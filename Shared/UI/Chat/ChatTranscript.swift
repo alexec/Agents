@@ -148,6 +148,9 @@ struct ChatTranscript: View {
     /// How the pane last moved, and the turn at its top: read on every scroll, so kept
     /// where writing them does not draw the pane again.
     @State private var motion = Motion()
+    /// Moves the pane by points, to hold a reader's line where it was (#2169). Moved
+    /// only by `turnMoved`; ends and turns are still gone to through the proxy.
+    @State private var position = ScrollPosition(idType: UUID.self)
     /// From choosing a conversation until it is placed: hidden, so it never shows anywhere
     /// but where it opens (#1287).
     @State private var isPlacing = false
@@ -173,6 +176,11 @@ struct ChatTranscript: View {
         var shown: [UUID] = []
         /// How far past the furthest the pane can rest it is (`Edges.pastTheEnd`).
         var pastTheEnd: CGFloat = -.infinity
+        /// Where each turn drawn starts in the conversation (#2169).
+        var turnTops: [UUID: CGFloat] = [:]
+        /// The turn a reader's place is held by: the first one that starts on screen, or
+        /// the one on screen when none does. Chosen as the pane moves, not as rows do.
+        var held: UUID?
     }
 
     /// Send now is for a turn that is running, on a runtime that said it takes words
@@ -229,6 +237,11 @@ struct ChatTranscript: View {
                                      fetch: { await fetch(turn) },
                                      fetchEarlier: { await fetchEarlier(turn) })
                                 .equatable()
+                                // Where it starts in the conversation, which moves only when
+                                // something above it changed size (#2169).
+                                .onGeometryChange(for: CGFloat.self) {
+                                    $0.frame(in: .named(Self.content)).minY
+                                } action: { turnMoved(turn.id, to: $0) }
                                 .id(turn.id)
                         }
                         .environment(\.backgroundWork, agent.background)
@@ -274,7 +287,9 @@ struct ChatTranscript: View {
                     }
                 }
                 .padding(.vertical, 20)
+                .coordinateSpace(.named(Self.content))
             }
+            .scrollPosition($position)
             // Hidden from choosing a conversation until it is placed at its end: its first
             // frame is the end, never a jump to it (#1287, #1349).
             .opacity(isPlacing ? 0 : 1)
@@ -283,6 +298,11 @@ struct ChatTranscript: View {
                 let visible = Set(visible)
                 motion.shown = rows.lazy.map(\.id).filter(visible.contains)
                 motion.topTurn = motion.shown.first
+                // Not chosen again here: rows put in above by a page are "visible" for the
+                // frame before the pane is moved past them, and holding one of those let
+                // the page push the reader's turn away (#2169). Only the pane moving
+                // chooses, once there is one.
+                if motion.held == nil { chooseHeld() }
             }
             // Open at the foot. A lazy stack built from the top and then jumped to the
             // end placed the rows it made on the way (the accessibility tree had them,
@@ -337,6 +357,7 @@ struct ChatTranscript: View {
                 motion.fromTop = edges.fromTop
                 motion.offset = edges.offset
                 motion.pastTheEnd = edges.pastTheEnd
+                if edges.offset != was.offset { chooseHeld() }
                 // Near the top, the page above. How far down the pane is does not depend
                 // on the content's height, so it is asked for whatever that reads.
                 if edges.contentHeight > 1, edges.fromTop < 400 { askForEarlier() }
@@ -501,7 +522,12 @@ struct ChatTranscript: View {
                 clearFocus()
             }
             .onChange(of: scrollToEndToken) { goToEnd(scroller) }
-            .onChange(of: isFollowing) { _, now in onFollowing(now) }
+            .onChange(of: isFollowing) { _, now in
+                onFollowing(now)
+                // The point a reader was held at is let go, so the scroll view never goes
+                // back to it while following the end (#2169).
+                if now { position = ScrollPosition(idType: UUID.self) }
+            }
             // Nobody is reading a chat that is not on screen, so it may be trimmed again.
             .onDisappear { onFollowing(true) }
             // The floor rose: the prompt bar grew, and the transcript's bottom margin
@@ -562,8 +588,13 @@ struct ChatTranscript: View {
                                             firstIndex: max(range.lowerBound, page.firstIndex))
         fetchedOrder.removeAll { $0 == turn.id }
         fetchedOrder.append(turn.id)
-        while fetchedOrder.count > Self.fetchedKept {
-            let dropped = fetchedOrder.removeFirst()
+        // The oldest not on screen: a turn being read that let its steps go shrank under
+        // the reader, a few turns above the one that asked (#2169). With more than eight
+        // on screen, the extra ones stay until they leave it.
+        let shown = Set(motion.shown)
+        while fetchedOrder.count > Self.fetchedKept,
+              let at = fetchedOrder.firstIndex(where: { !shown.contains($0) }) {
+            let dropped = fetchedOrder.remove(at: at)
             fetchedTurns[dropped] = nil
             // Still open, it would ask again as it is drawn and push another one out. Let
             // go, it shows the summary it already had, and Load steps (#285). Every turn is
@@ -638,6 +669,7 @@ struct ChatTranscript: View {
         // Still being placed at the end, out of sight: no animated move on open (#1349).
         guard !isPlacing else { return }
         isFollowing = true
+        position = ScrollPosition(idType: UUID.self)
         withAnimation(.easeOut(duration: 0.2)) { scroller.scrollTo(bottom, anchor: .bottom) }
     }
 
@@ -698,6 +730,8 @@ struct ChatTranscript: View {
         motion.pastTheEnd = -.infinity
         motion.topTurn = nil
         motion.wentDown = false
+        motion.turnTops = [:]
+        motion.held = nil
         turnViews = [:]
         focusedRun = nil
         fetchedTurns = [:]
@@ -774,12 +808,48 @@ struct ChatTranscript: View {
             place(scroller, on: bottom, anchor: .bottom)
             return
         }
+        // Held already, to the point, as the page pushed the turn being read down
+        // (`turnMoved`). Putting that turn's top at the top of the pane moved a reader
+        // part-way into it by however far in they were, on every page (#2169).
+        if let held = motion.held, rows.contains(where: { $0.id == held }) { return }
         // The first row may have been joined into the page that just arrived, so
         // its id is gone. The next row that is still there is the same line.
         if let id = restoreIDs.first(where: { id in rows.contains { $0.id == id } }) {
             place(scroller, on: id, anchor: .top)
         }
     }
+
+    /// The turn a reader's place is held by: the first that starts on screen, so a turn
+    /// above it growing as its steps come, or a row above being measured, or an earlier
+    /// page, moves the pane with it. A turn taller than the pane is held by itself.
+    private func chooseHeld() {
+        let top = motion.fromTop
+        // The one held already while what is on screen is not known yet.
+        motion.held = motion.shown.first { (motion.turnTops[$0] ?? -.infinity) >= top - 1 }
+            ?? motion.shown.first ?? motion.held
+    }
+
+    /// A turn starts somewhere else in the conversation: something above it changed size.
+    /// When it is the one held, and the reader is not following the end, the pane moves by
+    /// as much, so the line they are reading stays where it was (#2169). Following, the
+    /// foot holds itself (`defaultScrollAnchor`).
+    private func turnMoved(_ id: UUID, to top: CGFloat) {
+        let was = motion.turnTops.updateValue(top, forKey: id)
+        // Bounded: a long read back draws many turns, and only those on screen are held.
+        if motion.turnTops.count > 500 {
+            let shown = Set(motion.shown)
+            motion.turnTops = motion.turnTops.filter { shown.contains($0.key) }
+        }
+        guard let was, id == motion.held, !isFollowing, !isPlacing, settleKey == motion.key else { return }
+        let by = top - was
+        guard abs(by) > 0.5 else { return }
+        motion.offset += by
+        position.scrollTo(y: motion.offset)
+    }
+
+    /// The name of the conversation's own coordinates: a turn's place in them changes only
+    /// when what is above it does.
+    private static let content = "transcript-content"
 
     private var bottom: String { "bottom" }
 }

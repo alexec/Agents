@@ -8,9 +8,10 @@ public enum TurnDetail: Hashable, Sendable {
     /// of tool calls is drawn as its last, and opens to the rest (#759); a call opens to
     /// its argument and return; a thought is one line, and opens to the whole of it.
     case open
-    /// A stored turn whose entries the chat let go, to keep only a few (#285): the ask, the
-    /// answers, the reply and how it went, with *Load steps* where its steps go. It does not
-    /// fetch them again by itself, or two such turns would push each other out for ever.
+    /// A stored turn whose entries the chat let go, off screen, to keep only a few (#285): the
+    /// ask, the answers, the reply and how it went, with *Load steps* where its steps go. It
+    /// does not fetch them again by itself, or two such turns would push each other out for
+    /// ever; a turn on screen is never let go, so it does not shrink under a reader (#2169).
     case letGo
 
     public var showsSteps: Bool { self == .open }
