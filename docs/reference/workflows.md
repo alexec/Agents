@@ -291,7 +291,7 @@ that starts a helper decides what becomes of it.
 | `archive-allowed` | A run that finishes **Complete** or **Nothing to do** may archive itself, with `archive_session` and no id, when there is nothing for you to look at. It is told it may. Otherwise it stays. |
 | `archive` | A run that finishes **Complete** or **Nothing to do** is archived, whatever the agent asks. |
 
-- A run that ends **Waiting on your answer**, **Partly done**, **Stuck** or **Blocked** is
+- A run that ends **Waiting on your answer**, **Partly done**, **Stuck** or **Waiting** is
   never archived.
 - Only the run's own turn counts. A run is not archived if you send it something before
   it finishes, or if it ends without saying how it went.

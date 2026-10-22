@@ -24,7 +24,7 @@ colour. Session labels appear beneath the title on Mac rows and phone cards; age
 | **Waiting on your answer** | Needs you | The turn ended with a question for you. | Reply in the prompt. **Archive**, **Branch**. |
 | **Partly done** | Needs you | The turn ended with some of the work done; the rest needs a decision from you. | Reply in the prompt. **Archive**, **Branch**. |
 | **Stuck** | Needs you | The turn ended without the work done, and the agent says why. | Reply in the prompt. **Archive**, **Branch**. |
-| **Blocked** | Needs you | The turn ended blocked on something the app cannot watch, such as a review. | **Carry on**, once the block has gone. **Stop**, **Archive**, **Branch**. |
+| **Waiting** (old records) | Needs you | An old record only: the turn ended waiting on something the app cannot watch, such as a review, and named no agents and no time. A new wait always names agents or a time, so it is under **Waiting** below (#2045). | **Carry on**, once the wait is over. **Stop**, **Archive**, **Branch**. |
 | **Outcome unknown** | Needs you | The turn ended without a report saying how the work went. | Read the conversation and reply if needed. |
 | **Unexpected stop** | Needs you | The runtime crashed, failed, hit a limit or otherwise stopped short without you choosing to stop it. | Read the reason on the row and reply to resume. |
 | **Waiting** | Waiting | The agent is waiting on something the app watches: agents it started, a time to check again, or an event such as checks passing. The card says what it is waiting for. It carries on by itself when that comes, so you need not do anything. Its icon is Zs: asleep until what it waits for comes. | **Carry on**, to tell it the wait is over early. **Stop**, so it does not carry on. **Archive**, **Branch**. |
@@ -92,7 +92,7 @@ until you archive it.
 - **Needs You** lists every session waiting for approval, across every project and host
   (#773). Each row is approved on its own; there is no Approve All (#704).
 - The mark goes when you send the session a prompt, when a later turn ends wanting you
-  (with a question, stuck, blocked or crashed), or when the session is archived. Bringing
+  (with a question, stuck, waiting on others or crashed), or when the session is archived. Bringing
   it back does not bring the mark back. A workflow's prompt, or the app's own, leaves it.
 - A session that may already archive itself is archived without your approval, if its turn
   ends **Complete** or **Nothing to do**: a chat you started, while **Agents may archive the
