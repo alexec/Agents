@@ -64,6 +64,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -355,7 +356,14 @@ func secretKeeper() string {
 	if file == "" {
 		return ""
 	}
-	keeper, err := kms.LocalKeeper(filepath.Join(filepath.Dir(file), "secrets-key"))
+	path := filepath.Join(filepath.Dir(file), "secrets-key")
+	keeper, err := kms.LocalKeeper(path)
+	if errors.Is(err, os.ErrPermission) || errors.Is(err, syscall.EROFS) {
+		// A folder this copy can't write, such as a read-only mount (#2163). Each copy making
+		// its own would seal what the others can't open: every copy is given the same one.
+		fail("the key for secrets: there is none at %s, and that folder can't be written. Give every copy the same "+
+			"32-byte key there (deploy/make-secrets.sh makes deploy/secrets/secrets-key), or AGENTS_CONTROL_KMS", path)
+	}
 	if err != nil {
 		fail("the key for secrets: %v", err)
 	}

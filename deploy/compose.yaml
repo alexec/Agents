@@ -30,6 +30,8 @@ x-copy: &copy
     AGENTS_CONTROL_NAME: Walk control plane
   volumes:
     - ./secrets/control-key:/secrets/control-key:ro
+    # Beside the control key, where each copy looks for it: one key for every copy (#2163).
+    - ./secrets/secrets-key:/secrets/secrets-key:ro
 
 services:
   minio:

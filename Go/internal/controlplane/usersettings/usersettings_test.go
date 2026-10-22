@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 
@@ -180,5 +181,49 @@ func TestAMachineLeftIsNamedOnTheSecretsItHad(t *testing.T) {
 	b.SetSecret(ctx, "sam", "A", "3")
 	if rows, _ := b.Names(ctx, "sam"); len(rows[0].LeftOn) != 0 || len(rows[0].Machines) != 1 {
 		t.Fatalf("%+v", rows)
+	}
+}
+
+// Copies over one store (#2163): each given the same secrets-key file, as compose.yaml
+// mounts it, opens what another sealed; a copy with a key of its own opens nothing.
+func TestCopiesWithOneSecretsKeyOpenEachOthersSecrets(t *testing.T) {
+	ctx := context.Background()
+	s := store.NewMemory()
+	made := t.TempDir() + "/secrets-key"
+	if _, err := kms.LocalKeeper(made); err != nil {
+		t.Fatal(err)
+	}
+	book := func(path string) *Book {
+		url, err := kms.LocalKeeper(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		k, err := kms.Keeper(ctx, url)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { k.Close() })
+		return New(s, k, url)
+	}
+	given := func() string {
+		data, err := os.ReadFile(made)
+		if err != nil {
+			t.Fatal(err)
+		}
+		path := t.TempDir() + "/secrets-key"
+		if err := os.WriteFile(path, data, 0o444); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	if err := book(given()).SetSecret(ctx, "sam", "LINEAR_KEY", "lin_api_s3cret"); err != nil {
+		t.Fatal(err)
+	}
+	got, skipped, err := book(given()).Delivery(ctx, "sam")
+	if err != nil || len(skipped) != 0 || len(got.Secrets) != 1 || got.Secrets[0].Value != "lin_api_s3cret" {
+		t.Fatalf("another copy got %+v, skipped %v, %v", got.Secrets, skipped, err)
+	}
+	if _, skipped, _ := book(t.TempDir() + "/secrets-key").Delivery(ctx, "sam"); len(skipped) != 1 {
+		t.Fatalf("a copy with its own key skipped %v", skipped)
 	}
 }
