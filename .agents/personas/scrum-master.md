@@ -45,6 +45,10 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
   pushed) to free a place. Archive finished helpers at once.
 - **Only the open milestone is worked** (#2309). Start no lane for the next milestone
   before the open one ships; spare places go to the standing lane, then the backlog.
+- **UI changes go early** (#2337): `priority:high` first, then UI changes (`App/Sources`,
+  `Remote/Sources`, `Shared/UI`, `Web/src`), bugs first, from the milestone and the backlog
+  alike, then the rest. When places run short, pause a non-UI lane, never a UI one: a person
+  must review each UI change, so it must get to `main` and TestFlight early.
 - **The release unparks the next milestone** (#1729, #2309): when it ships, the next
   milestone becomes the open one and the release takes `parked` off its issues. Check its
   report; land anything it could not release.
