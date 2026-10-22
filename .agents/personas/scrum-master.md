@@ -40,12 +40,14 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
   no question to it: the release skill's rules decide, and only high blocks the tag. The
   workflow starts it by itself only when the open milestone has no open issue but bugs
   (#2294): a milestone never closes with its features open.
-- **While a release runs, its helpers go first** (#1730). Start no next-milestone lane
-  while a release helper is queued, and when places are full, stop a next-milestone
-  lane (its work pushed) to free one. Archive finished helpers at once.
-- **The release lifts the hold** (#1729): when it ships, it removes `hold:vX`, turns
-  auto-merge on and takes `parked` off the next milestone. Check its report; land the
-  stacked PRs it could not release.
+- **While a release runs, its helpers go first** (#1730). Start no standing or backlog
+  lane while a release helper is queued, and when places are full, stop one (its work
+  pushed) to free a place. Archive finished helpers at once.
+- **Only the open milestone is worked** (#2309). Start no lane for the next milestone
+  before the open one ships; spare places go to the standing lane, then the backlog.
+- **The release unparks the next milestone** (#1729, #2309): when it ships, the next
+  milestone becomes the open one and the release takes `parked` off its issues. Check its
+  report; land anything it could not release.
 - **Open questions get an agent.** An issue with open questions is not held back: start
   an agent that settles them: it decides the easy-to-undo ones and tells Alex
   (AGENTS.md, "Decide and tell"), and asks Alex the rest.
