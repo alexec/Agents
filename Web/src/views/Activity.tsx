@@ -6,7 +6,7 @@ import { Fragment } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
-import type { AllowanceReading, AllowanceState, Consequence, ControlHost, CostState, Event, ProjectSummary, RuntimeAvailability, RuntimeStatus } from "../protocol/generated";
+import type { AccountProfile, AllowanceReading, AllowanceState, Consequence, ControlHost, CostState, Event, ProjectSummary, RuntimeAvailability, RuntimeStatus } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import { who } from "../model/audit";
 import type { ActivityPage } from "../route";
@@ -20,7 +20,7 @@ import { forCleanup, pageLine, rowWords, tally as worktreeTally, worktreesIntro 
 import { BackToList } from "./BackToList";
 import { Modal } from "./Modal";
 import { folderKey, projectFolder } from "../model/groups";
-import { accountChoices, accountRows, accountState, defaultAccountName, isOrgRow, orgAllowanceLine, ownRow, ownSignInID, reachesFoot, reachesTheModelBy, rowTitle, runtimeTally } from "../model/runtimes";
+import { accountChoices, accountRows, accountState, agentsHolding, allowanceLine, defaultAccountName, isOrgRow, orgAllowanceLine, ownRow, ownSignInID, reachesFoot, reachesTheModelBy, removeMessage, rowTitle, runtimeTally, runtimeTime, signInOnTheMac } from "../model/runtimes";
 import { fromOrganisation } from "../model/orgAccounts";
 import { setBy as setByWords } from "../model/orgPolicy";
 import { healthTally, personalEmpty, personalIntro, personalServers } from "../model/hostedMCP";
@@ -104,14 +104,6 @@ export function lifetimeTotals(projects: ProjectSummary[]): Record<string, numbe
   return total;
 }
 
-function allowanceLine(state: AllowanceState): string {
-  if ("available" in state.status) return "Available";
-  if ("rateLimited" in state.status) return `Rate limited · trying again at ${runtimeTime(state.status.rateLimited.until)}`;
-  const out = state.status.out;
-  return out.until ? `Out · reset ${runtimeTime(out.until)}${out.retryAfter ? ` · checking after ${runtimeTime(out.retryAfter)}` : ""}`
-    : `Out since ${runtimeTime(state.since)}${out.retryAfter ? ` · checking after ${runtimeTime(out.retryAfter)}` : ""}`;
-}
-
 function allowanceReading(state: AllowanceState, now: Date): string | null {
   const reading = state.reading;
   if (!reading || (reading.resetsAt && fromWireDate(reading.resetsAt).getTime() <= now.getTime())) return null;
@@ -176,7 +168,23 @@ function AddAccount({ store, host, runtime }: { store: Store; host: string; runt
   </form>;
 }
 
-const runtimeTime = (wire: number) => fromWireDate(wire as never).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+/**
+ * Remove on an added account (#840): asked first, with how many sessions it stops and that it
+ * can't be undone (#2264), and the host's refusal under it.
+ */
+function RemoveAccount({ store, host, account, place }: { store: Store; host: string; account: AccountProfile; place: string }) {
+  const [problem, setProblem] = useState<string>();
+  const remove = () => {
+    const stopping = agentsHolding(store.agents.value[host] ?? [], account).length;
+    if (!window.confirm(`Remove ${account.name}? ${removeMessage(stopping, place)}`)) return;
+    setProblem(undefined);
+    store.removeAccount(host, account).catch((e: unknown) => setProblem(describe(e)));
+  };
+  return <>
+    <button onClick={remove}>Remove…</button>
+    {problem && <p class="quiet small failure">{problem}</p>}
+  </>;
+}
 
 /**
  * Whether the pool has left a runtime, or one of its models, out (#140): what the window's row
@@ -350,7 +358,8 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
                       {status.poolNote && <p class="quiet small">{status.poolNote}</p>}
                       {allowance?.setupNote && <p class="quiet small">{allowance.setupNote.split("`").map((part, i) => i % 2 ? <code key={i}>{part}</code> : part)}</p>}
                       {isAllowanceOut && allowance && <button onClick={() => void store.markRuntimeAvailable(host.id, allowance.credentialKey)}>Mark available</button>}
-                      {status.runtime.accountFolderVariable !== undefined && <AddAccount store={store} host={host.id} runtime={status.runtime.id} />}
+                      {/* Only this Mac's, and only one that is on it: no client can sign in a server's account (#2257). */}
+                      {status.runtime.accountFolderVariable !== undefined && !("missing" in status.availability) && store.isMac(host.id) && <AddAccount store={store} host={host.id} runtime={status.runtime.id} />}
                       <ReachesTheModelBy store={store} host={host.id} runtime={status.runtime.id} />
                     </li>
                     {/* Each account added to it (#840), then the organisation's (#999), under it, with its own allowance. */}
@@ -370,11 +379,10 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
                           <p class="quiet small">{allowanceReading(row.state, now)}</p>
                           {row.state.reading && <AllowanceBar reading={row.state.reading} />}
                         </>}
-                        {account && !account.signedIn && <p class="quiet small">Sign it in on the Mac, in {status.runtime.name}’s sign-in sheet.</p>}
+                        {account && !account.signedIn && store.isMac(host.id) && <p class="quiet small">{signInOnTheMac}</p>}
                         {out && <button onClick={() => void store.markRuntimeAvailable(host.id, row.credentialKey)}>Mark available</button>}
-                        {account && <button onClick={() => {
-                          if (window.confirm(`Remove ${account.name}? Its sessions stop, and its sign-in is deleted from the host.`)) void store.removeAccount(host.id, account);
-                        }}>Remove</button>}
+                        {account && <RemoveAccount store={store} host={host.id} account={account}
+                          place={store.isMac(host.id) ? "the Mac" : hostName(host.id)} />}
                       </li>;
                     })}
                   </Fragment>;
@@ -416,7 +424,7 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
               <button onClick={() => { for (const host of hosts) void store.loadWorktrees(host.id); }}>Refresh</button>
             </>
           )}
-          {page === "runtimes" && <p class="hint">Installing and signing in are managed on the Mac, in Settings ▸ Agent Runtimes.</p>}
+          {page === "runtimes" && <p class="hint">Install a runtime on the Mac, in Settings ▸ Agent Runtimes. Sign it in on the Mac, in Runtimes.</p>}
           {page === "spending" && (
             <div class="segmented events-panes" role="radiogroup" aria-label="Show">
               {(["cost", "reports"] as const).map((p) => (

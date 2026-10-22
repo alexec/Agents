@@ -13,13 +13,14 @@
 // again; and the form's runtime, choices and reach are kept between starts.
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import type { Attachment, BranchSummary, ConfigOption, JSONValue, Persona, PolicySetBy, RuntimeStatus, SandboxChoice, SlashCommand, StartRequest, UUID, WorktreeSize,
+import type { AccountProfile, Attachment, BranchSummary, ConfigOption, JSONValue, Persona, PolicySetBy, RuntimeStatus, SandboxChoice, SlashCommand, StartRequest, UUID, WorktreeSize,
   WorktreeSummary } from "../protocol/generated";
 import type { SandboxWillNotStart, Store } from "../model/store";
 import { drawable, modeOption, modeStartsOn } from "../model/options";
 import { keep, rememberOptions, rememberedOptions } from "../model/startMemory";
 import { folderKey } from "../model/groups";
-import { accountChoices, accountState, defaultAccountName, formRuntime, isOrgAccount, newSessionRuntime, ownSignInID, runtimeRuns, unavailableReason } from "../model/runtimes";
+import { fromWireDate } from "../protocol/dates";
+import { accountChoices, accountRows, choiceNote, defaultAccountName, formRuntime, newSessionRuntime, ownRow, ownSignInID, runtimeRuns, unavailableReason } from "../model/runtimes";
 import { formFor, keepForm, keptForm } from "../model/startForm";
 import { personaChoices, withPersonaLabels } from "../model/personas";
 import { sandboxCardTitle, sandboxChoiceWords, sandboxChoices, sandboxExplanation, sandboxOverrideWords, sandboxState,
@@ -277,8 +278,17 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   const capabilities = chosenRuntime ? store.account(host, chosenRuntime)?.promptCapabilities : undefined;
   // The runtime's accounts beyond its own sign-in (#840), the organisation's included (#999): the
   // picker shows only when there is one. Undefined is the runtime's account for new sessions.
-  const choices = accountChoices(chosenRuntime ?? "", chosenRuntime ? store.addedAccounts(host, chosenRuntime) : [],
+  // This Mac's only, as on the other two: no client signs in a server's account (#2257).
+  const choices = accountChoices(chosenRuntime ?? "", chosenRuntime && store.isMac(host) ? store.addedAccounts(host, chosenRuntime) : [],
     store.policyStates.value[host]?.policy);
+  // Under each choice, why it cannot be used or that its allowance is out (#2265).
+  const allowanceSet = store.runtimeAllowances.value[host];
+  const accountNote = (account: AccountProfile | undefined): string => {
+    const rows = allowanceSet?.rows ?? [];
+    const row = account ? accountRows(rows, chosenRuntime ?? "").find((r) => r.accountID === account.id) : ownRow(rows, chosenRuntime ?? "");
+    const words = choiceNote(account, row, allowanceSet ? fromWireDate(allowanceSet.at) : new Date());
+    return words ? ` · ${words}` : "";
+  };
   const chosenAccount = choices.account(accountID.value);
   const sentAccount = choices.sent(accountID.value);
 
@@ -481,9 +491,8 @@ export function NewAgent({ store, host, folder, projectName, down }: {
                   const id = (e.currentTarget as HTMLSelectElement).value;
                   accountID.value = id === ownSignInID ? choices.ownChoice : id;
                 }}>
-                <option value={ownSignInID} disabled={!!choices.ownSetBy}>{defaultAccountName}{choices.ownSetBy ? ` (${setByWords})` : ""}</option>
-                {choices.accounts.map((a) => <option key={a.id} value={a.id} disabled={!!a.setBy}>{a.name}{a.setBy ? ` (${setByWords})`
-                  : isOrgAccount(a) ? ` (${accountState(a).toLowerCase()})` : a.signedIn ? "" : ` (${accountState(a).toLowerCase()})`}</option>)}
+                <option value={ownSignInID} disabled={!!choices.ownSetBy}>{defaultAccountName}{choices.ownSetBy ? ` (${setByWords})` : accountNote(undefined)}</option>
+                {choices.accounts.map((a) => <option key={a.id} value={a.id} disabled={!!a.setBy}>{a.name}{a.setBy ? ` (${setByWords})` : accountNote(a)}</option>)}
               </select>
             </label>}
           </>)}>

@@ -137,3 +137,24 @@ test("account choices: the default, the own sign-in, what is sent and why a sess
   assert.equal(r.accountChoices("codex", list).ownChoice, undefined);
   assert.equal(r.defaultAccountName, "Your Own Sign-In");
 });
+
+test("account words: Remove counts the sessions it stops and says it can't be undone (#2264)", () => {
+  assert.equal(r.removeMessage(0, "the Mac"), "Nothing is running on it. Its sign-in is deleted from the Mac. This can’t be undone.");
+  assert.equal(r.removeMessage(2, "the Mac"), "This stops 2 sessions mid-conversation. Its sign-in is deleted from the Mac. This can’t be undone.");
+  const work = { id: "work", runtimeID: "claude", name: "Work", reach: { signIn: { folder: "/w" } }, signedIn: true };
+  const agents = [{ runtimeID: "claude", accountID: "work", state: "running" }, { runtimeID: "claude", accountID: "work", state: "finished" },
+    { runtimeID: "claude", state: "running" }];
+  assert.equal(r.agentsHolding(agents, work).length, 1);
+});
+
+test("account words: a choice says it is not signed in, not usable or out (#2265)", () => {
+  const now = new Date();
+  const work = { id: "work", runtimeID: "claude", name: "Work", reach: { signIn: { folder: "/w" } }, signedIn: true, signedInAs: "a@b.c" };
+  const row = (status, extra = {}) => ({ credentialKey: "claude:account:work", accountID: "work", state: { status, since: 0 }, ...extra });
+  assert.equal(r.choiceNote({ ...work, signedIn: false }, undefined, now), "Not signed in");
+  assert.equal(r.choiceNote(work, undefined, now), "a@b.c");
+  assert.equal(r.choiceNote(work, row({ available: {} }), now), "a@b.c");
+  assert.equal(r.choiceNote(work, row({ available: {} }, { unusable: "no key" }), now), "Not usable: no key");
+  assert.match(r.choiceNote(work, row({ out: {} }), now), /^Out since /);
+  assert.equal(r.choiceNote(undefined, undefined, now), undefined);
+});

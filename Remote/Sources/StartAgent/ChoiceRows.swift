@@ -81,6 +81,14 @@ struct ChoiceRows: View {
         .accessibilityLabel("Runtime, \(model.startRuntime?.runtime.name ?? "none")")
     }
 
+    /// Under an account's name: why it cannot be used, or that its allowance is out, as the
+    /// Mac's Account capsule says it (#2265).
+    private func accountNote(_ account: AccountProfile?, choices: AccountChoices?) -> String? {
+        guard let choices else { return nil }
+        return AccountWords.choiceNote(account, row: model.runtimeAllowances?.row(choices.runtimeID, account: account?.id),
+                                       now: model.runtimeAllowances?.at ?? Date())
+    }
+
     /// Which of the runtime's accounts the session uses (#840), the organisation's included
     /// (#999). One the organisation's policy refuses is shown, not chosen.
     private var accountRow: some View {
@@ -95,6 +103,7 @@ struct ChoiceRows: View {
                     model.startAccountID = choices?.ownChoice
                 } label: {
                     choiceLabel(AccountProfile.defaultName, chosen: chosen == nil)
+                    if let note = accountNote(nil, choices: choices) { Text(note) }
                 }
             }
             ForEach(choices?.accounts ?? []) { account in
@@ -105,7 +114,7 @@ struct ChoiceRows: View {
                         model.startAccountID = account.id
                     } label: {
                         choiceLabel(account.name, chosen: chosen?.id == account.id)
-                        Text(account.state)
+                        Text(accountNote(account, choices: choices) ?? account.state)
                     }
                 }
             }

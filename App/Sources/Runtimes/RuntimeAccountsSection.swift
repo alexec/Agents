@@ -70,10 +70,8 @@ struct RuntimeAccountsSection: View {
                 Task { await model.removeAccount(account) }
             }
         } message: {
-            let stopped = removing.map(model.agentsHolding(account:)) ?? []
-            Text((stopped.isEmpty ? "Nothing is running on it." :
-                    "This stops \(stopped.count) agent\(stopped.count == 1 ? "" : "s") mid-conversation.")
-                 + " Its sign-in is deleted from this Mac.")
+            Text(AccountWords.removeMessage(stopping: removing.map(model.agentsHolding(account:))?.count ?? 0,
+                                            from: "this Mac"))
         }
     }
 

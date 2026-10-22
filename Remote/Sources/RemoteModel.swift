@@ -1727,6 +1727,11 @@ final class RemoteModel {
         }
     }
 
+    /// The Mac's sessions an added account is running, which removing it stops (#2264).
+    func agentsHolding(account: AccountProfile) -> [Agent] {
+        work.agents.filter { $0.host == .mac && $0.accountID == account.id && $0.state.holdsRuntime }
+    }
+
     func removeAccount(_ account: AccountProfile) async {
         do {
             _ = try await client.call(DaemonAPI.Method.runtimesRemoveAccount,
