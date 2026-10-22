@@ -129,9 +129,9 @@ more answers `429` with `Retry-After`.
 | --- | --- | --- |
 | `/ServiceProviderConfig`, `/ResourceTypes`, `/Schemas` | GET | `patch` and `filter` (100 at most) supported; `bulk`, `sort`, `etag`, `changePassword` not. |
 | `/Users` | GET, POST | GET: `filter` with `eq` on `userName`, `externalId`, `emails.value`, `id` or `active`, joined by `and`; `startIndex`, `count` (100 at most); `attributes`, `excludedAttributes`. POST makes a provisioned person; a second `userName` answers `409 uniqueness`. |
-| `/Users/<id>` | GET, PUT, PATCH, DELETE | PATCH `add`, `replace`, `remove`, with or without `path` (`name.givenName`, `emails[type eq "work"].value`, the Enterprise extension's URN); `active` as `true`/`false` or `"True"`/`"False"`. DELETE suspends and asks an admin; then the user answers `404`. |
+| One user: `/Users`, then `/<id>` | GET, PUT, PATCH, DELETE | PATCH `add`, `replace`, `remove`, with or without `path` (`name.givenName`, `emails[type eq "work"].value`, the Enterprise extension's URN); `active` as `true`/`false` or `"True"`/`"False"`. DELETE suspends and asks an admin; then the user answers `404`. |
 | `/Groups` | GET, POST | GET: `filter` with `eq` on `displayName`, `externalId`, `id`, `members`; `excludedAttributes=members`. |
-| `/Groups/<id>` | GET, PUT, PATCH, DELETE | PATCH `members` `add` and `remove` (by `value`, or `members[value eq "x"]`), `replace` `displayName`. A member that is not a user of the provider answers `400 invalidValue`; a group as a member too. |
+| One group: `/Groups`, then `/<id>` | GET, PUT, PATCH, DELETE | PATCH `members` `add` and `remove` (by `value`, or `members[value eq "x"]`), `replace` `displayName`. A member that is not a user of the provider answers `400 invalidValue`; a group as a member too. |
 
 Errors are RFC 7644's: `400 invalidFilter`, `invalidValue`, `invalidSyntax`, `invalidPath`,
 `401`, `404`, `409 uniqueness`, `413`, `429`, and `501` for `Bulk`, `/Me` and `sortBy`. The
