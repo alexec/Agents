@@ -14,6 +14,7 @@ public enum Capability {
     public static let approvals1 = "approvals/1"
     public static let artifact1 = "artifact/1"
     public static let attention1 = "attention/1"
+    public static let auditSinks1 = "audit.sinks/1"
     public static let backupsStore1 = "backups.store/1"
     public static let backups1 = "backups/1"
     public static let bots1 = "bots/1"
@@ -429,6 +430,8 @@ public enum Capability {
         "attention/turn": "liveactivity/1",
         "audit/export": "events.audit/1",
         "audit/list": "events.audit/1",
+        "audit/setSinks": "audit.sinks/1",
+        "audit/sinks": "audit.sinks/1",
         "backups/commit": "backups.store/1",
         "backups/download": "backups.store/1",
         "backups/stored": "backups.store/1",

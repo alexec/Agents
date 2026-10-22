@@ -23,6 +23,7 @@ control/status
   },
   "capabilities": [
     "attention/1",
+    "audit.sinks/1",
     "backups.store/1",
     "bots/1",
     "clients/1",
@@ -251,6 +252,7 @@ control/status
   },
   "capabilities": [
     "attention/1",
+    "audit.sinks/1",
     "backups.store/1",
     "bots/1",
     "clients/1",

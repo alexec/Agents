@@ -51,9 +51,17 @@ Four parts, cut into slices by area (`.agents/areas`). Each slice is one pull re
 
 - **Export…** in the agent's menu and the project's menu; **Import…** in the sidebar's project menu and in the File menu on the Mac. The Mac saves with a save panel, the Remote with the share sheet (`fileExporter`), the web page as a download. Import opens a file picker, sends the parts, and says "Imported N agents" (and how many were skipped).
 
-### d
+### d1: the chain
 
-See the table. Its lane writes its own plan section.
+- Each copy of the control plane links what it writes: `chain` (its `copyID`, new at each start), `seq` from 1, `prev` = SHA-256 of the stored bytes before. Writes through one chain go one at a time.
+- A seal for each day and copy, `v1/audit-seals/<day>/<copy>.json`, holds the head; written each hour and when a day ends; swept with its day.
+- `agents-control audit verify` reads every entry and seal: a gap, a wrong `prev`, a missing or changed sealed head is a problem; a swept day is not.
+
+### d2 and d3: the sinks
+
+- `v1/audit-sinks.json` (not `control.json`): at most 4 sinks; an HTTP token sealed with the keeper for secrets, never answered. Every copy reads it each 30 s and sends what it writes.
+- A queue of 10,000 per sink, the oldest out, `"dropped": N` on the next line; backoff 1 s to 60 s. A line is `{key, hash, entry}`, the entry compacted.
+- `audit/sinks` and `audit/setSinks`, an admin's; Console ▸ Audit ▸ Sinks on the web page.
 
 ## Docs
 

@@ -111,6 +111,56 @@
       }
     },
     {
+      "name": "audit/setSinks",
+      "x-capability": "audit.sinks/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AuditSinks"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/AuditSinksState"
+        }
+      }
+    },
+    {
+      "name": "audit/sinks",
+      "x-capability": "audit.sinks/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/AuditSinksState"
+        }
+      }
+    },
+    {
       "name": "backups/commit",
       "x-capability": "backups.store/1",
       "description": "A host, on its channel 0 (#1815): a backup's parts are all there; write its .json and keep the newest keep.",

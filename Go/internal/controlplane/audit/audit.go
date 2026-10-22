@@ -122,6 +122,7 @@ var controlActions = map[string]string{
 	"hosts/detect":                "Added the machines it found",
 	"control/setProjectDetection": "Changed project detection",
 	"control/setAuditDays":        "Changed how long the audit is kept",
+	"audit/setSinks":              "Changed where the audit is sent",
 	"control/rotate":              "Rotated the control key",
 	"policy/set":                  "Changed the organisation's policy",
 	"policy/stopAll":              "Turned the kill switch on or off",
@@ -258,6 +259,8 @@ type Log struct {
 	Now   func() time.Time
 	// Chain links what this copy writes (#1001); nil writes entries in no chain.
 	Chain *Chain
+	// Out hears each entry kept, for the sinks (#1001); nil sends nowhere.
+	Out func(key string, data []byte)
 }
 
 func (l *Log) now() time.Time {
@@ -294,14 +297,17 @@ func (l *Log) Write(ctx context.Context, actor wire.AuditActor, method, action s
 	if host != "" {
 		e.Host = &host
 	}
+	key := Key(at, actor.User)
+	var data []byte
+	var err error
 	if l.Chain != nil {
-		return l.Chain.write(ctx, l.Store, &e, Key(at, actor.User), at)
+		data, err = l.Chain.write(ctx, l.Store, &e, key, at)
+	} else if data, err = records.Encode(e); err == nil {
+		_, err = l.Store.Put(ctx, key, data, store.Absent)
 	}
-	data, err := records.Encode(e)
-	if err != nil {
-		return err
+	if err == nil && l.Out != nil {
+		l.Out(key, data)
 	}
-	_, err = l.Store.Put(ctx, Key(at, actor.User), data, store.Absent)
 	return err
 }
 

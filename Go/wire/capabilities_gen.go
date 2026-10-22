@@ -13,6 +13,7 @@ const CapAgents1 = "agents/1"
 const CapApprovals1 = "approvals/1"
 const CapArtifact1 = "artifact/1"
 const CapAttention1 = "attention/1"
+const CapAuditSinks1 = "audit.sinks/1"
 const CapBackupsStore1 = "backups.store/1"
 const CapBackups1 = "backups/1"
 const CapBots1 = "bots/1"
@@ -475,6 +476,8 @@ var ControlCapabilities = pairs([][2]string{
 	{"attention/turn", "liveactivity/1"},
 	{"audit/export", "events.audit/1"},
 	{"audit/list", "events.audit/1"},
+	{"audit/setSinks", "audit.sinks/1"},
+	{"audit/sinks", "audit.sinks/1"},
 	{"backups/commit", "backups.store/1"},
 	{"backups/download", "backups.store/1"},
 	{"backups/stored", "backups.store/1"},

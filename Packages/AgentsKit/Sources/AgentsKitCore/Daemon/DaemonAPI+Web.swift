@@ -316,6 +316,9 @@ public extension DaemonAPI {
                 Row(Method.auditList, params: AuditQuery.self, result: AuditList.self, kind: .controlRequest),
                 Row(Method.auditExport, params: AuditQuery.self, result: AuditExport.self, kind: .controlRequest),
                 Row(Method.controlSetAuditDays, params: AuditDays.self, result: AuditDays.self, kind: .controlRequest),
+                // Where the audit is sent (#1001): Console ▸ Audit ▸ Sinks.
+                Row(Method.auditSinks, params: Empty.self, result: AuditSinksState.self, kind: .controlRequest),
+                Row(Method.auditSetSinks, params: AuditSinks.self, result: AuditSinksState.self, kind: .controlRequest),
                 // Rotate Control Key… in Settings ▸ People (#997).
                 Row(Method.controlRotate, params: Empty.self, result: Empty.self, kind: .controlRequest),
                 // Reports (#1811): usage, cost and time by person, project and machine.

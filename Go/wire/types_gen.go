@@ -826,6 +826,46 @@ type AuditSCIM struct {
 	Token string `json:"token"`
 }
 
+// One audit sink (#1001). `address` is tcp://host:port or tls://host:port for syslog, an https:// URL for HTTP. `token`, for HTTP, is sent as a bearer token; it is only ever sent to the control plane, which answers `hasToken` instead.
+type AuditSink struct {
+	Kind AuditSinkKind `json:"kind"`
+
+	Address string `json:"address"`
+
+	Token *string `json:"token,omitzero"`
+
+	HasToken *bool `json:"hasToken,omitzero"`
+}
+
+// Where an audit sink sends (#1001): syslog (RFC 5424 over TCP or TLS) or HTTP (a POST of JSON lines).
+type AuditSinkKind string
+
+const AuditSinkKindSyslog AuditSinkKind = "syslog"
+const AuditSinkKindHttp AuditSinkKind = "http"
+
+// A sink and how this copy of the control plane is sending to it (#1001): entries waiting (at most 10,000), dropped since it started because the queue was full, the last sent, and the last failure.
+type AuditSinkStatus struct {
+	Sink AuditSink `json:"sink"`
+
+	Queued int64 `json:"queued"`
+
+	Dropped int64 `json:"dropped"`
+
+	SentAt *Date `json:"sentAt,omitzero"`
+
+	LastError *string `json:"lastError,omitzero"`
+}
+
+// audit/sinks and audit/setSinks (#1001): the sinks, at most 4. In audit/setSinks, a sink with no `token` keeps the token it had at the same address.
+type AuditSinks struct {
+	Sinks []AuditSink `json:"sinks"`
+}
+
+// What audit/sinks and audit/setSinks answer (#1001): each sink and how it is sending.
+type AuditSinksState struct {
+	Sinks []AuditSinkStatus `json:"sinks"`
+}
+
 type AuthStatus struct {
 	Kind string `json:"kind"`
 

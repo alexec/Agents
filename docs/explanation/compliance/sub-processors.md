@@ -38,8 +38,9 @@ traffic and does not copy it ([Privacy](../../privacy.md)).
 | OpenCode | The model provider you sign it in to | Signed out, it uses OpenCode Zen's free models. Sharing is off. |
 
 The model gateways that the Claude row names (Bedrock, Vertex) are your organisation's
-accounts, so the data goes to that cloud and not to Anthropic directly. An org key and a
-gateway set by the organisation's policy are planned (#999).
+accounts, so the data goes to that cloud and not to Anthropic directly. An org key or a
+gateway that the organisation sets (#999) sends the data to that provider or gateway, as
+[Org keys and gateways](../org-keys-and-gateways.md) says.
 
 ## Only when you turn it on
 

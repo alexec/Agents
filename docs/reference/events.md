@@ -361,6 +361,29 @@ sweep deleted is not a removal. Entries written before the chain are counted, no
 The chain shows a change. It does not stop one: a person who can write the store can also
 write a new chain. To keep a copy out of their reach, send the entries to a sink.
 
+### Sinks
+
+An admin sends each entry to a **sink** as it is written, in Console ▸ Audit ▸ Sinks on the
+web page (#1001). Up to 4 sinks:
+
+- **Syslog:** `tcp://host:port` or `tls://host:port`. Each entry is an RFC 5424 message
+  (facility 13, log audit; severity 6; app `agents-control`; the copy's id as its process;
+  message id `audit`), framed by its length as RFC 6587 says.
+- **HTTP:** an `https://` address (`http://` only on the same machine). Each POST carries up
+  to 500 entries as JSON lines (`application/x-ndjson`), with an optional bearer token.
+  The control plane keeps the token sealed, as it keeps an org route's key, and never shows
+  it again: leave it empty to keep it.
+
+Each line is `{"key": …, "hash": …, "entry": …}`: the entry, its key in the store, and the
+hash it has in its chain, so the SIEM can follow each chain by itself. Each copy of the
+control plane sends the entries it writes. Each sink has a queue of 10,000 entries: when a
+sink is down, entries wait there and go when it is back. When the queue is full, the oldest
+go, and the next line says how many (`"dropped": N`). The pane shows, for each sink, when it
+last sent, how many wait, how many were dropped and the last failure.
+
+The methods are `audit/sinks` and `audit/setSinks`, an admin's only. The sinks are kept in
+the store under `v1/audit-sinks.json`.
+
 ## See also
 
 - [Have an agent wait for something](../how-to/wait-for-something.md)
