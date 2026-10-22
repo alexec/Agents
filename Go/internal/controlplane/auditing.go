@@ -35,7 +35,7 @@ func (s *Service) actorFor(client string) wire.AuditActor {
 }
 
 func (s *Service) auditLog() *audit.Log {
-	return &audit.Log{Store: s.cfg.Store, Chain: s.auditChain}
+	return &audit.Log{Store: s.cfg.Store, Chain: s.auditChain, Out: s.auditSinks.Add}
 }
 
 // auditTarget is audit.Target; a test holds it to prove where it runs.
@@ -59,6 +59,7 @@ func (s *Service) audited(from Caller, host, method string, params json.RawMessa
 }
 
 func (s *Service) startAudit() {
+	go s.followAuditSinks()
 	s.router.SetAudit(func(from Caller) *wire.AuditActor {
 		actor := s.actorFor(from.Client)
 		return &actor

@@ -62,16 +62,16 @@ func sealKey(day, chain string) string { return SealsPrefix + day + "/" + chain 
 
 // write links e into the chain and keeps it at key. An entry that is not kept takes no
 // place in the chain. The first entry of a new day seals the day before.
-func (c *Chain) write(ctx context.Context, s store.Store, e *stored, key string, at time.Time) error {
+func (c *Chain) write(ctx context.Context, s store.Store, e *stored, key string, at time.Time) ([]byte, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	e.Chain, e.Seq, e.Prev = c.ID, c.seq+1, c.head
 	data, err := records.Encode(*e)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if _, err := s.Put(ctx, key, data, store.Absent); err != nil {
-		return err
+		return nil, err
 	}
 	day := at.UTC().Format(dayLayout)
 	if c.day != "" && c.day != day {
@@ -80,7 +80,7 @@ func (c *Chain) write(ctx context.Context, s store.Store, e *stored, key string,
 		_ = c.sealLocked(ctx, s, c.day, at)
 	}
 	c.seq, c.head, c.day = c.seq+1, Hash(data), day
-	return nil
+	return data, nil
 }
 
 // Seal writes today's seal of this chain when it has moved since the last.

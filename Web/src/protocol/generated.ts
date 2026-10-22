@@ -708,6 +708,52 @@ export interface AuditSCIM {
   token: string;
 }
 
+/**
+ * One audit sink (#1001). `address` is tcp://host:port or tls://host:port for syslog, an https://
+ * URL for HTTP. `token`, for HTTP, is sent as a bearer token; it is only ever sent to the control
+ * plane, which answers `hasToken` instead.
+ */
+export interface AuditSink {
+  kind: AuditSinkKind;
+  address: string;
+  token?: string;
+  hasToken?: boolean;
+}
+
+/**
+ * Where an audit sink sends (#1001): syslog (RFC 5424 over TCP or TLS) or HTTP (a POST of JSON
+ * lines).
+ */
+export type AuditSinkKind =
+  | "syslog"
+  | "http";
+
+/**
+ * A sink and how this copy of the control plane is sending to it (#1001): entries waiting (at most
+ * 10,000), dropped since it started because the queue was full, the last sent, and the last
+ * failure.
+ */
+export interface AuditSinkStatus {
+  sink: AuditSink;
+  queued: number;
+  dropped: number;
+  sentAt?: WireDate;
+  lastError?: string;
+}
+
+/**
+ * audit/sinks and audit/setSinks (#1001): the sinks, at most 4. In audit/setSinks, a sink with no
+ * `token` keeps the token it had at the same address.
+ */
+export interface AuditSinks {
+  sinks: AuditSink[];
+}
+
+/** What audit/sinks and audit/setSinks answer (#1001): each sink and how it is sending. */
+export interface AuditSinksState {
+  sinks: AuditSinkStatus[];
+}
+
 export interface AuthStatus {
   kind: string;
   label: string;
@@ -7689,6 +7735,8 @@ export interface Methods {
   "attention/pending": { params: Empty; result: AttentionPending };
   "audit/export": { params: AuditQuery; result: AuditExport };
   "audit/list": { params: AuditQuery; result: AuditList };
+  "audit/setSinks": { params: AuditSinks; result: AuditSinksState };
+  "audit/sinks": { params: Empty; result: AuditSinksState };
   "backups/configure": { params: BackupSettings; result: BackupState };
   "backups/make": { params: BackupMakeRequest; result: BackupState };
   "backups/restore": { params: BackupRestoreRequest; result: BackupRestoreResult };
@@ -7944,6 +7992,8 @@ export const MethodTarget = {
   "attention/pending": "host",
   "audit/export": "control",
   "audit/list": "control",
+  "audit/setSinks": "control",
+  "audit/sinks": "control",
   "backups/configure": "host",
   "backups/make": "host",
   "backups/restore": "host",
@@ -8256,6 +8306,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AuditQuery: { required: [], optional: ["since", "until", "user", "limit"] },
   AuditRefresh: { required: ["provider"], optional: [] },
   AuditSCIM: { required: ["provider", "token"], optional: [] },
+  AuditSink: { required: ["kind", "address"], optional: ["token", "hasToken"] },
+  AuditSinkStatus: { required: ["sink", "queued", "dropped"], optional: ["sentAt", "lastError"] },
+  AuditSinks: { required: ["sinks"], optional: [] },
+  AuditSinksState: { required: ["sinks"], optional: [] },
   AuthStatus: { required: ["kind", "label"], optional: [] },
   AuthenticateRequest: { required: ["runtimeID", "methodID"], optional: ["accountID"] },
   BackgroundItem: { required: ["id", "kind", "name", "state", "canStop", "isStopping", "startedAt"], optional: ["taskType", "detail", "command", "parentID", "toolCallID", "outputFilePath", "summary", "lastToolName", "endedAt"] },

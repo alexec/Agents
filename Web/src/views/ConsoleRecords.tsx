@@ -10,6 +10,7 @@ import { capReachedWords } from "../model/teamGroups";
 import { liveJoins } from "../model/people";
 import { liveRequests, withoutRequest } from "../model/channelLinks";
 import { AuditPane } from "./Audit";
+import { AuditSinks } from "./AuditSinks";
 import { BotSheet, RemoveSheet } from "./People";
 import { orgName } from "../model/signIn";
 import { fromWireDate } from "../protocol/dates";
@@ -28,7 +29,11 @@ export function AuditPage({ store, down }: { store: Store; down: boolean }) {
     }, () => {});
   }, [down]);
   if (people === null) return <p class="hint">Loading…</p>;
-  return <AuditPane store={store} people={people} hostName={(host) => names.value[host] ?? host} />;
+  return <>
+    <AuditPane store={store} people={people} hostName={(host) => names.value[host] ?? host} />
+    {/* Where each entry is also sent (#1001), an admin's. */}
+    <AuditSinks store={store} down={down} />
+  </>;
 }
 
 /** M7: each request with its answer. Join requests and a bot at its cap come as notifications too. The

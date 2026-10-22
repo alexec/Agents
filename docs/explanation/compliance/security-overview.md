@@ -91,7 +91,10 @@ answering cards and changing settings are recorded. Reads and prompts are not.
   each copy of the control plane, and a seal for each day holds each chain's head
   (T8, #1001). `agents-control audit verify` says which entry was changed or removed. See
   [Events](../../reference/events.md#the-hash-chain).
-- **Not yet:** syslog and HTTP sinks are planned (T8, #1001).
+- **Sinks:** an admin sends each entry, as it is written, to syslog (RFC 5424 over TCP or
+  TLS) or to HTTP (JSON lines), from Console ▸ Audit ▸ Sinks. A copy outside the control
+  plane's store is out of reach of a person who can change the store. See
+  [Events](../../reference/events.md#sinks).
 
 ## Sandboxes
 

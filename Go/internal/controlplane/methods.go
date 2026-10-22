@@ -58,6 +58,8 @@ func newMethods(s *Service) *Methods {
 var own = methodSet(
 	"audit/export",
 	"audit/list",
+	"audit/setSinks",
+	"audit/sinks",
 	"bots/make",
 	"bots/setCaps",
 	"bots/stopRun",
@@ -181,6 +183,7 @@ func (m *Methods) setFrozen(frozen bool) {
 // writes is ControlMethods.writes: what changes records, refused while frozen. One a
 // line, sorted (#2020).
 var writes = methodSet(
+	"audit/setSinks",
 	"bots/make",
 	"bots/setCaps",
 	"clients/forget",
@@ -446,6 +449,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return map[string]any{}, m.s.installer.CheckAgain(ctx, string(request.Host))
 	case "audit/list", "audit/export", "control/setAuditDays":
 		return m.auditMethod(ctx, method, params, from)
+	case "audit/sinks", "audit/setSinks":
+		return m.auditSinksMethod(ctx, method, params, from)
 	case "control/rotate":
 		return wire.Empty{}, m.s.rotate(ctx, from)
 	case "control/setProjectDetection":

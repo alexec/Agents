@@ -1049,6 +1049,12 @@ button.remove:hover { opacity: 1; }
 /* Events | Audit (#996). */
 .activity-page .events-panes { display: flex; width: fit-content; margin: 4px auto 12px; }
 .activity-page .audit-head { display: flex; gap: 8px; align-items: center; }
+/* Console ▸ Audit ▸ Sinks (#1001). */
+.audit-sinks { margin-top: 24px; }
+.audit-sink { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.audit-sink input:not([type="password"]) { flex: 1 1 18rem; min-width: 0; }
+.audit-sink p { flex-basis: 100%; margin: 0; }
+.audit-sinks-foot { display: flex; gap: 8px; }
 .reports-pane { display: flex; flex-direction: column; gap: 8px; }
 .reports-pane .segmented { align-self: flex-start; }
 .reports-head { display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
