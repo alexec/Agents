@@ -565,6 +565,8 @@ struct RemoteProjectFold: View {
     @State private var fillingDropbox = false
     /// The smart groups turned off in Settings ▸ Sidebar (#846).
     @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = SidebarSmartRow.offAtFirst
+    /// Settings ▸ Sidebar: the sessions under a Sessions row (#2312), kept on the Mac's host.
+    @AppStorage(DisplayPreference.groupsSessions) private var groupsSessions = DisplayPreference.groupsSessionsDefault
     /// The smart groups the list draws, when not those Settings turns on (#1089).
     var smartGroups: Set<SidebarSmartRow>? = nil
     /// Drawn in a project's own scene (#1089).
@@ -585,10 +587,10 @@ struct RemoteProjectFold: View {
                 if fold.showsPinnedPages {
                     PinnedPageRows(project: key)
                 }
-                // Each under the session that started it, folded (#835).
-                ForEach(SidebarTree.rows(fold.sessions, in: model.work, folds: folds)) { row in
-                    SidebarSessionRow(agent: row.agent, tree: row, folds: folds)
-                }
+                // Each under the session that started it, folded (#835). Under a Sessions
+                // row, as the workflows are under theirs (#2312), unless Settings turns it
+                // off; not in a project's own scene, whose group is headed Sessions already.
+                sessionsFold(fold)
                 // Its workflows after the sessions (Alex, #495), in a Workflows fold of
                 // their own, one level in, as a mailbox's sub-mailboxes in Mail (#885).
                 if !fold.workflows.isEmpty {
@@ -643,6 +645,23 @@ struct RemoteProjectFold: View {
             }
     }
 
+    /// The project's live sessions, as the Mac's `ProjectFold` draws them (#2312): under a
+    /// Sessions row, open until closed and kept per project, held open by a search.
+    @ViewBuilder
+    private func sessionsFold(_ fold: SidebarProjectFold) -> some View {
+        let grouped = groupsSessions && !inScene && !fold.sessions.isEmpty
+        let isOpen = !grouped || fold.isSearching || folds.isOpen(key, .sessions)
+        if grouped {
+            SidebarFoldRow(title: "Sessions", count: fold.sessions.count, isOpen: isOpen) {
+                folds.set(key, .sessions, open: !isOpen)
+            }
+        }
+        // A closed fold has no rows at all (#237).
+        ForEach(isOpen ? SidebarTree.rows(fold.sessions, in: model.work, folds: folds) : []) { row in
+            SidebarSessionRow(agent: row.agent, tree: row, folds: folds, isNested: grouped)
+        }
+    }
+
     /// The project's live workflows, under a Workflows row with a chevron and a grey
     /// count (Alex, #885). Closed until opened, kept per project; a search opens it to
     /// show what matched. The Mac's `ProjectWorkflowRows`: a plain row rather than a
@@ -650,7 +669,7 @@ struct RemoteProjectFold: View {
     @ViewBuilder
     private func workflowsFold(_ fold: SidebarProjectFold) -> some View {
         let isOpen = fold.isSearching || folds.isOpen(key, .workflows)
-        WorkflowsFoldRow(count: fold.workflows.count, isOpen: isOpen) {
+        SidebarFoldRow(title: "Workflows", count: fold.workflows.count, isOpen: isOpen) {
             folds.set(key, .workflows, open: !isOpen)
         }
         // A closed fold has no rows at all (#237).
@@ -718,10 +737,11 @@ private struct ProjectPageRow: View {
     }
 }
 
-/// The Workflows row of a project's fold (#885): the chevron in the session rows' mark
-/// well, the word where their titles start, and the count at the end (#1079). A tap
-/// anywhere on it folds or unfolds it.
-private struct WorkflowsFoldRow: View {
+/// The Workflows row of a project's fold (#885), and its Sessions row (#2312): the chevron
+/// in the session rows' mark well, the word where their titles start, and the count at the
+/// end (#1079). A tap anywhere on it folds or unfolds it.
+private struct SidebarFoldRow: View {
+    let title: String
     let count: Int
     let isOpen: Bool
     let toggle: () -> Void
@@ -737,7 +757,7 @@ private struct WorkflowsFoldRow: View {
                     .appText(.fine)
                     .foregroundStyle(.secondary)
                     .frame(width: 20 * scale)
-                Text("Workflows").lineLimit(1)
+                Text(title).lineLimit(1)
                 Spacer(minLength: 4)
                 Text("\(count)")
                     .monospacedDigit()
@@ -748,7 +768,7 @@ private struct WorkflowsFoldRow: View {
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Workflows, \(count)")
+        .accessibilityLabel("\(title), \(count)")
         .accessibilityValue(isOpen ? "open" : "folded")
         .accessibilityAddTraits(.isButton)
     }

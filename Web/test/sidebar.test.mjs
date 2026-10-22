@@ -55,6 +55,21 @@ test("a project's Workflows fold starts folded and is kept per project (#885)", 
   assert.equal(next.isOpen("mac", "file:///w/a"), false, "the project's own fold is not touched");
 });
 
+test("a project's Sessions fold starts open and is kept per project (#2312)", async () => {
+  const { Folds } = await load("src/model/folds.ts");
+  const storage = new Memory();
+  const first = new Folds(storage);
+  assert.equal(first.isSessionsOpen("mac", "file:///w/a"), true, "open until folded");
+  first.setSessions("mac", "file:///w/a", false);
+  const next = new Folds(storage);
+  assert.equal(next.isSessionsOpen("mac", "file:///w/a/"), false, "kept folded");
+  assert.equal(next.isSessionsOpen("mac", "file:///w/b"), true, "only that project");
+  assert.equal(next.isSessionsOpen("box", "file:///w/a"), true, "the same folder on another host folds apart");
+  assert.equal(next.isWorkflowsOpen("mac", "file:///w/a"), false, "the Workflows fold is not touched");
+  next.setSessions("mac", "file:///w/a", true);
+  assert.deepEqual(JSON.parse(storage.getItem("agents.sidebar.folded")), [], "open again is the first state");
+});
+
 const agent = (id, createdAt, fields = {}) => ({ id, createdAt, lastActivityAt: createdAt, state: "finished",
   cwd: "file:///w/a", title: id, ...fields });
 

@@ -28,7 +28,7 @@ struct ProjectWorkflowRows: View {
             // A plain row rather than a `DisclosureGroup`, whose chevron the list puts by
             // its own indent (#1079): the chevron in the session rows' mark column, the
             // word at their titles, and the workflows one level in, under the word.
-            WorkflowsFoldRow(count: workflows.count, isOpen: workflowsFold)
+            SidebarFoldRow(title: "Workflows", count: workflows.count, isOpen: workflowsFold)
             // A closed fold has no rows at all (#237).
             ForEach(FoldedRow.rows(isOpen ? workflows : [], in: .workflows)) { row in
                 WorkflowListRow(summary: row.item, project: project, isNested: true)
@@ -37,10 +37,12 @@ struct ProjectWorkflowRows: View {
     }
 }
 
-/// The Workflows row of a project's fold (#885): a chevron in the sidebar's icon column,
-/// 16 wide and 6 to the title as a session's mark, then the subheading. A click anywhere
-/// on it folds or unfolds it (#440); VoiceOver has it as one button that says which.
-private struct WorkflowsFoldRow: View {
+/// The Workflows row of a project's fold (#885), and its Sessions row (#2312): a chevron in
+/// the sidebar's icon column, 16 wide and 6 to the title as a session's mark, then the
+/// subheading. A click anywhere on it folds or unfolds it (#440); VoiceOver has it as one
+/// button that says which.
+struct SidebarFoldRow: View {
+    let title: String
     let count: Int
     @Binding var isOpen: Bool
 
@@ -51,7 +53,7 @@ private struct WorkflowsFoldRow: View {
                 .appText(.fine)
                 .foregroundStyle(.secondary)
                 .frame(width: 16)
-            SidebarSubheading(title: "Workflows", count: count)
+            SidebarSubheading(title: title, count: count)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
@@ -59,7 +61,7 @@ private struct WorkflowsFoldRow: View {
         .simultaneousGesture(TapGesture().onEnded { isOpen.toggle() })
         // One label, over children it ignores: one stacked on the subheading's crashes AppKit.
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Workflows, \(count)")
+        .accessibilityLabel("\(title), \(count)")
         .accessibilityAddTraits(.isButton)
         .accessibilityValue(isOpen ? "open" : "folded")
         .accessibilityAction { isOpen.toggle() }

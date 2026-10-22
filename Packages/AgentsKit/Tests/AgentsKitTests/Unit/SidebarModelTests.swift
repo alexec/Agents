@@ -210,19 +210,22 @@ struct SidebarModelTests {
         #expect(folds.isOpen(key, .group(.running)), "a group starts open")
         #expect(folds.isOpen(key, .pinned))
         #expect(!folds.isOpen(key, .workflows), "a project's Workflows starts folded (#885)")
+        #expect(folds.isOpen(key, .sessions), "a project's Sessions starts open (#2312)")
 
         folds.set(key, open: true)
         folds.set(key, .archivedSessions, open: true)
         folds.set(key, .group(.finished), open: false)
         folds.set(key, .workflows, open: true)
+        folds.set(key, .sessions, open: false)
         let again = SidebarFolds(defaults: defaults, scope: "")
         #expect(again.isOpen(key))
         #expect(!again.isOpen(key, .group(.finished)))
         #expect(again.isOpen(key, .workflows), "each project's Workflows fold is kept")
+        #expect(!again.isOpen(key, .sessions), "each project's Sessions fold is kept")
         #expect(again.openArchivedFolds == [key])
         // The keys the Mac has always kept them under, so nobody's folds are lost.
         #expect(defaults.stringArray(forKey: "sidebar.folds")?.contains(key.stored) == true)
-        #expect(defaults.stringArray(forKey: "sidebar.folded") == ["group.finished:\(key.stored)"])
+        #expect(defaults.stringArray(forKey: "sidebar.folded") == ["group.finished:\(key.stored)", "sessions:\(key.stored)"])
 
         let walk = SidebarFolds(defaults: defaults, scope: ".walk:w1")
         #expect(!walk.isOpen(key), "another scope's folds are its own")

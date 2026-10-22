@@ -542,6 +542,10 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   const workflows = allWorkflows.filter((w) => !w.isArchived && !flowPins.includes(w.workflow.workflowID));
   const archivedWorkflows = allWorkflows.filter((w) => w.isArchived);
   const workflowsOpen = searching || folds.isWorkflowsOpen(host.id, folder);
+  // Under a Sessions row, as the workflows are under theirs (#2312), unless Settings ▸ Sidebar turns it
+  // off; not in a tab of the project alone, whose group is headed Sessions already. A search holds it open.
+  const groupsSessions = folds.groupsSessions.value && !isAlone && sessions.length > 0;
+  const sessionsOpen = searching || folds.isSessionsOpen(host.id, folder);
   const nameMatches = label.toLowerCase().includes(query.toLowerCase());
   if (searching && sessions.length === 0 && archived.length === 0 && workflows.length === 0
     && archivedWorkflows.length === 0 && !nameMatches) return null;
@@ -625,7 +629,18 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
         <div class="fold-body">
           {/* The project's pinned pages first (#159), not while searching: the search is for sessions. */}
           {!searching && <PinnedPageRows store={store} host={host.id} folder={folder} down={down} chosen={here ? r.page : undefined} />}
-          {sessionRows.map((tree) => row(tree.agent, tree))}
+          {groupsSessions ? (
+            <details class="sessions" open={sessionsOpen}
+              onToggle={(e) => {
+                const now = (e.currentTarget as HTMLDetailsElement).open;
+                if (!searching && now !== sessionsOpen) folds.setSessions(host.id, folder, now);
+              }}>
+              <summary data-fold="sessions" aria-label={`Sessions, ${sessions.length}`}>
+                Sessions<span class="count">{sessions.length}</span>
+              </summary>
+              {sessionsOpen && sessionRows.map((tree) => row(tree.agent, tree))}
+            </details>
+          ) : sessionRows.map((tree) => row(tree.agent, tree))}
           {/* Its workflows after the sessions (#495), in a Workflows fold of their own, one level in,
               as a mailbox's sub-mailboxes in Mail (#885): folded until opened, kept per project, its
               grey count on the right. A search holds it open. */}
@@ -823,7 +838,7 @@ function folderPath(folder: string): string {
 /** Every row the keys move through, in the order shown. */
 function navRows(list: HTMLElement): HTMLElement[] {
   return [...list.querySelectorAll<HTMLElement>(
-    ".new-session-top .pick, .activity .row, details.smart > summary, details.workflows > summary, .project-fold > .row.project .pick, .nav-item .row.pin .pick, .nav-item .row.session, .nav-item .row.workflow .pick, .nav-item .row.page-row .pick, details.archived > summary",
+    ".new-session-top .pick, .activity .row, details.smart > summary, details.sessions > summary, details.workflows > summary, .project-fold > .row.project .pick, .nav-item .row.pin .pick, .nav-item .row.session, .nav-item .row.workflow .pick, .nav-item .row.page-row .pick, details.archived > summary",
   )].filter((el) => el.offsetParent !== null);
 }
 

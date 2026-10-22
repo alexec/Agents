@@ -1,8 +1,9 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Settings ▸ You ▸ Sidebar (#846, #2079): a switch for each smart group, and whether agents
-/// may archive the chats the person starts (#1802). Both are kept on the Mac's host, so every
+/// Settings ▸ You ▸ Sidebar (#846, #2079): a switch for each smart group, one for a project's
+/// Sessions row (#2312), and whether agents may archive the chats the person starts (#1802).
+/// All are kept on the Mac's host, so every
 /// client shows the same (#1033). The Mac's Settings window and the Remote's Settings screen
 /// draw the same section; the web page has the same two sections under You.
 struct SidebarSettingsSection: View {
@@ -11,6 +12,9 @@ struct SidebarSettingsSection: View {
     /// same; the host reads it when a chat you started ends (#1802).
     @AppStorage(DisplayPreference.agentsMayArchiveMyChats, store: WindowDefaults.store)
     private var mayArchive = DisplayPreference.agentsMayArchiveMyChatsDefault
+    /// A project's sessions under a Sessions row (#2312), kept on the Mac's host.
+    @AppStorage(DisplayPreference.groupsSessions, store: WindowDefaults.store)
+    private var groupsSessions = DisplayPreference.groupsSessionsDefault
 
     var body: some View {
         Section {
@@ -28,6 +32,18 @@ struct SidebarSettingsSection: View {
         } footer: {
             Text("A group that is off is not shown. Its sessions go to the next group they fit, or under their project. "
                  + "With Needs You off, approvals are not listed in the sidebar. The same on every client of yours.")
+                .appText(.fine)
+                .foregroundStyle(.secondary)
+        }
+        .paperListRow()
+
+        Section {
+            Toggle("Group sessions under a Sessions row", isOn: $groupsSessions)
+        } header: {
+            Text("Projects")
+        } footer: {
+            Text("On, a project's sessions fold under a Sessions row, as its workflows fold under Workflows. "
+                 + "Off, they are listed straight under the project. The same on every client of yours.")
                 .appText(.fine)
                 .foregroundStyle(.secondary)
         }
