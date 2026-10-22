@@ -1,6 +1,6 @@
 ---
 diataxis: how-to
-devices: [mac, iphone, ipad]
+devices: [mac]
 description: Check that a runtime works with the app's tools, by having an agent on it work through each one while the app scores what it did.
 ---
 
@@ -23,22 +23,21 @@ so a pass never rests on the agent's word.
 
 ## Steps
 
-1. On the Mac, open **Settings ▸ Agent Runtimes** and pick the runtime.
-   On an iPhone or iPad, open **Runtimes** at the foot of **Spending**, and touch and hold the
-   runtime.
-2. Click **Assess…** (on the phone, **Assess in…**) and pick the project.
-   The agent starts on the cheapest model the runtime offers, such as Haiku for
-   Claude, and opens.
-3. Answer its two questions: a short form, and one question it asks with the runtime's own
-   question tool, where the runtime has one. Any answer will do.
-4. Later it tries to write a file outside the project, in the app's own `assessments`
-   folder. If a permission card asks about it, answer either way: the step checks that the
-   runtime did what you said. Allow anything else it asks for.
-5. Leave it. It waits for its helper, then for two one-minute timers, and moves into a
+The app has no button for an assessment (#2133). The **Runtime check** workflow assesses a
+runtime when a release updates it, and you can start one by hand:
+
+1. In a chat in this project, ask an agent to assess the runtime, for example "Assess Codex".
+   It uses the `assess-runtime` skill. Or, in a terminal in the project folder, run
+   `.agents/skills/assess-runtime/scripts/assess.py <root> <runtime> --folder <project>`.
+2. The assessing agent starts on the cheapest model the runtime offers, such as Haiku for
+   Claude. The script answers its questions and permission cards as a person would: the
+   form, the runtime's own question, and an allow for each card, except the write outside
+   the project, which it rejects.
+3. Leave it. It waits for its helper, then for two one-minute timers, and moves into a
    worktree and back, and is started again by itself each time. It takes about six minutes.
-6. Read the result at the end of the conversation: a table from the app with each step
-   passed, failed or not offered, and what the app's record shows. The agent's own report is
-   beside it, in the files pane.
+4. Read the result at the end of the assessing agent's conversation: a table from the app
+   with each step passed, failed or not offered, and what the app's record shows. The
+   agent's own report is beside it, in the files pane.
 
 If every step passed, the agent asks to be archived. If not, it waits under **Needs you**, naming
 each failure and its likely fix: the app, the runtime's adapter, the runtime's version, or a
@@ -54,8 +53,8 @@ setting.
   and where it ran.
 - **A runtime that can't take an agent** (not installed, not signed in, or out of its
   allowance on the Runtimes page) is not started, and you are told why.
-- **The web page** has no Settings or Runtimes page, so it can't start one. It shows an
-  assessment's conversation like any other.
+- **Every client** shows an assessment's conversation like any other: the Mac, the Remote
+  and the web page.
 - **Archive it** when you have read it. The helper it started is archived by the agent itself.
 
 ## See also

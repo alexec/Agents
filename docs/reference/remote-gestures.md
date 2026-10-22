@@ -47,7 +47,7 @@ The session's menu has these, when they apply:
 | A pinned page | | | **Move Up**, **Move Down**, **Unpin** |
 | An archived project | **Unarchive** | **Delete** | **Unarchive**, **Delete…** |
 | A worktree | | **Remove…**, **Remove Build Output** | **Remove Build Output**, **Remove…** |
-| A runtime, on **Runtimes** | | **Mark available**, when it is out | **Assess in…** |
+| A runtime, on **Runtimes** | | **Mark available**, when it is out | |
 
 A tap on a project's heading, or on its **Workflows** row, folds or unfolds it.
 
