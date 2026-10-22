@@ -3561,11 +3561,21 @@ final class RemoteModel {
         for host in reachableHosts { await refreshServerCost(host) }
     }
 
-    /// Cancel the wait shown in Waiting now, then refresh the authoritative list.
+    /// Cancel the wait shown in Waiting now, on the agent's own host (#2068), then refresh
+    /// the authoritative list. A failure says why.
     func cancelWait(of agentID: UUID) async {
-        _ = try? await client.call(DaemonAPI.Method.eventsCancelWait,
-                                   DaemonAPI.CancelWaitRequest(agentID: agentID),
-                                   returning: [DaemonAPI.WaitingAgent].self)
+        let host = work.agent(agentID)?.host ?? .mac
+        guard !isStale(on: host) else {
+            problem = notAnswering(host, "the wait could not be stopped.")
+            return
+        }
+        do {
+            let request = DaemonAPI.CancelWaitRequest(agentID: agentID)
+            _ = try await client(for: request).call(DaemonAPI.Method.eventsCancelWait, request,
+                                                    returning: [DaemonAPI.WaitingAgent].self)
+        } catch {
+            problem = away(error, "the wait could not be stopped.") ?? sentence(for: error)
+        }
         await refreshEvents()
     }
 
