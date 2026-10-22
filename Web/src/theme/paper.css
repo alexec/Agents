@@ -51,7 +51,8 @@
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 
   /* Every font-size, and the marks drawn beside text, is in rem, so the page follows the
-     browser's own font size and zoom (#1034): 1rem is 16px at the browser's default. */
+     browser's own font size and zoom (#1034): 1rem is the root's size, 112.5% of the
+     browser's (18px at its default, #2135). */
 }
 
 @media (prefers-color-scheme: dark) {
