@@ -17,8 +17,16 @@ export const noProject = "No project";
 export const noRuntime = "No runtime";
 export const noGroup = "No group";
 export const empty = "Nothing was used in this time. Each machine sends what it used once an hour.";
-/** Whose spend a scope shows, said on the pane (#2071). */
-export const meNote = "Your machines. A group’s and everyone’s are in Reports ▸ Spend.";
+/** Whose spend the Cost page's pane shows (#2071). Reports ▸ Spend is named only to someone it
+ * offers more than Me: an admin or a group's lead (#2200). */
+export function meNote(seesMore: boolean): string {
+  return seesMore ? "Your machines. A group’s and everyone’s are in Reports ▸ Spend." : memberNote;
+}
+export const memberNote = "Your machines. An admin or a group’s lead sees more.";
+/** Whether an answer is of the scope asked for: a late answer to an earlier scope is not shown (#2201). */
+export function sameScope(answer: ReportScope | undefined, asked: ReportScope): boolean {
+  return scopeKey(answer ?? { kind: "me" }) === scopeKey(asked);
+}
 export function scopeNote(scope: ReportScope, groupName?: string): string {
   switch (scope.kind) {
     case "me": return "Your machines.";

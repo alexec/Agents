@@ -2,13 +2,13 @@
 // person, project, machine and runtime, added up on the control plane from what each machine
 // sends each hour. Cost ▸ Reports shows the caller's own machines (Me, #2071); Reports ▸ Spend
 // has a scope, Me, a group or the organisation, and names it.
-import { useEffect, useMemo } from "preact/hooks";
+import { useEffect, useMemo, useRef } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import type { ReportFormat, ReportRange, ReportScope, ReportScopeOption, UsageReport } from "../protocol/generated";
 import { CallFailed } from "../wire/link";
-import { budgetWords, dimensionTitle, empty, exportName, groupNote, hiddenNote, line, meNote, rangeShort, rangeSpan, ranges,
-  reportTotals, scopeKey, scopeNote, scopedDimensions, share, utcNote } from "../model/reports";
+import { budgetWords, dimensionTitle, empty, exportName, groupNote, hiddenNote, line, meNote, memberNote, rangeShort, rangeSpan, ranges,
+  reportTotals, sameScope, scopeKey, scopeNote, scopedDimensions, share, utcNote } from "../model/reports";
 import type { ReportDimension, ReportGroup } from "../model/reports";
 import type { Section } from "../model/console";
 
@@ -20,22 +20,38 @@ function sentence(error: unknown): string {
   return "The control plane can’t be reached.";
 }
 
-/** With no `scope`, the Cost page's pane: the caller's own machines, an admin's too (#2071). */
-export function ReportsPane({ store, runtimeName, scope }: { store: Store; runtimeName: (id: string) => string; scope?: ReportScope | undefined }) {
+/** With no `scope`, the Cost page's pane: the caller's own machines, an admin's too (#2071).
+ * `seesMore` says whether reports/scopes offers the caller more than Me; the Cost page's pane asks
+ * it itself (#2200). */
+export function ReportsPane({ store, runtimeName, scope, seesMore }: { store: Store; runtimeName: (id: string) => string; scope?: ReportScope | undefined; seesMore?: boolean }) {
   const range = useSignal<ReportRange>("week");
   const by = useSignal<ReportDimension>("person");
   const report = useSignal<UsageReport | null>(null);
   const problem = useSignal<string | null>(null);
+  const offered = useSignal<boolean>(false);
   const asked = { scope: scope ?? { kind: "me" as const } };
+  // The scope on screen now, for an answer that comes after the scope changed.
+  const current = useRef(asked.scope);
+  current.current = asked.scope;
   const load = async () => {
+    const ask = { range: range.value, ...asked };
     try {
-      report.value = await store.link.call("reports/usage", { range: range.value, ...asked });
+      const got = await store.link.call("reports/usage", ask);
+      // A late answer to an earlier range or scope is dropped (#2201).
+      if (ask.range !== range.value || !sameScope(ask.scope, current.current)) return;
+      report.value = got;
       problem.value = null;
     } catch (error) {
       problem.value = sentence(error);
     }
   };
   useEffect(() => { report.value = null; void load(); }, [range.value, scope && scopeKey(scope)]);
+  useEffect(() => {
+    if (seesMore !== undefined) return;
+    // A control plane before scopes offers Me only.
+    void store.link.call("reports/scopes", {}).then((r) => { offered.value = r.scopes.length > 1; }, () => { offered.value = false; });
+  }, [seesMore]);
+  const more = seesMore ?? offered.value;
   const exportRows = async (format: ReportFormat) => {
     try {
       const got = await store.link.call("reports/export", { range: range.value, format, ...asked });
@@ -49,7 +65,8 @@ export function ReportsPane({ store, runtimeName, scope }: { store: Store; runti
       problem.value = sentence(error);
     }
   };
-  const shown = report.value?.range === range.value ? report.value : null;
+  // Shown only when it answers the range and the scope on screen (#2201).
+  const shown = report.value?.range === range.value && sameScope(report.value.scope, asked.scope) ? report.value : null;
   const ways = scopedDimensions(shown);
   // A way the scope does not offer (a person, with nobody named) falls back to the first.
   const way = ways.includes(by.value) ? by.value : ways[0]!;
@@ -97,11 +114,20 @@ export function ReportsPane({ store, runtimeName, scope }: { store: Store; runti
           )}
           {shown.personsHidden && <p class="quiet small">{hiddenNote}</p>}
           {way === "group" && <p class="quiet small">{groupNote}</p>}
-          <p class="quiet small">{scope ? `${scopeNote(scope, scope.group ? shown.groupNames?.[scope.group] : undefined)} ${utcNote}` : `${meNote} ${utcNote}`}</p>
+          <p class="quiet small">{`${note(shown, scope, more)} ${utcNote}`}</p>
         </>
       )}
     </div>
   );
+}
+
+/** Whose machines the report is of, named from the answer's scope (#2201); Reports ▸ Spend is
+ * named only to someone it offers more than Me (#2200). */
+function note(shown: UsageReport, scope: ReportScope | undefined, more: boolean): string {
+  if (!scope) return meNote(more);
+  const of = shown.scope ?? scope;
+  if (of.kind === "me" && !more) return memberNote;
+  return scopeNote(of, of.group ? shown.groupNames?.[of.group] : undefined);
 }
 
 /** A runtime's name, from the first host that knows it. */
@@ -150,7 +176,7 @@ export function ReportsPage({ store, down }: { store: Store; section: Section; d
           })}
         </div>
       )}
-      {scopes.value !== null && <ReportsPane store={store} runtimeName={runtimeNameIn(store)} scope={option?.scope} />}
+      {scopes.value !== null && <ReportsPane store={store} runtimeName={runtimeNameIn(store)} scope={option?.scope} seesMore={list.length > 1} />}
     </>
   );
 }

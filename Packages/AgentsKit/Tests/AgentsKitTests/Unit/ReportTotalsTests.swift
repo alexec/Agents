@@ -48,4 +48,10 @@ struct ReportTotalsTests {
         let day = calendar.date(from: DateComponents(year: 2026, month: 10, day: 21, hour: 9))!
         #expect(ReportWords.exportName(.week, .csv, day, calendar: calendar) == "report-week-2026-10-21.csv")
     }
+
+    /// Reports ▸ Spend is named only to an admin or a group's lead (#2200).
+    @Test func theNoteNamesReportsSpendOnlyToSomeoneItOffersMore() {
+        #expect(ReportWords.meNote(seesMore: true).contains("Reports ▸ Spend"))
+        #expect(ReportWords.meNote(seesMore: false) == "Your machines. An admin or a group’s lead sees more.")
+    }
 }

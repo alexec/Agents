@@ -105,7 +105,12 @@ public enum ReportWords {
     public static let noRuntime = "No runtime"
     public static let empty = "Nothing was used in this time. Each machine sends what it used once an hour."
     /// Whose spend the Cost page's Reports pane shows: the caller's own, an admin's too (#2071).
-    public static let meNote = "Your machines. A group’s and everyone’s are in Reports ▸ Spend on the web page."
+    /// Reports ▸ Spend is named only to someone it offers more than Me: an admin or a group's
+    /// lead (#2200).
+    public static func meNote(seesMore: Bool) -> String {
+        seesMore ? "Your machines. A group’s and everyone’s are in Reports ▸ Spend on the web page." : memberNote
+    }
+    public static let memberNote = "Your machines. An admin or a group’s lead sees more."
     public static let utcNote = "Hours and days are UTC, so machines in other time zones add up."
 
     /// D, W, M and 3M, as the Cost page's charts name them.
