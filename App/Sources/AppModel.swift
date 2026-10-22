@@ -3923,6 +3923,11 @@ final class AppModel {
                                                                forgetSecret: forgetSecret),
                                      returning: DaemonAPI.MCPRemoveAnswer.self)
             return nil
+        } catch HostProblem.offline {
+            // Said as the machine's, not as an add that failed (#2266).
+            return .failed("\(hosts.label(host)) is offline")
+        } catch let rpc as JSONRPCError where rpc.code == DaemonAPI.Failure.hostOffline {
+            return .failed("\(hosts.label(host)) is offline")
         } catch {
             return Self.mcpError(error)
         }

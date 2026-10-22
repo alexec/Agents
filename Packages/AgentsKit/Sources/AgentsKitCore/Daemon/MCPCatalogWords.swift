@@ -21,4 +21,10 @@ public enum MCPCatalogWords {
         case .failed(let why): "It could not be added: \(why)."
         }
     }
+
+    /// The same refusal for a Remove…, which added nothing (#2266).
+    public static func notRemoved(_ name: String, _ error: DaemonAPI.MCPCatalogError) -> String {
+        if case .failed(let why) = error { return "\(name) was not removed: \(why)." }
+        return MCPHealthWords.notRemoved(name, because: sentence(error))
+    }
 }

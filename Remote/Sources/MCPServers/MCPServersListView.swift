@@ -30,6 +30,11 @@ struct MCPServersListView: View {
 
     private var problem: String? { snapshot?.problem(in: project?.folder.path) }
 
+    /// The machine whose mcp.json this is (#2266).
+    private var host: HostID { project?.host ?? .mac }
+    /// Remove… waits for it to come back (#2266), as on the window and the page.
+    private var offline: Bool { model.hostIsOffline(host) }
+
     var body: some View {
         List {
             // The set-up first (#1336): a project's slots, or the person's connections; on a
@@ -60,9 +65,11 @@ struct MCPServersListView: View {
                         // Every connector (#2154), one written by hand in mcp.json too.
                         .swipeActions {
                             Button("Remove…", role: .destructive) { removing = server }
+                                .disabled(offline)
                         }
                         .contextMenu {
                             Button("Remove…", systemImage: "trash", role: .destructive) { removing = server }
+                                .disabled(offline)
                         }
                 }
                 .paperListRow()
@@ -90,10 +97,16 @@ struct MCPServersListView: View {
                             isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
                             titleVisibility: .visible, presenting: removing) { server in
             Button("Remove", role: .destructive) {
-                Task { removeProblem = await model.removeConnector(server.name, project: project)?.words }
+                Task {
+                    removeProblem = await model.removeConnector(server.name, project: project).map {
+                        offline ? MCPHealthWords.notRemoved(server.name, offline: model.hostLabel(host))
+                            : MCPHealthWords.notRemoved(server.name, because: $0.words)
+                    }
+                }
             }
         } message: { server in
-            Text(MCPHealthWords.removes(server.name, inProject: project != nil)
+            Text(MCPHealthWords.removes(server.name, inProject: project != nil,
+                                        on: host == .mac ? nil : model.hostLabel(host))
                  + (project != nil ? " " + MCPHealthWords.removesCommitted : ""))
         }
         // The servers are read with the leases.
