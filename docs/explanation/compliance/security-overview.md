@@ -168,18 +168,18 @@ token shapes out of each transcript line, each `app-tools.jsonl` line and each l
 `[redacted:<kind>]`, and the clients get the redacted line too. The shapes are GitHub,
 GitLab, Anthropic, OpenAI, Stripe, AWS access key, Google API key, Slack and npm tokens,
 JWTs, private key blocks, the token after `Bearer`, and the control plane's codes.
-Redaction is always on.
+Redaction is always on. A token that the runtime streams in two message chunks is caught
+too: the end of each chunk that could start a token waits for the next one (at most 256
+bytes). The report of a turn says its last message redacted as well.
 
 Redaction does not catch:
 
 - text that is not a known shape, such as a password in plain words;
-- a token that the runtime streams in two parts, one in each message chunk (planned, #1001
-  slice a2);
 - what a runtime writes to its standard error, and what Agents Host writes to `daemon.log`;
 - the runtimes' own session files (see [Erasure](data-and-retention.md#erasure)).
 
-`control.log` cuts out codes, `Bearer` tokens and `token=`, `secret=` and `password=`
-values. Agents Host's diagnostics bundle masks codes, secrets, tokens, passwords, keys, and
+`control.log` cuts out codes, `Bearer` tokens, `token=`, `secret=` and `password=`
+values, and the same known token shapes (#1001). Agents Host's diagnostics bundle masks codes, secrets, tokens, passwords, keys, and
 long base64 and hex strings.
 
 ## The web page

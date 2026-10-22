@@ -23,9 +23,9 @@
 - [x] T012 [US2] Queue from `deleteArchived`; `runtimeCopy` on `agent.deleted`; skip in `restoreAgent`.
 - [x] T013 Update `docs/explanation/compliance/` (erasure is built).
 
-## Phase 3: a2, chunk seams (area: hosts) — other lane
+## Phase 3: a2, chunk seams (area: hosts)
 
-- [ ] T014 [US1] Hold back a trailing run of token characters in an agent message chunk (at most 256 bytes) until the next chunk, a different update or the turn's end; test a GitHub token split over two chunks.
+- [x] T014 [US1] Hold back a trailing run of token characters in an agent message chunk (at most 256 bytes) until the next chunk, a different update or the turn's end; test a GitHub token split over two chunks.
 
 ## Phase 4: a3, the control plane's log (area: control-plane)
 
