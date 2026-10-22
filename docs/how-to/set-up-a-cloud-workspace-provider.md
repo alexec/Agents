@@ -39,7 +39,7 @@ install and sign in the CLI, and a person on a phone or in a browser has none th
 Each form fills in its own name, such as "AWS EC2 Instances". Change it in **Name** when
 you add more than one of a kind.
 
-**New Workspace…**, which makes a new machine from a provider's card, is on the Mac. On all
+**New Machine…**, which makes a new machine from a provider's card, is on the Mac. On all
 three clients, **Start a Machine from a Repository…** makes a machine for one repository
 from a provider that can make machines.
 
@@ -90,7 +90,7 @@ You need a service account's JSON key. Give the service account the smallest rol
 
 - To list, start and stop: `compute.instances.list`, `compute.instances.start` and
   `compute.instances.stop`.
-- To make and delete VMs with **New Workspace…** as well: `compute.instances.create`,
+- To make and delete VMs with **New Machine…** as well: `compute.instances.create`,
   `compute.instances.delete`, `compute.instances.setMetadata`,
   `compute.instances.setLabels`, `compute.disks.create`, `compute.subnetworks.use` and
   `compute.subnetworks.useExternalIp`.
@@ -108,7 +108,7 @@ The control plane gets an access token from the key, and keeps the token until a
 before it ends. The key itself is never sent. ssh goes to each VM's external address, so
 the network must let in port 22. A static address keeps the address the same after a stop.
 
-A VM made with **New Workspace…** makes the user `agents` with your key on its first boot,
+A VM made with **New Machine…** makes the user `agents` with your key on its first boot,
 and installs Agents as that user, never as root. Its boot disk is deleted with the VM.
 
 ## Google Cloud Workstations
@@ -137,7 +137,7 @@ update. To make and delete droplets from Agents, add droplet create and delete.
 3. Give the tag in **Droplets tagged** (the Mac) or **Tag**. The default is `agents`.
 4. Give the ssh user. The default is `root`.
 
-**New Workspace…** makes a droplet with the tag, in the region, size and image that you
+**New Machine…** makes a droplet with the tag, in the region, size and image that you
 choose. Choose an image with systemd, such as `ubuntu-24-04-x64`. Its first boot makes a
 user `agents` with root's ssh keys and installs Agents as that user, never as root.
 

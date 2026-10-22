@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// New Workspace… (#691 US5, layouts.md L9): a form drawn from the provider's
+/// New Machine… (#691 US5, layouts.md L9): a form drawn from the provider's
 /// `workspace_options`, then a confirmation that says what is made and, where the provider
 /// says, what it costs. Nothing is made until that is confirmed (US5 AS3).
 struct NewWorkspaceSheet: View {

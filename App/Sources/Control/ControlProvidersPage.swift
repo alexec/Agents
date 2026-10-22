@@ -9,7 +9,7 @@ struct ControlProvidersPage: View {
     @State private var adding = false
     @State private var removing: DaemonAPI.ProviderSummary?
     @State private var addingHost: ControlAddServerSheet.Prefill?
-    /// New Workspace… (US5, L9).
+    /// New Machine… (US5, L9; was New Workspace…).
     @State private var making: DaemonAPI.ProviderSummary?
     /// Write the Map Again… (#858 US4, L10f).
     @State private var rewriting: DaemonAPI.ProviderSummary?

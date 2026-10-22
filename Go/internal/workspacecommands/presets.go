@@ -437,7 +437,7 @@ rm -f /home/agents/first-boot.sh
 
 // gcpComputeAPI is Compute Engine VMs with a label, in one project and zone, through the
 // Compute Engine API with a service account's key in GOOGLE_SERVICE_ACCOUNT_KEY (#1346):
-// nothing to install. Each is reached by plain ssh to its external address. New Workspace…
+// nothing to install. Each is reached by plain ssh to its external address. New Machine…
 // makes a VM with the label whose startup script installs Agents once, reachable as agents
 // with the keys in sshKeys (public key lines); Delete deletes it.
 // Only labelled VMs are listed, so a VM without the label is never started, stopped or

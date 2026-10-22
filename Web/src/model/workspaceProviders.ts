@@ -72,7 +72,7 @@ const kinds: Record<ProviderKind, KindInfo> = {
   compute: {
     title: "Google Compute Engine VMs",
     preset: "gcp-compute-api",
-    needs: "Needs a service account’s JSON key, with the smallest role: compute.instances.list, start and stop, and for New Workspace… compute.instances.create, delete, setMetadata and setLabels, compute.disks.create, and compute.subnetworks.use and useExternalIp. ssh goes to each VM’s external address, so the network must let in port 22. Nothing to install.",
+    needs: "Needs a service account’s JSON key, with the smallest role: compute.instances.list, start and stop, and for New Machine… compute.instances.create, delete, setMetadata and setLabels, compute.disks.create, and compute.subnetworks.use and useExternalIp. ssh goes to each VM’s external address, so the network must let in port 22, and a static address keeps it the same after a stop (#1691). Nothing to install.",
     fields: [
       { id: "serviceKey", label: "Service account key (JSON)", secret: true },
       { id: "project", label: "Project" },
