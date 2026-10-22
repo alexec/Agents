@@ -19,7 +19,6 @@ idea, in the project's own `.agents` folder.
 | `plugins/` | Plugins every agent gets | **Settings ▸ Agent Configuration** |
 | `mcp.json` | Connectors (MCP servers) every agent gets. Secrets are named as `${NAME}`, never held. | You, or **Settings ▸ Agent Configuration** |
 | `marketplaces.json` | Which marketplaces are on | **Manage Marketplaces…** |
-| `chat/` | The chat project, for chats without a project | The app |
 | `settings/` | The settings below, one file each | The app |
 
 The top of the folder is configuration that other tools read too. `settings/` is what the

@@ -90,8 +90,6 @@ and iPad show, on every host:
   shown (see [Read a chat](read-a-chat.md));
 - send a prompt with files or pictures attached, use **Send now** on a queued prompt, and
   change the mode, model or runtime;
-- start a chat with **New Chat** at the top of the **+** menu, in the host's **chat**
-  project (see [Chat without a project](chat-without-a-project.md));
 - add a project with **+** at the head of the projects column: **Add Project…** chooses a
   folder on the host by typing a path or clicking into folders, and **Clone Project from Git
   URL…** clones an HTTPS or SSH address into the host's home folder. With more than one

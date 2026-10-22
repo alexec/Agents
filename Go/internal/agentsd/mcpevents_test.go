@@ -119,7 +119,7 @@ func quickPolls(d *Daemon) {
 
 func serverHome(t *testing.T, d *Daemon, url string) {
 	home := t.TempDir()
-	d.ChatHome = home
+	d.PersonalHome = home
 	os.MkdirAll(filepath.Join(home, ".agents"), 0o755)
 	b, _ := json.Marshal(map[string]any{"mcpServers": map[string]any{"ci": map[string]any{"url": url}}})
 	os.WriteFile(filepath.Join(home, ".agents", "mcp.json"), b, 0o644)
@@ -322,7 +322,7 @@ func TestATriggerNoServerHereOffers(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
 	quickPolls(d)
-	d.ChatHome = t.TempDir()
+	d.PersonalHome = t.TempDir()
 	dir := project(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)

@@ -328,24 +328,6 @@ struct ProjectListView: View {
             guard case .success(let folder) = result else { return }
             Task { await model.addProject(folder) }
         }
-        // New Chat found no chat project to open (#229): why, and Unarchive when that is it.
-        .alert("No chat project", isPresented: Binding(
-            get: { model.chatProblem != nil }, set: { if !$0 { model.chatProblem = nil } }),
-            presenting: model.chatProblem) { problem in
-            if problem.archived != nil {
-                Button("Unarchive") {
-                    Task {
-                        await model.unarchiveChatProject(problem)
-                        requests.focusPrompt()
-                    }
-                }
-                Button("Cancel", role: .cancel) {}
-            } else {
-                Button("OK", role: .cancel) {}
-            }
-        } message: { problem in
-            Text(problem.message)
-        }
         .sheet(isPresented: $isCloning) { CloneSheet(host: targetHost).paperSheet() }
         .sheet(isPresented: $isChoosingServerFolder) { RemoteFolderSheet(host: targetHost).paperSheet() }
         .sheet(isPresented: Binding(get: { requests.dropboxProject != nil },

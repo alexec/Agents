@@ -112,7 +112,6 @@ Web/src/views/Labels.tsx                               chat
 Shared/UI/LabelTagField.swift                          chat
 docs/how-to/answer-a-question.md                       chat
 docs/how-to/send-while-an-agent-works.md               chat
-docs/how-to/chat-without-a-project.md                  chat
 
 # panes: the panes beside a chat: files and the file editor, changes, terminal and
 # shells, the browser pane, pages and show_file.

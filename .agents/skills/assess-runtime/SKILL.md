@@ -27,9 +27,8 @@ $S/rpc.py $ROOT call runtimes/assessment '{"agentID":"…"}'
 ```
 
 Unattended, `.agents/skills/assess-runtime/scripts/assess.py` does both and answers what a
-person would (the form, the runtime's own question, permission cards) — see below. By
-default it finds this host's chat project in `projects/list`; pass `--folder` to use another
-project.
+person would (the form, the runtime's own question, permission cards) — see below. Pass
+`--folder` with the project to assess in: there is no chat project to default to (#2134).
 
 Runtimes out of the pool (not installed, not signed in, or marked out on the Runtimes page)
 are not assessed: `start_session` would refuse them too. Say which were skipped and why.
@@ -99,12 +98,10 @@ disagree, the daemon's table is the result, and the difference is itself a findi
 ## Running it unattended
 
 ```sh
-.agents/skills/assess-runtime/scripts/assess.py $ROOT claude [codex …]
-# or choose another project:
-.agents/skills/assess-runtime/scripts/assess.py $ROOT claude --folder $ROOT/work
+.agents/skills/assess-runtime/scripts/assess.py $ROOT claude [codex …] --folder $ROOT/work
 ```
 
-It starts each assessment through `runtimes/assess` in the chat project by default. It answers
+It starts each assessment through `runtimes/assess` in the `--folder` project. It answers
 the form (`pick` → the first option, `words` → a fixed phrase), the runtime's own question
 and every permission card with allow-once — except the card for the write outside the
 project, which it rejects, so the

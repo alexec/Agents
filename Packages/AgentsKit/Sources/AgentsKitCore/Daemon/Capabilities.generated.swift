@@ -283,7 +283,6 @@ public enum Capability {
         "projects/add": "projects/1",
         "projects/archive": "projects/1",
         "projects/bringBack": "projects/1",
-        "projects/chatState": "projects/1",
         "projects/clone": "projects/1",
         "projects/clones": "projects/1",
         "projects/delete": "projects/1",

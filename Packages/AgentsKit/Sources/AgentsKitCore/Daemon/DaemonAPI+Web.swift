@@ -277,8 +277,6 @@ public extension DaemonAPI {
                 Row(Method.approvalsRead, params: ApprovalReadRequest.self, result: GuardedChangeReading.self,
                     kind: .hostRequest),
                 Row(Method.approvalsAnswer, params: ApprovalAnswer.self, result: ProjectSummary.self, kind: .hostRequest),
-                // New Chat (#229): why a host has no chat project, asked only when none is listed.
-                Row(Method.projectsChatState, params: Empty.self, result: ChatProjectState.self, kind: .hostRequest),
                 Row(Method.filesWatch, params: FilesWatchRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.filesUnwatch, params: FilesWatchRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.artifactWrite, params: ArtifactWriteRequest.self, result: Empty.self, kind: .hostRequest),

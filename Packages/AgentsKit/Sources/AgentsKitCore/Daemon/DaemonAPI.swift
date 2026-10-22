@@ -235,9 +235,6 @@ public enum DaemonAPI {
         /// deletes one, and its record. Its folder is not touched. The person's alone;
         /// each client asks first.
         public static let projectsDelete = "projects/delete"
-        /// Why this host has a chat project or not (#229), for a New Chat that found no
-        /// summary marked `isChat` in the list.
-        public static let projectsChatState = "projects/chatState"
         /// The person setting a project's two helper limits (#64), from any window or
         /// paired client (#111). Not in `ConnectionRole.agentMethods`, so no agent and no
         /// workflow can raise a ceiling over agents.
@@ -653,20 +650,6 @@ public enum DaemonAPI {
         }
     }
 
-    /// Whether this host has a chat project, and why not (#229). `projects/list` is a
-    /// bare array, so the reason travels on its own call, asked only when New Chat finds
-    /// no summary marked `isChat`.
-    public enum ChatProjectState: Codable, Hashable, Sendable {
-        /// Laid out and live: New Chat starts in `folder`.
-        case ready(folder: URL)
-        /// The person archived it; the daemon leaves it so. Unarchive brings it back.
-        case archived(folder: URL)
-        /// A root with no personal home (a scratch root, a test) makes none.
-        case noPersonalHome
-        /// Something is in the way, in a sentence: the path is a file, or making it failed.
-        case failed(message: String)
-    }
-
     /// One project, named by its folder, because the folder is the identity.
     public struct ProjectRequest: Codable, Sendable {
         public var folder: URL
@@ -815,9 +798,6 @@ public enum DaemonAPI {
         /// Always none since #398, which dropped retiring: sent for a Remote older than
         /// that, whose summary cannot be read without it.
         private var retiredCount: Int = 0
-        /// True on the one project this host made for chats (#229), `~/.agents/chat`;
-        /// absent on every other, so an older reader sees an ordinary project.
-        public var isChat: Bool?
         /// The app-owned files in `.agents` changed outside the app and waiting for the
         /// person's Keep or Undo (#502); absent when none is, so an older reader sees
         /// nothing new. Until then the app goes on using the copy last approved.
@@ -849,7 +829,7 @@ public enum DaemonAPI {
 
         enum CodingKeys: String, CodingKey {
             case project, name, exists, lastActivityAt, counts, costToDate, unmeasuredAgents
-            case retiredCount, isChat, guardedChanges, approvals, helperLimitsSetBy
+            case retiredCount, guardedChanges, approvals, helperLimitsSetBy
         }
 
         /// Whether anything in this project wants the user.
@@ -888,7 +868,6 @@ public enum DaemonAPI {
             }
             costToDate = try c.decode([String: Decimal].self, forKey: .costToDate)
             unmeasuredAgents = try c.decode(Int.self, forKey: .unmeasuredAgents)
-            isChat = try c.decodeIfPresent(Bool.self, forKey: .isChat)
             guardedChanges = try? c.decodeIfPresent([GuardedChange].self, forKey: .guardedChanges)
             // One by one, so a kind or action from a newer host drops only its own item.
             approvals = (try? c.decodeIfPresent([LenientApproval].self, forKey: .approvals))

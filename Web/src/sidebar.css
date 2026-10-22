@@ -45,7 +45,6 @@
   border: none; background: none; padding: 4px 0; text-align: left; font: inherit; color: inherit; }
 /* The project is its group's heading (#495): its name in grey, so the sessions under it read first. */
 .with-sidebar .row.project .title { font-weight: 600; font-size: 0.75rem; opacity: 0.6; max-width: 100%; }
-.with-sidebar .row.project .project-chat { vertical-align: -1px; margin-right: 4px; }
 .with-sidebar .row.project .subtitle { font-size: 0.71875rem; }
 .with-sidebar .row.project .count { grid-column: 3; grid-row: 1; font-size: 0.6875rem; font-weight: 500; }
 .with-sidebar .project-fold.greyed .row, .with-sidebar .project-fold.greyed .subhead { opacity: 0.55; }

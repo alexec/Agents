@@ -186,7 +186,7 @@ func TestSharedSnapshotAnsweredOverTheSocket(t *testing.T) {
 func TestSharedSnapshotWithNoPersonalHome(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	d.ChatHome = ""
+	d.PersonalHome = ""
 	t.Setenv("AGENTS_PERSONAL_HOME", "")
 	raw := c.call(t, 1, "personal/shared", nil)
 	var s wire.SharedSnapshot

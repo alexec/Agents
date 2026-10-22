@@ -17,7 +17,7 @@ func TestASessionsMCPServers(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
 	home := t.TempDir()
-	d.ChatHome = home
+	d.PersonalHome = home
 	os.MkdirAll(filepath.Join(home, ".agents"), 0o755)
 	os.MkdirAll(filepath.Join(home, ".agents-secrets"), 0o700)
 	os.WriteFile(filepath.Join(home, ".agents", "mcp.json"), []byte(`{"mcpServers":{

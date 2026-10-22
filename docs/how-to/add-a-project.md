@@ -9,8 +9,8 @@ description: Add a folder or clone a Git URL as a project, and archive a project
 A project is a folder you work in. Every agent belongs to one. You add projects on the
 Mac; your iPhone and iPad show the same list.
 
-One project is there already: **chat**, which each host makes at `~/.agents/chat` for
-chats that need no project. See [Chat without a project](chat-without-a-project.md).
+To ask an agent something that needs no repository, add any folder, such as an empty one,
+as a project.
 
 ## Before you start
 
@@ -58,9 +58,6 @@ chats that need no project. See [Chat without a project](chat-without-a-project.
    it. Its folder, its agents and their conversations are kept, and its workflows stop
    running until it comes back.
 3. To unarchive it, open **Archived** and click **Unarchive** beside the project.
-
-The **chat** project can be archived too. It stays archived until you unarchive it, and
-**New Chat** offers to.
 
 There is no separate way to remove a project: archive it, and delete the folder in Finder
 if you no longer want it. **Show in Finder** on the same menu takes you there.

@@ -13,8 +13,7 @@ agent, in the project folder.
 ## Before you start
 
 - The project is a Git repository with at least one commit. In a folder that is not a
-  repository, such as the **chat** project, the choice below does not appear. See
-  [Add a project](add-a-project.md) and [Chat without a project](chat-without-a-project.md).
+  repository, the choice below does not appear. See [Add a project](add-a-project.md).
 
 ## Steps
 

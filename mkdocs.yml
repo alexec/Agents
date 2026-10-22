@@ -97,7 +97,6 @@ nav:
       - how-to/back-up-a-control-plane.md
       - how-to/release-agents-host.md
       - how-to/fix-agents-host-not-starting.md
-      - how-to/chat-without-a-project.md
       - how-to/add-a-project.md
       - how-to/start-in-a-worktree.md
       - how-to/give-an-agent-more-folders.md

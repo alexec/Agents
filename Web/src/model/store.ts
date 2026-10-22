@@ -9,7 +9,7 @@ import type {
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, ProjectRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
-  ChatProjectState, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
+  CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, HostJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
@@ -2162,11 +2162,6 @@ export class Store extends Work {
   async setProjectPinned(host: string, folder: string, pinned: boolean): Promise<void> {
     const summary = await this.act("projects/setPinned", { folder: folder as never, pinned }, host);
     if (summary) this.upsertProject(summary, host);
-  }
-
-  /** Why `host` has a chat project or not (#229), for a New Chat that found none listed. Throws a refusal. */
-  chatState(host: string): Promise<ChatProjectState> {
-    return this.link.call("projects/chatState", {}, host);
   }
 
   /** The folders at `path` on `host`, for choosing one as a project (037). Throws a refusal. */

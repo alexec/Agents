@@ -55,15 +55,14 @@ enum Appearance: String, CaseIterable, Identifiable {
     }
 }
 
-/// Settings ▸ Account (#846): what agents call you, and the chat project.
+/// Settings ▸ Account (#846): what agents call you.
 struct AccountSettingsView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         Form {
             PersonSettingsSection()
-            // How this person signs in on their other clients is You ▸ Sign-ins (#2197).
-            ChatProjectSettingsSection()
+            // How this person signs in on their other clients is Control plane ▸ Sign-ins (#2197).
         }
         .paperForm()
         .task { await model.refreshPerson() }

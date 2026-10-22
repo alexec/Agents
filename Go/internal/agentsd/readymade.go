@@ -81,7 +81,7 @@ func pushesToForge(folder string) bool {
 
 // addReadyMadeLocked lists the ready-made workflows that a folder has no file for.
 func (d *Daemon) addReadyMadeLocked(folder string, files map[string]map[string]*workflowFile) {
-	if !pushesToForge(folder) || folder == d.chatFolder() || !ownFolders(folder, workflowsRel) {
+	if !pushesToForge(folder) || !ownFolders(folder, workflowsRel) {
 		return
 	}
 	for _, id := range readyMadeIDs() {
