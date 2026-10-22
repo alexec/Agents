@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/alexec/agents/Go/internal/controllink"
@@ -230,5 +231,54 @@ func TestASenderThatNamesNoOneIsRefused(t *testing.T) {
 		if _, ok := plainSender(s); ok {
 			t.Fatalf("%+v", s)
 		}
+	}
+}
+
+// requestReads is a store that counts its reads of link requests.
+type requestReads struct {
+	store.Store
+	reads atomic.Int64
+}
+
+func (s *requestReads) Get(ctx context.Context, key string) (*store.Object, error) {
+	if strings.HasPrefix(key, linkRequestsPrefix) {
+		s.reads.Add(1)
+	}
+	return s.Store.Get(ctx, key)
+}
+
+func (s *requestReads) List(ctx context.Context, prefix string) ([]store.Key, error) {
+	if strings.HasPrefix(prefix, linkRequestsPrefix) {
+		s.reads.Add(1)
+	}
+	return s.Store.List(ctx, prefix)
+}
+
+// #2060: with as many requests waiting as may wait, a burst of messages from senders not
+// linked reads no request: what was read is used again until a request changes.
+func TestABurstOfStrangersReadsTheRequestsOnce(t *testing.T) {
+	st := &requestReads{Store: store.NewMemory()}
+	p := startPlane(t, st, controllink.NewPrivateKey())
+	_, owner := p.client("Alex's Mac")
+	sam := p.invite(owner, "Sam", wire.UserRoleMember)
+	box := p.machine(sam, "Sam's box")
+	for n := range linksOpen {
+		checkLink(t, p, box.member.Host, wire.ChannelSender{Channel: "slack", Identity: "U-" + itoa(n)})
+	}
+	if got := len(linkRequests(t, owner)); got != linksOpen {
+		t.Fatalf("%d requests wait", got)
+	}
+	st.reads.Store(0)
+	for n := range 100 {
+		checkLink(t, p, box.member.Host, wire.ChannelSender{Channel: "slack", Identity: "SPAM-" + itoa(n)})
+	}
+	if got := st.reads.Load(); got != 0 {
+		t.Fatalf("100 strangers read link requests %d times", got)
+	}
+	// A request decided is read again.
+	requests := linkRequests(t, owner)
+	call(t, owner, "", "links/deny", wire.ChannelLinkDecide{Request: requests[0].Request})
+	if got := len(linkRequests(t, owner)); got != linksOpen-1 {
+		t.Fatalf("%d requests wait after one was denied", got)
 	}
 }

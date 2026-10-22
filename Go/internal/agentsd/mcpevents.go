@@ -1149,8 +1149,9 @@ func (d *Daemon) deliverMCPEvents(result mcpPollResult, s *mcpSubscription, used
 	}
 	d.saveMCPRecordsLocked()
 	d.mcpEvMu.Unlock()
+	checks := senderChecks{}
 	for _, e := range fresh {
-		d.raiseMCPEvent(e, s)
+		d.raiseMCPEvent(e, s, checks)
 	}
 	d.mcpEvMu.Lock()
 	if r := d.mcpRecordsLocked().Subscriptions[s.id]; r != nil {
@@ -1165,12 +1166,13 @@ func (d *Daemon) deliverMCPEvents(result mcpPollResult, s *mcpSubscription, used
 
 // raiseMCPEvent puts one event on the log, which fires the workflows whose triggers it
 // matches. A channel message (one with a sender) is raised only when its sender is linked
-// to a person (#1762, FR-037); otherwise nothing starts, and it is not tried again.
-func (d *Daemon) raiseMCPEvent(e mcpPolled, s *mcpSubscription) wire.Event {
+// to a person (#1762, FR-037); otherwise nothing starts, and it is not tried again. checks
+// holds what was said of each sender in the same poll, or is nil.
+func (d *Daemon) raiseMCPEvent(e mcpPolled, s *mcpSubscription, checks senderChecks) wire.Event {
 	var linked wire.ChannelLinkChecked
 	if e.Sender != nil {
 		var ok bool
-		if linked, ok = d.senderLinked(*e.Sender); !ok {
+		if linked, ok = checks.linked(d, *e.Sender); !ok {
 			log.Printf("mcp events: %s %s evt %s is from a sender not linked to a person: nothing started", s.server, s.event, *e.EventID)
 			return wire.Event{}
 		}
@@ -1260,6 +1262,7 @@ func (d *Daemon) recoverMCPDelivering(ctx context.Context, s *mcpSubscription) {
 		log.Printf("mcp events: %s %s could not fetch %d event(s) again; kept to try at the next start", s.server, s.event, len(missing))
 		return
 	}
+	checks := senderChecks{}
 	for _, e := range result.Events {
 		if e.EventID == nil || !contains(missing, *e.EventID) || e.Name == nil || *e.Name != s.event {
 			continue
@@ -1271,7 +1274,7 @@ func (d *Daemon) recoverMCPDelivering(ctx context.Context, s *mcpSubscription) {
 		if seen {
 			continue
 		}
-		d.raiseMCPEvent(e, s)
+		d.raiseMCPEvent(e, s, checks)
 		d.mcpEvMu.Lock()
 		if r := d.mcpRecordsLocked().Subscriptions[s.id]; r != nil {
 			r.see([]string{*e.EventID}, at)
