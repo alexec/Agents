@@ -729,7 +729,9 @@ func agentModel(a *wire.Agent) string {
 
 // MARK: sandbox
 
-func sandboxRequired(p *wire.OrgPolicy) bool { return p != nil && p.Sandbox != nil && *p.Sandbox == "required" }
+func sandboxRequired(p *wire.OrgPolicy) bool {
+	return p != nil && p.Sandbox != nil && *p.Sandbox == "required"
+}
 
 const sandboxRequiredWords = "Your organisation requires the command sandbox."
 
@@ -1420,7 +1422,9 @@ func (d *Daemon) policyState() wire.PolicyState {
 	return st
 }
 
-func (d *Daemon) tellPolicyState() { Broadcast(d, wire.NotifyDaemonPolicyStateChanged, d.policyState()) }
+func (d *Daemon) tellPolicyState() {
+	Broadcast(d, wire.NotifyDaemonPolicyStateChanged, d.policyState())
+}
 
 func (d *Daemon) registerPolicy() {
 	On(d, wire.CallDaemonPolicyState, func(context.Context, *Client, wire.Empty) (wire.PolicyState, error) {

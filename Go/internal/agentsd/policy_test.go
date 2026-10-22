@@ -304,7 +304,10 @@ func TestEveryRuleAtEveryPath(t *testing.T) {
 			return call("agents/prompt", map[string]any{"agentID": gemini.ID, "text": "go on"})
 		}},
 		{"Continue in New: a runtime not allowed", "runtimes", func() *Error {
-			return asError(func() error { _, err := d.continueInProject(wire.ContinueInProjectRequest{AgentID: gemini.ID}); return err }())
+			return asError(func() error {
+				_, err := d.continueInProject(wire.ContinueInProjectRequest{AgentID: gemini.ID})
+				return err
+			}())
 		}},
 		{"Branch: a runtime not allowed", "runtimes", func() *Error {
 			return asError(func() error { _, err := d.fork(d.ctx, gemini.ID); return err }())
@@ -454,7 +457,9 @@ func TestARunningAgentMeetsANewPolicyAtItsNextTurn(t *testing.T) {
 	if v := stringValue(d.Store.Agent(id).StartOptions.Values["mode"]); v != "acceptEdits" {
 		t.Fatalf("mode %s", v)
 	}
-	if !slices.ContainsFunc(notes(d, id), func(s string) bool { return strings.HasPrefix(s, "The mode is now acceptEdits, not bypassPermissions.") }) {
+	if !slices.ContainsFunc(notes(d, id), func(s string) bool {
+		return strings.HasPrefix(s, "The mode is now acceptEdits, not bypassPermissions.")
+	}) {
 		t.Fatal(notes(d, id))
 	}
 	waitFor(t, "the end", func() bool { a := d.Store.Agent(id); return a.State == wire.AgentStateFinished })
