@@ -1,8 +1,8 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Remove a server the app added. The secret stays unless nothing else names it and
-/// the person asks to forget it (060, frame E).
+/// Remove a server, one the app added or one written by hand (#2154). The secret stays
+/// unless nothing else names it and the person asks to forget it (060, frame E).
 struct RemoveMCPServerSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -37,10 +37,16 @@ struct RemoveMCPServerSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Remove \(server.name)?").appText(.title)
-            Text("This takes it out of mcp.json. Agents started after that won't have it.")
+            Text(MCPHealthWords.removes(server.name, inProject: inProject))
                 .appText(.fine)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            if inProject {
+                Text(MCPHealthWords.removesCommitted)
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if let forgettable {
                 Toggle("Also forget \(forgettable)", isOn: $alsoForget)
                     .appText(.fine)
@@ -65,6 +71,11 @@ struct RemoveMCPServerSheet: View {
         .padding(20)
         .frame(width: 420)
         .paperSheet()
+    }
+
+    private var inProject: Bool {
+        if case .project = destination { return true }
+        return false
     }
 
     private func remove() async {

@@ -6473,6 +6473,7 @@ export interface Methods {
   "mcp/health": { params: Empty; result: MCPHealthSnapshot };
   "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
   "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
+  "mcp/remove": { params: MCPRemoveRequest; result: MCPRemoveAnswer };
   "milestones/state": { params: Empty; result: Milestones };
   "modes/remembered": { params: Empty; result: Record<string, JSONValue> };
   "options/remembered": { params: RememberedOptionsRequest; result: ConfigOption[] };
@@ -6684,6 +6685,7 @@ export const MethodTarget = {
   "mcp/health": "host",
   "mcp/health/check": "host",
   "mcp/hosted": "host",
+  "mcp/remove": "host",
   "milestones/state": "host",
   "modes/remembered": "host",
   "options/remembered": "host",

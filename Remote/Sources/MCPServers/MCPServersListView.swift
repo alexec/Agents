@@ -5,7 +5,7 @@ import SwiftUI
 /// person's connections first. Then every MCP server in one `mcp.json` and how each is doing
 /// (#753), as the window's: under Activity, the person's own on the Mac (#589); under a
 /// project, its `.agents/mcp.json`.
-/// Read-only but for Check Now: servers are edited in Settings.
+/// Read-only but for Check Now and Remove… (#2154): servers are edited in Settings.
 struct MCPServersListView: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.scenePhase) private var scenePhase
@@ -16,6 +16,10 @@ struct MCPServersListView: View {
     @State private var connections: [DaemonAPI.Connection]?
     /// Why the set-up or the connections did not read.
     @State private var setupProblem: String?
+    /// The connector Remove… asks about (#2154).
+    @State private var removing: DaemonAPI.MCPServerHealth?
+    /// Why the last Remove… did not take it out.
+    @State private var removeProblem: String?
 
     private var snapshot: DaemonAPI.MCPHealthSnapshot? { model.work.mcpHealthSnapshot(project?.host ?? .mac) }
 
@@ -48,8 +52,20 @@ struct MCPServersListView: View {
                     Text(project == nil ? MCPHealthWords.personalEmpty : MCPHealthWords.projectEmpty)
                         .foregroundStyle(.secondary)
                 }
-                ForEach(servers) { MCPHealthRow(server: $0) }
-                    .paperListRow()
+                if let removeProblem {
+                    Text(removeProblem).foregroundStyle(StateTint.failure.style(or: .secondary))
+                }
+                ForEach(servers) { server in
+                    MCPHealthRow(server: server)
+                        // Every connector (#2154), one written by hand in mcp.json too.
+                        .swipeActions {
+                            Button("Remove…", role: .destructive) { removing = server }
+                        }
+                        .contextMenu {
+                            Button("Remove…", systemImage: "trash", role: .destructive) { removing = server }
+                        }
+                }
+                .paperListRow()
             } header: {
                 Text(project == nil ? "Your connectors" : "All connectors")
             } footer: {
@@ -69,6 +85,16 @@ struct MCPServersListView: View {
                 }
             }
             .disabled(checking || !servers.contains { !$0.hosted })
+        }
+        .confirmationDialog(removing.map { "Remove \($0.name)?" } ?? "",
+                            isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
+                            titleVisibility: .visible, presenting: removing) { server in
+            Button("Remove", role: .destructive) {
+                Task { removeProblem = await model.removeConnector(server.name, project: project)?.words }
+            }
+        } message: { server in
+            Text(MCPHealthWords.removes(server.name, inProject: project != nil)
+                 + (project != nil ? " " + MCPHealthWords.removesCommitted : ""))
         }
         // The servers are read with the leases.
         .shows([.leases])

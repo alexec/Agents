@@ -3139,6 +3139,11 @@
     {
       "name": "mcp/remove",
       "x-capability": "mcp/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {

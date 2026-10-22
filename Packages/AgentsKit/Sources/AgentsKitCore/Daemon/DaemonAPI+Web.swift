@@ -98,6 +98,8 @@ public extension DaemonAPI {
                 Row(Method.mcpHealth, params: Empty.self, result: MCPHealthSnapshot.self, kind: .hostRequest),
                 Row(Method.mcpHealthCheck, params: MCPHealthCheckRequest.self, result: MCPHealthSnapshot.self,
                     kind: .hostRequest),
+                // Remove… on a Connectors page (#2154).
+                Row(Method.mcpRemove, params: MCPRemoveRequest.self, result: MCPRemoveAnswer.self, kind: .hostRequest),
                 // The person's connections (#1335) and a project's Connectors set-up (#1336).
                 Row(Method.connectionsList, params: Empty.self, result: ConnectionsList.self, kind: .hostRequest),
                 Row(Method.connectionsSignIn, params: ConnectionProviderRequest.self, result: ConnectionSignIn.self,
