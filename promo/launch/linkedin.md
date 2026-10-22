@@ -10,7 +10,7 @@ agents you already have, such as Claude, Codex and Copilot, and sorts them by wh
 Agents take turns with the simulator, wait for each other, and keep going when you close the
 window. You answer them from your iPhone, your iPad or a browser.
 
-It is open source, and it is open to everyone today.
+Its source is on GitHub for anyone to read, and it is open to everyone today.
 
 What it is and why I built it: POST_URL
 The site: https://www.agentloops.dev/

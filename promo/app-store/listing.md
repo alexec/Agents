@@ -61,7 +61,7 @@ WHAT YOU NEED
 - A Mac with Agents Host, a free download. It runs your agents, and this app is the window onto them. The app shows you where to get it, and docs.agentloops.dev says how to set it up.
 - An account with at least one of the coding agents above.
 
-Loops is open source under the MIT licence: github.com/alexec/Agents
+Loops' source is visible at github.com/alexec/Agents (all rights reserved).
 ```
 
 ## Support and marketing URLs

@@ -345,3 +345,7 @@ Every spec has a Docs section listing the pages on the docs site it adds or chan
 `scripts/docs.sh check` runs on every push, so the docs move with the code.
 
 The rules the specs are held to are in `.specify/memory/constitution.md`.
+
+## Licence
+
+Source visible, all rights reserved. See `LICENSE`.
