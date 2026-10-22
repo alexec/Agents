@@ -81,7 +81,7 @@ function InviteSheet({ store, close }: { store: Store; close: () => void }) {
   );
 }
 
-function RemoveSheet({ store, person, close }: { store: Store; person: PersonRow; close: () => void }) {
+export function RemoveSheet({ store, person, close }: { store: Store; person: PersonRow; close: () => void }) {
   const problem = useSignal<string | null>(null);
   const busy = useSignal(false);
   // What Remove would take (#1763), asked first; null from a control plane from before it.

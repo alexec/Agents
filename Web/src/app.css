@@ -1584,3 +1584,6 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .provider-sheet { max-width: 560px; }
 .provider-sheet .token-form textarea { font: inherit; font-family: var(--font-mono); font-size: 0.75rem; }
 .provider-sheet .token-form label.setting { flex-direction: row; justify-content: space-between; align-items: center; }
+/* Console ▸ Sign-In (#1002): a provider's actions in a row, and its domains and SCIM under it. */
+.org-actions { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 0 4px; }
+.org-domains, .org-scim { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--paper-rule); }

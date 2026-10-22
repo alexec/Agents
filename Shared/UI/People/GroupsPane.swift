@@ -17,6 +17,9 @@ struct GroupsPane: View {
     @State private var problem: String?
     @State private var editing: GroupSheet.Editing?
     @State private var removing: DaemonAPI.Group?
+    /// Console ▸ People and Groups on the web page, for a SCIM group's Edit in Console (#1002, D17).
+    @State private var console: URL?
+    @Environment(\.openURL) private var openURL
 
     private struct Load: Hashable {
         var reachable: Bool
@@ -41,6 +44,15 @@ struct GroupsPane: View {
                 ForEach(groups) { group in
                     Section {
                         Text(group.name).appText(.reading)
+                        // A SCIM group (#1002, FR-031): where it comes from, and whether it makes admins.
+                        // Read only here: an admin marks it in Console ▸ People and Groups (D17).
+                        if let source = group.source {
+                            Text(GroupWords.orgLine(group, provider: state.providerName(source.scim)))
+                                .appText(.fine).foregroundStyle(.secondary)
+                            if admin, let console {
+                                Button(PeopleWords.editInConsole) { openURL(console) }.buttonStyle(.borderless)
+                            }
+                        }
                         GroupLine(title: "People", words: GroupWords.members(group, people: people))
                         // Its bots apart from its people (#2132).
                         GroupLine(title: BotWords.title, words: GroupWords.bots(group, people: people))
@@ -77,6 +89,10 @@ struct GroupsPane: View {
         .task(id: Load(reachable: control != nil, revision: state.revision)) {
             while !(await load()), !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(3))
+            }
+            if let control, admin, console == nil {
+                let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
+                console = PeopleWords.consoleURL(status)
             }
         }
         .refreshable { await load() }

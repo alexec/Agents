@@ -92,12 +92,12 @@
 
 **Goal**: admins manage org providers, domains, SCIM and group roles on the web page.
 
-- [ ] T041 [US2] Add `Web/src/views/ConsoleSignIn.tsx` and the **Sign-In** section in `Web/src/model/console.ts` (Organisation group): built-in providers; org providers with presets, the redirect URI to copy, **Check**, **Replace Secret** (write only, fingerprint), **Who may join**, order, **Remove** (FR-030).
-- [ ] T042 [US3] Domains on the same page: the TXT record, **Check**, the two switches, the preview before **Require** is saved.
-- [ ] T043 [US4] SCIM on the same page: **Turn On SCIM**, the base URL, tokens shown once, last use, **Revoke**, the match attribute.
-- [ ] T044 [US5] Console ▸ People and Groups: SCIM groups with **From <provider>**, **Gives the admin role**; Requests kind **Remove** (FR-031).
-- [ ] T045 [US7] The Mac's and the Remote's Settings ▸ Control plane ▸ People show the providers read only with **Edit in Console** (D17).
-- [ ] T046 [P] Docs: `docs/how-to/sign-in-with-your-organisation.md` with the steps for Okta, Entra and Google Workspace (research R3, R5).
+- [x] T041 [US2] Add `Web/src/views/ConsoleSignIn.tsx` and the **Sign-In** section in `Web/src/model/console.ts` (Organisation group): built-in providers; org providers with presets, the redirect URI to copy, **Check**, **Replace Secret** (write only, fingerprint), **Who may join**, order, **Remove** (FR-030).
+- [x] T042 [US3] Domains on the same page: the TXT record, **Check**, the two switches, the preview before **Require** is saved.
+- [x] T043 [US4] SCIM on the same page: **Turn On SCIM**, the base URL, tokens shown once, last use, **Revoke**, the match attribute.
+- [x] T044 [US5] Console ▸ People and Groups: SCIM groups with **From <provider>**, **Gives the admin role**; Requests kind **Remove** (FR-031).
+- [x] T045 [US7] The Mac's and the Remote's Settings ▸ Control plane ▸ People show the providers read only with **Edit in Console** (D17).
+- [x] T046 [P] Docs: `docs/how-to/sign-in-with-your-organisation.md` with the steps for Okta, Entra and Google Workspace (research R3, R5).
 
 **Checkpoint**: quickstart step 6, then step 7.
 

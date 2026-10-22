@@ -48,6 +48,12 @@ const allowedURLs = new Set([
   "https://gitlab.com",
   // Connect Linear (#1343): the hand-back page, the one origin whose postMessage the page takes.
   "https://agentloops.dev",
+  // Console ▸ Sign-In (#1002): each preset's issuer, as a field's example text; the control plane reads the
+  // issuer's discovery document, never the page.
+  "https://acme.okta.com",
+  "https://login.microsoftonline.com/TENANT-ID/v2.0",
+  "https://accounts.google.com",
+  "https://sso.example.com",
   "http://www.w3.org/1998/Math/MathML",
   "http://www.w3.org/1999/xhtml",
   "http://www.w3.org/2000/svg",

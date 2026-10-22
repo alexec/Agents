@@ -163,5 +163,12 @@ struct ChannelLinkWordsTests {
         let json = #"{"name":"Team","version":"1","machineID":"m","publicWeb":"https://control.example.com/"}"#
         let status = try JSONDecoder().decode(DaemonAPI.ControlStatus.self, from: Data(json.utf8))
         #expect(PeopleWords.consoleURL(status)?.absoluteString == "https://control.example.com/#/console/people")
+        // A SCIM group's line on the Mac and the Remote (#1002, FR-031).
+        let scim = DaemonAPI.Group(id: "g", name: "Admins", source: .init(scim: "acme", displayName: "Admins"), role: "admin")
+        #expect(GroupWords.orgLine(scim, provider: "Acme Okta") == "From Acme Okta · Gives the admin role")
+        #expect(GroupWords.orgLine(DaemonAPI.Group(id: "h", name: "Eng", source: .init(scim: "acme", displayName: "Eng")),
+                                   provider: "Acme Okta") == "From Acme Okta")
+        // The providers' Edit in Console opens Console ▸ Sign-In (#1002, D17).
+        #expect(PeopleWords.signInConsoleURL(status)?.absoluteString == "https://control.example.com/#/console/signIn")
     }
 }

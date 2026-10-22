@@ -1375,7 +1375,12 @@
         "schema": {
           "$ref": "daemon.schema.json#/definitions/Group"
         }
-      }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
     },
     {
       "name": "handover/status",
@@ -2677,7 +2682,12 @@
         "schema": {
           "$ref": "daemon.schema.json#/definitions/RemoveRequestList"
         }
-      }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
     },
     {
       "name": "people/setRole",
@@ -3445,7 +3455,12 @@
         "schema": {
           "$ref": "daemon.schema.json#/definitions/OrgProviderKept"
         }
-      }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
     },
     {
       "name": "scim/tokens/list",
@@ -3466,7 +3481,12 @@
         "schema": {
           "$ref": "daemon.schema.json#/definitions/SCIMTokenList"
         }
-      }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
     },
     {
       "name": "scim/tokens/make",
@@ -3487,7 +3507,12 @@
         "schema": {
           "$ref": "daemon.schema.json#/definitions/SCIMTokenMade"
         }
-      }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
     },
     {
       "name": "scim/tokens/revoke",
@@ -3508,7 +3533,12 @@
         "schema": {
           "$ref": "daemon.schema.json#/definitions/Empty"
         }
-      }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
     },
     {
       "name": "signIn/addToMe",
@@ -3649,7 +3679,12 @@
         "schema": {
           "$ref": "daemon.schema.json#/definitions/DomainClaim"
         }
-      }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
     },
     {
       "name": "signIn/domains/claim",
@@ -3670,7 +3705,12 @@
         "schema": {
           "$ref": "daemon.schema.json#/definitions/DomainClaim"
         }
-      }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
     },
     {
       "name": "signIn/domains/list",
@@ -3691,7 +3731,12 @@
         "schema": {
           "$ref": "daemon.schema.json#/definitions/SignInDomainList"
         }
-      }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
     },
     {
       "name": "signIn/domains/preview",
@@ -3712,7 +3757,12 @@
         "schema": {
           "$ref": "daemon.schema.json#/definitions/SignInDomainPreview"
         }
-      }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
     },
     {
       "name": "signIn/domains/remove",
@@ -3733,7 +3783,12 @@
         "schema": {
           "$ref": "daemon.schema.json#/definitions/Empty"
         }
-      }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
     },
     {
       "name": "signIn/domains/set",
@@ -3754,7 +3809,12 @@
         "schema": {
           "$ref": "daemon.schema.json#/definitions/DomainClaim"
         }
-      }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
     },
     {
       "name": "signIn/orgProviders/check",
@@ -3775,7 +3835,12 @@
         "schema": {
           "$ref": "daemon.schema.json#/definitions/OrgProviderCheck"
         }
-      }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
     },
     {
       "name": "signIn/orgProviders/list",
@@ -3796,7 +3861,12 @@
         "schema": {
           "$ref": "daemon.schema.json#/definitions/OrgProviderList"
         }
-      }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
     },
     {
       "name": "signIn/orgProviders/remove",
@@ -3817,7 +3887,12 @@
         "schema": {
           "$ref": "daemon.schema.json#/definitions/Empty"
         }
-      }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
     },
     {
       "name": "signIn/orgProviders/set",
@@ -3838,7 +3913,12 @@
         "schema": {
           "$ref": "daemon.schema.json#/definitions/OrgProviderKept"
         }
-      }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
     },
     {
       "name": "signIn/orgStart",
