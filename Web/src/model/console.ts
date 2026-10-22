@@ -37,6 +37,8 @@ export const consoleSections: readonly Section[] = [
 /** Reports' pages. Each has three scopes: Me, a group and the organisation. */
 export const reportSections: readonly Section[] = [
   { id: "spend", title: "Spend", about: "Cost, tokens and time by person, group, project, machine and runtime.", group: "Reports", built: true },
+  { id: "outcomes", title: "Outcomes", about: "What the agents shipped: pull requests opened, merged and reverted, and the cost of each.", group: "Reports", built: true },
+  { id: "time", title: "Time", about: "Where the agents’ time goes: working, or waiting for a person.", group: "Reports", built: true },
 ];
 
 export function sectionsOf(app: SubApp): readonly Section[] {

@@ -42,6 +42,8 @@ type reportFile struct {
 	// the change it was last at.
 	Unsent map[string]int64 `json:"unsent,omitempty"`
 	Seq    int64            `json:"seq,omitempty"`
+	// EventsSeen is the last event log position counted into the hours (#2019).
+	EventsSeen int64 `json:"eventsSeen,omitempty"`
 }
 
 type reportBook struct {
@@ -105,6 +107,12 @@ func addRollupRow(r *wire.UsageRollupRow, o wire.UsageRollupRow) {
 	r.UnpricedTurns += o.UnpricedTurns
 	r.WorkingSeconds += o.WorkingSeconds
 	r.WaitingSeconds += o.WaitingSeconds
+	if o.Counts != nil {
+		if r.Counts == nil {
+			r.Counts = &wire.ReportCounts{}
+		}
+		addCounts(r.Counts, *o.Counts)
+	}
 }
 
 // pruneReport keeps the newest reportHoursKept hours, and only unsent hours still kept.
@@ -204,6 +212,10 @@ func (d *Daemon) reportTime(agent wire.UUID, runtime string, segments []timeSegm
 			var add wire.UsageRollupRow
 			if s.kind == "person" {
 				add.WaitingSeconds = next.Sub(from).Seconds()
+				// The wait counts once, in the hour it began, by its whole length (#2019).
+				if from.Equal(s.start) {
+					add.Counts = waitCounts(s.end.Sub(s.start))
+				}
 			} else {
 				add.WorkingSeconds = next.Sub(from).Seconds()
 			}
@@ -291,6 +303,7 @@ func (d *Daemon) sendReport() {
 	}
 	d.reportSending.Lock()
 	defer d.reportSending.Unlock()
+	d.countReportEvents()
 	for d.ctx.Err() == nil {
 		d.reportMu.Lock()
 		rollup, sent := d.rollupLocked()

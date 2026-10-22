@@ -40,6 +40,26 @@ Reports is one of the control plane's three apps on the web page, beside Workspa
 
 The Mac and the Remote show the Me scope only.
 
+## Reports ▸ Outcomes and Time, on the web page
+
+Two more pages of Reports (#2019), with the same scopes, ranges and **By** as Spend:
+
+- **Outcomes** (R2): what the agents shipped. Each line says the pull and merge requests
+  merged of those opened, the reverts, the cost of each merged one, the mean time from the
+  agent's start to the merge, and the sessions. The largest number merged comes first.
+- **Time** (R3): where the agents' time goes. Each line says the share of the time the
+  agents waited for a person, the waits and the length of the middle one, and the time
+  working. The most waiting comes first.
+- **A pull or merge request counts** when an agent made it on its own branch (a worktree's
+  branch) and the machine heard of it: a workflow or a wait on `pr.opened` or `pr.merged`
+  from the GitHub or GitLab server. Thus two machines that hear the same repository count it
+  once, and a person's own pull requests do not count. A revert is one whose title starts
+  with "Revert".
+- **A wait** is a question, a form or a permission that waits for its person in a turn. It
+  counts once, in the hour it began, by its whole length: under 1 minute, 1 to 5, 5 to 15,
+  15 to 60, 1 to 4 hours, or longer. The middle wait is the bucket it falls in.
+- **A machine from before #2019** sends no counts, so its rows count as nothing done.
+
 ## What a machine sends
 
 - **Each machine keeps its usage by the UTC hour**, by project and runtime, in
@@ -48,6 +68,10 @@ The Mac and the Remote show the Me scope only.
   cache write), the turns, the turns with no price, the working seconds and the waiting
   seconds. Working is the agent, its tools and waiting on others. Waiting is waiting for
   the person.
+- **The counts** (#2019): the sessions that began, the pull requests opened, merged and
+  reverted, their time to merge, and the waits for the person by length. The machine counts
+  them from its own event log (`events.jsonl`) at each send, from the position it counted
+  to last, and from its time ledger.
 - **The project** is the name of the project's folder. Thus the same repository on two
   machines adds up into one project.
 - **Each hour**, and each time the machine connects again, it sends the hours that changed
@@ -83,7 +107,9 @@ The Mac and the Remote show the Me scope only.
 - `reports/usage` with a range: `day` (the last 24 hours, by the hour), `week`, `month` or
   `threeMonths` (the last 7, 30 or 90 days, by the day). It gives the rows, oldest first.
 - `reports/export` with a range and a format: `csv` (the default) or `jsonl`. The CSV has
-  a cost column for each currency, such as `costUSD`.
+  a cost column for each currency, such as `costUSD`, then the counts (`sessions`,
+  `prsOpened`, `prsMerged`, `prsReverted`, `mergeSeconds`, `waits`; blank from a machine
+  before #2019), then `groups`.
 
 ## See also
 
