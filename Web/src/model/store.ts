@@ -10,11 +10,11 @@ import type {
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, ProjectRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
   ChatProjectState, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
-  PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
+  PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, HostJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
-  PolicyView, SignInRequest } from "../protocol/generated";
+  PolicyView, PolicyState, PassThroughName, SignInRequest } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
@@ -454,6 +454,10 @@ export class Work {
    * control/policyChanged and control/stopAll. Null until either; a view with no policy when none is set.
    */
   readonly orgPolicy = signal<PolicyView | null>(null);
+  /** Each host's policy as it follows it (daemon/policyState, #998): the red strip and the composer's reason. */
+  readonly policyStates = signal<Record<string, PolicyState>>({});
+  /** Each host's person's pass-through names, marked where the policy refuses one (settings/passThrough, #998). */
+  readonly passThrough = signal<Record<string, PassThroughName[]>>({});
   /** The last machine of the person's removed with secrets on it (#1760, control/secretsLeft), until read. */
   readonly secretsLeft = signal<SecretsLeft | null>(null);
   /** The mode last chosen for each runtime, by host (029). */
@@ -507,6 +511,9 @@ export class Work {
     switch (method) {
       case "agent/changed":
         this.upsertAgent(params as Agent, host);
+        return true;
+      case "daemon/policyStateChanged":
+        this.policyStates.value = { ...this.policyStates.value, [host]: params as PolicyState };
         return true;
       case "runtimes/accountProfilesChanged":
         this.accountProfiles.value = { ...this.accountProfiles.value, [host]: params as AccountProfile[] };
@@ -1225,6 +1232,11 @@ export class Store extends Work {
         return;
       }
       if (host) this.apply(method, params, host);
+      if (host && method === "daemon/policyStateChanged") {
+        // The marks on the lists change with the policy, and the page hears no change of them (#998).
+        void this.loadRuntimes(host);
+        void this.loadCost(host);
+      }
     });
     link.onState((state) => {
       if (state.kind === "open") void this.load();
@@ -1468,6 +1480,9 @@ export class Store extends Work {
       this.runtimes.value = without(this.runtimes.value);
       this.accounts.value = without(this.accounts.value);
       this.sandboxDefaults.value = without(this.sandboxDefaults.value);
+      this.sandboxSetBy.value = without(this.sandboxSetBy.value);
+      this.policyStates.value = without(this.policyStates.value);
+      this.passThrough.value = without(this.passThrough.value);
       this.rememberedModes.value = without(this.rememberedModes.value);
       this.resuming.value = without(this.resuming.value);
       this.events.value = without(this.events.value);
@@ -1873,6 +1888,8 @@ export class Store extends Work {
   readonly runtimeAllowances = signal<Record<string, RuntimeAllowances>>({});
   /** Each host's sandbox default per runtime (SandboxSettings); absent means its runtime decides. */
   readonly sandboxDefaults = signal<Record<string, Record<string, SandboxChoice>>>({});
+  /** Each host's mark while the organisation requires the sandbox (SandboxSettings.setBy, #998). */
+  readonly sandboxSetBy = signal<Record<string, PolicySetBy>>({});
   readonly accounts = signal<Record<string, RuntimeAccount[]>>({});
   /** A choice made on a menu that the host hasn't confirmed, by agent then option. */
   readonly pendingOptions = signal<Record<string, Record<string, JSONValue>>>({});
@@ -2137,7 +2154,7 @@ export class Store extends Work {
 
   /** What runs on a host, and what each runtime takes; asked once a connection. */
   async loadRuntimes(host: string): Promise<void> {
-    const [runtimes, accounts, modes, sandbox, allowances, profiles] = await Promise.all([
+    const [runtimes, accounts, modes, sandbox, allowances, profiles, policy, passThrough] = await Promise.all([
       this.link.call("runtimes/list", {}, host).catch(() => null),
       this.link.call("runtimes/accounts", {}, host).catch(() => null),
       this.link.call("modes/remembered", {}, host).catch(() => null),
@@ -2146,14 +2163,23 @@ export class Store extends Work {
       this.link.call("runtimes/allowances", null, host).catch(() => null),
       // A host on an older build has no added accounts (#840).
       this.link.call("runtimes/accountProfiles", {}, host).catch(() => null),
+      // A host on an older build follows no policy (#998).
+      this.link.call("daemon/policyState", {}, host).catch(() => null),
+      this.link.call("settings/passThrough", {}, host).catch(() => null),
     ]);
     batch(() => {
-      if (sandbox) this.sandboxDefaults.value = { ...this.sandboxDefaults.value, [host]: sandbox.defaults };
+      if (sandbox) {
+        this.sandboxDefaults.value = { ...this.sandboxDefaults.value, [host]: sandbox.defaults };
+        const { [host]: _, ...rest } = this.sandboxSetBy.value;
+        this.sandboxSetBy.value = sandbox.setBy ? { ...rest, [host]: sandbox.setBy } : rest;
+      }
       if (runtimes) this.runtimes.value = { ...this.runtimes.value, [host]: sortedRuntimes(runtimes) };
       if (allowances) this.runtimeAllowances.value = { ...this.runtimeAllowances.value, [host]: allowances };
       if (accounts) this.accounts.value = { ...this.accounts.value, [host]: accounts };
       if (profiles) this.accountProfiles.value = { ...this.accountProfiles.value, [host]: profiles };
       if (modes) this.rememberedModes.value = { ...this.rememberedModes.value, [host]: modes };
+      if (policy) this.policyStates.value = { ...this.policyStates.value, [host]: policy };
+      if (passThrough) this.passThrough.value = { ...this.passThrough.value, [host]: passThrough.names };
     });
   }
 

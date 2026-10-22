@@ -403,6 +403,13 @@ struct PromptBar: View {
                             }
                         }
                     }
+                    if !model.refusedRuntimes.isEmpty {
+                        Divider().padding(.vertical, 4)
+                        ForEach(model.refusedRuntimes) { status in
+                            SelectChoice(title: status.runtime.name, description: nil, isChosen: false,
+                                         setBy: status.setBy) {}
+                        }
+                    }
                     Divider().padding(.vertical, 4)
                     SelectChoice(title: "Sign in, sign out, providers…",
                                  description: nil,
@@ -845,6 +852,7 @@ struct PromptBar: View {
         // the placeholder rather than anything drawn over the field: the field has
         // one text style and one origin, and this way the words sit in it exactly as
         // the typed ones will.
+        if let refused = policyRefusal { return refused }
         if let suggestion { return suggestion.prompt }
         guard let agent else { return PromptWords.askPlaceholder }
         return PromptWords.placeholder(for: agent)
@@ -975,7 +983,8 @@ struct PromptBar: View {
                            runtimeDefault: model.sandboxSettings.choice(for: runtimeID),
                            codexMode: mode,
                            effective: agent?.effectiveSandbox,
-                           isWorking: agent?.state == .running) { choice in
+                           isWorking: agent?.state == .running,
+                           setBy: model.sandboxSettings.setBy) { choice in
                 if let agent {
                     Task { await model.setAgentSandbox(agent.id, choice) }
                 } else {
@@ -1048,7 +1057,15 @@ struct PromptBar: View {
     /// Something from this bar is on its way: the agent being started, or a prompt.
     private var isGoing: Bool { agent == nil ? model.isStarting : sending > 0 }
 
+    /// Why nothing can be sent on this Mac's host now, in its organisation's words (#998): the
+    /// kill switch, or no policy it can trust. A server says its own when it refuses.
+    private var policyRefusal: String? {
+        guard (agent?.host ?? model.selectedProjectHost) == .mac else { return nil }
+        return model.policyState?.composerReason
+    }
+
     private var canSend: Bool {
+        guard policyRefusal == nil else { return false }
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         // One new agent at a time: a second Return is not a second agent (#87).
         if agent == nil, model.isStarting { return false }

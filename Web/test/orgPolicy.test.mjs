@@ -152,3 +152,23 @@ test("Console ▸ Machines says whether each machine follows the policy", () => 
   assert.equal(o.followsWords(machine("a", ["host.policy/1"]), p, { a: 4 }), "Follows policy v4");
   assert.equal(o.followsWords(machine("a", ["host.policy/1"]), p, { a: 3 }), "Has v3 of v4");
 });
+
+// Slice 2b (T030–T034): what each client draws from the machine's marks and state.
+test("a host's policy state says why the composer cannot send, as on the Mac and the Remote", () => {
+  assert.equal(o.startsNothing(undefined), false);
+  assert.equal(o.composerReason({ stopAll: false, noPolicy: false }), null);
+  const stopped = { version: 3, stopAll: true, noPolicy: false,
+    refusal: { reason: "stopAll", rule: "stopAll", words: "Your organisation has stopped all agent work." } };
+  assert.equal(o.startsNothing(stopped), true);
+  assert.equal(o.composerReason(stopped), "Set by your organisation. Your organisation has stopped all agent work.");
+  const lost = { stopAll: false, noPolicy: true,
+    refusal: { reason: "noPolicy", words: "Agents Host has no policy from your organisation. Connect to the network." } };
+  assert.equal(o.composerReason(lost), "Agents Host has no policy from your organisation. Connect to the network.");
+});
+
+test("the organisation's budgets are rows on Cost, as on the Mac and the Remote", () => {
+  const money = (amount, currency) => `${currency} ${amount}`;
+  assert.deepEqual(o.budgetRows(undefined, money), []);
+  const rows = o.budgetRows({ daily: { amount: 40, currency: "USD" }, dailyTokens: 50000 }, money);
+  assert.deepEqual(rows.map((r) => [r.title, r.words]), [["Per day", "USD 40"], ["Tokens per day", "50,000 tokens"]]);
+});

@@ -12,6 +12,16 @@ struct StaleBanner: View {
     @Environment(RemoteModel.self) private var model
 
     var body: some View {
+        // The organisation stopped all agent work, or the Mac follows no policy it can trust
+        // (#998): on every page, under whatever says how the Mac is reached.
+        VStack(spacing: 0) {
+            reach
+            if !model.needsPairing, !model.isStale { OrgPolicyStrip(state: model.policyState) }
+        }
+    }
+
+    @ViewBuilder
+    private var reach: some View {
         if model.needsPairing {
             // Never paired, or forgotten by the Mac: the list below may still be what it
             // last knew, so the one thing to do is said here, on every screen.

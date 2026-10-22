@@ -182,12 +182,19 @@ public struct RuntimeStatus: Codable, Hashable, Sendable, Identifiable {
     /// Nil when it is in, or when only some of its models are out. For a client with no
     /// allowances of its own to split a chooser into Available and Out, as the page's (#257).
     public var isOut: Bool?
+    /// Set when the organisation's policy does not allow this runtime here (#998, FR-010):
+    /// the row is dimmed with **Set by your organisation**. Nil with no policy, or when allowed.
+    public var setBy: DaemonAPI.PolicySetBy?
 
     public var id: String { runtime.id }
+
+    /// Installed and allowed by the organisation's policy: a new agent can start on it.
+    public var canStart: Bool { availability.isAvailable && setBy == nil }
 
     /// Why it cannot be started, in the runtime's own terms, or nil when it can. One
     /// sentence, the same on the Mac and on a phone (029).
     public var unavailableReason: String? {
+        if let setBy { return OrgPolicyWords.line(setBy) }
         switch availability {
         case .available:
             return nil

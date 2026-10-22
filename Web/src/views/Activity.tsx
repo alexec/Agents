@@ -33,6 +33,7 @@ import { TimeCharts } from "./TimeCharts";
 import { MilestonesSection, TimeMilestonesUnder } from "./Milestones";
 import { isComplete } from "../model/milestones";
 import { Capability } from "../protocol/capabilities.generated";
+import { OrgBudget, OrgPolicyLine, PassThroughList } from "./OrgPolicyLine";
 
 function navigate(destination: { host: string; project: string; session?: string; workflow?: string }): void {
   const parts = ["h", destination.host, "p", destination.project];
@@ -310,12 +311,14 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
                   const now = allowanceSet ? fromWireDate(allowanceSet.at) : new Date();
                   return <Fragment key={status.runtime.id}>
                     <li class={isAllowanceOut || isOut(status) ? "out" : ""}>
-                      <p><span class="strong">{status.runtime.name}</span>{" "}
+                      <p class={status.setBy ? "set-by-org" : undefined}><span class="strong">{status.runtime.name}</span>{" "}
                         <span class="quiet small">{allowance?.unusable ? `Not usable: ${allowance.unusable}` : allowance ? allowanceLine(allowance.state) : availabilityWords(status.availability)}{status.outdated ? " · an update is out" : ""}</span></p>
                       {allowance && !allowance.unusable && allowanceReading(allowance.state, now) && <>
                         <p class="quiet small">{allowanceReading(allowance.state, now)}</p>
                         {allowance.state.reading && <AllowanceBar reading={allowance.state.reading} />}
                       </>}
+                      {/* A runtime the organisation does not allow here: shown, with why (#998). */}
+                      <OrgPolicyLine mark={status.setBy} />
                       {status.poolNote && <p class="quiet small">{status.poolNote}</p>}
                       {allowance?.setupNote && <p class="quiet small">{allowance.setupNote.split("`").map((part, i) => i % 2 ? <code key={i}>{part}</code> : part)}</p>}
                       {isAllowanceOut && allowance && <button onClick={() => void store.markRuntimeAvailable(host.id, allowance.credentialKey)}>Mark available</button>}
@@ -343,6 +346,8 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
                   </Fragment>;
                 })}
               </ul>
+              {/* The person's own pass-through names, a name the policy refuses dimmed (#998). */}
+              <PassThroughList names={store.passThrough.value[host.id] ?? []} />
             </section>
           ))}
           {page === "mcp" && (
@@ -664,6 +669,8 @@ function SpendingPage({ store, hostName }: { store: Store; hostName: (host: stri
             Daily limit {money(state.limits.daily.amount, state.limits.daily.currency)} · {headroom(state)}{dayLimitReached(state) && " · Nothing new will start until tomorrow"}</p>}
           {state.limits.perAgent && <p class="quiet small">
             Each agent up to {money(state.limits.perAgent.amount, state.limits.perAgent.currency)}</p>}
+          {/* The organisation's budgets, beside these: the lower is used (#998). */}
+          <OrgBudget state={state} />
           {state.note && <p class="quiet small">⚠︎ {state.note}</p>}
         </section>
       ))}

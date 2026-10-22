@@ -68,14 +68,16 @@
 
 **Goal**: US3 on all three clients. One PR per area when those areas are busy, else one PR.
 
-- [ ] T030 [US3] Add `Shared/UI/OrgPolicyLine.swift`: a dimmed choice with **Set by your organisation** and the rule in a help tip (Mac) or a detail line (Remote). Web: `Web/src/views/OrgPolicyLine.tsx`.
-- [ ] T031 [P] [US3] Runtimes area: the runtime list, the model menu (`ModelPill`), the mode menu, the sandbox capsule and failure card, on Mac, Remote and web.
-- [ ] T032 [P] [US3] Chat area: the new-agent form (`StartAgent`, `NewAgent.tsx`), and the chat line for a refused turn, a lowered mode, the budget line with **Ask for More**, and the kill-switch strip with the composer's reason.
-- [ ] T033 [P] [US3] Marketplace area: marketplaces not allowed are not listed; **Add by Hand** refused with the line.
-- [ ] T034 [P] [US3] Usage area: Cost shows the policy's budgets beside the person's, with the line; the helper limits rows in the project pane.
-- [ ] T035 [US3] Add a row per item of FR-020 to `specs/071-web-remote/walks/parity/`, and run `scripts/parity-counts.py`.
+- [x] T030 [US3] Add `Shared/UI/OrgPolicyLine.swift`: a dimmed choice with **Set by your organisation** and the rule in a help tip (Mac) or a detail line (Remote). Web: `Web/src/views/OrgPolicyLine.tsx`.
+- [x] T031 [P] [US3] Runtimes area: the runtime list, the model menu (`ModelPill`), the mode menu, the sandbox capsule and failure card, on Mac, Remote and web.
+- [x] T032 [P] [US3] Chat area: the new-agent form (`StartAgent`, `NewAgent.tsx`), and the chat line for a refused turn, a lowered mode, the budget line with **Ask for More**, and the kill-switch strip with the composer's reason.
+- [x] T033 [P] [US3] Marketplace area: marketplaces not allowed are not listed; **Add by Hand** refused with the line.
+- [x] T034 [P] [US3] Usage area: Cost shows the policy's budgets beside the person's, with the line; the helper limits rows in the project pane.
+- [x] T035 [US3] Add a row per item of FR-020 to `specs/071-web-remote/walks/parity/`, and run `scripts/parity-counts.py`.
 
 **Checkpoint**: walk the US3 list with `run-app`, the Remote walk simulator and headless Chrome (SC-007). Close each scratch app.
+
+**Built in the slice-2b lane (#998, Decided):** T030–T035 in one PR, because no other open PR held runtimes, chat, marketplace or usage when it opened. `OrgPolicyLine` also has `OrgPolicyMenuItem` (a native menu's dimmed item with the line as its second line), `OrgPolicyStrip`, `OrgBudgetRows` and `PassThroughRows`. The pass-through names are drawn read only where each client lists its runtimes, because no client writes `runtime-environment.json` yet. `daemon/policyState`, `daemon/policyStateChanged` and `settings/passThrough` are tagged `web`. **Left:** **Ask for More** on the budget line waits for slice 1b's `policy/askForMore`; the Remote was built and not walked (#2272).
 
 ## Phase 4: Slice 3, the admin policy page (areas: settings, reports)
 

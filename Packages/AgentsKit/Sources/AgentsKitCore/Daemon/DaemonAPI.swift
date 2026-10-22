@@ -815,6 +815,9 @@ public enum DaemonAPI {
         /// workflows, plugins, guarded files and sessions asking to be archived, as Needs
         /// You lists them on every client. Absent when nothing waits.
         public var approvals: [Approval]?
+        /// Set when the organisation's policy caps this project's helper limits (#998, #64):
+        /// the lower number is used, and the rows say so. Absent with no cap.
+        public var helperLimitsSetBy: PolicySetBy?
         /// Which machine the project is on, stamped by the window that heard of it and
         /// never sent (037). Not in `CodingKeys`.
         public var host: HostID = .mac
@@ -835,7 +838,7 @@ public enum DaemonAPI {
 
         enum CodingKeys: String, CodingKey {
             case project, name, exists, lastActivityAt, counts, costToDate, unmeasuredAgents
-            case retiredCount, isChat, guardedChanges, approvals
+            case retiredCount, isChat, guardedChanges, approvals, helperLimitsSetBy
         }
 
         /// Whether anything in this project wants the user.
@@ -879,6 +882,7 @@ public enum DaemonAPI {
             // One by one, so a kind or action from a newer host drops only its own item.
             approvals = (try? c.decodeIfPresent([LenientApproval].self, forKey: .approvals))
                 .map { $0.compactMap(\.approval) }
+            helperLimitsSetBy = try? c.decodeIfPresent(PolicySetBy.self, forKey: .helperLimitsSetBy)
         }
     }
 
@@ -1864,17 +1868,25 @@ public enum DaemonAPI {
         /// The tokens this local day has used, as a token limit counts them (#838).
         /// Zero from a daemon that predates it.
         public var tokensToday: Int
+        /// The organisation's budgets for this person today, with any raise (#998, FR-016).
+        /// Each limit in force is the lower of this and `limits`. Nil with no budget.
+        public var organisation: CostLimits?
+        /// Set when the organisation's budgets cap this person's own limits, or this person
+        /// is at a budget today (#998).
+        public var setBy: PolicySetBy?
 
         public init(limits: CostLimits, today: [String: Decimal], day: String, note: String? = nil,
-                    tokensToday: Int = 0) {
+                    tokensToday: Int = 0, organisation: CostLimits? = nil, setBy: PolicySetBy? = nil) {
             self.limits = limits
             self.today = today
             self.day = day
             self.note = note
             self.tokensToday = tokensToday
+            self.organisation = organisation
+            self.setBy = setBy
         }
 
-        enum CodingKeys: String, CodingKey { case limits, today, day, note, tokensToday }
+        enum CodingKeys: String, CodingKey { case limits, today, day, note, tokensToday, organisation, setBy }
 
         public init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -1883,6 +1895,8 @@ public enum DaemonAPI {
             day = try c.decode(String.self, forKey: .day)
             note = try c.decodeIfPresent(String.self, forKey: .note)
             tokensToday = try c.decodeIfPresent(Int.self, forKey: .tokensToday) ?? 0
+            organisation = try c.decodeIfPresent(CostLimits.self, forKey: .organisation)
+            setBy = try c.decodeIfPresent(PolicySetBy.self, forKey: .setBy)
         }
 
         /// Derived here rather than sent, so there is one place the rule lives.

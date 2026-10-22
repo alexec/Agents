@@ -115,6 +115,11 @@ final class AppModel {
     private(set) var person: PersonSettings?
     /// Each runtime's command sandbox default (064).
     private(set) var sandboxSettings = SandboxSettings()
+    /// The organisation's policy as this Mac's host follows it (#998): the red strip and the
+    /// composer's reason while the kill switch is on. Nil from a host without a policy capability.
+    private(set) var policyState: DaemonAPI.PolicyState?
+    /// The person's own pass-through names, each marked when the policy refuses it (#998).
+    private(set) var passThrough = DaemonAPI.PassThroughState()
 
     /// Why the Mac is, or is not, being kept awake (024). Nil until the daemon has
     /// said — and for ever against one too old to know the method, which is drawn the
@@ -1220,7 +1225,13 @@ final class AppModel {
     /// What a new agent can be started with, on the machine it would start on: the
     /// selected project's (037). A server's runtimes are the ones installed there.
     var availableRuntimes: [RuntimeStatus] {
-        runtimes(on: selectedProjectHost).filter { $0.availability.isAvailable }
+        runtimes(on: selectedProjectHost).filter(\.canStart)
+    }
+
+    /// Installed there, but not allowed by the organisation's policy (#998): the chooser
+    /// lists them, dimmed, with why, and never starts one.
+    var refusedRuntimes: [RuntimeStatus] {
+        runtimes(on: selectedProjectHost).filter { $0.availability.isAvailable && $0.setBy != nil }
     }
 
     /// This Mac's, whatever is selected: for saying nothing is installed on this Mac.
@@ -2231,6 +2242,18 @@ final class AppModel {
         }
     }
 
+    func refreshPolicyState() async {
+        guard let state = try? await macClient.call(DaemonAPI.Method.daemonPolicyState, DaemonAPI.Empty(),
+                                                 returning: DaemonAPI.PolicyState.self) else { return }
+        policyState = state
+    }
+
+    func refreshPassThrough() async {
+        guard let state = try? await macClient.call(DaemonAPI.Method.settingsPassThrough, DaemonAPI.Empty(),
+                                                 returning: DaemonAPI.PassThroughState.self) else { return }
+        passThrough = state
+    }
+
     func refreshSandboxSettings() async {
         guard let settings = try? await macClient.call(DaemonAPI.Method.sandboxState, Optional<String>.none,
                                                     returning: SandboxSettings.self) else { return }
@@ -3030,6 +3053,18 @@ final class AppModel {
             guard let settings = try? params?.decode(SandboxSettings.self) else { return }
             sandboxSettings = settings
 
+        case DaemonAPI.Notification.daemonPolicyStateChanged:
+            guard let state = try? params?.decode(DaemonAPI.PolicyState.self) else { return }
+            policyState = state
+            // The marks on the lists change with the policy: read them again (#998).
+            Task {
+                async let runtimes: Void = refreshRuntimes()
+                async let sandbox: Void = refreshSandboxSettings()
+                async let cost: Void = refreshCostState()
+                async let passThrough: Void = refreshPassThrough()
+                _ = await (runtimes, sandbox, cost, passThrough)
+            }
+
         case DaemonAPI.Notification.writeFailed:
             // Something nobody was waiting on was not kept: a full disk, or a folder
             // refusing writes. Said, so it is not found out at the next restart (#88).
@@ -3600,6 +3635,7 @@ final class AppModel {
         DaemonAPI.Notification.signInNeeded, DaemonAPI.Notification.clientPermissionsChanged,
         DaemonAPI.Notification.personChanged, DaemonAPI.Notification.sandboxChanged,
         DaemonAPI.Notification.backupsChanged, DaemonAPI.Notification.runtimesAccountProfilesChanged,
+        DaemonAPI.Notification.daemonPolicyStateChanged,
     ]
 
     /// What is this Mac's own, from this Mac's host by an id of its own (#1496). Its
@@ -3611,6 +3647,7 @@ final class AppModel {
         async let retention: Void = refreshRetentionState()
         async let clientPermissions: Void = refreshClientPermissions()
         async let sandbox: Void = refreshSandboxSettings()
+        async let policy: Void = refreshPolicyState()
         async let person: Void = refreshPerson()
         async let runtimeStates: Void = refreshRuntimeAllowances()
         async let wake: Void = refreshWakeState()
@@ -3621,7 +3658,7 @@ final class AppModel {
         async let events: Void = refreshEvents()
         async let modes: Void = refreshModes()
         async let display: Void = refreshDisplayPreferences()
-        _ = await (runtimes, accounts, cost, retention, clientPermissions, sandbox, person, runtimeStates, wake,
+        _ = await (runtimes, accounts, cost, retention, clientPermissions, sandbox, policy, person, runtimeStates, wake,
                    storeNotes, milestones, leases, hostedMCP, events, modes, display)
     }
 
@@ -3837,6 +3874,9 @@ final class AppModel {
            let reason = try? rpc.data?.decode(DaemonAPI.CatalogError.self) {
             return reason
         }
+        // The organisation's policy refused it (#998): its own words, as the other clients say them.
+        if let refusal = DaemonAPI.PolicyRefusal(error: error) { return .failed(refusal.line) }
+        if let rpc = error as? JSONRPCError { return .failed(rpc.message) }
         return .failed(String(describing: error))
     }
 

@@ -275,6 +275,78 @@ public extension DaemonAPI {
     }
 }
 
+public extension DaemonAPI {
+    /// `daemon/policyState` and `daemon/policyStateChanged` (#998, T027): the policy as this
+    /// machine follows it. The clients draw the red strip and the composer's reason from it.
+    struct PolicyState: Codable, Sendable, Hashable {
+        /// Absent when this machine has no policy.
+        public var version: Int?
+        public var policy: OrgPolicy?
+        /// The kill switch is on: this machine stops its turns and starts no work.
+        public var stopAll: Bool
+        /// This machine had a policy and has none it can trust now. It starts no work.
+        public var noPolicy: Bool
+        /// The capabilities the policy requires that this machine lacks (FR-014).
+        public var update: [String]?
+        /// Why this machine starts no work now, when it starts none.
+        public var refusal: PolicyRefusal?
+
+        public init(version: Int? = nil, policy: OrgPolicy? = nil, stopAll: Bool = false, noPolicy: Bool = false,
+                    update: [String]? = nil, refusal: PolicyRefusal? = nil) {
+            self.version = version
+            self.policy = policy
+            self.stopAll = stopAll
+            self.noPolicy = noPolicy
+            self.update = update
+            self.refusal = refusal
+        }
+
+        /// Whether this machine starts no work now: the kill switch, no policy it can trust, or
+        /// a capability it lacks.
+        public var startsNothing: Bool { stopAll || noPolicy || !(update ?? []).isEmpty || refusal != nil }
+
+        /// Why the composer cannot send, in the machine's words, or nil when it can.
+        public var composerReason: String? {
+            if let refusal { return refusal.line }
+            if stopAll { return "\(OrgPolicyWords.setBy). \(OrgPolicyWords.stoppedStrip)" }
+            return nil
+        }
+    }
+
+    /// One name in the person's own pass-through list (#998, FR-011a).
+    struct PassThroughName: Codable, Sendable, Hashable, Identifiable {
+        /// A variable's name, or a prefix ending in `*`.
+        public var name: String
+        /// The runtime it is passed to; absent for every runtime.
+        public var runtime: String?
+        /// Set when the policy does not allow the name: it is not passed.
+        public var setBy: PolicySetBy?
+
+        public var id: String { "\(runtime ?? "*")/\(name)" }
+
+        public init(name: String, runtime: String? = nil, setBy: PolicySetBy? = nil) {
+            self.name = name
+            self.runtime = runtime
+            self.setBy = setBy
+        }
+    }
+
+    /// `settings/passThrough` (#998): the person's own pass-through names, each marked when the
+    /// policy refuses it.
+    struct PassThroughState: Codable, Sendable, Hashable {
+        public var names: [PassThroughName]
+
+        public init(names: [PassThroughName] = []) {
+            self.names = names
+        }
+
+        /// The names passed to one runtime: its own, and those for every runtime.
+        public func names(for runtimeID: String) -> [PassThroughName] {
+            names.filter { $0.runtime == nil || $0.runtime == runtimeID }
+        }
+    }
+}
+
 public extension DaemonAPI.Failure {
     /// A choice the organisation's policy refuses (#998). `data`: `PolicyRefusal`.
     static let policyRefused = -32076
@@ -291,6 +363,10 @@ public extension DaemonAPI.Method {
     static let policyStopAll = "policy/stopAll"
     /// `PolicyRaiseRequest` → `PolicyKept`: an admin's (#998).
     static let policyRaise = "policy/raise"
+    /// `Empty` → `PolicyState`: the policy as this machine follows it (#998, T027).
+    static let daemonPolicyState = "daemon/policyState"
+    /// `Empty` → `PassThroughState`: the person's pass-through names, marked (#998).
+    static let settingsPassThrough = "settings/passThrough"
 }
 
 public extension DaemonAPI.Notification {
@@ -298,6 +374,8 @@ public extension DaemonAPI.Notification {
     static let controlPolicyChanged = "control/policyChanged"
     /// `PolicyView`: the kill switch went on or off (#998).
     static let controlStopAll = "control/stopAll"
+    /// `PolicyState`: the policy this machine follows changed, or the kill switch turned (#998).
+    static let daemonPolicyStateChanged = "daemon/policyStateChanged"
 }
 
 /// The words of the organisation's policy, on the Mac and the Remote (`Web/src/model/orgPolicy.ts`
@@ -309,6 +387,10 @@ public enum OrgPolicyWords {
     public static let symbol = "building.columns"
     public static let none = "Your organisation sets no policy."
     public static let editInConsole = "Edit in Console"
+    /// Over the person's pass-through names (`runtime-environment.json`).
+    public static let passThroughTitle = "Variables passed to it"
+    /// Under the budgets on Cost, when no budget is reached and none caps a limit of the person's.
+    public static let budgetFoot = "Your organisation’s budget. A lower limit of your own still applies."
     public static let foot = "Your organisation’s admins set these rules in Console ▸ Policy. Every machine follows them, also offline. A rule only caps your own settings: they come back when the rule does."
 
     // The kill switch (spec 998 US5).
@@ -472,6 +554,32 @@ public enum OrgPolicyWords {
     public static func running(_ board: DaemonAPI.FleetBoard?) -> Int? {
         let counts = (board?.machines ?? []).compactMap(\.running)
         return counts.isEmpty ? nil : counts.reduce(0, +)
+    }
+
+    /// The organisation's budgets in force for this person today (`CostState.organisation`, with
+    /// any raise), as rows beside the person's own limits on Cost: "Per day", "$40". Empty with none.
+    public static func budgetRows(_ limits: CostLimits?) -> [Rule] {
+        guard let limits else { return [] }
+        var out: [Rule] = []
+        if let d = limits.daily {
+            out.append(Rule(name: "budgets.daily", title: "Per day", words: d.amount.formatted(.currency(code: d.currency))))
+        }
+        if let t = limits.dailyTokens { out.append(Rule(name: "budgets.dailyTokens", title: "Tokens per day", words: tokens(t))) }
+        if let a = limits.perAgent {
+            out.append(Rule(name: "budgets.perAgent", title: "Per agent", words: a.amount.formatted(.currency(code: a.currency))))
+        }
+        if let t = limits.perAgentTokens {
+            out.append(Rule(name: "budgets.perAgentTokens", title: "Tokens per agent", words: tokens(t)))
+        }
+        return out
+    }
+
+    /// The mark on **Add by Hand** while the policy refuses MCP servers added by hand, in the
+    /// machine's words (`agentsd`'s refusal of `mcp/add-by-hand`); nil while it allows them.
+    public static func customServersMark(_ policy: DaemonAPI.OrgPolicy?) -> DaemonAPI.PolicySetBy? {
+        guard policy?.marketplaces?.customServers == "refuse" else { return nil }
+        return DaemonAPI.PolicySetBy(rule: "marketplaces.customServers",
+                                     words: "Your organisation does not allow MCP servers added by hand.")
     }
 
     /// The line under a refused choice: the mark's words, under **Set by your organisation**.

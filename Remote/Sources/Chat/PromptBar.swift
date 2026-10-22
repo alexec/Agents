@@ -188,7 +188,7 @@ struct PromptBar: View {
 
     private var field: some View {
         HStack(alignment: .bottom, spacing: 8) {
-            TextField(PromptWords.placeholder(for: agent), text: $text, selection: $selection, axis: .vertical)
+            TextField(policyRefusal ?? PromptWords.placeholder(for: agent), text: $text, selection: $selection, axis: .vertical)
                 .textFieldStyle(.plain)
                 .appText(.reading)
                 .lineLimit(1...8)
@@ -357,9 +357,16 @@ struct PromptBar: View {
         return styled
     }
 
+    /// Why nothing can be sent on the Mac's host now, in its organisation's words (#998). A
+    /// server says its own when it refuses.
+    private var policyRefusal: String? {
+        agent.host == .mac ? model.policyState?.composerReason : nil
+    }
+
     private var canSend: Bool {
+        guard policyRefusal == nil else { return false }
         // A stopped workspace that starts when used keeps what is sent until it is up (#691 US3).
-        (!model.isStale(agent) || model.startsWhenUsed(agent.host)) && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return (!model.isStale(agent) || model.startsWhenUsed(agent.host)) && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     /// Whether what is typed now will wait for the turn to end rather than go.
@@ -587,7 +594,8 @@ struct PromptBar: View {
                                runtimeDefault: model.sandboxSettings.choice(for: agent.runtimeID),
                                codexMode: agent.startOptions.values["mode"]?.stringValue,
                                effective: agent.effectiveSandbox,
-                               isWorking: agent.state == .running) { choice in
+                               isWorking: agent.state == .running,
+                               setBy: model.sandboxSettings.setBy) { choice in
                     Task { await model.setAgentSandbox(agent.id, choice) }
                 }
                 Spacer(minLength: 16)

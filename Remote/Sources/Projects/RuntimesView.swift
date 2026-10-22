@@ -13,7 +13,7 @@ struct RuntimesView: View {
         List {
             if let allowances = model.runtimeAllowances {
                 ForEach(allowances.rows) { row in
-                    RuntimeAllowanceRow(row: row, at: allowances.at)
+                    RuntimeAllowanceRow(row: row, at: allowances.at, setBy: setBy(of: row))
                         .swipeActions {
                             if row.state.isOut {
                                 Button("Mark available") { Task { await model.markRuntimeAvailable(row.credentialKey) } }
@@ -23,6 +23,19 @@ struct RuntimesView: View {
                                 Button("Remove", role: .destructive) { removing = account }
                             }
                         }
+                }
+            }
+            // The person's own pass-through names on the Mac, a name the policy refuses dimmed (#998).
+            if !model.passThrough.names.isEmpty {
+                Section("Variables passed to runtimes") {
+                    ForEach(model.passThrough.names) { name in
+                        VStack(alignment: .leading, spacing: 2) {
+                            PassThroughRows(names: [name])
+                            if let runtime = name.runtime {
+                                Text(OrgPolicyWords.runtimeName(runtime)).appText(.fine).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
                 }
             }
             if !model.accountProfiles.isEmpty {
@@ -75,8 +88,14 @@ struct RuntimesView: View {
                 Text("No runtimes on the Mac yet.").foregroundStyle(.secondary)
             }
         }
-        .task { await model.refreshRuntimeAllowances() }
-        .refreshable { await model.refreshRuntimeAllowances() }
+        .task {
+            await model.refreshRuntimeAllowances()
+            await model.refreshPassThrough()
+        }
+        .refreshable {
+            await model.refreshRuntimeAllowances()
+            await model.refreshPassThrough()
+        }
         .alert("Not added", isPresented: Binding(get: { addProblem != nil }, set: { if !$0 { addProblem = nil } })) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -94,6 +113,12 @@ struct RuntimesView: View {
         model.runtimes.filter { $0.runtime.accountFolderVariable != nil }
     }
 
+    /// The organisation's mark when its policy does not allow the row's runtime (#998).
+    private func setBy(of row: RuntimeAllowances.Row) -> DaemonAPI.PolicySetBy? {
+        let runtimeID = row.credentialKey.split(separator: ":").first.map(String.init)
+        return model.runtimes.first { $0.id == runtimeID }?.setBy
+    }
+
     private func account(of row: RuntimeAllowances.Row) -> AccountProfile? {
         row.accountID.flatMap { id in model.accountProfiles.first { $0.id == id } }
     }
@@ -102,10 +127,13 @@ struct RuntimesView: View {
 private struct RuntimeAllowanceRow: View {
     let row: RuntimeAllowances.Row
     let at: Date
+    var setBy: DaemonAPI.PolicySetBy?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(row.title).fontWeight(.semibold)
+                .foregroundStyle(setBy == nil ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+            if let setBy { OrgPolicyLine(mark: setBy) }
             Text(row.unusable.map { "Not usable: \($0)" } ?? row.line(now: at))
                 .appText(.fine)
                 .foregroundStyle(row.state.isOut ? StateTint.failure.style(or: .primary) : AnyShapeStyle(.secondary))

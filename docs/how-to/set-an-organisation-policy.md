@@ -80,6 +80,30 @@ The pane lists each rule in words, the version, and who changed it last. With no
 says "Your organisation sets no policy." An admin also sees **Edit in Console**, which opens
 Console ▸ Policy on the web page.
 
+## See what the policy refuses
+
+Every client shows a choice that the policy refuses. The choice is dimmed, and
+**Set by your organisation** is under it. On the Mac, hold the pointer over the line to read
+the rule. On the iPhone, the iPad and the web page, the rule is on the line.
+
+- **New agent**: a runtime that is not allowed is under its own heading, or under
+  *Can't start* on the web page. A mode above the ceiling, a model that is not allowed, and
+  each sandbox choice except **On** when the sandbox is required are dimmed.
+- **Chat**: the mode menu, the model menu and the sandbox menu are the same. The sandbox
+  failure card does not offer **Continue without sandbox** when the sandbox is required.
+- **Runtimes**: Settings ▸ Agent Runtimes on the Mac, Runtimes on the iPhone and the iPad,
+  and Activity ▸ Runtimes on the web page. A runtime that is not allowed says so. Each list
+  also shows your own pass-through variables. A variable that the policy does not allow is
+  dimmed, and the machine does not pass it.
+- **Cost**: Settings ▸ Cost on the Mac, and Spending on the other clients, show the
+  organisation's budget under your own limits. The lower number applies.
+- **Project Settings** on the Mac: a helper limit above the organisation's cap says so.
+- **Connectors** on the Mac: a marketplace that is not allowed is not listed.
+  **Add by Hand** does not add a server when servers added by hand are not allowed.
+
+When a machine refuses a turn or a start, the error says **Set by your organisation** and
+the rule.
+
 ## Stop all agent work
 
 Use this in an incident, for example a leaked key or a runaway cost.
@@ -89,8 +113,9 @@ Use this in an incident, for example a leaked key or a runaway cost.
 3. Confirm.
 
 Every online machine stops each running turn, refuses new agents and prompts, and pauses
-every workflow. Machines of bots stop too. Agents and their conversations are kept. The
-Policy pane shows "Your organisation has stopped all agent work." and who stopped it.
+every workflow. Machines of bots stop too. Agents and their conversations are kept. Every
+client shows a red strip at the top: "Your organisation has stopped all agent work.", with
+who stopped it. The prompt field says why it cannot send.
 
 To start again, choose **Resume Agent Work**, then confirm. Nothing starts again by itself.
 Each person sends their next prompt, and paused workflows run at their next trigger.

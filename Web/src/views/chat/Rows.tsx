@@ -7,7 +7,7 @@ import { createContext } from "preact";
 import { useContext, useEffect, useRef } from "preact/hooks";
 import type {
   AgentState, BackgroundItem, ContentBlock, EndedReason, FileReading, JSONValue, Plan, ToolCall, ToolCallContent, ToolCallLocation,
-  SandboxFailureRecord, SwitchRecord, TranscriptEntry, WorkReport,
+  PolicySetBy, SandboxFailureRecord, SwitchRecord, TranscriptEntry, WorkReport,
 } from "../../protocol/generated";
 import { lineDiff } from "../../model/diff";
 import { Lines } from "../Changes";
@@ -23,6 +23,7 @@ import { FileCard } from "./FileCard";
 import type { Shown } from "../../model/shownFile";
 import { switchNote } from "../../model/switchNote";
 import { continueWithout, keepStopped, sandboxCard } from "../../model/sandboxWords";
+import { OrgPolicyLine } from "../OrgPolicyLine";
 import { memo } from "../../render/memo";
 
 /** The text of a message's blocks: text blocks as Markdown, anything else named. */
@@ -131,6 +132,8 @@ export interface CallActions {
   showEdit: (diff: Extract<ToolCallContent, { type: "diff" }>, toolCallID: string | undefined) => void;
   /** The sandbox failure the open agent waits on an answer to (Agent.pendingSandboxFailure, #253). */
   waitingSandbox?: SandboxFailureRecord | undefined;
+  /** The organisation's mark while its policy requires the sandbox (#998): no Continue without sandbox. */
+  sandboxSetBy?: PolicySetBy | undefined;
   answerSandbox?: ((carryOn: boolean) => Promise<void>) | undefined;
   /** Open a subagent's own steps (ChatActions.subagentSteps, #544). */
   subagentSteps?: ((item: BackgroundItem) => void) | undefined;
@@ -267,10 +270,11 @@ function SandboxFailureCard({ record }: { record: SandboxFailureRecord }) {
       <p>{words.body}</p>
       {record.detail && <details><summary class="quiet">Show error details</summary><pre>{record.detail}</pre></details>}
       {(waiting || !record.recoveryOffered) && <p class="quiet">{words.offer}</p>}
+      <OrgPolicyLine mark={actions?.sandboxSetBy} />
       {waiting && (
         <p class="answers">
           <button disabled={sending.value} onClick={() => answer(false)}>{keepStopped}</button>
-          {record.recoveryOffered && (
+          {record.recoveryOffered && !actions?.sandboxSetBy && (
             <button class="prominent" disabled={sending.value} onClick={() => answer(true)}>{continueWithout}</button>
           )}
         </p>

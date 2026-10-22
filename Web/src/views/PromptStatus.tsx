@@ -1,4 +1,6 @@
-import type { Agent, CostState, SandboxChoice } from "../protocol/generated";
+import type { Agent, CostState, PolicySetBy, SandboxChoice } from "../protocol/generated";
+import { line } from "../model/orgPolicy";
+import { optionLabel } from "./OrgPolicyLine";
 import { sandboxChoices, sandboxExplanation, sandboxState, sandboxStateWords, sandboxWhy } from "../model/sandbox";
 import { costIsUnmeasured, dayTokenLimitReached, isAtMoneyLimit, isAtTokenLimit, tokenFigure } from "../model/limits";
 
@@ -33,22 +35,27 @@ export function ContextMeter({ agent, costs }: { agent: Agent; costs: CostState 
   </span>;
 }
 
-export function SandboxCapsule({ runtimeID, override, runtimeDefault = "runtime", mode, onChange, disabled = false }: {
+export function SandboxCapsule({ runtimeID, override, runtimeDefault = "runtime", mode, onChange, disabled = false, setBy }: {
   runtimeID: string; override?: SandboxChoice | undefined; runtimeDefault?: SandboxChoice | undefined; mode?: string | undefined;
   onChange?: ((choice: SandboxChoice | undefined) => void) | undefined; disabled?: boolean | undefined;
+  /** The organisation's mark while its policy requires the sandbox (#998): only On is in force. */
+  setBy?: PolicySetBy | undefined;
 }) {
   const state = sandboxState(runtimeID, override ?? runtimeDefault, mode);
   const choices = sandboxChoices(runtimeID);
   const why = sandboxWhy(runtimeID);
-  if (!choices.length || !onChange) return <span class="pill quiet" title={why ?? sandboxStateWords(state)}>{sandboxStateWords(state)}</span>;
+  if (!choices.length || !onChange) return <span class="pill quiet" title={setBy ? line(setBy) : why ?? sandboxStateWords(state)}>{sandboxStateWords(state)}</span>;
+  // While the organisation requires the sandbox, each choice but On is shown, dimmed, not chosen (#998).
+  const refused = (choice: SandboxChoice | undefined) => setBy !== undefined && choice !== "on";
   return <label class="pill select" title={sandboxExplanation(override ?? runtimeDefault, runtimeID, runtimeID)}>
     <span aria-hidden="true">{sandboxStateWords(state)} ▾</span>
     <select aria-label="Command sandbox" disabled={disabled} value={override ?? ""} onChange={(e) => {
       const value = (e.currentTarget as HTMLSelectElement).value;
       onChange(value ? value as SandboxChoice : undefined);
     }}>
-      <option value="">Use runtime default</option>
-      {choices.map((choice) => <option key={choice} value={choice}>{choice === "runtime" ? "As configured by runtime" : choice === "on" ? "On" : "Off"}</option>)}
+      <option value="" disabled={refused(runtimeDefault)}>{optionLabel("Use runtime default", refused(runtimeDefault) ? setBy : undefined)}</option>
+      {choices.map((choice) => <option key={choice} value={choice} disabled={refused(choice)} title={refused(choice) ? line(setBy!) : undefined}>
+        {optionLabel(choice === "runtime" ? "As configured by runtime" : choice === "on" ? "On" : "Off", refused(choice) ? setBy : undefined)}</option>)}
     </select>
   </label>;
 }

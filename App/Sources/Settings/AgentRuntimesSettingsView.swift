@@ -14,6 +14,8 @@ struct AgentRuntimesSettingsView: View {
         Form {
             if let status {
                 Section {
+                    // A runtime the organisation does not allow here: shown, with why (#998).
+                    if let mark = status.setBy { OrgPolicyLine(mark: mark) }
                     RuntimeInstallRow(status: status)
                     // A runtime whose only way in is a key from Settings (Gemini, 046) takes
                     // it here, beside where it is installed. The same key is lent to servers.
@@ -40,6 +42,12 @@ struct AgentRuntimesSettingsView: View {
                     SandboxDefaultRow(runtimeID: status.id, name: status.runtime.name)
                 }
                 .paperListRow()
+                // The person's own pass-through names, a name the policy does not allow dimmed (#998).
+                let names = model.passThrough.names(for: status.id)
+                if !names.isEmpty {
+                    Section(OrgPolicyWords.passThroughTitle) { PassThroughRows(names: names) }
+                        .paperListRow()
+                }
             }
         }
         .paperForm()
@@ -47,6 +55,7 @@ struct AgentRuntimesSettingsView: View {
             await model.refreshRuntimes()
             await model.refreshClientPermissions()
             await model.refreshSandboxSettings()
+            await model.refreshPassThrough()
         }
     }
 
@@ -117,18 +126,27 @@ private struct SandboxDefaultRow: View {
         let entry = SandboxCatalog.entry(for: runtimeID)
         if choices.isEmpty {
             LabeledContent("Default", value: stateWords(entry))
+            // No sandbox the app can vouch for, so the organisation's rule refuses it (#998).
+            if let mark = model.sandboxSettings.setBy { OrgPolicyLine(mark: mark) }
             if let why = entry?.why { supporting(why) }
         } else {
             Picker("Default", selection: binding) {
                 ForEach(choices, id: \.self) { choice in
+                    // While the organisation requires the sandbox, only On is in force (#998): the rest shown, not chosen.
                     Text(SandboxWords.choice(choice, runtimeID: runtimeID)).tag(choice)
+                        .disabled(isRefused(choice))
                 }
             }
+            if let mark = model.sandboxSettings.setBy { OrgPolicyLine(mark: mark) }
             supporting(SandboxWords.explanation(model.sandboxSettings.choice(for: runtimeID),
                                                 runtimeID: runtimeID, name: name))
             if let why = entry?.why { supporting(why) }
             supporting("New \(name) agents follow this unless one is set otherwise; a change applies from each one’s next turn.")
         }
+    }
+
+    private func isRefused(_ choice: SandboxChoice) -> Bool {
+        model.sandboxSettings.setBy != nil && choice != .on
     }
 
     private func stateWords(_ entry: SandboxCatalog.Entry?) -> String {

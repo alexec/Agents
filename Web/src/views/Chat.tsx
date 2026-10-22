@@ -55,6 +55,7 @@ import { Capability } from "../protocol/capabilities.generated";
 import { hostNeedsUpdate } from "../model/capabilities";
 import { WorkingMark } from "./SessionRow";
 import { runningTool, runningToolLabel } from "../model/sidebar";
+import { composerReason } from "../model/orgPolicy";
 
 /** One opened turn's entries, so an earlier page can be put in front and drawn again (#291). */
 interface HeldTurn {
@@ -85,6 +86,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   const down = linkDown || hostDown;
   // A stopped workspace that starts when used still takes a prompt, kept until it is up (#691 US3).
   const keeps = hostDown && store.startsWhenUsed(host);
+  // Why nothing can be sent to this host now, in its organisation's words (#998): the kill switch, or no policy.
+  const refusedHere = composerReason(store.policyStates.value[host]);
   const r = route.value;
   const agent = store.agent(host, session);
   // Opened: its runtime starts now, so the reply does not wait for it (#183). Once it has been
@@ -185,6 +188,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       branchNeedsUpdate: !!agent && agent.state !== "archived" && !store.has(host, Capability.chatBranch1),
       // Answered only while the agent waits on it, and while its host answers (#253).
       waitingSandbox: agent?.pendingSandboxFailure,
+      sandboxSetBy: store.sandboxSetBy.value[host],
       answerSandbox: agent?.pendingSandboxFailure && !down ? (carryOn) => store.answerSandbox(host, session, carryOn) : undefined,
       subagentSteps: (item) => (subagent.value = item),
       // A card opens its file as the agent's call did: the same path as `agent/showFile` (#836).
@@ -563,7 +567,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       <footer class="foot">
         <BackgroundRows store={store} host={host} agent={agent} disabled={down} steps={(item) => (subagent.value = item)} />
         {agent && <Capsules store={store} host={host} agent={agent} />}
-        <Prompt store={store} draftKey={`${host}|${session}`} placeholder={promptPlaceholder(agent)} disabled={(down && !keeps) || !agent}
+        <Prompt store={store} draftKey={`${host}|${session}`} placeholder={refusedHere ?? promptPlaceholder(agent)}
+          disabled={(down && !keeps) || !agent || refusedHere !== null}
           stop={agent && hasTurnInFlight(agent) ? () => void store.perform(host, agent.id, "agents/stop") : undefined}
           acting={agent && store.onItsWay.value[agent.id]}
           queues={willQueue(agent)} suggestion={agent?.suggestedPrompts?.[0]}
@@ -595,6 +600,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
               besideMode={<SandboxCapsule runtimeID={agent.runtimeID} override={agent.sandboxOverride}
                 runtimeDefault={store.sandboxDefaults.value[host]?.[agent.runtimeID] ?? "runtime"}
                 mode={typeof agent.startOptions.values.mode === "string" ? agent.startOptions.values.mode : undefined} disabled={down}
+                setBy={store.sandboxSetBy.value[host]}
                 onChange={(choice) => void store.setAgentSandbox(host, agent.id, choice)} />} />
           )}
         </Prompt>

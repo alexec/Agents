@@ -13,7 +13,7 @@
 // again; and the form's runtime, choices and reach are kept between starts.
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import type { Attachment, BranchSummary, ConfigOption, JSONValue, Persona, RuntimeStatus, SandboxChoice, SlashCommand, StartRequest, UUID, WorktreeSize,
+import type { Attachment, BranchSummary, ConfigOption, JSONValue, Persona, PolicySetBy, RuntimeStatus, SandboxChoice, SlashCommand, StartRequest, UUID, WorktreeSize,
   WorktreeSummary } from "../protocol/generated";
 import type { SandboxWillNotStart, Store } from "../model/store";
 import { drawable, modeOption, modeStartsOn } from "../model/options";
@@ -39,6 +39,8 @@ import { BackToList } from "./BackToList";
 import { orderedProjects, projectLabel } from "./Sidebar";
 import { GuardedChangeCards } from "./GuardedChange";
 import { KeptBubbles } from "./Kept";
+import { composerReason, line } from "../model/orgPolicy";
+import { optionLabel } from "./OrgPolicyLine";
 
 type Where = { kind: "project" } | { kind: "new" } | { kind: "existing"; root: string } | { kind: "branch"; name: string }
   | { kind: "named"; name: string };
@@ -330,6 +332,8 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   useEffect(() => { for (const k of keptStarts) keptShown.current.add(k.id); }, [keptStarts]);
 
   const state = form.value.state;
+  // Why nothing can start on this host now, in its organisation's words (#998).
+  const refusedHere = composerReason(store.policyStates.value[host]);
   const runtimeName = listed.find((r) => r.runtime.id === chosenRuntime)?.runtime.name ?? "the runtime";
   /** Under a runtime's name: its pool note, else whether it is signed in (the window's signInNote). */
   const runtimeNote = (r: RuntimeStatus) => {
@@ -339,7 +343,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   };
   const runtimeOption = (r: RuntimeStatus) => {
     const said = unavailableReason(r) ?? runtimeNote(r);
-    return <option key={r.runtime.id} value={r.runtime.id} disabled={!("available" in r.availability)} title={said ?? ""}>
+    return <option key={r.runtime.id} value={r.runtime.id} disabled={!("available" in r.availability) || !!r.setBy} title={said ?? ""}>
       {r.runtime.name}{said ? ` — ${said}` : ""}</option>;
   };
   // Codex's sandbox is its mode (FR-005a), so its state is read off the mode chosen.
@@ -394,8 +398,9 @@ export function NewAgent({ store, host, folder, projectName, down }: {
         onInput={(e) => { if (isPrompt(e.target)) typed.value = e.target.value.length; }}>
         {/* A change to the project's own files that no session can be asked about (#531). */}
         <GuardedChangeCards store={store} host={host} where={{ folder }} down={down || !store.hostIsOnline(host)} />
-        <Prompt key={filled.value} store={store} draftKey={draftKey} placeholder="What should it do?"
-          capabilities={capabilities} disabled={down || !chosenRuntime || (!store.hostIsOnline(host) && !store.startsWhenUsed(host))} send={start}
+        <Prompt key={filled.value} store={store} draftKey={draftKey} placeholder={refusedHere ?? "What should it do?"}
+          capabilities={capabilities} disabled={down || !chosenRuntime || refusedHere !== null
+            || (!store.hostIsOnline(host) && !store.startsWhenUsed(host))} send={start}
           recipient={store.recipient(host)} starting commands={form.value.commands}
           where={(
             <>
@@ -501,6 +506,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
               besideMode={chosenRuntime && (
                 <SandboxPill runtimeID={chosenRuntime} name={runtimeName} override={sandbox.value} runtimeDefault={runtimeDefault}
                   codexMode={typeof codexMode === "string" ? codexMode : undefined} disabled={down}
+                  setBy={store.sandboxSetBy.value[host]}
                   choose={(choice) => {
                     sandbox.value = choice;
                     // Codex's sandbox is its mode (FR-005a): the draft's mode follows.
@@ -551,13 +557,16 @@ function worktreeDescription(worktree: WorktreeSummary, size?: WorktreeSize): st
  * The command sandbox, beside the mode it is so often mistaken for (064; SandboxCapsule): a menu
  * where the runtime has a route, else its state, with why as the tooltip.
  */
-function SandboxPill({ runtimeID, name, override, runtimeDefault, codexMode, disabled, choose }: {
+function SandboxPill({ runtimeID, name, override, runtimeDefault, codexMode, disabled, choose, setBy }: {
   runtimeID: string; name: string; override: SandboxChoice | undefined; runtimeDefault: SandboxChoice;
   codexMode: string | undefined; disabled: boolean; choose: (choice: SandboxChoice | undefined) => void;
+  /** The organisation's mark while its policy requires the sandbox (#998): only On is in force. */
+  setBy?: PolicySetBy | undefined;
 }) {
   const choices = sandboxChoices(runtimeID);
   const words = sandboxStateWords(sandboxState(runtimeID, override ?? runtimeDefault, codexMode));
-  if (!choices.length) return <span class="pill quiet" title={sandboxWhy(runtimeID) ?? words}>{words}</span>;
+  if (!choices.length) return <span class="pill quiet" title={setBy ? line(setBy) : sandboxWhy(runtimeID) ?? words}>{words}</span>;
+  const refused = (choice: SandboxChoice) => setBy !== undefined && choice !== "on";
   return (
     <label class="pill select" title="Command sandbox">
       <span aria-hidden="true">{words} ▾</span>
@@ -566,9 +575,11 @@ function SandboxPill({ runtimeID, name, override, runtimeDefault, codexMode, dis
           const v = (e.currentTarget as HTMLSelectElement).value;
           choose(v === "" ? undefined : v as SandboxChoice);
         }}>
-        <option value="">{sandboxOverrideWords(undefined, runtimeDefault, runtimeID)}</option>
+        <option value="" disabled={refused(runtimeDefault)}>
+          {optionLabel(sandboxOverrideWords(undefined, runtimeDefault, runtimeID), refused(runtimeDefault) ? setBy : undefined)}</option>
         {choices.map((c) => (
-          <option key={c} value={c} title={sandboxExplanation(c, runtimeID, name)}>{sandboxChoiceWords(c, runtimeID)}</option>
+          <option key={c} value={c} disabled={refused(c)} title={refused(c) ? line(setBy!) : sandboxExplanation(c, runtimeID, name)}>
+            {optionLabel(sandboxChoiceWords(c, runtimeID), refused(c) ? setBy : undefined)}</option>
         ))}
       </select>
     </label>

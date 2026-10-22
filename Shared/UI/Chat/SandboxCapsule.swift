@@ -15,6 +15,8 @@ struct SandboxCapsule: View {
     var effective: EffectiveSandbox?
     /// Whether a turn is running, so the menu can say when a change applies (FR-012).
     var isWorking = false
+    /// The organisation's mark while its policy requires the sandbox (#998): only On is in force.
+    var setBy: DaemonAPI.PolicySetBy?
     let choose: (SandboxChoice?) -> Void
 
     var body: some View {
@@ -32,19 +34,20 @@ struct SandboxCapsule: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, TouchTarget.capsuleVertical)
                 .fixedSize()
-                .help(SandboxCatalog.entry(for: runtimeID)?.why ?? words)
+                .help(setBy.map(OrgPolicyWords.line) ?? SandboxCatalog.entry(for: runtimeID)?.why ?? words)
         } else {
             SelectCapsule(name: standing?.reason.map { "Command sandbox: \($0)" } ?? "Command sandbox",
                           title: words) { dismiss in
                 SelectChoice(title: SandboxWords.override(nil, runtimeDefault: runtimeDefault, runtimeID: runtimeID),
-                             description: nil, isChosen: override == nil) {
+                             description: nil, isChosen: override == nil, setBy: runtimeDefault == .on ? nil : setBy) {
                     choose(nil)
                     dismiss()
                 }
                 ForEach(choices, id: \.self) { choice in
                     SelectChoice(title: SandboxWords.choice(choice, runtimeID: runtimeID),
                                  description: description(for: choice),
-                                 isChosen: override == choice) {
+                                 isChosen: override == choice,
+                                 setBy: choice == .on ? nil : setBy) {
                         choose(choice)
                         dismiss()
                     }

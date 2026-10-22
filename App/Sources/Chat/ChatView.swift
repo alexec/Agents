@@ -95,6 +95,7 @@ struct ChatView: View {
         .animation(.snappy(duration: 0.28), value: (popped?.id ?? model.selection) == nil)
         // Title stays on ContentView's detail: one owner for the window title.
         .environment(\.chatActions, chatActions)
+        .environment(\.orgSandboxSetBy, model.sandboxSettings.setBy)
         .environment(\.appViewStore, views)
         .environment(\.appViewActions, agent.map(appViewActions))
         // A view full screen is drawn in the chat's place, as a pinned page is (#187).

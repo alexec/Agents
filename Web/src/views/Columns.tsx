@@ -31,6 +31,7 @@ import { SettingsPage } from "./Settings";
 import { ContextMenu } from "./ContextMenu";
 import { MilestoneCard } from "./MilestoneCard";
 import { AppSwitcher, SubAppPage } from "./ConsoleApp";
+import { OrgPolicyStrip } from "./OrgPolicyLine";
 
 export function Columns({ session, store }: { session: Session; store: Store }) {
   const r = route.value;
@@ -58,6 +59,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
     <div class={`app depth-${depth}${r.files && r.session ? " files-open" : ""}${down ? " down" : ""}`}>
       {down && <Banner session={session} />}
       <Problem store={store} />
+      <OrgPolicyStrip store={store} />
       <AppSwitcher store={store} down={down} />
       {r.app ? <SubAppPage store={store} app={r.app} down={down} /> : <div class="columns with-sidebar" aria-busy={down}>
         <Sidebar session={session} store={store} linkDown={down} />

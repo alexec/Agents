@@ -1050,6 +1050,11 @@ final class RemoteModel {
     var startSandbox: SandboxChoice?
     /// Each runtime's sandbox default, read from the Mac, for "Use runtime default (Off)".
     private(set) var sandboxSettings = SandboxSettings()
+    /// The organisation's policy as the Mac's host follows it (#998): the red strip on every
+    /// page and the composer's reason while the kill switch is on. Nil from an older Mac.
+    private(set) var policyState: DaemonAPI.PolicyState?
+    /// The person's own pass-through names on the Mac, each marked when the policy refuses it (#998).
+    private(set) var passThrough = DaemonAPI.PassThroughState()
     private(set) var startChoicesState: StartChoicesState = .loading
     /// Why the last Send did not start anything, in one sentence. Shown in the page
     /// rather than as the app's alert.
@@ -1087,7 +1092,7 @@ final class RemoteModel {
     var startRuntimes: [RuntimeStatus] { runtimes(on: startHost) }
 
     private var startAvailableRuntimeIDs: [String] {
-        startRuntimes.filter(\.availability.isAvailable).map(\.runtime.id)
+        startRuntimes.filter(\.canStart).map(\.runtime.id)
     }
 
     /// What the page reads: the runtimes to choose from, and, for its runtime menu, what
@@ -1728,7 +1733,7 @@ final class RemoteModel {
     }
 
     var availableRuntimeIDs: [String] {
-        runtimes.filter(\.availability.isAvailable).map(\.runtime.id)
+        runtimes.filter(\.canStart).map(\.runtime.id)
     }
 
     /// What this runtime says it will take in a prompt, as the Mac reads it. Nothing
@@ -2749,6 +2754,16 @@ final class RemoteModel {
            let settings = try? notification.params?.decode(SandboxSettings.self) {
             self.sandboxSettings = settings
         }
+        if notification.method == DaemonAPI.Notification.daemonPolicyStateChanged,
+           let state = try? notification.params?.decode(DaemonAPI.PolicyState.self) {
+            self.policyState = state
+            // The marks on the lists change with the policy: read them again (#998).
+            Task {
+                await self.refreshRuntimes()
+                await self.refreshSandboxSettings()
+                await self.refreshCostState()
+            }
+        }
         if notification.method == DaemonAPI.Notification.runtimeChanged, self.parts.changed(.runtimes) {
             self.reloadRuntimes()
         }
@@ -2903,6 +2918,8 @@ final class RemoteModel {
         if carried?.disk == nil { await refreshDisk() }
         // The person's display choices (#1033): the sidebar and every chat read them.
         await refreshDisplayPreferences()
+        // The organisation's strip is on every page (#998), so it is read on every catch-up.
+        await refreshPolicyState()
         // What the Mac could not read (#205, #223), at the foot of the projects list.
         if carried?.storeNotes == nil { await refreshStoreNotes() }
         // The milestones (#984), for the Time page and the iPad's card.
@@ -4304,6 +4321,18 @@ final class RemoteModel {
                               returning: DaemonAPI.BackupRestoreResult.self)
     }
 
+    /// The Runtimes page's pass-through names; none from a Mac too old to say.
+    func refreshPassThrough() async {
+        passThrough = (try? await client.call(DaemonAPI.Method.settingsPassThrough, DaemonAPI.Empty(),
+                                              returning: DaemonAPI.PassThroughState.self)) ?? DaemonAPI.PassThroughState()
+    }
+
+    /// A Mac too old to know the method has no policy to follow.
+    private func refreshPolicyState() async {
+        policyState = try? await client.call(DaemonAPI.Method.daemonPolicyState, DaemonAPI.Empty(),
+                                             returning: DaemonAPI.PolicyState.self)
+    }
+
     /// A Mac too old to know the method leaves every runtime as configured, which is
     /// what it does.
     private func refreshSandboxSettings() async {
@@ -4700,6 +4729,10 @@ final class RemoteModel {
             // Its folder has gone (#119): said with the ways on, carrying what was typed.
             folderGone = FolderGoneAsk(agentID: agentID, message: error.message, text: what,
                                        attachments: attachments)
+            return false
+        } catch let error where DaemonAPI.PolicyRefusal(error: error) != nil {
+            // The organisation's policy refused the turn (#998): its own words, not a lost Mac.
+            problem = DaemonAPI.PolicyRefusal(error: error)!.line + " What you typed is still there."
             return false
         } catch {
             problem = (away(error, "that was not sent.") ?? "That did not reach your Mac.") + " What you typed is still there."
