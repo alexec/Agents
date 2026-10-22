@@ -144,6 +144,11 @@ func (m *Methods) peopleMethod(ctx context.Context, method string, params json.R
 	switch method {
 	case "people/list":
 		return m.peopleList(user, admin), nil
+	case "people/removeRequests":
+		if !admin {
+			return nil, fail(notPermitted, "Only an admin sees the requests.")
+		}
+		return m.s.removeRequests(ctx)
 	case "people/invite":
 		if !admin {
 			return nil, fail(notPermitted, "Only an admin can invite a person.")
@@ -182,6 +187,10 @@ func (m *Methods) peopleMethod(ctx context.Context, method string, params json.R
 			}
 			if p.RoleOrAdmin() == string(request.Role) {
 				return nil, nil
+			}
+			// A role a SCIM group gives is the provider's to change (FR-020).
+			if len(p.RoleFrom) > 0 {
+				return nil, fail(managedByProvider, "%s's role is set by their organisation's groups. Change it there.", p.Name)
 			}
 			if request.Role == wire.UserRoleMember && admins(all) <= 1 {
 				return nil, fail(notPermitted, "%s is the only admin. Make another person an admin first.", p.Name)
@@ -269,6 +278,21 @@ func (m *Methods) peopleList(user string, admin bool) wire.PeopleList {
 		if row.Machines == nil {
 			row.Machines = []wire.PersonMachine{}
 		}
+		// What their org provider says of them (#1002, FR-028).
+		if p.SCIM != nil && !p.SCIM.Deleted {
+			row.Scim = &wire.PersonSCIM{Provider: p.SCIM.Provider, ExternalId: optional(p.SCIM.ExternalID), UserName: p.SCIM.UserName,
+				Name: p.SCIM.Name, DisplayName: optional(p.SCIM.DisplayName), Emails: p.SCIM.Emails, Active: p.SCIM.Active}
+		}
+		if p.Provisioned {
+			row.Provisioned = new(true)
+		}
+		if p.Suspended != nil {
+			row.Suspended = &wire.PersonSuspended{By: p.Suspended.By, Provider: p.Suspended.Provider, At: wire.DateOf(p.Suspended.At.Time),
+				Why: optional(p.Suspended.Why)}
+		}
+		if len(p.RoleFrom) > 0 {
+			row.RoleFrom = p.RoleFrom
+		}
 		for _, sign := range p.SignIns {
 			in := wire.SignIn{Provider: sign.Provider, Email: optional(sign.Email), Login: optional(sign.Login)}
 			if sign.Added != nil {
@@ -347,6 +371,9 @@ func (m *Methods) removePerson(ctx context.Context, user string, from Caller) er
 	}
 	m.s.joins.dropFor(ctx, user)
 	m.s.links.dropFor(ctx, user)
+	// A Remove request answered, and the refresh tokens kept for them (#1002).
+	_ = m.s.cfg.Store.Delete(ctx, removeRequestKey(user))
+	m.s.signIns.dropRefreshes(ctx, user)
 	m.s.peopleChanged(user, true)
 	m.s.log("person " + user + " removed")
 	return nil

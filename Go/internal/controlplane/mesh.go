@@ -726,6 +726,16 @@ func (s *Service) apply(e controlEvent) {
 	case "groupsChanged":
 		// A group made, changed or removed at another copy (#1761).
 		s.tellGroupsChanged(e.Subject, s.records.Group(e.Subject) == nil)
+	case "personSuspended":
+		// A person suspended, or no longer, at another copy (#1002, D13): within 5 seconds here.
+		s.suspendedHere(e.Subject)
+	case "scimTokenRevoked":
+		s.scimTokens.forget()
+	case "notice":
+		var n wire.ControlNotice
+		if json.Unmarshal([]byte(e.Subject), &n) == nil {
+			s.noticeAdminsHere(n)
+		}
 	case "peopleChanged":
 		// Another copy's invite or removal makes this one a team, or not (#1763).
 		s.noteTeam()

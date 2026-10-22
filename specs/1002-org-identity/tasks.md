@@ -41,25 +41,25 @@
 
 ### Tests first
 
-- [ ] T014 [US4] Record the Okta and Entra request sets (research R4) as fixtures in `Go/internal/controlplane/scim/testdata/`, and test that they play with no failed request (SC-006).
-- [ ] T015 [P] [US4] Test auth: no token, a wrong, revoked or ended token, a token of another provider: `401`, nothing written; two live tokens at most; `lastUse` at most once a minute (FR-014).
-- [ ] T016 [P] [US4] Test users: create, `409` on a second `userName`, filters, pages of 100, PUT, PATCH (with and without `path`, `active` as a string), the match at first sign-in by `externalId` and by `userName`, a rename kept in `lastNames` (FR-015, FR-016).
-- [ ] T017 [P] [US4] Test suspension on two copies: `active: false` closes three clients with `suspended` in 5 s, keys stop renewing, org sign-ins refused, `user/suspended` sent; `DELETE` also adds a **Remove** request; `active: true` undoes it; the local owner sign-in stays (FR-017, SC-003).
-- [ ] T018 [P] [US5] Test groups: create with members, PATCH add and remove, a member of another provider refused, **Gives the admin role**, `managedByProvider` on `people/setRole`, the last admin kept with a notice, a deleted group with shares kept as a tombstone (FR-019 to FR-021).
-- [ ] T019 [P] [US6] (Q1 A) Test refresh checks: `invalid_grant` suspends; the provider down lets keys renew for 7 days after the last good check, then stops (FR-024).
-- [ ] T020 [P] [US4] Test the size: 5,000 users and 500 groups, p95 under 200 ms (FR-023).
+- [x] T014 [US4] Record the Okta and Entra request sets (research R4) as fixtures in `Go/internal/controlplane/scim/testdata/`, and test that they play with no failed request (SC-006).
+- [x] T015 [P] [US4] Test auth: no token, a wrong, revoked or ended token, a token of another provider: `401`, nothing written; two live tokens at most; `lastUse` at most once a minute (FR-014).
+- [x] T016 [P] [US4] Test users: create, `409` on a second `userName`, filters, pages of 100, PUT, PATCH (with and without `path`, `active` as a string), the match at first sign-in by `externalId` and by `userName`, a rename kept in `lastNames` (FR-015, FR-016).
+- [x] T017 [P] [US4] Test suspension on two copies: `active: false` closes three clients with `suspended` in 5 s, keys stop renewing, org sign-ins refused, `user/suspended` sent; `DELETE` also adds a **Remove** request; `active: true` undoes it; the local owner sign-in stays (FR-017, SC-003).
+- [x] T018 [P] [US5] Test groups: create with members, PATCH add and remove, a member of another provider refused, **Gives the admin role**, `managedByProvider` on `people/setRole`, the last admin kept with a notice, a deleted group with shares kept as a tombstone (FR-019 to FR-021).
+- [x] T019 [P] [US6] (Q1 A) Test refresh checks: `invalid_grant` suspends; the provider down lets keys renew for 7 days after the last good check, then stops (FR-024).
+- [x] T020 [P] [US4] Test the size: 5,000 users and 500 groups, p95 under 200 ms (FR-023).
 
 ### Build
 
-- [ ] T021 [US4] Add `PersonSCIM`, `PersonSuspended`, `GroupSource`, `SCIMToken`, `SCIMTokenMade`, the `scim/*` and `groups/setRole` methods, `user/suspended` and `host.suspend.1` to `Packages/Wire`. Run `scripts/wire.sh gen`.
-- [ ] T022 [US4] Add `Go/internal/controlplane/scim/`: the HTTP server for D11, the filter parser (`eq`, `and`), PATCH, the error schema, `ServiceProviderConfig`, `ResourceTypes`, `Schemas`; it calls a `Directory` interface. Route `/scim/v2/` in `service.go`.
-- [ ] T023 [US4] Add `Go/internal/controlplane/people_scim.go`: the `Directory` for users, provisioned people, the indexes, the match at first sign-in (called from `signin_org.go`), suspend and unsuspend (cut off with `control/cutOff`, stop renewals in `keylife.go`, `user/suspended` to machines, through the mesh to the other copies).
-- [ ] T024 [US5] Add `Go/internal/controlplane/groups_scim.go`: the `Directory` for groups, `groups/setRole`, `roleFrom` on people, the last-admin rule, tombstones with shares.
-- [ ] T025 [US4] Add `scim/tokens/*` and `scim/set` in `signin_org.go`.
-- [ ] T026 [US6] (Q1 A) Keep the sealed refresh token at sign-in; refresh at renewal and daily in `keylife.go`.
-- [ ] T027 [US4] Add the Requests kind `remove` in `Go/internal/controlplane/console.go`; answering it runs `removePerson`.
-- [ ] T028 [US4] Add the SCIM actions and the `scim` actor to `audit/audit.go`.
-- [ ] T029 [P] Docs: `docs/explanation/org-identity.md` gains SCIM and suspension; `docs/reference/sign-in.md` gains `/scim/v2/*`; `docs/how-to/invite-someone.md` (**Who may join**, SCIM).
+- [x] T021 [US4] Add `PersonSCIM`, `PersonSuspended`, `GroupSource`, `SCIMToken`, `SCIMTokenMade`, the `scim/*` and `groups/setRole` methods, `user/suspended` and `host.suspend.1` to `Packages/Wire`. Run `scripts/wire.sh gen`.
+- [x] T022 [US4] Add `Go/internal/controlplane/scim/`: the HTTP server for D11, the filter parser (`eq`, `and`), PATCH, the error schema, `ServiceProviderConfig`, `ResourceTypes`, `Schemas`; it calls a `Directory` interface. Route `/scim/v2/` in `service.go`.
+- [x] T023 [US4] Add `Go/internal/controlplane/people_scim.go`: the `Directory` for users, provisioned people, the indexes, the match at first sign-in (called from `signin_org.go`), suspend and unsuspend (cut off with `control/cutOff`, stop renewals in `keylife.go`, `user/suspended` to machines, through the mesh to the other copies).
+- [x] T024 [US5] Add `Go/internal/controlplane/groups_scim.go`: the `Directory` for groups, `groups/setRole`, `roleFrom` on people, the last-admin rule, tombstones with shares.
+- [x] T025 [US4] Add `scim/tokens/*` and `scim/set` in `signin_org.go`.
+- [x] T026 [US6] (Q1 A) Keep the sealed refresh token at sign-in; refresh at renewal and daily in `keylife.go`.
+- [x] T027 [US4] Add the Requests kind `remove` in `Go/internal/controlplane/console.go`; answering it runs `removePerson`.
+- [x] T028 [US4] Add the SCIM actions and the `scim` actor to `audit/audit.go`.
+- [x] T029 [P] Docs: `docs/explanation/org-identity.md` gains SCIM and suspension; `docs/reference/sign-in.md` gains `/scim/v2/*`; `docs/how-to/invite-someone.md` (**Who may join**, SCIM).
 
 **Checkpoint**: quickstart step 3.
 

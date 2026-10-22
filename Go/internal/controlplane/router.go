@@ -1228,6 +1228,10 @@ const ForgottenCloseCode = 4403
 
 // detachLocked ends a session: its channels are closed on every host, then its socket.
 func (r *Router) detachLocked(id string, code websocket.StatusCode) {
+	r.detachReasonLocked(id, code, "forgotten")
+}
+
+func (r *Router) detachReasonLocked(id string, code websocket.StatusCode, reason string) {
 	s := r.clients[id]
 	if s == nil {
 		return
@@ -1241,11 +1245,23 @@ func (r *Router) detachLocked(id string, code websocket.StatusCode) {
 		}
 	}
 	if code != 0 {
-		s.conn.CloseWith(code, "forgotten")
+		s.conn.CloseWith(code, reason)
 	} else {
 		s.conn.Close()
 	}
 	r.noteLinkLocked(s.caller.Client)
+}
+
+// CutOffPerson ends every session of a suspended person here, each told why with 4403
+// suspended (#1002, D13). Their clients keep their records and keys.
+func (r *Router) CutOffPerson(person string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for id, s := range r.clients {
+		if s.caller.Person == person {
+			r.detachReasonLocked(id, ForgottenCloseCode, "suspended")
+		}
+	}
 }
 
 // ForgetClient ends every session of a forgotten client, each told why with 4403.

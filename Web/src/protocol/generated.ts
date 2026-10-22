@@ -605,6 +605,10 @@ export interface AuditActor {
   client?: UUID;
   clientName?: string;
   event?: AuditCause;
+  /** A SCIM write: the user is scim:<provider> (#1002). */
+  scim?: AuditSCIM;
+  /** A suspension by a refused refresh: the user is the suspended person (#1002). */
+  refresh?: AuditRefresh;
 }
 
 /** The event that started a bot's action (#996). */
@@ -662,6 +666,19 @@ export interface AuditQuery {
   user?: string;
   /** At most this many, newest first; 200 when absent, never more than 1,000. */
   limit?: number;
+}
+
+/** A suspension by a refused refresh (#1002, Q1 A): the provider that refused. */
+export interface AuditRefresh {
+  provider: string;
+}
+
+/**
+ * A SCIM write's actor (#1002, D16): the provider and the id of the token it used, never its value.
+ */
+export interface AuditSCIM {
+  provider: string;
+  token: string;
 }
 
 export interface AuthStatus {
@@ -1734,6 +1751,15 @@ export interface ControlCodeShown {
   command?: string;
 }
 
+/**
+ * control/cutOff (#1002, D13): to every client of a suspended person, just before the control plane
+ * closes their sockets with 4403 suspended.
+ */
+export interface ControlCutOff {
+  why: "suspended";
+  provider?: string;
+}
+
 /** One place a control plane answers (R16). */
 export interface ControlEndpoint {
   url: string;
@@ -1806,6 +1832,17 @@ export interface ControlMoved {
 export interface ControlNewKey {
   key: string;
   proof: string;
+}
+
+/**
+ * control/notice (#1002): something an admin should know, that no click caused: lastAdminKept,
+ * groupSharesOrphaned or removeRequested; words to show, and whom it is about.
+ */
+export interface ControlNotice {
+  kind: "lastAdminKept" | "groupSharesOrphaned" | "removeRequested";
+  words: string;
+  user?: string;
+  group?: string;
 }
 
 /** The control plane's proof back: {"ok":…} (ControlAuth.OK). */
@@ -2650,6 +2687,10 @@ export interface Group {
   everyone: boolean;
   members: string[];
   caps?: SpendCaps;
+  /** A SCIM group's provider (#1002). Absent for a group an admin made. */
+  source?: GroupSource;
+  /** Gives the admin role (#1002, FR-020): its members are admins. */
+  role?: "admin";
 }
 
 /** groups/list (#1761): every group for an admin; for a member, the groups they are in. */
@@ -2662,6 +2703,12 @@ export interface GroupRequest {
   id: string;
 }
 
+/** groups/setRole (#1002, FR-020): mark a SCIM group as giving the admin role, or not (no role). */
+export interface GroupRoleSet {
+  group: string;
+  role?: "admin";
+}
+
 /** groups/set (#1761): makes a group, or with id changes one. One user is a list of one. */
 export interface GroupSet {
   id?: string;
@@ -2669,6 +2716,15 @@ export interface GroupSet {
   everyone?: boolean;
   members?: string[];
   caps?: SpendCaps;
+}
+
+/**
+ * Where a group comes from (#1002, FR-019): an org provider's SCIM. Only SCIM changes its members.
+ */
+export interface GroupSource {
+  scim: string;
+  externalId?: string;
+  displayName: string;
 }
 
 /** control/groupsChanged (#1761): a group was made, changed or removed. */
@@ -3784,6 +3840,8 @@ export interface OrgProvider {
    * /v1/oidc/callback. Only in answers.
    */
   redirectURI?: string;
+  /** SCIM for this provider (slice 2a). Set by scim/set only. */
+  scim?: OrgProviderSCIM;
 }
 
 /**
@@ -3831,6 +3889,15 @@ export type OrgProviderPreset =
 export interface OrgProviderRequest {
   id: string;
   rev?: string;
+}
+
+/**
+ * An org provider's SCIM (#1002, FR-013, FR-016): on or off, and the attribute that matches a
+ * provisioned person to a sign-in.
+ */
+export interface OrgProviderSCIM {
+  on: boolean;
+  match: SCIMMatch;
 }
 
 /**
@@ -4200,6 +4267,31 @@ export interface PersonRow {
   caps?: SpendCaps;
   /** A bot's spend today, UTC, as its machines reported it (#1761). */
   spentTodayUSD?: number;
+  /** What SCIM says of the person, for one SCIM made (#1002). Shown as Managed by <provider>. */
+  scim?: PersonSCIM;
+  /** Made by SCIM and not signed in yet: Waiting for first sign-in (#1002). */
+  provisioned?: boolean;
+  /** Suspended by their org provider (#1002, D13). */
+  suspended?: PersonSuspended;
+  /**
+   * The SCIM groups that give the person their role (#1002, FR-020): Set by <provider>. Absent: set
+   * by hand.
+   */
+  roleFrom?: string[];
+}
+
+/**
+ * What an org provider's SCIM says of a person (#1002, FR-015). The match is only inside its
+ * provider.
+ */
+export interface PersonSCIM {
+  provider: string;
+  externalId?: string;
+  userName: string;
+  name?: SCIMName;
+  displayName?: string;
+  emails?: SCIMEmail[];
+  active: boolean;
 }
 
 /**
@@ -4209,6 +4301,17 @@ export interface PersonRow {
 export interface PersonSettings {
   name?: string;
   pronouns?: string;
+}
+
+/**
+ * Why a person is suspended (#1002, D13): by SCIM, by a refresh the provider refused (Q1 A), or by
+ * an admin's id; with the provider and when.
+ */
+export interface PersonSuspended {
+  by: string;
+  provider: string;
+  at: WireDate;
+  why?: string;
 }
 
 export interface Persona {
@@ -4985,6 +5088,22 @@ export interface RemovalCheck {
   unmerged: boolean;
 }
 
+/**
+ * A Remove request (#1002, D13, FR-017): an org provider deleted a person by SCIM; the person is
+ * suspended, and an admin confirms the removal with people/remove.
+ */
+export interface RemoveRequest {
+  user: string;
+  name: string;
+  provider: string;
+  at: WireDate;
+}
+
+/** people/removeRequests (#1002): the Remove requests waiting for an admin, oldest first. */
+export interface RemoveRequestList {
+  requests: RemoveRequest[];
+}
+
 export interface RemoveResourceRequest {
   name: string;
 }
@@ -5352,6 +5471,93 @@ export interface RuntimeStatus {
   isOut?: boolean;
   /** Set when the organisation's policy does not allow this runtime here (#998, FR-010). */
   setBy?: PolicySetBy;
+}
+
+/** A SCIM user's email (RFC 7643 §4.1.2), to show only: never a sign-in. */
+export interface SCIMEmail {
+  value: string;
+  type?: string;
+  primary?: boolean;
+}
+
+/**
+ * Which SCIM attribute must equal an org sign-in's account claim for the two to be one person
+ * (#1002, D5, R5).
+ */
+export type SCIMMatch =
+  | "externalId"
+  | "userName";
+
+/** A SCIM user's name parts (RFC 7643 §4.1.1), kept as they came. */
+export interface SCIMName {
+  givenName?: string;
+  familyName?: string;
+  formatted?: string;
+}
+
+/**
+ * scim/set (#1002): turn SCIM on or off for an org provider, and say which attribute matches a
+ * sign-in (externalId by default).
+ */
+export interface SCIMSet {
+  provider: string;
+  on: boolean;
+  match?: SCIMMatch;
+}
+
+/**
+ * A SCIM bearer token of one org provider (#1002, D12, FR-014), with no value: the control plane
+ * keeps only its SHA-256.
+ */
+export interface SCIMToken {
+  id: string;
+  provider: string;
+  name: string;
+  made: OrgRouteStamp;
+  ends?: WireDate;
+  lastUse?: SCIMTokenUse;
+  revoked?: OrgRouteStamp;
+}
+
+/** scim/tokens/list (#1002): one provider's tokens, newest first, revoked ones too. */
+export interface SCIMTokenList {
+  tokens: SCIMToken[];
+}
+
+/**
+ * scim/tokens/make (#1002): the token, its value once (never shown again), and the SCIM base URL to
+ * give the provider.
+ */
+export interface SCIMTokenMade {
+  token: SCIMToken;
+  value: string;
+  url: string;
+}
+
+/**
+ * scim/tokens/make (#1002): a name for the token, and when it ends, if ever. Refused while two are
+ * live.
+ */
+export interface SCIMTokenMake {
+  provider: string;
+  name: string;
+  ends?: WireDate;
+}
+
+/** scim/tokens/revoke (#1002): the token's id. */
+export interface SCIMTokenRequest {
+  id: string;
+}
+
+/** When and from where a SCIM token was last used (#1002, D12), written at most once a minute. */
+export interface SCIMTokenUse {
+  at: WireDate;
+  address?: string;
+}
+
+/** scim/tokens/list (#1002): the provider. */
+export interface SCIMTokensRequest {
+  provider: string;
 }
 
 /** A server ssh knows by a name, for Add a Server's server box (#610). */
@@ -6854,6 +7060,17 @@ export type UserSettingsPartName =
   | "resources";
 
 /**
+ * user/suspended (#1002, FR-018): to each machine of a suspended person, at hello before its
+ * settings and within 5 seconds of a change; off: true ends it.
+ */
+export interface UserSuspended {
+  user: string;
+  off?: boolean;
+  provider: string;
+  at: WireDate;
+}
+
+/**
  * What a third-party server's view waits on before it is drawn: the person's Show (#191). The data
  * of a viewNeedsShow failure.
  */
@@ -7873,13 +8090,15 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AttentionNotification: { required: ["needID", "alert"], optional: ["need", "to"] },
   AttentionPending: { required: ["needs", "deliveries"], optional: [] },
   AttentionTurn: { required: ["agentID", "phase"], optional: ["endedAt"] },
-  AuditActor: { required: ["user"], optional: ["userName", "client", "clientName", "event"] },
+  AuditActor: { required: ["user"], optional: ["userName", "client", "clientName", "event", "scim", "refresh"] },
   AuditCause: { required: ["kind", "id"], optional: [] },
   AuditDays: { required: ["days"], optional: [] },
   AuditEntry: { required: ["id", "at", "action", "method", "actor"], optional: ["host", "target"] },
   AuditExport: { required: ["lines", "count"], optional: [] },
   AuditList: { required: ["entries", "days", "more", "admin"], optional: [] },
   AuditQuery: { required: [], optional: ["since", "until", "user", "limit"] },
+  AuditRefresh: { required: ["provider"], optional: [] },
+  AuditSCIM: { required: ["provider", "token"], optional: [] },
   AuthStatus: { required: ["kind", "label"], optional: [] },
   AuthenticateRequest: { required: ["runtimeID", "methodID"], optional: ["accountID"] },
   BackgroundItem: { required: ["id", "kind", "name", "state", "canStop", "isStopping", "startedAt"], optional: ["taskType", "detail", "command", "parentID", "toolCallID", "outputFilePath", "summary", "lastToolName", "endedAt"] },
@@ -7965,12 +8184,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ControlAuth: { required: ["id", "nonce", "mac", "kind"], optional: ["for", "epoch", "capabilities", "page", "publicKey"] },
   ControlClientChanged: { required: [], optional: ["client", "removed"] },
   ControlCodeShown: { required: ["text", "expires"], optional: ["command"] },
+  ControlCutOff: { required: ["why"], optional: ["provider"] },
   ControlEndpoint: { required: ["url"], optional: ["pin"] },
   ControlHello: { required: ["v", "name", "control", "nonce", "copy"], optional: ["previous"] },
   ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "gitFrom", "gitAsks", "tunnel", "workspace", "implementation", "capabilities", "missing", "owner"] },
   ControlInstallProgress: { required: ["name", "step"], optional: [] },
   ControlMoved: { required: ["url", "controlKey", "name"], optional: ["pin"] },
   ControlNewKey: { required: ["key", "proof"], optional: [] },
+  ControlNotice: { required: ["kind", "words"], optional: ["user", "group"] },
   ControlOK: { required: ["mac"], optional: ["grant", "host", "relayed", "endpoints", "epoch", "newKey"] },
   ControlPerson: { required: ["id", "name", "role"], optional: ["localOwner"] },
   ControlPush: { required: ["sealed"], optional: [] },
@@ -8062,10 +8283,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   GitAsk: { required: ["server", "from"], optional: [] },
   GitCredential: { required: ["username", "password"], optional: [] },
   GitCredentialRequest: { required: ["protocol", "host"], optional: ["path"] },
-  Group: { required: ["id", "name", "everyone", "members"], optional: ["caps"] },
+  Group: { required: ["id", "name", "everyone", "members"], optional: ["caps", "source", "role"] },
   GroupList: { required: ["groups"], optional: [] },
   GroupRequest: { required: ["id"], optional: [] },
+  GroupRoleSet: { required: ["group"], optional: ["role"] },
   GroupSet: { required: ["name"], optional: ["id", "everyone", "members", "caps"] },
+  GroupSource: { required: ["scim", "displayName"], optional: ["externalId"] },
   GroupsChanged: { required: [], optional: ["id", "removed"] },
   GuardedChange: { required: ["path", "changedBy", "changedByIDs", "byGit", "since"], optional: ["digest", "askedIn"] },
   GuardedChangeReading: { required: ["path", "lines"], optional: ["digest", "approved", "current"] },
@@ -8183,11 +8406,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   OptionsRequest: { required: ["runtimeID", "cwd", "mcpServers"], optional: [] },
   OptionsResponse: { required: ["draftID", "options", "commands"], optional: [] },
   OrgPolicy: { required: ["version", "issued", "changedBy", "requires"], optional: ["modeCeiling", "sandbox", "runtimes", "marketplaces", "budgets", "helpers", "environment", "stopAll", "requireFollowing", "groups", "notices"] },
-  OrgProvider: { required: ["id", "name", "preset", "issuer", "clientID"], optional: ["accountClaim", "tenant", "scopes", "join", "on", "order", "secret", "version", "created", "changed", "redirectURI"] },
+  OrgProvider: { required: ["id", "name", "preset", "issuer", "clientID"], optional: ["accountClaim", "tenant", "scopes", "join", "on", "order", "secret", "version", "created", "changed", "redirectURI", "scim"] },
   OrgProviderCheck: { required: ["ok", "missing", "jwksKeys", "redirectURI"], optional: [] },
   OrgProviderKept: { required: ["provider", "rev"], optional: [] },
   OrgProviderList: { required: ["providers"], optional: [] },
   OrgProviderRequest: { required: ["id"], optional: ["rev"] },
+  OrgProviderSCIM: { required: ["on", "match"], optional: [] },
   OrgProviderSecret: { required: ["fingerprint", "setAt"], optional: ["setBy"] },
   OrgProviderSet: { required: ["provider"], optional: ["secret", "rev"] },
   OrgRoute: { required: ["id", "name", "kind", "runtimes"], optional: ["vendor", "settings", "models", "groups", "defaultFor", "secretFields", "fingerprint", "version", "created", "changed", "machines"] },
@@ -8225,8 +8449,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PersonRemoveRequest: { required: ["name", "agentID"], optional: [] },
   PersonRequest: { required: ["user"], optional: [] },
   PersonRoleRequest: { required: ["user", "role"], optional: [] },
-  PersonRow: { required: ["id", "name", "kind", "role", "signIns", "clients", "machines"], optional: ["localOwner", "you", "group", "caps", "spentTodayUSD"] },
+  PersonRow: { required: ["id", "name", "kind", "role", "signIns", "clients", "machines"], optional: ["localOwner", "you", "group", "caps", "spentTodayUSD", "scim", "provisioned", "suspended", "roleFrom"] },
+  PersonSCIM: { required: ["provider", "userName", "active"], optional: ["externalId", "name", "displayName", "emails"] },
   PersonSettings: { required: [], optional: ["name", "pronouns"] },
+  PersonSuspended: { required: ["by", "provider", "at"], optional: ["why"] },
   Persona: { required: ["id", "name", "origin", "settings"], optional: ["description", "problem"] },
   PersonasListRequest: { required: ["folder"], optional: [] },
   PinArrangeRequest: { required: ["folder", "paths"], optional: [] },
@@ -8316,6 +8542,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RelayTokens: { required: ["input", "output", "cacheRead", "cacheWrite"], optional: [] },
   RememberedOptionsRequest: { required: ["runtimeID", "cwd"], optional: [] },
   RemovalCheck: { required: ["blockedBy", "uncommitted", "unmerged"], optional: [] },
+  RemoveRequest: { required: ["user", "name", "provider", "at"], optional: [] },
+  RemoveRequestList: { required: ["requests"], optional: [] },
   RemoveResourceRequest: { required: ["name"], optional: [] },
   RenameRequest: { required: ["agentID", "title"], optional: [] },
   ReportCounts: { required: ["sessions", "failedSessions", "prsOpened", "prsMerged", "prsReverted", "mergeSeconds", "waits", "waitBuckets", "workflowRuns", "workflowFailures"], optional: [] },
@@ -8345,6 +8573,16 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RuntimeRequest: { required: ["runtimeID"], optional: [] },
   RuntimeSession: { required: ["sessionID", "cwd"], optional: ["additionalDirectories", "title", "updatedAt", "isHeld"] },
   RuntimeStatus: { required: ["runtime", "availability", "checkedAt", "outdated"], optional: ["poolNote", "isOut", "setBy"] },
+  SCIMEmail: { required: ["value"], optional: ["type", "primary"] },
+  SCIMName: { required: [], optional: ["givenName", "familyName", "formatted"] },
+  SCIMSet: { required: ["provider", "on"], optional: ["match"] },
+  SCIMToken: { required: ["id", "provider", "name", "made"], optional: ["ends", "lastUse", "revoked"] },
+  SCIMTokenList: { required: ["tokens"], optional: [] },
+  SCIMTokenMade: { required: ["token", "value", "url"], optional: [] },
+  SCIMTokenMake: { required: ["provider", "name"], optional: ["ends"] },
+  SCIMTokenRequest: { required: ["id"], optional: [] },
+  SCIMTokenUse: { required: ["at"], optional: ["address"] },
+  SCIMTokensRequest: { required: ["provider"], optional: [] },
   SSHHost: { required: ["alias", "resolved", "throughBastion", "isBastion", "known"], optional: [] },
   SSHHostsRequest: { required: [], optional: ["destination"] },
   SaidMatch: { required: ["agentID", "line"], optional: [] },
@@ -8500,6 +8738,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   UserSettings: { required: [], optional: ["mcpServers", "agentConfig", "runtimes", "costLimits", "resources", "updated"] },
   UserSettingsChanged: { required: [], optional: ["parts", "secrets"] },
   UserSettingsPart: { required: ["part", "value"], optional: [] },
+  UserSuspended: { required: ["user", "provider", "at"], optional: ["off"] },
   ViewAsk: { required: ["server", "uri", "hash", "isNew"], optional: [] },
   ViewCallRequest: { required: ["agentID", "viewID", "name"], optional: ["project", "arguments", "feed", "server"] },
   ViewContextRequest: { required: ["agentID", "viewID"], optional: ["uri", "content", "structuredContent"] },

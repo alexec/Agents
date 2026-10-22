@@ -52,6 +52,7 @@ public enum Capability {
     public static let handover1 = "handover/1"
     public static let hostOrgRoutes1 = "host.org-routes/1"
     public static let hostPolicy1 = "host.policy/1"
+    public static let hostSuspend1 = "host.suspend/1"
     public static let hostTeam1 = "host.team/1"
     public static let hostUpdate1 = "host.update/1"
     public static let hostUserSettings1 = "host.user-settings/1"
@@ -451,6 +452,7 @@ public enum Capability {
         "groups/list": "groups/1",
         "groups/remove": "groups/1",
         "groups/set": "groups/1",
+        "groups/setRole": "org-identity/1",
         "handover/status": "handover/1",
         "host/hello": "host/1",
         "host/orgRoutesAgain": "host.org-routes/1",
@@ -501,6 +503,7 @@ public enum Capability {
         "people/list": "people/1",
         "people/remove": "people/1",
         "people/removePreview": "people/1",
+        "people/removeRequests": "org-identity/1",
         "people/setRole": "people/1",
         "policy/get": "policy/1",
         "policy/mine": "policy/1",
@@ -529,6 +532,10 @@ public enum Capability {
         "reports/setPolicy": "reports.scope/1",
         "reports/usage": "reports/1",
         "reports/views": "reports.views/1",
+        "scim/set": "org-identity/1",
+        "scim/tokens/list": "org-identity/1",
+        "scim/tokens/make": "org-identity/1",
+        "scim/tokens/revoke": "org-identity/1",
         "signIn/addToMe": "signin/1",
         "signIn/approve": "signin/1",
         "signIn/configure": "signin/1",
@@ -563,6 +570,7 @@ public enum Capability {
         "workspaces/forAgent": "workspaces/1",
         "control/capReached": "bots/1",
         "control/clientChanged": "control/1",
+        "control/cutOff": "org-identity/1",
         "control/groupsChanged": "groups/1",
         "control/hostChanged": "control/1",
         "control/installProgress": "control/1",
@@ -574,6 +582,7 @@ public enum Capability {
         "control/linkRequested": "links/1",
         "control/linksChanged": "links/1",
         "control/moved": "control/1",
+        "control/notice": "org-identity/1",
         "control/orgRoutesChanged": "org-routes/1",
         "control/orgRoutesLeft": "org-routes/1",
         "control/peopleChanged": "people/1",
@@ -599,6 +608,7 @@ public enum Capability {
         "relay/count": "relay/1",
         "relay/deliver": "relay/1",
         "relay/devices": "relay/1",
+        "user/suspended": "host.suspend/1",
     ]
 
     /// x-declared-capabilities: what a host, a client or the control plane declares by hand, by who.

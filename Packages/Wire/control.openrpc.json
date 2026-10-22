@@ -573,6 +573,22 @@
       ]
     },
     {
+      "name": "control/cutOff",
+      "x-capability": "org-identity/1",
+      "description": "To every client of a person their org provider suspended (#1002, D13), then their sockets close with 4403 suspended.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ControlCutOff"
+          }
+        }
+      ]
+    },
+    {
       "name": "control/groupsChanged",
       "x-capability": "groups/1",
       "tags": [
@@ -778,6 +794,22 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/ControlMoved"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/notice",
+      "x-capability": "org-identity/1",
+      "description": "To admins (#1002): what changed with no click: the last admin kept, a SCIM group's shares left, a Remove request.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ControlNotice"
           }
         }
       ]
@@ -1257,6 +1289,27 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/GroupSet"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Group"
+        }
+      }
+    },
+    {
+      "name": "groups/setRole",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, FR-020, FR-021): a SCIM group gives the admin role, or not. The roles of its members follow, never leaving no admin.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/GroupRoleSet"
           }
         }
       ],
@@ -2519,6 +2572,27 @@
       }
     },
     {
+      "name": "people/removeRequests",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, D13): the people an org provider deleted by SCIM, suspended and waiting for people/remove.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/RemoveRequestList"
+        }
+      }
+    },
+    {
       "name": "people/setRole",
       "x-capability": "people/1",
       "tags": [
@@ -3266,6 +3340,90 @@
       }
     },
     {
+      "name": "scim/set",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, FR-013): SCIM on or off for an org provider, and its match attribute.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SCIMSet"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/OrgProviderKept"
+        }
+      }
+    },
+    {
+      "name": "scim/tokens/list",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, FR-014): a provider's SCIM tokens, with no value.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SCIMTokensRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SCIMTokenList"
+        }
+      }
+    },
+    {
+      "name": "scim/tokens/make",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, D12): a new SCIM token, its value shown once. Refused while two are live.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SCIMTokenMake"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SCIMTokenMade"
+        }
+      }
+    },
+    {
+      "name": "scim/tokens/revoke",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, D12): the token stops working at once.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SCIMTokenRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "signIn/addToMe",
       "x-capability": "signin/1",
       "paramStructure": "by-name",
@@ -3905,6 +4063,22 @@
           "$ref": "daemon.schema.json#/definitions/UserSettings"
         }
       }
+    },
+    {
+      "name": "user/suspended",
+      "x-capability": "host.suspend/1",
+      "description": "To each machine of a suspended person, on its channel 0 (#1002, FR-018): at hello before its settings, and within 5 seconds of a change, on every copy. A machine without host.suspend/1 whose person is suspended is refused at hello -32078 personSuspended.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/UserSuspended"
+          }
+        }
+      ]
     },
     {
       "name": "workflows/claimRun",

@@ -311,6 +311,8 @@ func (si *signIns) checkEvery(every time.Duration, stop <-chan struct{}) {
 			if si.s.phase.now() == phaseServing {
 				si.checkDomains(context.Background())
 				si.sweepOIDC(context.Background())
+				// Leavers without SCIM, once a day each (#1002, Q1 A).
+				si.checkRefreshes(context.Background())
 			}
 		}
 	}
