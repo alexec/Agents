@@ -66,9 +66,10 @@ is a release check, so that the bugs are found before GA, not by a full disk or 
 4. **Scope** is:
    - the diff `git diff <last tag>..main`, where the last tag is
      `git describe --tags --abbrev=0 origin/main` (#1462), read for every check in step 2;
-   - **in the first run** (no run file in `.agents/reviews/hadr/` yet), the whole system,
-     because nothing was reviewed before. That run starts from the seed findings of #1557
-     and checks each of them again.
+   - **until a run has reviewed the whole system** (no run file in `.agents/reviews/hadr/`
+     has `whole-system: done` in its front matter), the whole system too, because nothing
+     was reviewed before. Start from the findings already recorded (the seed findings of
+     #1557 were checked again in the first run, 2026-10-21) and check each one again.
 
 ## 2. Review
 
@@ -94,7 +95,11 @@ The checks. Give each finding the check's name as its kind.
    and the handover carry every store prefix and every secret that the control plane needs.
    Compare the prefixes the store writes with the prefixes the copy reads.
 6. `mesh`: **several copies.** The multi-copy mesh over a bucket still works (the walk
-   compose file), and the store's If-Match probe and its test pass.
+   compose file, `deploy/compose.yaml`: `deploy/make-secrets.sh`, then `docker compose -p
+   hadr-walk -f deploy/compose.yaml up -d --build`, and `down -v --rmi local` and
+   `rm -rf deploy/secrets` after), and the store's If-Match probe and its test pass
+   (`Go/scripts/go.sh test -count=1 -run 'Probe|CopyStore' ./internal/controlplane/s3store/
+   ./internal/controlplane/`, from `Go/`).
 7. `docs`: `docs/explanation/control-plane.md` and `docs/reference/agents-folder.md`
    say what is backed up, what is not, and how to restore.
 
@@ -125,11 +130,18 @@ For the control plane store, the minimum drill is:
    and `agentsd` on `<scratch>` as the run-app skill does). Seed a synthetic agent. Note the
    paired host and its agents.
 2. Take a backup the way the docs say (or, when the docs say nothing, `agents-control
-   store copy --from <the scratch store> --to <an empty store>`). Note the time T1.
-3. Make one more change (a second synthetic agent), then lose the control plane: stop it
-   and move its home away.
-4. Restore from the backup into a new home, start the control plane on it, and time how
-   long it takes until the host is joined again and its agents are listed (the RTO).
+   store copy --from file://<scratch>/control/store --to file://<backup>/store`; a bare
+   path is refused). Note the time T1.
+3. Make one more change (a second synthetic agent, or `agents-control code --client
+   --home <scratch>/control`), then lose the control plane: kill the pid in
+   `<scratch>/control/control.pid` and move its home away.
+4. Restore from the backup into a new home, start the control plane on it with the same
+   `serve` arguments (`ps -o command= -p <pid>` before step 3 shows them), and time how
+   long it takes until the host is joined again (a new `uplink: connected` line in
+   `<scratch>/logs/daemon.log`) and its agents are listed (the RTO). Try the store alone
+   first, then with what the backup says it holds besides the store. In the first run
+   (2026-10-21, #2137) the store alone was refused ("another key"), and the store with the
+   home's `control-key`, `secrets-key` and `tls/` came back in 26 s.
 5. Say what the restore lost (the RPO): the change after T1, any prefix or secret that the
    copy did not carry, and whether the host or the window had to pair again.
 
@@ -142,7 +154,7 @@ started (the run-app skill's "When you are done").
 In the review worktree:
 - Create `.agents/reviews/hadr/<today, YYYY-MM-DD>.md`, with front matter
   `reviewed-through: <git rev-parse main>`, `base: <the last tag>`, `previous: <last run's
-  reviewed-through, or none>`, then the drill (each store: the steps, RTO and RPO, or why it
+  reviewed-through, or none>`, `whole-system: done` or `partial` (step 1.4), then the drill (each store: the steps, RTO and RPO, or why it
   was not possible), then one section per finding with an id `H<YYYYMMDD>-<n>` and the
   fields above. A run that finds nothing still writes the file, saying what it read and
   what it restored.
