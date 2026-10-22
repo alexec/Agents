@@ -3,6 +3,9 @@
 
     scripts/video/upload.py --sign-in           once: the person approves with the Google
                                                 account of the channel
+    scripts/video/upload.py --sign-in --no-browser
+                                                the same, but only print the consent address,
+                                                so an agent opens it in the Safari MCP (#1856)
     scripts/video/upload.py <scene id> [mp4]    upload ~/Movies/agents-video/out/<id>.mp4
     scripts/video/make.sh i-linear --upload     make it, check it, then upload it
 
@@ -75,9 +78,13 @@ def post_form(url, form):
         raise RuntimeError(f"Google answered {error.code}: {body.get('error', '')} {body.get('error_description', '')}".strip()) from None
 
 
-def sign_in():
+def sign_in(browser=True):
     """The loopback flow with PKCE (Google's way for a desktop app): the browser goes to
-    Google, the person approves, Google sends the code to a port on this Mac."""
+    Google, the person approves, Google sends the code to a port on this Mac.
+
+    The consent address is always printed: it holds the client id, the PKCE challenge and
+    the state, and no secret. With `browser` False it is not opened, so an agent opens it in
+    a browser it can drive (#1856)."""
     c = client()
     verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).rstrip(b"=").decode()
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
@@ -105,7 +112,11 @@ def sign_in():
         "access_type": "offline", "prompt": "consent"})
     threading.Thread(target=server.serve_forever, daemon=True).start()
     log("approve in the browser, with the Google account of the YouTube channel")
-    webbrowser.open(address)
+    print(f"consent address: {address}", flush=True)
+    if browser:
+        webbrowser.open(address)
+    else:
+        log(f"not opened (--no-browser): open the address above; this waits on {redirect} for 10 minutes")
     end = time.time() + 600
     while "code" not in got and "error" not in got and time.time() < end:
         time.sleep(0.3)
@@ -128,7 +139,10 @@ def access_token():
     if not TOKEN.exists():
         raise NotSignedIn("not signed in to YouTube: Alex runs `scripts/video/upload.py --sign-in` (#1793, What Alex does)")
     c = client()
-    refresh = json.loads(TOKEN.read_text())["refresh_token"]
+    refresh = json.loads(TOKEN.read_text()).get("refresh_token")
+    if not refresh:
+        # A copy of the client file in its place (seen 2026-10-21) is not a sign-in.
+        raise NotSignedIn(f"{TOKEN} has no refresh token: Alex runs `scripts/video/upload.py --sign-in` (#1856, What Alex does)")
     return post_form(c.get("token_uri", "https://oauth2.googleapis.com/token"), {
         "refresh_token": refresh, "client_id": c["client_id"], "client_secret": c.get("client_secret", ""),
         "grant_type": "refresh_token"})["access_token"]
@@ -249,8 +263,12 @@ def upload(scene, mp4):
 
 
 def main():
-    if sys.argv[1:] == ["--sign-in"]:
-        return sign_in()
+    args = sys.argv[1:]
+    if "--sign-in" in args:
+        unknown = set(args) - {"--sign-in", "--no-browser"}
+        if unknown:
+            raise SystemExit(f"--sign-in takes only --no-browser, not {' '.join(sorted(unknown))}")
+        return sign_in(browser="--no-browser" not in args)
     if not sys.argv[1:] or sys.argv[1].startswith("-"):
         raise SystemExit(__doc__)
     sys.path.insert(0, str(HERE))

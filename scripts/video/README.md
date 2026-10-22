@@ -80,7 +80,8 @@ changes, the same scene makes it again.
   description gives the commit, the date and the scene file. A new take replaces the old one in
   the playlist: the old video is made private and taken out of the playlist, never deleted.
   The local file is deleted after a good upload. Until Alex's steps on #1793 are done (the
-  OAuth client in `~/.agents/secrets/youtube-client.json`, then `upload.py --sign-in`), the
+  OAuth client in `~/.agents/secrets/youtube-client.json`, then `upload.py --sign-in`; with
+  `--no-browser` it only prints the consent address, for an agent to open in the Safari MCP), the
   video stays in `out/` and the log says why.
 - **Its walk hand-off.** A walk's Connect Linear sheet opens no authentication session (that
   is Safari's sheet, on the person's screen): it writes the flow and its address to
