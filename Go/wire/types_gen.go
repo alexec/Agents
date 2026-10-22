@@ -5193,6 +5193,20 @@ const NeedKindElicitation NeedKind = "elicitation"
 const NeedKindReport NeedKind = "report"
 const NeedKindGuardedChange NeedKind = "guardedChange"
 
+// The OTLP exporter of the report figures (#2019, #1804 decision 4), set on agents-control by OTEL_EXPORTER_OTLP_ENDPOINT, as this copy runs it: where it sends, the last send and the last failure.
+type OTLPExport struct {
+	Endpoint string `json:"endpoint"`
+
+	// Seconds between sends.
+	Every int64 `json:"every"`
+
+	LastSent *Date `json:"lastSent,omitzero"`
+
+	LastFailure *string `json:"lastFailure,omitzero"`
+
+	FailedAt *Date `json:"failedAt,omitzero"`
+}
+
 type OptionsRequest struct {
 	RuntimeID string `json:"runtimeID"`
 
@@ -6637,6 +6651,47 @@ type RateLimitInfo struct {
 	OverageInUse *bool `json:"overageInUse,omitzero"`
 
 	OverageDisabledReason *string `json:"overageDisabledReason,omitzero"`
+}
+
+// readApi/list (#2019), an admin's: the read API's tokens, newest first, revoked ones too; its URL; and the OTLP exporter when one is set.
+type ReadAPI struct {
+	Tokens []ReadToken `json:"tokens"`
+
+	URL string `json:"url"`
+
+	Otlp *OTLPExport `json:"otlp,omitzero"`
+}
+
+// A read API token (#2019, #1804 decision 4), with no value: the control plane keeps only its SHA-256. It reads the organisation's reports at /v1/read/reports, and nothing else.
+type ReadToken struct {
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Made OrgRouteStamp `json:"made"`
+
+	LastUse *SCIMTokenUse `json:"lastUse,omitzero"`
+
+	Revoked *OrgRouteStamp `json:"revoked,omitzero"`
+}
+
+// readApi/make (#2019): the token, its value once (never shown again), and the URL to read.
+type ReadTokenMade struct {
+	Token ReadToken `json:"token"`
+
+	Value string `json:"value"`
+
+	URL string `json:"url"`
+}
+
+// readApi/make (#2019): a name for the token, such as the BI tool that uses it.
+type ReadTokenMake struct {
+	Name string `json:"name"`
+}
+
+// readApi/revoke (#2019): the token to stop at once.
+type ReadTokenRevoke struct {
+	ID string `json:"id"`
 }
 
 // Makes or brings up to date a host's copy of a Mac's repository (#1123): fetches the `bundle` upload, moves `branches` forward only, checks out `checkout`, sets `origin`, applies the `patch` upload (uncommitted changes), and adds the folder as a project. It stops, and changes nothing, when the host has changes or commits of its own.

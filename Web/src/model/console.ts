@@ -38,6 +38,7 @@ export const consoleSections: readonly Section[] = [
   { id: "catalogue", title: "Catalogue", about: "Who uses each MCP server and skill, at which version, and what is approved for whom.", group: "Rules", built: true },
   { id: "requests", title: "Requests", about: "Machines asking to join, channel identities to link, bots stopped at a cap, and people asking for an MCP server or skill.", group: "Records", built: true },
   { id: "audit", title: "Audit", about: "Who did what on each machine, for one person or everyone.", group: "Records", built: true },
+  { id: "readApi", title: "Read API", about: "Tokens for BI tools to read the reports, and the OTLP exporter.", group: "Records", built: true },
 ];
 
 /** Reports' pages. Each has three scopes: Me, a group and the organisation. */

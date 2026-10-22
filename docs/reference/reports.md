@@ -150,6 +150,50 @@ Three more pages of Reports (#2019), with the same scopes:
 - `reports/views`, `reports/saveView` (a view with no `id` is new) and `reports/deleteView`
   (#2019): the caller's saved views.
 
+## Reading the reports from another tool
+
+### The read API
+
+A BI tool reads the organisation's reports over HTTPS with a token an admin made in
+Console ▸ Read API (#2019):
+
+```sh
+curl -H "Authorization: Bearer agread_…" \
+  "https://control.example.com/v1/read/reports?range=month&format=csv"
+```
+
+- `range` is `day`, `week`, `month` (the default) or `threeMonths`, as for `reports/usage`.
+- `format` is `json` (the default, the same answer as `reports/usage`), `csv` or `jsonl`
+  (the same as `reports/export`).
+- `group=<id>` reads one group's rows instead of the organisation's.
+- **A token reads these reports and nothing else.** It opens no socket and calls no
+  method.
+- **The control plane keeps only the token's SHA-256.** The value is shown once.
+- **Each token asks at most 30 times a minute.** Past that, the answer is 429 with
+  `Retry-After`.
+- **A token stops** when an admin revokes it, or when the admin who made it is no longer
+  an admin. At most 10 tokens are live, and 50 are kept, revoked ones too.
+
+### OTLP metrics
+
+agents-control sends today's figures to an OpenTelemetry collector over OTLP/HTTP (JSON)
+when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. It is off by default.
+
+| Variable | What it does |
+|---|---|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | The collector. The exporter sends to it with `/v1/metrics` added. |
+| `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | The full URL, in place of the one above. |
+| `OTEL_EXPORTER_OTLP_HEADERS` | Headers as `key=value,key=value` (values URL-encoded), such as `authorization=Bearer%20…`. |
+| `OTEL_METRIC_EXPORT_INTERVAL` | Milliseconds between sends: 300000 (5 minutes) by default, 60000 at least. |
+
+Each metric is a cumulative sum that starts at midnight UTC, by runtime:
+`agents.cost` (by currency), `agents.tokens` (by kind), `agents.turns`,
+`agents.sessions` (ended or failed), `agents.pull_requests` (opened, merged, reverted),
+`agents.workflow.runs` (succeeded or failed) and `agents.time` (working or waiting, in
+seconds). No person, project or machine is named. Console ▸ Read API shows where the
+exporter sends and how its last send went. For the control plane's own health, use the
+Prometheus metrics (`AGENTS_CONTROL_METRICS`, #2176).
+
 ## See also
 
 - [The Console](console.md): Report Policy, the leads and the budgets.

@@ -4003,6 +4003,20 @@ export type NeedKind =
   | "report"
   | "guardedChange";
 
+/**
+ * The OTLP exporter of the report figures (#2019, #1804 decision 4), set on agents-control by
+ * OTEL_EXPORTER_OTLP_ENDPOINT, as this copy runs it: where it sends, the last send and the last
+ * failure.
+ */
+export interface OTLPExport {
+  endpoint: string;
+  /** Seconds between sends. */
+  every: number;
+  lastSent?: WireDate;
+  lastFailure?: string;
+  failedAt?: WireDate;
+}
+
 export interface OptionsRequest {
   runtimeID: string;
   cwd: URLString;
@@ -5212,6 +5226,45 @@ export interface RateLimitInfo {
   isUsingOverage?: boolean;
   overageInUse?: boolean;
   overageDisabledReason?: string;
+}
+
+/**
+ * readApi/list (#2019), an admin's: the read API's tokens, newest first, revoked ones too; its URL;
+ * and the OTLP exporter when one is set.
+ */
+export interface ReadAPI {
+  tokens: ReadToken[];
+  url: string;
+  otlp?: OTLPExport;
+}
+
+/**
+ * A read API token (#2019, #1804 decision 4), with no value: the control plane keeps only its
+ * SHA-256. It reads the organisation's reports at /v1/read/reports, and nothing else.
+ */
+export interface ReadToken {
+  id: string;
+  name: string;
+  made: OrgRouteStamp;
+  lastUse?: SCIMTokenUse;
+  revoked?: OrgRouteStamp;
+}
+
+/** readApi/make (#2019): the token, its value once (never shown again), and the URL to read. */
+export interface ReadTokenMade {
+  token: ReadToken;
+  value: string;
+  url: string;
+}
+
+/** readApi/make (#2019): a name for the token, such as the BI tool that uses it. */
+export interface ReadTokenMake {
+  name: string;
+}
+
+/** readApi/revoke (#2019): the token to stop at once. */
+export interface ReadTokenRevoke {
+  id: string;
 }
 
 /**
@@ -7995,6 +8048,9 @@ export interface Methods {
   "providers/remove": { params: ProviderRequest; result: Empty };
   "providers/setGroup": { params: ProviderGroup; result: Empty };
   "providers/update": { params: ProviderAdd; result: ProviderSummary };
+  "readApi/list": { params: Empty; result: ReadAPI };
+  "readApi/make": { params: ReadTokenMake; result: ReadTokenMade };
+  "readApi/revoke": { params: ReadTokenRevoke; result: ReadAPI };
   "reports/deleteView": { params: ReportViewID; result: ReportViews };
   "reports/export": { params: ReportQuery; result: ReportExport };
   "reports/policy": { params: Empty; result: ReportPolicy };
@@ -8257,6 +8313,9 @@ export const MethodTarget = {
   "providers/remove": "control",
   "providers/setGroup": "control",
   "providers/update": "control",
+  "readApi/list": "control",
+  "readApi/make": "control",
+  "readApi/revoke": "control",
   "reports/deleteView": "control",
   "reports/export": "control",
   "reports/policy": "control",
@@ -8762,6 +8821,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Milestones: { required: ["earned"], optional: [] },
   MissingFolder: { required: ["branchKept"], optional: [] },
   Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID"] },
+  OTLPExport: { required: ["endpoint", "every"], optional: ["lastSent", "lastFailure", "failedAt"] },
   OptionsRequest: { required: ["runtimeID", "cwd", "mcpServers"], optional: [] },
   OptionsResponse: { required: ["draftID", "options", "commands"], optional: [] },
   OrgPolicy: { required: ["version", "issued", "changedBy", "requires"], optional: ["modeCeiling", "sandbox", "runtimes", "marketplaces", "budgets", "helpers", "environment", "stopAll", "requireFollowing", "groups", "notices"] },
@@ -8885,6 +8945,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   QuickAnswer: { required: ["kind", "id", "title", "isDestructive"], optional: ["field"] },
   QuitRequest: { required: ["stopAgents"], optional: [] },
   RateLimitInfo: { required: [], optional: ["status", "resetsAt", "rateLimitType", "utilization", "overageStatus", "overageResetsAt", "isUsingOverage", "overageInUse", "overageDisabledReason"] },
+  ReadAPI: { required: ["tokens", "url"], optional: ["otlp"] },
+  ReadToken: { required: ["id", "name", "made"], optional: ["lastUse", "revoked"] },
+  ReadTokenMade: { required: ["token", "value", "url"], optional: [] },
+  ReadTokenMake: { required: ["name"], optional: [] },
+  ReadTokenRevoke: { required: ["id"], optional: [] },
   ReceiveRequest: { required: ["folder", "branches", "checkout"], optional: ["bundle", "patch", "origin"] },
   ReceiveState: { required: ["folder", "exists", "repository", "ownChanges", "heads"], optional: [] },
   ReceiveStateRequest: { required: ["folder"], optional: [] },

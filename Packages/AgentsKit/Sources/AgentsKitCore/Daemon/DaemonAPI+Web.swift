@@ -347,6 +347,10 @@ public extension DaemonAPI {
                 Row("governance/requests", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
                 Row("governance/revoke", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
                 Row("governance/usage", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                // The read API's tokens and the OTLP exporter (#2019): the Console's only.
+                Row("readApi/list", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("readApi/make", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("readApi/revoke", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
                 Row("scim/set", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
                 Row("scim/tokens/list", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
                 Row("scim/tokens/make", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),

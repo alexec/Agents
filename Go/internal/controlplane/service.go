@@ -195,6 +195,9 @@ type Service struct {
 	// SCIM at /scim/v2/ (#1002, slice 2a).
 	scimTokens      *scimTokens
 	scimServer      *scim.Server
+	// The read API's tokens, and the OTLP exporter when one is set (#2019).
+	readAPI *readTokens
+	otlp    *otlpExporter
 	signInApprovals *signInApprovals
 	// Each person's settings and secrets (#1760), and what each machine here was sent.
 	users     *usersettings.Book
@@ -271,6 +274,7 @@ func New(cfg Config) (*Service, error) {
 	s.links = newLinks(s)
 	s.signIns = newSignIns(s, cfg.SignIn)
 	s.scimTokens = &scimTokens{s: s}
+	s.readAPI = &readTokens{s: s}
 	s.scimServer = &scim.Server{Directory: scimDirectory{s}, Tokens: s.scimTokens, Log: s.log, URL: func() string {
 		base, _ := s.signIns.httpsBase()
 		return base + scim.Base
@@ -971,6 +975,8 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		s.signIns.serveOIDC(w, r)
 	case path == scim.Base || strings.HasPrefix(path, scim.Base+"/"):
 		s.scimServer.ServeHTTP(w, r)
+	case path == readAPIPath:
+		s.readAPI.serve(w, r)
 	case path == "/v1/join" || strings.HasPrefix(path, "/v1/join/"):
 		s.joins.serve(w, r)
 	case path == "/v1/connect":

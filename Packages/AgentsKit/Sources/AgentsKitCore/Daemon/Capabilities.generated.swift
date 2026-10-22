@@ -93,6 +93,7 @@ public enum Capability {
     public static let project1 = "project/1"
     public static let projects1 = "projects/1"
     public static let providers1 = "providers/1"
+    public static let readapi1 = "readapi/1"
     public static let relay1 = "relay/1"
     public static let reportsScope1 = "reports.scope/1"
     public static let reportsViews1 = "reports.views/1"
@@ -541,6 +542,9 @@ public enum Capability {
         "providers/runtimes": "providers/1",
         "providers/setGroup": "groups/1",
         "providers/update": "providers/1",
+        "readApi/list": "readapi/1",
+        "readApi/make": "readapi/1",
+        "readApi/revoke": "readapi/1",
         "relay/switch": "relay/1",
         "reports/deleteView": "reports.views/1",
         "reports/export": "reports/1",

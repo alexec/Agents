@@ -28,6 +28,7 @@ requests and cap notices come to them as cards.
 | **Catalogue** | **Who Uses What**: each MCP server and skill that machines have from a catalogue, at each version, on how many machines and whose (`governance/usage`, #2019). Each machine sends this list each hour. **Approved**: each approval, for a group or a person (`governance/approvals`). | **Take Back** an approval (`governance/revoke`). |
 | **Requests** | Machines that ask to join, channel identities that ask to be linked (`links/requests`), each bot that stopped at its cap, and people who ask for an MCP server or skill (`governance/requests`). The count beside **Requests** includes them all. | Approve or refuse a join or a link. **Change Cap…** opens the bot's sheet. Approve an MCP server or skill for the person or for a group, or refuse it (`governance/decide`). |
 | **Audit** | Who did what through the control plane. This is the same pane as Events ▸ Audit. | Choose whose entries to see, change how long entries are kept, and export them. |
+| **Read API** | The tokens BI tools read the reports with (`readApi/list`, #2019): each one's name, who made it and when, and its last use; the URL to read; and the OTLP exporter, when agents-control's environment sets one. See [Reports](reports.md#reading-the-reports-from-another-tool). | **Make Token** (its value shown once), **Revoke**. |
 
 ## Report Policy
 

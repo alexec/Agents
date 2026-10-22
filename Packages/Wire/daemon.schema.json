@@ -12148,6 +12148,33 @@
         "guardedChange"
       ]
     },
+    "OTLPExport": {
+      "type": "object",
+      "description": "The OTLP exporter of the report figures (#2019, #1804 decision 4), set on agents-control by OTEL_EXPORTER_OTLP_ENDPOINT, as this copy runs it: where it sends, the last send and the last failure.",
+      "properties": {
+        "endpoint": {
+          "type": "string"
+        },
+        "every": {
+          "type": "integer",
+          "description": "Seconds between sends."
+        },
+        "lastSent": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "lastFailure": {
+          "type": "string"
+        },
+        "failedAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "endpoint",
+        "every"
+      ],
+      "additionalProperties": false
+    },
     "OptionsRequest": {
       "type": "object",
       "properties": {
@@ -15468,6 +15495,103 @@
           "type": "string"
         }
       },
+      "additionalProperties": false
+    },
+    "ReadAPI": {
+      "type": "object",
+      "description": "readApi/list (#2019), an admin's: the read API's tokens, newest first, revoked ones too; its URL; and the OTLP exporter when one is set.",
+      "properties": {
+        "tokens": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReadToken"
+          }
+        },
+        "url": {
+          "type": "string"
+        },
+        "otlp": {
+          "$ref": "#/definitions/OTLPExport"
+        }
+      },
+      "required": [
+        "tokens",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "ReadToken": {
+      "type": "object",
+      "description": "A read API token (#2019, #1804 decision 4), with no value: the control plane keeps only its SHA-256. It reads the organisation's reports at /v1/read/reports, and nothing else.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "made": {
+          "$ref": "#/definitions/OrgRouteStamp"
+        },
+        "lastUse": {
+          "$ref": "#/definitions/SCIMTokenUse"
+        },
+        "revoked": {
+          "$ref": "#/definitions/OrgRouteStamp"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "made"
+      ],
+      "additionalProperties": false
+    },
+    "ReadTokenMade": {
+      "type": "object",
+      "description": "readApi/make (#2019): the token, its value once (never shown again), and the URL to read.",
+      "properties": {
+        "token": {
+          "$ref": "#/definitions/ReadToken"
+        },
+        "value": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "token",
+        "value",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "ReadTokenMake": {
+      "type": "object",
+      "description": "readApi/make (#2019): a name for the token, such as the BI tool that uses it.",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "ReadTokenRevoke": {
+      "type": "object",
+      "description": "readApi/revoke (#2019): the token to stop at once.",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
       "additionalProperties": false
     },
     "ReceiveRequest": {
