@@ -19,6 +19,7 @@ struct RemoteSettings: View {
             Form {
                 Section(SettingsScope.thisApp.title) {
                     SettingsPageLink("Appearance", systemImage: "paintbrush") { ThoughtsSettingsSection() }
+                    SettingsPageLink("Voice", systemImage: "waveform") { VoiceSettingsSection() }
                     SettingsPageLink("Notifications", systemImage: "bell") { LiveActivitySettingsSection() }
                     // Kept on the Mac's host, the same on every client (#1033, #2079).
                     SettingsPageLink("Sidebar", systemImage: "sidebar.left") { SidebarSettingsSection() }

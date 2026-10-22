@@ -32,6 +32,9 @@ enum WalkCommands {
 
     private static func perform(_ verb: String, _ request: [String: Any]) throws -> [String: Any] {
         switch verb {
+        // Voice mode with no microphone and no sound (#2322).
+        case "voice":
+            return VoiceWalk.perform(request)
         case "ping":
             return ["ok": true, "pid": Int(getpid())]
         // For when a shot or a press goes wrong: the views, a view's layers.

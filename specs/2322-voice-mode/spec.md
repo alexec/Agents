@@ -18,7 +18,8 @@ not (Alex, 2026-10-22: "would be weird").
 
 ## What the person sees
 
-1. **Settings ▸ Voice ▸ Voice mode**, a switch on each device. Off at first. Off, the chat has no
+1. **Voice mode**, a switch on each device: Settings ▸ Appearance ▸ Voice on the Mac, Settings ▸
+   Voice on the Remote. Off at first. Off, the chat has no
    voice control and no voice model is loaded.
 2. **A voice button in the prompt bar**, beside the dictate button, when the switch is on. It
    turns on voice mode for this chat:

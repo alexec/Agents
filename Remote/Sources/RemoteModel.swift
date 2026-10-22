@@ -4746,7 +4746,8 @@ final class RemoteModel {
     /// this turn. That is the daemon's rule and it is deliberately not second-guessed
     /// from here. What is attached is checked first, by the same rules as a start from
     /// the phone (029): nothing the runtime cannot take, and nothing too big for the link.
-    func send(_ what: String, attachments: [Attachment] = [], to agentID: UUID) async -> Bool {
+    /// `voice`: sent from voice mode (#2322), so the reply is short and fit to be heard.
+    func send(_ what: String, attachments: [Attachment] = [], to agentID: UUID, voice: Bool = false) async -> Bool {
         let host = work.agent(agentID)?.host ?? .mac
         // A stopped workspace that starts when used: kept by the control plane (#691 US3).
         if host != .mac, isStale(on: host), startsWhenUsed(host) {
@@ -4755,7 +4756,7 @@ final class RemoteModel {
                 return false
             }
             guard await keepThroughControl(host, DaemonAPI.Method.agentsPrompt,
-                                           DaemonAPI.PromptRequest(agentID: agentID, text: what, sendID: UUID())) != nil
+                                           DaemonAPI.PromptRequest(agentID: agentID, text: what, sendID: UUID(), voice: voice ? true : nil)) != nil
             else { return false }
             turnSent(to: agentID)
             return true
@@ -4776,7 +4777,8 @@ final class RemoteModel {
         do {
             try await sendOnce(DaemonAPI.Method.agentsPrompt,
                                DaemonAPI.PromptRequest(agentID: agentID, text: what,
-                                                       attachments: attachments, sendID: UUID()))
+                                                       attachments: attachments, sendID: UUID(),
+                                                       voice: voice ? true : nil))
             turnSent(to: agentID)
             return true
         } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.couldNotSave {

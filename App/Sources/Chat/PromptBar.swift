@@ -156,6 +156,8 @@ struct PromptBar: View {
                 } else if agent != nil, sending > 0, sendingIsSlow {
                     Telling(host: recipient, doing: "Sending")
                 }
+                // Voice mode in this chat (#2322): what it hears and says.
+                if let agent { VoiceModeStrip(agentID: agent.id) }
                 field
                 options
             }
@@ -600,6 +602,11 @@ struct PromptBar: View {
             .buttonBorderShape(.circle)
             .help("Dictate, as the Mac does everywhere")
             .accessibilityLabel("Dictate")
+
+            // Voice mode (#2322), while Settings ▸ Appearance has it on.
+            if let agent {
+                VoiceModeButton(agentID: agent.id) { await model.send($0, to: agent.id, voice: true) }
+            }
 
             // While it works and nothing is typed, send is stop. Type and it is send
             // again, queueing what is typed for when the turn ends.

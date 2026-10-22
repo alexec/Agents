@@ -4717,7 +4717,8 @@ final class AppModel {
     /// way this is the same call: whether there is room for it is not the window's
     /// question to answer.
     @discardableResult
-    func send(_ text: String, attachments: [Attachment] = [], to agentID: UUID? = nil) async -> Bool {
+    /// `voice`: sent from voice mode (#2322), so the reply is short and fit to be heard.
+    func send(_ text: String, attachments: [Attachment] = [], to agentID: UUID? = nil, voice: Bool = false) async -> Bool {
         // The main window's chat, or the one in a window of its own that sent it (#826).
         guard let selection = agentID ?? selection, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         let host = host(ofAgent: selection)
@@ -4728,7 +4729,7 @@ final class AppModel {
                 return false
             }
             return await keepThroughControl(host, DaemonAPI.Method.agentsPrompt,
-                                            DaemonAPI.PromptRequest(agentID: selection, text: text, sendID: UUID())) != nil
+                                            DaemonAPI.PromptRequest(agentID: selection, text: text, sendID: UUID(), voice: voice ? true : nil)) != nil
         }
         if host != .mac {
             guard let carried = await carry(attachments, to: host, for: selection) else { return false }
@@ -4736,14 +4737,16 @@ final class AppModel {
             return await sendToServer(host) { client in
                 try await client.call(DaemonAPI.Method.agentsPrompt,
                                       DaemonAPI.PromptRequest(agentID: selection, text: text,
-                                                              attachments: carried, sendID: sendID))
+                                                              attachments: carried, sendID: sendID,
+                                                              voice: voice ? true : nil))
             }
         }
         return await attempt {
             do {
                 try await self.client(forAgent: selection).call(DaemonAPI.Method.agentsPrompt,
                                            DaemonAPI.PromptRequest(agentID: selection, text: text,
-                                                                   attachments: attachments))
+                                                                   attachments: attachments,
+                                                                   voice: voice ? true : nil))
             } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.folderGone {
                 // Its own alert, with the ways on, carrying what was typed (#119).
                 self.folderGone = FolderGoneAsk(agentID: selection, message: error.message,

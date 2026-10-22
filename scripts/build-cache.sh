@@ -64,7 +64,9 @@ checkouts_key() {
 	local top
 	top=$(repo)
 	# Every pinned package set the apps build with; the spikes under specs/ are not built.
-	(cd "$top" && cat Packages/*/Package.resolved 2>/dev/null) |
+	# And the packages project.yml names itself (FluidAudio, #2322), which no
+	# Package.resolved holds: a package added there is a new set.
+	(cd "$top" && cat Packages/*/Package.resolved 2>/dev/null && sed -n '/^packages:/,/^targets:/p' project.yml) |
 		shasum | cut -c1-12
 }
 

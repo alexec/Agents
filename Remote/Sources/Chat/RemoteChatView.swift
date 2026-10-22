@@ -126,6 +126,8 @@ struct RemoteChatView: View {
                                // that (SC-007).
                                onHeight: { model.measure(transcriptHeight: $0) },
                                onFollowing: { page.isFollowingEnd = $0 })
+                    // Voice mode speaks a turn's reply when it ends (#2322).
+                    .voiceModeObserves(agent, items: page.transcriptItems)
             }
             form
         }
