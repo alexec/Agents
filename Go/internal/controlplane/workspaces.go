@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/controlplane/kms"
 	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/wire"
@@ -15,6 +17,23 @@ import (
 // a home for their secrets, beside the tunnels. They keep prompts and starts for a
 // stopped workspace (US3), and an agent on this machine's own host writes a map for a new
 // one (Write It for Me, #858).
+
+// providerSecrets is where providers keep their secrets: in the store, sealed by the keeper
+// for secrets, so a store copy, a handover or a backup carries them (#2138); or, with no
+// keeper, in home.
+func (s *Service) providerSecrets(home string) *providers.Secrets {
+	if s.cfg.SecretKeeper == "" {
+		return providers.NewSecrets(home)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), userDeliveryTimeout)
+	defer cancel()
+	k, err := kms.Keeper(ctx, s.cfg.SecretKeeper)
+	if err != nil {
+		s.log(fmt.Sprintf("providers: the keeper for secrets %s does not open (%v); their secrets stay in %s", kms.Describe(s.cfg.SecretKeeper), err, home))
+		return providers.NewSecrets(home)
+	}
+	return providers.NewSealedSecrets(s.cfg.Store, k, s.cfg.SecretKeeper)
+}
 
 // makeProviders makes the providers, their kept requests and their drafts.
 func (s *Service) makeProviders(home string) *providers.Providers {
@@ -32,7 +51,7 @@ func (s *Service) makeProviders(home string) *providers.Providers {
 	adapter := providerRouter{s.router}
 	p := providers.NewProviders(providers.Config{
 		Store: s.cfg.Store, Records: s.records, Router: adapter, Methods: providerMethods{s.methods},
-		Secrets: providers.NewSecrets(home), Timing: timing, Log: s.log,
+		Secrets: s.providerSecrets(home), Timing: timing, Log: s.log,
 		Hooks: providers.Hooks{
 			SSHStart: s.sshStart,
 			OpenTunnel: func(string) {

@@ -22,6 +22,15 @@ enum HostSecrets {
             return try ControlAgreement.loadOrMake(file: paths.controlHome.appendingPathComponent("control-key"))
         }
         if let kept = read(account: "control-key") { return kept }
+        // A key restored from a backup (`agents-control restore`, #2137) goes into the
+        // keychain, and its file is deleted: a new Mac keeps the old control plane's key.
+        let restored = paths.controlHome.appendingPathComponent("control-key")
+        if let key = try? Data(contentsOf: restored), key.count == 32,
+           (try? ControlAgreement.publicKey(privateKey: key)) != nil {
+            try write(key, account: "control-key")
+            try? FileManager.default.removeItem(at: restored)
+            return key
+        }
         let made = ControlAgreement.generate().privateKey
         try write(made, account: "control-key")
         return made

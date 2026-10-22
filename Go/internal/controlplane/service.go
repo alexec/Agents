@@ -89,8 +89,9 @@ type Config struct {
 	// How often a copy beats, looks for the others and renews its leases; shorter in
 	// tests. 0 is 10 s.
 	CopyBeat time.Duration
-	// Where workspace providers keep their secrets (#691, research R3): the control
-	// plane's own home, never the store. "" for none, and no providers.
+	// The workspace providers' home (#691): their connections' files, and their secrets
+	// when there is no SecretKeeper; with one, the secrets are sealed in the store (#2138).
+	// "" for none, and no providers.
 	ProviderHome string
 	// The command provider's binary, when not beside agents-control (tests).
 	CommandProvider string

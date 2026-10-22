@@ -102,5 +102,7 @@ backup is made is left out, never cut in half.
 
 ## Related
 
+- [Back up and restore a control plane](back-up-a-control-plane.md): its records, key and
+  certificate, which these backups do not hold
 - [Archive and stop agents](archive-and-stop.md)
 - [Move an existing set-up across](move-an-existing-set-up.md)

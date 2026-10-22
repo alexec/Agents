@@ -57,6 +57,10 @@ not be able to change them:
 - **This Mac's data:** agents, transcripts, and the sleep, resource, approval and
   retention-clock files, in `~/Library/Application Support/Agents`
   (`~/.agents-server/root` on a server).
+- **The control plane's folder** (Agents Host): `~/Library/Application Support/Agents Control`.
+  It holds the store (unless it is a bucket), `secrets-key` and the certificate in `tls/`.
+  The control key is in the keychain. To back them up together, and restore
+  them on a new Mac, see [Back up and restore a control plane](../how-to/back-up-a-control-plane.md).
 - **Caches and logs:** the system's cache and log folders. You can delete them at any time.
 - **Each device's own choices:** project folds, drafts, the new-session form's folders,
   window sizes, the selected project, and pairing.

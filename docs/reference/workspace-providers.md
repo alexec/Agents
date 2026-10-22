@@ -92,9 +92,13 @@ logged.
 
 ## Secrets
 
-- **Where they live.** A provider's secrets are kept in `provider-secrets.json` in the
-  control plane's own folder, readable by its user only. They are never in the store, never
-  sent to a host or a client, and never logged.
+- **Where they live.** A provider's secrets are kept in the store at
+  `v1/providersecrets/<provider>.json`, sealed by the keeper that seals people's secrets:
+  `secrets-key` in the control plane's folder on a Mac, the KMS on a cloud machine (#2138).
+  No value is in the store in clear, and a sealed record opens only at its own key. A store
+  copy, a handover and a [backup](../how-to/back-up-a-control-plane.md) keep them. A control
+  plane with no keeper keeps them in `provider-secrets.json` in its own folder, readable by
+  its user only. They are never sent to a host or a client, and never logged.
 - **How the provider gets them.** A server the control plane runs gets them as environment
   variables. A server at an address gets them through `${NAME}` in its configured headers.
 
