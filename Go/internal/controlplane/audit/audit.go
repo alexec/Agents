@@ -386,6 +386,28 @@ func Lines(entries []wire.AuditEntry) string {
 // Expired says whether an event's key is older than days before now: what the sweep
 // deletes.
 func Expired(key string, days int, now time.Time) bool {
+	return KeyDay(key) < Cutoff(days, now)
+}
+
+// KeyDay is the day in an event's key.
+func KeyDay(key string) string {
 	day, _, _ := strings.Cut(strings.TrimPrefix(key, Prefix), "/")
-	return day < now.Add(-time.Duration(days)*24*time.Hour).UTC().Format(dayLayout)
+	return day
+}
+
+// Cutoff is the first day kept: every day before it has expired.
+func Cutoff(days int, now time.Time) string {
+	return now.Add(-time.Duration(days) * 24 * time.Hour).UTC().Format(dayLayout)
+}
+
+// DayFolder is the folder of a day's entries, every person's.
+func DayFolder(day string) string { return dayPrefix(day, "") }
+
+// NextDay is the day after day, or "" for one that is not a day.
+func NextDay(day string) string {
+	t, err := time.Parse(dayLayout, day)
+	if err != nil {
+		return ""
+	}
+	return t.AddDate(0, 0, 1).Format(dayLayout)
 }

@@ -43,30 +43,22 @@ func (r sweepReport) String() string {
 // folder's leftovers out of the store, at most most deletions a time, so a store never
 // swept is caught up over a few hours. Deleting is plain: a race between two copies
 // changes nothing.
-func sweep(ctx context.Context, rs *records.Records, now time.Time, most int) (sweepReport, error) {
+// events is where the last sweep left the audit; nil sweeps as the first does.
+func sweep(ctx context.Context, rs *records.Records, now time.Time, most int, events *eventSweep) (sweepReport, error) {
 	var report sweepReport
+	if events == nil {
+		events = &eventSweep{}
+	}
 	s := rs.Store
 	left := most
 
 	// Events, by the day in their key: the audit's days (#996), or the days before a
 	// shorter time for a day after it (#2067).
-	days := audit.SweepDays(rs.Settings(), now)
-	events, err := s.List(ctx, eventsPrefix)
+	n, err := events.sweep(ctx, s, audit.Cutoff(audit.SweepDays(rs.Settings(), now), now), left)
+	report.events += n
+	left -= n
 	if err != nil {
 		return report, err
-	}
-	for _, e := range events {
-		if left <= 0 {
-			break
-		}
-		if !audit.Expired(e.Key, days, now) {
-			continue
-		}
-		if err := s.Delete(ctx, e.Key); err != nil {
-			return report, err
-		}
-		report.events++
-		left--
 	}
 
 	// Codes, by their expiry; a .spent whose code is gone goes too.
@@ -215,6 +207,48 @@ func dateTombstone(ctx context.Context, s store.Store, key string, object *store
 	return true, nil
 }
 
+// eventSweep is the oldest day that may still hold events, so a sweep lists only the
+// days that have expired, a day each, not every day the audit keeps (#2053). The first
+// sweep finds it from one list of every event.
+type eventSweep struct{ oldest string }
+
+// sweep deletes, at most most, the events of each day before cutoff, from the oldest,
+// and says how many it deleted.
+func (e *eventSweep) sweep(ctx context.Context, s store.Store, cutoff string, most int) (int, error) {
+	if e.oldest == "" {
+		all, err := s.List(ctx, eventsPrefix)
+		if err != nil {
+			return 0, err
+		}
+		e.oldest = cutoff
+		for _, k := range all {
+			// Sorted, so the first that names a day names the oldest.
+			if day := audit.KeyDay(k.Key); audit.NextDay(day) != "" {
+				e.oldest = min(day, cutoff)
+				break
+			}
+		}
+	}
+	deleted := 0
+	for e.oldest < cutoff && deleted < most {
+		keys, err := s.List(ctx, audit.DayFolder(e.oldest))
+		if err != nil {
+			return deleted, err
+		}
+		for _, k := range keys {
+			if deleted >= most {
+				return deleted, nil
+			}
+			if err := s.Delete(ctx, k.Key); err != nil {
+				return deleted, err
+			}
+			deleted++
+		}
+		e.oldest = audit.NextDay(e.oldest)
+	}
+	return deleted, nil
+}
+
 // sweepEveryHour runs the sweep once an hour, the first a minute after start (#174).
 func (s *Service) sweepEveryHour() {
 	select {
@@ -224,12 +258,13 @@ func (s *Service) sweepEveryHour() {
 	}
 	t := time.NewTicker(sweepEvery)
 	defer t.Stop()
+	var events eventSweep
 	for {
 		// Only while serving: a receiving or forwarding copy leaves the store alone.
 		var report sweepReport
 		var err error
 		if s.phase.now() == phaseServing {
-			report, err = sweep(context.Background(), s.records, time.Now(), mostPerSweep)
+			report, err = sweep(context.Background(), s.records, time.Now(), mostPerSweep, &events)
 			s.renewConnected(context.Background())
 			s.dropPreviousKey(context.Background())
 		}
