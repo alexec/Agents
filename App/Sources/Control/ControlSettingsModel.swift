@@ -102,6 +102,8 @@ final class ControlSettingsModel {
                        let change = try? note.params?.decode(DaemonAPI.HostTunnelChanged.self) {
                         self.tunnels[change.name] = change.tunnel
                     }
+                    // What this page does not show asks for nothing (#2055).
+                    if Self.notShown.contains(note.method) { continue }
                     await self.refresh()
                 }
                 // The control plane went; come back when it does.
@@ -111,6 +113,20 @@ final class ControlSettingsModel {
             }
         }
     }
+
+    /// Control notifications about what this page does not show: approvals, links,
+    /// sign-ins, caps, user settings and kept work. Each would otherwise run `refresh()`'s
+    /// seven calls, on every Mac with Settings open (#2055).
+    static let notShown: Set<String> = [
+        DaemonAPI.Notification.controlJoinRequested, DaemonAPI.Notification.controlJoinDecided,
+        DaemonAPI.Notification.controlLinkRequested, DaemonAPI.Notification.controlLinkDecided,
+        DaemonAPI.Notification.controlLinksChanged,
+        DaemonAPI.Notification.controlSignInRequested, DaemonAPI.Notification.controlSignInDecided,
+        DaemonAPI.Notification.controlSignInWaiting,
+        DaemonAPI.Notification.controlCapReached,
+        DaemonAPI.Notification.controlUserSettingsChanged, DaemonAPI.Notification.controlSecretsLeft,
+        DaemonAPI.Notification.controlKeptChanged, DaemonAPI.Notification.controlKeptDelivered,
+    ]
 
     func stop() {
         listening?.cancel()

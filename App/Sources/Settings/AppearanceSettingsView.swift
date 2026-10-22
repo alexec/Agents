@@ -65,7 +65,7 @@ struct AccountSettingsView: View {
             // How this person signs in on their other clients (#995), with a control plane.
             if model.controlRequests != nil {
                 SignInsSection(control: model.controlRequests, controlKey: ControlConfig.controlKey,
-                               revision: model.people.revision)
+                               people: model.people)
             }
             ChatProjectSettingsSection()
         }

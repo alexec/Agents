@@ -16,12 +16,9 @@ import UIKit
 struct PeoplePane: View {
     /// The control plane, or nil while it cannot be reached.
     let control: DaemonClient?
-    /// Goes up when the control plane says people changed, to load them again.
-    let revision: Int
-    /// The last bot that stopped at a cap, for an admin (#1761).
-    var capReached: DaemonAPI.CapReached?
+    /// The people and groups this client keeps, loaded once per change (#2055).
+    let people: PeopleState
 
-    @State private var list: DaemonAPI.PeopleList?
     @State private var problem: String?
     @State private var isInviting = false
     @State private var removing: DaemonAPI.PersonRow?
@@ -33,10 +30,6 @@ struct PeoplePane: View {
     @State private var isRotating = false
     /// Said once the control key was rotated (#997).
     @State private var rotated = false
-    /// `control/status`'s line to run on a server so it asks to join as this person.
-    @State private var joinCommand: String?
-    /// The groups a bot may be in (#1761).
-    @State private var groups: [DaemonAPI.Group] = []
     /// Make a Bot… (nil bot) and Group and Cap… (#1761).
     @State private var botSheet: BotSheetItem?
     @State private var machineFor: DaemonAPI.PersonRow?
@@ -46,14 +39,15 @@ struct PeoplePane: View {
         var id: String { bot?.id ?? "new" }
     }
 
-    private struct Load: Hashable {
-        var reachable: Bool
-        var revision: Int
-    }
+    private var list: DaemonAPI.PeopleList? { people.list }
+    /// The groups a bot may be in (#1761).
+    private var groups: [DaemonAPI.Group] { people.groups }
+    /// The last bot that stopped at a cap, for an admin (#1761).
+    private var capReached: DaemonAPI.CapReached? { people.capReached }
 
     var body: some View {
         Form {
-            if let problem {
+            if let problem = problem ?? people.listProblem {
                 Section {
                     Text(problem).appText(.supporting).tinted(.failure)
                         .fixedSize(horizontal: false, vertical: true)
@@ -80,7 +74,7 @@ struct PeoplePane: View {
                                   remove: { Task { await askBeforeRemoving(person) } },
                                   setCap: { botSheet = BotSheetItem(bot: person) },
                                   addMachine: { machineFor = person })
-                    if person.isYou, let joinCommand, !joinCommand.isEmpty {
+                    if person.isYou, let joinCommand = people.joinCommand, !joinCommand.isEmpty {
                         JoinCommandSection(command: joinCommand)
                     }
                 }
@@ -110,15 +104,15 @@ struct PeoplePane: View {
                     }
                     .paperListRow()
                 }
-            } else if problem == nil {
+            } else if problem == nil, people.listProblem == nil {
                 Text("Loading…").appText(.supporting).foregroundStyle(.secondary).paperListRow()
             }
         }
         .paperForm()
-        .task(id: Load(reachable: control != nil, revision: revision)) {
+        .task(id: control != nil) {
             // Until the control plane answers: Settings can open before the window's
-            // connection to it is up.
-            while !(await load()), !Task.isCancelled {
+            // connection to it is up. Once loaded, the model keeps the list true.
+            while people.list == nil, !(await load()), !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(3))
             }
         }
@@ -127,9 +121,9 @@ struct PeoplePane: View {
             InvitePersonSheet(control: control)
                 .paperSheet()
         }
-        .onChange(of: isInviting) { _, open in if !open { Task { await load() } } }
         .sheet(item: $botSheet) { item in
-            BotSheet(control: control, bot: item.bot, groups: groups) { Task { await load() } }
+            // A bot made or changed is told as control/peopleChanged: the list loads then.
+            BotSheet(control: control, bot: item.bot, groups: groups) {}
                 .paperSheet()
         }
         .sheet(item: $machineFor) { bot in
@@ -160,20 +154,8 @@ struct PeoplePane: View {
             problem = "The control plane can’t be reached."
             return true
         }
-        do {
-            list = try await control.call(DaemonAPI.Method.peopleList, DaemonAPI.Empty(),
-                                          returning: DaemonAPI.PeopleList.self)
-            joinCommand = (try? await control.call(DaemonAPI.Method.controlStatus,
-                                                   returning: DaemonAPI.ControlStatus.self))?.joinCommand
-            // A control plane before groups has none: no bot can be made.
-            groups = (try? await control.call(DaemonAPI.Method.groupsList, DaemonAPI.Empty(),
-                                              returning: DaemonAPI.GroupList.self))?.groups ?? []
-            problem = nil
-        } catch {
-            problem = PeopleWords.refusal(error)
-            return error is JSONRPCError
-        }
-        return true
+        problem = nil
+        return await people.loadList(control)
     }
 
     private func setRole(_ person: DaemonAPI.PersonRow, _ role: DaemonAPI.UserRole) async {
@@ -185,7 +167,7 @@ struct PeoplePane: View {
             // Refused when it would leave no admin: said, and the picker shows the role kept.
             problem = PeopleWords.refusal(error)
         }
-        await reload()
+        // A change is told as control/peopleChanged, which loads the list once for every pane.
     }
 
     /// Asks the control plane what Remove would take, then asks to confirm it (FR-029). An
@@ -216,7 +198,6 @@ struct PeoplePane: View {
         } catch {
             problem = PeopleWords.refusal(error)
         }
-        await reload()
     }
 
     /// control/rotate (#997). This client's own connection closes a moment later, and it
@@ -230,13 +211,6 @@ struct PeoplePane: View {
         } catch {
             problem = PeopleWords.refusal(error)
         }
-    }
-
-    /// Loads again and keeps a refusal on show.
-    private func reload() async {
-        let said = problem
-        await load()
-        if let said { problem = said }
     }
 }
 
