@@ -82,6 +82,25 @@ func (d *Daemon) remembered(key string) (optionEntry, bool) {
 	return e, ok && e.worthKeeping()
 }
 
+// runtimeOffers is the options a runtime last offered in any folder, newest first, or nil:
+// what a start's model is matched with before its session says its own (#2274).
+func (d *Daemon) runtimeOffers(runtimeID string) []wire.ConfigOption {
+	d.optionMu.Lock()
+	defer d.optionMu.Unlock()
+	var cache map[string]optionEntry
+	b, err := os.ReadFile(d.optionCachePath())
+	if err != nil || diskjson.Unmarshal(b, &cache) != nil {
+		return nil
+	}
+	var newest optionEntry
+	for k, e := range cache {
+		if strings.HasPrefix(k, runtimeID+"\t") && len(e.Options) > 0 && e.SavedAt > newest.SavedAt {
+			newest = e
+		}
+	}
+	return newest.Options
+}
+
 // remember keeps what a runtime offered, the 50 newest.
 func (d *Daemon) remember(key string, e optionEntry) {
 	if !e.worthKeeping() {

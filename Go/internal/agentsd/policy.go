@@ -395,17 +395,128 @@ func budgetSet(b *wire.PolicyBudgets) bool {
 	return b.Daily != nil || b.DailyTokens != nil || b.PerAgent != nil || b.PerAgentTokens != nil
 }
 
-// nameMatches is a policy name: the same, or a prefix with * at the end.
+// nameMatches is a policy name: the same, or a prefix with * at the end. A prefix that ends
+// in "-" also takes the name without it: claude-sonnet-* takes the family claude-sonnet.
 func nameMatches(pattern, name string) bool {
 	if prefix, ok := strings.CutSuffix(pattern, "*"); ok {
-		return strings.HasPrefix(name, prefix)
+		return strings.HasPrefix(name, prefix) || (strings.HasSuffix(prefix, "-") && name == strings.TrimSuffix(prefix, "-"))
 	}
 	return pattern == name
 }
 
+// modelChoice is one value of a runtime's model option, with its name and description.
+type modelChoice struct {
+	Value       string `json:"value"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// modelChoices is the model option's values, flat or in groups, or nil.
+func modelChoices(options []wire.ConfigOption) []modelChoice {
+	id := modelOptionID(options)
+	for _, o := range options {
+		if o.ID != id {
+			continue
+		}
+		var items []struct {
+			modelChoice
+			Options []modelChoice `json:"options"`
+		}
+		if json.Unmarshal(o.Options, &items) != nil {
+			return nil
+		}
+		var out []modelChoice
+		for _, it := range items {
+			if it.Value != "" {
+				out = append(out, it.modelChoice)
+			}
+			out = append(out, it.Options...)
+		}
+		return out
+	}
+	return nil
+}
+
+// claudeAliases is the Claude adapter's aliases for a family of models (#2274).
+var claudeAliases = map[string]bool{"sonnet": true, "opus": true, "haiku": true, "fable": true}
+
+// bareModel is a model value without its context suffix: opus[1m] is opus.
+func bareModel(v string) string {
+	if i := strings.IndexByte(v, '['); i > 0 {
+		return v[:i]
+	}
+	return v
+}
+
+// modelSlug is a model's name as an id: "Sonnet 5" is sonnet-5, "Opus 5.5" opus-5-5.
+func modelSlug(name string) string {
+	var b strings.Builder
+	dash := false
+	for _, r := range strings.ToLower(name) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			if dash && b.Len() > 0 {
+				b.WriteByte('-')
+			}
+			b.WriteRune(r)
+			dash = false
+		} else {
+			dash = true
+		}
+	}
+	return b.String()
+}
+
+// modelNames is every name a policy's model pattern can match for a value (#2274): the
+// value, the value without its context suffix and, for Claude, the model id that an alias
+// stands for (from the option's name, such as Sonnet 5, and its family claude-sonnet).
+// Claude's default goes by its description (Opus (1M context)) to the alias it names.
+// It is nil when the value is default and the options do not say what it is.
+func modelNames(runtimeID, value string, options []wire.ConfigOption) []string {
+	choices := modelChoices(options)
+	if runtimeID == "claude" && value == "default" {
+		words := ""
+		for _, c := range choices {
+			if c.Value == value {
+				words = c.Description
+			}
+		}
+		alias, _, _ := strings.Cut(strings.ToLower(strings.TrimSpace(words)), " ")
+		for _, c := range choices {
+			if c.Value != value && bareModel(c.Value) == alias {
+				return append([]string{value}, modelNames(runtimeID, c.Value, options)...)
+			}
+		}
+		if !claudeAliases[alias] {
+			return nil
+		}
+		return []string{value, "claude-" + alias}
+	}
+	names := []string{value}
+	bare := bareModel(value)
+	if bare != value {
+		names = append(names, bare)
+	}
+	if runtimeID != "claude" {
+		return names
+	}
+	if claudeAliases[bare] {
+		names = append(names, "claude-"+bare)
+	}
+	for _, c := range choices {
+		if c.Value != value {
+			continue
+		}
+		if slug := modelSlug(c.Name); slug != "" && claudeAliases[strings.SplitN(slug, "-", 2)[0]] {
+			names = append(names, "claude-"+slug)
+		}
+	}
+	return names
+}
+
 // modelRefusal is why the policy does not allow a model on a runtime, or nil. A model is
-// matched by its id; "" is the runtime's own choice, which the turn checks once it is known.
-func (d *Daemon) modelRefusal(p *wire.OrgPolicy, runtimeID, model string) error {
+// matched by its value and the names it stands for (modelNames), with the runtime's
+// options; "" is the runtime's own choice, which the turn checks once it is known.
+func (d *Daemon) modelRefusal(p *wire.OrgPolicy, runtimeID, model string, options []wire.ConfigOption) error {
 	if p == nil || p.Runtimes == nil || model == "" {
 		return nil
 	}
@@ -413,7 +524,13 @@ func (d *Daemon) modelRefusal(p *wire.OrgPolicy, runtimeID, model string) error 
 	if !ok || rule.Models == nil {
 		return nil
 	}
-	if slices.ContainsFunc(rule.Models, func(m string) bool { return nameMatches(m, model) }) {
+	names := modelNames(runtimeID, model, options)
+	if names == nil {
+		return nil
+	}
+	if slices.ContainsFunc(rule.Models, func(m string) bool {
+		return slices.ContainsFunc(names, func(n string) bool { return nameMatches(m, n) })
+	}) {
 		return nil
 	}
 	return policyRefusal("policy", "runtimes."+runtimeID+".models",
@@ -870,7 +987,7 @@ func (d *Daemon) policyStart(r *wire.StartRequest, by startedBy) (note string, e
 	if err := d.runtimeRefusal(p, r.RuntimeID); err != nil {
 		return "", err
 	}
-	if err := d.modelRefusal(p, r.RuntimeID, stringValue(r.StartOptions.Values["model"])); err != nil {
+	if err := d.modelRefusal(p, r.RuntimeID, stringValue(r.StartOptions.Values["model"]), d.runtimeOffers(r.RuntimeID)); err != nil {
 		return "", err
 	}
 	if err := d.dayBudgetRefusal(); err != nil {
@@ -943,7 +1060,7 @@ func (d *Daemon) policyTurn(l *live, a *wire.Agent) string {
 	if err := d.sessionReachRefusal(a); err != nil {
 		return policyWords(err)
 	}
-	if err := d.modelRefusal(p, a.RuntimeID, agentModel(a)); err != nil {
+	if err := d.modelRefusal(p, a.RuntimeID, agentModel(a), a.AdvertisedOptions); err != nil {
 		return policyWords(err)
 	}
 	if err := d.dayBudgetRefusal(); err != nil {
@@ -1052,7 +1169,7 @@ func (d *Daemon) optionRefusal(a *wire.Agent, optionID, value string) error {
 			return policyRefusal("policy", "sandbox", sandboxRequiredWords, nil)
 		}
 	case modelOptionID(a.AdvertisedOptions):
-		return d.modelRefusal(p, a.RuntimeID, value)
+		return d.modelRefusal(p, a.RuntimeID, value, a.AdvertisedOptions)
 	case approveAllOptionID(a.AdvertisedOptions):
 		return approveAllRefusal(p, value)
 	}
@@ -1179,7 +1296,7 @@ func (d *Daemon) markOptions(runtimeID string, options []wire.ConfigOption) []wi
 			}
 		case o.ID == modelID:
 			refuse = func(v string) *wire.PolicySetBy {
-				if err := d.modelRefusal(p, runtimeID, v); err != nil {
+				if err := d.modelRefusal(p, runtimeID, v, options); err != nil {
 					return setBy("runtimes."+runtimeID+".models", err.(*Error).Data.(wire.PolicyRefusal).Words)
 				}
 				return nil
