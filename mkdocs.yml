@@ -77,6 +77,7 @@ nav:
       - how-to/send-a-project-to-a-server.md
       - how-to/start-workspaces-from-agents.md
       - how-to/add-a-workspace-provider.md
+      - how-to/set-up-a-cloud-workspace-provider.md
       - how-to/run-the-control-plane-in-the-cloud.md
       - how-to/run-the-hosted-service.md
       - how-to/run-several-copies.md
@@ -97,6 +98,8 @@ nav:
       - how-to/use-a-shell.md
       - how-to/set-up-a-workflow.md
       - how-to/start-a-workflow-from-an-mcp-event.md
+      - how-to/use-github.md
+      - how-to/use-gitlab.md
       - how-to/use-linear-issues.md
       - how-to/wait-for-mail.md
       - how-to/hand-files-to-a-workflow.md
@@ -149,6 +152,7 @@ nav:
       - explanation/versions.md
       - explanation/scoped-tools.md
       - explanation/views.md
+      - explanation/connector-levels.md
       - explanation/projects-hosts-worktrees.md
       - explanation/leases.md
       - explanation/phone-and-ipad.md

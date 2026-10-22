@@ -27,6 +27,9 @@ something particular done.
   start and stop the machines your servers run on, and press Start on a stopped one.
 - [Add a workspace provider](add-a-workspace-provider.md): a preset, your own commands, a
   tool map, or a provider of your own.
+- [Set up a cloud workspace provider](set-up-a-cloud-workspace-provider.md): add AWS EC2,
+  Compute Engine, Cloud Workstations, DigitalOcean, Codespaces or Coder, with the credentials
+  each one needs.
 - [Run the control plane in the cloud](run-the-control-plane-in-the-cloud.md): on a
   machine you rent, at your own domain with a public certificate.
 - [Run the control plane as several copies](run-several-copies.md): over one bucket,
@@ -114,6 +117,10 @@ something particular done.
   agent finishes, stops or asks.
 - [Start a workflow from an MCP event](start-a-workflow-from-an-mcp-event.md): an agent
   each time a connector reports something, such as a pull request's checks failing.
+- [Use GitHub](use-github.md): connect GitHub once, set up a project's Tasks, Code review
+  and CI, work with pull requests and issues on their pages, and use CodeRabbit.
+- [Use GitLab](use-gitlab.md): connect GitLab with the gitlab.com sign-in or an access
+  token, set up a project from it, and work with merge requests, issues and pipelines.
 - [Use Linear issues](use-linear-issues.md): Linear's own tools, and an agent when an
   issue is opened, labelled, commented on or closed.
 - [Wait for mail](wait-for-mail.md): a mailbox for agents, the Mail page, and sign-up codes
