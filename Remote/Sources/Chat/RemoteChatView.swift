@@ -186,6 +186,10 @@ struct RemoteChatView: View {
                 if let agent, agent.missingFolder != nil, agent.state != .archived {
                     RemoteMissingFolderStrip(agent: agent)
                 }
+                // Its account gone or refused by the organisation (#999): why, and Continue in New.
+                if let agent, agent.missingFolder == nil, let reason = model.accountMoveReason(agent) {
+                    RemoteAccountMoveStrip(agent: agent, reason: reason)
+                }
                 // Paused by a spent allowance (#1859): Continue when it is back, or Cancel.
                 if let agent, ContinueWhenBackWords.offers(agent) || agent.continueWhenBack != nil,
                    model.host(agent.host, has: Capability.chatContinueWhenBack1) {
@@ -654,8 +658,9 @@ struct ContextMeter: View {
         let spent = Cost.total(of: agent.costToDate)
             ?? (agent.usage?.cost?.amount ?? 0)
                 .money(in: agent.usage?.cost?.currency ?? "USD")
-        guard let ceiling = agent.ceiling(under: model.costLimits) else { return spent }
-        return "\(spent) of \(ceiling.amount.formatted(.currency(code: ceiling.currency)))"
+        // On an org account the figure is the runtime's list price, and says so (#999).
+        guard let ceiling = agent.ceiling(under: model.costLimits) else { return agent.priced(spent) }
+        return agent.priced("\(spent) of \(ceiling.amount.formatted(.currency(code: ceiling.currency)))")
     }
 
     /// The app's existing threshold for a nearly full context, not a second number.

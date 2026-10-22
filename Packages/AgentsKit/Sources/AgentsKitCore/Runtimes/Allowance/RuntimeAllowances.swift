@@ -75,16 +75,23 @@ public struct RuntimeAllowances: Codable, Hashable, Sendable {
         /// The added account this row is for (#840), and its name; nil for the runtime's own.
         public var accountID: String?
         public var accountName: String?
+        /// An org account's tokens today on the host, as its model relay counted them (#999,
+        /// D12). Nil on every other row.
+        public var tokensToday: Int?
 
         public init(credentialKey: String, state: AllowanceState, unusable: String? = nil, setupNote: String? = nil,
-                    accountID: String? = nil, accountName: String? = nil) {
+                    accountID: String? = nil, accountName: String? = nil, tokensToday: Int? = nil) {
             self.credentialKey = credentialKey
             self.state = state
             self.unusable = unusable
             self.setupNote = setupNote
             self.accountID = accountID
             self.accountName = accountName
+            self.tokensToday = tokensToday
         }
+
+        /// An organisation's account (#999): its id is `org:<route id>`.
+        public var isOrganisation: Bool { accountID?.hasPrefix("org:") == true }
 
         /// The runtime's name, and the account's for an added one: "Claude · Work".
         public var title: String {

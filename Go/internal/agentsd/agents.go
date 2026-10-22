@@ -94,6 +94,9 @@ func (d *Daemon) registerAgents() {
 	On(d, wire.CallAgentsContinueInProject, func(ctx context.Context, c *Client, r wire.ContinueInProjectRequest) (wire.UUID, error) {
 		return d.continueInProject(r)
 	})
+	On(d, wire.CallAgentsContinueInNew, func(ctx context.Context, c *Client, r wire.ContinueInNewRequest) (wire.UUID, error) {
+		return d.continueInNew(r)
+	})
 }
 
 func unqueued(queue []wire.QueuedPrompt, id wire.UUID) []wire.QueuedPrompt {
@@ -578,6 +581,43 @@ func shortPath(path string) string {
 		return "~" + path[len(home):]
 	}
 	return path
+}
+
+// continueInNew is Continue in New (#999): a successor in the same folder that reads this
+// session and carries on, with its runtime, choices and the person's labels, on the account
+// asked for, else the runtime's account for new sessions. For a session whose account the
+// organisation removed or no longer allows; start applies the policy to the new account.
+func (d *Daemon) continueInNew(r wire.ContinueInNewRequest) (wire.UUID, error) {
+	a := d.Store.Agent(r.AgentID)
+	if a == nil {
+		return "", noSuchAgent()
+	}
+	cwd := a.Cwd
+	if !isDir(store.FolderPath(cwd)) {
+		cwd = store.FolderURL(projectFolder(a))
+	}
+	name := string(a.ID)
+	if a.Title != nil {
+		name = "“" + *a.Title + "” (" + string(a.ID) + ")"
+	}
+	prompt := "Continue the work of the session " + name + ", which can no longer reach the model on its account. " +
+		"Read that session with read_session to see what it did and what is left, then carry on."
+	var labels []string
+	for _, l := range a.Labels {
+		if l.Owner == wire.SessionLabelOwnerPerson {
+			labels = append(labels, l.Value)
+		}
+	}
+	id, err := d.start(wire.StartRequest{RuntimeID: a.RuntimeID, Cwd: cwd, Prompt: prompt, Attachments: []wire.Attachment{},
+		StartOptions: a.StartOptions, AdditionalDirectories: a.AdditionalDirectories, McpServers: a.McpServers,
+		RequestID: r.RequestID, Sandbox: a.SandboxOverride, Labels: labels, AccountID: r.AccountID})
+	if err != nil {
+		return "", err
+	}
+	if a.Title != nil {
+		d.change(id, func(s *wire.Agent) { s.Title, s.TitleIsPersons = a.Title, a.TitleIsPersons })
+	}
+	return id, nil
 }
 
 // continueInProject starts a successor in the project folder that reads this session and

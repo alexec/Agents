@@ -19,7 +19,7 @@ import type { SandboxWillNotStart, Store } from "../model/store";
 import { drawable, modeOption, modeStartsOn } from "../model/options";
 import { keep, rememberOptions, rememberedOptions } from "../model/startMemory";
 import { folderKey } from "../model/groups";
-import { accountState, defaultAccountName, formRuntime, newSessionRuntime, runtimeRuns, unavailableReason } from "../model/runtimes";
+import { accountChoices, accountState, defaultAccountName, formRuntime, isOrgAccount, newSessionRuntime, ownSignInID, runtimeRuns, unavailableReason } from "../model/runtimes";
 import { formFor, keepForm, keptForm } from "../model/startForm";
 import { personaChoices, withPersonaLabels } from "../model/personas";
 import { sandboxCardTitle, sandboxChoiceWords, sandboxChoices, sandboxExplanation, sandboxOverrideWords, sandboxState,
@@ -39,7 +39,7 @@ import { BackToList } from "./BackToList";
 import { orderedProjects, projectLabel } from "./Sidebar";
 import { GuardedChangeCards } from "./GuardedChange";
 import { KeptBubbles } from "./Kept";
-import { composerReason, line } from "../model/orgPolicy";
+import { composerReason, line, setBy as setByWords } from "../model/orgPolicy";
 import { optionLabel } from "./OrgPolicyLine";
 
 type Where = { kind: "project" } | { kind: "new" } | { kind: "existing"; root: string } | { kind: "branch"; name: string }
@@ -275,9 +275,12 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   const description = usablePersonas.find((p) => p.id === persona.value)?.description;
 
   const capabilities = chosenRuntime ? store.account(host, chosenRuntime)?.promptCapabilities : undefined;
-  // The runtime's accounts beyond its own sign-in (#840): the picker shows only when there is one.
-  const added = chosenRuntime ? store.addedAccounts(host, chosenRuntime) : [];
-  const chosenAccount = added.find((a) => a.id === accountID.value);
+  // The runtime's accounts beyond its own sign-in (#840), the organisation's included (#999): the
+  // picker shows only when there is one. Undefined is the runtime's account for new sessions.
+  const choices = accountChoices(chosenRuntime ?? "", chosenRuntime ? store.addedAccounts(host, chosenRuntime) : [],
+    store.policyStates.value[host]?.policy);
+  const chosenAccount = choices.account(accountID.value);
+  const sentAccount = choices.sent(accountID.value);
 
   const start = async (text: string, attachments: Attachment[], override = sandbox.value) => {
     if (!chosenRuntime) {
@@ -296,7 +299,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
         : w.kind === "branch" ? { worktree: { branch: { _0: w.name } } } : w.kind === "named" ? { worktree: { named: { _0: w.name } } } : {}),
       ...(override ? { sandbox: override } : {}),
       ...(persona.value ? { persona: persona.value } : {}),
-      ...(chosenAccount ? { accountID: chosenAccount.id } : {}),
+      ...(sentAccount ? { accountID: sentAccount } : {}),
       // Kept until this start succeeds, so a retry after a timeout is the same start (#291).
       requestID: store.startRequestID(host, folder),
     };
@@ -469,16 +472,18 @@ export function NewAgent({ store, host, folder, projectName, down }: {
                 {runs.cannot.length > 0 && <optgroup label="Can't start">{runs.cannot.map(runtimeOption)}</optgroup>}
               </select>
             </label>
-            {/* Which of the runtime's accounts (#840): only when it has more than one. */}
-            {added.length > 0 && <label class="pill select" title="Account">
-              <span aria-hidden="true">{chosenAccount?.name ?? defaultAccountName} ▾</span>
-              <select aria-label="Account" value={chosenAccount?.id ?? ""} disabled={down}
+            {/* Which of the runtime's accounts (#840, #999): only when it has more than one. One the
+                organisation's policy refuses is shown, dimmed, and cannot be chosen. */}
+            {choices.shows && <label class="pill select" title="Account">
+              <span aria-hidden="true">{choices.name(accountID.value)} ▾</span>
+              <select aria-label="Account" value={chosenAccount?.id ?? ownSignInID} disabled={down}
                 onChange={(e) => {
                   const id = (e.currentTarget as HTMLSelectElement).value;
-                  accountID.value = id === "" ? undefined : id;
+                  accountID.value = id === ownSignInID ? choices.ownChoice : id;
                 }}>
-                <option value="">{defaultAccountName}</option>
-                {added.map((a) => <option key={a.id} value={a.id}>{a.name}{a.signedIn ? "" : ` (${accountState(a).toLowerCase()})`}</option>)}
+                <option value={ownSignInID} disabled={!!choices.ownSetBy}>{defaultAccountName}{choices.ownSetBy ? ` (${setByWords})` : ""}</option>
+                {choices.accounts.map((a) => <option key={a.id} value={a.id} disabled={!!a.setBy}>{a.name}{a.setBy ? ` (${setByWords})`
+                  : isOrgAccount(a) ? ` (${accountState(a).toLowerCase()})` : a.signedIn ? "" : ` (${accountState(a).toLowerCase()})`}</option>)}
               </select>
             </label>}
           </>)}>

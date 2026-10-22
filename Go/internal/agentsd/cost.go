@@ -400,6 +400,10 @@ func (d *Daemon) bankTurnUsage(id wire.UUID, u wire.TurnUsage) {
 	})
 	if counted > 0 {
 		d.tellCost()
+		// An org account's row says its tokens today (#999, FR-025).
+		if reportRoute(a) != "" {
+			d.tellAllowances()
+		}
 	}
 }
 

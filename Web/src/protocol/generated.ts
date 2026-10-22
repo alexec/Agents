@@ -1683,6 +1683,21 @@ export interface ContentBlockAnnotations {
   priority?: number;
 }
 
+/**
+ * agents/continueInNew (#999): a new session in the same folder that reads this one and carries on,
+ * on another account of its runtime.
+ */
+export interface ContinueInNewRequest {
+  agentID: UUID;
+  /**
+   * The account the new session uses: an added account, an org account (org:<route id>) or default
+   * for the runtime's own sign-in. Absent: the runtime's account for new sessions (Reaches the
+   * Model By).
+   */
+  accountID?: string;
+  requestID?: UUID;
+}
+
 export interface ContinueInProjectRequest {
   agentID: UUID;
   text: string;
@@ -5407,10 +5422,18 @@ export interface RuntimeAllowancesRow {
    * it (#1946). Only on the runtime's own sign-in row.
    */
   setupNote?: string;
-  /** The added account this row is for (#840); absent for the runtime's own sign-in. */
+  /**
+   * The added account this row is for (#840), or an org account (org:<route id>, #999); absent for
+   * the runtime's own sign-in.
+   */
   accountID?: string;
   /** That account's name. */
   accountName?: string;
+  /**
+   * An org account's tokens today on this host, as its model relay counted them from the provider's
+   * answers (#999, D12): fresh input, cache writes and output. Only on an org account's row.
+   */
+  tokensToday?: number;
 }
 
 export interface RuntimeAssessmentCheck {
@@ -7554,6 +7577,7 @@ export interface Methods {
   "agents/archive": { params: AgentRequest; result: Empty };
   "agents/branchFrom": { params: BranchFromRequest; result: UUID };
   "agents/cancelContinue": { params: AgentRequest; result: Agent };
+  "agents/continueInNew": { params: ContinueInNewRequest; result: UUID };
   "agents/continueInProject": { params: ContinueInProjectRequest; result: UUID };
   "agents/continueWhenBack": { params: AgentRequest; result: Agent };
   "agents/delete": { params: AgentRequest; result: Empty };
@@ -7734,6 +7758,7 @@ export interface Methods {
   "runtimes/list": { params: Empty; result: RuntimeStatus[] };
   "runtimes/markAvailable": { params: MarkRuntimeAvailable; result: RuntimeAllowances };
   "runtimes/removeAccount": { params: AccountRequest; result: UUID[] };
+  "runtimes/setDefaultAccount": { params: DefaultAccountRequest; result: Empty };
   "sandbox/state": { params: Empty; result: SandboxSettings };
   "settings/passThrough": { params: Empty; result: PassThroughState };
   "signIn/approve": { params: SignInDecide; result: Empty };
@@ -7785,6 +7810,7 @@ export const MethodTarget = {
   "agents/archive": "host",
   "agents/branchFrom": "host",
   "agents/cancelContinue": "host",
+  "agents/continueInNew": "host",
   "agents/continueInProject": "host",
   "agents/continueWhenBack": "host",
   "agents/delete": "host",
@@ -7965,6 +7991,7 @@ export const MethodTarget = {
   "runtimes/list": "host",
   "runtimes/markAvailable": "host",
   "runtimes/removeAccount": "host",
+  "runtimes/setDefaultAccount": "host",
   "sandbox/state": "host",
   "settings/passThrough": "host",
   "signIn/approve": "control",
@@ -8192,6 +8219,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConnectorSlot: { required: ["slot", "choice", "state"], optional: ["proof", "readAt", "message"] },
   ConnectorWorkflow: { required: ["id", "name"], optional: [] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
+  ContinueInNewRequest: { required: ["agentID"], optional: ["accountID", "requestID"] },
   ContinueInProjectRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
   ContinueWhenBack: { required: ["at", "resetKnown"], optional: [] },
   ControlAuth: { required: ["id", "nonce", "mac", "kind"], optional: ["for", "epoch", "capabilities", "page", "publicKey"] },
@@ -8580,7 +8608,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Runtime: { required: ["id", "name", "executable", "arguments", "installPage", "usesAppCopyOnly"], optional: ["install", "accountFolderVariable"] },
   RuntimeAccount: { required: ["runtimeID", "state", "authMethods", "canLogOut", "providers", "promptCapabilities", "canSteer", "checkedAt"], optional: ["currentProviderID", "signedInAs"] },
   RuntimeAllowances: { required: ["rows", "at"], optional: ["shared"] },
-  RuntimeAllowancesRow: { required: ["credentialKey", "state"], optional: ["unusable", "setupNote", "accountID", "accountName"] },
+  RuntimeAllowancesRow: { required: ["credentialKey", "state"], optional: ["unusable", "setupNote", "accountID", "accountName", "tokensToday"] },
   RuntimeAssessmentCheck: { required: ["id", "area", "verdict", "evidence"], optional: [] },
   RuntimeAssessmentScore: { required: ["agentID", "runtimeID", "scoredAt", "checks"], optional: ["model", "runtimeVersion", "host", "reportPath"] },
   RuntimeRequest: { required: ["runtimeID"], optional: [] },

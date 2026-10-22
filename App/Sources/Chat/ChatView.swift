@@ -279,6 +279,8 @@ struct ChatView: View {
     private func actions(for agent: Agent) -> some View {
         if agent.missingFolder != nil, agent.state != .archived {
             MissingFolderStrip(agent: agent)
+        } else if let reason = model.accountMoveReason(agent) {
+            AccountMoveStrip(agent: agent, reason: reason)
         } else if agent.state == .archived {
             // Matching the phone: an archived chat's own page is where Unarchive lives,
             // not only on the row you left it from.

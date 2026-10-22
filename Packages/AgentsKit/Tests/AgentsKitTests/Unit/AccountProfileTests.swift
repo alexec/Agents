@@ -36,22 +36,31 @@ struct AccountProfileTests {
         #expect((back?["reach"] as? [String: Any])?["signIn"] as? [String: String] == ["folder": "/r/a"])
     }
 
-    /// An org route reaches a machine before this client draws org accounts (#999): the list
-    /// still decodes, and the way is kept whole, as the host wrote it.
-    @Test func aWayThisBuildDoesNotDrawStillDecodes() throws {
+    /// An org route on a machine (#999): an org key and a gateway decode as theirs, with who
+    /// gave them, the default and the policy's mark; a way a newer host names is kept whole.
+    @Test func orgAccountsAndLaterWaysDecode() throws {
         let json = #"""
         [{"id":"org:acme","runtimeID":"claude","name":"Acme Gateway","reach":{"gateway":{"route":"acme","kind":"baseURL"}},
-          "source":"organisation","addedAt":0,"signedIn":true},
-         {"id":"w1","runtimeID":"claude","name":"Work","reach":{"signIn":{"folder":"/r/a"}},"addedAt":0,"signedIn":false},
+          "source":"organisation","isDefault":true,"addedAt":0,"signedIn":true},
+         {"id":"org:key","runtimeID":"codex","name":"Acme Key","reach":{"orgKey":{"route":"key"}},"source":"organisation","addedAt":0,"signedIn":true},
+         {"id":"w1","runtimeID":"claude","name":"Work","reach":{"signIn":{"folder":"/r/a"}},"addedAt":0,"signedIn":false,
+          "setBy":{"by":"organisation","rule":"runtimes.claude.reach","words":"Your organisation requires Claude to use Acme Gateway."}},
          {"id":"x","runtimeID":"claude","name":"Later","reach":{"teleport":{}},"addedAt":0,"signedIn":true}]
         """#
         let list = try JSONDecoder().decode([AccountProfile].self, from: Data(json.utf8))
-        try #require(list.map(\.name) == ["Acme Gateway", "Work", "Later"])
-        let org = list[0], work = list[1]  // index-ok: the three names are required just above
-        #expect(org.reach == .other(["gateway": ["route": "acme", "kind": "baseURL"]]))
-        #expect(work.reach == .signIn(folder: "/r/a"))
-        let back = try JSONSerialization.jsonObject(with: JSONEncoder().encode(org)) as? [String: Any]
+        try #require(list.map(\.name) == ["Acme Gateway", "Acme Key", "Work", "Later"])
+        let gateway = list[0], key = list[1], work = list[2], later = list[3]  // index-ok: the four names are required just above
+        #expect(gateway.reach == .gateway(route: "acme", kind: "baseURL"))
+        #expect(gateway.isOrganisation && gateway.isDefault == true)
+        #expect(gateway.state == "From your organisation")
+        #expect(key.reach == .orgKey(route: "key") && key.reach.route == "key")
+        #expect(work.reach == .signIn(folder: "/r/a") && !work.isOrganisation)
+        #expect(work.setBy?.rule == "runtimes.claude.reach")
+        #expect(later.reach == .other(["teleport": [:]]))
+        let back = try JSONSerialization.jsonObject(with: JSONEncoder().encode(gateway)) as? [String: Any]
         #expect(((back?["reach"] as? [String: Any])?["gateway"] as? [String: String]) == ["route": "acme", "kind": "baseURL"])
+        let kept = try JSONSerialization.jsonObject(with: JSONEncoder().encode(later)) as? [String: Any]
+        #expect((kept?["reach"] as? [String: Any])?["teleport"] != nil)
     }
 
     @Test func anAccountNotSignedInSaysSo() {

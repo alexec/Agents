@@ -265,6 +265,32 @@
       }
     },
     {
+      "name": "agents/continueInNew",
+      "description": "Continue in New (#999): start a session in the same folder that reads this one and carries on, with its runtime, choices and the person's labels, on another account: the one given, else the runtime's account for new sessions. For a session whose account the organisation removed or no longer allows. Refused with policyRefused when the policy refuses that account.",
+      "x-capability": "host.org-routes/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ContinueInNewRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/UUID"
+        }
+      }
+    },
+    {
       "name": "agents/continueInProject",
       "x-capability": "agents/1",
       "tags": [
@@ -5223,8 +5249,13 @@
     },
     {
       "name": "runtimes/setDefaultAccount",
-      "x-capability": "host.org-routes/1",
       "description": "A runtime's account for new sessions, Reaches the Model By (#999, FR-016): an added account, an org account (org:<route id>) or default for the runtime's own sign-in. Kept on the machine. Refused with policyRefused when the organisation's policy refuses that account.",
+      "x-capability": "host.org-routes/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {

@@ -97,7 +97,7 @@ time alone never brings it back. **Mark available** does, at once.
 ## More than one account
 
 Claude and Codex can have more than one account (#840), for example a personal plan and a
-work plan. The sign-in a runtime has already is its **Default account**. Each account you add
+work plan. The sign-in a runtime has already is its own, **Your Own Sign-In**. Each account you add
 is a folder of its own, which the app gives the runtime in the variable that names where it
 keeps its sign-in:
 
@@ -120,7 +120,7 @@ keeps its sign-in:
   skills), so only the sign-in is separate.
 - **Sign it in** on the Mac. For Claude, **Sign In** gives the command
   `CLAUDE_CONFIG_DIR=<folder> claude`: run it, then type `/login`. Codex signs in as its
-  Default account does.
+  own sign-in does.
 - **Choose it** when you start a session: the **Account** menu is beside the runtime menu,
   on all three, when the runtime has more than one account. A branch, **Continue in New** and
   a helper the session starts keep its account.
@@ -147,12 +147,22 @@ adds it in Console ▸ Model Access; the machine gets it sealed to its own key a
   `GEMINI_*`, `GOOGLE_*`, `AWS_*`, `CLAUDE_CODE_USE_*` and the like, from your login
   environment and your pass-through list, do not reach a session on an org account.
 - **Reaches the Model By** is each runtime's default account for new sessions
-  (`runtimes/setDefaultAccount`, kept in the runtimes part of your settings). Without a
+  (`runtimes/setDefaultAccount`, kept on the machine in `default-accounts.json`). Without a
   choice of yours, it is the route the organisation made the default, then the runtime's
-  own sign-in. A helper or workflow that names no account takes it, and says so.
+  own sign-in. A helper or workflow that names no account takes it, and says so. Set it in
+  the runtime's sign-in sheet on the Mac, and under the runtime's row on the **Runtimes**
+  page on iPhone, iPad and the web. The **Account** menu of a new session opens on it.
 - **The organisation can require the org path** (policy `runtimes.<id>.reach`). Your own
-  sign-in and added accounts are then refused, with **Set by your organisation**, and a
-  session on one is told to **Continue in New**.
+  sign-in and added accounts are then refused: each client shows them dimmed, with **Set by
+  your organisation**.
+- **Continue in New.** A session whose account the organisation removed, or no longer
+  allows, shows why over its chat, with **Continue in New** (`agents/continueInNew`). It
+  starts a session in the same folder, on the runtime's account for new sessions, that reads
+  the old session and carries on. The old session is kept.
+- **Its allowance has no plan.** An org account's row on the **Runtimes** page says
+  **Organisation · No plan limit** and its tokens today, as the relay counted them. After a
+  rate-limit answer it says "Out until 14:05". A cost on an org account is the runtime's own
+  figure, so it says "list price, as Claude reports it".
 - **Tokens are the provider's count.** The relay reads the usage in each answer and keeps
   it beside what the runtime says (`relayTokens`); a limit counts it. A rate-limit answer
   puts only that account out, until its `Retry-After`, or for 5 minutes.

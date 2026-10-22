@@ -814,6 +814,26 @@ func TestAnOrgKeyReplacedAndRemoved(t *testing.T) {
 		e.Code != wire.FailureOrgRouteRemoved || !strings.Contains(e.Message, "Continue in New") {
 		t.Fatalf("%+v", e)
 	}
+	// Continue in New moves it: a session in the same folder that reads this one, on the
+	// runtime's account for new sessions, here its own sign-in.
+	var moved wire.UUID
+	json.Unmarshal(c.call(t, 3, "agents/continueInNew", map[string]any{"agentID": id}), &moved)
+	c.until(t, "moved", func(method string, params json.RawMessage) bool {
+		var a wire.Agent
+		json.Unmarshal(params, &a)
+		return method == "agent/changed" && a.ID == moved && a.State == wire.AgentStateRunning
+	})
+	m := d.Store.Agent(moved)
+	if m.AccountID != nil || store.FolderPath(m.Cwd) != dir || m.RuntimeID != "claude" {
+		t.Fatalf("%+v", m)
+	}
+	if said := userMessages(d, moved); len(said) != 1 || !strings.HasPrefix(said[0], "Continue the work of the session “wait for me” ("+string(id)+")") {
+		t.Fatalf("%q", said)
+	}
+	// An account the organisation removed is not one to move to.
+	if e := c.callError(t, 4, "agents/continueInNew", map[string]any{"agentID": id, "accountID": "org:acme"}); e == nil {
+		t.Fatal("moved to a removed account")
+	}
 }
 
 // T018, US7: the route holds across a restart with no control plane; a file that does not
@@ -1030,6 +1050,19 @@ func TestTheRelayCountsTheProvidersTokens(t *testing.T) {
 	d.reportMu.Unlock()
 	if row.Route == nil || *row.Route != "acme" || row.LimitTokens == nil || *row.LimitTokens != 165 {
 		t.Fatalf("%+v", row)
+	}
+	// Its allowance row says its tokens today, and the own sign-in's says none (FR-025).
+	for _, r := range d.runtimeAllowances().Rows {
+		switch r.CredentialKey {
+		case "claude:account:org:acme":
+			if r.TokensToday == nil || *r.TokensToday != 165 {
+				t.Fatalf("%+v", r)
+			}
+		case ownKey("claude"):
+			if r.TokensToday != nil {
+				t.Fatalf("%+v", r)
+			}
+		}
 	}
 }
 

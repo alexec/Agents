@@ -422,19 +422,22 @@ struct PromptBar: View {
                 .help(noServerRuntime ?? "")
 
                 // Which of the runtime's accounts the session uses (#840): only when it has
-                // more than one. Chosen, never switched to by itself.
-                if !model.draftAccounts.isEmpty {
-                    SelectCapsule(name: "Account", title: draftAccountName) { dismiss in
+                // more than one, an org account included (#999). Chosen, never switched to by itself.
+                if let choices = model.draftAccountChoices, choices.shows {
+                    SelectCapsule(name: "Account", title: choices.name(model.draftAccountID)) { dismiss in
+                        let chosen = choices.account(for: model.draftAccountID)
                         SelectChoice(title: AccountProfile.defaultName,
                                      description: accountNote(nil),
-                                     isChosen: model.draftAccountID == nil) {
-                            model.draftAccountID = nil
+                                     isChosen: chosen == nil,
+                                     setBy: choices.ownSetBy) {
+                            model.draftAccountID = choices.ownChoice
                             dismiss()
                         }
-                        ForEach(model.draftAccounts) { account in
+                        ForEach(choices.accounts) { account in
                             SelectChoice(title: account.name,
                                          description: accountNote(account),
-                                         isChosen: model.draftAccountID == account.id) {
+                                         isChosen: chosen?.id == account.id,
+                                         setBy: account.setBy) {
                                 model.draftAccountID = account.id
                                 dismiss()
                             }
@@ -445,17 +448,14 @@ struct PromptBar: View {
         }
     }
 
-    private var draftAccountName: String {
-        model.draftAccounts.first { $0.id == model.draftAccountID }?.name ?? AccountProfile.defaultName
-    }
-
     /// Under an account's name: why it cannot be used, or where its allowance stands.
     private func accountNote(_ account: AccountProfile?) -> String? {
         guard let runtimeID = model.draftRuntimeID else { return nil }
         if let account, !account.signedIn { return account.state }
-        guard let row = model.runtimeAllowances?.row(runtimeID, account: account?.id) else { return account?.signedInAs }
+        let fallback = account?.isOrganisation == true ? account?.state : account?.signedInAs
+        guard let row = model.runtimeAllowances?.row(runtimeID, account: account?.id) else { return fallback }
         if let unusable = row.unusable { return "Not usable: \(unusable)" }
-        return row.state.isOut ? row.line(now: model.runtimeAllowances?.at ?? Date()) : account?.signedInAs
+        return row.state.isOut ? row.memberLine(now: model.runtimeAllowances?.at ?? Date()) : fallback
     }
 
     /// The runtime the conversation is on, where a new chat chooses one. Said, not

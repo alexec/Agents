@@ -154,6 +154,9 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 Row(Method.runtimesAddAccount, params: AddAccountRequest.self, result: AccountProfile.self, kind: .hostRequest),
                 Row(Method.runtimesRemoveAccount, params: AccountRequest.self, result: [UUID].self, kind: .hostRequest),
+                // Reaches the Model By (#999), on the runtime's row.
+                Row(Method.runtimesSetDefaultAccount, params: DefaultAccountRequest.self, result: Empty.self,
+                    kind: .hostRequest),
                 Row(Method.agentsPrompt, params: PromptRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsSendNow, params: UnqueueRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsUnqueue, params: UnqueueRequest.self, result: Empty.self, kind: .hostRequest),
@@ -182,6 +185,8 @@ public extension DaemonAPI {
                 // The ways on from a missing folder (#119), as the window's header has them.
                 Row(Method.agentsContinueInProject, params: ContinueInProjectRequest.self, result: UUID.self,
                     kind: .hostRequest),
+                // Continue in New (#999): a session whose account the organisation removed or refuses.
+                Row(Method.agentsContinueInNew, params: ContinueInNewRequest.self, result: UUID.self, kind: .hostRequest),
                 Row(Method.agentsRecreateWorktree, params: AgentRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.agentsContinueWhenBack, params: AgentRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.agentsCancelContinue, params: AgentRequest.self, result: Agent.self, kind: .hostRequest),

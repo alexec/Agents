@@ -103,8 +103,9 @@ struct ContextMeter: View {
                 .money(in: agent.usage?.cost?.currency ?? "USD")
         // `$0.42 of $2.00`, and nothing extra when there is no limit — a figure that
         // comes and goes is one you stop trusting.
-        guard let ceiling = agent.ceiling(under: limits) else { return spent }
-        return "\(spent) of \(ceiling.amount.formatted(.currency(code: ceiling.currency)))"
+        // On an org account the figure is the runtime's list price, and says so (#999).
+        guard let ceiling = agent.ceiling(under: limits) else { return agent.priced(spent) }
+        return agent.priced("\(spent) of \(ceiling.amount.formatted(.currency(code: ceiling.currency)))")
     }
 
     private func helpText(_ usage: Usage) -> String {

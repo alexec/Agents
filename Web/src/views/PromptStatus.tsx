@@ -3,6 +3,7 @@ import { line } from "../model/orgPolicy";
 import { optionLabel } from "./OrgPolicyLine";
 import { sandboxChoices, sandboxExplanation, sandboxState, sandboxStateWords, sandboxWhy } from "../model/sandbox";
 import { costIsUnmeasured, dayTokenLimitReached, isAtMoneyLimit, isAtTokenLimit, tokenFigure } from "../model/limits";
+import { priced } from "../model/runtimes";
 
 export function CostLimitBanner({ agent, costs, goOn }: { agent: Agent; costs: CostState | undefined; goOn: () => void }) {
   const limits = costs?.limits;
@@ -28,10 +29,12 @@ export function ContextMeter({ agent, costs }: { agent: Agent; costs: CostState 
   const amounts = Object.entries(agent.costToDate ?? {}).sort(([a], [b]) => a.localeCompare(b))
     .map(([currency, value]) => new Intl.NumberFormat(undefined, { style: "currency", currency }).format(value)).join(" · ");
   const cost = amounts || (usage?.cost ? new Intl.NumberFormat(undefined, { style: "currency", currency: usage.cost.currency }).format(usage.cost.amount)
-    : !costIsUnmeasured(agent) ? "$0.00" : tokenFigure(agent, costs?.limits) ?? "Not measured");
+    : !costIsUnmeasured(agent) ? "$0.00" : null);
+  // On an org account a figure is the runtime's list price, and says so (#999, FR-025).
+  const shown = cost === null ? tokenFigure(agent, costs?.limits) ?? "Not measured" : priced(agent, cost);
   return <span class="context-meter" title={fraction === undefined ? "Cost reported by the runtime" : `${usage!.used.toLocaleString()} of ${usage!.size.toLocaleString()} tokens`}>
     {fraction !== undefined && <span class={`context-ring${fraction >= .85 ? " close" : ""}`} style={{ "--used": `${fraction * 100}%` }} aria-label={`${Math.round(fraction * 100)}% context used`} />}
-    {cost}
+    {shown}
   </span>;
 }
 

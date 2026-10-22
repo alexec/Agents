@@ -18,6 +18,7 @@ import { OfflineStrip } from "./OfflineStrip";
 import { DiskStrip } from "./DiskStrip";
 import { KeptBubbles } from "./Kept";
 import { FolderGoneNotice, MissingFolderStrip } from "./MissingFolder";
+import { AccountMoveStrip } from "./AccountMove";
 import { BlockStrip } from "./BlockStrip";
 import { ContinueStrip } from "./ContinueStrip";
 import { CurrentPlanStrip } from "./PlanStrip";
@@ -508,6 +509,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       {!hostDown && <DiskStrip store={store} host={host} />}
       <FolderGoneNotice store={store} host={host} agent={agent} />
       <MissingFolderStrip store={store} host={host} agent={agent} />
+      <AccountMoveStrip store={store} host={host} agent={agent} />
       <BlockStrip store={store} host={host} agent={agent} disabled={down} />
       <ContinueStrip store={store} host={host} agent={agent} disabled={down} />
       {/* What it said it would do, under what it waits on, as the Remote has it (#341). */}
