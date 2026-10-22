@@ -525,6 +525,26 @@ func TestApprovingEveryRequestIsUnderTheModeCeiling(t *testing.T) {
 	}
 }
 
+// An agent started with no model chosen runs on the runtime's own: once the runtime says
+// it, a model the policy refuses holds the first turn, as at the start of any turn.
+func TestTheRuntimesOwnModelIsCheckedBeforeTheFirstTurn(t *testing.T) {
+	fakeRuntimes(t)
+	k := newControlKeys(t)
+	root := t.TempDir()
+	d, c := joined(t, root, k)
+	// The fake runtime's own model in a folder called offers is opus.
+	dir := filepath.Join(t.TempDir(), "offers")
+	os.Mkdir(dir, 0o755)
+	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 1, map[string]any{"runtimes": map[string]any{"claude": map[string]any{"models": []string{"sonnet"}}}}))
+	id := startAgent(t, c, 1, dir, "hi")
+	waitFor(t, "the hold said", func() bool {
+		return slices.ContainsFunc(notes(d, id), func(s string) bool { return strings.Contains(s, "does not allow the model opus") })
+	})
+	if len(userMessages(d, id)) != 0 || len(d.Store.Agent(id).QueuedPrompts) != 1 {
+		t.Fatal("the first turn went on a refused model")
+	}
+}
+
 // T016, US5, SC-004: the kill switch stops each running turn within 5 s, refuses new
 // agents, prompts and workflow runs, keeps what is queued, and when it is turned off
 // starts nothing by itself.
