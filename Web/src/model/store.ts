@@ -14,7 +14,7 @@ import type {
   GuardedChange, GuardedChangeReading, HostJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
-  SignInRequest } from "../protocol/generated";
+  PolicyView, SignInRequest } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
@@ -449,6 +449,11 @@ export class Work {
   }
   /** Counts each control/userSettingsChanged (#1760): You ▸ On Every Machine loads again when it moves. */
   readonly userScopeChanges = signal(0);
+  /**
+   * The organisation's policy in force (#998): from policy/mine when Settings ▸ Policy loads it, and from each
+   * control/policyChanged and control/stopAll. Null until either; a view with no policy when none is set.
+   */
+  readonly orgPolicy = signal<PolicyView | null>(null);
   /** The last machine of the person's removed with secrets on it (#1760, control/secretsLeft), until read. */
   readonly secretsLeft = signal<SecretsLeft | null>(null);
   /** The mode last chosen for each runtime, by host (029). */
@@ -1199,6 +1204,10 @@ export class Store extends Work {
       if (method === "control/groupsChanged") {
         // Settings ▸ Groups, and each provider's group's name (#1761).
         void this.providers.loadGroups().then(() => { this.keepCapsTrue(); this.peopleChanges.value += 1; });
+        return;
+      }
+      if (method === "control/policyChanged" || method === "control/stopAll") {
+        this.orgPolicy.value = (params as PolicyView | null) ?? {};
         return;
       }
       if (method === "control/userSettingsChanged") {

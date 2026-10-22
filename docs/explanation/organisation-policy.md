@@ -91,3 +91,9 @@ Agents Host and `agentsd` run as the user of the machine, and never ask for admi
 user who changes the program can avoid the rules. The policy stops mistakes and ordinary
 use. The signature makes an edit to the policy file useless, but it is not a security
 boundary against the user of the machine.
+
+## See also
+
+- [Set an organisation policy](../how-to/set-an-organisation-policy.md): Console ▸ Policy,
+  the Policy pane on every client, and the kill switch.
+- [Policy](../reference/policy.md): every field.

@@ -81,15 +81,17 @@
 
 **Goal**: an admin edits the policy on the web Console; everyone reads it on all three clients; admins have the kill switch everywhere.
 
-- [ ] T029 [US3] (moved here from slice 2b, because the pane needs the words first) Add the words and the decoding of `setBy` and `PolicyRefusal` in `Packages/AgentsKit/Sources/AgentsKitCore/Model/OrgPolicy.swift`, with tests (`OrgPolicyWordsTests`); the same in `Web/src/model/orgPolicy.ts` with `Web/test/orgPolicy.test.mjs`. Map the new `OrgPolicy*` files to `settings` in `.agents/areas`, and `OrgPolicyLine*` to `runtimes`.
-- [ ] T036 [US2] Web: `Web/src/views/ConsoleOrgPolicy.tsx` and a `policy` section in `Web/src/model/console.ts` (group "Rules", before Report Policy): a control per rule, the preview from `policy/preview` ("3 people use Gemini; their agents will be refused"), a warning when no runtime is left, Save with `rev`. Tests in `Web/test/console.test.mjs`.
-- [ ] T037 [US2] The Console's Machines page shows "Follows policy vN" or **Does not follow policy** (FR-024).
+- [x] T029 [US3] (moved here from slice 2b, because the pane needs the words first) Add the words and the decoding of `setBy` and `PolicyRefusal` in `Packages/AgentsKit/Sources/AgentsKitCore/Model/OrgPolicy.swift`, with tests (`OrgPolicyWordsTests`); the same in `Web/src/model/orgPolicy.ts` with `Web/test/orgPolicy.test.mjs`. Map the new `OrgPolicy*` files to `settings` in `.agents/areas`, and `OrgPolicyLine*` to `runtimes`.
+- [x] T036 [US2] Web: `Web/src/views/ConsoleOrgPolicy.tsx` and a `policy` section in `Web/src/model/console.ts` (group "Rules", before Report Policy): a control per rule, the preview from `policy/preview` ("3 people use Gemini; their agents will be refused"), a warning when no runtime is left, Save with `rev`. Tests in `Web/test/console.test.mjs`.
+- [x] T037 [US2] The Console's Machines page shows "Follows policy vN" or **Does not follow policy** (FR-024).
 - [ ] T038 [US4] Requests shows `budget` requests with **Raise for Today**.
-- [ ] T039 [P] [US3] Mac: Settings ▸ Control plane ▸ Policy (`App/Sources/Settings/SettingsWindow.swift`, a new `SettingsPane.policy`), drawing `Shared/UI/OrgPolicyPane.swift`: the rules in words, the last change and its actor, **Edit in Console** for an admin.
-- [ ] T040 [P] [US3] Remote: the same pane in `Remote/Sources/Settings/` from `Shared/UI/OrgPolicyPane.swift`.
-- [ ] T041 [P] [US3] Web: `Web/src/views/settings/Policy.tsx` in `sections.ts` (Control plane group).
-- [ ] T042 [US5] The kill switch on all three panes for admins: **Stop All Agent Work**, a confirmation that names how many agents are running, and **Resume Agent Work**. The red strip on every screen for every person while it is on.
-- [ ] T043 [P] Docs: `docs/how-to/set-an-organisation-policy.md`; `docs/reference/settings.md`; parity rows for FR-021 and FR-022.
+- [x] T039 [P] [US3] Mac: Settings ▸ Control plane ▸ Policy (`App/Sources/Settings/SettingsWindow.swift`, a new `SettingsPane.policy`), drawing `Shared/UI/OrgPolicyPane.swift`: the rules in words, the last change and its actor, **Edit in Console** for an admin.
+- [x] T040 [P] [US3] Remote: the same pane in `Remote/Sources/Settings/` from `Shared/UI/OrgPolicyPane.swift`.
+- [x] T041 [P] [US3] Web: `Web/src/views/settings/Policy.tsx` in `sections.ts` (Control plane group).
+- [x] T042 [US5] The kill switch on all three panes for admins: **Stop All Agent Work**, a confirmation that names how many agents are running, and **Resume Agent Work**. The red strip on every screen for every person while it is on.
+- [x] T043 [P] Docs: `docs/how-to/set-an-organisation-policy.md`; `docs/reference/settings.md`; parity rows for FR-021 and FR-022.
+
+**Built in the slice-3 lane (#998, Decided):** T029, T036, T037, T039–T043. **Left:** T038 (Requests shows `budget` requests with **Raise for Today**) waits for slice 1b's Requests kind `budget` and `policy/askForMore` on the control plane; the preview of T036 says what each rule change refuses from what the Console already reads (the runtimes left, the sandbox and budget rules, machines that do not follow) and not yet who it refuses, which needs slice 1b's `policy/preview`. The red strip on every screen of T042 is slice 2b's (T032, chat area): the store keeps `orgPolicy` from `control/policyChanged` and `control/stopAll` for it, and the Policy pane draws the strip.
 
 **Checkpoint**: headless Chrome walk of Console ▸ Policy end to end; Mac and Remote pane walk; kill switch from the phone stops a turn on a scratch machine.
 

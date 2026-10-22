@@ -859,6 +859,11 @@
       "name": "control/policyChanged",
       "x-capability": "policy/1",
       "description": "To every person's clients when the policy changes (#998).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -1084,6 +1089,11 @@
       "name": "control/stopAll",
       "x-capability": "policy/1",
       "description": "To every person's clients when the kill switch is turned on or off (#998), so a client draws the strip at once.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -2521,6 +2531,11 @@
       "name": "policy/get",
       "x-capability": "policy/1",
       "description": "An admin's: the whole policy, its rev, and each machine's applied version (#998).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -2542,6 +2557,11 @@
       "name": "policy/mine",
       "x-capability": "policy/1",
       "description": "Any person's: the policy in force (#998).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -2563,6 +2583,11 @@
       "name": "policy/raise",
       "x-capability": "policy/1",
       "description": "An admin's: raise a person's budget for today, UTC (#998, FR-019).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -2584,6 +2609,11 @@
       "name": "policy/set",
       "x-capability": "policy/1",
       "description": "An admin's: keep the rules, one version higher, signed, audited and sent to every machine (#998).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -2605,6 +2635,11 @@
       "name": "policy/stopAll",
       "x-capability": "policy/1",
       "description": "An admin's: the kill switch on or off (#998, FR-015).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {

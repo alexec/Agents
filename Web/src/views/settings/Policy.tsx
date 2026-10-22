@@ -1,0 +1,106 @@
+// Settings ▸ Policy (#998, spec 998 FR-021, FR-022): the organisation's rules in words, read only, with
+// the last change and who made it; for an admin, Edit in Console and the kill switch. The same as the
+// window's and the Remote's pane (Shared/UI/OrgPolicyPane.swift). Console ▸ Policy draws the kill switch too.
+import { useEffect } from "preact/hooks";
+import { useSignal } from "@preact/signals";
+import type { Store } from "../../model/store";
+import type { OrgPolicy } from "../../protocol/generated";
+import { fromWireDate } from "../../protocol/dates";
+import { go } from "../../route";
+import { describe } from "../../model/errors";
+import { changed, editInConsole, foot, none, resumeAll, resumeMessage, resumeTitle, rules, runningAgents, stopAll, stopFoot,
+  stopMessage, stopTitle, stoppedBy, stoppedStrip, title, viewOf } from "../../model/orgPolicy";
+
+/** The red strip while the kill switch is on, and the time it went on. */
+export function StoppedStrip({ policy }: { policy: OrgPolicy | undefined }) {
+  const stop = policy?.stopAll;
+  if (!stop?.on) return null;
+  return (
+    <p class="policy-stopped" role="alert">
+      <strong>{stoppedStrip}</strong> <span class="small">{stoppedBy(stop, fromWireDate(stop.at), new Date())}</span>
+      {stop.note && <><br /><span class="small">{stop.note}</span></>}
+    </p>
+  );
+}
+
+/** Stop All Agent Work, or Resume Agent Work while it is on: an admin's, asked first. */
+export function KillSwitch({ store, policy, down, changedTo }: { store: Store; policy: OrgPolicy | undefined; down: boolean;
+  changedTo?: (policy: OrgPolicy | undefined) => void }) {
+  const busy = useSignal(false);
+  const on = policy?.stopAll?.on === true;
+  const flip = async () => {
+    let running: number | undefined;
+    if (!on) {
+      // The running agents each machine last listed; the question asks without them when this fails.
+      running = await store.link.call("console/fleet", {}).then((b) => runningAgents(b.machines), () => undefined);
+    }
+    if (!window.confirm(on ? `${resumeTitle}\n\n${resumeMessage}` : `${stopTitle}\n\n${stopMessage(running)}`)) return;
+    busy.value = true;
+    try {
+      const kept = await store.link.call("policy/stopAll", { on: !on });
+      store.orgPolicy.value = viewOf(kept.policy);
+      changedTo?.(kept.policy);
+    } catch (error) {
+      store.say(describe(error));
+    } finally {
+      busy.value = false;
+    }
+  };
+  return (
+    <div class="policy-kill">
+      <button type="button" class={on ? "" : "destructive"} disabled={down || busy.value} onClick={() => void flip()}>
+        {on ? resumeAll : stopAll}
+      </button>
+      <p class="hint">{stopFoot}</p>
+    </div>
+  );
+}
+
+export function PolicySection({ store, down }: { store: Store; down: boolean }) {
+  const problem = useSignal<string | null>(null);
+  const admin = store.person.value?.role === "admin";
+  const load = async () => {
+    try {
+      store.orgPolicy.value = await store.link.call("policy/mine", {});
+      problem.value = null;
+    } catch (error) {
+      problem.value = describe(error);
+    }
+  };
+  useEffect(() => { if (!down) void load(); }, [down]);
+  const view = store.orgPolicy.value;
+  const policy = view?.policy;
+  const list = policy ? rules(policy) : [];
+  return (
+    <section aria-labelledby="settings-policy">
+      <h3 class="section-head" id="settings-policy">{title}</h3>
+      {problem.value && <p class="hint" role="alert">{problem.value}</p>}
+      {!view && !problem.value && <p class="hint">Loading…</p>}
+      {view && (
+        <>
+          <StoppedStrip policy={policy} />
+          {list.length === 0 ? <p class="hint">{none}</p> : (
+            <dl class="policy-rules">
+              {list.map((r) => (
+                <div key={r.name} class="setting">
+                  <dt>{r.title}</dt>
+                  <dd>{r.words}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+          {policy && <p class="quiet small">{changed(policy, fromWireDate(policy.issued), new Date())}</p>}
+          {admin && (
+            <>
+              <div class="policy-kill">
+                <button type="button" onClick={() => go({ app: "console", section: "policy" })}>{editInConsole}</button>
+              </div>
+              <KillSwitch store={store} policy={policy} down={down} />
+            </>
+          )}
+          <p class="hint">{foot}</p>
+        </>
+      )}
+    </section>
+  );
+}

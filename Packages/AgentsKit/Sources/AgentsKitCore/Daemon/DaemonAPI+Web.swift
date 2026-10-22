@@ -318,6 +318,12 @@ public extension DaemonAPI {
                 // The Console (#1804): the admins' app on the web page.
                 Row(Method.consoleFleet, params: Empty.self, result: FleetBoard.self, kind: .controlRequest),
                 Row(Method.consoleTeamWorkflows, params: Empty.self, result: TeamWorkflows.self, kind: .controlRequest),
+                // The organisation's policy (#998): Console ▸ Policy, and Settings ▸ Policy on every client.
+                Row(Method.policyMine, params: Empty.self, result: PolicyView.self, kind: .controlRequest),
+                Row(Method.policyGet, params: Empty.self, result: PolicyKept.self, kind: .controlRequest),
+                Row(Method.policySet, params: PolicySet.self, result: PolicyKept.self, kind: .controlRequest),
+                Row(Method.policyStopAll, params: PolicyStopAllRequest.self, result: PolicyKept.self, kind: .controlRequest),
+                Row(Method.policyRaise, params: PolicyRaiseRequest.self, result: PolicyKept.self, kind: .controlRequest),
                 // The user scope (#1760): what follows the person to their machines, under You.
                 Row(Method.userSettings, params: Empty.self, result: UserSettings.self, kind: .controlRequest),
                 Row(Method.userSetSettings, params: UserSettingsPart.self, result: Empty.self, kind: .controlRequest),
@@ -440,6 +446,10 @@ public extension DaemonAPI {
                 Row(Notification.controlUserSettingsChanged, params: UserSettingsChanged.self, result: Empty.self,
                     kind: .controlNotification),
                 Row(Notification.controlSecretsLeft, params: SecretsLeft.self, result: Empty.self,
+                    kind: .controlNotification),
+                Row(Notification.controlPolicyChanged, params: PolicyView.self, result: Empty.self,
+                    kind: .controlNotification),
+                Row(Notification.controlStopAll, params: PolicyView.self, result: Empty.self,
                     kind: .controlNotification),
             ]
         }
