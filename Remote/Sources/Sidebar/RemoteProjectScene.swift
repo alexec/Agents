@@ -130,6 +130,7 @@ private struct RemoteProjectColumns: View {
     let summary: DaemonAPI.ProjectSummary
     let chat: PoppedChat?
     let back: (() -> Void)?
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var compactColumn = NavigationSplitViewColumn.sidebar
 
     var body: some View {
@@ -147,6 +148,11 @@ private struct RemoteProjectColumns: View {
         .onChange(of: state.pick) { _, pick in
             model.startPagesMoved()
             compactColumn = pick != nil ? .detail : .sidebar
+        }
+        // Back to the list on an iPhone puts the pick down, so the same row opens it
+        // again (#2191), as the main scene's.
+        .onChange(of: compactColumn) { _, column in
+            if column == .sidebar, sizeClass == .compact { state.pick = nil }
         }
     }
 
