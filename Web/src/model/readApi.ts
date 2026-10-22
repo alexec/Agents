@@ -11,7 +11,7 @@ export const tokensFoot = "A token reads the organisation's reports and nothing 
 export const otlpOff = "Off. To send today's figures by runtime to an OpenTelemetry collector, set OTEL_EXPORTER_OTLP_ENDPOINT on agents-control and start it again.";
 export const shownOnce = "Copy it now. It is not shown again.";
 
-/** "curl -H 'Authorization: Bearer agread_…' 'https://…/v1/read/reports?range=month&format=csv'" */
+/** The curl line that reads a month of the reports as CSV with the token. */
 export function curlLine(url: string, value: string): string {
   return `curl -H 'Authorization: Bearer ${value}' '${url}?range=month&format=csv'`;
 }
