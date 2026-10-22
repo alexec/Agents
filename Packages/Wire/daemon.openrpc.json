@@ -6734,6 +6734,10 @@
         "code": -32035,
         "message": "leaseRefused"
       },
+      "managedByProvider": {
+        "code": -32079,
+        "message": "managedByProvider"
+      },
       "needsSignIn": {
         "code": -32007,
         "message": "needsSignIn"
@@ -6810,6 +6814,10 @@
         "code": -32027,
         "message": "notYours"
       },
+      "orgProviderUnavailable": {
+        "code": -32082,
+        "message": "orgProviderUnavailable"
+      },
       "orgRouteMissing": {
         "code": -32099,
         "message": "orgRouteMissing"
@@ -6818,9 +6826,17 @@
         "code": -32100,
         "message": "orgRouteRemoved"
       },
+      "orgSignInRequired": {
+        "code": -32077,
+        "message": "orgSignInRequired"
+      },
       "outsideScratchRoot": {
         "code": -32098,
         "message": "outsideScratchRoot"
+      },
+      "personSuspended": {
+        "code": -32078,
+        "message": "personSuspended"
       },
       "pinRefused": {
         "code": -32061,

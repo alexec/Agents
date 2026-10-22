@@ -139,6 +139,18 @@ var controlActions = map[string]string{
 	"hosts/deleteWorkspace":       "Deleted a workspace",
 	"hosts/link":                  "Linked a machine to a workspace",
 	"hosts/unlink":                "Unlinked a machine from its workspace",
+
+	// Org sign-in (#1002, FR-025): each writes its own entry, with what changed and no secret.
+	"signIn/orgProviders/set":    "Added or changed an org sign-in provider",
+	"signIn/orgProviders/check":  "Checked an org sign-in provider",
+	"signIn/orgProviders/remove": "Removed an org sign-in provider",
+	"signIn/domains/claim":       "Claimed a domain",
+	"signIn/domains/check":       "Checked a domain",
+	"signIn/domains/set":         "Changed a domain's sign-in",
+	"signIn/domains/remove":      "Removed a domain's claim",
+	"signIn/domains/lost":        "Lost a domain's proof",
+	"signIn/ticket":              "Signed in with an org provider",
+	"signIn/refusedByRequire":    "Refused a sign-in the organisation does not allow",
 }
 
 // Action is what a call is in words, and whether the audit keeps it at all. toHost is a

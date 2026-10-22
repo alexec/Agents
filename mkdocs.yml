@@ -161,6 +161,7 @@ nav:
       - reference/console.md
       - reference/workspace-providers.md
       - reference/integrations.md
+      - reference/sign-in.md
       - reference/ssh-options.md
       - reference/get-started-checklist.md
       - reference/charts-and-diagrams.md
@@ -173,6 +174,7 @@ nav:
       - explanation/why-agents.md
       - explanation/control-plane.md
       - explanation/org-keys-and-gateways.md
+      - explanation/org-identity.md
       - explanation/people-and-machines.md
       - Compliance pack:
           - explanation/compliance/index.md

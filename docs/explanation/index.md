@@ -17,6 +17,8 @@ Nothing here needs doing; it is for understanding.
 - [Org keys and gateways](org-keys-and-gateways.md): where an organisation's keys and
   gateways are kept, how each machine gets them sealed to its own key, and what that does
   not protect against.
+- [Org identity](org-identity.md): how an organisation's own sign-in provider, its
+  tickets and its claimed domains work, and what they do not protect against.
 - [People and machines](people-and-machines.md): why each client is a person's and each
   machine one user's, what an admin sees, and why machines are not shared.
 - [Compliance pack](compliance/index.md): for an organisation's IT and security team: the

@@ -32,6 +32,87 @@ type SignInWith func(providers wire.SignInProviders, nonce string) (provider, to
 // take the hello's (a URL alone, behind TLS).
 func SignIn(ctx context.Context, base, pin string, controlKey []byte, name, kind string, with SignInWith,
 	waiting func(wire.SignInWaiting)) (*ClientMembership, error) {
+	s, err := OpenSignIn(ctx, base, pin, controlKey, kind)
+	if err != nil {
+		return nil, err
+	}
+	defer s.Close()
+	s.Waiting = waiting
+	raw, err := s.Call(ctx, "signIn/providers", map[string]any{})
+	if err != nil {
+		return nil, err
+	}
+	var providers wire.SignInProviders
+	if err := json.Unmarshal(raw, &providers); err != nil {
+		return nil, err
+	}
+	provider, token, err := with(providers, s.Nonce())
+	if err != nil {
+		return nil, err
+	}
+	raw, err = s.Call(ctx, "signIn/pair", wire.SignInPair{Provider: provider, Token: token, Name: name, Kind: wire.ClientKind(kind)})
+	if err != nil {
+		return nil, err
+	}
+	var admitted wire.Admitted
+	if json.Unmarshal(raw, &admitted) != nil || admitted.Client == nil {
+		return nil, fmt.Errorf("signIn/pair: %s", raw)
+	}
+	return s.Membership(*admitted.Client)
+}
+
+// SignInOrg pairs a client by an org provider (#1002, D2, D3): signIn/orgStart, then
+// browse opens the address it gives in a browser and says the ticket the browser came
+// back with, then signIn/ticket on the same connection.
+func SignInOrg(ctx context.Context, base, pin string, controlKey []byte, name, kind, provider string,
+	browse func(url string) (ticket string, err error)) (*ClientMembership, error) {
+	s, err := OpenSignIn(ctx, base, pin, controlKey, kind)
+	if err != nil {
+		return nil, err
+	}
+	defer s.Close()
+	raw, err := s.Call(ctx, "signIn/orgStart", wire.SignInOrgStart{Provider: provider, Purpose: wire.SignInOrgPurposePair,
+		ReturnTo: wire.SignInOrgReturnApp})
+	if err != nil {
+		return nil, err
+	}
+	var started wire.SignInOrgStarted
+	if err := json.Unmarshal(raw, &started); err != nil {
+		return nil, err
+	}
+	ticket, err := browse(started.URL)
+	if err != nil {
+		return nil, err
+	}
+	k := wire.ClientKind(kind)
+	raw, err = s.Call(ctx, "signIn/ticket", wire.SignInTicket{Ticket: ticket, Name: &name, Kind: &k})
+	if err != nil {
+		return nil, err
+	}
+	var paired wire.SignInTicketResult
+	if json.Unmarshal(raw, &paired) != nil || paired.Client == nil {
+		return nil, fmt.Errorf("signIn/ticket: %s", raw)
+	}
+	return s.Membership(*paired.Client)
+}
+
+// SignInSession is an s: connection that has proved its new key, before it is paired.
+type SignInSession struct {
+	// Waiting is told control/signInWaiting (a GitHub sign-in's code).
+	Waiting func(wire.SignInWaiting)
+
+	l          *Lines
+	id         string
+	private    []byte
+	controlKey []byte
+	helloNonce []byte
+	base, pin  string
+	name       string
+	n          int
+}
+
+// OpenSignIn dials as s:<a new UUID> with a new key and proves it (#995).
+func OpenSignIn(ctx context.Context, base, pin string, controlKey []byte, kind string) (*SignInSession, error) {
 	origin, err := Origin(base)
 	if err != nil {
 		return nil, err
@@ -40,114 +121,116 @@ func SignIn(ctx context.Context, base, pin string, controlKey []byte, name, kind
 	if err != nil {
 		return nil, err
 	}
-	defer l.Close()
+	fail := func(err error) (*SignInSession, error) {
+		l.Close()
+		return nil, err
+	}
 	rctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	line, err := l.Read(rctx)
 	if err != nil {
-		return nil, fmt.Errorf("no hello: %w", err)
+		return fail(fmt.Errorf("no hello: %w", err))
 	}
 	h, ok := ParseMessage(line)
 	if !ok || h.Hello == nil {
-		return nil, fmt.Errorf("expected hello, got %s", line)
+		return fail(fmt.Errorf("expected hello, got %s", line))
 	}
 	if controlKey == nil {
 		if controlKey, err = FromB64URL(h.Hello.Control); err != nil || !ValidPublicKey(controlKey) {
-			return nil, Refuse(BadMessage)
+			return fail(Refuse(BadMessage))
 		}
 	}
 	helloNonce, err := FromB64URL(h.Hello.Nonce)
 	if err != nil {
-		return nil, Refuse(BadMessage)
+		return fail(Refuse(BadMessage))
 	}
 	private := NewPrivateKey()
 	public, _ := PublicKey(private)
 	id := strings.ToUpper(newRef())
 	key, err := ClientKey(private, controlKey, id)
 	if err != nil {
-		return nil, err
+		return fail(err)
 	}
 	auth, expect, err := Answer(h.Hello, Identity{'s', id}, key, origin, kind, controlKey, "", nil)
 	if err != nil {
-		return nil, err
+		return fail(err)
 	}
 	auth.PublicKey = public
 	if err := l.Write(ctx, Message{Auth: auth}.Line()); err != nil {
-		return nil, err
+		return fail(err)
 	}
 	if line, err = l.Read(rctx); err != nil {
-		return nil, fmt.Errorf("no ok: %w", err)
+		return fail(fmt.Errorf("no ok: %w", err))
 	}
 	m, ok := ParseMessage(line)
 	switch {
 	case !ok:
-		return nil, fmt.Errorf("expected ok, got %s", line)
+		return fail(fmt.Errorf("expected ok, got %s", line))
 	case m.OK == nil:
-		return nil, Refuse(m.Refused)
+		return fail(Refuse(m.Refused))
 	}
 	// The control plane proved it holds the key the nonce is bound to.
 	if err := Check(m.OK, expect); err != nil {
+		return fail(err)
+	}
+	return &SignInSession{l: l, id: id, private: private, controlKey: controlKey, helloNonce: helloNonce, base: base, pin: pin,
+		name: h.Hello.Name}, nil
+}
+
+// Nonce is what a provider's ID token names on this connection (R2).
+func (s *SignInSession) Nonce() string { return SignInNonce(s.controlKey, s.helloNonce) }
+
+// Close closes the connection.
+func (s *SignInSession) Close() { s.l.Close() }
+
+// Call asks the control plane on the connection and waits for its answer.
+func (s *SignInSession) Call(ctx context.Context, method string, params any) (json.RawMessage, error) {
+	s.n++
+	n := s.n
+	p, _ := json.Marshal(params)
+	req, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": n, "method": method, "params": json.RawMessage(p)})
+	if err := s.l.Write(ctx, string(req)); err != nil {
 		return nil, err
 	}
-	call := func(n int, method string, params any) (json.RawMessage, error) {
-		p, _ := json.Marshal(params)
-		req, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": n, "method": method, "params": json.RawMessage(p)})
-		if err := l.Write(ctx, string(req)); err != nil {
+	for {
+		line, err := s.l.Read(ctx)
+		if err != nil {
 			return nil, err
 		}
-		for {
-			line, err := l.Read(ctx)
-			if err != nil {
-				return nil, err
-			}
-			var r struct {
-				ID     *int            `json:"id"`
-				Method string          `json:"method"`
-				Params json.RawMessage `json:"params"`
-				Result json.RawMessage `json:"result"`
-				Error  *struct {
-					Code    int    `json:"code"`
-					Message string `json:"message"`
-				} `json:"error"`
-			}
-			if json.Unmarshal([]byte(line), &r) != nil {
-				return nil, fmt.Errorf("%s: %s", method, line)
-			}
-			if r.ID == nil && r.Method == "control/signInWaiting" {
-				var w wire.SignInWaiting
-				if json.Unmarshal(r.Params, &w) == nil && waiting != nil {
-					waiting(w)
-				}
-				continue
-			}
-			if r.ID == nil || *r.ID != n {
-				continue
-			}
-			if r.Error != nil {
-				return nil, fmt.Errorf("%d %s", r.Error.Code, r.Error.Message)
-			}
-			return r.Result, nil
+		var r struct {
+			ID     *int            `json:"id"`
+			Method string          `json:"method"`
+			Params json.RawMessage `json:"params"`
+			Result json.RawMessage `json:"result"`
+			Error  *struct {
+				Code    int    `json:"code"`
+				Message string `json:"message"`
+			} `json:"error"`
 		}
+		if json.Unmarshal([]byte(line), &r) != nil {
+			return nil, fmt.Errorf("%s: %s", method, line)
+		}
+		if r.ID == nil && r.Method == "control/signInWaiting" {
+			var w wire.SignInWaiting
+			if json.Unmarshal(r.Params, &w) == nil && s.Waiting != nil {
+				s.Waiting(w)
+			}
+			continue
+		}
+		if r.ID == nil || *r.ID != n {
+			continue
+		}
+		if r.Error != nil {
+			return nil, fmt.Errorf("%d %s", r.Error.Code, r.Error.Message)
+		}
+		return r.Result, nil
 	}
-	raw, err := call(1, "signIn/providers", map[string]any{})
-	if err != nil {
-		return nil, err
+}
+
+// Membership is what the client keeps once the control plane paired it as client.
+func (s *SignInSession) Membership(client wire.UUID) (*ClientMembership, error) {
+	if !strings.EqualFold(string(client), s.id) {
+		return nil, fmt.Errorf("paired as %s, not %s", client, s.id)
 	}
-	var providers wire.SignInProviders
-	if err := json.Unmarshal(raw, &providers); err != nil {
-		return nil, err
-	}
-	provider, token, err := with(providers, SignInNonce(controlKey, helloNonce))
-	if err != nil {
-		return nil, err
-	}
-	raw, err = call(2, "signIn/pair", wire.SignInPair{Provider: provider, Token: token, Name: name, Kind: wire.ClientKind(kind)})
-	if err != nil {
-		return nil, err
-	}
-	var admitted wire.Admitted
-	if json.Unmarshal(raw, &admitted) != nil || admitted.Client == nil || !strings.EqualFold(string(*admitted.Client), id) {
-		return nil, fmt.Errorf("signIn/pair: %s", raw)
-	}
-	return &ClientMembership{Client: id, Private: private, ControlKey: controlKey, URL: base, Pin: pin, Name: h.Hello.Name}, nil
+	return &ClientMembership{Client: s.id, Private: s.private, ControlKey: s.controlKey, URL: s.base, Pin: s.pin, Name: s.name}, nil
 }

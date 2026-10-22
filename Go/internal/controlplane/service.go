@@ -405,6 +405,7 @@ func (s *Service) Start(ctx context.Context) (int, error) {
 	go s.refreshEvery(15 * time.Second)
 	go s.sweepEveryHour()
 	go s.renewTokensEvery(time.Minute)
+	go s.signIns.checkEvery(time.Hour, s.stop)
 	if s.tunnels != nil {
 		s.tunnels.Start(0)
 	}
@@ -952,6 +953,8 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(data)
+	case strings.HasPrefix(path, "/v1/oidc/"):
+		s.signIns.serveOIDC(w, r)
 	case path == "/v1/join" || strings.HasPrefix(path, "/v1/join/"):
 		s.joins.serve(w, r)
 	case path == "/v1/connect":

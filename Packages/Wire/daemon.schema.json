@@ -5849,6 +5849,60 @@
       ],
       "additionalProperties": false
     },
+    "DomainClaim": {
+      "type": "object",
+      "description": "A claimed email domain (#1002, D8, FR-010): proved by the TXT record `txtValue` at `txtName`, for one org provider. The control plane keeps it at v1/signin/domains/<domain>.json and checks it each day; 7 days of failures take it back to notProved. `sendHere` sends an email at the domain to the provider (signIn/discover); `require` refuses a built-in sign-in at the domain to join, pair or renew (D9).",
+      "properties": {
+        "domain": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/DomainClaimState"
+        },
+        "txtName": {
+          "type": "string"
+        },
+        "txtValue": {
+          "type": "string"
+        },
+        "lastGood": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "failingSince": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "sendHere": {
+          "type": "boolean"
+        },
+        "require": {
+          "type": "boolean"
+        },
+        "claimed": {
+          "$ref": "#/definitions/OrgRouteStamp"
+        }
+      },
+      "required": [
+        "domain",
+        "provider",
+        "state",
+        "txtName",
+        "txtValue",
+        "sendHere",
+        "require"
+      ],
+      "additionalProperties": false
+    },
+    "DomainClaimState": {
+      "type": "string",
+      "enum": [
+        "notProved",
+        "proved"
+      ],
+      "description": "Whether a claimed domain's TXT record was found (#1002)."
+    },
     "DraftCheck": {
       "type": "object",
       "properties": {
@@ -11580,6 +11634,212 @@
         "issued",
         "changedBy",
         "requires"
+      ],
+      "additionalProperties": false
+    },
+    "OrgProvider": {
+      "type": "object",
+      "description": "An org sign-in provider (#1002, D1, FR-001): an OIDC issuer that an organisation registered for this control plane. Kept at v1/signin/providers/<id>.json; its client secret is sealed beside it and never returned. The control plane sets version, secret, created, changed and redirectURI.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "[a-z0-9-]{2,32}, made from the name when absent at add, never changed: the provider of each sign-in it makes."
+        },
+        "name": {
+          "type": "string",
+          "description": "On the button: Sign in with <name>. 1 to 40 characters."
+        },
+        "preset": {
+          "$ref": "#/definitions/OrgProviderPreset"
+        },
+        "issuer": {
+          "type": "string",
+          "description": "An https URL. Its discovery document must name it as issuer."
+        },
+        "clientID": {
+          "type": "string"
+        },
+        "accountClaim": {
+          "type": "string",
+          "description": "The claim that names a person for life (D5): sub, or oid for Entra."
+        },
+        "tenant": {
+          "type": "string",
+          "description": "Entra: the tid an ID token must have."
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "join": {
+          "$ref": "#/definitions/OrgProviderJoin"
+        },
+        "on": {
+          "type": "boolean"
+        },
+        "order": {
+          "type": "integer"
+        },
+        "secret": {
+          "$ref": "#/definitions/OrgProviderSecret"
+        },
+        "version": {
+          "type": "integer"
+        },
+        "created": {
+          "$ref": "#/definitions/OrgRouteStamp"
+        },
+        "changed": {
+          "$ref": "#/definitions/OrgRouteStamp"
+        },
+        "redirectURI": {
+          "type": "string",
+          "description": "The callback to register at the provider: this control plane's https address and /v1/oidc/callback. Only in answers."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "preset",
+        "issuer",
+        "clientID"
+      ],
+      "additionalProperties": false
+    },
+    "OrgProviderCheck": {
+      "type": "object",
+      "description": "signIn/orgProviders/check (#1002, FR-004): what the issuer's discovery document lacks, and how many keys its JWKS has.",
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "missing": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "jwksKeys": {
+          "type": "integer"
+        },
+        "redirectURI": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ok",
+        "missing",
+        "jwksKeys",
+        "redirectURI"
+      ],
+      "additionalProperties": false
+    },
+    "OrgProviderJoin": {
+      "type": "string",
+      "enum": [
+        "scim",
+        "anyone",
+        "invite"
+      ],
+      "description": "Who may join through an org provider (D10): only people from SCIM, anyone the provider signs in, or only by invite."
+    },
+    "OrgProviderKept": {
+      "type": "object",
+      "description": "An org provider with its store tag, for an admin (#1002).",
+      "properties": {
+        "provider": {
+          "$ref": "#/definitions/OrgProvider"
+        },
+        "rev": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "rev"
+      ],
+      "additionalProperties": false
+    },
+    "OrgProviderList": {
+      "type": "object",
+      "description": "signIn/orgProviders/list (#1002): every org provider, for an admin. No secret.",
+      "properties": {
+        "providers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/OrgProviderKept"
+          }
+        }
+      },
+      "required": [
+        "providers"
+      ],
+      "additionalProperties": false
+    },
+    "OrgProviderPreset": {
+      "type": "string",
+      "enum": [
+        "okta",
+        "entra",
+        "googleWorkspace",
+        "oidc"
+      ],
+      "description": "Which form filled an org provider (#1002, research R3). Only googleWorkspace changes a check: hd must be a claimed domain."
+    },
+    "OrgProviderRequest": {
+      "type": "object",
+      "description": "signIn/orgProviders/check and remove (#1002).",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "rev": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "OrgProviderSecret": {
+      "type": "object",
+      "description": "Who set an org provider's client secret, when, and its fingerprint: the first 8 hex of its SHA-256 (#1002, D4). Never the value.",
+      "properties": {
+        "fingerprint": {
+          "type": "string"
+        },
+        "setBy": {
+          "$ref": "#/definitions/AuditActor"
+        },
+        "setAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "fingerprint",
+        "setAt"
+      ],
+      "additionalProperties": false
+    },
+    "OrgProviderSet": {
+      "type": "object",
+      "description": "signIn/orgProviders/set (#1002, FR-001 to FR-004): add or change an org provider. secret is written only, never read back; needed to add. rev is the tag the admin read; none to add.",
+      "properties": {
+        "provider": {
+          "$ref": "#/definitions/OrgProvider"
+        },
+        "secret": {
+          "type": "string"
+        },
+        "rev": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider"
       ],
       "additionalProperties": false
     },
@@ -17748,6 +18008,210 @@
       ],
       "additionalProperties": false
     },
+    "SignInDiscover": {
+      "type": "object",
+      "description": "signIn/discover (#1002, FR-011): the email a person typed.",
+      "properties": {
+        "email": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "email"
+      ],
+      "additionalProperties": false
+    },
+    "SignInDiscovered": {
+      "type": "object",
+      "description": "signIn/discover's answer: the org provider of a claimed domain that sends people there, or none. The same for an unknown domain and a domain with no switch.",
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "SignInDomainClaim": {
+      "type": "object",
+      "description": "signIn/domains/claim (#1002): a domain for one org provider.",
+      "properties": {
+        "domain": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "domain",
+        "provider"
+      ],
+      "additionalProperties": false
+    },
+    "SignInDomainList": {
+      "type": "object",
+      "description": "signIn/domains/list (#1002): every claimed domain, for an admin.",
+      "properties": {
+        "domains": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DomainClaim"
+          }
+        }
+      },
+      "required": [
+        "domains"
+      ],
+      "additionalProperties": false
+    },
+    "SignInDomainPreview": {
+      "type": "object",
+      "description": "signIn/domains/preview (#1002, FR-012): the people and the built-in sign-ins that Require would refuse.",
+      "properties": {
+        "people": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SignInDomainPreviewPerson"
+          }
+        }
+      },
+      "required": [
+        "people"
+      ],
+      "additionalProperties": false
+    },
+    "SignInDomainPreviewPerson": {
+      "type": "object",
+      "description": "A person that Require changes, with their sign-ins at the domain.",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "signIns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SignIn"
+          }
+        }
+      },
+      "required": [
+        "user",
+        "name",
+        "signIns"
+      ],
+      "additionalProperties": false
+    },
+    "SignInDomainRequest": {
+      "type": "object",
+      "description": "signIn/domains/check, preview and remove (#1002).",
+      "properties": {
+        "domain": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "domain"
+      ],
+      "additionalProperties": false
+    },
+    "SignInDomainSet": {
+      "type": "object",
+      "description": "signIn/domains/set (#1002, D8): a claimed domain's switches; an absent one stays. Either needs a proved domain.",
+      "properties": {
+        "domain": {
+          "type": "string"
+        },
+        "sendHere": {
+          "type": "boolean"
+        },
+        "require": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "domain"
+      ],
+      "additionalProperties": false
+    },
+    "SignInOrgProvider": {
+      "type": "object",
+      "description": "An org provider on the sign-in screen (#1002, FR-003): its id, name and order, and nothing more.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "order": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "order"
+      ],
+      "additionalProperties": false
+    },
+    "SignInOrgPurpose": {
+      "type": "string",
+      "enum": [
+        "pair",
+        "addToMe"
+      ]
+    },
+    "SignInOrgReturn": {
+      "type": "string",
+      "enum": [
+        "app",
+        "web"
+      ]
+    },
+    "SignInOrgStart": {
+      "type": "object",
+      "description": "signIn/orgStart (#1002, D2): start an org provider's flow for this connection: pair (an `s:` connection) or addToMe (a paired client's). returnTo says where the browser comes back: agents://oidc (app) or the web page (web).",
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "purpose": {
+          "$ref": "#/definitions/SignInOrgPurpose"
+        },
+        "returnTo": {
+          "$ref": "#/definitions/SignInOrgReturn"
+        },
+        "loginHint": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "purpose",
+        "returnTo"
+      ],
+      "additionalProperties": false
+    },
+    "SignInOrgStarted": {
+      "type": "object",
+      "description": "signIn/orgStart's answer: the /v1/oidc/start address to open in the browser. It ends after 10 minutes.",
+      "properties": {
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "additionalProperties": false
+    },
     "SignInPair": {
       "type": "object",
       "description": "signIn/pair, on an `s:` connection (#995): the client's name and kind, and its provider's token: an ID token for google and apple, a user access token for github. The control plane checks it and forgets it (FR-008, FR-010).",
@@ -17802,7 +18266,7 @@
     },
     "SignInProviders": {
       "type": "object",
-      "description": "signIn/providers, signIn/configure (#995): the providers. `challenge` (base64url) is what a client's nonce is made from on this connection: the hello's nonce on an `s:` connection, or a fresh one used once on a paired client's. The client makes the nonce itself, from the control key it trusts and the challenge (R2), so a token cannot be passed on to another control plane (FR-008, FR-011). `domains` (Google Workspace) and `organisations` (GitHub) are for admins only (FR-006).",
+      "description": "signIn/providers, signIn/configure (#995): the providers. `challenge` (base64url) is what a client's nonce is made from on this connection: the hello's nonce on an `s:` connection, or a fresh one used once on a paired client's. The client makes the nonce itself, from the control key it trusts and the challenge (R2), so a token cannot be passed on to another control plane (FR-008, FR-011). `domains` (Google Workspace) and `organisations` (GitHub) are for admins only (FR-006). `orgProviders` are the org providers turned on, in order (#1002), first on every sign-in screen.",
       "properties": {
         "providers": {
           "type": "array",
@@ -17824,6 +18288,16 @@
           "items": {
             "type": "string"
           }
+        },
+        "orgProviders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SignInOrgProvider"
+          }
+        },
+        "discover": {
+          "type": "boolean",
+          "description": "A claimed domain sends people to its org provider: a client offers Use an Email (#1002, FR-011)."
         }
       },
       "required": [
@@ -17882,6 +18356,39 @@
         "code",
         "expires"
       ],
+      "additionalProperties": false
+    },
+    "SignInTicket": {
+      "type": "object",
+      "description": "signIn/ticket (#1002, D3, FR-006): the ticket the callback gave, on the connection that started the flow, within 2 minutes, once. To pair, the client's name and kind too.",
+      "properties": {
+        "ticket": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/ClientKind"
+        }
+      },
+      "required": [
+        "ticket"
+      ],
+      "additionalProperties": false
+    },
+    "SignInTicketResult": {
+      "type": "object",
+      "description": "signIn/ticket's answer: the client paired, or the sign-in added to the caller's person.",
+      "properties": {
+        "client": {
+          "$ref": "#/definitions/UUID"
+        },
+        "signIn": {
+          "$ref": "#/definitions/SignIn"
+        }
+      },
+      "required": [],
       "additionalProperties": false
     },
     "SignInWaiting": {
