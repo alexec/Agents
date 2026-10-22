@@ -34,7 +34,9 @@ func (s *Service) actorFor(client string) wire.AuditActor {
 	return actor
 }
 
-func (s *Service) auditLog() *audit.Log { return &audit.Log{Store: s.cfg.Store} }
+func (s *Service) auditLog() *audit.Log {
+	return &audit.Log{Store: s.cfg.Store, Chain: s.auditChain}
+}
 
 // auditTarget is audit.Target; a test holds it to prove where it runs.
 var auditTarget = audit.Target

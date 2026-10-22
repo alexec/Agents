@@ -23,6 +23,7 @@
 //	agents-control key export --key-fd N        the key, raw, out on N: for a move back to a Mac
 //	agents-control backup --to DIR              the store and what a restore needs beside it (#2137)
 //	agents-control restore --from DIR [--new-kms]  a backup, into a new home and an empty store
+//	agents-control audit verify [--store URL]   whether an audit entry was changed or removed (#1001)
 //	agents-control install-script               the script a server runs to become a host
 //	agents-control store check [--store URL]
 //	agents-control version
@@ -739,7 +740,8 @@ const usage = `usage: agents-control serve [--port N] [--bind ADDR] [--self-sign
        agents-control store check [--store URL]
        agents-control store copy --from URL --to URL
        agents-control backup --to DIR [--home DIR]
-       agents-control restore --from DIR [--home DIR] [--store URL] [--new-kms]`
+       agents-control restore --from DIR [--home DIR] [--store URL] [--new-kms]
+       agents-control audit verify [--store URL]`
 
 func main() {
 	first := ""
@@ -769,6 +771,8 @@ func main() {
 		backup()
 	case first == "restore":
 		restore()
+	case first == "audit" && len(args) > 1 && args[1] == "verify":
+		verifyAudit()
 	case first == "install-script":
 		fmt.Print(controlplane.InstallScript)
 	case first == "--version" || first == "version":

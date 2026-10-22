@@ -245,12 +245,19 @@ type stored struct {
 	At     records.Stamp    `json:"at"`
 	By     string           `json:"by,omitempty"`
 	Actor  *wire.AuditActor `json:"actor,omitempty"`
+	// The chain this entry is in (#1001): the copy that wrote it, its place in that copy's
+	// entries, and the SHA-256 of the stored bytes of the one before (none for the first).
+	Chain string `json:"chain,omitempty"`
+	Seq   int64  `json:"seq,omitempty"`
+	Prev  string `json:"prev,omitempty"`
 }
 
 // Log writes and reads the entries.
 type Log struct {
 	Store store.Store
 	Now   func() time.Time
+	// Chain links what this copy writes (#1001); nil writes entries in no chain.
+	Chain *Chain
 }
 
 func (l *Log) now() time.Time {
@@ -286,6 +293,9 @@ func (l *Log) Write(ctx context.Context, actor wire.AuditActor, method, action s
 	}
 	if host != "" {
 		e.Host = &host
+	}
+	if l.Chain != nil {
+		return l.Chain.write(ctx, l.Store, &e, Key(at, actor.User), at)
 	}
 	data, err := records.Encode(e)
 	if err != nil {

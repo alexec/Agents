@@ -26,6 +26,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/buildinfo"
 	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/alexec/agents/Go/internal/controlplane/audit"
 	"github.com/alexec/agents/Go/internal/controlplane/hostinstall"
 	"github.com/alexec/agents/Go/internal/controlplane/hosttunnels"
 	"github.com/alexec/agents/Go/internal/controlplane/notices"
@@ -147,6 +148,8 @@ type Service struct {
 	records *records.Records
 	codes   *Codes
 	router  *Router
+	// auditChain links the audit entries this copy writes (#1001).
+	auditChain *audit.Chain
 	// Servers' backups (#1815).
 	backups *backupStore
 	methods *Methods
@@ -247,6 +250,7 @@ func New(cfg Config) (*Service, error) {
 		records: records.New(cfg.Store), started: time.Now(), desk: notices.NewDesk(), phase: &phaseBox{phase: phaseServing}, sockets: map[*Conn]bool{}, stop: make(chan struct{}),
 		reads: readGate{every: readAgainEvery}, metrics: metrics}
 	s.sources = newSources(cfg.TrustedProxies, s.log)
+	s.auditChain = audit.NewChain(s.copyID)
 	s.downloads, s.socketsMost, s.refusals = newAddressRates(), socketsMost, newRefusalLog(s.log)
 	if cfg.Push != nil {
 		s.pushes = newPushes(s, cfg.Push)
