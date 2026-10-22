@@ -18,6 +18,8 @@ struct ReportsPane: View {
     /// The report added up by the dimension, once per report or dimension, not at each draw (#2057).
     @State private var totals: ReportTotals?
     @State private var problem: String?
+    /// Whether reports/scopes offers the caller more than Me (#2200).
+    @State private var seesMore = false
     @State private var export: ReportFile?
     @State private var isExporting = false
 
@@ -41,7 +43,7 @@ struct ReportsPane: View {
                         }
                     }
                 } footer: {
-                    Text("\(ReportWords.meNote) \(ReportWords.utcNote)")
+                    Text("\(ReportWords.meNote(seesMore: seesMore)) \(ReportWords.utcNote)")
                         .appText(.fine)
                         .foregroundStyle(.secondary)
                 }
@@ -115,6 +117,9 @@ struct ReportsPane: View {
         } catch {
             problem = ReportWords.sentence(error)
         }
+        // A control plane before scopes offers Me only.
+        let scopes = try? await control.call(DaemonAPI.Method.reportsScopes, DaemonAPI.Empty(), returning: DaemonAPI.ReportScopes.self)
+        seesMore = (scopes?.scopes.count ?? 0) > 1
     }
 
     private func addUp() {

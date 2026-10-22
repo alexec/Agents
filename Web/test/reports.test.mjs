@@ -61,5 +61,15 @@ test("each scope is named on the pane (#2071)", () => {
   assert.equal(r.scopeNote({ kind: "me" }), "Your machines.");
   assert.equal(r.scopeNote({ kind: "org" }), "Everyone’s machines.");
   assert.equal(r.scopeNote({ kind: "group", group: "g1" }, "Platform"), "The machines of Platform’s people.");
-  assert.match(r.meNote, /^Your machines\. .*Reports ▸ Spend/);
+  assert.match(r.meNote(true), /^Your machines\. .*Reports ▸ Spend/);
+  // Only an admin or a group's lead is sent to Reports ▸ Spend (#2200).
+  assert.equal(r.meNote(false), "Your machines. An admin or a group’s lead sees more.");
+  assert.doesNotMatch(r.meNote(false), /Reports ▸ Spend/);
+});
+
+test("a late answer to another scope is not taken for this one (#2201)", () => {
+  assert.equal(r.sameScope(undefined, { kind: "me" }), true);
+  assert.equal(r.sameScope({ kind: "me" }, { kind: "org" }), false);
+  assert.equal(r.sameScope({ kind: "group", group: "g1" }, { kind: "group", group: "g2" }), false);
+  assert.equal(r.sameScope({ kind: "group", group: "g1" }, { kind: "group", group: "g1" }), true);
 });
