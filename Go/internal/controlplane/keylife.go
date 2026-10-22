@@ -63,13 +63,15 @@ func (s *Service) newExpiry() *records.Stamp {
 // connection, or the next hour, tries again.
 func (s *Service) renewClient(ctx context.Context, id string) {
 	life, now := s.keyLifetime(), time.Now()
+	// A built-in sign-in at a domain that requires its org provider renews nothing (#1002, D9).
+	refused := s.signIns.refusesRenewal(ctx, s.PersonOf(id))
 	err := s.records.ChangeClient(ctx, id, func(c *records.ClientRecord) bool {
 		used := c.Paired.Time
 		if c.LastSeen != nil {
 			used = c.LastSeen.Time
 		}
 		next := renewing(c.Expires, used, now, life)
-		if next == nil {
+		if next == nil || refused && c.Expires != nil {
 			return false
 		}
 		c.Expires = next

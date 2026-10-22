@@ -45,7 +45,7 @@ var auditTarget = audit.Target
 // params are the message's own, decoded from its line, and never changed after.
 func (s *Service) audited(from Caller, host, method string, params json.RawMessage) {
 	action, ok := audit.Action(method, host != "")
-	if !ok || host == "" && orgRoutesSelfAudited[method] {
+	if !ok || host == "" && (orgRoutesSelfAudited[method] || orgSelfAudited[method]) {
 		return
 	}
 	go func() {

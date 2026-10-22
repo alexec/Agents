@@ -43,6 +43,7 @@ export const Failure = {
   kept: -32067,
   lastOperator: -32092,
   leaseRefused: -32035,
+  managedByProvider: -32079,
   needsSignIn: -32007,
   noSuchAgent: -32005,
   noSuchHost: -32091,
@@ -62,9 +63,12 @@ export const Failure = {
   notPermitted: -32045,
   notSupported: -32009,
   notYours: -32027,
+  orgProviderUnavailable: -32082,
   orgRouteMissing: -32099,
   orgRouteRemoved: -32100,
+  orgSignInRequired: -32077,
   outsideScratchRoot: -32098,
+  personSuspended: -32078,
   pinRefused: -32061,
   policyRefused: -32076,
   projectHasLiveAgents: -32013,
@@ -2109,6 +2113,31 @@ export interface DiskWorktree {
   partial: boolean;
 }
 
+/**
+ * A claimed email domain (#1002, D8, FR-010): proved by the TXT record `txtValue` at `txtName`, for
+ * one org provider. The control plane keeps it at v1/signin/domains/<domain>.json and checks it
+ * each day; 7 days of failures take it back to notProved. `sendHere` sends an email at the domain
+ * to the provider (signIn/discover); `require` refuses a built-in sign-in at the domain to join,
+ * pair or renew (D9).
+ */
+export interface DomainClaim {
+  domain: string;
+  provider: string;
+  state: DomainClaimState;
+  txtName: string;
+  txtValue: string;
+  lastGood?: WireDate;
+  failingSince?: WireDate;
+  sendHere: boolean;
+  require: boolean;
+  claimed?: OrgRouteStamp;
+}
+
+/** Whether a claimed domain's TXT record was found (#1002). */
+export type DomainClaimState =
+  | "notProved"
+  | "proved";
+
 export interface DraftCheck {
   passed: boolean;
   workspaces?: WorkspaceInfo[];
@@ -3709,6 +3738,109 @@ export interface OrgPolicy {
   /** Empty. A place for later layers that only make a rule tighter. */
   groups?: Empty;
   notices?: PolicyNotices;
+}
+
+/**
+ * An org sign-in provider (#1002, D1, FR-001): an OIDC issuer that an organisation registered for
+ * this control plane. Kept at v1/signin/providers/<id>.json; its client secret is sealed beside it
+ * and never returned. The control plane sets version, secret, created, changed and redirectURI.
+ */
+export interface OrgProvider {
+  /**
+   * [a-z0-9-]{2,32}, made from the name when absent at add, never changed: the provider of each
+   * sign-in it makes.
+   */
+  id: string;
+  /** On the button: Sign in with <name>. 1 to 40 characters. */
+  name: string;
+  preset: OrgProviderPreset;
+  /** An https URL. Its discovery document must name it as issuer. */
+  issuer: string;
+  clientID: string;
+  /** The claim that names a person for life (D5): sub, or oid for Entra. */
+  accountClaim?: string;
+  /** Entra: the tid an ID token must have. */
+  tenant?: string;
+  scopes?: string[];
+  join?: OrgProviderJoin;
+  on?: boolean;
+  order?: number;
+  secret?: OrgProviderSecret;
+  version?: number;
+  created?: OrgRouteStamp;
+  changed?: OrgRouteStamp;
+  /**
+   * The callback to register at the provider: this control plane's https address and
+   * /v1/oidc/callback. Only in answers.
+   */
+  redirectURI?: string;
+}
+
+/**
+ * signIn/orgProviders/check (#1002, FR-004): what the issuer's discovery document lacks, and how
+ * many keys its JWKS has.
+ */
+export interface OrgProviderCheck {
+  ok: boolean;
+  missing: string[];
+  jwksKeys: number;
+  redirectURI: string;
+}
+
+/**
+ * Who may join through an org provider (D10): only people from SCIM, anyone the provider signs in,
+ * or only by invite.
+ */
+export type OrgProviderJoin =
+  | "scim"
+  | "anyone"
+  | "invite";
+
+/** An org provider with its store tag, for an admin (#1002). */
+export interface OrgProviderKept {
+  provider: OrgProvider;
+  rev: string;
+}
+
+/** signIn/orgProviders/list (#1002): every org provider, for an admin. No secret. */
+export interface OrgProviderList {
+  providers: OrgProviderKept[];
+}
+
+/**
+ * Which form filled an org provider (#1002, research R3). Only googleWorkspace changes a check: hd
+ * must be a claimed domain.
+ */
+export type OrgProviderPreset =
+  | "okta"
+  | "entra"
+  | "googleWorkspace"
+  | "oidc";
+
+/** signIn/orgProviders/check and remove (#1002). */
+export interface OrgProviderRequest {
+  id: string;
+  rev?: string;
+}
+
+/**
+ * Who set an org provider's client secret, when, and its fingerprint: the first 8 hex of its
+ * SHA-256 (#1002, D4). Never the value.
+ */
+export interface OrgProviderSecret {
+  fingerprint: string;
+  setBy?: AuditActor;
+  setAt: WireDate;
+}
+
+/**
+ * signIn/orgProviders/set (#1002, FR-001 to FR-004): add or change an org provider. secret is
+ * written only, never read back; needed to add. rev is the tag the admin read; none to add.
+ */
+export interface OrgProviderSet {
+  provider: OrgProvider;
+  secret?: string;
+  rev?: string;
 }
 
 /**
@@ -5750,6 +5882,98 @@ export interface SignInDecided {
   result: string;
 }
 
+/** signIn/discover (#1002, FR-011): the email a person typed. */
+export interface SignInDiscover {
+  email: string;
+}
+
+/**
+ * signIn/discover's answer: the org provider of a claimed domain that sends people there, or none.
+ * The same for an unknown domain and a domain with no switch.
+ */
+export interface SignInDiscovered {
+  provider?: string;
+  name?: string;
+}
+
+/** signIn/domains/claim (#1002): a domain for one org provider. */
+export interface SignInDomainClaim {
+  domain: string;
+  provider: string;
+}
+
+/** signIn/domains/list (#1002): every claimed domain, for an admin. */
+export interface SignInDomainList {
+  domains: DomainClaim[];
+}
+
+/**
+ * signIn/domains/preview (#1002, FR-012): the people and the built-in sign-ins that Require would
+ * refuse.
+ */
+export interface SignInDomainPreview {
+  people: SignInDomainPreviewPerson[];
+}
+
+/** A person that Require changes, with their sign-ins at the domain. */
+export interface SignInDomainPreviewPerson {
+  user: string;
+  name: string;
+  signIns: SignIn[];
+}
+
+/** signIn/domains/check, preview and remove (#1002). */
+export interface SignInDomainRequest {
+  domain: string;
+}
+
+/**
+ * signIn/domains/set (#1002, D8): a claimed domain's switches; an absent one stays. Either needs a
+ * proved domain.
+ */
+export interface SignInDomainSet {
+  domain: string;
+  sendHere?: boolean;
+  require?: boolean;
+}
+
+/**
+ * An org provider on the sign-in screen (#1002, FR-003): its id, name and order, and nothing more.
+ */
+export interface SignInOrgProvider {
+  id: string;
+  name: string;
+  order: number;
+}
+
+export type SignInOrgPurpose =
+  | "pair"
+  | "addToMe";
+
+export type SignInOrgReturn =
+  | "app"
+  | "web";
+
+/**
+ * signIn/orgStart (#1002, D2): start an org provider's flow for this connection: pair (an `s:`
+ * connection) or addToMe (a paired client's). returnTo says where the browser comes back:
+ * agents://oidc (app) or the web page (web).
+ */
+export interface SignInOrgStart {
+  provider: string;
+  purpose: SignInOrgPurpose;
+  returnTo: SignInOrgReturn;
+  loginHint?: string;
+}
+
+/**
+ * signIn/orgStart's answer: the /v1/oidc/start address to open in the browser. It ends after 10
+ * minutes.
+ */
+export interface SignInOrgStarted {
+  url: string;
+}
+
 /**
  * signIn/pair, on an `s:` connection (#995): the client's name and kind, and its provider's token:
  * an ID token for google and apple, a user access token for github. The control plane checks it and
@@ -5781,13 +6005,20 @@ export interface SignInProvider {
  * fresh one used once on a paired client's. The client makes the nonce itself, from the control key
  * it trusts and the challenge (R2), so a token cannot be passed on to another control plane
  * (FR-008, FR-011). `domains` (Google Workspace) and `organisations` (GitHub) are for admins only
- * (FR-006).
+ * (FR-006). `orgProviders` are the org providers turned on, in order (#1002), first on every
+ * sign-in screen.
  */
 export interface SignInProviders {
   providers: SignInProvider[];
   challenge?: string;
   domains?: string[];
   organisations?: string[];
+  orgProviders?: SignInOrgProvider[];
+  /**
+   * A claimed domain sends people to its org provider: a client offers Use an Email (#1002,
+   * FR-011).
+   */
+  discover?: boolean;
 }
 
 /**
@@ -5811,6 +6042,22 @@ export interface SignInRequest {
   login?: string;
   code: string;
   expires: WireDate;
+}
+
+/**
+ * signIn/ticket (#1002, D3, FR-006): the ticket the callback gave, on the connection that started
+ * the flow, within 2 minutes, once. To pair, the client's name and kind too.
+ */
+export interface SignInTicket {
+  ticket: string;
+  name?: string;
+  kind?: ClientKind;
+}
+
+/** signIn/ticket's answer: the client paired, or the sign-in added to the caller's person. */
+export interface SignInTicketResult {
+  client?: UUID;
+  signIn?: SignIn;
 }
 
 /**
@@ -7708,6 +7955,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DiskState: { required: ["alarms"], optional: [] },
   DiskThresholds: { required: [], optional: ["lowGB", "lowPercent", "criticalGB"] },
   DiskWorktree: { required: ["name", "bytes", "partial"], optional: [] },
+  DomainClaim: { required: ["domain", "provider", "state", "txtName", "txtValue", "sendHere", "require"], optional: ["lastGood", "failingSince", "claimed"] },
   DraftCheck: { required: ["passed"], optional: ["workspaces", "problem", "ssh", "noSSH"] },
   DraftOptionsNotification: { required: ["draftID", "options", "commands"], optional: ["failure"] },
   DraftQuestion: { required: ["id", "kind", "text", "yes"], optional: ["workspace", "cost"] },
@@ -7884,6 +8132,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   OptionsRequest: { required: ["runtimeID", "cwd", "mcpServers"], optional: [] },
   OptionsResponse: { required: ["draftID", "options", "commands"], optional: [] },
   OrgPolicy: { required: ["version", "issued", "changedBy", "requires"], optional: ["modeCeiling", "sandbox", "runtimes", "marketplaces", "budgets", "helpers", "environment", "stopAll", "requireFollowing", "groups", "notices"] },
+  OrgProvider: { required: ["id", "name", "preset", "issuer", "clientID"], optional: ["accountClaim", "tenant", "scopes", "join", "on", "order", "secret", "version", "created", "changed", "redirectURI"] },
+  OrgProviderCheck: { required: ["ok", "missing", "jwksKeys", "redirectURI"], optional: [] },
+  OrgProviderKept: { required: ["provider", "rev"], optional: [] },
+  OrgProviderList: { required: ["providers"], optional: [] },
+  OrgProviderRequest: { required: ["id"], optional: ["rev"] },
+  OrgProviderSecret: { required: ["fingerprint", "setAt"], optional: ["setBy"] },
+  OrgProviderSet: { required: ["provider"], optional: ["secret", "rev"] },
   OrgRoute: { required: ["id", "name", "kind", "runtimes"], optional: ["vendor", "settings", "models", "groups", "defaultFor", "secretFields", "fingerprint", "version", "created", "changed", "machines"] },
   OrgRouteCheck: { required: ["ok", "words"], optional: [] },
   OrgRouteDelivery: { required: ["routes", "at"], optional: [] },
@@ -8103,11 +8358,24 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SignInConfigure: { required: ["provider"], optional: ["on", "domains", "organisations"] },
   SignInDecide: { required: ["request"], optional: [] },
   SignInDecided: { required: ["request", "result"], optional: [] },
+  SignInDiscover: { required: ["email"], optional: [] },
+  SignInDiscovered: { required: [], optional: ["provider", "name"] },
+  SignInDomainClaim: { required: ["domain", "provider"], optional: [] },
+  SignInDomainList: { required: ["domains"], optional: [] },
+  SignInDomainPreview: { required: ["people"], optional: [] },
+  SignInDomainPreviewPerson: { required: ["user", "name", "signIns"], optional: [] },
+  SignInDomainRequest: { required: ["domain"], optional: [] },
+  SignInDomainSet: { required: ["domain"], optional: ["sendHere", "require"] },
+  SignInOrgProvider: { required: ["id", "name", "order"], optional: [] },
+  SignInOrgStart: { required: ["provider", "purpose", "returnTo"], optional: ["loginHint"] },
+  SignInOrgStarted: { required: ["url"], optional: [] },
   SignInPair: { required: ["provider", "token", "name", "kind"], optional: [] },
   SignInProvider: { required: ["provider", "on", "available"], optional: ["clientID", "why"] },
-  SignInProviders: { required: ["providers"], optional: ["challenge", "domains", "organisations"] },
+  SignInProviders: { required: ["providers"], optional: ["challenge", "domains", "organisations", "orgProviders", "discover"] },
   SignInRemove: { required: ["provider", "account"], optional: [] },
   SignInRequest: { required: ["request", "name", "kind", "provider", "code", "expires"], optional: ["login"] },
+  SignInTicket: { required: ["ticket"], optional: ["name", "kind"] },
+  SignInTicketResult: { required: [], optional: ["client", "signIn"] },
   SignInWaiting: { required: ["code", "expires"], optional: [] },
   SignedPolicy: { required: ["policy", "signature"], optional: [] },
   Simulator: { required: ["udid", "name", "os", "booted"], optional: [] },

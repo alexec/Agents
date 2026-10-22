@@ -70,6 +70,7 @@ public enum Capability {
     public static let modes1 = "modes/1"
     public static let mute1 = "mute/1"
     public static let options1 = "options/1"
+    public static let orgIdentity1 = "org-identity/1"
     public static let orgRoutes1 = "org-routes/1"
     public static let pages1 = "pages/1"
     public static let pairing1 = "pairing/1"
@@ -528,10 +529,23 @@ public enum Capability {
         "signIn/approve": "signin/1",
         "signIn/configure": "signin/1",
         "signIn/deny": "signin/1",
+        "signIn/discover": "org-identity/1",
+        "signIn/domains/check": "org-identity/1",
+        "signIn/domains/claim": "org-identity/1",
+        "signIn/domains/list": "org-identity/1",
+        "signIn/domains/preview": "org-identity/1",
+        "signIn/domains/remove": "org-identity/1",
+        "signIn/domains/set": "org-identity/1",
+        "signIn/orgProviders/check": "org-identity/1",
+        "signIn/orgProviders/list": "org-identity/1",
+        "signIn/orgProviders/remove": "org-identity/1",
+        "signIn/orgProviders/set": "org-identity/1",
+        "signIn/orgStart": "org-identity/1",
         "signIn/pair": "signin/1",
         "signIn/providers": "signin/1",
         "signIn/removeFromMe": "signin/1",
         "signIn/requests": "signin/1",
+        "signIn/ticket": "org-identity/1",
         "tunnel/open": "tunnel/1",
         "usage/rollup": "reports/1",
         "user/removeSecret": "user/1",

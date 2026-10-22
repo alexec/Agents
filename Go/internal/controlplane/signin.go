@@ -81,6 +81,8 @@ type signIns struct {
 	open map[string][]*Conn
 	// Each paired session's challenge for signIn/addToMe, used once.
 	challenges map[string]challenge
+	// Org providers and claimed domains (#1002).
+	org orgBits
 }
 
 type challenge struct {
@@ -139,6 +141,14 @@ func (si *signIns) providers(settings signInSettings, admin bool, challengeValue
 	if admin {
 		out.Domains = append([]string{}, settings.Google.Domains...)
 		out.Organisations = append([]string{}, settings.GitHub.Orgs...)
+	}
+	// Org providers come first on every screen (#1002, FR-026); none is no field at all.
+	ctx := context.Background()
+	if rows := si.orgRows(ctx); len(rows) > 0 {
+		out.OrgProviders = rows
+		if si.discovers(ctx) {
+			out.Discover = new(true)
+		}
 	}
 	return out
 }
@@ -411,6 +421,9 @@ func (si *signIns) addToMe(ctx context.Context, a wire.SignInAdd, from Caller, u
 	if err != nil {
 		return nil, err
 	}
+	if err := si.requiredFor(ctx, c.provider, c.email, user); err != nil {
+		return nil, err
+	}
 	err = si.s.records.ChangePeople(ctx, func(all map[string]records.Person) ([]records.Person, error) {
 		me, ok := all[user]
 		if !ok || me.IsRemoved() || me.IsBot() {
@@ -480,7 +493,7 @@ func (si *signIns) key(id controllink.Identity, public, private []byte) ([]byte,
 	if err != nil {
 		return nil, notTheirs{controllink.Refuse(controllink.Unavailable)}
 	}
-	if !si.anyOn(settings) || len(public) == 0 || si.s.records.Client(id.ID) != nil || si.s.records.WasForgotten(id.ID) {
+	if !si.anyOn(settings) && len(si.orgProvidersOn(context.Background())) == 0 || len(public) == 0 || si.s.records.Client(id.ID) != nil || si.s.records.WasForgotten(id.ID) {
 		return nil, controllink.Refuse(controllink.Unknown)
 	}
 	key, err := controllink.ClientKey(private, public, id.ID)
@@ -587,8 +600,39 @@ func (si *signIns) pairing(conn *Conn, client string, public, helloNonce []byte)
 			si.s.log("a sign-in with " + signin.Title(p.Provider) + " from " + source + " was refused: " + asRPC(err).Message)
 			conn.SendNow(replyError(m.ID, err))
 			return
+		case "signIn/orgStart":
+			// An org provider's flow (#1002): the browser goes and comes back while this
+			// connection waits, then signIn/ticket pairs it.
+			o, err := require[wire.SignInOrgStart](m.Params, "SignInOrgStart")
+			if err == nil {
+				var started wire.SignInOrgStarted
+				if started, err = si.orgStart(context.Background(), o, binding{hello: helloNonce}); err == nil {
+					conn.SendNow(reply(m.ID, started))
+					continue
+				}
+			}
+			conn.SendNow(replyError(m.ID, err))
+		case "signIn/ticket":
+			t, err := require[wire.SignInTicket](m.Params, "SignInTicket")
+			if err == nil {
+				var paired *wire.SignInTicketResult
+				if paired, err = si.ticketPair(context.Background(), client, public, helloNonce, t); err == nil {
+					conn.SendNow(reply(m.ID, paired))
+					return
+				}
+			}
+			si.s.log("an org sign-in from " + source + " was refused: " + asRPC(err).Message)
+			conn.SendNow(replyError(m.ID, err))
+			return
+		case "signIn/discover":
+			d, err := require[wire.SignInDiscover](m.Params, "SignInDiscover")
+			if err != nil {
+				conn.SendNow(replyError(m.ID, err))
+				continue
+			}
+			conn.SendNow(reply(m.ID, si.discover(context.Background(), d)))
 		default:
-			conn.SendNow(replyError(m.ID, fail(notPermitted, "Only signIn/providers and signIn/pair are answered on a sign-in connection.")))
+			conn.SendNow(replyError(m.ID, fail(notPermitted, "Only signIn/providers, signIn/discover, signIn/pair, signIn/orgStart and signIn/ticket are answered on a sign-in connection.")))
 		}
 	}
 }
@@ -613,6 +657,14 @@ func (si *signIns) pair(ctx context.Context, conn *Conn, client string, public, 
 	}
 	person, err := si.personWithSignIn(ctx, c.provider, c.account)
 	if err != nil {
+		return nil, err
+	}
+	// A domain that requires its org provider refuses this one, to join or to pair (D9).
+	known := ""
+	if person != nil {
+		known = person.ID
+	}
+	if err := si.requiredFor(ctx, c.provider, c.email, known); err != nil {
 		return nil, err
 	}
 	if person == nil {
@@ -689,5 +741,5 @@ func (m *Methods) signInMethod(ctx context.Context, method string, params json.R
 	case "signIn/pair":
 		return nil, fail(notPermitted, "signIn/pair is answered only on a sign-in connection.")
 	}
-	return nil, fail(methodNotFound, "%s", method)
+	return m.orgSignInMethod(ctx, method, params, from, user)
 }

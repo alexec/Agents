@@ -125,10 +125,23 @@ var own = methodSet(
 	"signIn/approve",
 	"signIn/configure",
 	"signIn/deny",
+	"signIn/discover",
+	"signIn/domains/check",
+	"signIn/domains/claim",
+	"signIn/domains/list",
+	"signIn/domains/preview",
+	"signIn/domains/remove",
+	"signIn/domains/set",
+	"signIn/orgProviders/check",
+	"signIn/orgProviders/list",
+	"signIn/orgProviders/remove",
+	"signIn/orgProviders/set",
+	"signIn/orgStart",
 	"signIn/pair",
 	"signIn/providers",
 	"signIn/removeFromMe",
 	"signIn/requests",
+	"signIn/ticket",
 	"user/removeSecret",
 	"user/secretNames",
 	"user/setSecret",
@@ -203,7 +216,15 @@ var writes = methodSet(
 	"signIn/approve",
 	"signIn/configure",
 	"signIn/deny",
+	"signIn/domains/check",
+	"signIn/domains/claim",
+	"signIn/domains/remove",
+	"signIn/domains/set",
+	"signIn/orgProviders/remove",
+	"signIn/orgProviders/set",
+	"signIn/orgStart",
 	"signIn/removeFromMe",
+	"signIn/ticket",
 	"user/removeSecret",
 	"user/setSecret",
 	"user/setSettings",
@@ -268,7 +289,10 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 	case "links/list", "links/requests", "links/approve", "links/deny", "links/remove":
 		return m.linksMethod(ctx, method, params, from)
 	case "signIn/providers", "signIn/pair", "signIn/addToMe", "signIn/removeFromMe", "signIn/configure",
-		"signIn/requests", "signIn/approve", "signIn/deny":
+		"signIn/requests", "signIn/approve", "signIn/deny", "signIn/discover", "signIn/orgStart", "signIn/ticket",
+		"signIn/orgProviders/check", "signIn/orgProviders/list", "signIn/orgProviders/remove", "signIn/orgProviders/set",
+		"signIn/domains/check", "signIn/domains/claim", "signIn/domains/list", "signIn/domains/preview",
+		"signIn/domains/remove", "signIn/domains/set":
 		return m.signInMethod(ctx, method, params, from)
 	case "reports/usage", "reports/export":
 		return m.reportMethod(ctx, method, params, from)

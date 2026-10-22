@@ -2630,6 +2630,35 @@ type DiskWorktree struct {
 	Partial bool `json:"partial"`
 }
 
+// A claimed email domain (#1002, D8, FR-010): proved by the TXT record `txtValue` at `txtName`, for one org provider. The control plane keeps it at v1/signin/domains/<domain>.json and checks it each day; 7 days of failures take it back to notProved. `sendHere` sends an email at the domain to the provider (signIn/discover); `require` refuses a built-in sign-in at the domain to join, pair or renew (D9).
+type DomainClaim struct {
+	Domain string `json:"domain"`
+
+	Provider string `json:"provider"`
+
+	State DomainClaimState `json:"state"`
+
+	TxtName string `json:"txtName"`
+
+	TxtValue string `json:"txtValue"`
+
+	LastGood *Date `json:"lastGood,omitzero"`
+
+	FailingSince *Date `json:"failingSince,omitzero"`
+
+	SendHere bool `json:"sendHere"`
+
+	Require bool `json:"require"`
+
+	Claimed *OrgRouteStamp `json:"claimed,omitzero"`
+}
+
+// Whether a claimed domain's TXT record was found (#1002).
+type DomainClaimState string
+
+const DomainClaimStateNotProved DomainClaimState = "notProved"
+const DomainClaimStateProved DomainClaimState = "proved"
+
 type DraftCheck struct {
 	Passed bool `json:"passed"`
 
@@ -4911,6 +4940,110 @@ type OrgPolicy struct {
 	Groups *Empty `json:"groups,omitzero"`
 
 	Notices *PolicyNotices `json:"notices,omitzero"`
+}
+
+// An org sign-in provider (#1002, D1, FR-001): an OIDC issuer that an organisation registered for this control plane. Kept at v1/signin/providers/<id>.json; its client secret is sealed beside it and never returned. The control plane sets version, secret, created, changed and redirectURI.
+type OrgProvider struct {
+	// [a-z0-9-]{2,32}, made from the name when absent at add, never changed: the provider of each sign-in it makes.
+	ID string `json:"id"`
+
+	// On the button: Sign in with <name>. 1 to 40 characters.
+	Name string `json:"name"`
+
+	Preset OrgProviderPreset `json:"preset"`
+
+	// An https URL. Its discovery document must name it as issuer.
+	Issuer string `json:"issuer"`
+
+	ClientID string `json:"clientID"`
+
+	// The claim that names a person for life (D5): sub, or oid for Entra.
+	AccountClaim *string `json:"accountClaim,omitzero"`
+
+	// Entra: the tid an ID token must have.
+	Tenant *string `json:"tenant,omitzero"`
+
+	Scopes []string `json:"scopes,omitzero"`
+
+	Join *OrgProviderJoin `json:"join,omitzero"`
+
+	On *bool `json:"on,omitzero"`
+
+	Order *int64 `json:"order,omitzero"`
+
+	Secret *OrgProviderSecret `json:"secret,omitzero"`
+
+	Version *int64 `json:"version,omitzero"`
+
+	Created *OrgRouteStamp `json:"created,omitzero"`
+
+	Changed *OrgRouteStamp `json:"changed,omitzero"`
+
+	// The callback to register at the provider: this control plane's https address and /v1/oidc/callback. Only in answers.
+	RedirectURI *string `json:"redirectURI,omitzero"`
+}
+
+// signIn/orgProviders/check (#1002, FR-004): what the issuer's discovery document lacks, and how many keys its JWKS has.
+type OrgProviderCheck struct {
+	Ok bool `json:"ok"`
+
+	Missing []string `json:"missing"`
+
+	JwksKeys int64 `json:"jwksKeys"`
+
+	RedirectURI string `json:"redirectURI"`
+}
+
+// Who may join through an org provider (D10): only people from SCIM, anyone the provider signs in, or only by invite.
+type OrgProviderJoin string
+
+const OrgProviderJoinScim OrgProviderJoin = "scim"
+const OrgProviderJoinAnyone OrgProviderJoin = "anyone"
+const OrgProviderJoinInvite OrgProviderJoin = "invite"
+
+// An org provider with its store tag, for an admin (#1002).
+type OrgProviderKept struct {
+	Provider OrgProvider `json:"provider"`
+
+	Rev string `json:"rev"`
+}
+
+// signIn/orgProviders/list (#1002): every org provider, for an admin. No secret.
+type OrgProviderList struct {
+	Providers []OrgProviderKept `json:"providers"`
+}
+
+// Which form filled an org provider (#1002, research R3). Only googleWorkspace changes a check: hd must be a claimed domain.
+type OrgProviderPreset string
+
+const OrgProviderPresetOkta OrgProviderPreset = "okta"
+const OrgProviderPresetEntra OrgProviderPreset = "entra"
+const OrgProviderPresetGoogleWorkspace OrgProviderPreset = "googleWorkspace"
+const OrgProviderPresetOidc OrgProviderPreset = "oidc"
+
+// signIn/orgProviders/check and remove (#1002).
+type OrgProviderRequest struct {
+	ID string `json:"id"`
+
+	Rev *string `json:"rev,omitzero"`
+}
+
+// Who set an org provider's client secret, when, and its fingerprint: the first 8 hex of its SHA-256 (#1002, D4). Never the value.
+type OrgProviderSecret struct {
+	Fingerprint string `json:"fingerprint"`
+
+	SetBy *AuditActor `json:"setBy,omitzero"`
+
+	SetAt Date `json:"setAt"`
+}
+
+// signIn/orgProviders/set (#1002, FR-001 to FR-004): add or change an org provider. secret is written only, never read back; needed to add. rev is the tag the admin read; none to add.
+type OrgProviderSet struct {
+	Provider OrgProvider `json:"provider"`
+
+	Secret *string `json:"secret,omitzero"`
+
+	Rev *string `json:"rev,omitzero"`
 }
 
 // An organisation's way to the model for one or more runtimes (#999, spec FR-001): an org key or a gateway. The control plane keeps it at v1/org/routes/<id>.json; its secrets are in an envelope beside it, never in this record. The control plane sets version, secretFields, fingerprint, created and changed; machines is how many machines hold its version, for an admin.
@@ -7490,6 +7623,93 @@ type SignInDecided struct {
 	Result string `json:"result"`
 }
 
+// signIn/discover (#1002, FR-011): the email a person typed.
+type SignInDiscover struct {
+	Email string `json:"email"`
+}
+
+// signIn/discover's answer: the org provider of a claimed domain that sends people there, or none. The same for an unknown domain and a domain with no switch.
+type SignInDiscovered struct {
+	Provider *string `json:"provider,omitzero"`
+
+	Name *string `json:"name,omitzero"`
+}
+
+// signIn/domains/claim (#1002): a domain for one org provider.
+type SignInDomainClaim struct {
+	Domain string `json:"domain"`
+
+	Provider string `json:"provider"`
+}
+
+// signIn/domains/list (#1002): every claimed domain, for an admin.
+type SignInDomainList struct {
+	Domains []DomainClaim `json:"domains"`
+}
+
+// signIn/domains/preview (#1002, FR-012): the people and the built-in sign-ins that Require would refuse.
+type SignInDomainPreview struct {
+	People []SignInDomainPreviewPerson `json:"people"`
+}
+
+// A person that Require changes, with their sign-ins at the domain.
+type SignInDomainPreviewPerson struct {
+	User string `json:"user"`
+
+	Name string `json:"name"`
+
+	SignIns []SignIn `json:"signIns"`
+}
+
+// signIn/domains/check, preview and remove (#1002).
+type SignInDomainRequest struct {
+	Domain string `json:"domain"`
+}
+
+// signIn/domains/set (#1002, D8): a claimed domain's switches; an absent one stays. Either needs a proved domain.
+type SignInDomainSet struct {
+	Domain string `json:"domain"`
+
+	SendHere *bool `json:"sendHere,omitzero"`
+
+	Require *bool `json:"require,omitzero"`
+}
+
+// An org provider on the sign-in screen (#1002, FR-003): its id, name and order, and nothing more.
+type SignInOrgProvider struct {
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Order int64 `json:"order"`
+}
+
+type SignInOrgPurpose string
+
+const SignInOrgPurposePair SignInOrgPurpose = "pair"
+const SignInOrgPurposeAddToMe SignInOrgPurpose = "addToMe"
+
+type SignInOrgReturn string
+
+const SignInOrgReturnApp SignInOrgReturn = "app"
+const SignInOrgReturnWeb SignInOrgReturn = "web"
+
+// signIn/orgStart (#1002, D2): start an org provider's flow for this connection: pair (an `s:` connection) or addToMe (a paired client's). returnTo says where the browser comes back: agents://oidc (app) or the web page (web).
+type SignInOrgStart struct {
+	Provider string `json:"provider"`
+
+	Purpose SignInOrgPurpose `json:"purpose"`
+
+	ReturnTo SignInOrgReturn `json:"returnTo"`
+
+	LoginHint *string `json:"loginHint,omitzero"`
+}
+
+// signIn/orgStart's answer: the /v1/oidc/start address to open in the browser. It ends after 10 minutes.
+type SignInOrgStarted struct {
+	URL string `json:"url"`
+}
+
 // signIn/pair, on an `s:` connection (#995): the client's name and kind, and its provider's token: an ID token for google and apple, a user access token for github. The control plane checks it and forgets it (FR-008, FR-010).
 type SignInPair struct {
 	Provider string `json:"provider"`
@@ -7514,7 +7734,7 @@ type SignInProvider struct {
 	Why *string `json:"why,omitzero"`
 }
 
-// signIn/providers, signIn/configure (#995): the providers. `challenge` (base64url) is what a client's nonce is made from on this connection: the hello's nonce on an `s:` connection, or a fresh one used once on a paired client's. The client makes the nonce itself, from the control key it trusts and the challenge (R2), so a token cannot be passed on to another control plane (FR-008, FR-011). `domains` (Google Workspace) and `organisations` (GitHub) are for admins only (FR-006).
+// signIn/providers, signIn/configure (#995): the providers. `challenge` (base64url) is what a client's nonce is made from on this connection: the hello's nonce on an `s:` connection, or a fresh one used once on a paired client's. The client makes the nonce itself, from the control key it trusts and the challenge (R2), so a token cannot be passed on to another control plane (FR-008, FR-011). `domains` (Google Workspace) and `organisations` (GitHub) are for admins only (FR-006). `orgProviders` are the org providers turned on, in order (#1002), first on every sign-in screen.
 type SignInProviders struct {
 	Providers []SignInProvider `json:"providers"`
 
@@ -7523,6 +7743,11 @@ type SignInProviders struct {
 	Domains []string `json:"domains,omitzero"`
 
 	Organisations []string `json:"organisations,omitzero"`
+
+	OrgProviders []SignInOrgProvider `json:"orgProviders,omitzero"`
+
+	// A claimed domain sends people to its org provider: a client offers Use an Email (#1002, FR-011).
+	Discover *bool `json:"discover,omitzero"`
 }
 
 // signIn/removeFromMe (#995): an outside sign-in to take off the caller's person. The local owner's stays.
@@ -7547,6 +7772,22 @@ type SignInRequest struct {
 	Code string `json:"code"`
 
 	Expires Date `json:"expires"`
+}
+
+// signIn/ticket (#1002, D3, FR-006): the ticket the callback gave, on the connection that started the flow, within 2 minutes, once. To pair, the client's name and kind too.
+type SignInTicket struct {
+	Ticket string `json:"ticket"`
+
+	Name *string `json:"name,omitzero"`
+
+	Kind *ClientKind `json:"kind,omitzero"`
+}
+
+// signIn/ticket's answer: the client paired, or the sign-in added to the caller's person.
+type SignInTicketResult struct {
+	Client *UUID `json:"client,omitzero"`
+
+	SignIn *SignIn `json:"signIn,omitzero"`
 }
 
 // control/signInWaiting, on an `s:` connection (#995, FR-010): a GitHub sign-in waits for Approve on another client of the person, which shows the same code.

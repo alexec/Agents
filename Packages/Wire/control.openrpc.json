@@ -3349,6 +3349,258 @@
       "description": "Deny a waiting GitHub sign-in (#995)."
     },
     {
+      "name": "signIn/discover",
+      "x-capability": "org-identity/1",
+      "description": "On a sign-in or a paired connection (#1002, FR-011): the org provider an email's claimed domain sends people to.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInDiscover"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SignInDiscovered"
+        }
+      }
+    },
+    {
+      "name": "signIn/domains/check",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, D8): look for the domain's TXT record now.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInDomainRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/DomainClaim"
+        }
+      }
+    },
+    {
+      "name": "signIn/domains/claim",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, D8): claim a domain for one org provider; answers the TXT record to add. One domain has one provider.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInDomainClaim"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/DomainClaim"
+        }
+      }
+    },
+    {
+      "name": "signIn/domains/list",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002): every claimed domain.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SignInDomainList"
+        }
+      }
+    },
+    {
+      "name": "signIn/domains/preview",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, FR-012): who Require would refuse, before it is turned on.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInDomainRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SignInDomainPreview"
+        }
+      }
+    },
+    {
+      "name": "signIn/domains/remove",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002): take a domain claim back.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInDomainRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "signIn/domains/set",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, D8, D9): turn Send people here and Require this provider on or off; either needs a proved domain.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInDomainSet"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/DomainClaim"
+        }
+      }
+    },
+    {
+      "name": "signIn/orgProviders/check",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, FR-004): read the issuer's discovery document and JWKS again, and say what is missing.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgProviderRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/OrgProviderCheck"
+        }
+      }
+    },
+    {
+      "name": "signIn/orgProviders/list",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002): every org provider, with no secret.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/OrgProviderList"
+        }
+      }
+    },
+    {
+      "name": "signIn/orgProviders/remove",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, FR-009): remove an org provider and its sealed secret; its id is never used again.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgProviderRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "signIn/orgProviders/set",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, FR-001 to FR-004): add or change an org provider, conditional on its rev; its client secret sealed with the keeper. Refused -32082 orgProviderUnavailable with no keeper, no https address, or a discovery document that lacks the code flow with PKCE S256.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgProviderSet"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/OrgProviderKept"
+        }
+      }
+    },
+    {
+      "name": "signIn/orgStart",
+      "x-capability": "org-identity/1",
+      "description": "On a sign-in or a paired connection (#1002, D2): the /v1/oidc/start address for an org provider's flow, bound to this connection.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInOrgStart"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SignInOrgStarted"
+        }
+      }
+    },
+    {
       "name": "signIn/pair",
       "x-capability": "signin/1",
       "paramStructure": "by-name",
@@ -3449,6 +3701,27 @@
         }
       },
       "description": "The GitHub sign-ins waiting for the caller's Approve (#995, FR-010)."
+    },
+    {
+      "name": "signIn/ticket",
+      "x-capability": "org-identity/1",
+      "description": "On the connection that started the flow (#1002, D3, FR-006): the ticket from the callback pairs it, or adds the sign-in to the caller's person. Used once, within 2 minutes. Refused -32077 orgSignInRequired, and when the provider's Who may join does not let a new person in.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInTicket"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SignInTicketResult"
+        }
+      }
     },
     {
       "name": "tunnel/open",

@@ -26,6 +26,8 @@ something up, not for reading through.
   how the control plane checks and calls them.
 - [Integrations](integrations.md): every third-party service and tool the app talks to,
   starts, installs or signs in to, with its state and when it was last checked.
+- [Sign-in providers](sign-in.md): org sign-in providers, claimed domains, their methods and
+  the `/v1/oidc` routes on the control plane.
 - [ssh options](ssh-options.md): how each option in your `~/.ssh/config` fares when the
   control plane connects to a server.
 - [Personas](personas.md): the persona file format, where personas live, and what picking one does.
