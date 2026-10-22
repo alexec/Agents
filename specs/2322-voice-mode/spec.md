@@ -32,7 +32,9 @@ not (Alex, 2026-10-22: "would be weird").
    - then the microphone opens again for the next prompt.
 3. **Stop** stops the voice at once. What was not spoken stays on the screen. The button again ends voice mode.
 4. **A turn that stops to ask** (a question card, or Grok's question as a waiting turn) speaks
-   the question, then its options with numbers: "Two choices. One: Keychain. Two: File."
+   the question, then its options with numbers: "Two choices. One: Keychain. Two: File. One
+   is recommended." The person says a number or the choice's words; voice mode says
+   "Sending: File." and sends it unless the person says "no" within 2 seconds.
 5. **Sounds**: built-in system sounds only. Mac: `NSSound(named:)`. iPhone and iPad:
    `AudioServicesPlaySystemSound`. Moments: microphone open, prompt sent, done, question
    waiting, error.
@@ -59,12 +61,11 @@ not (Alex, 2026-10-22: "would be weird").
 2. **Voice mode on the Mac and the Remote.** `Shared/UI/Voice/`: the setting, the button, the
    loop (listen, send, speak), Stop, the sounds, FluidAudio and the bundled models. One change
    for both apps, because both compile `Shared/UI`.
-3. **Questions and barge-in.** A question card read out and answered by voice ("two", "the
-   first", or the option's words). The person can talk over the voice: the input node's voice
-   processing (echo cancellation) stays on while the app speaks, and about 400 ms of speech
-   stops the voice.
-4. **Approvals by voice**, later: low-risk requests once only, never high-risk ones ("This one
-   needs your screen.").
+3. **Questions by voice.** A question card with one set of choices is read out with numbers
+   and answered by voice ("two", "the second", or the choice's words): "Sending: File.", with
+   2 seconds to say "no". Any other form says "This one needs your screen." (`SpokenQuestion`).
+4. **Barge-in, approvals by voice, plans, a still-working line:** #2358. Barge-in needs the
+   voice and the microphone on one audio engine, and measurement on real speakers.
 
 ## Not in this feature
 

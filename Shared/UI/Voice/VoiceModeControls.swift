@@ -99,6 +99,7 @@ struct VoiceModeStrip: View {
         case .speaking: voice.saying ?? "Speaking…"
         case .listening:
             if !voice.heard.isEmpty { voice.heard }
+            else if voice.isAsking { "Say a number, or the choice's words." }
             else if voice.isWaitingForReply { "Working on it. You can say more." }
             else { "Listening. Say what you want." }
         }
@@ -108,14 +109,18 @@ struct VoiceModeStrip: View {
 extension View {
     /// Tells voice mode what this chat shows, so it can speak a reply when a turn ends.
     /// Does nothing unless voice mode is on in this chat.
-    func voiceModeObserves(_ agent: Agent, items: [TranscriptItem]) -> some View {
-        modifier(VoiceModeObserver(agent: agent, items: items))
+    /// `question` is the form the agent waits on, and `answer` sends an answer to it.
+    func voiceModeObserves(_ agent: Agent, items: [TranscriptItem], question: ElicitationRequest?,
+                           answer: @escaping VoiceMode.Answer) -> some View {
+        modifier(VoiceModeObserver(agent: agent, items: items, question: question, answer: answer))
     }
 }
 
 private struct VoiceModeObserver: ViewModifier {
     let agent: Agent
     let items: [TranscriptItem]
+    let question: ElicitationRequest?
+    let answer: VoiceMode.Answer
 
     /// What changes when a turn moves on: cheap to compare, unlike the items.
     private struct Key: Equatable {
@@ -124,13 +129,15 @@ private struct VoiceModeObserver: ViewModifier {
         var state: AgentState
         var count: Int
         var last: TranscriptItem?
+        var question: UUID?
     }
 
     func body(content: Content) -> some View {
         let isOn = VoiceMode.shared.isOn(in: agent.id)
-        content.onChange(of: Key(isOn: isOn, state: agent.state, count: items.count, last: items.last), initial: true) {
+        content.onChange(of: Key(isOn: isOn, state: agent.state, count: items.count, last: items.last,
+                                 question: question?.id), initial: true) {
             guard isOn else { return }
-            VoiceMode.shared.observe(agent, items: items)
+            VoiceMode.shared.observe(agent, items: items, question: question, answer: answer)
         }
     }
 }
