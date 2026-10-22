@@ -167,7 +167,7 @@ struct FakeDeviceLiveTests {
         let none = Optional<String>.none
         var began = ContinuousClock.now
         _ = try await away.catchUp()
-        _ = try await away.call(DaemonAPI.Method.leasesSnapshot, none)
+        _ = try await away.call(DaemonAPI.Method.resourcesSnapshot, none)
         _ = try await away.call(DaemonAPI.Method.mcpHosted, none)
         _ = try await away.call(DaemonAPI.Method.mcpHealth, none)
         _ = try await away.call(DaemonAPI.Method.pinsList, DaemonAPI.Empty())

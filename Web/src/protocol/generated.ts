@@ -7928,7 +7928,6 @@ export interface Methods {
   "hosts/startEnroll": { params: HostEnroll; result: ControlCodeShown };
   "hosts/stop": { params: HostStop; result: ControlHost };
   "hosts/unlink": { params: HostRequest; result: ControlHost };
-  "leases/snapshot": { params: Empty; result: LeaseSnapshot };
   "links/approve": { params: ChannelLinkDecide; result: Empty };
   "links/deny": { params: ChannelLinkDecide; result: Empty };
   "links/list": { params: Empty; result: ChannelLink[] };
@@ -8003,6 +8002,7 @@ export interface Methods {
   "reports/setPolicy": { params: ReportPolicy; result: ReportPolicy };
   "reports/usage": { params: ReportQuery; result: UsageReport };
   "reports/views": { params: Empty; result: ReportViews };
+  "resources/snapshot": { params: Empty; result: LeaseSnapshot };
   "runtimes/accountProfiles": { params: Empty; result: AccountProfile[] };
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
   "runtimes/addAccount": { params: AddAccountRequest; result: AccountProfile };
@@ -8190,7 +8190,6 @@ export const MethodTarget = {
   "hosts/startEnroll": "control",
   "hosts/stop": "control",
   "hosts/unlink": "control",
-  "leases/snapshot": "host",
   "links/approve": "control",
   "links/deny": "control",
   "links/list": "control",
@@ -8265,6 +8264,7 @@ export const MethodTarget = {
   "reports/setPolicy": "control",
   "reports/usage": "control",
   "reports/views": "control",
+  "resources/snapshot": "host",
   "runtimes/accountProfiles": "host",
   "runtimes/accounts": "host",
   "runtimes/addAccount": "host",
@@ -8368,7 +8368,6 @@ export interface Notifications {
   "daemon/policyStateChanged": PolicyState;
   "disk/changed": DiskState;
   "files/changed": FilesChangedNotification;
-  "leases/changed": LeaseSnapshot;
   "mcp/healthChanged": MCPHealthSnapshot;
   "mcp/hostedChanged": HostedMCPSnapshot;
   "milestones/changed": Milestones;
@@ -8378,6 +8377,7 @@ export interface Notifications {
   "preferences/changed": Record<string, JSONValue>;
   "project/changed": ProjectSummary;
   "project/removed": ProjectRemovedNotification;
+  "resources/changed": LeaseSnapshot;
   "runtimes/accountProfilesChanged": AccountProfile[];
   "storage/writeFailed": WriteFailure;
   "store/notesChanged": StoreNotes;

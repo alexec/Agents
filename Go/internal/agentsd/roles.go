@@ -35,15 +35,12 @@ const CodeNotPermitted = -32045
 // strangerMethods: enough to find out a host is answering, which a client does first.
 var strangerMethods = []string{"daemon/ping", "daemon/status"}
 
-// agentMethods: what a helper relays, one per app tool, and nothing a window does.
+// agentMethods: what an agent's connection may call on the socket, and nothing a window
+// does. The app tools are served over MCP (apptools.go), so only those this host serves on
+// the socket too are here (#2172): the rest were names with no handler, and one of the new
+// names, sessions/list, is the window's.
 var agentMethods = methodSet(append([]string{
-	"agents/finishTurn", "agents/afterTurn", "agents/setOwnLabels", "agents/waitOn",
-	"agents/suggestPrompts", "agents/reportOutcome", "agents/showFile", "agents/askForm",
-	"agents/manageWorkflows", "agents/startHelper", "agents/stopHelper",
-	"agents/requestArchiveHelper", "agents/listHelpers", "agents/listSessions",
-	"agents/readSession", "agents/messageAgent", "leases/lease", "leases/release",
-	"leases/list", "events/wait", "events/cancel", "agents/moveSelf", "views/toolCall",
-	"agents/workspaces", "agents/providerDraft",
+	"resources/lease", "resources/release", "resources/list", "views/toolCall",
 }, strangerMethods...))
 
 var pairingMethods = methodSet(append([]string{"devices/announce"}, strangerMethods...))

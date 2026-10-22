@@ -1869,7 +1869,7 @@ final class AppModel {
     /// Every resource and who holds it (036). A daemon too old to know the method
     /// leaves `leases` nil, and nothing about leases is drawn.
     func refreshLeases() async {
-        guard let snapshot = try? await macClient.call(DaemonAPI.Method.leasesSnapshot,
+        guard let snapshot = try? await macClient.call(DaemonAPI.Method.resourcesSnapshot,
                                                     Optional<String>.none,
                                                     returning: DaemonAPI.LeaseSnapshot.self) else { return }
         work.replaceLeases(snapshot)
@@ -1980,7 +1980,7 @@ final class AppModel {
     /// The person ending a lease (036 US4): one holder's, or with none named, every
     /// one. Never a way to take one.
     func endLease(_ name: ResourceName, holder: UUID? = nil) async {
-        guard let snapshot = try? await macClient.call(DaemonAPI.Method.leasesEnd,
+        guard let snapshot = try? await macClient.call(DaemonAPI.Method.resourcesEnd,
                                                     DaemonAPI.PersonEndRequest(name: name.key,
                                                                                agentID: holder?.uuidString),
                                                     returning: DaemonAPI.LeaseSnapshot.self) else { return }
@@ -2025,7 +2025,7 @@ final class AppModel {
     /// The person taking one agent out of one line (036 US4).
     func removeFromLine(_ name: ResourceName, agentID: UUID) async {
         guard let snapshot = try? await macClient.call(
-            DaemonAPI.Method.leasesRemoveWaiter,
+            DaemonAPI.Method.resourcesRemoveWaiter,
             DaemonAPI.PersonRemoveRequest(name: name.key, agentID: agentID.uuidString),
             returning: DaemonAPI.LeaseSnapshot.self) else { return }
         work.replaceLeases(snapshot)
@@ -3431,7 +3431,7 @@ final class AppModel {
         case DaemonAPI.Notification.diskChanged:
             serverDisks[host] = try? params?.decode(DiskState.self)
             return
-        case DaemonAPI.Notification.leasesChanged, DaemonAPI.Notification.eventsChanged,
+        case DaemonAPI.Notification.resourcesChanged, DaemonAPI.Notification.eventsChanged,
              DaemonAPI.Notification.mcpHostedChanged:
             // These describe the Mac's shared resources and event feed in this window.
             return
@@ -3572,7 +3572,7 @@ final class AppModel {
     /// What a host says about the whole of this Mac rather than its work (#1496).
     private static let aboutThisMac: Set<String> = [
         DaemonAPI.Notification.runtimesAllowancesChanged, DaemonAPI.Notification.costChanged,
-        DaemonAPI.Notification.leasesChanged, DaemonAPI.Notification.eventsChanged,
+        DaemonAPI.Notification.resourcesChanged, DaemonAPI.Notification.eventsChanged,
         DaemonAPI.Notification.mcpHostedChanged, DaemonAPI.Notification.wakeChanged,
         DaemonAPI.Notification.selfUpdateChanged, DaemonAPI.Notification.modesChanged, DaemonAPI.Notification.storeNotesChanged,
         DaemonAPI.Notification.milestonesChanged, DaemonAPI.Notification.preferencesChanged,

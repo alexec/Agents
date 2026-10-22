@@ -14,8 +14,6 @@ public extension DaemonAPI.Method {
     static let providersDraftAnswer = "providers/draftAnswer"
     /// `{}` → `ProviderRuntimes`: the runtimes that can write, on the control plane's host.
     static let providersRuntimes = "providers/runtimes"
-    /// `ProviderDraftToolRequest` → `{note}`: a writer's tool, from the agent to its daemon.
-    static let agentsProviderDraft = "agents/providerDraft"
     /// `HostProviderDraftCall` → `{note}`: a host to its control plane on channel 0.
     static let hostProviderDraft = "host/providerDraft"
 }

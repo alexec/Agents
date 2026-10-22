@@ -4,8 +4,6 @@ import Foundation
 /// delete, relayed by the agent's daemon to its control plane on channel 0, which answers
 /// them as a client's would. Making and deleting ask the person first, on the daemon.
 public extension DaemonAPI.Method {
-    /// `WorkspaceToolRequest` → `{note}` or `{result}`: an agent's call, by its token.
-    static let agentsWorkspaces = "agents/workspaces"
     /// `HostWorkspaceCall`, a host to its control plane on channel 0.
     static let hostWorkspaces = "host/workspaces"
     /// `{}` → `AgentWorkspaces`: what an agent is shown, never a secret's name.

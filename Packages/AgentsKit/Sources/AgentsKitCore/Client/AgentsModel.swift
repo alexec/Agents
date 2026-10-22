@@ -292,7 +292,7 @@ public final class AgentsModel {
     /// from a host too old to keep backups, which leaves the section out.
     public private(set) var backupState: DaemonAPI.BackupState?
     /// Every resource an agent can lease, who holds it and who is waiting (036), as
-    /// the daemon last said. Replaced whole by each `leases/changed`, never merged. Nil
+    /// the daemon last said. Replaced whole by each `resources/changed`, never merged. Nil
     /// from a daemon too old to have leases, which draws nothing.
     public private(set) var leases: DaemonAPI.LeaseSnapshot?
     /// The MCP servers the host runs for every agent (#488), as the daemon last said.
@@ -492,7 +492,7 @@ public final class AgentsModel {
         case DaemonAPI.Notification.runtimesAllowancesChanged:
             return decode(RuntimeAllowances.self, Update.runtimeAllowancesChanged)
         case DaemonAPI.Notification.agentRemoved: return decode(DaemonAPI.AgentRemovedNotification.self, Update.agentRemoved)
-        case DaemonAPI.Notification.leasesChanged: return decode(DaemonAPI.LeaseSnapshot.self, Update.leasesChanged)
+        case DaemonAPI.Notification.resourcesChanged: return decode(DaemonAPI.LeaseSnapshot.self, Update.leasesChanged)
         case DaemonAPI.Notification.mcpHostedChanged:
             return decode(DaemonAPI.HostedMCPSnapshot.self, Update.hostedMCPChanged)
         case DaemonAPI.Notification.mcpHealthChanged:
