@@ -374,3 +374,13 @@ Chrome from one web walk ran for 20 hours after its PR merged (#1624).
    ```sh
    pgrep -fl -- "--walk run-<slug>|/tmp/run-<slug>"
    ```
+
+5. When the lane ends (its pull request is open with auto-merge on, or it hands the work
+   on), delete the worktree's own build output: about 2 GB a worktree, and 17 lanes' of it
+   filled the disk (#2346). Never in the main checkout, whose `build/DD` the live app may
+   run from. The shared cache in `~/Library/Caches/Agents-build/` stays.
+
+   ```sh
+   [ "$(git rev-parse --git-dir)" != "$(git rev-parse --git-common-dir)" ] &&  # a linked worktree
+     rm -rf build .build Packages/*/.build
+   ```

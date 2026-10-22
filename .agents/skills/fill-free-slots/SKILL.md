@@ -80,7 +80,8 @@ For each of the first (free slots) issues, in order:
    > Work on GitHub issue #<n> (`gh issue view <n>`). Follow AGENTS.md: verify only what
    > you touch, building through scripts/build-cache.sh with the "build" lease, and say
    > in each UI commit what the other two clients do. Commit, push, open a pull request
-   > that says "Fixes #<n>", and turn on auto-merge (squash) at once. Then call
+   > that says "Fixes #<n>", and turn on auto-merge (squash) at once. Then delete your
+   > worktree's build output (`rm -rf build .build Packages/*/.build`), call
    > move_worktree with leave_worktree: remove, and archive_session with no id.
 
    For a walk lane, name the worktree `walk-github-issue-<n>`, title it
@@ -92,8 +93,9 @@ For each of the first (free slots) issues, in order:
    > root, never the real app. Follow AGENTS.md for the "build" lease. If the Mac is
    > locked, leave everything as it is and end your turn. If it works, comment on the issue what you
    > ran and saw, and remove the `needs-walk` label. If not, file a bug for each problem,
-   > linked to #<n>, then remove the label. Then call move_worktree with leave_worktree:
-   > remove, and archive_session with no id.
+   > linked to #<n>, then remove the label. Then close the scratch app (run-app's "When
+   > you are done", which deletes the worktree's build output), call move_worktree with
+   > leave_worktree: remove, and archive_session with no id.
 
 3. If start_session refuses because the limit is reached, unassign that issue
    (`gh issue edit <n> --remove-assignee alexec`) and stop starting more.
