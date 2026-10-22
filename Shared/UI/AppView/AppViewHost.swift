@@ -70,6 +70,9 @@ final class AppViewStore {
 
     func existing(_ id: UUID) -> AppViewHost? { hosts[id] }
 
+    /// Whether any of its views is in a window now: drawn, or about to be.
+    var anyInWindow: Bool { hosts.values.contains { $0.inWindow } }
+
     /// The link came back: every view still loading, or whose read failed, is read again, as a
     /// read in flight when it dropped may never be answered (#978).
     func reconnected() {
@@ -114,6 +117,7 @@ final class AppViewHost {
     @ObservationIgnored var actions: AppViewActions
     @ObservationIgnored weak var store: AppViewStore?
     @ObservationIgnored private(set) lazy var web: WKWebView = makeWebView()
+    @ObservationIgnored private var madeWeb = false
     @ObservationIgnored private var delegate: AppViewDelegate?
     @ObservationIgnored private var feed = AppViewFeed()
     @ObservationIgnored private var policy = AppViewPolicy.strict
@@ -239,7 +243,11 @@ final class AppViewHost {
         }
     }
 
+    /// Whether its web view is in a window: a page that is still shown (#2167).
+    var inWindow: Bool { madeWeb && web.window != nil }
+
     private func makeWebView() -> WKWebView {
+        madeWeb = true
         let configuration = WKWebViewConfiguration()
         // Nothing kept, and nothing of the app's: a store of its own, gone with the view.
         configuration.websiteDataStore = .nonPersistent()

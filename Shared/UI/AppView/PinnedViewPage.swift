@@ -33,9 +33,12 @@ struct PinnedViewPage: View {
     @State private var problem: String?
     /// Try Again and a reconnect make the feeding call again.
     @State private var attempt = 0
-    /// Torn down by a disappear that SwiftUI followed with an appear of the same page, as
-    /// the iPhone's navigation does on a push (#1797): it is fed and drawn again.
+    /// A disappear came, and no appear since. On a push the iPhone can send a disappear
+    /// before an appear (#1797) or after it (#2167) while the page stays on screen, so a
+    /// disappear tears the view down only when, a moment later, it is in no window.
     @State private var closed = false
+    /// Torn down: the next appear feeds it and draws it again.
+    @State private var tornDown = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -43,20 +46,30 @@ struct PinnedViewPage: View {
             Divider()
             content.frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .task(id: Feeding(view: view, attempt: attempt)) { await feed() }
+        // Not a .task: a disappear cancels one, and a page still shown then never got its
+        // answer and stayed on its input ("Listing…", #2167).
+        .onChange(of: Feeding(view: view, attempt: attempt), initial: true) { _, feeding in
+            Task { await feed(feeding) }
+        }
         .onChange(of: connected) {
             guard connected else { return }
             if problem != nil || answer == nil { attempt += 1 }
             store.reconnected()
         }
         .onAppear {
-            guard closed else { return }
             closed = false
+            guard tornDown else { return }
+            tornDown = false
             attempt += 1
         }
         .onDisappear {
             closed = true
-            store.tearDownAll(reason: "The pinned view was closed.")
+            Task {
+                try? await Task.sleep(for: .milliseconds(500))
+                guard closed, !tornDown, !store.anyInWindow else { return }
+                tornDown = true
+                store.tearDownAll(reason: "The pinned view was closed.")
+            }
         }
     }
 
@@ -125,7 +138,8 @@ struct PinnedViewPage: View {
     }
 
     /// The feeding call, within its deadline (#978): one with no answer said so, with Try Again.
-    private func feed() async {
+    /// An answer for an older feeding than the latest is dropped.
+    private func feed(_ feeding: Feeding) async {
         guard pin.missingReason == nil else { return }
         problem = nil
         let call = call
@@ -136,10 +150,10 @@ struct PinnedViewPage: View {
             let value = try await AppViewLoad.answered(within: AppViewLoad.feedDeadline) {
                 try await call(DaemonAPI.Method.viewsCall, params)
             }
-            guard !Task.isCancelled else { return }
+            guard feeding == Feeding(view: view, attempt: attempt) else { return }
             answer = value
         } catch {
-            guard !Task.isCancelled else { return }
+            guard feeding == Feeding(view: view, attempt: attempt) else { return }
             problem = "The view's call did not answer: \(AppViewHost.words(error))"
         }
     }
