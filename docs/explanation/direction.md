@@ -41,7 +41,7 @@ organisations it serves, changes.
 | **Self-hosted** | You, as a container on your own hosting | One | A team or a company that keeps everything in its own account |
 | **Hosted** | Us | Many, one per account | Anyone who wants to start in a browser |
 
-- The control plane is free in every shape. It is open source like the rest.
+- The control plane is free in every shape. Its source is visible like the rest, all rights reserved.
 - Hosted starts small (0.8): **one control plane per account**, each a separate copy with
   its own store and key. That uses the single-organisation design as it is today. Many
   organisations on one shared copy (T10, #1003) comes later, in 0.12.
@@ -138,9 +138,9 @@ People who run an organisation must see what it used and did:
 
 ## Money
 
-Agents is open source, and this page does not depend on how it is paid for. The control
-plane stays free. If paid parts come later, they come from running the hosted service, not
-from features taken out of the open source.
+Agents' source is visible, with all rights reserved (see `LICENSE`), and this page does not
+depend on how it is paid for. The control plane stays free. If paid parts come later, they
+come from running the hosted service, not from features taken out of the free app.
 
 ## Milestones
 
