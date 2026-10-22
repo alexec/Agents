@@ -23,10 +23,10 @@
 #
 # Then it prints the address, and stops until both names point at it (deploy/cloudflare/dns.sh):
 # Let's Encrypt allows only a few failed tries an hour. Run it again after that, and it copies
-# deploy/compose.public.yaml, the secrets and the release's Linux host to /opt/agents on the VM,
-# has the VM pull the release's image, ghcr.io/alexec/agents-control:<version> (#2140), and
-# starts the control plane and Caddy there. --build is for a commit no release has: it builds
-# the image (linux/amd64) and the Linux host here, from this checkout, and copies them. The VM has no service
+# deploy/compose.public.yaml and the secrets to /opt/agents on the VM, has the VM pull the
+# release's image, ghcr.io/alexec/agents-control:<version> (#2140), which carries the Linux host
+# for servers that join, and starts the control plane and Caddy there. --build is for a commit
+# no release has: it builds the image (linux/amd64) here, from this checkout, and copies it. The VM has no service
 # account file (an empty one): it uses the key as its own service account.
 #
 # --apns gives the APNs key (deploy/make-secrets.sh --apns); without it, a key already on the
@@ -35,7 +35,7 @@
 # and runs none: it needs no gcloud, no key file and no account.
 #
 # AGENTS_VERSION is the version it runs: a release sets it to the tag's, X.Y.Z (#2100), whose
-# image and Linux host it pulls. Without it, scripts/version.sh says. That is a release's only
+# image it pulls. Without it, scripts/version.sh says. That is a release's only
 # on its tag, so elsewhere give --build, which stamps that version on what it builds. At the end
 # it checks that the control plane running on the VM says that version.
 set -euo pipefail
@@ -67,8 +67,6 @@ done
 [[ -z $seal_key || -s $seal_key ]] || die "$seal_key is not a key file"
 # Look before anything is made in the cloud.
 pick_version
-((build || dry_run)) || gh release view "v$version" --repo alexec/Agents >/dev/null ||
-	die "there is no GitHub release v$version: give --build to build this checkout"
 # With --build, the image is built for linux/amd64. On an Apple silicon Mac the classic builder
 # cannot do it: it needs BuildKit, through the buildx plugin.
 ((!build || dry_run)) || docker buildx version >/dev/null 2>&1 ||
@@ -191,22 +189,11 @@ fi
 
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
-mkdir -p "$stage/deploy" "$stage/App/Resources/servers"
+mkdir -p "$stage/deploy"
 if ((build)); then
-	say "== the image and the Linux host, built here: $version"
-	run env AGENTS_MARKETING_VERSION="$version" "$root/scripts/build-linux-agentsd.sh"
+	say "== the image, with the Linux host in it, built here: $version"
 	run docker build --platform linux/amd64 --build-arg "VERSION=$version" \
 		-f "$root/deploy/Containerfile" -t "$image:$tag" "$root"
-	((dry_run)) || cp -R "$root/App/Resources/servers/." "$stage/App/Resources/servers/"
-else
-	# The release's own Linux host, the one its Agents Host carries, rather than one built here.
-	say "== the Linux host of release v$version"
-	for arch in x86_64 aarch64; do
-		run gh release download "v$version" --repo alexec/Agents --pattern "agentsd-linux-$arch-$version.tar.gz" \
-			--dir "$stage" --clobber
-		run tar -xzf "$stage/agentsd-linux-$arch-$version.tar.gz" -C "$stage/App/Resources/servers"
-		run rm "$stage/agentsd-linux-$arch-$version.tar.gz"
-	done
 fi
 
 say "== what the VM runs, in /opt/agents"
@@ -225,7 +212,6 @@ tar_skip=()
 	if [[ -f $stage/deploy/.env ]]; then cat "$stage/deploy/.env"; fi
 } >"$stage/deploy/.env.new"
 rm -f "$stage/deploy/.env" "$stage/deploy/make-secrets.sh"
-((dry_run)) || cp -R "$root/App/Resources/toolsets" "$stage/App/Resources/toolsets"
 # The lines in .env.new replace the same names in the VM's deploy/.env; the others stay.
 install='set -e; sudo mkdir -p /opt/agents; sudo tar -C /opt/agents --no-same-owner -xzf -; cd /opt/agents/deploy
 sudo touch .env; sudo chmod 600 .env
@@ -235,10 +221,10 @@ if ((dry_run)); then
 	if ((build)); then
 		say "+ docker save $image:$tag | gzip | $(shown gcloud compute ssh "$name" --zone "$zone" --quiet --command 'gunzip | sudo docker load')"
 	fi
-	say "+ tar -C STAGE ${tar_skip[*]-} -czf - deploy App | $(shown gcloud compute ssh "$name" --zone "$zone" --quiet --command "$install")"
+	say "+ tar -C STAGE ${tar_skip[*]-} -czf - deploy | $(shown gcloud compute ssh "$name" --zone "$zone" --quiet --command "$install")"
 else
 	if ((build)); then docker save "$image:$tag" | gzip | vm_ssh 'gunzip | sudo docker load'; fi
-	COPYFILE_DISABLE=1 tar --no-xattrs -C "$stage" ${tar_skip[@]+"${tar_skip[@]}"} -czf - deploy App | vm_ssh "$install"
+	COPYFILE_DISABLE=1 tar --no-xattrs -C "$stage" ${tar_skip[@]+"${tar_skip[@]}"} -czf - deploy | vm_ssh "$install"
 fi
 
 compose='cd /opt/agents && sudo docker compose -f deploy/compose.public.yaml'

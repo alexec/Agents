@@ -12,8 +12,9 @@
 #   docker compose -f deploy/compose.public.yaml up -d
 #
 # The image is the release's, from ghcr.io/alexec/agents-control (#2140): AGENTS_VERSION is
-# its tag (X.Y.Z, X.Y or latest). To run a commit no release has, build it from the repository
-# instead: `up -d --build`, with scripts/build-linux-agentsd.sh first for the Linux host.
+# its tag (X.Y.Z, X.Y or latest). It carries this file, the Linux host it hands to servers that
+# join and the runtimes' toolsets, so nothing else is downloaded. To run a commit no release
+# has, build it from the repository instead: `up -d --build`.
 #
 # AGENTS_DOMAIN and AGENTS_VIEWS_DOMAIN must already point at this machine, with ports 80 and
 # 443 open to the internet. The variables may also go in deploy/.env.
@@ -73,13 +74,11 @@ services:
       AGENTS_APNS_KEY_ID: ${AGENTS_APNS_KEY_ID:-}
       AGENTS_APNS_TEAM_ID: ${AGENTS_APNS_TEAM_ID:-}
     secrets: [gcp-service-account, apns-key]
+    # The Linux host (/servers, served at /v1/servers/… to servers joining with the install
+    # command) and the runtimes' toolsets (/toolsets, at /v1/toolsets/…, so a server that joins
+    # installs Claude by itself, #1312) are in the image, of its version (#2140).
     volumes:
       - data:/data
-      # The Linux host, served at /v1/servers/… to servers joining with the install command.
-      - ../App/Resources/servers:/servers:ro
-      # The runtimes' toolsets, served at /v1/toolsets/…, so a server that joins installs
-      # Claude by itself (#1312). Without them it gets no Claude (#1461's walk).
-      - ../App/Resources/toolsets:/toolsets:ro
 
   caddy:
     image: caddy:2

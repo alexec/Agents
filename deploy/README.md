@@ -9,7 +9,7 @@ it out:
 
 | File | What it is |
 |---|---|
-| `Containerfile` | Static `agents-control` and `workspace-commands`, built in the image from `Go/` (with the web remote from `Web/`, served at the domain by `compose.public.yaml`, #1459), on Alpine, a user of their own. Built from the repository's root. Each release publishes it as `ghcr.io/alexec/agents-control:<version>` (#2140), for amd64 and arm64, signed with cosign, with an SBOM and provenance. |
+| `Containerfile` | Static `agents-control` and `workspace-commands`, built in the image from `Go/` (with the web remote from `Web/`, served at the domain by `compose.public.yaml`, #1459), on Alpine, a user of their own. Built from the repository's root. It carries the Linux host for servers that join (`/servers`), the runtimes' toolsets and the deploy files too. Each release publishes it as `ghcr.io/alexec/agents-control:<version>` (#2140), for amd64 and arm64, signed with cosign, with an SBOM and provenance. |
 | `compose.yaml` | MinIO (the bucket), three copies, and Caddy in front of them. |
 | `Caddyfile` | TLS, round robin, and `/readyz` health checks, so a copy that can't reach the store gets no new connections. |
 | `make-secrets.sh` | The control plane's key, shared by every copy, plus Caddy's certificate and its pin. With `--public`, no key file: the Cloud KMS key's name and the service account file. |
@@ -59,10 +59,10 @@ docker compose -f deploy/compose.public.yaml pull
 docker compose -f deploy/compose.public.yaml up -d
 ```
 
-The image is the release's (#2140), and the Linux host that joining servers download is the
-release's `agentsd-linux-<arch>-<version>.tar.gz`, unpacked in `App/Resources/servers/`. To
-run this checkout instead, run `scripts/build-linux-agentsd.sh` and `up -d --build`. The
-how-to, docs/how-to/run-the-control-plane-in-the-cloud.md, needs no clone of the repository.
+The image is the release's (#2140). It carries the Linux host that joining servers download
+(`/servers`), the runtimes' toolsets (`/toolsets`) and these deploy files (`/deploy`, which
+`docker cp` takes out), so docs/how-to/run-the-control-plane-in-the-cloud.md needs no clone
+of the repository. To run this checkout instead, `up -d --build`.
 
 Both names must point at the machine, with ports 80 and 443 open. At the views name the copy
 serves only the sandbox proxy (`/sandbox.html`, `/sandbox.js`), with the loopback proxy's
