@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/netip"
@@ -113,6 +114,9 @@ type Config struct {
 	// Where each log line goes, already marked with this copy. No line may hold a code,
 	// a key, a MAC or a message (071 FR-033).
 	Log func(string)
+	// Logger takes a line for each request, at debug, with its fields (#2176): method,
+	// client, person, host and request id. Nil drops them.
+	Logger *slog.Logger
 	// Posts this copy's own pushes through APNs (#1460) when no Mac host relays a notice.
 	// Nil, with no key on the machine, sends none.
 	Push Pusher
@@ -207,6 +211,8 @@ type Service struct {
 	loopback *web.Listener
 	// The page at this copy's own origin (#1459), or nil.
 	page *web.Public
+	// What an operations team scrapes (#2176): always counted, served only by ServeMetrics.
+	metrics *Metrics
 }
 
 // New makes a service; Start opens the store and listens.
@@ -228,9 +234,14 @@ func New(cfg Config) (*Service, error) {
 	if cfg.Bind == "" {
 		cfg.Bind = "0.0.0.0"
 	}
+	if cfg.Logger == nil {
+		cfg.Logger = slog.New(slog.DiscardHandler)
+	}
+	metrics := newMetrics()
+	cfg.Store = countedStore{Store: cfg.Store, m: metrics}
 	s := &Service{cfg: cfg, keyBook: keyBook{keys: controlKeys{private: cfg.PrivateKey, public: public}}, origin: origin, copyID: strings.ToLower(records.NewUUID()[:8]),
 		records: records.New(cfg.Store), started: time.Now(), desk: notices.NewDesk(), phase: &phaseBox{phase: phaseServing}, sockets: map[*Conn]bool{}, stop: make(chan struct{}),
-		reads: readGate{every: readAgainEvery}}
+		reads: readGate{every: readAgainEvery}, metrics: metrics}
 	s.sources = newSources(cfg.TrustedProxies, s.log)
 	s.downloads, s.socketsMost, s.refusals = newAddressRates(), socketsMost, newRefusalLog(s.log)
 	if cfg.Push != nil {
@@ -239,6 +250,8 @@ func New(cfg Config) (*Service, error) {
 	s.codes = &Codes{Store: cfg.Store, Private: cfg.PrivateKey, Public: public, URL: cfg.URL, Pin: cfg.Pin, Name: cfg.Name,
 		Keys: func() ([]byte, []byte) { k := s.currentKeys(); return k.private, k.public }}
 	s.router = NewRouter(nil, s.log)
+	s.router.SetRequested(s.requested)
+	s.router.SetSent(metrics.Event)
 	s.router.OnPresence(s.presenceHeard)
 	s.methods = newMethods(s)
 	s.router.handler = s.methods

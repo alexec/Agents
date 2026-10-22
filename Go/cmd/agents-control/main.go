@@ -11,6 +11,9 @@
 //	agents-control serve … [--store-credentials-fd N]
 //	agents-control serve … [--receive]          empty, for a handover to fill (AGENTS_CONTROL_RECEIVE=1)
 //	agents-control serve … [--no-forwarding]    serve, even if this copy was forwarding
+//	agents-control serve … [--log-format text|json] [--log-level debug|info|warn|error]
+//	                                            JSON lines through log/slog (#2176); debug logs each request
+//	agents-control serve … [--metrics ADDR]      Prometheus /metrics on a listener of its own (#2176)
 //	agents-control serve … [--key-days N]       how long a client's or machine's key lives unused (#997, AGENTS_CONTROL_KEY_DAYS); 90
 //	agents-control code (--client [--browser] | --host) [--minutes N] [--home DIR] [--command]
 //	agents-control hosts | clients
@@ -56,6 +59,10 @@
 //	AGENTS_CONTROL_NAME, AGENTS_CONTROL_MACHINE_ID, AGENTS_CONTROL_SERVERS,
 //	AGENTS_CONTROL_TOOLSETS
 //	AGENTS_APNS_KEY_FILE, AGENTS_APNS_KEY_ID, AGENTS_APNS_TEAM_ID: the APNs key (#1460)
+//	AGENTS_CONTROL_LOG_FORMAT, AGENTS_CONTROL_LOG_LEVEL  as --log-format and --log-level
+//	AGENTS_CONTROL_METRICS      as --metrics: host:port, such as 127.0.0.1:9791; off when unset
+//	AGENTS_CONTROL_METRICS_TOKEN  the bearer token a scraper sends; needed on any address but
+//	                            loopback. AGENTS_CONTROL_METRICS_TOKEN_FILE reads it from a file
 //	AGENTS_TEST_APNS_URL        a walk's fake APNs, trusted by AGENTS_TEST_TRUST_ROOT (#1507)
 package main
 
@@ -67,6 +74,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -116,7 +124,7 @@ func has(flag string) bool {
 func fail(format string, a ...any) {
 	line := "agents-control: " + fmt.Sprintf(format, a...)
 	if logs.Taken() {
-		logs.Write(line)
+		logs.WriteAt(slog.LevelError, line)
 	} else {
 		fmt.Fprintln(os.Stderr, line)
 	}
@@ -130,6 +138,32 @@ func say(line string) {
 	} else {
 		fmt.Println(line)
 	}
+}
+
+// flagOrEnv is the flag's value, or else the environment's.
+func flagOrEnv(flag, env string) string {
+	if v := value(flag); v != "" {
+		return v
+	}
+	return os.Getenv(env)
+}
+
+// metricsToken is AGENTS_CONTROL_METRICS_TOKEN, or the first line of the file
+// AGENTS_CONTROL_METRICS_TOKEN_FILE names (a compose secret).
+func metricsToken() string {
+	if token := os.Getenv("AGENTS_CONTROL_METRICS_TOKEN"); token != "" {
+		return token
+	}
+	file := os.Getenv("AGENTS_CONTROL_METRICS_TOKEN_FILE")
+	if file == "" {
+		return ""
+	}
+	data, err := os.ReadFile(file)
+	if err != nil {
+		fail("AGENTS_CONTROL_METRICS_TOKEN_FILE: %v", err)
+	}
+	line, _, _ := strings.Cut(string(data), "\n")
+	return strings.TrimSpace(line)
 }
 
 func expand(path string) string {
@@ -440,6 +474,9 @@ func serve() {
 	if file := value("--log"); file != "" {
 		logs.Take(expand(file), controlplane.LogLimit)
 	}
+	if err := logs.Configure(flagOrEnv("--log-format", "AGENTS_CONTROL_LOG_FORMAT"), flagOrEnv("--log-level", "AGENTS_CONTROL_LOG_LEVEL")); err != nil {
+		fail("%v", err)
+	}
 	homePort := 8791
 	if p, err := strconv.Atoi(value("--port")); err == nil {
 		homePort = p
@@ -458,7 +495,7 @@ func serve() {
 	} else if p, err := strconv.Atoi(u.Port()); err == nil {
 		port = p
 	}
-	cfg := controlplane.Config{URL: text, Bind: value("--bind"), Port: port, Log: logs.Write,
+	cfg := controlplane.Config{URL: text, Bind: value("--bind"), Port: port, Log: logs.Write, Logger: logs.Logger(),
 		ServerFolder: controlplane.ServerFolder(), ToolsetFolder: controlplane.ToolsetFolder()}
 	if dir := value("--self-signed"); dir != "" || home() != "" {
 		if dir == "" {
@@ -554,6 +591,11 @@ func serve() {
 	listening, err := s.Start(context.Background())
 	if err != nil {
 		fail("%v", err)
+	}
+	if addr := flagOrEnv("--metrics", "AGENTS_CONTROL_METRICS"); addr != "" {
+		if _, err := s.ServeMetrics(addr, metricsToken()); err != nil {
+			fail("metrics: %v", err)
+		}
 	}
 	if cfg.Pin != "" {
 		say("pin " + cfg.Pin)

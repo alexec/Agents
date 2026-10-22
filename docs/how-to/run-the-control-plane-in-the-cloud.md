@@ -536,6 +536,63 @@ notifications.
   lines again (see [Start it](#start-it)). Hosts and clients reconnect within
   seconds. Linux servers update their host the next time they connect.
 
+## Metrics and logs
+
+To scrape the control plane with Prometheus and ship its logs, set these in `deploy/.env`,
+then run `docker compose -f deploy/compose.public.yaml up -d` again:
+
+```sh
+AGENTS_CONTROL_METRICS=0.0.0.0:9791
+AGENTS_CONTROL_METRICS_TOKEN=<a long random string, such as from openssl rand -hex 32>
+AGENTS_CONTROL_LOG_FORMAT=json
+AGENTS_CONTROL_LOG_LEVEL=info
+```
+
+**Metrics.** The control plane serves `/metrics`, in the Prometheus text format, on a port
+of its own, `9791`. It is off unless `AGENTS_CONTROL_METRICS` is set. Caddy does not serve
+it, and the compose file does not publish it, so only a container on the same Docker
+network reaches it, at `http://control:9791/metrics`. On an address other than loopback, a
+token is necessary: the control plane does not start without one. Prometheus sends it as a
+bearer token:
+
+```yaml
+scrape_configs:
+  - job_name: agents-control
+    authorization:
+      credentials_file: /etc/prometheus/agents-control-token
+    static_configs:
+      - targets: ["control:9791"]
+```
+
+The metrics are:
+
+| Metric | What it counts |
+| --- | --- |
+| `agents_control_requests_total{method,result}` | Requests from clients. `result` is `ok` or `error` for the control plane's own methods, `routed` for a call sent on to a machine, `refused` or `offline` for one that was not |
+| `agents_control_request_seconds{method}` | A histogram of the time that the control plane took for its own methods |
+| `agents_control_events_sent_total{method}` | Notifications sent to clients, one for each client |
+| `agents_control_store_operations_total{op}`, `agents_control_store_errors_total{op}`, `agents_control_store_seconds{op}` | Store reads, writes, deletes and lists, the ones that failed, and their times |
+| `agents_control_hosts_connected`, `agents_control_hosts_known` | Machines connected to this copy, and machines in the store |
+| `agents_control_clients_connected`, `agents_control_client_sessions` | Windows, phones and browsers connected, and their sessions |
+| `agents_control_relay_sessions` | Mac relays connected |
+| `agents_control_leases_held`, `agents_control_copies` | With several copies: machine leases that this copy holds, and the copies it knows |
+| `agents_control_phase{phase}` | 1 for this copy's phase: `serving`, `receiving`, `frozen` or `forwarding` |
+| `agents_control_up_seconds`, `agents_control_build_info{version}` | How long it has run, and its version |
+
+A method name gets a label of its own for the first 300 names only. After that, the count
+goes to `other`, so a client can't make the metrics grow without end.
+
+**Logs.** With `AGENTS_CONTROL_LOG_FORMAT=json`, each line of `docker compose logs control`
+is one JSON object, from Go's `log/slog`, with `time`, `level` and `msg`. A line also has
+`copy`, `method`, `client_id`, `person_id`, `host_id` and `request_id` when they apply.
+`AGENTS_CONTROL_LOG_LEVEL` is `debug`, `info`, `warn` or `error`. At `debug`, each request
+from a client gets a line `request`, with its method, result and time. A line never holds
+a request's parameters, a prompt, a code, a bearer token, or a `token=`, `secret=` or
+`password=` value: these are cut out before the line is written.
+
+`agents-control serve` takes the same settings as flags: `--metrics`, `--log-format` and
+`--log-level`.
+
 ## Restore the disk from a snapshot
 
 `up.sh` keeps a snapshot of the machine's disk for each of the last 7 days. The disk holds
