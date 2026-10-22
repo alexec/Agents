@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
 	"regexp"
 	"slices"
@@ -607,10 +608,11 @@ func (s *Service) policyApplied(ctx context.Context, host string, applied wire.P
 		if bytes.Equal(r.Extra[policyAppliedField], value) {
 			return false
 		}
-		if r.Extra == nil {
-			r.Extra = records.Extra{}
-		}
-		r.Extra[policyAppliedField] = value
+		// A new map: the record's own is shared with whoever read it.
+		extra := make(records.Extra, len(r.Extra)+1)
+		maps.Copy(extra, r.Extra)
+		extra[policyAppliedField] = value
+		r.Extra = extra
 		changed = true
 		return true
 	}); err != nil {
