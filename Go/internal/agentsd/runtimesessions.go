@@ -162,6 +162,7 @@ func (d *Daemon) adoptSession(ctx context.Context, r wire.AdoptRequest) (wire.UU
 	d.projectChanged(projectFolder(&a))
 	d.record(id, runtimeNote("Picked up a conversation "+rt.Name+" was already holding."))
 	err = s.LoadRecorded(ctx, sid, path, d.sessionMCP(path), sessionMeta(r.RuntimeID))
+	l.flushHeld()
 	sink.flush()
 	d.dropAppTokens(id)
 	if err != nil {
@@ -183,6 +184,8 @@ type replaySink struct {
 
 func (r *replaySink) Update(n sdk.SessionNotification) {
 	if u := n.Update.UserMessageChunk; u != nil {
+		// The reply before it, held back for a token's sake (#1001), goes first.
+		r.live.flushHeld()
 		if u.Content.Text != nil {
 			r.user.WriteString(u.Content.Text.Text)
 		}

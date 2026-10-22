@@ -16,6 +16,7 @@ import (
 	sdk "github.com/coder/acp-go-sdk"
 
 	"github.com/alexec/agents/Go/internal/agentsd/acp"
+	"github.com/alexec/agents/Go/internal/agentsd/redact"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
@@ -49,6 +50,10 @@ type live struct {
 	// messageText is the text of the agent's last message this turn, for its report.
 	lastMessageID string
 	lastMessage   strings.Builder
+	// held is the end of the last message chunk, held back for the next (chunkseam.go),
+	// and heldID its message.
+	held   string
+	heldID *string
 	// toolCalls is the tool calls recorded, by id, so a card waits for the call it names:
 	// the SDK hands a request over on a goroutine of its own, ahead of the notifications
 	// that came before it on the wire.
@@ -743,6 +748,8 @@ func (l *live) turn() bool {
 		return false
 	}
 	r, err := s.Prompt(ctx, acpBlocks(bs))
+	// The turn is over: what a message chunk held back goes now (#1001).
+	l.flushHeld()
 	if err != nil {
 		if ctx.Err() != nil {
 			d.end(l, wire.AgentStateStopped, wire.EndedReasonCancelled)
@@ -932,6 +939,9 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 	l.mu.Lock()
 	last, reported, showedFile := l.lastMessage.String(), l.reported, l.showedFile
 	l.mu.Unlock()
+	// The report says the last message as the transcript does: whole, so a token in it,
+	// or split across its chunks, is cut out (#1001).
+	last = redact.Text(last)
 	// A turn its archive cut off (#1611): the session stays archived, and the ending is not
 	// said, as a stop or a crash, nor picked up after a restart.
 	if a := d.Store.Agent(l.id); a != nil && a.State == wire.AgentStateArchived {
@@ -1093,6 +1103,10 @@ func configOptions(v any) []wire.ConfigOption {
 func (l *live) Update(n sdk.SessionNotification) {
 	d := l.d
 	u := n.Update
+	// What a message chunk held back goes before any other update (#1001).
+	if u.AgentMessageChunk == nil {
+		l.flushHeld()
+	}
 	switch {
 	case u.AgentMessageChunk != nil || u.AgentThoughtChunk != nil:
 		var c sdk.ContentBlock
@@ -1123,7 +1137,14 @@ func (l *live) Update(n sdk.SessionNotification) {
 		l.lastMessage.WriteString(text)
 		l.evidence.takeReply(text)
 		l.mu.Unlock()
-		d.record(l.id, wire.TranscriptEntryKind{AgentMessage: &wire.TranscriptEntryKindAgentMessage{MessageID: id, Text: text}})
+		// The end that could start a token waits for the next chunk (#1001).
+		earlier, now := l.holdChunk(id, text)
+		if earlier != nil {
+			d.record(l.id, wire.TranscriptEntryKind{AgentMessage: earlier})
+		}
+		if now != "" {
+			d.record(l.id, wire.TranscriptEntryKind{AgentMessage: &wire.TranscriptEntryKindAgentMessage{MessageID: id, Text: now}})
+		}
 	case u.ToolCall != nil:
 		call := toolCall(u.ToolCall)
 		d.record(l.id, wire.TranscriptEntryKind{ToolCall: &wire.TranscriptEntryKindToolCall{Value: call}})

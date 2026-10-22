@@ -172,6 +172,13 @@ func (f *fakeRuntime) Prompt(ctx context.Context, p sdk.PromptRequest) (sdk.Prom
 		say("The model said " + callTheModel() + ".\nMy environment:\n" + strings.Join(os.Environ(), "\n"))
 		return sdk.PromptResponse{StopReason: sdk.StopReasonEndTurn}, nil
 	}
+	// A token split over two chunks, and a last word held back to the turn's end (#1001).
+	if strings.Contains(text, "split a token") {
+		token := "ghp_" + strings.Repeat("a1B2", 9)
+		say("Your token is " + token[:10])
+		say(token[10:] + " so keep it. Done")
+		return sdk.PromptResponse{StopReason: sdk.StopReasonEndTurn}, nil
+	}
 	// Deaf to session/cancel, as Claude was waiting on CI (#1611): only a SIGTERM ends it.
 	if strings.Contains(text, "keep going") {
 		select {}

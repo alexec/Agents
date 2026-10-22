@@ -51,10 +51,6 @@ built:
   `agents-control audit verify`, and syslog and HTTP sinks (see
   [Security overview](security-overview.md#who-did-what)).
 
-This part is planned, not built:
-
-- **A token split across two message chunks** is not yet caught (#1001, slice a2).
-
 The organisation policy (T5, #998) and org keys and model gateways (T6, #999) are built
 too: see [Policy](../../reference/policy.md) and
 [Org keys and gateways](../org-keys-and-gateways.md).
