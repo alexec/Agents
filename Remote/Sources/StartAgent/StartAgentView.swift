@@ -19,6 +19,10 @@ struct StartAgentView: View {
 
     @State private var text = ""
     @State private var attachments: [Attachment] = []
+    /// Where the cursor is in `text`, so dictation writes there (#427), as in the chat's bar.
+    @State private var selection: TextSelection?
+    /// Said instead of typed, as in the chat's bar (#2300).
+    @State private var dictation = Dictation()
     @State private var draftLabels: [String] = []
     @State private var folderPath = ""
     /// Why something picked could not be attached, or that a kept picture was too big
@@ -65,9 +69,17 @@ struct StartAgentView: View {
         .onChange(of: attachNote) {
             if let attachNote { AccessibilityNotification.Announcement(attachNote).post() }
         }
-        .onChange(of: text) { keep() }
+        .onChange(of: text) {
+            keep()
+            // Typed while dictating: theirs, and never written over (#427).
+            dictation.edited(text)
+        }
+        .onChange(of: selection) {
+            if let range = DictationCursor.range(of: selection, in: text) { dictation.selected(range) }
+        }
         .onChange(of: attachments) { keep() }
         .onDisappear {
+            dictation.stop()
             StartDraftKeeper.shared.flush()
             model.startPageDisappeared(page)
         }
@@ -254,14 +266,15 @@ struct StartAgentView: View {
             if model.isStarting {
                 Telling(host: model.recipient(on: model.startHost), doing: AgentState.startingLabel)
             }
-            // The chat's prompt bar: one raised card holding the words, attach, and send
+            // The chat's prompt bar: one raised card holding the words, attach, dictate and send
             // in ink, so starting an agent and talking to one look like the same act.
             HStack(alignment: .bottom, spacing: 8) {
-                TextField(policyRefusal ?? "What should it do?", text: $text, axis: .vertical)
+                TextField(policyRefusal ?? "What should it do?", text: $text, selection: $selection, axis: .vertical)
                     .textFieldStyle(.plain)
                     .lineLimit(2...6)
                     .focused($focused)
                     .appText(.reading)
+                    .overlay(alignment: .topLeading) { HeardUnderline(dictation: dictation, text: text) }
                     .accessibilityLabel("What the new agent should do")
                     // ⌘V of a picture from an iPad's keyboard attaches it (#396).
                     .modifier(PastesPictures(attachments: $attachments, refusal: $attachNote))
@@ -269,6 +282,9 @@ struct StartAgentView: View {
                     .disabled(model.isStarting)
 
                 AttachButton(attachments: $attachments, refusal: $attachNote)
+
+                DictateButton(dictation: dictation, begin: beginDictation)
+                    .disabled(model.isStarting)
 
                 Button {
                     send()
@@ -319,10 +335,22 @@ struct StartAgentView: View {
     private func send() {
         // One agent at a time: a second tap while one starts is not a second (#87).
         guard canSend else { return }
+        dictation.stop()
         // The keyboard goes, as the chat's does (#2091): what the start says is what comes next.
         focused = false
         let words = text
         let attached = attachments
         Task { _ = await model.startAgent(prompt: words, attachments: attached, labels: draftLabels, in: project, page: page) }
+    }
+
+    /// Listens, as the chat's bar does: what is in the field stays, and the words go in at
+    /// the cursor (#427).
+    private func beginDictation() {
+        focused = true
+        dictation.start(in: text, selection: DictationCursor.range(of: selection, in: text),
+                        vocabulary: [project.lastPathComponent]) { field, cursor in
+            text = field
+            selection = DictationCursor.selection(cursor, in: field)
+        }
     }
 }
