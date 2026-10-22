@@ -393,16 +393,21 @@ func (d *Daemon) checkBranches(folder string) {
 func (d *Daemon) dropGoneBranchTips(live map[string]bool) {
 	d.eventMu.Lock()
 	defer d.eventMu.Unlock()
+	if dropGone(d.eventStateNow.BranchTips, live) {
+		d.saveEventStateLocked()
+	}
+}
+
+// dropGone deletes the tips of each folder live does not name, and says whether any went.
+func dropGone(tips map[string]map[string]string, live map[string]bool) bool {
 	gone := false
-	for folder := range d.eventStateNow.BranchTips {
+	for folder := range tips {
 		if !live[folder] {
-			delete(d.eventStateNow.BranchTips, folder)
+			delete(tips, folder)
 			gone = true
 		}
 	}
-	if gone {
-		d.saveEventStateLocked()
-	}
+	return gone
 }
 
 func short(s string, n int) string {
