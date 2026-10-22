@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/acp"
@@ -134,18 +135,21 @@ func (r *runtimeDef) locate() (path string, args []string, lookedIn []string) {
 }
 
 // searchPaths is LoginShellPath.directories: the login shell's PATH, then the usual places.
+// The login shell's PATH is kept for shellPathTTL, so a broadcast that locates each runtime
+// starts one shell at most, not one a row (#2251).
 func searchPaths() []string {
-	var dirs []string
 	shell := os.Getenv("SHELL")
 	if shell == "" {
 		shell = "/bin/sh"
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if out, err := exec.CommandContext(ctx, shell, "-lc", `printf %s "$PATH"`).Output(); err == nil {
-		dirs = strings.Split(string(out), ":")
-	}
 	home, _ := os.UserHomeDir()
+	key := shell + "\x00" + home
+	shellPath.Lock()
+	if shellPath.key != key || time.Since(shellPath.at) >= shellPathTTL {
+		shellPath.key, shellPath.dirs, shellPath.at = key, loginShellPath(shell), time.Now()
+	}
+	dirs := slices.Clone(shellPath.dirs)
+	shellPath.Unlock()
 	dirs = append(dirs, "/opt/homebrew/bin", "/usr/local/bin", filepath.Join(home, ".local/bin"), filepath.Join(home, ".grok/bin"),
 		filepath.Join(home, ".bun/bin"), "/usr/bin", "/bin", "/usr/sbin", "/sbin")
 	seen := map[string]bool{}
@@ -157,6 +161,29 @@ func searchPaths() []string {
 		}
 	}
 	return out
+}
+
+// shellPathTTL is how long searchPaths keeps the login shell's PATH.
+const shellPathTTL = 60 * time.Second
+
+// shellPath is the one PATH searchPaths keeps, for the shell and home it was read with.
+var shellPath struct {
+	sync.Mutex
+	key  string
+	dirs []string
+	at   time.Time
+}
+
+// loginShellPath is the PATH the login shell sets, or nothing when it fails; a test
+// replaces it to count the shells.
+var loginShellPath = func(shell string) []string {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, shell, "-lc", `printf %s "$PATH"`).Output()
+	if err != nil {
+		return nil
+	}
+	return strings.Split(string(out), ":")
 }
 
 // loginEnvironment is LoginShellPath.environment: this process's, with the login shell's
