@@ -477,7 +477,21 @@ public enum PeopleWords {
         parts.fragment = "/console/people"
         return parts.url
     }
+    /// Console ▸ Sign-In on the web page, for the providers' Edit in Console (D17).
+    public static func signInConsoleURL(_ status: DaemonAPI.ControlStatus?) -> URL? {
+        guard let people = consoleURL(status), var parts = URLComponents(url: people, resolvingAgainstBaseURL: false) else { return nil }
+        parts.fragment = "/console/signIn"
+        return parts.url
+    }
+    public static let orgProvidersTitle = "Your organisation’s sign-in"
+    /// Under the providers, read only on the Mac and the Remote (D17).
+    public static func orgProvidersFoot(admin: Bool) -> String {
+        admin ? "People see these on the sign-in screen, in this order. Change them, their domains and SCIM in Console ▸ Sign-In on the web page."
+            : "People see these on the sign-in screen, in this order. An admin changes them in Console ▸ Sign-In on the web page."
+    }
     public static func suspendedBy(_ provider: String) -> String { "Suspended by \(provider)" }
+    /// A SCIM group's line: where it comes from.
+    public static func fromProvider(_ provider: String) -> String { "From \(provider)" }
     /// On a role or a group that the provider controls (FR-020, FR-028).
     public static func setBy(_ provider: String) -> String { "Set by \(provider)" }
 

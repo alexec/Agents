@@ -36,6 +36,9 @@ struct PeoplePane: View {
     @State private var machineFor: DaemonAPI.PersonRow?
     /// Console ▸ People on the web page, for an admin's Edit in Console (#1002, D17).
     @State private var console: URL?
+    /// Console ▸ Sign-In on the web page, for the providers' Edit in Console (#1002, D17).
+    @State private var signInConsole: URL?
+    @Environment(\.openURL) private var openURL
 
     struct BotSheetItem: Identifiable {
         var bot: DaemonAPI.PersonRow?
@@ -100,6 +103,24 @@ struct PeoplePane: View {
                         .foregroundStyle(.secondary)
                 }
                 .paperListRow()
+                // The organisation's providers, read only: the Console is web only (#1002, D17).
+                if kind == .person, !people.orgProviders.isEmpty {
+                    Section {
+                        ForEach(people.orgProviders) { provider in
+                            Text(provider.name).appText(.reading)
+                        }
+                        if list.admin, let signInConsole {
+                            Button(PeopleWords.editInConsole) { openURL(signInConsole) }
+                        }
+                    } header: {
+                        Text(PeopleWords.orgProvidersTitle)
+                    } footer: {
+                        Text(PeopleWords.orgProvidersFoot(admin: list.admin))
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                    }
+                    .paperListRow()
+                }
                 if list.admin, kind == .person {
                     Section {
                         Button("Rotate Control Key…") { isRotating = true }
@@ -128,6 +149,7 @@ struct PeoplePane: View {
             if let control, people.list?.admin == true {
                 let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
                 console = PeopleWords.consoleURL(status)
+                signInConsole = PeopleWords.signInConsoleURL(status)
             }
         }
         .refreshable { await load() }

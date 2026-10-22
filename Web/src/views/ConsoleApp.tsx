@@ -26,6 +26,7 @@ import { followsWords } from "../model/orgPolicy";
 import { AuditPage, RequestsPage, requestCount } from "./ConsoleRecords";
 import { TeamWorkflowsPage } from "./ConsoleWorkflows";
 import { LiveNowPage } from "./ConsoleLive";
+import { SignInPage } from "./ConsoleSignIn";
 
 /** Whether this person is an admin of the control plane, from the store's one people list (#2055): null until it answers. */
 function adminOf(store: Store): boolean | null {
@@ -99,6 +100,7 @@ function ConsoleSection({ store, section, down }: { store: Store; section: Secti
   switch (section.id) {
     case "people": return <PeoplePage store={store} down={down} />;
     case "machines": return <MachinesPage store={store} down={down} />;
+    case "signIn": return <SignInPage store={store} down={down} />;
     case "live": return <LiveNowPage store={store} down={down} runtimeName={runtimeNameIn(store)} />;
     case "policy": return <OrgPolicyPage store={store} down={down} />;
     case "modelAccess": return <ModelAccessPage store={store} down={down} />;

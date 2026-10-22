@@ -7706,6 +7706,7 @@ export interface Methods {
   "groups/list": { params: Empty; result: GroupList };
   "groups/remove": { params: GroupRequest; result: Empty };
   "groups/set": { params: GroupSet; result: Group };
+  "groups/setRole": { params: GroupRoleSet; result: Group };
   "hosts/approveJoin": { params: JoinRequestDecide; result: JoinApproved };
   "hosts/denyJoin": { params: JoinRequestDecide; result: Empty };
   "hosts/dropKept": { params: KeptRequestID; result: Empty };
@@ -7744,6 +7745,7 @@ export interface Methods {
   "people/list": { params: Empty; result: PeopleList };
   "people/remove": { params: PersonRequest; result: Empty };
   "people/removePreview": { params: PersonRequest; result: PersonRemovePreview };
+  "people/removeRequests": { params: Empty; result: RemoveRequestList };
   "people/setRole": { params: PersonRoleRequest; result: Empty };
   "permissions/answer": { params: AnswerRequest; result: Empty };
   "permissions/pending": { params: Empty; result: PermissionRequest[] };
@@ -7805,10 +7807,24 @@ export interface Methods {
   "runtimes/removeAccount": { params: AccountRequest; result: UUID[] };
   "runtimes/setDefaultAccount": { params: DefaultAccountRequest; result: Empty };
   "sandbox/state": { params: Empty; result: SandboxSettings };
+  "scim/set": { params: SCIMSet; result: OrgProviderKept };
+  "scim/tokens/list": { params: SCIMTokensRequest; result: SCIMTokenList };
+  "scim/tokens/make": { params: SCIMTokenMake; result: SCIMTokenMade };
+  "scim/tokens/revoke": { params: SCIMTokenRequest; result: Empty };
   "settings/passThrough": { params: Empty; result: PassThroughState };
   "signIn/approve": { params: SignInDecide; result: Empty };
   "signIn/configure": { params: SignInConfigure; result: SignInProviders };
   "signIn/deny": { params: SignInDecide; result: Empty };
+  "signIn/domains/check": { params: SignInDomainRequest; result: DomainClaim };
+  "signIn/domains/claim": { params: SignInDomainClaim; result: DomainClaim };
+  "signIn/domains/list": { params: Empty; result: SignInDomainList };
+  "signIn/domains/preview": { params: SignInDomainRequest; result: SignInDomainPreview };
+  "signIn/domains/remove": { params: SignInDomainRequest; result: Empty };
+  "signIn/domains/set": { params: SignInDomainSet; result: DomainClaim };
+  "signIn/orgProviders/check": { params: OrgProviderRequest; result: OrgProviderCheck };
+  "signIn/orgProviders/list": { params: Empty; result: OrgProviderList };
+  "signIn/orgProviders/remove": { params: OrgProviderRequest; result: Empty };
+  "signIn/orgProviders/set": { params: OrgProviderSet; result: OrgProviderKept };
   "signIn/providers": { params: Empty; result: SignInProviders };
   "signIn/removeFromMe": { params: SignInRemove; result: Empty };
   "signIn/requests": { params: Empty; result: SignInRequest[] };
@@ -7941,6 +7957,7 @@ export const MethodTarget = {
   "groups/list": "control",
   "groups/remove": "control",
   "groups/set": "control",
+  "groups/setRole": "control",
   "hosts/approveJoin": "control",
   "hosts/denyJoin": "control",
   "hosts/dropKept": "control",
@@ -7979,6 +7996,7 @@ export const MethodTarget = {
   "people/list": "control",
   "people/remove": "control",
   "people/removePreview": "control",
+  "people/removeRequests": "control",
   "people/setRole": "control",
   "permissions/answer": "host",
   "permissions/pending": "host",
@@ -8040,10 +8058,24 @@ export const MethodTarget = {
   "runtimes/removeAccount": "host",
   "runtimes/setDefaultAccount": "host",
   "sandbox/state": "host",
+  "scim/set": "control",
+  "scim/tokens/list": "control",
+  "scim/tokens/make": "control",
+  "scim/tokens/revoke": "control",
   "settings/passThrough": "host",
   "signIn/approve": "control",
   "signIn/configure": "control",
   "signIn/deny": "control",
+  "signIn/domains/check": "control",
+  "signIn/domains/claim": "control",
+  "signIn/domains/list": "control",
+  "signIn/domains/preview": "control",
+  "signIn/domains/remove": "control",
+  "signIn/domains/set": "control",
+  "signIn/orgProviders/check": "control",
+  "signIn/orgProviders/list": "control",
+  "signIn/orgProviders/remove": "control",
+  "signIn/orgProviders/set": "control",
   "signIn/providers": "control",
   "signIn/removeFromMe": "control",
   "signIn/requests": "control",

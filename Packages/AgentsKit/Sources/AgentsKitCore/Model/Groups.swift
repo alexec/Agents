@@ -12,17 +12,40 @@ public extension DaemonAPI {
         public var members: [String]
         /// Caps for the group's bots together (#1761, FR-033).
         public var caps: SpendCaps?
+        /// A SCIM group's provider (#1002, FR-019). Nil for a group an admin made.
+        public var source: GroupSource?
+        /// "admin": the group gives its people the admin role (#1002, FR-020).
+        public var role: String?
 
-        public init(id: String, name: String, everyone: Bool = false, members: [String] = [], caps: SpendCaps? = nil) {
+        public init(id: String, name: String, everyone: Bool = false, members: [String] = [], caps: SpendCaps? = nil,
+                    source: GroupSource? = nil, role: String? = nil) {
             self.caps = caps
+            self.source = source
+            self.role = role
             self.id = id
             self.name = name
             self.everyone = everyone
             self.members = members
         }
 
+        /// Whether it gives its people the admin role (FR-020).
+        public var givesAdmin: Bool { role == "admin" }
+
         /// Says a user is in it.
         public func has(_ user: String) -> Bool { everyone || members.contains(user) }
+    }
+
+    /// Where a group comes from (#1002, FR-019): an org provider's SCIM, which alone changes its members.
+    struct GroupSource: Codable, Sendable, Hashable {
+        public var scim: String
+        public var externalId: String?
+        public var displayName: String
+
+        public init(scim: String, externalId: String? = nil, displayName: String) {
+            self.scim = scim
+            self.externalId = externalId
+            self.displayName = displayName
+        }
     }
 
     /// `groups/list`: every group for an admin; for a member, the groups they are in.
@@ -187,6 +210,11 @@ public extension DaemonAPI.Notification {
 /// the Remote (the web page's are in `Web/src/model/teamGroups.ts`).
 public enum GroupWords {
     public static let title = "Groups"
+    public static let givesAdmin = "Gives the admin role"
+    /// A SCIM group's line (#1002, FR-031): "From Acme Okta", with " · Gives the admin role" when it does.
+    public static func orgLine(_ group: DaemonAPI.Group, provider: String) -> String {
+        group.givesAdmin ? "\(PeopleWords.fromProvider(provider)) · \(givesAdmin)" : PeopleWords.fromProvider(provider)
+    }
     /// A provider with no group.
     public static let adminsOnly = "Admins only"
 

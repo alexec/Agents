@@ -8,6 +8,7 @@ import type { Group, PersonRow } from "../protocol/generated";
 import { describe } from "../model/errors";
 import { botWords, dollars, foot, groupBots, groupCapFoot, groupCapLine, members, providersOf, readCap, removeMessage, removeTitle, title } from "../model/teamGroups";
 import { fromProvider, orgName } from "../model/signIn";
+import { groupRoleFoot, groupRoleWords } from "../model/orgSignIn";
 import { Modal } from "./Modal";
 
 function GroupSheet({ store, group, people, close }: {
@@ -90,6 +91,15 @@ export function GroupsSection({ store, down }: { store: Store; down: boolean }) 
   const failure = store.peopleFailure.value;
   const problem = failure ? describe(failure) : null;
   const editing = useSignal<{ group: Group | null } | null>(null);
+  const setRole = async (group: Group, admin: boolean) => {
+    if (admin && !window.confirm(`Make each person in ${group.name} an admin while they are in it? ${groupRoleFoot}`)) return;
+    try {
+      // The change comes back as control/groupsChanged.
+      await store.link.call("groups/setRole", admin ? { group: group.id, role: "admin" } : { group: group.id });
+    } catch (error) {
+      store.say(describe(error));
+    }
+  };
   const remove = async (group: Group) => {
     if (!window.confirm(`${removeTitle(group)} ${removeMessage}`)) return;
     try {
@@ -117,6 +127,15 @@ export function GroupsSection({ store, down }: { store: Store; down: boolean }) 
                 {group.source && (
                   <div class="person-org">
                     <span class="quiet small">{fromProvider(orgName(group.source.scim, store.orgProviderNames.value))}</span>
+                    {/* FR-020: a SCIM group can make its people admins; an admin marks it. */}
+                    {admin
+                      ? (
+                        <label class="small">
+                          <input type="checkbox" checked={group.role === "admin"} disabled={down}
+                            onChange={(e) => void setRole(group, (e.currentTarget as HTMLInputElement).checked)} /> {groupRoleWords}
+                        </label>
+                      )
+                      : group.role === "admin" && <span class="quiet small"> · {groupRoleWords}</span>}
                   </div>
                 )}
                 <div class="person-things">

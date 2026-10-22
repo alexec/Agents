@@ -77,6 +77,7 @@ nav:
       - how-to/set-up-on-this-mac.md
       - how-to/connect-a-window-or-phone.md
       - how-to/sign-in-with-google-apple-or-github.md
+      - how-to/sign-in-with-your-organisation.md
       - how-to/set-up-sign-in-for-your-own-build.md
       - how-to/use-agents-in-a-browser.md
       - how-to/add-a-server.md
