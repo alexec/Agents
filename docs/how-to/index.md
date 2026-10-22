@@ -72,6 +72,8 @@ something particular done.
   its turn, or put it into the running turn with **Send now**.
 - [See what needs you from your Home screen](see-what-needs-you-from-your-home-screen.md):
   the number of sessions waiting on you, and a tap that opens one.
+- [Follow a turn on the Lock Screen](follow-a-turn-on-the-lock-screen.md): follow a turn you
+  sent from the iPhone or iPad on the Lock Screen and in the Dynamic Island, and turn this off.
 - [Watch an agent's background work](watch-background-work.md): the shells and
   subagents it runs in the background, their output, and **Stop**.
 - [Review changes and approvals](review-changes-and-approvals.md): read a change that waits
@@ -131,6 +133,8 @@ something particular done.
 
 - [Set up a workflow](set-up-a-workflow.md): start agents on a schedule, or when another
   agent finishes, stops or asks.
+- [Read a workflow's page](read-a-workflows-page.md): see whether a workflow runs and why
+  not, what each run did and why it started, and run it now.
 - [Start a workflow from an MCP event](start-a-workflow-from-an-mcp-event.md): an agent
   each time a connector reports something, such as a pull request's checks failing.
 - [Use GitHub](use-github.md): connect GitHub once, set up a project's Tasks, Code review

@@ -85,8 +85,8 @@ an agent finishes.
    or one you wrote in another editor, shows a raised hand and **New — waiting for your
    OK**: it does not run until you approve it.
 
-   On iPhone and iPad the same list is on the project's page, and a waiting workflow says
-   **waiting for your OK on the Mac**. You approve it on the Mac.
+   On iPhone and iPad and on the web page, the same list is on the project's page, and
+   you can approve a waiting workflow on its page there too.
 3. Click the workflow to open its page. Check what it will do and the settings it will
    start the agent with (**Runtime**, **Permission mode**, **Model**, **Effort**), change
    any you want there, then click **Approve**. You can also click **Approve** on the row.
@@ -94,7 +94,8 @@ an agent finishes.
    the workflow's page too.
 
    A new agent starts, named after the workflow, and appears on the project's page. The
-   workflow's page lists it under **Recent runs**, with **Open the agent it started**.
+   workflow's page lists it under **History** (**Recent runs** on iPhone and iPad). See
+   [Read a workflow's page](read-a-workflows-page.md).
 5. From now on, each time an agent in the project finishes, the workflow starts a reviewer.
 
 **When the file changes**
@@ -134,9 +135,9 @@ unarchiving it does not pin it again.
 
 **Turn it off**
 
-- Turn it off for a while: switch off **Enabled** on its page, or right-click its row and
-  choose **Turn Off**. On iPhone and iPad, the switch is on its page and **Turn Off** is on
-  a long press. It stays where it is, marked **Off**, none of its triggers run it, and
+- Turn it off for a while: on the Mac, click **Turn Off** on its page, or right-click its
+  row and choose **Turn Off**. On iPhone and iPad, switch off **Enabled** on its page, or
+  long-press its row for **Turn Off**. On the web page, switch off **Enabled** on its page. It stays where it is, marked **Off**, none of its triggers run it, and
   **Run now** still does. Switch it back on to have it run again.
 - Archive it: on the Mac, swipe the row left with two fingers, right-click it and choose
   **Archive**, or click **Archive** on its page. It stays listed under **Archived workflows** and
@@ -187,6 +188,48 @@ and you change the method without touching the workflow's triggers.
 
 `.agents/workflows/release.md` and the review workflows in this repository have this shape.
 
+**What you approve**
+
+The app finds a skill in the workflow's text by its path, `.agents/skills/<name>/SKILL.md`.
+It is not a field in the front matter. What you approve is the workflow together with each
+skill it names, and **Review** shows the text of each skill under the workflow's. A change
+to one of those skills makes the workflow wait for your OK again, as a change to its own
+file does. A skill holds the method, so a changed skill changes what the run does.
+
+The workflow does not run, and its page says why, when a skill it names:
+
+- is not there, or cannot be read;
+- is a link, or is in a folder that is a link;
+- is outside the project's `.agents/skills` folder, for example a name with `/` or `..`.
+
+## Let an agent run a workflow
+
+An agent can run a workflow once, as **Run now** does, with the `run` action of its
+`manage_workflows` tool (#1526). This lets one agent hand a job to a workflow that already
+has the right prompt and settings, such as a release agent that runs the review workflows.
+Ask it in words, for example:
+
+```text
+Run the crash-reports workflow now, and tell me what it finds.
+```
+
+The agent gets the id of the session that the run started. It can then wait for that
+session to finish, or read it.
+
+An agent cannot run a workflow that:
+
+- waits for your OK, or is archived;
+- is turned off. **Run now** on its page still runs it, but an agent does not, because
+  the off switch is yours;
+- has `agent: triggering`, because nothing triggered it;
+- would go past the chain limit of three. The run carries the chain depth of the agent
+  that runs it, so workflows cannot run each other for ever.
+
+When it cannot run, the agent is told why, and nothing starts. The run's prompt ends with a
+note that names the agent that ran it, by its title and id. See
+[Workflow triggers and actions](../reference/workflows.md) and
+[Tools the app gives agents](../reference/agent-tools.md).
+
 ## If it doesn't work
 
 A workflow that did not run says why on its row and its page, for example:
@@ -216,3 +259,4 @@ A workflow that did not run says why on its row and its page, for example:
 - [Workflow triggers and actions](../reference/workflows.md)
 - [Events](../reference/events.md)
 - [Have an agent wait for something](wait-for-something.md)
+- [Read a workflow's page](read-a-workflows-page.md)

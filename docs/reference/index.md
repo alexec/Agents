@@ -43,6 +43,8 @@ something up, not for reading through.
   milestone, when each is ticked, where it shows, and how to hide it.
 - [Charts and diagrams](charts-and-diagrams.md): which Vega-Lite charts and Mermaid
   diagrams each client draws, and what happens to one it cannot draw.
+- [Gestures on the iPhone and iPad](remote-gestures.md): every swipe, long press, pull and
+  menu in the iPhone and iPad app.
 - [Keyboard shortcuts](keyboard-shortcuts.md): every shortcut and menu command on the Mac.
 - [Feature matrix of coding-agent apps](feature-matrix.md): which apps for running several
   coding agents have which features, Agents included.

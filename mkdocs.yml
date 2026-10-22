@@ -98,6 +98,7 @@ nav:
       - how-to/find-in-a-chat-or-a-session.md
       - how-to/send-while-an-agent-works.md
       - how-to/see-what-needs-you-from-your-home-screen.md
+      - how-to/follow-a-turn-on-the-lock-screen.md
       - how-to/watch-background-work.md
       - how-to/review-changes-and-approvals.md
       - how-to/use-a-shell.md
@@ -105,6 +106,7 @@ nav:
       - how-to/use-the-simulator-pane.md
       - how-to/open-in-its-own-window.md
       - how-to/set-up-a-workflow.md
+      - how-to/read-a-workflows-page.md
       - how-to/start-a-workflow-from-an-mcp-event.md
       - how-to/use-github.md
       - how-to/use-gitlab.md
@@ -151,6 +153,7 @@ nav:
       - reference/ssh-options.md
       - reference/get-started-checklist.md
       - reference/charts-and-diagrams.md
+      - reference/remote-gestures.md
       - reference/keyboard-shortcuts.md
       - reference/feature-matrix.md
   - Explanation:
@@ -168,6 +171,7 @@ nav:
       - explanation/projects-hosts-worktrees.md
       - explanation/leases.md
       - explanation/phone-and-ipad.md
+      - explanation/live-activities.md
       - explanation/compaction-by-runtime.md
       - explanation/token-compression-tools.md
       - explanation/token-cost-of-tools.md

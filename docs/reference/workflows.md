@@ -150,7 +150,8 @@ This project's own `github` server names it `pr.opened` (#833): a pull request o
 draft marked ready for review, by the repo's own people. The **Review pull requests**
 workflow (`.agents/workflows/review-pull-requests.md`) starts a new agent on it that reads
 the diff and leaves one comment, and never pushes, approves or merges. It comes with
-`enabled: false`; turn it on with its **Enabled** switch.
+`enabled: false`; turn it on with **Turn On** on the Mac, or its **Enabled** switch on the
+iPhone, the iPad and the web page.
 
 Under **Triggers**, the workflow's page shows a line for each server a trigger hears: when
 the server was last asked and when the last event came, or why not. See
@@ -231,8 +232,9 @@ A workflow does not run, and its page says why, when:
 
 On the Mac, each workflow on the project page has **Open**, **Run now** (**Approve** and
 **Deny on This Host** while it is waiting for your OK), **Turn Off** (**Turn On** once off), **Archive**
-(**Unarchive** once archived) and **Show in Finder**. Its page has the **Enabled** switch
-beside **Run now**, and a **Triggers** section listing each trigger on its own line: the
+(**Unarchive** once archived) and **Show in Finder**. Its page has **Run now** and **Turn
+Off** (**Turn On** once off) in its toolbar; on the iPhone, the iPad and the web page it has
+an **Enabled** switch instead. It has a **Triggers** section listing each trigger on its own line: the
 filters on it, whether it listens in this project or on the whole Mac or server, which
 agent a `triggering` run resumes, when a schedule is next due, and a trigger this
 version does not know marked **Unknown**. Under them it says when the workflow last ran
