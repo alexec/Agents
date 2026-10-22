@@ -1000,6 +1000,23 @@ type BringBackRequest struct {
 	Branches []SentBranch `json:"branches"`
 }
 
+// A budget raised for one person for one UTC day (#998, FR-019), kept in the policy and swept the day after.
+type BudgetRaise struct {
+	User string `json:"user"`
+
+	// The UTC day, YYYY-MM-DD.
+	Day string `json:"day"`
+
+	Daily *float64 `json:"daily,omitzero"`
+
+	DailyTokens *int64 `json:"dailyTokens,omitzero"`
+
+	By AuditActor `json:"by"`
+
+	// The request in Console ▸ Requests it answers.
+	Request *string `json:"request,omitzero"`
+}
+
 type BuildOutputRemoved struct {
 	Removed []string `json:"removed"`
 
@@ -3509,6 +3526,15 @@ type HostLink struct {
 	StopWhenIdleMinutes *int64 `json:"stopWhenIdleMinutes,omitzero"`
 }
 
+// host/policy (#998, FR-006): to a machine that says host.policy/1, on its channel 0, at each join and within 5 seconds of each change. A signed policy, or none when no policy was ever set.
+type HostPolicy struct {
+	Policy *OrgPolicy `json:"policy,omitzero"`
+
+	Signature *PolicySignature `json:"signature,omitzero"`
+
+	None *bool `json:"none,omitzero"`
+}
+
 // host/providerDraft: a writing agent called one of the writer's tools (#858).
 type HostProviderDraftCall struct {
 	AgentID UUID `json:"agentID"`
@@ -4726,6 +4752,44 @@ type OptionsResponse struct {
 	Commands []SlashCommand `json:"commands"`
 }
 
+// The organisation's policy (#998, spec 998 FR-001, FR-002): one document, kept by the control plane at v1/policy.json, signed by its control key and sent to every machine that says host.policy/1. Each rule is optional; an absent rule sets no ceiling. Only an admin changes it. The control plane sets version, issued, changedBy and requires; stopAll and budgets.raises change only by policy/stopAll and policy/raise.
+type OrgPolicy struct {
+	// One more at each change. A machine refuses a lower one (FR-008).
+	Version int64 `json:"version"`
+
+	Issued Date `json:"issued"`
+
+	ChangedBy AuditActor `json:"changedBy"`
+
+	// The capabilities a machine needs to follow this policy: host.policy/1, and one for each later rule (FR-014). A machine that lacks one starts no agent.
+	Requires []string `json:"requires"`
+
+	// The loosest mode, by ModeLooseness rank 0 to 4. A mode a machine does not know counts as rank 4.
+	ModeCeiling *string `json:"modeCeiling,omitzero"`
+
+	// Required refuses the choice off and the states none and runtimeControlled. Absent is the person's choice.
+	Sandbox *string `json:"sandbox,omitzero"`
+
+	// The runtimes allowed, by runtime id. Absent allows every runtime.
+	Runtimes map[string]PolicyRuntimeRule `json:"runtimes,omitzero"`
+
+	Marketplaces *PolicyMarketplaces `json:"marketplaces,omitzero"`
+
+	Budgets *PolicyBudgets `json:"budgets,omitzero"`
+
+	Helpers *PolicyHelpers `json:"helpers,omitzero"`
+
+	Environment *PolicyEnvironment `json:"environment,omitzero"`
+
+	StopAll *PolicyStopAll `json:"stopAll,omitzero"`
+
+	// The control plane refuses agent starts and prompts on a machine that has not applied this version.
+	RequireFollowing *bool `json:"requireFollowing,omitzero"`
+
+	// Empty. A place for later layers that only make a rule tighter.
+	Groups *Empty `json:"groups,omitzero"`
+}
+
 type PagesChangedNotification struct {
 	Folder URL `json:"folder"`
 
@@ -5127,6 +5191,135 @@ type PluginsList struct {
 
 type PluginsListRequest struct {
 	Folder URL `json:"folder"`
+}
+
+// host/policyApplied (#998): a machine kept this version of the policy.
+type PolicyApplied struct {
+	Version int64 `json:"version"`
+}
+
+// Each person's budget per UTC day and per agent (#998, FR-016): a ceiling over their own CostLimits. Money is US dollars.
+type PolicyBudgets struct {
+	Daily *float64 `json:"daily,omitzero"`
+
+	DailyTokens *int64 `json:"dailyTokens,omitzero"`
+
+	PerAgent *float64 `json:"perAgent,omitzero"`
+
+	PerAgentTokens *int64 `json:"perAgentTokens,omitzero"`
+
+	// Runtime ids that may run under a budget though their turns report neither a cost nor tokens.
+	AllowUnmetered []string `json:"allowUnmetered"`
+
+	// An admin's raises, each for one person and one UTC day.
+	Raises []BudgetRaise `json:"raises"`
+}
+
+// The variable names a person's own pass-through list may name (#998, FR-011a), * at the end allowed.
+type PolicyEnvironment struct {
+	PassThrough []string `json:"passThrough"`
+}
+
+// The ceiling over each project's helper limits (#998, #64).
+type PolicyHelpers struct {
+	MostRunning *int64 `json:"mostRunning,omitzero"`
+
+	MostNotArchived *int64 `json:"mostNotArchived,omitzero"`
+}
+
+// policy/get and policy/set (#998): the whole policy with its store tag, for an admin. No policy and no rev when none was ever set. machines is each machine's applied version, by host id.
+type PolicyKept struct {
+	Policy *OrgPolicy `json:"policy,omitzero"`
+
+	Rev *string `json:"rev,omitzero"`
+
+	Machines map[string]int64 `json:"machines,omitzero"`
+}
+
+// The marketplaces a policy allows (#998), by the ids #687 gives them, and whether an MCP server added by hand is allowed.
+type PolicyMarketplaces struct {
+	Allowed []string `json:"allowed"`
+
+	CustomServers string `json:"customServers"`
+}
+
+// policy/raise (#998): an admin raises a person's budget for today (UTC).
+type PolicyRaiseRequest struct {
+	User string `json:"user"`
+
+	Daily *float64 `json:"daily,omitzero"`
+
+	DailyTokens *int64 `json:"dailyTokens,omitzero"`
+
+	Request *string `json:"request,omitzero"`
+}
+
+// The data of a policyRefused error (#998, FR-010): why, the rule, and the words for the client.
+type PolicyRefusal struct {
+	Reason string `json:"reason"`
+
+	Rule *string `json:"rule,omitzero"`
+
+	Words string `json:"words"`
+
+	Until *Date `json:"until,omitzero"`
+}
+
+// One allowed runtime in a policy (#998).
+type PolicyRuntimeRule struct {
+	// The model ids allowed, with * at the end allowed (claude-sonnet-*). Absent allows every model.
+	Models []string `json:"models,omitzero"`
+}
+
+// policy/set (#998): the rules, and the rev the admin read. No rev when there was no policy. Refused changedElsewhere when another admin saved first.
+type PolicySet struct {
+	Policy OrgPolicy `json:"policy"`
+
+	Rev *string `json:"rev,omitzero"`
+}
+
+// The mark on a choice a policy refuses or caps (#998, FR-010).
+type PolicySetBy struct {
+	By string `json:"by"`
+
+	Rule string `json:"rule"`
+
+	Words string `json:"words"`
+}
+
+// The control key's signature of a policy (#998, FR-004), kept at v1/policy.sig: ECDSA P-256 with SHA-256 (es256), over the policy's canonical JSON (keys sorted, no spaces). sig is the 64 bytes r then s.
+type PolicySignature struct {
+	Version int64 `json:"version"`
+
+	// The first 8 bytes of the SHA-256 of the control key's X9.63 public key, base64url.
+	KeyID string `json:"keyID"`
+
+	Alg string `json:"alg"`
+
+	Sig Data `json:"sig"`
+}
+
+// The kill switch (#998, FR-015): while on, every machine stops its turns and starts no work.
+type PolicyStopAll struct {
+	On bool `json:"on"`
+
+	By AuditActor `json:"by"`
+
+	At Date `json:"at"`
+
+	Note *string `json:"note,omitzero"`
+}
+
+// policy/stopAll (#998): the kill switch on or off, with an optional note.
+type PolicyStopAllRequest struct {
+	On bool `json:"on"`
+
+	Note *string `json:"note,omitzero"`
+}
+
+// policy/mine and control/policyChanged (#998): the policy in force, for any person, with only their own budget raises. No policy when none was ever set.
+type PolicyView struct {
+	Policy *OrgPolicy `json:"policy,omitzero"`
 }
 
 type PresenceReport struct {
@@ -6904,6 +7097,13 @@ type SignInWantedReason string
 
 const SignInWantedReasonNotSignedIn SignInWantedReason = "notSignedIn"
 const SignInWantedReasonUnreadable SignInWantedReason = "unreadable"
+
+// A policy and its signature (#998): what a machine receives and keeps in <root>/policy.json.
+type SignedPolicy struct {
+	Policy OrgPolicy `json:"policy"`
+
+	Signature PolicySignature `json:"signature"`
+}
 
 // An iOS simulator on a Mac host (#842): its UDID, its name, its system and whether it is booted.
 type Simulator struct {

@@ -49,6 +49,7 @@ const CapFiles1 = "files/1"
 const CapGit1 = "git/1"
 const CapGroups1 = "groups/1"
 const CapHandover1 = "handover/1"
+const CapHostPolicy1 = "host.policy/1"
 const CapHostTeam1 = "host.team/1"
 const CapHostUserSettings1 = "host.user-settings/1"
 const CapHostWire1 = "host.wire/1"
@@ -76,6 +77,7 @@ const CapPersonal1 = "personal/1"
 const CapPersonas1 = "personas/1"
 const CapPins1 = "pins/1"
 const CapPlugins1 = "plugins/1"
+const CapPolicy1 = "policy/1"
 const CapPool1 = "pool/1"
 const CapPreferences1 = "preferences/1"
 const CapPresence1 = "presence/1"
@@ -477,6 +479,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"groups/set", "groups/1"},
 	{"handover/status", "handover/1"},
 	{"host/hello", "host/1"},
+	{"host/policyApplied", "host.policy/1"},
 	{"host/providerDraft", "host/1"},
 	{"host/status", "host/1"},
 	{"host/workspaces", "host/1"},
@@ -517,6 +520,11 @@ var ControlCapabilities = pairs([][2]string{
 	{"people/remove", "people/1"},
 	{"people/removePreview", "people/1"},
 	{"people/setRole", "people/1"},
+	{"policy/get", "policy/1"},
+	{"policy/mine", "policy/1"},
+	{"policy/raise", "policy/1"},
+	{"policy/set", "policy/1"},
+	{"policy/stopAll", "policy/1"},
 	{"projects/detected", "projects/1"},
 	{"providers/add", "providers/1"},
 	{"providers/create", "providers/1"},
@@ -569,17 +577,20 @@ var ControlCapabilities = pairs([][2]string{
 	{"control/linksChanged", "links/1"},
 	{"control/moved", "control/1"},
 	{"control/peopleChanged", "people/1"},
+	{"control/policyChanged", "policy/1"},
 	{"control/providerDraft", "control/1"},
 	{"control/providersChanged", "control/1"},
 	{"control/secretsLeft", "user/1"},
 	{"control/signInDecided", "signin/1"},
 	{"control/signInRequested", "signin/1"},
 	{"control/signInWaiting", "signin/1"},
+	{"control/stopAll", "policy/1"},
 	{"control/thisMacHostChanged", "control/1"},
 	{"control/tunnelChanged", "control/1"},
 	{"control/userSettingsChanged", "user/1"},
 	{"control/webChanged", "control/1"},
 	{"host/clients", "host/1"},
+	{"host/policy", "host.policy/1"},
 	{"host/user", "bots/1"},
 	{"host/userSettings", "user/1"},
 	{"projects/detect", "projects/1"},
@@ -604,17 +615,20 @@ var ControlNotifications = set([]string{
 	"control/linksChanged",
 	"control/moved",
 	"control/peopleChanged",
+	"control/policyChanged",
 	"control/providerDraft",
 	"control/providersChanged",
 	"control/secretsLeft",
 	"control/signInDecided",
 	"control/signInRequested",
 	"control/signInWaiting",
+	"control/stopAll",
 	"control/thisMacHostChanged",
 	"control/tunnelChanged",
 	"control/userSettingsChanged",
 	"control/webChanged",
 	"host/clients",
+	"host/policy",
 	"host/user",
 	"host/userSettings",
 	"projects/detect",

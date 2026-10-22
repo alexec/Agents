@@ -16,22 +16,24 @@
 
 ### Tests first
 
-- [ ] T001 [US1] Test that a control plane with no policy sends `host/policy {none: true}` and nothing else changes, in `Go/internal/controlplane/policy_test.go` (SC-001).
-- [ ] T002 [P] [US2] Test `policy/set`: bounds, `rev` conflict between two admins, `version` + 1, a member refused, the signature checks with the control key and fails after one changed byte, in `policy_test.go`.
-- [ ] T003 [P] [US2] Test the push: two copies over one store, three machines, a save reaches all three in 5 s; a machine without `host.policy.1` gets nothing; a machine that connects later gets the newest, in `policy_test.go` (SC-002).
+- [x] T001 [US1] Test that a control plane with no policy sends `host/policy {none: true}` and nothing else changes, in `Go/internal/controlplane/policy_test.go` (SC-001).
+- [x] T002 [P] [US2] Test `policy/set`: bounds, `rev` conflict between two admins, `version` + 1, a member refused, the signature checks with the control key and fails after one changed byte, in `policy_test.go`.
+- [x] T003 [P] [US2] Test the push: two copies over one store, three machines, a save reaches all three in 5 s; a machine without `host.policy.1` gets nothing; a machine that connects later gets the newest, in `policy_test.go` (SC-002).
 - [ ] T004 [P] [US4] Test person budgets: two machines' roll-ups add up by UTC day in dollars and `limitTokens`; at a budget, `host/user` carries `capReachedUntil` for a person; a raise lifts it for that day only, in `Go/internal/controlplane/policybudget_test.go`.
-- [ ] T005 [P] [US5] Test `policy/stopAll`: on and off are audited, pushed, and `control/stopAll` reaches every person's clients, in `policy_test.go`.
+- [x] T005 [P] [US5] Test `policy/stopAll`: on and off are audited, pushed, and `control/stopAll` reaches every person's clients, in `policy_test.go`.
 
 ### Build
 
 - [ ] T006 [US2] Add `OrgPolicy`, `SignedPolicy`, `PolicySignature`, `PolicyView`, `PolicyPreview`, `PolicyRefusal`, `PolicySetBy`, `BudgetRaise` to `Packages/Wire/daemon.schema.json`; the methods and notifications of `contracts/policy-api.md` to `control.openrpc.json`; `limitTokens` on `UsageRollupRow`. Run `scripts/wire.sh gen`, commit the generated files, and do what `WireSchemaTests` says in Swift.
 - [ ] T007 [US2] Add `Go/internal/controlplane/policy.go`: read and keep `v1/policy.json` and `v1/policy.sig` (conditional on `rev`), bounds, canonical JSON, Ed25519 signing with the control key, `policy/mine`, `policy/get`, `policy/set`, `policy/preview`, `policy/stopAll`, `policy/raise`, `policy/askForMore`. Admin checks with `isAdmin`. Add `policy/set`, `policy/stopAll`, `policy/raise` to `writes` in `methods.go`.
-- [ ] T008 [US2] Push `host/policy` on `host/hello` and on each change, with the hash dedup of `userscope.go`; tell the other copies through the mesh, as `userChanged` does. Handle `host/policyApplied` and keep each machine's applied version for the Console. With `requireFollowing`, the router refuses agent starts on a machine whose applied version is not the current one (edge case "a machine of an older version").
-- [ ] T009 [US2] Add the `policy/*` actions to `audit.controlActions` in `Go/internal/controlplane/audit/audit.go`, with before and after.
+- [x] T008 [US2] Push `host/policy` on `host/hello` and on each change, with the hash dedup of `userscope.go`; tell the other copies through the mesh, as `userChanged` does. Handle `host/policyApplied` and keep each machine's applied version for the Console. With `requireFollowing`, the router refuses agent starts on a machine whose applied version is not the current one (edge case "a machine of an older version").
+- [x] T009 [US2] Add the `policy/*` actions to `audit.controlActions` in `Go/internal/controlplane/audit/audit.go`, with before and after.
 - [ ] T010 [US4] Add `Go/internal/controlplane/policybudget.go`: `checkBudgets(user)` from the roll-ups (as `spentToday`, plus tokens), raises, and the sweep of old raises. Call it where `checkCaps` is called. In `bots.go`, `sendHostUser` sends `capReachedUntil` for a person at a budget too.
 - [ ] T011 [US4] Add the Requests kind `budget` in `Go/internal/controlplane/console.go`; answering it calls `policy/raise`.
-- [ ] T012 [US2] Rotation (T4): sign the policy again with the new key at rotation, in `rotate.go`.
-- [ ] T013 [P] Docs: `docs/explanation/control-plane.md` gains "Policy" and the store keys; `docs/reference/policy.md` (fields).
+- [x] T012 [US2] Rotation (T4): sign the policy again with the new key at rotation, in `rotate.go`.
+- [x] T013 [P] Docs: `docs/explanation/control-plane.md` gains "Policy" and the store keys; `docs/reference/policy.md` (fields).
+
+**Built in the first slice-1 lane (#998, Decided):** T001–T003, T005, T008, T009, T012, T013, and of T006 and T007 all but `PolicyPreview`, `policy/preview`, `policy/askForMore` and `limitTokens`. The signature is ECDSA P-256 (`es256`) with the control key, not Ed25519, because the control key is a P-256 key that machines already trust. **Left for a slice 1b lane** (areas team and reports): T004, T010, T011, `limitTokens` on `UsageRollupRow`, `policy/askForMore` (a Requests kind), and `policy/preview` (with slice 3, which draws it).
 
 **Checkpoint**: `test-servers` walk: two copies, three machines, a policy reaches all three in 5 s, the kill switch flag reaches them, and the audit shows both.
 

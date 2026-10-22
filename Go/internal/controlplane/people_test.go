@@ -245,6 +245,7 @@ func TestEveryClientMethodChecksTheOwner(t *testing.T) {
 		"links/list": true, "links/requests": true, "links/approve": true, "links/deny": true, "links/remove": true,
 		"signIn/providers": true, "signIn/pair": true, "signIn/addToMe": true, "signIn/removeFromMe": true,
 		"signIn/configure": true, "signIn/requests": true, "signIn/approve": true, "signIn/deny": true,
+		"policy/get": true, "policy/mine": true, "policy/set": true, "policy/stopAll": true, "policy/raise": true,
 		// It names a bot's machine, an admin's to stop, and checks that itself (#1761).
 		"bots/stopRun": true,
 	}

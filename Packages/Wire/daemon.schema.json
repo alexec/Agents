@@ -2051,6 +2051,38 @@
       ],
       "additionalProperties": false
     },
+    "BudgetRaise": {
+      "type": "object",
+      "description": "A budget raised for one person for one UTC day (#998, FR-019), kept in the policy and swept the day after.",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "day": {
+          "type": "string",
+          "description": "The UTC day, YYYY-MM-DD."
+        },
+        "daily": {
+          "type": "number"
+        },
+        "dailyTokens": {
+          "type": "integer"
+        },
+        "by": {
+          "$ref": "#/definitions/AuditActor"
+        },
+        "request": {
+          "type": "string",
+          "description": "The request in Console ▸ Requests it answers."
+        }
+      },
+      "required": [
+        "user",
+        "day",
+        "by"
+      ],
+      "additionalProperties": false
+    },
     "BuildOutputRemoved": {
       "type": "object",
       "properties": {
@@ -8017,6 +8049,22 @@
       ],
       "additionalProperties": false
     },
+    "HostPolicy": {
+      "type": "object",
+      "description": "host/policy (#998, FR-006): to a machine that says host.policy/1, on its channel 0, at each join and within 5 seconds of each change. A signed policy, or none when no policy was ever set.",
+      "properties": {
+        "policy": {
+          "$ref": "#/definitions/OrgPolicy"
+        },
+        "signature": {
+          "$ref": "#/definitions/PolicySignature"
+        },
+        "none": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
     "HostProviderDraftCall": {
       "type": "object",
       "description": "host/providerDraft: a writing agent called one of the writer's tools (#858).",
@@ -11182,6 +11230,84 @@
       ],
       "additionalProperties": false
     },
+    "OrgPolicy": {
+      "type": "object",
+      "description": "The organisation's policy (#998, spec 998 FR-001, FR-002): one document, kept by the control plane at v1/policy.json, signed by its control key and sent to every machine that says host.policy/1. Each rule is optional; an absent rule sets no ceiling. Only an admin changes it. The control plane sets version, issued, changedBy and requires; stopAll and budgets.raises change only by policy/stopAll and policy/raise.",
+      "properties": {
+        "version": {
+          "type": "integer",
+          "description": "One more at each change. A machine refuses a lower one (FR-008)."
+        },
+        "issued": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "changedBy": {
+          "$ref": "#/definitions/AuditActor"
+        },
+        "requires": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The capabilities a machine needs to follow this policy: host.policy/1, and one for each later rule (FR-014). A machine that lacks one starts no agent."
+        },
+        "modeCeiling": {
+          "type": "string",
+          "enum": [
+            "ask",
+            "default",
+            "acceptEdits",
+            "auto",
+            "bypassPermissions"
+          ],
+          "description": "The loosest mode, by ModeLooseness rank 0 to 4. A mode a machine does not know counts as rank 4."
+        },
+        "sandbox": {
+          "type": "string",
+          "enum": [
+            "required"
+          ],
+          "description": "Required refuses the choice off and the states none and runtimeControlled. Absent is the person's choice."
+        },
+        "runtimes": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/PolicyRuntimeRule"
+          },
+          "description": "The runtimes allowed, by runtime id. Absent allows every runtime."
+        },
+        "marketplaces": {
+          "$ref": "#/definitions/PolicyMarketplaces"
+        },
+        "budgets": {
+          "$ref": "#/definitions/PolicyBudgets"
+        },
+        "helpers": {
+          "$ref": "#/definitions/PolicyHelpers"
+        },
+        "environment": {
+          "$ref": "#/definitions/PolicyEnvironment"
+        },
+        "stopAll": {
+          "$ref": "#/definitions/PolicyStopAll"
+        },
+        "requireFollowing": {
+          "type": "boolean",
+          "description": "The control plane refuses agent starts and prompts on a machine that has not applied this version."
+        },
+        "groups": {
+          "$ref": "#/definitions/Empty",
+          "description": "Empty. A place for later layers that only make a rule tighter."
+        }
+      },
+      "required": [
+        "version",
+        "issued",
+        "changedBy",
+        "requires"
+      ],
+      "additionalProperties": false
+    },
     "PagesChangedNotification": {
       "type": "object",
       "properties": {
@@ -12144,6 +12270,314 @@
       "required": [
         "folder"
       ],
+      "additionalProperties": false
+    },
+    "PolicyApplied": {
+      "type": "object",
+      "description": "host/policyApplied (#998): a machine kept this version of the policy.",
+      "properties": {
+        "version": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "additionalProperties": false
+    },
+    "PolicyBudgets": {
+      "type": "object",
+      "description": "Each person's budget per UTC day and per agent (#998, FR-016): a ceiling over their own CostLimits. Money is US dollars.",
+      "properties": {
+        "daily": {
+          "type": "number"
+        },
+        "dailyTokens": {
+          "type": "integer"
+        },
+        "perAgent": {
+          "type": "number"
+        },
+        "perAgentTokens": {
+          "type": "integer"
+        },
+        "allowUnmetered": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Runtime ids that may run under a budget though their turns report neither a cost nor tokens."
+        },
+        "raises": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BudgetRaise"
+          },
+          "description": "An admin's raises, each for one person and one UTC day."
+        }
+      },
+      "required": [
+        "allowUnmetered",
+        "raises"
+      ],
+      "additionalProperties": false
+    },
+    "PolicyEnvironment": {
+      "type": "object",
+      "description": "The variable names a person's own pass-through list may name (#998, FR-011a), * at the end allowed.",
+      "properties": {
+        "passThrough": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "passThrough"
+      ],
+      "additionalProperties": false
+    },
+    "PolicyHelpers": {
+      "type": "object",
+      "description": "The ceiling over each project's helper limits (#998, #64).",
+      "properties": {
+        "mostRunning": {
+          "type": "integer"
+        },
+        "mostNotArchived": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PolicyKept": {
+      "type": "object",
+      "description": "policy/get and policy/set (#998): the whole policy with its store tag, for an admin. No policy and no rev when none was ever set. machines is each machine's applied version, by host id.",
+      "properties": {
+        "policy": {
+          "$ref": "#/definitions/OrgPolicy"
+        },
+        "rev": {
+          "type": "string"
+        },
+        "machines": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "PolicyMarketplaces": {
+      "type": "object",
+      "description": "The marketplaces a policy allows (#998), by the ids #687 gives them, and whether an MCP server added by hand is allowed.",
+      "properties": {
+        "allowed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "customServers": {
+          "type": "string",
+          "enum": [
+            "allow",
+            "refuse"
+          ]
+        }
+      },
+      "required": [
+        "allowed",
+        "customServers"
+      ],
+      "additionalProperties": false
+    },
+    "PolicyRaiseRequest": {
+      "type": "object",
+      "description": "policy/raise (#998): an admin raises a person's budget for today (UTC).",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "daily": {
+          "type": "number"
+        },
+        "dailyTokens": {
+          "type": "integer"
+        },
+        "request": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "user"
+      ],
+      "additionalProperties": false
+    },
+    "PolicyRefusal": {
+      "type": "object",
+      "description": "The data of a policyRefused error (#998, FR-010): why, the rule, and the words for the client.",
+      "properties": {
+        "reason": {
+          "type": "string",
+          "enum": [
+            "policy",
+            "budget",
+            "stopAll",
+            "noPolicy",
+            "mustJoin",
+            "update"
+          ]
+        },
+        "rule": {
+          "type": "string"
+        },
+        "words": {
+          "type": "string"
+        },
+        "until": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "reason",
+        "words"
+      ],
+      "additionalProperties": false
+    },
+    "PolicyRuntimeRule": {
+      "type": "object",
+      "description": "One allowed runtime in a policy (#998).",
+      "properties": {
+        "models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The model ids allowed, with * at the end allowed (claude-sonnet-*). Absent allows every model."
+        }
+      },
+      "additionalProperties": false
+    },
+    "PolicySet": {
+      "type": "object",
+      "description": "policy/set (#998): the rules, and the rev the admin read. No rev when there was no policy. Refused changedElsewhere when another admin saved first.",
+      "properties": {
+        "policy": {
+          "$ref": "#/definitions/OrgPolicy"
+        },
+        "rev": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "policy"
+      ],
+      "additionalProperties": false
+    },
+    "PolicySetBy": {
+      "type": "object",
+      "description": "The mark on a choice a policy refuses or caps (#998, FR-010).",
+      "properties": {
+        "by": {
+          "type": "string",
+          "enum": [
+            "organisation"
+          ]
+        },
+        "rule": {
+          "type": "string"
+        },
+        "words": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "by",
+        "rule",
+        "words"
+      ],
+      "additionalProperties": false
+    },
+    "PolicySignature": {
+      "type": "object",
+      "description": "The control key's signature of a policy (#998, FR-004), kept at v1/policy.sig: ECDSA P-256 with SHA-256 (es256), over the policy's canonical JSON (keys sorted, no spaces). sig is the 64 bytes r then s.",
+      "properties": {
+        "version": {
+          "type": "integer"
+        },
+        "keyID": {
+          "type": "string",
+          "description": "The first 8 bytes of the SHA-256 of the control key's X9.63 public key, base64url."
+        },
+        "alg": {
+          "type": "string",
+          "enum": [
+            "es256"
+          ]
+        },
+        "sig": {
+          "$ref": "#/definitions/Base64"
+        }
+      },
+      "required": [
+        "version",
+        "keyID",
+        "alg",
+        "sig"
+      ],
+      "additionalProperties": false
+    },
+    "PolicyStopAll": {
+      "type": "object",
+      "description": "The kill switch (#998, FR-015): while on, every machine stops its turns and starts no work.",
+      "properties": {
+        "on": {
+          "type": "boolean"
+        },
+        "by": {
+          "$ref": "#/definitions/AuditActor"
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "on",
+        "by",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "PolicyStopAllRequest": {
+      "type": "object",
+      "description": "policy/stopAll (#998): the kill switch on or off, with an optional note.",
+      "properties": {
+        "on": {
+          "type": "boolean"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "on"
+      ],
+      "additionalProperties": false
+    },
+    "PolicyView": {
+      "type": "object",
+      "description": "policy/mine and control/policyChanged (#998): the policy in force, for any person, with only their own budget raises. No policy when none was ever set.",
+      "properties": {
+        "policy": {
+          "$ref": "#/definitions/OrgPolicy"
+        }
+      },
       "additionalProperties": false
     },
     "PresenceReport": {
@@ -16491,6 +16925,23 @@
         "notSignedIn",
         "unreadable"
       ]
+    },
+    "SignedPolicy": {
+      "type": "object",
+      "description": "A policy and its signature (#998): what a machine receives and keeps in <root>/policy.json.",
+      "properties": {
+        "policy": {
+          "$ref": "#/definitions/OrgPolicy"
+        },
+        "signature": {
+          "$ref": "#/definitions/PolicySignature"
+        }
+      },
+      "required": [
+        "policy",
+        "signature"
+      ],
+      "additionalProperties": false
     },
     "Simulator": {
       "type": "object",

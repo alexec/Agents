@@ -149,6 +149,7 @@ nav:
       - reference/events.md
       - reference/channels.md
       - reference/groups.md
+      - reference/policy.md
       - reference/on-every-machine.md
       - reference/reports.md
       - reference/console.md

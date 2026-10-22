@@ -703,6 +703,9 @@ func (s *Service) apply(e controlEvent) {
 	case "userSettingsChanged":
 		// A person's settings or secrets changed at another copy (#1760).
 		s.userChangedHere(e.Subject, nil, true)
+	case "policyChanged", "policyStopAll":
+		// The policy changed at another copy (#998): its machines and clients here.
+		s.policyChangedHere(e.Kind == "policyStopAll")
 	case "linkRequested", "linkDecided":
 		// A channel link asked for, sent on or decided at another copy (#1762).
 		s.links.heardFromCopy(e.Kind, e.Subject)

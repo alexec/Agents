@@ -50,6 +50,7 @@ public enum Capability {
     public static let git1 = "git/1"
     public static let groups1 = "groups/1"
     public static let handover1 = "handover/1"
+    public static let hostPolicy1 = "host.policy/1"
     public static let hostTeam1 = "host.team/1"
     public static let hostUserSettings1 = "host.user-settings/1"
     public static let hostWire1 = "host.wire/1"
@@ -77,6 +78,7 @@ public enum Capability {
     public static let personas1 = "personas/1"
     public static let pins1 = "pins/1"
     public static let plugins1 = "plugins/1"
+    public static let policy1 = "policy/1"
     public static let pool1 = "pool/1"
     public static let preferences1 = "preferences/1"
     public static let presence1 = "presence/1"
@@ -434,6 +436,7 @@ public enum Capability {
         "groups/set": "groups/1",
         "handover/status": "handover/1",
         "host/hello": "host/1",
+        "host/policyApplied": "host.policy/1",
         "host/providerDraft": "host/1",
         "host/status": "host/1",
         "host/workspaces": "host/1",
@@ -474,6 +477,11 @@ public enum Capability {
         "people/remove": "people/1",
         "people/removePreview": "people/1",
         "people/setRole": "people/1",
+        "policy/get": "policy/1",
+        "policy/mine": "policy/1",
+        "policy/raise": "policy/1",
+        "policy/set": "policy/1",
+        "policy/stopAll": "policy/1",
         "projects/detected": "projects/1",
         "providers/add": "providers/1",
         "providers/create": "providers/1",
@@ -526,17 +534,20 @@ public enum Capability {
         "control/linksChanged": "links/1",
         "control/moved": "control/1",
         "control/peopleChanged": "people/1",
+        "control/policyChanged": "policy/1",
         "control/providerDraft": "control/1",
         "control/providersChanged": "control/1",
         "control/secretsLeft": "user/1",
         "control/signInDecided": "signin/1",
         "control/signInRequested": "signin/1",
         "control/signInWaiting": "signin/1",
+        "control/stopAll": "policy/1",
         "control/thisMacHostChanged": "control/1",
         "control/tunnelChanged": "control/1",
         "control/userSettingsChanged": "user/1",
         "control/webChanged": "control/1",
         "host/clients": "host/1",
+        "host/policy": "host.policy/1",
         "host/user": "bots/1",
         "host/userSettings": "user/1",
         "projects/detect": "projects/1",

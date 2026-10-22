@@ -64,6 +64,7 @@ export const Failure = {
   notYours: -32027,
   outsideScratchRoot: -32098,
   pinRefused: -32061,
+  policyRefused: -32076,
   projectHasLiveAgents: -32013,
   providerFailed: -32066,
   providersNeedOneCopy: -32064,
@@ -819,6 +820,21 @@ export interface BringBackRequest {
   patch?: UUID;
   patchOn?: string;
   branches: SentBranch[];
+}
+
+/**
+ * A budget raised for one person for one UTC day (#998, FR-019), kept in the policy and swept the
+ * day after.
+ */
+export interface BudgetRaise {
+  user: string;
+  /** The UTC day, YYYY-MM-DD. */
+  day: string;
+  daily?: number;
+  dailyTokens?: number;
+  by: AuditActor;
+  /** The request in Console ▸ Requests it answers. */
+  request?: string;
 }
 
 export interface BuildOutputRemoved {
@@ -2729,6 +2745,16 @@ export interface HostLink {
   stopWhenIdleMinutes?: number;
 }
 
+/**
+ * host/policy (#998, FR-006): to a machine that says host.policy/1, on its channel 0, at each join
+ * and within 5 seconds of each change. A signed policy, or none when no policy was ever set.
+ */
+export interface HostPolicy {
+  policy?: OrgPolicy;
+  signature?: PolicySignature;
+  none?: boolean;
+}
+
 /** host/providerDraft: a writing agent called one of the writer's tools (#858). */
 export interface HostProviderDraftCall {
   agentID: UUID;
@@ -3534,6 +3560,49 @@ export interface OptionsResponse {
   commands: SlashCommand[];
 }
 
+/**
+ * The organisation's policy (#998, spec 998 FR-001, FR-002): one document, kept by the control
+ * plane at v1/policy.json, signed by its control key and sent to every machine that says
+ * host.policy/1. Each rule is optional; an absent rule sets no ceiling. Only an admin changes it.
+ * The control plane sets version, issued, changedBy and requires; stopAll and budgets.raises change
+ * only by policy/stopAll and policy/raise.
+ */
+export interface OrgPolicy {
+  /** One more at each change. A machine refuses a lower one (FR-008). */
+  version: number;
+  issued: WireDate;
+  changedBy: AuditActor;
+  /**
+   * The capabilities a machine needs to follow this policy: host.policy/1, and one for each later
+   * rule (FR-014). A machine that lacks one starts no agent.
+   */
+  requires: string[];
+  /**
+   * The loosest mode, by ModeLooseness rank 0 to 4. A mode a machine does not know counts as rank
+   * 4.
+   */
+  modeCeiling?: "ask" | "default" | "acceptEdits" | "auto" | "bypassPermissions";
+  /**
+   * Required refuses the choice off and the states none and runtimeControlled. Absent is the
+   * person's choice.
+   */
+  sandbox?: "required";
+  /** The runtimes allowed, by runtime id. Absent allows every runtime. */
+  runtimes?: Record<string, PolicyRuntimeRule>;
+  marketplaces?: PolicyMarketplaces;
+  budgets?: PolicyBudgets;
+  helpers?: PolicyHelpers;
+  environment?: PolicyEnvironment;
+  stopAll?: PolicyStopAll;
+  /**
+   * The control plane refuses agent starts and prompts on a machine that has not applied this
+   * version.
+   */
+  requireFollowing?: boolean;
+  /** Empty. A place for later layers that only make a rule tighter. */
+  groups?: Empty;
+}
+
 export interface PagesChangedNotification {
   folder: URLString;
   folders: string[];
@@ -3837,6 +3906,138 @@ export interface PluginsList {
 
 export interface PluginsListRequest {
   folder: URLString;
+}
+
+/** host/policyApplied (#998): a machine kept this version of the policy. */
+export interface PolicyApplied {
+  version: number;
+}
+
+/**
+ * Each person's budget per UTC day and per agent (#998, FR-016): a ceiling over their own
+ * CostLimits. Money is US dollars.
+ */
+export interface PolicyBudgets {
+  daily?: number;
+  dailyTokens?: number;
+  perAgent?: number;
+  perAgentTokens?: number;
+  /**
+   * Runtime ids that may run under a budget though their turns report neither a cost nor tokens.
+   */
+  allowUnmetered: string[];
+  /** An admin's raises, each for one person and one UTC day. */
+  raises: BudgetRaise[];
+}
+
+/**
+ * The variable names a person's own pass-through list may name (#998, FR-011a), * at the end
+ * allowed.
+ */
+export interface PolicyEnvironment {
+  passThrough: string[];
+}
+
+/** The ceiling over each project's helper limits (#998, #64). */
+export interface PolicyHelpers {
+  mostRunning?: number;
+  mostNotArchived?: number;
+}
+
+/**
+ * policy/get and policy/set (#998): the whole policy with its store tag, for an admin. No policy
+ * and no rev when none was ever set. machines is each machine's applied version, by host id.
+ */
+export interface PolicyKept {
+  policy?: OrgPolicy;
+  rev?: string;
+  machines?: Record<string, number>;
+}
+
+/**
+ * The marketplaces a policy allows (#998), by the ids #687 gives them, and whether an MCP server
+ * added by hand is allowed.
+ */
+export interface PolicyMarketplaces {
+  allowed: string[];
+  customServers: "allow" | "refuse";
+}
+
+/** policy/raise (#998): an admin raises a person's budget for today (UTC). */
+export interface PolicyRaiseRequest {
+  user: string;
+  daily?: number;
+  dailyTokens?: number;
+  request?: string;
+}
+
+/**
+ * The data of a policyRefused error (#998, FR-010): why, the rule, and the words for the client.
+ */
+export interface PolicyRefusal {
+  reason: "policy" | "budget" | "stopAll" | "noPolicy" | "mustJoin" | "update";
+  rule?: string;
+  words: string;
+  until?: WireDate;
+}
+
+/** One allowed runtime in a policy (#998). */
+export interface PolicyRuntimeRule {
+  /**
+   * The model ids allowed, with * at the end allowed (claude-sonnet-*). Absent allows every model.
+   */
+  models?: string[];
+}
+
+/**
+ * policy/set (#998): the rules, and the rev the admin read. No rev when there was no policy.
+ * Refused changedElsewhere when another admin saved first.
+ */
+export interface PolicySet {
+  policy: OrgPolicy;
+  rev?: string;
+}
+
+/** The mark on a choice a policy refuses or caps (#998, FR-010). */
+export interface PolicySetBy {
+  by: "organisation";
+  rule: string;
+  words: string;
+}
+
+/**
+ * The control key's signature of a policy (#998, FR-004), kept at v1/policy.sig: ECDSA P-256 with
+ * SHA-256 (es256), over the policy's canonical JSON (keys sorted, no spaces). sig is the 64 bytes r
+ * then s.
+ */
+export interface PolicySignature {
+  version: number;
+  /** The first 8 bytes of the SHA-256 of the control key's X9.63 public key, base64url. */
+  keyID: string;
+  alg: "es256";
+  sig: Base64;
+}
+
+/** The kill switch (#998, FR-015): while on, every machine stops its turns and starts no work. */
+export interface PolicyStopAll {
+  on: boolean;
+  by: AuditActor;
+  at: WireDate;
+  note?: string;
+}
+
+/** policy/stopAll (#998): the kill switch on or off, with an optional note. */
+export interface PolicyStopAllRequest {
+  on: boolean;
+  note?: string;
+}
+
+/**
+ * policy/mine and control/policyChanged (#998): the policy in force, for any person, with only
+ * their own budget raises. No policy when none was ever set.
+ */
+export interface PolicyView {
+  policy?: OrgPolicy;
 }
 
 export interface PresenceReport {
@@ -5179,6 +5380,12 @@ export interface SignInWaiting {
 export type SignInWantedReason =
   | "notSignedIn"
   | "unreadable";
+
+/** A policy and its signature (#998): what a machine receives and keeps in <root>/policy.json. */
+export interface SignedPolicy {
+  policy: OrgPolicy;
+  signature: PolicySignature;
+}
 
 /**
  * An iOS simulator on a Mac host (#842): its UDID, its name, its system and whether it is booted.
@@ -6901,6 +7108,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BranchSummary: { required: ["name"], optional: ["remote"] },
   BringBack: { required: ["moved", "applied"], optional: [] },
   BringBackRequest: { required: ["folder", "branches"], optional: ["bundle", "patch", "patchOn"] },
+  BudgetRaise: { required: ["user", "day", "by"], optional: ["daily", "dailyTokens", "request"] },
   BuildOutputRemoved: { required: ["removed", "freed"], optional: [] },
   CancelWaitRequest: { required: ["agentID"], optional: [] },
   CapReached: { required: ["user", "name", "spentUSD", "capUSD", "until"], optional: ["group"] },
@@ -7082,6 +7290,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HostJoinTicket: { required: ["request", "code", "expires"], optional: [] },
   HostLastHeard: { required: ["host"], optional: ["projects", "agents", "heardAt"] },
   HostLink: { required: ["host", "provider", "workspace"], optional: ["startWhenUsed", "stopWhenIdleMinutes"] },
+  HostPolicy: { required: [], optional: ["policy", "signature", "none"] },
   HostProviderDraftCall: { required: ["agentID", "draft", "tool"], optional: ["arguments"] },
   HostRelayRequest: { required: ["host", "relay"], optional: [] },
   HostRequest: { required: ["host"], optional: ["purge"] },
@@ -7175,6 +7384,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID"] },
   OptionsRequest: { required: ["runtimeID", "cwd", "mcpServers"], optional: [] },
   OptionsResponse: { required: ["draftID", "options", "commands"], optional: [] },
+  OrgPolicy: { required: ["version", "issued", "changedBy", "requires"], optional: ["modeCeiling", "sandbox", "runtimes", "marketplaces", "budgets", "helpers", "environment", "stopAll", "requireFollowing", "groups"] },
   PagesChangedNotification: { required: ["folder", "folders"], optional: [] },
   PairingCode: { required: ["macKey", "secret", "name", "expires"], optional: [] },
   PairingSecret: { required: [], optional: ["secret", "expires"] },
@@ -7214,6 +7424,21 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PluginApproveRequest: { required: ["plugin", "digest"], optional: [] },
   PluginsList: { required: ["folder", "plugins"], optional: [] },
   PluginsListRequest: { required: ["folder"], optional: [] },
+  PolicyApplied: { required: ["version"], optional: [] },
+  PolicyBudgets: { required: ["allowUnmetered", "raises"], optional: ["daily", "dailyTokens", "perAgent", "perAgentTokens"] },
+  PolicyEnvironment: { required: ["passThrough"], optional: [] },
+  PolicyHelpers: { required: [], optional: ["mostRunning", "mostNotArchived"] },
+  PolicyKept: { required: [], optional: ["policy", "rev", "machines"] },
+  PolicyMarketplaces: { required: ["allowed", "customServers"], optional: [] },
+  PolicyRaiseRequest: { required: ["user"], optional: ["daily", "dailyTokens", "request"] },
+  PolicyRefusal: { required: ["reason", "words"], optional: ["rule", "until"] },
+  PolicyRuntimeRule: { required: [], optional: ["models"] },
+  PolicySet: { required: ["policy"], optional: ["rev"] },
+  PolicySetBy: { required: ["by", "rule", "words"], optional: [] },
+  PolicySignature: { required: ["version", "keyID", "alg", "sig"], optional: [] },
+  PolicyStopAll: { required: ["on", "by", "at"], optional: ["note"] },
+  PolicyStopAllRequest: { required: ["on"], optional: ["note"] },
+  PolicyView: { required: [], optional: ["policy"] },
   PresenceReport: { required: ["active"], optional: ["watching", "mayNotify", "showing", "alsoShowing"] },
   PreviewFile: { required: ["path", "bytes", "runnable", "via"], optional: [] },
   PrewarmRequest: { required: ["agentID", "why"], optional: [] },
@@ -7361,6 +7586,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SignInRemove: { required: ["provider", "account"], optional: [] },
   SignInRequest: { required: ["request", "name", "kind", "provider", "code", "expires"], optional: ["login"] },
   SignInWaiting: { required: ["code", "expires"], optional: [] },
+  SignedPolicy: { required: ["policy", "signature"], optional: [] },
   Simulator: { required: ["udid", "name", "os", "booted"], optional: [] },
   SimulatorList: { required: ["simulators"], optional: ["reason"] },
   SimulatorRequest: { required: ["udid"], optional: [] },

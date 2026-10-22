@@ -107,6 +107,11 @@ var own = methodSet(
 	"people/remove",
 	"people/removePreview",
 	"people/setRole",
+	"policy/get",
+	"policy/mine",
+	"policy/raise",
+	"policy/set",
+	"policy/stopAll",
 	"providers/setGroup",
 	"reports/export",
 	"reports/usage",
@@ -180,6 +185,9 @@ var writes = methodSet(
 	"people/invite",
 	"people/remove",
 	"people/setRole",
+	"policy/raise",
+	"policy/set",
+	"policy/stopAll",
 	"providers/setGroup",
 	"reports/setPolicy",
 	"signIn/addToMe",
@@ -244,6 +252,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return m.groupsMethod(ctx, method, params, from)
 	case "bots/make", "bots/setCaps", "bots/stopRun":
 		return m.botsMethod(ctx, method, params, from)
+	case "policy/get", "policy/mine", "policy/set", "policy/stopAll", "policy/raise":
+		return m.policyMethod(ctx, method, params, from)
 	case "links/list", "links/requests", "links/approve", "links/deny", "links/remove":
 		return m.linksMethod(ctx, method, params, from)
 	case "signIn/providers", "signIn/pair", "signIn/addToMe", "signIn/removeFromMe", "signIn/configure",
@@ -884,6 +894,12 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 	case "attention/need":
 		m.s.heard(host, params)
 		return map[string]any{}, nil
+	case "host/policyApplied":
+		applied, err := require[wire.PolicyApplied](params, "PolicyApplied")
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{}, m.s.policyApplied(ctx, host, applied)
 	case "attention/turn":
 		turn, err := require[wire.AttentionTurn](params, "AttentionTurn")
 		if err != nil {
@@ -1058,6 +1074,8 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.HostHello) 
 	}
 	// Its person's settings and secrets, at every join (#1760, FR-024).
 	go m.s.sendUserSettings(host, true)
+	// The organisation's policy, or none, at every join (#998, FR-006).
+	go m.s.sendPolicy(host, true)
 	// Its user, their kind and labels (#1761); a bot's cap is weighed again.
 	go func() {
 		m.s.sendHostUser(host)
