@@ -374,6 +374,13 @@ func (m *Methods) removePerson(ctx context.Context, user string, from Caller) er
 	// A Remove request answered, and the refresh tokens kept for them (#1002).
 	_ = m.s.cfg.Store.Delete(ctx, removeRequestKey(user))
 	m.s.signIns.dropRefreshes(ctx, user)
+	// Their user settings, sealed secrets and saved report views (#2293).
+	if m.s.users != nil {
+		if err := m.s.users.Forget(ctx, user); err != nil {
+			m.s.log("person " + user + ": their settings could not be deleted: " + err.Error())
+		}
+	}
+	_ = m.s.cfg.Store.Delete(ctx, reportViewsKey(user))
 	m.s.peopleChanged(user, true)
 	m.s.log("person " + user + " removed")
 	return nil

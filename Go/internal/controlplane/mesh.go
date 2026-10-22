@@ -42,7 +42,9 @@ type hostLease struct {
 	Expires records.Stamp `json:"expires"`
 }
 
-func leaseKey(host string) string      { return "v1/leases/" + host + ".json" }
+const leasesPrefix = "v1/leases/"
+
+func leaseKey(host string) string      { return leasesPrefix + host + ".json" }
 func copyRecordKey(copy string) string { return "v1/copies/" + copy + ".json" }
 
 type heldLease struct {

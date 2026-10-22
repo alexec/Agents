@@ -141,6 +141,24 @@ func (b *Book) Settings(ctx context.Context, user string) (wire.UserSettings, er
 	return out, nil
 }
 
+// Forget deletes everything kept for a person: their settings and every sealed secret
+// (#2293). For a person removed, so what was theirs does not stay for ever.
+func (b *Book) Forget(ctx context.Context, user string) error {
+	if err := checkUser(user); err != nil {
+		return err
+	}
+	keys, err := b.store.List(ctx, Prefix+user+"/")
+	if err != nil {
+		return err
+	}
+	for _, k := range keys {
+		if err := b.store.Delete(ctx, k.Key); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // kinds is the JSON a part must be: an object, but for resources, a list.
 func partKind(part wire.UserSettingsPartName) (string, bool) {
 	switch part {

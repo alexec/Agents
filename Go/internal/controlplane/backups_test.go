@@ -208,3 +208,31 @@ func TestBackupsKeepTheNewestOfEachHost(t *testing.T) {
 		}
 	}
 }
+
+// #2293: when no host of an owner is left to back up, the sweep's daily pass still prunes
+// their removed hosts' old backups and a cut-off backup's parts.
+func TestTheSweepPrunesBackupsNoHostPrunes(t *testing.T) {
+	b, st, owner := backupPlane(t)
+	b.now = func() time.Time { return time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC) }
+	if _, err := putBackup(t, b, "b", "20261019T120000Z", [][]byte{[]byte("b")}, 3); err != nil {
+		t.Fatal(err)
+	}
+	b.said("backups/upload", "a", raw(t, wire.BackupStorePart{Name: "20261018T000000Z", Part: 0, Data: []byte("cut off")}))
+	b.records.RemoveHost(context.Background(), "a")
+	b.records.RemoveHost(context.Background(), "b")
+	// Recent: kept, for a new server to restore.
+	if err := b.pruneOrphans(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if keys, _ := st.List(context.Background(), b.hostFolder(owner, "b")); len(keys) != 2 {
+		t.Fatalf("b's recent backup went: %v", keys)
+	}
+	if keys, _ := st.List(context.Background(), b.hostFolder(owner, "a")); len(keys) != 0 {
+		t.Fatalf("a's cut-off part stayed: %v", keys)
+	}
+	b.now = func() time.Time { return time.Date(2027, 2, 1, 0, 0, 0, 0, time.UTC) }
+	b.pruneOrphans(context.Background())
+	if keys, _ := st.List(context.Background(), backupsPrefix); len(keys) != 0 {
+		t.Fatalf("left %v", keys)
+	}
+}

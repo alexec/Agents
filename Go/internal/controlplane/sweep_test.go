@@ -176,6 +176,39 @@ func TestTheSweepRoundsStop(t *testing.T) {
 	}
 }
 
+// #2293: an expired lease of a host with no record goes, a live one or a known host's
+// stays; an org route's tombstone goes with its secret.
+func TestTheSweepRemovesOrphans(t *testing.T) {
+	ctx := context.Background()
+	s := store.NewMemory()
+	rs := records.New(s)
+	now := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
+	if err := rs.SaveHost(ctx, records.HostRecord{ID: "KNOWN", Name: "known"}); err != nil {
+		t.Fatal(err)
+	}
+	lease := func(host string, expires time.Time) {
+		data, _ := records.Encode(hostLease{Host: host, Copy: "c", Epoch: 3, Expires: records.At(expires)})
+		s.Put(ctx, leaseKey(host), data, store.Always)
+	}
+	lease("KNOWN", now.Add(-time.Hour))
+	lease("GONE", now.Add(-time.Hour))
+	lease("GOING", now.Add(time.Minute))
+	s.Put(ctx, orgRouteKey("r1"), []byte(`{"removed":true}`), store.Always)
+	s.Put(ctx, orgSecretKey("r1"), []byte(`{}`), store.Always)
+	s.Put(ctx, orgRouteKey("r2"), []byte(`{"id":"r2","name":"live"}`), store.Always)
+	s.Put(ctx, orgSecretKey("r2"), []byte(`{}`), store.Always)
+	report, err := sweep(ctx, rs, now, mostPerSweep, nil)
+	if err != nil || report.orphans != 2 {
+		t.Fatalf("%+v %v", report, err)
+	}
+	for key, kept := range map[string]bool{leaseKey("KNOWN"): true, leaseKey("GONE"): false, leaseKey("GOING"): true,
+		orgRouteKey("r1"): false, orgSecretKey("r1"): false, orgRouteKey("r2"): true, orgSecretKey("r2"): true} {
+		if o, _ := s.Get(ctx, key); (o != nil) != kept {
+			t.Errorf("%s kept %v", key, o != nil)
+		}
+	}
+}
+
 // listCounter is a store that counts its lists.
 type listCounter struct {
 	store.Store
