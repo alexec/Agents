@@ -16,6 +16,8 @@ Nothing here needs doing; it is for understanding.
   run it, and what happens when it is down.
 - [People and machines](people-and-machines.md): why each client is a person's and each
   machine one user's, what an admin sees, and why machines are not shared.
+- [Compliance pack](compliance/index.md): for an organisation's IT and security team: the
+  data flow, the sub-processors, a security overview, and data and retention.
 - [The window and the host](window-and-daemon.md): why agents keep working when the
   window is closed, what Agents Host does, and what happens when the Mac restarts.
 - [Why agents' own tools are taken away](scoped-tools.md): what a runtime loses in the
