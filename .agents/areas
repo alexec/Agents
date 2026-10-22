@@ -342,6 +342,19 @@ Go/cmd/agents-control/                                 control-plane
 Go/internal/controlplane/                              control-plane
 Go/internal/controllink/                               control-plane
 
+# hosted: the hosted service (#1003, T10): many organisations on one service, sign-up,
+# plans and its pages. After control-plane, so that its deploy files win over deploy/.
+Go/cmd/agents-hosted/                                  hosted
+Go/internal/hosted/                                    hosted
+docs/how-to/run-the-hosted-service.md                  hosted
+specs/1003-*/                                          hosted
+deploy/compose.hosted.yaml                             hosted
+deploy/Caddyfile.hosted                                hosted
+# hosted-ops: running the hosted service in the cloud (#2223).
+deploy/gcp/hosted*                                     hosted-ops
+# billing: plans bought through Stripe (#2224). After hosted, so that it wins.
+Go/internal/hosted/billing/                            billing
+
 # hosts: the machines agents run on: Agents Host, agentsd, servers over ssh, Linux
 # hosts, wakefulness and lending.
 Host/                                                  hosts
