@@ -73,3 +73,29 @@ test("a late answer to another scope is not taken for this one (#2201)", () => {
   assert.equal(r.sameScope({ kind: "group", group: "g1" }, { kind: "group", group: "g2" }), false);
   assert.equal(r.sameScope({ kind: "group", group: "g1" }, { kind: "group", group: "g1" }), true);
 });
+
+// Outcomes and Time (#2019): the counts each machine adds to its rows.
+test("outcomes add up by person, merged first, with the cost of each merged pull request", () => {
+  const counts = (over) => ({ sessions: 0, prsOpened: 0, prsMerged: 0, prsReverted: 0, mergeSeconds: 0, waits: 0, waitBuckets: [0, 0, 0, 0, 0, 0], ...over });
+  const rows = [
+    row({ cost: { USD: 8 }, counts: counts({ sessions: 3, prsOpened: 2, prsMerged: 2, prsReverted: 1, mergeSeconds: 7200 }) }),
+    row({ person: "al", personName: "Al", cost: { USD: 1 }, workingSeconds: 60, waitingSeconds: 180,
+      counts: counts({ sessions: 1, waits: 3, waitBuckets: [1, 0, 2, 0, 0, 0] }) }),
+    // A machine before #2019 sends no counts.
+    row({ person: "cy", personName: "Cy", cost: { USD: 2 }, workingSeconds: 100 }),
+  ];
+  const out = r.outcomeTotals(rows, "person", "merged");
+  assert.deepEqual(out.groups.map((g) => g.name), ["Bea", "Al", "Cy"]);
+  assert.equal(out.total.merged, 2);
+  assert.equal(out.total.sessions, 4);
+  assert.equal(r.outcomeLine(out.groups[0]), `2 merged of 2 opened · 1 revert · ${new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(4)} a merged pull request · 1h from start to merge · 3 sessions`);
+  assert.equal(r.outcomeLine(out.groups[2]), "0 merged of 0 opened · 0 sessions");
+
+  const time = r.outcomeTotals(rows, "person", "waiting");
+  assert.equal(time.groups[0].name, "Al");
+  assert.equal(r.waitingShare(time.groups[0]), 0.75);
+  assert.equal(r.medianWait(time.groups[0].buckets), "5 to 15 minutes");
+  assert.equal(r.medianWait([0, 0, 0, 0, 0, 0]), null);
+  assert.equal(r.timeLine(time.groups[0]), "Waiting for a person 75% of the time · 3 waits, the middle one 5 to 15 minutes · 1m working");
+  assert.equal(r.timeLine(time.groups[2]), "Waiting for a person 0% of the time · no waits · 2m working");
+});

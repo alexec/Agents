@@ -5979,6 +5979,30 @@ type RenameRequest struct {
 	Title string `json:"title"`
 }
 
+// What a machine's agents did in an hour or a day (#2019), counted from its own event log and its time ledger: never a conversation's words. Absent from a machine before #2019.
+type ReportCounts struct {
+	// Agents that began their first turn (agent.started).
+	Sessions int64 `json:"sessions"`
+
+	// Pull and merge requests opened from an agent's branch on this machine (pr.opened).
+	PrsOpened int64 `json:"prsOpened"`
+
+	// Those merged (pr.merged).
+	PrsMerged int64 `json:"prsMerged"`
+
+	// Of those merged, the ones that revert another: a title that starts with "Revert".
+	PrsReverted int64 `json:"prsReverted"`
+
+	// The merged ones' time from their agent's start to the merge, added up: divide by prsMerged for the mean.
+	MergeSeconds float64 `json:"mergeSeconds"`
+
+	// The times an agent waited for its person in a turn (a question, a form, a permission).
+	Waits int64 `json:"waits"`
+
+	// The waits by how long each was: under 1 minute, 5, 15, 60, 240, and longer. Six numbers.
+	WaitBuckets []int64 `json:"waitBuckets"`
+}
+
 // reports/export's answer (#1811): the rows as CSV or JSON lines.
 type ReportExport struct {
 	Text string `json:"text"`
@@ -6066,6 +6090,9 @@ type ReportRow struct {
 
 	// The groups the person is in (#1804), by id, for a group or organisation scope; absent when the person is hidden.
 	Groups []string `json:"groups,omitzero"`
+
+	// What the agents did (#2019): sessions, pull requests and waits.
+	Counts *ReportCounts `json:"counts,omitzero"`
 }
 
 // Whose rows a report adds up (#1804).
@@ -8066,6 +8093,9 @@ type UsageRollupRow struct {
 
 	// Waiting for the person: TimeBucket's person.
 	WaitingSeconds float64 `json:"waitingSeconds"`
+
+	// What the agents did (#2019): sessions, pull requests and waits.
+	Counts *ReportCounts `json:"counts,omitzero"`
 }
 
 // The agentConfig part (#1760): the person's own instructions, personas and skills, as ~/.agents keeps them on each machine.

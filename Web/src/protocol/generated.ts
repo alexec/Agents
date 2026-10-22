@@ -4543,6 +4543,30 @@ export interface RenameRequest {
   title: string;
 }
 
+/**
+ * What a machine's agents did in an hour or a day (#2019), counted from its own event log and its
+ * time ledger: never a conversation's words. Absent from a machine before #2019.
+ */
+export interface ReportCounts {
+  /** Agents that began their first turn (agent.started). */
+  sessions: number;
+  /** Pull and merge requests opened from an agent's branch on this machine (pr.opened). */
+  prsOpened: number;
+  /** Those merged (pr.merged). */
+  prsMerged: number;
+  /** Of those merged, the ones that revert another: a title that starts with "Revert". */
+  prsReverted: number;
+  /**
+   * The merged ones' time from their agent's start to the merge, added up: divide by prsMerged for
+   * the mean.
+   */
+  mergeSeconds: number;
+  /** The times an agent waited for its person in a turn (a question, a form, a permission). */
+  waits: number;
+  /** The waits by how long each was: under 1 minute, 5, 15, 60, 240, and longer. Six numbers. */
+  waitBuckets: number[];
+}
+
 /** reports/export's answer (#1811): the rows as CSV or JSON lines. */
 export interface ReportExport {
   text: string;
@@ -4614,6 +4638,8 @@ export interface ReportRow {
    * person is hidden.
    */
   groups?: string[];
+  /** What the agents did (#2019): sessions, pull requests and waits. */
+  counts?: ReportCounts;
 }
 
 /** Whose rows a report adds up (#1804). */
@@ -6037,6 +6063,8 @@ export interface UsageRollupRow {
   workingSeconds: number;
   /** Waiting for the person: TimeBucket's person. */
   waitingSeconds: number;
+  /** What the agents did (#2019): sessions, pull requests and waits. */
+  counts?: ReportCounts;
 }
 
 /**
@@ -7563,10 +7591,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RemovalCheck: { required: ["blockedBy", "uncommitted", "unmerged"], optional: [] },
   RemoveResourceRequest: { required: ["name"], optional: [] },
   RenameRequest: { required: ["agentID", "title"], optional: [] },
+  ReportCounts: { required: ["sessions", "prsOpened", "prsMerged", "prsReverted", "mergeSeconds", "waits", "waitBuckets"], optional: [] },
   ReportExport: { required: ["text", "count", "format"], optional: [] },
   ReportPolicy: { required: ["totalsOnly", "leads", "budgetsUSD"], optional: [] },
   ReportQuery: { required: ["range"], optional: ["format", "scope"] },
-  ReportRow: { required: ["at", "person", "personName", "host", "hostName", "project", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds"], optional: ["groups"] },
+  ReportRow: { required: ["at", "person", "personName", "host", "hostName", "project", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds"], optional: ["groups", "counts"] },
   ReportScope: { required: ["kind"], optional: ["group"] },
   ReportScopeOption: { required: ["scope", "name"], optional: [] },
   ReportScopes: { required: ["scopes", "admin"], optional: [] },
@@ -7715,7 +7744,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   UsageReport: { required: ["range", "rows", "admin"], optional: ["scope", "personsHidden", "groupNames", "budgetUSD", "monthSpentUSD"] },
   UsageRollup: { required: ["hours", "days"], optional: [] },
   UsageRollupPeriod: { required: ["at", "rows"], optional: [] },
-  UsageRollupRow: { required: ["project", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds"], optional: [] },
+  UsageRollupRow: { required: ["project", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds"], optional: ["counts"] },
   UserAgentConfig: { required: [], optional: ["instructions", "personas", "skills"] },
   UserPartHere: { required: ["part", "value"], optional: ["leftOut"] },
   UserPartRequest: { required: ["part"], optional: [] },

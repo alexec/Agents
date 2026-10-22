@@ -155,3 +155,113 @@ export function budgetWords(spent: number, budget: number, now: Date = new Date(
   const over = forecast > budget ? ", over budget" : "";
   return `${money(spent, "USD")} of ${money(budget, "USD")} this month · forecast ${money(forecast, "USD")}${over}`;
 }
+
+// Outcomes and Time (#2019): what the agents did, from the counts each machine adds to its rows
+// (ReportCounts). A machine before #2019 sends none, so its rows count as nothing done.
+
+export interface OutcomeGroup {
+  id: string;
+  name: string;
+  cost: Record<string, number>;
+  sessions: number;
+  opened: number;
+  merged: number;
+  reverted: number;
+  mergeSeconds: number;
+  workingSeconds: number;
+  waitingSeconds: number;
+  waits: number;
+  /** The waits by length, as ReportCounts.waitBuckets. */
+  buckets: number[];
+}
+
+const blankOutcome = (id: string, name: string): OutcomeGroup => ({ id, name, cost: {}, sessions: 0, opened: 0, merged: 0, reverted: 0,
+  mergeSeconds: 0, workingSeconds: 0, waitingSeconds: 0, waits: 0, buckets: [0, 0, 0, 0, 0, 0] });
+
+function addOutcome(g: OutcomeGroup, r: ReportRow) {
+  for (const [currency, amount] of Object.entries(r.cost)) g.cost[currency] = (g.cost[currency] ?? 0) + amount;
+  g.workingSeconds += r.workingSeconds;
+  g.waitingSeconds += r.waitingSeconds;
+  const c = r.counts;
+  if (!c) return;
+  g.sessions += c.sessions;
+  g.opened += c.prsOpened;
+  g.merged += c.prsMerged;
+  g.reverted += c.prsReverted;
+  g.mergeSeconds += c.mergeSeconds;
+  g.waits += c.waits;
+  c.waitBuckets.forEach((n, i) => { if (i < g.buckets.length) g.buckets[i]! += n; });
+}
+
+export interface OutcomeTotals {
+  groups: OutcomeGroup[];
+  total: OutcomeGroup;
+}
+
+/** The rows added up by a dimension. `order` sorts the groups: merged first for Outcomes, waiting first for Time. */
+export function outcomeTotals(rows: readonly ReportRow[], by: ReportDimension, order: "merged" | "waiting",
+  runtimeName: (id: string) => string = (id) => id, groupNames: Record<string, string> = {}): OutcomeTotals {
+  const groups = new Map<string, OutcomeGroup>();
+  const total = blankOutcome("", "Total");
+  for (const r of rows) {
+    for (const [id, name] of keys(r, by, runtimeName, groupNames)) {
+      const g = groups.get(id) ?? blankOutcome(id, name);
+      groups.set(id, g);
+      addOutcome(g, r);
+    }
+    addOutcome(total, r);
+  }
+  const sorted = [...groups.values()].sort((a, b) => order === "merged"
+    ? b.merged - a.merged || b.opened - a.opened || b.sessions - a.sessions || a.name.localeCompare(b.name)
+    : waitingShare(b) - waitingShare(a) || b.waits - a.waits || a.name.localeCompare(b.name));
+  return { groups: sorted, total };
+}
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** "3 merged of 4 opened · 1 revert · $7.90 a merged pull request · 2h 10m from start to merge · 5 sessions". */
+export function outcomeLine(g: OutcomeGroup): string {
+  const parts = [`${g.merged} merged of ${g.opened} opened`];
+  if (g.reverted > 0) parts.push(plural(g.reverted, "revert", "reverts"));
+  if (g.merged > 0) {
+    for (const [c, v] of Object.entries(g.cost).sort(([a], [b]) => a.localeCompare(b))) parts.push(`${money(v / g.merged, c)} a merged pull request`);
+    parts.push(`${timeWords(g.mergeSeconds / g.merged)} from start to merge`);
+  }
+  parts.push(plural(g.sessions, "session", "sessions"));
+  return parts.join(" · ");
+}
+
+export const outcomesNote = "A pull or merge request counts when an agent made it on its own branch, and the machine heard of it: a workflow or a wait on pr.opened or pr.merged. A revert is one whose title starts with “Revert”. The time is from the agent’s start to the merge.";
+export const noOutcomes = "No sessions or pull requests in this time. Each machine sends what its agents did once an hour.";
+
+/** The share of the agents' time spent waiting for a person, 0 to 1. */
+export function waitingShare(g: Pick<OutcomeGroup, "workingSeconds" | "waitingSeconds">): number {
+  const all = g.workingSeconds + g.waitingSeconds;
+  return all > 0 ? g.waitingSeconds / all : 0;
+}
+
+/** What each of ReportCounts.waitBuckets holds. */
+export const waitBucketWords = ["under 1 minute", "1 to 5 minutes", "5 to 15 minutes", "15 to 60 minutes", "1 to 4 hours", "over 4 hours"];
+
+/** The bucket the middle wait is in, or null with no waits. */
+export function medianWait(buckets: readonly number[]): string | null {
+  const all = buckets.reduce((a, b) => a + b, 0);
+  if (all === 0) return null;
+  let seen = 0;
+  for (let i = 0; i < buckets.length; i++) {
+    seen += buckets[i]!;
+    if (seen * 2 >= all) return waitBucketWords[i] ?? null;
+  }
+  return null;
+}
+
+/** "Waiting for a person 38% of the time · 12 waits, the middle one 5 to 15 minutes · 6h 10m working". */
+export function timeLine(g: OutcomeGroup): string {
+  const parts = [`Waiting for a person ${Math.round(waitingShare(g) * 100)}% of the time`];
+  const middle = medianWait(g.buckets);
+  parts.push(middle ? `${plural(g.waits, "wait", "waits")}, the middle one ${middle}` : "no waits");
+  parts.push(`${timeWords(g.workingSeconds)} working`);
+  return parts.join(" · ");
+}
+
+export const timeNote = "Working is the agent, its tools and waiting on others. Waiting is a question, a form or a permission that waits for its person. When the agents wait a lot, the fix may be people, not machines.";

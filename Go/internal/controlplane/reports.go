@@ -221,7 +221,8 @@ func (s *Service) reportFrom(ctx context.Context, prefix, first string, keep fun
 				HostName: host.Name, Project: row.Project, Runtime: row.Runtime, Cost: cost,
 				InputTokens: row.InputTokens, OutputTokens: row.OutputTokens, ThoughtTokens: row.ThoughtTokens,
 				CachedReadTokens: row.CachedReadTokens, CachedWriteTokens: row.CachedWriteTokens, Turns: row.Turns,
-				UnpricedTurns: row.UnpricedTurns, WorkingSeconds: row.WorkingSeconds, WaitingSeconds: row.WaitingSeconds})
+				UnpricedTurns: row.UnpricedTurns, WorkingSeconds: row.WorkingSeconds, WaitingSeconds: row.WaitingSeconds,
+				Counts: row.Counts})
 		}
 	}
 	sort.SliceStable(out, func(i, j int) bool {
@@ -314,7 +315,8 @@ func reportCSV(rows []wire.ReportRow, groupNames map[string]string) string {
 		header = append(header, "cost"+c)
 	}
 	header = append(header, "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens",
-		"cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds", "groups")
+		"cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds",
+		"sessions", "prsOpened", "prsMerged", "prsReverted", "mergeSeconds", "waits", "groups")
 	var b bytes.Buffer
 	w := csv.NewWriter(&b)
 	w.Write(header)
@@ -327,6 +329,12 @@ func reportCSV(rows []wire.ReportRow, groupNames map[string]string) string {
 		}
 		line = append(line, i(r.InputTokens), i(r.OutputTokens), i(r.ThoughtTokens), i(r.CachedReadTokens),
 			i(r.CachedWriteTokens), i(r.Turns), i(r.UnpricedTurns), f(r.WorkingSeconds), f(r.WaitingSeconds))
+		// What the agents did (#2019), blank from a machine before it.
+		if c := r.Counts; c != nil {
+			line = append(line, i(c.Sessions), i(c.PrsOpened), i(c.PrsMerged), i(c.PrsReverted), f(c.MergeSeconds), i(c.Waits))
+		} else {
+			line = append(line, "", "", "", "", "", "")
+		}
 		var groups []string
 		for _, id := range r.Groups {
 			groups = append(groups, groupNames[id])

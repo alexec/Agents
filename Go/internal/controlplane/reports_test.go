@@ -121,3 +121,30 @@ func TestReportsAreBounded(t *testing.T) {
 		t.Fatal(n)
 	}
 }
+
+// Outcomes and Time (#2019): what the agents did comes through with its row, and in the CSV.
+func TestReportsKeepWhatTheAgentsDid(t *testing.T) {
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	owner := p.host("OWNERS-MAC")
+	_, admin := p.client("Owner's window")
+	hour := time.Now().UTC().Format(usageHourLayout)
+	counts := &wire.ReportCounts{Sessions: 2, PrsOpened: 1, PrsMerged: 1, MergeSeconds: 3600, Waits: 1, WaitBuckets: []int64{1, 0, 0, 0, 0, 0}}
+	rows := []wire.UsageRollupRow{{Project: "shop", Runtime: "claude", Cost: map[string]float64{}, Counts: counts},
+		{Project: "site", Runtime: "codex", Cost: map[string]float64{"USD": 1}}}
+	params, _ := json.Marshal(wire.UsageRollup{Hours: []wire.UsageRollupPeriod{{At: hour, Rows: rows}}, Days: []wire.UsageRollupPeriod{}})
+	if _, err := p.s.methods.HostSaid(owner.member.Host, "usage/rollup", params); err != nil {
+		t.Fatal(err)
+	}
+	var got wire.UsageReport
+	json.Unmarshal(call(t, admin, "", "reports/usage", wire.ReportQuery{Range: wire.ReportRangeDay}), &got)
+	if len(got.Rows) != 2 || got.Rows[0].Counts == nil || got.Rows[0].Counts.PrsMerged != 1 || got.Rows[1].Counts != nil {
+		t.Fatalf("%+v", got.Rows)
+	}
+	var csv wire.ReportExport
+	json.Unmarshal(call(t, admin, "", "reports/export", wire.ReportQuery{Range: wire.ReportRangeDay}), &csv)
+	lines := strings.Split(strings.TrimSpace(csv.Text), "\n")
+	if !strings.HasSuffix(lines[0], ",sessions,prsOpened,prsMerged,prsReverted,mergeSeconds,waits,groups") ||
+		!strings.HasSuffix(lines[1], ",2,1,1,0,3600,1,") || !strings.HasSuffix(lines[2], ",,,,,,,") {
+		t.Fatalf("%v", lines)
+	}
+}
