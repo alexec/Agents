@@ -38,8 +38,8 @@ Security & access ▸ Personal API keys**, make a key with the **Read** permissi
 
 Add Linear's own server from the registry, or by hand with the URL
 `https://mcp.linear.app/mcp`. It signs in with OAuth in your browser. See
-[Add a connector from the registry](add-an-mcp-server-from-the-registry.md) and
-[Sign in to a connector](sign-in-to-an-mcp-server.md).
+[Add a connector from the registry](add-a-connector-from-the-registry.md) and
+[Sign in to a connector](sign-in-to-a-connector.md).
 
 ## Add the page and the events
 
@@ -55,7 +55,7 @@ Add Linear's own server from the registry, or by hand with the URL
    `"env": { "LINEAR_API_KEY": "${LINEAR_API_KEY}" }`.
 
 2. In **Project Settings ▸ Agent Configuration ▸ Connectors**, choose **Approve** on
-   `linear`. See [Add a connector by hand](add-an-mcp-server-by-hand.md).
+   `linear`. See [Add a connector by hand](add-a-connector-by-hand.md).
 
 3. To keep the page in the sidebar, pin it in the project's `.agents/pins.json`:
 

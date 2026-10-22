@@ -186,7 +186,7 @@ for your OK**, until you choose **Approve**; no agent is given it before that. W
 the project both have a connector of the same name, agents in the project get the project's. A
 missing secret is named on the row, and agents start without that connector rather than with an
 empty key. Projects on a server don't show the section. See
-[Add a connector from the registry](../how-to/add-an-mcp-server-from-the-registry.md).
+[Add a connector from the registry](../how-to/add-a-connector-from-the-registry.md).
 
 Nothing from a catalogue is taken on trust. skills.sh does not review what it lists, so the
 app shows every file before anything is written, points out scripts an agent could run, pins

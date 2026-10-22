@@ -40,12 +40,15 @@ ones every Mac app has.
 | Option-Command-I | **View ▸ Show Inspector** or **Hide Inspector** | Opens or closes the sidebar beside the conversation. |
 | Command-1 to Command-6 | **View ▸ Files**, **Changes**, **Terminal**, **Browser**, **Exchanged**, **Background** | Opens that pane of the sidebar. While a permission or question card is up, these yield to the card's answers. |
 | Control-` | **View ▸ Project Terminal** | Shows or hides the selected project's own shells, one to a tab, in its folder under the page, with or without an agent chosen. Hiding them leaves them running. |
+| Command-+, Command-- | **View ▸ Zoom In**, **Zoom Out** | Makes the text of the Markdown page in front larger or smaller. |
+| Command-0 | **View ▸ Actual Size** | Puts the Markdown page in front back to its own size. With no page in front, Command-0 is **Window ▸ Agents (All Projects)**. |
 | Command-Down Arrow | **View ▸ Jump to Latest** | Scrolls the conversation to its end. |
 | Option-Command-E | **View ▸ Events** | Opens the Events page. |
 | Option-Command-L | **View ▸ Resources** | Opens the Resources page, which shows who holds or is waiting for the simulators, browsers and screen. |
 | Option-Command-R | **View ▸ Runtimes** | Opens the Runtimes page, which shows what each runtime can be started on right now and where its allowance stands. |
 | Option-Command-S | **View ▸ Spending** | Opens the Spending page. See [Limit what agents spend](../how-to/limit-spending.md). |
-| Command-F | **View ▸ Find Session** | Puts the keyboard in the sessions column's search field. |
+| Command-F | **View ▸ Find in Chat** | With a chat open in the main window, finds words in its prompts and replies. With no chat open, Command-F is **Find Session**. |
+| Option-Command-F | **View ▸ Find Session** | With a chat open, puts the keyboard in the sessions column's search field. |
 | Command-P | **Go ▸ Open File…** | Finds a file in the open session's folders by name, to read or edit. |
 | Command-? | **Help ▸ Agents Help** | Opens these docs. |
 | Command-, | **Agents ▸ Settings…** | Opens [Settings and the Resources page](settings.md). |

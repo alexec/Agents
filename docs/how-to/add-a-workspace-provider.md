@@ -1,6 +1,6 @@
 ---
 diataxis: how-to
-devices: [mac, server]
+devices: [mac, iphone, ipad, web, server]
 description: Make anything that can start and stop a machine a workspace provider - a preset, your own commands, a tool map over another MCP server, or a server of your own.
 ---
 
@@ -184,6 +184,23 @@ that a map would fix, the refusal has **Write a Tool Map**.
 
 Start and Stop never use the agent: they use the map that you kept.
 
+## On the iPhone, the iPad and the web page
+
+The Remote and the web page add, edit and remove the API presets: DigitalOcean Droplets,
+GitHub Codespaces, Coder workspaces, Google Compute Engine VMs and AWS EC2 instances.
+
+- **iPhone and iPad:** open **Settings**, tap **Workspace providers**, then tap
+  **Add Provider…**.
+- **Web page:** open **Settings**, go to **Workspace providers**, then click **Add
+  Provider…**.
+
+Each one asks for the same fields and the same token as the Mac. The token goes to the
+control plane, and the page never shows it again. **List Again**, **Edit…** and
+**Remove…** are on each provider, and **Stop** and **Unlink** on each linked host.
+
+Add Docker, Cloud Workstations, your own commands and MCP servers in the Mac app. They need
+a CLI or a map, which the Remote and the page do not edit.
+
 ## A provider of your own
 
 Any MCP server that offers `workspaces_list`, `workspace_start` and `workspace_stop` is a
@@ -194,5 +211,5 @@ provider as it is. It needs no map. The tools, their arguments and their answers
 
 - [Start workspaces from Agents](start-workspaces-from-agents.md): link a server and press
   Start.
-- [Add a connector by hand](add-an-mcp-server-by-hand.md): connectors (MCP servers) for agents, which are
+- [Add a connector by hand](add-a-connector-by-hand.md): connectors (MCP servers) for agents, which are
   set up per project, not on the control plane.
