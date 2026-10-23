@@ -578,8 +578,8 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
     ...(store.has(host.id, Capability.agentsExport1) ? [
       { label: "Export Agents…", disabled: down, help: "Download this project's agents as a .tar.gz",
         run: () => exportFromMenu(store, host.id, { folder: folder as NonNullable<AgentsExportRequest["folder"]> }) },
-      { label: "Import Agents…", disabled: down, help: "Bring back the agents of an export, archived, on this project's machine",
-        run: () => importFromMenu(store, host.id) },
+      { label: "Import Agents…", disabled: down, help: "Bring back the agents of an export, archived, into this project",
+        run: () => importFromMenu(store, host.id, { folder, name: project.name }) },
     ] : []),
   ];
   const row = (agent: Agent, tree?: TreeRow) => (

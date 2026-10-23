@@ -759,10 +759,13 @@
     },
     "AgentsImportRequest": {
       "type": "object",
-      "description": "What agents/import takes (#1001): the export sent with agents/importUpload. Its agents come back archived, as a restore brings them; one this machine has, or deleted, is skipped.",
+      "description": "What agents/import takes (#1001): the export sent with agents/importUpload. Its agents come back archived, as a restore brings them; one this machine has, or deleted, is skipped. With `folder`, a project on this machine (the one whose menu was used, #2389), every agent comes back in that project; without it, each in the folder it had where it was exported.",
       "properties": {
         "upload": {
           "$ref": "#/definitions/UUID"
+        },
+        "folder": {
+          "$ref": "#/definitions/URLString"
         }
       },
       "required": [

@@ -119,6 +119,41 @@ func TestExportAnAgentAndImportItOnAnotherMachine(t *testing.T) {
 	}
 }
 
+// #2389: an export from project A, imported from project B's menu on another machine,
+// lands in B, whatever folder A was there; a folder that is no project is refused.
+func TestImportFromAProjectMenuLandsInThatProject(t *testing.T) {
+	a, ca := start(t, t.TempDir())
+	projectA := project(t, ca, 1)
+	one := seeded(t, a, projectA, nil)
+	two := seeded(t, a, projectA, func(x *wire.Agent) {
+		x.Worktree = &wire.AgentWorktree{Name: "w", Root: store.FolderURL(filepath.Join(projectA, "w")), Project: store.FolderURL(projectA)}
+	})
+	_, b := exportOf(t, a, ca, 2, map[string]any{"folder": store.FolderURL(projectA)})
+
+	bd, cb := start(t, t.TempDir())
+	projectB := project(t, cb, 1)
+	upload := store.NewUUID()
+	cb.call(t, 2, "agents/importUpload", map[string]any{"upload": upload, "offset": 0, "data": b})
+	var res wire.BackupRestoreResult
+	if err := json.Unmarshal(cb.call(t, 3, "agents/import", map[string]any{"upload": upload, "folder": store.FolderURL(projectB)}), &res); err != nil {
+		t.Fatal(err)
+	}
+	if res.Restored != 2 {
+		t.Fatalf("imported %+v", res)
+	}
+	got := bd.agentsOf(projectB)
+	if len(got) != 2 || !slices.ContainsFunc(got, func(x wire.Agent) bool { return x.ID == one.ID }) ||
+		!slices.ContainsFunc(got, func(x wire.Agent) bool { return x.ID == two.ID && x.Worktree == nil }) {
+		t.Fatalf("project B holds %+v", got)
+	}
+
+	upload = store.NewUUID()
+	cb.call(t, 4, "agents/importUpload", map[string]any{"upload": upload, "offset": 0, "data": b})
+	if msg := cb.callErr(t, 5, "agents/import", map[string]any{"upload": upload, "folder": store.FolderURL(t.TempDir())}); !strings.Contains(msg, "not a project") {
+		t.Fatalf("no project: %s", msg)
+	}
+}
+
 // A project's export holds its agents and no other project's.
 func TestExportAProject(t *testing.T) {
 	a, ca := start(t, t.TempDir())

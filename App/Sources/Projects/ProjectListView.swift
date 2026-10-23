@@ -817,7 +817,7 @@ private struct ProjectMenu: View {
         // Its agents as a .tar.gz, and an export brought back on its machine (#1001).
         Button("Export Agents…") { Task { await model.exportProject(summary) } }
             .disabled(model.hostUnreachable(summary.host))
-        Button("Import Agents…") { Task { await model.importAgents(on: summary.host) } }
+        Button("Import Agents…") { Task { await model.importAgents(into: summary) } }
             .disabled(model.hostUnreachable(summary.host))
         // Only this Mac's folder is somewhere Finder can show (058, FR-019).
         if model.isOnThisMac(summary.host) {

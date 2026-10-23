@@ -393,9 +393,11 @@ type AgentsExportRequest struct {
 	Folder *URL `json:"folder,omitzero"`
 }
 
-// What agents/import takes (#1001): the export sent with agents/importUpload. Its agents come back archived, as a restore brings them; one this machine has, or deleted, is skipped.
+// What agents/import takes (#1001): the export sent with agents/importUpload. Its agents come back archived, as a restore brings them; one this machine has, or deleted, is skipped. With `folder`, a project on this machine (the one whose menu was used, #2389), every agent comes back in that project; without it, each in the folder it had where it was exported.
 type AgentsImportRequest struct {
 	Upload UUID `json:"upload"`
+
+	Folder *URL `json:"folder,omitzero"`
 }
 
 type AllowanceReading struct {

@@ -589,7 +589,7 @@ func (d *Daemon) restoreBackup(id string) (wire.BackupRestoreResult, error) {
 	archive, _, _ := d.backupPaths(id)
 	// The folder, not the manifest, says whose backup it is.
 	folder, _, _ := strings.Cut(id, "/")
-	return d.restoreArchive(archive, listed.RootID, folder == d.Store.RootID, true)
+	return d.restoreArchive(archive, listed.RootID, folder == d.Store.RootID, true, "")
 }
 
 // restoredElsewhere is the root a record from another machine's backup is stamped with
@@ -599,8 +599,9 @@ const restoredElsewhere = "restored"
 // restoreArchive restores the archive at path; madeIn is the root that made it, and mine
 // whether it is this machine's own backup. An import (#1001) takes no root files
 // (withRoot false): an export has none, and one made by hand must not change this
-// machine's history or its erased list.
-func (d *Daemon) restoreArchive(archive, madeIn string, mine, withRoot bool) (wire.BackupRestoreResult, error) {
+// machine's history or its erased list. into, when not empty, is the project folder every
+// agent is put in (#2389); empty keeps each agent's own.
+func (d *Daemon) restoreArchive(archive, madeIn string, mine, withRoot bool, into string) (wire.BackupRestoreResult, error) {
 	res := wire.BackupRestoreResult{}
 	f, err := os.Open(archive)
 	if err != nil {
@@ -633,7 +634,7 @@ func (d *Daemon) restoreArchive(archive, madeIn string, mine, withRoot bool) (wi
 			res.Skipped++
 			return nil
 		}
-		restored, err := d.restoreAgent(held, files, madeIn, mine)
+		restored, err := d.restoreAgent(held, files, madeIn, mine, into)
 		held, files = "", map[string][]byte{}
 		if err != nil {
 			return err
@@ -695,8 +696,9 @@ func (d *Daemon) restoreArchive(archive, madeIn string, mine, withRoot bool) (wi
 }
 
 // restoreAgent writes one agent's folder and saves its record archived; false when this
-// machine has it already or the record can't be read.
-func (d *Daemon) restoreAgent(id wire.UUID, files map[string][]byte, madeIn string, mine bool) (bool, error) {
+// machine has it already or the record can't be read. into, when not empty, is the folder
+// it is put in: its worktree, which was on the machine that made it, is left behind.
+func (d *Daemon) restoreAgent(id wire.UUID, files map[string][]byte, madeIn string, mine bool, into string) (bool, error) {
 	raw, ok := files["agent.json"]
 	if !ok || d.Store.Agent(id) != nil {
 		return false, nil
@@ -709,6 +711,9 @@ func (d *Daemon) restoreAgent(id wire.UUID, files map[string][]byte, madeIn stri
 		return false, nil
 	}
 	a.ID = id
+	if into != "" {
+		a.Cwd, a.Worktree = store.FolderURL(into), nil
+	}
 	// Made under the root that made the backup. This machine's own record keeps what it
 	// says; one from another machine never names this root, and brings no MCP servers.
 	if mine {

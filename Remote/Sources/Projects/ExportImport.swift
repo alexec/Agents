@@ -32,8 +32,9 @@ enum RemoteExportImport {
         }
     }
 
-    static func importAgents(on host: HostID, model: RemoteModel) {
-        guard let client = model.hostClient(host) else {
+    /// Import Agents… from a project's menu: on that project's machine, into that project.
+    static func importAgents(into summary: DaemonAPI.ProjectSummary, model: RemoteModel) {
+        guard let client = model.hostClient(summary.host) else {
             say("The import did not start", "That machine is not connected.")
             return
         }
@@ -44,8 +45,8 @@ enum RemoteExportImport {
             Task {
                 defer { try? FileManager.default.removeItem(at: file) }
                 do {
-                    let result = try await AgentsExportTransfer.importFile(file, into: client)
-                    say(AgentsExportTransfer.imported(result), nil)
+                    let result = try await AgentsExportTransfer.importFile(file, into: client, folder: summary.folder)
+                    say(AgentsExportTransfer.imported(result, into: summary.name), nil)
                 } catch {
                     say("The import did not finish", error.localizedDescription)
                 }
@@ -114,7 +115,7 @@ struct ExportImportProjectButtons: View {
         }
         .disabled(model.isStale(on: summary.host))
         Button("Import Agents…", systemImage: "square.and.arrow.down") {
-            RemoteExportImport.importAgents(on: summary.host, model: model)
+            RemoteExportImport.importAgents(into: summary, model: model)
         }
         .disabled(model.isStale(on: summary.host))
     }
