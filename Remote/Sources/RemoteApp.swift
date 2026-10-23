@@ -41,14 +41,17 @@ struct RemoteApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RemoteView()
-                .background(Paper.ground)
-                // The organisation turned this person's access off: only that (#1002, FR-029).
-                .overlay {
-                    if model.signIn.suspended {
-                        SuspendedPage(device: UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone")
-                    }
+            Group {
+                // The organisation turned this person's access off: only that (#1002, FR-029),
+                // in place of the screens, so VoiceOver reaches nothing under it and their
+                // sheets close (#2439).
+                if model.signIn.suspended {
+                    SuspendedPage(device: UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone")
+                } else {
+                    RemoteView()
                 }
+            }
+                .background(Paper.ground)
                 // Undo after Archive (#1534), for a few seconds, over the foot of whatever shows.
                 .modifier(ArchiveUndoOverlay())
                 .environment(model)
