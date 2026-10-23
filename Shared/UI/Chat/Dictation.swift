@@ -92,9 +92,9 @@ final class Dictation {
 
     /// Where the switches are, in each system's own words.
     #if os(iOS)
-    private static let whereTheSwitchIs = "Turn it on in Settings, under this app."
+    static let whereTheSwitchIs = "Turn it on in Settings, under this app."
     #else
-    private static let whereTheSwitchIs = "Turn it on in System Settings, under Privacy & Security."
+    static let whereTheSwitchIs = "Turn it on in System Settings, under Privacy & Security."
     #endif
 
     private(set) var isListening = false

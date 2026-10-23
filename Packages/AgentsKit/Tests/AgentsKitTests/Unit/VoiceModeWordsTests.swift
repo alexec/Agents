@@ -14,4 +14,12 @@ struct VoiceModeWordsTests {
     @Test func anAnswerThatDidNotGoSaysItIsOnTheScreen() {
         #expect(VoiceModeWords.answerNotSent == "The answer did not go. It is on the screen.")
     }
+
+    /// #2444: dictation's problem is said as voice mode's, in voice mode's alert.
+    @Test func dictationsProblemIsVoiceModes() {
+        #expect(VoiceModeWords.problem(dictation: "Dictation needs the microphone. Turn it on in Settings, under this app.")
+            == "Voice mode needs the microphone. Turn it on in Settings, under this app.")
+        #expect(VoiceModeWords.problem(dictation: "The microphone would not start: busy")
+            == "The microphone would not start: busy")
+    }
 }

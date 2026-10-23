@@ -44,6 +44,10 @@ enum PromptWords {
     static let atItsCostLimit = "This agent has reached its cost limit"
     static let draftLostSomething = "A picture you had pasted was too large to keep, so it did not come back with the rest."
     static let dictationPrimerTitle = "Say it instead of typing it"
+    static let dictationPrimer = "The phone listens while the button is on, and what you say becomes the words in the prompt. It is recognised on this phone where this phone can do it."
+    /// Before voice mode first listens (#2444).
+    static let voicePrimerTitle = "Talk to the agent"
+    static let voicePrimer = "The phone listens while voice mode is on, and what you say goes to the chat after a short pause. It is recognised on this phone where this phone can do it."
 
     /// The runtime's name as a person knows it.
     static func runtimeName(_ id: String) -> String {

@@ -46,26 +46,13 @@ struct DictateButton: View {
 
     /// Our own words before the system's alert, the first time only.
     private var primer: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(PromptWords.dictationPrimerTitle).appText(.reading).fontWeight(.semibold)
-            Text("The phone listens while the button is on, and what you say becomes the words in the prompt. It is recognised on this phone where this phone can do it.")
-                .foregroundStyle(.secondary)
-            Text("iOS will ask for the microphone and for speech recognition next.")
-                .appText(.supporting)
-                .foregroundStyle(.secondary)
-            HStack {
-                Spacer()
-                Button("Not now") { isPriming = false }
-                    .buttonStyle(.paper)
-                Button("Continue") {
-                    isPriming = false
-                    begin()
-                }
-                .buttonStyle(.paperProminent)
-            }
-        }
-        .padding(20)
-        .presentationDetents([.medium])
+        DictationPrimer(title: PromptWords.dictationPrimerTitle,
+                        what: PromptWords.dictationPrimer,
+                        notNow: { isPriming = false },
+                        continue: {
+                            isPriming = false
+                            begin()
+                        })
     }
 }
 
