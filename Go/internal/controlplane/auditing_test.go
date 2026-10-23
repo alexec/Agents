@@ -17,6 +17,7 @@ import (
 // the control plane knows it by, never the one it names, and the host is told the same
 // actor on the channel. Reads are not kept.
 func TestTheControlPlaneWritesTheActor(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	actors := make(chan *wire.AuditActor, 4)
 	box := p.hostWith("MACHINE-2", func(c controllink.Conn) {
@@ -73,6 +74,7 @@ func TestTheControlPlaneWritesTheActor(t *testing.T) {
 // start's target is held up, as a multi-MB attachment would hold it, the machine still
 // answers and other calls still pass; the entry is kept once the read ends.
 func TestTheAuditTargetIsReadOffTheRoutersLock(t *testing.T) {
+	// Not parallel (#2512): it sets the package's audit target.
 	reading, release := make(chan struct{}), make(chan struct{})
 	var once sync.Once
 	was := auditTarget

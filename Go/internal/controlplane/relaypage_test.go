@@ -20,6 +20,7 @@ import (
 // the same socket, bound to http://localhost:<port>. A browser pairs and connects that way,
 // and is refused anywhere else, as at the control plane's own loopback listener.
 func TestAPageAHostCarries(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	host, _, hostKey := p.rawHostKey("Mac", false)
 	p.waitFor(func() bool { return p.s.router.Reaches(host) }, "the host online")

@@ -15,6 +15,7 @@ import (
 // Reports (#1811): each machine's hours and days, kept as it sends them, added up by
 // person, machine, project and runtime. An admin sees every person; a member their own.
 func TestReportsAddUpWhatMachinesSend(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	owner := p.host("OWNERS-MAC")
 	_, admin := p.client("Owner's window")
@@ -87,6 +88,7 @@ func TestReportsAddUpWhatMachinesSend(t *testing.T) {
 // A machine's period that is too old is let go, a stranger is refused, and the sweep
 // keeps hours 7 days and days 90.
 func TestReportsAreBounded(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	box := p.host("MACHINE-1")
 	now := time.Now().UTC()
@@ -124,6 +126,7 @@ func TestReportsAreBounded(t *testing.T) {
 
 // Outcomes and Time (#2019): what the agents did comes through with its row, and in the CSV.
 func TestReportsKeepWhatTheAgentsDid(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	owner := p.host("OWNERS-MAC")
 	_, admin := p.client("Owner's window")

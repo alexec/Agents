@@ -53,6 +53,7 @@ func twoCopies(t *testing.T) (*plane, *plane) {
 // A host held by copy A, a window at copy B: B reaches the host through A, and the
 // reply comes back the same way (T065).
 func TestAWindowAtOneCopyReachesAHostAtAnother(t *testing.T) {
+	t.Parallel()
 	a, b := twoCopies(t)
 	box := a.host("MACHINE-2")
 	host := box.member.Host
@@ -72,6 +73,7 @@ func TestAWindowAtOneCopyReachesAHostAtAnother(t *testing.T) {
 
 // A client paired at one copy is known at the other at once, and forgotten at both.
 func TestAForgetReachesEveryCopy(t *testing.T) {
+	t.Parallel()
 	a, b := twoCopies(t)
 	member, _ := a.client("Window")
 	phone, phoneAtB := b.client("Phone")
@@ -101,6 +103,7 @@ func TestAForgetReachesEveryCopy(t *testing.T) {
 
 // The store holds whose each host is, and each live copy.
 func TestLeasesAndCopiesAreInTheStore(t *testing.T) {
+	t.Parallel()
 	a, b := twoCopies(t)
 	box := a.host("MACHINE-2")
 	lease := a.s.mesh.leases.holder(context.Background(), box.member.Host)

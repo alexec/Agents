@@ -65,6 +65,7 @@ func notTakingHello(name string) controllink.HostHello {
 }
 
 func TestSettingsAndSecretsGoOnlyToTheirPersonsMachines(t *testing.T) {
+	t.Parallel()
 	key := make([]byte, 32)
 	rand.Read(key)
 	st := store.NewMemory()
@@ -170,6 +171,7 @@ func TestSettingsAndSecretsGoOnlyToTheirPersonsMachines(t *testing.T) {
 }
 
 func TestNoKeeperKeepsNoSecrets(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, window := p.client("Alex's Mac")
 	if e := callError(t, window, "", "user/setSecret", wire.UserSecret{Name: "TOKEN", Value: "v"}); !strings.Contains(e, "-32009") || strings.Contains(e, `"v"`) {

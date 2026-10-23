@@ -537,21 +537,60 @@ jobs:
     if: ${{ always() && !cancelled() && (needs.select.result != 'success' || needs.select.outputs.go != 'skip') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: write
     defaults:
       run:
         working-directory: Go
     steps:
       - uses: actions/checkout@v6
+      # The build cache is our own below, not setup-go's (#2512). setup-go keys it on go.mod
+      # alone, so it held whatever the first run after a go.mod change compiled: by the
+      # afternoon `go test -race` spent 98 s compiling before its first result (run
+      # 39980533674), the job's second-longest part after the controlplane tests.
       - uses: actions/setup-go@v6
         with:
           go-version-file: Go/go.mod
-          cache-dependency-path: Go/go.mod
+          cache: false
+      # Keyed on the Go sources, so each run that changes them saves a key of its own, and a
+      # pull request starts from its own newest, else main's (it can read main's caches, not
+      # another PR's). Go's build cache is content-addressed: an old entry is never used
+      # for new sources, so a restore from an older tree is only less warm, never wrong.
+      # go.mod names the toolchain, so a new Go misses the first prefix.
+      - name: Restore Go build cache
+        id: go-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-race-${{ runner.os }}-${{ hashFiles('Go/go.mod', 'Go/go.sum') }}-${{ hashFiles('Go/**/*.go') }}
+          restore-keys: |
+            go-race-${{ runner.os }}-${{ hashFiles('Go/go.mod', 'Go/go.sum') }}-
+            go-race-${{ runner.os }}-
       - name: Build
         run: go build ./...
       - name: Vet
         run: go vet ./...
       - name: Test
         run: go test -race ./...
+      # A failed test still leaves good compiled packages; a cancelled run may not finish
+      # writing, so it saves nothing. Each ref keeps only its newest, as the Xcode caches do.
+      - name: Save Go build cache
+        if: ${{ always() && !cancelled() && steps.go-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-race-${{ runner.os }}-${{ hashFiles('Go/go.mod', 'Go/go.sum') }}-${{ hashFiles('Go/**/*.go') }}
+      - name: Prune old Go build caches for this ref
+        if: ${{ always() && !cancelled() && steps.go-cache.outputs.cache-hit != 'true' }}
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/prune-ci-caches.sh "go-race-${{ runner.os }}-" "go-race-${{ runner.os }}-${{ hashFiles('Go/go.mod', 'Go/go.sum') }}-${{ hashFiles('Go/**/*.go') }}" "$GITHUB_REF"
 
   # Mixed versions (#1767): the last release's agentsd joined to this tree's control plane,
   # and the last release's control plane with this tree's client, as a person meets them

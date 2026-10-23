@@ -15,6 +15,7 @@ import (
 // control.openrpc.json has every method the control plane answers for a client itself, so
 // its list, made from that document, is true (#1748).
 func TestControlPlaneAnswersItsDocument(t *testing.T) {
+	t.Parallel()
 	for method := range own {
 		// daemon/ping is the home host's, and devices/* the older names of clients/*.
 		if _, ok := wire.ControlCapabilities[method]; !ok && method != "daemon/ping" && !strings.HasPrefix(method, "devices/") {
@@ -32,6 +33,7 @@ func TestControlPlaneAnswersItsDocument(t *testing.T) {
 // control/status says the control plane's list and its required sets; hosts/list says the
 // list each host said.
 func TestStatusAndHostsSayCapabilities(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	box := p.olderHost("MACHINE-2")
 	_, window := p.client("Window")
@@ -54,6 +56,7 @@ func TestStatusAndHostsSayCapabilities(t *testing.T) {
 // A host whose list lacks a required capability needs an update, and is online again once
 // it says one that has the set.
 func TestAHostWithoutTheRequiredSetNeedsAnUpdate(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	box := p.host("MACHINE-2")
 	hello := func(list []string) {
@@ -93,6 +96,7 @@ func TestAHostWithoutTheRequiredSetNeedsAnUpdate(t *testing.T) {
 // A client whose list lacks a required capability is answered -32008 with what it is
 // missing, on each call but control/status; one that says no list is not.
 func TestAClientWithoutTheRequiredSetIsToldToUpdate(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	m, err := controllink.PairClient(context.Background(), p.code(false), "Old window")
 	if err != nil {
@@ -121,6 +125,7 @@ func TestAClientWithoutTheRequiredSetIsToldToUpdate(t *testing.T) {
 // tier is refused with -32074, and is let in again once only one person is left (#1763,
 // R14). This build's client and host are not.
 func TestOlderBuildsAreRefusedOnATeam(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, owner := p.client("Owner's Mac")
 	older := p.olderHost("OLD-BOX")

@@ -33,6 +33,7 @@ func activityState(t *testing.T, push apns.Push) turnActivityState {
 // A phone gives its activity's token; its host says the turn asks, is answered, and ends:
 // each goes to the activity by APNs, with no words, and the end forgets the token (#1744).
 func TestATurnUpdatesItsLiveActivityByPush(t *testing.T) {
+	t.Parallel()
 	pusher := &fakePusher{}
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.Push = pusher })
 	box := p.host("MACHINE-2")
@@ -89,6 +90,7 @@ func TestATurnUpdatesItsLiveActivityByPush(t *testing.T) {
 // An archived session's activity ends at once; a token Apple says is gone is forgotten;
 // no token takes one away; and only a device sets one.
 func TestLiveActivityTokensComeAndGo(t *testing.T) {
+	t.Parallel()
 	pusher := &fakePusher{answer: apns.ErrGone}
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.Push = pusher })
 	_, window := p.client("window")

@@ -13,6 +13,7 @@ import (
 // At its join, a machine that updates Agents Host itself is told the release this control
 // plane names, its own version; one that does not is told nothing (#2178).
 func TestAMachineIsToldTheRelease(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	p.s.cfg.Version = "0.12.0"
 	var mu sync.Mutex

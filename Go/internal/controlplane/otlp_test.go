@@ -18,6 +18,7 @@ import (
 )
 
 func TestOTLPIsSetByTheStandardVariables(t *testing.T) {
+	t.Parallel()
 	env := func(vars map[string]string) func(string) string { return func(k string) string { return vars[k] } }
 	if c, err := OTLPFromEnv(env(nil)); c != nil || err != nil {
 		t.Fatal("on with nothing set")
@@ -42,6 +43,7 @@ func TestOTLPIsSetByTheStandardVariables(t *testing.T) {
 }
 
 func TestOTLPSendsTodaysFiguresByRuntime(t *testing.T) {
+	t.Parallel()
 	var got map[string]any
 	var auth string
 	fail := false

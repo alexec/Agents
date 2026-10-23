@@ -17,6 +17,7 @@ import (
 // suspension ends), and it cannot start a team workflow, check a channel link, take a git
 // credential, open a tunnel or write a backup.
 func TestASuspendedPersonsMachineGetsNoRouteAndStartsNothing(t *testing.T) {
+	t.Parallel()
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), withKeeper(newKeeperKey()))
 	told := newRoutesTold()
 	p.told = told.heard

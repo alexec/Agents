@@ -62,6 +62,7 @@ func (h *hostUsers) of(host string) (wire.HostUser, bool) {
 // an admin is told it is a bot's; one trigger claimed by three machines runs once in 100
 // tries; and its cap stops it, with a notice to the admins.
 func TestABotRunsOncePerTriggerAndStopsAtItsCap(t *testing.T) {
+	t.Parallel()
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.ProviderHome = t.TempDir() })
 	users := &hostUsers{}
 	p.told = users.heard

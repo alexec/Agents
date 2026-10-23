@@ -17,6 +17,7 @@ import (
 )
 
 func TestTheSweepRemovesTheDeadAndKeepsTheLive(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	root := t.TempDir()
 	s := store.NewFolder(root)
@@ -112,6 +113,7 @@ func TestTheSweepRemovesTheDeadAndKeepsTheLive(t *testing.T) {
 }
 
 func TestTheSweepStopsAtItsBound(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	s := store.NewMemory()
 	for n := range 12 {
@@ -126,6 +128,7 @@ func TestTheSweepStopsAtItsBound(t *testing.T) {
 // #2291: more expired than one round deletes goes within a bounded number of rounds of the
 // same hour, not a round an hour for ever.
 func TestTheSweepCatchesUpWithinTheHour(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	s := store.NewMemory()
 	now := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
@@ -149,6 +152,7 @@ func TestTheSweepCatchesUpWithinTheHour(t *testing.T) {
 // The rounds stop when told to (the copy stops serving, or the service stops), and when
 // the next hour's sweep is due: the rest is the next hour's.
 func TestTheSweepRoundsStop(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	fill := func() store.Store {
 		s := store.NewMemory()
@@ -179,6 +183,7 @@ func TestTheSweepRoundsStop(t *testing.T) {
 // #2293: an expired lease of a host with no record goes, a live one or a known host's
 // stays; an org route's tombstone goes with its secret.
 func TestTheSweepRemovesOrphans(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	s := store.NewMemory()
 	rs := records.New(s)
@@ -223,6 +228,7 @@ func (l *listCounter) List(ctx context.Context, prefix string) ([]store.Key, err
 // #2053: the hourly sweep lists the audit's events once, at its first sweep. After that it
 // lists only each day that has expired since, not the 90 days kept.
 func TestTheSweepListsOnlyTheExpiredDays(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	s := &listCounter{Store: store.NewMemory()}
 	now := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
@@ -272,6 +278,7 @@ func TestTheSweepListsOnlyTheExpiredDays(t *testing.T) {
 // A window's whole lists of a host are kept, and said by hosts/lastHeard while the host
 // is offline (#962); a narrowed list is not.
 func TestWhatAHostLastListedIsKept(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	box := p.host("MACHINE-2")
 	_, window := p.client("Window")

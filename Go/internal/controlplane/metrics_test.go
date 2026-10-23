@@ -33,6 +33,7 @@ func scrape(t *testing.T, url, token string) (int, string) {
 // The metrics are served on a listener of their own, in the Prometheus text format, and
 // count what clients asked, what went to machines, the store and the sessions (#2176).
 func TestMetricsAreServedOnTheirOwnListener(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	box := p.host("MACHINE-2")
 	defer box.stop()
@@ -72,6 +73,7 @@ func TestMetricsAreServedOnTheirOwnListener(t *testing.T) {
 
 // Off by default: the port clients and hosts use serves no metrics.
 func TestNoMetricsOnTheClientsPort(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, window := p.client("Alex's MacBook")
 	call(t, window, "", "control/status", nil)
@@ -83,6 +85,7 @@ func TestNoMetricsOnTheClientsPort(t *testing.T) {
 
 // A token is asked for when given, and needed for any address but loopback.
 func TestMetricsTakeAToken(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	if _, err := p.s.ServeMetrics("0.0.0.0:0", ""); err == nil || !strings.Contains(err.Error(), "need a token") {
 		t.Fatal(err)
@@ -104,6 +107,7 @@ func TestMetricsTakeAToken(t *testing.T) {
 
 // A method a client names is a label of its own only for the first few hundred names.
 func TestMetricsMethodsAreBounded(t *testing.T) {
+	t.Parallel()
 	m := newMetrics()
 	for i := range metricsMethods + 50 {
 		m.Request("made/up"+itoa(i), "error", 0)
@@ -134,6 +138,7 @@ func (w *stalledWriter) Write(b []byte) (int, error) {
 // A scraper that stops reading mid-scrape holds no lock: requests, events and store
 // operations are counted at once while it waits (#2249).
 func TestStalledScraperDoesNotBlockCounting(t *testing.T) {
+	t.Parallel()
 	m := newMetrics()
 	for i := range metricsMethods {
 		m.Request("made/up"+itoa(i), "ok", time.Millisecond)
@@ -166,6 +171,7 @@ func TestStalledScraperDoesNotBlockCounting(t *testing.T) {
 // JSON lines with the request's fields at debug, and no token in any line: not a param, not
 // a code, not a bearer token (#2176).
 func TestJSONLogsHoldNoToken(t *testing.T) {
+	t.Parallel()
 	var out syncBuffer
 	logs := NewLog()
 	logs.to = &out
@@ -216,6 +222,7 @@ func TestJSONLogsHoldNoToken(t *testing.T) {
 
 // At info, the request lines are dropped; text lines stay as they were.
 func TestLogLevelAndText(t *testing.T) {
+	t.Parallel()
 	var out syncBuffer
 	logs := NewLog()
 	logs.to = &out

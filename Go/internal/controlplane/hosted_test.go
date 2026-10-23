@@ -11,6 +11,7 @@ import (
 // #1807: a copy we run for an account has no ssh: no tunnels, and no machine installed,
 // found or listed over the servers' own ssh.
 func TestAHostedCopyHasNoSSH(t *testing.T) {
+	t.Parallel()
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.Hosted = true })
 	if p.s.tunnels != nil {
 		t.Fatal("a hosted copy has ssh tunnels")

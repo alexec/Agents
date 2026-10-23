@@ -141,6 +141,7 @@ func storeHolds(t *testing.T, st store.Store, value string) bool {
 // SC-001, US1: a control plane with no route sends an empty list to a machine that keeps
 // routes, nothing to one that does not, and writes nothing.
 func TestNoRouteSendsAnEmptyListAndChangesNothing(t *testing.T) {
+	t.Parallel()
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), withKeeper(newKeeperKey()))
 	told := newRoutesTold()
 	p.told = told.heard
@@ -173,6 +174,7 @@ func TestNoRouteSendsAnEmptyListAndChangesNothing(t *testing.T) {
 // rev and one version higher; no method gives a value back; the store holds none; a member
 // sees only names; a control plane with no keeper keeps no secret.
 func TestAnAdminKeepsARouteAndNoValueComesBack(t *testing.T) {
+	t.Parallel()
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), withKeeper(newKeeperKey()))
 	_, window := p.client("Alex's Mac")
 	sam := p.invite(window, "Sam", wire.UserRoleMember)
@@ -282,6 +284,7 @@ func TestAnAdminKeepsARouteAndNoValueComesBack(t *testing.T) {
 // group: only the group's machines get it, within 5 seconds, and each envelope opens with
 // that machine's key only, and not as another route, machine or version.
 func TestARouteReachesOnlyTheMachinesAllowed(t *testing.T) {
+	// Not parallel (#2512): it holds a wall-clock limit, which other tests running beside it would make flaky.
 	st, private, keeper := store.NewMemory(), controllink.NewPrivateKey(), newKeeperKey()
 	a, b := startCopyWith(t, st, private, withKeeper(keeper)), startCopyWith(t, st, private, withKeeper(keeper))
 	a.waitFor(func() bool { return len(a.s.mesh.peers()) == 1 && len(b.s.mesh.peers()) == 1 }, "the copies linked")
@@ -366,6 +369,7 @@ func TestARouteReachesOnlyTheMachinesAllowed(t *testing.T) {
 // the group and a removed route give an empty list; the audit says "key replaced" and holds
 // no value; a removed machine's person and the admins hear which routes it held.
 func TestReplaceAndRemoveARoute(t *testing.T) {
+	t.Parallel()
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), withKeeper(newKeeperKey()))
 	told := newRoutesTold()
 	p.told = told.heard
@@ -508,6 +512,7 @@ func fakeServiceAccount(t *testing.T) string {
 // FR-007, US7 (Q1 A): a cloud credential stays here; a machine gets only a token that ends
 // within an hour, and a new one about 10 minutes before it ends.
 func TestCloudCredentialsGoAsShortLivedTokens(t *testing.T) {
+	t.Parallel()
 	clouds := newFakeClouds(t)
 	var clock atomic.Int64
 	clock.Store(time.Now().UnixNano())
@@ -614,6 +619,7 @@ func TestCloudCredentialsGoAsShortLivedTokens(t *testing.T) {
 // machine, not once a minute for each one; and a machine keeps the last token until it
 // ends (#2250).
 func TestARefusedCredentialBacksOff(t *testing.T) {
+	t.Parallel()
 	clouds := newFakeClouds(t)
 	var clock atomic.Int64
 	clock.Store(time.Now().UnixNano())
@@ -694,6 +700,7 @@ func TestARefusedCredentialBacksOff(t *testing.T) {
 
 // orgRoutes/check sends one small request with a key, to the vendor or a gateway.
 func TestCheckARoute(t *testing.T) {
+	t.Parallel()
 	const key = "sk-ant-checked-key"
 	vendorAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/models" || r.Header.Get("x-api-key") != key || r.Header.Get("anthropic-version") == "" {
@@ -734,6 +741,7 @@ func TestCheckARoute(t *testing.T) {
 
 // FR-008: the policy's reach and Antigravity's terms are bounded, and need host.org-routes/1.
 func TestThePolicyReachAndAntigravityTerms(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, window := p.client("Alex's Mac")
 	for _, bad := range []wire.OrgPolicy{
@@ -765,6 +773,7 @@ func TestThePolicyReachAndAntigravityTerms(t *testing.T) {
 // A token whose route no machine here uses any more is dropped once it ends, and brings no
 // resend each minute after (#2431); a machine that asks again gets a new one.
 func TestAnEndedTokenNobodyUsesStopsTheResends(t *testing.T) {
+	t.Parallel()
 	clouds := newFakeClouds(t)
 	var clock atomic.Int64
 	clock.Store(time.Now().UnixNano())

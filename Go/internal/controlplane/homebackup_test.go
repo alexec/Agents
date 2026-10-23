@@ -42,6 +42,7 @@ func homePlane(t *testing.T, home string, port int) (*Service, error) {
 }
 
 func TestABackupRestoresAControlPlaneInANewHome(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	old, port := t.TempDir(), freePort(t)
 	s, err := homePlane(t, old, port)

@@ -25,6 +25,7 @@ import (
 // code and connects with its key, bound to that origin; a window's code and key are
 // refused there, and a browser's over a window's socket. Forgotten, it is refused.
 func TestABrowserThroughThePublicPage(t *testing.T) {
+	t.Parallel()
 	dist := t.TempDir()
 	index := []byte("<html></html>")
 	sum := sha256.Sum256(index)
@@ -167,6 +168,7 @@ func TestABrowserThroughThePublicPage(t *testing.T) {
 // With a second name (#1484), the page frames the views' sandbox proxy there, and
 // control/status says where it is, for the page to draw views through.
 func TestThePublicPagesViewsName(t *testing.T) {
+	t.Parallel()
 	dist := t.TempDir()
 	index := []byte("<html></html>")
 	sum := sha256.Sum256(index)

@@ -18,6 +18,7 @@ import (
 // US4 (#1001): an admin sets an HTTP sink; each audit entry goes to it; the token is
 // sealed in the store and never answered; a set with no token keeps it; a member may not.
 func TestAnAdminSetsAnAuditSink(t *testing.T) {
+	t.Parallel()
 	var mu sync.Mutex
 	var lines, auths []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

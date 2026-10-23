@@ -17,6 +17,7 @@ import (
 // preset's ssh field). The start over ssh hands ssh one word for it (#857): as three, ssh
 // said "hostname contains invalid characters" and the host never came back.
 func TestAStartOverSSHTakesAProvidersDestinationWithAPort(t *testing.T) {
+	t.Parallel()
 	folder := t.TempDir()
 	said := filepath.Join(folder, "said")
 	ssh := filepath.Join(folder, "ssh")
@@ -76,6 +77,7 @@ func tunnelFor(t *testing.T, host, destination, key string) *hosttunnels.Tunnels
 // new (#1701). After the control plane's own Start, the ssh start takes the key it is
 // offered and pins it for the host's tunnel; the old one is not asked for.
 func TestAStartOverSSHPinsTheNewKeyOfAWorkspaceThatRenewsIt(t *testing.T) {
+	t.Parallel()
 	ssh, said := keyedSSH(t, "NEWKEY")
 	s := &Service{installer: &hostinstall.Installer{SSH: ssh}, tunnels: tunnelFor(t, "ws", "w1701-ws", "OLDKEY"),
 		cfg: Config{Log: func(string) {}}}
@@ -93,6 +95,7 @@ func TestAStartOverSSHPinsTheNewKeyOfAWorkspaceThatRenewsIt(t *testing.T) {
 
 // Without renewKey a key is never taken: the one trusted at the install is checked.
 func TestAStartOverSSHKeepsTheInstallsKeyOtherwise(t *testing.T) {
+	t.Parallel()
 	ssh, said := keyedSSH(t, "OLDKEY")
 	s := &Service{installer: &hostinstall.Installer{SSH: ssh}, tunnels: tunnelFor(t, "vm", "agents@10.0.0.1", "OLDKEY"),
 		cfg: Config{Log: func(string) {}}}
@@ -134,6 +137,7 @@ func (u *uplinkStandIn) Close() {
 // #1701: a host whose workspace was stopped is closed and shown offline, so a Start waits
 // for its new connection.
 func TestAStoppedHostsUplinkIsClosedAndOffline(t *testing.T) {
+	t.Parallel()
 	r := NewRouter(nil, nil)
 	up := &uplinkStandIn{closed: make(chan struct{})}
 	r.AttachHost("ws", up)
