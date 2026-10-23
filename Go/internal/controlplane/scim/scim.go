@@ -102,12 +102,16 @@ type Group struct {
 // Directory is the people and groups behind the server. Each call is for one provider's
 // own resources. A resource not found is (nil, nil); a refusal is an *Error.
 type Directory interface {
-	Users(ctx context.Context, provider string) ([]User, error)
+	// Users is the provider's users that keep takes, by id: filtered before they are sorted,
+	// so a sync's GET for one user is not a sort of every user (#2430).
+	Users(ctx context.Context, provider string, keep func(User) bool) ([]User, error)
 	User(ctx context.Context, provider, id string) (*User, error)
 	CreateUser(ctx context.Context, c Caller, u User) (*User, error)
 	ReplaceUser(ctx context.Context, c Caller, u User) (*User, error)
 	DeleteUser(ctx context.Context, c Caller, id string) error
-	Groups(ctx context.Context, provider string) ([]Group, error)
+	// Groups is the provider's groups that keep takes, by id. keep sees each member's
+	// value only; the groups it takes have their members' names too.
+	Groups(ctx context.Context, provider string, keep func(Group) bool) ([]Group, error)
 	Group(ctx context.Context, provider, id string) (*Group, error)
 	CreateGroup(ctx context.Context, c Caller, g Group) (*Group, error)
 	ReplaceGroup(ctx context.Context, c Caller, g Group) (*Group, error)

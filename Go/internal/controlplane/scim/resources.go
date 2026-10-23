@@ -27,16 +27,10 @@ func (s *Server) users(w http.ResponseWriter, r *http.Request, c Caller, id stri
 			writeError(w, err)
 			return
 		}
-		all, e := s.Directory.Users(ctx, c.Provider)
+		matched, e := s.Directory.Users(ctx, c.Provider, func(u User) bool { return userMatches(u, clauses) })
 		if e != nil {
 			writeError(w, asError(e))
 			return
-		}
-		var matched []User
-		for _, u := range all {
-			if userMatches(u, clauses) {
-				matched = append(matched, u)
-			}
 		}
 		var resources []any
 		for i := start - 1; i < len(matched) && len(resources) < count; i++ {
@@ -280,16 +274,10 @@ func (s *Server) groups(w http.ResponseWriter, r *http.Request, c Caller, id str
 			writeError(w, err)
 			return
 		}
-		all, e := s.Directory.Groups(ctx, c.Provider)
+		matched, e := s.Directory.Groups(ctx, c.Provider, func(g Group) bool { return groupMatches(g, clauses) })
 		if e != nil {
 			writeError(w, asError(e))
 			return
-		}
-		var matched []Group
-		for _, g := range all {
-			if groupMatches(g, clauses) {
-				matched = append(matched, g)
-			}
 		}
 		var resources []any
 		for i := start - 1; i < len(matched) && len(resources) < count; i++ {

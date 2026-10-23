@@ -148,13 +148,15 @@ func (s *Service) scimActor(c scim.Caller) wire.AuditActor {
 	return actor
 }
 
-func (d scimDirectory) Users(ctx context.Context, provider string) ([]scim.User, error) {
+func (d scimDirectory) Users(ctx context.Context, provider string, keep func(scim.User) bool) ([]scim.User, error) {
 	var out []scim.User
-	for _, p := range d.s.records.People() {
-		if scimPerson(&p, provider) {
-			out = append(out, userOf(p))
+	d.s.records.EachPerson(func(p *records.Person) {
+		if !p.IsRemoved() && scimPerson(p, provider) {
+			if u := userOf(*p); keep(u) {
+				out = append(out, u)
+			}
 		}
-	}
+	})
 	// By id, so that pages do not move as names change during a sync.
 	slices.SortFunc(out, func(a, b scim.User) int { return strings.Compare(a.ID, b.ID) })
 	return out, nil
@@ -217,6 +219,21 @@ func (d scimDirectory) dropName(ctx context.Context, provider, userName, user st
 	}
 }
 
+// personSignedInFirst is the person who signs in with that account, without reading every
+// person again for each user a sync makes (#2430): this copy's, or else the one an org
+// sign-in makes for it (personIDForSignIn), read by its key, since another copy may have
+// made it a moment ago.
+func (d scimDirectory) personSignedInFirst(ctx context.Context, provider, account string) *records.Person {
+	if p := d.s.records.PersonWithSignIn(provider, account); p != nil {
+		return p
+	}
+	p, err := d.s.records.ReadPerson(ctx, personIDForSignIn(provider, account))
+	if err != nil || p == nil || !p.HasSignIn(provider, account) {
+		return nil
+	}
+	return p
+}
+
 // CreateUser makes a provisioned person (US4 AS2), or links the SCIM user to the person
 // who signed in first with the provider (Anyone the provider signs in), matched as a
 // sign-in is (edge case "A SCIM POST for a user who signed in first").
@@ -229,7 +246,7 @@ func (d scimDirectory) CreateUser(ctx context.Context, c scim.Caller, u scim.Use
 	account := matchValue(match, u.ExternalID, u.UserName)
 	var linked *records.Person
 	if account != "" {
-		if found, err := d.s.signIns.personWithSignIn(ctx, c.Provider, account); err == nil && found != nil && !found.IsRemoved() &&
+		if found := d.personSignedInFirst(ctx, c.Provider, account); found != nil && !found.IsRemoved() &&
 			(found.SCIM == nil || found.SCIM.Deleted || found.SCIM.Provider != c.Provider) {
 			linked = found
 		}

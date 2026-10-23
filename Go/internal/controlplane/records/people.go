@@ -242,6 +242,50 @@ func (r *Records) People() []Person {
 	return out
 }
 
+// EachPerson calls each with every person this copy holds, removed or not, in no order,
+// under the lock: each must not call Records.
+func (r *Records) EachPerson(each func(*Person)) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, h := range r.people {
+		p := h.record
+		each(&p)
+	}
+}
+
+// PersonWithSignIn is the person this copy holds, removed or not, who signs in with that
+// account, or nil. It reads nothing from the store.
+func (r *Records) PersonWithSignIn(provider, account string) *Person {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, h := range r.people {
+		if h.record.HasSignIn(provider, account) {
+			p := h.record
+			return &p
+		}
+	}
+	return nil
+}
+
+// ReadPerson reads one person from the store, removed or not, and holds it when this copy
+// held none: nil when there is none.
+func (r *Records) ReadPerson(ctx context.Context, id string) (*Person, error) {
+	object, err := r.Store.Get(ctx, PersonKey(id))
+	if err != nil || object == nil {
+		return nil, err
+	}
+	var p Person
+	if err := p.UnmarshalJSON(object.Data); err != nil || p.ID != id {
+		return nil, nil
+	}
+	r.mu.Lock()
+	if _, ok := r.people[id]; !ok {
+		r.people[id] = held[Person]{p, object.ETag}
+	}
+	r.mu.Unlock()
+	return &p, nil
+}
+
 // Person is the person of that id, removed or not, or nil.
 func (r *Records) Person(id string) *Person {
 	r.mu.Lock()
