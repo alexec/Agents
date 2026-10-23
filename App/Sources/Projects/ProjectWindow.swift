@@ -391,10 +391,18 @@ extension FocusedValues {
     @Entry var projectWindow: ProjectWindowState?
 }
 
-/// The Dock's menu (#1089): each project, to open in a window of its own.
+/// The Dock's menu (#1089): each project, to open in a window of its own; no window tabs (#2384).
 final class AgentsAppDelegate: NSObject, NSApplicationDelegate {
     /// The app's model, handed over when the app starts.
     @MainActor static weak var model: AppModel?
+
+    /// No tabs: the only way left to a second window, and a second window would be a
+    /// mirror of the first, because what is selected lives on the one model. Before the
+    /// launch finishes, when AppKit puts its tab items in the View menu; turned off later,
+    /// they left a blank row at its end (#2384).
+    @MainActor func applicationWillFinishLaunching(_ notification: Notification) {
+        NSWindow.allowsAutomaticWindowTabbing = false
+    }
 
     @MainActor func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         guard let model = Self.model, model.openProjectWindow != nil else { return nil }

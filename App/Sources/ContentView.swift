@@ -322,9 +322,6 @@ struct ContentView: View {
             AgentsAppDelegate.model = model
             model.openProjectWindow = { [openWindow] in openWindow(id: ProjectWindowScene.id, value: $0) }
         }
-        // No tabs: the only way left to a second window, and a second window would be a
-        // mirror of the first, because what is selected lives on the one model.
-        .onAppear { NSWindow.allowsAutomaticWindowTabbing = false }
         // An agent asking to be looked at is the one thing that opens this column by
         // itself. Here rather than in the sidebar, because the sidebar may be shut,
         // and shut means gone: there would be nothing listening.
