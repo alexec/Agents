@@ -23,20 +23,39 @@ public enum Speakable {
     }
 
     /// The reply as sentences, in order, so a voice can start on the first one at once.
-    public static func sentences(_ markdown: String) -> [String] {
-        blocks(markdown)
-            .map(clean(line:))
-            .filter { !$0.isEmpty }
-            .flatMap(split(sentencesIn:))
+    /// `limit`: stop once this many are found, so a long reply is not cleaned to its end
+    /// for the few that are said (#2429).
+    public static func sentences(_ markdown: String, limit: Int = .max) -> [String] {
+        var out: [String] = []
+        forEachBlock(markdown) { line in
+            let cleaned = clean(line: line)
+            if !cleaned.isEmpty { out += split(sentencesIn: cleaned) }
+            return out.count < limit
+        }
+        return Array(out.prefix(limit))
     }
 
     /// What voice mode says for a reply: its sentences, or the first three and
-    /// "The rest is on the screen." when it is long.
+    /// "The rest is on the screen." when it is long. Lines are cleaned only until the
+    /// reply is known to be long (#2429): a 1,000-line reply cleans a few, not all.
     public static func spoken(_ markdown: String) -> [String] {
-        let all = sentences(markdown)
-        let words = all.reduce(0) { $0 + $1.split(separator: " ").count }
-        guard words > longReplyWords, all.count > longReplySentences else { return all }
+        var all: [String] = []
+        var words = 0
+        forEachBlock(markdown) { line in
+            let cleaned = clean(line: line)
+            guard !cleaned.isEmpty else { return true }
+            for sentence in split(sentencesIn: cleaned) {
+                all.append(sentence)
+                words += sentence.split(separator: " ").count
+            }
+            return !isLong(words: words, sentences: all.count)
+        }
+        guard isLong(words: words, sentences: all.count) else { return all }
         return Array(all.prefix(longReplySentences)) + [restOnTheScreen]
+    }
+
+    private static func isLong(words: Int, sentences: Int) -> Bool {
+        words > longReplyWords && sentences > longReplySentences
     }
 
     // MARK: - Blocks
@@ -44,6 +63,17 @@ public enum Speakable {
     /// Code fences and tables become one short line each; every other line stays a line.
     static func blocks(_ markdown: String) -> [String] {
         var out: [String] = []
+        forEachBlock(markdown) { out.append($0); return true }
+        return out
+    }
+
+    /// Gives each line of `blocks`, in order, until `visit` says false: the rest of the
+    /// reply is not read.
+    static func forEachBlock(_ markdown: String, _ visit: (String) -> Bool) {
+        var stopped = false
+        func emit(_ line: String) {
+            if !stopped, !visit(line) { stopped = true }
+        }
         var fence: (language: String, lines: Int)?
         var tableRows = 0
         var tableHeader: [String] = []
@@ -53,16 +83,17 @@ public enum Speakable {
             let rows = max(tableRows - 1, 0)
             var line = "A table with \(rows) \(rows == 1 ? "row" : "rows")"
             if !tableHeader.isEmpty { line += ", of " + list(tableHeader) }
-            out.append(line + ", is on the screen.")
+            emit(line + ", is on the screen.")
             tableRows = 0
             tableHeader = []
         }
 
-        for raw in markdown.components(separatedBy: "\n") {
+        for raw in markdown.split(separator: "\n", omittingEmptySubsequences: false) {
+            if stopped { return }
             let line = raw.trimmingCharacters(in: .whitespaces)
             if line.hasPrefix("```") || line.hasPrefix("~~~") {
                 if let open = fence {
-                    out.append(codeLine(open.language, open.lines))
+                    emit(codeLine(open.language, open.lines))
                     fence = nil
                 } else {
                     endTable()
@@ -86,12 +117,11 @@ public enum Speakable {
             endTable()
             // The three-client parity lines are for reviewers, not for the ear.
             if line.range(of: #"^(mac|remote|web): "#, options: .regularExpression) != nil { continue }
-            out.append(line)
+            emit(line)
         }
         endTable()
         // A fence the reply never closed (it was cut off): still not read.
-        if let open = fence { out.append(codeLine(open.language, open.lines)) }
-        return out
+        if let open = fence { emit(codeLine(open.language, open.lines)) }
     }
 
     static func codeLine(_ language: String, _ lines: Int) -> String {
