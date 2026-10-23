@@ -1165,25 +1165,30 @@ func (d *Daemon) waitDeadlinesPassed() {
 		if w == nil || w.Ending != nil || w.Deadline == nil || w.Deadline.Time().After(at.Time()) {
 			continue
 		}
-		if c := d.takeOpenWait(a.ID); c != nil {
-			d.change(a.ID, func(a *wire.Agent) { a.EventWait = nil })
-			c.answer <- timedOutWords(w, at) + d.restartNotice(w)
-			continue
-		}
-		prompt := wire.QueuedPrompt{ID: store.NewUUID(), Text: timedOutWords(w, at) + d.restartNotice(w), QueuedAt: now(), From: wire.PromptOriginApp,
-			Attachments: []wire.Attachment{}}
-		ended := *w
-		ended.Ending = &wire.EventWaitEnding{TimedOut: &struct{}{}}
-		ended.ResumePromptID = &prompt.ID
-		d.change(a.ID, func(a *wire.Agent) {
-			a.EventWait = &ended
-			a.QueuedPrompts = append(append([]wire.QueuedPrompt{}, a.QueuedPrompts...), prompt)
-		})
-		id := a.ID
-		safe.Go("event timeout", func() { d.sendEventResume(id, prompt.ID, nil) })
+		d.endWaitWithNoMatch(a.ID, w, timedOutWords(w, at))
 	}
 	d.tellEvents(nil)
 	d.armWaitTimer()
+}
+
+// endWaitWithNoMatch ends an open wait as a time-out does, with words: an open call hears
+// them, and an agent whose turn has ended is started again to be told.
+func (d *Daemon) endWaitWithNoMatch(id wire.UUID, w *wire.EventWait, words string) {
+	if c := d.takeOpenWait(id); c != nil {
+		d.change(id, func(a *wire.Agent) { a.EventWait = nil })
+		c.answer <- words + d.restartNotice(w)
+		return
+	}
+	prompt := wire.QueuedPrompt{ID: store.NewUUID(), Text: words + d.restartNotice(w), QueuedAt: now(), From: wire.PromptOriginApp,
+		Attachments: []wire.Attachment{}}
+	ended := *w
+	ended.Ending = &wire.EventWaitEnding{TimedOut: &struct{}{}}
+	ended.ResumePromptID = &prompt.ID
+	d.change(id, func(a *wire.Agent) {
+		a.EventWait = &ended
+		a.QueuedPrompts = append(append([]wire.QueuedPrompt{}, a.QueuedPrompts...), prompt)
+	})
+	safe.Go("event timeout", func() { d.sendEventResume(id, prompt.ID, nil) })
 }
 
 // resumeEventWaits is resumeEventWaitsAfterRestart: no call survives a restart, so every

@@ -1053,6 +1053,66 @@ func (d *Daemon) stopMCP(id string, s *mcpSubscription, code wire.MCPTriggerFail
 	d.setMCPLive(id, mcpLive{state: wire.MCPTriggerStatusStateStopped, stoppedFor: s.fingerprint,
 		failure: &wire.MCPTriggerFailure{Code: code, Message: message, Since: now()}})
 	log.Printf("mcp events: %s %s stopped (%s)", s.server, s.event, code)
+	d.endWaitsOnStoppedServers(s)
+}
+
+// endWaitsOnStoppedServers ends each wait that s holds once every subscription the wait
+// holds has stopped, with their reasons (#2491): nothing can wake it any more, and it
+// would sit until its until_minutes. A wait that also hears the app's own events stays.
+func (d *Daemon) endWaitsOnStoppedServers(s *mcpSubscription) {
+	ended := false
+	for _, agent := range s.waits {
+		a := d.Store.Agent(agent)
+		if a == nil || a.EventWait == nil || a.EventWait.Ending != nil || len(a.EventWait.ServerEvents) == 0 {
+			continue
+		}
+		w := a.EventWait
+		hearsOwn := false
+		for _, p := range waitPatterns(w) {
+			hearsOwn = hearsOwn || !isServerPattern(p.name)
+		}
+		if hearsOwn {
+			continue
+		}
+		var why []string
+		allStopped := true
+		d.mcpEvMu.Lock()
+		ids := make([]string, 0, len(d.mcpSubs))
+		for id, other := range d.mcpSubs {
+			if containsUUID(other.waits, agent) {
+				ids = append(ids, id)
+			}
+		}
+		sort.Strings(ids)
+		for _, id := range ids {
+			l := d.mcpLives[id]
+			if l.state != wire.MCPTriggerStatusStateStopped {
+				allStopped = false
+				break
+			}
+			if l.failure != nil {
+				why = append(why, l.failure.Message)
+			}
+		}
+		d.mcpEvMu.Unlock()
+		if !allStopped || len(ids) == 0 {
+			continue
+		}
+		d.endWaitWithNoMatch(agent, w, serverStoppedWords(w, now(), why))
+		ended = true
+	}
+	if ended {
+		d.tellEvents(nil)
+		d.armWaitTimer()
+	}
+}
+
+func serverStoppedWords(w *wire.EventWait, at wire.Date, why []string) string {
+	words := "Your wait for " + waitLabel(w) + " ended at " + clock(at) + " with no match: the server stopped sending it."
+	for _, m := range why {
+		words += " " + strings.TrimSpace(m)
+	}
+	return words + " Nothing would have woken you. Check by hand, or wait again once the server is fixed."
 }
 
 // setMCPLive keeps a subscription's state, in its record too, and tells the clients when it
