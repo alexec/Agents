@@ -14,9 +14,15 @@ struct GovernanceWordsTests {
 
     @Test func eachRequestSaysWhereItStands() {
         #expect(GovernanceWords.mine(Self.request(.waiting)) == "The MCP server github: waiting for an admin")
-        #expect(GovernanceWords.mine(Self.request(.approved)) == "The MCP server github: approved for you")
+        #expect(GovernanceWords.mine(Self.request(.approved))
+            == "The MCP server github: approved for you. Add it as you add any MCP server.")
         #expect(GovernanceWords.mine(Self.request(.approved, kind: .skills, group: "Platform"))
-            == "The skill review: approved for Platform")
+            == "The skill review: approved for Platform. Add it as you add any skill.")
+        // #2434: the Policy's marketplaces still decide.
+        #expect(GovernanceWords.mine(Self.request(.approved), marketplacesLimited: true)
+            == "The MCP server github: approved for you. Add it as you add any MCP server. "
+            + "Your organisation's Policy still blocks it if no marketplace it allows has it.")
+        #expect(GovernanceWords.mine(Self.request(.refused), marketplacesLimited: true) == "The MCP server github: refused")
         #expect(GovernanceWords.mine(Self.request(.refused, kind: .skills)) == "The skill review: refused")
     }
 

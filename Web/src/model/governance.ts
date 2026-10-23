@@ -12,6 +12,7 @@ export const approvalsTitle = "Approved";
 export const noApprovals = "Nothing is approved yet. Approve a request in Requests, for the person or for a group.";
 export const noUsage = "No machine has said what it has yet. A machine says it each hour once it runs this version.";
 export const approvalsFoot = "An approval answers a request. The Policy's marketplaces still say what a machine may add.";
+export const policyStillBlocks = "Your organisation's Policy still blocks it if no marketplace it allows has it.";
 export const kindNames: Record<CatalogKind, string> = { mcp: "MCP server", skills: "Skill" };
 
 /** "the MCP server github" or "the skill review". */
@@ -25,12 +26,19 @@ export function requestWords(r: CatalogRequest): string {
   return `${r.userName} asks for ${itemWords(r.kind, r.name)}${why}`;
 }
 
-/** A person's line for their own request, by its state. */
-export function mineWords(r: CatalogRequest): string {
+/**
+ * A person's line for their own request, by its state. An approval does not add it, nor change what the Policy's
+ * marketplaces allow (#2434): the line says how to add it and, when the Policy names marketplaces, that they still decide.
+ */
+export function mineWords(r: CatalogRequest, marketplacesLimited = false): string {
   const item = itemWords(r.kind, r.name);
   const first = item.charAt(0).toUpperCase() + item.slice(1);
   switch (r.state) {
-    case "approved": return r.groupName ? `${first}: approved for ${r.groupName}` : `${first}: approved for you`;
+    case "approved": {
+      const add = r.kind === "skills" ? "Add it as you add any skill." : "Add it as you add any MCP server.";
+      const still = marketplacesLimited ? ` ${policyStillBlocks}` : "";
+      return `${first}: approved for ${r.groupName ?? "you"}. ${add}${still}`;
+    }
     case "refused": return `${first}: refused`;
     default: return `${first}: waiting for an admin`;
   }

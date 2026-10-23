@@ -103,12 +103,18 @@ public enum GovernanceWords {
         kind == .skills ? "the skill \(name)" : "the MCP server \(name)"
     }
 
-    /// A person's line for their own request, by its state.
-    public static func mine(_ request: DaemonAPI.CatalogRequest) -> String {
+    public static let policyStillBlocks = "Your organisation's Policy still blocks it if no marketplace it allows has it."
+
+    /// A person's line for their own request, by its state. An approval does not add it, nor
+    /// change what the Policy's marketplaces allow (#2434): the line says how to add it and,
+    /// when the Policy names marketplaces, that they still decide.
+    public static func mine(_ request: DaemonAPI.CatalogRequest, marketplacesLimited: Bool = false) -> String {
         let item = item(request.kind, request.name)
         let first = item.prefix(1).uppercased() + item.dropFirst()
         switch request.state {
-        case .approved: return request.groupName.map { "\(first): approved for \($0)" } ?? "\(first): approved for you"
+        case .approved:
+            let add = request.kind == .skills ? "Add it as you add any skill." : "Add it as you add any MCP server."
+            return "\(first): approved for \(request.groupName ?? "you"). \(add)" + (marketplacesLimited ? " \(policyStillBlocks)" : "")
         case .refused: return "\(first): refused"
         case .waiting: return "\(first): waiting for an admin"
         }

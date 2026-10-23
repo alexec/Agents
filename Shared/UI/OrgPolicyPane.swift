@@ -171,7 +171,7 @@ struct OrgPolicyPane: View {
                 .disabled(isSending || control == nil
                     || GovernanceWords.request(kind: askKind, name: askName, why: askWhy) == nil)
             ForEach(own) { request in
-                Text(GovernanceWords.mine(request)).appText(.fine)
+                Text(GovernanceWords.mine(request, marketplacesLimited: view?.policy?.marketplaces != nil)).appText(.fine)
                     .fixedSize(horizontal: false, vertical: true)
             }
         } header: {

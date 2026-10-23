@@ -66,7 +66,7 @@ export function GovernanceAsk({ store, down }: { store: Store; down: boolean }) 
       </form>
       {own.length > 0 && (
         <ul class="policy-routes">
-          {own.map((r) => <li key={r.id} class="small">{mineWords(r)}</li>)}
+          {own.map((r) => <li key={r.id} class="small">{mineWords(r, store.orgPolicy.value?.policy?.marketplaces !== undefined)}</li>)}
         </ul>
       )}
       <p class="hint">{askFoot}</p>
