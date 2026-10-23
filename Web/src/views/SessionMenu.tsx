@@ -17,6 +17,7 @@ import { go, routeHash } from "../route";
 import { canStop, liveDescendants } from "../model/tree";
 import { isMuted, muteHelp, muteLabel, unmuteLabel } from "../model/mute";
 import { Capability } from "../protocol/capabilities.generated";
+import { setShowsThoughts, showsThoughts, thoughtsItem } from "../model/thoughts";
 
 export type Action = "carryOn" | "agents/stop" | "stopAll" | "agents/archive" | "agents/unarchive"
   | "markRead" | "markUnread" | "mute" | "unmute" | "rename" | "pin" | "unpin" | "fork" | "delete" | "keep";
@@ -215,6 +216,14 @@ export function SessionMenu({ store, host, agent, disabled, find, findsOnHost = 
                 open.value = false;
                 openFile();
               }}>Open File…</button>
+          )}
+          {inChat && (
+            // Next to the chat, not in Settings (#2383), as View ▸ Show Thoughts on the Mac.
+            <button role="menuitem" title={thoughtsItem(showsThoughts.value).title}
+              onClick={() => {
+                open.value = false;
+                setShowsThoughts(!showsThoughts.value);
+              }}>{thoughtsItem(showsThoughts.value).label}</button>
           )}
           {sessionActions(agent, store.sessionPinsIn(host, projectFolder(agent)).includes(agent.id), startedBy(store, host, agent),
             store.has(host, Capability.mute1)).map(({ action, label, help }) => (
