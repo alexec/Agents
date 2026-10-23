@@ -43,7 +43,7 @@ func TestEveryRunSaysWhyItStarted(t *testing.T) {
 		{"an agent's run", fireRequest{byHand: true, byAgent: &a.ID, trigger: byHandTrigger()},
 			`because the agent “Fix the build” (id ` + string(a.ID) + `) ran it.)`},
 	} {
-		want := "Review it.\n\n(You were started by the workflow \"Review\" " + c.want
+		want := "(You were started by the workflow \"Review\" " + c.want + "\n\nReview it."
 		if got := d.runPrompt(w, c.fr); got != want {
 			t.Errorf("%s:\n got %q\nwant %q", c.name, got, want)
 		}

@@ -540,11 +540,11 @@ func queued(a *wire.Agent, prompt wire.UUID) bool {
 	return false
 }
 
-// runPrompt is the file's prompt, and a note at its end that says why the run started
-// (#1562): the event and its details, the agent behind it, the schedule, or a run by hand.
+// runPrompt is the file's prompt, after a note that says why the run started (#1562,
+// #2407): the event and its details, the agent behind it, the schedule, or a run by hand.
 func (d *Daemon) runPrompt(w wire.Workflow, fr fireRequest) string {
-	text := w.Prompt
-	started := "\n\n(You were started by the workflow \"" + w.Name + "\" because "
+	text := ""
+	started := "(You were started by the workflow \"" + w.Name + "\" because "
 	var e *wire.Event
 	if fr.causingEvent != nil {
 		e = d.event(*fr.causingEvent)
@@ -570,7 +570,7 @@ func (d *Daemon) runPrompt(w wire.Workflow, fr fireRequest) string {
 		}
 		text += ")"
 	case e != nil && e.Details["subscription"] != "" && e.Details["server"] != "":
-		text = serverEventPrompt(w, *e, e.Details["server"])
+		return serverEventPrompt(w, *e, e.Details["server"])
 	case e != nil:
 		text += started + "of the event " + e.Name + ": " + e.Sentence + eventDetails(*e) + ")"
 	case fr.byAgent != nil:
@@ -582,7 +582,10 @@ func (d *Daemon) runPrompt(w wire.Workflow, fr fireRequest) string {
 	case fr.trigger.Schedule != nil:
 		text += started + "of its schedule.)"
 	}
-	return text
+	if text == "" {
+		return w.Prompt
+	}
+	return text + "\n\n" + w.Prompt
 }
 
 // agentWords is an agent's title in quotes, or "an untitled agent".

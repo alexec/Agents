@@ -365,7 +365,7 @@ function entryBody(entry: TranscriptEntry) {
     case "userMessage": {
       const message = fields(entry, "userMessage")!;
       if (message.from === "app") {
-        return <div class="note copyable"><p class="faint">Agents asked</p><div class="quiet"><Blocks blocks={message.blocks} text={message._0} /></div><CopyMessage entry={entry} /></div>;
+        return <div class="note copyable"><p class="faint">From the app</p><div class="quiet"><Blocks blocks={message.blocks} text={message._0} /></div><CopyMessage entry={entry} /></div>;
       }
       if (message.from === "agent") {
         // Another agent's message (#560): the person's bubble, named as the sender's.
