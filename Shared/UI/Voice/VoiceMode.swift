@@ -53,6 +53,7 @@ final class VoiceMode {
         didSet {
             speaker.isMuted = isWalked
             audio.listens = !isWalked
+            armTick()
         }
     }
     /// Set by a walk: the next prompt does not go, as when the host is away.
@@ -84,6 +85,9 @@ final class VoiceMode {
     /// tried it (#2375).
     static let pause: Duration = .milliseconds(2_000)
 
+    /// How often a tick says it is still listening, while nothing is heard (#2520).
+    static let tickEvery: Duration = .seconds(8)
+
     @ObservationIgnored let dictation: Dictation
     @ObservationIgnored private let audio: VoiceAudio
     @ObservationIgnored private let voice: ParadeeVoice
@@ -94,6 +98,8 @@ final class VoiceMode {
     private var send: Send?
     private var vocabulary: [String] = []
     private var pauseTimer: Task<Void, Never>?
+    /// The next quiet tick (#2520). Nil while one should not play.
+    private var tickTask: Task<Void, Never>?
     private var speaking: Task<Void, Never>?
     /// The last turn when the latest words went, and whether the agent was seen working
     /// since: a turn has ended only once both have moved on.
@@ -199,8 +205,12 @@ final class VoiceMode {
     }
 
     /// Turns voice mode off: the microphone closes, the voice stops and is let go.
+    /// A short falling sound says it stopped (#2520).
     func turnOff() {
+        let wasOn = phase != .off
         pauseTimer?.cancel()
+        tickTask?.cancel()
+        tickTask = nil
         speaking?.cancel()
         speaking = nil
         speaker.stop()
@@ -225,6 +235,11 @@ final class VoiceMode {
         permission = nil
         stillWorking?.cancel()
         stillWorking = nil
+        // dictation.stop() can call back and arm a tick before the phase is off.
+        tickTask?.cancel()
+        tickTask = nil
+        pauseTimer?.cancel()
+        if wasOn { sound(.ended) }
         Task { await voice.unload() }
     }
 
@@ -307,6 +322,7 @@ final class VoiceMode {
         }
         step = items.turns().last.flatMap { Self.step(in: $0.items) }
         defer {
+            armTick()
             askIfWaiting()
             hangUpIfSaid()
         }
@@ -518,6 +534,7 @@ final class VoiceMode {
     /// strip says meanwhile, as "Sending File".
     private func confirm(_ doing: String, _ send: @escaping () async -> Bool) {
         confirmLine = VoiceModeWords.sayNoToStop(doing)
+        armTick()
         confirming = Task { [weak self] in
             try? await Task.sleep(for: Self.confirmFor)
             guard let self, !Task.isCancelled else { return }
@@ -528,6 +545,7 @@ final class VoiceMode {
             heard = ""
             pauseTimer?.cancel()
             let sent = walkSendFails ? false : await send()
+            guard !Task.isCancelled, phase != .off else { return }
             if sent {
                 // The turn goes on, and its reply is said when it ends.
                 isWaitingForReply = true
@@ -536,6 +554,7 @@ final class VoiceMode {
             } else {
                 answerDidNotGo()
             }
+            armTick()
         }
     }
 
@@ -558,6 +577,7 @@ final class VoiceMode {
         heard = ""
         phase = .listening
         armStillWorking()
+        armTick()
         defer { askIfWaiting() }
         if !words.isEmpty { heardChanged(words) }
         guard !isWalked else { return }
@@ -623,6 +643,7 @@ final class VoiceMode {
             if !isWalked, phase == .listening { startDictation() }
             return
         }
+        defer { armTick() }
         // Over the voice: words that mean something stop it, and are the next prompt.
         if phase == .speaking {
             guard isBargeIn(text) else { return }
@@ -671,6 +692,7 @@ final class VoiceMode {
         guard confirming == nil else { return }
         dictation.stop()
         phase = .sending
+        armTick()
         let agent = agentID
         let target = walkSendFails ? nil : await send(words)
         guard agentID == agent, phase == .sending else { return }
@@ -743,6 +765,7 @@ final class VoiceMode {
         stillWorking?.cancel()
         phase = .speaking
         heard = ""
+        armTick()
         if !listensWhileSpeaking {
             dictation.stop()
         } else if !isWalked {
@@ -777,6 +800,32 @@ final class VoiceMode {
     private func hangUpIfSaid() {
         guard isHangingUp, !isWaitingForReply, phase == .listening, queue.isEmpty, heard.isEmpty else { return }
         turnOff()
+    }
+
+    /// Listening, nothing heard, and no answer waiting for a "no". A turn that is still
+    /// running counts: the microphone is open, and that long silence is when the tick
+    /// says it is still on (#2520). "Still working" stays the spoken line (#2358).
+    private var ticksInSilence: Bool {
+        phase == .listening && heard.isEmpty && confirmLine == nil && !isWalked
+    }
+
+    /// Starts the tick, or stops it. A tick already waiting is left, so an empty update
+    /// does not put the next one off.
+    private func armTick() {
+        guard ticksInSilence else {
+            tickTask?.cancel()
+            tickTask = nil
+            return
+        }
+        guard tickTask == nil else { return }
+        tickTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.tickEvery)
+            guard !Task.isCancelled, let self else { return }
+            self.tickTask = nil
+            guard self.ticksInSilence else { return }
+            self.sound(.tick)
+            self.armTick()
+        }
     }
 
     /// A sound, but none in a walk.
