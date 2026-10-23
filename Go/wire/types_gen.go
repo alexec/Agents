@@ -5166,6 +5166,9 @@ type Need struct {
 	RaisedAt Date `json:"raisedAt"`
 
 	Headline Headline `json:"headline"`
+
+	// A notice's (#2034): the item's page on its site, which opening the notice opens.
+	URL *string `json:"url,omitzero"`
 }
 
 // NeedID (Attention/Need.swift): what is being answered, one key per kind.
@@ -5177,6 +5180,8 @@ type NeedID struct {
 	Report *NeedIDReport `json:"report,omitzero"`
 
 	GuardedChange *NeedIDGuardedChange `json:"guardedChange,omitzero"`
+
+	Notice *string `json:"notice,omitzero"`
 }
 
 type NeedIDReport struct {
@@ -5197,6 +5202,52 @@ const NeedKindPermission NeedKind = "permission"
 const NeedKindElicitation NeedKind = "elicitation"
 const NeedKindReport NeedKind = "report"
 const NeedKindGuardedChange NeedKind = "guardedChange"
+const NeedKindNotice NeedKind = "notice"
+
+// A notice was opened: it is withdrawn everywhere (#2034).
+type NoticeOpenRequest struct {
+	ID string `json:"id"`
+}
+
+// One event a person can be told of (#2034): its name, its words, and whether it is on for this person in this project.
+type NotifyEvent struct {
+	Event string `json:"event"`
+
+	Title string `json:"title"`
+
+	On bool `json:"on"`
+}
+
+// Notify me (#2034): the project's servers and, for each, the events that tell the person.
+type NotifyList struct {
+	Folder string `json:"folder"`
+
+	Servers []NotifyServer `json:"servers"`
+}
+
+type NotifyListRequest struct {
+	Folder string `json:"folder"`
+}
+
+// A server of the project with events a person can be told of (#2034), by its name in the project's mcp.json.
+type NotifyServer struct {
+	Server string `json:"server"`
+
+	Title string `json:"title"`
+
+	Events []NotifyEvent `json:"events"`
+}
+
+// Turn one event on or off for the person in a project. Kept in the host's <root>/notify-me.json, not in the project.
+type NotifySetRequest struct {
+	Folder string `json:"folder"`
+
+	Server string `json:"server"`
+
+	Event string `json:"event"`
+
+	On bool `json:"on"`
+}
 
 // The OTLP exporter of the report figures (#2019, #1804 decision 4), set on agents-control by OTEL_EXPORTER_OTLP_ENDPOINT, as this copy runs it: where it sends, the last send and the last failure.
 type OTLPExport struct {

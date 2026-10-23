@@ -6,11 +6,12 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { Store } from "../model/store";
 import type {
-  Connection, ConnectionProvider, ConnectionSignIn, ConnectorSetup, ConnectorSetupReading, ConnectorSlot, ConnectorSlotKind, UUID,
+  Connection, ConnectionProvider, ConnectionSignIn, ConnectorSetup, ConnectorSetupReading, ConnectorSlot, ConnectorSlotKind, UUID, NotifyList,
 } from "../protocol/generated";
 import { projectPath } from "../model/hostedMCP";
 import { Capability } from "../protocol/capabilities.generated";
 import * as words from "../model/connectorSetup";
+import { notifyMeWords } from "../model/notifyMe";
 import { Modal } from "./Modal";
 
 function why(e: unknown): string {
@@ -112,6 +113,7 @@ export function ConnectorSetupSection({ store, host, folder, projectName, go }: 
           )}
         </>
       )}
+      {setup && <NotifyMe store={store} host={host} folder={path} />}
       {!setup && !problem && <p class="quiet small">Reading…</p>}
       {connecting && (
         <ConnectDialog store={store} host={host} provider={connecting} folder={path}
@@ -567,5 +569,43 @@ export function YourConnections({ store, host }: { store: Store; host: string })
         <ConnectDialog store={store} host={host} provider={connecting} again={again} connected={() => void load()} close={() => setConnecting(undefined)} />
       )}
     </div>
+  );
+}
+
+/** Notify me (#2034), as the window's: each server's events that send the person a notification, a box each. */
+function NotifyMe({ store, host, folder }: { store: Store; host: string; folder: string }) {
+  const [list, setList] = useState<NotifyList>();
+  const [problem, setProblem] = useState<string>();
+  useEffect(() => {
+    store.link.call("notify/list", { folder }, host).then((l) => { setList(l); setProblem(undefined); }).catch((e) => setProblem(why(e)));
+  }, [host, folder]);
+  const set = async (server: string, event: string, on: boolean) => {
+    try {
+      setList(await store.link.call("notify/set", { folder, server, event, on }, host));
+      setProblem(undefined);
+    } catch (e) {
+      setProblem(why(e));
+    }
+  };
+  return (
+    <>
+      <h2 class="setup-heading">{notifyMeWords.heading}</h2>
+      <div class="setup-card">
+        {list && list.servers.length === 0 && <p class="quiet small">{notifyMeWords.none}</p>}
+        {list?.servers.map((s) => (
+          <fieldset key={s.server} class="notify-me">
+            <legend class="strong">{s.title}</legend>
+            {s.events.map((e) => (
+              <label key={e.event} class="check">
+                <input type="checkbox" checked={e.on} onChange={(ev) => void set(s.server, e.event, (ev.target as HTMLInputElement).checked)} />
+                {e.title}
+              </label>
+            ))}
+          </fieldset>
+        ))}
+        <p class="quiet small">{notifyMeWords.note} {notifyMeWords.where}</p>
+        {problem && <p class="small failure">{problem}</p>}
+      </div>
+    </>
   );
 }

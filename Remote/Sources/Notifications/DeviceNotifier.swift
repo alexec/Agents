@@ -69,7 +69,7 @@ final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
         let live = Set(pending.needs.map(\.id.token))
         let delivered = await center.deliveredNotifications().map(\.request.identifier)
         let stale = delivered.filter { !live.contains($0) }
-            .filter { $0.hasPrefix("permission:") || $0.hasPrefix("elicitation:") || $0.hasPrefix("report:") }
+            .filter { $0.hasPrefix("permission:") || $0.hasPrefix("elicitation:") || $0.hasPrefix("report:") || $0.hasPrefix("notice:") }
         if !stale.isEmpty { center.removeDeliveredNotifications(withIdentifiers: stale) }
         showing = showing.filter { live.contains($0.key) }
         for delivery in pending.deliveries where delivery.to == me {
@@ -94,9 +94,10 @@ final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
         guard showing[token] == nil else { return }
         let content = UNMutableNotificationContent()
         let headline = headline.truncating()
-        content.title = headline.h2
-        content.subtitle = headline.h1
-        content.body = headline.h3
+        let lines = BannerLines(headline, for: needID)
+        content.title = lines.title
+        content.subtitle = lines.subtitle
+        content.body = lines.body
         content.sound = alert ? .default : nil
         content.userInfo = ["needToken": token]
         if let agentID { content.userInfo["agentID"] = agentID.uuidString }

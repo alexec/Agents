@@ -35,7 +35,8 @@ final class NotificationService: UNNotificationServiceExtension {
         }
         // A loud push never wakes the app, so the widget hears of it here (#1046), with the
         // Mac's whole count where the push carries it, which the badge shows too (#1163).
-        let written = AttentionSnapshotStore.apply(AttentionPush(need: pushed.needID, headline: headline,
+        // A notice (#2034) is no widget row.
+        let written = pushed.needID.isNotice ? nil : AttentionSnapshotStore.apply(AttentionPush(need: pushed.needID, headline: headline,
                                                                  withdrawn: pushed.withdraws,
                                                                  count: pushed.count))
         if written != nil {
@@ -48,9 +49,10 @@ final class NotificationService: UNNotificationServiceExtension {
             contentHandler(content)
             return
         }
-        content.title = headline.h2
-        content.subtitle = headline.h1
-        content.body = headline.h3
+        let lines = BannerLines(headline, for: pushed.needID)
+        content.title = lines.title
+        content.subtitle = lines.subtitle
+        content.body = lines.body
         content.threadIdentifier = pushed.token
         content.userInfo["needToken"] = pushed.token
         // Its buttons (#1170), made here from the opened envelope: what they say is as

@@ -3996,6 +3996,8 @@ export interface Need {
   kind: NeedKind;
   raisedAt: WireDate;
   headline: Headline;
+  /** A notice's (#2034): the item's page on its site, which opening the notice opens. */
+  url?: string;
 }
 
 /** NeedID (Attention/Need.swift): what is being answered, one key per kind. */
@@ -4003,13 +4005,61 @@ export type NeedID =
   | { permission: UUID }
   | { elicitation: UUID }
   | { report: { agentID: UUID; at: WireDate } }
-  | { guardedChange: { folder: URLString; path: string } };
+  | { guardedChange: { folder: URLString; path: string } }
+  | { notice: string };
 
 export type NeedKind =
   | "permission"
   | "elicitation"
   | "report"
-  | "guardedChange";
+  | "guardedChange"
+  | "notice";
+
+/** A notice was opened: it is withdrawn everywhere (#2034). */
+export interface NoticeOpenRequest {
+  id: string;
+}
+
+/**
+ * One event a person can be told of (#2034): its name, its words, and whether it is on for this
+ * person in this project.
+ */
+export interface NotifyEvent {
+  event: string;
+  title: string;
+  on: boolean;
+}
+
+/** Notify me (#2034): the project's servers and, for each, the events that tell the person. */
+export interface NotifyList {
+  folder: string;
+  servers: NotifyServer[];
+}
+
+export interface NotifyListRequest {
+  folder: string;
+}
+
+/**
+ * A server of the project with events a person can be told of (#2034), by its name in the project's
+ * mcp.json.
+ */
+export interface NotifyServer {
+  server: string;
+  title: string;
+  events: NotifyEvent[];
+}
+
+/**
+ * Turn one event on or off for the person in a project. Kept in the host's <root>/notify-me.json,
+ * not in the project.
+ */
+export interface NotifySetRequest {
+  folder: string;
+  server: string;
+  event: string;
+  on: boolean;
+}
 
 /**
  * The OTLP exporter of the report figures (#2019, #1804 decision 4), set on agents-control by
@@ -8041,6 +8091,9 @@ export interface Methods {
   "mcp/remove": { params: MCPRemoveRequest; result: MCPRemoveAnswer };
   "milestones/state": { params: Empty; result: Milestones };
   "modes/remembered": { params: Empty; result: Record<string, JSONValue> };
+  "notice/open": { params: NoticeOpenRequest; result: Empty };
+  "notify/list": { params: NotifyListRequest; result: NotifyList };
+  "notify/set": { params: NotifySetRequest; result: NotifyList };
   "options/remembered": { params: RememberedOptionsRequest; result: ConfigOption[] };
   "orgRoutes/check": { params: OrgRouteRequest; result: OrgRouteCheck };
   "orgRoutes/list": { params: Empty; result: OrgRouteList };
@@ -8307,6 +8360,9 @@ export const MethodTarget = {
   "mcp/remove": "host",
   "milestones/state": "host",
   "modes/remembered": "host",
+  "notice/open": "host",
+  "notify/list": "host",
+  "notify/set": "host",
   "options/remembered": "host",
   "orgRoutes/check": "control",
   "orgRoutes/list": "control",
@@ -8871,7 +8927,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MessageSender: { required: ["agentID", "title"], optional: [] },
   Milestones: { required: ["earned"], optional: [] },
   MissingFolder: { required: ["branchKept"], optional: [] },
-  Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID"] },
+  Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID", "url"] },
+  NoticeOpenRequest: { required: ["id"], optional: [] },
+  NotifyEvent: { required: ["event", "title", "on"], optional: [] },
+  NotifyList: { required: ["folder", "servers"], optional: [] },
+  NotifyListRequest: { required: ["folder"], optional: [] },
+  NotifyServer: { required: ["server", "title", "events"], optional: [] },
+  NotifySetRequest: { required: ["folder", "server", "event", "on"], optional: [] },
   OTLPExport: { required: ["endpoint", "every"], optional: ["lastSent", "lastFailure", "failedAt"] },
   OptionsRequest: { required: ["runtimeID", "cwd", "mcpServers"], optional: [] },
   OptionsResponse: { required: ["draftID", "options", "commands"], optional: [] },

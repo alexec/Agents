@@ -267,6 +267,8 @@ public struct AttentionPush: Hashable, Sendable {
             self.init(token: need.token, kind: .report, agentID: agentID, headline: headline, withdrawn: withdrawn, count: count)
         case .guardedChange:
             self.init(token: need.token, kind: .guardedChange, agentID: nil, headline: headline, withdrawn: withdrawn, count: count)
+        case .notice:
+            self.init(token: need.token, kind: .notice, agentID: nil, headline: headline, withdrawn: withdrawn, count: count)
         }
     }
 }

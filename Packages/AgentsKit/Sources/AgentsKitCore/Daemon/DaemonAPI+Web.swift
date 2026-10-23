@@ -125,6 +125,10 @@ public extension DaemonAPI {
                 Row(Method.connectorsSetup, params: ConnectorSetupRequest.self, result: ConnectorSetup.self, kind: .hostRequest),
                 Row(Method.connectorsSetupSkip, params: ConnectorSkipRequest.self, result: ConnectorSetup.self,
                     kind: .hostRequest),
+                // Notify me (#2034).
+                Row(Method.noticeOpen, params: NoticeOpenRequest.self, result: Empty.self, kind: .hostRequest),
+                Row(Method.notifyList, params: NotifyListRequest.self, result: NotifyList.self, kind: .hostRequest),
+                Row(Method.notifySet, params: NotifySetRequest.self, result: NotifyList.self, kind: .hostRequest),
                 // The low disk space strip (#195, #196), as the window draws it.
                 Row(Method.diskState, params: Empty.self, result: DiskState.self, kind: .hostRequest),
                 // Backups of the machine, in Settings (#1810).

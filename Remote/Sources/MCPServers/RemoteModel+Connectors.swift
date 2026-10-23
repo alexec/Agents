@@ -1,5 +1,6 @@
 import AgentsKitCore
 import Foundation
+import UIKit
 
 /// The person's connections (#1335) and a project's Connectors set-up (#1336), on the host
 /// that has the project, as the window's AppModel+Connectors.
@@ -134,4 +135,37 @@ extension RemoteModel {
 
 struct RemoteConnectorProblem: Error, Equatable {
     var words: String
+}
+
+/// Notify me (#2034): the project's servers' events that tell the person, and a notice opened.
+extension RemoteModel {
+    func notifyList(_ project: ProjectKey) async -> Result<DaemonAPI.NotifyList, RemoteConnectorProblem> {
+        await connectorCall(project.host) {
+            try await $0.call(DaemonAPI.Method.notifyList, DaemonAPI.NotifyListRequest(folder: project.folder.path),
+                              returning: DaemonAPI.NotifyList.self)
+        }
+    }
+
+    func notifySet(_ project: ProjectKey, server: String, event: String, on: Bool) async
+        -> Result<DaemonAPI.NotifyList, RemoteConnectorProblem> {
+        await connectorCall(project.host) {
+            try await $0.call(DaemonAPI.Method.notifySet,
+                              DaemonAPI.NotifySetRequest(folder: project.folder.path, server: server, event: event, on: on),
+                              returning: DaemonAPI.NotifyList.self)
+        }
+    }
+
+    /// A notice's banner opened: the item's page, from the notice the model holds, and the
+    /// notice withdrawn everywhere.
+    func openNotice(token: String) {
+        let id = String(token.dropFirst("notice:".count))
+        if let url = work.needs[.notice(id)]?.url.flatMap(URL.init(string:)) {
+            UIApplication.shared.open(url)
+        }
+        Task {
+            _ = await connectorCall(.mac) {
+                try await $0.call(DaemonAPI.Method.noticeOpen, DaemonAPI.NoticeOpenRequest(id: id), returning: DaemonAPI.Empty.self)
+            }
+        }
+    }
 }

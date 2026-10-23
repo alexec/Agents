@@ -73,6 +73,7 @@ public enum Capability {
     public static let milestones1 = "milestones/1"
     public static let modes1 = "modes/1"
     public static let mute1 = "mute/1"
+    public static let notify1 = "notify/1"
     public static let options1 = "options/1"
     public static let orgIdentity1 = "org-identity/1"
     public static let orgRoutes1 = "org-routes/1"
@@ -252,6 +253,9 @@ public enum Capability {
         "mcp/verify": "mcp/1",
         "milestones/state": "milestones/1",
         "modes/remembered": "modes/1",
+        "notice/open": "notify/1",
+        "notify/list": "notify/1",
+        "notify/set": "notify/1",
         "options/remembered": "options/1",
         "pairing/current": "pairing/1",
         "permissions/answer": "permissions/1",

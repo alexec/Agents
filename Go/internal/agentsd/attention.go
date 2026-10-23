@@ -378,6 +378,9 @@ func (d *Daemon) needs() []wire.Need {
 				RaisedAt: raised, Headline: truncating(wire.Headline{H1: filepath.Base(folder), H2: title, H3: guardedHeadline(c)})})
 		}
 	}
+	// What a Notify me choice brought (#2034): a notice, not a Needs you row; each client leaves
+	// it out of Needs you and only posts it.
+	found = append(found, d.noticeNeedsLocked(at.Time())...)
 	// Forget the first-seen time of anything no longer outstanding.
 	live := map[string]bool{}
 	for _, id := range ids {

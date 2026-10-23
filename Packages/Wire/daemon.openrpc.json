@@ -3411,6 +3411,84 @@
       }
     },
     {
+      "name": "notice/open",
+      "description": "A notice was opened: withdrawn from every window and device.",
+      "x-capability": "notify/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/NoticeOpenRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "notify/list",
+      "description": "Notify me (#2034): the project's servers with events that can tell the person, and which are on.",
+      "x-capability": "notify/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/NotifyListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/NotifyList"
+        }
+      }
+    },
+    {
+      "name": "notify/set",
+      "description": "Turn one Notify me event on or off; answers the list again.",
+      "x-capability": "notify/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/NotifySetRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/NotifyList"
+        }
+      }
+    },
+    {
       "name": "options/remembered",
       "x-capability": "options/1",
       "tags": [

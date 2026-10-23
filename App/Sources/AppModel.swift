@@ -904,6 +904,7 @@ final class AppModel {
         }
         notifier.openProject = { [weak self] folder in self?.openProject(ProjectKey(host: .mac, folder: folder)) }
         notifier.answer = { [weak self] token, quick, typed in await self?.answerFromBanner(token, quick, typed: typed) }
+        notifier.openNotice = { [weak self] id, url in self?.openNotice(id, url: url) }
         #if DEBUG
         openFromLaunchArguments()
         #endif

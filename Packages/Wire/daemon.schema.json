@@ -12056,6 +12056,10 @@
         },
         "headline": {
           "$ref": "#/definitions/Headline"
+        },
+        "url": {
+          "type": "string",
+          "description": "A notice's (#2034): the item's page on its site, which opening the notice opens."
         }
       },
       "required": [
@@ -12142,6 +12146,18 @@
             "guardedChange"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "notice": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "notice"
+          ],
+          "additionalProperties": false
         }
       ],
       "description": "NeedID (Attention/Need.swift): what is being answered, one key per kind."
@@ -12152,8 +12168,124 @@
         "permission",
         "elicitation",
         "report",
-        "guardedChange"
+        "guardedChange",
+        "notice"
       ]
+    },
+    "NoticeOpenRequest": {
+      "type": "object",
+      "description": "A notice was opened: it is withdrawn everywhere (#2034).",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "NotifyEvent": {
+      "type": "object",
+      "description": "One event a person can be told of (#2034): its name, its words, and whether it is on for this person in this project.",
+      "properties": {
+        "event": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "on": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "event",
+        "title",
+        "on"
+      ],
+      "additionalProperties": false
+    },
+    "NotifyList": {
+      "type": "object",
+      "description": "Notify me (#2034): the project's servers and, for each, the events that tell the person.",
+      "properties": {
+        "folder": {
+          "type": "string"
+        },
+        "servers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/NotifyServer"
+          }
+        }
+      },
+      "required": [
+        "folder",
+        "servers"
+      ],
+      "additionalProperties": false
+    },
+    "NotifyListRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "folder"
+      ],
+      "additionalProperties": false
+    },
+    "NotifyServer": {
+      "type": "object",
+      "description": "A server of the project with events a person can be told of (#2034), by its name in the project's mcp.json.",
+      "properties": {
+        "server": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/NotifyEvent"
+          }
+        }
+      },
+      "required": [
+        "server",
+        "title",
+        "events"
+      ],
+      "additionalProperties": false
+    },
+    "NotifySetRequest": {
+      "type": "object",
+      "description": "Turn one event on or off for the person in a project. Kept in the host's <root>/notify-me.json, not in the project.",
+      "properties": {
+        "folder": {
+          "type": "string"
+        },
+        "server": {
+          "type": "string"
+        },
+        "event": {
+          "type": "string"
+        },
+        "on": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "folder",
+        "server",
+        "event",
+        "on"
+      ],
+      "additionalProperties": false
     },
     "OTLPExport": {
       "type": "object",

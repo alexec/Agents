@@ -63,7 +63,9 @@ type mcpSubscription struct {
 	// workflows are the ids of the workflows whose triggers make it, sorted.
 	workflows []string
 	// waits are the agents whose open waits hold it (#577), sorted.
-	waits  []wire.UUID
+	waits []wire.UUID
+	// notify is a Notify me choice (#2034): what it brings is a notice too.
+	notify bool
 	pool   string
 	filled sdk.McpServer
 	cwd    string
@@ -708,7 +710,7 @@ func (d *Daemon) reconcileMCPEvents(ctx context.Context) {
 		}
 		lines[workflowKey(w.folder, w.id)] = heardLines(workflowLines)
 	}
-	d.addMCPWaits(wanted, func(folder string) map[string]found {
+	resolve := func(folder string) map[string]found {
 		if resolved[folder] == nil {
 			m := map[string]found{}
 			for _, n := range d.mcpServerNames(folder) {
@@ -718,7 +720,9 @@ func (d *Daemon) reconcileMCPEvents(ctx context.Context) {
 			resolved[folder] = m
 		}
 		return resolved[folder]
-	})
+	}
+	d.addMCPWaits(wanted, resolve)
+	d.addNotifyMe(wanted, resolve)
 	// A workflow's file is part of what a stopped subscription waits on.
 	digests := map[string]string{}
 	for _, w := range hearing {
@@ -1152,6 +1156,12 @@ func (d *Daemon) deliverMCPEvents(result mcpPollResult, s *mcpSubscription, used
 	checks := senderChecks{}
 	for _, e := range fresh {
 		d.raiseMCPEvent(e, s, checks)
+	}
+	// A Notify me choice (#2034), as it is now: one turned off since is not told.
+	if cur := d.mcpSubscription(s.id); cur != nil && cur.notify {
+		for _, e := range fresh {
+			d.addNotice(e, cur)
+		}
 	}
 	d.mcpEvMu.Lock()
 	if r := d.mcpRecordsLocked().Subscriptions[s.id]; r != nil {

@@ -1444,6 +1444,9 @@ button.plain:hover { opacity: 1; }
 .setup-card { background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: 10px;
   padding: 12px 14px; margin: 0; }
 .setup-card p { margin: 0 0 3px; }
+/* Notify me (#2034): a box per event under each server. */
+.notify-me { border: 0; padding: 0; margin: 0 0 8px; }
+.notify-me label.check { display: flex; gap: 6px; align-items: center; margin: 3px 0; }
 .setup-card.connection, .setup-card .connection, .connect-sheet .connection, .connections li.connection {
   display: flex; align-items: center; gap: 12px; }
 .setup-card.list { list-style: none; padding: 0; }

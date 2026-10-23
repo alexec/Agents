@@ -3317,6 +3317,11 @@ final class RemoteModel {
     /// model does not hold yet (a cold launch, a wake) is kept and opened once caught up,
     /// as `open(_:)` keeps an agent (#1045).
     func open(needToken token: String) {
+        // A notice (#2034) opens its item, not a session.
+        if token.hasPrefix("notice:") {
+            openNotice(token: token)
+            return
+        }
         if let agentID = agentID(forNeedToken: token) {
             pendingNeed = nil
             open(agentID)

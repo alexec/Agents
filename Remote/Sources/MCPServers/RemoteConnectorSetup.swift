@@ -62,6 +62,8 @@ struct RemoteConnectorSetup: View {
                     .paperListRow()
                 }
             }
+            // The person's own (#2034): which of the servers' events send them a notification.
+            RemoteNotifyMeSection(project: project)
         }
     }
 
@@ -717,6 +719,54 @@ private extension View {
         VStack(alignment: .leading, spacing: 2) {
             Text(caption).appText(.fine).foregroundStyle(.secondary).accessibilityHidden(true)
             self
+        }
+    }
+}
+
+/// Notify me (#2034), as the window's: each server's events that send the person a
+/// notification, a switch each.
+private struct RemoteNotifyMeSection: View {
+    @Environment(RemoteModel.self) private var model
+    let project: ProjectKey
+    @State private var list: DaemonAPI.NotifyList?
+    @State private var problem: String?
+
+    var body: some View {
+        Section {
+            if let list, list.servers.isEmpty {
+                Text(NotifyMeWords.none).foregroundStyle(.secondary).paperListRow()
+            }
+            ForEach(list?.servers ?? []) { server in
+                ForEach(server.events) { event in
+                    Toggle(isOn: Binding(get: { event.on }, set: { on in Task { await set(server.server, event.event, on) } })) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(event.title)
+                            Text(server.title).appText(.fine).foregroundStyle(.secondary)
+                        }
+                    }
+                    .paperListRow()
+                }
+            }
+            if let problem { Text(problem).tinted(.failure).paperListRow() }
+        } header: {
+            Text(NotifyMeWords.heading)
+        } footer: {
+            Text(NotifyMeWords.note)
+        }
+        .task(id: project) { await load() }
+    }
+
+    private func load() async {
+        switch await model.notifyList(project) {
+        case .success(let fresh): list = fresh; problem = nil
+        case .failure(let failure): problem = failure.words
+        }
+    }
+
+    private func set(_ server: String, _ event: String, _ on: Bool) async {
+        switch await model.notifySet(project, server: server, event: event, on: on) {
+        case .success(let fresh): list = fresh; problem = nil
+        case .failure(let failure): problem = failure.words
         }
     }
 }

@@ -26,6 +26,8 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
     /// One of the banner's own buttons (#1170): the need's token, the answer, and the line
     /// typed for a reply.
     var answer: @MainActor (String, QuickAnswer, String?) async -> Void = { _, _, _ in }
+    /// A notice opened (#2034): its id, and the item's page to open.
+    var openNotice: @MainActor (String, URL?) -> Void = { _, _ in }
 
     private let center = UNUserNotificationCenter.current()
     private var showing: [String: NeedID] = [:]
@@ -64,7 +66,7 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
     func sweep(keeping pending: DaemonAPI.AttentionPending, me: Surface = .mac) async {
         let live = Set(pending.needs.map(\.id.token))
         let delivered = await center.deliveredNotifications().map(\.request.identifier)
-        let stale = delivered.filter { $0.hasPrefix("permission:") || $0.hasPrefix("elicitation:") || $0.hasPrefix("report:") }
+        let stale = delivered.filter { $0.hasPrefix("permission:") || $0.hasPrefix("elicitation:") || $0.hasPrefix("report:") || $0.hasPrefix("notice:") }
             .filter { !live.contains($0) }
         if !stale.isEmpty {
             note("notifier: sweep removing stale \(stale); live \(Array(live))")
@@ -89,11 +91,17 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
         // under it; what is wanted as the body. Never blank: the headline is truncated
         // rather than emptied, in Core, before it gets here.
         let headline = need.headline.truncating()
-        content.title = headline.h2
-        content.subtitle = headline.h1
-        content.body = headline.h3
+        let lines = BannerLines(headline, for: need.id)
+        content.title = lines.title
+        content.subtitle = lines.subtitle
+        content.body = lines.body
         content.sound = alert ? .default : nil
         content.userInfo = ["needToken": token]
+        if case .notice(let id) = need.id {
+            // Notify me (#2034): opening it opens the item.
+            content.userInfo["notice"] = id
+            if let url = need.url { content.userInfo["url"] = url }
+        }
         if let agentID = need.agentID {
             content.userInfo["agentID"] = agentID.uuidString
             content.threadIdentifier = agentID.uuidString
@@ -168,6 +176,11 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
             return
         }
         let request = response.notification.request
+        if let id = request.content.userInfo["notice"] as? String {
+            let url = (request.content.userInfo["url"] as? String).flatMap(URL.init(string:))
+            await MainActor.run { openNotice(id, url) }
+            return
+        }
         if let text = request.content.userInfo["agentID"] as? String, let agentID = UUID(uuidString: text) {
             await MainActor.run {
                 NSApp.activate()

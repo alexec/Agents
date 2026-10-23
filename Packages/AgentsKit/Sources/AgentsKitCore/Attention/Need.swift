@@ -15,8 +15,10 @@ public enum NeedID: Hashable, Sendable, Codable {
     /// A change to one of the app's own files in a project's `.agents`, waiting for Keep
     /// or Undo (#531): the project and the file, since there is one question per file.
     case guardedChange(URL, String)
+    /// What a Notify me choice brought (#2034): the host's id for it. Not a Needs you row.
+    case notice(String)
 
-    private enum CodingKeys: String, CodingKey { case permission, elicitation, report, guardedChange }
+    private enum CodingKeys: String, CodingKey { case permission, elicitation, report, guardedChange, notice }
     private struct Report: Codable { var agentID: UUID; var at: Date }
     private struct Guarded: Codable { var folder: URL; var path: String }
 
@@ -32,6 +34,8 @@ public enum NeedID: Hashable, Sendable, Codable {
         } else if c.contains(.guardedChange) {
             let g = try c.decode(Guarded.self, forKey: .guardedChange)
             self = .guardedChange(g.folder, g.path)
+        } else if c.contains(.notice) {
+            self = .notice(try c.decode(String.self, forKey: .notice))
         } else {
             throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
                                                     debugDescription: "a need id names what is asked"))
@@ -46,6 +50,7 @@ public enum NeedID: Hashable, Sendable, Codable {
         case .report(let agentID, let at): try c.encode(Report(agentID: agentID, at: at), forKey: .report)
         case .guardedChange(let folder, let path):
             try c.encode(Guarded(folder: folder, path: path), forKey: .guardedChange)
+        case .notice(let id): try c.encode(id, forKey: .notice)
         }
     }
 
@@ -56,6 +61,7 @@ public enum NeedID: Hashable, Sendable, Codable {
         case .elicitation(let id): return "elicitation:\(id.uuidString)"
         case .report(let agentID, let at): return "report:\(agentID.uuidString):\(at.timeIntervalSinceReferenceDate)"
         case .guardedChange(let folder, let path): return "guarded:\(folder.path):\(path)"
+        case .notice(let id): return "notice:\(id)"
         }
     }
 
@@ -86,6 +92,8 @@ public enum NeedID: Hashable, Sendable, Codable {
 public struct Need: Hashable, Sendable, Codable, Identifiable {
     public enum Kind: String, Hashable, Sendable, Codable {
         case permission, elicitation, report, guardedChange
+        /// Notify me (#2034): posted, never listed in Needs you.
+        case notice
     }
 
     public var id: NeedID
@@ -96,13 +104,48 @@ public struct Need: Hashable, Sendable, Codable, Identifiable {
     public var kind: Kind
     public var raisedAt: Date
     public var headline: Headline
+    /// A notice's (#2034): the item's page on its site, which opening the notice opens.
+    public var url: String?
 
-    public init(id: NeedID, agentID: UUID?, folder: URL, kind: Kind, raisedAt: Date, headline: Headline) {
+    /// Whether it is a Needs you row: a notice is only posted (#2034).
+    public var isNeedsYou: Bool { kind != .notice }
+
+    public init(id: NeedID, agentID: UUID?, folder: URL, kind: Kind, raisedAt: Date, headline: Headline, url: String? = nil) {
+        self.url = url
         self.id = id
         self.agentID = agentID
         self.folder = folder
         self.kind = kind
         self.raisedAt = raisedAt
         self.headline = headline
+    }
+}
+
+/// A banner's three lines (spec 021, #2034): the agent, its project, and what is wanted; for
+/// a notice, what happened, then where it came from. The Mac, the Remote and the push
+/// extension say the same.
+public struct BannerLines: Hashable, Sendable {
+    public var title: String
+    public var subtitle: String
+    public var body: String
+
+    public init(_ headline: Headline, for need: NeedID) {
+        if case .notice = need {
+            title = headline.h3
+            subtitle = ""
+            body = "\(headline.h2) \u{00B7} \(headline.h1)"
+        } else {
+            title = headline.h2
+            subtitle = headline.h1
+            body = headline.h3
+        }
+    }
+}
+
+public extension NeedID {
+    /// A Notify me notice (#2034): posted, never a Needs you row or a widget's.
+    var isNotice: Bool {
+        if case .notice = self { return true }
+        return false
     }
 }

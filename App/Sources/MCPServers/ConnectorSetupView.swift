@@ -46,6 +46,8 @@ struct ConnectorSetupView: View {
                     heading("Events")
                     events(setup.events, forge: setup.forgeOrGitHub)
                 }
+                // The person's own (#2034): which of the servers' events send them a notification.
+                NotifyMeSection(project: project)
             } else if problem == nil {
                 ProgressView().controlSize(.small)
             }
