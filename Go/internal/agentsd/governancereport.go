@@ -33,7 +33,11 @@ func (d *Daemon) governanceItems() []wire.CatalogItem {
 	}
 	var servers mcpcatalog.Sidecar
 	if b, err := os.ReadFile(d.mcpSidecarPath()); err == nil && json.Unmarshal(b, &servers) == nil {
+		still := d.mcpStillThere()
 		for key, r := range servers.Servers {
+			if !still(key) {
+				continue
+			}
 			add(wire.CatalogItem{Kind: wire.CatalogKindMCP, Name: lastPart(key), Source: optionalString(r.RegistryName),
 				Version: optionalString(r.Version), ByHand: r.ByHand})
 		}
@@ -63,6 +67,50 @@ func (d *Daemon) governanceItems() []wire.CatalogItem {
 
 // lastPart is a sidecar key's name: personal/<name> or <folder>/<name>.
 func lastPart(key string) string { return key[strings.LastIndex(key, "/")+1:] }
+
+// mcpStillThere says whether a sidecar entry's server is still in the mcp.json its key
+// names, the personal one or the project folder's (#2505). The sidecar is not pruned when a
+// server leaves mcp.json by hand, so the report would keep a server no agent can use. Each
+// mcp.json is read once a report. One that cannot be read, or that is not valid, settles
+// nothing: its entries stay, as the sidecar is all that is known of them.
+func (d *Daemon) mcpStillThere() func(key string) bool {
+	type names struct {
+		known bool
+		has   map[string]bool
+	}
+	files := map[string]names{}
+	return func(key string) bool {
+		i := strings.LastIndex(key, "/")
+		if i < 0 {
+			return true
+		}
+		scope, name := key[:i], key[i+1:]
+		path := ""
+		if scope == "personal" {
+			if home := d.personalHome(); home != "" {
+				path = mcpcatalog.PersonalFile(home)
+			}
+		} else {
+			path = mcpcatalog.ProjectFile(scope)
+		}
+		if path == "" {
+			return true
+		}
+		f, ok := files[path]
+		if !ok {
+			if _, err := mcpcatalog.LoadFile(path); err == nil {
+				if entries, problem := readMCPFile(path); problem == "" {
+					f = names{known: true, has: map[string]bool{}}
+					for _, e := range entries {
+						f.has[e.name] = true
+					}
+				}
+			}
+			files[path] = f
+		}
+		return !f.known || f.has[name]
+	}
+}
 
 func optionalString(s string) *string {
 	if s == "" {
