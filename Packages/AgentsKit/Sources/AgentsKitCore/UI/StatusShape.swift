@@ -58,12 +58,13 @@ public enum StatusShape: Hashable, Sendable {
         }
     }
 
-    /// The SF Symbol to draw. Nil for `working`, which is drawn as a spinner.
+    /// The SF Symbol to draw. Nil for `working`, which is drawn as the working ring, and
+    /// for `waiting`, which is drawn as the breathing dot (#2456): motion, not a fourth
+    /// symbol after the hourglass, `moon.zzz` and `zzz` (#765).
     public var symbol: String? {
         switch self {
-        case .working: return nil
+        case .working, .waiting: return nil
         case .needsYou: return "exclamationmark.circle.fill"
-        case .waiting: return "zzz"
         case .done: return "checkmark"
         case .stopped: return "stop.circle"
         }

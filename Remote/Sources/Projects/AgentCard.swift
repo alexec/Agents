@@ -474,6 +474,9 @@ struct StatusIcon: View {
                     .glyph(size: 16)
                     .foregroundStyle((shape.wantsAPerson ? StateTint.attention : .none)
                         .style(or: .secondary))
+            } else if shape == .waiting {
+                // In the accent, as the sidebar's (#2456).
+                BreathingDot(size: 18)
             } else {
                 WorkingRing(size: 18, doing: tool != nil)
             }

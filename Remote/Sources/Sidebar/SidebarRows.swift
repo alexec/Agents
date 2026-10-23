@@ -210,8 +210,8 @@ private struct FoldAction: ViewModifier {
 
 /// A session's mark in the sidebar (#495, #498), the window's: what it wants, in four
 /// shapes — an orange hand when it needs the person, a spinner in the accent while it
-/// works (#1558), a tick once done, read or not (#1323, #2363); a numbered list while queued, an
-/// hourglass while it waits and a pause mark once stopped (#630).
+/// works (#1558), a tick once done, read or not (#1323, #2363); a numbered list while queued, a
+/// breathing dot while it waits (#2456) and a pause mark once stopped (#630).
 /// An orange archive box when it asks to be archived, as it is listed under Needs You
 /// (#817). Archived keeps its `StatusIcon`.
 private struct SessionMark: View {
@@ -256,7 +256,8 @@ private struct SessionMark: View {
             case .queued:
                 Image(systemName: "list.number").sidebarMark(Paper.accent)
             case .waiting:
-                Image(systemName: "zzz").sidebarMark(Paper.accent)
+                // One dot that breathes, in step with every other (#2456): asleep, but alive.
+                BreathingDot(size: 14 * scale, color: onAccent ? Paper.ground : Paper.accent)
             case .paused:
                 Image(systemName: "pause.circle").sidebarMark(Paper.accent)
             case .done:

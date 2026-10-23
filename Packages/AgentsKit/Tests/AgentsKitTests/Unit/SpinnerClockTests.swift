@@ -60,6 +60,45 @@ struct SpinnerClockTests {
         #expect(abs(pivots - pivots.rounded()) < 1e-9)
     }
 
+    @Test("The waiting dot breathes: dim at the start, full halfway, back round, in step (#2456)")
+    func breath() {
+        let dim = SpinnerClock.breathDimOpacity
+        #expect(abs(SpinnerClock.breathOpacity(at: 0) - dim) < 1e-9)
+        #expect(abs(SpinnerClock.breathOpacity(at: SpinnerClock.breathPeriod / 2) - 1) < 1e-9)
+        #expect(abs(SpinnerClock.breathOpacity(at: SpinnerClock.breathPeriod) - dim) < 1e-9)
+        // A quarter in it is halfway up, and the slope is gentle at both ends: no corners.
+        #expect(abs(SpinnerClock.breathOpacity(at: 1) - (dim + (1 - dim) / 2)) < 1e-9)
+        #expect(SpinnerClock.breathOpacity(at: 0.1) - dim < 0.01)
+        for n in 0..<40 {
+            let time = Double(n) / 40 * SpinnerClock.breathPeriod
+            let opacity = SpinnerClock.breathOpacity(at: time)
+            #expect(opacity >= dim - 1e-9 && opacity <= 1 + 1e-9)
+            #expect(abs(SpinnerClock.breathOpacity(at: time + SpinnerClock.breathPeriod) - opacity) < 1e-9)
+        }
+        // A longer breath from the key keeps the same shape, stretched.
+        #expect(abs(SpinnerClock.breathOpacity(at: 4, period: 8) - 1) < 1e-9)
+        // Every dot reads the one clock, so two that never met agree.
+        let date = SpinnerClock.epoch.addingTimeInterval(1234.5)
+        let first = SpinnerClock.fraction(at: date, period: SpinnerClock.breathPeriod)
+        let second = SpinnerClock.fraction(at: Date(timeIntervalSince1970: date.timeIntervalSince1970),
+                                           period: SpinnerClock.breathPeriod)
+        #expect(first == second)
+        // The dot is the ring's dot, and as dim as its back.
+        #expect(SpinnerClock.breathDotDiameter == SpinnerClock.ringDotDiameter)
+        #expect(dim == SpinnerClock.ringRestingOpacity)
+    }
+
+    @Test("The breath's period comes from the defaults key, between 1 and 30 s, else 4 (#2456)")
+    func breathPeriodKey() {
+        #expect(SpinnerClock.breathPeriod(from: nil) == 4)
+        #expect(SpinnerClock.breathPeriod(from: .nan) == 4)
+        #expect(SpinnerClock.breathPeriod(from: .infinity) == 4)
+        #expect(SpinnerClock.breathPeriod(from: 6) == 6)
+        #expect(SpinnerClock.breathPeriod(from: 0.2) == 1)
+        #expect(SpinnerClock.breathPeriod(from: 90) == 30)
+        #expect(SpinnerClock.breathPeriodKey == "waitingMarkPeriod")
+    }
+
     @Test("At rest the ring is today's three dots: a line, 0.34 apart, the middle one bright")
     func ringAtRest() throws {
         for tilt in [0.0, SpinnerClock.ringTilt] {

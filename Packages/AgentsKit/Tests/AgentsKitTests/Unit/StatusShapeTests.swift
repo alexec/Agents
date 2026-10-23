@@ -68,7 +68,8 @@ struct StatusShapeTests {
         let shape = StatusShape(state: .finished, outcome: .blocked, isWaiting: true, isComingBack: false)
         #expect(shape == .waiting)
         #expect(!shape.wantsAPerson)
-        #expect(shape.symbol != StatusShape.needsYou.symbol)
+        // Drawn as the breathing dot, not a symbol (#2456).
+        #expect(shape.symbol == nil)
         #expect(StatusShape(state: .finished, outcome: .done, isWaiting: true, isComingBack: false) == .waiting)
         #expect(StatusShape(state: .finished, outcome: .needsAnswer, isWaiting: true, isComingBack: false) == .needsYou)
         #expect(StatusShape(state: .stopped, outcome: .blocked, isWaiting: true, isComingBack: false,
@@ -83,7 +84,9 @@ struct StatusShapeTests {
         })
         #expect(shapes.isSubset(of: [.working, .needsYou, .done, .stopped]))
         #expect(StatusShape(state: .queued, outcome: nil, isWaiting: false, isComingBack: false) == .waiting)
-        #expect(Set([StatusShape.needsYou, .waiting, .done, .stopped].compactMap(\.symbol)).count == 4)
+        // Two are motion (the ring, the breathing dot); the other three are symbols, each its own.
+        #expect(Set([StatusShape.needsYou, .done, .stopped].compactMap(\.symbol)).count == 3)
+        #expect(StatusShape.waiting.symbol == nil)
     }
 }
 

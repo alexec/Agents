@@ -20,7 +20,7 @@ import { shortAgo } from "../model/activity";
 import { runningTool, runningToolLabel, sessionMark, type SessionMark } from "../model/sidebar";
 import { isMuted, muteMark, mutedHelp, mutedWords } from "../model/mute";
 
-const glyphs: Record<StatusShape, string> = { working: "", needsYou: "!", waiting: "ᶻᶻ", done: "✓", stopped: "■" };
+const glyphs: Record<StatusShape, string> = { working: "", needsYou: "!", waiting: "", done: "✓", stopped: "■" };
 
 /** The shape beside a title, with its words for the tooltip and a screen reader. */
 export function StatusMark({ agent, comingBack = false }: { agent: Agent; comingBack?: boolean }) {
@@ -28,9 +28,10 @@ export function StatusMark({ agent, comingBack = false }: { agent: Agent; coming
   return (
     <span class={`status ${status.shape}${status.tinted ? " tinted" : ""}`} role="img" aria-label={status.words}
       title={status.words}>
-      {status.shape === "working"
-        ? <WorkingMark tool={runningTool(agent)} />
-        : <span class="glyph" aria-hidden="true">{glyphs[status.shape]}</span>}
+      {status.shape === "working" && <WorkingMark tool={runningTool(agent)} />}
+      {status.shape === "waiting" && <WaitingMark />}
+      {status.shape !== "working" && status.shape !== "waiting"
+        && <span class="glyph" aria-hidden="true">{glyphs[status.shape]}</span>}
     </span>
   );
 }
@@ -40,7 +41,7 @@ const markWords: Record<SessionMark, string> = { needsYou: "Needs you", working:
 
 /**
  * A session's mark in the sidebar (#495, #499), the window's and the Remote's: an orange hand when
- * it needs the person, the working ring while it thinks, tipping while it runs a tool (#2332), a numbered list while queued, Zs while it waits (#765), a pause mark once
+ * it needs the person, the working ring while it thinks, tipping while it runs a tool (#2332), a numbered list while queued, a breathing dot while it waits (#2456), a pause mark once
  * stopped (#630), a tick once done, read or not (#1323, #2363). Archived keeps its
  * status mark.
  */
@@ -54,7 +55,7 @@ export function SidebarMark({ agent, comingBack = false }: { agent: Agent; comin
       {mark === "needsYou" && <span class="glyph" aria-hidden="true">✋&#xFE0E;</span>}
       {(mark === "working" || mark === "tool") && <WorkingMark tool={tool} />}
       {mark === "queued" && <span class="glyph" aria-hidden="true">≡</span>}
-      {mark === "waiting" && <span class="glyph" aria-hidden="true">ᶻᶻ</span>}
+      {mark === "waiting" && <WaitingMark />}
       {mark === "paused" && <span class="glyph" aria-hidden="true">⏸&#xFE0E;</span>}
       {mark === "done" && <span class="glyph" aria-hidden="true">✓&#xFE0E;</span>}
       {mark === "asksToArchive" && <span class="glyph" aria-hidden="true">🗃&#xFE0E;</span>}
@@ -70,6 +71,15 @@ export function SidebarMark({ agent, comingBack = false }: { agent: Agent; comin
  */
 export function WorkingMark({ tool }: { tool: string | null }) {
   return <span class={tool !== null ? "working-ring doing" : "working-ring"} aria-hidden="true"><i /><i /><i /></span>;
+}
+
+/**
+ * A waiting session's mark (#2456), the window's `BreathingDot`: one dot, the ring's dot, that
+ * breathes between dim and full once in 4 s, in step on the page (spinnerClock.ts) and slower under
+ * Reduce Motion. In the colour around it: the accent, where the unread dot is grey and still.
+ */
+export function WaitingMark() {
+  return <span class="breathing-dot" aria-hidden="true"><i /></span>;
 }
 
 const relative = new Intl.RelativeTimeFormat("en", { numeric: "always" });
