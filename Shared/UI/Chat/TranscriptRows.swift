@@ -354,12 +354,12 @@ private struct EntryRow: View {
     var body: some View {
         switch entry.kind {
         case .userMessage(let text, let blocks, let from):
-            // Not in the person's bubble when it is not the person's. The app asks an
-            // agent that ended without saying how it went, once, and a question they
-            // never typed must not be shown as though they had (FR-022).
+            // Not in the person's bubble when it is not the person's: words the app sent
+            // the agent (a woken wait, a lease, a move, a workflow run) must not be shown
+            // as though the person had typed them (FR-022, #2407).
             if from == .app {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Agents asked").appText(.reading).foregroundStyle(.tertiary)
+                    Text("From the app").appText(.reading).foregroundStyle(.tertiary)
                     BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
                         .appText(.reading)
                         .foregroundStyle(.secondary)

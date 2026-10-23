@@ -33,8 +33,8 @@ func whyCannotMove(id string) string {
 	return name + " can't carry its conversation into another folder, so this agent stays where it is. Start a new one in a worktree instead."
 }
 
-// carryOn is what the app says to an agent it has just moved, as the prompt that starts it
-// again.
+// carryOn ends what the app says to an agent it has just moved, as the prompt that starts it
+// again, after the move's preface (#2407).
 const carryOn = "Carry on with what you were doing."
 
 // moveWorktree is move_worktree: a move asked for now, made when this turn ends. Neither
@@ -421,7 +421,7 @@ func (d *Daemon) afterTurnMove(id wire.UUID, s wire.AgentState, archiving bool) 
 		})
 		return true
 	}
-	if err := d.enqueue(id, wire.QueuedPrompt{ID: store.NewUUID(), Text: carryOn, QueuedAt: now(), From: wire.PromptOriginApp, Preface: &preface}, false); err != nil {
+	if err := d.enqueue(id, wire.QueuedPrompt{ID: store.NewUUID(), Text: preface + " " + carryOn, QueuedAt: now(), From: wire.PromptOriginApp}, false); err != nil {
 		d.record(id, runtimeNote("Could not start again after the move: "+err.Error()))
 		return false
 	}
