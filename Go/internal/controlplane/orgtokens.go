@@ -88,8 +88,10 @@ func (s *Service) endpoints() *orgEndpoints {
 }
 
 // orgToken is a token made for a route's version, its field and when it ends; and, after
-// a renewal that failed, how many failed and when the next is tried.
+// a renewal that failed, how many failed and when the next is tried; and when a machine's
+// delivery last asked for it.
 type orgToken struct {
+	asked    time.Time
 	version  int64
 	field    string
 	value    string
@@ -137,6 +139,7 @@ func (s *Service) routeValuesToSend(ctx context.Context, r wire.OrgRoute, values
 	if ok && (t.version != deref(r.Version) || t.field != field) {
 		t = orgToken{}
 	}
+	t.asked = now
 	// After a renewal that failed, nothing is tried until retryAt, whichever machine asks.
 	if t.expires.Sub(now) <= renewTokenBefore && !now.Before(t.retryAt) {
 		value, expires, err := s.makeToken(ctx, r, values)
@@ -149,13 +152,13 @@ func (s *Service) routeValuesToSend(ctx context.Context, r wire.OrgRoute, values
 			t.retryAt = now.Add(tokenRetry(t.failures))
 			s.log(fmt.Sprintf("org route %s: no token made (%v); tried again at %s", r.ID, err, t.retryAt.UTC().Format(time.TimeOnly)))
 		}
-		s.orgRoutes.mu.Lock()
-		if s.orgRoutes.tokens == nil {
-			s.orgRoutes.tokens = map[string]orgToken{}
-		}
-		s.orgRoutes.tokens[r.ID] = t
-		s.orgRoutes.mu.Unlock()
 	}
+	s.orgRoutes.mu.Lock()
+	if s.orgRoutes.tokens == nil {
+		s.orgRoutes.tokens = map[string]orgToken{}
+	}
+	s.orgRoutes.tokens[r.ID] = t
+	s.orgRoutes.mu.Unlock()
 	// The last token goes on until it ends, through a renewal that failed.
 	if t.value == "" || !t.expires.After(now) {
 		return nil, time.Time{}, cmp.Or(t.err, errors.New("no token was made"))
@@ -209,12 +212,19 @@ func (s *Service) renewTokensEvery(every time.Duration) {
 }
 
 // tokensEndingSoon says a token this copy made ends within renewTokenBefore, and is due a
-// renewal: not one that failed until its retryAt.
+// renewal: not one that failed until its retryAt. A token that ended and that a resend
+// since did not ask for is dropped: no machine here uses its route any more, and it would
+// bring a resend every minute for ever (#2431).
 func (s *Service) tokensEndingSoon() bool {
 	now := s.endpoints().Now()
 	s.orgRoutes.mu.Lock()
 	defer s.orgRoutes.mu.Unlock()
-	for _, t := range s.orgRoutes.tokens {
+	resent := s.orgRoutes.resent
+	for id, t := range s.orgRoutes.tokens {
+		if !t.expires.After(resent) && t.asked.Before(resent) {
+			delete(s.orgRoutes.tokens, id)
+			continue
+		}
 		if t.expires.Sub(now) <= renewTokenBefore && !now.Before(t.retryAt) {
 			return true
 		}
