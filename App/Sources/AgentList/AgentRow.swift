@@ -347,7 +347,7 @@ struct AgentRow: View {
             Divider()
             // Its record and transcript as a .tar.gz, to keep or import elsewhere (#1001).
             Button("Export…") { Task { await model.exportAgent(agent) } }
-                .disabled(model.hostUnreachable(agent.host))
+                .disabled(model.hostUnreachable(agent.host) || model.exportImport != nil)
             // Finder only sees this Mac's disk (058, FR-019).
             if model.isOnThisMac(agent.host) {
                 Button("Show in Finder") {

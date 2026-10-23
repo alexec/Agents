@@ -1407,6 +1407,9 @@ button.plain:hover { opacity: 1; }
 .plan .in_progress .content { font-weight: 600; }
 .plan-block.withdrawn .plan .in_progress .content { font-weight: inherit; }
 /* With the working line: what the open agent holds and waits for in line (036, #2344). Untinted. */
+/* An export or import on its way (#2437): the line, a bar, and Cancel. */
+.export-import-sheet { min-width: 300px; }
+.export-import-sheet progress { width: 100%; }
 .lease-line { display: flex; flex-direction: column; align-items: flex-start; gap: 0; margin: 0; max-width: 100%; }
 /* A way to Resources, so a chevron and a row's hit area: 24 px, 44 on touch (#2448). */
 .lease-line .link { display: inline-flex; align-items: center; gap: 4px; min-height: 24px; font-size: 0.75rem; color: inherit; max-width: 100%; }

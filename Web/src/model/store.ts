@@ -3,6 +3,7 @@
 // (research R7). Nothing here decides anything; the hosts do.
 import { preferencesSaid, sendPreferencesWith } from "./preferences";
 import { projectPath } from "./hostedMCP";
+import type { ExportImportBusy } from "./exports";
 import { batch, computed, signal, type ReadonlySignal, type Signal } from "@preact/signals";
 import type {
   Agent, AgentRemovedNotification, ResumingNotification, ControlHost, HostID, HostWorkspace, ElicitationNotification, ElicitationRequest, EntryNotification,
@@ -485,6 +486,9 @@ export class Work {
   readonly offeredPrompt = signal<{ draftKey: string; text: string } | null>(null);
   /** Words quoted from a reply for a prompt bar, by its draft key (#1553): added after what is typed. */
   readonly offeredQuote = signal<{ draftKey: string; words: string } | null>(null);
+  /** The Export… or Import Agents… on its way, as a busy sheet with Cancel (#2437). */
+  readonly exportImport = signal<ExportImportBusy | null>(null);
+
   /** The last Archive, while Undo is offered for it (ArchiveUndo, #1534). */
   readonly archiveUndo = signal<{ key: number; host: string; agentIDs: string[]; line: string } | null>(null);
 

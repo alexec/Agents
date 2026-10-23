@@ -68,8 +68,49 @@ struct AgentsExportTransferTests {
         #expect(made.agents == 2)
         #expect(made.name == "Fix the build 2026-10-22.tar.gz")
         let file = folder.appending(path: made.name)
-        try await AgentsExportTransfer.read(made, from: client, into: file)
+        let seen = Seen()
+        try await AgentsExportTransfer.read(made, from: client, into: file) { seen.add($0, $1) }
         #expect(try Data(contentsOf: file) == Data("one-two-three".utf8))
+        // How far it is, after each part, of the whole the host said (#2437).
+        #expect(seen.all.map(\.0) == [4, 8, 13])
+        #expect(seen.all.allSatisfy { $0.1 == 13 })
+    }
+
+    /// What a progress callback heard, in order.
+    final class Seen: @unchecked Sendable {
+        private let lock = NSLock()
+        private var _all: [(Int, Int)] = []
+        var all: [(Int, Int)] { lock.withLock { _all } }
+        func add(_ done: Int, _ whole: Int) { lock.withLock { _all.append((done, whole)) } }
+    }
+
+    /// Cancel stops an import between parts, and nothing is imported (#2437).
+    @Test func aCancelledImportImportsNothing() async throws {
+        let host = Host()
+        let client = DaemonClient(link: host)
+        try await client.connect(startIfNeeded: false)
+        let file = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString + ".tar.gz")
+        defer { try? FileManager.default.removeItem(at: file) }
+        try Data(count: AgentsExportTransfer.partSize * 3).write(to: file)
+
+        let task = Task {
+            try await AgentsExportTransfer.importFile(file, into: client) { done, _ in
+                if done >= AgentsExportTransfer.partSize { withUnsafeCurrentTask { $0?.cancel() } }
+            }
+        }
+        await #expect(throws: CancellationError.self) { try await task.value }
+        #expect(host.received.count == 1)
+        #expect(host.imported == nil)
+    }
+
+    @Test func theBusyLinesSayWhatIsGoingOn() {
+        #expect(AgentsExportTransfer.exporting(nil) == "Making the export…")
+        #expect(AgentsExportTransfer.exporting(1) == "Exporting 1 agent…")
+        #expect(AgentsExportTransfer.exporting(12) == "Exporting 12 agents…")
+        #expect(AgentsExportTransfer.importing(sent: false) == "Sending the export…")
+        #expect(AgentsExportTransfer.importing(sent: true) == "Importing the agents…")
+        #expect(AgentsExportTransfer.exported(1) == "Exported 1 agent.")
+        #expect(AgentsExportTransfer.exported(12) == "Exported 12 agents.")
     }
 
     @Test func anImportIsSentInPartsThenImported() async throws {

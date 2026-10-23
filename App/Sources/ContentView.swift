@@ -97,6 +97,10 @@ struct ContentView: View {
             // A known server with a new key: rebuilt, or not what it says (043).
             // Agents missing at start-up, offered once each (048). Closed any way at
             // all, what was missing counts as offered.
+            // An export or import on its way, with Cancel (#2437).
+            .sheet(item: $model.exportImport) { progress in
+                ExportImportProgressView(progress: progress).paperSheet()
+            }
             .sheet(isPresented: $model.isOfferingInstall,
                    onDismiss: { model.rememberInstallOffer() }) {
                 InstallAgentsSheet().paperSheet()
