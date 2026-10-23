@@ -15,7 +15,8 @@ import Observation
 /// (`TurnParts.replyText`, never the thoughts or the steps) is cleaned by `Speakable` and
 /// spoken in the Paradee voice a sentence at a time, each one as soon as it is written
 /// (#2375). The microphone stays open while it speaks, with echo cancellation
-/// (`VoiceAudio`), and words said over the voice stop it and are the next prompt.
+/// (`VoiceAudio`), and words said over the voice stop it and are the next prompt. Enter
+/// sends the words heard so far at once (#2519).
 @MainActor
 @Observable
 final class VoiceMode {
@@ -229,6 +230,7 @@ final class VoiceMode {
         asking = nil
         confirming?.cancel()
         confirming = nil
+        pendingConfirm = nil
         confirmLine = nil
         waiting = nil
         approving = nil
@@ -398,6 +400,8 @@ final class VoiceMode {
     private var asked: Set<UUID> = []
     /// "Sending: File.", and two seconds to say no.
     private var confirming: Task<Void, Never>?
+    /// The answer to send when the confirm wait ends, or Enter ends it early (#2519).
+    private var pendingConfirm: (() async -> Bool)?
     /// What the strip says while an answer waits for a "no": "Sending File. Say no to
     /// stop." (#2443). Set while it waits, with Don't Send beside it.
     private(set) var confirmLine: String?
@@ -534,28 +538,42 @@ final class VoiceMode {
     /// strip says meanwhile, as "Sending File".
     private func confirm(_ doing: String, _ send: @escaping () async -> Bool) {
         confirmLine = VoiceModeWords.sayNoToStop(doing)
+        pendingConfirm = send
         armTick()
         confirming = Task { [weak self] in
             try? await Task.sleep(for: Self.confirmFor)
             guard let self, !Task.isCancelled else { return }
-            confirming = nil
-            confirmLine = nil
-            self.asking = nil
-            self.approving = nil
-            heard = ""
-            pauseTimer?.cancel()
-            let sent = walkSendFails ? false : await send()
-            guard !Task.isCancelled, phase != .off else { return }
-            if sent {
-                // The turn goes on, and its reply is said when it ends.
-                isWaitingForReply = true
-                sawWork = false
-                turnAtSend = latestTurn
-            } else {
-                answerDidNotGo()
-            }
-            armTick()
+            await self.finishConfirm()
         }
+    }
+
+    /// The confirm wait ended, or Enter cut it short (#2519).
+    private func finishConfirm() async {
+        let send = pendingConfirm
+        guard let send, phase != .off else {
+            pendingConfirm = nil
+            return
+        }
+        pendingConfirm = nil
+        confirming?.cancel()
+        confirming = nil
+        confirmLine = nil
+        asking = nil
+        approving = nil
+        heard = ""
+        pauseTimer?.cancel()
+        pauseTimer = nil
+        let sent = walkSendFails ? false : await send()
+        guard phase != .off else { return }
+        if sent {
+            // The turn goes on, and its reply is said when it ends.
+            isWaitingForReply = true
+            sawWork = false
+            turnAtSend = latestTurn
+        } else {
+            answerDidNotGo()
+        }
+        armTick()
     }
 
     /// An answer that did not go: the question is not read again (it is in `asked`), so
@@ -672,6 +690,7 @@ final class VoiceMode {
         guard confirming != nil else { return }
         confirming?.cancel()
         confirming = nil
+        pendingConfirm = nil
         confirmLine = nil
         heard = ""
         pauseTimer?.cancel()
@@ -721,6 +740,22 @@ final class VoiceMode {
         } else {
             startSpeaking()
         }
+    }
+
+    /// Enter (#2519): send the words heard so far without waiting for the pause.
+    /// Nothing while the voice speaks or when no words have been heard. While the
+    /// confirm line waits, send that answer at once.
+    func sendNow() {
+        guard phase == .listening else { return }
+        if confirming != nil {
+            confirming?.cancel()
+            Task { await self.finishConfirm() }
+            return
+        }
+        guard !heard.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        pauseTimer?.cancel()
+        pauseTimer = nil
+        Task { await self.sendHeard() }
     }
 
     // MARK: Talking over the voice
