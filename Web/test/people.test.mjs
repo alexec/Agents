@@ -64,6 +64,9 @@ test("Remove says which machines are deleted and the work on them that is not pu
     "1 machine is taken off: box-1.",
   ]);
   assert.equal(p.askingLine("Sam"), "Asking Sam’s machines what work on them is not pushed…");
+  assert.equal(p.checkFailedLine("Sam", "The control plane can’t be reached."),
+    "Could not check what Sam’s machines would lose. The control plane can’t be reached. Removing Sam stops and "
+    + "deletes the machines Sam started, with any work on them not pushed, so Remove stays off until the check works.");
 });
 
 test("an invite says how long it works and where it goes", () => {

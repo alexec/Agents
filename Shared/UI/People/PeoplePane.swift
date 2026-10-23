@@ -322,7 +322,8 @@ private struct ListLine: View {
 /// Remove… (FR-029, #1763, #2077): opens at once, asks the control plane what would go (the
 /// person's started machines with their work that is not pushed) while it shows, then says
 /// it a line each, as the web page's sheet does. An older control plane does not know
-/// `people/removePreview`: the sheet then says what it did before.
+/// `people/removePreview`: the sheet then says what it did before. A check that failed
+/// otherwise keeps Remove off, says what is at stake, and offers Try Again (#2193).
 struct RemovePersonSheet: View {
     @Environment(\.dismiss) private var dismiss
     let control: DaemonClient?
@@ -332,6 +333,7 @@ struct RemovePersonSheet: View {
     @State private var isAsking = true
     @State private var isRemoving = false
     @State private var problem: String?
+    @State private var checkProblem: String?
 
     var body: some View {
         #if os(macOS)
@@ -343,7 +345,7 @@ struct RemovePersonSheet: View {
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Remove", role: .destructive) { Task { await remove() } }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(isAsking || isRemoving)
+                    .disabled(isAsking || isRemoving || checkProblem != nil)
             }
         }
         .padding(24)
@@ -358,7 +360,7 @@ struct RemovePersonSheet: View {
                     ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Remove", role: .destructive) { Task { await remove() } }
-                            .disabled(isAsking || isRemoving)
+                            .disabled(isAsking || isRemoving || checkProblem != nil)
                     }
                 }
         }
@@ -383,6 +385,14 @@ struct RemovePersonSheet: View {
                 }
             }
             .paperListRow()
+            if let checkProblem, !isAsking {
+                Section {
+                    Text(checkProblem).appText(.supporting).tinted(.failure)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button("Try Again") { Task { await ask() } }
+                }
+                .paperListRow()
+            }
             if let problem {
                 Text(problem).appText(.supporting).tinted(.failure)
                     .fixedSize(horizontal: false, vertical: true)
@@ -393,19 +403,20 @@ struct RemovePersonSheet: View {
     }
 
     private func ask() async {
+        isAsking = true
+        checkProblem = nil
+        defer { isAsking = false }
         guard let control else {
-            problem = "The control plane can’t be reached."
-            isAsking = false
+            checkProblem = PeopleWords.checkFailed(person, why: "The control plane can’t be reached.")
             return
         }
-        defer { isAsking = false }
         do {
             preview = try await control.call(DaemonAPI.Method.peopleRemovePreview, DaemonAPI.PersonRequest(user: person.id),
                                              returning: DaemonAPI.PersonRemovePreview.self)
         } catch let error as JSONRPCError where error.code == JSONRPCError.methodNotFound {
             preview = nil
         } catch {
-            problem = PeopleWords.refusal(error)
+            checkProblem = PeopleWords.checkFailed(person, why: PeopleWords.refusal(error))
         }
     }
 

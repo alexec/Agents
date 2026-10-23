@@ -533,6 +533,12 @@ public enum PeopleWords {
         "Asking \(person.name)’s machines what work on them is not pushed…"
     }
 
+    /// Remove…'s check failed (#2193): `why` is a sentence. Remove stays off until it works.
+    public static func checkFailed(_ person: DaemonAPI.PersonRow, why: String) -> String {
+        "Could not check what \(person.name)’s machines would lose. \(why) Removing \(person.name) stops and deletes "
+            + "the machines \(person.name) started, with any work on them not pushed, so Remove stays off until the check works."
+    }
+
     public static func removeTitle(_ person: DaemonAPI.PersonRow) -> String {
         "Remove \(person.name)?"
     }
