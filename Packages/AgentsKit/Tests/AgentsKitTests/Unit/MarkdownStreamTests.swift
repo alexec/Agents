@@ -28,7 +28,7 @@ struct MarkdownStreamTests {
     /// Read in parts or whole, the same blocks: for the awkward shapes, and at every line
     /// as one of them arrives.
     @Test func readInPartsIsReadWhole() {
-        let filler = String(repeating: "Words enough to fill a part of the reading. ", count: 60)
+        let filler = String(repeating: "Words enough to fill a part of the reading. ", count: 100)
         let shapes = [
             "# Title\n\n" + filler + "\n\n1. one\n\n2. two\n\nText between.\n\n3. three",
             filler + "\n\n- a\n\n  still a\n\n- b\n\nAfter the list.",
@@ -43,6 +43,8 @@ struct MarkdownStreamTests {
             "---\ntitle: front\n\nmatter: yes\n---\n\n" + filler + "\n\nBody.",
             filler + "\n\nSetext\n===\n\n" + filler + "\n\n- [ ] a task\n- [x] done",
         ]
+        // All but the three a cut could change (a link by reference, HTML, front matter) are read in parts.
+        #expect(shapes.filter { MarkdownBlock.parts($0).count > 1 }.count == shapes.count - 3)
         for shape in shapes {
             #expect(MarkdownCache().blocks(for: shape) == MarkdownBlock.parse(shape), "\(shape.suffix(60))")
             let cache = MarkdownCache()
