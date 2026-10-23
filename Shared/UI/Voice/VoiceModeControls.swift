@@ -138,6 +138,12 @@ struct VoiceModeBar: View {
         }
         .padding(14)
         .paperRaised(in: RoundedRectangle(cornerRadius: 18))
+        .background {
+            Button("Send") { voice.sendNow() }
+                .keyboardShortcut(.defaultAction)
+                .frame(width: 0, height: 0)
+                .accessibilityHidden(true)
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Voice mode")
     }
