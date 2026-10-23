@@ -6672,8 +6672,6 @@ type QueuedPrompt struct {
 	Preface *string `json:"preface,omitzero"`
 
 	Sender *MessageSender `json:"sender,omitzero"`
-
-	Hops *int64 `json:"hops,omitzero"`
 }
 
 type QueuedStart struct {

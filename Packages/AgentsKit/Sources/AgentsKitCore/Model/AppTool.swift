@@ -66,6 +66,9 @@ public enum AppTool {
     /// prompt marked as this agent's.
     public static let messageSession = "message_session"
 
+    /// Take back this agent's queued message to another session (#2006).
+    public static let cancelMessage = "cancel_message"
+
     /// What the session tools were called before #638 (and `park_agent` before #584).
     /// No longer offered or answered; kept so a conversation that called them still
     /// draws as the app's own calls.
@@ -162,7 +165,7 @@ public enum AppTool {
         finishTurn, showFile, manageWorkflows, askQuestion, suggestNextPrompt, hangUp, startSession, stopSession, archiveSession,
         leaseResource, releaseResource, listResources, waitForEvent, waitForAgents, checkAgain,
         cancelWait, listSessions, readSession,
-        setSessionLabels, moveWorktree, messageSession,
+        setSessionLabels, moveWorktree, messageSession, cancelMessage,
     ] + workspaceTools + writerTools
 
     /// How runtimes put the server's name in front of a tool's, as measured: Claude's

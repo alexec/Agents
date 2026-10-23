@@ -342,7 +342,7 @@
     "title": "Move to a worktree or back"
   },
   {
-    "description": "The sessions in this project, a page at a time: the ones not archived first, then the archived, each most recent first, yours included. Each one's id, title, runtime, status, worktree and branch, the resources it holds, labels with owners, and what it last said. The page ends by saying how many more there are and what to pass as `after` for the next. Use it to find a session the person asks you to continue, then read it with read_session.\n\nWith started_by me: only the sessions you started with start_session, and the ones they started, that have not been archived, each one's id, what it is doing, what it last said, and its labels with owners; first, how many of this project's running and not-archived places are in use out of the limits the person set, and which of yours are queued and where; last, which runtimes start_session can start one on here, as of now, with the model each starts on where known, and why the others cannot. Archive the finished ones whose work is merged or abandoned with archive_session, so their places are free for the next.",
+    "description": "The sessions in this project, a page at a time: the ones not archived first, then the archived, each most recent first, yours included. Each one's id, title, runtime, status, worktree and branch, the resources it holds, labels with owners, and what it last said. For a session you have a message waiting for, the line says so with its text. The page ends by saying how many more there are and what to pass as `after` for the next. Use it to find a session the person asks you to continue, then read it with read_session.\n\nWith started_by me: only the sessions you started with start_session, and the ones they started, that have not been archived, each one's id, what it is doing, what it last said, and its labels with owners; first, how many of this project's running and not-archived places are in use out of the limits the person set, and which of yours are queued and where; last, which runtimes start_session can start one on here, as of now, with the model each starts on where known, and why the others cannot. Archive the finished ones whose work is merged or abandoned with archive_session, so their places are free for the next.",
     "inputSchema": {
       "properties": {
         "after": {
@@ -371,7 +371,7 @@
     "title": "List the sessions in this project"
   },
   {
-    "description": "The app's record of one session in this project: what the person asked, what the agent said, the tools it ran and the files they touched, and its plan as it last stood. Use it when asked to continue another session's work. Reading it does not change that session. A long one keeps the first request and the latest turns and says how many were left out.",
+    "description": "The app's record of one session in this project: what the person asked, what the agent said, the tools it ran and the files they touched, and its plan as it last stood. Use it when asked to continue another session's work. Reading it does not change that session. A long one keeps the first request and the latest turns and says how many were left out. If you have a message waiting for that session, the header says so with its text.",
     "inputSchema": {
       "properties": {
         "description": {
@@ -392,7 +392,7 @@
     "title": "Read another session's history"
   },
   {
-    "description": "Say something to another session in this project, which it reads as a prompt marked as yours, not the person's; the person sees it in that chat too. A session that is working gets it after its turn; one that is done or asking to be archived is woken by it, within the project's running limit for sessions started by sessions; one that is stopped waits until it is next started. It never answers a question that session is waiting on. A session that another session started takes messages only from that session: send to its starter instead. A reply comes back the same way, as a message to you. Limits: 4000 characters, 30 an hour, and at most 3 messages between sessions in a row with no prompt from the person.",
+    "description": "Say something to another session in this project, which it reads as a prompt marked as yours, not the person's; the person sees it in that chat too. A session that is working gets it after its turn; one that is done or asking to be archived is woken by it, within the project's running limit for sessions started by sessions; one that is stopped waits until it is next started. It never answers a question that session is waiting on. A session that another session started takes messages only from that session: send to its starter instead. A reply comes back the same way, as a message to you. You may have one message waiting for a given session at a time. While it is queued, a second send is refused; pass replace: true to swap the waiting text and keep its place, or take it back with cancel_message. list_sessions and read_session say when your message waits, with its text. Limits: 4000 characters and 30 new messages an hour. Replace and cancel do not count towards the hour.",
     "inputSchema": {
       "properties": {
         "description": {
@@ -402,6 +402,10 @@
         "message": {
           "description": "What to tell it.",
           "type": "string"
+        },
+        "replace": {
+          "description": "When true, swap the text of the message you already have waiting for that session, and keep its place. Refused when nothing is waiting.",
+          "type": "boolean"
         },
         "to": {
           "description": "The session's id, as list_sessions gave it, or its exact title.",
@@ -716,5 +720,26 @@
     },
     "name": "delete_workspace",
     "title": "Delete a workspace"
+  },
+  {
+    "description": "Take back the one message you have waiting for another session in this project, by its id or exact title. It says when nothing is waiting: already read, or nothing was sent. Only your own queued message is removed.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        },
+        "session": {
+          "description": "The session's id, as list_sessions gave it, or its exact title.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "type": "object"
+    },
+    "name": "cancel_message",
+    "title": "Take back a waiting message"
   }
 ]

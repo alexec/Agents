@@ -523,7 +523,7 @@ func (d *Daemon) listHelpers(caller *wire.Agent) string {
 		if a.StartedByAgent != nil && *a.StartedByAgent != caller.ID {
 			below = ", started by " + d.holderName(*a.StartedByAgent)
 		}
-		lines = append(lines, "- "+string(a.ID)+": "+quotedTitle(a.Title)+below+" — "+helperStatus(&a, queue)+labelsLine(&a))
+		lines = append(lines, "- "+string(a.ID)+": "+quotedTitle(a.Title)+below+" — "+helperStatus(&a, queue)+labelsLine(&a)+waitingLine(&a, caller.ID))
 	}
 	return strings.Join(append(lines, runtimes), "\n")
 }
