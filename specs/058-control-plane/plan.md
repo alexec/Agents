@@ -159,7 +159,7 @@ Host/                                # NEW: Agents Host.app (Developer ID)
 └── Relay/                           # agents-relay: RelayHost + MailboxTransport (from Bridge/)
 
 App/                                 # the window; AGENTS_STORE build setting → sandbox, Core-only link
-├── Agents.entitlements              # + app-sandbox, network.client, user-selected read-only
+├── Agents.entitlements              # + app-sandbox, network.client, user-selected read-write (#2302)
 └── Sources/                         # HostSet, SocketLink use, LocalServices, SignInRelays,
                                      #   ServerBinaries leave; isOnThisMac reads → files/*, shared/*, mac/*
 Remote/Sources/                      # ControlLink over URLSession WebSocket; relay via a Mac host
