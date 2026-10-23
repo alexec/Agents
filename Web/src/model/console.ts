@@ -204,6 +204,11 @@ export function runsWords(runs: number): string {
 // Console ▸ Live Now (#2019, M9): every agent running now on every machine, the most costly
 // first, each with Stop (console/stopAgent). Ids and numbers only; no agent's title or words.
 
+/** How many requests wait on the Console's Requests page, each kind counted (#2436: SCIM removals too). */
+export function waitingCount(n: { joins: number; links: number; capped: number; governance: number; removals: number }): number {
+  return n.joins + n.links + n.capped + n.governance + n.removals;
+}
+
 export const noLive = "No agent is running now on any machine.";
 export const liveFoot = "The page asks each online machine for its agents every 15 seconds. A machine that is offline shows what it ran last. Stop ends one agent. For an incident, Policy’s Stop All Agent Work stops every agent on every machine.";
 
