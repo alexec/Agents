@@ -64,8 +64,15 @@ not (Alex, 2026-10-22: "would be weird").
 3. **Questions by voice.** A question card with one set of choices is read out with numbers
    and answered by voice ("two", "the second", or the choice's words): "Sending: File.", with
    2 seconds to say "no". Any other form says "This one needs your screen." (`SpokenQuestion`).
-4. **Barge-in, approvals by voice, plans, a still-working line:** #2358. Barge-in needs the
-   voice and the microphone on one audio engine, and measurement on real speakers.
+4. **Barge-in, approvals by voice, plans, a still-working line:** #2358. Barge-in is in #2375
+   (the voice and the microphone on one audio engine, repaired in #2419). A permission the
+   agent waits on is read out (`SpokenPermission`): a read, a search, or an edit inside the
+   agent's own worktree is answered by voice, "yes" allows it once (never "always", with 2
+   seconds to say "no") and "no" refuses it; anything else ends "This one needs your
+   screen.". A plan to approve is read as its number of steps and the first two, then
+   "Approve the plan?". After 45 s of nothing said or heard while a turn runs, voice mode
+   says "Still working." and the current tool call's line, once a step (`StillWorking`).
+   Measurement on real speakers, AirPods and the iPhone is on Alex's list (#2222).
 
 ## Not in this feature
 

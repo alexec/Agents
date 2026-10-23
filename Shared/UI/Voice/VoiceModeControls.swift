@@ -96,10 +96,13 @@ struct VoiceModeBar: View {
 extension View {
     /// Tells voice mode what this chat shows, so it can speak a reply when a turn ends.
     /// Does nothing unless voice mode is on in this chat.
-    /// `question` is the form the agent waits on, and `answer` sends an answer to it.
+    /// `question` is the form the agent waits on, and `answer` sends an answer to it;
+    /// `permission` the request it waits on, and `approve` answers it (#2358).
     func voiceModeObserves(_ agent: Agent, items: [TranscriptItem], question: ElicitationRequest?,
+                           permission: PermissionRequest?, approve: @escaping VoiceMode.Approve,
                            answer: @escaping VoiceMode.Answer) -> some View {
-        modifier(VoiceModeObserver(agent: agent, items: items, question: question, answer: answer))
+        modifier(VoiceModeObserver(agent: agent, items: items, question: question, permission: permission,
+                                   approve: approve, answer: answer))
     }
 }
 
@@ -107,6 +110,8 @@ private struct VoiceModeObserver: ViewModifier {
     let agent: Agent
     let items: [TranscriptItem]
     let question: ElicitationRequest?
+    let permission: PermissionRequest?
+    let approve: VoiceMode.Approve
     let answer: VoiceMode.Answer
 
     /// What changes when a turn moves on: cheap to compare, unlike the items.
@@ -117,6 +122,7 @@ private struct VoiceModeObserver: ViewModifier {
         var count: Int
         var last: TranscriptItem?
         var question: UUID?
+        var permission: UUID?
     }
 
     @Environment(\.scenePhase) private var scenePhase
@@ -124,9 +130,10 @@ private struct VoiceModeObserver: ViewModifier {
     func body(content: Content) -> some View {
         let isOn = VoiceMode.shared.isOn(in: agent.id)
         content.onChange(of: Key(isOn: isOn, state: agent.state, count: items.count, last: items.last,
-                                 question: question?.id), initial: true) {
+                                 question: question?.id, permission: permission?.id), initial: true) {
             guard isOn else { return }
-            VoiceMode.shared.observe(agent, items: items, question: question, answer: answer)
+            VoiceMode.shared.observe(agent, items: items, question: question, answer: answer,
+                                     permission: permission, approve: approve)
         }
         // Another chat opened in this place, or this one closed: voice mode ends (#2388).
         .onChange(of: agent.id) { old, _ in VoiceMode.shared.leave(old) }

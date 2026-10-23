@@ -52,6 +52,8 @@ final class VoiceMode {
 
     /// Sends an answer to a form, and says whether it went.
     typealias Answer = (ElicitationRequest, [String: JSONValue]) async -> Bool
+    /// Answers a permission request with one of its options, and says whether it went (#2358).
+    typealias Approve = (PermissionRequest, String) async -> Bool
 
     /// How long a pause is before the words go: 2.5 s at first (#1792), 2 s since Alex
     /// tried it (#2375).
@@ -183,6 +185,10 @@ final class VoiceMode {
         confirming?.cancel()
         confirming = nil
         waiting = nil
+        approving = nil
+        permission = nil
+        stillWorking?.cancel()
+        stillWorking = nil
         Task { await voice.unload() }
     }
 
@@ -239,16 +245,26 @@ final class VoiceMode {
 
     /// What the chat shows now. The chat calls this as its agent and items change.
     func observe(_ agent: Agent, items: [TranscriptItem], question: ElicitationRequest? = nil,
-                 answer: Answer? = nil) {
+                 answer: Answer? = nil, permission: PermissionRequest? = nil, approve: Approve? = nil) {
         guard agent.id == agentID, phase != .off else { return }
         waiting = question
         if let answer { self.answer = answer }
+        self.permission = permission
+        if let approve { self.approve = approve }
+        who = PoolWords.runtimeName(agent.runtimeID)
+        worktree = agent.worktree == nil ? nil : agent.cwd
         // Answered on the screen, or withdrawn: it is not asked any more.
         if let asking, asking.request.id != question?.id {
             self.asking = nil
             confirming?.cancel()
             confirming = nil
         }
+        if let approving, approving.request.id != permission?.id {
+            self.approving = nil
+            confirming?.cancel()
+            confirming = nil
+        }
+        step = items.turns().last.flatMap { Self.step(in: $0.items) }
         defer {
             askIfWaiting()
             hangUpIfSaid()
@@ -282,7 +298,7 @@ final class VoiceMode {
         isWaitingForReply = false
         sawWork = false
         // A turn that stops to ask with no form (Grok's way): its reply is the question.
-        if agent.state == .waitingOnUser, question == nil { sound(.question) }
+        if agent.state == .waitingOnUser, question == nil, permission == nil { sound(.question) }
         streamReply(in: turn.id, parts.replyText, isDone: true)
         stream = nil
     }
@@ -325,13 +341,99 @@ final class VoiceMode {
     private var confirming: Task<Void, Never>?
     private static let confirmFor: Duration = .seconds(2)
 
-    /// Whether a question is being answered by voice: the strip says so.
-    var isAsking: Bool { asking != nil }
+    /// Whether a question or a permission is being answered by voice: the strip says so.
+    var isAsking: Bool { asking != nil || approving != nil }
+
+    // MARK: Permissions and plans (#2358)
+
+    /// The permission the agent waits on, as last seen, and how to answer it.
+    private var permission: PermissionRequest?
+    private var approve: Approve?
+    /// The permission being asked by voice, and how many answers missed.
+    private var approving: (request: PermissionRequest, spoken: SpokenPermission, misses: Int)?
+    /// The runtime's name, as "Claude", and the agent's worktree, when it has one.
+    private var who = "The agent"
+    private var worktree: URL?
+
+    /// Reads out a permission that waits, once: answerable by voice when low risk, else
+    /// "This one needs your screen."
+    private func askPermissionIfWaiting() {
+        guard let request = permission, !asked.contains(request.id) else { return }
+        asked.insert(request.id)
+        sound(.question)
+        let spoken = SpokenPermission(request, who: who, worktree: worktree)
+        if spoken.isAnswerable { approving = (request, spoken, 0) }
+        speak(spoken.sentences)
+    }
+
+    /// The person's words, as the answer to the permission being asked. Allowing waits two
+    /// seconds for a "no", as an answer to a question does; refusing goes at once.
+    private func approveHeard(_ words: String) {
+        guard var approving else { return }
+        guard let answer = approving.spoken.answer(for: words) else {
+            approving.misses += 1
+            if approving.misses >= 2 {
+                self.approving = nil
+                speak(["It stays on the screen."])
+            } else {
+                self.approving = approving
+                speak([SpokenPermission.notCaught])
+            }
+            return
+        }
+        let request = approving.request
+        switch answer {
+        case .allow(let optionID):
+            speak([approving.spoken.isPlan ? "Approving the plan." : "Allowing it once."]) { [weak self] in
+                self?.confirm { [weak self] in await self?.approve?(request, optionID) ?? false }
+            }
+        case .reject(let optionID):
+            self.approving = nil
+            speak(["Not allowed."])
+            Task { [weak self] in
+                if await self?.approve?(request, optionID) != true { self?.sound(.problem) }
+            }
+        }
+    }
+
+    // MARK: Still working (#2358)
+
+    /// The current step of the turn: its last tool call still going, in the chat's words.
+    private var step: String?
+    /// The steps already said, in this turn: each is said once.
+    private var saidSteps: Set<String> = []
+    private var stillWorking: Task<Void, Never>?
+
+    private static func step(in items: [TranscriptItem]) -> String? {
+        for item in items.reversed() {
+            guard case .toolRun(_, let calls) = item, let call = calls.last(where: { !$0.isTheApps }) else { continue }
+            return call.isUnderway ? call.line : nil
+        }
+        return nil
+    }
+
+    /// After `StillWorking.after` of nothing said or heard while a turn runs, says what
+    /// it is doing: "Still working. Running the tests." Once a step.
+    private func armStillWorking() {
+        stillWorking?.cancel()
+        guard isWaitingForReply else { return }
+        stillWorking = Task { [weak self] in
+            try? await Task.sleep(for: StillWorking.after)
+            guard !Task.isCancelled, let self, self.isWaitingForReply, self.phase == .listening,
+                  self.heard.isEmpty, !self.isAsking, self.confirming == nil else { return }
+            let key = self.step ?? ""
+            guard self.saidSteps.insert(key).inserted else { return }
+            self.speak([StillWorking.line(step: self.step)])
+        }
+    }
 
     /// Reads out a question that waits, once, when nothing else is being said or heard.
     private func askIfWaiting() {
-        guard phase == .listening, heard.isEmpty, asking == nil, confirming == nil,
-              let question = waiting, !asked.contains(question.id) else { return }
+        guard phase == .listening, heard.isEmpty, !isAsking, confirming == nil else { return }
+        guard let question = waiting, !asked.contains(question.id) else {
+            askPermissionIfWaiting()
+            return
+        }
         asked.insert(question.id)
         sound(.question)
         guard let spoken = SpokenQuestion(question) else {
@@ -357,21 +459,23 @@ final class VoiceMode {
             return
         }
         let title = SpokenQuestion.spokenTitle(choice.title)
+        let (request, property) = (asking.request, asking.spoken.property)
         speak(["Sending: \(title)."]) { [weak self] in
-            self?.confirm(asking.request, property: asking.spoken.property, value: choice.value)
+            self?.confirm { [weak self] in await self?.answer?(request, [property: .string(choice.value)]) ?? false }
         }
     }
 
     /// Listens for two seconds for a "no", then sends the answer.
-    private func confirm(_ request: ElicitationRequest, property: String, value: String) {
+    private func confirm(_ send: @escaping () async -> Bool) {
         confirming = Task { [weak self] in
             try? await Task.sleep(for: Self.confirmFor)
             guard let self, !Task.isCancelled else { return }
             confirming = nil
             self.asking = nil
+            self.approving = nil
             heard = ""
             pauseTimer?.cancel()
-            let sent = await answer?(request, [property: .string(value)]) ?? false
+            let sent = await send()
             if sent {
                 // The turn goes on, and its reply is said when it ends.
                 isWaitingForReply = true
@@ -393,6 +497,7 @@ final class VoiceMode {
         guard phase != .off else { return }
         heard = ""
         phase = .listening
+        armStillWorking()
         defer { askIfWaiting() }
         if !words.isEmpty { heardChanged(words) }
         guard !isWalked else { return }
@@ -452,11 +557,13 @@ final class VoiceMode {
         }
         heard = text
         pauseTimer?.cancel()
+        armStillWorking()
         if confirming != nil, SpokenQuestion.isNo(text) {
             confirming?.cancel()
             confirming = nil
             dictation.stop()
             if let asking { speak(["Not sent."] + asking.spoken.sentences) }
+            else if let approving { speak(["Not sent."] + approving.spoken.sentences) }
             return
         }
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
@@ -470,9 +577,9 @@ final class VoiceMode {
     private func sendHeard() async {
         let words = heard.trimmingCharacters(in: .whitespacesAndNewlines)
         guard phase == .listening, !words.isEmpty, let send else { return }
-        if asking != nil, confirming == nil {
+        if isAsking, confirming == nil {
             dictation.stop()
-            answerHeard(words)
+            if approving != nil { approveHeard(words) } else { answerHeard(words) }
             return
         }
         // Words while an answer waits to go are not a prompt.
@@ -495,6 +602,7 @@ final class VoiceMode {
             isWaitingForReply = true
             sawWork = false
             turnAtSend = latestTurn
+            saidSteps = []
         } else {
             sound(.problem)
         }
@@ -518,7 +626,7 @@ final class VoiceMode {
     /// read, as "two!". Words the voice is saying now are its own, heard back.
     private func isBargeIn(_ text: String) -> Bool {
         let meant = Self.words(text).filter { !Self.backchannel.contains($0) }
-        guard meant.count >= (asking == nil ? 2 : 1) else { return false }
+        guard meant.count >= (isAsking ? 1 : 2) else { return false }
         let own = Set(said.suffix(2).flatMap(Self.words))
         let echoed = meant.filter(own.contains).count
         return Double(echoed) < Double(meant.count) * 0.7
@@ -544,6 +652,7 @@ final class VoiceMode {
     private func startSpeaking() {
         guard phase != .speaking, !queue.isEmpty else { return }
         pauseTimer?.cancel()
+        stillWorking?.cancel()
         phase = .speaking
         heard = ""
         if !listensWhileSpeaking {
