@@ -29,7 +29,7 @@ expected=(
   com.apple.security.app-sandbox com.apple.security.device.audio-input
   com.apple.security.files.user-selected.read-write com.apple.security.network.client
   com.apple.security.get-task-allow keychain-access-groups
-  com.apple.security.application-groups
+  com.apple.security.application-groups com.apple.developer.applesignin
 )
 
 archive=${1:?usage: check-store-archive.sh path/to/Some.xcarchive}
