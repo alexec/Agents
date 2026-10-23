@@ -255,6 +255,9 @@ func (d *Daemon) startSession(caller wire.UUID, args map[string]json.RawMessage)
 		return "", Invalid("Nothing was started: say what the agent is to do.")
 	}
 	runtimeID := strings.TrimSpace(argString(args, "runtime"))
+	if runtimeID == "" {
+		runtimeID = me.RuntimeID
+	}
 	model := strings.TrimSpace(argString(args, "model"))
 	labels, err := stringList(args, "labels")
 	if err != nil {
@@ -271,9 +274,6 @@ func (d *Daemon) startSession(caller wire.UUID, args map[string]json.RawMessage)
 			return "", Invalid("Nothing was started: %s would let it do more without asking than you may (%s). Name no mode and it takes yours.", wanted, ownWords)
 		}
 		mode = &wanted
-	}
-	if runtimeID == "" {
-		runtimeID = defaultRuntimeID
 	}
 	rt := runtimeByID(runtimeID)
 	if rt == nil {
@@ -512,7 +512,7 @@ func (d *Daemon) listHelpers(caller *wire.Agent) string {
 			}
 		}
 	}
-	runtimes := d.runtimeChoices()
+	runtimes := d.runtimeChoices(caller.RuntimeID)
 	if len(mine) == 0 {
 		return "You have not started any sessions that are still here. " + places + "\n" + runtimes
 	}
@@ -567,7 +567,7 @@ func helperStatus(a *wire.Agent, queue []wire.Agent) string {
 }
 
 // runtimeChoices is which runtimes an agent may name, as this host has them now.
-func (d *Daemon) runtimeChoices() string {
+func (d *Daemon) runtimeChoices(callerRuntime string) string {
 	var available, not []string
 	for i := range catalog {
 		rt := &catalog[i]
@@ -579,7 +579,7 @@ func (d *Daemon) runtimeChoices() string {
 	}
 	lines := []string{"No runtime can take a new agent on this machine right now."}
 	if len(available) > 0 {
-		lines = []string{"Runtimes you can start agents on (" + defaultRuntimeID + " if you name none): " + strings.Join(available, ", ") + "."}
+		lines = []string{"Runtimes you can start agents on (your own runtime, " + callerRuntime + ", if you name none): " + strings.Join(available, ", ") + "."}
 	}
 	if len(not) > 0 {
 		lines = append(lines, "Not available on this machine: "+strings.Join(not, ", ")+".")
