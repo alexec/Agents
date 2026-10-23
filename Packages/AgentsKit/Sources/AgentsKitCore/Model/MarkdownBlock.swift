@@ -377,6 +377,7 @@ public final class MarkdownCache: @unchecked Sendable {
     private let readings = NSCache<NSString, Reading>()
     private let lock = NSLock()
     private var reads = 0
+    private var characters = 0
 
     public init(countLimit: Int = 2_000, characterLimit: Int = 8_000_000) {
         readings.countLimit = countLimit
@@ -388,11 +389,16 @@ public final class MarkdownCache: @unchecked Sendable {
         if let reading = readings.object(forKey: key) { return reading.blocks }
         let blocks = MarkdownBlock.parse(markdown)
         readings.setObject(Reading(blocks), forKey: key, cost: key.length)
-        lock.withLock { reads += 1 }
+        lock.withLock {
+            reads += 1
+            characters += key.length
+        }
         return blocks
     }
 
     /// How many times the text was actually read, for tests.
     public var readCount: Int { lock.withLock { reads } }
+    /// How many characters were actually read, for tests.
+    public var charactersRead: Int { lock.withLock { characters } }
 }
 #endif
