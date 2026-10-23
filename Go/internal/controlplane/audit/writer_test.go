@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -14,12 +15,15 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// slowStore is a bucket whose every Put takes a while, and whose first fails Puts fail.
+// slowStore is a bucket whose every Put takes a while. When refuses is set, that
+// many Puts of each event key fail, and then the key is kept. A seal is kept at
+// once, so one entry cannot spend another's refusals (#2495).
 type slowStore struct {
 	store.Store
-	pause time.Duration
-	fails atomic.Int64
-	puts  atomic.Int64
+	pause   time.Duration
+	refuses int
+	puts    atomic.Int64
+	seen    sync.Map
 }
 
 func (s *slowStore) Put(ctx context.Context, key string, data []byte, when store.Condition) (string, error) {
@@ -29,8 +33,11 @@ func (s *slowStore) Put(ctx context.Context, key string, data []byte, when store
 	case <-ctx.Done():
 		return "", ctx.Err()
 	}
-	if s.fails.Add(-1) >= 0 {
-		return "", errors.New("the bucket is down")
+	if s.refuses > 0 && strings.HasPrefix(key, Prefix) {
+		v, _ := s.seen.LoadOrStore(key, &atomic.Int64{})
+		if int(v.(*atomic.Int64).Add(1)) <= s.refuses {
+			return "", errors.New("the bucket is down")
+		}
 	}
 	return s.Store.Put(ctx, key, data, when)
 }
@@ -98,10 +105,10 @@ func TestAWriterKeepsABurstInOrder(t *testing.T) {
 	}
 }
 
-// A Put the bucket refuses is tried again, and the chain stays whole (#2433).
+// A Put the bucket refuses is tried again, past the old budget of three tries, and
+// the chain stays whole (#2495). Each event key fails on its own.
 func TestAWriterTriesAFailedPutAgain(t *testing.T) {
-	s := &slowStore{Store: store.NewMemory()}
-	s.fails.Store(3)
+	s := &slowStore{Store: store.NewMemory(), refuses: 5}
 	c := NewChain("copy1")
 	w := NewWriter(&Log{Store: s, Chain: c}, func(line string) { t.Log(line) })
 	for i := range 10 {
@@ -111,6 +118,43 @@ func TestAWriterTriesAFailedPutAgain(t *testing.T) {
 	c.Seal(context.Background(), s, time.Now())
 	if r, err := Verify(context.Background(), s); err != nil || !r.OK() || r.Entries != 10 {
 		t.Fatalf("verify %+v %v", r, err)
+	}
+}
+
+// An entry is given up only when Close's context ends. Until then a refusal is
+// tried again, so the test store can refuse every Put and the entry stays out
+// until that moment (#2495).
+func TestAWriterGivesUpWhenCloseEnds(t *testing.T) {
+	s := &slowStore{Store: store.NewMemory(), refuses: 1_000_000}
+	said := make(chan string, 8)
+	w := NewWriter(&Log{Store: s, Chain: NewChain("copy1")}, func(line string) {
+		select {
+		case said <- line:
+		default:
+		}
+	})
+	if !w.Add(pending(1)) {
+		t.Fatal("the entry was refused")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	w.Close(ctx)
+	deadline := time.After(3 * time.Second)
+	var lines []string
+	for {
+		select {
+		case line := <-said:
+			lines = append(lines, line)
+			if strings.Contains(line, "was not kept") {
+				keys, err := s.List(context.Background(), Prefix)
+				if err != nil || len(keys) != 0 {
+					t.Fatalf("kept %v %v", keys, err)
+				}
+				return
+			}
+		case <-deadline:
+			t.Fatalf("no gap line: %v", lines)
+		}
 	}
 }
 
