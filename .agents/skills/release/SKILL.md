@@ -1,6 +1,6 @@
 ---
 name: release
-description: Take main to a new version with nobody watching (#914), started by Alex or by itself once the open milestone is ready: no open issue but bugs, none high, its walks done (#1729, #2294). Run the seven reviews and checks once each on what changed since the last tag, have the high findings fixed through the Scrum Master's lanes (the medium ones are filed, listed as known issues and left to the lanes after the release), check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, deploy the live control plane, close the milestone, unpark the next milestone, which is now the open one, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
+description: Take main to a new version with nobody watching (#914), started by Alex or by itself once the open milestone is ready: no open issue but bugs, none high, its walks done (#1729, #2294). Run the eight reviews and checks once each on what changed since the last tag, have the high findings fixed through the Scrum Master's lanes (the medium ones are filed, listed as known issues and left to the lanes after the release), check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, deploy the live control plane, close the milestone, unpark the next milestone, which is now the open one, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
 ---
 
 # Release
@@ -99,13 +99,14 @@ calendar day in America/Los_Angeles, not 24 hours since the tag.
 
 ## 2. Reviews and checks, once each
 
-Seven workflows run exactly once per release, and only here (#1462). None has a schedule.
+Eight workflows run exactly once per release, and only here (#1462). None has a schedule.
 
 | Order | Workflow | It writes |
 |---|---|---|
 | 1 | `security-review` | `.agents/reviews/security/` on `agents/reviews-security` |
 | 1 | `performance-review` | `.agents/reviews/performance/` on `agents/reviews-performance` |
 | 1 | `hadr-review` | `.agents/reviews/hadr/` on `agents/reviews-hadr` |
+| 1 | `dead-code-review` | `.agents/reviews/dead-code/` on `agents/reviews-dead-code` |
 | 2 | `nightly-runtimes` (Runtime check) | `~/Library/Caches/Agents Nightly Runtimes/runs/latest/report.md` |
 | 2 | `usability-check` | `.agents/reviews/usability/` on `agents/reviews-usability` |
 | 3 | `competitor-check` | `~/.agents/reviews/competitors/` |
