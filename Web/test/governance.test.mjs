@@ -11,8 +11,13 @@ test("a waiting request reads with why, and a person's own by its state", () => 
   assert.equal(m.requestWords(request({ why: "to review pull requests" })), "Sam asks for the MCP server github: to review pull requests");
   assert.equal(m.requestWords(request({ kind: "skills", name: "review" })), "Sam asks for the skill review");
   assert.equal(m.mineWords(request()), "The MCP server github: waiting for an admin");
-  assert.equal(m.mineWords(request({ state: "approved", groupName: "Platform" })), "The MCP server github: approved for Platform");
-  assert.equal(m.mineWords(request({ state: "approved" })), "The MCP server github: approved for you");
+  assert.equal(m.mineWords(request({ state: "approved", groupName: "Platform" })),
+    "The MCP server github: approved for Platform. Add it as you add any MCP server.");
+  assert.equal(m.mineWords(request({ kind: "skills", name: "review", state: "approved" })),
+    "The skill review: approved for you. Add it as you add any skill.");
+  // #2434: the Policy's marketplaces still decide.
+  assert.equal(m.mineWords(request({ state: "approved" }), true),
+    "The MCP server github: approved for you. Add it as you add any MCP server. Your organisation's Policy still blocks it if no marketplace it allows has it.");
   assert.equal(m.mineWords(request({ kind: "skills", name: "review", state: "refused" })), "The skill review: refused");
 });
 
