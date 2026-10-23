@@ -30,13 +30,19 @@ private struct ServerViewRow: View {
             Text(view.title)
                 .lineLimit(1)
             Spacer(minLength: 4)
+            // Its server's count (#2033), grey as a heading's count.
+            if let count = view.count {
+                Text("\(count)")
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
         }
         .appText(.supporting)
         .padding(.vertical, 2)
         .listRowInsets(.vertical, 2)
-        .help(view.path)
+        .help(view.countHelp.map { "\(view.path)\n\($0)" } ?? view.path)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(view.title), view")
+        .accessibilityLabel("\(view.title), view" + (view.count.map { ", \($0)" } ?? ""))
         .sidebarInk(.pin(view.path, in: project))
         .tag(SidebarItem.pin(view.path, in: project))
         .contextMenu {

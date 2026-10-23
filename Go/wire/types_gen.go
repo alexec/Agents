@@ -5945,6 +5945,14 @@ type PinView struct {
 	MissingReason *string `json:"missingReason,omitzero"`
 
 	Hidden *bool `json:"hidden,omitzero"`
+
+	Count *int64 `json:"count,omitzero"`
+
+	Attention *int64 `json:"attention,omitzero"`
+
+	CountAt *Date `json:"countAt,omitzero"`
+
+	CountStale *bool `json:"countStale,omitzero"`
 }
 
 type PinWriteRequest struct {

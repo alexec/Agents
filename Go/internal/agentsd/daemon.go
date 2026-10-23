@@ -40,6 +40,7 @@ type Daemon struct {
 	// agentMu orders every read-change-save of an agent record.
 	agentMu sync.Mutex
 	pinState
+	viewCountBook
 	attachmentBook
 	settingsState
 	userScopeState
@@ -137,6 +138,8 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	d.checkMilestonesSoon()
 	d.countMergedPRsEveryHour()
 	d.watchDisk()
+	// The counts on the servers' list view rows (#2033).
+	d.startViewCounts()
 	d.installDefaultToolsets()
 	return d, nil
 }

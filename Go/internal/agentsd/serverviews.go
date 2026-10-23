@@ -71,7 +71,7 @@ func (d *Daemon) serverViews(project string, f pinsFile) []wire.PinView {
 				yes := true
 				v.Hidden = &yes
 			}
-			out = append(out, v)
+			out = append(out, d.withCount(project, v))
 		}
 	}
 	return out

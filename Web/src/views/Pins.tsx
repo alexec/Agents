@@ -12,6 +12,7 @@ import { folderKey } from "../model/groups";
 import { describe } from "../model/errors";
 import type { FileStamp, PinView } from "../protocol/generated";
 import { go } from "../route";
+import { fromWireDate } from "../protocol/dates";
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
 import { LiveDocument, type PageSource } from "./LiveDocument";
 import { BackToList } from "./BackToList";
@@ -102,16 +103,25 @@ export function ServerViewRows({ store, host, folder, chosen, down }: {
           onContextMenu={(e) => openContextMenu(e, menu(view))}
           onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu(view)); }} {...holdForMenu(() => menu(view))}>
           <div class={`row pin${chosen === view.path ? " chosen" : ""}`}>
-            <button class="pick" aria-current={chosen === view.path} title={view.path}
+            <button class="pick" aria-current={chosen === view.path} title={countTitle(view)}
               onClick={() => go({ host, project: folder, page: view.path })}>
               <span class="pin-mark" aria-hidden="true">{pinMark(view)}</span>
               <span class="title">{view.title}</span>
+              {/* Its server's count (#2033), grey as a fold's count. */}
+              {view.count !== undefined && <span class="count">{view.count}</span>}
             </button>
           </div>
         </div>
       ))}
     </div>
   );
+}
+
+/** A view row's tooltip: its address, and when its count was read (#2033). */
+function countTitle(view: PinView): string {
+  if (view.count === undefined || view.countAt === undefined) return view.path;
+  const when = fromWireDate(view.countAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return `${view.path}\n${view.countStale ? `As of ${when}: the server did not answer since.` : `As of ${when}.`}`;
 }
 
 /** The project menu's Show Hidden Views (#2032), or nothing when none is hidden. */

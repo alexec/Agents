@@ -63,6 +63,16 @@ struct SidebarModelTests {
         #expect(model.serverViews(in: api).map(\.hidden) == [true, nil])
     }
 
+    /// #2033: a view row's count and when it was read, decoded from the host's answer.
+    @Test func aViewRowsCountIsDecodedWithItsTime() throws {
+        let json = #"{"path":"ui://github/issues","title":"GitHub · Issues","kind":"view","missing":false,"#
+            + #""pinnedBy":{"kind":"server","id":"github","name":"GitHub"},"count":23,"attention":1,"#
+            + #""countAt":800000000,"countStale":true}"#
+        let view = try JSONDecoder().decode(PinView.self, from: Data(json.utf8))
+        #expect(view.count == 23 && view.attention == 1 && view.countStale == true)
+        #expect(view.countHelp?.contains("did not answer") == true)
+    }
+
     @Test func aFoldedProjectHasNothingUnderItsRow() {
         let model = AgentsModel()
         model.replaceAgents([agent(api, .archived, "old", at: 1)])
