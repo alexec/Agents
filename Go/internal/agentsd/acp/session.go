@@ -113,7 +113,7 @@ func handshake(ctx context.Context, l Launch, sink Sink) (_ *Session, silent boo
 		return nil, false, fmt.Errorf("start %s: %w", l.Command, err)
 	}
 	s := &Session{cmd: cmd, stderr: stderr, done: make(chan struct{})}
-	s.client = &client{sink: sink, dir: l.Dir, env: l.Env, terminals: map[string]*terminal{}}
+	s.client = &client{sink: sink, dir: l.Dir, env: l.Env, runtime: l.Name, terminals: map[string]*terminal{}}
 	s.conn = sdk.NewClientSideConnection(s.client, stdin, &rawElicitations{r: bufio.NewReader(stdout), c: s.client})
 	safe.Go("runtime wait", func() { _ = cmd.Wait(); close(s.done) })
 
@@ -313,6 +313,9 @@ func (s *Session) Done() <-chan struct{} { return s.done }
 type client struct {
 	sink Sink
 	dir  string
+	// runtime is the name shown to the person (Launch.Name), used for narrow client
+	// compatibility where an ACP runtime does not follow the standard request shape.
+	runtime string
 	// env is the runtime's own environment (environment, runtimes.go), which its
 	// terminals get too: never the daemon's whole one.
 	env       []string
@@ -637,7 +640,15 @@ func (t *terminal) Write(b []byte) (int, error) {
 
 func (c *client) CreateTerminal(ctx context.Context, p sdk.CreateTerminalRequest) (_ sdk.CreateTerminalResponse, err error) {
 	defer safe.Err("acp CreateTerminal", &err)
-	cmd := exec.Command(p.Command, p.Args...)
+	command, args := p.Command, p.Args
+	// Grok sends its full shell invocation in command instead of separating the
+	// executable and arguments. Run only that known shape through bash; other
+	// runtimes keep the standard executable-plus-arguments path below.
+	if strings.EqualFold(c.runtime, "Grok") && len(args) == 0 && strings.HasPrefix(command, "/bin/bash -lc ") {
+		args = []string{"-lc", command}
+		command = "/bin/bash"
+	}
+	cmd := exec.Command(command, args...)
 	cmd.Dir = c.dir
 	if p.Cwd != nil {
 		dir, err := c.inside(*p.Cwd)
@@ -678,7 +689,7 @@ func (c *client) CreateTerminal(ctx context.Context, p sdk.CreateTerminalRequest
 	id := fmt.Sprintf("term-%d", c.next)
 	c.terminals[id] = t
 	c.mu.Unlock()
-	c.sink.Served("terminal", strings.Join(append([]string{p.Command}, p.Args...), " "))
+	c.sink.Served("terminal", strings.Join(append([]string{command}, args...), " "))
 	return sdk.CreateTerminalResponse{TerminalId: id}, nil
 }
 
