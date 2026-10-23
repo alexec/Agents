@@ -763,9 +763,9 @@ func (s *Service) openRouteSecretsTagged(ctx context.Context, id string) (map[st
 // MARK: Who gets which
 
 // mayUseRoute says a person (or bot) may use a route: it names no group, or one of theirs
-// (spec D6).
+// (spec D6). A removed or suspended person may use none (D13).
 func (s *Service) mayUseRoute(user string, r wire.OrgRoute) bool {
-	if p := s.records.Person(user); p != nil && p.IsRemoved() {
+	if p := s.records.Person(user); (p != nil && p.IsRemoved()) || s.suspended(user) {
 		return false
 	}
 	if len(r.Groups) == 0 {

@@ -570,6 +570,8 @@ func (s *Service) suspendedHere(user string) {
 	for _, host := range s.router.HostsHeldHere() {
 		if s.ownerOf(host) == user {
 			s.sendUserSuspended(host)
+			// A suspended person's machine keeps no org route; they come back with the end.
+			go s.sendOrgRoutes(host, true)
 		}
 	}
 	if !s.suspended(user) {
