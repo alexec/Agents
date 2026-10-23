@@ -433,6 +433,10 @@ struct RemoteChatView: View {
 
     private var actions: ChatActions {
         let agentID = agent?.id
+        // Activity ▸ Resources (#116), as the Mac opens its Resources page (#2344). Not in a
+        // scene of its own, which has no Activity: there the line is words alone (#2447).
+        var openLease: (@MainActor (ResourceName) -> Void)?
+        if popped == nil { openLease = { [model] _ in model.sidebarItem = .resources } }
         return ChatActions(
             open: { [model] location in
                 guard !model.macLacksPanes, let agentID else {
@@ -488,8 +492,7 @@ struct RemoteChatView: View {
                 return Image(uiImage: image)
             },
             leaseStatus: { [model] agentID in model.work.leaseStatus(of: agentID) },
-            // Activity ▸ Resources (#116), as the Mac opens its Resources page (#2344).
-            openLease: { [model] _ in model.sidebarItem = .resources })
+            openLease: openLease)
     }
 
     /// What a view in the chat may ask of the phone (#187): the Mac it is on, the person's
