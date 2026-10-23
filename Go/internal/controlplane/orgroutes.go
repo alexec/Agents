@@ -101,6 +101,8 @@ type orgRouteBook struct {
 	opened map[string]openedRoute
 	told   map[string][sha256.Size]byte
 	tokens map[string]orgToken
+	// resending is a resend running; again is another asked for while it ran (#2424).
+	resending, again bool
 	// making is held while a token is made, so machines that join at once share one.
 	making sync.Mutex
 }
@@ -888,10 +890,51 @@ func (s *Service) orgRoutesChangedHere() {
 
 // resendOrgRoutes sends each machine here its routes, where they differ: a route, a group
 // or a person changed.
+// One resend runs at a time, over at most orgResendWorkers machines at once; those asked
+// for while it runs are one more run after it (#2424).
 func (s *Service) resendOrgRoutes() {
-	for _, host := range s.router.HostsHeldHere() {
-		go s.sendOrgRoutes(host, false)
+	s.orgRoutes.mu.Lock()
+	if s.orgRoutes.resending {
+		s.orgRoutes.again = true
+		s.orgRoutes.mu.Unlock()
+		return
 	}
+	s.orgRoutes.resending = true
+	s.orgRoutes.mu.Unlock()
+	go func() {
+		for {
+			s.sendOrgRoutesTo(s.router.HostsHeldHere())
+			s.orgRoutes.mu.Lock()
+			if !s.orgRoutes.again {
+				s.orgRoutes.resending = false
+				s.orgRoutes.mu.Unlock()
+				return
+			}
+			s.orgRoutes.again = false
+			s.orgRoutes.mu.Unlock()
+		}
+	}()
+}
+
+// orgResendWorkers is how many machines a resend sends to at once.
+const orgResendWorkers = 8
+
+// sendOrgRoutesTo sends each of hosts its routes where they differ, orgResendWorkers at once.
+func (s *Service) sendOrgRoutesTo(hosts []string) {
+	next := make(chan string)
+	var wg sync.WaitGroup
+	for range min(orgResendWorkers, len(hosts)) {
+		wg.Go(func() {
+			for host := range next {
+				s.sendOrgRoutes(host, false)
+			}
+		})
+	}
+	for _, host := range hosts {
+		next <- host
+	}
+	close(next)
+	wg.Wait()
 }
 
 // orgRoutesAgain is host/orgRoutesAgain: a sealed route did not open on the machine.
