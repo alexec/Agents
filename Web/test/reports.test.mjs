@@ -152,3 +152,10 @@ test("Delete… names the view, and a refused copy is not the control plane (#22
   assert.match(r.deleteViewWords("Monday digest"), /^Delete Monday digest\?/);
   assert.doesNotMatch(r.noCopy, /control plane/);
 });
+
+test("each range has a spoken name and each page says what its bars measure, as ReportWords has them (#2440)", () => {
+  assert.deepEqual(r.ranges.map((x) => r.rangeSpoken[x]), ["Day", "Week", "Month", "3 months"]);
+  const captions = [r.spendBarCaption, ...Object.values(r.barCaption)];
+  assert.equal(new Set(captions).size, 5);
+  for (const c of captions) assert.match(c, /^Each bar is/);
+});

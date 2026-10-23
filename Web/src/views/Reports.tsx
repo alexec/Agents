@@ -8,9 +8,9 @@ import { go } from "../route";
 import type { Store } from "../model/store";
 import type { ReportFormat, ReportPage, ReportRange, ReportRow, ReportScope, ReportScopeOption, ReportView, UsageReport } from "../protocol/generated";
 import { CallFailed } from "../wire/link";
-import { adoption, adoptionLine, adoptionNote, budgetWords, dimensionTitle, empty, exportName, groupNote, hiddenNote, line, meNote,
-  memberNote, noOutcomes, noWorkflows, outcomeLine, outcomeTotals, outcomesNote, rangeShort, rangeSpan, ranges, reportTotals, runtimeLine,
-  runtimesNote, sameScope, scopeKey, scopeNote, scopedDimensions, share, timeLine, timeNote, utcNote, waitingShare, weekTitle, workflowLine,
+import { adoption, adoptionLine, barCaption, adoptionNote, budgetWords, dimensionTitle, empty, exportName, groupNote, hiddenNote, line, meNote,
+  memberNote, noOutcomes, noWorkflows, outcomeLine, outcomeTotals, outcomesNote, rangeShort, rangeSpan, rangeSpoken, ranges, reportTotals, runtimeLine,
+  runtimesNote, sameScope, spendBarCaption, scopeKey, scopeNote, scopedDimensions, share, timeLine, timeNote, utcNote, waitingShare, weekTitle, workflowLine,
   workflowRows, workflowsNote, deleteViewWords, digestText, noCopy, noViews, noViewsHere, viewBy, viewWords, viewsNote } from "../model/reports";
 import type { OutcomeGroup, OutcomeOrder, ReportDimension, ReportGroup } from "../model/reports";
 import type { Section } from "../model/console";
@@ -97,7 +97,7 @@ export function ReportsPane({ store, runtimeName, scope, seesMore, initial }: { 
         <div class="segmented" role="radiogroup" aria-label="Range" title={rangeSpan[range.value]}>
           {ranges.map((r) => (
             <button key={r} role="radio" aria-checked={range.value === r} class={range.value === r ? "on" : ""}
-              onClick={() => { range.value = r; }}>{rangeShort[r]}</button>
+              aria-label={rangeSpoken[r]} onClick={() => { range.value = r; }}>{rangeShort[r]}</button>
           ))}
         </div>
         <span class="reports-export">
@@ -124,6 +124,7 @@ export function ReportsPane({ store, runtimeName, scope, seesMore, initial }: { 
               {totals.groups.map((g) => row(g, share(totals, g)))}
             </ul>
           )}
+          {totals.groups.length > 0 && <p class="quiet small">{spendBarCaption}</p>}
           {shown.personsHidden && <p class="quiet small">{hiddenNote}</p>}
           {way === "group" && <p class="quiet small">{groupNote}</p>}
           <p class="quiet small">{`${note(shown, scope, more)} ${utcNote}`}</p>
@@ -145,16 +146,16 @@ function note(shown: UsageReport, scope: ReportScope | undefined, more: boolean)
 type CountsKind = "outcomes" | "time" | "runtimes" | "workflows";
 
 /** How each page of counts adds up, sorts, says and draws its groups. */
-const countsPages: Record<CountsKind, { order: OutcomeOrder; by: ReportDimension; words: (g: OutcomeGroup) => string; note: string;
+const countsPages: Record<CountsKind, { order: OutcomeOrder; by: ReportDimension; words: (g: OutcomeGroup) => string; note: string; caption: string;
   none: string; rows: (rows: readonly ReportRow[]) => readonly ReportRow[]; nothing: (t: OutcomeGroup) => boolean;
   bar: (g: OutcomeGroup, most: OutcomeGroup[]) => number }> = {
-  outcomes: { order: "merged", by: "person", words: outcomeLine, note: outcomesNote, none: noOutcomes, rows: (r) => r,
+  outcomes: { order: "merged", by: "person", words: outcomeLine, note: outcomesNote, caption: barCaption.outcomes, none: noOutcomes, rows: (r) => r,
     nothing: (t) => t.sessions + t.opened === 0, bar: (g, all) => fraction(g.merged, Math.max(0, ...all.map((x) => x.merged))) },
-  time: { order: "waiting", by: "person", words: timeLine, note: timeNote, none: empty, rows: (r) => r,
+  time: { order: "waiting", by: "person", words: timeLine, note: timeNote, caption: barCaption.time, none: empty, rows: (r) => r,
     nothing: (t) => t.workingSeconds + t.waitingSeconds === 0, bar: (g) => waitingShare(g) },
-  runtimes: { order: "cost", by: "runtime", words: runtimeLine, note: runtimesNote, none: empty, rows: (r) => r,
+  runtimes: { order: "cost", by: "runtime", words: runtimeLine, note: runtimesNote, caption: barCaption.runtimes, none: empty, rows: (r) => r,
     nothing: (t) => t.turns + t.sessions === 0, bar: (g, all) => fraction(costOf(g), Math.max(0, ...all.map(costOf))) },
-  workflows: { order: "failing", by: "workflow", words: workflowLine, note: workflowsNote, none: noWorkflows, rows: workflowRows,
+  workflows: { order: "failing", by: "workflow", words: workflowLine, note: workflowsNote, caption: barCaption.workflows, none: noWorkflows, rows: workflowRows,
     nothing: (t) => t.runs + t.turns === 0, bar: (g) => fraction(g.runFailures, g.runs) },
 };
 
@@ -273,7 +274,7 @@ function RangePicker({ range, from = 0 }: { range: { value: ReportRange }; from?
     <div class="segmented" role="radiogroup" aria-label="Range" title={rangeSpan[range.value]}>
       {ranges.slice(from).map((r) => (
         <button key={r} role="radio" aria-checked={range.value === r} class={range.value === r ? "on" : ""}
-          onClick={() => { range.value = r; }}>{rangeShort[r]}</button>
+          aria-label={rangeSpoken[r]} onClick={() => { range.value = r; }}>{rangeShort[r]}</button>
       ))}
     </div>
   );
@@ -323,6 +324,7 @@ function CountsPane({ store, runtimeName, scope, kind, initial }: { store: Store
               {totals.groups.map((g) => row(g, false))}
             </ul>
           )}
+          {!page.nothing(totals.total) && <p class="quiet small">{page.caption}</p>}
           <p class="quiet small">{page.note}</p>
           {shown.personsHidden && <p class="quiet small">{hiddenNote}</p>}
           {way === "group" && <p class="quiet small">{groupNote}</p>}

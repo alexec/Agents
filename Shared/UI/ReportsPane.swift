@@ -79,7 +79,7 @@ struct ReportsPane: View {
                     }
                 }
             } footer: {
-                footer(nil)
+                footer(nil, bars: totals.groups.isEmpty ? nil : ReportWords.barCaption)
             }
             .paperListRow()
         }
@@ -98,7 +98,7 @@ struct ReportsPane: View {
                     }
                 }
             } footer: {
-                footer(ReportOutcomeWords.note(outcomes.page))
+                footer(ReportOutcomeWords.note(outcomes.page), bars: outcomes.isEmpty ? nil : ReportOutcomeWords.barCaption(outcomes.page))
             }
             .paperListRow()
         }
@@ -122,10 +122,10 @@ struct ReportsPane: View {
         }
     }
 
-    /// What the page counts, then whose machines.
-    private func footer(_ note: String?) -> some View {
+    /// What the bars measure, what the page counts, then whose machines.
+    private func footer(_ note: String?, bars: String? = nil) -> some View {
         let whose = "\(ReportWords.meNote(seesMore: seesMore)) \(ReportWords.utcNote)"
-        return Text(note.map { "\($0) \(whose)" } ?? whose)
+        return Text([bars, note, whose].compactMap { $0 }.joined(separator: " "))
             .appText(.fine)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -162,7 +162,7 @@ struct ReportsPane: View {
                 Picker("Range", selection: $range) {
                     // Adoption counts weeks, so it starts at W.
                     ForEach(DaemonAPI.ReportRange.allCases.filter { page != .adoption || $0 != .day }, id: \.self) {
-                        Text(ReportWords.short($0)).tag($0)
+                        Text(ReportWords.short($0)).accessibilityLabel(ReportWords.spoken($0)).tag($0)
                     }
                 }
                 .pickerStyle(.segmented)
