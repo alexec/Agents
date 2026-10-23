@@ -70,8 +70,8 @@ struct VoiceModeButton: View {
 }
 
 /// Voice mode in place of the whole prompt bar (#2375), field and pills: the blue waveform,
-/// moving while it listens or speaks, the words heard or said, never cut, and × (or
-/// Escape) to end it.
+/// moving while it listens or speaks, the words heard or said, never cut, and Stop (or
+/// Escape) to end it (#2517).
 struct VoiceModeBar: View {
     private var voice: VoiceMode { VoiceMode.shared }
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverIsOn
@@ -126,15 +126,15 @@ struct VoiceModeBar: View {
             Button {
                 voice.turnOff()
             } label: {
-                Image(systemName: "xmark")
+                Image(systemName: PromptWords.stopSymbol)
                     .appText(.reading).fontWeight(.semibold)
                     .frame(width: 22, height: 22)
             }
             .buttonStyle(.paper)
             .buttonBorderShape(.circle)
             .keyboardShortcut(.cancelAction)
-            .help("End voice mode (Esc)")
-            .accessibilityLabel("End voice mode")
+            .help("Stop voice mode (Esc)")
+            .accessibilityLabel("Stop voice mode")
         }
         .padding(14)
         .paperRaised(in: RoundedRectangle(cornerRadius: 18))

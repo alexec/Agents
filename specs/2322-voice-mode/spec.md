@@ -30,7 +30,7 @@ not (Alex, 2026-10-22: "would be weird").
    - when the turn ends, the reply is spoken, a sentence at a time. A reply of more than 60
      words speaks its first three sentences and then "The rest is on the screen.";
    - then the microphone opens again for the next prompt.
-3. **Stop** stops the voice at once. What was not spoken stays on the screen. The button again ends voice mode.
+3. **Stop** ends voice mode. One press of the stop symbol, or Escape, stops the voice at once and closes the microphone. What was not spoken stays on the screen. Talking over the voice, which stops it and keeps listening, is barge-in (#2358), not this button.
 4. **A turn that stops to ask** (a question card, or Grok's question as a waiting turn) speaks
    the question, then its options with numbers: "Two choices. One: Keychain. Two: File. One
    is recommended." The person says a number or the choice's words; voice mode says

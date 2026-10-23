@@ -103,7 +103,7 @@ struct PromptBar: View {
                 Telling(host: model.answerRecipient(agent.id), doing: "Sending")
             }
             // Voice mode (#2322) is the whole bar, field and options: what it hears and
-            // says, and × to end it (#2375).
+            // says, and Stop to end it (#2375, #2517).
             if VoiceMode.shared.isOn(in: agent.id) {
                 VoiceModeBar()
             } else {
