@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -262,4 +263,61 @@ func TestExportFileName(t *testing.T) {
 			t.Errorf("%q: %q, want %q", in, got, want)
 		}
 	}
+}
+
+// #2428: export and import stream an agent's files, so a big transcript is never held in
+// memory whole; a torn last line is still left out.
+func TestExportAndImportStreamABigTranscript(t *testing.T) {
+	a, ca := start(t, t.TempDir())
+	dir := project(t, ca, 1)
+	one := seeded(t, a, dir, nil)
+	const size = 64 << 20
+	line := strings.Repeat("x", 1023) + "\n"
+	f, err := os.Create(a.Store.Loc.Transcript(string(one.ID)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range size / len(line) {
+		f.WriteString(line)
+	}
+	f.WriteString(`{"torn":`)
+	f.Close()
+
+	path := filepath.Join(t.TempDir(), "x.tar.gz")
+	m := backupManifest{Format: backupFormat, RootID: a.Store.RootID, MadeAt: wire.DateOf(time.Now())}
+	exported := allocatedBy(func() {
+		if err := a.writeBackupArchive(path, &m, []wire.Agent{one}, false); err != nil {
+			t.Fatal(err)
+		}
+	})
+	bd, _ := start(t, t.TempDir())
+	var res wire.BackupRestoreResult
+	imported := allocatedBy(func() {
+		if res, err = bd.restoreArchive(path, a.Store.RootID, false, false, ""); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Logf("a %d MB transcript: export allocates %d KB, import %d KB", size>>20, exported>>10, imported>>10)
+	if res.Restored != 1 {
+		t.Fatalf("imported %+v", res)
+	}
+	fi, err := os.Stat(bd.Store.Loc.Transcript(string(one.ID)))
+	if err != nil || fi.Size() != size/int64(len(line))*int64(len(line)) {
+		t.Fatalf("the transcript came back as %v, %v", fi, err)
+	}
+	if exported > size/4 || imported > size/4 {
+		t.Fatalf("export allocates %d bytes and import %d for a %d byte transcript", exported, imported, size)
+	}
+	if left, _ := filepath.Glob(filepath.Join(bd.Store.Loc.Root, ".restore-*")); len(left) != 0 {
+		t.Fatalf("staging stays: %v", left)
+	}
+}
+
+// allocatedBy is how many bytes of heap do allocates.
+func allocatedBy(do func()) uint64 {
+	var before, after goruntime.MemStats
+	goruntime.ReadMemStats(&before)
+	do()
+	goruntime.ReadMemStats(&after)
+	return after.TotalAlloc - before.TotalAlloc
 }

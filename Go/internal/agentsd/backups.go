@@ -51,9 +51,13 @@ const (
 	// backupStoreWait bounds a list of the store, so a control plane that does not answer
 	// does not hold the state up.
 	backupStoreWait = 10 * time.Second
-	// backupEntryMost bounds one file read from an archive into memory: a transcript is
-	// far less, and an archive made by hand (an import, #1001) can say any size.
+	// backupEntryMost bounds one file in an archive: a transcript is far less, and an
+	// archive made by hand (an import, #1001) can say any size. An agent's files go to disk
+	// as they are read (#2428).
 	backupEntryMost = 1 << 30
+	// backupHeldMost bounds a file an archive's reader holds in memory: a record or a
+	// root file, all small.
+	backupHeldMost = 16 << 20
 )
 
 // backupPartBytes is one backups/upload: a JSON-RPC line of about 11 MB in base64, well
@@ -492,13 +496,10 @@ func (d *Daemon) writeBackupArchive(path string, m *backupManifest, agents []wir
 		}
 		for _, file := range backupAgentFiles {
 			p := filepath.Join(d.Store.Loc.Agent(string(a.ID)), file)
-			b, err := readWholeLines(p)
+			err := addTarFileFrom(tw, "agents/"+string(a.ID)+"/"+file, p)
 			if errors.Is(err, os.ErrNotExist) {
 				continue
 			} else if err != nil {
-				return err
-			}
-			if err := addTarFile(tw, "agents/"+string(a.ID)+"/"+file, b, nowFunc()); err != nil {
 				return err
 			}
 		}
@@ -526,17 +527,48 @@ func (d *Daemon) writeBackupArchive(path string, m *backupManifest, agents []wir
 	return f.Sync()
 }
 
-// readWholeLines reads a file; a .jsonl one up to its last whole line, so an entry being
-// written as the backup reads it is left out rather than torn.
-func readWholeLines(p string) ([]byte, error) {
-	b, err := os.ReadFile(p)
-	if err != nil || !strings.HasSuffix(p, ".jsonl") {
-		return b, err
+// addTarFileFrom copies the file at p into the archive as name, streamed (#2428): a
+// .jsonl one up to its last whole line, so an entry being written as the backup reads it
+// is left out rather than torn.
+func addTarFileFrom(tw *tar.Writer, name, p string) error {
+	f, err := os.Open(p)
+	if err != nil {
+		return err
 	}
-	if i := bytes.LastIndexByte(b, '\n'); i >= 0 {
-		return b[:i+1], nil
+	defer f.Close()
+	fi, err := f.Stat()
+	if err != nil {
+		return err
 	}
-	return b[:0], nil
+	size := fi.Size()
+	if strings.HasSuffix(p, ".jsonl") {
+		if size, err = wholeLinesSize(f, size); err != nil {
+			return err
+		}
+	}
+	if err := tw.WriteHeader(&tar.Header{Name: name, Mode: 0o600, Size: size, ModTime: nowFunc(), Typeflag: tar.TypeReg}); err != nil {
+		return err
+	}
+	_, err = io.CopyN(tw, io.NewSectionReader(f, 0, size), size)
+	return err
+}
+
+// wholeLinesSize is how much of f's first size bytes ends at a newline: it reads back
+// from the end a block at a time.
+func wholeLinesSize(f *os.File, size int64) (int64, error) {
+	buf := make([]byte, 64<<10)
+	for end := size; end > 0; {
+		start := max(end-int64(len(buf)), 0)
+		b := buf[:end-start]
+		if _, err := f.ReadAt(b, start); err != nil {
+			return 0, err
+		}
+		if i := bytes.LastIndexByte(b, '\n'); i >= 0 {
+			return start + int64(i) + 1, nil
+		}
+		end = start
+	}
+	return 0, nil
 }
 
 func addTarFile(tw *tar.Writer, name string, b []byte, at time.Time) error {
@@ -618,9 +650,22 @@ func (d *Daemon) restoreArchive(archive, madeIn string, mine, withRoot bool, int
 	// here.
 	// One agent's files are held until the next agent's begin: a backup is written agent
 	// by agent. Its record goes in last, so a restore cut off leaves a folder with no
-	// record, which the store does not load.
+	// record, which the store does not load. Its other files wait in staging, on disk, not
+	// in memory (#2428).
+	staging, err := os.MkdirTemp(d.Store.Loc.Root, ".restore-")
+	if err != nil {
+		return res, err
+	}
+	defer os.RemoveAll(staging)
 	var held wire.UUID
-	files := map[string][]byte{}
+	var record []byte
+	files := map[string]string{}
+	drop := func() {
+		for _, p := range files {
+			os.Remove(p)
+		}
+		held, record, files = "", nil, map[string]string{}
+	}
 	// An agent this machine deleted is never restored (#1001).
 	d.erasures.mu.Lock()
 	erased := d.readErasedLocked()
@@ -630,12 +675,12 @@ func (d *Daemon) restoreArchive(archive, madeIn string, mine, withRoot bool, int
 			return nil
 		}
 		if _, gone := erased[held]; gone {
-			held, files = "", map[string][]byte{}
+			drop()
 			res.Skipped++
 			return nil
 		}
-		restored, err := d.restoreAgent(held, files, madeIn, mine, into)
-		held, files = "", map[string][]byte{}
+		restored, err := d.restoreAgent(held, record, files, madeIn, mine, into)
+		drop()
 		if err != nil {
 			return err
 		}
@@ -663,14 +708,18 @@ func (d *Daemon) restoreArchive(archive, madeIn string, mine, withRoot bool, int
 		if h.Size > backupEntryMost {
 			return res, fmt.Errorf("the backup can't be read: %s is more than %d MB", h.Name, backupEntryMost>>20)
 		}
-		b, err := io.ReadAll(io.LimitReader(tr, h.Size))
-		if err != nil {
-			return res, err
-		}
 		switch {
 		case h.Name == erasedFile:
+			b, err := readHeld(tr, h)
+			if err != nil {
+				return res, err
+			}
 			d.takeErasedList(b)
 		case slices.Contains(backupRootFiles, h.Name):
+			b, err := readHeld(tr, h)
+			if err != nil {
+				return res, err
+			}
 			p := filepath.Join(d.Store.Loc.Root, h.Name)
 			if _, err := os.Stat(p); errors.Is(err, os.ErrNotExist) {
 				if err := store.WriteAtomically(p, b, 0o600); err != nil {
@@ -689,7 +738,17 @@ func (d *Daemon) restoreArchive(archive, madeIn string, mine, withRoot bool, int
 				}
 				held = id
 			}
-			files[parts[2]] = b
+			if parts[2] == "agent.json" {
+				if record, err = readHeld(tr, h); err != nil {
+					return res, err
+				}
+				continue
+			}
+			p := filepath.Join(staging, parts[2])
+			if err := writeStaged(p, tr, h.Size); err != nil {
+				return res, err
+			}
+			files[parts[2]] = p
 		}
 	}
 	return res, flush()
@@ -698,9 +757,8 @@ func (d *Daemon) restoreArchive(archive, madeIn string, mine, withRoot bool, int
 // restoreAgent writes one agent's folder and saves its record archived; false when this
 // machine has it already or the record can't be read. into, when not empty, is the folder
 // it is put in: its worktree, which was on the machine that made it, is left behind.
-func (d *Daemon) restoreAgent(id wire.UUID, files map[string][]byte, madeIn string, mine bool, into string) (bool, error) {
-	raw, ok := files["agent.json"]
-	if !ok || d.Store.Agent(id) != nil {
+func (d *Daemon) restoreAgent(id wire.UUID, raw []byte, files map[string]string, madeIn string, mine bool, into string) (bool, error) {
+	if raw == nil || d.Store.Agent(id) != nil {
 		return false, nil
 	}
 	if _, err := os.Stat(d.Store.Loc.Record(string(id))); err == nil {
@@ -744,11 +802,8 @@ func (d *Daemon) restoreAgent(id wire.UUID, files map[string][]byte, madeIn stri
 	if err := os.MkdirAll(folder, 0o755); err != nil {
 		return false, err
 	}
-	for name, b := range files {
-		if name == "agent.json" {
-			continue
-		}
-		if err := store.WriteAtomically(filepath.Join(folder, name), b, 0o644); err != nil {
+	for name, p := range files {
+		if err := os.Rename(p, filepath.Join(folder, name)); err != nil {
 			return false, err
 		}
 	}
@@ -757,6 +812,32 @@ func (d *Daemon) restoreAgent(id wire.UUID, files map[string][]byte, madeIn stri
 	}
 	d.tellChanged(a, nil)
 	return true, nil
+}
+
+// readHeld reads an archive's entry into memory: a record or a root file, at most
+// backupHeldMost.
+func readHeld(tr *tar.Reader, h *tar.Header) ([]byte, error) {
+	if h.Size > backupHeldMost {
+		return nil, fmt.Errorf("the backup can't be read: %s is more than %d MB", h.Name, backupHeldMost>>20)
+	}
+	return io.ReadAll(io.LimitReader(tr, h.Size))
+}
+
+// writeStaged copies an archive's entry of size bytes to a new file at p, synced, so the
+// rename into the agent's folder leaves a whole file.
+func writeStaged(p string, r io.Reader, size int64) error {
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	_, err = io.CopyN(f, r, size)
+	if err == nil {
+		err = f.Sync()
+	}
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	return err
 }
 
 func backupAgentID(s string) bool {
