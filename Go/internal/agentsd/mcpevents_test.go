@@ -3,6 +3,7 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -329,11 +330,14 @@ func TestEventsHalfDeliveredAreRaisedOnceAtTheNextStart(t *testing.T) {
 	if n := len(mcpEventsRaised(d, "e9")); n != 1 {
 		t.Fatalf("e9 raised %d times", n)
 	}
+	// Read under the lock: the next poll writes the record (#2486).
 	d.mcpEvMu.Lock()
 	r := d.mcpRecordsLocked().Subscriptions[store.FolderPath(folder)+"|"+key]
+	bad := r == nil || len(r.Delivering) != 0 || !r.hasSeen("e8") || !r.hasSeen("e9")
+	got := fmt.Sprintf("%+v", r)
 	d.mcpEvMu.Unlock()
-	if r == nil || len(r.Delivering) != 0 || !r.hasSeen("e8") || !r.hasSeen("e9") {
-		t.Fatalf("%+v", r)
+	if bad {
+		t.Fatal(got)
 	}
 }
 
