@@ -72,8 +72,14 @@ func mcpWhy(err error) wire.MCPCatalogError {
 }
 
 // mcpChanged has the health checks look again, as a change to mcp.json or a secret can
-// make a server answer or stop.
-func (d *Daemon) mcpChanged() { safe.Go("mcp health", d.reconcileMCPHealth) }
+// make a server answer or stop, and says every project's pins again, whose server views
+// (#2032) may have come or gone.
+func (d *Daemon) mcpChanged() {
+	safe.Go("mcp health", d.reconcileMCPHealth)
+	for _, s := range d.projects(false) {
+		d.pinsChanged(store.FolderPath(s.Project.Folder))
+	}
+}
 
 func (d *Daemon) mcpSidecarPath() string { return filepath.Join(d.Store.Loc.Root, "catalog-mcp.json") }
 

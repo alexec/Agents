@@ -88,7 +88,11 @@ export function PinnedViewPage({ store, host, folder, path, pin, down }: {
           <h1>{title}</h1>
           <span class="small quiet">{path}</span>
         </div>
-        {pin && <button disabled={down} onClick={() => { void store.unpin(host, folder, path); go({ host, project: folder, compose: true }); }}>Unpin</button>}
+        {/* A server's list view (#2032) is hidden, not unpinned. */}
+        {pin && <button disabled={down} onClick={() => {
+          void (pin.pinnedBy.kind === "server" ? store.setViewHidden(host, folder, path, true) : store.unpin(host, folder, path));
+          go({ host, project: folder, compose: true });
+        }}>{pin.pinnedBy.kind === "server" ? "Hide" : "Unpin"}</button>}
       </header>
       {!pin ? (
         <p class="hint">{path} isn't pinned in this project.</p>

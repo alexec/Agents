@@ -378,11 +378,18 @@ struct RemoteView: View {
             }
         case .page(let path):
             if let folder = model.selectedProject {
-                if let pin = model.pins(in: folder).first(where: { $0.path == path }), let view = pin.view {
-                    // A pinned view (#189), fed afresh, through the host a chat's views use.
+                if let pin = model.work.pinOrView(path, in: folder), let view = pin.view {
+                    // A pinned view (#189), or a server's list view (#2032), fed afresh,
+                    // through the host a chat's views use.
                     PinnedViewPage(folder: folder, pin: pin, view: view,
                                    call: { method, params in try await model.viewCall(method, params) },
-                                   unpin: { await model.unpin(path, in: folder) },
+                                   unpin: {
+                                       if pin.isServerView {
+                                           await model.setViewHidden(path, true, in: folder)
+                                       } else {
+                                           await model.unpin(path, in: folder)
+                                       }
+                                   },
                                    startAgent: { start in
                                        guard let key = model.work.project(folder)?.key else {
                                            return "This project isn’t one the phone knows."

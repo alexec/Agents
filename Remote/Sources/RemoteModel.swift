@@ -4048,6 +4048,20 @@ final class RemoteModel {
     }
 
     func pins(in folder: URL?) -> [PinView] { work.pins(in: folder) }
+    /// The project's servers' list views (#2032), the hidden ones too.
+    func serverViews(in folder: URL?) -> [PinView] { work.serverViews(in: folder) }
+
+    /// Hide or Show on a server's list view (#2032): shown at once, then the host told.
+    func setViewHidden(_ uri: String, _ hidden: Bool, in folder: URL) async {
+        work.setViewHidden(uri, hidden, in: folder)
+        if hidden, openPin == uri { openPin = nil }
+        do {
+            try await client.call(DaemonAPI.Method.pinsHideView,
+                                  DaemonAPI.PinHideViewRequest(folder: folder, uri: uri, hidden: hidden))
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
 
     func refreshPins() async {
         guard let listed = try? await client.call(DaemonAPI.Method.pinsList, DaemonAPI.Empty(),

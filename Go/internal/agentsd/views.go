@@ -547,16 +547,21 @@ func (d *Daemon) callFromView(ctx context.Context, r wire.ViewCallRequest) (wire
 	if err != nil {
 		return nil, err
 	}
-	// The server the view is of, as the host wrote it or the project pinned it, not as the
-	// request says.
+	// The server the view is of, as the host wrote it, the project pinned it or the server
+	// shows it (#2032), not as the request says.
 	own := false
 	if d.Store.Agent(r.AgentID) != nil {
 		own = d.viewServerOf(r.ViewID, r.AgentID) == name
 	} else {
-		for _, p := range d.readPins(project).pins {
+		f := d.readPins(project)
+		for _, p := range f.pins {
 			if p.view != nil && p.view.Server == name {
 				own = true
 			}
+		}
+		// Or a server's list view, shown without a pin (#2032).
+		for _, v := range d.serverViews(project, f) {
+			own = own || v.View.Server == name
 		}
 	}
 	if !own {

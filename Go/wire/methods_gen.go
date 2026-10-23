@@ -140,6 +140,7 @@ var CallPersonasList = Method[PersonasListRequest, []Persona]{"personas/list"}
 var CallPinsArrange = Method[PinArrangeRequest, Empty]{"pins/arrange"}
 var CallPinsArrangeSessions = Method[PinArrangeSessionsRequest, Empty]{"pins/arrangeSessions"}
 var CallPinsArrangeWorkflows = Method[PinArrangeWorkflowsRequest, Empty]{"pins/arrangeWorkflows"}
+var CallPinsHideView = Method[PinHideViewRequest, Empty]{"pins/hideView"}
 var CallPinsList = Method[Empty, []ProjectPins]{"pins/list"}
 var CallPinsPin = Method[PinRequest, []PinView]{"pins/pin"}
 var CallPinsPinSession = Method[PinSessionRequest, Empty]{"pins/pinSession"}

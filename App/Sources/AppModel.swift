@@ -1552,6 +1552,8 @@ final class AppModel {
     // MARK: Pinned pages (#159)
 
     func pins(in folder: URL?) -> [PinView] { work.pins(in: folder) }
+    /// The project's servers' list views (#2032), the hidden ones too.
+    func serverViews(in folder: URL?) -> [PinView] { work.serverViews(in: folder) }
     func pageRevision(in folder: URL?) -> Int { work.pageRevision(in: folder) }
 
     func refreshPins() async {
@@ -1631,6 +1633,16 @@ final class AppModel {
         await attempt(on: key.host) {
             try await self.client(for: key.host).call(DaemonAPI.Method.pinsUnpin,
                                                       DaemonAPI.PinPathRequest(folder: key.folder, path: path))
+        }
+    }
+
+    /// Hide or Show on a server's list view (#2032): shown at once, then the host told.
+    func setViewHidden(_ uri: String, _ hidden: Bool, in key: ProjectKey) async {
+        work.setViewHidden(uri, hidden, in: key.folder)
+        if hidden, openPin == uri, selectedProjectKey == key { showProject(key) }
+        await attempt(on: key.host) {
+            try await self.client(for: key.host).call(DaemonAPI.Method.pinsHideView,
+                                                      DaemonAPI.PinHideViewRequest(folder: key.folder, uri: uri, hidden: hidden))
         }
     }
 

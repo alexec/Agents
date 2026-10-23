@@ -50,6 +50,9 @@ public final class AgentsModel {
     @ObservationIgnored public private(set) var sessionPins: [URL: [UUID]] = [:]
     /// Each project's pinned workflows' ids (#432), likewise.
     @ObservationIgnored public private(set) var workflowPins: [URL: [String]] = [:]
+    /// Each project's servers' list views (#2032), the hidden ones marked, kept current by
+    /// `pins/changed`. A project with none is absent.
+    @ObservationIgnored public private(set) var serverViews: [URL: [PinView]] = [:]
     /// Bumped by `pages/changed`: a page a screen may be showing changed on disk. Whoever
     /// shows one reads it again, with its stamp, so an unchanged file costs nothing.
     public private(set) var pageRevisions: [URL: [String: Int]] = [:]
@@ -662,6 +665,9 @@ public final class AgentsModel {
             sessionPins[folder] = sessions.isEmpty ? nil : sessions
             let flows = notification.workflows ?? []
             workflowPins[folder] = flows.isEmpty ? nil : flows
+            let views = notification.views ?? []
+            serverViews[folder] = views.isEmpty ? nil : views
+            pinShelves[folder]?.setViews(views)
             pinShelves[folder]?.setPins(notification.pins)
             pinShelves[folder]?.setSessions(sessions)
             pinShelves[folder]?.setWorkflows(flows)
@@ -833,6 +839,26 @@ public final class AgentsModel {
         return pinShelf(folder).pins
     }
 
+    /// One project's servers' list views (#2032), the hidden ones too, in the servers' order.
+    public func serverViews(in folder: URL?) -> [PinView] {
+        guard let folder else { return [] }
+        return pinShelf(folder).views
+    }
+
+    /// A pin or a server's list view at this path: what a selected sidebar row opens.
+    public func pinOrView(_ path: String, in folder: URL?) -> PinView? {
+        pins(in: folder).first { $0.path == path } ?? serverViews(in: folder).first { $0.path == path }
+    }
+
+    /// A server view hidden or shown as a screen left it, before the host says so.
+    public func setViewHidden(_ uri: String, _ hidden: Bool, in folder: URL) {
+        let key = Project.standardize(folder)
+        guard var views = serverViews[key], let at = views.firstIndex(where: { $0.path == uri }) else { return }
+        views[at].hidden = hidden ? true : nil
+        serverViews[key] = views
+        pinShelves[key]?.setViews(views)
+    }
+
     public func replacePins(_ listed: [ProjectPins]) {
         pins = Dictionary(listed.compactMap { $0.pins.isEmpty ? nil : (Project.standardize($0.folder), $0.pins) },
                           uniquingKeysWith: { $1 })
@@ -844,7 +870,12 @@ public final class AgentsModel {
             listed.workflows.map { (Project.standardize(listed.folder), $0) }
         }, uniquingKeysWith: { $1 })
         if workflowPins != flows { workflowPins = flows }
+        let views = Dictionary(listed.compactMap { listed in
+            listed.views.flatMap { $0.isEmpty ? nil : (Project.standardize(listed.folder), $0) }
+        }, uniquingKeysWith: { $1 })
+        if serverViews != views { serverViews = views }
         for (folder, shelf) in pinShelves {
+            shelf.setViews(serverViews[folder] ?? [])
             shelf.setPins(pins[folder] ?? [])
             shelf.setSessions(sessionPins[folder] ?? [])
             shelf.setWorkflows(workflowPins[folder] ?? [])
@@ -892,6 +923,7 @@ public final class AgentsModel {
         let key = Project.standardize(folder)
         if let shelf = pinShelves[key] { return shelf }
         let shelf = PinShelf()
+        shelf.setViews(serverViews[key] ?? [])
         shelf.setPins(pins[key] ?? [])
         shelf.setSessions(sessionPins[key] ?? [])
         shelf.setWorkflows(workflowPins[key] ?? [])

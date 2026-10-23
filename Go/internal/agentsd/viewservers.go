@@ -175,7 +175,11 @@ func (d *Daemon) viewServerNames(project string) []string {
 // call each, and the resources' addresses. Kept at <root>/mcp-views/<key>.json, keyed by
 // the entry, so a changed entry is a new catalog. Never a secret, a URL or a header.
 type viewCatalog struct {
-	Server    string         `json:"server"`
+	// Version is viewCatalogVersion when it was made; an older one is read again.
+	Version int    `json:"version"`
+	Server  string `json:"server"`
+	// Title is the server's own title (initialize's serverInfo.title), when it gives one.
+	Title     string         `json:"title,omitempty"`
 	MadeAt    time.Time      `json:"madeAt"`
 	Tools     []viewTool     `json:"tools"`
 	AppTools  []string       `json:"appTools"`
@@ -187,6 +191,8 @@ type viewTool struct {
 	ResourceURI string   `json:"resourceURI"`
 	Visibility  []string `json:"visibility"`
 	ReadOnly    bool     `json:"readOnly"`
+	// NeedsArguments: its input schema requires an argument, so it feeds no list (#2032).
+	NeedsArguments bool `json:"needsArguments,omitempty"`
 }
 
 type viewResource struct {
@@ -232,13 +238,16 @@ func (c *viewCatalog) appTool(name string) bool {
 	return false
 }
 
+// viewCatalogVersion is what a catalog made now holds: 2 added NeedsArguments and Title.
+const viewCatalogVersion = 2
+
 // viewCatalogFresh is how long a catalog is kept: a server's tools can change without its
 // entry changing.
 const viewCatalogFresh = 24 * time.Hour
 
 // makeViewCatalog is ServerViewCatalog.make, from tools/list and resources/list.
 func makeViewCatalog(server string, tools, resources []json.RawMessage, at time.Time) viewCatalog {
-	c := viewCatalog{Server: server, MadeAt: at, Tools: []viewTool{}, AppTools: []string{}, Resources: []viewResource{}}
+	c := viewCatalog{Version: viewCatalogVersion, Server: server, MadeAt: at, Tools: []viewTool{}, AppTools: []string{}, Resources: []viewResource{}}
 	for _, raw := range tools {
 		var t struct {
 			Name string `json:"name"`
@@ -252,6 +261,9 @@ func makeViewCatalog(server string, tools, resources []json.RawMessage, at time.
 			Annotations struct {
 				ReadOnlyHint bool `json:"readOnlyHint"`
 			} `json:"annotations"`
+			InputSchema struct {
+				Required []string `json:"required"`
+			} `json:"inputSchema"`
 		}
 		if json.Unmarshal(raw, &t) != nil || t.Name == "" {
 			continue
@@ -273,7 +285,8 @@ func makeViewCatalog(server string, tools, resources []json.RawMessage, at time.
 		if !strings.HasPrefix(uri, "ui://") {
 			continue
 		}
-		c.Tools = append(c.Tools, viewTool{Name: t.Name, ResourceURI: uri, Visibility: seen, ReadOnly: t.Annotations.ReadOnlyHint})
+		c.Tools = append(c.Tools, viewTool{Name: t.Name, ResourceURI: uri, Visibility: seen, ReadOnly: t.Annotations.ReadOnlyHint,
+			NeedsArguments: len(t.InputSchema.Required) > 0})
 	}
 	for _, raw := range resources {
 		var r struct {
@@ -303,7 +316,7 @@ func (d *Daemon) cachedViewCatalog(s viewServer) *viewCatalog {
 	d.viewMu.Lock()
 	held, ok := d.viewCatalogs[s.entry]
 	d.viewMu.Unlock()
-	if ok && nowFunc().Sub(held.MadeAt) < viewCatalogFresh {
+	if ok && held.Version == viewCatalogVersion && nowFunc().Sub(held.MadeAt) < viewCatalogFresh {
 		return &held
 	}
 	b, err := os.ReadFile(d.viewCatalogPath(s.entry))
@@ -311,7 +324,7 @@ func (d *Daemon) cachedViewCatalog(s viewServer) *viewCatalog {
 		return nil
 	}
 	var c viewCatalog
-	if json.Unmarshal(b, &c) != nil || nowFunc().Sub(c.MadeAt) >= viewCatalogFresh {
+	if json.Unmarshal(b, &c) != nil || c.Version != viewCatalogVersion || nowFunc().Sub(c.MadeAt) >= viewCatalogFresh {
 		return nil
 	}
 	d.keepViewCatalog(s.entry, c)
@@ -377,6 +390,7 @@ func (d *Daemon) loadViewCatalog(ctx context.Context, s viewServer) *viewCatalog
 			return err
 		}
 		c = makeViewCatalog(s.name, tools, resources, nowFunc())
+		c.Title = m.serverTitle
 		return nil
 	})
 	if err != nil {
@@ -409,6 +423,8 @@ type viewSession struct {
 	ctx  context.Context
 	conn mcpConn
 	next int
+	// serverTitle is initialize's serverInfo.title, or "".
+	serverTitle string
 }
 
 // withViewSession connects to s, initializes, runs body, and ends the session.
@@ -436,9 +452,18 @@ func withViewSession(ctx context.Context, s viewServer, body func(*viewSession) 
 		}
 		return err
 	}
-	if _, err := m.call("initialize", map[string]any{"protocolVersion": "2025-06-18", "capabilities": map[string]any{},
-		"clientInfo": map[string]any{"name": "Agents", "version": "1"}}); err != nil {
+	init, err := m.call("initialize", map[string]any{"protocolVersion": "2025-06-18", "capabilities": map[string]any{},
+		"clientInfo": map[string]any{"name": "Agents", "version": "1"}})
+	if err != nil {
 		return timedOut(err)
+	}
+	var info struct {
+		ServerInfo struct {
+			Title string `json:"title"`
+		} `json:"serverInfo"`
+	}
+	if json.Unmarshal(init, &info) == nil {
+		m.serverTitle = strings.TrimSpace(info.ServerInfo.Title)
 	}
 	if err := conn.notify(ctx, "notifications/initialized"); err != nil {
 		return timedOut(err)

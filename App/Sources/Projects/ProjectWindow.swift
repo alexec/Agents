@@ -234,7 +234,24 @@ private struct ProjectWindowColumns: View {
         case .review(let id, let key):
             ReviewDestination(id: id, project: key).paperGround()
         case .pin(let path, let key):
-            PinnedPage(project: key, path: path).paperGround()
+            // A pinned view, or a server's list view (#2032), as the main window draws it.
+            if let pin = model.work.pinOrView(path, in: key.folder), let view = pin.view {
+                PinnedViewPage(folder: key.folder, pin: pin, view: view,
+                               call: { method, params in try await model.client(for: key.host).call(method, params) },
+                               unpin: {
+                                   if pin.isServerView {
+                                       await model.setViewHidden(path, true, in: key)
+                                   } else {
+                                       await model.unpin(path, in: key)
+                                   }
+                               },
+                               startAgent: { model.offerStart($0, in: key) },
+                               connected: model.isConnected)
+                    .id(pin.path)
+                    .paperGround()
+            } else {
+                PinnedPage(project: key, path: path).paperGround()
+            }
         default:
             // The project itself, or nothing picked yet: a new session in it, the empty chat
             // with its prompt (066).

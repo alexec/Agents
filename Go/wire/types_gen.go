@@ -5885,6 +5885,14 @@ type PinArrangeWorkflowsRequest struct {
 	WorkflowIDs []string `json:"workflowIDs"`
 }
 
+type PinHideViewRequest struct {
+	Folder URL `json:"folder"`
+
+	URI string `json:"uri"`
+
+	Hidden bool `json:"hidden"`
+}
+
 type PinKind string
 
 const PinKindMarkdown PinKind = "markdown"
@@ -5935,6 +5943,8 @@ type PinView struct {
 	View *ViewPin `json:"view,omitzero"`
 
 	MissingReason *string `json:"missingReason,omitzero"`
+
+	Hidden *bool `json:"hidden,omitzero"`
 }
 
 type PinWriteRequest struct {
@@ -5954,6 +5964,7 @@ type PinnerKind string
 const PinnerKindPerson PinnerKind = "person"
 const PinnerKindAgent PinnerKind = "agent"
 const PinnerKindWorkflow PinnerKind = "workflow"
+const PinnerKindServer PinnerKind = "server"
 
 type PinnerView struct {
 	Kind PinnerKind `json:"kind"`
@@ -5971,6 +5982,8 @@ type PinsChangedNotification struct {
 	Sessions []UUID `json:"sessions,omitzero"`
 
 	Workflows []string `json:"workflows,omitzero"`
+
+	Views []PinView `json:"views,omitzero"`
 }
 
 type Plan struct {
@@ -6294,6 +6307,8 @@ type ProjectPins struct {
 	Sessions []UUID `json:"sessions,omitzero"`
 
 	Workflows []string `json:"workflows,omitzero"`
+
+	Views []PinView `json:"views,omitzero"`
 }
 
 type ProjectPlugin struct {

@@ -15,6 +15,7 @@ struct PinnedViewPage: View {
     let view: ViewPin
     /// One of `views/*`, to the host the project is on.
     var call: @MainActor (String, JSONValue) async throws -> JSONValue
+    /// Unpin, or Hide for a server's list view (#2032).
     var unpin: @MainActor () async -> Void
     /// The new-agent form in this project, filled in by the view (#834).
     var startAgent: (@MainActor (AppViewStart) -> String?)? = nil
@@ -89,7 +90,7 @@ struct PinnedViewPage: View {
                     .truncationMode(.middle)
             }
             Spacer()
-            Button("Unpin") { Task { await unpin() } }
+            Button(pin.isServerView ? "Hide" : "Unpin") { Task { await unpin() } }
                 .buttonStyle(.paper)
         }
         .padding(.horizontal, 16)

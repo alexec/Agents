@@ -584,6 +584,8 @@ struct RemoteProjectFold: View {
                 // Folded, nothing at all is under the heading (#356): see `isUnfolded`.
                 if fold.showsPinnedPages {
                     PinnedPageRows(project: key)
+                    // Then its servers' list views, without a pin (#2032).
+                    ServerViewRows(project: key)
                 }
                 // Each under the session that started it, folded (#835). Under a Sessions
                 // row, as the workflows are under theirs (#2312), unless Settings turns it
@@ -831,6 +833,7 @@ private struct ProjectMenuItems: View {
             Label("Put Files in Drop Box…", systemImage: "tray.and.arrow.down")
         }
         .disabled(model.isStale(on: summary.host))
+        ShowHiddenViewsButton(summary: summary)
         // To the top of the sidebar, as the window's Pin.
         Button {
             Task { await model.setPinned(!summary.project.isPinned, for: summary) }

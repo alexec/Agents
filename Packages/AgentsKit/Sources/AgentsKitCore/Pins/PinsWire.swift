@@ -11,6 +11,8 @@ public extension DaemonAPI.Method {
     static let pinsUnpin = "pins/unpin"
     /// A person's drop or Move item: the whole new order, once.
     static let pinsArrange = "pins/arrange"
+    /// A person's Hide on a server's list view (#2032), and Show to take it back.
+    static let pinsHideView = "pins/hideView"
     /// A pinned page, or a file an HTML page draws from: any file in
     /// the project folder, read as `files/read` reads one for an agent.
     static let pinsRead = "pins/read"
@@ -72,6 +74,19 @@ public extension DaemonAPI {
         public init(folder: URL, path: String) {
             self.folder = folder
             self.path = path
+        }
+    }
+
+    /// Hide or show one of a project's server views (#2032), by its `ui://` address.
+    struct PinHideViewRequest: Codable, Sendable, Hashable {
+        public var folder: URL
+        public var uri: String
+        public var hidden: Bool
+
+        public init(folder: URL, uri: String, hidden: Bool) {
+            self.folder = folder
+            self.uri = uri
+            self.hidden = hidden
         }
     }
 
@@ -151,12 +166,16 @@ public extension DaemonAPI {
         public var sessions: [UUID]?
         /// The pinned workflows' ids in their order (#432). Nil from a host with none.
         public var workflows: [String]?
+        /// The servers' list views (#2032), the hidden ones marked. Nil from a host with none.
+        public var views: [PinView]?
 
-        public init(folder: URL, pins: [PinView], sessions: [UUID] = [], workflows: [String] = []) {
+        public init(folder: URL, pins: [PinView], sessions: [UUID] = [], workflows: [String] = [],
+                    views: [PinView] = []) {
             self.folder = folder
             self.pins = pins
             self.sessions = sessions.isEmpty ? nil : sessions
             self.workflows = workflows.isEmpty ? nil : workflows
+            self.views = views.isEmpty ? nil : views
         }
     }
 

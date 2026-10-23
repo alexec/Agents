@@ -83,6 +83,45 @@ export function PinnedPageRows({ store, host, folder, chosen, down }: {
   );
 }
 
+/** A connected server's list views (#2032), after the project's pins: a row each, named by the service
+ *  ("GitHub · Issues"), without a pin. Its menu hides one; the project's menu shows them again. */
+export function ServerViewRows({ store, host, folder, chosen, down }: {
+  store: Store; host: string; folder: string; chosen: string | undefined; down: boolean;
+}) {
+  const views = store.serverViewsIn(host, folder).filter((v) => !v.hidden);
+  if (views.length === 0) return null;
+  const menu = (view: PinView): MenuItem[] => [
+    { label: "Open", run: () => go({ host, project: folder, page: view.path }) },
+    { label: "Hide", disabled: down, help: "Take this view out of the sidebar; the project's menu shows it again",
+      run: () => void store.setViewHidden(host, folder, view.path, true) },
+  ];
+  return (
+    <div class="group pins server-views" role="group" aria-label="Server views">
+      {views.map((view) => (
+        <div class="nav-item" key={view.path}
+          onContextMenu={(e) => openContextMenu(e, menu(view))}
+          onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu(view)); }} {...holdForMenu(() => menu(view))}>
+          <div class={`row pin${chosen === view.path ? " chosen" : ""}`}>
+            <button class="pick" aria-current={chosen === view.path} title={view.path}
+              onClick={() => go({ host, project: folder, page: view.path })}>
+              <span class="pin-mark" aria-hidden="true">{pinMark(view)}</span>
+              <span class="title">{view.title}</span>
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The project menu's Show Hidden Views (#2032), or nothing when none is hidden. */
+export function showHiddenViewsItem(store: Store, host: string, folder: string, down: boolean): MenuItem[] {
+  const hidden = store.serverViewsIn(host, folder).filter((v) => v.hidden);
+  if (hidden.length === 0) return [];
+  return [{ label: `Show Hidden Views (${hidden.length})`, disabled: down, help: "Put this project's hidden server views back in the sidebar",
+    run: () => { for (const v of hidden) void store.setViewHidden(host, folder, v.path, false); } }];
+}
+
 function pinMark(pin: PinView): string {
   return pin.kind === "view" ? "◇" : pin.kind === "html" ? "◍" : "▤";
 }
@@ -95,7 +134,7 @@ type Shown =
 export function PinnedPage({ store, host, folder, path, down }: {
   store: Store; host: string; folder: string; path: string; down: boolean;
 }) {
-  const pin = store.pinsIn(host, folder).find((p) => p.path === path);
+  const pin = store.pinOrViewIn(host, folder, path);
   if (pin?.view || path.startsWith("ui://")) {
     return <PinnedViewPage store={store} host={host} folder={folder} path={path} pin={pin} down={down} />;
   }

@@ -491,6 +491,8 @@ struct ProjectFold: View {
                 // searching: the search is for sessions.
                 if fold.showsPinnedPages {
                     PinnedPageRows(project: key)
+                    // Then its servers' list views, without a pin (#2032).
+                    ServerViewRows(project: key)
                 }
                 // Its pinned sessions and workflows are in Pinned at the top (#495).
                 // Then every other live session, newest first, its state a mark on the
@@ -787,6 +789,7 @@ private struct ProjectMenu: View {
         // A drag onto the row goes to the drop box's top; this names a folder in it.
         Button("Put Files in Drop Box…") { requests.dropboxProject = summary.key }
             .disabled(model.hostUnreachable(summary.host) || !summary.exists)
+        ShowHiddenViewsButton(project: summary.key)
         // This Mac's repository, sent to a server and added there (#1123).
         if model.canSend(from: summary.host) {
             ForEach(model.sendTargets, id: \.self) { host in
