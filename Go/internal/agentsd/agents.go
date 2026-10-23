@@ -523,6 +523,12 @@ func (d *Daemon) delete(id wire.UUID) error {
 // deleteArchived removes an archived agent, its folder and its turns; because is who or
 // what deleted it ("person", or "retention" for the sweep).
 func (d *Daemon) deleteArchived(a *wire.Agent, because string) error {
+	return d.deleteArchivedThen(a, because, func(a *wire.Agent) { d.queueErasure(a) })
+}
+
+// deleteArchivedThen is deleteArchived, with erase to queue the runtime's copy: a sweep
+// collects them, to queue many at once (#2427).
+func (d *Daemon) deleteArchivedThen(a *wire.Agent, because string, erase func(*wire.Agent)) error {
 	d.mu.Lock()
 	l := d.lives[a.ID]
 	delete(d.lives, a.ID)
@@ -535,8 +541,9 @@ func (d *Daemon) deleteArchived(a *wire.Agent, because string) error {
 		return &Error{Code: wire.FailureCouldNotSave, Message: "The agent could not be deleted: " + err.Error()}
 	}
 	// The runtime's own copy goes next, and a backup never brings the agent back (#1001).
+	erase(a)
 	copyOf := "none"
-	if d.queueErasure(a) {
+	if hasRuntimeCopy(a) {
 		copyOf = "queued"
 	}
 	Broadcast(d, wire.NotifyAgentRemoved, wire.AgentRemovedNotification{AgentID: a.ID})

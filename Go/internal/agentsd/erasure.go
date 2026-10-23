@@ -10,10 +10,12 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/agentsd/acp"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
@@ -29,6 +31,9 @@ import (
 //     could not be erased is tried again at the next start, erasureTries times at most.
 //   - erased.json is every agent this machine deleted, so a restore skips it. Backups carry
 //     it, and a restore adds the backup's to this machine's.
+//
+// A sweep of many agents costs one runtime start per runtime and account, none for an
+// adapter that said it cannot delete, and one rewrite of each file per batch (#2427).
 const (
 	erasuresFile = "erasures.json"
 	erasedFile   = "erased.json"
@@ -51,11 +56,30 @@ type erasure struct {
 }
 
 // eraser is the Daemon's queue state. mu guards both files; busy is whether the eraser is
-// taking an entry, for a test to wait on.
+// taking an entry, for a test to wait on. cannotDelete is each adapter install that said it
+// cannot delete a session, by adapterKey; only eraseLoop reads and writes it.
 type eraser struct {
-	mu   sync.Mutex
-	kick chan struct{}
-	busy bool
+	mu           sync.Mutex
+	kick         chan struct{}
+	busy         bool
+	cannotDelete map[string]bool
+}
+
+// writeErasureFile writes erasures.json and erased.json; a test counts the writes.
+var writeErasureFile = store.WriteAtomically
+
+// adapterKey names a runtime's adapter as installed: its path and when it last changed, so
+// an update is asked again. It is "" when the adapter is not found.
+func adapterKey(rt *runtimeDef) string {
+	path, _, _ := locateFor(rt)
+	if path == "" {
+		return ""
+	}
+	at := ""
+	if st, err := os.Stat(path); err == nil {
+		at = st.ModTime().UTC().Format(time.RFC3339Nano) + "/" + strconv.FormatInt(st.Size(), 10)
+	}
+	return rt.ID + "\x00" + path + "\x00" + at
 }
 
 // erasing is whether the eraser runs. A test turns it on when it says so, so that no test
@@ -97,17 +121,39 @@ func (d *Daemon) startErasures() {
 	d.erasures.kick <- struct{}{}
 }
 
+// hasRuntimeCopy is whether the runtime holds a copy of an agent's conversation to erase.
+func hasRuntimeCopy(a *wire.Agent) bool {
+	return a.RuntimeSessionID != nil && *a.RuntimeSessionID != ""
+}
+
 // queueErasure adds the runtime's copy of a deleted agent, and puts it on the erased list.
 // It says whether there was a copy to queue.
 func (d *Daemon) queueErasure(a *wire.Agent) bool {
+	d.queueErasures([]*wire.Agent{a})
+	return hasRuntimeCopy(a)
+}
+
+// queueErasures is queueErasure for many deleted agents, with one rewrite of each file.
+func (d *Daemon) queueErasures(agents []*wire.Agent) {
+	if len(agents) == 0 {
+		return
+	}
 	d.erasures.mu.Lock()
 	defer d.erasures.mu.Unlock()
-	d.noteErasedLocked(map[wire.UUID]time.Time{a.ID: nowFunc()})
-	if a.RuntimeSessionID == nil || *a.RuntimeSessionID == "" {
-		return false
+	erased := map[wire.UUID]time.Time{}
+	var add []erasure
+	for _, a := range agents {
+		erased[a.ID] = nowFunc()
+		if hasRuntimeCopy(a) {
+			add = append(add, erasure{AgentID: a.ID, RuntimeID: a.RuntimeID, SessionID: *a.RuntimeSessionID,
+				AccountID: a.AccountID, QueuedAt: nowFunc()})
+		}
 	}
-	q := append(d.readErasures(), erasure{AgentID: a.ID, RuntimeID: a.RuntimeID, SessionID: *a.RuntimeSessionID,
-		AccountID: a.AccountID, QueuedAt: nowFunc()})
+	d.noteErasedLocked(erased)
+	if len(add) == 0 {
+		return
+	}
+	q := append(d.readErasures(), add...)
 	if over := len(q) - erasuresMost; over > 0 {
 		log.Printf("erasure: the queue is full; %d older copies will not be erased", over)
 		q = q[over:]
@@ -117,11 +163,12 @@ func (d *Daemon) queueErasure(a *wire.Agent) bool {
 	case d.erasures.kick <- struct{}{}:
 	default:
 	}
-	return true
 }
 
 // eraseLoop takes the queue's entries in turn each time it is kicked. An entry that fails
-// stays, with one more try, for the next start: it is not tried again in this run.
+// stays, with one more try, for the next start: it is not tried again in this run. The
+// entries of one pass share a runtime session per runtime and account, and what they came
+// to is written once, at the end of the pass, or every eraseBatch entries.
 func (d *Daemon) eraseLoop() {
 	tried := map[erasure]bool{}
 	for {
@@ -134,6 +181,8 @@ func (d *Daemon) eraseLoop() {
 		todo := d.readErasures()
 		d.erasures.busy = len(todo) > 0
 		d.erasures.mu.Unlock()
+		p := &erasePass{d: d, sessions: map[string]*passSession{}}
+		results := map[erasure]bool{}
 		for _, e := range todo {
 			if d.ctx.Err() != nil {
 				break
@@ -143,31 +192,114 @@ func (d *Daemon) eraseLoop() {
 				continue
 			}
 			tried[key] = true
-			done := d.erase(e)
-			d.erasures.mu.Lock()
-			q := d.readErasures()
-			for i := range q {
-				if q[i].AgentID == e.AgentID && q[i].SessionID == e.SessionID {
-					if done {
-						q = slices.Delete(q, i, i+1)
-					} else {
-						q[i].Tries++
-					}
-					break
-				}
+			results[key] = d.erase(p, e)
+			if len(results) >= eraseBatch {
+				d.noteErasures(results)
+				results = map[erasure]bool{}
 			}
-			d.writeErasures(q)
-			d.erasures.mu.Unlock()
 		}
+		p.stop()
 		d.erasures.mu.Lock()
+		d.noteErasuresLocked(results)
 		d.erasures.busy = false
 		d.erasures.mu.Unlock()
 	}
 }
 
+// eraseBatch is how many erased entries a pass takes before it writes erasures.json.
+const eraseBatch = 50
+
+func (d *Daemon) noteErasures(results map[erasure]bool) {
+	d.erasures.mu.Lock()
+	defer d.erasures.mu.Unlock()
+	d.noteErasuresLocked(results)
+}
+
+// noteErasuresLocked drops the queue's entries that were erased and counts a try on the rest.
+func (d *Daemon) noteErasuresLocked(results map[erasure]bool) {
+	if len(results) == 0 {
+		return
+	}
+	q := d.readErasures()
+	kept := q[:0]
+	for _, e := range q {
+		done, ok := results[erasure{AgentID: e.AgentID, SessionID: e.SessionID}]
+		switch {
+		case !ok:
+		case done:
+			continue
+		default:
+			e.Tries++
+		}
+		kept = append(kept, e)
+	}
+	d.writeErasures(kept)
+}
+
+// erasePass is one pass of the eraser: the runtime sessions it started, one per runtime and
+// account, kept for the pass's other entries and stopped at its end.
+type erasePass struct {
+	d        *Daemon
+	sessions map[string]*passSession
+}
+
+// passSession is a runtime started for a pass, or why it could not be.
+type passSession struct {
+	s   *acp.Session
+	err error
+}
+
+// session is the pass's runtime session for an entry, started the first time it is asked
+// for. It is nil, with no error, when the adapter is known not to delete.
+func (p *erasePass) session(e erasure, account *wire.AccountProfile) (*acp.Session, error) {
+	if e.AccountID != nil && account == nil {
+		return nil, errors.New("its account was removed")
+	}
+	key := e.RuntimeID
+	if e.AccountID != nil {
+		key += "\x00" + *e.AccountID
+	}
+	if ps, ok := p.sessions[key]; ok {
+		return ps.s, ps.err
+	}
+	rt := runtimeByID(e.RuntimeID)
+	adapter := ""
+	if rt != nil {
+		adapter = adapterKey(rt)
+	}
+	if adapter != "" && p.d.erasures.cannotDelete[adapter] {
+		p.sessions[key] = &passSession{}
+		return nil, nil
+	}
+	ctx, cancel := context.WithTimeout(p.d.ctx, erasureWait)
+	defer cancel()
+	s, _, err := p.d.handshakeAs(ctx, e.RuntimeID, account, &probe{commands: make(chan []wire.SlashCommand, 1)})
+	ps := &passSession{s: s, err: err}
+	if err == nil && !s.CanDelete() {
+		s.Stop()
+		ps.s = nil
+		if adapter != "" {
+			if p.d.erasures.cannotDelete == nil {
+				p.d.erasures.cannotDelete = map[string]bool{}
+			}
+			p.d.erasures.cannotDelete[adapter] = true
+		}
+	}
+	p.sessions[key] = ps
+	return ps.s, ps.err
+}
+
+func (p *erasePass) stop() {
+	for _, ps := range p.sessions {
+		if ps.s != nil {
+			ps.s.Stop()
+		}
+	}
+}
+
 // erase asks the runtime to delete its copy, then removes the files known for it. It is
 // done when the runtime deleted it, or when the runtime's files are known and removed.
-func (d *Daemon) erase(e erasure) bool {
+func (d *Daemon) erase(p *erasePass, e erasure) bool {
 	ctx, cancel := context.WithTimeout(d.ctx, erasureWait)
 	defer cancel()
 	var account *wire.AccountProfile
@@ -180,7 +312,7 @@ func (d *Daemon) erase(e erasure) bool {
 			env = l.Env
 		}
 	}
-	asked := d.eraseInRuntime(ctx, e, account)
+	asked := d.eraseInRuntime(ctx, p, e, account)
 	if asked != nil {
 		log.Printf("erasure: %s did not delete agent %s's conversation: %v", e.RuntimeID, e.AgentID, asked)
 	}
@@ -193,17 +325,10 @@ func (d *Daemon) erase(e erasure) bool {
 
 // eraseInRuntime is session/delete on the runtime, started as the agent ran. A runtime
 // that cannot delete a conversation is not an error: nothing more can be asked of it.
-func (d *Daemon) eraseInRuntime(ctx context.Context, e erasure, account *wire.AccountProfile) error {
-	if e.AccountID != nil && account == nil {
-		return errors.New("its account was removed")
-	}
-	s, _, err := d.handshakeAs(ctx, e.RuntimeID, account, &probe{commands: make(chan []wire.SlashCommand, 1)})
-	if err != nil {
+func (d *Daemon) eraseInRuntime(ctx context.Context, p *erasePass, e erasure, account *wire.AccountProfile) error {
+	s, err := p.session(e, account)
+	if err != nil || s == nil {
 		return err
-	}
-	defer s.Stop()
-	if !s.CanDelete() {
-		return nil
 	}
 	return s.DeleteSession(ctx, e.SessionID)
 }
@@ -286,7 +411,7 @@ func (d *Daemon) writeErasures(q []erasure) {
 		return
 	}
 	b, _ := json.Marshal(q)
-	if err := store.WriteAtomically(d.erasuresPath(), b, 0o600); err != nil {
+	if err := writeErasureFile(d.erasuresPath(), b, 0o600); err != nil {
 		log.Printf("erasures.json: %v", err)
 	}
 }
@@ -322,7 +447,7 @@ func (d *Daemon) noteErasedLocked(add map[wire.UUID]time.Time) {
 		}
 	}
 	b, _ := json.Marshal(list)
-	if err := store.WriteAtomically(d.erasedPath(), b, 0o600); err != nil {
+	if err := writeErasureFile(d.erasedPath(), b, 0o600); err != nil {
 		log.Printf("erased.json: %v", err)
 	}
 }
