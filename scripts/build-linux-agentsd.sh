@@ -23,6 +23,11 @@
 set -euo pipefail
 
 root=${0:A:h:h}
+# Stop at once, not with Go's "go.mod file not found" after the steps before it (#2221).
+if [[ $(uname -s) == Darwin && $root/ != $HOME/* ]]; then
+    print -u2 "build-linux-agentsd: $root is not under $HOME, and Go's container sees only the home folder: make the checkout under it (e.g. git worktree add --detach ~/.agents/scratch/<name> <ref>)"
+    exit 1
+fi
 check=0
 [[ ${1:-} == --check ]] && { check=1; shift }
 
