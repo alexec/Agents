@@ -31,7 +31,7 @@ type Views interface {
 	ReplyInThread(ctx context.Context, repo string, number, commentID int, body string) (map[string]any, error)
 }
 
-// Board is the open pull requests, newest updated first, and who is signed in.
+// Board is the open pull requests, newest created first, and who is signed in.
 type Board struct {
 	Viewer string
 	PRs    []BoardPR
@@ -253,7 +253,7 @@ func conflictsOf(mergeable string) *bool {
 // MARK: The board
 
 const boardQuery = `query($owner: String!, $name: String!) { viewer { login } repository(owner: $owner, name: $name) {
-  pullRequests(states: OPEN, first: 100, orderBy: {field: UPDATED_AT, direction: DESC}) { nodes {
+  pullRequests(states: OPEN, first: 100, orderBy: {field: CREATED_AT, direction: DESC}) { nodes {
     number title url headRefName baseRefName isDraft updatedAt mergeable reviewDecision
     author { login __typename } autoMergeRequest { enabledAt } ` + rollupFields + ` } } } }`
 
@@ -304,12 +304,13 @@ func (g *RealGitHub) BoardPRs(ctx context.Context, repo string) (Board, error) {
 
 // MARK: Issues
 
+// OpenIssues are the open issues, newest created first, at most 100.
 func (g *RealGitHub) OpenIssues(ctx context.Context, repo, label string) ([]ListedIssue, error) {
 	if _, _, err := ownerName(repo); err != nil {
 		return nil, err
 	}
 	// The listing has pull requests in it too: up to three pages, for 100 issues.
-	q := fmt.Sprintf("state=open&sort=updated&direction=desc&per_page=%d", perPage)
+	q := fmt.Sprintf("state=open&sort=created&direction=desc&per_page=%d", perPage)
 	if label != "" {
 		q += "&labels=" + url.QueryEscape(label)
 	}

@@ -57,11 +57,11 @@ func (m mergeRequest) review() string {
 	return ""
 }
 
-// Board is the open merge requests, newest updated first, each with its head commit's
+// Board is the open merge requests, newest created first, each with its head commit's
 // pipeline, and who is signed in.
 func (g *RealGitLab) Board(ctx context.Context, project string) (map[string]any, error) {
 	var mrs []mergeRequest
-	if err := g.get(ctx, fmt.Sprintf("projects/%s/merge_requests?state=opened&order_by=updated_at&sort=desc&per_page=100", pid(project)), false, &mrs); err != nil {
+	if err := g.get(ctx, fmt.Sprintf("projects/%s/merge_requests?state=opened&order_by=created_at&sort=desc&per_page=100", pid(project)), false, &mrs); err != nil {
 		return nil, err
 	}
 	// One listing of the newest pipelines, not one call a merge request: each one's is its
@@ -105,9 +105,9 @@ func (g *RealGitLab) Board(ctx context.Context, project string) (map[string]any,
 
 // MARK: Issues
 
-// OpenIssues are the open issues, newest updated first, at most 100, with label's only when it is set.
+// OpenIssues are the open issues, newest created first, at most 100, with label's only when it is set.
 func (g *RealGitLab) OpenIssues(ctx context.Context, project, label string) (map[string]any, error) {
-	path := fmt.Sprintf("projects/%s/issues?state=opened&order_by=updated_at&sort=desc&per_page=100", pid(project))
+	path := fmt.Sprintf("projects/%s/issues?state=opened&order_by=created_at&sort=desc&per_page=100", pid(project))
 	if label != "" {
 		path += "&labels=" + url.QueryEscape(label)
 	}

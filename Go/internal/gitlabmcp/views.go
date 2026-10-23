@@ -76,7 +76,7 @@ func addViews(server *mcp.Server, g *RealGitLab, projectOf func(context.Context,
 	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true}
 
 	tool(server, &mcp.Tool{Name: "show_merge_requests", Title: "Show merge requests",
-		Description: "The project's open merge requests, newest updated first, at most 100, each with its head commit's pipeline " +
+		Description: "The project's open merge requests, newest created first, at most 100, each with its head commit's pipeline " +
 			"(passing, failing, running or none), whether it conflicts with its target, whether approvals are missing, and whether " +
 			"auto-merge is on. Its view is the Merge requests page, where a person opens a merge request's page.",
 		Annotations: readOnly, Meta: uiMeta(mrsURI, "model", "app")},
@@ -89,7 +89,7 @@ func addViews(server *mcp.Server, g *RealGitLab, projectOf func(context.Context,
 		})
 
 	tool(server, &mcp.Tool{Name: "show_issues", Title: "Show issues",
-		Description: "The project's open issues, newest updated first, at most 100, each with its labels, assignees (usernames) " +
+		Description: "The project's open issues, newest created first, at most 100, each with its labels, assignees (usernames) " +
 			"and comment count. Its view is the Issues page, with Start Agent on each issue.",
 		Annotations: readOnly, Meta: uiMeta(issuesURI, "model", "app")},
 		func(ctx context.Context, in issuesViewArgs) (map[string]any, error) {
@@ -173,9 +173,9 @@ func addViews(server *mcp.Server, g *RealGitLab, projectOf func(context.Context,
 	// No network at all: an empty csp, so the host draws them under its strictest policy.
 	meta := mcp.Meta{"ui": map[string]any{"csp": map[string]any{}, "prefersBorder": true}}
 	for _, v := range []struct{ uri, name, title, description, file string }{
-		{mrsURI, "merge-requests", "Merge requests", "The project's open merge requests, with their pipeline, conflict, approvals " +
+		{mrsURI, "merge-requests", "Merge requests", "The project's open merge requests, newest created first, with their pipeline, conflict, approvals " +
 			"and auto-merge; a merge request opens its page. Fed by show_merge_requests.", "mrs.html"},
-		{issuesURI, "issues", "Issues", "The project's open issues, with their labels and assignees, and Start Agent; a label narrows " +
+		{issuesURI, "issues", "Issues", "The project's open issues, newest created first, with their labels and assignees, and Start Agent; a label narrows " +
 			"the list. Fed by show_issues.", "issues.html"},
 		{mrURI, "mr", "Merge request", "One merge request's page: description, comments, discussions on lines, files with the app's " +
 			"diff, and its pipeline with a failed job's log, with Comment, Approve, Merge, Auto-merge and Ask an Agent. Fed by show_merge_request.", "mr.html"},
