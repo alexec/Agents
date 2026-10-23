@@ -401,7 +401,7 @@ final class VoiceMode {
             self.approving = nil
             speak(["Not allowed."])
             Task { [weak self] in
-                if await self?.approve?(request, optionID) != true { self?.sound(.problem) }
+                if await self?.approve?(request, optionID) != true { self?.answerDidNotGo() }
             }
         }
     }
@@ -485,16 +485,24 @@ final class VoiceMode {
             self.approving = nil
             heard = ""
             pauseTimer?.cancel()
-            let sent = await send()
+            let sent = walkSendFails ? false : await send()
             if sent {
                 // The turn goes on, and its reply is said when it ends.
                 isWaitingForReply = true
                 sawWork = false
                 turnAtSend = latestTurn
             } else {
-                sound(.problem)
+                answerDidNotGo()
             }
         }
+    }
+
+    /// An answer that did not go: the question is not read again (it is in `asked`), so
+    /// the voice says where it is (#2442).
+    private func answerDidNotGo() {
+        guard phase != .off else { return }
+        sound(.problem)
+        speak([VoiceModeWords.answerNotSent])
     }
 
     // MARK: Listening

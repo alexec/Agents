@@ -9,4 +9,9 @@ struct VoiceModeWordsTests {
         #expect(VoiceModeWords.notSent == "Not sent. Say it again.")
         #expect(VoiceModeWords.unsent("Fix the bug") == "Not sent: “Fix the bug”. Say it again.")
     }
+
+    /// #2442: an answer by voice that did not go says where it is.
+    @Test func anAnswerThatDidNotGoSaysItIsOnTheScreen() {
+        #expect(VoiceModeWords.answerNotSent == "The answer did not go. It is on the screen.")
+    }
 }
