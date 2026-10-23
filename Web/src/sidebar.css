@@ -83,13 +83,13 @@
 .with-sidebar .sidebar .title.placed :is(.place, .started-by) { flex: none; white-space: pre; }
 .with-sidebar .sidebar .title.placed .place { max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
 
-/* A session's mark in the sidebar (#495): an orange hand, the working ring (#2044, #2332), a list when queued, an
-   Zs (#765), a pause mark (#630), a tick once done, read or not (#1323, #2363); every icon in the
+/* A session's mark in the sidebar (#495): an orange hand, the working ring (#2044, #2332), a list when queued,
+   a breathing dot (#2456), a pause mark (#630), a tick once done, read or not (#1323, #2363); every icon in the
    accent but what lists it under Needs You (#817). */
 .sidebar-mark { width: 1rem; height: 1rem; margin-top: 1px; box-sizing: border-box;
   display: inline-flex; align-items: center; justify-content: center; color: var(--accent); }
 .sidebar-mark.needsYou { color: var(--tint-attention); font-size: 0.8125rem; }
-.sidebar-mark.queued, .sidebar-mark.waiting, .sidebar-mark.paused, .sidebar-mark.done { font-size: 0.75rem; }
+.sidebar-mark.queued, .sidebar-mark.paused, .sidebar-mark.done { font-size: 0.75rem; }
 /* Archiving needs approval (#584): the window's archive box, in the attention tint, as it is
    listed under Needs You (#817). */
 .sidebar-mark.asksToArchive { color: var(--tint-attention); font-size: 0.75rem; }
