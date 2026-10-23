@@ -173,9 +173,7 @@ public struct ToolCall: Codable, Hashable, Sendable {
         if called.hasSuffix(AppTool.archiveSession) || AppTool.retiredOwnArchive.contains(where: called.hasSuffix) {
             return rawInput?["id"]?.stringValue?.isEmpty ?? true
         }
-        if called.hasSuffix(AppTool.waitForEvent) {
-            return rawInput?["agents"] != nil || (rawInput?["events"] == nil && rawInput?["until_minutes"] != nil)
-        }
+        if called.hasSuffix(AppTool.waitForAgents) || called.hasSuffix(AppTool.checkAgain) { return true }
         return false
     }
 

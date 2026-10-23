@@ -146,7 +146,7 @@ public enum EventCatalogue {
                   "An agent in this project is asking for permission."),
         EventKind("agent.asked_form", .project, about(),
                   "An agent in this project raised a form to fill in."),
-        EventKind("agent.blocked", .project, about(EventDetail("waiting_on")),
+        EventKind("agent.waiting", .project, about(EventDetail("waiting_on")),
                   "An agent in this project ended its turn waiting on something."),
         EventKind("agent.stopped", .project, about(EventDetail("by", values: ["you", "admin", "cost_limit", "unknown"])),
                   "An agent in this project was stopped before finishing."),
@@ -161,7 +161,7 @@ public enum EventCatalogue {
         EventKind("agent.deleted", .project, about(EventDetail("because", values: ["age", "person"])),
                   "An archived agent was deleted with its conversation."),
         EventKind("project.idle", .project,
-                  shown("agents", "finished", "blocked", "waiting_on_you", "stopped", "failed", "since", "ids"),
+                  shown("agents", "finished", "waiting", "waiting_on_you", "stopped", "failed", "since", "ids"),
                   "Every agent in this project has stopped working."),
         EventKind("workflow.ran", .project, shown("workflow", "agent"), "A workflow in this project started an agent."),
         EventKind("workflow.completed", .project, shown("workflow", "agent") + [outcome],
@@ -327,7 +327,7 @@ public enum EventList {
         lines += unlisted
         lines.append("A subject with .* matches all of its events, e.g. agent.*; for an MCP server's noun, all of "
                      + "that noun's events. A list in where matches any of its values, e.g. why: [locked, idle]. "
-                     + "To wait for particular agents, use wait_for_event with agents.")
+                     + "To wait for particular agents, use wait_for_agents.")
         return lines.joined(separator: "\n")
     }
 

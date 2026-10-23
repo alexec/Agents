@@ -80,9 +80,9 @@ struct AgentGroupTests {
 
     /// Only a question needs the person (#1916): a block on nothing the app watches is done.
     @Test func manualBlocksAreDoneAndAutomaticWaitsWait() {
-        var blocked = agent(.finished, report: .blocked, endedReason: .endTurn)
+        var blocked = agent(.finished, report: .waiting, endedReason: .endTurn)
         #expect(blocked.group() == .finished)
-        blocked.report = WorkReport(outcome: .blocked, message: "Waiting", at: Date(),
+        blocked.report = WorkReport(outcome: .waiting, message: "Waiting", at: Date(),
                                     block: Block(checkAgainAt: Date().addingTimeInterval(600)))
         #expect(blocked.group() == .waiting)
         blocked.isUnread = true

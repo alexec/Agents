@@ -96,10 +96,10 @@ struct WebFixturesTests {
             ("finished, nothing said, read", agent(7, .finished, endedReason: .endTurn)),
             ("finished, unread", agent(8, .finished, isUnread: true, endedReason: .endTurn)),
             ("finished, needs an answer", agent(9, .finished, report: report(.needsAnswer))),
-            ("blocked on agents", agent(12, .finished, report: report(.blocked, block: waits))),
-            ("blocked until a time", agent(13, .finished, report: report(.blocked, block: later))),
-            ("blocked on nothing named", agent(14, .finished, report: report(.blocked))),
-            ("blocked, cleared", agent(15, .finished, report: report(.blocked, block: cleared))),
+            ("blocked on agents", agent(12, .finished, report: report(.waiting, block: waits))),
+            ("blocked until a time", agent(13, .finished, report: report(.waiting, block: later))),
+            ("blocked on nothing named", agent(14, .finished, report: report(.waiting))),
+            ("blocked, cleared", agent(15, .finished, report: report(.waiting, block: cleared))),
             ("finished, waiting on events", agent(16, .finished, endedReason: .endTurn, eventWait: openWait)),
             ("finished, wait on events ended", agent(17, .finished, endedReason: .endTurn, eventWait: endedWait)),
             ("asked how it went, said nothing", agent(18, .finished, endedReason: .endTurn, outcomeAsked: true)),
@@ -250,11 +250,11 @@ struct WebFixturesTests {
             ("cleared", Block(waits: [one, two], clearedAt: Self.at(4), clearedBy: .waits)),
         ]
         var blocked = blocks.map { name, block in
-            (name, Self.agent(62, .finished, title: "Lead", report: Self.report(.blocked, "Waiting on the haikus.", block: block)))
+            (name, Self.agent(62, .finished, title: "Lead", report: Self.report(.waiting, "Waiting on the haikus.", block: block)))
         }
-        blocked.append(("blocked on nothing named", Self.agent(62, .finished, title: "Lead", report: Self.report(.blocked))))
+        blocked.append(("blocked on nothing named", Self.agent(62, .finished, title: "Lead", report: Self.report(.waiting))))
         blocked.append(("blocked, still running", Self.agent(62, .running, title: "Lead",
-                                                             report: Self.report(.blocked, block: Block(waits: [one])))))
+                                                             report: Self.report(.waiting, block: Block(waits: [one])))))
         let cases = try blocked.map { name, agent in
             Case(name: name, input: .object([
                 "agents": .array(try [running, done, agent].map(Self.encode)), "agentID": .string(agent.id.uuidString)]))

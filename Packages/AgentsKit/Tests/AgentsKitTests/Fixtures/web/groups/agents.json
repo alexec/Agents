@@ -334,7 +334,7 @@
             ]
           },
           "message" : "It went.",
-          "outcome" : "blocked"
+          "outcome" : "waiting"
         },
         "runtimeID" : "claude",
         "startOptions" : {
@@ -381,7 +381,7 @@
             ]
           },
           "message" : "It went.",
-          "outcome" : "blocked"
+          "outcome" : "waiting"
         },
         "runtimeID" : "claude",
         "startOptions" : {
@@ -422,7 +422,7 @@
         "report" : {
           "at" : 812500060,
           "message" : "It went.",
-          "outcome" : "blocked"
+          "outcome" : "waiting"
         },
         "runtimeID" : "claude",
         "startOptions" : {
@@ -473,7 +473,7 @@
             ]
           },
           "message" : "It went.",
-          "outcome" : "blocked"
+          "outcome" : "waiting"
         },
         "runtimeID" : "claude",
         "startOptions" : {

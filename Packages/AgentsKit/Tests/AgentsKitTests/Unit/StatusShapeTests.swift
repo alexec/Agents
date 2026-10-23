@@ -51,28 +51,28 @@ struct StatusShapeTests {
 
     /// A block the app will not clear (an old record's) is done: only a question needs the
     /// person (#1916).
-    @Test("A turn that ended blocked on nothing is done, and wants nobody")
+    @Test("A turn that ended waiting on nothing is done, and wants nobody")
     func blocked() {
-        let shape = StatusShape(state: .finished, outcome: .blocked, isWaiting: false, isComingBack: false)
+        let shape = StatusShape(state: .finished, outcome: .waiting, isWaiting: false, isComingBack: false)
         #expect(shape == .done)
         #expect(!shape.wantsAPerson)
-        #expect(StatusShape(state: .stopped, outcome: .blocked, isWaiting: false, isComingBack: false,
+        #expect(StatusShape(state: .stopped, outcome: .waiting, isWaiting: false, isComingBack: false,
                             endedReason: .cancelled) == .stopped)
-        #expect(StatusShape(state: .running, outcome: .blocked, isWaiting: false, isComingBack: false) == .working)
+        #expect(StatusShape(state: .running, outcome: .waiting, isWaiting: false, isComingBack: false) == .working)
     }
 
     /// Something the app watches will carry it on: its own shape, apart from Blocked,
     /// and no colour. Wanting a person still outranks it.
     @Test("A turn the app will carry on is waiting, and wants nobody")
     func waiting() {
-        let shape = StatusShape(state: .finished, outcome: .blocked, isWaiting: true, isComingBack: false)
+        let shape = StatusShape(state: .finished, outcome: .waiting, isWaiting: true, isComingBack: false)
         #expect(shape == .waiting)
         #expect(!shape.wantsAPerson)
         // Drawn as the breathing dot, not a symbol (#2456).
         #expect(shape.symbol == nil)
         #expect(StatusShape(state: .finished, outcome: .done, isWaiting: true, isComingBack: false) == .waiting)
         #expect(StatusShape(state: .finished, outcome: .needsAnswer, isWaiting: true, isComingBack: false) == .needsYou)
-        #expect(StatusShape(state: .stopped, outcome: .blocked, isWaiting: true, isComingBack: false,
+        #expect(StatusShape(state: .stopped, outcome: .waiting, isWaiting: true, isComingBack: false,
                             endedReason: .cancelled) == .stopped)
     }
 

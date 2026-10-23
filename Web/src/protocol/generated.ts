@@ -7629,14 +7629,14 @@ export type Weekday =
   | "sat";
 
 /**
- * How a turn ended (#1916): only a question needs the person. An old record's `stuck` or
- * `partly_done` (finish_turn's, before #494) reads as `done`.
+ * How a turn ended (#1916): only a question needs the person. Old `blocked` reads as `waiting`; old
+ * `stuck` or `partly_done` reads as `done`.
  */
 export type WorkOutcome =
   | "done"
   | "nothing_to_do"
   | "needs_answer"
-  | "blocked";
+  | "waiting";
 
 export interface WorkReport {
   outcome: WorkOutcome;

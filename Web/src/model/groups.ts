@@ -23,9 +23,9 @@ export function outcomeNeedsAPerson(outcome: WorkOutcome): boolean {
   return outcome === "needs_answer";
 }
 
-/** A blocked report whose block has not cleared (WorkReport.isOpenBlock). */
+/** A waiting report whose block has not cleared (WorkReport.isOpenBlock). */
 export function isOpenBlock(report: WorkReport | undefined): boolean {
-  return report?.outcome === "blocked" && report.block?.clearedAt === undefined;
+  return report?.outcome === "waiting" && report.block?.clearedAt === undefined;
 }
 
 /** An open block the app clears by itself: it names agents, or a time (WorkReport.resumesByItself). */

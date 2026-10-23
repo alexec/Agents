@@ -90,13 +90,18 @@ public enum AppTool {
     /// What can be leased on this Mac, and who holds what.
     public static let listResources = "list_resources"
 
-    // Three for waiting on what happens, and saying that something has (042). Offered
-    // to every agent, including one another agent started. None of the three names
-    // ends with another tool's name, which is how the app tells tools apart (see 036's
-    // release_resource).
+    // Four for waiting on what happens, and saying that something has (042, #1915). Offered
+    // to every agent, including one another agent started. None of the names is a suffix of
+    // another, which is how the app tells tools apart (see 036's release_resource).
 
-    /// Wait for an event, read the recent ones, or list what can be waited on.
+    /// Wait for an event in this project or on this Mac.
     public static let waitForEvent = "wait_for_event"
+
+    /// Wait for sessions in this project to finish.
+    public static let waitForAgents = "wait_for_agents"
+
+    /// Resume after a set number of minutes.
+    public static let checkAgain = "check_again"
 
     /// Stop waiting.
     public static let cancelWait = "cancel_wait"
@@ -155,7 +160,7 @@ public enum AppTool {
     /// Every tool the app's MCP server serves.
     public static let all: [String] = [
         finishTurn, showFile, manageWorkflows, askQuestion, suggestNextPrompt, hangUp, startSession, stopSession, archiveSession,
-        leaseResource, releaseResource, listResources, waitForEvent,
+        leaseResource, releaseResource, listResources, waitForEvent, waitForAgents, checkAgain,
         cancelWait, listSessions, readSession,
         setSessionLabels, moveWorktree, messageSession,
     ] + workspaceTools + writerTools

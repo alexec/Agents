@@ -422,7 +422,8 @@ func TestAWaitOnAServersEvent(t *testing.T) {
 			t.Errorf("%v: %s", c.args, text)
 		}
 	}
-	if text, _ := m.tool(20, "wait_for_event", map[string]any{"action": "list"}); !strings.Contains(text, `{"name":"pr.merged","source":"ci","inputSchema":`) {
+	if text, isErr := m.tool(20, "wait_for_event", map[string]any{"events": "pr.closed", "until_minutes": 5}); !isErr ||
+		!strings.Contains(text, "ci offers pr.merged") {
 		t.Fatal(text)
 	}
 	answered := make(chan string, 1)

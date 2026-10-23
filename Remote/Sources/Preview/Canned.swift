@@ -138,7 +138,7 @@ enum Canned {
                   title: "Land the settings rewrite", state: .finished,
                   createdAt: ago(50), lastActivityAt: ago(12),
                   endedReason: .endTurn, costToDate: ["USD": 0.19],
-                  report: WorkReport(outcome: .blocked,
+                  report: WorkReport(outcome: .waiting,
                                      message: "Waiting on the two helpers before I merge.",
                                      at: ago(12),
                                      block: Block(waits: [

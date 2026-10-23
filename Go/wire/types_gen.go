@@ -324,6 +324,7 @@ func (v *AgentState) UnmarshalJSON(b []byte) error {
 		AgentStateArchived,
 		AgentStateQueued:
 		*v = AgentState(s)
+
 	default:
 		*v = AgentStateStopped
 	}
@@ -974,6 +975,7 @@ func (v *BackupEvery) UnmarshalJSON(b []byte) error {
 		BackupEveryDaily,
 		BackupEveryWeekly:
 		*v = BackupEvery(s)
+
 	default:
 		*v = BackupEveryDaily
 	}
@@ -1079,6 +1081,7 @@ func (v *BackupTarget) UnmarshalJSON(b []byte) error {
 	case BackupTargetFolder,
 		BackupTargetControl:
 		*v = BackupTarget(s)
+
 	default:
 		*v = BackupTargetFolder
 	}
@@ -1804,6 +1807,7 @@ func (v *ClientKind) UnmarshalJSON(b []byte) error {
 		ClientKindUnknown,
 		ClientKindBrowser:
 		*v = ClientKind(s)
+
 	default:
 		*v = ClientKindUnknown
 	}
@@ -1833,6 +1837,7 @@ func (v *ClientPermissionMode) UnmarshalJSON(b []byte) error {
 	case ClientPermissionModeDefault,
 		ClientPermissionModeAlwaysApprove:
 		*v = ClientPermissionMode(s)
+
 	default:
 		*v = ClientPermissionModeDefault
 	}
@@ -3196,6 +3201,7 @@ func (v *EndedReason) UnmarshalJSON(b []byte) error {
 		EndedReasonImported,
 		EndedReasonStoppedByAdmin:
 		*v = EndedReason(s)
+
 	default:
 		*v = EndedReasonUnrecognised
 	}
@@ -7220,6 +7226,7 @@ func (v *RetentionKeepFor) UnmarshalJSON(b []byte) error {
 		RetentionKeepForDays90,
 		RetentionKeepForForever:
 		*v = RetentionKeepFor(s)
+
 	default:
 		*v = RetentionKeepForDays30
 	}
@@ -7695,6 +7702,7 @@ func (v *SelfUpdateState) UnmarshalJSON(b []byte) error {
 		SelfUpdateStateFailed,
 		SelfUpdateStateCannot:
 		*v = SelfUpdateState(s)
+
 	default:
 		*v = SelfUpdateStateUpToDate
 	}
@@ -9726,13 +9734,13 @@ const WeekdayThu Weekday = "thu"
 const WeekdayFri Weekday = "fri"
 const WeekdaySat Weekday = "sat"
 
-// How a turn ended (#1916): only a question needs the person. An old record's `stuck` or `partly_done` (finish_turn's, before #494) reads as `done`.
+// How a turn ended (#1916): only a question needs the person. Old `blocked` reads as `waiting`; old `stuck` or `partly_done` reads as `done`.
 type WorkOutcome string
 
 const WorkOutcomeDone WorkOutcome = "done"
 const WorkOutcomeNothingToDo WorkOutcome = "nothing_to_do"
 const WorkOutcomeNeedsAnswer WorkOutcome = "needs_answer"
-const WorkOutcomeBlocked WorkOutcome = "blocked"
+const WorkOutcomeWaiting WorkOutcome = "waiting"
 
 // UnmarshalJSON reads a value this build does not know as "done".
 func (v *WorkOutcome) UnmarshalJSON(b []byte) error {
@@ -9744,8 +9752,15 @@ func (v *WorkOutcome) UnmarshalJSON(b []byte) error {
 	case WorkOutcomeDone,
 		WorkOutcomeNothingToDo,
 		WorkOutcomeNeedsAnswer,
-		WorkOutcomeBlocked:
+		WorkOutcomeWaiting:
 		*v = WorkOutcome(s)
+	case WorkOutcome("blocked"):
+		*v = WorkOutcomeWaiting
+	case WorkOutcome("partly_done"):
+		*v = WorkOutcomeDone
+	case WorkOutcome("stuck"):
+		*v = WorkOutcomeDone
+
 	default:
 		*v = WorkOutcomeDone
 	}

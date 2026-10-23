@@ -71,7 +71,7 @@ public enum StatusShape: Hashable, Sendable {
     }
 
     /// What the Mac's row and the phone's card say for `waiting`, in place of the
-    /// outcome's heading: a blocked report the app will resume is not Blocked to the
+    /// outcome's heading: a waiting report the app will resume is Waiting to the
     /// person, whatever word the agent used.
     public static let waitingLabel = "Waiting"
 

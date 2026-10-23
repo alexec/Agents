@@ -21,7 +21,7 @@ struct WorkOutcomeTests {
     @Test("only a question wants a person")
     func whichOnesWantAPerson() {
         #expect(WorkOutcome.allCases.filter(\.needsAPerson) == [.needsAnswer])
-        #expect(WorkOutcome.allCases.filter { !$0.needsAPerson } == [.done, .nothingToDo, .blocked])
+        #expect(WorkOutcome.allCases.filter { !$0.needsAPerson } == [.done, .nothingToDo, .waiting])
     }
 
     /// Two outcomes that read the same are two outcomes a person cannot tell apart,
@@ -44,18 +44,20 @@ struct WorkOutcomeTests {
     @Test("the wire spellings are the ones the tool offers")
     func wireSpellings() {
         #expect(WorkOutcome.allCases.map(\.rawValue)
-            == ["done", "nothing_to_do", "needs_answer", "blocked"])
+            == ["done", "nothing_to_do", "needs_answer", "waiting"])
         for outcome in WorkOutcome.allCases {
             #expect(WorkOutcome(wire: outcome.rawValue) == outcome)
         }
     }
 
     /// #1916: an old record's stuck or partly_done (finish_turn's) reads as done.
-    @Test("an old stuck or partly_done reads as done")
+    /// #1915: an old wait recorded as blocked reads as waiting, never as done.
+    @Test("an old stuck or partly_done reads as done, and an old blocked as waiting")
     func oldEndingsReadAsDone() throws {
         for word in ["stuck", "partly_done"] {
             #expect(try JSONDecoder().decode(WorkOutcome.self, from: Data("\"\(word)\"".utf8)) == .done)
         }
+        #expect(try JSONDecoder().decode(WorkOutcome.self, from: Data("\"blocked\"".utf8)) == .waiting)
         #expect(throws: DecodingError.self) { try JSONDecoder().decode(WorkOutcome.self, from: Data("\"later\"".utf8)) }
     }
 
@@ -117,15 +119,15 @@ struct WorkOutcomeTests {
         #expect(WorkReport(outcome: .done, wire: "  it is done.\n")?.message == "it is done.")
     }
 
-    // MARK: Blocked (039)
+    // MARK: Waiting (039, #1915)
 
-    @Test("a blocked report keeps its block through the record")
+    @Test("a waiting report keeps its block through the record")
     func aBlockRoundTrips() throws {
         let block = Block(waits: [Wait(agentID: UUID(), nameAtReport: "helper",
                                        ending: WaitEnding(at: Date(timeIntervalSince1970: 5),
                                                           how: .finished(outcome: .done, message: "ok")))],
                           checkAgainAt: Date(timeIntervalSince1970: 100))
-        let report = WorkReport(outcome: .blocked, message: "waiting", at: Date(timeIntervalSince1970: 1),
+        let report = WorkReport(outcome: .waiting, message: "waiting", at: Date(timeIntervalSince1970: 1),
                                 block: block)
         let back = try JSONDecoder().decode(WorkReport.self, from: JSONEncoder().encode(report))
         #expect(back == report)

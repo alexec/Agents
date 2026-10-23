@@ -11,7 +11,7 @@ export const outcomeHeadings: Record<WorkOutcome, string> = {
   done: "Complete",
   nothing_to_do: "Nothing to do",
   needs_answer: "Waiting on your answer",
-  blocked: "Waiting", // waiting on agents or a time, not blocked (#2045)
+  waiting: "Waiting",
 };
 
 /** EndedReason.summary: why it stopped, in the window's words. */
