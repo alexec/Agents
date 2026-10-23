@@ -185,12 +185,17 @@ func (d *Daemon) prompt(r wire.PromptRequest) error {
 		preface = &p
 	}
 	voice := r.Voice != nil && *r.Voice
+	// The turn running before the words were queued: the one they talk over.
+	l := d.live(a.ID)
+	l.mu.Lock()
+	busy, seq := l.inTurn, l.turnSeq
+	l.mu.Unlock()
 	if err := d.enqueue(a.ID, wire.QueuedPrompt{ID: store.NewUUID(), Text: r.Text, Attachments: r.Attachments,
 		QueuedAt: now(), From: from, Preface: preface}, voice); err != nil {
 		return err
 	}
-	if voice {
-		d.bargeIn(a.ID)
+	if voice && busy {
+		d.bargeIn(a.ID, seq)
 	}
 	return nil
 }
@@ -198,12 +203,13 @@ func (d *Daemon) prompt(r wire.PromptRequest) error {
 // bargeIn is words said in voice mode while a turn runs (#2375): the person talked over
 // the agent, as over a person, so the turn stops and the words, first in the queue, go
 // as soon as it has ended. A stop leaves the queue (run), so it is started again here.
-func (d *Daemon) bargeIn(id wire.UUID) {
+// Only turn seq, the one running when the words came: never the turn that carries them.
+func (d *Daemon) bargeIn(id wire.UUID, seq int) {
 	l := d.live(id)
 	l.mu.Lock()
-	busy := l.inTurn
+	still := l.inTurn && l.turnSeq == seq
 	l.mu.Unlock()
-	if !busy {
+	if !still {
 		return
 	}
 	l.cancel()
