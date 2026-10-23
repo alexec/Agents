@@ -67,6 +67,17 @@ enum Canned {
                       availability: .needsSignIn(authMethods: [], fixCommand: "grok login")),
     ]
 
+    /// The working agent holding "build" for 18 minutes more, for the chat's lease line.
+    static var leases: DaemonAPI.LeaseSnapshot {
+        let name = ResourceName("build")!
+        let lease = Lease(resource: name, displayName: "build", holder: working,
+                          grantedAt: ago(4), expiresAt: Date().addingTimeInterval(18 * 60))
+        return DaemonAPI.LeaseSnapshot(resources: [DaemonAPI.ResourceState(name: name, kind: .named,
+                                                                           displayName: "build",
+                                                                           holds: [lease])],
+                                       at: Date())
+    }
+
     static var agents: [Agent] {
         [
             Agent(id: waiting, runtimeID: "claude", cwd: agentsFolder,

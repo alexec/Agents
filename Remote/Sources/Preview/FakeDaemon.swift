@@ -98,6 +98,10 @@ private actor FakeState {
                 await tell(DaemonAPI.Notification.agentChanged, try? JSONValue.encoding(agent))
                 return .success(try JSONValue.encoding(agent.id))
 
+            // The working agent holds "build", so the chat's lease line can be walked (#2447).
+            case DaemonAPI.Method.resourcesSnapshot:
+                return .success(try JSONValue.encoding(Canned.leases))
+
             case DaemonAPI.Method.agentsResuming:
                 return .success(try JSONValue.encoding(DaemonAPI.ResumingResponse(agentIDs: [])))
 
