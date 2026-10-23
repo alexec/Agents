@@ -127,13 +127,19 @@ private struct SwipeAnchorView: NSViewRepresentable {
     let anchor: SwipeAnchor
 
     func makeNSView(context: Context) -> NSView {
-        let view = NSView()
+        let view = Anchor()
         anchor.view = view
         return view
     }
 
     func updateNSView(_ view: NSView, context: Context) {
         anchor.view = view
+    }
+
+    /// Where the chat is, never what a click lands on: behind the transcript, it was
+    /// still hit before the chat's own rows, so no card took a click (#2374).
+    final class Anchor: NSView {
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
     }
 }
 

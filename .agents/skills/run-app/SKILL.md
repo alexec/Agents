@@ -258,6 +258,27 @@ pressable ancestor. Typing is its weak spot: keystrokes go
 wherever focus is, so use `walk.py set` or `walk.py key`, never `cliclick`-style synthetic
 keys.
 
+### A question card takes a click (#2374)
+
+A view drawn over the transcript took every click once, and no question card could be
+answered; AXPress went round it, so only a click shows it. After a change to the chat pane
+(`ChatTranscript`, `SwipeToShowPane`, a card), walk a card:
+
+```sh
+$S/rpc.py $ROOT start claude $ROOT/work "Call ask_form once with two questions: id 'pick', \
+  prompt 'Which colour?', options Red and Blue; and id 'words', prompt 'Any other words?', \
+  with no options." 300 &
+$S/walk.py $ROOT select "Call ask_form"
+$S/walk.py $ROOT click "=Blue"   # must say "clicked …HostingScrollView…", never "…SwipeAnchorView…"
+```
+
+The click must land in the transcript's scroll view. A SwiftUI Button fires only in a
+key window, and a walk never makes its window key: the walk socket's click reaches the
+Button but does not press it while another app is in front, as on a locked screen. While
+the scratch window is key, the same clicks answer the card: Blue turns the page, a click
+in the box and `key` letters type into it, and Submit's answer is in the transcript as
+`elicitationAnswered`.
+
 ### When a full-screen app is in front
 
 A window opened behind (`launch.sh` without `--front`) while the user's front app is
