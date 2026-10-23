@@ -185,6 +185,7 @@ func openSignIn(t *testing.T, p *plane) *controllink.SignInSession {
 // T001, SC-001, US1: with no org provider nothing changes. signIn/providers lists none,
 // /v1/oidc/* is not there, and an s: connection with no provider on is refused as before.
 func TestNoOrgProviderChangesNothing(t *testing.T) {
+	t.Parallel()
 	prov := signintest.NewProvider(t, "RS256", "")
 	p, _, owner, _ := orgPlane(t, prov, nil)
 	var providers wire.SignInProviders
@@ -215,6 +216,7 @@ func TestNoOrgProviderChangesNothing(t *testing.T) {
 // T003, FR-001 to FR-004, SC-005: an admin's provider, its bounds, its rev and version,
 // what a member may do, and the secret nowhere but sealed.
 func TestOrgProviderSettings(t *testing.T) {
+	t.Parallel()
 	prov := signintest.NewProvider(t, "RS256", "/oauth2/default")
 	p, _, owner, _ := orgPlane(t, prov, nil)
 	sam := p.invite(owner, "Sam", wire.UserRoleMember)
@@ -324,6 +326,7 @@ func TestOrgProviderSettings(t *testing.T) {
 
 // FR-002, D18: an org provider needs an https address; http only on loopback.
 func TestOrgProvidersNeedAnHTTPSAddress(t *testing.T) {
+	t.Parallel()
 	for address, want := range map[string]string{
 		"https://control.example.com":    "https://control.example.com",
 		"wss://control.example.com:8443": "https://control.example.com:8443",
@@ -349,6 +352,7 @@ func TestOrgProvidersNeedAnHTTPSAddress(t *testing.T) {
 // and ES256, and nothing else pairs: an unknown or used state, a bad token, a ticket on
 // another connection or late, and an ID token sent to the control plane.
 func TestAnOrgSignInPairsByTicket(t *testing.T) {
+	t.Parallel()
 	for _, alg := range []string{"RS256", "ES256"} {
 		t.Run(alg, func(t *testing.T) {
 			prov := signintest.NewProvider(t, alg, "/oauth2/default")
@@ -392,6 +396,7 @@ func TestAnOrgSignInPairsByTicket(t *testing.T) {
 }
 
 func TestEveryRefusedOrgSignInPairsNothing(t *testing.T) {
+	t.Parallel()
 	prov := signintest.NewProvider(t, "RS256", "")
 	p, _, owner, _ := orgPlane(t, prov, nil)
 	addOrg(t, owner, prov, wire.OrgProviderJoinAnyone)
@@ -482,6 +487,7 @@ func TestEveryRefusedOrgSignInPairsNothing(t *testing.T) {
 // A callback may come to another copy than the one that started the flow: the state and
 // the ticket are store records.
 func TestAnOrgSignInCrossesCopies(t *testing.T) {
+	t.Parallel()
 	prov := signintest.NewProvider(t, "RS256", "")
 	st, key, keeper := store.NewMemory(), controllink.NewPrivateKey(), newKeeperKey()
 	change := func(c *Config) {
@@ -512,6 +518,7 @@ func TestAnOrgSignInCrossesCopies(t *testing.T) {
 // T005, D10: Who may join. Only by invite refuses a person nobody knows; anyone joins as a
 // member; an invited person adds the org sign-in and stays one person (US2 AS5, AS6).
 func TestWhoMayJoinByAnOrgProvider(t *testing.T) {
+	t.Parallel()
 	prov := signintest.NewProvider(t, "RS256", "")
 	p, _, owner, _ := orgPlane(t, prov, nil)
 	addOrg(t, owner, prov, wire.OrgProviderJoinInvite)
@@ -570,6 +577,7 @@ func TestWhoMayJoinByAnOrgProvider(t *testing.T) {
 // requiring its provider at join, pair and renewal; never the local owner; the daily
 // check takes a lost domain back after 7 days.
 func TestClaimedDomainsSendAndRequire(t *testing.T) {
+	t.Parallel()
 	prov := signintest.NewProvider(t, "RS256", "")
 	f := newProvidersFake(t)
 	p, m, owner, dns := orgPlane(t, prov, f)
@@ -720,6 +728,7 @@ func TestClaimedDomainsSendAndRequire(t *testing.T) {
 // Entra's preset: the account is oid, and an ID token of another tenant is refused.
 // Google Workspace's: hd must be one of the provider's proved domains.
 func TestEntraAndGoogleWorkspacePresets(t *testing.T) {
+	t.Parallel()
 	prov := signintest.NewProvider(t, "RS256", "/tenant-1/v2.0")
 	p, _, owner, dns := orgPlane(t, prov, nil)
 	entra := wire.OrgProvider{Name: "Acme Okta", Preset: wire.OrgProviderPresetEntra, Issuer: prov.Issuer, ClientID: prov.ClientID,
@@ -768,6 +777,7 @@ func TestEntraAndGoogleWorkspacePresets(t *testing.T) {
 // ticket is bound to the page's key and the s: id it proved, so the page pairs with it on a
 // new connection with the same key, and nothing else does.
 func TestTheWebPageComesBackOnANewConnection(t *testing.T) {
+	t.Parallel()
 	prov := signintest.NewProvider(t, "RS256", "")
 	p, _, owner, _ := orgPlane(t, prov, nil)
 	addOrg(t, owner, prov, wire.OrgProviderJoinAnyone)
@@ -813,6 +823,7 @@ func TestTheWebPageComesBackOnANewConnection(t *testing.T) {
 // p:, so the page signs in with its org provider and comes back to pair. This Mac's
 // loopback listener still takes none.
 func TestThePageOnThisDomainSignsIn(t *testing.T) {
+	t.Parallel()
 	dist := t.TempDir()
 	index := []byte("<html></html>")
 	sum := sha256.Sum256(index)

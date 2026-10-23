@@ -51,6 +51,7 @@ func giveEmail(t *testing.T, p *plane, user, email string) {
 // US7 AS1 (#1762, FR-037): a message from an identity that is not linked starts nothing,
 // and asks its person, who alone approves it. From then on the identity is that person.
 func TestAChannelIdentityActsOnlyOnceItsPersonApproves(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, owner := p.client("Alex's Mac")
 	sam := p.invite(owner, "Sam", wire.UserRoleMember)
@@ -120,6 +121,7 @@ func TestAChannelIdentityActsOnlyOnceItsPersonApproves(t *testing.T) {
 // A request for an identity no person's email names goes to the admins, who send it on;
 // only the person it goes to approves it. A denied identity asks no second time that day.
 func TestAnAdminSendsALinkRequestOnAndCannotApproveItForSomeoneElse(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, owner := p.client("Alex's Mac")
 	sam := p.invite(owner, "Sam", wire.UserRoleMember)
@@ -155,6 +157,7 @@ func TestAnAdminSendsALinkRequestOnAndCannotApproveItForSomeoneElse(t *testing.T
 
 // US7 AS2 (#1762, FR-037): a linked email address whose DKIM check fails is refused.
 func TestAnEmailMustPassDKIMForItsAddress(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, owner := p.client("Alex's Mac")
 	sam := p.invite(owner, "Sam", wire.UserRoleMember)
@@ -200,6 +203,7 @@ func TestAnEmailMustPassDKIMForItsAddress(t *testing.T) {
 
 // A removed person's links go, and a bot is never linked.
 func TestARemovedPersonsLinksGo(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, owner := p.client("Alex's Mac")
 	sam := p.invite(owner, "Sam", wire.UserRoleMember)
@@ -223,6 +227,7 @@ func TestARemovedPersonsLinksGo(t *testing.T) {
 
 // Malformed senders name no one.
 func TestASenderThatNamesNoOneIsRefused(t *testing.T) {
+	t.Parallel()
 	for _, s := range []wire.ChannelSender{
 		{Channel: "", Identity: "U1"},
 		{Channel: "slack", Identity: " "},
@@ -258,6 +263,7 @@ func (s *requestReads) List(ctx context.Context, prefix string) ([]store.Key, er
 // #2060: with as many requests waiting as may wait, a burst of messages from senders not
 // linked reads no request: what was read is used again until a request changes.
 func TestABurstOfStrangersReadsTheRequestsOnce(t *testing.T) {
+	t.Parallel()
 	st := &requestReads{Store: store.NewMemory()}
 	p := startPlane(t, st, controllink.NewPrivateKey())
 	_, owner := p.client("Alex's Mac")
@@ -287,6 +293,7 @@ func TestABurstOfStrangersReadsTheRequestsOnce(t *testing.T) {
 // #2293: a removed person's settings, sealed secrets and saved report views go with them;
 // another person's stay.
 func TestARemovedPersonsRecordsGo(t *testing.T) {
+	t.Parallel()
 	st := store.NewMemory()
 	p := startPlane(t, st, controllink.NewPrivateKey())
 	_, owner := p.client("Alex's Mac")

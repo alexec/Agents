@@ -29,6 +29,7 @@ func (o *ownersStandIn) OwnerOf(host string) string {
 // once a machine, outside the router's lock, not once a session and machine under it; and
 // a machine that changes hands moves only its own channels.
 func TestHoldingToOwnersReadsEachOwnerOnceOutsideTheLock(t *testing.T) {
+	t.Parallel()
 	const hosts, sessions, people = 400, 600, 10
 	r := NewRouter(nil, nil)
 	o := &ownersStandIn{r: r, owner: map[string]string{}}

@@ -27,6 +27,7 @@ func (g *getCounting) Get(ctx context.Context, key string) (*store.Object, error
 // #2054, #2056: a key is read from the store once until its tag moves, and a key the
 // store no longer lists is let go.
 func TestStoreReadsAreReadOnceByTag(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	st := &getCounting{Store: store.NewMemory()}
 	for i := range 30 {
@@ -60,6 +61,7 @@ func TestStoreReadsAreReadOnceByTag(t *testing.T) {
 
 // #2056: past mostRunsRead claims in a week, the newest are counted, not the oldest.
 func TestTeamWorkflowsCountsTheNewestRuns(t *testing.T) {
+	t.Parallel()
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.ProviderHome = t.TempDir() })
 	_, admin := p.client("Alex's Mac")
 	var made wire.BotMade

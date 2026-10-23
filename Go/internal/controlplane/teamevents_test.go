@@ -52,6 +52,7 @@ func (f *fires) total() (asked, ran int) {
 // machine that cannot run it is passed over; runs-on: with no bot is left to the machine;
 // someone outside the bot's group cannot send it a trigger.
 func TestATeamTriggerHeardByEveryMachineRunsOnce(t *testing.T) {
+	t.Parallel()
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), nil)
 	f := &fires{asked: map[string]int{}, ran: map[string]int{}}
 	p.asked = f.answer
@@ -156,6 +157,7 @@ func (s *starter) starts() []string {
 // start that never joins, starts nothing more for 15 minutes; with no machine that may be
 // started, nothing is.
 func TestABotsMachineIsStartedOnceForItsTriggers(t *testing.T) {
+	t.Parallel()
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), nil)
 	f := &fires{asked: map[string]int{}, ran: map[string]int{}, takes: func(string) bool { return true }}
 	p.asked = f.answer
@@ -261,6 +263,7 @@ func TestABotsMachineIsStartedOnceForItsTriggers(t *testing.T) {
 // workflow's server triggers for it, and again when a bot or a group changes; a bot's
 // machine and someone outside the group are told none.
 func TestAPersonsMachineIsToldTheBotsOfItsGroups(t *testing.T) {
+	t.Parallel()
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), nil)
 	users := &hostUsers{}
 	p.told = users.heard

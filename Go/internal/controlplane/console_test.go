@@ -15,6 +15,7 @@ import (
 // Console ▸ Machines (#1804, M1): an admin sees every machine with its owner; a member is
 // refused the Console.
 func TestConsoleFleetIsEveryMachineForAnAdmin(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	owner := p.host("OWNERS-MAC")
 	_, admin := p.client("Owner's window")
@@ -45,6 +46,7 @@ func TestConsoleFleetIsEveryMachineForAnAdmin(t *testing.T) {
 // Every Console method is an admin's and names no machine (as TestEveryClientMethodChecksTheOwner
 // has it for the others), and none is in the other lists.
 func TestConsoleMethodsAreAdminsOnly(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, admin := p.client("Owner's window")
 	bea := p.invite(admin, "Bea", wire.UserRoleMember)
@@ -61,6 +63,7 @@ func TestConsoleMethodsAreAdminsOnly(t *testing.T) {
 // Console ▸ Team Workflows (#1804, M6): each bot with its group, its machines, the
 // workflows it ran this week and the agents running on its machines, by id only.
 func TestConsoleTeamWorkflowsIsEachBotsRuns(t *testing.T) {
+	t.Parallel()
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.ProviderHome = t.TempDir() })
 	_, admin := p.client("Alex's Mac")
 	sam := p.invite(admin, "Sam", wire.UserRoleMember)
@@ -105,6 +108,7 @@ func TestConsoleTeamWorkflowsIsEachBotsRuns(t *testing.T) {
 // bot's, with its owner, runtime, state and cost so far, the most costly first; no title.
 // console/stopAgent reaches any machine for an admin, and no member.
 func TestConsoleLiveIsEveryRunningAgent(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	owner := p.host("OWNERS-MAC")
 	_, admin := p.client("Owner's window")

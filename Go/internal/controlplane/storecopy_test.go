@@ -11,6 +11,7 @@ import (
 
 // A copy carries every record but leases and copies, and refuses a store already in use.
 func TestCopyStoreCarriesRecordsAndRefusesAStoreInUse(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	from, to := store.NewFolder(t.TempDir()), store.NewFolder(t.TempDir())
 	for _, key := range []string{records.SettingsKey, "v1/hosts/a.json", "v1/leases/a.json", "v1/copies/b.json", "v1/keys/control.sealed"} {

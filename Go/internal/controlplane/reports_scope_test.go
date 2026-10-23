@@ -15,6 +15,7 @@ import (
 // when the policy says so; the organisation and the policy are an admin's; a member who
 // leads nothing sees only Me.
 func TestReportScopesAndTheGroupLead(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	p.host("OWNERS-MAC")
 	_, admin := p.client("Owner's window")
@@ -124,6 +125,7 @@ func TestReportScopesAndTheGroupLead(t *testing.T) {
 // The scopes' methods are their own list, naming no machine (as TestEveryClientMethodChecksTheOwner
 // has it for the others).
 func TestReportScopeMethodsNameNoMachine(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	for method := range scopeMethods {
 		if own[method] || workspaceMethods[method] || hostNamingMethods[method] || consoleMethods[method] || !p.s.methods.Handles(method) {

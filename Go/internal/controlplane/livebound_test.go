@@ -14,6 +14,7 @@ import (
 // One Live Now tab on 100 machines for 5 minutes (#2432): a poll each 15 s asks the
 // stalest 50, so every machine is asked, none more than every other poll.
 func TestLiveNowAsksEveryMachineInTurn(t *testing.T) {
+	t.Parallel()
 	const machines, polls = 100, 20
 	heard := map[string]time.Time{}
 	asked := map[string]int{}
@@ -50,6 +51,7 @@ func TestLiveNowAsksEveryMachineInTurn(t *testing.T) {
 // A list a machine says again unchanged is not written again (#2432): one Put, not one
 // an answer, until copyRestamp.
 func TestAnUnchangedListIsNotWrittenAgain(t *testing.T) {
+	// Not parallel (#2512): it holds a wall-clock limit, which other tests running beside it would make flaky.
 	counted := &putCountingStore{Store: store.NewMemory()}
 	copies := newHostCopies(counted)
 	agents := make([]string, 50)

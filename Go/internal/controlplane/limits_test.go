@@ -19,6 +19,7 @@ import (
 )
 
 func TestABucketRefillsAtItsRate(t *testing.T) {
+	t.Parallel()
 	var b bucket
 	now := time.Unix(1000, 0)
 	for i := range 10 {
@@ -42,6 +43,7 @@ func TestABucketRefillsAtItsRate(t *testing.T) {
 // A client over its rate for a costly method is answered tooManyRequests, and its socket
 // stays open: the next cheap call goes.
 func TestACostlyMethodOverItsRateIsRefusedAndTheSocketStays(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, s := p.client("Window")
 	ctx := context.Background()
@@ -77,6 +79,7 @@ func TestACostlyMethodOverItsRateIsRefusedAndTheSocketStays(t *testing.T) {
 }
 
 func TestEveryLineAndByteCounts(t *testing.T) {
+	t.Parallel()
 	c := newClientRates()
 	now := time.Unix(1000, 0)
 	c.now = func() time.Time { return now }
@@ -99,6 +102,7 @@ func TestEveryLineAndByteCounts(t *testing.T) {
 
 // The listeners close a slow request, but never a socket in use, however long it lasts.
 func TestTimeoutsCloseASlowRequestButNotASocket(t *testing.T) {
+	// Not parallel (#2512): it sets the package's HTTP timeouts.
 	read, write, idle := httpReadTimeout, httpWriteTimeout, httpIdleTimeout
 	httpReadTimeout, httpWriteTimeout, httpIdleTimeout = 300*time.Millisecond, 300*time.Millisecond, 300*time.Millisecond
 	t.Cleanup(func() { httpReadTimeout, httpWriteTimeout, httpIdleTimeout = read, write, idle })
@@ -138,6 +142,7 @@ func TestTimeoutsCloseASlowRequestButNotASocket(t *testing.T) {
 }
 
 func TestTheDownloadsHaveARateForEachAddress(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	get := func() int {
 		resp, err := http.Get(p.url + "/v1/install.sh")
@@ -160,6 +165,7 @@ func TestTheDownloadsHaveARateForEachAddress(t *testing.T) {
 // Past the most sockets a copy holds, a new one is refused before it opens; past the most a
 // client key holds, its exchange is refused as crowded (#2194), which it tries again later.
 func TestSocketsAreCapped(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	m, _ := p.client("Window")
 	for range sessionsPerClient - 1 {
@@ -188,6 +194,7 @@ func refusedAs(err error, reason string) bool {
 
 // Until a socket proves a key, it reads no message larger than an auth line needs.
 func TestAnUnprovenSocketReadsOnlySmallMessages(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -209,6 +216,7 @@ func TestAnUnprovenSocketReadsOnlySmallMessages(t *testing.T) {
 // When every place to join is taken, the oldest of the address holding the most ends, so
 // a few addresses can't keep everyone out; and one person named holds at most ten.
 func TestJoinPlacesAreFair(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	ctx := context.Background()
 	public, _ := controllink.PublicKey(controllink.NewPrivateKey())
@@ -263,6 +271,7 @@ func TestJoinPlacesAreFair(t *testing.T) {
 // When every sign-in place is taken, the oldest of the address holding the most is closed
 // for a newcomer, and an address with its five still gets no sixth.
 func TestSignInPlacesAreFair(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	si := p.s.signIns
 	conns := make(chan *websocket.Conn, 1)

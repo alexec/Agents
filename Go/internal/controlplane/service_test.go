@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -54,6 +55,22 @@ func startPlane(t *testing.T, st store.Store, private []byte) *plane {
 
 // startPlaneWith is startPlane with something of its Config changed first.
 func startPlaneWith(t *testing.T, st store.Store, private []byte, change func(*Config)) *plane {
+	// freePort lets its port go before the plane binds it, and the tests run in parallel
+	// (#2512), so another test can take it in between: try a new one then.
+	for range 4 {
+		p, err := tryStartPlane(t, st, private, change)
+		if err == nil {
+			return p
+		}
+		if !errors.Is(err, syscall.EADDRINUSE) {
+			t.Fatal(err)
+		}
+	}
+	t.Fatal("no free port for the plane")
+	return nil
+}
+
+func tryStartPlane(t *testing.T, st store.Store, private []byte, change func(*Config)) (*plane, error) {
 	port := freePort(t)
 	p := &plane{t: t, url: "http://127.0.0.1:" + itoa(port), store: st, private: private, lines: make(chan string, 1000)}
 	cfg := Config{Store: st, PrivateKey: private, URL: p.url, Bind: "127.0.0.1", Port: port,
@@ -71,11 +88,11 @@ func startPlaneWith(t *testing.T, st store.Store, private []byte, change func(*C
 		t.Fatal(err)
 	}
 	if _, err := s.Start(context.Background()); err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	t.Cleanup(s.Stop)
 	p.s = s
-	return p
+	return p, nil
 }
 
 func itoa(n int) string { return strconv.Itoa(n) }
@@ -251,6 +268,7 @@ func callError(t *testing.T, s *controllink.Session, host, method string, params
 // The whole path: a host enrols and connects, a window pairs and connects, the window's
 // calls reach the host through its channel and the control plane's own methods answer.
 func TestAHostAndAWindowThroughTheControlPlane(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	// A host on the control plane's own machine is its home host, mac.
 	home := p.host("MACHINE-1")
@@ -309,6 +327,7 @@ func TestAHostAndAWindowThroughTheControlPlane(t *testing.T) {
 
 // A code works once; the same key spending it again is the same join (#212).
 func TestACodeIsUsedOnce(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	c := p.code(false)
 	if _, err := controllink.PairClient(context.Background(), c, "First"); err != nil {
@@ -340,6 +359,7 @@ func TestACodeIsUsedOnce(t *testing.T) {
 
 // clients/forget: its sockets close with 4403, and it is refused as forgotten after.
 func TestAForgottenClientIsClosedAndRefused(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, window := p.client("Window")
 	other, phone := p.client("Phone")
@@ -357,6 +377,7 @@ func TestAForgottenClientIsClosedAndRefused(t *testing.T) {
 // A copy started again on the same folder and key is the same control plane: the host
 // rejoins with its membership, and the window with its pairing.
 func TestTheFolderAndKeyAreTheControlPlane(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	key := controllink.NewPrivateKey()
 	st := store.NewFolder(filepath.Join(root, "store"))
@@ -390,6 +411,7 @@ func TestTheFolderAndKeyAreTheControlPlane(t *testing.T) {
 
 // A store the Swift control plane wrote is taken up as it is.
 func TestASwiftStoreIsTakenUp(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	key := controllink.NewPrivateKey()
 	public, _ := controllink.PublicKey(key)
@@ -413,6 +435,7 @@ func TestASwiftStoreIsTakenUp(t *testing.T) {
 }
 
 func TestTheInstallScriptIsSwifts(t *testing.T) {
+	t.Parallel()
 	theirs, err := os.ReadFile("../../../scripts/host-install.sh")
 	if err != nil {
 		t.Skip("scripts/ is not here (the Go module alone, in a container)")
@@ -427,6 +450,7 @@ func TestTheInstallScriptIsSwifts(t *testing.T) {
 }
 
 func TestStampedLines(t *testing.T) {
+	t.Parallel()
 	at := time.Date(2026, 10, 16, 9, 0, 0, 123e6, time.Local)
 	got := stamped("one\ntwo", at)
 	lines := strings.Split(strings.TrimSuffix(got, "\n"), "\n")
@@ -438,6 +462,7 @@ func TestStampedLines(t *testing.T) {
 // A browser pairs and connects through the loopback listener only, bound to its origin;
 // a window's code and key are refused there, and a browser's code over TLS (071).
 func TestABrowserThroughTheLoopbackListener(t *testing.T) {
+	t.Parallel()
 	dist := t.TempDir()
 	index := []byte("<html></html>")
 	sum := sha256.Sum256(index)
@@ -562,6 +587,7 @@ func answerHello(l *controllink.Lines, id controllink.Identity, key []byte, at, 
 
 // hosts/install is answered by the installer, in its words, through the router.
 func TestHostsInstallAnswersInItsWords(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, window := p.client("Window")
 	if e := callError(t, window, "", "hosts/install", map[string]string{"destination": " "}); !strings.Contains(e, "Say which server.") {
@@ -635,6 +661,7 @@ func readUntil(t *testing.T, l *controllink.Lines, want string) string {
 // A need a host raises goes to the relay host, sealed to the device the ladder picks
 // (T097): the iPhone that may notify, then taken back when the need is met.
 func TestANeedGoesToTheRelayHost(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	relayID, relay := p.rawHost("relay mac", true)
 	if relayID == "mac" {
@@ -681,6 +708,7 @@ func TestANeedGoesToTheRelayHost(t *testing.T) {
 const keptClient = "C4A77E15-0000-4000-8000-000000001009"
 
 func TestAKeptRequestIsDelivered(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	box := p.host("MACHINE-2")
 	m := p.s.Router().DeliverKept("elicitations/pending", map[string]any{}, keptClient, records.KindUnknown, box.member.Host, 5*time.Second)
@@ -698,6 +726,7 @@ func TestAKeptRequestIsDelivered(t *testing.T) {
 // Workspace providers answer on a single copy with a home for their secrets, and say
 // why not anywhere else (#691).
 func TestProvidersAnswerWhereTheyCanRun(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, window := p.client("Window")
 	if e := callError(t, window, "", "providers/list", nil); !strings.Contains(e, "-32064") {
@@ -740,6 +769,7 @@ func TestProvidersAnswerWhereTheyCanRun(t *testing.T) {
 // and a hello from the other language on the same root replaces it, as
 // HostImplementationTests.itIsKeptFromTheHelloAndListed.
 func TestAHostsImplementationIsKeptFromItsHello(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	box := p.host("MACHINE-2")
 	implementation := func() string {
@@ -768,6 +798,7 @@ func TestAHostsImplementationIsKeptFromItsHello(t *testing.T) {
 }
 
 func TestToolsetFilesAreTheNamedOnesOnly(t *testing.T) {
+	t.Parallel()
 	folder := t.TempDir()
 	os.MkdirAll(filepath.Join(folder, "claude"), 0o755)
 	os.WriteFile(filepath.Join(folder, "claude", "manifest.json"), []byte(`{"runtimeID":"claude"}`), 0o644)
@@ -788,6 +819,7 @@ func TestToolsetFilesAreTheNamedOnesOnly(t *testing.T) {
 // Every host hears which windows are paired, and hears it again when one is forgotten: the
 // policy it checks its local socket against (#1118).
 func TestHostsHearThePairedWindows(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, host := p.rawHost("this mac", false)
 	m, err := controllink.PairClient(context.Background(), p.code(false), "window")
@@ -799,8 +831,18 @@ func TestHostsHearThePairedWindows(t *testing.T) {
 	if err := p.s.methods.forget(context.Background(), m.Client, 0); err != nil {
 		t.Fatal(err)
 	}
-	if line := readUntil(t, host, "host/clients"); strings.Contains(line, m.Client) {
-		t.Fatal("a forgotten window is still listed:", line)
+	// A listing sent before the forget can still be on its way (the pairing can send more
+	// than one), so read on until one leaves the window out, for at most 10 s (#2512).
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	for {
+		line, err := host.Read(ctx)
+		if err != nil {
+			t.Fatal("a forgotten window is still listed:", err)
+		}
+		if strings.Contains(line, "host/clients") && !strings.Contains(line, m.Client) {
+			return
+		}
 	}
 }
 
@@ -808,6 +850,7 @@ func TestHostsHearThePairedWindows(t *testing.T) {
 // on every refresh (#1528): forty refreshes (ten minutes of them) tell it nothing, so the
 // next host/clients it reads is the one that lists a new window.
 func TestAHostHearsThePairedWindowsOnlyWhenTheyChange(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, host := p.rawHost("this mac", false)
 	if line := readUntil(t, host, "host/clients"); !strings.Contains(line, `"clients":[]`) {
@@ -829,6 +872,7 @@ func TestAHostHearsThePairedWindowsOnlyWhenTheyChange(t *testing.T) {
 // its own, are one mac and the rest ids of their own, each kept with its own key, and
 // each proves it. None writes over another's record.
 func TestHostsJoiningAtOnceFromItsMachineAreOneMac(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	const n = 6
 	codes := make([]*controllink.Code, n)
@@ -892,6 +936,7 @@ func TestHostsJoiningAtOnceFromItsMachineAreOneMac(t *testing.T) {
 // #1996: a host proving a key that is not the one it enrolled with is refused, and the
 // log says which host and why.
 func TestABadProofSaysWhichHostAndWhy(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	code := p.code(true)
 	member, err := controllink.Enroll(context.Background(), t.TempDir(), code, controllink.NewPrivateKey(),

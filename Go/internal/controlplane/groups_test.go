@@ -22,6 +22,7 @@ func listedProviders(t *testing.T, s *controllink.Session) []wire.ProviderSummar
 // US5 AS4 (#1761, FR-027, FR-028): a provider given to a group is shown to and used by
 // that group's users only. One with no group is the admins'. Only an admin changes groups.
 func TestOnlyAProvidersGroupSeesAndUsesIt(t *testing.T) {
+	t.Parallel()
 	st := store.NewMemory()
 	record := `{"id":"do-1","name":"DigitalOcean","kind":"http","url":"http://127.0.0.1:9/","secretNames":[],` +
 		`"capabilities":["create"],"contract":1,"rev":1}`

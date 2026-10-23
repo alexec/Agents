@@ -43,6 +43,7 @@ func readReports(t *testing.T, p *plane, token, query string) (int, string) {
 }
 
 func TestTheReadAPIReadsTheReportsWithAToken(t *testing.T) {
+	t.Parallel()
 	st := store.NewMemory()
 	p := startPlane(t, st, controllink.NewPrivateKey())
 	owner := p.host("OWNERS-MAC")
@@ -110,6 +111,7 @@ func TestTheReadAPIReadsTheReportsWithAToken(t *testing.T) {
 
 // A token works only while its maker is an admin, and asks at most its rate.
 func TestAReadTokenIsLimited(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, admin := p.client("Owner's window")
 	bea := p.invite(admin, "Bea", wire.UserRoleAdmin)
@@ -136,6 +138,7 @@ func TestAReadTokenIsLimited(t *testing.T) {
 
 // At most mostLiveReadTokens are live.
 func TestReadTokensAreBounded(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, admin := p.client("Owner's window")
 	for range mostLiveReadTokens {

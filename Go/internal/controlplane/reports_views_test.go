@@ -13,6 +13,7 @@ import (
 // Saved views (#2019, R8): each person keeps their own, of a scope they see; a change keeps
 // its id, and a delete of one already gone is no fault.
 func TestSavedViewsArePersonal(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	p.host("OWNERS-MAC")
 	_, admin := p.client("Owner's window")

@@ -10,6 +10,7 @@ import (
 // Every type the control plane writes or reads on the wire reads the bytes in
 // testdata/wire-types.golden and writes them again unchanged (#1313).
 func TestWireTypesKeepTheirBytes(t *testing.T) {
+	t.Parallel()
 	wiretest.Check(t, "testdata/wire-types.golden", wiretest.Types{
 		"ClientRecord":         func() any { return new(wire.ClientRecord) },
 		"HostJoinStatus":       func() any { return new(wire.HostJoinStatus) },

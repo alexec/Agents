@@ -153,6 +153,7 @@ func toFloat(v any) float64 {
 // T014, SC-006: Okta's and Entra's request sets play with no failed request; the
 // Enterprise extension is kept as it came, and no password is kept anywhere.
 func TestOktaAndEntraRequestSetsPlay(t *testing.T) {
+	t.Parallel()
 	p, owner, _, token, base := scimPlane(t, wire.OrgProviderJoinScim)
 	ids := play(t, base, token, "scim/testdata/okta.json")
 	kim := p.s.records.Person(ids["kim"])
@@ -194,6 +195,7 @@ func TestOktaAndEntraRequestSetsPlay(t *testing.T) {
 // T015, FR-014: no token, a wrong, revoked or ended one, or another provider's resource:
 // refused, and nothing written. Two tokens at most are live; the last use is noted.
 func TestSCIMTokens(t *testing.T) {
+	t.Parallel()
 	p, owner, _, token, base := scimPlane(t, wire.OrgProviderJoinScim)
 	people := len(p.s.records.People())
 	for _, bad := range []string{"", "agscim_wrong", "Basic " + token} {
@@ -264,6 +266,7 @@ func TestSCIMTokens(t *testing.T) {
 // T016, FR-015, FR-016: users made, a second userName refused, filters, pages of 100, PUT
 // and PATCH, the match at first sign-in, and a rename kept.
 func TestSCIMUsers(t *testing.T) {
+	t.Parallel()
 	p, owner, prov, token, base := scimPlane(t, wire.OrgProviderJoinScim)
 	status, lee := scimDo(t, base, token, "POST", "/Users", newUser("lee@acme.test", "00u-lee"))
 	if status != 201 || lee["id"] == "" || lee["active"] != true {
@@ -365,6 +368,7 @@ func listedProvider(t *testing.T, owner *controllink.Session) wire.OrgProviderKe
 // both copies within 5 seconds; they cannot connect or sign in again, and their keys stop
 // renewing. DELETE adds a Remove request. active: true undoes it. The local owner stays.
 func TestSCIMSuspensionOnTwoCopies(t *testing.T) {
+	// Not parallel (#2512): it holds a wall-clock limit, which other tests running beside it would make flaky.
 	prov := signintest.NewProvider(t, "RS256", "")
 	st, key, keeper := store.NewMemory(), controllink.NewPrivateKey(), newKeeperKey()
 	change := func(c *Config) {
@@ -465,6 +469,7 @@ func TestSCIMSuspensionOnTwoCopies(t *testing.T) {
 // T018, FR-019 to FR-021: groups with members, PATCH add and remove, another provider's
 // member refused, Gives the admin role, managedByProvider, the last admin kept.
 func TestSCIMGroupsGiveRoles(t *testing.T) {
+	t.Parallel()
 	p, owner, _, token, base := scimPlane(t, wire.OrgProviderJoinScim)
 	_, raj := scimDo(t, base, token, "POST", "/Users", newUser("raj@acme.test", "00u-raj"))
 	rajID := raj["id"].(string)
@@ -520,6 +525,7 @@ func TestSCIMGroupsGiveRoles(t *testing.T) {
 // T019, Q1 A, FR-024: an org sign-in's refresh token is kept sealed; invalid_grant
 // suspends; with the provider down, keys renew for 7 days after the last good check.
 func TestRefreshChecksFindLeavers(t *testing.T) {
+	t.Parallel()
 	prov := signintest.NewProvider(t, "RS256", "")
 	p, _, owner, _ := orgPlane(t, prov, nil)
 	addOrg(t, owner, prov, wire.OrgProviderJoinAnyone)
@@ -571,6 +577,7 @@ func (failing) RoundTrip(*http.Request) (*http.Response, error) { return nil, io
 
 // T020, FR-023: 5,000 users and 500 groups; SCIM answers within 200 ms at p95.
 func TestSCIMAtSize(t *testing.T) {
+	// Not parallel (#2512): it holds a wall-clock limit, which other tests running beside it would make flaky.
 	if testing.Short() {
 		t.Skip("5,000 users")
 	}
@@ -628,6 +635,7 @@ func TestSCIMAtSize(t *testing.T) {
 // #2424: a sync sends every user and group again, mostly as they were. A write that
 // changes nothing keeps nothing and tells nobody; one that changes something tells once.
 func TestSCIMNoOpWritesTellNobody(t *testing.T) {
+	t.Parallel()
 	p, owner, _, token, base := scimPlane(t, wire.OrgProviderJoinScim)
 	raj := newUser("raj@acme.test", "00u-raj")
 	_, made := scimDo(t, base, token, "POST", "/Users", raj)
@@ -682,6 +690,7 @@ func TestSCIMNoOpWritesTellNobody(t *testing.T) {
 // #2425: a million made-up bearers keep nothing; a live token is still kept, and one
 // address that sends many made-up ones is answered 429 with no token read.
 func TestSCIMUnknownBearersKeepNothing(t *testing.T) {
+	t.Parallel()
 	p, _, _, token, base := scimPlane(t, wire.OrgProviderJoinScim)
 	st := p.s.scimTokens
 	ctx := context.Background()
@@ -719,6 +728,7 @@ func TestSCIMUnknownBearersKeepNothing(t *testing.T) {
 var scimSyncUsers = flag.Int("scim-sync", 1000, "how many users TestAFirstSyncListsNoPeoplePerUser syncs")
 
 func TestAFirstSyncListsNoPeoplePerUser(t *testing.T) {
+	// Not parallel (#2512): it holds a wall-clock limit, which other tests running beside it would make flaky.
 	n := *scimSyncUsers
 	p, _, _, _, _ := scimPlane(t, wire.OrgProviderJoinScim)
 	counted := &countingStore{Store: p.s.records.Store}

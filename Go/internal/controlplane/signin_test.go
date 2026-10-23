@@ -104,6 +104,7 @@ func personOf(t *testing.T, p *plane, m *controllink.ClientMembership) string {
 // US2 AS1 and AS3 (FR-005, FR-009): the local owner adds a Google and an Apple sign-in
 // to themselves, and a new client that signs in with either pairs as them, with no code.
 func TestASignInPairsAKnownPersonWithNoCode(t *testing.T) {
+	t.Parallel()
 	f := newProvidersFake(t)
 	p, m, owner := signInPlane(t, f)
 	ownerID := personOf(t, p, m)
@@ -143,6 +144,7 @@ func TestASignInPairsAKnownPersonWithNoCode(t *testing.T) {
 // connection, a provider turned off, an account nobody has, a removed person. Each pairs
 // nothing.
 func TestEveryRefusedSignInPairsNothing(t *testing.T) {
+	t.Parallel()
 	f := newProvidersFake(t)
 	p, m, owner := signInPlane(t, f)
 	addToMe(t, owner, m, signin.Google, func(n string) string { return f.mint(signin.Google, "alex", n, nil) })
@@ -206,6 +208,7 @@ func TestEveryRefusedSignInPairsNothing(t *testing.T) {
 // FR-011, SC-005: a sign-in made for one control plane pairs nothing on another, for
 // Google, Apple and GitHub, though both trust the same app.
 func TestASignInSentToAnotherControlPlanePairsNothing(t *testing.T) {
+	t.Parallel()
 	f := newProvidersFake(t)
 	a, am, aOwner := signInPlane(t, f)
 	b, bm, bOwner := signInPlane(t, f)
@@ -257,6 +260,7 @@ func TestASignInSentToAnotherControlPlanePairsNothing(t *testing.T) {
 // waits for Approve on one of their clients, which shows the same code. Nobody else
 // decides it. The control plane asks GitHub once and keeps no token.
 func TestAGitHubSignInWaitsForThePersonsApprove(t *testing.T) {
+	t.Parallel()
 	f := newProvidersFake(t)
 	p, _, owner := signInPlane(t, f)
 	sam := p.invite(owner, "Sam", wire.UserRoleMember)
@@ -339,6 +343,7 @@ func TestAGitHubSignInWaitsForThePersonsApprove(t *testing.T) {
 // #2097 (FR-014a, FR-014b): a browser asks by a sign-in's email; the person's card has no
 // code, and Approve needs the code the browser shows. An account nobody has waits the same.
 func TestABrowserPairsByApprovalWithItsCode(t *testing.T) {
+	t.Parallel()
 	f := newProvidersFake(t)
 	p, _, owner := signInPlane(t, f)
 	sam := p.invite(owner, "Sam", wire.UserRoleMember)
@@ -405,6 +410,7 @@ func TestABrowserPairsByApprovalWithItsCode(t *testing.T) {
 // FR-006: with organisations allowed, a GitHub sign-in outside them is refused, to add or
 // to pair; inside one it works.
 func TestAllowedGitHubOrganisations(t *testing.T) {
+	t.Parallel()
 	f := newProvidersFake(t)
 	p, m, owner := signInPlane(t, f)
 	var shown wire.SignInProviders
@@ -429,6 +435,7 @@ func TestAllowedGitHubOrganisations(t *testing.T) {
 // US2 AS8 (FR-006): a Google Workspace account on an allowed domain joins as a member with
 // no invite. Another domain, a personal account and an email not verified do not.
 func TestAnAllowedGoogleDomainJoinsWithNoInvite(t *testing.T) {
+	t.Parallel()
 	f := newProvidersFake(t)
 	p, _, owner := signInPlane(t, f)
 	call(t, owner, "", "signIn/configure", wire.SignInConfigure{Provider: signin.Google, Domains: []string{"Example.com"}})
@@ -471,6 +478,7 @@ func TestAnAllowedGoogleDomainJoinsWithNoInvite(t *testing.T) {
 // FR-015: a provider that cannot be reached says sign-in is not available, and why;
 // paired clients carry on.
 func TestAProviderThatCannotBeReachedSaysSo(t *testing.T) {
+	t.Parallel()
 	f := newProvidersFake(t)
 	p, _, owner := signInPlane(t, f)
 	f.google.Down.Store(true)
@@ -489,6 +497,7 @@ func TestAProviderThatCannotBeReachedSaysSo(t *testing.T) {
 // build has no id for cannot be turned on; a challenge is used once; a sign-in can be
 // taken off again.
 func TestSignInSettingsAndChallenges(t *testing.T) {
+	t.Parallel()
 	f := newProvidersFake(t)
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) {
 		cfg := f.config()

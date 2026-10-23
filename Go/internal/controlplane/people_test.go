@@ -110,6 +110,7 @@ func idsOf(hosts []*fakeHost) []string {
 // US1 (T012): one person sees no change. A code-paired client and a code-enrolled host
 // are the local owner's, who is the one admin.
 func TestOnePersonSeesNoChange(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	box := p.host("MACHINE-2")
 	_, window := p.client("Test window")
@@ -138,6 +139,7 @@ func TestOnePersonSeesNoChange(t *testing.T) {
 // their own machines; another's is not found, through the router and through every
 // control-plane method that names a machine. Admins see the name, user and state only.
 func TestEachPersonReachesOnlyTheirOwnMachines(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, alexWindow := p.client("Alex's Mac")
 	alex := &person{id: p.s.localOwner(), window: alexWindow}
@@ -219,6 +221,7 @@ func hostNamingParams(host string) map[string]any {
 // and each that does refuses another person's as not found. A method added with no
 // entry here fails.
 func TestEveryClientMethodChecksTheOwner(t *testing.T) {
+	t.Parallel()
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.ProviderHome = t.TempDir() })
 	_, alexWindow := p.client("Alex's Mac")
 	alexMachine := p.host("MACHINE-2")
@@ -294,6 +297,7 @@ func TestEveryClientMethodChecksTheOwner(t *testing.T) {
 // FR-006: a control plane keeps one admin at least; a removed person's clients are cut
 // off and their machines leave, and the code they paired with does nothing again.
 func TestRolesAndRemoval(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, alexWindow := p.client("Alex's Mac")
 	alex := p.s.localOwner()
@@ -340,6 +344,7 @@ func TestRolesAndRemoval(t *testing.T) {
 // FR-017: a machine with no code asks to join as a person, and joins once that person
 // approves it, as theirs. Another person cannot decide it, and a denied one ends.
 func TestAMachineJoinsByApproval(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, alexWindow := p.client("Alex's Mac")
 	sam := p.invite(alexWindow, "Sam", wire.UserRoleMember)
@@ -453,6 +458,7 @@ func waitNote(t *testing.T, s *controllink.Session, method string) controllink.N
 // A workspace's machine is the person's who started it (FR-028): the host code its first
 // boot uses names them.
 func TestACodeMadeForAPersonMakesTheirMachine(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	shown, err := p.s.Codes().Issue(withCodeOwner(context.Background(), "someone"), true, false, time.Minute)
 	if err != nil {
@@ -472,6 +478,7 @@ func TestACodeMadeForAPersonMakesTheirMachine(t *testing.T) {
 // sign-in or git access only within one user. A lend made before the team tier by another
 // user's machine is neither shown nor used.
 func TestLendsAndWindowsStayWithinOneUser(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	ctx := context.Background()
 	_, alexWindow := p.client("Alex's Mac")
@@ -538,6 +545,7 @@ func TestLendsAndWindowsStayWithinOneUser(t *testing.T) {
 // that is not pushed, and their registered machines. Only an admin may ask. Remove then
 // takes every machine off at once.
 func TestRemoveFirstSaysWhatWorkIsNotPushed(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	ctx := context.Background()
 	_, alexWindow := p.client("Alex's Mac")

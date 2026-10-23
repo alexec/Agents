@@ -34,6 +34,7 @@ func usage(t *testing.T, s *controllink.Session) wire.CatalogUsage {
 // Each machine's report says who uses which item at which version; a machine removed
 // takes its report with it.
 func TestGovernanceUsageIsWhatEachMachineReports(t *testing.T) {
+	t.Parallel()
 	st := store.NewMemory()
 	p := startPlane(t, st, controllink.NewPrivateKey())
 	_, admin := p.client("Alex's Mac")
@@ -75,6 +76,7 @@ func TestGovernanceUsageIsWhatEachMachineReports(t *testing.T) {
 
 // A machine's report keeps at most governanceItemsMost items.
 func TestGovernanceReportIsBounded(t *testing.T) {
+	t.Parallel()
 	st := store.NewMemory()
 	p := startPlane(t, st, controllink.NewPrivateKey())
 	_, admin := p.client("Alex's Mac")
@@ -109,6 +111,7 @@ func ask(t *testing.T, s *controllink.Session, kind wire.CatalogKind, name strin
 // the group's members who ask, and the members already waiting are approved with it. A
 // person outside the group still waits.
 func TestGovernanceApprovesOncePerGroup(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, admin := p.client("Alex's Mac")
 	sam := p.invite(admin, "Sam", wire.UserRoleMember)
@@ -177,6 +180,7 @@ func TestGovernanceApprovesOncePerGroup(t *testing.T) {
 // An approval for one person covers only them; with the group's approval in place, a new
 // member's ask is approved at once.
 func TestGovernanceApprovedAtOnce(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, admin := p.client("Alex's Mac")
 	sam := p.invite(admin, "Sam", wire.UserRoleMember)
@@ -200,6 +204,7 @@ func TestGovernanceApprovedAtOnce(t *testing.T) {
 // The bounds: at most governanceWaitingMost waiting per person, and a decided request goes
 // after governanceDecidedKept.
 func TestGovernanceRequestsAreBounded(t *testing.T) {
+	t.Parallel()
 	st := store.NewMemory()
 	p := startPlane(t, st, controllink.NewPrivateKey())
 	_, admin := p.client("Alex's Mac")

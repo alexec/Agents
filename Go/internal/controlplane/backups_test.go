@@ -74,6 +74,7 @@ func storedList(t *testing.T, b *backupStore, host string) []wire.Backup {
 }
 
 func TestBackupsGoUpInPartsAndComeBackOnAnotherHost(t *testing.T) {
+	t.Parallel()
 	b, st, owner := backupPlane(t)
 	one, two := bytes.Repeat([]byte("transcript "), 1000), []byte("the last part")
 	made, err := putBackup(t, b, "a", "20261020T120000Z", [][]byte{one, two}, 3)
@@ -122,6 +123,7 @@ func TestBackupsGoUpInPartsAndComeBackOnAnotherHost(t *testing.T) {
 }
 
 func TestBackupsRefuseWhatIsNotAHostsOwn(t *testing.T) {
+	t.Parallel()
 	b, _, _ := backupPlane(t)
 	for _, bad := range []wire.BackupStorePart{
 		{Name: "../b/20261020T120000Z", Part: 0, Data: []byte("x")},
@@ -158,6 +160,7 @@ func TestBackupsRefuseWhatIsNotAHostsOwn(t *testing.T) {
 }
 
 func TestBackupsKeepTheNewestOfEachHost(t *testing.T) {
+	t.Parallel()
 	b, st, owner := backupPlane(t)
 	b.now = func() time.Time { return time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC) }
 	for _, name := range []string{"20261018T120000Z", "20261019T120000Z"} {
@@ -212,6 +215,7 @@ func TestBackupsKeepTheNewestOfEachHost(t *testing.T) {
 // #2293: when no host of an owner is left to back up, the sweep's daily pass still prunes
 // their removed hosts' old backups and a cut-off backup's parts.
 func TestTheSweepPrunesBackupsNoHostPrunes(t *testing.T) {
+	t.Parallel()
 	b, st, owner := backupPlane(t)
 	b.now = func() time.Time { return time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC) }
 	if _, err := putBackup(t, b, "b", "20261019T120000Z", [][]byte{[]byte("b")}, 3); err != nil {
