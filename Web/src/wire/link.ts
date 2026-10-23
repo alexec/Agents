@@ -11,7 +11,9 @@ import { type KeyRecord, type KeyStore, UnsupportedBrowser } from "./keys";
 export type LinkState =
   | { kind: "connecting" }
   | { kind: "open"; name: string }
-  | { kind: "down"; since: number }
+  // `crowded` when the control plane said this browser holds as many sockets as it may: too
+  // many tabs open (#2194). It tries again as for any other.
+  | { kind: "down"; since: number; crowded?: boolean }
   | { kind: "unpaired" }
   | { kind: "forgotten" }
   | { kind: "wrongControlPlane" }
@@ -350,6 +352,13 @@ export class Link {
           socket.close(1000, "");
           return void this.suspended();
         }
+        // Too many tabs (#2194): down, and said so, trying again as ever.
+        if (error instanceof Refused && error.reason === "crowded") {
+          log("link.refused", error.reason);
+          this.socket = null;
+          socket.close(1000, "");
+          return void this.down(true);
+        }
         if (error instanceof WrongControlPlane) {
           log("link.wrongControlPlane");
           this.socket = null;
@@ -433,11 +442,12 @@ export class Link {
     this.pending.clear();
   }
 
-  private down(): void {
+  private down(crowded = false): void {
     this.clearTimers();
-    if (this.state.kind !== "down") {
-      log("link.down");
-      this.set({ kind: "down", since: Date.now() });
+    if (this.state.kind !== "down" || (this.state.crowded ?? false) !== crowded) {
+      if (this.state.kind !== "down") log("link.down");
+      const since = this.state.kind === "down" ? this.state.since : Date.now();
+      this.set(crowded ? { kind: "down", since, crowded } : { kind: "down", since });
     }
     // Out of sight it waits: the tab's return calls retryNow (#170).
     if (this.stopped || this.options.hidden()) return;

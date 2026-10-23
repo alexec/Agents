@@ -59,6 +59,10 @@ const (
 	// keeps its key: it connects again once the suspension ends. A build from before it
 	// reads it as a failed dial.
 	Suspended = "suspended"
+	// The client's key, or its person, holds as many sockets as it may (#2150): too many tabs
+	// open in one browser, say. Try again; the page says to close one (#2194). A build from
+	// before it reads it as a failed dial, as it did unavailable.
+	Crowded = "crowded"
 )
 
 // Refusal is a refused exchange, with its reason.

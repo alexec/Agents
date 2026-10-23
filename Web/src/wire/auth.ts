@@ -16,7 +16,9 @@ export interface LineSocket {
 export type RefusalReason =
   | "unknown" | "forgotten" | "expired" | "spent" | "bad-proof" | "wrong-control-plane" | "bad-message"
   // The person's org provider suspended them (#1002, D13): the key stays.
-  | "suspended";
+  | "suspended"
+  // The browser's key, or its person, holds as many sockets as it may: too many tabs (#2194).
+  | "crowded";
 
 /** The control plane said no. */
 export class Refused extends Error {

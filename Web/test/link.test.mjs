@@ -306,3 +306,22 @@ test("refused as suspended keeps the key, stays suspended, and opens once it is 
   assert.equal(net.made.length, 3);
   l.stop();
 });
+
+test("refused as crowded is down, says so, keeps the key, and opens once a tab closes (#2194)", async () => {
+  const net = sockets();
+  const keys = paired();
+  let refusals = 2;
+  const seen = [];
+  const l = link(keys, net, { authenticate: async () => {
+    if (refusals-- > 0) throw new w.Refused("crowded");
+    return { name: "test" };
+  } });
+  l.onState((state) => seen.push(state));
+  const states = await opened(l);
+  await wait(60);
+  assert.deepEqual(states, ["connecting", "down", "open"]);
+  assert.equal(seen.find((s) => s.kind === "down").crowded, true);
+  assert.notEqual(keys.record, null);
+  assert.equal(net.made.length, 3);
+  l.stop();
+});
