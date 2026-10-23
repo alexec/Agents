@@ -40,6 +40,9 @@ final class VoiceMode {
     /// Whether a prompt went and its turn has not ended yet.
     private(set) var isWaitingForReply = false
     private(set) var problem: String?
+    /// The words of a prompt the host did not take: the strip keeps them until the next
+    /// words are heard (#2441).
+    private(set) var unsent: String?
     /// The sentences said lately, newest last: what a walk reads back.
     private(set) var said: [String] = []
     /// Set by a walk (`VoiceWalk`): no microphone and no sound.
@@ -49,6 +52,8 @@ final class VoiceMode {
             audio.listens = !isWalked
         }
     }
+    /// Set by a walk: the next prompt does not go, as when the host is away.
+    var walkSendFails = false
 
     /// Sends an answer to a form, and says whether it went.
     typealias Answer = (ElicitationRequest, [String: JSONValue]) async -> Bool
@@ -118,9 +123,12 @@ final class VoiceMode {
         case .off: ""
         case .loading: "Getting the voice ready…"
         case .sending: "Sending…"
-        case .speaking: saying ?? "Speaking…"
+        case .speaking:
+            if let unsent, saying == VoiceModeWords.notSent { VoiceModeWords.unsent(unsent) }
+            else { saying ?? "Speaking…" }
         case .listening:
             if isAsking { "Say your answer." }
+            else if let unsent { VoiceModeWords.unsent(unsent) }
             else if isWaitingForReply { "Working on it. You can say more." }
             else { "Say what you want." }
         }
@@ -137,6 +145,7 @@ final class VoiceMode {
         self.vocabulary = vocabulary
         problem = nil
         heard = ""
+        unsent = nil
         isWaitingForReply = false
         // What was said before voice mode is not read out: the chat's last turn is taken
         // as spoken when it is first seen.
@@ -179,6 +188,7 @@ final class VoiceMode {
         send = nil
         phase = .off
         heard = ""
+        unsent = nil
         saying = nil
         isWaitingForReply = false
         asking = nil
@@ -556,6 +566,7 @@ final class VoiceMode {
             phase = .listening
         }
         heard = text
+        if !text.isEmpty { unsent = nil }
         pauseTimer?.cancel()
         armStillWorking()
         if confirming != nil, SpokenQuestion.isNo(text) {
@@ -587,7 +598,7 @@ final class VoiceMode {
         dictation.stop()
         phase = .sending
         let agent = agentID
-        let target = await send(words)
+        let target = walkSendFails ? nil : await send(words)
         guard agentID == agent, phase == .sending else { return }
         if let target {
             sound(.sent)
@@ -604,7 +615,10 @@ final class VoiceMode {
             turnAtSend = latestTurn
             saidSteps = []
         } else {
+            // The words are not lost: the strip keeps them, and the voice says so first.
             sound(.problem)
+            unsent = words
+            queue.insert(VoiceModeWords.notSent, at: 0)
         }
         if queue.isEmpty {
             listen()
