@@ -278,8 +278,15 @@ A tag that already exists for this version means another release ran: end with
    the step and the first error: the `mac` job waits for it, so there is no GitHub release
    either.
    **The parts agree** (#1748): each asset's name says `<version>`, and so does the
-   `testflight` job's version. On this Mac, `git checkout --detach v<version>` in a scratch
-   worktree and `scripts/version.sh` there prints `<version>`, the version every build
+   `testflight` job's version. On this Mac, make the scratch worktree at the tag under the
+   home folder, never under `$TMPDIR` or `/tmp` (Go runs in a container that sees only the
+   home folder, #2221):
+
+   ```sh
+   git worktree add --detach ~/.agents/scratch/release-v<version> v<version>
+   ```
+
+   `scripts/version.sh` there prints `<version>`, the version every build
    script stamps (agentsd, agents-control, the Linux host's `VERSION`).
 3. **TestFlight:** the `testflight` job passed. It has already waited for both builds to
    reach VALID (`scripts/asc-builds.swift`). To look again from this Mac:
@@ -290,7 +297,7 @@ A tag that already exists for this version means another release ran: end with
 5. **Deploy the control plane** (#2100). When steps 2 and 3 found the GitHub release and
    both TestFlight builds, put the version on the live control plane,
    control.agentloops.dev. Alex approved its restart for every release's deploy (2026-10-22).
-   In the scratch worktree of step 2 (at `v<version>`), lease "build" (30 minutes), run
+   In the scratch worktree of step 2 (`~/.agents/scratch/release-v<version>`), lease "build" (30 minutes), run
 
    ```sh
    AGENTS_VERSION=<version> deploy/gcp/up.sh
@@ -308,7 +315,9 @@ A tag that already exists for this version means another release ran: end with
    `priority:high`, `area:control-plane`, in the next milestone, with the step and its first
    error (never a secret). Say it in the report. It does not hold step 9: the release is
    out.
-6. **Integration videos** (#1857): `scripts/video/make.sh --changed <the last tag> v<version>`
+6. **Remove the scratch worktree** when the deploy and its checks are done, also when they
+   failed: `git worktree remove --force ~/.agents/scratch/release-v<version>`.
+7. **Integration videos** (#1857): `scripts/video/make.sh --changed <the last tag> v<version>`
    lists the integration scenes whose integration this release changed. If it lists any,
    run the `integration-videos` workflow with `manage_workflows run`, with those ids as
    its note. Do not wait for it: it is not part of the gate, and its result is not in
