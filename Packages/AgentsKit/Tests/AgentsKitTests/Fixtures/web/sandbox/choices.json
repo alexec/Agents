@@ -218,8 +218,8 @@
         "runtime" : "Use runtime default (As configured by runtime)"
       },
       "explanations" : {
-        "off" : "Grok’s own settings decide. The app adds nothing.",
-        "on" : "Grok’s own settings decide. The app adds nothing.",
+        "off" : "Commands run with your own access. Grok still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, its temporary folders and Grok’s own folder. Its permission mode is a separate choice.",
         "runtime" : "Grok’s own settings decide. The app adds nothing."
       },
       "states" : {
@@ -249,8 +249,8 @@
         "runtime" : "Use runtime default (As configured by runtime)"
       },
       "explanations" : {
-        "off" : "Grok’s own settings decide. The app adds nothing.",
-        "on" : "Grok’s own settings decide. The app adds nothing.",
+        "off" : "Commands run with your own access. Grok still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, its temporary folders and Grok’s own folder. Its permission mode is a separate choice.",
         "runtime" : "Grok’s own settings decide. The app adds nothing."
       },
       "states" : {
@@ -280,8 +280,8 @@
         "runtime" : "Use runtime default (As configured by runtime)"
       },
       "explanations" : {
-        "off" : "Grok’s own settings decide. The app adds nothing.",
-        "on" : "Grok’s own settings decide. The app adds nothing.",
+        "off" : "Commands run with your own access. Grok still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, its temporary folders and Grok’s own folder. Its permission mode is a separate choice.",
         "runtime" : "Grok’s own settings decide. The app adds nothing."
       },
       "states" : {
