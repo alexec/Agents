@@ -49,7 +49,7 @@ struct ApprovalMark: View {
 
     var body: some View {
         Image(systemName: kind == .workflowFailed ? "exclamationmark.triangle" : "checkmark.shield")
-            .foregroundStyle(StateTint.attention.style(or: .primary))
+            .sidebarMark(StateTint.attention.style(or: .primary))
             .frame(width: 16)
             .accessibilityHidden(true)
     }

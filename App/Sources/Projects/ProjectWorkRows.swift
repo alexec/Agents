@@ -177,7 +177,7 @@ struct WorkflowListRow: View {
                 if summary.workflow.isMuted, !summary.isArchived {
                     Image(systemName: MuteWords.symbol)
                         .appText(.fine)
-                        .foregroundStyle(.tertiary)
+                        .sidebarMark(.tertiary)
                         .help(MuteWords.mutedHelp)
                         .accessibilityLabel(MuteWords.muted)
                 }

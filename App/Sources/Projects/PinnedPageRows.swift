@@ -35,7 +35,7 @@ private struct PinnedPageRow: View {
             // Plain text beside a plain image, not a Label: a sidebar draws a Label's
             // title in its own style, and the row must read as the sessions do (#155).
             Image(systemName: pin.kind == .view ? "square.grid.2x2" : pin.kind == .html ? "globe" : "doc.text")
-                .foregroundStyle(Paper.accent)
+                .sidebarMark(Paper.accent)
                 .frame(width: 16)
                 .accessibilityHidden(true)
             Text(pin.title)
@@ -51,6 +51,7 @@ private struct PinnedPageRow: View {
         .help(pin.missingReason.map { "\(pin.path): \($0)" } ?? pin.path)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(pin.title), pinned \(pin.kind == .view ? "view" : "page")" + (pin.missing ? ", missing" : ""))
+        .sidebarInk(.pin(pin.path, in: project))
         .tag(SidebarItem.pin(pin.path, in: project))
         .contextMenu {
             Button("Open") { model.showPin(pin.path, in: project) }

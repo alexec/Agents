@@ -241,26 +241,28 @@ private struct SessionMark: View {
 
     /// The well grows with the text beside it (#750), so the row keeps its shape.
     @ScaledMetric private var scale: CGFloat = 1
+    /// On a row filled with the accent, the ground as the other marks (#2382).
+    @Environment(\.drawsOnAccent) private var onAccent
 
     var body: some View {
         Group {
             switch kind {
             case .needsYou:
-                Image(systemName: "hand.raised.fill").tinted(.attention)
+                Image(systemName: "hand.raised.fill").sidebarMark(StateTint.attention.style(or: .secondary))
             case .working:
                 // In the accent as the other marks (#1558, #2044); one ring for both
                 // activities (#2332).
-                WorkingRing(size: 14 * scale, color: Paper.accent, doing: tool != nil)
+                WorkingRing(size: 14 * scale, color: onAccent ? Paper.ground : Paper.accent, doing: tool != nil)
             case .queued:
-                Image(systemName: "list.number").foregroundStyle(Paper.accent)
+                Image(systemName: "list.number").sidebarMark(Paper.accent)
             case .waiting:
-                Image(systemName: "zzz").foregroundStyle(Paper.accent)
+                Image(systemName: "zzz").sidebarMark(Paper.accent)
             case .paused:
-                Image(systemName: "pause.circle").foregroundStyle(Paper.accent)
+                Image(systemName: "pause.circle").sidebarMark(Paper.accent)
             case .done:
-                Image(systemName: "checkmark").foregroundStyle(Paper.accent)
+                Image(systemName: "checkmark").sidebarMark(Paper.accent)
             case .asksToArchive:
-                Image(systemName: ArchiveRequestWords.symbol).tinted(.attention)
+                Image(systemName: ArchiveRequestWords.symbol).sidebarMark(StateTint.attention.style(or: .secondary))
             }
         }
         // Decorative: a mark filling the rows' 20-point well, as `WorkflowMark` (FR-015).
@@ -430,18 +432,20 @@ struct WorkflowMark: View {
 
     /// The well grows with the text beside it (#750), so the row keeps its shape.
     @ScaledMetric private var scale: CGFloat = 1
+    /// On a row filled with the accent, the ground as the other marks (#2382).
+    @Environment(\.drawsOnAccent) private var onAccent
 
     var body: some View {
         Group {
             if summary.isRunning {
-                SyncedSpinner(diameter: 14 * scale, color: Paper.accent)
+                SyncedSpinner(diameter: 14 * scale, color: onAccent ? Paper.ground : Paper.accent)
             } else {
                 Image(systemName: symbol)
                     // Decorative: the workflow's mark filling a 20-point well, not text (FR-015).
                     .glyph(size: 14)
                     // In the accent, as the sidebar's icons are, unless it wants a person (#495).
-                    .foregroundStyle(summary.needsAPerson ? StateTint.attention.style(or: .secondary)
-                                     : AnyShapeStyle(Paper.accent))
+                    .sidebarMark(summary.needsAPerson ? StateTint.attention.style(or: .secondary)
+                                 : AnyShapeStyle(Paper.accent))
             }
         }
         .frame(width: 20 * scale, height: 20 * scale)
@@ -481,7 +485,7 @@ struct PinnedPageRows: View {
         ForEach(Array(pins.enumerated()), id: \.element.path) { index, pin in
             HStack(spacing: 8) {
                 Image(systemName: pin.kind == .view ? "square.grid.2x2" : pin.kind == .html ? "globe" : "doc.text")
-                    .foregroundStyle(Paper.accent)
+                    .sidebarMark(Paper.accent)
                     .frame(width: 20)
                     .accessibilityHidden(true)
                 Text(pin.title)
