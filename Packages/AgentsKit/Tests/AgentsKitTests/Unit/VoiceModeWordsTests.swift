@@ -22,4 +22,9 @@ struct VoiceModeWordsTests {
         #expect(VoiceModeWords.problem(dictation: "The microphone would not start: busy")
             == "The microphone would not start: busy")
     }
+
+    /// #2443: while an answer waits for a "no", the strip says what goes.
+    @Test func theStripSaysWhatIsAboutToGo() {
+        #expect(VoiceModeWords.sayNoToStop("Sending File") == "Sending File. Say no to stop.")
+    }
 }

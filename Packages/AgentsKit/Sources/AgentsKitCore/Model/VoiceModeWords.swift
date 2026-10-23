@@ -10,6 +10,12 @@ public enum VoiceModeWords {
     /// "Sending: …" (#2442). The card is still on the screen.
     public static let answerNotSent = "The answer did not go. It is on the screen."
 
+    /// The strip while an answer waits two seconds for a "no": "Sending File. Say no to
+    /// stop." (#2443). `doing` is what was said, without its full stop.
+    public static func sayNoToStop(_ doing: String) -> String {
+        "\(doing). Say no to stop."
+    }
+
     /// Dictation's problem, in voice mode's alert, which is titled "Voice mode": "Voice mode
     /// needs the microphone.", not "Dictation needs the microphone." (#2444).
     public static func problem(dictation message: String) -> String {

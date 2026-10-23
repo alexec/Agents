@@ -129,7 +129,8 @@ final class VoiceMode {
             if let unsent, saying == VoiceModeWords.notSent { VoiceModeWords.unsent(unsent) }
             else { saying ?? "Speaking…" }
         case .listening:
-            if isAsking { "Say your answer." }
+            if let confirmLine { confirmLine }
+            else if isAsking { "Say your answer." }
             else if let unsent { VoiceModeWords.unsent(unsent) }
             else if isWaitingForReply { "Working on it. You can say more." }
             else { "Say what you want." }
@@ -196,6 +197,7 @@ final class VoiceMode {
         asking = nil
         confirming?.cancel()
         confirming = nil
+        confirmLine = nil
         waiting = nil
         approving = nil
         permission = nil
@@ -273,11 +275,13 @@ final class VoiceMode {
             self.asking = nil
             confirming?.cancel()
             confirming = nil
+            confirmLine = nil
         }
         if let approving, approving.request.id != permission?.id {
             self.approving = nil
             confirming?.cancel()
             confirming = nil
+            confirmLine = nil
         }
         step = items.turns().last.flatMap { Self.step(in: $0.items) }
         defer {
@@ -354,6 +358,9 @@ final class VoiceMode {
     private var asked: Set<UUID> = []
     /// "Sending: File.", and two seconds to say no.
     private var confirming: Task<Void, Never>?
+    /// What the strip says while an answer waits for a "no": "Sending File. Say no to
+    /// stop." (#2443). Set while it waits, with Don't Send beside it.
+    private(set) var confirmLine: String?
     private static let confirmFor: Duration = .seconds(2)
 
     /// Whether a question or a permission is being answered by voice: the strip says so.
@@ -399,8 +406,9 @@ final class VoiceMode {
         let request = approving.request
         switch answer {
         case .allow(let optionID):
-            speak([approving.spoken.isPlan ? "Approving the plan." : "Allowing it once."]) { [weak self] in
-                self?.confirm { [weak self] in await self?.approve?(request, optionID) ?? false }
+            let doing = approving.spoken.isPlan ? "Approving the plan" : "Allowing it once"
+            speak([doing + "."]) { [weak self] in
+                self?.confirm(doing) { [weak self] in await self?.approve?(request, optionID) ?? false }
             }
         case .reject(let optionID):
             self.approving = nil
@@ -476,16 +484,21 @@ final class VoiceMode {
         let title = SpokenQuestion.spokenTitle(choice.title)
         let (request, property) = (asking.request, asking.spoken.property)
         speak(["Sending: \(title)."]) { [weak self] in
-            self?.confirm { [weak self] in await self?.answer?(request, [property: .string(choice.value)]) ?? false }
+            self?.confirm("Sending \(title)") { [weak self] in
+                await self?.answer?(request, [property: .string(choice.value)]) ?? false
+            }
         }
     }
 
-    /// Listens for two seconds for a "no", then sends the answer.
-    private func confirm(_ send: @escaping () async -> Bool) {
+    /// Listens for two seconds for a "no", then sends the answer. `doing` is what the
+    /// strip says meanwhile, as "Sending File".
+    private func confirm(_ doing: String, _ send: @escaping () async -> Bool) {
+        confirmLine = VoiceModeWords.sayNoToStop(doing)
         confirming = Task { [weak self] in
             try? await Task.sleep(for: Self.confirmFor)
             guard let self, !Task.isCancelled else { return }
             confirming = nil
+            confirmLine = nil
             self.asking = nil
             self.approving = nil
             heard = ""
@@ -590,11 +603,7 @@ final class VoiceMode {
         pauseTimer?.cancel()
         armStillWorking()
         if confirming != nil, SpokenQuestion.isNo(text) {
-            confirming?.cancel()
-            confirming = nil
-            dictation.stop()
-            if let asking { speak(["Not sent."] + asking.spoken.sentences) }
-            else if let approving { speak(["Not sent."] + approving.spoken.sentences) }
+            dontSend()
             return
         }
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
@@ -603,6 +612,20 @@ final class VoiceMode {
             guard !Task.isCancelled else { return }
             await self?.sendHeard()
         }
+    }
+
+    /// No, or Don't Send (#2443): the answer waiting to go does not, and the question is
+    /// asked again.
+    func dontSend() {
+        guard confirming != nil else { return }
+        confirming?.cancel()
+        confirming = nil
+        confirmLine = nil
+        heard = ""
+        pauseTimer?.cancel()
+        dictation.stop()
+        if let asking { speak(["Not sent."] + asking.spoken.sentences) }
+        else if let approving { speak(["Not sent."] + approving.spoken.sentences) }
     }
 
     private func sendHeard() async {
