@@ -211,27 +211,23 @@
   },
   {
     "expected" : {
-      "choices" : [
-        "runtime",
-        "on",
-        "off"
-      ],
+      "choices" : [],
       "defaults" : {
         "off" : "Use runtime default (Off)",
         "on" : "Use runtime default (On)",
         "runtime" : "Use runtime default (As configured by runtime)"
       },
       "explanations" : {
-        "off" : "Commands run with your own access. Grok still asks as its permission mode says.",
-        "on" : "Commands can write only in the project, its temporary folders and Grok’s own folder. Its permission mode is a separate choice.",
+        "off" : "Grok’s own settings decide. The app adds nothing.",
+        "on" : "Grok’s own settings decide. The app adds nothing.",
         "runtime" : "Grok’s own settings decide. The app adds nothing."
       },
       "states" : {
-        "off" : "Sandbox off",
-        "on" : "Sandbox on",
+        "off" : "Sandbox: runtime controlled",
+        "on" : "Sandbox: runtime controlled",
         "runtime" : "Sandbox: runtime controlled"
       },
-      "why" : null,
+      "why" : "Grok 1.0.67 does not accept --sandbox with agent stdio. The app cannot change Grok’s sandbox.",
       "words" : {
         "off" : "Off",
         "on" : "On",
@@ -246,27 +242,23 @@
   },
   {
     "expected" : {
-      "choices" : [
-        "runtime",
-        "on",
-        "off"
-      ],
+      "choices" : [],
       "defaults" : {
         "off" : "Use runtime default (Off)",
         "on" : "Use runtime default (On)",
         "runtime" : "Use runtime default (As configured by runtime)"
       },
       "explanations" : {
-        "off" : "Commands run with your own access. Grok still asks as its permission mode says.",
-        "on" : "Commands can write only in the project, its temporary folders and Grok’s own folder. Its permission mode is a separate choice.",
+        "off" : "Grok’s own settings decide. The app adds nothing.",
+        "on" : "Grok’s own settings decide. The app adds nothing.",
         "runtime" : "Grok’s own settings decide. The app adds nothing."
       },
       "states" : {
-        "off" : "Sandbox off",
-        "on" : "Sandbox on",
+        "off" : "Sandbox: runtime controlled",
+        "on" : "Sandbox: runtime controlled",
         "runtime" : "Sandbox: runtime controlled"
       },
-      "why" : null,
+      "why" : "Grok 1.0.67 does not accept --sandbox with agent stdio. The app cannot change Grok’s sandbox.",
       "words" : {
         "off" : "Off",
         "on" : "On",
@@ -281,27 +273,23 @@
   },
   {
     "expected" : {
-      "choices" : [
-        "runtime",
-        "on",
-        "off"
-      ],
+      "choices" : [],
       "defaults" : {
         "off" : "Use runtime default (Off)",
         "on" : "Use runtime default (On)",
         "runtime" : "Use runtime default (As configured by runtime)"
       },
       "explanations" : {
-        "off" : "Commands run with your own access. Grok still asks as its permission mode says.",
-        "on" : "Commands can write only in the project, its temporary folders and Grok’s own folder. Its permission mode is a separate choice.",
+        "off" : "Grok’s own settings decide. The app adds nothing.",
+        "on" : "Grok’s own settings decide. The app adds nothing.",
         "runtime" : "Grok’s own settings decide. The app adds nothing."
       },
       "states" : {
-        "off" : "Sandbox off",
-        "on" : "Sandbox on",
+        "off" : "Sandbox: runtime controlled",
+        "on" : "Sandbox: runtime controlled",
         "runtime" : "Sandbox: runtime controlled"
       },
-      "why" : null,
+      "why" : "Grok 1.0.67 does not accept --sandbox with agent stdio. The app cannot change Grok’s sandbox.",
       "words" : {
         "off" : "Off",
         "on" : "On",

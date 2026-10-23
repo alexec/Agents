@@ -477,7 +477,7 @@ version below. A runtime the app cannot reach offers no choice, and says why.
 | --- | --- | --- | --- | --- | --- |
 | **Claude** | Claude Code 2.1.284 | `sandbox.enabled` true, through `_meta`: writes only in the project, asks before a new website | false | your settings decide: **Runtime controlled** | On a server without bubblewrap and socat, it will not start the conversation. On a Mac already inside a sandbox, each command fails. |
 | **Codex** | Codex 0.156.1 | **Ask for approval** or **Approve for me**: writes only in the project, no network | **Full access**, which also stops approval prompts | the mode decides | Each command fails, on a server without user namespaces or a Mac already inside a sandbox; Codex says so in its reply. |
-| **Grok** | Grok 1.0.44 | `--sandbox workspace`: writes only in the project, temporary folders and `~/.grok` | `--sandbox off` | your config decides: **Runtime controlled** | Grok refuses to start. |
+| **Grok** | Grok 1.0.67 | not offered: `grok agent stdio --help` has no `--sandbox` option | not offered | **Runtime controlled**: the app cannot change Grok’s sandbox | Grok 1.0.44 refused to start when the flag was passed. |
 | **Gemini** | Gemini CLI 0.61.0 | not offered: with its sandbox on, Gemini never answers the app | `GEMINI_SANDBOX=false`, above your own settings | your settings decide: **Runtime controlled** | On a server without Docker or Podman it will not start; on a Mac it never answers, and after 90 seconds the app says so. |
 | **Cursor** | 2026.09.26 | — | — | **Runtime controlled**: its own `sandbox.mode` | — |
 | **Copilot** | 1.0.89-5 | — | — | **Runtime controlled**; not measured yet | — |
