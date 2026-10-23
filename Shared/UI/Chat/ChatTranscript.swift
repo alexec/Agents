@@ -140,6 +140,8 @@ struct ChatTranscript: View {
     @State private var layoutPass = 0
     /// The slack, as the margin that keeps the pane out of it: the pane goes no higher
     /// than the first row, however much empty space is kept above it for a page (#2310).
+    /// Taken off the top of the rows, so the content starts at the first row and counts
+    /// from there; `Edges` puts it back, so the rest counts in the rows' own places.
     @State private var slackMargin: CGFloat = 0
     /// How the pane last moved, kept where writing it does not draw the pane again.
     @State private var motion = Motion()
@@ -236,6 +238,10 @@ struct ChatTranscript: View {
                     foot(column, callIsMarked: callIsMarked)
                         .layoutValue(key: TranscriptRowID.self, value: Self.foot)
                 }
+                // Out of the slack: the rows less the empty space above them. Not a negative
+                // top margin on the scroll view, which hid every row from the pointer: no
+                // click reached a question card's choices or any other row (#2374).
+                .padding(.top, -slackMargin)
             }
             .scrollPosition($position)
             // Hidden from choosing a conversation until it is placed at its end: its first
@@ -256,9 +262,6 @@ struct ChatTranscript: View {
             // Held within the pane, which only a card that fills the pane asks for.
             .contentMargins(.bottom, footMargin, for: .scrollContent)
             .contentMargins(.bottom, footMargin, for: .scrollIndicators)
-            // Out of the slack: a margin changes how far the pane may go, never where the
-            // rows are, so it can follow the slack a pass late and move nothing.
-            .contentMargins(.top, -slackMargin, for: .scrollContent)
             // A scroll view will not be shorter than its margins, so the margin above
             // made the pane at least as tall as the cards and prompt bar it measured,
             // and they, being given that much, never shrank: a tall question card ran
@@ -270,21 +273,22 @@ struct ChatTranscript: View {
                 if abs($0.width - paneWidth) > 0.5 { paneWidth = $0.width }
             }
             .onScrollGeometryChange(for: Edges.self) { geometry in
-                // The screen in the content's own coordinates: the offset and the pane's height.
-                // Not `visibleRect`, which takes in the margin that keeps the pane out of the
-                // slack, half a million points of it.
-                Edges(contentHeight: geometry.contentSize.height, offset: geometry.contentOffset.y,
+                // The screen in the rows' own places, the slack above them put back: the
+                // content starts at the first row, the slack taken off its top (#2374).
+                // Read with the margin the content was laid out by, so `was` and `edges`
+                // each count by their own.
+                Edges(contentHeight: geometry.contentSize.height + slackMargin,
+                      offset: geometry.contentOffset.y + slackMargin,
                       footInset: geometry.contentInsets.bottom, height: geometry.containerSize.height,
                       topInset: geometry.contentInsets.top)
             } action: { was, edges in
                 #if os(macOS)
-                // The Mac's container takes in the margin that keeps the pane out of the slack,
-                // half a million points of it: the pane is its own frame and the title bar it
-                // runs under. On iOS the container is the pane, safe area and all.
+                // The pane is its own frame and the title bar it runs under. On iOS the
+                // container is the pane, safe area and all.
                 var edges = edges, was = was
                 if let paneHeight {
-                    edges.height = paneHeight + edges.topInset + slackMargin
-                    was.height = paneHeight + was.topInset + slackMargin
+                    edges.height = paneHeight + edges.topInset
+                    was.height = paneHeight + was.topInset
                 }
                 #endif
                 moved(was, edges)
@@ -471,7 +475,7 @@ struct ChatTranscript: View {
         guard settleKey == motion.key else { return }
         onHeight?(edges.height)
         motion.offset = edges.offset
-        motion.barInset = edges.topInset + slackMargin
+        motion.barInset = edges.topInset
         motion.visibleTop = edges.top
         motion.visibleBottom = edges.bottom
         // The slack ran out under a reader: everything went down by as much, and so does
@@ -668,8 +672,9 @@ struct ChatTranscript: View {
         position.scrollTo(edge: .bottom)
     }
 
-    /// Moves the pane so the screen starts at `y` in the content. A scroll position counts
-    /// from the top margin: the bar over the pane, less the slack (#2310). Never eased: an
+    /// Moves the pane so the screen starts at `y` in the rows' own places. A scroll position
+    /// counts from the top margin, the bar over the pane, in the content, which starts
+    /// below the slack (#2310, #2374). Never eased: an
     /// eased move started as following ends was dropped, and nothing that moves this pane
     /// is eased.
     private func scroll(to y: Double) {
@@ -698,7 +703,7 @@ struct ChatTranscript: View {
         var footInset: CGFloat
         /// How tall the pane is.
         var height: CGFloat
-        /// The margin over the content: a bar over the pane, less the slack's margin.
+        /// The margin over the content: a bar over the pane.
         var topInset: CGFloat
 
         /// The part of the content on screen.
