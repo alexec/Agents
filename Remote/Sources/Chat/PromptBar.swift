@@ -265,10 +265,13 @@ struct PromptBar: View {
 
             AttachButton(attachments: $attachments, refusal: $attachRefusal)
 
-            DictateButton(dictation: dictation, begin: beginDictation)
+            DictateButton(dictation: dictation, begin: beginDictation, send: send)
 
             // Voice mode (#2322), while Settings ▸ Voice has it on.
-            VoiceModeButton(agentID: agent.id, vocabulary: speechSeeds) { await model.send($0, to: agent.id, voice: true) ? agent.id : nil }
+            VoiceModeButton(agentID: agent.id, vocabulary: speechSeeds) { words, stopping in
+                if let stopping { await model.stop(stopping) }
+                return await model.send(words, to: agent.id, voice: true) ? agent.id : nil
+            }
 
             // While it works and nothing is typed, send is stop. Type and it is send
             // again, queueing what is typed for when the turn ends.

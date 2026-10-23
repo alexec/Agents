@@ -9,13 +9,8 @@ import Foundation
 /// link says whose it is; hashes, issue numbers, units, clock times and versions are said
 /// as a person says them.
 public enum Speakable {
-    /// A reply longer than this many words is cut to its first sentences (#1792, question 3):
-    /// 60 words is about 25 seconds of speech.
-    public static let longReplyWords = 60
-    /// How many sentences of a long reply are spoken.
+    /// How many sentences may be spoken while a reply is still streaming (#2429).
     public static let longReplySentences = 3
-    /// What is said after a long reply is cut.
-    public static let restOnTheScreen = "The rest is on the screen."
 
     /// The whole reply, as one speakable string.
     public static func text(_ markdown: String) -> String {
@@ -35,27 +30,9 @@ public enum Speakable {
         return Array(out.prefix(limit))
     }
 
-    /// What voice mode says for a reply: its sentences, or the first three and
-    /// "The rest is on the screen." when it is long. Lines are cleaned only until the
-    /// reply is known to be long (#2429): a 1,000-line reply cleans a few, not all.
+    /// What voice mode says for a reply: every cleaned sentence (#2534).
     public static func spoken(_ markdown: String) -> [String] {
-        var all: [String] = []
-        var words = 0
-        forEachBlock(markdown) { line in
-            let cleaned = clean(line: line)
-            guard !cleaned.isEmpty else { return true }
-            for sentence in split(sentencesIn: cleaned) {
-                all.append(sentence)
-                words += sentence.split(separator: " ").count
-            }
-            return !isLong(words: words, sentences: all.count)
-        }
-        guard isLong(words: words, sentences: all.count) else { return all }
-        return Array(all.prefix(longReplySentences)) + [restOnTheScreen]
-    }
-
-    private static func isLong(words: Int, sentences: Int) -> Bool {
-        words > longReplyWords && sentences > longReplySentences
+        sentences(markdown)
     }
 
     // MARK: - Blocks

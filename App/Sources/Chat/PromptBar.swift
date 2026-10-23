@@ -608,7 +608,7 @@ struct PromptBar: View {
             .help("Attach a file or a picture")
             .accessibilityLabel("Attach")
 
-            Button(action: toggleDictation) {
+            PushToTalkButton(tap: toggleDictation, begin: beginDictation, end: finishPushToTalk) {
                 Image(systemName: dictation.isListening ? "waveform" : "microphone")
                     .appText(.reading).fontWeight(.semibold)
                     .frame(width: 22, height: 22)
@@ -712,12 +712,22 @@ struct PromptBar: View {
             dictation.stop()
             return
         }
+        beginDictation()
+    }
+
+    private func beginDictation() {
         focused = true
         dictation.start(in: text, selection: DictationCursor.range(of: selection, in: text),
                         vocabulary: speechSeeds) { field, cursor in
             text = field
             selection = DictationCursor.selection(cursor, in: field)
         }
+    }
+
+    private func finishPushToTalk() {
+        guard dictation.isListening else { return }
+        dictation.stop()
+        send()
     }
 
     // MARK: What goes with the words
@@ -1128,8 +1138,9 @@ struct PromptBar: View {
 
     /// Words from voice mode: to this chat, or the start of a new session with this bar's
     /// labels (#2375). Says which chat took them.
-    private func sendSpoken(_ words: String) async -> UUID? {
+    private func sendSpoken(_ words: String, _ stopping: UUID?) async -> UUID? {
         if let agent {
+            if let stopping { await model.stop(stopping) }
             return await model.send(words, to: agent.id, voice: true) ? agent.id : nil
         }
         var started: UUID?

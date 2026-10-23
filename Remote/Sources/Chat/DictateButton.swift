@@ -8,11 +8,13 @@ struct DictateButton: View {
     let dictation: Dictation
     /// Starts listening at the bar's cursor, after the primer the first time.
     let begin: () -> Void
+    /// Sends the prompt after a held press ends.
+    let send: () -> Void
 
     @State private var isPriming = false
 
     var body: some View {
-        Button(action: toggle) {
+        PushToTalkButton(tap: toggle, begin: beginPushToTalk, end: finishPushToTalk) {
             Image(systemName: dictation.isListening ? "waveform" : "microphone")
                 .appText(.reading).fontWeight(.semibold)
                 .frame(width: 22, height: 22)
@@ -44,6 +46,18 @@ struct DictateButton: View {
         } else {
             isPriming = true
         }
+    }
+
+    private func beginPushToTalk() {
+        guard !VoiceMode.shared.isOn, !dictation.isListening else { return }
+        if dictation.hasBeenAsked { begin() }
+        else { isPriming = true }
+    }
+
+    private func finishPushToTalk() {
+        guard dictation.isListening else { return }
+        dictation.stop()
+        send()
     }
 
     /// Our own words before the system's alert, the first time only.
