@@ -141,7 +141,6 @@ function WorkspaceRow({ store, provider, workspace, hosts, say, link }: {
   );
 }
 
-/** Add a Provider (kind first, then its form), or Edit… one: its name and its secrets again. */
 /** Add a Provider, or Edit… one. With `added` (Add a Machine, #2131) it goes on with the provider it added, in place of closing. */
 export function AddProviderDialog({ store, editing, close, added }: {
   store: Store; editing?: ProviderSummary | undefined; close: () => void; added?: (id: string | undefined) => void;

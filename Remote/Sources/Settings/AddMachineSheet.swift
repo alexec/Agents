@@ -50,7 +50,7 @@ struct AddMachineSheet: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(Words.choice(way))
             Text(way == .provider && oneCopy ? Words.needsControlPlane : Words.note(way, ssh: false))
-                .font(.footnote).foregroundStyle(.secondary)
+                .appText(.supporting).foregroundStyle(.secondary)
         }
     }
 
