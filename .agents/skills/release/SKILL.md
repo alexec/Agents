@@ -62,6 +62,15 @@ workflow runs when an issue closes and once a day, so most runs find it is not, 
 once. Skip this step when Alex started the run (Run now, or a message): the note at the end
 of the prompt says why it started.
 
+**One release a day (Alex, 2026-10-22, #2462).** Do this check first, also when Alex started
+the run. Find the last tag's time in Alex's time zone:
+`git fetch --quiet --tags origin && git for-each-ref --sort=-taggerdate --count=1 --format='%(refname:short) %(taggerdate:unix)' 'refs/tags/v*'`,
+then `TZ=America/Los_Angeles date -r <unix> '+%F %H:%M'`, and today is
+`TZ=America/Los_Angeles date +%F`. When the tag's date is today, end with `nothing_to_do` and
+the line "released today (vX.Y.Z at HH:MM); next release tomorrow". Change nothing and start
+nothing. Only a prompt from Alex that says to release again today goes on. A day is the
+calendar day in America/Los_Angeles, not 24 hours since the tag.
+
 1. The open milestone is the earliest open one by its version:
    `gh api 'repos/alexec/Agents/milestones?state=open' --jq '.[]|[.number,.title]|@tsv'`,
    the lowest `0.x` first.
@@ -226,6 +235,9 @@ All of these, on the commit you will tag (`git rev-parse origin/main`, fetched a
    advisories is without its fix.
 3. **Walks:** `gh issue list --label needs-walk --state open` holds at most five.
    More than five: end with `partly_done`, naming them; walks are the Scrum Master's to start.
+4. **No tag today** (#2462): look again as in step 0. The release can run past midnight, so a
+   tag pushed today by another run ends this one with `nothing_to_do` and "released today
+   (vX.Y.Z at HH:MM); next release tomorrow", unless Alex's prompt says to release again today.
 
 ## 6. Version and notes
 
