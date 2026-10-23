@@ -5794,6 +5794,23 @@
       ],
       "additionalProperties": false
     },
+    "DeletePreview": {
+      "type": "object",
+      "description": "How many archived agents a retention change would delete at once, and the bytes that frees.",
+      "properties": {
+        "count": {
+          "type": "integer"
+        },
+        "bytes": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "count",
+        "bytes"
+      ],
+      "additionalProperties": false
+    },
     "DeleteSessionRequest": {
       "type": "object",
       "properties": {
@@ -11983,12 +12000,56 @@
       ],
       "additionalProperties": false
     },
+    "MoveAnswer": {
+      "type": "object",
+      "description": "What a person's move came to. The message is what the window may show.",
+      "properties": {
+        "when": {
+          "$ref": "#/definitions/MoveWhen"
+        },
+        "message": {
+          "type": "string"
+        },
+        "agent": {
+          "$ref": "#/definitions/Agent"
+        }
+      },
+      "required": [
+        "when",
+        "message"
+      ],
+      "additionalProperties": false
+    },
     "MoveAsker": {
       "type": "string",
       "enum": [
         "agent",
         "person"
       ]
+    },
+    "MoveRequest": {
+      "type": "object",
+      "description": "The person moving an agent (053). No target takes back the person's move that is waiting.",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "target": {
+          "$ref": "#/definitions/MoveTarget"
+        },
+        "removeLeft": {
+          "type": "boolean"
+        },
+        "discardChanges": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "agentID",
+        "removeLeft",
+        "discardChanges"
+      ],
+      "additionalProperties": false
     },
     "MoveTarget": {
       "anyOf": [
@@ -12046,6 +12107,14 @@
           ],
           "additionalProperties": false
         }
+      ]
+    },
+    "MoveWhen": {
+      "type": "string",
+      "enum": [
+        "now",
+        "afterTurn",
+        "nothing"
       ]
     },
     "Need": {
@@ -16666,6 +16735,41 @@
         "forever"
       ],
       "x-fallback": "days30"
+    },
+    "RetentionSetRequest": {
+      "type": "object",
+      "description": "retention/set. Without confirmed, a change that would delete agents at once is only described.",
+      "properties": {
+        "settings": {
+          "$ref": "#/definitions/RetentionSettings"
+        },
+        "confirmed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "settings",
+        "confirmed"
+      ],
+      "additionalProperties": false
+    },
+    "RetentionSetResult": {
+      "type": "object",
+      "properties": {
+        "applied": {
+          "type": "boolean"
+        },
+        "wouldDelete": {
+          "$ref": "#/definitions/DeletePreview"
+        },
+        "state": {
+          "$ref": "#/definitions/RetentionState"
+        }
+      },
+      "required": [
+        "applied"
+      ],
+      "additionalProperties": false
     },
     "RetentionSettings": {
       "type": "object",
@@ -23050,6 +23154,16 @@
         "project",
         "total"
       ]
+    },
+    "WorkflowLimitSettings": {
+      "type": "object",
+      "description": "How many workflows may be turned on at once. No total is the default, 10. Kept in workflow-limit.json.",
+      "properties": {
+        "total": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false
     },
     "WorkflowMCPClearMissedRequest": {
       "type": "object",

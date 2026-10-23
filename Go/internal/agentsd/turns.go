@@ -1293,6 +1293,17 @@ func (l *live) Permission(ctx context.Context, p sdk.RequestPermissionRequest) s
 	if d.isBot() {
 		return l.refuseForBot(req)
 	}
+	// Always-approve answers before a card, for Cursor, Grok and OpenCode (061). A request
+	// with no allow option still waits for the person.
+	if a := d.Store.Agent(l.id); a != nil && d.alwaysApproves(a.RuntimeID) {
+		for _, kind := range []wire.PermissionOptionKind{wire.PermissionOptionKindAllowOnce, wire.PermissionOptionKindAllowAlways} {
+			for _, o := range req.Options {
+				if o.Kind == kind {
+					return o.OptionID
+				}
+			}
+		}
+	}
 	pp := &pendingPermission{req: req, answer: make(chan string, 1)}
 	l.mu.Lock()
 	l.pending[req.ID] = pp

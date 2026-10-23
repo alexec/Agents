@@ -353,6 +353,13 @@ func (d *Daemon) launchOn(r *runtimeDef, dir string, account *wire.AccountProfil
 		env = append(env, "GEMINI_HOME="+d.appHomes()["antigravity"], "AGY_ACP_DISABLE_WORKSPACE_TRUST=1",
 			"AGY_ACP_FORCE_FILE_STORAGE=1")
 	}
+	// A Gemini key the window lent (043) wins over one already in the environment. An
+	// account of the runtime's own, and Antigravity, are left as they are.
+	if account == nil && r.ID == "gemini" {
+		if key := d.lentSecret("gemini"); key != "" {
+			env = append(without(env, "GEMINI_API_KEY", "GOOGLE_API_KEY"), "GEMINI_API_KEY="+key)
+		}
+	}
 	if isOrgAccount(account) {
 		var err error
 		if env, err = d.withOrgAccount(env, r.ID, account, agent); err != nil {

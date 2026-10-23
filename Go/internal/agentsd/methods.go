@@ -16,8 +16,9 @@ func (d *Daemon) register() {
 	On(d, wire.CallDaemonPing, func(context.Context, *Client, wire.Empty) (wire.PingResponse, error) {
 		return wire.PingResponse{Ok: true}, nil
 	})
-	// What the window pushes or reports on connecting, which this host has no use for yet.
-	Quiet(d, wire.CallCredentialsOffer.Name, wire.CallAgentsPrewarm.Name)
+	// What the window pushes on connecting, which this host has no use for yet.
+	Quiet(d, wire.CallAgentsPrewarm.Name)
+	d.registerLend()
 	d.registerFiles()
 	d.registerMac()
 	d.registerAgents()
@@ -46,6 +47,7 @@ func (d *Daemon) register() {
 	d.registerOptions()
 	d.registerInstall()
 	d.registerSandbox()
+	d.registerMoves()
 	d.registerRuntimeSessions()
 	d.registerRuntimeAuth()
 	d.registerWorkflows()

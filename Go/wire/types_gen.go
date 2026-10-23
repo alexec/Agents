@@ -2655,6 +2655,13 @@ type DefaultAccountRequest struct {
 	AccountID *string `json:"accountID,omitzero"`
 }
 
+// How many archived agents a retention change would delete at once, and the bytes that frees.
+type DeletePreview struct {
+	Count int64 `json:"count"`
+
+	Bytes int64 `json:"bytes"`
+}
+
 type DeleteSessionRequest struct {
 	RuntimeID string `json:"runtimeID"`
 
@@ -5139,10 +5146,30 @@ type MissingFolder struct {
 	BranchKept bool `json:"branchKept"`
 }
 
+// What a person's move came to. The message is what the window may show.
+type MoveAnswer struct {
+	When MoveWhen `json:"when"`
+
+	Message string `json:"message"`
+
+	Agent *Agent `json:"agent,omitzero"`
+}
+
 type MoveAsker string
 
 const MoveAskerAgent MoveAsker = "agent"
 const MoveAskerPerson MoveAsker = "person"
+
+// The person moving an agent (053). No target takes back the person's move that is waiting.
+type MoveRequest struct {
+	AgentID UUID `json:"agentID"`
+
+	Target *MoveTarget `json:"target,omitzero"`
+
+	RemoveLeft bool `json:"removeLeft"`
+
+	DiscardChanges bool `json:"discardChanges"`
+}
 
 type MoveTarget struct {
 	NewWorktree *MoveTargetNewWorktree `json:"newWorktree,omitzero"`
@@ -5159,6 +5186,12 @@ type MoveTargetNewWorktree struct {
 type MoveTargetExisting struct {
 	Value URL `json:"_0"`
 }
+
+type MoveWhen string
+
+const MoveWhenNow MoveWhen = "now"
+const MoveWhenAfterTurn MoveWhen = "afterTurn"
+const MoveWhenNothing MoveWhen = "nothing"
 
 type Need struct {
 	ID NeedID `json:"id"`
@@ -7191,6 +7224,21 @@ func (v *RetentionKeepFor) UnmarshalJSON(b []byte) error {
 		*v = RetentionKeepForDays30
 	}
 	return nil
+}
+
+// retention/set. Without confirmed, a change that would delete agents at once is only described.
+type RetentionSetRequest struct {
+	Settings RetentionSettings `json:"settings"`
+
+	Confirmed bool `json:"confirmed"`
+}
+
+type RetentionSetResult struct {
+	Applied bool `json:"applied"`
+
+	WouldDelete *DeletePreview `json:"wouldDelete,omitzero"`
+
+	State *RetentionState `json:"state,omitzero"`
 }
 
 type RetentionSettings struct {
@@ -9809,6 +9857,11 @@ type WorkflowLimit string
 
 const WorkflowLimitProject WorkflowLimit = "project"
 const WorkflowLimitTotal WorkflowLimit = "total"
+
+// How many workflows may be turned on at once. No total is the default, 10. Kept in workflow-limit.json.
+type WorkflowLimitSettings struct {
+	Total *int64 `json:"total,omitzero"`
+}
 
 type WorkflowMCPClearMissedRequest struct {
 	Folder URL `json:"folder"`

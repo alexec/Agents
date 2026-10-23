@@ -30,6 +30,58 @@ func (d *Daemon) keepFor() wire.RetentionKeepFor {
 	return wire.RetentionKeepForDays30
 }
 
+// dueArchived is what a sweep at keep would delete now. The same agents sweepArchived
+// keeps are left out: one with no archive time, and a pinned session. Nothing is written.
+func (d *Daemon) dueArchived(keep wire.RetentionKeepFor) (count int, bytes int64) {
+	days, ok := keepDays(keep)
+	if !ok {
+		return 0, 0
+	}
+	cutoff := nowFunc().Add(-days)
+	pinned := map[string]map[wire.UUID]bool{}
+	for _, a := range d.Store.Agents() {
+		if a.State != wire.AgentStateArchived || a.ArchivedAt == nil || !a.ArchivedAt.Time().Before(cutoff) {
+			continue
+		}
+		project := projectFolder(&a)
+		if pinned[project] == nil {
+			pinned[project] = map[wire.UUID]bool{}
+			for _, s := range d.readPins(project).sessions {
+				pinned[project][wire.UUID(strings.ToUpper(string(s.Session)))] = true
+			}
+		}
+		if pinned[project][wire.UUID(strings.ToUpper(string(a.ID)))] {
+			continue
+		}
+		count++
+		bytes += folderBytes(d.Store.Loc.Agent(string(a.ID)))
+	}
+	return count, bytes
+}
+
+// setRetention is retention/set. Unconfirmed, a change that would delete agents now is
+// only described. Confirmed, or a change that deletes nothing, is saved and swept.
+func (d *Daemon) setRetention(r wire.RetentionSetRequest) (wire.RetentionSetResult, error) {
+	keep := r.Settings.KeepFor
+	switch keep {
+	case wire.RetentionKeepForDays7, wire.RetentionKeepForDays14, wire.RetentionKeepForDays30,
+		wire.RetentionKeepForDays90, wire.RetentionKeepForForever:
+	default:
+		keep = wire.RetentionKeepForDays30
+	}
+	count, bytes := d.dueArchived(keep)
+	if !r.Confirmed && count > 0 {
+		return wire.RetentionSetResult{Applied: false, WouldDelete: &wire.DeletePreview{Count: int64(count), Bytes: bytes}}, nil
+	}
+	if err := d.writeSetting("retention.json", wire.RetentionSettings{KeepFor: keep}); err != nil {
+		return wire.RetentionSetResult{}, &Error{Code: wire.FailureCouldNotSave, Message: "retention.json: " + err.Error()}
+	}
+	d.sweepArchived()
+	state := d.retentionState()
+	Broadcast(d, wire.NotifyRetentionChanged, state)
+	return wire.RetentionSetResult{Applied: true, State: &state}, nil
+}
+
 // keepDays is how long an archived agent is kept; false for Forever.
 func keepDays(keep wire.RetentionKeepFor) (time.Duration, bool) {
 	days := map[wire.RetentionKeepFor]int{wire.RetentionKeepForDays7: 7, wire.RetentionKeepForDays14: 14,

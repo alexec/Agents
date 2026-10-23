@@ -111,7 +111,7 @@ func TestABotsMachineSendsTeamEventsAndKeepsItsOwn(t *testing.T) {
 		out, ok := d.Asked(wire.CallWorkflowsFire.Name, params)
 		return ok && out.(wire.TeamTriggerFired).Ran
 	}
-	if _, ok := d.Asked("git/fill", nil); ok {
+	if _, ok := d.Asked("nothing/here", nil); ok {
 		t.Fatal("answered what it does not know")
 	}
 	other := wire.Event{Name: "lease.granted", Scope: projectScope("/elsewhere/" + filepath.Base(dir)), Details: map[string]string{"resource": "build"}}

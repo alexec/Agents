@@ -30,6 +30,7 @@ import (
 const (
 	workflowsWaitingPerProject = 3
 	workflowsTotalDefault      = 10
+	workflowsTotalMax          = 50
 	approvalsBeganNote         = "Approval began here; see #205.\n"
 )
 
@@ -331,10 +332,34 @@ func (d *Daemon) workflowTotal() int64 {
 	var l struct {
 		Total int64 `json:"total"`
 	}
-	if b, err := os.ReadFile(filepath.Join(d.SettingsDir, "workflow-limit.json")); err == nil && diskjson.Unmarshal(b, &l) == nil && l.Total >= 1 && l.Total <= 50 {
+	if b, err := os.ReadFile(filepath.Join(d.SettingsDir, "workflow-limit.json")); err == nil && diskjson.Unmarshal(b, &l) == nil && l.Total >= 1 && l.Total <= workflowsTotalMax {
 		return l.Total
 	}
 	return workflowsTotalDefault
+}
+
+// workflowLimitSettings is workflows/limit. No total is the default.
+func (d *Daemon) workflowLimitSettings() wire.WorkflowLimitSettings {
+	var l struct {
+		Total *int64 `json:"total"`
+	}
+	b, err := os.ReadFile(filepath.Join(d.SettingsDir, "workflow-limit.json"))
+	if err != nil || diskjson.Unmarshal(b, &l) != nil || l.Total == nil || *l.Total < 1 || *l.Total > workflowsTotalMax {
+		return wire.WorkflowLimitSettings{}
+	}
+	return wire.WorkflowLimitSettings{Total: l.Total}
+}
+
+// setWorkflowLimit is workflows/setLimit. A total outside 1 to 50 is refused in the
+// words the window already shows.
+func (d *Daemon) setWorkflowLimit(s wire.WorkflowLimitSettings) (wire.WorkflowLimitSettings, error) {
+	if s.Total != nil && (*s.Total < 1 || *s.Total > workflowsTotalMax) {
+		return wire.WorkflowLimitSettings{}, Invalid("Workflows turned on must be between 1 and 50.")
+	}
+	if err := d.writeSetting("workflow-limit.json", s); err != nil {
+		return wire.WorkflowLimitSettings{}, &Error{Code: wire.FailureCouldNotSave, Message: "workflow-limit.json: " + err.Error()}
+	}
+	return d.workflowLimitSettings(), nil
 }
 
 // ceilingsLocked is which workflows are over a ceiling: past the 3 waiting in a project,
@@ -921,6 +946,12 @@ func (d *Daemon) approveWorkflow(r wire.WorkflowApproveRequest, approve bool) (w
 func (d *Daemon) byPerson(c *Client) bool { return true }
 
 func (d *Daemon) registerWorkflows() {
+	On(d, wire.CallWorkflowsLimit, func(ctx context.Context, c *Client, _ wire.Empty) (wire.WorkflowLimitSettings, error) {
+		return d.workflowLimitSettings(), nil
+	})
+	On(d, wire.CallWorkflowsSetLimit, func(ctx context.Context, c *Client, s wire.WorkflowLimitSettings) (wire.WorkflowLimitSettings, error) {
+		return d.setWorkflowLimit(s)
+	})
 	On(d, wire.CallWorkflowsList, func(ctx context.Context, c *Client, r wire.WorkflowsListRequest) ([]wire.WorkflowSummary, error) {
 		folder := ""
 		if r.Folder != nil {

@@ -2227,6 +2227,12 @@ export interface DefaultAccountRequest {
   accountID?: string;
 }
 
+/** How many archived agents a retention change would delete at once, and the bytes that frees. */
+export interface DeletePreview {
+  count: number;
+  bytes: number;
+}
+
 export interface DeleteSessionRequest {
   runtimeID: string;
   sessionID: string;
@@ -3990,14 +3996,34 @@ export interface MissingFolder {
   branchKept: boolean;
 }
 
+/** What a person's move came to. The message is what the window may show. */
+export interface MoveAnswer {
+  when: MoveWhen;
+  message: string;
+  agent?: Agent;
+}
+
 export type MoveAsker =
   | "agent"
   | "person";
+
+/** The person moving an agent (053). No target takes back the person's move that is waiting. */
+export interface MoveRequest {
+  agentID: UUID;
+  target?: MoveTarget;
+  removeLeft: boolean;
+  discardChanges: boolean;
+}
 
 export type MoveTarget =
   | { newWorktree: { name?: string } }
   | { existing: { _0: URLString } }
   | { projectFolder: Record<string, never> };
+
+export type MoveWhen =
+  | "now"
+  | "afterTurn"
+  | "nothing";
 
 export interface Need {
   id: NeedID;
@@ -5690,6 +5716,20 @@ export type RetentionKeepFor =
   | "days30"
   | "days90"
   | "forever";
+
+/**
+ * retention/set. Without confirmed, a change that would delete agents at once is only described.
+ */
+export interface RetentionSetRequest {
+  settings: RetentionSettings;
+  confirmed: boolean;
+}
+
+export interface RetentionSetResult {
+  applied: boolean;
+  wouldDelete?: DeletePreview;
+  state?: RetentionState;
+}
 
 export interface RetentionSettings {
   keepFor: RetentionKeepFor;
@@ -7683,6 +7723,14 @@ export type WorkflowLimit =
   | "project"
   | "total";
 
+/**
+ * How many workflows may be turned on at once. No total is the default, 10. Kept in
+ * workflow-limit.json.
+ */
+export interface WorkflowLimitSettings {
+  total?: number;
+}
+
 export interface WorkflowMCPClearMissedRequest {
   folder: URLString;
   workflowID: string;
@@ -8684,6 +8732,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DeclareResourceRequest: { required: ["resource"], optional: ["replacing"] },
   DeclaredResource: { required: ["name", "displayName", "description", "holders"], optional: ["defaultMinutes", "maximumMinutes"] },
   DefaultAccountRequest: { required: ["runtimeID"], optional: ["accountID"] },
+  DeletePreview: { required: ["count", "bytes"], optional: [] },
   DeleteSessionRequest: { required: ["runtimeID", "sessionID"], optional: ["confirmed"] },
   DeliveredRoute: { required: ["id", "name", "kind", "runtimes", "defaultFor", "secretFields", "version", "sealed"], optional: ["vendor", "settings", "models", "expires"] },
   DestinationStateAnswer: { required: ["destinationState"], optional: [] },
@@ -8882,6 +8931,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MessageSender: { required: ["agentID", "title"], optional: [] },
   Milestones: { required: ["earned"], optional: [] },
   MissingFolder: { required: ["branchKept"], optional: [] },
+  MoveAnswer: { required: ["when", "message"], optional: ["agent"] },
+  MoveRequest: { required: ["agentID", "removeLeft", "discardChanges"], optional: ["target"] },
   Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID"] },
   OTLPExport: { required: ["endpoint", "every"], optional: ["lastSent", "lastFailure", "failedAt"] },
   OptionsRequest: { required: ["runtimeID", "cwd", "mcpServers"], optional: [] },
@@ -9049,6 +9100,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ResourceState: { required: ["name", "kind", "displayName", "isGone", "line", "endingSoon"], optional: ["holds", "lease", "places", "declared"] },
   ResumingNotification: { required: ["agentID", "isResuming"], optional: [] },
   ResumingResponse: { required: ["agentIDs"], optional: [] },
+  RetentionSetRequest: { required: ["settings", "confirmed"], optional: [] },
+  RetentionSetResult: { required: ["applied"], optional: ["wouldDelete", "state"] },
   RetentionSettings: { required: ["keepFor"], optional: [] },
   RetentionState: { required: ["settings", "archivedCount", "archivedBytes"], optional: [] },
   Runtime: { required: ["id", "name", "executable", "arguments", "installPage", "usesAppCopyOnly"], optional: ["install", "accountFolderVariable"] },
@@ -9252,6 +9305,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowClaim: { required: ["workflow", "trigger"], optional: [] },
   WorkflowClaimed: { required: ["won"], optional: [] },
   WorkflowEnableRequest: { required: ["folder", "workflowID", "enabled"], optional: [] },
+  WorkflowLimitSettings: { required: [], optional: ["total"] },
   WorkflowMCPClearMissedRequest: { required: ["folder", "workflowID", "name"], optional: ["server"] },
   WorkflowMuteRequest: { required: ["folder", "workflowID", "muted"], optional: [] },
   WorkflowRemovedNotification: { required: ["folder", "workflowID"], optional: [] },

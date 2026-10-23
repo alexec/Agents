@@ -57,17 +57,19 @@ func (d *Daemon) registerHost() {
 		return d.diskState(), nil
 	})
 	On(d, wire.CallSandboxState, func(ctx context.Context, c *Client, _ wire.Empty) (wire.SandboxSettings, error) {
-		st := d.sandboxSettings()
-		if sandboxRequired(d.orgPolicy()) {
-			st.SetBy = setBy("sandbox", sandboxRequiredWords)
-		}
-		return st, nil
+		return d.sandboxState(), nil
 	})
 	On(d, wire.CallClientPermissionsState, func(ctx context.Context, c *Client, _ wire.Empty) (wire.ClientPermissionSettings, error) {
 		return d.clientPermissions(), nil
 	})
+	On(d, wire.CallClientPermissionsSet, func(ctx context.Context, c *Client, s wire.ClientPermissionSettings) (wire.ClientPermissionSettings, error) {
+		return d.setClientPermissions(s)
+	})
 	On(d, wire.CallRetentionState, func(ctx context.Context, c *Client, _ wire.Empty) (wire.RetentionState, error) {
 		return d.retentionState(), nil
+	})
+	On(d, wire.CallRetentionSet, func(ctx context.Context, c *Client, r wire.RetentionSetRequest) (wire.RetentionSetResult, error) {
+		return d.setRetention(r)
 	})
 	On(d, wire.CallStoreNotes, func(ctx context.Context, c *Client, _ wire.Empty) (wire.StoreNotes, error) {
 		// No file of this host's has been set aside.
@@ -139,6 +141,28 @@ func (d *Daemon) readSetting(name string, v any) {
 	}
 }
 
+// writeSetting saves one settings file the way person/set saves person.json.
+func (d *Daemon) writeSetting(name string, v any) error {
+	b, err := storeJSON(v)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(d.SettingsDir, 0o700); err != nil {
+		return err
+	}
+	return store.WriteAtomically(filepath.Join(d.SettingsDir, name), b, 0o644)
+}
+
+// sandboxState is sandbox/state: the saved defaults, and who required them when the
+// organisation's policy does.
+func (d *Daemon) sandboxState() wire.SandboxSettings {
+	st := d.sandboxSettings()
+	if sandboxRequired(d.orgPolicy()) {
+		st.SetBy = setBy("sandbox", sandboxRequiredWords)
+	}
+	return st
+}
+
 func (d *Daemon) sandboxSettings() wire.SandboxSettings {
 	var raw struct {
 		Defaults map[string]string `json:"defaults"`
@@ -166,6 +190,34 @@ func (d *Daemon) clientPermissions() wire.ClientPermissionSettings {
 	d.readSetting("client-permissions.json", &raw)
 	return wire.ClientPermissionSettings{Cursor: clientPermissionMode(raw.Cursor), Grok: clientPermissionMode(raw.Grok),
 		Opencode: clientPermissionMode(raw.Opencode)}
+}
+
+// setClientPermissions is clientPermissions/set (061): save, then tell every window.
+func (d *Daemon) setClientPermissions(in wire.ClientPermissionSettings) (wire.ClientPermissionSettings, error) {
+	saved := wire.ClientPermissionSettings{Cursor: clientPermissionMode(string(in.Cursor)), Grok: clientPermissionMode(string(in.Grok)),
+		Opencode: clientPermissionMode(string(in.Opencode))}
+	if err := d.writeSetting("client-permissions.json", saved); err != nil {
+		return wire.ClientPermissionSettings{}, &Error{Code: wire.FailureCouldNotSave, Message: "client-permissions.json: " + err.Error()}
+	}
+	Broadcast(d, wire.NotifyClientPermissionsChanged, saved)
+	return saved, nil
+}
+
+// alwaysApproves is the person's Always-approve for Cursor, Grok and OpenCode (061).
+func (d *Daemon) alwaysApproves(runtimeID string) bool {
+	s := d.clientPermissions()
+	var mode wire.ClientPermissionMode
+	switch runtimeID {
+	case "cursor":
+		mode = s.Cursor
+	case "grok":
+		mode = s.Grok
+	case "opencode":
+		mode = s.Opencode
+	default:
+		return false
+	}
+	return mode == wire.ClientPermissionModeAlwaysApprove
 }
 
 func (d *Daemon) retentionState() wire.RetentionState {
