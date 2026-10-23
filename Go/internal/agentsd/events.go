@@ -736,8 +736,9 @@ func (d *Daemon) raiseAgentEnding(id wire.UUID, next wire.AgentState, why *wire.
 	d.raiseAgentEvent("agent.failed", id, "ended in an error: "+words+".", map[string]string{"reason": endedCode(*why)})
 }
 
-// raiseLeaseEvent is lease.granted and lease.released, on the host's log.
-func (d *Daemon) raiseLeaseEvent(e leaseEvent) {
+// raiseLeaseEvent is lease.granted and lease.released, on the host's log: the event raised,
+// or nil.
+func (d *Daemon) raiseLeaseEvent(e leaseEvent) *wire.Event {
 	l := e.lease
 	switch {
 	case e.granted:
@@ -749,9 +750,10 @@ func (d *Daemon) raiseLeaseEvent(e leaseEvent) {
 				title = *a.Title
 			}
 		}
-		d.raise(wire.EventDraft{Name: "lease.granted", At: now(), Scope: macScope(),
+		raised := d.raise(wire.EventDraft{Name: "lease.granted", At: now(), Scope: macScope(),
 			Sentence: agentName(t) + " was given " + l.DisplayName + ".",
 			Details:  map[string]string{"resource": string(l.Resource), "agent": string(l.Holder), "agent_title": title}})
+		return &raised
 	case e.released:
 		how, words := "ended", "taken back"
 		switch e.ending {
@@ -760,10 +762,12 @@ func (d *Daemon) raiseLeaseEvent(e leaseEvent) {
 		case "released":
 			how, words = "released", "given back"
 		}
-		d.raise(wire.EventDraft{Name: "lease.released", At: now(), Scope: macScope(),
+		raised := d.raise(wire.EventDraft{Name: "lease.released", At: now(), Scope: macScope(),
 			Sentence: l.DisplayName + " was " + words + ".",
 			Details:  map[string]string{"resource": string(l.Resource), "how": how}})
+		return &raised
 	}
+	return nil
 }
 
 // diskWords is DiskSpace.words: "12.3 GB", "850 MB".

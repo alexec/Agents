@@ -36,6 +36,7 @@ never hold a lease themselves: only agents do.
 - Q: When an agent's turn ends while it still holds a lease, what happens? → A: The lease is kept until it expires. It is also released on release, stop, archive, or when the person ends it. The end of a turn never releases it.
 - Q: How much goes on the phone and iPad? → A: The status line and card only. The Resources view, and ending leases, are on the Mac only for now.
 - Q: Can the person hold a lease? → A: No. Only agents hold leases. There is no way in the app to take one. The person can end an agent's lease and remove an agent from a line.
+- Q (2026-10-22, #2361): Does `lease_resource` hold the call while the agent waits in line? → A: No. It answers at once with the place in line. Joining the line opens the agent's event wait on `lease.granted` for itself and the resource, so the grant's event starts it again, and the wait card at the end of the chat shows the place. Stop Waiting or `cancel_wait` leaves the line. The 45-second call and the wake prompt in `contracts/lease-tools.md` are replaced by this.
 - Q: Is a lease chosen when a chat is started? → A: No. Starting a chat, on the Mac, phone or iPad, or by an agent through `start_agent`, has no lease option. The agent takes a lease itself, with its tools, when it needs one.
 
 ## User Scenarios & Testing *(mandatory)*

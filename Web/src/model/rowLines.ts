@@ -42,13 +42,51 @@ export interface LeaseMark {
   waitingNames: string[]; waitingFull: string[];
 }
 
-/** LeaseStatus.of, then its mark: nothing when the agent holds and waits for nothing. */
+/** LeaseStatus.Waiting: a place in a resource's line. */
+interface Place { short: string; display: string; holder: string; until?: Date; place: number }
+
+/** The agent's place in one resource's line, if it has one. */
+function placeIn(state: LeaseSnapshot["resources"][number], agentID: string,
+  title: (id: string) => string | undefined): Place | null {
+  const holds = state.holds ?? (state.lease ? [state.lease] : []);
+  const index = state.line.findIndex((m) => m.agentID === agentID);
+  if (index < 0) return null;
+  const next = [...holds].sort((a, b) => a.expiresAt - b.expiresAt)[0];
+  return { short: shortName(state.displayName, state.kind), display: state.displayName,
+    holder: agentName(next ? title(next.holder) : undefined),
+    ...(next ? { until: fromWireDate(next.expiresAt) } : {}), place: index + 1 };
+}
+
+/**
+ * EventWait.lineResource: the resource whose line the agent's open wait is a place in (#2361), a
+ * wait on lease.granted narrowed to it and one resource; undefined for any other wait.
+ */
+export function lineResource(agent: Agent): string | undefined {
+  const wait = agent.eventWait;
+  if (!wait || wait.ending !== undefined || wait.patterns.length !== 1) return undefined;
+  const pattern = wait.patterns[0]!;
+  const keys = new Set([...Object.keys(pattern.filters), ...Object.keys(pattern.anyOf ?? {})]);
+  if (pattern.name !== "lease.granted" || keys.size !== 2 || single(pattern, "agent") === undefined) return undefined;
+  return single(pattern, "resource");
+}
+
+/** The agent's place in the line its wait is for, from the daemon's leases. */
+function linePlace(agent: Agent, resource: string, snapshot: LeaseSnapshot | undefined,
+  title: (id: string) => string | undefined): Place | null {
+  const state = snapshot?.resources.find((r) => r.name === resource);
+  return state ? placeIn(state, agent.id, title) : null;
+}
+
+/**
+ * LeaseStatus.of, then its mark: nothing when the agent holds and waits for nothing. `without` is
+ * the resource whose place in line the agent's wait card says already (#2361), left out here.
+ */
 export function leaseMark(agentID: string, snapshot: LeaseSnapshot | undefined,
-  title: (id: string) => string | undefined): LeaseMark | null {
+  title: (id: string) => string | undefined, without?: string): LeaseMark | null {
   if (!snapshot) return null;
   const now = fromWireDate(snapshot.at).getTime();
   const holding: { short: string; display: string; expires: Date; minutes: number; soon: boolean }[] = [];
-  const waiting: { short: string; display: string; holder: string; until?: Date; place: number }[] = [];
+  const waiting: Place[] = [];
   for (const state of snapshot.resources) {
     const holds = state.holds ?? (state.lease ? [state.lease] : []);
     const short = shortName(state.displayName, state.kind);
@@ -59,12 +97,8 @@ export function leaseMark(agentID: string, snapshot: LeaseSnapshot | undefined,
       holding.push({ short, display: state.displayName, expires, minutes: Math.max(0, Math.ceil(left / 60_000)),
         soon: left > 0 && left <= warning });
     }
-    const index = state.line.findIndex((m) => m.agentID === agentID);
-    if (index >= 0) {
-      const next = [...holds].sort((a, b) => a.expiresAt - b.expiresAt)[0];
-      waiting.push({ short, display: state.displayName, holder: agentName(next ? title(next.holder) : undefined),
-        ...(next ? { until: fromWireDate(next.expiresAt) } : {}), place: index + 1 });
-    }
+    const place = state.name === without ? null : placeIn(state, agentID, title);
+    if (place) waiting.push(place);
   }
   if (holding.length === 0 && waiting.length === 0) return null;
   const first = holding[0];
@@ -107,7 +141,16 @@ function single(pattern: EventPattern, key: string): string | undefined {
  * WaitStatus.of(…).line for a wait on events, for the chat's wait card (#1995): "◷ Waiting for … ·
  * since 23:30 · until 09:00".
  */
-export function eventWaitLine(agent: Agent, title: (id: string) => string | undefined): string | null {
+export function eventWaitLine(agent: Agent, title: (id: string) => string | undefined,
+  snapshot?: LeaseSnapshot): string | null {
+  // A place in a lease's line, as the line says it (#2361).
+  const resource = lineResource(agent);
+  if (resource !== undefined) {
+    const place = linePlace(agent, resource, snapshot, title);
+    return place
+      ? `◷ Waiting for ${place.display} \u00B7 held by ${place.holder}${place.until ? ` until ${clock(place.until)}` : ""} \u00B7 ${ordinal(place.place)} in line`
+      : `◷ Waiting for your turn with ${resource}`;
+  }
   const wait = agent.eventWait;
   const mark = eventWaitMark(agent, title);
   if (!wait || !mark) return null;
@@ -117,9 +160,15 @@ export function eventWaitLine(agent: Agent, title: (id: string) => string | unde
 }
 
 /** WaitStatus.of(…).mark for a wait on events: "◷ Waiting for “Fix login” to finish". A block's is blockLines'. */
-export function eventWaitMark(agent: Agent, title: (id: string) => string | undefined): string | null {
+export function eventWaitMark(agent: Agent, title: (id: string) => string | undefined,
+  snapshot?: LeaseSnapshot): string | null {
   const wait = agent.eventWait;
   if (!wait || wait.ending !== undefined) return null;
+  const resource = lineResource(agent);
+  if (resource !== undefined) {
+    const place = linePlace(agent, resource, snapshot, title);
+    return `◷ Waiting for ${place ? `${place.short} \u00B7 ${ordinal(place.place)} in line` : resource}`;
+  }
   const agents = wait.patterns.map((p) => {
     const id = p.name === "agent.finished" && Object.keys(p.anyOf ?? p.filters).length === 1 ? single(p, "agent") : undefined;
     return id === undefined ? undefined : title(id) ?? id;
@@ -130,9 +179,13 @@ export function eventWaitMark(agent: Agent, title: (id: string) => string | unde
 }
 
 /** WaitStatus.things: what a wait on events waits for, one thing a pattern, an agent finishing by its name in quotes. */
-export function eventWaitThings(agent: Agent, title: (id: string) => string | undefined): string[] {
+export function eventWaitThings(agent: Agent, title: (id: string) => string | undefined,
+  snapshot?: LeaseSnapshot): string[] {
   const wait = agent.eventWait;
   if (!wait || wait.ending !== undefined) return [];
+  // A place in a line, by the resource's short name, as the lease mark had it (#2361).
+  const resource = lineResource(agent);
+  if (resource !== undefined) return [linePlace(agent, resource, snapshot, title)?.short ?? resource];
   return wait.patterns.map((p) => {
     const id = p.name === "agent.finished" && Object.keys(p.anyOf ?? p.filters).length === 1 ? single(p, "agent") : undefined;
     return id === undefined ? patternLabel(p) : `“${title(id) ?? id}”`;
@@ -151,11 +204,12 @@ export interface WaitMark { line: string; detail: string }
 /**
  * AgentsModel.waitMark: the agents its block waits on, what its wait on events waits for and the
  * resources it is in line for, on one line, first first; a block naming nothing says when it looks again.
+ * `leases` leaves out the place in line its wait says (leaseMark's without, #2361).
  */
 export function waitMark(agent: Agent, block: { names: string[]; lines: string[] }, leases: LeaseMark | null,
-  title: (id: string) => string | undefined): WaitMark | null {
-  const things = [...block.names, ...eventWaitThings(agent, title), ...(leases?.waitingNames ?? [])];
-  const event = eventWaitLine(agent, title);
+  title: (id: string) => string | undefined, snapshot?: LeaseSnapshot): WaitMark | null {
+  const things = [...block.names, ...eventWaitThings(agent, title, snapshot), ...(leases?.waitingNames ?? [])];
+  const event = eventWaitLine(agent, title, snapshot);
   const detail = [...block.lines, ...(event ? [event] : []), ...(leases?.waitingFull ?? [])];
   const line = rowWaitLine(things) ?? (detail[0] !== undefined ? `◷ ${detail[0]}` : null);
   return line === null ? null : { line, detail: detail.join("\n") };

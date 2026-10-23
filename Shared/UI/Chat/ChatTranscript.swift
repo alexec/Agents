@@ -469,8 +469,9 @@ struct ChatTranscript: View {
                     WorkingLine(tool: RunningToolWords.tool(agent))
                 }
                 // What it holds and waits for in line: what the agent is doing now, as the
-                // working line says, so here and not over the prompt (#2344).
-                if let leases = actions.leaseStatus(agent.id) {
+                // working line says, so here and not over the prompt (#2344). A place in line
+                // that its wait card says is left to the card (#2361).
+                if let leases = actions.leaseStatus(agent.id)?.without(agent.eventWait) {
                     LeaseLine(status: leases, open: actions.openLease)
                 }
             }

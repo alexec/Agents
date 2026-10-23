@@ -58,7 +58,7 @@ func TestDeclaringAResource(t *testing.T) {
 }
 
 // A book the Swift host wrote is read, ended by the person, and handed on: the next in
-// line, whose call returned long ago, is started again with the news.
+// line, with no wait open for it, is started again with the event (#2361).
 func TestABookSwiftWroteIsHandedOn(t *testing.T) {
 	fakeRuntimes(t)
 	root := t.TempDir()
@@ -96,7 +96,7 @@ func TestABookSwiftWroteIsHandedOn(t *testing.T) {
 	json.Unmarshal(c.call(t, 3, "resources/end", map[string]any{"name": "simulator:abc"}), &snap)
 	waitFor(t, "the next in line started", func() bool {
 		for _, m := range userMessages(d, next.ID) {
-			if strings.HasPrefix(m, "iPhone 17 is yours now. You hold it until ") {
+			if strings.HasPrefix(m, "The event you were waiting for happened.") && strings.Contains(m, "You hold iPhone 17 until ") {
 				return true
 			}
 		}

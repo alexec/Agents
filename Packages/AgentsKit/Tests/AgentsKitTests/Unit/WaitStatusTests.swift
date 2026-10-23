@@ -73,4 +73,32 @@ struct WaitStatusTests {
                         EventPattern("mac.wake")]
         #expect(WaitStatus.things(patterns, names: { $0 == fixLogin ? "Fix login" : nil }) == ["“Fix login”", "mac.wake"])
     }
+
+    /// A place in a lease's line is a wait on its own grant (#2361), said as the line says it,
+    /// and left out of the lease row so it is said once.
+    @Test func aPlaceInLineIsSaidAsTheLineSaysIt() throws {
+        let fixLogin = UUID()
+        var waiting = agent()
+        let wait = EventWait(patterns: [EventPattern("lease.granted", filters: [
+            "agent": DetailFilter(waiting.id.uuidString), "resource": DetailFilter("build")])], from: 0, deadline: until, since: since)
+        waiting.eventWait = wait
+        #expect(wait.lineResource == ResourceName("build"))
+        #expect(WaitStatus.of(waiting, names: { _ in nil })?.line == "◷ Waiting for your turn with build")
+
+        let build = ResourceName("build")!
+        let snapshot = DaemonAPI.LeaseSnapshot(resources: [
+            .init(name: build, kind: .named, displayName: "Build",
+                  lease: Lease(resource: build, displayName: "Build", holder: fixLogin, grantedAt: since, expiresAt: until),
+                  line: [.init(agentID: UUID(), askedAt: since, isCallOpen: true),
+                         .init(agentID: waiting.id, askedAt: since, isCallOpen: true)]),
+        ], at: since)
+        let lease = try #require(LeaseStatus.of(waiting.id, in: snapshot, titles: [fixLogin: "Fix login"]))
+        let status = WaitStatus.of(waiting, names: { _ in nil }, lease: lease)
+        #expect(status?.line == "◷ Waiting for Build · held by “Fix login” until 09:00 · 2nd in line")
+        #expect(status?.mark == "◷ Waiting for Build · 2nd in line")
+        #expect(status?.cancellable == true)
+        #expect(WaitStatus.things(wait, names: { _ in nil }, lease: lease) == ["Build"])
+        #expect(lease.without(wait) == nil)
+        #expect(lease.without(nil) == lease)
+    }
 }

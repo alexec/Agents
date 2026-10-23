@@ -80,12 +80,12 @@ struct EventCatalogueTests {
         #expect(granted.details == ["resource", "agent"])
     }
 
-    /// Only three events take a filter (#574), and only those have an inputSchema
+    /// Only four events take a filter (#574, #2361), and only those have an inputSchema
     /// with anything in it (#579).
     @Test func onlyTheFiltersAreInTheInputSchema() throws {
         let filtered = EventCatalogue.all.filter { !$0.filters.isEmpty }
             .map { "\($0.name) \($0.filters.map(\.key).joined(separator: ","))" }
-        #expect(filtered == ["branch.moved branch", "person.away why", "person.back why"])
+        #expect(filtered == ["branch.moved branch", "lease.granted resource,agent", "person.away why", "person.back why"])
         let branch = try #require(EventCatalogue.kind(named: "branch.moved"))
         #expect(branch.inputSchema == ["type": "object", "additionalProperties": false,
                                        "properties": ["branch": ["type": "string"]]])
