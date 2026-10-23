@@ -192,6 +192,8 @@
 .with-sidebar .new-session-top { margin-top: 6px; }
 .row.pin .title, .row.new-session .title { font-weight: 400; }
 .row.pin.missing .title { opacity: 0.55; }
+/* A server view's count (#2033): grey, at the end, as a fold's. */
+.row.pin .count { font-size: 0.75rem; }
 .row.pin.dragging { opacity: 0.4; }
 .group.pins { margin-bottom: 2px; }
 

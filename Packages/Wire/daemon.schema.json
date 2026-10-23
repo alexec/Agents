@@ -13831,6 +13831,18 @@
         },
         "hidden": {
           "type": "boolean"
+        },
+        "count": {
+          "type": "integer"
+        },
+        "attention": {
+          "type": "integer"
+        },
+        "countAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "countStale": {
+          "type": "boolean"
         }
       },
       "required": [

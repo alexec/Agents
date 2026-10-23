@@ -121,7 +121,7 @@ func AddViews(server *mcp.Server, linear Views) {
 				names[i] = map[string]any{"key": t.Key, "name": t.Name}
 			}
 			return structured(map[string]any{"team": in.Team, "state": in.State, "label": in.Label,
-				"teams": names, "states": openStateTypes, "issues": issues}), nil, nil
+				"teams": names, "states": openStateTypes, "issues": issues, "count": len(issues)}), nil, nil
 		})
 
 	// No network at all: an empty csp, so the host draws it under its strictest policy.

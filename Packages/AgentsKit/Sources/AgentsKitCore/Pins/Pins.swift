@@ -338,9 +338,19 @@ public struct PinView: Codable, Sendable, Hashable, Identifiable {
     public var missingReason: String?
     /// A server's list view (#2032) that the person hid from the sidebar.
     public var hidden: Bool?
+    /// A list view's count, as its server last said it (#2033): open issues, open pull
+    /// requests. Nil when the server says none.
+    public var count: Int?
+    /// How many of `count` want the person, when the server says (PRs of yours with failed checks).
+    public var attention: Int?
+    /// When the count was read.
+    public var countAt: Date?
+    /// The last poll failed: `count` is the one before.
+    public var countStale: Bool?
 
     public init(path: String, title: String, kind: PinKind, missing: Bool, pinnedBy: PinnerView,
-                view: ViewPin? = nil, missingReason: String? = nil, hidden: Bool? = nil) {
+                view: ViewPin? = nil, missingReason: String? = nil, hidden: Bool? = nil,
+                count: Int? = nil, attention: Int? = nil, countAt: Date? = nil, countStale: Bool? = nil) {
         self.path = path
         self.title = title
         self.kind = kind
@@ -349,6 +359,17 @@ public struct PinView: Codable, Sendable, Hashable, Identifiable {
         self.view = view
         self.missingReason = missingReason
         self.hidden = hidden
+        self.count = count
+        self.attention = attention
+        self.countAt = countAt
+        self.countStale = countStale
+    }
+
+    /// The row's tooltip for its count (#2033): when it was read, and that it may be old.
+    public var countHelp: String? {
+        guard count != nil, let countAt else { return nil }
+        let when = countAt.formatted(date: .omitted, time: .shortened)
+        return countStale == true ? "As of \(when): the server did not answer since." : "As of \(when)."
     }
 
     /// A server's list view, shown without a pin (#2032): Hide, not Unpin.

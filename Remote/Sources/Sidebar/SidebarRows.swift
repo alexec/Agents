@@ -541,10 +541,17 @@ struct ServerViewRows: View {
                 Text(view.title)
                     .lineLimit(1)
                 Spacer(minLength: 4)
+                // Its server's count (#2033), grey as a fold's count.
+                if let count = view.count {
+                    Text("\(count)")
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
             }
             .appText(.supporting)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("\(view.title), view")
+            // VoiceOver says the count (#590).
+            .accessibilityLabel("\(view.title), view" + (view.count.map { ", \($0)" } ?? ""))
             .tag(SidebarItem.pin(view.path, in: project))
             .contextMenu {
                 Button("Hide", systemImage: "eye.slash") {

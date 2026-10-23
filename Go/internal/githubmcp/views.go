@@ -149,10 +149,16 @@ func AddViews(server *mcp.Server, gh Views, person bool) {
 				return failed(err), nil, nil
 			}
 			prs := make([]any, len(b.PRs))
+			// The count on the sidebar's row (#2033), and the signed-in person's PRs whose checks fail.
+			failing := 0
 			for i, p := range b.PRs {
 				prs[i] = p.json()
+				if p.Checks == "failing" && p.Author != "" && p.Author == b.Viewer {
+					failing++
+				}
 			}
-			return structured(map[string]any{"repo": repo, "viewer": b.Viewer, "prs": prs}), nil, nil
+			return structured(map[string]any{"repo": repo, "viewer": b.Viewer, "prs": prs,
+				"count": len(prs), "attention": failing}), nil, nil
 		})
 
 	mcp.AddTool(server, &mcp.Tool{Name: "show_issues", Title: "Show issues",
@@ -172,7 +178,7 @@ func AddViews(server *mcp.Server, gh Views, person bool) {
 			for i, l := range list {
 				issues[i] = l.json()
 			}
-			return structured(map[string]any{"repo": repo, "issues": issues}), nil, nil
+			return structured(map[string]any{"repo": repo, "issues": issues, "count": len(issues)}), nil, nil
 		})
 
 	mcp.AddTool(server, &mcp.Tool{Name: "show_pull_request", Title: "Show a pull request",

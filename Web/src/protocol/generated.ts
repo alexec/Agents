@@ -4664,6 +4664,10 @@ export interface PinView {
   view?: ViewPin;
   missingReason?: string;
   hidden?: boolean;
+  count?: number;
+  attention?: number;
+  countAt?: WireDate;
+  countStale?: boolean;
 }
 
 export interface PinWriteRequest {
@@ -8912,7 +8916,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PinReadRequest: { required: ["folder", "path"], optional: ["knownStamp"] },
   PinRequest: { required: ["folder", "path"], optional: ["title", "view"] },
   PinSessionRequest: { required: ["folder", "agentID"], optional: [] },
-  PinView: { required: ["path", "title", "kind", "missing", "pinnedBy"], optional: ["view", "missingReason", "hidden"] },
+  PinView: { required: ["path", "title", "kind", "missing", "pinnedBy"], optional: ["view", "missingReason", "hidden", "count", "attention", "countAt", "countStale"] },
   PinWriteRequest: { required: ["folder", "path", "text"], optional: [] },
   PingResponse: { required: ["ok"], optional: [] },
   PinnerView: { required: ["kind", "id", "name"], optional: [] },

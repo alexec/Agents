@@ -90,6 +90,13 @@ pull request's number. **This is our extension of MCP Apps (SEP-1865)**, as pins
   no row. The GitHub connector's views show only in a project whose `origin` is on
   github.com, and GitLab's only where it is on another host.
 - **Opening one.** As a pinned view opens: the host calls the feeding tool afresh.
+- **Its count.** The row ends in a grey count, such as **GitHub · Issues 23** (#2033). The
+  host calls each shown view's feeding tool every 2 minutes, once for every client, and
+  shows the `count` in its answer's `structuredContent` (or `_meta`). A server may also say
+  `attention`, how many of them want you (the GitHub connector: your pull requests whose
+  checks fail). A failed call keeps the last count, and its tooltip says when it was read.
+  A hidden view is not called. The GitHub, GitLab and Linear connectors send the count of
+  what the view lists: open pull requests, issues and merge requests.
 - **Hide.** The row's menu, or **Hide** at the top of the view, takes it out of the sidebar.
   The hidden addresses are kept in `.agents/pins.json` as `hidden_views` (at most 50).
   **Show Hidden Views** in the project's menu puts them back.

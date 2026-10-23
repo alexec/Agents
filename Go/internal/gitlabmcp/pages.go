@@ -99,7 +99,8 @@ func (g *RealGitLab) Board(ctx context.Context, project string) (map[string]any,
 		}
 		out[i] = j
 	}
-	return map[string]any{"project": project, "viewer": viewer, "mergeRequests": out}, nil
+	// count is the sidebar row's (#2033).
+	return map[string]any{"project": project, "viewer": viewer, "mergeRequests": out, "count": len(out)}, nil
 }
 
 // MARK: Issues
@@ -120,7 +121,7 @@ func (g *RealGitLab) OpenIssues(ctx context.Context, project, label string) (map
 		j["comments"], j["updatedAt"] = is.UserNotesCount, is.UpdatedAt
 		out[i] = j
 	}
-	return map[string]any{"project": project, "issues": out}, nil
+	return map[string]any{"project": project, "issues": out, "count": len(out)}, nil
 }
 
 // MARK: A merge request's page
