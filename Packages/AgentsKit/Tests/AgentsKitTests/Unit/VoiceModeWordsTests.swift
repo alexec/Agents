@@ -27,4 +27,12 @@ struct VoiceModeWordsTests {
     @Test func theStripSaysWhatIsAboutToGo() {
         #expect(VoiceModeWords.sayNoToStop("Sending File") == "Sending File. Say no to stop.")
     }
+
+    /// #2446: VoiceOver's own words, heard through the microphone, are not a prompt.
+    @Test func voiceOversWordsAreNotAPrompt() {
+        #expect(VoiceModeWords.isEcho("voice mode is on", of: "Voice mode is on. Say what you want."))
+        #expect(VoiceModeWords.isEcho("Say what you want", of: "Voice mode is on. Say what you want."))
+        #expect(!VoiceModeWords.isEcho("Fix the bug", of: "Voice mode is on. Say what you want."))
+        #expect(!VoiceModeWords.isEcho("", of: "Voice mode is on."))
+    }
 }

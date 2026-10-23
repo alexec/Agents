@@ -1,3 +1,4 @@
+import Accessibility
 import AgentsKitCore
 #if os(iOS)
 import AVFoundation
@@ -56,6 +57,23 @@ final class VoiceMode {
     }
     /// Set by a walk: the next prompt does not go, as when the host is away.
     var walkSendFails = false
+    /// Set by a walk: as if VoiceOver were on (#2446).
+    var walkVoiceOver = false
+    /// What was last told to VoiceOver, and when: heard back through the microphone, it
+    /// is not a prompt (#2446).
+    private var announced: (text: String, at: Date)?
+    /// What was told to VoiceOver lately, newest last: what a walk reads back.
+    private(set) var announcements: [String] = []
+
+    /// Tells VoiceOver what the strip says: only the strip says it, as the voice and the
+    /// sounds say the rest (#2446).
+    func announce(_ text: String) {
+        // Once, not after each reply: "Say what you want." again is noise.
+        guard !text.isEmpty, text != announcements.last else { return }
+        announced = (text, Date())
+        announcements = Array((announcements + [text]).suffix(20))
+        AccessibilityNotification.Announcement(text).post()
+    }
 
     /// Sends an answer to a form, and says whether it went.
     typealias Answer = (ElicitationRequest, [String: JSONValue]) async -> Bool
@@ -598,6 +616,13 @@ final class VoiceMode {
     }
 
     private func heardChanged(_ text: String) {
+        // VoiceOver saying what it was told, heard through the microphone (#2446).
+        if let announced, Date().timeIntervalSince(announced.at) < 8,
+           VoiceModeWords.isEcho(text, of: announced.text) {
+            // Heard afresh, so the person's next words do not start with VoiceOver's.
+            if !isWalked, phase == .listening { startDictation() }
+            return
+        }
         // Over the voice: words that mean something stop it, and are the next prompt.
         if phase == .speaking {
             guard isBargeIn(text) else { return }
