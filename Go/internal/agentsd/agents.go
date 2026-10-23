@@ -136,7 +136,8 @@ const voicePreface = "You are in voice mode. The person hears your reply and doe
 	"Answer in one to three short spoken sentences. Use plain words. " +
 	"Do not use markdown, lists, tables, code or file paths. " +
 	"If the work changed files, say what changed in one sentence. " +
-	"If you need a decision, ask one clear question."
+	"If you need a decision, ask one clear question. " +
+	"If the person says they are done talking, say a short goodbye and call hang_up."
 
 // prompt is agents/prompt: the words go on the queue, never refused for the agent being
 // busy, and go once the agent is free.
@@ -183,9 +184,53 @@ func (d *Daemon) prompt(r wire.PromptRequest) error {
 		}
 		preface = &p
 	}
-	return d.enqueue(a.ID, wire.QueuedPrompt{ID: store.NewUUID(), Text: r.Text, Attachments: r.Attachments,
-		QueuedAt: now(), From: from, Preface: preface}, false)
+	voice := r.Voice != nil && *r.Voice
+	if err := d.enqueue(a.ID, wire.QueuedPrompt{ID: store.NewUUID(), Text: r.Text, Attachments: r.Attachments,
+		QueuedAt: now(), From: from, Preface: preface}, voice); err != nil {
+		return err
+	}
+	if voice {
+		d.bargeIn(a.ID)
+	}
+	return nil
 }
+
+// bargeIn is words said in voice mode while a turn runs (#2375): the person talked over
+// the agent, as over a person, so the turn stops and the words, first in the queue, go
+// as soon as it has ended. A stop leaves the queue (run), so it is started again here.
+func (d *Daemon) bargeIn(id wire.UUID) {
+	l := d.live(id)
+	l.mu.Lock()
+	busy := l.inTurn
+	l.mu.Unlock()
+	if !busy {
+		return
+	}
+	l.cancel()
+	go func() {
+		for range bargeInTries {
+			select {
+			case <-d.ctx.Done():
+				return
+			case <-time.After(bargeInEvery):
+			}
+			l.mu.Lock()
+			ended := !l.inTurn && !l.running
+			l.mu.Unlock()
+			if ended {
+				l.kick()
+				return
+			}
+		}
+	}()
+}
+
+// How often, and how many times, a barge-in looks for the stopped turn to have ended:
+// 10 s in all, longer than a runtime takes to answer session/cancel.
+var (
+	bargeInEvery = 100 * time.Millisecond
+	bargeInTries = 100
+)
 
 // sendNow is DaemonCore.sendNow: a queued prompt goes at once, into the running turn
 // where the runtime takes words mid-turn, or as the next turn when none is running.

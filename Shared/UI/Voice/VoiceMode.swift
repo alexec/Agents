@@ -72,6 +72,13 @@ final class VoiceMode {
     private var latestTurn: UUID?
     /// Set when voice mode turns on, until the chat is first seen.
     private var needsBaseline = false
+    /// When voice mode turned on: a hang_up before it is an old call's.
+    private var turnedOnAt = Date.distantPast
+    /// The agent hung up (#2375): voice mode ends once the reply has been said.
+    private var isHangingUp = false
+    /// The turn the person last talked over: the host stops it (#2375), and what it says
+    /// after is not read out.
+    private var talkedOver: UUID?
 
     private init() {
         let audio = VoiceAudio()
@@ -112,6 +119,9 @@ final class VoiceMode {
         // What was said before voice mode is not read out: the chat's last turn is taken
         // as spoken when it is first seen.
         needsBaseline = true
+        turnedOnAt = Date()
+        isHangingUp = false
+        talkedOver = nil
         phase = .loading
         Task {
             do {
@@ -188,18 +198,22 @@ final class VoiceMode {
             confirming?.cancel()
             confirming = nil
         }
-        defer { askIfWaiting() }
+        defer {
+            askIfWaiting()
+            hangUpIfSaid()
+        }
         if agent.state == .archived {
             turnOff()
             return
         }
+        if let hung = agent.voiceHungUpAt, hung > turnedOnAt { isHangingUp = true }
         let last = items.turns().last
         latestTurn = last?.id
         if needsBaseline {
             needsBaseline = false
             spoken = last.map { ($0.id, TurnParts($0.items, isLive: false).replyText) }
         }
-        guard isWaitingForReply, let turn = last else { return }
+        guard isWaitingForReply, let turn = last, turn.id != talkedOver else { return }
         let working = agent.state == .running || agent.state == .starting || agent.state == .queued
         if working { sawWork = true }
         // The reply comes in a new turn, or in this one going on after an answer.
@@ -416,6 +430,9 @@ final class VoiceMode {
         guard agentID == agent, phase == .sending else { return }
         if took {
             sound(.sent)
+            // Words said while it works stop its turn (the host does it, #2375): the rest
+            // of that turn is not read out.
+            talkedOver = latestTurn
             isWaitingForReply = true
             sawWork = false
             turnAtSend = latestTurn
@@ -494,9 +511,16 @@ final class VoiceMode {
             saying = nil
             let then = afterSpeaking
             afterSpeaking = nil
-            listen(chime: !isWaitingForReply)
+            listen(chime: !isWaitingForReply && !isHangingUp)
             then?()
+            hangUpIfSaid()
         }
+    }
+
+    /// Ends voice mode once the agent has hung up and its goodbye has been said.
+    private func hangUpIfSaid() {
+        guard isHangingUp, !isWaitingForReply, phase == .listening, queue.isEmpty, heard.isEmpty else { return }
+        turnOff()
     }
 
     /// A sound, but none in a walk.

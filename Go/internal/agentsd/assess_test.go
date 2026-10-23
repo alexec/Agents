@@ -108,7 +108,8 @@ func TestSessionsTakesTheTitleListedBeforeTheRead(t *testing.T) {
 func TestEveryAppToolIsOneMethodNamedAfterIt(t *testing.T) {
 	// The tools whose noun is not in their name: ask_form asks a question (#2298), and
 	// cancel_wait cancels a wait for an event.
-	nouns := map[string]string{"ask_form": "questions", "cancel_wait": "events", "wait_for_event": "events"}
+	// hang_up hangs up a voice call (#2375).
+	nouns := map[string]string{"ask_form": "questions", "cancel_wait": "events", "wait_for_event": "events", "hang_up": "calls"}
 	seen := map[string]string{}
 	for _, tool := range appToolCalls() {
 		method, ok := appToolMethods[tool.name]

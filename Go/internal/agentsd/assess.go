@@ -73,6 +73,7 @@ var appToolMethods = map[string]string{
 	"show_file":           "files/show",
 	"ask_form":            "questions/ask",
 	"suggest_next_prompt": "prompts/suggest",
+	"hang_up":             "calls/hangUp",
 	"manage_workflows":    "workflows/manage",
 	"lease_resource":      "resources/lease",
 	"release_resource":    "resources/release",

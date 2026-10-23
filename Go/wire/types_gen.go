@@ -262,6 +262,9 @@ type Agent struct {
 
 	// The added account its runtime runs with (#840); absent for the runtime's own sign-in.
 	AccountID *string `json:"accountID,omitzero"`
+
+	// When the agent last ended voice mode with hang_up (#2375): the person said they were done talking. A client in voice mode on this chat says the reply, then turns voice mode off.
+	VoiceHungUpAt *Date `json:"voiceHungUpAt,omitzero"`
 }
 
 type AgentArchivedReason string
