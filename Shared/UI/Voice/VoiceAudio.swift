@@ -71,6 +71,13 @@ final class VoiceAudio {
         try engine.connectNode(engine.mainMixerNode, to: engine.outputNode, format: format)
     }
 
+    /// Stops the engine and joins the mixer to the output again, for a part that found the
+    /// graph changed under it (#2472). The part joins itself again and starts it.
+    func rejoin() throws {
+        if engine.isRunning { engine.stop() }
+        try joinOutput()
+    }
+
     /// Starts the engine, once something is joined to it.
     func start() throws {
         guard !engine.isRunning else { return }

@@ -72,12 +72,23 @@ final class VoiceSpeaker {
     }
 
     /// Plays `buffer`; the task ends once it has been heard, or the player was stopped.
-    private func play(_ buffer: AVAudioPCMBuffer) throws -> Task<Void, Never> {
+    private func play(_ buffer: AVAudioPCMBuffer, again: Bool = true) throws -> Task<Void, Never> {
         let (heard, done) = AsyncStream<Void>.makeStream()
         player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { @Sendable _ in
             done.finish()
         }
-        if !player.isPlaying { try player.playAudio() }
+        if !player.isPlaying {
+            do {
+                try player.playAudio()
+            } catch where again {
+                // The second voice after a launch could find the graph changed under the
+                // engine, though it said it was joined and running (-10863, #2472): join
+                // it again and start once more.
+                player.stop()
+                try rejoin()
+                return try play(buffer, again: false)
+            }
+        }
         return Task { for await _ in heard {} }
     }
 
@@ -90,6 +101,15 @@ final class VoiceSpeaker {
             try engine.connectNode(player, to: engine.mainMixerNode, format: format)
             isConnected = true
         }
+        try audio.start()
+    }
+
+    /// Stops the engine, joins the mixer and the player again and starts it.
+    private func rejoin() throws {
+        guard let format else { return }
+        try audio.rejoin()
+        try engine.connectNode(player, to: engine.mainMixerNode, format: format)
+        isConnected = true
         try audio.start()
     }
 
