@@ -6,6 +6,10 @@ public enum VoiceModeWords {
     /// Said when the host did not take a prompt (#2441).
     public static let notSent = "Not sent. Say it again."
 
+    /// Said when an answer by voice, to a question or a permission, did not go after
+    /// "Sending: …" (#2442). The card is still on the screen.
+    public static let answerNotSent = "The answer did not go. It is on the screen."
+
     /// The strip, after a prompt did not go: the words stay on the screen until the next
     /// words are heard (#2441).
     public static func unsent(_ words: String) -> String {
