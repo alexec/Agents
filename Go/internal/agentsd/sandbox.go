@@ -233,7 +233,28 @@ func (d *Daemon) setSandbox(ctx context.Context, r wire.SetSandboxRequest) (wire
 	return *d.Store.Agent(a.ID), nil
 }
 
+// setSandboxDefaults is sandbox/set (064). A choice the catalog does not offer is dropped.
+// "runtime" is said by leaving the runtime out. An agent's own choice is not touched.
+func (d *Daemon) setSandboxDefaults(in wire.SandboxSettings) (wire.SandboxSettings, error) {
+	kept := map[string]wire.SandboxChoice{}
+	for runtime, choice := range in.Defaults {
+		if choice == wire.SandboxChoiceRuntime || !slices.Contains(sandboxChoices(runtime), choice) {
+			continue
+		}
+		kept[runtime] = choice
+	}
+	if err := d.writeSetting("sandbox.json", wire.SandboxSettings{Defaults: kept}); err != nil {
+		return wire.SandboxSettings{}, &Error{Code: wire.FailureCouldNotSave, Message: "sandbox.json: " + err.Error()}
+	}
+	st := d.sandboxState()
+	Broadcast(d, wire.NotifySandboxChanged, st)
+	return st, nil
+}
+
 func (d *Daemon) registerSandbox() {
+	On(d, wire.CallSandboxSet, func(ctx context.Context, c *Client, s wire.SandboxSettings) (wire.SandboxSettings, error) {
+		return d.setSandboxDefaults(s)
+	})
 	On(d, wire.CallAgentsSetSandbox, func(ctx context.Context, c *Client, r wire.SetSandboxRequest) (wire.Agent, error) {
 		return d.setSandbox(ctx, r)
 	})

@@ -648,6 +648,27 @@
       }
     },
     {
+      "name": "agents/move",
+      "x-capability": "agents/1",
+      "description": "The person moving an agent, or taking back the move that is waiting (053).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MoveRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MoveAnswer"
+        }
+      }
+    },
+    {
       "name": "agents/options",
       "x-capability": "agents/1",
       "tags": [
@@ -1571,6 +1592,43 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/CatchUpSnapshot"
+        }
+      }
+    },
+    {
+      "name": "clientPermissions/changed",
+      "x-capability": "client-permissions/1",
+      "x-notification": true,
+      "description": "The saved permission modes (061).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ClientPermissionSettings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "clientPermissions/set",
+      "x-capability": "client-permissions/1",
+      "description": "Save the permission modes and return what was saved (061).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ClientPermissionSettings"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ClientPermissionSettings"
         }
       }
     },
@@ -4932,6 +4990,43 @@
       }
     },
     {
+      "name": "retention/changed",
+      "x-capability": "retention/1",
+      "x-notification": true,
+      "description": "How long archived agents are kept, after a change.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/RetentionState"
+          }
+        }
+      ]
+    },
+    {
+      "name": "retention/set",
+      "x-capability": "retention/1",
+      "description": "Change how long archived agents are kept. Unconfirmed, a change that would delete agents now is only described.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/RetentionSetRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/RetentionSetResult"
+        }
+      }
+    },
+    {
       "name": "retention/state",
       "x-capability": "retention/1",
       "paramStructure": "by-name",
@@ -5375,6 +5470,43 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/RuntimeAccount"
+        }
+      }
+    },
+    {
+      "name": "sandbox/changed",
+      "x-capability": "sandbox/1",
+      "x-notification": true,
+      "description": "The saved command-sandbox defaults (064).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SandboxSettings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "sandbox/set",
+      "x-capability": "sandbox/1",
+      "description": "Save command-sandbox defaults. A default the catalog does not offer for that runtime is dropped. An agent's own choice is left as it is (064).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SandboxSettings"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SandboxSettings"
         }
       }
     },
@@ -6557,6 +6689,27 @@
       }
     },
     {
+      "name": "workflows/limit",
+      "x-capability": "workflows/1",
+      "description": "How many workflows may be turned on at once. No total is the default.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/WorkflowLimitSettings"
+        }
+      }
+    },
+    {
       "name": "workflows/list",
       "x-capability": "workflows/1",
       "tags": [
@@ -6631,6 +6784,27 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/WorkflowSummary"
+        }
+      }
+    },
+    {
+      "name": "workflows/setLimit",
+      "x-capability": "workflows/1",
+      "description": "Set how many workflows may be turned on at once. A total is from 1 to 50. No total is the default.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/WorkflowLimitSettings"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/WorkflowLimitSettings"
         }
       }
     },

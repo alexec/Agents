@@ -91,6 +91,8 @@ type Daemon struct {
 	setupBook
 	orgPolicyState
 	orgRouteState
+	// lent is a sign-in secret the window lent for a launch (#2524). It stays in memory.
+	lent lentBook
 	// pageEdits is what the person changed on live pages since each agent's last turn.
 	pageEdits  pageEdits
 	policyOnce sync.Once

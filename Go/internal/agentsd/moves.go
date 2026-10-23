@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"context"
 	"encoding/json"
 	"path/filepath"
 	"strconv"
@@ -101,6 +102,47 @@ func moveCall(args map[string]json.RawMessage) (*wire.PendingMove, error) {
 		return &wire.PendingMove{Target: wire.MoveTarget{ProjectFolder: &struct{}{}}, RemoveLeft: true, DiscardChanges: discard}, nil
 	}
 	return nil, Invalid("Nothing was recorded: leave_worktree has to be keep or remove.")
+}
+
+// registerMoves serves agents/move: a person moving an agent (053). The agent's own
+// move_worktree tool is separate, and a person taking the move back does not cancel that.
+func (d *Daemon) registerMoves() {
+	On(d, wire.CallAgentsMove, func(_ context.Context, _ *Client, r wire.MoveRequest) (wire.MoveAnswer, error) {
+		return d.moveAgent(r)
+	})
+}
+
+// moveAgent is agents/move. No target takes back a move the person asked for.
+func (d *Daemon) moveAgent(r wire.MoveRequest) (wire.MoveAnswer, error) {
+	if r.Target == nil {
+		a := d.Store.Agent(r.AgentID)
+		if a == nil {
+			return wire.MoveAnswer{}, &Error{Code: CodeNoSuchAgent, Message: "That conversation is not open any more, so nothing was moved."}
+		}
+		if a.PendingMove == nil || a.PendingMove.AskedBy != wire.MoveAskerPerson {
+			return wire.MoveAnswer{When: wire.MoveWhenNothing, Message: "No move was waiting."}, nil
+		}
+		d.change(r.AgentID, func(a *wire.Agent) { a.PendingMove = nil })
+		d.record(r.AgentID, runtimeNote("Move cancelled."))
+		return wire.MoveAnswer{When: wire.MoveWhenNothing, Message: "Move cancelled."}, nil
+	}
+	msg, err := d.askMove(r.AgentID, wire.PendingMove{Target: *r.Target, RemoveLeft: r.RemoveLeft,
+		DiscardChanges: r.DiscardChanges, AskedBy: wire.MoveAskerPerson, AskedAt: now()})
+	if err != nil {
+		return wire.MoveAnswer{}, err
+	}
+	when := wire.MoveWhenNow
+	switch {
+	case strings.HasPrefix(msg, "You are not in a worktree"), strings.HasPrefix(msg, "Already working"):
+		when = wire.MoveWhenNothing
+	case strings.HasPrefix(msg, "Moving to "):
+		when = wire.MoveWhenAfterTurn
+	}
+	answer := wire.MoveAnswer{When: when, Message: msg}
+	if when == wire.MoveWhenNow {
+		answer.Agent = d.Store.Agent(r.AgentID)
+	}
+	return answer, nil
 }
 
 // askMove checks a move now, in words, and keeps it for when the turn ends, or makes it now

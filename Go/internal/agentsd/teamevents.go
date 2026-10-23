@@ -80,17 +80,22 @@ func (d *Daemon) sendTrigger(fr fireRequest, w wire.Workflow) (taken, ok bool) {
 	return sent.Taken, true
 }
 
-// Asked answers what the control plane asks on channel 0: workflows/fire.
+// Asked answers what the control plane asks on channel 0: workflows/fire, and git/fill
+// for a lend a person allowed (#1122). git/fill is not registered as a window method.
 func (d *Daemon) Asked(method string, params json.RawMessage) (any, bool) {
-	if method != wire.CallWorkflowsFire.Name {
+	switch method {
+	case wire.CallWorkflowsFire.Name:
+		var t wire.TeamTrigger
+		if err := json.Unmarshal(params, &t); err != nil {
+			log.Printf("workflows/fire: %v", err)
+			return wire.TeamTriggerFired{Ran: false}, true
+		}
+		return wire.TeamTriggerFired{Ran: d.fireFromControl(t)}, true
+	case wire.CallGitFill.Name:
+		return d.fillGit(params), true
+	default:
 		return nil, false
 	}
-	var t wire.TeamTrigger
-	if err := json.Unmarshal(params, &t); err != nil {
-		log.Printf("workflows/fire: %v", err)
-		return wire.TeamTriggerFired{Ran: false}, true
-	}
-	return wire.TeamTriggerFired{Ran: d.fireFromControl(t)}, true
 }
 
 // fireFromControl runs a trigger the control plane took once: true when this machine has
