@@ -507,8 +507,8 @@ func outcomeSummary(action wire.AnswerElicitationRequestAction) string {
 	return "The form was closed"
 }
 
-// askFormNote is DaemonCore.askFormNote: the words an agent reads for an answer.
-func askFormNote(action wire.AnswerElicitationRequestAction, said []wire.ElicitationAnswer) string {
+// askQuestionNote is DaemonCore.askQuestionNote: the words an agent reads for an answer.
+func askQuestionNote(action wire.AnswerElicitationRequestAction, said []wire.ElicitationAnswer) string {
 	switch action {
 	case wire.AnswerElicitationRequestActionAccept:
 		if len(said) == 0 {

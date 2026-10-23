@@ -20,7 +20,7 @@ func assessBrief(runtimeID, runtimeName string, model, runtimeVersion *string, h
 	}
 	ownAsk := "Your runtime has no question tool the app can carry. Ask nothing here; write `not offered` for this step."
 	if escalationTool != "" {
-		ownAsk = "Ask one question with your runtime's own question tool, `" + escalationTool + "`, not `ask_form`: \"Is this assessment running unattended?\" with the options Yes and No. " +
+		ownAsk = "Ask one question with your runtime's own question tool, `" + escalationTool + "`, not the app's `ask_question` (the agents server's): \"Is this assessment running unattended?\" with the options Yes and No. " +
 			"It is one of your runtime's built-in tools, not one of the app's, so look for it among those; " +
 			"call it rather than deciding from a list that it is missing, and if the call is refused, put its words in the report."
 	}

@@ -19,7 +19,7 @@ import (
 type assessStep struct{ id, area string }
 
 var assessSteps = []assessStep{{"show_file", "Files"}, {"leases", "Leases"}, {"workflows", "Workflows"},
-	{"workspaces", "Workspaces"}, {"events", "Events"}, {"ask_form", "Questions"}, {"own_ask", "Questions"},
+	{"workspaces", "Workspaces"}, {"events", "Events"}, {"ask_question", "Questions"}, {"own_ask", "Questions"},
 	{"helpers", "Helpers"}, {"wait", "Events"}, {"ending", "Ending a turn"}, {"worktree", "Worktrees"},
 	{"sessions", "Sessions"}, {"scope", "Scope"}, {"permissions", "Permissions"}, {"report", "Self-report"}}
 
@@ -83,8 +83,8 @@ func (r assessRecord) check(id string) (verdict, string) {
 		return r.workspaces()
 	case "events":
 		return r.eventSteps()
-	case "ask_form":
-		return r.askForm()
+	case "ask_question":
+		return r.askQuestion()
 	case "own_ask":
 		return r.ownAsk()
 	case "helpers":
@@ -560,7 +560,7 @@ func questionsOf(c appToolCall) []formQuestion {
 	return out
 }
 
-func (r assessRecord) askForm() (verdict, string) {
+func (r assessRecord) askQuestion() (verdict, string) {
 	asked := r.callsOf("questions/ask")
 	var call *appToolCall
 	for i := range asked {
@@ -570,7 +570,7 @@ func (r assessRecord) askForm() (verdict, string) {
 		}
 	}
 	if call == nil {
-		return failedStep, said(asked, "ask_form")
+		return failedStep, said(asked, "ask_question")
 	}
 	var choice bool
 	var text *formQuestion
@@ -583,7 +583,7 @@ func (r assessRecord) askForm() (verdict, string) {
 		}
 	}
 	if !choice || text == nil {
-		return failedStep, "`ask_form` was not asked with both a choice and a text field"
+		return failedStep, "`ask_question` was not asked with both a choice and a text field"
 	}
 	given := ""
 	for _, e := range r.transcript {
@@ -600,7 +600,7 @@ func (r assessRecord) askForm() (verdict, string) {
 		return failedStep, "no answer to \"" + text.prompt + "\" in the record"
 	}
 	if !strings.Contains(answerOfCall(*call), given) {
-		return failedStep, "the person typed \"" + given + "\" and `ask_form` did not hand it back"
+		return failedStep, "the person typed \"" + given + "\" and `ask_question` did not hand it back"
 	}
 	if r.reportText == nil || !strings.Contains(*r.reportText, given) {
 		return failedStep, "\"" + given + "\" came back to the agent but is not in its report"

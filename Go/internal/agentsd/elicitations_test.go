@@ -261,8 +261,8 @@ func TestAFormIsReadAsSwiftReadsIt(t *testing.T) {
 		`{"question":"tags","answer":"Ex"}]` {
 		t.Fatal(string(b))
 	}
-	if askFormNote(wire.AnswerElicitationRequestActionAccept, said[:1]) != "They answered:\n- Which?: Banana, ripe" {
-		t.Fatal(askFormNote(wire.AnswerElicitationRequestActionAccept, said[:1]))
+	if askQuestionNote(wire.AnswerElicitationRequestActionAccept, said[:1]) != "They answered:\n- Which?: Banana, ripe" {
+		t.Fatal(askQuestionNote(wire.AnswerElicitationRequestActionAccept, said[:1]))
 	}
 	// A lone untitled question takes the message as its question; with no order, by name.
 	one, _ := parseElicitation(json.RawMessage(`{"message":"Go ahead?","requestedSchema":{"properties":{"b":{"type":"boolean"},"a":{"type":"number","maximum":2}}}}`), "A")

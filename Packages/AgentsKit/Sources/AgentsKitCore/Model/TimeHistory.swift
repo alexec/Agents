@@ -239,7 +239,11 @@ public enum TimeMark: Sendable, Hashable {
     /// (`mcp__agents__`, `mcp.agents.`, `agents_`).
     public static func kind(ofTool name: String) -> TimeKind {
         let name = name.lowercased()
-        if name.hasSuffix("askuserquestion") || name.hasSuffix(AppTool.askForm) { return .person }
+        // Antigravity's own `ask_question` has the app's name, and is the person's time all the
+        // same; `ask_form` is the app's name before #2298, in older records.
+        if name.hasSuffix("askuserquestion") || name.hasSuffix(AppTool.askQuestion) || name.hasSuffix("ask_form") {
+            return .person
+        }
         // `release_resource` ends with `lease_resource`: a release is quick, and a tool.
         if name.hasSuffix(AppTool.releaseResource) { return .tools }
         if name.hasSuffix(AppTool.waitForEvent) || name.hasSuffix(AppTool.leaseResource) { return .others }
@@ -321,7 +325,7 @@ public enum TimeMark: Sendable, Hashable {
     /// A tool name `kind(ofTool:)` reads back as this kind, for a carried call.
     private static func name(of kind: TimeKind) -> String {
         switch kind {
-        case .person: AppTool.askForm
+        case .person: AppTool.askQuestion
         case .others: AppTool.waitForEvent
         case .agent, .tools: "tool"
         }

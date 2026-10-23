@@ -210,7 +210,7 @@ public enum ToolPolicyCatalog {
     /// `AskQuestion` is kept and named: Cursor raises it as `cursor/ask_question`,
     /// which this app draws as a form elicitation the phone can answer. Composer
     /// sessions sometimes omit it from the tool catalogue; the briefing also names
-    /// `ask_form` as the fallback the app always serves.
+    /// `ask_question` as the fallback the app always serves.
     public static let cursor = ToolPolicy(
         runtimeID: RuntimeCatalog.cursor.id,
         kept: [
@@ -445,7 +445,7 @@ public enum ToolPolicyCatalog {
     ///
     /// Its `question` tool is off over ACP unless `OPENCODE_ENABLE_QUESTION_TOOL` is set,
     /// which `RuntimeLaunchCatalog.opencode` removes, so no escalation tool: a question goes
-    /// through the app's own `ask_form`, or ends the turn as needs_answer.
+    /// through the app's own `ask_question`, or ends the turn as needs_answer.
     public static let opencode = ToolPolicy(
         runtimeID: RuntimeCatalog.opencode.id,
         kept: [

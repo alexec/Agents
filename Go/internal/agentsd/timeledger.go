@@ -100,7 +100,9 @@ func timeMarkOf(e wire.TranscriptEntry) (timeMark, bool) {
 func toolTimeKind(name string) string {
 	n := strings.ToLower(name)
 	switch {
-	case strings.HasSuffix(n, "askuserquestion") || strings.HasSuffix(n, "ask_form"):
+	// The app's ask_question, any runtime's own (Antigravity's has the same name, and is the
+	// person's time all the same), and ask_form, its name before #2298, in older records.
+	case strings.HasSuffix(n, "askuserquestion") || strings.HasSuffix(n, "ask_question") || strings.HasSuffix(n, "ask_form"):
 		return "person"
 	case strings.HasSuffix(n, "release_resource"):
 		// release_resource ends with lease_resource: a release is quick, and a tool.
@@ -197,7 +199,7 @@ func splitMarks(marks []timeMark) ([]timeSegment, []timeMark) {
 				name := "tool"
 				switch kind {
 				case "person":
-					name = "ask_form"
+					name = "ask_question"
 				case "others":
 					name = "wait_for_event"
 				}

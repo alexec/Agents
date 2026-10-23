@@ -13,9 +13,9 @@ import (
 )
 
 // The three endings name the runtime's own question tool where the app knows it, and
-// ask_form always.
+// ask_question always.
 func TestTheEndingBriefNamesTheThreeEndings(t *testing.T) {
-	for runtimeID, ask := range map[string]string{"claude": "AskUserQuestion (or ask_form if you lack it)", "grok": "ask_form,"} {
+	for runtimeID, ask := range map[string]string{"claude": "AskUserQuestion (or ask_question if you lack it)", "grok": "ask_question,"} {
 		got := endingBrief(runtimeID)
 		for _, want := range []string{ask, "show_file on it once", "do not archive", "suggest_next_prompt with it", "archive_session with no id"} {
 			if !strings.Contains(got, want) {
@@ -161,11 +161,15 @@ func TestTheBriefSaysWhoIsWho(t *testing.T) {
 // Asking names the runtime's own question tool where the app keeps one, and says what is
 // decided and told (#601, #1083).
 func TestTheBriefSaysWhatToAskAndWhatToDecide(t *testing.T) {
-	if got := escalationBrief("cursor"); !strings.Contains(got, "ask me with AskQuestion (or ask_form if you lack it) rather than guessing") ||
+	if got := escalationBrief("cursor"); !strings.Contains(got, "ask me with AskQuestion (or ask_question if you lack it) rather than guessing") ||
 		!strings.Contains(got, "write `Decided: <what>, because <why>.`") {
 		t.Fatal(got)
 	}
-	if got := escalationBrief("gemini"); !strings.Contains(got, "ask me with ask_form rather than guessing") {
+	// Antigravity's own tool has the app's name (#2298): said by whose it is.
+	if got := escalationBrief("antigravity"); !strings.Contains(got, "ask me with your runtime's own ask_question (or the app's ask_question, from the agents server, if yours is missing) rather than guessing") {
+		t.Fatal(got)
+	}
+	if got := escalationBrief("gemini"); !strings.Contains(got, "ask me with ask_question rather than guessing") {
 		t.Fatal(got)
 	}
 }
@@ -234,7 +238,7 @@ func TestThePersonasPromptFollowsTheBrief(t *testing.T) {
 func TestGroksRulesWriteOutTheAppsTools(t *testing.T) {
 	rules := grokRules()
 	if !strings.HasPrefix(rules, "These tools are fully specified.") || !strings.Contains(rules, "agents__show_file — ") ||
-		!strings.Contains(rules, "agents__ask_form — ") || strings.Contains(rules, "agents__move_worktree") {
+		!strings.Contains(rules, "agents__ask_question — ") || strings.Contains(rules, "agents__move_worktree") {
 		t.Fatal(rules)
 	}
 	if m := sessionMeta("grok"); m["rules"] != rules {

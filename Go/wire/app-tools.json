@@ -159,7 +159,7 @@
       ],
       "type" : "object"
     },
-    "name" : "ask_form",
+    "name" : "ask_question",
     "title" : "Ask the person a question"
   },
   {

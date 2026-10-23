@@ -17,13 +17,13 @@ import (
 // questionWentUnanswered is RuntimeNote.questionWentUnanswered.
 const questionWentUnanswered = "Nobody answered this question before the agent ended."
 
-// formHoldLimit is how long an ask_form call is held open (#1641): a runtime's MCP client
+// formHoldLimit is how long an ask_question call is held open (#1641): a runtime's MCP client
 // lets a tool call go at about a minute ("The operation timed out"), as eventHoldLimit
 // says for wait_for_event. After it, the call says the form is still open, and the answer
 // comes to the agent as a prompt.
 var formHoldLimit = 45 * time.Second
 
-// formStillOpen is what an ask_form call says when it is not answered within formHoldLimit.
+// formStillOpen is what an ask_question call says when it is not answered within formHoldLimit.
 const formStillOpen = "The form is still open, and nobody has answered it yet. Your place is kept: end your turn " +
 	"(or go on with other work). You'll be started again with the answer when they answer, skip or cancel. " +
 	"Do not ask again."
@@ -31,7 +31,7 @@ const formStillOpen = "The form is still open, and nobody has answered it yet. Y
 type pendingElicitation struct {
 	req   wire.ElicitationRequest
 	reply chan elicitationReply
-	// left is an ask_form whose call came back before the answer (formStillOpen): the
+	// left is an ask_question whose call came back before the answer (formStillOpen): the
 	// form stays open after the turn, and its answer goes to the agent as a prompt.
 	left bool
 }
@@ -110,7 +110,7 @@ func (l *live) showForm(req wire.ElicitationRequest) *pendingElicitation {
 	return pe
 }
 
-// holdAskedForm is ask_form's form: held up to formHoldLimit, then left open, with false,
+// holdAskedForm is ask_question's form: held up to formHoldLimit, then left open, with false,
 // for the answer to come as a prompt (#1641).
 func (l *live) holdAskedForm(req wire.ElicitationRequest) (elicitationReply, bool) {
 	pe := l.showForm(req)
@@ -300,7 +300,7 @@ func formAnsweredWords(req wire.ElicitationRequest, action wire.AnswerElicitatio
 	if req.Message != nil && strings.TrimSpace(*req.Message) != "" {
 		form = "your form \"" + strings.TrimSpace(*req.Message) + "\""
 	}
-	return "The person replied to " + form + " (ask_form). " + askFormNote(action, said)
+	return "The person replied to " + form + " (ask_question). " + askQuestionNote(action, said)
 }
 
 // moveIf moves an agent from one state to another, and does nothing from any other

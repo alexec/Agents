@@ -26,7 +26,7 @@ against. It is never Alex's personal account.
   print, log, screenshot or store a card number. Alex types the card in, unless Alex has
   said otherwise for this sign-up.
 - **Alex's hands:** every CAPTCHA, email code or link, phone check, and the card. Ask with
-  `ask_form` and name who asks ("the <provider> sign-up lane asks: …"). `ask_form` can time
+  `ask_question` and name who asks ("the <provider> sign-up lane asks: …"). `ask_question` can time
   out after about 60 seconds; then end the turn with the question in your reply instead of
   asking again and again.
 - **The private Chrome window is on Alex's screen.** For a code or a CAPTCHA, ask Alex to

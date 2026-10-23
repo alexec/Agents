@@ -1622,7 +1622,7 @@ public enum DaemonAPI {
         }
     }
 
-    /// What the MCP helper sends when an agent calls `ask_form`. The token does the
+    /// What the MCP helper sends when an agent calls `ask_question`. The token does the
     /// same work it does for a suggestion, and the questions become a form
     /// elicitation the daemon holds until the person answers — including on the phone.
     public struct AskFormRequest: Codable, Sendable {

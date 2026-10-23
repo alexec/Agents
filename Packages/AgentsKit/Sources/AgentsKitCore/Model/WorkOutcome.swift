@@ -119,7 +119,7 @@ public struct WorkReport: Codable, Hashable, Sendable {
         }
         return """
             Nothing was recorded: keep the question to one sentence under \(messageLimit) \
-            characters. If it needs more than that, ask it with ask_form, which shows the \
+            characters. If it needs more than that, ask it with ask_question, which shows the \
             person a question card and waits for the answer; otherwise call this again \
             with a shorter one.
             """

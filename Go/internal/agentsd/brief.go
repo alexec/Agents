@@ -43,10 +43,7 @@ const leasesBrief = "Lease a shared resource with lease_resource before using it
 // nothing for the person stopped and left an unread row. suggest_next_prompt is named here
 // too (#2171): Claude defers MCP tools, so its description alone was never read.
 func endingBrief(runtimeID string) string {
-	ask := "ask_form"
-	if own := escalationTools[runtimeID]; own != "" {
-		ask = own + " (or ask_form if you lack it)"
-	}
+	ask := askToolWords(runtimeID)
 	return "End each turn in one of three ways. If you cannot continue without me, ask me with " +
 		ask + ", or end the turn stuck or blocked. If you are done and have something for me " +
 		"(a report, a document, a diagram), call show_file on it once and end the turn; do not " +
@@ -139,15 +136,26 @@ func personName(set *string) string {
 const liveDocumentBrief = "Before first writing a Markdown report, plan or spec I asked for, call " +
 	"show_file on it once."
 
+// askToolWords names the tool to ask the person with: the runtime's own where the app keeps
+// one, and the app's ask_question for the rest. Antigravity's own tool has the app's name
+// too (#2298), so the two are told apart by whose they are, not by the name.
+func askToolWords(runtimeID string) string {
+	own := escalationTools[runtimeID]
+	switch {
+	case own == "":
+		return "ask_question"
+	case own == "ask_question":
+		return "your runtime's own ask_question (or the app's ask_question, from the agents server, if yours is missing)"
+	}
+	return own + " (or ask_question if you lack it)"
+}
+
 // escalationBrief is Briefing.escalation: what is the person's to decide, asked with the
 // runtime's own question tool where the app keeps one, and decide-and-tell for the rest
 // (#601, #1083). Of 196 forms answered by 2026-10-15, 79% of questions took the
 // recommended option, and agents waited 65 hours on them.
 func escalationBrief(runtimeID string) string {
-	named := "ask_form"
-	if own := escalationTools[runtimeID]; own != "" {
-		named = own + " (or ask_form if you lack it)"
-	}
+	named := askToolWords(runtimeID)
 	return "When something is mine to decide (anything hard to undo, money or an outside " +
 		"account, a restart or an install on my devices, a missing credential, a choice with " +
 		"no clear best answer), ask me with " + named + " rather than guessing or asking in your " +
