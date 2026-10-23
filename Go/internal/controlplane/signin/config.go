@@ -10,9 +10,9 @@ import (
 )
 
 // The app's own client ids (FR-012): every control plane trusts sign-ins made for them,
-// and its operator registers nothing. Empty until Alex makes the Google OAuth client, the
-// Sign in with Apple Services id and the GitHub App (#995, "What Alex does"); a provider
-// with no client id is offered as not available. AGENTS_SIGNIN_* set them for a build or a
+// and its operator registers nothing. Apple is on (#2507); Google and GitHub are empty
+// until Alex makes the Google OAuth client and the GitHub App (#995, "What Alex does"); a
+// provider with no client id is offered as not available. AGENTS_SIGNIN_* set them for a build or a
 // control plane before then.
 var (
 	// AppGoogleClientIDs are the Google OAuth clients (iOS type) the Mac and the Remote sign
@@ -21,9 +21,10 @@ var (
 	// AppAppleAudiences are the bundle ids a native Sign in with Apple names as aud, and the
 	// Services id.
 	AppAppleAudiences = []string{"com.alexecollins.agents.store", "com.alexecollins.agents.remote"}
-	// AppAppleEnabled says the app has the Sign in with Apple capability: off until the
-	// Services id is made.
-	AppAppleEnabled = false
+	// AppAppleEnabled says the app has the Sign in with Apple capability: on the two App
+	// IDs and in the entitlements since #2507. The web pairs from a code, so there is no
+	// Services id.
+	AppAppleEnabled = true
 	// AppGitHubClientID is the GitHub App's client id, for the device flow.
 	AppGitHubClientID = ""
 )
