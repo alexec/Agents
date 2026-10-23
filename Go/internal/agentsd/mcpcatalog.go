@@ -689,7 +689,7 @@ func (d *Daemon) mcpSetSecret(r wire.MCPSetSecretRequest) (wire.MCPSetSecretAnsw
 
 // mcpRemove takes a server out of mcp.json, one the app added or one written by hand
 // (#2154): the person asked for it, so only add leaves a hand-written entry alone. The rest
-// of the file stays as it is. forgetSecret goes only when no other server, personal or a
+// of the file stays as it is; a personal entry is kept in mcp.removed.json (#2195). forgetSecret goes only when no other server, personal or a
 // project's, still names it.
 func (d *Daemon) mcpRemove(r wire.MCPRemoveRequest) (wire.MCPRemoveAnswer, error) {
 	if err := d.requireMCPProject(r.Destination); err != nil {
@@ -725,8 +725,15 @@ func (d *Daemon) mcpRemove(r wire.MCPRemoveRequest) (wire.MCPRemoveAnswer, error
 			return wire.MCPRemoveAnswer{}, mcpRefusal(mcpcatalog.Failed(err.Error()))
 		}
 	}
+	entry, _, _ := mcpcatalog.Entry(path, r.Name)
 	if err := mcpcatalog.Remove(path, r.Name); err != nil {
 		return wire.MCPRemoveAnswer{}, mcpRefusal(mcpcatalog.Unreadable(path))
+	}
+	// The personal file is in no git: keep a copy of what went (#2195). A project's is committed.
+	if r.Destination.Kind == wire.SkillDestinationKindPersonal {
+		if err := mcpcatalog.KeepRemoved(home, r.Name, entry); err != nil {
+			log.Printf("mcp: remove %s: no copy kept in %s: %v", r.Name, mcpcatalog.RemovedFile(home), err)
+		}
 	}
 	delete(side.Servers, key)
 	side.Save(d.mcpSidecarPath())

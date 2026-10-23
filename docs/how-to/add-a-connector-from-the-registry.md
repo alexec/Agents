@@ -68,14 +68,21 @@ the new value is not shown again.
 
 ## Take a connector out
 
-**Remove…** is offered only for a connector the app added. One from the registry shows
-**registry** and the version it was added at; one added on the sheet by hand shows
-**added by hand** (see [Add a connector by hand](add-a-connector-by-hand.md)). Confirming takes the entry out of `mcp.json`. The secret stays in
-`secrets.env` unless nothing else names it, in which case you can tick **Also forget** that
-name. If another server still names it, the secret stays and the sheet says so.
+**Remove…** is offered on every connector: one from the registry (it shows **registry** and
+the version it was added at), one added on the sheet by hand (**added by hand**, see
+[Add a connector by hand](add-a-connector-by-hand.md)), and one you wrote into `mcp.json`
+yourself (#2154). Confirming takes the entry out of `mcp.json`; the rest of the file stays as
+it is. The secret stays in `secrets.env` unless nothing else names it, in which case you can
+tick **Also forget** that name. If another server still names it, the secret stays and the
+sheet says so.
 
-A server you wrote into `mcp.json` yourself has no **Remove**. If its name is the one you
-wanted to add, the app leaves it alone.
+Your own `~/.agents/mcp.json` is in no git, so the entry that goes is kept in
+`~/.agents/mcp.removed.json`, in the same shape: copy it back into `mcp.json` to have the
+connector again. That file keeps the last 20 (#2195). A project's `.agents/mcp.json` is
+committed, so git brings back what was committed.
+
+If you add a connector whose name is one you wrote into `mcp.json` yourself, the app leaves
+yours alone.
 
 A connector that is not on the registry can be added from the same sheet with **Add by
 hand…**, which connects to it before anything is written: see
