@@ -5,7 +5,7 @@ import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import type { CatalogApproval, CatalogKind, CatalogRequest, CatalogUsage } from "../protocol/generated";
-import { approvalFor, approvalsFoot, approvalsTitle, askFoot, askTitle, itemWords, kindNames, mineWords, noApprovals, noUsage,
+import { approvalFor, takeBackQuestion, approvalsFoot, approvalsTitle, askFoot, askTitle, itemWords, kindNames, mineWords, noApprovals, noUsage,
   requestWords, usageFoot, usageTitle, usersWords, withGovernanceRequest } from "../model/governance";
 import { failedWords } from "../model/console";
 
@@ -172,7 +172,9 @@ export function CataloguePage({ store, down }: { store: Store; down: boolean }) 
               <li key={`${a.kind}/${a.name}/${a.group ?? ""}/${a.user ?? ""}`} class="request">
                 <span>{kindNames[a.kind]} <span class="strong">{a.name}</span>, for {approvalFor(a)}. <span class="quiet small">Approved by {a.by}.</span></span>
                 <span class="request-actions">
-                  <button type="button" class="destructive" disabled={down} onClick={() => void revoke(a)}>Take Back</button>
+                  <button type="button" class="destructive" disabled={down} onClick={() => {
+                    if (window.confirm(takeBackQuestion(a.kind, a.name, approvalFor(a)))) void revoke(a);
+                  }}>Take Back…</button>
                 </span>
               </li>
             ))}

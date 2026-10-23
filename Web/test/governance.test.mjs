@@ -35,3 +35,8 @@ test("an approval is for its group, or else its person", () => {
   assert.equal(m.approvalFor({ kind: "mcp", name: "github", group: "g1", groupName: "Platform", by: "Alex", at: 1 }), "Platform");
   assert.equal(m.approvalFor({ kind: "mcp", name: "github", user: "sam", userName: "Sam", by: "Alex", at: 1 }), "Sam");
 });
+
+test("Take Back… asks first, and names what and whose (#2438)", () => {
+  assert.match(m.takeBackQuestion("mcp", "github", "Platform"), /^Take back the MCP server github for Platform\? /);
+  assert.match(m.takeBackQuestion("skills", "pdf", "Sam"), /^Take back the skill pdf for Sam\? /);
+});

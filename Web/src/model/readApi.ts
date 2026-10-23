@@ -9,6 +9,10 @@ export const otlpTitle = "OTLP Exporter";
 export const noTokens = "No tokens yet. Make one for each tool that reads the reports.";
 export const tokensFoot = "A token reads the organisation's reports and nothing else, at most 30 times a minute. It stops when you revoke it, or when the admin who made it is an admin no longer.";
 export const otlpOff = "Off. To send today's figures by runtime to an OpenTelemetry collector, set OTEL_EXPORTER_OTLP_ENDPOINT on agents-control and start it again.";
+/** What Revoke… asks first (#2438): a revoked token cannot be brought back. */
+export function revokeQuestion(name: string): string {
+  return `Revoke ${name}? The tool that reads the reports with it stops at once, and a revoked token cannot be brought back.`;
+}
 export const shownOnce = "Copy it now. It is not shown again.";
 
 /** The curl line that reads a month of the reports as CSV with the token. */

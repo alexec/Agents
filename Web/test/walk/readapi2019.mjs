@@ -44,7 +44,9 @@ try {
   check(!listed.includes(value), "the value is not shown again");
   check(/Made by .* at \d\d:\d\d\./.test(listed), "who made it, and when");
   await page.shot(`${out}/web-readapi-listed.png`);
-  await page.press("Revoke");
+  await page.eval(`window.confirm = (m) => { window.asked = m; return true; }`);
+  await page.press("Revoke…");
+  check(/^Revoke Looker\?/.test(await page.eval(`window.asked`)), "Revoke… asks first (#2438)");
   await page.waitFor(`document.body.textContent.includes("Revoked at")`, 10_000);
   check(true, "Revoke marks it revoked");
 } catch (error) {

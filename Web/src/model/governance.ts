@@ -41,6 +41,11 @@ export function approvalFor(a: CatalogApproval): string {
   return a.groupName ?? a.group ?? a.userName ?? a.user ?? "";
 }
 
+/** What Take Back… asks first (#2438): an approval taken back is asked for and approved again. */
+export function takeBackQuestion(kind: CatalogKind, name: string, forWhom: string): string {
+  return `Take back the ${kind === "mcp" ? "MCP server" : "skill"} ${name} for ${forWhom}? Their machines lose it, and it must be asked for and approved again.`;
+}
+
 /** "3 machines: Bea, Sam": at most 3 names, then "and 2 more". */
 export function usersWords(row: CatalogUseRow): string {
   const machines = row.machines === 1 ? "1 machine" : `${row.machines} machines`;
