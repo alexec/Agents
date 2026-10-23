@@ -136,6 +136,11 @@ struct AgentRow: View {
                             .help(MuteWords.mutedHelp)
                             .accessibilityLabel(MuteWords.muted)
                     }
+                    // Voice mode listens in this chat (#2518): beside the mute mark, and
+                    // gone the moment voice mode ends.
+                    if VoiceMode.shared.isOn(in: agent.id) {
+                        ListeningMark()
+                    }
                     // Started by another agent (028): the same kind of mark, for the
                     // same reason — this is not something the person typed for.
                     if let starter = model.startedByAgentLabel(agent) {
