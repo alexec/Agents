@@ -135,7 +135,7 @@ func AddViews(server *mcp.Server, gh Views, person bool) {
 	addCodeRabbitTools(server, gh, repoOf)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "show_pull_requests", Title: "Show pull requests",
-		Description: "The repo's open pull requests, newest updated first, each with its checks (passing, failing, running or none), " +
+		Description: "The repo's open pull requests, newest created first, each with its checks (passing, failing, running or none), " +
 			"its review (approved, changes_requested or review_required), whether it conflicts with its base, and whether auto-merge is on. " +
 			"Its view is the Pull requests page, where a person opens a pull request's page.",
 		Annotations: readOnly, Meta: uiMeta(pullsURI, "model", "app")},
@@ -162,7 +162,7 @@ func AddViews(server *mcp.Server, gh Views, person bool) {
 		})
 
 	mcp.AddTool(server, &mcp.Tool{Name: "show_issues", Title: "Show issues",
-		Description: "The repo's open issues (not pull requests), newest updated first, at most 100, each with its labels, " +
+		Description: "The repo's open issues (not pull requests), newest created first, at most 100, each with its labels, " +
 			"assignees (logins) and comment count. Its view is the Issues page, with Start Agent on each issue.",
 		Annotations: readOnly, Meta: uiMeta(issuesURI, "model", "app")},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in issuesArgs) (*mcp.CallToolResult, any, error) {
@@ -311,9 +311,9 @@ func AddViews(server *mcp.Server, gh Views, person bool) {
 	// No network at all: an empty csp, so the host draws them under its strictest policy.
 	meta := mcp.Meta{"ui": map[string]any{"csp": map[string]any{}, "prefersBorder": true}}
 	for _, v := range []struct{ uri, name, title, description, file string }{
-		{pullsURI, "pulls", "Pull requests", "The repo's open pull requests, with their checks, review, conflict and auto-merge; " +
+		{pullsURI, "pulls", "Pull requests", "The repo's open pull requests, newest created first, with their checks, review, conflict and auto-merge; " +
 			"a pull request opens its page. Fed by show_pull_requests.", "pulls.html"},
-		{issuesURI, "issues", "Issues", "The repo's open issues, with their labels and assignees, and Start Agent; a label narrows " +
+		{issuesURI, "issues", "Issues", "The repo's open issues, newest created first, with their labels and assignees, and Start Agent; a label narrows " +
 			"the list. Fed by show_issues.", "issues.html"},
 		{prURI, "pr", "Pull request", "One pull request's page: description, checks with a failed run's log, files, comments and " +
 			"review threads, CodeRabbit's summary and review, with Comment, Approve, Merge, Auto-merge, Start Agent and Ask CodeRabbit Again. Fed by show_pull_request.", "pr.html"},

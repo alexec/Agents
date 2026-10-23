@@ -51,6 +51,8 @@ type viewsAPI struct {
 	posted []string
 	// sent is each write's method, path and body.
 	sent []string
+	// queries records each GET's raw query and each GraphQL request body.
+	queries []string
 }
 
 func (a *viewsAPI) sentText() string {
@@ -64,6 +66,11 @@ func (a *viewsAPI) serve(t *testing.T) *httptest.Server {
 		body, _ := io.ReadAll(r.Body)
 		a.mu.Lock()
 		a.calls = append(a.calls, r.Method+" "+r.URL.Path)
+		if r.Method == http.MethodGet {
+			a.queries = append(a.queries, r.URL.RawQuery)
+		} else if r.URL.Path == "/graphql" {
+			a.queries = append(a.queries, string(body))
+		}
 		if r.Method != http.MethodGet && !strings.HasPrefix(string(body), `{"query":"query`) {
 			a.sent = append(a.sent, r.Method+" "+r.URL.Path+" "+string(body))
 		}
@@ -113,6 +120,68 @@ func (a *viewsAPI) serve(t *testing.T) *httptest.Server {
 	}))
 	t.Cleanup(s.Close)
 	return s
+}
+
+func TestTheListsAskForNewestCreatedFirst(t *testing.T) {
+	c, api := viewsClient(t)
+	callTool(t, c, "show_pull_requests", map[string]any{})
+	callTool(t, c, "show_issues", map[string]any{"repo": "o/r"})
+
+	api.mu.Lock()
+	queries := append([]string(nil), api.queries...)
+	api.mu.Unlock()
+	board, issues := "", ""
+	for _, q := range queries {
+		if strings.Contains(q, `"query":"query`) && strings.Contains(q, "pullRequests(states: OPEN") {
+			board = q
+		}
+		if strings.Contains(q, "sort=created") {
+			issues = q
+		}
+	}
+	if !strings.Contains(board, "orderBy: {field: CREATED_AT, direction: DESC}") || strings.Contains(board, "UPDATED_AT") {
+		t.Errorf("board query: %s", board)
+	}
+	if !strings.Contains(issues, "sort=created") || !strings.Contains(issues, "direction=desc") || strings.Contains(issues, "sort=updated") {
+		t.Errorf("issues query: %s", issues)
+	}
+
+	tools, err := c.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"show_pull_requests", "show_issues"} {
+		found := false
+		for _, tool := range tools.Tools {
+			if tool.Name == name {
+				found = true
+				if !strings.Contains(tool.Description, "newest created first") {
+					t.Errorf("%s description: %s", name, tool.Description)
+				}
+			}
+		}
+		if !found {
+			t.Errorf("missing tool %s", name)
+		}
+	}
+	resources, err := c.ListResources(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, title := range []string{"Pull requests", "Issues"} {
+		found := false
+		for _, resource := range resources.Resources {
+			if resource.Title == title {
+				found = true
+				if !strings.Contains(resource.Description, "newest created first") {
+					t.Errorf("%s resource description: %s", title, resource.Description)
+				}
+			}
+		}
+		if !found {
+			t.Errorf("missing resource %s", title)
+		}
+	}
 }
 
 func viewsClient(t *testing.T) (*mcp.ClientSession, *viewsAPI) {

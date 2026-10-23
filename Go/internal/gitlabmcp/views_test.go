@@ -48,6 +48,65 @@ func callTool(t *testing.T, c *mcp.ClientSession, name string, args map[string]a
 	return r, data
 }
 
+func TestTheListsAskForNewestCreatedFirst(t *testing.T) {
+	f := viewsFake(t)
+	c := viewsClient(t, f)
+	callTool(t, c, "show_merge_requests", map[string]any{})
+	callTool(t, c, "show_issues", map[string]any{})
+
+	mergeRequests, issues := "", ""
+	for _, request := range f.asked() {
+		if strings.Contains(request, "/merge_requests?") {
+			mergeRequests = request
+		}
+		if strings.Contains(request, "/issues?") {
+			issues = request
+		}
+	}
+	for label, request := range map[string]string{"merge requests": mergeRequests, "issues": issues} {
+		if !strings.Contains(request, "order_by=created_at") || !strings.Contains(request, "sort=desc") || strings.Contains(request, "order_by=updated_at") {
+			t.Errorf("%s request: %s", label, request)
+		}
+	}
+
+	tools, err := c.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"show_merge_requests", "show_issues"} {
+		found := false
+		for _, tool := range tools.Tools {
+			if tool.Name == name {
+				found = true
+				if !strings.Contains(tool.Description, "newest created first") {
+					t.Errorf("%s description: %s", name, tool.Description)
+				}
+			}
+		}
+		if !found {
+			t.Errorf("missing tool %s", name)
+		}
+	}
+	resources, err := c.ListResources(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, title := range []string{"Merge requests", "Issues"} {
+		found := false
+		for _, resource := range resources.Resources {
+			if resource.Title == title {
+				found = true
+				if !strings.Contains(resource.Description, "newest created first") {
+					t.Errorf("%s resource description: %s", title, resource.Description)
+				}
+			}
+		}
+		if !found {
+			t.Errorf("missing resource %s", title)
+		}
+	}
+}
+
 func viewsFake(t *testing.T) *fakeGitLab {
 	f := newFake(t)
 	f.addMembers()
