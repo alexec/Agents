@@ -33,6 +33,8 @@ type eventsServer struct {
 	// byCursor answers a poll from a given cursor, for a fetch again.
 	byCursor map[string][]map[string]any
 	polls    []string
+	// notConnected is how many polls after c1 answer that the server's sign-in ended (#2457).
+	notConnected int
 }
 
 func newEventsServer(t *testing.T) *eventsServer {
@@ -71,6 +73,14 @@ func newEventsServer(t *testing.T) *eventsServer {
 				cursor = *p.Cursor
 			}
 			s.polls = append(s.polls, cursor)
+			if cursor == "c1" && s.notConnected > 0 {
+				s.notConnected--
+				s.mu.Unlock()
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": *m.ID, "error": map[string]any{
+					"code": -32012, "message": "GitHub is not connected, or its sign-in ended", "data": map[string]any{"reason": "not connected"}}})
+				return
+			}
 			events := []map[string]any{}
 			next := "c1"
 			truncated := false
@@ -438,6 +448,44 @@ func TestAWaitOnAServersEvent(t *testing.T) {
 		defer d.mcpEvMu.Unlock()
 		return len(d.mcpSubs) == 0
 	})
+}
+
+// #2457: a poll answered "not connected" (a sign-in that failed for a moment) is tried again
+// from the same cursor, so a wait on pr.merged still wakes when the PR merges; it used to
+// stop the subscription for good, and the wait never woke.
+func TestAWaitOutlastsASignInThatFailsForAMoment(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	ci := newEventsServer(t)
+	a := seeded(t, d, t.TempDir(), nil)
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+	serverHome(t, d, ci.URL)
+	quickPolls(d)
+	d.StartMCPEvents()
+	answered := make(chan string, 1)
+	go func() {
+		text, _ := m.tool(2, "wait_for_event", map[string]any{"events": "pr.merged", "where": map[string]any{"pr": 5}, "until_minutes": 10})
+		answered <- text
+	}()
+	waitFor(t, "the first poll", func() bool { return ci.polled("c1") })
+	ci.mu.Lock()
+	ci.notConnected = 2
+	ci.queued = []map[string]any{{"eventId": "w1", "name": "pr.merged", "data": map[string]any{"pr": map[string]any{"number": 5}}}}
+	ci.mu.Unlock()
+	select {
+	case text := <-answered:
+		if !strings.Contains(text, "pr.merged happened at ") {
+			t.Fatal(text)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the wait was never answered")
+	}
+	ci.mu.Lock()
+	defer ci.mu.Unlock()
+	if ci.notConnected != 0 {
+		t.Fatalf("%d refusals not polled", ci.notConnected)
+	}
 }
 
 // A server's data is the server's whoever wrote it: backticks in it (a PR's title, say) stay
