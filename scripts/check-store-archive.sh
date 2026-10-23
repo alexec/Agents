@@ -20,10 +20,8 @@
 # installer package holding one only its owner can read (90255), which a shell with umask
 # 077 leaves in _CodeSignature.
 #
-#   scripts/check-store-archive.sh --entitlements App/Agents-Store.entitlements
-#
-# checks the source entitlements file against the same list, so a pull request fails on a
-# new entitlement before a release's archive does (#2498). scripts/lint.sh runs it.
+# scripts/check-store-entitlements.py checks App/Agents-Store.entitlements against the same
+# list, so a pull request fails on a new entitlement before a release's archive does (#2498).
 
 set -euo pipefail
 expected=(
@@ -33,17 +31,6 @@ expected=(
   com.apple.security.get-task-allow keychain-access-groups
   com.apple.security.application-groups
 )
-
-if [[ ${1:-} == --entitlements ]]; then
-  file=${2:?usage: check-store-archive.sh --entitlements path/to/App.entitlements}
-  bad=0
-  for key in ${(f)"$(python3 -c 'import plistlib,sys; print("\n".join(sorted(plistlib.load(open(sys.argv[1],"rb")))))' $file)"}; do
-    (( ${expected[(Ie)$key]} )) && continue
-    print -u2 "BAD entitlement $key in $file (not in T044's list in scripts/check-store-archive.sh)"
-    bad=$(( bad + 1 ))
-  done
-  exit $(( bad > 0 ))
-fi
 
 archive=${1:?usage: check-store-archive.sh path/to/Some.xcarchive}
 [[ -d $archive/Products ]] || { print -u2 "$archive is not an archive (no Products)"; exit 2 }
