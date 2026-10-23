@@ -109,11 +109,16 @@ public enum MCPHealthWords {
     public static let projectEmpty = "No connectors in this project's .agents/mcp.json yet."
 
     /// What Remove… takes out (#2154), whether the app added it or it was written by hand.
-    /// `machine` names a server a project is on (#2266); nil for this Mac's.
+    /// `machine` names a server a project is on (#2266); nil for this Mac's. The personal file
+    /// is in no git, so the daemon keeps a copy of what went, and this says where (#2195).
     public static func removes(_ name: String, inProject: Bool, on machine: String? = nil) -> String {
         "This removes the \(name) entry from \(inProject ? ".agents/mcp.json" : "~/.agents/mcp.json")"
             + (machine.map { " on \($0)" } ?? "") + ". Agents started after that won't have it."
+            + (inProject ? "" : removesKept)
     }
+
+    /// Where a removed personal entry is kept (#2195).
+    public static let removesKept = " A copy of the entry is kept in ~/.agents/mcp.removed.json."
 
     /// Remove… found the machine offline (#2266).
     public static func notRemoved(_ name: String, offline machine: String) -> String {
@@ -126,5 +131,5 @@ public enum MCPHealthWords {
     }
 
     /// Said too for a project's: its mcp.json is committed (#2154).
-    public static let removesCommitted = "That file is committed with the project, so the change shows in git."
+    public static let removesCommitted = "That file is committed with the project, so the change shows in git, and git can bring back what was committed."
 }

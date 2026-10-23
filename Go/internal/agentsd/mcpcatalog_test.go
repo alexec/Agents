@@ -135,6 +135,31 @@ func TestAnMCPServerFoundAddedListedAndRemoved(t *testing.T) {
 	}
 }
 
+// A personal entry removed is kept in ~/.agents/mcp.removed.json (#2195): that file is in no git.
+func TestARemovedPersonalServerIsKept(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("AGENTS_PERSONAL_HOME", home)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	os.MkdirAll(filepath.Join(home, ".agents"), 0o755)
+	os.WriteFile(filepath.Join(home, ".agents", "mcp.json"), []byte(`{"mcpServers": {"mine": {"command": "my-server", "args": ["--fast"]}, "theirs": {"command": "x"}}}`), 0o644)
+	c.call(t, 1, "mcp/remove", map[string]any{"destination": map[string]any{"kind": "personal"}, "name": "mine"})
+	kept := filepath.Join(home, ".agents", "mcp.removed.json")
+	e, ok, _ := mcpEntryAt(kept, "mine")
+	if !ok {
+		t.Fatal("no copy kept")
+	}
+	if m, _ := e.(map[string]any); m["command"] != "my-server" {
+		t.Fatalf("%+v", e)
+	}
+	if info, _ := os.Stat(kept); info.Mode().Perm() != 0o600 {
+		t.Fatal(info.Mode())
+	}
+	if _, ok, _ := mcpEntryAt(filepath.Join(home, ".agents", "mcp.json"), "mine"); ok {
+		t.Fatal("still there")
+	}
+}
+
 func list0Digest(t *testing.T, c *conn, dest map[string]any) string {
 	var list wire.MCPListAnswer
 	json.Unmarshal(c.call(t, 98, "mcp/list", map[string]any{"destination": dest}), &list)
