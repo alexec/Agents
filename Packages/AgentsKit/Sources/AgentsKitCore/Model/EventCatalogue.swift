@@ -173,7 +173,10 @@ public enum EventCatalogue {
                   "A branch an agent works on moved; never the default branch."),
         EventKind("dropbox.file_added", .project, shown("path", "name", "folder", "extension", "size"),
                   "A file arrived in this project's drop box, .agents/dropbox/, or a folder in it."),
-        EventKind("lease.granted", .mac, shown("resource", "agent"), "An agent was given a lease."),
+        // Narrowed by agent and resource: a place in a lease's line is a wait on its own
+        // grant (#2361).
+        EventKind("lease.granted", .mac, [EventDetail("resource", isFilter: true), EventDetail("agent", isFilter: true)],
+                  "An agent was given a lease."),
         EventKind("lease.released", .mac,
                   shown("resource") + [EventDetail("how", values: ["expired", "ended", "released"])],
                   "A lease was given back, ended or ran out."),

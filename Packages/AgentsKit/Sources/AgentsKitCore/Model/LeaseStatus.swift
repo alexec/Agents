@@ -101,6 +101,14 @@ public struct LeaseStatus: Equatable, Sendable {
         holding.isEmpty ? nil : LeaseStatus(holding: holding, waiting: [])
     }
 
+    /// Without the place in line that the agent's wait card says (#2361), so the chat's foot
+    /// and the row do not say it twice. Nil when nothing is left.
+    public func without(_ wait: EventWait?) -> LeaseStatus? {
+        guard let wait, wait.isOpen, let resource = wait.lineResource else { return self }
+        let left = LeaseStatus(holding: holding, waiting: waiting.filter { $0.name != resource })
+        return left.holding.isEmpty && left.waiting.isEmpty ? nil : left
+    }
+
     /// The first lease or wait, in short: the card's mark and the row's.
     public var mark: String {
         if let first = holding.first { return "Holds \(Self.holdingWords(first))" }

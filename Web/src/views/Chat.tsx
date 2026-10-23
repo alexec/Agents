@@ -49,7 +49,7 @@ import { comingBackDescription, footStatusWords } from "../model/status";
 import { ArchiveCard } from "./ArchiveCard";
 import { showsThoughts, shownItems } from "../model/thoughts";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
-import { eventWaitLine, leaseMark } from "../model/rowLines";
+import { eventWaitLine, leaseMark, lineResource } from "../model/rowLines";
 import { routeHash } from "../route";
 import { sessionRuntimeName } from "../model/runtimes";
 import { GuardedChangeCard } from "./GuardedChange";
@@ -430,7 +430,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   // What waits on the person is in the conversation, not over it (#723), after all of it (#1995),
   // and the agent's wait on events under it.
   const asked = useWaitingCards({ store, host, session, down });
-  const waitLine = agent && eventWaitLine(agent, (id) => store.agent(host, id)?.title);
+  const waitLine = agent && eventWaitLine(agent, (id) => store.agent(host, id)?.title, store.leases.value[host]);
   const cards: WaitingCard[] = [
     // A change its agent made to the project's own files, asked here (#531).
     ...store.guardedChanges(host, { session }).map(({ folder, change }) => ({
@@ -790,7 +790,8 @@ function Queued({ store, host, agent, disabled, draftKey }: { store: Store; host
  * #2344): one line each, a way to the Resources page. What it waits for on events is a card (#1995).
  */
 function LeaseLine({ store, host, agent }: { store: Store; host: string; agent: Agent }) {
-  const leases = leaseMark(agent.id, store.leases.value[host], (id) => store.agent(host, id)?.title);
+  // A place in line that the wait card says is left to the card (#2361).
+  const leases = leaseMark(agent.id, store.leases.value[host], (id) => store.agent(host, id)?.title, lineResource(agent));
   if (!leases) return null;
   return (
     <div class="lease-line" role="status" aria-label={leases.full}>

@@ -6,7 +6,7 @@
 // the project page's and the chat's.
 import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
-import { leaseMark, startedByAgentLabel, waitMark, worktreeHelp, type LeaseMark, type WaitMark } from "../model/rowLines";
+import { leaseMark, lineResource, startedByAgentLabel, waitMark, worktreeHelp, type LeaseMark, type WaitMark } from "../model/rowLines";
 import { blockWaitNames, openBlock } from "../model/block";
 import { backgroundMark } from "../model/background";
 import { drawsUnread, projectFolder } from "../model/groups";
@@ -104,7 +104,9 @@ export interface RowExtras {
 export function rowExtras(store: Store, host: string, agent: Agent): RowExtras {
   const title = (id: string) => store.agent(host, id)?.title;
   const workflowID = agent.startedByWorkflow;
-  const leases = leaseMark(agent.id, store.leases.value[host], title);
+  const snapshot = store.leases.value[host];
+  // A place in line that its wait says is said once, by the wait (#2361).
+  const leases = leaseMark(agent.id, snapshot, title, lineResource(agent));
   return {
     comingBack: store.isComingBack(host, agent.id),
     // Its id when the file has since gone, so the mark never goes with it, as the window's.
@@ -115,7 +117,7 @@ export function rowExtras(store: Store, host: string, agent: Agent): RowExtras {
     leases,
     wait: waitMark(agent, openBlock(agent)
       ? { names: blockWaitNames(agent, store.agents.value[host] ?? []), lines: store.waitsOf(host, agent) }
-      : { names: [], lines: [] }, leases, title),
+      : { names: [], lines: [] }, leases, title, snapshot),
     queued: agent.state === "queued" ? queuedLine(agent, store.projectAgents(host, projectFolder(agent))) : null,
     said: store.saidLines.value[agent.id] ?? null,
   };

@@ -75,6 +75,27 @@ test("a waiting row is one line: the first thing it waits for and how many more 
     "◷ Checks again at 14:30");
 });
 
+test("a place in a lease's line is its wait card, said once (#2361)", () => {
+  const now = new Date(2026, 9, 4, 14, 0);
+  const snapshot = { at: wire(now), resources: [
+    { name: "build", kind: "named", displayName: "Build", isGone: false, endingSoon: false,
+      line: [{ agentID: "x", askedAt: 0, isCallOpen: true }, { agentID: "me", askedAt: 0, isCallOpen: true }],
+      holds: [{ resource: "build", displayName: "Build", holder: "a", grantedAt: wire(now),
+        expiresAt: wire(new Date(2026, 9, 4, 14, 12)), warned: false }] },
+  ] };
+  const agent = { id: "me", state: "finished", eventWait: { id: "w", from: 0, since: 0,
+    patterns: [{ name: "lease.granted", filters: { agent: "me", resource: "build" } }] } };
+  assert.equal(lines.lineResource(agent), "build");
+  assert.equal(lines.lineResource({ ...agent, eventWait: { ...agent.eventWait, ending: { timedOut: {} } } }), undefined);
+  assert.equal(lines.eventWaitLine(agent, title, snapshot), "◷ Waiting for Build · held by “Fix login” until 14:12 · 2nd in line");
+  assert.equal(lines.eventWaitLine(agent, title), "◷ Waiting for your turn with build");
+  assert.equal(lines.eventWaitMark(agent, title, snapshot), "◷ Waiting for Build · 2nd in line");
+  assert.deepEqual(lines.eventWaitThings(agent, title, snapshot), ["Build"]);
+  assert.equal(lines.leaseMark("me", snapshot, title, "build"), null);
+  const mark = lines.waitMark(agent, { names: [], lines: [] }, null, title, snapshot);
+  assert.equal(mark.line, "◷ Waiting for Build");
+});
+
 test("who started it, and the worktree's help", () => {
   assert.equal(lines.startedByAgentLabel({ startedByAgent: "a" }, title), "Started by “Fix login”");
   assert.equal(lines.startedByAgentLabel({ startedByAgent: "gone" }, title), "Started by another agent");

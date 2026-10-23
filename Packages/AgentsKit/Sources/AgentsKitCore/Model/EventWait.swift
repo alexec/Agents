@@ -63,6 +63,15 @@ public struct EventWait: Codable, Hashable, Sendable {
         isOpen && (deadline.map { $0 <= now } ?? false)
     }
 
+    /// The resource whose line this wait is a place in (#2361): one pattern, `lease.granted`
+    /// narrowed to one agent and one resource. Nil for any other wait.
+    public var lineResource: ResourceName? {
+        guard patterns.count == 1, let pattern = patterns.first, pattern.name == "lease.granted",
+              pattern.filters.count == 2, pattern.filters["agent"]?.single != nil,
+              let resource = pattern.filters["resource"]?.single else { return nil }
+        return ResourceName(resource)
+    }
+
     /// The patterns as the status line and the replies write them, joined with "or".
     public var label: String {
         labels.joined(separator: " or ")

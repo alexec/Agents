@@ -1150,7 +1150,7 @@ public final class AgentsModel {
 
     /// What an agent is waiting on, in the words its row, card and capsule use.
     public func waitStatus(of agent: Agent) -> WaitStatus? {
-        WaitStatus.of(agent, names: { self.agentTitles[$0] })
+        WaitStatus.of(agent, names: { self.agentTitles[$0] }, lease: leaseStatus(of: agent.id))
     }
 
     /// What an agent holds and waits for, in the words the row, the card and the chat
@@ -1518,11 +1518,13 @@ public final class AgentsModel {
             things += (working.isEmpty ? block.waits : working).map { "\u{201C}\(waitName($0))\u{201D}" }
             detail += blockLines(agent)
         }
+        let leases = leaseStatus(of: agent.id)
         if let wait = agent.eventWait, wait.isOpen {
-            things += WaitStatus.things(wait.patterns, names: { self.agentTitles[$0] })
+            things += WaitStatus.things(wait, names: { self.agentTitles[$0] }, lease: leases)
             if let status = waitStatus(of: agent) { detail.append(status.line) }
         }
-        if let lease = leaseStatus(of: agent.id) {
+        // A place in line the wait above says already is not said twice (#2361).
+        if let lease = leases?.without(agent.eventWait) {
             things += lease.waiting.map(\.shortName)
             detail += lease.waitingLines
         }

@@ -416,8 +416,17 @@ func waitPatterns(w *wire.EventWait) []waitPattern {
 	return out
 }
 
-// waitLabel is EventWait.label: a server's event says the servers it was subscribed to.
+// waitLabel is EventWait.label: a server's event says the servers it was subscribed to; a
+// place in a lease's line, "your turn with build" (#2361).
 func waitLabel(w *wire.EventWait) string {
+	if len(w.Patterns) == 1 {
+		p := patternOf(w.Patterns[0])
+		if who := p.filters["agent"]; len(who) == 1 {
+			if name, ok := lineWaitResource(w, wire.UUID(who[0])); ok {
+				return "your turn with " + string(name)
+			}
+		}
+	}
 	var labels []string
 	for _, p := range waitPatterns(w) {
 		label := p.label()
@@ -971,6 +980,11 @@ func (d *Daemon) endWait(agent wire.UUID, by wire.EventWaitEndingCanceller, quie
 	}
 	w := *a.EventWait
 	d.change(agent, func(a *wire.Agent) { a.EventWait = nil })
+	// Stop Waiting, or cancel_wait, on a place in a line leaves the line (#2361); a wait
+	// that replaces it keeps the place.
+	if name, ok := lineWaitResource(&w, agent); ok && !quietly && (by == "person" || by == "agent") {
+		d.leaveLine(agent, name)
+	}
 	if c := d.takeOpenWait(agent); c != nil {
 		if quietly {
 			c.answer <- replacedWords(&w)
@@ -988,7 +1002,9 @@ func (d *Daemon) endWait(agent wire.UUID, by wire.EventWaitEndingCanceller, quie
 func (d *Daemon) matchWaits(e wire.Event) {
 	for _, a := range d.Store.Agents() {
 		w := a.EventWait
-		if w == nil || !d.inScope(e, &a) || !waitMatches(w, e) || e.Details["agent"] == string(a.ID) {
+		// An agent's own events do not wake it, but for its own grant, which is the one
+		// thing its place in a line waits for (#2361).
+		if w == nil || !d.inScope(e, &a) || !waitMatches(w, e) || e.Details["agent"] == string(a.ID) && e.Name != "lease.granted" {
 			continue
 		}
 		title := "Untitled"

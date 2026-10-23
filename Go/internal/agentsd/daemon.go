@@ -122,6 +122,8 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	// raise an event that wakes one, so its wake says so.
 	d.noteRestart()
 	d.resumeEventWaits()
+	// A lease's line and the waits for it agree again (#2361).
+	d.reconcileLineWaits()
 	d.resumeBlocks()
 	d.resumeContinues()
 	d.checkEveryQueue()

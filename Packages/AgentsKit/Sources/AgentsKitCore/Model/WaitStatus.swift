@@ -25,8 +25,20 @@ public struct WaitStatus: Codable, Hashable, Sendable {
 
     public static let symbol = LeaseStatus.waitingSymbol
 
-    /// Nil when the agent is waiting on nothing.
-    public static func of(_ agent: Agent, names: (UUID) -> String?) -> WaitStatus? {
+    /// Nil when the agent is waiting on nothing. A place in a lease's line (#2361) is said
+    /// as the line says it: "◷ Waiting for build · held by “Fix login” until 14:12 · 2nd in
+    /// line", from `lease` when the daemon has said its leases.
+    public static func of(_ agent: Agent, names: (UUID) -> String?, lease: LeaseStatus? = nil) -> WaitStatus? {
+        if let wait = agent.eventWait, wait.isOpen, let resource = wait.lineResource {
+            let place = lease?.waiting.first { $0.name == resource }
+            let what = place.map { place in
+                "\(place.displayName) · held by \(place.holderName)"
+                    + (place.until.map { " until \(LeaseWords.clock($0))" } ?? "")
+                    + " · \(LeaseWords.ordinal(place.place)) in line"
+            } ?? "your turn with \(resource)"
+            let short = place.map { "\($0.shortName) · \(LeaseWords.ordinal($0.place)) in line" } ?? resource.key
+            return WaitStatus(line: "\(symbol) Waiting for \(what)", mark: "\(symbol) Waiting for \(short)", cancellable: true)
+        }
         if let wait = agent.eventWait, wait.isOpen {
             let what = described(wait, names: names)
             var line = "\(symbol) Waiting for \(what) · since \(LeaseWords.clock(wait.since))"
@@ -56,6 +68,14 @@ public struct WaitStatus: Codable, Hashable, Sendable {
 
     /// What an event wait waits for, one thing a pattern (#582): an agent finishing by
     /// its name in quotes, as a block names it, and anything else by its label.
+    static func things(_ wait: EventWait, names: (UUID) -> String?, lease: LeaseStatus? = nil) -> [String] {
+        // A place in a line, by the resource's short name, as the lease mark had it.
+        if let resource = wait.lineResource {
+            return [lease?.waiting.first { $0.name == resource }?.shortName ?? resource.key]
+        }
+        return things(wait.patterns, names: names)
+    }
+
     static func things(_ patterns: [EventPattern], names: (UUID) -> String?) -> [String] {
         patterns.map { pattern in
             guard pattern.name == "agent.finished", pattern.filters.count == 1,
