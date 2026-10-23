@@ -23,18 +23,36 @@ func scimGroup(g *records.Group, provider string) bool {
 }
 
 func (d scimDirectory) groupOf(g records.Group) scim.Group {
+	out := groupValuesOf(g)
+	d.nameMembers(&out)
+	return out
+}
+
+// groupValuesOf is a group with its members' values and not their names.
+func groupValuesOf(g records.Group) scim.Group {
 	out := scim.Group{ID: g.ID, ExternalID: g.Source.ExternalID, DisplayName: g.Source.DisplayName}
 	for _, m := range g.Members {
-		out.Members = append(out.Members, scim.Member{Value: m, Display: d.s.personName(m)})
+		out.Members = append(out.Members, scim.Member{Value: m})
 	}
 	return out
 }
 
-func (d scimDirectory) Groups(ctx context.Context, provider string) ([]scim.Group, error) {
+func (d scimDirectory) nameMembers(g *scim.Group) {
+	for i := range g.Members {
+		g.Members[i].Display = d.s.personName(g.Members[i].Value)
+	}
+}
+
+func (d scimDirectory) Groups(ctx context.Context, provider string, keep func(scim.Group) bool) ([]scim.Group, error) {
 	var out []scim.Group
 	for _, g := range d.s.records.Groups() {
-		if scimGroup(&g, provider) {
-			out = append(out, d.groupOf(g))
+		if !scimGroup(&g, provider) {
+			continue
+		}
+		// Named only once kept: a sync asks for one group by its name (#2430).
+		if sg := groupValuesOf(g); keep(sg) {
+			d.nameMembers(&sg)
+			out = append(out, sg)
 		}
 	}
 	slices.SortFunc(out, func(a, b scim.Group) int { return strings.Compare(a.ID, b.ID) })
@@ -159,13 +177,19 @@ func sameGroup(before, after records.Group) bool {
 }
 
 func memberChanges(before, after []string) (added, removed int) {
+	// Sets: a group has up to 10,000 members (#2430).
+	was, is := make(map[string]bool, len(before)), make(map[string]bool, len(after))
+	for _, m := range before {
+		was[m] = true
+	}
 	for _, m := range after {
-		if !slices.Contains(before, m) {
+		is[m] = true
+		if !was[m] {
 			added++
 		}
 	}
 	for _, m := range before {
-		if !slices.Contains(after, m) {
+		if !is[m] {
 			removed++
 		}
 	}

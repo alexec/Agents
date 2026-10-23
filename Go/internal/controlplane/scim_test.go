@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"flag"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -16,6 +18,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
+	"github.com/alexec/agents/Go/internal/controlplane/scim"
 	"github.com/alexec/agents/Go/internal/controlplane/signin"
 	"github.com/alexec/agents/Go/internal/controlplane/signin/signintest"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
@@ -707,5 +710,41 @@ func TestSCIMUnknownBearersKeepNothing(t *testing.T) {
 	}
 	if limited == 0 {
 		t.Fatal("30 made-up tokens from one address were all read")
+	}
+}
+
+// #2430: a first sync, Okta's GET with a filter then a POST for each user, reads every
+// person from the store for none of them, and its median call does not grow with N.
+// -scim-sync sets N: go test -run TestAFirstSync -args -scim-sync=5000.
+var scimSyncUsers = flag.Int("scim-sync", 1000, "how many users TestAFirstSyncListsNoPeoplePerUser syncs")
+
+func TestAFirstSyncListsNoPeoplePerUser(t *testing.T) {
+	n := *scimSyncUsers
+	p, _, _, _, _ := scimPlane(t, wire.OrgProviderJoinScim)
+	counted := &countingStore{Store: p.s.records.Store}
+	p.s.records.Store = counted
+	d := scimDirectory{p.s}
+	ctx := context.Background()
+	c := scim.Caller{Provider: "acme-okta"}
+	var took []time.Duration
+	for i := range n {
+		userName := fmt.Sprintf("user%05d@acme.example", i)
+		start := time.Now()
+		found, err := d.Users(ctx, c.Provider, func(u scim.User) bool { return u.UserName == userName })
+		if err != nil || len(found) != 0 {
+			t.Fatalf("GET %s: %v %v", userName, found, err)
+		}
+		if _, err := d.CreateUser(ctx, c, scim.User{UserName: userName, ExternalID: fmt.Sprintf("ext-%05d", i), Active: true}); err != nil {
+			t.Fatalf("POST %s: %v", userName, err)
+		}
+		took = append(took, time.Since(start))
+	}
+	slices.Sort(took)
+	lists := counted.lists.Load()
+	t.Logf("a first sync of %d users: median GET+POST %v, slowest %v, %d store Lists", n, took[n/2], took[n-1], lists)
+	// Some Lists come from elsewhere as people change (a reload, a group's roles); one per
+	// user is the cost this bounds.
+	if lists > int64(n/10) {
+		t.Fatalf("%d store Lists for %d users", lists, n)
 	}
 }
