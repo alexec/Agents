@@ -634,11 +634,15 @@ export interface TurnParts {
   stepCount: number;
   /** The latest step, while the turn runs and has said nothing after it. */
   live?: Item;
+  /** The thought the agent is thinking now (#2380): the last item drawn in a turn still going, when
+   * that is a thought and the turn draws its steps. Its line has the thinking mark; the foot none. */
+  liveThought?: string;
 }
 
 /** TurnParts(items, isLive:). */
 export function turnParts(items: readonly Item[], isLive: boolean): TurnParts {
-  const shown = drawnInTurn(items, isLive).filter((item) => !isThought(item));
+  const drawn = drawnInTurn(items, isLive);
+  const shown = drawn.filter((item) => !isThought(item));
   const replied = new Set(reply(shown, isLive));
   const outcome: Item[] = [];
   const reports: Item[] = [];
@@ -654,7 +658,9 @@ export function turnParts(items: readonly Item[], isLive: boolean): TurnParts {
   if (isLive && replied.size === 0) {
     for (let i = shown.length - 1; i >= 0; i--) if (!isOutcome(shown[i]!)) { live = shown[i]; break; }
   }
-  return { outcome: [...outcome, ...reports], stepCount: steps, ...(live ? { live } : {}) };
+  const last = drawn.at(-1);
+  const liveThought = isLive && steps !== 0 && last && isThought(last) ? last.id : undefined;
+  return { outcome: [...outcome, ...reports], stepCount: steps, ...(live ? { live } : {}), ...(liveThought ? { liveThought } : {}) };
 }
 
 /** Whether the conversation's last turn is still going. */

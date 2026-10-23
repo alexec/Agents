@@ -246,6 +246,11 @@ struct ChatTranscript: View {
         let liveID = isWorking ? rows.last?.id : nil
         // The live turn ends on a call still underway: that line has the tool mark (#2338).
         let callIsMarked = liveID != nil && rows.last?.items.last?.latestToolCall?.isUnderway == true
+        // Or on a thought the agent is thinking now: that line has the thinking mark (#2380).
+        let thoughtIsMarked = liveID != nil && rows.last.map {
+            TurnView.marksThought($0, detail: turnViews[$0.id] ?? .initial,
+                                  fetched: fetchedTurns[$0.id]?.items(showsThoughts: showsThoughts), isLive: true)
+        } == true
         // The head (the load failure, the spinner for the page above), every turn, and the
         // foot (what waits to be sent, the working line, the cards), as the stack lays them out.
         let turnRows = cut(rows, liveID: liveID)
@@ -281,7 +286,7 @@ struct ChatTranscript: View {
                             .id(part.id)
                     }
                     .environment(\.backgroundWork, agent.background)
-                    foot(column, callIsMarked: callIsMarked)
+                    foot(column, callIsMarked: callIsMarked || thoughtIsMarked)
                         .layoutValue(key: TranscriptRowID.self, value: Self.foot)
                 }
                 // Out of the slack: the rows less the empty space above them. Not a negative
@@ -465,7 +470,8 @@ struct ChatTranscript: View {
                     ComingBackLine()
                 } else if (agent.state == .running || agent.state == .starting) && !callIsMarked {
                     // Not while the call's own line has the tool mark: one tool mark on the
-                    // page, by the words that say what runs (#2338).
+                    // page, by the words that say what runs (#2338); nor while a thought's
+                    // line has the thinking mark (#2380).
                     WorkingLine(tool: RunningToolWords.tool(agent))
                 }
                 // What it holds and waits for in line: what the agent is doing now, as the
