@@ -43,4 +43,11 @@ struct ShellCommandTests {
         #expect(report.contains("```\nerror: no rule\n```"))
         #expect(ShellCommand.report(command: "true", printed: "").contains("(It printed nothing.)"))
     }
+
+    @Test func sharedTellAgentActionBuildsTheReportFromRecentShellOutput() {
+        let report = ShellCommandActions.report("make", recent: Data("error: no rule\n".utf8))
+        #expect(report == ShellCommand.report(command: "make", printed: "error: no rule"))
+        #expect(ShellCommandActions.report("true", recent: Data()).contains("(It printed nothing.)"))
+        #expect(ShellCommandActions.unavailableMessage == "The session's shell did not start, so the command did not run.")
+    }
 }
