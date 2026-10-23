@@ -431,19 +431,28 @@ private struct NoMacHostNotice: View {
 }
 
 /// The top of a pane whose part can be the same on every machine of the person's (#2069,
-/// #2157): where an edit here goes, and the switch. On takes this Mac's to every machine;
-/// off, asked first, leaves each machine what it has.
+/// #2157): where an edit here goes, and the switch. On, asked first (#2390), takes this Mac's
+/// to every machine in place of theirs; off, asked first, leaves each machine what it has.
 private struct ScopeLine: View {
     @Environment(AppModel.self) private var model
     let part: DaemonAPI.UserSettingsPartName
 
     @State private var busy = false
     @State private var problem: String?
-    @State private var asksToStop = false
+    /// The question before the switch moves: true to turn the part on, false to turn it off.
+    @State private var asking: Bool?
     /// The switch: moved at once by a press, then kept to what the control plane says.
     @State private var isOn = false
 
     private var follows: Bool { model.userScope.follows(part) }
+
+    /// The person's other machines that run agents, by name, as the control plane lists them.
+    private var otherMachines: [String] {
+        let you = model.people.you?.id
+        return (model.controlPlaneHosts ?? [])
+            .filter { $0.runsAgents && $0.id != model.thisMacHostID && (you == nil || $0.owner == nil || $0.owner == you) }
+            .map(\.name)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -473,24 +482,28 @@ private struct ScopeLine: View {
         .onChange(of: follows, initial: true) { isOn = follows }
         .onChange(of: isOn) { turn(isOn) }
         // Cancel, or the dialog sent away: the switch goes back.
-        .onChange(of: asksToStop) { if !asksToStop, !busy { isOn = follows } }
-        .confirmationDialog(UserScopeWords.stopTitle(part), isPresented: $asksToStop, titleVisibility: .visible) {
-            Button(UserScopeWords.stop) {
-                Task { await run { await model.userScope.set(part, to: .null, on: model.controlRequests) } }
+        .onChange(of: asking) { if asking == nil, !busy { isOn = follows } }
+        .confirmationDialog(asking == true ? UserScopeWords.takeTitle(part) : UserScopeWords.stopTitle(part),
+                            isPresented: Binding(get: { asking != nil }, set: { if !$0 { asking = nil } }),
+                            titleVisibility: .visible, presenting: asking) { on in
+            if on {
+                Button(UserScopeWords.take, role: .destructive) {
+                    Task { await run { await model.takeUserPartFromThisMac(part) } }
+                }
+            } else {
+                Button(UserScopeWords.stop) {
+                    Task { await run { await model.userScope.set(part, to: .null, on: model.controlRequests) } }
+                }
             }
             Button("Cancel", role: .cancel) {}
-        } message: {
-            Text(UserScopeWords.stopMessage)
+        } message: { on in
+            Text(on ? UserScopeWords.takeMessage(part, machines: otherMachines) : UserScopeWords.stopMessage)
         }
     }
 
     private func turn(_ on: Bool) {
         guard on != follows, !busy else { return }
-        if on {
-            Task { await run { await model.takeUserPartFromThisMac(part) } }
-        } else {
-            asksToStop = true
-        }
+        asking = on
     }
 
     private func run(_ change: () async -> String?) async {
