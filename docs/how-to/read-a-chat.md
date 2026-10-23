@@ -53,16 +53,14 @@ Most runtimes send the agent's thinking as well as its replies. The chat does no
 these thoughts at first, because most people want to read what the agent did, not how
 it got there.
 
-To see them, turn on **Show thoughts**:
+To see them, choose **Show Thoughts**. Choose **Hide Thoughts** to leave them out again.
 
-- **On the Mac:** open **Settings ▸ Appearance**.
-- **On iPhone or iPad:** tap **Settings…** at the foot of the sidebar. The switch is under
-  **Appearance**.
-- **On the web page:** click **Settings** at the foot of the sidebar. The switch is under
-  **Appearance**.
+- **On the Mac:** choose **View ▸ Show Thoughts**.
+- **On iPhone or iPad:** in a chat, tap **···** at the top, then **Show Thoughts**.
+- **On the web page:** in a chat, click **···** at the top, then **Show Thoughts**.
 
-With **Show thoughts** on, each thought is one line that starts **Thought:**, with its
-first words. Click or tap the line to read the whole thought. With it off, the chat, the
+With the thoughts shown, each thought is one line that starts **Thought:**, with its
+first words. Click or tap the line to read the whole thought. With them hidden, the chat, the
 turns you open and the steps of a subagent show no thoughts.
 
 Each device keeps its own choice. Turning it on in one browser does not turn it on for

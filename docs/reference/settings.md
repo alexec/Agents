@@ -45,7 +45,8 @@ Change one on any of them and the others follow. They are kept on your Mac, in
 | Device | Pane | Control | What it does |
 | --- | --- | --- | --- |
 | Mac | Appearance | **Appearance**: **System**, **Light**, **Dark** | Sets the app's look. **System** follows your Mac, and changes with it. |
-| Mac, iPhone, iPad, web | Appearance | **Show thoughts**, on or off | On: the chat shows each of the agent's thoughts as one folded line. Off (the default): they are not shown. The same on every device. See [Read a chat](../how-to/read-a-chat.md). |
+| Mac | View menu | **Show Thoughts** / **Hide Thoughts** | Shows each of the agent's thoughts as one folded line in the chat, or leaves them out (the default). Not in Settings: it is next to the chat (#2383). See [Read a chat](../how-to/read-a-chat.md). |
+| iPhone, iPad, web | The chat's **···** menu | **Show Thoughts** / **Hide Thoughts** | The same as the Mac's View menu item. |
 | Mac | View menu | **Zoom In**, **Zoom Out**, **Actual Size** | Makes the text of a Markdown page in front larger or smaller, as Safari and Preview do (#1419). A pinch does the same. Command-0 is **Actual Size** while a page is in front. |
 | Mac | Control plane | The control plane's version, and each host's | The running line says `agents-control` and its version. Each host says its own version, and a host too old for the control plane says what it is missing (#1748). |
 | iPhone, iPad, web | Versions | The control plane's version, and each host's | The same versions as the Mac's Control plane pane, and what a host that is too old is missing. Shown only when this device is a control plane's client. |

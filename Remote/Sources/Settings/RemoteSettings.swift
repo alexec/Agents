@@ -1,9 +1,8 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Settings (#846), in the window's three groups by subject (#2157): This app (Appearance,
-/// with Show thoughts as the window's Appearance pane has it (#1725); Live Activities, which
-/// only a phone or an iPad has (#1657); and Sidebar, kept on the Mac's host and the same on
+/// Settings (#846), in the window's three groups by subject (#2157): This app (Voice; Live
+/// Activities, which only a phone or an iPad has (#1657); and Sidebar, kept on the Mac's host and the same on
 /// every client: #1033, #2079); Machines (each machine, with what is the same on all of them,
 /// and the person's secrets); and Control plane (Sign-ins first, People (#994), Bots (#2132) and the workspace providers
 /// (#1819)), only once paired (#2260). Each row opens its page. Everything else follows the Mac.
@@ -18,7 +17,6 @@ struct RemoteSettings: View {
         NavigationStack {
             Form {
                 Section(SettingsScope.thisApp.title) {
-                    SettingsPageLink("Appearance", systemImage: "paintbrush") { ThoughtsSettingsSection() }
                     SettingsPageLink("Voice", systemImage: "waveform") { VoiceSettingsSection() }
                     SettingsPageLink("Notifications", systemImage: "bell") { LiveActivitySettingsSection() }
                     // Kept on the Mac's host, the same on every client (#1033, #2079).

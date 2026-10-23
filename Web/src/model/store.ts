@@ -226,7 +226,7 @@ export class Work {
    * so an entry redraws the one turn it landed in (#170).
    */
   readonly chatTurns: ReadonlySignal<ChatTurn[]> = computed(() => {
-    // Thoughts left off unless Settings ▸ Appearance shows them (#1725).
+    // Thoughts left off unless the chat menu's Show Thoughts shows them (#1725, #2383).
     this.heardTurns = keepingTurns(turns(shownItems(this.items.value)), this.heardTurns);
     return keepingLatestByID([...this.turns.value.map(storedTurnOf), ...this.heardTurns]);
   });

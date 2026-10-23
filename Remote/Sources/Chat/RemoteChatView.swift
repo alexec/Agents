@@ -560,6 +560,9 @@ private struct ChatMenu: View {
     var prompts: (() -> Void)? = nil
     /// Open File… (#415), over the chat.
     let openFile: () -> Void
+    /// Whether the chat draws the agent's thoughts (#1725): View ▸ Show Thoughts on the Mac,
+    /// this menu here, which has no View menu (#2383).
+    @AppStorage(ChatThoughts.showsKey, store: WindowDefaults.store) private var showsThoughts = ChatThoughts.showsAtFirst
 
     var body: some View {
         Menu {
@@ -588,6 +591,8 @@ private struct ChatMenu: View {
                 Button("Prompts", systemImage: "list.number", action: prompts)
             }
             Button("Open File…", systemImage: "magnifyingglass", action: openFile)
+            Button(ChatThoughts.menuTitle(showsThoughts: showsThoughts), systemImage: "brain") { showsThoughts.toggle() }
+                .accessibilityHint(ChatThoughts.menuHelp)
             // On a phone, the panes one item each, in place of the bar's Panes button
             // (#981): the Page once there is one, and only what the Mac can give.
             if sizeClass != .regular, !model.macLacksPanes {

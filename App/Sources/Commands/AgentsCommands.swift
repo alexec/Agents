@@ -78,6 +78,8 @@ struct AgentsCommands: Commands {
     /// A Markdown page on screen in the key window (#1419), for View ▸ Zoom.
     @FocusedValue(\.pageZoom) private var pageZoom
     @Environment(\.openWindow) private var openWindow
+    /// Whether the chat draws the agent's thoughts (#1725), turned on and off here (#2383).
+    @AppStorage(ChatThoughts.showsKey, store: WindowDefaults.store) private var showsThoughts = ChatThoughts.showsAtFirst
 
     /// What the Session menu acts on: the key window's session, which is the main
     /// window's selection unless a session's (#826) or a project's (#1089) own window is
@@ -199,6 +201,9 @@ struct AgentsCommands: Commands {
             Button("Jump to Latest") { if let popped { popped.scrollToEnd() } else { model.scrollToEnd() } }
                 .keyboardShortcut(.downArrow, modifiers: .command)
                 .disabled(sessionAgent == nil)
+            // Next to the chat, not in Settings (#2383); no key, as none is clearly right.
+            Button(ChatThoughts.menuTitle(showsThoughts: showsThoughts)) { showsThoughts.toggle() }
+                .help(ChatThoughts.menuHelp)
             Divider()
             // In the main window's open chat, ⌘F finds in it (#1532), and Find Session
             // takes ⌥⌘F; with no chat open, ⌘F is Find Session as before.
