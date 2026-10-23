@@ -9,6 +9,7 @@ import Foundation
 ///     {"cmd": "voice", "enable": true}                  Settings' switch, without the window
 ///     {"cmd": "voice", "walk": true}                    no microphone, no sound, from now on
 ///     {"cmd": "voice", "heard": "Fix the bug."}         words as if heard, then the pause
+///     {"cmd": "voice", "wake": "Hey Agents, hi."}       words as if the wake listener heard them (Mac, #2420)
 @MainActor
 enum VoiceWalk {
     static func perform(_ request: [String: Any]) -> [String: Any] {
@@ -22,6 +23,12 @@ enum VoiceWalk {
         if let heard = request["heard"] as? String {
             voice.walkHeard(heard)
         }
+        var woke: Bool?
+        #if os(macOS)
+        if let wake = request["wake"] as? String {
+            woke = WakeListener.shared.walkHeard(wake)
+        }
+        #endif
         return [
             "ok": true,
             "enabled": WindowDefaults.store.bool(forKey: VoiceSettings.onKey),
@@ -31,6 +38,7 @@ enum VoiceWalk {
             "waitingForReply": voice.isWaitingForReply,
             "said": voice.said,
             "problem": voice.problem ?? "",
+            "woke": woke as Any,
         ]
     }
 }

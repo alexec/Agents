@@ -69,7 +69,7 @@ not (Alex, 2026-10-22: "would be weird").
 
 ## Not in this feature
 
-- The wake word on the Mac (#1800). It opens this voice mode, after it ships.
+- The wake word on the Mac (#1800). Shipped after this spec, in #2420: "Hey Agents" opens this voice mode, off by default, under Settings ▸ Appearance ▸ Voice.
 - The web page. No Paradee in WASM and no phonemes on the wire.
 - Paradee v1.1 in Core ML. Move to it when FluidAudio has it.
 

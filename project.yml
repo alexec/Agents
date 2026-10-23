@@ -141,7 +141,8 @@ targets:
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
         NSHumanReadableCopyright: © 2026 Alex Collins
         NSMicrophoneUsageDescription: >-
-          So you can say what you want done instead of typing it.
+          So you can say what you want done instead of typing it, and, when you turn it
+          on, so this Mac can listen for "Hey Agents". No audio is kept.
         NSSpeechRecognitionUsageDescription: >-
           So what you say becomes the words in the prompt. It is recognised on this Mac
           where this Mac can do it.
