@@ -53,7 +53,9 @@ try {
   check(/1 machine: Local owner|1 machine/.test(catalogue), "who uses it");
   check(/MCP server github, for/.test(catalogue), "the approval is listed");
   await page.shot(`${out}/web-catalogue.png`);
-  await page.press("Take Back");
+  await page.eval(`window.confirm = (m) => { window.asked = m; return true; }`);
+  await page.press("Take Back…");
+  check(/^Take back the MCP server github for/.test(await page.eval(`window.asked`)), "Take Back… asks first (#2438)");
   await page.waitFor(`document.body.textContent.includes("Nothing is approved yet")`, 10_000);
   check(true, "Take Back removes the approval");
 

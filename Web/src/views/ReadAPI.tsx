@@ -6,7 +6,7 @@ import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import type { ReadAPI, ReadTokenMade } from "../protocol/generated";
 import { failedWords } from "../model/console";
-import { curlLine, noTokens, otlpLine, otlpOff, otlpTitle, shownOnce, tokenLine, tokensFoot, tokensTitle } from "../model/readApi";
+import { curlLine, noTokens, otlpLine, revokeQuestion, otlpOff, otlpTitle, shownOnce, tokenLine, tokensFoot, tokensTitle } from "../model/readApi";
 
 export function ReadAPIPage({ store, down }: { store: Store; down: boolean }) {
   const state = useSignal<ReadAPI | null>(null);
@@ -69,7 +69,7 @@ export function ReadAPIPage({ store, down }: { store: Store; down: boolean }) {
                 <span><span class="strong">{t.name}</span><br /><span class="quiet small">{tokenLine(t)}</span></span>
                 {!t.revoked && (
                   <span class="request-actions">
-                    <button type="button" class="destructive" disabled={down || busy.value} onClick={() => void revoke(t.id)}>Revoke</button>
+                    <button type="button" class="destructive" disabled={down || busy.value} onClick={() => { if (window.confirm(revokeQuestion(t.name))) void revoke(t.id); }}>Revoke…</button>
                   </span>
                 )}
               </li>

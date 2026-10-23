@@ -25,3 +25,7 @@ test("the exporter says where, how often, and how the last send went", () => {
 test("the curl line reads a month as CSV", () => {
   assert.equal(m.curlLine("https://cp/v1/read/reports", "agread_x"), "curl -H 'Authorization: Bearer agread_x' 'https://cp/v1/read/reports?range=month&format=csv'");
 });
+
+test("Revoke… asks first, and names the token (#2438)", () => {
+  assert.match(m.revokeQuestion("Looker"), /^Revoke Looker\? .*cannot be brought back\.$/);
+});
