@@ -27,8 +27,38 @@ public enum TurnRows {
     }
 
     /// The rows of the turn `id` whose drawn outcome is `outcome`.
+    /// A reply of more than `size` blocks is cut every `size` blocks; a new row starts at
+    /// each cut, and what follows the reply ends the row its last blocks are in.
     public static func rows(of id: UUID, outcome: [TranscriptItem]) -> [Row] {
-        [Row(id: id, pieces: [.head] + outcome.indices.map(Piece.item))]
+        var rows = [Row(id: id, pieces: [.head])]
+        for (index, item) in outcome.enumerated() {
+            guard let count = blockCount(item), count > size else {
+                rows[rows.count - 1].pieces.append(.item(index))
+                continue
+            }
+            for start in stride(from: 0, to: count, by: size) {
+                let piece = Piece.blocks(item: index, start..<min(start + size, count))
+                if start == 0 {
+                    rows[rows.count - 1].pieces.append(piece)
+                } else {
+                    rows.append(Row(id: rowID(id, rows.count), pieces: [piece]))
+                }
+            }
+        }
+        return rows
+    }
+
+    /// The id of a turn's row after its first: the turn's id with its last four bytes
+    /// turned over by the row's place, so it is the same on every pass. Also what the blocks
+    /// of a reply that a row goes on with are drawn by: the reply's id and where they start.
+    public static func rowID(_ turn: UUID, _ row: Int) -> UUID {
+        var bytes = turn.uuid
+        let at = UInt32(truncatingIfNeeded: row)
+        bytes.12 ^= UInt8(truncatingIfNeeded: at >> 24)
+        bytes.13 ^= UInt8(truncatingIfNeeded: at >> 16)
+        bytes.14 ^= UInt8(truncatingIfNeeded: at >> 8)
+        bytes.15 ^= UInt8(truncatingIfNeeded: at)
+        return UUID(uuid: bytes)
     }
 
     /// How many blocks an item's text is, when it is a reply that is one text: nil otherwise.

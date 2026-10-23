@@ -78,6 +78,26 @@ struct ChatTranscript: View {
         var itemTurns: [ChatTurn] = []
         /// The in-hand items without their thoughts, made again only when they change (#1849).
         let shown = ShownItems()
+        /// Each turn's rows, by its id, cut again only when what it draws changes: a reply
+        /// arrives several chunks a second (P20261022-18).
+        var cuts: [UUID: Cut] = [:]
+
+        struct Cut {
+            let turn: ChatTurn
+            let detail: TurnDetail
+            let fetched: [TranscriptItem]?
+            let isLive: Bool
+            let rows: [TurnRows.Row]
+        }
+    }
+
+    /// A row of the transcript that is a turn, or part of a turn whose reply is long
+    /// (`TurnRows`, P20261022-18). The turn's first row has its id.
+    private struct TurnRow: Identifiable {
+        let turn: ChatTurn
+        let row: TurnRows.Row
+        let isLast: Bool
+        var id: UUID { row.id }
     }
 
     /// A stored turn's entries as far back as they have been fetched, folded once.
@@ -194,6 +214,31 @@ struct ChatTranscript: View {
         return (folded.storedTurns + folded.itemTurns).keepingLastTurnWithEachID()
     }
 
+    /// The turns as rows: a long reply is several, so a turn drawn lays out a few screens of
+    /// its reply, not all of it (P20261022-18).
+    private func cut(_ turns: [ChatTurn], liveID: UUID?) -> [TurnRow] {
+        if folded.cuts.count > turns.count * 2 {
+            let now = Set(turns.map(\.id))
+            folded.cuts = folded.cuts.filter { now.contains($0.key) }
+        }
+        return turns.flatMap { turn -> [TurnRow] in
+            let detail = turnViews[turn.id] ?? .initial
+            let fetched = fetchedTurns[turn.id]?.items(showsThoughts: showsThoughts)
+            let isLive = turn.id == liveID
+            let rows: [TurnRows.Row]
+            if let was = folded.cuts[turn.id], was.turn == turn, was.detail == detail, was.fetched == fetched,
+               was.isLive == isLive {
+                rows = was.rows
+            } else {
+                let outcome = TurnView.outcome(of: turn, detail: detail, fetched: fetched, isLive: isLive)
+                rows = TurnRows.rows(of: turn.id, outcome: outcome)
+                folded.cuts[turn.id] = FoldedTurns.Cut(turn: turn, detail: detail, fetched: fetched,
+                                                       isLive: isLive, rows: rows)
+            }
+            return rows.enumerated().map { TurnRow(turn: turn, row: $1, isLast: $0 == rows.count - 1) }
+        }
+    }
+
     var body: some View {
         // Once per pass. Read inside the row closure, `rows` was the whole conversation
         // mapped again for every row it drew (#90).
@@ -203,8 +248,9 @@ struct ChatTranscript: View {
         let callIsMarked = liveID != nil && rows.last?.items.last?.latestToolCall?.isUnderway == true
         // The head (the load failure, the spinner for the page above), every turn, and the
         // foot (what waits to be sent, the working line, the cards), as the stack lays them out.
-        let ids = [Self.head] + rows.map(\.id) + [Self.foot]
-        let drawn = drawnRows(ids)
+        let turnRows = cut(rows, liveID: liveID)
+        let ids = [Self.head] + turnRows.map(\.id) + [Self.foot]
+        let drawn = drawnRows(ids, turns: [Self.head] + turnRows.map(\.turn.id) + [Self.foot])
         let column = paneWidth > 0 ? ChatMetrics.forPane(width: paneWidth) : nil
         ScrollViewReader { scroller in
             ScrollView {
@@ -215,7 +261,8 @@ struct ChatTranscript: View {
                     }
                     // Folded once by the model as each entry lands, not here on every
                     // redraw: a reply arrives several chunks a second. Only the turns drawn.
-                    ForEach(rows[Self.turns(drawn, of: rows.count)]) { turn in
+                    ForEach(turnRows[Self.turns(drawn, of: turnRows.count)]) { part in
+                        let turn = part.turn
                         TurnView(turn: turn,
                                  detail: turnViews[turn.id] ?? .initial,
                                  focusedRun: focusedRun,
@@ -225,16 +272,15 @@ struct ChatTranscript: View {
                                  isLive: turn.id == liveID,
                                  loadSteps: { loadSteps(turn) },
                                  fetch: { await fetch(turn) },
-                                 fetchEarlier: { await fetchEarlier(turn) })
+                                 fetchEarlier: { await fetchEarlier(turn) },
+                                 row: part.row,
+                                 isLastRow: part.isLast)
                             .equatable()
-                            .padding(.bottom, 14)
                             .inColumn(column)
-                            .layoutValue(key: TranscriptRowID.self, value: turn.id)
-                            .id(turn.id)
+                            .layoutValue(key: TranscriptRowID.self, value: part.id)
+                            .id(part.id)
                     }
                     .environment(\.backgroundWork, agent.background)
-                    // Whole, not lazy: a row's height is known once it is drawn (#2310).
-                    .environment(\.textIsLazy, false)
                     foot(column, callIsMarked: callIsMarked)
                         .layoutValue(key: TranscriptRowID.self, value: Self.foot)
                 }
@@ -457,14 +503,15 @@ struct ChatTranscript: View {
     }
 
     /// The rows to draw, as indices into `ids`: those in `drawnSpan`, or following, the end
-    /// and half a pane above the screen. The foot is drawn whatever this says.
-    private func drawnRows(_ ids: [UUID]) -> Range<Int> {
+    /// and half a pane above the screen. The foot is drawn whatever this says. `turns` is
+    /// the turn each row is of: a turn with any row drawn keeps its steps.
+    private func drawnRows(_ ids: [UUID], turns: [UUID]) -> Range<Int> {
         let placed = geometry.place(ids)
         let pane = Double(paneHeight ?? 800)
         let span = isFollowing ? (placed.height - pane * 1.5)...(placed.height) : drawnSpan
         let range = TranscriptPlacement.window(tops: placed.tops, heights: geometry.heights,
                                                from: span.lowerBound, to: span.upperBound)
-        motion.drawn = Set(ids[range])
+        motion.drawn = Set(turns[range])
         return range
     }
 
