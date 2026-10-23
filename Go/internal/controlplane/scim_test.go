@@ -675,3 +675,37 @@ func TestSCIMNoOpWritesTellNobody(t *testing.T) {
 		t.Fatalf("a changed group told %d times", n)
 	}
 }
+
+// #2425: a million made-up bearers keep nothing; a live token is still kept, and one
+// address that sends many made-up ones is answered 429 with no token read.
+func TestSCIMUnknownBearersKeepNothing(t *testing.T) {
+	p, _, _, token, base := scimPlane(t, wire.OrgProviderJoinScim)
+	st := p.s.scimTokens
+	ctx := context.Background()
+	if _, ok := st.Authenticate(ctx, token, "192.0.2.1"); !ok {
+		t.Fatal("the live token was refused")
+	}
+	for i := range 1_000_000 {
+		if _, ok := st.Authenticate(ctx, "agscim_"+strconv.Itoa(i), "192.0.2.1"); ok {
+			t.Fatal("a made-up bearer was taken")
+		}
+	}
+	st.mu.Lock()
+	kept := len(st.read)
+	st.mu.Unlock()
+	if kept != 1 {
+		t.Fatalf("%d tokens kept, want only the live one", kept)
+	}
+	if _, ok := st.Authenticate(ctx, token, "192.0.2.1"); !ok {
+		t.Fatal("the live token was refused after the crowd")
+	}
+	limited := 0
+	for i := range 30 {
+		if status, _ := scimDo(t, base, "agscim_made-up-"+strconv.Itoa(i), "GET", "/Users", nil); status == http.StatusTooManyRequests {
+			limited++
+		}
+	}
+	if limited == 0 {
+		t.Fatal("30 made-up tokens from one address were all read")
+	}
+}
