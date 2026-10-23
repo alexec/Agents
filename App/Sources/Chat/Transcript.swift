@@ -41,7 +41,9 @@ struct Transcript: View {
                        clearFocus: { if popped == nil { model.clearFocus() } },
                        onFollowing: { page.isFollowingEnd = $0 })
             // Voice mode speaks a turn's reply when it ends (#2322).
-            .voiceModeObserves(agent, items: page.transcriptItems, question: model.work.elicitation(for: agent.id)) {
+            .voiceModeObserves(agent, items: page.transcriptItems, question: model.work.elicitation(for: agent.id),
+                               permission: model.work.permission(for: agent.id),
+                               approve: { await model.answer($0, optionID: $1) }) {
                 await model.answerElicitation($0, action: .accept, content: $1)
             }
     }
