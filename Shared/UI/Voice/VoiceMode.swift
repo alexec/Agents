@@ -40,6 +40,8 @@ final class VoiceMode {
     /// Whether a prompt went and its turn has not ended yet.
     private(set) var isWaitingForReply = false
     private(set) var problem: String?
+    /// The switch that would fix `problem`, when one would: its alert opens it (#2444).
+    private(set) var problemPermission: Dictation.Permission?
     /// The words of a prompt the host did not take: the strip keeps them until the next
     /// words are heard (#2441).
     private(set) var unsent: String?
@@ -143,7 +145,7 @@ final class VoiceMode {
         self.agentID = agentID
         self.send = send
         self.vocabulary = vocabulary
-        problem = nil
+        dismissProblem()
         heard = ""
         unsent = nil
         isWaitingForReply = false
@@ -251,7 +253,10 @@ final class VoiceMode {
         saying = nil
     }
 
-    func dismissProblem() { problem = nil }
+    func dismissProblem() {
+        problem = nil
+        problemPermission = nil
+    }
 
     /// What the chat shows now. The chat calls this as its agent and items change.
     func observe(_ agent: Agent, items: [TranscriptItem], question: ElicitationRequest? = nil,
@@ -532,6 +537,13 @@ final class VoiceMode {
         watchDictation()
     }
 
+    /// The microphone as if refused, for a walk: the alert dictation's refusal brings.
+    func walkRefuseMicrophone() {
+        guard phase != .off else { return }
+        fail(VoiceModeWords.problem(dictation: "Dictation needs the microphone. " + Dictation.whereTheSwitchIs),
+             permission: .microphone)
+    }
+
     /// Words as if heard, for a walk: they go after the pause, as spoken ones do, and
     /// stop the voice when it is speaking.
     func walkHeard(_ words: String) {
@@ -556,9 +568,9 @@ final class VoiceMode {
                 guard let self else { return }
                 self.isWatchingDictation = false
                 guard self.phase != .off else { return }
-                if let message = self.dictation.problem?.message {
+                if let problem = self.dictation.problem {
                     self.dictation.dismissProblem()
-                    self.fail(message)
+                    self.fail(VoiceModeWords.problem(dictation: problem.message), permission: problem.permission)
                 } else {
                     self.watchDictation()
                 }
@@ -718,9 +730,10 @@ final class VoiceMode {
         if !isWalked { sound.play() }
     }
 
-    private func fail(_ message: String) {
+    private func fail(_ message: String, permission: Dictation.Permission? = nil) {
         sound(.problem)
         turnOff()
         problem = message
+        problemPermission = permission
     }
 }

@@ -16,11 +16,20 @@ struct VoiceModeButton: View {
     let send: VoiceMode.Send
 
     @AppStorage(VoiceSettings.onKey, store: WindowDefaults.store) private var isEnabled = VoiceSettings.onAtFirst
+    @Environment(\.openURL) private var openURL
+    @State private var isPriming = false
     private var voice: VoiceMode { VoiceMode.shared }
 
     var body: some View {
         if isEnabled {
             Button {
+                #if os(iOS)
+                // Our own words before the system asks, the first time, as Dictate has (#2444).
+                guard voice.dictation.hasBeenAsked else {
+                    isPriming = true
+                    return
+                }
+                #endif
                 voice.turnOn(in: agentID, vocabulary: vocabulary, send: send)
             } label: {
                 Image(systemName: "waveform.circle")
@@ -35,8 +44,23 @@ struct VoiceModeButton: View {
                 guard takesWake, let wake = voice.takeWake(for: agentID) else { return }
                 voice.turnOn(in: agentID, vocabulary: vocabulary, words: wake.words, send: send)
             }
+            #if os(iOS)
+            .sheet(isPresented: $isPriming) {
+                DictationPrimer(title: PromptWords.voicePrimerTitle, what: PromptWords.voicePrimer,
+                                notNow: { isPriming = false },
+                                continue: {
+                                    isPriming = false
+                                    voice.turnOn(in: agentID, vocabulary: vocabulary, send: send)
+                                })
+                .paperSheet()
+            }
+            #endif
             .alert("Voice mode", isPresented: Binding(get: { voice.problem != nil },
                                                       set: { if !$0 { voice.dismissProblem() } })) {
+                // Where a switch would fix it, offer to open the switch, as Dictate does (#2444).
+                if let permission = voice.problemPermission {
+                    Button("Open Settings") { openURL(permission.settings) }
+                }
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(voice.problem ?? "")
