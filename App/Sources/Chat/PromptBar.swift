@@ -122,7 +122,7 @@ struct PromptBar: View {
     var body: some View {
         GlassEffectContainer(spacing: 12) {
             // Voice mode (#2322) is the whole bar, field and pills: what it hears and says,
-            // and × to end it (#2375).
+            // and Stop to end it (#2375, #2517).
             if VoiceMode.shared.isOn(in: agent?.id) {
                 VoiceModeBar()
                     // Left before its first words: a new session's voice mode ends (#2388).
