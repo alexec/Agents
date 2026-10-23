@@ -69,8 +69,9 @@ func TestThePersonsChatArchivesItself(t *testing.T) {
 	if requested, archiveNow := d.settleArchiveRequest(&shown, wire.AgentStateFinished, wire.EndedReasonEndTurn, true); requested || archiveNow || shown.ArchiveRequest != nil {
 		t.Fatalf("%v %v %+v", requested, archiveNow, shown.ArchiveRequest)
 	}
-	partly := wire.Agent{ID: a.ID, AfterTurn: after, Report: &wire.WorkReport{Outcome: wire.WorkOutcomePartlyDone, At: now()}, State: wire.AgentStateFinished, Cwd: a.Cwd}
-	if requested, archiveNow := d.settleArchiveRequest(&partly, wire.AgentStateFinished, wire.EndedReasonEndTurn, false); !requested || archiveNow {
+	// A question takes the ask away (#1916: the only ending that wants the person).
+	asked := wire.Agent{ID: a.ID, AfterTurn: after, Report: &wire.WorkReport{Outcome: wire.WorkOutcomeNeedsAnswer, At: now()}, State: wire.AgentStateFinished, Cwd: a.Cwd}
+	if requested, archiveNow := d.settleArchiveRequest(&asked, wire.AgentStateFinished, wire.EndedReasonEndTurn, false); requested || archiveNow {
 		t.Fatal(requested, archiveNow)
 	}
 	// A workflow's run goes by its workflow's when-done, not by the person's setting.

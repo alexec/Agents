@@ -574,7 +574,7 @@
       "lines" : [
         "Carries on when any of these finishes",
         "No outcome — finished without saying how it went",
-        "Stuck — finished: stuck",
+        "Asked — finished: waiting on your answer",
         "Stopped — rate limited, and still limited after retrying",
         "Stopped, no reason — stopped",
         "Stopped, ended its turn — stopped",
@@ -670,11 +670,11 @@
                     "at" : 812500180,
                     "how" : {
                       "finished" : {
-                        "outcome" : "stuck"
+                        "outcome" : "needs_answer"
                       }
                     }
                   },
-                  "nameAtReport" : "Stuck"
+                  "nameAtReport" : "Asked"
                 },
                 {
                   "agentID" : "00000000-0000-0000-0000-000000000072",
@@ -760,7 +760,7 @@
   },
   {
     "expected" : {
-      "carryOnHelp" : "Tell it the block has cleared, and let it carry on",
+      "carryOnHelp" : "Stop waiting and carry on now",
       "checksAgain" : false,
       "isBlocked" : false,
       "lines" : [
@@ -879,9 +879,9 @@
   },
   {
     "expected" : {
-      "carryOnHelp" : "Tell it the block has cleared, and let it carry on",
+      "carryOnHelp" : "Stop waiting and carry on now",
       "checksAgain" : false,
-      "isBlocked" : true,
+      "isBlocked" : false,
       "lines" : [
 
       ],

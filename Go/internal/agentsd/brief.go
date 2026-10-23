@@ -44,8 +44,12 @@ const leasesBrief = "Lease a shared resource with lease_resource before using it
 // too (#2171): Claude defers MCP tools, so its description alone was never read.
 func endingBrief(runtimeID string) string {
 	ask := askToolWords(runtimeID)
-	return "End each turn in one of three ways. If you cannot continue without me, ask me with " +
-		ask + ", or end the turn stuck or blocked. If you are done and have something for me " +
+	// Only a question puts a turn in Needs you (#1916), so one that needs the person asks; and
+	// a question quoted in a report goes before its last paragraph, or it reads as asked.
+	return "End each turn in one of three ways. If you cannot continue without me, ask me: say " +
+		"what you need, as a question, with " + ask + ". End your last message with a question " +
+		"only when you ask me one; put any other question, such as an issue's open questions, " +
+		"before your last paragraph. If you are done and have something for me " +
 		"(a report, a document, a diagram), call show_file on it once and end the turn; do not " +
 		"archive. When such a turn, or a done reply, leaves one clear next step for me, call " +
 		"suggest_next_prompt with it before you end the turn; not with a question waiting, nor " +

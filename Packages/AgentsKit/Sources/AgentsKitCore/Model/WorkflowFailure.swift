@@ -48,20 +48,15 @@ public struct WorkflowFailure: Hashable, Sendable {
         }
     }
 
-    /// How a run's agent ended, when it failed or is blocked on the person: stopped short
-    /// (a crash, an error, a refusal, a limit), stuck, or blocked on nothing the app can
-    /// wait for. A question is the agent's own row in Needs You, not a failure; an agent
+    /// How a run's agent ended, when it failed: stopped short (a crash, an error, a
+    /// refusal, a limit). A finished run is never a failure (#1916). A question is the agent's own row in Needs You, not a failure; an agent
     /// archived is one the person has put away.
     public static func runFailure(of agent: Agent) -> String? {
         switch agent.state {
         case .stopped:
             guard agent.group() == .needsAttention else { return nil }
             return "Run failed — " + (agent.endedReason?.summary ?? "it stopped")
-        case .finished:
-            guard let report = agent.report else { return nil }
-            if report.outcome == .stuck { return "Run failed — \(report.message)" }
-            if report.isOpenBlock && !report.resumesByItself { return "Run blocked — \(report.message)" }
-            return nil
+        // A finished run is never a failure: only a question wants the person (#1916).
         default:
             return nil
         }

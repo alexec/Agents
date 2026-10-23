@@ -15,9 +15,13 @@ import (
 // The three endings name the runtime's own question tool where the app knows it, and
 // ask_question always.
 func TestTheEndingBriefNamesTheThreeEndings(t *testing.T) {
-	for runtimeID, ask := range map[string]string{"claude": "AskUserQuestion (or ask_question if you lack it)", "grok": "ask_question,"} {
+	for runtimeID, ask := range map[string]string{"claude": "AskUserQuestion (or ask_question if you lack it)", "grok": "with ask_question."} {
 		got := endingBrief(runtimeID)
-		for _, want := range []string{ask, "show_file on it once", "do not archive", "suggest_next_prompt with it", "archive_session with no id"} {
+		// Only a question needs the person (#1916): no stuck or blocked ending.
+		if strings.Contains(got, "stuck") {
+			t.Fatalf("%s: %q", runtimeID, got)
+		}
+		for _, want := range []string{ask, "as a question", "before your last paragraph", "show_file on it once", "do not archive", "suggest_next_prompt with it", "archive_session with no id"} {
 			if !strings.Contains(got, want) {
 				t.Fatalf("%s: %q has no %q", runtimeID, got, want)
 			}

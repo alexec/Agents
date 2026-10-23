@@ -11,8 +11,6 @@ export const outcomeHeadings: Record<WorkOutcome, string> = {
   done: "Complete",
   nothing_to_do: "Nothing to do",
   needs_answer: "Waiting on your answer",
-  partly_done: "Partly done",
-  stuck: "Stuck",
   blocked: "Waiting", // waiting on agents or a time, not blocked (#2045)
 };
 
@@ -55,7 +53,7 @@ export function shapeOf(agent: Agent, isComingBack = false): StatusShape {
       if (endingIsUnaccountedFor(agent)) return "needsYou";
       if (outcome !== undefined && outcomeNeedsAPerson(outcome)) return "needsYou";
       if (isWaiting(agent)) return "waiting";
-      if (outcome === "blocked") return "needsYou";
+      // Only a question needs the person (#1916).
       return "done";
     case "stopped":
       if (agent.continueWhenBack) return "waiting";

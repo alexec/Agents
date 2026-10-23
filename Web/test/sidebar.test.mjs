@@ -119,19 +119,19 @@ test("Needs You gathers what an agent asked to have archived, each listed once (
   const asked = { requested: { at: 1 } };
   const live = [
     agent("done", 1, { archiveRequest: asked }),
-    agent("partly", 2, { archiveRequest: asked, report: { outcome: "partly_done", message: "m", at: 1 } }),
+    agent("partly", 2, { archiveRequest: asked, report: { outcome: "nothing_to_do", message: "m", at: 1 } }),
     agent("later", 3, { state: "running", archiveRequest: { whenTurnEnds: { since: 1 } } }),
     agent("asked-unread", 4, { archiveRequest: asked, isUnread: true }),
     agent("none", 5),
   ];
   assert.deepEqual(smartAgents("needsYou", live).map((a) => a.id), ["asked-unread", "partly", "done"],
-    "asked, and partly done, once each; not set to ask");
+    "asked, and nothing to do, once each; not set to ask");
   assert.deepEqual(smartAgents("unread", live).map((a) => a.id), [], "asking unread is in Needs You alone");
   assert.deepEqual(smartAgents("working", live).map((a) => a.id), ["later"]);
   assert.deepEqual(live.map((a) => home(a, false)), ["needsYou", "needsYou", "working", "needsYou", null]);
   assert.deepEqual(smartRows, ["pinned", "needsYou", "working", "unread"], "no Approve Archiving");
   assert.deepEqual(Object.keys(smartTitles), ["pinned", "needsYou", "working", "unread"]);
-  assert.deepEqual(live.map(sessionMark), ["asksToArchive", "needsYou", "working", "asksToArchive", "done"], "partly done still needs you");
+  assert.deepEqual(live.map(sessionMark), ["asksToArchive", "asksToArchive", "working", "asksToArchive", "done"], "nothing to do asks too (#1916)");
 });
 
 const approval = (kind, key, fields = {}) => ({ kind, key, title: key, line: "New with the last pull",

@@ -15,7 +15,7 @@ import (
 
 // goesWithRequest is AfterTurn.requestArchive.goes(with:).
 func goesWithRequest(o wire.WorkOutcome) bool {
-	return o == wire.WorkOutcomeDone || o == wire.WorkOutcomeNothingToDo || o == wire.WorkOutcomePartlyDone
+	return o == wire.WorkOutcomeDone || o == wire.WorkOutcomeNothingToDo
 }
 
 // goesWithArchive is AfterTurn.archive.goes(with:).

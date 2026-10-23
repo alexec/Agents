@@ -44,7 +44,7 @@ public enum StatusShape: Hashable, Sendable {
             switch outcome {
             case .some(let outcome) where outcome.needsAPerson: self = .needsYou
             case _ where isWaiting: self = .waiting
-            case .blocked: self = .needsYou
+            // Only a question needs the person (#1916).
             default: self = .done
             }
         case .stopped where waitingForAllowance: self = .waiting

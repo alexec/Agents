@@ -111,15 +111,15 @@ enum Canned {
                   title: "Update the call sites", state: .finished,
                   createdAt: ago(70), lastActivityAt: ago(44),
                   endedReason: .endTurn, costToDate: ["USD": 0.22],
-                  report: WorkReport(outcome: .partlyDone,
+                  report: WorkReport(outcome: .done,
                                      message: "Five of six done; the sixth is generated code.",
                                      at: ago(44))),
             Agent(id: stuck, runtimeID: "cursor", cwd: apiFolder,
                   title: "Ship the release", state: .finished,
                   createdAt: ago(60), lastActivityAt: ago(35),
                   endedReason: .endTurn, costToDate: ["USD": 0.08],
-                  report: WorkReport(outcome: .stuck,
-                                     message: "No signing certificate on this machine.",
+                  report: WorkReport(outcome: .needsAnswer,
+                                     message: "No signing certificate here: shall I make one?",
                                      at: ago(35))),
             // Waiting on two agents of its own, one of which has finished (039): under
             // Blocked, grey, with a line for each.

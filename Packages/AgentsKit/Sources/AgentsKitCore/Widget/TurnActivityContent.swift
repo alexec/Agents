@@ -23,7 +23,7 @@ public struct TurnActivityContent: Codable, Hashable, Sendable {
         /// A permission, or a guarded change to keep or undo.
         case approval
         case done
-        /// It ended cleanly, but wanting the person: Partly done, Stuck, Blocked, Outcome
+        /// It ended cleanly, but wanting the person: a question (#1916), Outcome
         /// unknown, or a question in its report (#1861). The sidebars put it under Needs you.
         case needsYou = "needs_you"
         /// Cut short on purpose, or its allowance ran out: Paused in the sidebars, so a
