@@ -984,16 +984,23 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 	d.record(l.id, stateChanged(s, reason(why)))
 	// A move asked for in this turn is made now, before the ending is heard and before an
 	// archive, so the worktree left is removed either way (053).
-	d.afterTurnMove(l.id, s, requested || archiveNow)
+	// An agent that moved itself and goes on in the new folder has not finished (#1955):
+	// no agent.finished, its workflow run goes on, and those waiting on it wait on.
+	goesOn := d.afterTurnMove(l.id, s, requested || archiveNow)
 	// The event after the record (042): what a waiting agent hears and what the log keeps.
-	d.raiseAgentEnding(l.id, s, reason(why), archiveNow)
-	d.workflowRunFinished(l.id)
+	if !goesOn {
+		d.raiseAgentEnding(l.id, s, reason(why), archiveNow)
+		d.workflowRunFinished(l.id)
+	}
 	d.afterArchiveRequest(l.id, requested, archiveNow)
 	// What the turn did to the app's own files is looked at as it ends (guardedTurnEnded).
 	d.guardedTurnEnded(l.id)
 	// A place may have come free for a queued helper, and those waiting on it may go on.
 	if a := d.Store.Agent(l.id); a != nil {
 		d.checkQueueSoon(projectFolder(a))
+	}
+	if goesOn {
+		return
 	}
 	d.agentEnded(l.id)
 	if s == wire.AgentStateFinished {

@@ -52,6 +52,17 @@ func TestAnAgentMovesIntoANewWorktreeWhenItsTurnEnds(t *testing.T) {
 	// Started again there, with the app's words, and its runtime in the new folder.
 	waitFor(t, "the carry-on turn", func() bool { return slices.Contains(userMessages(d, a.ID), carryOn) })
 	waitFor(t, "finished again", func() bool { return d.Store.Agent(a.ID).State == wire.AgentStateFinished })
+	// The turn that moved is not a finish (#1955): only the carry-on turn's is heard.
+	waitFor(t, "the finish on the log", func() bool { return slices.Contains(names(d), "agent.finished") })
+	finishes := 0
+	for _, e := range logged(d) {
+		if e.Name == "agent.finished" {
+			finishes++
+		}
+	}
+	if finishes != 1 {
+		t.Fatalf("%d agent.finished, want 1: %v", finishes, names(d))
+	}
 }
 
 func TestAnAgentMovesIntoAnExistingWorktreeAtOnce(t *testing.T) {
