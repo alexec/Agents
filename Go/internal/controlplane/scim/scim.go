@@ -151,6 +151,31 @@ type Server struct {
 
 	mu    sync.Mutex
 	rates map[string]*rate
+	// refusals is each address's refused tokens this second (refusedAt), so a crowd of
+	// made-up tokens from one address costs the store little (#2425).
+	refusals  map[string]int
+	refusedAt int64
+}
+
+// mostRefusedPerSecond is how many refused tokens an address may send each second before
+// it is answered 429 with no token read.
+const mostRefusedPerSecond = 10
+
+// refusing says an address sent mostRefusedPerSecond refused tokens this second; refuse
+// counts one more. The map holds one second's addresses only.
+func (s *Server) refusing(address string, now time.Time, refuse bool) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.refusedAt != now.Unix() {
+		s.refusals, s.refusedAt = nil, now.Unix()
+	}
+	if refuse {
+		if s.refusals == nil {
+			s.refusals = map[string]int{}
+		}
+		s.refusals[address]++
+	}
+	return s.refusals[address] >= mostRefusedPerSecond
 }
 
 type rate struct {
@@ -226,8 +251,15 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeError(w, Errorf(http.StatusUnauthorized, "", "Send a SCIM token: Authorization: Bearer agscim_…"))
 		return
 	}
-	caller, ok := s.Tokens.Authenticate(r.Context(), strings.TrimSpace(bearer), address(r))
+	from := address(r)
+	if s.refusing(from, time.Now(), false) {
+		w.Header().Set("Retry-After", "1")
+		writeError(w, Errorf(http.StatusTooManyRequests, "", "Too many tokens that are not live. Try again in a second."))
+		return
+	}
+	caller, ok := s.Tokens.Authenticate(r.Context(), strings.TrimSpace(bearer), from)
 	if !ok {
+		s.refusing(from, time.Now(), true)
 		w.Header().Set("WWW-Authenticate", `Bearer realm="scim", error="invalid_token"`)
 		s.log("scim: a request with a token that is not live was refused")
 		writeError(w, Errorf(http.StatusUnauthorized, "", "That SCIM token is not live. An admin makes one in Console ▸ Sign-In."))

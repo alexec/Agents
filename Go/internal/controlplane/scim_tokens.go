@@ -66,6 +66,10 @@ type scimTokens struct {
 	noted map[string]time.Time
 }
 
+// mostSCIMTokensKept is how many tokens a copy keeps read before it starts again, as the
+// read API does.
+const mostSCIMTokensKept = 1000
+
 type keptSCIMToken struct {
 	t  *scimTokenRecord
 	at time.Time
@@ -89,12 +93,15 @@ func (st *scimTokens) Authenticate(ctx context.Context, bearer, address string) 
 			return scim.Caller{}, false
 		}
 		kept = keptSCIMToken{t, now}
-		st.mu.Lock()
-		if st.read == nil {
-			st.read = map[string]keptSCIMToken{}
+		// An unknown bearer is not kept: anyone can send a million of them (#2425).
+		if t != nil {
+			st.mu.Lock()
+			if st.read == nil || len(st.read) >= mostSCIMTokensKept {
+				st.read = map[string]keptSCIMToken{}
+			}
+			st.read[hash] = kept
+			st.mu.Unlock()
 		}
-		st.read[hash] = kept
-		st.mu.Unlock()
 	}
 	if kept.t == nil || !kept.t.live(now) {
 		return scim.Caller{}, false
