@@ -279,6 +279,15 @@ the scratch window is key, the same clicks answer the card: Blue turns the page,
 in the box and `key` letters type into it, and Submit's answer is in the transcript as
 `elicitationAnswered`.
 
+A swipe on a session row is the row's, not the chat's (#2459). The detail column, and the
+transcript in it, is laid out under the floating sidebar, so `SwipeAnchor.holds` takes a
+swipe only when what the window hits is in the anchor's own split view column. With the
+screen lease and the scratch window in front, two fingers right to left on another
+session's row must show its Archive action and leave the Exchanged pane shut; the same
+swipe over the transcript must still open it. `walk.py views 60` shows the two columns:
+the `SwipeAnchorView` under one `_NSSplitViewItemViewWrapper`, the sidebar's
+`ListCoreScrollView` under the other.
+
 ### When a full-screen app is in front
 
 A window opened behind (`launch.sh` without `--front`) while the user's front app is
