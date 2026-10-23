@@ -14,7 +14,7 @@ import { CallFailed } from "../wire/link";
 import { describe, methodNotFound } from "../model/errors";
 import { editInConsole } from "../model/orgPolicy";
 import { go, route } from "../route";
-import { askingLine, badges, canRemove, orgLines, providerManaged, roleSetBy, joinCommandNote, joinCommandTitle, canSetRole, clientLine, inviteNote, machineLine, memberNote, noPeople, ordered, removeLines,
+import { askingLine, badges, checkFailedLine, canRemove, orgLines, providerManaged, roleSetBy, joinCommandNote, joinCommandTitle, canSetRole, clientLine, inviteNote, machineLine, memberNote, noPeople, ordered, removeLines,
   removeTitle, roleNote, roleWord, roles, rotateFoot, rotateMessage, rotateTitle, rotated } from "../model/people";
 import { JoinRequests } from "./JoinRequest";
 import { Modal } from "./Modal";
@@ -87,16 +87,23 @@ export function RemoveSheet({ store, person, close }: { store: Store; person: Pe
   // What Remove would take (#1763), asked first; null from a control plane from before it.
   const preview = useSignal<PersonRemovePreview | null>(null);
   const asking = useSignal(true);
+  // A check that failed, but for a control plane from before it, keeps Remove off (#2193).
+  const checkProblem = useSignal<string | null>(null);
+  const tries = useSignal(0);
   useEffect(() => {
     let live = true;
+    asking.value = true;
+    checkProblem.value = null;
     store.link.call("people/removePreview", { user: person.id })
       .then((answer) => { if (live) preview.value = answer; })
       .catch((error) => {
-        if (live && !(error instanceof CallFailed && error.code === methodNotFound)) problem.value = sentence(error);
+        if (live && !(error instanceof CallFailed && error.code === methodNotFound)) {
+          checkProblem.value = checkFailedLine(person.name, sentence(error));
+        }
       })
       .finally(() => { if (live) asking.value = false; });
     return () => { live = false; };
-  }, [person.id]);
+  }, [person.id, tries.value]);
   const remove = async () => {
     busy.value = true;
     try {
@@ -115,10 +122,16 @@ export function RemoveSheet({ store, person, close }: { store: Store; person: Pe
         {asking.value
           ? <p class="sheet-note" role="status">{askingLine(person.name)}</p>
           : <ul class="sheet-note remove-lines">{removeLines(person, preview.value).map((line) => <li key={line}>{line}</li>)}</ul>}
+        {checkProblem.value && !asking.value && (
+          <p class="sheet-note failure" role="alert">
+            {checkProblem.value} <button type="button" class="link" onClick={() => { tries.value++; }}>Try Again</button>
+          </p>
+        )}
         {problem.value && <p class="sheet-note failure" role="alert">{problem.value}</p>}
         <div class="sheet-actions">
           <button type="button" onClick={close}>Cancel</button>
-          <button type="button" class="prominent destructive" disabled={busy.value || asking.value} onClick={() => void remove()}>Remove</button>
+          <button type="button" class="prominent destructive" disabled={busy.value || asking.value || checkProblem.value !== null}
+            onClick={() => void remove()}>Remove</button>
         </div>
       </div>
     </Modal>

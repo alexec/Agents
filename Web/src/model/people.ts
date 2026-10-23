@@ -118,6 +118,12 @@ export function askingLine(name: string): string {
   return `Asking ${name}’s machines what work on them is not pushed…`;
 }
 
+/** Remove's check failed (#2193), as PeopleWords.checkFailed: `why` is a sentence. Remove stays off until it works. */
+export function checkFailedLine(name: string, why: string): string {
+  return `Could not check what ${name}’s machines would lose. ${why} Removing ${name} stops and deletes `
+    + `the machines ${name} started, with any work on them not pushed, so Remove stays off until the check works.`;
+}
+
 /** The title of the Remove confirmation. */
 export function removeTitle(name: string): string {
   return `Remove ${name}?`;

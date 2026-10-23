@@ -55,6 +55,10 @@ struct PeopleTests {
             + "p-new (1 commit never pushed). sam-old is not online, so it could not be asked. "
             + "These machines leave the control plane: studio.")
         #expect(PeopleWords.asking(sam) == "Asking Sam’s machines what work on them is not pushed…")
+        // A check that failed says what is at stake, and Remove stays off (#2193).
+        #expect(PeopleWords.checkFailed(sam, why: "The control plane can’t be reached.")
+            == "Could not check what Sam’s machines would lose. The control plane can’t be reached. Removing Sam stops and "
+            + "deletes the machines Sam started, with any work on them not pushed, so Remove stays off until the check works.")
         // Remove…'s sheet: a line each, a machine to a line (#2077).
         let lines = PeopleWords.removeLines(sam, preview: preview)
         try #require(lines.count == 5)
