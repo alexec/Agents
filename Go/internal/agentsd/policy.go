@@ -470,9 +470,9 @@ func modelSlug(name string) string {
 // value, the value without its context suffix and, for Claude, the model id that an alias
 // stands for (from the option's name, such as Sonnet 5, and its family claude-sonnet).
 // Claude's default goes by its description (Opus (1M context)) to the alias it names.
-// It is nil when the value is default and the options do not say what it is.
-func modelNames(runtimeID, value string, options []wire.ConfigOption) []string {
-	choices := modelChoices(options)
+// It is nil when the value is default and the options do not say what it is. choices is
+// the model option's values (modelChoices), read only for Claude.
+func modelNames(runtimeID, value string, choices []modelChoice) []string {
 	if runtimeID == "claude" && value == "default" {
 		words := ""
 		for _, c := range choices {
@@ -483,7 +483,7 @@ func modelNames(runtimeID, value string, options []wire.ConfigOption) []string {
 		alias, _, _ := strings.Cut(strings.ToLower(strings.TrimSpace(words)), " ")
 		for _, c := range choices {
 			if c.Value != value && bareModel(c.Value) == alias {
-				return append([]string{value}, modelNames(runtimeID, c.Value, options)...)
+				return append([]string{value}, modelNames(runtimeID, c.Value, choices)...)
 			}
 		}
 		if !claudeAliases[alias] {
@@ -517,14 +517,38 @@ func modelNames(runtimeID, value string, options []wire.ConfigOption) []string {
 // matched by its value and the names it stands for (modelNames), with the runtime's
 // options; "" is the runtime's own choice, which the turn checks once it is known.
 func (d *Daemon) modelRefusal(p *wire.OrgPolicy, runtimeID, model string, options []wire.ConfigOption) error {
-	if p == nil || p.Runtimes == nil || model == "" {
+	if !hasModelRule(p, runtimeID) {
 		return nil
+	}
+	return d.modelRefusalIn(p, runtimeID, model, runtimeModelChoices(runtimeID, options))
+}
+
+// hasModelRule is whether the policy limits the models of a runtime.
+func hasModelRule(p *wire.OrgPolicy, runtimeID string) bool {
+	if p == nil || p.Runtimes == nil {
+		return false
 	}
 	rule, ok := p.Runtimes[runtimeID]
-	if !ok || rule.Models == nil {
+	return ok && rule.Models != nil
+}
+
+// runtimeModelChoices is modelChoices for Claude, the one runtime whose names come from
+// them, and nil for the rest, which so never decode the list (#2426).
+func runtimeModelChoices(runtimeID string, options []wire.ConfigOption) []modelChoice {
+	if runtimeID != "claude" {
 		return nil
 	}
-	names := modelNames(runtimeID, model, options)
+	return modelChoices(options)
+}
+
+// modelRefusalIn is modelRefusal with the model option's values already decoded, so a
+// list of V models is decoded once, not V times (#2426).
+func (d *Daemon) modelRefusalIn(p *wire.OrgPolicy, runtimeID, model string, choices []modelChoice) error {
+	if !hasModelRule(p, runtimeID) || model == "" {
+		return nil
+	}
+	rule := p.Runtimes[runtimeID]
+	names := modelNames(runtimeID, model, choices)
 	if names == nil {
 		return nil
 	}
@@ -1297,8 +1321,12 @@ func (d *Daemon) markOptions(runtimeID string, options []wire.ConfigOption) []wi
 				return nil
 			}
 		case o.ID == modelID:
+			if !hasModelRule(p, runtimeID) {
+				continue
+			}
+			choices := runtimeModelChoices(runtimeID, options)
 			refuse = func(v string) *wire.PolicySetBy {
-				if err := d.modelRefusal(p, runtimeID, v, options); err != nil {
+				if err := d.modelRefusalIn(p, runtimeID, v, choices); err != nil {
 					return setBy("runtimes."+runtimeID+".models", err.(*Error).Data.(wire.PolicyRefusal).Words)
 				}
 				return nil
@@ -1364,11 +1392,19 @@ func (d *Daemon) markEveryAgent() {
 		if a.State == wire.AgentStateArchived || len(a.AdvertisedOptions) == 0 {
 			continue
 		}
-		marked := d.markOptions(a.RuntimeID, a.AdvertisedOptions)
-		if sameJSON(marked, a.AdvertisedOptions) {
+		before := a.AdvertisedOptions
+		marked := d.markOptions(a.RuntimeID, before)
+		if sameJSON(marked, before) {
 			continue
 		}
-		d.change(a.ID, func(a *wire.Agent) { a.AdvertisedOptions = d.markOptions(a.RuntimeID, a.AdvertisedOptions) })
+		// The marks just drawn, unless the options changed in between (#2426).
+		d.change(a.ID, func(a *wire.Agent) {
+			if sameJSON(a.AdvertisedOptions, before) {
+				a.AdvertisedOptions = marked
+				return
+			}
+			a.AdvertisedOptions = d.markOptions(a.RuntimeID, a.AdvertisedOptions)
+		})
 	}
 }
 

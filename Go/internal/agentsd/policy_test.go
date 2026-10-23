@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -596,6 +597,42 @@ func TestAModelPatternMatchesTheAliasAndTheModelItIs(t *testing.T) {
 			if d.modelRefusal(p, r.runtime, m, r.options) == nil {
 				t.Errorf("%s %v allowed %s", r.runtime, r.patterns, m)
 			}
+		}
+	}
+}
+
+// #2426: marking a list of V models under a model rule decodes the list once, not once per
+// model: the cost grows with V, not V². 300 models (OpenCode's size) against 30 costs about
+// 10 times as much, where decoding per model cost about 100 times.
+func TestMarkingTheModelsGrowsWithTheList(t *testing.T) {
+	fakeRuntimes(t)
+	k := newControlKeys(t)
+	d, _ := joined(t, t.TempDir(), k)
+	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 1, map[string]any{"runtimes": map[string]any{
+		"claude":   map[string]any{"models": []string{"claude-sonnet-*"}},
+		"opencode": map[string]any{"models": []string{"anthropic/*"}},
+	}}))
+	models := func(n int) []wire.ConfigOption {
+		items := make([]map[string]string, n)
+		for i := range items {
+			items[i] = map[string]string{"value": fmt.Sprintf("vendor/model-%d", i), "name": fmt.Sprintf("Model %d", i), "description": "A model"}
+		}
+		raw, _ := json.Marshal(items)
+		return []wire.ConfigOption{{ID: "model", Name: "Model", Category: new("model"), Type: "select",
+			CurrentValue: json.RawMessage(`"vendor/model-0"`), Options: raw}}
+	}
+	small, large := models(30), models(300)
+	for _, runtime := range []string{"claude", "opencode"} {
+		if n := strings.Count(string(d.markOptions(runtime, large)[0].Options), "setBy"); n != 300 {
+			t.Fatalf("%s: %d of 300 marked", runtime, n)
+		}
+		a := testing.AllocsPerRun(5, func() { d.markOptions(runtime, small) })
+		b := testing.AllocsPerRun(5, func() { d.markOptions(runtime, large) })
+		start := time.Now()
+		d.markOptions(runtime, large)
+		t.Logf("%s: %.0f allocs at 30 models, %.0f at 300 (×%.1f); 300 models in %v", runtime, a, b, b/a, time.Since(start))
+		if b/a > 20 {
+			t.Errorf("%s: marking 300 models costs %.0f times as much as 30", runtime, b/a)
 		}
 	}
 }
