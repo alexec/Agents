@@ -332,23 +332,30 @@ milestone (none for a patch version):
    `gh issue list --milestone "<title>" --state open --label bug --json number --jq '.[].number'`,
    then `gh issue edit N --milestone "<next>"` for each one. The next milestone is the
    open one with the next lowest version.
-2. Close it: `gh api -X PATCH repos/alexec/Agents/milestones/<number> -f state=closed`.
+2. Move every other open issue to the backlog (#2455):
+   `gh issue list --milestone "<title>" --state open --json number --jq '.[].number'`,
+   then `gh issue edit N --remove-milestone` for each one. A milestone never closes with
+   open issues: nothing schedules an issue in a closed milestone. A non-bug goes to the
+   backlog, not the next milestone, because an issue gets a milestone only when it serves
+   that milestone's goal (#1340). A run a trigger started has none here (step 0); a run
+   Alex started can.
+3. Look again: the list in 2 is empty. Then close it:
+   `gh api -X PATCH repos/alexec/Agents/milestones/<number> -f state=closed`.
 
-Its other open issues stay open in it. A run a trigger started has none but bugs (step 0);
-only a run Alex started can leave other issues open here. Then the next milestone becomes the
+Then the next milestone becomes the
 open one and its work can start (#2309), and you open the gate for it yourself (#1729). The Scrum Master may not read a message
 from you until Alex speaks to it (#1728), so do not leave this to it:
 
-3. **Lift the hold:** there should be none, as nobody works the next milestone before this
+4. **Lift the hold:** there should be none, as nobody works the next milestone before this
    one ships (#2309). For each open pull request still labelled `hold:v<major.minor>` (for
    v0.6.0, `hold:v0.6`): `gh pr edit N --remove-label hold:v<major.minor>`, then
    `gh pr merge N --auto --squash`. Turning auto-merge on is not merging: CI and the
    branch rules still decide. A stacked PR whose base is not `main` refuses auto-merge;
    leave it, and name it in the report.
-4. **Unpark the new open milestone:** the open milestone is now the one after this one
+5. **Unpark the new open milestone:** the open milestone is now the one after this one
    (AGENTS.md, "Work by milestone"). Take `parked` off its open issues, and only its:
    `gh issue edit N --remove-label parked`. Every later milestone keeps `parked` (#2309).
-5. Tell the Scrum Master (`message_session`) that the release shipped, which PRs you
+6. Tell the Scrum Master (`message_session`) that the release shipped, which PRs you
    released and which you could not.
 
 If step 8 failed, leave the milestone open and say so in the report.
