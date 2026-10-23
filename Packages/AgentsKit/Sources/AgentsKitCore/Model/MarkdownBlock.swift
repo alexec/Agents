@@ -72,7 +72,12 @@ public enum MarkdownBlock: Hashable, Sendable {
     /// with no presentation intent is a raw HTML block, and it is shown verbatim rather
     /// than interpreted or discarded.
     public static func parse(_ markdown: String) -> [MarkdownBlock] {
-        let source = FrontMatter.strip(markdown)
+        parse(markdown, frontMatter: true)
+    }
+
+    /// `frontMatter` false for a part of a text after its first (`parts`), whose `---` is a rule.
+    static func parse(_ markdown: String, frontMatter: Bool) -> [MarkdownBlock] {
+        let source = frontMatter ? FrontMatter.strip(markdown) : markdown
         guard !source.isEmpty else { return [] }
         guard let read = try? AttributedString(markdown: source, options: .init(
             allowsExtendedAttributes: true,
@@ -105,6 +110,76 @@ public enum MarkdownBlock: Hashable, Sendable {
     /// same words share one reading.
     public static func parsed(_ markdown: String) -> [MarkdownBlock] {
         MarkdownCache.shared.blocks(for: markdown)
+    }
+
+    /// A text cut where a block surely starts, into parts of about `size` characters or more
+    /// that read as the whole does (P20261022-18): so a streamed reply that grows is read
+    /// again at its last part, not from its start. One part, the whole, when it is short or
+    /// has what a cut could change: front matter, a link defined by reference, HTML.
+    ///
+    /// A cut is before a line at the left edge after a blank line, outside a fence, that
+    /// starts no list item, quote or table row: a new block, whatever came before it.
+    static func parts(_ markdown: String, size: Int = 2_000) -> [Substring] {
+        let utf8 = markdown.utf8
+        guard utf8.count > size * 2 else { return [markdown[...]] }
+        var parts: [Substring] = []
+        var start = markdown.startIndex
+        var fence: (mark: Character, count: Int)?
+        var afterBlank = false
+        for (index, line) in markdown.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+            let indent = line.prefix(while: { $0 == " " }).count
+            let body = line.dropFirst(indent)
+            if let open = fence {
+                if indent <= 3, let close = fenceMark(body), close.mark == open.mark, close.count >= open.count,
+                   body.drop(while: { $0 == open.mark }).allSatisfy(\.isWhitespace) {
+                    fence = nil
+                }
+                afterBlank = false
+                continue
+            }
+            if indent <= 3, body.first == "<" || isReferenceDefinition(body) { return [markdown[...]] }
+            if index == 0, line.trimmingCharacters(in: .whitespaces) == "---" { return [markdown[...]] }
+            let blank = line.allSatisfy(\.isWhitespace)
+            if !blank, afterBlank, indent == 0, startsABlock(body),
+               utf8.distance(from: start, to: line.startIndex) >= size {
+                parts.append(markdown[start..<line.startIndex])
+                start = line.startIndex
+            }
+            if indent <= 3, let open = fenceMark(body) { fence = open }
+            afterBlank = blank
+        }
+        parts.append(markdown[start...])
+        return parts
+    }
+
+    /// A fence's mark and how many of it: three or more backticks or tildes.
+    private static func fenceMark(_ line: Substring) -> (mark: Character, count: Int)? {
+        guard let mark = line.first, mark == "`" || mark == "~" else { return nil }
+        let count = line.prefix(while: { $0 == mark }).count
+        return count >= 3 ? (mark, count) : nil
+    }
+
+    /// `[name]: destination`, which may be used anywhere in the text.
+    private static func isReferenceDefinition(_ line: Substring) -> Bool {
+        guard line.first == "[", let close = line.firstIndex(of: "]") else { return false }
+        return line[line.index(after: close)...].first == ":"
+    }
+
+    /// Whether a line at the left edge after a blank one starts a block of its own: not a
+    /// list item, a quote, a table row or a setext underline, which join what came before.
+    private static func startsABlock(_ line: Substring) -> Bool {
+        guard let first = line.first else { return false }
+        if "\t>|<=[".contains(first) { return false }
+        let next = line.dropFirst().first
+        if "-*+".contains(first), next == nil || next == " " || next == "\t" { return false }
+        if first.isASCII, first.isNumber {
+            let rest = line.drop(while: { $0.isASCII && $0.isNumber })
+            if let mark = rest.first, mark == "." || mark == ")" {
+                let after = rest.dropFirst().first
+                if after == nil || after == " " || after == "\t" { return false }
+            }
+        }
+        return true
     }
 
     /// The inline marks worth carrying, and nothing else.
@@ -377,6 +452,7 @@ public final class MarkdownCache: @unchecked Sendable {
     private let readings = NSCache<NSString, Reading>()
     private let lock = NSLock()
     private var reads = 0
+    private var characters = 0
 
     public init(countLimit: Int = 2_000, characterLimit: Int = 8_000_000) {
         readings.countLimit = countLimit
@@ -386,13 +462,36 @@ public final class MarkdownCache: @unchecked Sendable {
     public func blocks(for markdown: String) -> [MarkdownBlock] {
         let key = markdown as NSString
         if let reading = readings.object(forKey: key) { return reading.blocks }
-        let blocks = MarkdownBlock.parse(markdown)
+        let parts = MarkdownBlock.parts(markdown)
+        let blocks: [MarkdownBlock]
+        if parts.count == 1 {
+            blocks = MarkdownBlock.parse(markdown)
+            counted(key.length)
+        } else {
+            // Each part read once and remembered, so a reply that grows reads its last part.
+            blocks = parts.flatMap { part -> [MarkdownBlock] in
+                let partKey = ("\u{1}" + part) as NSString
+                if let reading = readings.object(forKey: partKey) { return reading.blocks }
+                let read = MarkdownBlock.parse(String(part), frontMatter: false)
+                readings.setObject(Reading(read), forKey: partKey, cost: partKey.length)
+                counted(partKey.length - 1)
+                return read
+            }
+        }
         readings.setObject(Reading(blocks), forKey: key, cost: key.length)
-        lock.withLock { reads += 1 }
         return blocks
+    }
+
+    private func counted(_ characters: Int) {
+        lock.withLock {
+            reads += 1
+            self.characters += characters
+        }
     }
 
     /// How many times the text was actually read, for tests.
     public var readCount: Int { lock.withLock { reads } }
+    /// How many characters were actually read, for tests.
+    public var charactersRead: Int { lock.withLock { characters } }
 }
 #endif
