@@ -20,7 +20,7 @@ struct VoiceSettingsSection: View {
         } header: {
             if let header { Text(header) }
         } footer: {
-            Text("On, each chat has a voice button beside the prompt. Say what you want and hear the reply. The voice runs on this device. Off, no voice is loaded.")
+            Text("On, each chat has a voice button beside the prompt. Say what you want and hear the reply. The voice runs on this device. Voice mode ends when you leave the chat, or the app goes to the background or is interrupted by a call. Off, no voice is loaded.")
                 .appText(.fine)
                 .foregroundStyle(.secondary)
         }

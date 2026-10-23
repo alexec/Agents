@@ -125,6 +125,8 @@ struct PromptBar: View {
             // and × to end it (#2375).
             if VoiceMode.shared.isOn(in: agent?.id) {
                 VoiceModeBar()
+                    // Left before its first words: a new session's voice mode ends (#2388).
+                    .onDisappear { if agent == nil { VoiceMode.shared.leave(nil) } }
             } else {
                 VStack(alignment: .leading, spacing: 12) {
                     whereAndWhat

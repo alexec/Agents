@@ -112,6 +112,8 @@ private struct VoiceModeObserver: ViewModifier {
         var question: UUID?
     }
 
+    @Environment(\.scenePhase) private var scenePhase
+
     func body(content: Content) -> some View {
         let isOn = VoiceMode.shared.isOn(in: agent.id)
         content.onChange(of: Key(isOn: isOn, state: agent.state, count: items.count, last: items.last,
@@ -119,5 +121,14 @@ private struct VoiceModeObserver: ViewModifier {
             guard isOn else { return }
             VoiceMode.shared.observe(agent, items: items, question: question, answer: answer)
         }
+        // Another chat opened in this place, or this one closed: voice mode ends (#2388).
+        .onChange(of: agent.id) { old, _ in VoiceMode.shared.leave(old) }
+        .onDisappear { VoiceMode.shared.leave(agent.id) }
+        #if os(iOS)
+        // The phone put away: voice mode ends (Alex, U20261022-49).
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { VoiceMode.shared.leave(agent.id) }
+        }
+        #endif
     }
 }

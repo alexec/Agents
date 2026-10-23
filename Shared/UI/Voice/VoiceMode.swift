@@ -1,4 +1,7 @@
 import AgentsKitCore
+#if os(iOS)
+import AVFoundation
+#endif
 import Foundation
 import Observation
 
@@ -90,6 +93,17 @@ final class VoiceMode {
         self.voice = voice
         dictation = Dictation(shared: audio)
         speaker = VoiceSpeaker(voice: voice, audio: audio)
+        #if os(iOS)
+        // A call, an alarm or a locked phone takes the audio: voice mode ends (Alex,
+        // U20261022-49). A real background mode is for a later spec.
+        NotificationCenter.default.addObserver(forName: AVAudioSession.didBecomeInactiveNotification, object: nil,
+                                               queue: .main) { _ in
+            MainActor.assumeIsolated {
+                guard VoiceMode.shared.phase != .off else { return }
+                VoiceMode.shared.turnOff()
+            }
+        }
+        #endif
     }
 
     /// Whether voice mode is on in this chat; nil is a new session, not started yet (#2375).
@@ -169,6 +183,15 @@ final class VoiceMode {
         confirming = nil
         waiting = nil
         Task { await voice.unload() }
+    }
+
+    /// The person left this chat, or the new session (nil), or the app went to the
+    /// background: voice mode ends, so no microphone is left open on a chat not in front
+    /// (#2388). Not while a new session's first words are starting it: the bar goes as
+    /// its chat opens.
+    func leave(_ agentID: UUID?) {
+        guard isOn(in: agentID), !(agentID == nil && phase == .sending) else { return }
+        turnOff()
     }
 
     /// Stop: the voice stops at once, and it listens again. What was not said stays on
