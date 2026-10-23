@@ -654,10 +654,11 @@ jobs:
       - run: npm test
 
   # The linters (#1224), through scripts/lint.sh, on every change: shellcheck, zsh -n and our
-  # own text checks are required (a finding fails the job); ruff, Biome and SwiftLint report
-  # their findings in the job's summary, and which are in this change's files, without failing,
-  # as do golangci-lint and govulncheck. Their old findings are listed in
-  # .agents/reviews/lint-2026-10-17.md. The pinned binaries are cached, and golangci-lint's
+  # own text checks are required (a finding fails the job); ruff, Biome, SwiftLint, jscpd,
+  # golangci-lint and govulncheck report findings in the job's summary, and which are in this
+  # change's files, without failing. Their old findings are listed in
+  # .agents/reviews/lint-2026-10-17.md; jscpd's first report is in
+  # .agents/reviews/lint-dupes-2026-10-23.md. The pinned binaries are cached, and golangci-lint's
   # analysis with them. It runs beside the macOS jobs, which take longer, so it does not make a
   # merge wait.
   #
@@ -688,7 +689,7 @@ jobs:
           restore-keys: golangci-lint-
       - name: Tools
         run: |
-          scripts/lint.sh --tools ~/.cache/lint-tools shellcheck ruff biome swiftlint golangci-lint govulncheck
+          scripts/lint.sh --tools ~/.cache/lint-tools shellcheck ruff biome swiftlint jscpd golangci-lint govulncheck
           echo ~/.cache/lint-tools >> "$GITHUB_PATH"
       - name: Lint
         env:
