@@ -621,3 +621,57 @@ func TestSCIMAtSize(t *testing.T) {
 		t.Fatalf("p95 %v", p95)
 	}
 }
+
+// #2424: a sync sends every user and group again, mostly as they were. A write that
+// changes nothing keeps nothing and tells nobody; one that changes something tells once.
+func TestSCIMNoOpWritesTellNobody(t *testing.T) {
+	p, owner, _, token, base := scimPlane(t, wire.OrgProviderJoinScim)
+	raj := newUser("raj@acme.test", "00u-raj")
+	_, made := scimDo(t, base, token, "POST", "/Users", raj)
+	rajID := made["id"].(string)
+	group := map[string]any{"displayName": "Engineers", "members": []any{map[string]any{"value": rajID}}}
+	_, g := scimDo(t, base, token, "POST", "/Groups", group)
+	gid := g["id"].(string)
+	told := func(method string) int {
+		n := 0
+		settle := time.After(500 * time.Millisecond)
+		for {
+			select {
+			case note := <-owner.Notes:
+				if note.Method == method {
+					n++
+				}
+			case <-settle:
+				return n
+			}
+		}
+	}
+	told("")
+	personRev, groupRev := p.s.records.Person(rajID).Rev, p.s.records.Group(gid).Rev
+	if status, out := scimDo(t, base, token, "PUT", "/Users/"+rajID, raj); status != 200 || out["id"] != rajID {
+		t.Fatal(status, out)
+	}
+	if status, out := scimDo(t, base, token, "PUT", "/Groups/"+gid, group); status != 200 || out["id"] != gid {
+		t.Fatal(status, out)
+	}
+	if n := told("control/peopleChanged") + told("control/groupsChanged"); n != 0 {
+		t.Fatalf("a write that changed nothing told %d times", n)
+	}
+	if p.s.records.Person(rajID).Rev != personRev || p.s.records.Group(gid).Rev != groupRev {
+		t.Fatal("a write that changed nothing was kept")
+	}
+	raj["displayName"] = "Raj K"
+	if status, _ := scimDo(t, base, token, "PUT", "/Users/"+rajID, raj); status != 200 {
+		t.Fatal(status)
+	}
+	if n := told("control/peopleChanged"); n != 1 {
+		t.Fatalf("a changed user told %d times", n)
+	}
+	group["displayName"] = "Engineering"
+	if status, _ := scimDo(t, base, token, "PUT", "/Groups/"+gid, group); status != 200 {
+		t.Fatal(status)
+	}
+	if n := told("control/groupsChanged"); n != 1 {
+		t.Fatalf("a changed group told %d times", n)
+	}
+}

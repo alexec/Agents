@@ -311,6 +311,11 @@ func (d scimDirectory) ReplaceUser(ctx context.Context, c scim.Caller, u scim.Us
 		}
 	}
 	changes := userChanges(*before.SCIM, u)
+	if changes == "" && before.Name == shownName(u) {
+		// A sync sends every user again, mostly as they were: nothing is kept or told (#2424).
+		out := userOf(*before)
+		return &out, nil
+	}
 	err := d.s.changePerson(ctx, u.ID, func(p *records.Person) (bool, error) {
 		if !scimPerson(p, c.Provider) {
 			return false, scim.Errorf(http.StatusNotFound, "", "No user %s here.", u.ID)

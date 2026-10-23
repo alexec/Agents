@@ -111,6 +111,7 @@ func (d scimDirectory) ReplaceGroup(ctx context.Context, c scim.Caller, g scim.G
 		return nil, err
 	}
 	var before records.Group
+	unchanged := false
 	kept, err := d.s.records.ChangeGroup(ctx, g.ID, func(current *records.Group) (*records.Group, error) {
 		if !scimGroup(current, c.Provider) {
 			return nil, scim.Errorf(http.StatusNotFound, "", "No group %s here.", g.ID)
@@ -119,6 +120,10 @@ func (d scimDirectory) ReplaceGroup(ctx context.Context, c scim.Caller, g scim.G
 		next := *current
 		next.Name, next.Members = groupNameOf(g.DisplayName), members
 		next.Source = &records.GroupSource{SCIM: c.Provider, ExternalID: g.ExternalID, DisplayName: g.DisplayName}
+		if sameGroup(before, next) {
+			unchanged = true
+			return nil, nil
+		}
 		return &next, nil
 	})
 	if err != nil {
@@ -126,6 +131,11 @@ func (d scimDirectory) ReplaceGroup(ctx context.Context, c scim.Caller, g scim.G
 			return nil, err
 		}
 		return nil, scim.Errorf(http.StatusServiceUnavailable, "", "The group could not be kept. Try again.")
+	}
+	if unchanged {
+		// A sync sends every group again, mostly as it was: nothing is kept or told (#2424).
+		out := d.groupOf(*kept)
+		return &out, nil
 	}
 	added, removed := memberChanges(before.Members, members)
 	what := g.DisplayName
@@ -139,6 +149,13 @@ func (d scimDirectory) ReplaceGroup(ctx context.Context, c scim.Caller, g scim.G
 	d.s.groupsChanged(g.ID, false)
 	out := d.groupOf(*kept)
 	return &out, nil
+}
+
+// sameGroup says a SCIM write leaves a group as it was: its name, its members and its source.
+func sameGroup(before, after records.Group) bool {
+	added, removed := memberChanges(before.Members, after.Members)
+	return added == 0 && removed == 0 && len(before.Members) == len(after.Members) && before.Name == after.Name &&
+		before.Source != nil && after.Source != nil && *before.Source == *after.Source
 }
 
 func memberChanges(before, after []string) (added, removed int) {
