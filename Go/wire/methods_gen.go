@@ -118,7 +118,6 @@ var CallMCPHealth = Method[Empty, MCPHealthSnapshot]{"mcp/health"}
 var CallMCPHealthCheck = Method[MCPHealthCheckRequest, MCPHealthSnapshot]{"mcp/health/check"}
 var CallMCPHosted = Method[Empty, HostedMCPSnapshot]{"mcp/hosted"}
 var CallMCPList = Method[MCPListRequest, MCPListAnswer]{"mcp/list"}
-var CallMCPMadeByAgents = Method[Empty, MCPSearchAnswer]{"mcp/made-by-agents"}
 var CallMCPPreview = Method[MCPPreviewRequest, MCPPreviewAnswer]{"mcp/preview"}
 var CallMCPRemove = Method[MCPRemoveRequest, MCPRemoveAnswer]{"mcp/remove"}
 var CallMCPSetSecret = Method[MCPSetSecretRequest, MCPSetSecretAnswer]{"mcp/set-secret"}

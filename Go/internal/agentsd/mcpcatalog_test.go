@@ -242,8 +242,8 @@ func TestAnMCPServerTypedVerifiedAndAdded(t *testing.T) {
 	}
 }
 
-// Ours are listed first, with their levels and the Made by Agents mark, and added as any
-// connector is: hosted, with their secret by name (#1428).
+// Ours are rows of the Agents marketplace, a file inside agentsd, with their levels and no
+// mark of their own, and added as any connector is: hosted (#1428, #2155).
 func TestOursAreListedAndAddedLikeAnyConnector(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("AGENTS_PERSONAL_HOME", home)
@@ -254,13 +254,13 @@ func TestOursAreListedAndAddedLikeAnyConnector(t *testing.T) {
 	dest := map[string]any{"kind": "project", "folder": project}
 
 	var ours wire.MCPSearchAnswer
-	json.Unmarshal(c.call(t, 2, "mcp/made-by-agents", map[string]any{}), &ours)
+	json.Unmarshal(c.call(t, 2, "catalog/search", map[string]any{"query": "", "kind": "mcp", "marketplace": "provided:agents"}), &ours)
 	if len(ours.Results) != 4 || ours.Results[0].Title != "GitHub" || ours.Results[1].Title != "Linear" || ours.Results[2].Title != "GitLab" ||
 		ours.Results[3].Title != "Email" {
 		t.Fatalf("%+v", ours)
 	}
 	github, linear := ours.Results[0], ours.Results[1]
-	if github.MadeByAgents == nil || !*github.MadeByAgents || *github.Levels != (wire.MCPLevels{Tools: true, Events: true, Views: true, Workflows: true, Tested: true}) {
+	if github.Publisher.Label != "Agents" || deref(github.Marketplace) != "provided:agents" || *github.Levels != (wire.MCPLevels{Tools: true, Events: true, Views: true, Workflows: true, Tested: true}) {
 		t.Fatalf("github: %+v", github)
 	}
 	if *linear.Levels != (wire.MCPLevels{Tools: true, Events: true, Views: true, Workflows: true, Tested: true}) {
@@ -286,12 +286,53 @@ func TestOursAreListedAndAddedLikeAnyConnector(t *testing.T) {
 		strings.Contains(string(file), "LINEAR_API_KEY") {
 		t.Fatal(string(file))
 	}
-	// Its row on the project's Connectors page says who made it.
+	// Its row on the project's Connectors page is hosted, as any hosted connector's.
 	var snap wire.MCPHealthSnapshot
 	json.Unmarshal(c.call(t, 5, "mcp/health", nil), &snap)
 	for _, h := range snap.Servers {
-		if h.Name == "linear" && (h.MadeByAgents == nil || !*h.MadeByAgents || !h.Hosted) {
+		if h.Name == "linear" && !h.Hosted {
 			t.Fatalf("%+v", h)
 		}
+	}
+	// Words typed narrow it.
+	json.Unmarshal(c.call(t, 6, "catalog/search", map[string]any{"query": "merge requests", "kind": "mcp", "marketplace": "provided:agents"}), &ours)
+	if len(ours.Results) != 1 || ours.Results[0].ID != "agents/gitlab" {
+		t.Fatalf("%+v", ours.Results)
+	}
+}
+
+// A person's marketplace can be a file (#2155): the registry's shape, searched and added with no
+// network; a command in its _meta is not read, so it cannot run one.
+func TestAFileMarketplaceIsSearchedAndAdded(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("AGENTS_PERSONAL_HOME", home)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	os.MkdirAll(filepath.Join(home, "team"), 0o755)
+	os.WriteFile(filepath.Join(home, "team", "connectors.json"), []byte(`{"servers": [
+	  {"server": {"name": "io.github.acme/tickets", "title": "Tickets", "description": "Acme's tickets",
+	    "remotes": [{"type": "streamable-http", "url": "https://mcp.acme.example/mcp"}]}},
+	  {"server": {"name": "io.github.acme/sneaky", "description": "runs anything"},
+	    "_meta": {"dev.agentloops/connector": {"command": "github-mcp", "hosted": true}}}]}`), 0o644)
+	if e := c.callError(t, 1, "marketplaces/add", map[string]any{"name": "Acme", "format": "file", "url": "https://x"}); e == nil ||
+		!strings.Contains(e.Message, "is a path") {
+		t.Fatalf("%+v", e)
+	}
+	c.call(t, 2, "marketplaces/add", map[string]any{"name": "Acme", "format": "file", "url": "~/team/connectors.json"})
+	id := "personal:~/team/connectors.json"
+	var found wire.MCPSearchAnswer
+	json.Unmarshal(c.call(t, 3, "catalog/search", map[string]any{"query": "", "kind": "mcp", "marketplace": id}), &found)
+	if found.Error != nil || len(found.Results) != 2 || found.Results[0].Title != "Tickets" || found.Results[1].Levels != nil {
+		t.Fatalf("%+v", found)
+	}
+	personal := map[string]any{"kind": "personal"}
+	var preview wire.MCPPreviewAnswer
+	json.Unmarshal(c.call(t, 4, "mcp/preview", map[string]any{"result": found.Results[0], "destination": personal}), &preview)
+	if preview.Error != nil || preview.Preview.CommandOrURL != "https://mcp.acme.example/mcp" {
+		t.Fatalf("%+v %+v", preview.Error, preview.Preview)
+	}
+	json.Unmarshal(c.call(t, 5, "mcp/preview", map[string]any{"result": found.Results[1], "destination": personal}), &preview)
+	if preview.Error == nil {
+		t.Fatalf("a command in a person's file was read: %+v", preview.Preview)
 	}
 }

@@ -68,7 +68,6 @@ public enum Capability {
     public static let mac1 = "mac/1"
     public static let mailbox1 = "mailbox/1"
     public static let marketplaces1 = "marketplaces/1"
-    public static let mcpMadeByAgents1 = "mcp.made-by-agents/1"
     public static let mcp1 = "mcp/1"
     public static let milestones1 = "milestones/1"
     public static let modes1 = "modes/1"
@@ -241,7 +240,6 @@ public enum Capability {
         "mcp/health/check": "mcp/1",
         "mcp/hosted": "mcp/1",
         "mcp/list": "mcp/1",
-        "mcp/made-by-agents": "mcp.made-by-agents/1",
         "mcp/preview": "mcp/1",
         "mcp/remove": "mcp/1",
         "mcp/set-secret": "mcp/1",

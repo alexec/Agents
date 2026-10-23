@@ -6,7 +6,7 @@ import { useState } from "preact/hooks";
 import type { Store } from "../model/store";
 import type { MCPLevels } from "../protocol/generated";
 import {
-  connectorLevels, fileProblem, healthKind, healthLastError, healthLine, healthTone, levelsSentence, madeByAgents,
+  connectorLevels, fileProblem, healthKind, healthLastError, healthLine, healthTone, levelsSentence,
   notRemoved, notRemovedOffline, personalServers, projectEmpty, projectIntro, projectServers, removesCommitted, removesWords,
 } from "../model/hostedMCP";
 import { BackToList } from "./BackToList";
@@ -51,7 +51,6 @@ export function MCPServersList({ store, host, folder }: { store: Store; host: st
                 <p>
                   <span class={`mcp-dot ${tone}`} aria-hidden="true" />{" "}
                   <span class="strong">{server.name}</span>{" "}
-                  {server.madeByAgents && <><span class="made-by-agents">{madeByAgents}</span>{" "}</>}
                   <span class="quiet small">{healthKind(server)}</span>
                 </p>
                 <p class="quiet small">{healthLine(server)}</p>

@@ -34,9 +34,6 @@ func (d *Daemon) registerMCPCatalog() {
 	On(d, wire.CallMCPAdd, func(ctx context.Context, c *Client, r wire.MCPAddRequest) (wire.MCPAddAnswer, error) {
 		return d.mcpAdd(r)
 	})
-	On(d, wire.CallMCPMadeByAgents, func(ctx context.Context, c *Client, r wire.Empty) (wire.MCPSearchAnswer, error) {
-		return d.mcpMadeByAgents(), nil
-	})
 	On(d, wire.CallMCPList, func(ctx context.Context, c *Client, r wire.MCPListRequest) (wire.MCPListAnswer, error) {
 		return d.mcpList(r.Destination)
 	})
@@ -152,7 +149,13 @@ func (d *Daemon) mcpCatalogSearch(ctx context.Context, r wire.CatalogSearchReque
 		}
 		return wire.MCPSearchAnswer{Results: none, Error: &mcpcatalog.Failed(why).Why}
 	}
-	results, err := d.mcpRegistry(&m).Search(ctx, r.Query, mcpTools())
+	var results []wire.MCPCatalogResult
+	var err error
+	if m.Format == wire.MarketplaceFormatFile {
+		results, err = d.fileMarketplace(m, r.Destination).Search(r.Query, mcpTools(), d.declaredBy)
+	} else {
+		results, err = d.mcpRegistry(&m).Search(ctx, r.Query, mcpTools())
+	}
 	if err != nil {
 		log.Printf("mcp: search %q failed: %v", r.Query, err)
 		why := mcpWhy(err)
@@ -166,15 +169,25 @@ func (d *Daemon) mcpCatalogSearch(ctx context.Context, r wire.CatalogSearchReque
 	return wire.MCPSearchAnswer{Results: results}
 }
 
-// mcpMadeByAgents is mcp/made-by-agents: the connectors Agents makes, for the catalogue's
-// first group (#1428). Each one's levels are what a copy on this host declared when it was
-// last checked, or what it declares as written down before that.
-func (d *Daemon) mcpMadeByAgents() wire.MCPSearchAnswer {
-	results := []wire.MCPCatalogResult{}
-	for _, o := range mcpcatalog.Made {
-		results = append(results, mcpcatalog.OursResult(o, d.declaredBy(o)))
+// fileMarketplace is a marketplace of the format file (#2155): the Agents one inside agentsd,
+// or a path, from ~/ or, when relative, from the home (a person's) or the project folder.
+func (d *Daemon) fileMarketplace(m wire.Marketplace, dest *wire.SkillDestination) mcpcatalog.FileMarketplace {
+	if m.Origin == wire.MarketplaceOriginProvided && m.URL == skillcatalog.AgentsMarketplaceFile {
+		return mcpcatalog.FileMarketplace{Builtin: true}
 	}
-	return wire.MCPSearchAnswer{Results: results}
+	path, home := m.URL, d.personalHome()
+	switch {
+	case strings.HasPrefix(path, "~/") && home != "":
+		path = filepath.Join(home, path[2:])
+	case filepath.IsAbs(path):
+	case m.Origin == wire.MarketplaceOriginProject && dest != nil:
+		if place, err := d.skillPlace(*dest); err == nil {
+			path = filepath.Join(place.Folder, path)
+		}
+	case home != "":
+		path = filepath.Join(home, path)
+	}
+	return mcpcatalog.FileMarketplace{Path: path}
 }
 
 // declaredBy is what a checked copy of one of ours declared, or what it is written to declare.
@@ -225,10 +238,20 @@ func (d *Daemon) mcpPreview(ctx context.Context, r wire.MCPPreviewRequest) wire.
 	if home := d.personalHome(); home != "" {
 		secrets = skillcatalog.LoadSecrets(skillcatalog.SecretsPath(home))
 	}
-	if o, ours := mcpcatalog.OursByID(r.Result.ID); ours {
+	if o, ours := mcpcatalog.OursByID(r.Result.ID); ours && (market == nil || market.ID == mcpcatalog.AgentsMarketplace) {
 		return d.stageMCPPreview(r, mcpcatalog.BuildOurs(o, secrets.IsSet), o.ID, "")
 	}
-	server, err := d.mcpRegistry(market).Detail(ctx, r.Result.ID)
+	var server mcpcatalog.Server
+	var err error
+	if market != nil && market.Format == wire.MarketplaceFormatFile {
+		var ours *mcpcatalog.Ours
+		server, ours, err = d.fileMarketplace(*market, &r.Destination).Detail(r.Result.ID)
+		if err == nil && ours != nil {
+			return d.stageMCPPreview(r, mcpcatalog.BuildOurs(*ours, secrets.IsSet), ours.ID, "")
+		}
+	} else {
+		server, err = d.mcpRegistry(market).Detail(ctx, r.Result.ID)
+	}
 	if err != nil {
 		return fail(err)
 	}

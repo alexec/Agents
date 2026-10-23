@@ -92,7 +92,7 @@ func TestOursAreAddedHostedWithNoSecretToAsk(t *testing.T) {
 		t.Fatalf("email built: %+v", built)
 	}
 	r := OursResult(linear, linear.Declares)
-	if r.MadeByAgents == nil || !*r.MadeByAgents || r.Levels == nil || !r.Levels.Tools || !r.Levels.Views || !r.Levels.Events {
+	if r.Marketplace == nil || *r.Marketplace != AgentsMarketplace || r.Levels == nil || !r.Levels.Tools || !r.Levels.Views || !r.Levels.Events {
 		t.Fatalf("result: %+v", r)
 	}
 }

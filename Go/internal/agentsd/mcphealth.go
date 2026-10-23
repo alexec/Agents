@@ -69,14 +69,11 @@ type mcpDue struct {
 	server          sdk.McpServer
 }
 
-// mcpLevels is a row's five levels from what its check found, and whether Agents made it.
+// mcpLevels is a row's five levels from what its check found; Tested is known for ours.
 func mcpLevels(h *wire.MCPServerHealth, e mcpEntry, kept *mcpHealthResult) {
 	ours, made := mcpcatalog.Ours{}, false
 	if e.server.Stdio != nil {
 		ours, made = mcpcatalog.OursByCommand(e.server.Stdio.Command)
-	}
-	if made {
-		h.MadeByAgents = &made
 	}
 	if kept != nil && kept.check == wire.MCPCheckStateAnswered {
 		levels := mcpcatalog.Levels(kept.declared, made && ours.Tested != "")

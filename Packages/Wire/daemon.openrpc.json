@@ -3130,26 +3130,6 @@
       }
     },
     {
-      "name": "mcp/made-by-agents",
-      "x-capability": "mcp.made-by-agents/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/MCPSearchAnswer"
-        }
-      }
-    },
-    {
       "name": "mcp/preview",
       "x-capability": "mcp/1",
       "paramStructure": "by-name",

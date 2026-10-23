@@ -67,7 +67,6 @@ const CapLiveactivity1 = "liveactivity/1"
 const CapMac1 = "mac/1"
 const CapMailbox1 = "mailbox/1"
 const CapMarketplaces1 = "marketplaces/1"
-const CapMcpMadeByAgents1 = "mcp.made-by-agents/1"
 const CapMcp1 = "mcp/1"
 const CapMilestones1 = "milestones/1"
 const CapModes1 = "modes/1"
@@ -240,7 +239,6 @@ var HostCapabilities = pairs([][2]string{
 	{"mcp/health/check", "mcp/1"},
 	{"mcp/hosted", "mcp/1"},
 	{"mcp/list", "mcp/1"},
-	{"mcp/made-by-agents", "mcp.made-by-agents/1"},
 	{"mcp/preview", "mcp/1"},
 	{"mcp/remove", "mcp/1"},
 	{"mcp/set-secret", "mcp/1"},

@@ -21,15 +21,14 @@ struct ConnectorLevelsTests {
 
     @Test func aRowFromTheHost() throws {
         let json = #"""
-        {"name":"linear","transport":"stdio","hosted":true,"check":"unchecked","madeByAgents":true,
+        {"name":"linear","transport":"stdio","hosted":true,"check":"unchecked",
          "levels":{"tools":false,"events":true,"views":false,"workflows":false,"tested":false}}
         """#
         let row = try JSONDecoder().decode(DaemonAPI.MCPServerHealth.self, from: Data(json.utf8))
-        #expect(row.madeByAgents == true)
         #expect(row.levels == DaemonAPI.MCPLevels(events: true))
         let older = try JSONDecoder().decode(DaemonAPI.MCPServerHealth.self,
                                              from: Data(#"{"name":"x","transport":"http","hosted":false,"check":"answered"}"#.utf8))
-        #expect(older.levels == nil && older.madeByAgents == nil)
+        #expect(older.levels == nil)
     }
 
     /// Remove…'s words (#2266): a server named, and a refusal said as a removal, not an add.

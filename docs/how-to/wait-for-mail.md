@@ -44,7 +44,7 @@ You can use variables in place of the connection: set `EMAIL_IMAP_URL`, `EMAIL_U
 
 ## Add the page and the event
 
-1. Add **Email** from **Made by Agents** in the catalogue, or by hand in the project's
+1. Add **Email** from the **Agents** marketplace in the catalogue, or by hand in the project's
    `.agents/mcp.json`:
 
    ```json
