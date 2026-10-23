@@ -8195,6 +8195,13 @@ type SignInAdd struct {
 	Token string `json:"token"`
 }
 
+// signIn/ask, on an `s:` connection (#2097): a browser pairs by approval. `account` is the email or GitHub login of one of the person's sign-ins; `name` is the browser's.
+type SignInAsk struct {
+	Account string `json:"account"`
+
+	Name string `json:"name"`
+}
+
 // signIn/configure (#995, admins): turn a provider on or off, and set Google's allowed Workspace domains or GitHub's allowed organisations. What is left out stays as it was.
 type SignInConfigure struct {
 	Provider string `json:"provider"`
@@ -8206,9 +8213,11 @@ type SignInConfigure struct {
 	Organisations []string `json:"organisations,omitzero"`
 }
 
-// signIn/approve, signIn/deny (#995).
+// signIn/approve, signIn/deny (#995). `code` is the code a browser shows, typed by the person: signIn/approve of a browser's request needs it (#2097).
 type SignInDecide struct {
 	Request string `json:"request"`
+
+	Code *string `json:"code,omitzero"`
 }
 
 // control/signInDecided (#995): how a request ended: approved, denied or expired.
@@ -8352,7 +8361,7 @@ type SignInRemove struct {
 	Account string `json:"account"`
 }
 
-// signIn/requests, control/signInRequested (#995, FR-010): a new client that signed in with GitHub, waiting for Approve on one of the person's clients, with the code it shows.
+// signIn/requests, control/signInRequested (#995, FR-010): a new client that signed in with GitHub, waiting for Approve on one of the person's clients, with the code it shows. A browser's (provider `browser`, #2097) has the account typed as `login` and an empty `code`: the person types the code the browser shows.
 type SignInRequest struct {
 	Request string `json:"request"`
 

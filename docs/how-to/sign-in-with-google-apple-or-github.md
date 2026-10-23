@@ -9,7 +9,8 @@ description: Pair a Mac, iPhone or iPad with no code by signing in with Google, 
 A person can pair a new Mac, iPhone or iPad with no code. They sign in with Google, Apple
 or GitHub, and the control plane pairs the client as that person. Codes still work, and a
 control plane with no provider turned on uses only codes. A browser pairs with a code from a
-signed-in client, or signs in with your organisation's own provider (see below).
+signed-in client, by your approval with the code it shows (see below), or signs in with your
+organisation's own provider.
 
 The control plane uses the app's own Google, Apple and GitHub client ids. You do not register
 anything with them. A build that you make from source needs ids of its own: see [Set up Google,
@@ -45,8 +46,8 @@ invite's code, then add their sign-in in the same way.
 
 ## Pair a new client by signing in
 
-1. On a Mac, open the **Connect** sheet. On an iPhone or iPad, select **Sign In Instead…**
-   on the pairing screen.
+1. On a Mac, open the **Connect** sheet. On an iPhone or iPad, open Agents. Both show the
+   sign-in first. To pair with a code, select **Use a Code Instead…**.
 2. Type the control plane's address, for example `control.example.com`, and select
    **Continue**.
 3. Sign in with a provider that you added to yourself.
@@ -55,6 +56,21 @@ With Apple or Google, the client pairs at once. With GitHub, the new client show
 one of your other clients, a card says **wants to sign in as you**, with your GitHub account and the same
 code. Make sure that the codes are the same, then select **Approve**. The request stops
 after 10 minutes.
+
+If the address has no provider turned on, the screen goes to the code by itself, and says so.
+
+## Pair a browser by your approval
+
+1. Open the control plane's page in the browser. Under **Sign in with your account**, type the
+   email of your Google or Apple sign-in, or your GitHub login, and select **Continue**.
+2. The page shows a code.
+3. On one of your signed-in clients, a card says **Chrome wants to sign in as you**. The card
+   does not show the code. Type the code that the browser shows, and select **Approve**.
+
+The browser pairs as you. The request stops after 10 minutes. You type the code, and do not
+only compare it, because anyone can type your email: only someone who sees the browser can
+approve it. The page says the same for an email that nobody has, so it tells nobody who has an
+account. This needs a provider turned on; with none, use **Add a Browser…**.
 
 ## Sign in with your organisation's provider
 

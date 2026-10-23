@@ -1,6 +1,6 @@
 // The page's sign-in connection (#995, #1002 slice 3, FR-026, FR-027): `s:<client>` with a new
-// key, which answers signIn/providers, signIn/discover, signIn/orgStart and signIn/ticket and
-// nothing else. Its lines are bare JSON-RPC, not the `{"m"}` frames of a paired client.
+// key, which answers signIn/providers, signIn/discover, signIn/ask, signIn/orgStart and signIn/ticket
+// and nothing else. Its lines are bare JSON-RPC, not the `{"m"}` frames of a paired client.
 // The org flow leaves the page: the key it started with waits in IndexedDB as a pending sign-in,
 // apart from the paired key's record, until the provider sends the browser back or 10 minutes pass.
 import { signInConnect, type LineSocket, type SignedIn } from "./auth";
@@ -84,19 +84,27 @@ export class SignInConnection {
 
   constructor(private readonly lines: LineSocket, readonly signedIn: SignedIn) {}
 
-  /** Asks `method` and waits for its answer; a failure is a CallFailed with the wire's code and data. */
-  async call<T>(method: string, params: unknown, timeoutMs = 15_000): Promise<T> {
+  /**
+   * Asks `method` and waits for its answer; a failure is a CallFailed with the wire's code and data.
+   * `note` hears the notifications on the way (control/signInWaiting, for signIn/ask: #2097).
+   */
+  async call<T>(method: string, params: unknown, timeoutMs = 15_000,
+                note?: (method: string, params: unknown) => void): Promise<T> {
     const id = this.nextID++;
     this.lines.send(JSON.stringify({ jsonrpc: "2.0", id, method, params }));
     for (;;) {
-      let message: { id?: number | null; result?: unknown; error?: { code: number; message: string; data?: unknown } };
+      let message: { id?: number | null; method?: string; params?: unknown; result?: unknown;
+        error?: { code: number; message: string; data?: unknown } };
       try {
         message = JSON.parse(await this.lines.next(timeoutMs));
       } catch (error) {
         if (error instanceof SyntaxError) continue;
         throw error instanceof LinkDown ? error : new LinkDown();
       }
-      // Notifications (control/signInWaiting) are not this page's: it signs in with an org provider only.
+      if (message.id === undefined && message.method) {
+        note?.(message.method, message.params);
+        continue;
+      }
       if (message.id !== id) continue;
       if (message.error) throw new CallFailed(message.error.code, message.error.message, message.error.data);
       return message.result as T;

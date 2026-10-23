@@ -600,6 +600,19 @@ func (si *signIns) pairing(conn *Conn, client string, public, helloNonce []byte)
 			si.s.log("a sign-in with " + signin.Title(p.Provider) + " from " + source + " was refused: " + asRPC(err).Message)
 			conn.SendNow(replyError(m.ID, err))
 			return
+		case "signIn/ask":
+			a, err := require[wire.SignInAsk](m.Params, "SignInAsk")
+			if err == nil {
+				var admitted *wire.Admitted
+				admitted, err = si.ask(context.Background(), conn, client, public, a)
+				if err == nil {
+					conn.SendNow(reply(m.ID, admitted))
+					return
+				}
+			}
+			si.s.log("a browser's sign-in by approval from " + source + " was refused: " + asRPC(err).Message)
+			conn.SendNow(replyError(m.ID, err))
+			return
 		case "signIn/orgStart":
 			// An org provider's flow (#1002): the browser goes and comes back while this
 			// connection waits, then signIn/ticket pairs it.
@@ -632,7 +645,7 @@ func (si *signIns) pairing(conn *Conn, client string, public, helloNonce []byte)
 			}
 			conn.SendNow(reply(m.ID, si.discover(context.Background(), d)))
 		default:
-			conn.SendNow(replyError(m.ID, fail(notPermitted, "Only signIn/providers, signIn/discover, signIn/pair, signIn/orgStart and signIn/ticket are answered on a sign-in connection.")))
+			conn.SendNow(replyError(m.ID, fail(notPermitted, "Only signIn/providers, signIn/discover, signIn/pair, signIn/ask, signIn/orgStart and signIn/ticket are answered on a sign-in connection.")))
 		}
 	}
 }
@@ -701,6 +714,51 @@ func (si *signIns) pair(ctx context.Context, conn *Conn, client string, public, 
 	return &wire.Admitted{Client: new(wire.UUID(client))}, nil
 }
 
+// ask is signIn/ask (#2097): a browser asks to pair as the person with this sign-in's email
+// or GitHub login, and waits for that person to type its code on one of their clients. An
+// account nobody has waits the same way, so the browser learns nothing of who is here.
+func (si *signIns) ask(ctx context.Context, conn *Conn, client string, public []byte, a wire.SignInAsk) (*wire.Admitted, error) {
+	name := strings.TrimSpace(a.Name)
+	account := strings.TrimSpace(a.Account)
+	if name == "" || len([]rune(name)) > 80 {
+		return nil, fail(invalidParams, "Say the browser's name.")
+	}
+	if account == "" || len(account) > 320 {
+		return nil, fail(invalidParams, "Type the email or GitHub login of one of your sign-ins.")
+	}
+	person, signIn := si.personWithAccount(account)
+	if signIn != nil {
+		// A domain that requires its org provider refuses a built-in sign-in, here too (D9).
+		if err := si.requiredFor(ctx, signIn.Provider, signIn.Email, person.ID); err != nil {
+			return nil, err
+		}
+	}
+	ask := signInAsk{client: client, public: public, name: name, kind: records.KindBrowser, login: account, provider: browserProvider}
+	if person != nil {
+		ask.person = person.ID
+	}
+	return si.s.signInApprovals.wait(ctx, conn, ask)
+}
+
+// personWithAccount is the person one of whose outside sign-ins has this email or GitHub
+// login, and that sign-in; none for a removed, suspended or bot person.
+func (si *signIns) personWithAccount(account string) (*records.Person, *records.SignIn) {
+	for _, p := range si.s.records.People() {
+		if p.IsRemoved() || p.IsSuspended() || p.IsBot() {
+			continue
+		}
+		for _, s := range p.SignIns {
+			if !outsideProvider(s.Provider) {
+				continue
+			}
+			if s.Email != "" && strings.EqualFold(s.Email, account) || s.Provider == signin.GitHub && s.Login != "" && strings.EqualFold(s.Login, account) {
+				return &p, &s
+			}
+		}
+	}
+	return nil, nil
+}
+
 // signInMethod answers signIn/* on a paired client's connection.
 func (m *Methods) signInMethod(ctx context.Context, method string, params json.RawMessage, from Caller) (any, error) {
 	si := m.s.signIns
@@ -737,7 +795,11 @@ func (m *Methods) signInMethod(ctx context.Context, method string, params json.R
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{}, m.s.signInApprovals.decide(ctx, d.Request, user, method == "signIn/approve")
+		code := ""
+		if d.Code != nil {
+			code = *d.Code
+		}
+		return map[string]any{}, m.s.signInApprovals.decide(ctx, d.Request, user, method == "signIn/approve", code)
 	case "signIn/pair":
 		return nil, fail(notPermitted, "signIn/pair is answered only on a sign-in connection.")
 	}

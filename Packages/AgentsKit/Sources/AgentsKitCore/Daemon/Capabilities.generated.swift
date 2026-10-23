@@ -106,6 +106,7 @@ public enum Capability {
     public static let sandbox1 = "sandbox/1"
     public static let sessions1 = "sessions/1"
     public static let shell1 = "shell/1"
+    public static let signinAsk1 = "signin.ask/1"
     public static let signin1 = "signin/1"
     public static let simulators1 = "simulators/1"
     public static let skills1 = "skills/1"
@@ -561,6 +562,7 @@ public enum Capability {
         "scim/tokens/revoke": "org-identity/1",
         "signIn/addToMe": "signin/1",
         "signIn/approve": "signin/1",
+        "signIn/ask": "signin.ask/1",
         "signIn/configure": "signin/1",
         "signIn/deny": "signin/1",
         "signIn/discover": "org-identity/1",

@@ -252,13 +252,21 @@ public extension DaemonAPI {
         }
 
         public var id: String { request }
+
+        /// A browser that asked by an account (#2097): the person types the code it shows,
+        /// and the request carries none (FR-014a).
+        public var needsCode: Bool { provider == "browser" }
     }
 
-    /// `signIn/approve`, `signIn/deny`.
+    /// `signIn/approve`, `signIn/deny`. `code` is what the person typed for a browser (#2097).
     struct SignInDecide: Codable, Sendable, Hashable {
         public var request: String
+        public var code: String?
 
-        public init(request: String) { self.request = request }
+        public init(request: String, code: String? = nil) {
+            self.request = request
+            self.code = code
+        }
     }
 
     /// `control/signInDecided`: approved, denied or expired, so its card goes.
@@ -290,6 +298,8 @@ public extension DaemonAPI.Method {
     static let signInApprove = "signIn/approve"
     /// `SignInDecide` → `{}` (#995).
     static let signInDeny = "signIn/deny"
+    /// `SignInAsk` → `Admitted`, on an `s:` connection only: a browser by approval (#2097).
+    static let signInAsk = "signIn/ask"
     /// `SignInOrgStart` → `SignInOrgStarted` (#1002).
     static let signInOrgStart = "signIn/orgStart"
     /// `SignInTicket` → `SignInTicketResult` (#1002).
@@ -318,6 +328,7 @@ public enum SignInProviderName {
         case "github": "GitHub"
         case "local": "This control plane"
         case "code": "Invite code"
+        case "browser": "Browser"
         default: provider
         }
     }
@@ -400,6 +411,14 @@ public enum SignInWords {
     public static func code(_ request: DaemonAPI.SignInRequest) -> String {
         "Check that it shows \(request.code.map(String.init).joined(separator: " "))."
     }
+
+    /// A browser's card (#2097): the code is on the browser's screen only.
+    public static let typeCode = "Type the code that the browser shows."
+    public static let codePlaceholder = "Code"
+
+    /// The pairing screens (#2097): sign-in first, the code behind this.
+    public static let useCode = "Use a Code Instead…"
+    public static let useSignIn = "Sign In Instead…"
 
     /// One sign-in as Account lists it: "GitHub · sam", "Google · sam@example.com".
     public static func row(_ signIn: DaemonAPI.SignIn) -> String {

@@ -3911,7 +3911,28 @@
           "$ref": "daemon.schema.json#/definitions/Empty"
         }
       },
-      "description": "Approve a waiting GitHub sign-in: the new client pairs as the caller's person (#995)."
+      "description": "Approve a waiting GitHub sign-in: the new client pairs as the caller's person (#995). A browser's needs the code it shows (#2097)."
+    },
+    {
+      "name": "signIn/ask",
+      "x-capability": "signin.ask/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInAsk"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Admitted"
+        }
+      },
+      "description": "On an `s:` connection only (#2097): a browser asks to pair as the person with this sign-in's email or GitHub login. It gets control/signInWaiting with a code, and is answered when the person types that code and approves on one of their clients. The same for an account nobody has: it waits, and nothing approves it."
     },
     {
       "name": "signIn/configure",

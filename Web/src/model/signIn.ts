@@ -2,7 +2,8 @@
 // SignInWords): a GitHub sign-in on a new client waits for Approve on one of the person's clients,
 // and an admin turns providers on and allows Google Workspace domains and GitHub organisations.
 // A browser does not sign in with a built-in provider: it pairs with a code from a signed-in client
-// (FR-014), or with its organisation's provider (#1002, slice 3), in the same tab.
+// (FR-014), by approval on one of the person's clients with the code it shows (#2097), or with its
+// organisation's provider (#1002, slice 3), in the same tab.
 import type { SignIn, SignInOrgProvider, SignInRequest } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 
@@ -11,7 +12,8 @@ export const signInsTitle = "Sign-ins";
 /** Where a person adds a sign-in: the group and pane every client lists it under (#2157, #2256), as SignInWords.signInsPlace. */
 export const signInsPlace = `Control plane ▸ ${signInsTitle}`;
 
-const titles: Record<string, string> = { google: "Google", apple: "Apple", github: "GitHub", local: "This control plane", code: "Invite code" };
+const titles: Record<string, string> = { google: "Google", apple: "Apple", github: "GitHub", local: "This control plane", code: "Invite code",
+  browser: "Browser" };
 
 /** A provider as the screen names it. */
 export function providerTitle(provider: string): string {
@@ -31,6 +33,20 @@ export function account(request: SignInRequest): string {
   return [providerTitle(request.provider), request.login].filter(Boolean).join(" · ");
 }
 
+/** A browser that asked by an account (#2097): the person types the code it shows, and the card has none. */
+export function needsCode(request: SignInRequest): boolean {
+  return request.provider === "browser";
+}
+
+export const typeCode = "Type the code that the browser shows.";
+
+// Pairing this browser by approval (#2097), on the pairing page.
+export const askTitle = "Sign in with your account";
+export const askPlaceholder = "Email or GitHub login";
+export const askFoot = "One of your signed-in Macs, iPhones or iPads asks you to type the code this page shows.";
+export const askWaiting = "On one of your signed-in clients, type this code and approve. This page waits for 10 minutes.";
+export const askExpired = "Nobody approved this browser within 10 minutes. Try again.";
+
 /** One sign-in as Settings lists it: "GitHub · sam", "Google · sam@example.com". */
 export function row(signIn: SignIn): string {
   const detail = signIn.email ?? signIn.login ?? (isOutside(signIn.provider) ? signIn.account : undefined);
@@ -42,7 +58,7 @@ export function removeTitle(signIn: SignIn): string {
 }
 
 export const removeMessage = "You can no longer pair a client with this sign-in. Your clients stay paired.";
-export const signInsFoot = `Sign in with one of these on a Mac, iPhone or iPad to pair it with no code. Add one there, under ${signInsPlace}. A browser pairs with a code.`;
+export const signInsFoot = `Sign in with one of these on a Mac, iPhone or iPad to pair it with no code. Add one there, under ${signInsPlace}. A browser pairs with its email or GitHub login, and your approval.`;
 /** Control plane ▸ Sign-ins with none yet: where one is added (#2080). */
 export const signInsNone = `No sign-ins yet. Add one on a Mac, iPhone or iPad, under ${signInsPlace}.`;
 export const paneFoot = `People sign in with these to pair a window or a phone with no code. A person not known joins only through an allowed Google Workspace domain; everyone else is invited first, and adds their sign-in under ${signInsPlace}.`;
