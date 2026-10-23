@@ -299,14 +299,7 @@ func dayPrefix(day, user string) string {
 // over each other.
 func (l *Log) Write(ctx context.Context, actor wire.AuditActor, method, action string, host string, target *string) error {
 	at := l.now()
-	e := stored{Kind: Kind, Action: action, Method: method, Target: target, At: records.At(at), Actor: &actor}
-	if actor.Client != nil {
-		e.By = string(*actor.Client)
-	}
-	if host != "" {
-		e.Host = &host
-	}
-	key := Key(at, actor.User)
+	e, key := entry(actor, method, action, host, target, at)
 	var data []byte
 	var err error
 	if l.Chain != nil {
@@ -318,6 +311,18 @@ func (l *Log) Write(ctx context.Context, actor wire.AuditActor, method, action s
 		l.Out(key, data)
 	}
 	return err
+}
+
+// entry is what Write and a Writer keep, and where.
+func entry(actor wire.AuditActor, method, action string, host string, target *string, at time.Time) (stored, string) {
+	e := stored{Kind: Kind, Action: action, Method: method, Target: target, At: records.At(at), Actor: &actor}
+	if actor.Client != nil {
+		e.By = string(*actor.Client)
+	}
+	if host != "" {
+		e.Host = &host
+	}
+	return e, Key(at, actor.User)
 }
 
 // decode reads one stored event as an entry. The control plane's own events between

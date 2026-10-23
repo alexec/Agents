@@ -993,11 +993,7 @@ func (si *signIns) auditOrg(actor wire.AuditActor, method, id, what string) {
 	if len(target) > 300 {
 		target = target[:300] + "…"
 	}
-	go func() {
-		if err := si.s.auditLog().Write(context.Background(), actor, method, action, "", &target); err != nil {
-			si.s.log("audit: could not keep " + method + ": " + err.Error())
-		}
-	}()
+	si.s.auditTo(actor, method, action, target)
 }
 
 // auditSignIn keeps an org sign-in: who, by which provider, and what it did. The actor is
