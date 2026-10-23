@@ -21,9 +21,10 @@ const (
 	// writerBatch is the most entries one batch takes, and writerPuts the Puts at once.
 	writerBatch = 256
 	writerPuts  = 32
-	// PutPatience is each Put's deadline, and putTries the tries before it is given up.
+	// PutPatience is each Put's deadline. putWait is the longest pause before the
+	// next try. The pause starts at 200ms.
 	PutPatience = 10 * time.Second
-	putTries    = 3
+	putWait     = 2 * time.Second
 )
 
 // Pending is an entry to keep. Who did it and what it named are read on the writer, not
@@ -41,12 +42,18 @@ type Writer struct {
 	queue chan Pending
 	stop  chan struct{}
 	done  chan struct{}
-	once  sync.Once
+	// giveUp is closed when Close's context ends, so a Put still refused is given up.
+	giveUp     chan struct{}
+	once       sync.Once
+	giveUpOnce sync.Once
 }
 
 // NewWriter starts the writer of l's entries; logf hears what it could not keep.
 func NewWriter(l *Log, logf func(string)) *Writer {
-	w := &Writer{log: l, logf: logf, queue: make(chan Pending, WriterQueue), stop: make(chan struct{}), done: make(chan struct{})}
+	w := &Writer{
+		log: l, logf: logf, queue: make(chan Pending, WriterQueue),
+		stop: make(chan struct{}), done: make(chan struct{}), giveUp: make(chan struct{}),
+	}
 	go w.run()
 	return w
 }
@@ -76,6 +83,7 @@ func (w *Writer) Close(ctx context.Context) {
 	select {
 	case <-w.done:
 	case <-ctx.Done():
+		w.giveUpOnce.Do(func() { close(w.giveUp) })
 	}
 }
 
@@ -112,8 +120,9 @@ func (w *Writer) take(p Pending) []Pending {
 	return batch
 }
 
-// keep links a batch in order and puts it at once. A Put that fails putTries times leaves
-// a place in the chain with nothing in it, and the log says which; verify reports it.
+// keep links a batch in order and puts it at once. A Put the store refuses is tried
+// again until it is kept. It is given up only when Close's context ends, and then
+// the log says which entry left a gap.
 func (w *Writer) keep(batch []Pending) {
 	l := w.log
 	linked := make([]Linked, 0, len(batch))
@@ -167,19 +176,45 @@ func (w *Writer) keep(batch []Pending) {
 	}
 }
 
-// put keeps one entry, trying again on a failure. A try that answers "already there" landed
-// on an earlier try whose answer was lost.
+// put keeps one entry. It tries again until the store takes it. A later try that
+// answers "already there" landed on an earlier try whose answer was lost. The wait
+// starts at 200ms and grows to putWait. The entry is given up only when Close's
+// context has ended.
 func (w *Writer) put(one Linked) bool {
-	for try := range putTries {
+	for try := 0; ; try++ {
 		ctx, cancel := context.WithTimeout(context.Background(), PutPatience)
 		_, err := w.log.Store.Put(ctx, one.Key, one.Data, store.Absent)
 		cancel()
 		if err == nil || try > 0 && store.IsConflict(err) {
 			return true
 		}
-		if try < putTries-1 {
-			time.Sleep(time.Duration(try+1) * 200 * time.Millisecond)
+		if try == 0 {
+			w.sayRefused(one)
+		}
+		select {
+		case <-w.giveUp:
+			return false
+		default:
+		}
+		wait := time.Duration(try+1) * 200 * time.Millisecond
+		if wait <= 0 || wait > putWait {
+			wait = putWait
+		}
+		timer := time.NewTimer(wait)
+		select {
+		case <-timer.C:
+		case <-w.giveUp:
+			timer.Stop()
+			return false
 		}
 	}
-	return false
+}
+
+// sayRefused logs the first time the store refuses one entry.
+func (w *Writer) sayRefused(one Linked) {
+	if w.log.Chain != nil {
+		w.logf(fmt.Sprintf("audit: entry %d of chain %s (%s) was refused; trying again", one.Seq, w.log.Chain.ID, one.Key))
+		return
+	}
+	w.logf("audit: " + one.Key + " was refused; trying again")
 }
