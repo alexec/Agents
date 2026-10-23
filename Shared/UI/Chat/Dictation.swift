@@ -40,31 +40,11 @@ private final class BufferSink: @unchecked Sendable {
             return
         }
         if converter?.inputFormat != buffer.format {
-            converter = AVAudioConverter(from: buffer.format, to: target)
+            converter = DictationAudio.converter(from: buffer.format, to: target)
         }
-        guard let converter else { return }
-        let ratio = target.sampleRate / buffer.format.sampleRate
-        let capacity = AVAudioFrameCount((Double(buffer.frameLength) * ratio).rounded(.up)) + 1
-        guard let converted = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: capacity) else { return }
-        let given = Given()
-        var error: NSError?
-        let status = converter.convert(to: converted, error: &error) { _, status in
-            if given.done {
-                status.pointee = .noDataNow
-                return nil
-            }
-            given.done = true
-            status.pointee = .haveData
-            return buffer
-        }
-        if status != .error, converted.frameLength > 0 {
-            continuation.yield(AnalyzerInput(buffer: converted))
-        }
+        guard let converter, let converted = DictationAudio.convert(buffer, with: converter) else { return }
+        continuation.yield(AnalyzerInput(buffer: converted))
     }
-
-    /// Whether the converter has had this buffer yet. It asks until told there is no
-    /// more for now, and the same buffer twice would be heard twice.
-    private final class Given { var done = false }
 }
 
 /// Talking into the prompt instead of typing it.
