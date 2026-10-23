@@ -30,6 +30,7 @@ export function AppView({ call }: { call: AppViewCall }) {
     return <div class="note"><p class="faint">{viewTitle(call.tool, call.server)}</p>{text && <p class="quiet">{text}</p>}</div>;
   }
   const full = hosting.layer.fullscreen.value === call.id;
+  const result = resultText(call);
   return (
     <div class="app-view">
       <p class="view-caption">
@@ -48,9 +49,12 @@ export function AppView({ call }: { call: AppViewCall }) {
       </p>
       {view.phase.value === "loading" && <p class="quiet">Loading {view.title}…</p>}
       {view.phase.value === "failed" && (
-        <p class="quiet">{view.failure.value}{" "}
-          {view.canRetry.value && <button onClick={() => view.retry()}>Try Again</button>}
-        </p>
+        <>
+          <p class="quiet">{view.failure.value}{" "}
+            {view.canRetry.value && <button onClick={() => view.retry()}>Try Again</button>}
+          </p>
+          {result && <pre class="view-result">{result}</pre>}
+        </>
       )}
       {view.phase.value === "asking" && view.ask.value && (
         <div class="view-ask">
@@ -88,4 +92,11 @@ export function AppView({ call }: { call: AppViewCall }) {
       )}
     </div>
   );
+}
+
+function resultText(call: AppViewCall): string | null {
+  const result = call.result as { content?: { type?: string; text?: string }[]; structuredContent?: unknown } | undefined;
+  const content = result?.content?.flatMap((block) => block.type === "text" && block.text ? [block.text] : []).join("\n");
+  if (content) return content;
+  return result?.structuredContent === undefined ? null : JSON.stringify(result.structuredContent, null, 2) ?? null;
 }

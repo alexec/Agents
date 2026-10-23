@@ -1395,6 +1395,7 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / 0.25); }
 .app-view .view-caption { display: flex; gap: 8px; align-items: center; margin: 0; font-size: 0.75rem; }
 .app-view .view-caption .view-actions { margin-left: auto; display: flex; gap: 12px; align-items: center; }
 .app-view .view-slot { width: 100%; }
+.app-view .view-result { margin: 0; max-width: 100%; overflow-wrap: anywhere; white-space: pre-wrap; }
 button.plain { background: none; border: none; padding: 0; color: inherit; opacity: 0.65; font: inherit; }
 button.plain:hover { opacity: 1; }
 .view-ask { background: var(--paper-well); border-radius: var(--radius-card); padding: 10px; }

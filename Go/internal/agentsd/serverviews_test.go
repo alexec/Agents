@@ -83,9 +83,27 @@ func TestAViewFedByAToolWithRequiredArgumentsIsNoList(t *testing.T) {
 		return b
 	}
 	c := makeViewCatalog("github", []json.RawMessage{tool("show_pull_requests", "ui://github/pulls"),
-		tool("show_pull_request", "ui://github/pr", "number")}, nil, nowFunc())
+		tool("show_pull_request", "ui://github/pr", "number")}, []json.RawMessage{
+		json.RawMessage(`{"uri":"ui://github/pulls"}`), json.RawMessage(`{"uri":"ui://github/pr"}`),
+	}, nowFunc())
 	if c.Version != viewCatalogVersion || c.Tools[0].NeedsArguments || !c.Tools[1].NeedsArguments {
 		t.Fatalf("%+v", c)
+	}
+}
+
+func TestAToolIsNotAViewWhenItsResourceIsNotListed(t *testing.T) {
+	tool, _ := json.Marshal(map[string]any{"name": "get_me", "_meta": map[string]any{"ui": map[string]any{
+		"resourceUri": "ui://github/profile", "visibility": []string{"model", "app"},
+	}}})
+	c := makeViewCatalog("github", []json.RawMessage{tool}, nil, nowFunc())
+	if got := c.tool("get_me"); got != nil {
+		t.Fatalf("unlisted resource made get_me a view: %+v", got)
+	}
+
+	resource, _ := json.Marshal(map[string]any{"uri": "ui://github/profile"})
+	c = makeViewCatalog("github", []json.RawMessage{tool}, []json.RawMessage{resource}, nowFunc())
+	if got := c.tool("get_me"); got == nil || got.ResourceURI != "ui://github/profile" {
+		t.Fatalf("listed resource was not attached to the tool: %+v", got)
 	}
 }
 

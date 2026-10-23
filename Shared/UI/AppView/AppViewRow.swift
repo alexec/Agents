@@ -45,6 +45,9 @@ private struct AppViewInline: View {
                 case .failed(let words):
                     AppViewFailure(host: host, words: words)
                         .frame(maxWidth: .infinity, minHeight: 60)
+                    if let text = host.call.resultText {
+                        Text(text).appText(.reading).textSelection(.enabled)
+                    }
                 case .asking(let ask):
                     AppViewShowAsk(host: host, ask: ask)
                 case .gone:
