@@ -9,6 +9,9 @@ struct VoiceModeButton: View {
     let agentID: UUID?
     /// Words for the recogniser that a dictionary would not have: agent, file and runtime names.
     var vocabulary: [String] = []
+    /// Whether "Hey Agents" (#2420) turns voice mode on here, as a press does, with the words
+    /// said after the phrase. One bar of a chat takes it: the main window's.
+    var takesWake = false
     /// Sends the words as a voice prompt, and says which chat took them.
     let send: VoiceMode.Send
 
@@ -28,6 +31,10 @@ struct VoiceModeButton: View {
             .buttonBorderShape(.circle)
             .help("Voice mode: say what you want and hear the reply")
             .accessibilityLabel("Voice mode")
+            .onChange(of: voice.wake, initial: true) {
+                guard takesWake, let wake = voice.takeWake(for: agentID) else { return }
+                voice.turnOn(in: agentID, vocabulary: vocabulary, words: wake.words, send: send)
+            }
             .alert("Voice mode", isPresented: Binding(get: { voice.problem != nil },
                                                       set: { if !$0 { voice.dismissProblem() } })) {
                 Button("OK", role: .cancel) {}

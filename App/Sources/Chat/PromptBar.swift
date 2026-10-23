@@ -610,7 +610,8 @@ struct PromptBar: View {
 
             // Voice mode (#2322), while Settings ▸ Appearance has it on: in this chat, or in a
             // new session that its first words start (#2375).
-            VoiceModeButton(agentID: agent?.id, send: sendSpoken)
+            // A session's own window does not take "Hey Agents" (#2420): the main window does.
+            VoiceModeButton(agentID: agent?.id, takesWake: popped == nil, send: sendSpoken)
 
             // While it works and nothing is typed, send is stop. Type and it is send
             // again, queueing what is typed for when the turn ends.

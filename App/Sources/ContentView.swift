@@ -253,6 +253,19 @@ struct ContentView: View {
                 SidebarToggle(windowWidth: frame.windowWidth)
             }
         }
+        // The microphone is open for "Hey Agents" (#2420): said here as well as by the
+        // system's orange dot, and a click stops it.
+        if WakeListener.shared.isListening {
+            ToolbarItem {
+                Button {
+                    WindowDefaults.store.set(false, forKey: WakeListener.onKey)
+                    WakeListener.shared.update()
+                } label: {
+                    Label("Listening for “Hey Agents”", systemImage: "ear")
+                }
+                .help("Listening for “Hey Agents”. Click to stop; Settings ▸ Appearance ▸ Voice turns it on again.")
+            }
+        }
     }
 
     /// The window's title: the worktree this build came from, then whatever the detail
@@ -328,6 +341,22 @@ struct ContentView: View {
         .onAppear {
             AgentsAppDelegate.model = model
             model.openProjectWindow = { [openWindow] in openWindow(id: ProjectWindowScene.id, value: $0) }
+            // "Hey Agents" (#2420): voice mode in the chat in front, else a new session in
+            // the project New Session would start in.
+            WakeListener.shared.onWake = { [model, requests] words in
+                NSApp.activate()
+                if model.selectedAgent == nil, !model.composing {
+                    guard let project = model.newSessionProject else {
+                        NSSound.beep()
+                        WakeListener.shared.update()
+                        return
+                    }
+                    model.showProject(project)
+                    requests.focusPrompt()
+                }
+                VoiceMode.shared.wake(in: model.composing ? nil : model.selectedAgent?.id, words: words)
+            }
+            WakeListener.shared.start()
         }
         // An agent asking to be looked at is the one thing that opens this column by
         // itself. Here rather than in the sidebar, because the sidebar may be shut,

@@ -127,7 +127,8 @@ final class VoiceMode {
     /// Turns voice mode on in a chat, or a new session (nil) that its first words start.
     /// `send` sends words to it as a voice prompt, and says
     /// whether the host took them.
-    func turnOn(in agentID: UUID?, vocabulary: [String] = [], send: @escaping Send) {
+    /// `words`: what was said after "Hey Agents" (#2420), the start of the first prompt.
+    func turnOn(in agentID: UUID?, vocabulary: [String] = [], words: String = "", send: @escaping Send) {
         if phase != .off { turnOff() }
         self.agentID = agentID
         self.send = send
@@ -157,7 +158,7 @@ final class VoiceMode {
                 fail("The microphone and speaker would not start: \(error.localizedDescription)")
                 return
             }
-            listen()
+            listen(after: words)
         }
     }
 
@@ -183,6 +184,28 @@ final class VoiceMode {
         confirming = nil
         waiting = nil
         Task { await voice.unload() }
+    }
+
+    /// "Hey Agents" was heard (#2420): voice mode, in this chat or a new session (nil), with
+    /// `words` said after the phrase as the start of the first prompt. The prompt bar of that
+    /// chat takes it (`takeWake`) and turns voice mode on, as its button does.
+    struct Wake: Equatable {
+        let id = UUID()
+        let agentID: UUID?
+        let words: String
+    }
+
+    private(set) var wake: Wake?
+
+    func wake(in agentID: UUID?, words: String) {
+        wake = Wake(agentID: agentID, words: words)
+    }
+
+    /// The wake for the prompt bar of this chat, once.
+    func takeWake(for agentID: UUID?) -> Wake? {
+        guard let wake, wake.agentID == agentID else { return nil }
+        self.wake = nil
+        return wake
     }
 
     /// The person left this chat, or the new session (nil), or the app went to the
@@ -364,20 +387,23 @@ final class VoiceMode {
 
     /// `chime`: the listening sound, which is left out between the sentences of a reply
     /// still being written.
-    private func listen(chime: Bool = true) {
+    /// `words`: heard already, before voice mode turned on (#2420); they go after the pause
+    /// with what is said next.
+    private func listen(chime: Bool = true, after words: String = "") {
         guard phase != .off else { return }
         heard = ""
         phase = .listening
         defer { askIfWaiting() }
+        if !words.isEmpty { heardChanged(words) }
         guard !isWalked else { return }
         if chime { sound(.listening) }
-        startDictation()
+        startDictation(after: words)
     }
 
     /// Dictation afresh, so what was heard before is not in what comes next.
-    private func startDictation() {
+    private func startDictation(after words: String = "") {
         dictation.stop()
-        dictation.start(in: "", selection: nil, vocabulary: vocabulary) { [weak self] text, _ in
+        dictation.start(in: words, selection: nil, vocabulary: vocabulary) { [weak self] text, _ in
             self?.heardChanged(text)
         }
         watchDictation()
