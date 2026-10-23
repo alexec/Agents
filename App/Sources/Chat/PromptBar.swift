@@ -14,6 +14,7 @@ struct PromptBar: View {
     @Environment(\.chatActions) private var chatActions
     /// Set in a window of its own (#826): this bar is that session's.
     @Environment(\.poppedChat) private var popped
+    @Environment(\.openURL) private var openURL
     /// Whether the folder is the caller's to decide rather than this bar's.
     ///
     /// Set on a project page, where the folder is the project and changing it would
@@ -23,6 +24,9 @@ struct PromptBar: View {
     /// over a new session to look at it (#987).
     var presence: ((_ focused: Bool, _ typed: Int) -> Void)?
     @State private var text = ""
+    /// Where the cursor is, so dictation writes there (#427, #2515).
+    @State private var selection: TextSelection?
+    @State private var dictation = Dictation()
     /// How far back Up has gone through the prompts sent here; nil at the prompt bar's
     /// own text (#1551).
     @State private var recalled: Int?
@@ -200,7 +204,13 @@ struct PromptBar: View {
                                             set: { model.draftServers = $0 }))
                 .paperSheet()
         }
+        // Voice mode listens with its own dictation (#2445).
+        .onChange(of: VoiceMode.shared.isOn) { _, isOn in
+            if isOn { dictation.stop() }
+        }
+        .onDisappear { dictation.stop() }
         .onChange(of: model.selection) {
+            dictation.stop()
             dismissedSuggestions = false
             // What was half typed is no longer thrown away here. It is kept against the
             // conversation it was typed for, and each conversation's own comes back, files
@@ -241,14 +251,8 @@ struct PromptBar: View {
         // Until a folder is chosen, the first agent to arrive names it. After that,
         // another project's agent arriving is not a reason to list this one's
         // worktrees again (#285).
-        .onChange(of: model.work.agentCount) {
-            guard isNew, model.draftCwd == nil else { return }
-            prepare()
-        }
-        .onChange(of: draftProjectAgentCount) {
-            guard isNew, model.draftCwd != nil else { return }
-            Task { await model.loadDraftWorktrees() }
-        }
+        .onChange(of: model.work.agentCount) { prepareWhenProjectChanges() }
+        .onChange(of: draftProjectAgentCount) { loadWorktreesWhenProjectChanges() }
         .modifier(KeepsDrafts(text: $text, attachments: $attachments,
                               lostSomething: $draftLostSomething, key: draftKey))
     }
@@ -489,10 +493,11 @@ struct PromptBar: View {
 
     private var field: some View {
         HStack(alignment: .bottom, spacing: 8) {
-            TextField(placeholder, text: $text, axis: .vertical)
+            TextField(placeholder, text: $text, selection: $selection, axis: .vertical)
                 .textFieldStyle(.plain)
                 .appText(.reading)
                 .lineLimit(2...12)
+                .overlay(alignment: .topLeading) { HeardUnderline(dictation: dictation, text: text) }
                 .focused($focused)
                 .onChange(of: focused) { presence?(focused, text.count) }
                 // ⌘V attaches pictures and files too, and still pastes the words (#396).
@@ -584,8 +589,13 @@ struct PromptBar: View {
                     if dismissedMentionTerm != mentionQuery?.term { dismissedMentionTerm = nil }
                     updateMentions()
                     presence?(focused, text.count)
+                    // Typed while dictating: theirs, and never written over (#427).
+                    dictation.edited(text)
                     // Typing is a prompt coming (#183).
                     if !text.isEmpty, let id = agent?.id { Task { await model.prewarm(id, .typing) } }
+                }
+                .onChange(of: selection) {
+                    if let range = DictationCursor.range(of: selection, in: text) { dictation.selected(range) }
                 }
 
             Button(action: chooseAttachment) {
@@ -598,22 +608,32 @@ struct PromptBar: View {
             .help("Attach a file or a picture")
             .accessibilityLabel("Attach")
 
-            Button(action: dictate) {
-                Image(systemName: "microphone")
+            Button(action: toggleDictation) {
+                Image(systemName: dictation.isListening ? "waveform" : "microphone")
                     .appText(.reading).fontWeight(.semibold)
                     .frame(width: 22, height: 22)
+                    .symbolEffect(.variableColor, isActive: dictation.isListening)
             }
             .buttonStyle(.paper)
             .buttonBorderShape(.circle)
-            .help("Dictate, as the Mac does everywhere")
-            .accessibilityLabel("Dictate")
+            .help(dictation.isListening ? "Stop dictating" : "Dictate")
+            .accessibilityLabel(dictation.isListening ? "Stop dictating" : "Dictate")
             // Voice mode listens already, in this window or another (#2445).
-            .disabled(VoiceMode.shared.isOn)
+            .disabled(VoiceMode.shared.isOn && !dictation.isListening)
+            .alert("Dictation", isPresented: Binding(get: { dictation.problem != nil },
+                                                     set: { if !$0 { dictation.dismissProblem() } })) {
+                if let permission = dictation.problem?.permission {
+                    Button("Open Settings") { openURL(permission.settings) }
+                }
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(dictation.problem?.message ?? "")
+            }
 
             // Voice mode (#2322), while Settings ▸ Appearance has it on: in this chat, or in a
             // new session that its first words start (#2375).
             // A session's own window does not take "Hey Agents" (#2420): the main window does.
-            VoiceModeButton(agentID: agent?.id, takesWake: popped == nil, send: sendSpoken)
+            VoiceModeButton(agentID: agent?.id, vocabulary: speechSeeds, takesWake: popped == nil, send: sendSpoken)
 
             // While it works and nothing is typed, send is stop. Type and it is send
             // again, queueing what is typed for when the turn ends.
@@ -679,50 +699,25 @@ struct PromptBar: View {
 
     // MARK: Said instead of typed
 
-    /// The Mac's own dictation, in this field (#427).
-    ///
-    /// It is the same thing pressing the dictation key starts. It writes at the cursor,
-    /// underlines what it is still unsure of, and lets the person type and edit while it
-    /// listens. A recogniser of our own would only be a worse copy of it. The system
-    /// shows its own microphone and stops it the usual ways, and asks for nothing more
-    /// than its own switch in Keyboard settings.
-    private func dictate() {
-        focused = true
-        // Once the field has focus, so the field editor is the one that listens.
-        DispatchQueue.main.async {
-            NSApp.sendAction(Selector(("startDictation:")), to: nil, from: nil)
-        }
+    /// The open projects, and this project's titles and issue numbers (#2515).
+    private var speechSeeds: [String] {
+        let folder = agent?.projectFolder ?? model.draftCwd ?? model.selectedProject
+        return DictationVocabulary.seeds(projects: model.work.projects, agents: model.work.agents, in: folder)
     }
 
-    /// Ends any dictation in the field before a send, and answers the words the field
-    /// shows when dictation was still unsure of some of them.
-    ///
-    /// It never sends `stopDictation:` (#517): AppKit gives that the same toggle as
-    /// `startDictation:`, so a send with dictation off turned it on. The field gives up
-    /// the caret instead, which ends whatever session it had, and takes it back once it
-    /// has been emptied. The words still underlined are the system's to finish, and it
-    /// can write its final copy of them after the field has been emptied, bringing #318
-    /// back (#449), so they are kept as shown first.
-    private func endDictation() -> String? {
-        guard focused,
-              let window = NSApp.keyWindow,
-              let editor = window.firstResponder as? NSTextView,
-              editor.isFieldEditor
-        else { return nil }
-        var shown: String?
-        if editor.hasMarkedText() {
-            editor.unmarkText()
-            shown = editor.string
+    /// On-device dictation in this field (#427, #2515). The words go in at the cursor.
+    /// A late volatile result leaves the underline off and the button pulsing.
+    private func toggleDictation() {
+        if dictation.isListening {
+            dictation.stop()
+            return
         }
-        // Back to this field itself (#650). Asked of SwiftUI alone, focus could land
-        // on the next field along instead, the labels.
-        let field = editor.delegate as? NSView
-        window.makeFirstResponder(nil)
-        DispatchQueue.main.async {
-            if let field, field.window === window { window.makeFirstResponder(field) }
-            focused = true
+        focused = true
+        dictation.start(in: text, selection: DictationCursor.range(of: selection, in: text),
+                        vocabulary: speechSeeds) { field, cursor in
+            text = field
+            selection = DictationCursor.selection(cursor, in: field)
         }
-        return shown
     }
 
     // MARK: What goes with the words
@@ -1150,9 +1145,10 @@ struct PromptBar: View {
             model.show(problem: refused)
             return
         }
-        // Whatever is said next is not part of what went (#318).
-        let shown = endDictation()
-        let outgoing = shown ?? text
+        // Whatever is said next is not part of what went (#318). Words still being
+        // heard stay as shown: a later result belongs to the run that stopped.
+        dictation.stop()
+        let outgoing = text
         let going = attachments
         let labels = draftLabels
         let starting = agent == nil
@@ -1278,6 +1274,18 @@ struct PromptBar: View {
         guard isNew, let folder = model.draftCwd else { return 0 }
         let counts = model.work.counts(in: ProjectKey(host: model.selectedProjectHost, folder: folder))
         return counts.values.reduce(0, +)
+    }
+
+    private func prepareWhenProjectChanges() {
+        guard isNew else { return }
+        guard model.draftCwd == nil else { return }
+        prepare()
+    }
+
+    private func loadWorktreesWhenProjectChanges() {
+        guard isNew else { return }
+        guard model.draftCwd != nil else { return }
+        Task { await model.loadDraftWorktrees() }
     }
 
     /// The new agent's host answers: this Mac's daemon, or the project's server.

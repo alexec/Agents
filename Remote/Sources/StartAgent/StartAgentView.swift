@@ -352,7 +352,8 @@ struct StartAgentView: View {
     private func beginDictation() {
         focused = true
         dictation.start(in: text, selection: DictationCursor.range(of: selection, in: text),
-                        vocabulary: [project.lastPathComponent]) { field, cursor in
+                        vocabulary: DictationVocabulary.seeds(projects: model.work.projects,
+                                                             agents: model.work.agents, in: project)) { field, cursor in
             text = field
             selection = DictationCursor.selection(cursor, in: field)
         }
