@@ -208,3 +208,25 @@ func TestATerminalGetsTheRuntimesEnvironmentNotTheDaemons(t *testing.T) {
 		t.Fatalf("%v", env)
 	}
 }
+
+// Grok sends `/bin/bash -lc '…'` as one command field instead of separate argv fields.
+func TestAGrokTerminalRunsItsSingleShellCommandField(t *testing.T) {
+	dir, _ := folders(t)
+	c := &client{sink: &asker{}, dir: dir, runtime: "Grok", terminals: map[string]*terminal{}}
+	defer c.closeTerminals()
+
+	r, err := c.CreateTerminal(context.Background(), sdk.CreateTerminalRequest{Command: "/bin/bash -lc 'printf grok-terminal-ok'"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.WaitForTerminalExit(context.Background(), sdk.WaitForTerminalExitRequest{TerminalId: r.TerminalId}); err != nil {
+		t.Fatal(err)
+	}
+	out, err := c.TerminalOutput(context.Background(), sdk.TerminalOutputRequest{TerminalId: r.TerminalId})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Output != "grok-terminal-ok" || out.ExitStatus == nil || out.ExitStatus.ExitCode == nil || *out.ExitStatus.ExitCode != 0 {
+		t.Fatalf("terminal output = %+v", out)
+	}
+}
