@@ -818,10 +818,11 @@ private struct ProjectMenu: View {
         .disabled(model.hostUnreachable(summary.host))
         Divider()
         // Its agents as a .tar.gz, and an export brought back on its machine (#1001).
+        // Off while one is on its way, so a second tap makes no second export (#2437).
         Button("Export Agents…") { Task { await model.exportProject(summary) } }
-            .disabled(model.hostUnreachable(summary.host))
+            .disabled(model.hostUnreachable(summary.host) || model.exportImport != nil)
         Button("Import Agents…") { Task { await model.importAgents(into: summary) } }
-            .disabled(model.hostUnreachable(summary.host))
+            .disabled(model.hostUnreachable(summary.host) || model.exportImport != nil)
         // Only this Mac's folder is somewhere Finder can show (058, FR-019).
         if model.isOnThisMac(summary.host) {
             Button("Show in Finder") {

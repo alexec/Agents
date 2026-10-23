@@ -102,6 +102,8 @@ final class RemoteModel {
     var projectScenes: [ProjectKey: RemoteProjectState] = [:]
     /// The project an iPhone shows alone, over the sidebar of every project (#1089).
     var phoneProject: ProjectKey?
+    /// The Export… or Import Agents… on its way, drawn as a busy sheet with Cancel (#2437).
+    var exportImport: ExportImportProgress?
     /// The project whose own scene's start page the start form is for, while one is (#1089).
     var composingScene: ProjectKey?
     /// Brings a project's scene forward, or opens it: handed over by a view that has the

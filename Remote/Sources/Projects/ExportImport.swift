@@ -5,35 +5,40 @@ import UniformTypeIdentifiers
 
 /// Export… and Import Agents… (#1001), as the Mac's: an agent or a project's agents as a
 /// .tar.gz the person saves with the system's file picker, and one brought back, archived,
-/// on a project's machine. A row's menu is gone once a button in it is pressed, so the
+/// on a project's machine, with a busy sheet and Cancel while the host works (#2437). A row's menu is gone once a button in it is pressed, so the
 /// picker and what it says are put up from the front window, not from the row.
 @MainActor
 enum RemoteExportImport {
+    /// Made and read with the busy sheet up (#2437), then saved with the picker. One at a time.
     static func export(_ request: DaemonAPI.AgentsExportRequest, on host: HostID, model: RemoteModel) {
+        guard model.exportImport == nil else { return }
         guard let client = model.hostClient(host) else {
             say("The export did not start", "That machine is not connected.")
             return
         }
-        Task {
-            let folder = FileManager.default.temporaryDirectory.appending(path: "Export-\(UUID().uuidString)")
-            do {
-                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-                let made = try await AgentsExportTransfer.make(request, on: client)
-                let file = folder.appending(path: made.name)
-                try await AgentsExportTransfer.read(made, from: client, into: file)
+        let folder = FileManager.default.temporaryDirectory.appending(path: "Export-\(UUID().uuidString)")
+        run(.export, model: model) { progress in
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let made = try await AgentsExportTransfer.make(request, on: client)
+            try Task.checkCancellation()
+            progress.agents = made.agents
+            let file = folder.appending(path: made.name)
+            try await AgentsExportTransfer.read(made, from: client, into: file, progress: progress.report)
+            return {
                 let picker = UIDocumentPickerViewController(forExporting: [file], asCopy: true)
                 let keeper = PickerEnd { _ in try? FileManager.default.removeItem(at: folder) }
                 hold(keeper, for: picker)
                 present(picker)
-            } catch {
-                try? FileManager.default.removeItem(at: folder)
-                say("The export did not finish", error.localizedDescription)
             }
+        } failed: { error in
+            try? FileManager.default.removeItem(at: folder)
+            if let error { say("The export did not finish", error.localizedDescription) }
         }
     }
 
     /// Import Agents… from a project's menu: on that project's machine, into that project.
     static func importAgents(into summary: DaemonAPI.ProjectSummary, model: RemoteModel) {
+        guard model.exportImport == nil else { return }
         guard let client = model.hostClient(summary.host) else {
             say("The import did not start", "That machine is not connected.")
             return
@@ -42,18 +47,51 @@ enum RemoteExportImport {
         picker.allowsMultipleSelection = false
         let keeper = PickerEnd { urls in
             guard let file = urls.first else { return }
-            Task {
+            run(.import, model: model) { progress in
                 defer { try? FileManager.default.removeItem(at: file) }
-                do {
-                    let result = try await AgentsExportTransfer.importFile(file, into: client, folder: summary.folder)
-                    say(AgentsExportTransfer.imported(result, into: summary.name), nil)
-                } catch {
-                    say("The import did not finish", error.localizedDescription)
+                let result = try await AgentsExportTransfer.importFile(file, into: client, folder: summary.folder) { done, whole in
+                    progress.report(done, whole)
+                    if done >= whole { Task { @MainActor in progress.sent = true } }
                 }
+                return { say(AgentsExportTransfer.imported(result, into: summary.name), nil) }
+            } failed: { error in
+                try? FileManager.default.removeItem(at: file)
+                if let error { say("The import did not finish", error.localizedDescription) }
             }
         }
         hold(keeper, for: picker)
         present(picker)
+    }
+
+    /// Runs `work` with the busy sheet up and as the task its Cancel stops. What `work`
+    /// gives back is done once the sheet has gone; `failed` hears the error, nil for a cancel.
+    private static func run(_ kind: ExportImportProgress.Kind, model: RemoteModel,
+                            _ work: @escaping @MainActor (ExportImportProgress) async throws -> @MainActor () -> Void,
+                            failed: @escaping @MainActor (Error?) -> Void) {
+        let progress = ExportImportProgress(kind)
+        model.exportImport = progress
+        let sheet = UIHostingController(rootView: ExportImportProgressView(progress: progress))
+        sheet.modalPresentationStyle = .formSheet
+        sheet.isModalInPresentation = true
+        sheet.sheetPresentationController?.detents = [.custom { _ in 140 }]
+        present(sheet)
+        progress.task = Task { @MainActor in
+            var then: (@MainActor () -> Void)?
+            var problem: Error?
+            var ended = false
+            do {
+                then = try await work(progress)
+                try Task.checkCancellation()
+            } catch is CancellationError {
+                ended = true
+            } catch {
+                problem = Task.isCancelled ? nil : error
+                ended = true
+            }
+            await withCheckedContinuation { done in sheet.dismiss(animated: true) { done.resume() } }
+            model.exportImport = nil
+            if ended { failed(problem) } else { then?() }
+        }
     }
 
     /// A picker's delegate is weak: the one up now is kept here until it ends.
@@ -100,7 +138,8 @@ struct ExportAgentButton: View {
         Button("Export…", systemImage: "square.and.arrow.up") {
             RemoteExportImport.export(DaemonAPI.AgentsExportRequest(agentID: agent.id), on: agent.host, model: model)
         }
-        .disabled(model.isStale(agent))
+        // Off while one is on its way, so a second tap makes no second export (#2437).
+        .disabled(model.isStale(agent) || model.exportImport != nil)
     }
 }
 
@@ -113,10 +152,10 @@ struct ExportImportProjectButtons: View {
         Button("Export Agents…", systemImage: "square.and.arrow.up") {
             RemoteExportImport.export(DaemonAPI.AgentsExportRequest(folder: summary.folder), on: summary.host, model: model)
         }
-        .disabled(model.isStale(on: summary.host))
+        .disabled(model.isStale(on: summary.host) || model.exportImport != nil)
         Button("Import Agents…", systemImage: "square.and.arrow.down") {
             RemoteExportImport.importAgents(into: summary, model: model)
         }
-        .disabled(model.isStale(on: summary.host))
+        .disabled(model.isStale(on: summary.host) || model.exportImport != nil)
     }
 }

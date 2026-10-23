@@ -577,9 +577,9 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
       } },
     // Its agents as a .tar.gz, and an export brought back on its machine (#1001), as the window's.
     ...(store.has(host.id, Capability.agentsExport1) ? [
-      { label: "Export Agents…", disabled: down, help: "Download this project's agents as a .tar.gz",
+      { label: "Export Agents…", disabled: down || !!store.exportImport.value, help: "Download this project's agents as a .tar.gz",
         run: () => exportFromMenu(store, host.id, { folder: folder as NonNullable<AgentsExportRequest["folder"]> }) },
-      { label: "Import Agents…", disabled: down, help: "Bring back the agents of an export, archived, into this project",
+      { label: "Import Agents…", disabled: down || !!store.exportImport.value, help: "Bring back the agents of an export, archived, into this project",
         run: () => importFromMenu(store, host.id, { folder, name: project.name }) },
     ] : []),
   ];
@@ -777,7 +777,7 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
     })),
     // Its record and transcript as a .tar.gz (#1001), as the window's Export….
     ...(store.has(host, Capability.agentsExport1) ? [
-      { label: "Export…", help: "Download this session as a .tar.gz", disabled: down,
+      { label: "Export…", help: "Download this session as a .tar.gz", disabled: down || !!store.exportImport.value,
         run: () => exportFromMenu(store, host, { agentID: agent.id }) },
     ] : []),
     ...(pinnedAt ? [

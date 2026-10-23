@@ -49,3 +49,38 @@ test("the words say what an import did, as the window's", () => {
   assert.equal(e.importedWords({ restored: 0, skipped: 0 }), "There were no agents to import.");
   assert.equal(e.importedWords({ restored: 2, skipped: 0 }, "Web"), "Imported 2 agents into Web, archived.");
 });
+
+test("a read says how far it is, and Cancel stops it between parts (#2437)", async () => {
+  const parts = ["one-", "two-", "three"];
+  const call = async (method, params) => {
+    if (method === "agents/export") return { file: { id: "F", size: 13 }, agents: 2, name: "Fix.tar.gz" };
+    const at = { 0: 0, 4: 1, 8: 2 }[params.offset];
+    return { data: b64(parts[at]), end: at === 2 };
+  };
+  const seen = [];
+  let agents = null;
+  await e.readExport(call, "h1", { agentID: "A" }, { progress: (d, w) => seen.push([d, w]) }, (n) => { agents = n; });
+  assert.deepEqual(seen, [[4, 13], [8, 13], [13, 13]]);
+  assert.equal(agents, 2);
+  let cancel = false;
+  await assert.rejects(e.readExport(call, "h1", { agentID: "A" },
+    { progress: () => { cancel = true; }, cancelled: () => cancel }), e.Cancelled);
+});
+
+test("a cancelled import imports nothing (#2437)", async () => {
+  const bytes = new Uint8Array(e.importPartSize * 3);
+  const asked = [];
+  const call = async (method) => { asked.push(method); return {}; };
+  let cancel = false;
+  await assert.rejects(e.sendImport(call, "h1", bytes, "U", undefined,
+    { progress: () => { cancel = true; }, cancelled: () => cancel }), e.Cancelled);
+  assert.deepEqual(asked, ["agents/importUpload"]);
+});
+
+test("the busy lines say what is going on, as the window's (#2437)", () => {
+  assert.equal(e.exportingWords(null), "Making the export…");
+  assert.equal(e.exportingWords(1), "Exporting 1 agent…");
+  assert.equal(e.exportingWords(12), "Exporting 12 agents…");
+  assert.equal(e.importingWords(false), "Sending the export…");
+  assert.equal(e.importingWords(true), "Importing the agents…");
+});

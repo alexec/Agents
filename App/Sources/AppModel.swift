@@ -979,6 +979,8 @@ final class AppModel {
     let credentials = ServerCredentials(locations: .default)
     /// A server asked for a credential there is none of; the window asks the person (043).
     var tokenAsk: TokenAsk?
+    /// The Export… or Import Agents… on its way, drawn as a busy sheet with Cancel (#2437).
+    var exportImport: ExportImportProgress?
     /// A server asked for a sign-in this Mac relays; the window asks the person (T091).
     var signInLendAsk: SignInLendAsk?
     /// Git asks answered here, until the control plane's list drops them (#1122).

@@ -18,6 +18,7 @@ import { NewProjectDialog } from "./NewProject";
 import { DropboxDialog } from "./DropboxDialog";
 import { TokenAskDialog } from "./TokenAsk";
 import { GitLendDialog } from "./GitLend";
+import { ExportImportDialog } from "./ExportImport";
 import { Problem } from "./Errors";
 import { FilesPane } from "./FilesPane";
 import { WorkflowPage } from "./WorkflowPage";
@@ -88,6 +89,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
       <DropboxDialog store={store} />
       <TokenAskDialog store={store} />
       <GitLendDialog store={store} />
+      <ExportImportDialog store={store} />
       <ContextMenu />
       <MilestoneCard store={store} />
     </div>
