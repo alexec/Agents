@@ -27,7 +27,7 @@ struct VoiceSettingsSection: View {
             if let problem = WakeListener.shared.problem, isOn, listensForWake {
                 Text(problem)
                     .appText(.fine)
-                    .foregroundStyle(.red)
+                    .tinted(.failure)
             }
             #endif
         } header: {
