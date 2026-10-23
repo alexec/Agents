@@ -330,6 +330,13 @@ func (v *AgentState) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// agents/stop (#2435): the agent, and whether an admin stopped it from the Console, so its owner reads who stopped it. Only a label on the owner's own transcript: whoever sends it could already stop the agent.
+type AgentStopRequest struct {
+	AgentID UUID `json:"agentID"`
+
+	ByAdmin *bool `json:"byAdmin,omitzero"`
+}
+
 // workspaces/forAgent: what list_workspaces shows an agent.
 type AgentWorkspaces struct {
 	Providers []AgentWorkspacesProvider `json:"providers"`
@@ -3155,6 +3162,7 @@ const EndedReasonAllowanceSpent EndedReason = "allowanceSpent"
 const EndedReasonRateLimited EndedReason = "rateLimited"
 const EndedReasonSandboxFailed EndedReason = "sandboxFailed"
 const EndedReasonImported EndedReason = "imported"
+const EndedReasonStoppedByAdmin EndedReason = "stoppedByAdmin"
 
 // UnmarshalJSON reads a value this build does not know as "unrecognised".
 func (v *EndedReason) UnmarshalJSON(b []byte) error {
@@ -3178,7 +3186,8 @@ func (v *EndedReason) UnmarshalJSON(b []byte) error {
 		EndedReasonAllowanceSpent,
 		EndedReasonRateLimited,
 		EndedReasonSandboxFailed,
-		EndedReasonImported:
+		EndedReasonImported,
+		EndedReasonStoppedByAdmin:
 		*v = EndedReason(s)
 	default:
 		*v = EndedReasonUnrecognised

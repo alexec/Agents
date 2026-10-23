@@ -171,7 +171,7 @@ public enum SessionPrompts {
             switch entry.kind {
             case .stateChanged(.stopped, let reason):
                 switch reason {
-                case .cancelled, .stoppedByAgent, .costLimit: return .stopped
+                case .cancelled, .stoppedByAgent, .stoppedByAdmin, .costLimit: return .stopped
                 case .endTurn, .daemonGone, nil: return nil
                 default: return .failed
                 }

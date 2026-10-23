@@ -57,6 +57,7 @@ export function Blocks({ blocks, text }: { blocks: ContentBlock[] | undefined; t
 const stopWords: Partial<Record<EndedReason, string>> = {
   cancelled: "You stopped it",
   stoppedByAgent: "The agent that started it stopped it",
+  stoppedByAdmin: "An admin stopped it in the Console",
   processDied: "The runtime crashed",
   signInRefused: "Its sign-in was refused",
   runtimeError: "The runtime reported an error",

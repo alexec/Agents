@@ -1145,6 +1145,7 @@ private struct StateLine: View {
             switch reason {
             case .cancelled: return "You stopped it"
             case .stoppedByAgent: return "The agent that started it stopped it"
+            case .stoppedByAdmin: return "An admin stopped it in the Console"
             case .processDied: return "The runtime crashed"
             case .signInRefused: return "Its sign-in was refused"
             case .runtimeError: return "The runtime reported an error"

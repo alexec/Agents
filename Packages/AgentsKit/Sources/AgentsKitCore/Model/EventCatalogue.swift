@@ -148,7 +148,7 @@ public enum EventCatalogue {
                   "An agent in this project raised a form to fill in."),
         EventKind("agent.blocked", .project, about(EventDetail("waiting_on")),
                   "An agent in this project ended its turn waiting on something."),
-        EventKind("agent.stopped", .project, about(EventDetail("by", values: ["you", "cost_limit", "unknown"])),
+        EventKind("agent.stopped", .project, about(EventDetail("by", values: ["you", "admin", "cost_limit", "unknown"])),
                   "An agent in this project was stopped before finishing."),
         EventKind("agent.failed", .project, about(EventDetail("reason", values: EndedReason.allCases.map(\.code))),
                   "An agent in this project ended in an error."),

@@ -995,6 +995,17 @@ public enum DaemonAPI {
         public init(agentID: UUID) { self.agentID = agentID }
     }
 
+    /// `agents/stop` (#2435): `byAdmin` is the Console's, so the owner reads that an admin
+    /// stopped it. The window and the Remote leave it out.
+    public struct AgentStopRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var byAdmin: Bool?
+        public init(agentID: UUID, byAdmin: Bool? = nil) {
+            self.agentID = agentID
+            self.byAdmin = byAdmin
+        }
+    }
+
     /// `agents/branchFrom` (#1658): `entryID` is the person's prompt the new session goes
     /// on from just before.
     public struct BranchFromRequest: Codable, Sendable {

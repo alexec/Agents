@@ -145,7 +145,7 @@ function ending(entries: readonly TranscriptEntry[]): PromptEnding | null {
     const state = fields(entry, "stateChanged");
     if (state?._0 === "stopped") {
       const reason = state.reason;
-      if (reason === "cancelled" || reason === "stoppedByAgent" || reason === "costLimit") return "stopped";
+      if (reason === "cancelled" || reason === "stoppedByAgent" || reason === "stoppedByAdmin" || reason === "costLimit") return "stopped";
       if (reason === undefined || reason === "endTurn" || reason === "daemonGone") return null;
       return "failed";
     }

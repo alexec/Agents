@@ -63,6 +63,11 @@ public enum EndedReason: String, Codable, Hashable, Sendable, CaseIterable {
     /// daemon's, so this one shows it and never runs it. Set on load, never by a turn.
     case imported
 
+    /// An admin stopped it from the Console's Live Now (#2435): kept apart from
+    /// `cancelled` so the owner never reads "Stopped by you" about a stop they did not
+    /// make. Not a protocol stop reason.
+    case stoppedByAdmin
+
     /// Stopped short, and why. Never a reason dressed up as a finish, and `nil` for a
     /// turn that simply ended — there is nothing to say about that.
     ///
@@ -86,6 +91,7 @@ public enum EndedReason: String, Codable, Hashable, Sendable, CaseIterable {
         case .rateLimited: return "Rate limited, and still limited after retrying"
         case .sandboxFailed: return "Its sandbox could not start"
         case .imported: return "Imported from another set-up, so not run here"
+        case .stoppedByAdmin: return "Stopped by an admin in the Console"
         }
     }
 

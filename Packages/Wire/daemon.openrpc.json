@@ -1039,7 +1039,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/AgentRequest"
+            "$ref": "daemon.schema.json#/definitions/AgentStopRequest"
           }
         }
       ],

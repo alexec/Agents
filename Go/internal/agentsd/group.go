@@ -23,7 +23,7 @@ func Group(a *wire.Agent) string {
 	case wire.AgentStateStopped:
 		if a.EndedReason != nil {
 			switch *a.EndedReason {
-			case wire.EndedReasonCancelled, wire.EndedReasonStoppedByAgent, wire.EndedReasonAllowanceSpent:
+			case wire.EndedReasonCancelled, wire.EndedReasonStoppedByAgent, wire.EndedReasonStoppedByAdmin, wire.EndedReasonAllowanceSpent:
 				return "stopped"
 			}
 		}

@@ -93,7 +93,7 @@ public struct TurnActivityContent: Codable, Hashable, Sendable {
     }
 
     /// The endings the sidebars show as Paused (StatusShape): nobody is surprised by them.
-    public static let pausingReasons: Set<EndedReason> = [.cancelled, .stoppedByAgent, .allowanceSpent]
+    public static let pausingReasons: Set<EndedReason> = [.cancelled, .stoppedByAgent, .stoppedByAdmin, .allowanceSpent]
 
     /// The line for a turn that ended without a report saying how the work went.
     public static let outcomeUnknown = "Outcome unknown"

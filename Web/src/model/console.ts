@@ -210,7 +210,23 @@ export function waitingCount(n: { joins: number; links: number; capped: number; 
 }
 
 export const noLive = "No agent is running now on any machine.";
-export const liveFoot = "The page asks each online machine for its agents every 15 seconds. A machine that is offline shows what it ran last. Stop ends one agent. For an incident, Policy’s Stop All Agent Work stops every agent on every machine.";
+export const liveFoot = "The page asks each online machine for its agents every 15 seconds. A machine that is offline shows what it ran last. Stop… ends one agent, and its owner reads that an admin stopped it. For an incident, Policy’s Stop All Agent Work stops every agent on every machine.";
+
+/** An agent's short id, its first 8 characters, so two of one runtime on one machine can be
+ * told apart without its title (#2435). */
+export function liveShortID(a: LiveAgent): string {
+  return a.agent.slice(0, 8);
+}
+
+/** Each Stop's own name, for a screen reader (#2435). */
+export function liveStopLabel(a: LiveAgent, runtime: string): string {
+  return `Stop ${runtime} ${liveShortID(a)} on ${a.hostName}`;
+}
+
+/** What Stop… asks first (#2435): one click must not end the wrong agent. */
+export function liveStopQuestion(a: LiveAgent, runtime: string): string {
+  return `Stop ${runtime} ${liveShortID(a)} on ${a.hostName} (${a.ownerName})? It stops now, and ${a.ownerName} reads that an admin stopped it.`;
+}
 
 /** "Waiting for its person", "Waiting on others", "Starting" or "Working". */
 export function liveStateWords(a: LiveAgent): string {

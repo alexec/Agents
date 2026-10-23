@@ -108,3 +108,11 @@ test("the Requests count has the people SCIM removed (#2436)", () => {
   assert.equal(c.waitingCount({ joins: 0, links: 0, capped: 0, governance: 0, removals: 2 }), 2);
   assert.equal(c.waitingCount({ joins: 1, links: 1, capped: 1, governance: 1, removals: 1 }), 5);
 });
+
+test("Live Now tells two agents apart by a short id, and Stop… names the one it stops (#2435)", () => {
+  const a = { host: "H1", hostName: "Bea's Mac", owner: "p", ownerName: "Bea", bot: false, agent: "0f3c9a21-7d4e-4b8a-9c1d-2e5f6a7b8c9d",
+    runtime: "claude", state: "running" };
+  assert.equal(c.liveShortID(a), "0f3c9a21");
+  assert.equal(c.liveStopLabel(a, "Claude"), "Stop Claude 0f3c9a21 on Bea's Mac");
+  assert.match(c.liveStopQuestion(a, "Claude"), /^Stop Claude 0f3c9a21 on Bea's Mac \(Bea\)\? .*Bea reads that an admin stopped it\.$/);
+});

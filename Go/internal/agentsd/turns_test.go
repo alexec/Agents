@@ -412,6 +412,32 @@ func TestStopEndsTheTurnCancelled(t *testing.T) {
 	}
 }
 
+// An admin's stop from the Console (#2435) reads as theirs, not "Stopped by you"; the
+// owner's next stop is the owner's again.
+func TestAnAdminsStopSaysSo(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	var id wire.UUID
+	json.Unmarshal(c.call(t, 1, "agents/start", map[string]any{"runtimeID": "claude", "cwd": "file://" + t.TempDir(),
+		"prompt": "wait for me"}), &id)
+	c.until(t, "running", ended(id, wire.AgentStateRunning))
+	time.Sleep(200 * time.Millisecond)
+	c.call(t, 2, "agents/stop", map[string]any{"agentID": id, "byAdmin": true})
+	c.until(t, "stopped", ended(id, wire.AgentStateStopped))
+	if a := d.Store.Agent(id); *a.EndedReason != wire.EndedReasonStoppedByAdmin {
+		t.Fatalf("ended %s", *a.EndedReason)
+	}
+	if endedSummary[wire.EndedReasonStoppedByAdmin] != "Stopped by an admin in the Console" {
+		t.Fatal(endedSummary[wire.EndedReasonStoppedByAdmin])
+	}
+	d.noteAdminStop(id, true)
+	d.noteAdminStop(id, false)
+	if d.takeAdminStop(id) {
+		t.Fatal("the owner's own stop read as an admin's")
+	}
+}
+
 func TestAStartInAFolderThatIsNotThere(t *testing.T) {
 	_, c := start(t, t.TempDir())
 	c.in <- `{"jsonrpc":"2.0","id":1,"method":"agents/start","params":{"runtimeID":"claude","cwd":"file:///no/such","prompt":"x"}}`

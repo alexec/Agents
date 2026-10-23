@@ -4955,7 +4955,7 @@ final class RemoteModel {
     func terminalOutput(_ terminalID: String) -> String { work.terminalOutput[terminalID] ?? "" }
 
     func stop(_ agentID: UUID) async {
-        await act(.stop, on: agentID, DaemonAPI.Method.agentsStop, DaemonAPI.AgentRequest(agentID: agentID))
+        await act(.stop, on: agentID, DaemonAPI.Method.agentsStop, DaemonAPI.AgentStopRequest(agentID: agentID))
     }
     /// Stop a session and every session it started that is running (#835).
     func stopAll(_ agentID: UUID) async {

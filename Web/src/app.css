@@ -1635,3 +1635,4 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 /* Console ▸ Read API (#2019): a new token's value, shown once. */
 .read-token-made { margin: 8px 0; padding: 8px 10px; border: 1px solid var(--paper-rule); border-radius: 6px; }
 .read-token-value { display: block; word-break: break-all; user-select: all; margin: 4px 0; }
+.live-id { font-family: var(--mono, ui-monospace, monospace); }
