@@ -21,6 +21,8 @@ struct DictateButton: View {
         .buttonStyle(.paper)
         .buttonBorderShape(.circle)
         .accessibilityLabel(dictation.isListening ? "Stop dictating" : "Dictate")
+        // Voice mode listens already: one listener at a time (#2445).
+        .disabled(VoiceMode.shared.isOn && !dictation.isListening)
         .sheet(isPresented: $isPriming) { primer.paperSheet() }
         .alert("Dictation", isPresented: Binding(get: { dictation.problem != nil },
                                                  set: { if !$0 { dictation.dismissProblem() } })) {

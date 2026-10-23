@@ -115,6 +115,10 @@ final class VoiceMode {
         #endif
     }
 
+    /// Whether voice mode is on in any chat: Dictate is off meanwhile, so two do not
+    /// listen at once (#2445).
+    var isOn: Bool { phase != .off }
+
     /// Whether voice mode is on in this chat; nil is a new session, not started yet (#2375).
     func isOn(in agentID: UUID?) -> Bool { self.agentID == agentID && phase != .off }
 

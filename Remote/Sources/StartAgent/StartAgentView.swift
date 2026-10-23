@@ -52,6 +52,10 @@ struct StartAgentView: View {
             focused = true
         }
         .onChange(of: model.offeredStart) { takeOffer() }
+        // Voice mode turned on in a chat (another window on an iPad): one listener (#2445).
+        .onChange(of: VoiceMode.shared.isOn) { _, isOn in
+            if isOn { dictation.stop() }
+        }
         // Which showing holds the page is the model's (#2089): the last to come, and the
         // one under it once that goes. But an iPhone says this showing went just after it
         // came, and it stays on screen with nothing behind it: a showing still told of
