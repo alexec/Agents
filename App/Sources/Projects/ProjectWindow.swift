@@ -313,7 +313,7 @@ private struct ProjectNewSessionRow: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "square.and.pencil")
-                .foregroundStyle(Paper.accent)
+                .sidebarMark(Paper.accent)
                 .frame(width: 16)
                 .accessibilityHidden(true)
             Text("New Session")

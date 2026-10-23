@@ -715,7 +715,7 @@ private struct ProjectPageRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: systemImage)
-                .foregroundStyle(warns ? StateTint.failure.style(or: .primary) : AnyShapeStyle(Paper.accent))
+                .sidebarMark(warns ? StateTint.failure.style(or: .primary) : AnyShapeStyle(Paper.accent))
                 .frame(width: 20)
                 .accessibilityHidden(true)
             // Nothing at its end, which is only a session's (#587): the count is
@@ -783,7 +783,7 @@ private extension View {
     func activityIcon(_ systemImage: String, warns: Bool = false) -> some View {
         HStack(spacing: 8) {
             Image(systemName: systemImage)
-                .foregroundStyle(warns ? StateTint.failure.style(or: .primary) : AnyShapeStyle(Paper.accent))
+                .sidebarMark(warns ? StateTint.failure.style(or: .primary) : AnyShapeStyle(Paper.accent))
                 .frame(width: 20)
                 .accessibilityHidden(true)
             self
@@ -878,7 +878,7 @@ private struct NewSessionTopRow: View {
         let project = model.newSessionProject
         HStack(spacing: 8) {
             Image(systemName: "square.and.pencil")
-                .foregroundStyle(Paper.accent)
+                .sidebarMark(Paper.accent)
                 .frame(width: 20)
                 .accessibilityHidden(true)
             Text("New Session")

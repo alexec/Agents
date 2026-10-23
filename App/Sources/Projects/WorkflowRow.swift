@@ -264,8 +264,8 @@ struct WorkflowStatusIcon: View {
         Image(systemName: name)
             // The sidebar's icons are the size of its rows' text (#495); the page's larger.
             .appText(accented ? .supporting : .reading)
-            .foregroundStyle(summary.needsAPerson ? StateTint.attention.style(or: .secondary)
-                             : accented ? AnyShapeStyle(Paper.accent) : AnyShapeStyle(.secondary))
+            .sidebarMark(summary.needsAPerson ? StateTint.attention.style(or: .secondary)
+                         : accented ? AnyShapeStyle(Paper.accent) : AnyShapeStyle(.secondary))
             .accessibilityLabel(label)
     }
 

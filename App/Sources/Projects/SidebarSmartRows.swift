@@ -265,7 +265,7 @@ struct ProjectPageRow: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: systemImage)
-                .foregroundStyle(warns ? StateTint.failure.style(or: .primary) : AnyShapeStyle(Paper.accent))
+                .sidebarMark(warns ? StateTint.failure.style(or: .primary) : AnyShapeStyle(Paper.accent))
                 .frame(width: 16)
                 .accessibilityHidden(true)
             // White, as every row's title is (#587); nothing at its end, which is only
@@ -304,7 +304,7 @@ private struct ActivityIcon: ViewModifier {
     func body(content: Content) -> some View {
         HStack(spacing: 6) {
             Image(systemName: systemImage)
-                .foregroundStyle(warns ? StateTint.failure.style(or: .primary) : AnyShapeStyle(Paper.accent))
+                .sidebarMark(warns ? StateTint.failure.style(or: .primary) : AnyShapeStyle(Paper.accent))
                 .frame(width: 16)
                 .accessibilityHidden(true)
             content

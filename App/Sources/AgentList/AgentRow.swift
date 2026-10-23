@@ -124,7 +124,7 @@ struct AgentRow: View {
                     if let workflowName = startedByWorkflowName {
                         Image(systemName: "flowchart")
                             .appText(.fine)
-                            .foregroundStyle(.tertiary)
+                            .sidebarMark(.tertiary)
                             .help("Started by the workflow \(workflowName)")
                             .accessibilityLabel("started by the workflow \(workflowName)")
                     }
@@ -132,7 +132,7 @@ struct AgentRow: View {
                     if agent.isMuted {
                         Image(systemName: MuteWords.symbol)
                             .appText(.fine)
-                            .foregroundStyle(.tertiary)
+                            .sidebarMark(.tertiary)
                             .help(MuteWords.mutedHelp)
                             .accessibilityLabel(MuteWords.muted)
                     }
@@ -141,7 +141,7 @@ struct AgentRow: View {
                     if let starter = model.startedByAgentLabel(agent) {
                         Image(systemName: AgentsModel.startedByAgentSymbol)
                             .appText(.fine)
-                            .foregroundStyle(.tertiary)
+                            .sidebarMark(.tertiary)
                             .help(starter)
                             .accessibilityLabel(starter)
                     }
@@ -150,7 +150,7 @@ struct AgentRow: View {
                     if let file = FileToSeeWords.line(agent) {
                         Image(systemName: FileToSeeWords.symbol)
                             .appText(.fine)
-                            .foregroundStyle(.secondary)
+                            .sidebarMark(.secondary)
                             .help(file)
                             .accessibilityLabel(file)
                     }
@@ -448,26 +448,28 @@ private struct SessionMark: View {
 
     /// The well grows with the text beside it (#750), so the row keeps its shape.
     @ScaledMetric private var scale: CGFloat = 1
+    /// On a row filled with the accent, the ring is the ground as the other marks (#2382).
+    @Environment(\.drawsOnAccent) private var onAccent
 
     var body: some View {
         Group {
             switch kind {
             case .needsYou:
-                Image(systemName: "hand.raised.fill").tinted(.attention)
+                Image(systemName: "hand.raised.fill").sidebarMark(StateTint.attention.style(or: .secondary))
             case .working:
                 // In the accent as the other marks, and in step with every one (#1558, #2044).
                 // One case for both activities, so a tool tips the same ring (#2332).
-                WorkingRing(size: 12 * scale, color: Paper.accent, doing: tool != nil)
+                WorkingRing(size: 12 * scale, color: onAccent ? Paper.ground : Paper.accent, doing: tool != nil)
             case .queued:
-                Image(systemName: "list.number").foregroundStyle(Paper.accent)
+                Image(systemName: "list.number").sidebarMark(Paper.accent)
             case .waiting:
-                Image(systemName: "zzz").foregroundStyle(Paper.accent)
+                Image(systemName: "zzz").sidebarMark(Paper.accent)
             case .paused:
-                Image(systemName: "pause.circle").foregroundStyle(Paper.accent)
+                Image(systemName: "pause.circle").sidebarMark(Paper.accent)
             case .done:
-                Image(systemName: "checkmark").foregroundStyle(Paper.accent)
+                Image(systemName: "checkmark").sidebarMark(Paper.accent)
             case .asksToArchive:
-                Image(systemName: ArchiveRequestWords.symbol).tinted(.attention)
+                Image(systemName: ArchiveRequestWords.symbol).sidebarMark(StateTint.attention.style(or: .secondary))
             }
         }
         .frame(width: 16 * scale, height: 16 * scale)
@@ -526,8 +528,8 @@ struct StatusIcon: View {
                 Image(systemName: symbol)
                     // Decorative: a glyph filling an 18-point well, not text (FR-015).
                     .glyph(size: 15)
-                    .foregroundStyle((StatusShape.isTinted(shape, isWaitingForAllowance: isWaitingForAllowance)
-                                      ? StateTint.attention : .none)
+                    .sidebarMark((StatusShape.isTinted(shape, isWaitingForAllowance: isWaitingForAllowance)
+                                  ? StateTint.attention : .none)
                         .style(or: .secondary))
             } else {
                 WorkingRing(size: 12 * scale, doing: tool != nil)

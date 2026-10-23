@@ -604,7 +604,7 @@ private struct NewSessionTopRow: View {
         let project = model.newSessionProject
         HStack(spacing: 6) {
             Image(systemName: "square.and.pencil")
-                .foregroundStyle(Paper.accent)
+                .sidebarMark(Paper.accent)
                 .frame(width: 16)
                 .accessibilityHidden(true)
             Text("New Session")
@@ -1145,7 +1145,8 @@ private struct SidebarInk: ViewModifier {
 
     func body(content: Content) -> some View {
         if picks.listFocused, windowState == .key, picks.items.contains(item) {
-            content.foregroundStyle(Paper.ground)
+            // The marks set their own colour, which wins over this one: they read it (#2382).
+            content.foregroundStyle(Paper.ground).environment(\.sidebarRowInked, true)
         } else {
             content
         }
