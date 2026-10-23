@@ -150,6 +150,8 @@ type Service struct {
 	router  *Router
 	// auditChain links the audit entries this copy writes, and auditSinks sends them (#1001).
 	auditChain *audit.Chain
+	// auditWriter keeps the entries, one goroutine for all (#2433).
+	auditWriter *audit.Writer
 	auditSinks *auditSinkState
 	// Servers' backups (#1815).
 	backups *backupStore
@@ -255,6 +257,7 @@ func New(cfg Config) (*Service, error) {
 		reads: readGate{every: readAgainEvery}, metrics: metrics}
 	s.sources = newSources(cfg.TrustedProxies, s.log)
 	s.auditChain, s.auditSinks = audit.NewChain(s.copyID), newAuditSinkState(cfg.Name, s.copyID)
+	s.auditWriter = audit.NewWriter(s.auditLog(), s.log)
 	s.downloads, s.socketsMost, s.refusals = newAddressRates(), socketsMost, newRefusalLog(s.log)
 	if cfg.Push != nil {
 		s.pushes = newPushes(s, cfg.Push)
@@ -548,7 +551,14 @@ func (s *Service) Stop() {
 	if s.mesh != nil {
 		s.mesh.stop()
 	}
+	// The entries still queued are kept, for a while (#2433).
+	ctx, cancel := context.WithTimeout(context.Background(), auditDrain)
+	s.auditWriter.Close(ctx)
+	cancel()
 }
+
+// auditDrain is how long Stop waits for the audit's queued entries.
+const auditDrain = 10 * time.Second
 
 func (s *Service) setReady(ready bool) {
 	s.mu.Lock()

@@ -268,11 +268,7 @@ func (s *Service) auditRoute(actor wire.AuditActor, method, id, what string) {
 	if what != "" {
 		target += ": " + what
 	}
-	go func() {
-		if err := s.auditLog().Write(context.Background(), actor, method, action, "", &target); err != nil {
-			s.log("audit: could not keep " + method + ": " + err.Error())
-		}
-	}()
+	s.auditTo(actor, method, action, target)
 }
 
 // routeFailure is a sealing error in words, as userFailure.

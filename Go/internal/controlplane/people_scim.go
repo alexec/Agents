@@ -445,11 +445,7 @@ func (s *Service) auditAs(actor wire.AuditActor, method, target string) {
 	if len(target) > 300 {
 		target = target[:300] + "…"
 	}
-	go func() {
-		if err := s.auditLog().Write(context.Background(), actor, method, action, "", &target); err != nil {
-			s.log("audit: could not keep " + method + ": " + err.Error())
-		}
-	}()
+	s.auditTo(actor, method, action, target)
 }
 
 // MARK: The match at first sign-in (FR-016)

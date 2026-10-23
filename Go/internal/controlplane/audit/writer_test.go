@@ -1,0 +1,144 @@
+package audit
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"runtime"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/wire"
+)
+
+// slowStore is a bucket whose every Put takes a while, and whose first fails Puts fail.
+type slowStore struct {
+	store.Store
+	pause time.Duration
+	fails atomic.Int64
+	puts  atomic.Int64
+}
+
+func (s *slowStore) Put(ctx context.Context, key string, data []byte, when store.Condition) (string, error) {
+	s.puts.Add(1)
+	select {
+	case <-time.After(s.pause):
+	case <-ctx.Done():
+		return "", ctx.Err()
+	}
+	if s.fails.Add(-1) >= 0 {
+		return "", errors.New("the bucket is down")
+	}
+	return s.Store.Put(ctx, key, data, when)
+}
+
+func pending(i int) Pending {
+	target := fmt.Sprintf("bea-%d", i)
+	return Pending{Method: "scim/patchUser", Action: "Changed a person by SCIM", Who: func() (wire.AuditActor, *string) {
+		return wire.AuditActor{User: "scim:okta"}, &target
+	}}
+}
+
+// 1,000 entries in a second on a bucket whose Put takes 100 ms (#2433): kept in a few
+// seconds by one writer, not one Put at a time (100 s), and with no goroutine each; the
+// chain and its seal verify.
+func TestAWriterKeepsABurstInOrder(t *testing.T) {
+	s := &slowStore{Store: store.NewMemory(), pause: 100 * time.Millisecond}
+	c := NewChain("copy1")
+	w := NewWriter(&Log{Store: s, Chain: c}, func(line string) { t.Log(line) })
+	before := runtime.NumGoroutine()
+	peak := atomic.Int64{}
+	sampling := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-sampling:
+				return
+			case <-time.After(5 * time.Millisecond):
+				if n := int64(runtime.NumGoroutine()); n > peak.Load() {
+					peak.Store(n)
+				}
+			}
+		}
+	}()
+	start := time.Now()
+	for i := range 1000 {
+		if !w.Add(pending(i)) {
+			t.Fatalf("entry %d was refused", i)
+		}
+		if i%100 == 99 {
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	w.Close(ctx)
+	took := time.Since(start)
+	close(sampling)
+	if err := c.Seal(context.Background(), s, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	r, err := Verify(context.Background(), s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r.OK() || r.Entries != 1000 || r.Chains != 1 || r.Seals != 1 {
+		t.Fatalf("verify %+v", r)
+	}
+	extra := peak.Load() - int64(before)
+	t.Logf("1000 entries, Put 100 ms: kept in %v, %d Puts, peak %d goroutines over the %d before", took.Round(time.Millisecond), s.puts.Load(), extra, before)
+	if took > 15*time.Second {
+		t.Fatalf("took %v", took)
+	}
+	if extra > writerPuts+8 {
+		t.Fatalf("peak %d goroutines over the %d before", extra, before)
+	}
+}
+
+// A Put the bucket refuses is tried again, and the chain stays whole (#2433).
+func TestAWriterTriesAFailedPutAgain(t *testing.T) {
+	s := &slowStore{Store: store.NewMemory()}
+	s.fails.Store(3)
+	c := NewChain("copy1")
+	w := NewWriter(&Log{Store: s, Chain: c}, func(line string) { t.Log(line) })
+	for i := range 10 {
+		w.Add(pending(i))
+	}
+	w.Close(context.Background())
+	c.Seal(context.Background(), s, time.Now())
+	if r, err := Verify(context.Background(), s); err != nil || !r.OK() || r.Entries != 10 {
+		t.Fatalf("verify %+v %v", r, err)
+	}
+}
+
+// A writer that has stopped refuses an entry and says so; a full queue does too.
+func TestAStoppedWriterRefuses(t *testing.T) {
+	said := atomic.Int64{}
+	w := NewWriter(&Log{Store: store.NewMemory(), Chain: NewChain("copy1")}, func(string) { said.Add(1) })
+	w.Close(context.Background())
+	if w.Add(pending(1)) || said.Load() != 1 {
+		t.Fatalf("a stopped writer took an entry, said %d", said.Load())
+	}
+}
+
+// A seal names only an entry in the store: one linked but not landed is not its head.
+func TestASealNamesOnlyALandedEntry(t *testing.T) {
+	s := store.NewMemory()
+	c := NewChain("copy1")
+	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
+	first, second := stored{Kind: Kind}, stored{Kind: Kind}
+	one, _ := c.link(&first, Key(at, "alex"), at)
+	if _, err := s.Put(context.Background(), one.Key, one.Data, store.Absent); err != nil {
+		t.Fatal(err)
+	}
+	c.landed(context.Background(), s, one)
+	c.link(&second, Key(at, "alex"), at)
+	c.Seal(context.Background(), s, at)
+	object, _ := s.Get(context.Background(), sealKey("2026-10-22", "copy1"))
+	if object == nil || !strings.Contains(string(object.Data), `"seq":1,`) {
+		t.Fatalf("seal %v", object)
+	}
+}
