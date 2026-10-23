@@ -215,9 +215,8 @@ func TestAPolicyOfTheOldKeyIsTrusted30Days(t *testing.T) {
 		t.Fatal("the old key's policy is not trusted after the rotation")
 	}
 	at := time.Now().Add(31 * 24 * time.Hour)
-	old := nowFunc
-	nowFunc = func() time.Time { return at }
-	t.Cleanup(func() { nowFunc = old })
+	old := setNowFunc(func() time.Time { return at })
+	t.Cleanup(func() { setNowFunc(old) })
 	d.orgMu.Lock()
 	d.orgRead = false
 	d.orgMu.Unlock()

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -53,9 +54,32 @@ func newWaker(t *testing.T, m *fakeMac) *waker {
 }
 
 func atTime(t *testing.T, at *time.Time) {
-	old := nowFunc
-	nowFunc = func() time.Time { return *at }
-	t.Cleanup(func() { nowFunc = old })
+	old := setNowFunc(func() time.Time { return *at })
+	t.Cleanup(func() { setNowFunc(old) })
+}
+
+func TestNowFuncSwapDoesNotRace(t *testing.T) {
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				_ = nowFunc()
+			}
+		}
+	}()
+	old := setNowFunc(func() time.Time { return time.Unix(1, 0).UTC() })
+	if got := nowFunc(); !got.Equal(time.Unix(1, 0).UTC()) {
+		t.Fatalf("swapped clock: got %v", got)
+	}
+	setNowFunc(old)
+	close(stop)
+	wg.Wait()
 }
 
 func TestWakeHoldsForWorkThenTheGrace(t *testing.T) {
