@@ -938,8 +938,24 @@ func (m *Methods) setRelay(ctx context.Context, request wire.HostRelayRequest) e
 	return nil
 }
 
+// startsWork is what a machine says that starts work or uses its person's access, refused
+// while its person is suspended (D13). What it says to stop their work still goes. One a
+// line, sorted (#2020).
+var startsWork = methodSet(
+	"backups/commit",
+	"backups/upload",
+	"git/credential",
+	"links/check",
+	"tunnel/open",
+	"workflows/claimRun",
+	"workflows/trigger",
+)
+
 func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, error) {
 	ctx := context.Background()
+	if startsWork[method] && m.s.suspended(m.s.ownerOf(host)) {
+		return nil, fail(personSuspended, "This machine's person was suspended by their organisation.")
+	}
 	switch method {
 	case "control/ping":
 		return map[string]any{}, nil
