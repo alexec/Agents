@@ -11,8 +11,10 @@ struct AgentsExportTransferTests {
         private let lock = NSLock()
         private var _received: [(offset: Int, data: Data)] = []
         private var _imported: String?
+        private var _importedInto: String?
         var received: [(offset: Int, data: Data)] { lock.withLock { _received } }
         var imported: String? { lock.withLock { _imported } }
+        var importedInto: String? { lock.withLock { _importedInto } }
 
         func transport() async throws -> any LineTransport {
             let (near, far) = PairedTransport.pair()
@@ -46,7 +48,7 @@ struct AgentsExportTransferTests {
                 lock.withLock { _received.append((params["offset"] as? Int ?? -1, data)) }
                 return "{}"
             case DaemonAPI.Method.agentsImport:
-                lock.withLock { _imported = params["upload"] as? String }
+                lock.withLock { (_imported, _importedInto) = (params["upload"] as? String, params["folder"] as? String) }
                 return #"{"restored":2,"skipped":1}"#
             default:
                 return "{}"
@@ -79,11 +81,14 @@ struct AgentsExportTransferTests {
         let bytes = Data((0..<(AgentsExportTransfer.partSize * 2 + 10)).map { UInt8($0 % 251) })
         try bytes.write(to: file)
 
-        let result = try await AgentsExportTransfer.importFile(file, into: client)
+        let project = URL(fileURLWithPath: "/tmp/B", isDirectory: true)
+        let result = try await AgentsExportTransfer.importFile(file, into: client, folder: project)
         #expect(result == DaemonAPI.BackupRestoreResult(restored: 2, skipped: 1))
         #expect(host.received.map(\.offset) == [0, AgentsExportTransfer.partSize, AgentsExportTransfer.partSize * 2])
         #expect(host.received.reduce(Data()) { $0 + $1.data } == bytes)
         #expect(host.imported != nil)
+        // Into the project whose menu was used (#2389).
+        #expect(host.importedInto == project.absoluteString)
     }
 
     @Test func theWordsSayWhatAnImportDid() {
@@ -95,5 +100,6 @@ struct AgentsExportTransferTests {
         #expect(AgentsExportTransfer.imported(R(restored: 0, skipped: 2))
             == "Imported no agents. 2 were skipped: already here, or deleted here.")
         #expect(AgentsExportTransfer.imported(R(restored: 0, skipped: 0)) == "There were no agents to import.")
+        #expect(AgentsExportTransfer.imported(R(restored: 2, skipped: 0), into: "Web") == "Imported 2 agents into Web, archived.")
     }
 }

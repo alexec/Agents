@@ -376,10 +376,13 @@ export interface AgentsExportRequest {
 
 /**
  * What agents/import takes (#1001): the export sent with agents/importUpload. Its agents come back
- * archived, as a restore brings them; one this machine has, or deleted, is skipped.
+ * archived, as a restore brings them; one this machine has, or deleted, is skipped. With `folder`,
+ * a project on this machine (the one whose menu was used, #2389), every agent comes back in that
+ * project; without it, each in the folder it had where it was exported.
  */
 export interface AgentsImportRequest {
   upload: UUID;
+  folder?: URLString;
 }
 
 export interface AllowanceReading {
@@ -8470,7 +8473,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AgentWorktree: { required: ["name", "root", "project", "madeByApp"], optional: ["branch", "base"] },
   AgentsExport: { required: ["file", "agents", "name"], optional: [] },
   AgentsExportRequest: { required: [], optional: ["agentID", "folder"] },
-  AgentsImportRequest: { required: ["upload"], optional: [] },
+  AgentsImportRequest: { required: ["upload"], optional: ["folder"] },
   AllowanceReading: { required: ["spent", "nearlySpent", "at"], optional: ["window", "used", "resetsAt"] },
   AllowanceState: { required: ["credentialKey", "entryID", "status", "since", "changedAt", "learnedFrom", "spent", "rateLimitStreak"], optional: ["lastRateLimit", "reading", "modelsOut"] },
   AllowanceStateModelOut: { required: ["model", "since", "retryAfter"], optional: ["name"] },

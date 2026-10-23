@@ -31,9 +31,11 @@ test("an import is sent in parts at their offsets, then imported", async () => {
     if (method === "agents/importUpload") { sent.push(params); return {}; }
     assert.equal(method, "agents/import");
     assert.equal(params.upload, "U");
+    // Into the project whose menu was used (#2389).
+    assert.equal(params.folder, "file:///tmp/B/");
     return { restored: 2, skipped: 1 };
   };
-  const result = await e.sendImport(call, "h1", bytes, "U");
+  const result = await e.sendImport(call, "h1", bytes, "U", "file:///tmp/B/");
   assert.deepEqual(result, { restored: 2, skipped: 1 });
   assert.deepEqual(sent.map((p) => p.offset), [0, e.importPartSize, e.importPartSize * 2]);
   assert.deepEqual(Buffer.concat(sent.map((p) => Buffer.from(p.data, "base64"))), Buffer.from(bytes));
@@ -45,4 +47,5 @@ test("the words say what an import did, as the window's", () => {
   assert.equal(e.importedWords({ restored: 2, skipped: 1 }), "Imported 2 agents, archived. 1 was skipped: already here, or deleted here.");
   assert.equal(e.importedWords({ restored: 0, skipped: 2 }), "Imported no agents. 2 were skipped: already here, or deleted here.");
   assert.equal(e.importedWords({ restored: 0, skipped: 0 }), "There were no agents to import.");
+  assert.equal(e.importedWords({ restored: 2, skipped: 0 }, "Web"), "Imported 2 agents into Web, archived.");
 });

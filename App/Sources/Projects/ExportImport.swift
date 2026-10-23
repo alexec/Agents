@@ -29,16 +29,17 @@ extension AppModel {
         }
     }
 
-    /// Import Agents… from a project's menu: on that project's machine.
-    func importAgents(on host: HostID) async {
+    /// Import Agents… from a project's menu: on that project's machine, into that project.
+    func importAgents(into summary: DaemonAPI.ProjectSummary) async {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.gzip]
         panel.allowsMultipleSelection = false
-        panel.message = "Choose an export of Agents. Its agents come back archived."
+        panel.message = "Choose an export of Agents. Its agents come back archived, in \(summary.name)."
         guard panel.runModal() == .OK, let file = panel.url else { return }
         do {
-            let result = try await AgentsExportTransfer.importFile(file, into: client(for: host))
-            say(AgentsExportTransfer.imported(result), nil)
+            let result = try await AgentsExportTransfer.importFile(file, into: client(for: summary.host),
+                                                                   folder: summary.folder)
+            say(AgentsExportTransfer.imported(result, into: summary.name), nil)
         } catch {
             say("The import did not finish", describe(error))
         }

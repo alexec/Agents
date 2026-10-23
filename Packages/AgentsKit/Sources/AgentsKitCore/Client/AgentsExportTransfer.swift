@@ -32,8 +32,9 @@ public enum AgentsExportTransfer {
         }
     }
 
-    /// Sends `file` in parts and imports it.
-    public static func importFile(_ file: URL, into client: DaemonClient) async throws -> DaemonAPI.BackupRestoreResult {
+    /// Sends `file` in parts and imports it, into the project at `folder` when one is given.
+    public static func importFile(_ file: URL, into client: DaemonClient,
+                                  folder: URL? = nil) async throws -> DaemonAPI.BackupRestoreResult {
         let input = try FileHandle(forReadingFrom: file)
         defer { try? input.close() }
         let upload = UUID()
@@ -43,13 +44,15 @@ public enum AgentsExportTransfer {
                                   DaemonAPI.ReceiveUploadRequest(upload: upload, offset: offset, data: data))
             offset += data.count
         }
-        return try await client.call(DaemonAPI.Method.agentsImport, DaemonAPI.AgentsImportRequest(upload: upload),
+        return try await client.call(DaemonAPI.Method.agentsImport, DaemonAPI.AgentsImportRequest(upload: upload, folder: folder),
                                      returning: DaemonAPI.BackupRestoreResult.self)
     }
 
-    /// What an import did, in a line: "Imported 2 agents." and what it skipped.
-    public static func imported(_ result: DaemonAPI.BackupRestoreResult) -> String {
-        let count = result.restored == 1 ? "1 agent" : "\(result.restored) agents"
+    /// What an import did, in a line: "Imported 2 agents into Web, archived." and what it
+    /// skipped. `project` is the project they went into, when the person chose one.
+    public static func imported(_ result: DaemonAPI.BackupRestoreResult, into project: String? = nil) -> String {
+        let into = project.map { " into \($0)" } ?? ""
+        let count = (result.restored == 1 ? "1 agent" : "\(result.restored) agents") + into
         let words = "Imported \(count), archived."
         guard result.skipped > 0 else { return result.restored == 0 ? "There were no agents to import." : words }
         let skipped = result.skipped == 1 ? "1 was skipped" : "\(result.skipped) were skipped"

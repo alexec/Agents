@@ -40,7 +40,7 @@ func (d *Daemon) registerExports() {
 		return wire.Empty{}, d.receiveUpload(r)
 	})
 	On(d, wire.CallAgentsImport, func(ctx context.Context, c *Client, r wire.AgentsImportRequest) (wire.BackupRestoreResult, error) {
-		return d.importExport(r.Upload)
+		return d.importExport(r)
 	})
 }
 
@@ -127,8 +127,19 @@ func exportFileName(s string) string {
 }
 
 // importExport restores the agents of an uploaded export, archived, and removes the upload.
-func (d *Daemon) importExport(upload wire.UUID) (wire.BackupRestoreResult, error) {
-	path, err := d.incomingFile(upload)
+// With a folder, the project whose menu the person used, every agent comes back in that
+// project (#2389); without one, each in the folder it had where it was exported.
+func (d *Daemon) importExport(r wire.AgentsImportRequest) (wire.BackupRestoreResult, error) {
+	into := ""
+	if r.Folder != nil {
+		into = store.FolderPath(*r.Folder)
+		s, ok := d.summaryFor(into)
+		if !ok {
+			return wire.BackupRestoreResult{}, noSuchProject(shortPath(into) + " is not a project.")
+		}
+		into = store.FolderPath(s.Project.Folder)
+	}
+	path, err := d.incomingFile(r.Upload)
 	if err != nil {
 		return wire.BackupRestoreResult{}, err
 	}
@@ -138,7 +149,7 @@ func (d *Daemon) importExport(upload wire.UUID) (wire.BackupRestoreResult, error
 		return wire.BackupRestoreResult{}, err
 	}
 	// Never this machine's own: an imported agent is shown and never run (#1001).
-	return d.restoreArchive(path, m.RootID, false, false)
+	return d.restoreArchive(path, m.RootID, false, false, into)
 }
 
 // readExportManifest reads an archive's first entry, which a backup and an export both

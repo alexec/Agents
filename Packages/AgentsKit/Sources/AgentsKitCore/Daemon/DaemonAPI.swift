@@ -4410,11 +4410,16 @@ public extension DaemonAPI {
         }
     }
 
-    /// `agents/import`: the upload sent with `agents/importUpload`.
+    /// `agents/import`: the upload sent with `agents/importUpload`, and the project whose menu
+    /// was used: its agents come back in that project (#2389).
     struct AgentsImportRequest: Codable, Hashable, Sendable {
         public var upload: UUID
+        public var folder: URL?
 
-        public init(upload: UUID) { self.upload = upload }
+        public init(upload: UUID, folder: URL? = nil) {
+            self.upload = upload
+            self.folder = folder
+        }
     }
 
     struct BackupRestoreResult: Codable, Hashable, Sendable {
