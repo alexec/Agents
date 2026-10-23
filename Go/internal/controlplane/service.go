@@ -1235,10 +1235,11 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 		return
 	}
 	// A client key, or a person, holding as many sockets as it may (#2150): not a verdict
-	// on it, so it tries again later, and logged once a minute.
+	// on it, so it tries again later, and logged once a minute. Said as crowded, not
+	// unavailable, so a page can tell its person to close a tab (#2194).
 	if client != nil && s.router.Crowded(client.ID) {
 		settle(false)
-		conn.SendNow(controllink.Message{Refused: controllink.Unavailable}.Line())
+		conn.SendNow(controllink.Message{Refused: controllink.Crowded}.Line())
 		s.refusals.note("crowded", client.ID, fmt.Sprintf("refused a connection from %s: client %s holds as many sockets as it may", conn.Remote, client.ID))
 		conn.Close()
 		return

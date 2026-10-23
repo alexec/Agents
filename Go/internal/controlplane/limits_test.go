@@ -158,7 +158,7 @@ func TestTheDownloadsHaveARateForEachAddress(t *testing.T) {
 }
 
 // Past the most sockets a copy holds, a new one is refused before it opens; past the most a
-// client key holds, its exchange is refused as unavailable, which it tries again later.
+// client key holds, its exchange is refused as crowded (#2194), which it tries again later.
 func TestSocketsAreCapped(t *testing.T) {
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	m, _ := p.client("Window")
@@ -170,7 +170,7 @@ func TestSocketsAreCapped(t *testing.T) {
 		t.Cleanup(s.Close)
 	}
 	p.waitFor(func() bool { return p.s.router.Crowded(m.Client) }, "the client to hold its most")
-	if _, err := controllink.DialClient(context.Background(), m); !refusedAs(err, controllink.Unavailable) {
+	if _, err := controllink.DialClient(context.Background(), m); !refusedAs(err, controllink.Crowded) {
 		t.Fatalf("one socket more: %v", err)
 	}
 	// Eight are open: as many as this copy holds, say.

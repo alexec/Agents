@@ -117,6 +117,9 @@ public enum ControlAuth {
         /// The client's person was suspended by their org provider (#1002, D13). The client
         /// keeps its key and shows only that, until the provider turns them on again.
         case suspended
+        /// The client's key, or its person, holds as many sockets as it may (#2150, #2194).
+        /// Try again, as for unavailable; the web page says to close a tab.
+        case crowded
     }
 
     /// One line of the exchange, as it goes on the wire.

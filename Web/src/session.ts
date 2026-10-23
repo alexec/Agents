@@ -37,6 +37,8 @@ export const pairingWords: Record<RefusalReason | "notACode" | "otherControlPlan
   "bad-message": "The control plane answered something this page doesn't understand.",
   "wrong-control-plane": "This code is for another control plane.",
   suspended: "Your organisation's sign-in turned your access off.",
+  // As the banner says it, for a tab one too many (#2194).
+  crowded: "Too many Agents tabs are open in this browser. Close one to use this one.",
   notACode: "That isn't an Agents code. It starts agents-control:2:c:",
   otherControlPlane: "This code is for another control plane.",
   unreachable: "Can't reach the control plane. Is Agents Host open?",
