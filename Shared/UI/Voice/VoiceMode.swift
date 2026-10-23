@@ -330,7 +330,9 @@ final class VoiceMode {
     /// the screen (`Speakable.spoken`). A reply that is not the one being said (the agent
     /// went on to a step, then wrote again) is said from its start.
     private func streamReply(in turn: UUID, _ text: String, isDone: Bool) {
-        let all = Speakable.sentences(text)
+        // No more are said while it is written than the first three, and one more shows
+        // the third is whole: the rest of a long reply is not cleaned (#2429).
+        let all = Speakable.sentences(text, limit: Speakable.longReplySentences + 1)
         var said = stream?.turn == turn ? stream?.said ?? [] : []
         if !all.starts(with: said) { said = [] }
         let target = isDone ? Speakable.spoken(text)
