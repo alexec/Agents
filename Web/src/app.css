@@ -1621,6 +1621,10 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 /* Settings ▸ Workspace providers (#1808): a card per provider, a row per workspace with its dot. */
 .provider-card { margin-bottom: 10px; max-width: 640px; }
 .provider-add { margin: 4px 0 6px; }
+/* Add a Machine… (#2131): its three ways, a row each, the chosen one outlined in the accent. */
+.add-machine-ways { display: flex; flex-direction: column; gap: 8px; }
+.add-machine-way { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 10px 12px; }
+.add-machine-way.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .provider-card .grow { flex: 1; min-width: 0; }
 .provider-card .chip { font-weight: normal; }
 .workspace-row .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--paper-rule); }

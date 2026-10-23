@@ -5,7 +5,7 @@ import SwiftUI
 /// A project's Connectors set-up on the iPhone and iPad (#1336, frame F): the same page as
 /// the window's, in the same order, with the slots as a list. Each slot opens its own screen
 /// with its proof and its choices. The state is the host's, so all three clients show the
-/// same ticks. Other providers are set up on the Mac (Providers is the Mac's own page).
+/// same ticks. Where agents run has Add a Machine… and Add Provider… (#2131).
 /// The page that shows it reads it (MCPServersListView): at first, when the app comes back
 /// to the front, and on a pull (#1684).
 struct RemoteConnectorSetup: View {
@@ -41,7 +41,7 @@ struct RemoteConnectorSetup: View {
                     NavigationLink {
                         RemoteSlotView(project: project, projectName: projectName, kind: slot.slot, setup: $setup)
                     } label: {
-                        RemoteSlotRow(slot: slot, setup: setup, projectName: projectName)
+                        RemoteSlotRow(project: project, slot: slot, setup: setup, projectName: projectName)
                     }
                     .paperListRow()
                 }
@@ -91,15 +91,21 @@ struct RemoteConnectorSetup: View {
 
 /// One slot in the list: its mark, "Tasks · GitHub Issues", and one grey line.
 private struct RemoteSlotRow: View {
+    @Environment(RemoteModel.self) private var model
+    let project: ProjectKey
     let slot: DaemonAPI.ConnectorSlot
     let setup: DaemonAPI.ConnectorSetup
     let projectName: String
+
+    private var title: String {
+        slot.slot == .workspace ? model.whereAgentsRun(project.host).title : ConnectorSetupWords.title(slot)
+    }
 
     var body: some View {
         HStack(spacing: 12) {
             RemoteSlotMark(state: slot.state)
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(ConnectorSetupWords.heading(slot.slot)) \u{00B7} \(ConnectorSetupWords.title(slot))")
+                Text("\(ConnectorSetupWords.heading(slot.slot)) \u{00B7} \(title)")
                 Text(subtitle).appText(.fine).foregroundStyle(.secondary).lineLimit(2)
             }
         }
@@ -109,7 +115,7 @@ private struct RemoteSlotRow: View {
     private var subtitle: String {
         if let proof = ConnectorSetupWords.proof(slot) { return proof }
         if slot.state == .notConnected, slot.slot != .workspace { return "Comes with \(ConnectorSetupWords.name(setup.forgeOrGitHub))" }
-        if slot.slot == .workspace, slot.state == .read { return ConnectorSetupWords.otherProvidersElsewhere }
+        if slot.slot == .workspace { return model.whereAgentsRun(project.host).line }
         return ConnectorSetupWords.line(slot, project: projectName, repository: setup.repository, forge: setup.forgeOrGitHub)
     }
 }
@@ -146,6 +152,11 @@ private struct RemoteSlotView: View {
     /// Tasks only (#1682): whether the person's Linear connection is there, nil until read.
     @State private var linearConnected: Bool?
     @State private var connectingLinear = false
+    @State private var addingMachine = false
+    @State private var addingProvider = false
+    /// The providers before Add Provider…: the new one goes on to its New Machine.
+    @State private var before: Set<ProviderID> = []
+    @State private var making: DaemonAPI.ProviderSummary?
 
     private var slot: DaemonAPI.ConnectorSlot? { setup?.slot(kind) }
 
@@ -156,7 +167,8 @@ private struct RemoteSlotView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 8) {
                             RemoteSlotMark(state: slot.state)
-                            Text(ConnectorSetupWords.title(slot)).appText(.reading).fontWeight(.semibold)
+                            Text(kind == .workspace ? model.whereAgentsRun(project.host).title : ConnectorSetupWords.title(slot))
+                                .appText(.reading).fontWeight(.semibold)
                         }
                         if let proof = slot.proof {
                             HStack(alignment: .firstTextBaseline, spacing: 4) {
@@ -172,7 +184,7 @@ private struct RemoteSlotView: View {
                             }
                             .appText(.supporting)
                         } else {
-                            Text(slot.slot == .workspace && slot.state == .read ? ConnectorSetupWords.otherProvidersElsewhere
+                            Text(slot.slot == .workspace ? model.whereAgentsRun(project.host).line
                                  : ConnectorSetupWords.line(slot, project: projectName, repository: setup.repository,
                                                             forge: setup.forgeOrGitHub))
                                 .appText(.supporting)
@@ -206,7 +218,12 @@ private struct RemoteSlotView: View {
                                 .appText(.fine).foregroundStyle(.secondary)
                         }
                     } else {
-                        Text(ConnectorSetupWords.otherProvidersElsewhere).foregroundStyle(.secondary)
+                        // Add a Machine… and Add Provider… in place (#2131).
+                        Button(AddMachine.Words.menuItem) { addingMachine = true }
+                        if model.isAdmin {
+                            Button(AddMachine.Words.addProvider) { addingProvider = true }
+                        }
+                        Text(WhereAgentsRun.addProviderNote).appText(.fine).foregroundStyle(.secondary)
                     }
                 }
                 .paperListRow()
@@ -216,7 +233,23 @@ private struct RemoteSlotView: View {
         .scrollContentBackground(.hidden)
         .background(Paper.ground)
         .navigationTitle(ConnectorSetupWords.heading(kind))
-        .task { if kind == .tasks { await readLinear() } }
+        .task {
+            if kind == .tasks { await readLinear() }
+            if kind == .workspace { await model.loadWorkspaceProviders() }
+        }
+        .sheet(isPresented: $addingMachine) { AddMachineSheet() }
+        .sheet(isPresented: $addingProvider, onDismiss: {
+            Task {
+                await model.loadWorkspaceProviders()
+                making = model.workspaceProviders?.first { !before.contains($0.id) }
+            }
+        }) {
+            AddWorkspaceProviderSheet(editing: nil)
+                .onAppear { before = Set((model.workspaceProviders ?? []).map(\.id)) }
+        }
+        .sheet(item: $making) { provider in
+            NavigationStack { NewMachinePage(picked: provider.id, close: { making = nil }) }
+        }
         .sheet(isPresented: $connectingLinear) {
             RemoteConnectSheet(provider: .linear, host: project.host, onConnected: { Task { await readLinear() } })
         }
@@ -718,5 +751,16 @@ private extension View {
             Text(caption).appText(.fine).foregroundStyle(.secondary).accessibilityHidden(true)
             self
         }
+    }
+}
+
+extension RemoteModel {
+    /// Where agents run (#2131): the machine the project's folder is on, and its line of what
+    /// else is yours: the other machines and the providers.
+    func whereAgentsRun(_ host: HostID) -> (title: String, line: String) {
+        let others = projectHosts.filter { $0.id != host }.map(\.title)
+        let providers = (workspaceProviders ?? []).map(\.name)
+        return (WhereAgentsRun.title(onThisMac: false, hostName: hostLabel(host)),
+                WhereAgentsRun.line(others: others, providers: providers))
     }
 }

@@ -1,8 +1,8 @@
 // A project's Connectors set-up (#1336, frames A, C, F and G), the one Connect sheet for GitHub
 // (frame B) and Linear (#1343, frame H), and Connectors ▸ Connections (frame E), as the
 // window's ConnectorSetupView, ConnectGitHubSheet and YourConnectionsView. The state is the host's, so all three clients
-// show the same ticks. The page draws the Mac's grid; Where agents run says the other
-// providers are set up on the Mac, since Providers is a Mac-only page by design.
+// show the same ticks. The page draws the Mac's grid; Where agents run says the machine the
+// project is on, and has Add a Machine… and Add Provider… in place (#2131).
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { Store } from "../model/store";
 import type {
@@ -11,7 +11,9 @@ import type {
 import { projectPath } from "../model/hostedMCP";
 import { Capability } from "../protocol/capabilities.generated";
 import * as words from "../model/connectorSetup";
+import { addMachineWords, whereAgentsRun } from "../model/addMachine";
 import { Modal } from "./Modal";
+import { AddMachineDialog } from "./AddMachineDialog";
 
 function why(e: unknown): string {
   if (e && typeof e === "object" && "message" in e) return String((e as { message: unknown }).message);
@@ -35,6 +37,16 @@ export function ConnectorSetupSection({ store, host, folder, projectName, go }: 
   /** Whether the person's Linear connection is there, for the Tasks slot (#1682); unknown until read. */
   const [linearConnected, setLinearConnected] = useState<boolean>();
   const path = projectPath(folder);
+  /** Add a Machine… or Add Provider…, in place (#2131). */
+  const [adding, setAdding] = useState<"machine" | "provider">();
+  useEffect(() => { if (store.providers.list.peek() === null) void store.providers.load(); }, []);
+  // Where agents run (#2131): the machine the project's folder is on, and what else is yours.
+  const hosts = store.hosts.value.filter((h) => h.relay == null);
+  const place = {
+    title: whereAgentsRun.title(false, hosts.find((h) => h.id === host)?.name),
+    line: whereAgentsRun.line(hosts.filter((h) => h.id !== host).map((h) => h.name),
+      (store.providers.list.value ?? []).map((p) => p.name)),
+  };
 
   const readLinear = async () => {
     try {
@@ -85,7 +97,8 @@ export function ConnectorSetupSection({ store, host, folder, projectName, go }: 
             {setup.slots.map((slot) => (
               <SlotCard key={slot.slot} slot={slot} setup={setup} projectName={projectName} reading={reading}
                 tryAgain={() => void load("fresh")} skip={(s) => void skip(slot.slot, s)}
-                linearConnected={linearConnected} connectLinear={() => setConnecting("linear")} />
+                linearConnected={linearConnected} connectLinear={() => setConnecting("linear")}
+                place={place} admin={store.person.value?.role !== "member"} add={setAdding} />
             ))}
           </div>
           {(setup.connection || setup.events.state !== "off") && (
@@ -117,6 +130,10 @@ export function ConnectorSetupSection({ store, host, folder, projectName, go }: 
         <ConnectDialog store={store} host={host} provider={connecting} folder={path}
           connected={() => void (connecting === "linear" ? readLinear() : load("fresh"))}
           close={() => setConnecting(undefined)} />
+      )}
+      {adding && (
+        <AddMachineDialog store={store} start={adding === "provider" ? { kind: "addProvider" } : { kind: "choose" }}
+          close={() => setAdding(undefined)} />
       )}
     </div>
   );
@@ -166,23 +183,27 @@ function SlotMark({ slot, reading }: { slot: ConnectorSlot; reading: boolean }) 
   return <span class={`slot-mark ${slot.state}`} role="img" aria-label={label}>{mark}</span>;
 }
 
-function SlotCard({ slot, setup, projectName, reading, tryAgain, skip, linearConnected, connectLinear }: {
+function SlotCard({ slot, setup, projectName, reading, tryAgain, skip, linearConnected, connectLinear, place, admin, add }: {
   slot: ConnectorSlot; setup: ConnectorSetup; projectName: string; reading: boolean;
   tryAgain: () => void; skip: (skipped: boolean) => void;
   /** Tasks only: whether Linear is connected, unknown until read (#1682). */
   linearConnected: boolean | undefined; connectLinear: () => void;
+  /** Where agents run only (#2131): its machine and line, and Add a Machine… or Add Provider…. */
+  place: { title: string; line: string }; admin: boolean; add: (what: "machine" | "provider") => void;
 }) {
   const [changing, setChanging] = useState(false);
-  const canChange = slot.slot !== "workspace" && ["read", "refused", "failed"].includes(slot.state);
+  const workspace = slot.slot === "workspace";
+  const canChange = workspace || ["read", "refused", "failed"].includes(slot.state);
   const proof = slot.proof;
+  const title = workspace ? place.title : words.title(slot);
   return (
-    <div class={`setup-card slot ${changing ? "changing" : ""}`} aria-label={`${words.heading(slot.slot)}: ${words.title(slot)}`}>
+    <div class={`setup-card slot ${changing ? "changing" : ""}`} aria-label={`${words.heading(slot.slot)}: ${title}`}>
       <p class="slot-head">
         <SlotMark slot={slot} reading={reading} />
         <span class="slot-kind">{words.heading(slot.slot)}</span>
         {canChange && !changing && <button class="link small" onClick={() => setChanging(true)}>Change…</button>}
       </p>
-      <p class="strong">{words.title(slot)}</p>
+      <p class="strong">{title}</p>
       {proof ? (
         <p class="quiet small">
           {words.proofLead(slot.slot)}:{" "}
@@ -193,7 +214,7 @@ function SlotCard({ slot, setup, projectName, reading, tryAgain, skip, linearCon
         </p>
       ) : (
         <p class={`small ${["failed", "refused", "noRemote"].includes(slot.state) ? "attention" : "quiet"}`}>
-          {words.line(slot, projectName, setup.repository, false, words.forgeOf(setup))}
+          {workspace ? place.line : words.line(slot, projectName, setup.repository, false, words.forgeOf(setup))}
         </p>
       )}
       <p class="slot-actions small">
@@ -213,7 +234,18 @@ function SlotCard({ slot, setup, projectName, reading, tryAgain, skip, linearCon
         )}
         {slot.state === "skipped" && <button class="link" onClick={() => skip(false)}>Set Up</button>}
       </p>
-      {changing && (
+      {changing && workspace && (
+        <div class="slot-change">
+          <button title={whereAgentsRun.hereNote} onClick={() => setChanging(false)}>{place.title}</button>
+          <button title={whereAgentsRun.addMachineNote} onClick={() => { add("machine"); setChanging(false); }}>{addMachineWords.menuItem}</button>
+          {admin && (
+            <button title={whereAgentsRun.addProviderNote} onClick={() => { add("provider"); setChanging(false); }}>{addMachineWords.addProvider}</button>
+          )}
+          <button class="link" onClick={() => setChanging(false)}>Cancel</button>
+          <p class="quiet small">{addMachineWords.providersYours}</p>
+        </div>
+      )}
+      {changing && !workspace && (
         <div class="slot-change">
           <button onClick={() => setChanging(false)}>{slot.choice}</button>
           {slot.slot === "tasks" && linearConnected === false && (

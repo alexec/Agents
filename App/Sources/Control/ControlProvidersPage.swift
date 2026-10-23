@@ -54,12 +54,9 @@ struct ControlProvidersPage: View {
         .sheet(item: $rewriting) { provider in AddProviderSheet(control: control, editing: provider).paperSheet() }
         .sheet(item: $editing) { provider in EditProviderSheet(control: control, provider: provider).paperSheet() }
         .sheet(item: $addingHost) { prefill in ControlAddServerSheet(control: control, prefill: prefill).paperSheet() }
+        // The same sheet as Settings ▸ Machines' Add a Machine…, at this provider (#2131).
         .sheet(item: $making) { provider in
-            NewWorkspaceSheet(control: control, provider: provider) { prefill in
-                // After this sheet has gone, so the next can come up.
-                Task { @MainActor in addingHost = prefill }
-            }
-            .paperSheet()
+            AddMachineSheet(control: control, start: .provider(provider.id)).paperSheet()
         }
         .confirmationDialog(removing.map { "Remove \($0.name)?" } ?? "",
                             isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
@@ -231,6 +228,8 @@ struct AddProviderSheet: View {
     @Environment(\.dismiss) private var dismiss
     let control: ControlSettingsModel
     var editing: DaemonAPI.ProviderSummary?
+    /// Inside Add a Machine (#2131): the provider added, to go on with, in place of closing.
+    var onAdded: ((ProviderID?) -> Void)?
 
     enum Kind: String, CaseIterable, Identifiable {
         case docker, digitalOcean, codespaces, coder, workstations, compute, aws, commands, mcp
@@ -874,6 +873,7 @@ struct AddProviderSheet: View {
         }
         working = true
         problem = nil
+        let before = Set(control.providers.map(\.id))
         Task {
             let refused = await control.addProvider(request)
             working = false
@@ -882,7 +882,11 @@ struct AddProviderSheet: View {
             } else {
                 if let draftID { control.forgetDraft(draftID) }
                 draftID = nil
-                dismiss()
+                if let onAdded {
+                    onAdded(control.providers.first { !before.contains($0.id) }?.id)
+                } else {
+                    dismiss()
+                }
             }
         }
     }

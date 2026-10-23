@@ -254,8 +254,7 @@ struct ControlHostsPage: View {
     @Environment(AppModel.self) private var model
     let control: ControlSettingsModel
     @State private var removing: DaemonAPI.ControlHost?
-    @State private var addingByCode = false
-    @State private var addingServer = false
+    @State private var addingMachine = false
     @State private var choosing: DaemonAPI.ControlHost?
     /// Link to Workspace… (#691, L5).
     @State private var linking: DaemonAPI.ControlHost?
@@ -299,18 +298,15 @@ struct ControlHostsPage: View {
                                detail: unjoinedLine(pending.tunnel)) { EmptyView() }
                 }
             }
-            HStack(spacing: 8) {
-                Button("Add a Server…") { addingServer = true }.buttonStyle(.paper)
-                Button("Add by Code…") { addingByCode = true }.buttonStyle(.paper)
-            }
-            Text("Add a Server gives you one command to run on it, or installs it over ssh as you log in from Terminal, through an ssh tunnel when it can’t reach this Mac. Either way the server connects out, so nothing has to reach it. Add by Code gives another Mac a code to join with. Removing a machine stops it connecting. Its agents are left running where they are.")
+            // One sheet, a provider first (#2131): a server and a code are its other two ways.
+            Button(AddMachine.Words.menuItem) { addingMachine = true }.buttonStyle(.paper)
+            Text("A machine comes from a workspace provider, or a server runs one command, or is installed over ssh as you log in from Terminal, through an ssh tunnel when it can’t reach this Mac. Either way it connects out, so nothing has to reach it. Another Mac joins with a code. " + AddMachine.Words.machinesFoot)
                 .appText(.supporting).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             SharedSectionLabel("Auto-detect")
             ProjectDetectionCard(control: control)
         }
-        .sheet(isPresented: $addingByCode) { CodeSheet(control: control, purpose: .host).paperSheet() }
-        .sheet(isPresented: $addingServer) { ControlAddServerSheet(control: control).paperSheet() }
+        .sheet(isPresented: $addingMachine) { AddMachineSheet(control: control).paperSheet() }
         .sheet(item: $updating) { host in ControlAddServerSheet(control: control, updating: host).paperSheet() }
         .sheet(item: $linking) { host in
             LinkWorkspaceSheet(control: control, host: host).paperSheet()

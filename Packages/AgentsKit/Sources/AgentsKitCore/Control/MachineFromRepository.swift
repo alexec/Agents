@@ -90,8 +90,9 @@ public enum MachineFromRepository {
         }
     }
 
-    /// What Start sends: providers/create with the repository and the form's values, typed.
-    public static func request(_ provider: ProviderID, name: String, repository: Repository,
+    /// What Start sends: providers/create with the repository, if any (#2131), and the form's
+    /// values, typed.
+    public static func request(_ provider: ProviderID, name: String, repository: Repository?,
                                fields: [Field]) -> DaemonAPI.ProviderCreate {
         var options: [String: JSONValue] = [:]
         for field in fields {
@@ -103,7 +104,7 @@ public enum MachineFromRepository {
             case .string: options[field.key] = .string(v)
             }
         }
-        return DaemonAPI.ProviderCreate(id: provider, name: name, options: .object(options), repository: repository.url)
+        return DaemonAPI.ProviderCreate(id: provider, name: name, options: .object(options), repository: repository?.url)
     }
 
     /// The web page's machineWords.
