@@ -1,39 +1,33 @@
 import AgentsKitCore
 import SwiftUI
 
-/// The prompt bar's voice button (#2322), beside the dictate button under the prompt
-/// (#2375), while Settings has voice mode on. It turns voice mode on in this chat, and off again.
+/// The prompt bar's voice button (#2322), beside the dictate button, while Settings has
+/// voice mode on. It turns voice mode on in this chat, or in a new session (#2375), whose
+/// first words start it. On, `VoiceModeBar` takes the bar's place.
 struct VoiceModeButton: View {
-    let agentID: UUID
+    /// Nil for a new session, not started yet.
+    let agentID: UUID?
     /// Words for the recogniser that a dictionary would not have: agent, file and runtime names.
     var vocabulary: [String] = []
-    /// Sends the words to this chat as a voice prompt, and says whether the host took them.
-    let send: (String) async -> Bool
+    /// Sends the words as a voice prompt, and says which chat took them.
+    let send: VoiceMode.Send
 
     @AppStorage(VoiceSettings.onKey, store: WindowDefaults.store) private var isEnabled = VoiceSettings.onAtFirst
     private var voice: VoiceMode { VoiceMode.shared }
 
     var body: some View {
         if isEnabled {
-            let isOn = voice.isOn(in: agentID)
             Button {
-                if isOn {
-                    voice.turnOff()
-                } else {
-                    voice.turnOn(in: agentID, vocabulary: vocabulary, send: send)
-                }
+                voice.turnOn(in: agentID, vocabulary: vocabulary, send: send)
             } label: {
-                Image(systemName: isOn ? "xmark" : "waveform.circle")
+                Image(systemName: "waveform.circle")
                     .appText(.reading).fontWeight(.semibold)
                     .frame(width: 22, height: 22)
-                    .symbolEffect(.variableColor, isActive: isOn && voice.phase == .speaking)
             }
             .buttonStyle(.paper)
             .buttonBorderShape(.circle)
-            // On, it is × and Escape ends it (#2375).
-            .keyboardShortcut(isOn ? .cancelAction : nil)
-            .help(isOn ? "End voice mode (Esc)" : "Voice mode: say what you want and hear the reply")
-            .accessibilityLabel(isOn ? "End voice mode" : "Voice mode")
+            .help("Voice mode: say what you want and hear the reply")
+            .accessibilityLabel("Voice mode")
             .alert("Voice mode", isPresented: Binding(get: { voice.problem != nil },
                                                       set: { if !$0 { voice.dismissProblem() } })) {
                 Button("OK", role: .cancel) {}
@@ -44,25 +38,50 @@ struct VoiceModeButton: View {
     }
 }
 
-extension View {
-    /// Voice mode writes what it hears into the prompt field itself (#2375): the bar keeps
-    /// its layout, and the words go when the person pauses, as dictation's do. What was
-    /// typed before voice mode is left until the first word is heard.
-    func voiceModeWrites(into text: Binding<String>, in agentID: UUID?) -> some View {
-        modifier(VoiceModeWriter(agentID: agentID, text: text))
+/// Voice mode in place of the whole prompt bar (#2375), field and pills: the blue waveform,
+/// moving while it listens or speaks, the words heard or said, never cut, and × (or
+/// Escape) to end it.
+struct VoiceModeBar: View {
+    private var voice: VoiceMode { VoiceMode.shared }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "waveform")
+                .appText(.reading)
+                .foregroundStyle(.tint)
+                .frame(width: 22, height: 22)
+                .symbolEffect(.variableColor.iterative, isActive: voice.phase == .listening || voice.phase == .speaking)
+                .accessibilityHidden(true)
+            Text(words)
+                .appText(.reading)
+                .foregroundStyle(voice.heard.isEmpty || voice.phase == .speaking ? .secondary : .primary)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                voice.turnOff()
+            } label: {
+                Image(systemName: "xmark")
+                    .appText(.reading).fontWeight(.semibold)
+                    .frame(width: 22, height: 22)
+            }
+            .buttonStyle(.paper)
+            .buttonBorderShape(.circle)
+            .keyboardShortcut(.cancelAction)
+            .help("End voice mode (Esc)")
+            .accessibilityLabel("End voice mode")
+        }
+        .padding(14)
+        .paperRaised(in: RoundedRectangle(cornerRadius: 18))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Voice mode")
     }
-}
 
-private struct VoiceModeWriter: ViewModifier {
-    let agentID: UUID?
-    @Binding var text: String
-
-    func body(content: Content) -> some View {
-        let voice = VoiceMode.shared
-        let heard = agentID.map(voice.isOn(in:)) == true ? voice.heard : nil
-        content.onChange(of: heard) { old, new in
-            guard let new, !(old == nil && new.isEmpty) else { return }
-            text = new
+    /// The words heard, or the sentence being said, or what it waits for.
+    private var words: String {
+        switch voice.phase {
+        case .listening, .sending: voice.heard.isEmpty ? voice.hint : voice.heard
+        default: voice.hint
         }
     }
 }

@@ -8576,6 +8576,9 @@ type StartRequest struct {
 
 	// The added account the session uses (#840); absent for the runtime's own sign-in.
 	AccountID *string `json:"accountID,omitzero"`
+
+	// Started from voice mode (#2375): its first prompt asks for a short spoken reply, as agents/prompt's voice does.
+	Voice *bool `json:"voice,omitzero"`
 }
 
 // A started machine in people/removePreview: the branches and worktrees on it with work that is not pushed. `unknown` says why it could not be asked (offline, or it did not answer), and then `unpushed` is empty.

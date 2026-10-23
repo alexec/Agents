@@ -6808,6 +6808,11 @@ export interface StartRequest {
   purpose?: AgentPurpose;
   /** The added account the session uses (#840); absent for the runtime's own sign-in. */
   accountID?: string;
+  /**
+   * Started from voice mode (#2375): its first prompt asks for a short spoken reply, as
+   * agents/prompt's voice does.
+   */
+  voice?: boolean;
 }
 
 /**
@@ -9123,7 +9128,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SlashCommand: { required: ["name"], optional: ["description", "inputHint"] },
   SpendCaps: { required: [], optional: ["dailyUSD"] },
   StartOptions: { required: ["values", "extraArguments"], optional: [] },
-  StartRequest: { required: ["runtimeID", "cwd", "prompt", "attachments", "startOptions", "additionalDirectories", "mcpServers", "labels"], optional: ["draftID", "worktree", "requestID", "sandbox", "persona", "purpose", "accountID"] },
+  StartRequest: { required: ["runtimeID", "cwd", "prompt", "attachments", "startOptions", "additionalDirectories", "mcpServers", "labels"], optional: ["draftID", "worktree", "requestID", "sandbox", "persona", "purpose", "accountID", "voice"] },
   StartedMachinePreview: { required: ["host", "name", "state", "unpushed"], optional: ["unknown"] },
   StartingPoint: { required: ["repository", "commit"], optional: [] },
   StopBackgroundRequest: { required: ["agentID", "itemID"], optional: [] },

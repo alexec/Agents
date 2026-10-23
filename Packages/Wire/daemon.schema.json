@@ -20068,6 +20068,10 @@
         "accountID": {
           "description": "The added account the session uses (#840); absent for the runtime's own sign-in.",
           "type": "string"
+        },
+        "voice": {
+          "description": "Started from voice mode (#2375): its first prompt asks for a short spoken reply, as agents/prompt's voice does.",
+          "type": "boolean"
         }
       },
       "required": [

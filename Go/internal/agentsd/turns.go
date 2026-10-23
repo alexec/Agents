@@ -340,8 +340,14 @@ func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) 
 	if r.Purpose == nil {
 		safe.Go("starting point", func() { d.takeStartingPoint(a.ID, path) })
 	}
+	// Started from voice mode (#2375): its first reply is heard, as a voice prompt's is.
+	var preface *string
+	if r.Voice != nil && *r.Voice {
+		p := voicePreface
+		preface = &p
+	}
 	if err := d.enqueue(a.ID, wire.QueuedPrompt{ID: store.NewUUID(), Text: r.Prompt, Attachments: r.Attachments,
-		QueuedAt: t, From: wire.PromptOriginPerson}, false); err != nil {
+		QueuedAt: t, From: wire.PromptOriginPerson, Preface: preface}, false); err != nil {
 		return "", err
 	}
 	return a.ID, nil

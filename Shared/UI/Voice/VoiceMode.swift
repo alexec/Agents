@@ -58,7 +58,10 @@ final class VoiceMode {
     @ObservationIgnored private let audio: VoiceAudio
     @ObservationIgnored private let voice: ParadeeVoice
     @ObservationIgnored private let speaker: VoiceSpeaker
-    private var send: ((String) async -> Bool)?
+    /// Sends words as a voice prompt, and says which chat took them: nil when none did.
+    /// A new session's starts the chat with them (#2375).
+    typealias Send = (String) async -> UUID?
+    private var send: Send?
     private var vocabulary: [String] = []
     private var pauseTimer: Task<Void, Never>?
     private var speaking: Task<Void, Never>?
@@ -89,7 +92,8 @@ final class VoiceMode {
         speaker = VoiceSpeaker(voice: voice, audio: audio)
     }
 
-    func isOn(in agentID: UUID) -> Bool { self.agentID == agentID && phase != .off }
+    /// Whether voice mode is on in this chat; nil is a new session, not started yet (#2375).
+    func isOn(in agentID: UUID?) -> Bool { self.agentID == agentID && phase != .off }
 
     /// What the prompt field says while it is empty in voice mode: what it waits for, or
     /// the sentence being said.
@@ -102,14 +106,15 @@ final class VoiceMode {
         case .listening:
             if isAsking { "Say your answer." }
             else if isWaitingForReply { "Working on it. You can say more." }
-            else { "Say what you want. Esc ends voice mode." }
+            else { "Say what you want." }
         }
     }
 
-    /// Turns voice mode on in a chat. `send` sends words to it as a voice prompt, and says
+    /// Turns voice mode on in a chat, or a new session (nil) that its first words start.
+    /// `send` sends words to it as a voice prompt, and says
     /// whether the host took them.
-    func turnOn(in agentID: UUID, vocabulary: [String] = [], send: @escaping (String) async -> Bool) {
-        if self.agentID != nil { turnOff() }
+    func turnOn(in agentID: UUID?, vocabulary: [String] = [], send: @escaping Send) {
+        if phase != .off { turnOff() }
         self.agentID = agentID
         self.send = send
         self.vocabulary = vocabulary
@@ -118,7 +123,7 @@ final class VoiceMode {
         isWaitingForReply = false
         // What was said before voice mode is not read out: the chat's last turn is taken
         // as spoken when it is first seen.
-        needsBaseline = true
+        needsBaseline = agentID != nil
         turnedOnAt = Date()
         isHangingUp = false
         talkedOver = nil
@@ -337,7 +342,7 @@ final class VoiceMode {
     /// `chime`: the listening sound, which is left out between the sentences of a reply
     /// still being written.
     private func listen(chime: Bool = true) {
-        guard agentID != nil else { return }
+        guard phase != .off else { return }
         heard = ""
         phase = .listening
         defer { askIfWaiting() }
@@ -426,10 +431,15 @@ final class VoiceMode {
         dictation.stop()
         phase = .sending
         let agent = agentID
-        let took = await send(words)
+        let target = await send(words)
         guard agentID == agent, phase == .sending else { return }
-        if took {
+        if let target {
             sound(.sent)
+            // A new session's first words started it: voice mode goes on in its chat.
+            if agentID == nil {
+                agentID = target
+                latestTurn = nil
+            }
             // Words said while it works stop its turn (the host does it, #2375): the rest
             // of that turn is not read out.
             talkedOver = latestTurn
