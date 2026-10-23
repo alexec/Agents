@@ -18,6 +18,8 @@
 # privacy manifests.
 .github/                                               build
 .agents/areas                                          build
+# The run-app skill (#2400): the scratch set-up every lane tests with.
+.agents/skills/run-app/                                build
 project.yml                                            build
 **/Package.swift                                       build
 **/Package.resolved                                    build

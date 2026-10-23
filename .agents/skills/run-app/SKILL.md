@@ -1,6 +1,6 @@
 ---
 name: run-app
-description: Build, launch and drive this Mac app (Agents) on a scratch set-up of its own (a control plane, this Mac's host and the window), so a change can be seen working without touching the real ones or asking the user to click anything. Use whenever asked to run, start, screenshot, walk or manually verify the app, or whenever a change to App/, Host/, Go/, Remote/ or Packages/AgentsKit needs proving beyond `swift test`. Close everything it started when done ("When you are done"), also when the walk failed.
+description: Build, launch and drive this Mac app (Agents) on a scratch set-up of its own (a control plane, this Mac's host and the window), so a change can be seen working without touching the real ones or asking the user to click anything. Use whenever asked to run, start, screenshot, walk or manually verify the app, or whenever a change to App/, Host/, Go/, Remote/ or Packages/AgentsKit needs proving beyond `swift test`. Close everything it started and delete the scratch app and its files when done ("When you are done"), also when the walk failed.
 ---
 
 # Run and test this app
@@ -105,8 +105,9 @@ Host.app`.
    `control/control.pid`, which is what `stop.sh` does.
 2. **Always stop what you started**, including when the test failed or you are
    about to hand back. A left-behind window and daemon are the user's problem to
-   find. `stop.sh $ROOT` removes the root too; `stop.sh $ROOT --keep` leaves it
-   for reading and still stops the processes.
+   find. `stop.sh $ROOT` removes the root and its side files too; `stop.sh $ROOT --keep`
+   leaves them for reading and still stops the processes. Run `stop.sh $ROOT` again once
+   you have read a kept root: nothing else deletes it (#2400).
 3. **Keep this session out of what you start** — `launch.sh` does. `open` hands
    this session's environment to the app, and the `CLAUDE_*` variables in it reach
    every runtime the daemon starts; an agent started that way stops authenticating
@@ -352,7 +353,7 @@ $S/walk.py remote key escape                     # put the keyboard away
 $S/walk.py remote scroll --by -600               # as a drag: a following transcript lets go
 $S/walk.py remote press "#BackButton"
 $S/walk.py remote shot /tmp/remote.png
-$S/remote.sh down                                # quits it and shuts the simulator down
+$S/remote.sh down                                # quits and uninstalls it, shuts the simulator down
 ```
 
 `AGENTS_WALK_SIM="iPad Pro 13-inch (M5) (16GB)"` gives a kept iPad simulator of its own.
@@ -391,24 +392,34 @@ opens it in headless Chrome. Run it once per press, on the same profile.
 
 ## When you are done
 
-Before you commit, hand back or end your turn, close everything you started. Do this
-also when the walk failed. A scratch app left running is a bug in the lane: a headless
-Chrome from one web walk ran for 20 hours after its PR merged (#1624).
+Before you commit, hand back or end your turn, close everything you started and delete
+the scratch app and its files. Do this also when the walk failed, and as soon as you have
+finished with the app: not when the lane ends. A scratch app left running is a bug in the
+lane: a headless Chrome from one web walk ran for 20 hours after its PR merged (#1624). A
+scratch app left on disk is one too: 264 `/tmp/run-*` items and four worktrees' builds of
+0.7–7 GB each were found waiting on CI and review (#2400).
 
-1. For every root you launched: `$S/stop.sh $ROOT`. It must print `clean`.
-2. If you started the walk simulator: `$S/remote.sh down`.
-3. For every headless Chrome from `Web/test/walk/cdp.mjs`: `await chrome.close()`, then
-   remove its profile, `rm -rf /tmp/run-<slug>-chrome*`.
-4. Check that nothing is left. This must print nothing:
+1. For every headless Chrome from `Web/test/walk/cdp.mjs`: `await chrome.close()`. Its
+   profile, `/tmp/run-<slug>-chrome*`, goes in step 3.
+2. If you started the walk simulator: `$S/remote.sh down`. It uninstalls the Remote too.
+3. For every root you launched: `$S/stop.sh $ROOT`. It must print `clean`. It removes the
+   root and its side files (`/tmp/run-<slug>-*`, `/tmp/run-<slug>.*`: the build log, the
+   shots, the Chrome profiles). A root you kept with `--keep`: run `$S/stop.sh $ROOT` again
+   the moment you have read it.
+4. Check that nothing is left, running or on disk. Both must print nothing:
 
    ```sh
    pgrep -fl -- "--walk run-<slug>|/tmp/run-<slug>"
+   ls -d /tmp/run-<slug>* 2>/dev/null
    ```
 
-5. When the lane ends (its pull request is open with auto-merge on, or it hands the work
-   on), delete the worktree's own build output: about 2 GB a worktree, and 17 lanes' of it
-   filled the disk (#2346). Never in the main checkout, whose `build/DD` the live app may
-   run from. The shared cache in `~/Library/Caches/Agents-build/` stays.
+5. After the last walk or screenshot you need, unless you will launch again in this turn,
+   delete the worktree's own build output: the scratch `Agents.app` and Agents Host in
+   `build/DD`, about 2 GB a worktree, and 17 lanes' of it filled the disk (#2346). Do not
+   wait for the lane to end: a rebuild from the shared cache is fast (#234), and a lane
+   that must walk again after review rebuilds. Never in the main checkout, whose
+   `build/DD` the live app may run from. The shared cache in
+   `~/Library/Caches/Agents-build/` stays.
 
    ```sh
    [ "$(git rev-parse --git-dir)" != "$(git rev-parse --git-common-dir)" ] &&  # a linked worktree
