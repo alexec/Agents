@@ -1407,8 +1407,13 @@ button.plain:hover { opacity: 1; }
 .plan .in_progress .content { font-weight: 600; }
 .plan-block.withdrawn .plan .in_progress .content { font-weight: inherit; }
 /* With the working line: what the open agent holds and waits for in line (036, #2344). Untinted. */
-.lease-line { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin: 0; max-width: 100%; }
-.lease-line .link { font-size: 0.75rem; opacity: 0.7; color: inherit; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lease-line { display: flex; flex-direction: column; align-items: flex-start; gap: 0; margin: 0; max-width: 100%; }
+/* A way to Resources, so a chevron and a row's hit area: 24 px, 44 on touch (#2448). */
+.lease-line .link { display: inline-flex; align-items: center; gap: 4px; min-height: 24px; font-size: 0.75rem; color: inherit; max-width: 100%; }
+.lease-line .link .words { opacity: 0.7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lease-line .link .chevron { opacity: 0.45; }
+.lease-line .link:hover .words { opacity: 1; }
+@media (hover: none) { .lease-line .link { min-height: 44px; } }
 
 /* The new-session page's project name, a menu of every project (#495, #499): the browser's own
    menu over the name, as a pill's. */

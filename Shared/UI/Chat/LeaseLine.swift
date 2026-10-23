@@ -11,7 +11,8 @@ import SwiftUI
 /// tinted: holding or waiting is neither a person being needed nor anything broken.
 ///
 /// `open` is each app's: the Mac opens Resources at the resource, the Remote its
-/// Resources page. Nil draws the words alone.
+/// Resources page. Nil draws the words alone. With it, each line ends in a chevron, so it
+/// reads as a way somewhere, and its hit area is a full row: 44 pt high on iOS (#2448).
 struct LeaseLine: View {
     let status: LeaseStatus
     var open: ((ResourceName) -> Void)?
@@ -21,10 +22,20 @@ struct LeaseLine: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: open == nil ? 4 : 0) {
             ForEach(lines, id: \.text) { line in
                 if let open {
-                    Button { open(line.name) } label: { words(line.text) }
+                    Button { open(line.name) } label: {
+                        HStack(spacing: 4) {
+                            words(line.text)
+                            Image(systemName: "chevron.right")
+                                .appText(.fine)
+                                .imageScale(.small)
+                                .foregroundStyle(.tertiary)
+                        }
+                        .frame(minHeight: Self.rowHeight)
+                        .contentShape(Rectangle())
+                    }
                         .buttonStyle(.plain)
                         .help(status.fullLine)
                 } else {
@@ -36,6 +47,12 @@ struct LeaseLine: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(status.fullLine)
     }
+
+    #if os(iOS)
+    private static let rowHeight: CGFloat = 44
+    #else
+    private static let rowHeight: CGFloat = 22
+    #endif
 
     private func words(_ text: String) -> some View {
         Text(text)
