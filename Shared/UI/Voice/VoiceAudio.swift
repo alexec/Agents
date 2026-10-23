@@ -45,9 +45,30 @@ final class VoiceAudio {
                 // No echo cancellation on this route: the microphone closes while it speaks.
             }
         }
-        // The output is joined to the engine before it starts, as voice processing needs.
-        _ = engine.mainMixerNode
+        try joinOutput()
+        // Voice processing can still refuse to start: then without it, rather than no voice.
+        if cancelsEcho {
+            do {
+                engine.prepare()
+                try engine.start()
+                engine.stop()
+            } catch {
+                try? engine.inputNode.setVoiceProcessingEnabled(false)
+                cancelsEcho = false
+                try joinOutput()
+            }
+        }
         isOpen = true
+    }
+
+    /// The mixer joined to the output before the engine starts, as voice processing needs.
+    /// With it on, at the microphone's rate: voice processing will not start when the
+    /// output runs at another one (-10875 on a MacBook Air's speakers, 44.1 against 48 kHz).
+    private func joinOutput() throws {
+        // Not the input node without voice processing: a walk has no microphone to ask for.
+        let rate = cancelsEcho ? engine.inputNode.outputFormat(forBus: 0).sampleRate : 0
+        let format = rate > 0 ? AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1) : nil
+        try engine.connectNode(engine.mainMixerNode, to: engine.outputNode, format: format)
     }
 
     /// Starts the engine, once something is joined to it.
