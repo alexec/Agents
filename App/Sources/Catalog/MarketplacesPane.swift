@@ -164,11 +164,22 @@ private struct AddMarketplaceForm: View {
                     Text("skills.sh-compatible").tag(DaemonAPI.MarketplaceFormat.skillsSh)
                 }
                 .pickerStyle(.segmented).labelsHidden().fixedSize()
+            } else {
+                // A registry, or a file in its shape (#2155), such as a team's in its repository.
+                Picker("Kind", selection: $format) {
+                    Text("A registry").tag(DaemonAPI.MarketplaceFormat.mcpRegistry)
+                    Text("A file on this machine").tag(DaemonAPI.MarketplaceFormat.file)
+                }
+                .pickerStyle(.segmented).labelsHidden().fixedSize()
             }
             TextField("Name, such as Acme", text: $name).textFieldStyle(.roundedBorder)
-            TextField(format == .gitHubSkills ? "owner/repo" : "https://mcp.example.com", text: $url)
+            TextField(placeholder, text: $url)
                 .textFieldStyle(.roundedBorder)
-            if format != .gitHubSkills {
+            if format == .file {
+                Text("A JSON file, or a folder of them, in the MCP Registry's shape. A path from ~/ or a full path.")
+                    .appText(.fine).foregroundStyle(.secondary)
+            }
+            if format != .gitHubSkills && format != .file {
                 HStack {
                     TextField("Token name, if it needs one (ACME_MCP_TOKEN)", text: $token).textFieldStyle(.roundedBorder)
                     SecureField("Token", text: $tokenValue).textFieldStyle(.roundedBorder)
@@ -191,13 +202,21 @@ private struct AddMarketplaceForm: View {
         .onAppear { format = kind == .mcp ? .mcpRegistry : .gitHubSkills }
     }
 
+    private var placeholder: String {
+        switch format {
+        case .gitHubSkills: "owner/repo"
+        case .file: "~/team/connectors.json"
+        default: "https://mcp.example.com"
+        }
+    }
+
     private func add() async {
         saving = true
         defer { saving = false }
         let request = DaemonAPI.MarketplaceAddRequest(
             name: name, format: format, url: url,
-            token: format == .gitHubSkills || token.isEmpty ? nil : token,
-            tokenValue: format == .gitHubSkills || tokenValue.isEmpty ? nil : tokenValue)
+            token: format == .gitHubSkills || format == .file || token.isEmpty ? nil : token,
+            tokenValue: format == .gitHubSkills || format == .file || tokenValue.isEmpty ? nil : tokenValue)
         if let reason = await model.addMarketplace(request) {
             problem = reason
         } else {

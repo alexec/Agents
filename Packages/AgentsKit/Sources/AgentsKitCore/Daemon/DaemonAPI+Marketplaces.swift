@@ -20,10 +20,13 @@ extension DaemonAPI {
         case skillsSh = "skills.sh"
         /// A GitHub repository of skills: every folder with a `SKILL.md`.
         case gitHubSkills = "github-skills"
+        /// A JSON file, or a folder of them, in the MCP Registry's shape (#2155): the Agents
+        /// marketplace inside the host, or a path in a person's or a project's list.
+        case file
 
         public var kind: CatalogKind {
             switch self {
-            case .mcpRegistry: .mcp
+            case .mcpRegistry, .file: .mcp
             case .skillsSh, .gitHubSkills: .skills
             }
         }
@@ -66,6 +69,8 @@ extension DaemonAPI {
         /// What a result row and the sheet's footer name: the host, or `owner/repo`.
         public var host: String {
             if format == .gitHubSkills { return url }
+            // The Agents marketplace (#2155) is inside the host; a file is its path.
+            if format == .file { return url.hasPrefix("builtin:") ? "this machine" : url }
             return URL(string: url)?.host ?? url
         }
     }

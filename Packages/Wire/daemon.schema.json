@@ -10421,9 +10421,6 @@
         },
         "levels": {
           "$ref": "#/definitions/MCPLevels"
-        },
-        "madeByAgents": {
-          "type": "boolean"
         }
       },
       "required": [
@@ -11071,9 +11068,6 @@
         },
         "levels": {
           "$ref": "#/definitions/MCPLevels"
-        },
-        "madeByAgents": {
-          "type": "boolean"
         }
       },
       "required": [
@@ -11876,7 +11870,8 @@
       "enum": [
         "mcp-registry",
         "skills.sh",
-        "github-skills"
+        "github-skills",
+        "file"
       ]
     },
     "MarketplaceIDRequest": {

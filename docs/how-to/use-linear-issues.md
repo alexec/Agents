@@ -43,7 +43,7 @@ Add Linear's own server from the registry, or by hand with the URL
 
 ## Add the page and the events
 
-1. Add **Linear** from **Made by Agents** in the catalogue, or by hand in the project's
+1. Add **Linear** from the **Agents** marketplace in the catalogue, or by hand in the project's
    `.agents/mcp.json`:
 
    ```json

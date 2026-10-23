@@ -4530,8 +4530,6 @@ type MCPCatalogResult struct {
 	Marketplace *string `json:"marketplace,omitzero"`
 
 	Levels *MCPLevels `json:"levels,omitzero"`
-
-	MadeByAgents *bool `json:"madeByAgents,omitzero"`
 }
 
 type MCPCheckState string
@@ -4769,8 +4767,6 @@ type MCPServerHealth struct {
 	Tools *int64 `json:"tools,omitzero"`
 
 	Levels *MCPLevels `json:"levels,omitzero"`
-
-	MadeByAgents *bool `json:"madeByAgents,omitzero"`
 }
 
 type MCPServerTransport struct {
@@ -5099,6 +5095,7 @@ type MarketplaceFormat string
 const MarketplaceFormatMCPRegistry MarketplaceFormat = "mcp-registry"
 const MarketplaceFormatSkillsSh MarketplaceFormat = "skills.sh"
 const MarketplaceFormatGithubSkills MarketplaceFormat = "github-skills"
+const MarketplaceFormatFile MarketplaceFormat = "file"
 
 type MarketplaceIDRequest struct {
 	ID string `json:"id"`

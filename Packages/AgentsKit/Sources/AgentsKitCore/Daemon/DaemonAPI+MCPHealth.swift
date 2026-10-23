@@ -66,17 +66,15 @@ extension DaemonAPI {
         public var tools: Int?
         /// The five levels it reaches (#1428), from what it declared when it last answered.
         public var levels: MCPLevels?
-        /// One of the connectors Agents makes (#1428).
-        public var madeByAgents: Bool?
 
         public var id: String { (project ?? "~") + "|" + name }
 
         public init(name: String, project: String?, transport: MCPTransportName, hosted: Bool = false,
                     live: HostedMCPStatus? = nil, check: MCPCheckState = .unchecked, checkedAt: Date? = nil,
-                    lastError: String? = nil, tools: Int? = nil, levels: MCPLevels? = nil, madeByAgents: Bool? = nil) {
+                    lastError: String? = nil, tools: Int? = nil, levels: MCPLevels? = nil) {
             self.name = name; self.project = project; self.transport = transport; self.hosted = hosted
             self.live = live; self.check = check; self.checkedAt = checkedAt; self.lastError = lastError
-            self.tools = tools; self.levels = levels; self.madeByAgents = madeByAgents
+            self.tools = tools; self.levels = levels
         }
     }
 

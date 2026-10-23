@@ -133,7 +133,7 @@ func TestMCPServersAreChecked(t *testing.T) {
 	if h := got["fake"]; h.Check != wire.MCPCheckStateAnswered || h.Tools == nil || *h.Tools != 2 || h.CheckedAt == nil {
 		t.Fatalf("fake: %+v", h)
 	}
-	if h := got["fake"]; h.Levels == nil || *h.Levels != (wire.MCPLevels{Tools: true}) || h.MadeByAgents != nil {
+	if h := got["fake"]; h.Levels == nil || *h.Levels != (wire.MCPLevels{Tools: true}) {
 		t.Fatalf("fake's levels: %+v", h.Levels)
 	}
 	if h := got["levels"]; h.Levels == nil || *h.Levels != (wire.MCPLevels{Tools: true, Events: true, Views: true}) {

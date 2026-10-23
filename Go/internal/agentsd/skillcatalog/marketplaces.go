@@ -23,6 +23,12 @@ import (
 
 const SkillsShID = "provided:skills-sh"
 
+// The Agents marketplace (#2155): its id, and the address the built-in file is listed under.
+const (
+	AgentsMarketplaceID   = "provided:agents"
+	AgentsMarketplaceFile = "builtin:agents.json"
+)
+
 // RegistryVariable points every provided MCP registry at a walk's fixture server.
 const RegistryVariable = "AGENTS_TEST_MCP_REGISTRY_URL"
 
@@ -46,6 +52,9 @@ func Provided(env func(string) string) []wire.Marketplace {
 		{ID: "provided:official-mcp", Name: "MCP Registry", Format: wire.MarketplaceFormatMCPRegistry,
 			URL: registry("https://registry.modelcontextprotocol.io"), Origin: wire.MarketplaceOriginProvided,
 			About: about("The open registry: everything published, in its own order.")},
+		// The connectors Agents makes (#2155): a file carried inside agentsd (mcpcatalog's agents.json).
+		{ID: AgentsMarketplaceID, Name: "Agents", Format: wire.MarketplaceFormatFile, URL: AgentsMarketplaceFile,
+			Origin: wire.MarketplaceOriginProvided, About: about("The connectors Agents makes, carried by every host.")},
 		{ID: SkillsShID, Name: "skills.sh", Format: wire.MarketplaceFormatSkillsSh, URL: catalog,
 			Origin: wire.MarketplaceOriginProvided, About: about("Skills on GitHub, most installed first.")},
 		{ID: "provided:anthropic-skills", Name: "Anthropic skills", Format: wire.MarketplaceFormatGithubSkills,
@@ -55,7 +64,7 @@ func Provided(env func(string) string) []wire.Marketplace {
 
 // KindOf is what a format lists.
 func KindOf(f wire.MarketplaceFormat) wire.CatalogKind {
-	if f == wire.MarketplaceFormatMCPRegistry {
+	if f == wire.MarketplaceFormatMCPRegistry || f == wire.MarketplaceFormatFile {
 		return wire.CatalogKindMCP
 	}
 	return wire.CatalogKindSkills
@@ -212,6 +221,14 @@ func MarketplaceProblem(r wire.MarketplaceAddRequest) string {
 	case wire.MarketplaceFormatGithubSkills:
 		if _, _, ok := GitHubSource(u); !ok {
 			return "A GitHub repository is owner/repo."
+		}
+	case wire.MarketplaceFormatFile:
+		// A path: absolute, from ~/, or from the folder that holds the marketplaces.json's .agents.
+		if u == "" || strings.Contains(u, "://") || strings.HasPrefix(u, "builtin:") {
+			return "A file marketplace is a path, such as ~/team/connectors.json."
+		}
+		if r.Token != nil && *r.Token != "" {
+			return "A file marketplace takes no token."
 		}
 	default:
 		p, err := url.Parse(u)

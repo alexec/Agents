@@ -93,9 +93,6 @@ public enum MCPHealthWords {
         return "Reaches " + reached.joined(separator: ", ") + ". Not yet " + not.joined(separator: ", ") + "."
     }
 
-    /// The mark on the connectors that Agents makes (#1428).
-    public static let madeByAgents = "Made by Agents"
-
     public static let personalIntro = "Every connector in your own ~/.agents/mcp.json, which every agent has. "
         + "A hosted one runs once on this machine; any other is checked every four hours, and when its entry changes. "
         + "Edit them in the Mac's Settings \u{25B8} Agent Configuration \u{25B8} Connectors."

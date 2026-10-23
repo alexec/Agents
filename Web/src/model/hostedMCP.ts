@@ -157,9 +157,6 @@ export function levelsSentence(levels: MCPLevels | undefined): string {
   return `Reaches ${reached.join(", ")}. Not yet ${not.join(", ")}.`;
 }
 
-/** The mark on the connectors that Agents makes (#1428). */
-export const madeByAgents = "Made by Agents";
-
 export const personalIntro = "Every connector in your own ~/.agents/mcp.json, which every agent has. "
   + "A hosted one runs once on this machine; any other is checked every four hours, and when its entry changes. "
   + "Edit them in the Mac's Settings ▸ Agent Configuration ▸ Connectors.";

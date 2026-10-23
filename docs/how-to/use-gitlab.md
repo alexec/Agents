@@ -88,7 +88,7 @@ for access.
 When the first slot has read, the page adds the `gitlab` connector to the project's
 `.agents/mcp.json`, approved, once. Its events then reach the project.
 
-To add it by hand, add **GitLab** from **Made by Agents** in the catalogue on the Mac, or
+To add it by hand, add **GitLab** from the **Agents** marketplace in the catalogue on the Mac, or
 write the entry:
 
 ```json

@@ -90,7 +90,7 @@ When the first slot has read, the page adds the `github` connector to the projec
 `.agents/mcp.json`, approved, once. Its events then reach the project. The page shows
 them, such as `issue.* pr.* checks.*`, and the workflows that start on them.
 
-To add the connector by hand, add **GitHub** from **Made by Agents** in the catalogue on the
+To add the connector by hand, add **GitHub** from the **Agents** marketplace in the catalogue on the
 Mac, or write the entry yourself:
 
 ```json

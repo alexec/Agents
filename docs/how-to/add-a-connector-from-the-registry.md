@@ -21,8 +21,9 @@ never committed and never shown again.
 ## Add a connector for yourself
 
 1. Open **Settings ▸ Agent Configuration ▸ Connectors** and choose **Add Connector…**.
-   The connectors that Agents makes come first, under **Made by Agents**: GitHub and Linear.
-   They run hosted, one copy for each host, so their events come in when no agent runs.
+   The connectors that Agents makes (GitHub, Linear, GitLab and Email) are in the **Agents**
+   marketplace: choose it in the **Marketplace** menu. They run hosted, one copy for each host,
+   so their events come in when no agent runs.
 2. Type what you are looking for. Results come from the marketplace chosen in the
    **Marketplace** menu, in its own order (GitHub's puts the most starred first). Each
    shows the publisher it has checked (a GitHub org, or a domain), the description, the

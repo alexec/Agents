@@ -3889,14 +3889,6 @@ final class AppModel {
         }
     }
 
-    /// The connectors Agents makes, for the catalogue's first group (#1428).
-    func mcpMadeByAgents() async -> [DaemonAPI.MCPCatalogResult] {
-        // None from a host too old to say (#1748).
-        guard host(.mac, has: Capability.mcpMadeByAgents1) else { return [] }
-        return (try? await macClient.call(DaemonAPI.Method.mcpMadeByAgents, DaemonAPI.Empty(),
-                                   returning: DaemonAPI.MCPSearchAnswer.self))?.results ?? []
-    }
-
     func mcpPreview(_ result: DaemonAPI.MCPCatalogResult,
                     for destination: DaemonAPI.SkillDestination,
                     run: DaemonAPI.MCPRunKind?) async -> DaemonAPI.MCPPreviewAnswer {

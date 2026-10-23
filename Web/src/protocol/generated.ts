@@ -3587,7 +3587,6 @@ export interface MCPCatalogResult {
   remoteHost?: string;
   marketplace?: string;
   levels?: MCPLevels;
-  madeByAgents?: boolean;
 }
 
 export type MCPCheckState =
@@ -3748,7 +3747,6 @@ export interface MCPServerHealth {
   lastError?: string;
   tools?: number;
   levels?: MCPLevels;
-  madeByAgents?: boolean;
 }
 
 export type MCPServerTransport =
@@ -3952,7 +3950,8 @@ export interface MarketplaceAddRequest {
 export type MarketplaceFormat =
   | "mcp-registry"
   | "skills.sh"
-  | "github-skills";
+  | "github-skills"
+  | "file";
 
 export interface MarketplaceIDRequest {
   id: string;
@@ -8835,7 +8834,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MCPAddByHandRequest: { required: ["verifyID", "destination"], optional: [] },
   MCPAddRequest: { required: ["previewID", "destination", "secrets", "plain", "replace"], optional: [] },
   MCPApproveRequest: { required: ["destination", "name", "digest"], optional: [] },
-  MCPCatalogResult: { required: ["id", "title", "description", "version", "publisher", "known", "runs"], optional: ["remoteHost", "marketplace", "levels", "madeByAgents"] },
+  MCPCatalogResult: { required: ["id", "title", "description", "version", "publisher", "known", "runs"], optional: ["remoteHost", "marketplace", "levels"] },
   MCPEventTrigger: { required: ["event", "arguments"], optional: ["servers"] },
   MCPHandServer: { required: ["name", "kind", "command", "args", "env", "url", "headers"], optional: [] },
   MCPHandValue: { required: ["name", "value", "secret"], optional: ["secretName"] },
@@ -8853,7 +8852,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MCPRemoveRequest: { required: ["destination", "name"], optional: ["forgetSecret"] },
   MCPSearchAnswer: { required: ["results"], optional: ["error"] },
   MCPServer: { required: ["name", "transport"], optional: [] },
-  MCPServerHealth: { required: ["name", "transport", "hosted", "check"], optional: ["project", "live", "checkedAt", "lastError", "tools", "levels", "madeByAgents"] },
+  MCPServerHealth: { required: ["name", "transport", "hosted", "check"], optional: ["project", "live", "checkedAt", "lastError", "tools", "levels"] },
   MCPSetSecretAnswer: { required: ["set"], optional: [] },
   MCPSetSecretRequest: { required: ["name", "value"], optional: [] },
   MCPSignInAnswer: { required: [], optional: ["flowID", "authorizationURL", "needsClient", "callback", "error"] },

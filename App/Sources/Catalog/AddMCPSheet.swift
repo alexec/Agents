@@ -2,8 +2,8 @@ import AgentsKitCore
 import SwiftUI
 
 /// Add an MCP server from a marketplace (060, frames B and C; #687), or by hand (#305). The
-/// connectors Agents makes come first, in a group of their own, and every row shows the five
-/// levels it reaches (#1428).
+/// connectors Agents makes are rows of the Agents marketplace like any other (#2155), and every
+/// row shows the five levels it reaches (#1428).
 struct AddMCPSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -13,7 +13,6 @@ struct AddMCPSheet: View {
 
     @State private var query = ""
     @State private var results: [DaemonAPI.MCPCatalogResult] = []
-    @State private var ours: [DaemonAPI.MCPCatalogResult] = []
     @State private var searched = false
     @State private var searchError: DaemonAPI.MCPCatalogError?
     @State private var preview: DaemonAPI.MCPPreview?
@@ -49,7 +48,6 @@ struct AddMCPSheet: View {
         .frame(width: Self.size.width, height: Self.size.height)
         .background(Paper.ground)
         .task { await loadMarketplaces() }
-        .task { ours = await model.mcpMadeByAgents() }
         .task(id: SearchKey(query: query, marketplace: marketplace?.id)) {
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
@@ -68,11 +66,6 @@ struct AddMCPSheet: View {
                 .textFieldStyle(.roundedBorder)
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 6) {
-                    if !oursShown.isEmpty {
-                        groupHeading(MCPHealthWords.madeByAgents)
-                        ForEach(oursShown) { resultRow($0) }
-                        groupHeading("From \(marketplace?.name ?? "the registry")").padding(.top, 8)
-                    }
                     if marketplace == nil && !marketplaces.isEmpty {
                         Text("Every connector marketplace is off. Manage Marketplaces… in the menu turns one on.")
                             .appText(.fine).foregroundStyle(.secondary)
@@ -80,7 +73,7 @@ struct AddMCPSheet: View {
                         Text(MCPCatalogWords.sentence(searchError)).appText(.fine).foregroundStyle(.secondary)
                     } else if results.isEmpty && searched {
                         Text("No connectors match.").appText(.fine).foregroundStyle(.secondary)
-                    } else if !searched {
+                    } else if !searched && marketplace?.format != .file {
                         Text("Type two letters or more to search.").appText(.fine).foregroundStyle(.secondary)
                     }
                     ForEach(results) { resultRow($0) }
@@ -97,17 +90,6 @@ struct AddMCPSheet: View {
         .padding(18)
     }
 
-    /// Ours that match the words typed, or all of them when nothing is typed.
-    private var oursShown: [DaemonAPI.MCPCatalogResult] {
-        let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !words.isEmpty else { return ours }
-        return ours.filter { $0.title.localizedCaseInsensitiveContains(words) || $0.description.localizedCaseInsensitiveContains(words) }
-    }
-
-    private func groupHeading(_ title: String) -> some View {
-        Text(title.uppercased()).appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
-    }
-
     private func resultRow(_ result: DaemonAPI.MCPCatalogResult) -> some View {
         Button {
             Task { await open(result) }
@@ -115,29 +97,20 @@ struct AddMCPSheet: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
                     Text(result.title).fontWeight(.semibold)
-                    if result.madeByAgents == true {
-                        MadeByAgentsBadge()
-                    } else {
-                        if result.known {
-                            Text("known").appText(.fine).padding(.horizontal, 6)
-                                .background(Paper.accent.opacity(0.15), in: Capsule())
-                        }
-                        Text(result.publisher.label).appText(.fine).foregroundStyle(.secondary)
+                    if result.known {
+                        Text("known").appText(.fine).padding(.horizontal, 6)
+                            .background(Paper.accent.opacity(0.15), in: Capsule())
                     }
+                    Text(result.publisher.label).appText(.fine).foregroundStyle(.secondary)
                     Spacer()
                     Text(result.version).appText(.fine).foregroundStyle(.secondary)
                 }
                 Text(result.description).appText(.fine).foregroundStyle(.secondary).lineLimit(2)
                 HStack {
                     ConnectorLevels(levels: result.levels)
-                    if result.madeByAgents == true {
-                        Text("hosted").appText(.fine)
+                    ForEach(result.runs, id: \.self) { run in
+                        Text(run.rawValue).appText(.fine)
                             .padding(.horizontal, 6).background(Color.secondary.opacity(0.12), in: Capsule())
-                    } else {
-                        ForEach(result.runs, id: \.self) { run in
-                            Text(run.rawValue).appText(.fine)
-                                .padding(.horizontal, 6).background(Color.secondary.opacity(0.12), in: Capsule())
-                        }
                     }
                     if let host = result.remoteHost {
                         Text("remote · \(host)").appText(.fine).tinted(.attention)
@@ -157,7 +130,6 @@ struct AddMCPSheet: View {
             HStack {
                 Button("‹ Results") { self.preview = nil; secretValues = [:] }.buttonStyle(.paper)
                 Text(preview.result.title).appText(.title)
-                if preview.result.madeByAgents == true { MadeByAgentsBadge() }
                 Spacer()
             }
             ConnectorLevels(levels: preview.result.levels)
@@ -213,7 +185,8 @@ struct AddMCPSheet: View {
 
     private func search(_ query: String) async {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.count >= 2 else {
+        // A file (#2155) is short and lists all of itself with nothing typed; a registry needs two letters.
+        guard trimmed.count >= 2 || marketplace?.format == .file else {
             results = []; searched = false; searchError = nil; return
         }
         guard let marketplace else {

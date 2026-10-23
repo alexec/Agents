@@ -34,7 +34,7 @@ Nothing here needs doing; it is for understanding.
 - [Versions and capabilities](versions.md): how the clients, the hosts and the control
   plane work together at different versions, and what a version number means.
 - [Connector levels](connector-levels.md): what Tools, Events, Views, Workflows and Tested
-  mean, why they exist, and what "Made by Agents" says.
+  mean, why they exist, and where the connectors that Agents makes come from.
 - [Projects, hosts and worktrees](projects-hosts-worktrees.md): a project is a folder on
   one machine, and an agent can have a worktree of its own.
 - [Leases on shared resources](leases.md): how agents take turns with the screen, a

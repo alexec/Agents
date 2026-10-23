@@ -243,7 +243,7 @@ func TestThePersonsOwnMarketplaces(t *testing.T) {
 	}
 	list = wire.MarketplacesListAnswer{}
 	json.Unmarshal(c.call(t, 6, "marketplaces/remove", map[string]any{"id": "personal:https://mcp.acme.example"}), &list)
-	if len(list.Marketplaces) != 4 {
+	if len(list.Marketplaces) != 5 {
 		t.Fatalf("%+v", list)
 	}
 }
