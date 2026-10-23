@@ -64,6 +64,9 @@ func (d *Daemon) sweepArchived() (deleted int) {
 	keep, ok := keepDays(d.keepFor())
 	cutoff := nowFunc().Add(-keep)
 	pinned := map[string]map[wire.UUID]bool{}
+	// The runtime copies are queued in batches, each with one rewrite of the files (#2427).
+	var erase []*wire.Agent
+	defer func() { d.queueErasures(erase) }()
 	for _, a := range d.Store.Agents() {
 		if a.State != wire.AgentStateArchived {
 			continue
@@ -89,11 +92,15 @@ func (d *Daemon) sweepArchived() (deleted int) {
 		if cur := d.Store.Agent(a.ID); cur == nil || cur.State != wire.AgentStateArchived {
 			continue
 		}
-		if err := d.deleteArchived(&a, "retention"); err != nil {
+		if err := d.deleteArchivedThen(&a, "retention", func(a *wire.Agent) { erase = append(erase, a) }); err != nil {
 			log.Printf("retention: %s: %v", a.ID, err)
 			continue
 		}
 		deleted++
+		if len(erase) >= eraseBatch {
+			d.queueErasures(erase)
+			erase = nil
+		}
 	}
 	return deleted
 }

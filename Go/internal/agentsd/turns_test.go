@@ -68,10 +68,22 @@ func systemPromptOf(meta any) string {
 }
 
 func (f *fakeRuntime) Initialize(context.Context, sdk.InitializeRequest) (sdk.InitializeResponse, error) {
+	// AGENTS_FAKE_STARTS names a file the fake adds a line to each time it starts.
+	if file := os.Getenv("AGENTS_FAKE_STARTS"); file != "" {
+		if f, err := os.OpenFile(file, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600); err == nil {
+			f.WriteString("started\n")
+			f.Close()
+		}
+	}
+	// AGENTS_FAKE_NO_DELETE: an adapter that cannot delete a session.
+	var del *sdk.SessionDeleteCapabilities
+	if os.Getenv("AGENTS_FAKE_NO_DELETE") == "" {
+		del = &sdk.SessionDeleteCapabilities{}
+	}
 	return sdk.InitializeResponse{ProtocolVersion: sdk.ProtocolVersionNumber, AuthMethods: fakeAuthMethods(),
 		AgentCapabilities: sdk.AgentCapabilities{Auth: sdk.AgentAuthCapabilities{Logout: &sdk.LogoutCapabilities{}},
 			Providers: &sdk.ProvidersCapabilities{}, LoadSession: true, SessionCapabilities: sdk.SessionCapabilities{Resume: &sdk.SessionResumeCapabilities{},
-				Fork: &sdk.SessionForkCapabilities{}, List: &sdk.SessionListCapabilities{}, Delete: &sdk.SessionDeleteCapabilities{}}}}, nil
+				Fork: &sdk.SessionForkCapabilities{}, List: &sdk.SessionListCapabilities{}, Delete: del}}}, nil
 }
 
 // The fake holds one conversation the app did not start, "theirs", in any folder.
@@ -93,9 +105,12 @@ func (f *fakeRuntime) LoadSession(ctx context.Context, r sdk.LoadSessionRequest)
 }
 
 func (f *fakeRuntime) UnstableDeleteSession(_ context.Context, r sdk.UnstableDeleteSessionRequest) (sdk.UnstableDeleteSessionResponse, error) {
-	// AGENTS_FAKE_DELETED names a file the fake writes each deleted session's ID to.
+	// AGENTS_FAKE_DELETED names a file the fake adds each deleted session's ID to, a line each.
 	if file := os.Getenv("AGENTS_FAKE_DELETED"); file != "" {
-		os.WriteFile(file, []byte(r.SessionId), 0o600)
+		if f, err := os.OpenFile(file, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600); err == nil {
+			f.WriteString(string(r.SessionId) + "\n")
+			f.Close()
+		}
 	}
 	return sdk.UnstableDeleteSessionResponse{}, nil
 }

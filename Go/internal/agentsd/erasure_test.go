@@ -2,9 +2,11 @@ package agentsd
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -73,7 +75,7 @@ func TestDeleteLeavesNoRuntimeSessionFile(t *testing.T) {
 	if _, err := os.Stat(other); err != nil {
 		t.Errorf("another session's file went: %v", err)
 	}
-	if b, _ := os.ReadFile(deleted); string(b) != session {
+	if b, _ := os.ReadFile(deleted); strings.TrimSpace(string(b)) != session {
 		t.Errorf("the runtime was asked to delete %q", b)
 	}
 	if got := lastEvent(d, "agent.deleted"); got == nil || got.Details["runtimeCopy"] != "queued" {
@@ -214,4 +216,81 @@ func mustRead(t *testing.T, file string) []byte {
 		t.Fatal(err)
 	}
 	return b
+}
+
+// A sweep of 200 archived agents starts the runtime once a batch to erase them, and writes
+// each file a few times, not 3 times an agent; an adapter that cannot delete is not
+// started again for the next sweep (#2427).
+func TestASweepStartsTheRuntimeOnce(t *testing.T) {
+	eraseInTests(t)
+	fakeRuntimes(t)
+	scratch := t.TempDir()
+	t.Setenv("HOME", filepath.Join(scratch, "home"))
+	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(scratch, "claude"))
+	starts, deleted := filepath.Join(scratch, "starts"), filepath.Join(scratch, "deleted")
+	t.Setenv("AGENTS_FAKE_STARTS", starts)
+	t.Setenv("AGENTS_FAKE_DELETED", deleted)
+	var writes atomic.Int64
+	old := writeErasureFile
+	writeErasureFile = func(file string, data []byte, mode os.FileMode) error {
+		writes.Add(1)
+		return old(file, data, mode)
+	}
+	t.Cleanup(func() { writeErasureFile = old })
+	lines := func(file string) int {
+		b, _ := os.ReadFile(file)
+		return strings.Count(string(b), "\n")
+	}
+
+	d, c := start(t, t.TempDir())
+	dir := project(t, c, 1)
+	// Nobody reads this client's notifications: drop them, so a broadcast never waits.
+	quiet := make(chan struct{})
+	t.Cleanup(func() { close(quiet) })
+	go func() {
+		for {
+			select {
+			case <-c.out:
+			case <-quiet:
+				return
+			}
+		}
+	}()
+	sweep := func(n int) {
+		t.Helper()
+		byUser := wire.AgentArchivedReasonByUser
+		for i := range n {
+			session := fmt.Sprintf("s%d-%d", lines(starts), i)
+			seeded(t, d, dir, func(a *wire.Agent) {
+				at := wire.DateOf(nowFunc().Add(-31 * 24 * time.Hour))
+				a.State, a.ArchivedAt, a.ArchivedReason, a.RuntimeSessionID = wire.AgentStateArchived, &at, &byUser, &session
+			})
+		}
+		began := time.Now()
+		if got := d.sweepArchived(); got != n {
+			t.Fatalf("deleted %d of %d", got, n)
+		}
+		waitFor(t, "the erasures", d.erasuresDone)
+		t.Logf("%d agents: %d runtime starts, %d file writes, %v", n, lines(starts), writes.Load(), time.Since(began))
+	}
+
+	sweep(200)
+	if n := lines(deleted); n != 200 {
+		t.Fatalf("the runtime deleted %d of 200", n)
+	}
+	if n := lines(starts); n > 200/eraseBatch+1 {
+		t.Fatalf("%d runtime starts for 200 agents", n)
+	}
+	if n := writes.Load(); n > 20 {
+		t.Fatalf("%d file writes for 200 agents", n)
+	}
+
+	// An adapter that cannot delete: asked once, then not started again.
+	t.Setenv("AGENTS_FAKE_NO_DELETE", "1")
+	os.Remove(starts)
+	sweep(20)
+	sweep(20)
+	if n := lines(starts); n != 1 {
+		t.Fatalf("%d runtime starts for an adapter that cannot delete", n)
+	}
 }
