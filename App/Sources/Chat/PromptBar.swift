@@ -607,6 +607,8 @@ struct PromptBar: View {
             .buttonBorderShape(.circle)
             .help("Dictate, as the Mac does everywhere")
             .accessibilityLabel("Dictate")
+            // Voice mode listens already, in this window or another (#2445).
+            .disabled(VoiceMode.shared.isOn)
 
             // Voice mode (#2322), while Settings ▸ Appearance has it on: in this chat, or in a
             // new session that its first words start (#2375).

@@ -125,6 +125,11 @@ struct PromptBar: View {
         .animation(.easeOut(duration: 0.15), value: isMentioning)
         .onAppear { restoreDraft() }
         .onChange(of: agent.id) { restoreDraft() }
+        // Voice mode listens with its own dictation: this bar's stops, so the same words do
+        // not go two ways (#2445).
+        .onChange(of: VoiceMode.shared.isOn) { _, isOn in
+            if isOn { dictation.stop() }
+        }
         // Opened: its runtime starts now, so the reply does not wait for it (#183). Once
         // it has been on screen a moment, so paging past chats starts nothing (#202).
         .task(id: agent.id) {
