@@ -45,7 +45,7 @@ import { ViewLayer, type ViewActions } from "./chat/viewLayer";
 import { ViewDiff } from "./chat/ViewDiff";
 import { offerStart } from "./NewAgent";
 import { BackToList } from "./BackToList";
-import { comingBackDescription } from "../model/status";
+import { comingBackDescription, footStatusWords } from "../model/status";
 import { ArchiveCard } from "./ArchiveCard";
 import { showsThoughts, shownItems } from "../model/thoughts";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
@@ -56,7 +56,7 @@ import { GuardedChangeCard } from "./GuardedChange";
 import { Capability } from "../protocol/capabilities.generated";
 import { hostNeedsUpdate } from "../model/capabilities";
 import { WorkingMark } from "./SessionRow";
-import { runningTool, runningToolLabel } from "../model/sidebar";
+import { runningTool } from "../model/sidebar";
 import { composerReason } from "../model/orgPolicy";
 
 /** One opened turn's entries, so an earlier page can be put in front and drawn again (#291). */
@@ -591,11 +591,13 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         {agent && <Queued store={store} host={host} agent={agent} disabled={down} draftKey={`${host}|${session}`} />}
         {agent && <KeptBubbles store={store} kept={store.keptFor(host, agent.id)} />}
         {/* Live, at the foot: what the row says, until the prompt lands (ChatTranscript, #251). */}
-        {agent && store.isComingBack(host, agent.id) ? <p class="working coming-back" role="status">↻ {comingBackDescription}</p>
+        {agent && store.isComingBack(host, agent.id) ? <p class="working coming-back" aria-hidden="true">↻ {comingBackDescription}</p>
           : agent && (agent.state === "running" || agent.state === "starting") && !callIsMarked && (
-          <p class="working" role="status" aria-label={runningTool(agent) !== null ? runningToolLabel(runningTool(agent)!) : "Working"}>
-            <WorkingMark tool={runningTool(agent)} /></p>
+          <p class="working" aria-hidden="true"><WorkingMark tool={runningTool(agent)} /></p>
         )}
+        {/* What the foot says to a screen reader, as text, in one node that is always there: a
+            live region reads a change to its text, not to an aria-label, nor a node just drawn (#2391). */}
+        <p class="visually-hidden" role="status">{agent ? footStatusWords(agent, store.isComingBack(host, agent.id)) : ""}</p>
         {/* What it holds and waits for in line: what the agent is doing now, as the working line says (#2344). */}
         {agent && <LeaseLine store={store} host={host} agent={agent} />}
         {/* After all of it, where the reader is (#1995). */}
