@@ -4,10 +4,10 @@
 #   scripts/lint.sh [linter…]         lint the whole tree; every linter when none is named
 #   scripts/lint.sh --fix [linter…]   run each linter's fix mode first, then lint
 #   scripts/lint.sh --tools DIR TOOL…  put pinned Linux x86_64 binaries in DIR (CI): shellcheck,
-#                                     ruff, golangci-lint, govulncheck (needs Go), biome, swiftlint
+#                                     ruff, golangci-lint, govulncheck (needs Go), biome, swiftlint, jscpd
 #
 # Linters: shell (shellcheck), zsh (zsh -n), python (ruff), go (golangci-lint), govulncheck,
-# web (biome lint), swift (SwiftLint), checks (our own text checks). Their rules are in
+# web (biome lint), swift (SwiftLint), dupes (jscpd), checks (our own text checks). Their rules are in
 # .shellcheckrc, ruff.toml, Go/.golangci.yml, Web/biome.json and .swiftlint.yml.
 #
 # A linter is "required" or "report". A required one is clean on main, and a finding fails
@@ -30,12 +30,13 @@ GOLANGCI=2.15.0
 GOVULNCHECK=1.9.0
 BIOME=2.5.15
 SWIFTLINT=0.65.1
+JSCPD=5.4.2
 GO_IMAGE=golang:1.26
 ZSH=5.9
 NODE=$(cat Web/.node-version)
 
 REQUIRED=" shell zsh checks "
-ALL="shell zsh python go govulncheck web swift checks"
+ALL="shell zsh python go govulncheck web swift dupes checks"
 
 if [ "${1:-}" = --tools ]; then
 	dir=${2:?usage: scripts/lint.sh --tools DIR TOOL…}
@@ -60,6 +61,9 @@ if [ "${1:-}" = --tools ]; then
 		swiftlint)
 			curl -sSfLo swiftlint.zip "$gh/realm/SwiftLint/releases/download/$SWIFTLINT/swiftlint_linux_amd64.zip"
 			unzip -qo swiftlint.zip swiftlint-static && mv swiftlint-static swiftlint && rm swiftlint.zip ;;
+		jscpd)
+			curl -sSfL "$gh/kucherenko/jscpd/releases/download/v$JSCPD/jscpd-linux-x64-gnu.tar.gz" |
+				tar -xz --strip-components=0 jscpd ;;
 		*) echo "lint.sh: no tool $t" >&2; exit 2 ;;
 		esac
 	done
@@ -79,7 +83,7 @@ native() { [ "$(uname -s)" = Linux ] && command -v "$1" >/dev/null 2>&1; }
 tool() {
 	case $1 in
 	shell) echo shellcheck ;; python) echo ruff ;; go) echo golangci-lint ;;
-	web) echo biome ;; swift) echo swiftlint ;; *) echo "$1" ;;
+	web) echo biome ;; swift) echo swiftlint ;; dupes) echo jscpd ;; *) echo "$1" ;;
 	esac
 }
 
@@ -203,6 +207,28 @@ run_swift() {
 		box "ghcr.io/realm/swiftlint:$SWIFTLINT" lint --quiet
 	fi | sed -E "s#^(/repo/|$root/)##"
 	return "${PIPESTATUS[0]}"
+}
+
+run_dupes() {
+	local out log status
+	out=$(mktemp -d "$root/.agents/reviews/.jscpd-lint.XXXXXX") || return 1
+	log="$out/run.log"
+	if native jscpd; then
+		jscpd --reporters json --output "$out" >"$log" 2>&1
+		status=$?
+	else
+		local relative_out=${out#"$root/"}
+		docker run --rm -v "$root":/src -w /src \
+			"ghcr.io/kucherenko/jscpd:$JSCPD" --reporters json --output "$relative_out" >"$log" 2>&1
+		status=$?
+	fi
+	if [ -f "$out/jscpd-report.json" ]; then
+		python3 scripts/jscpd-report.py "$out/jscpd-report.json"
+	else
+		cat "$log"
+	fi
+	rm -rf "$out"
+	return "$status"
 }
 
 # Our own checks that read only text, and so run anywhere: the rest need a build.
