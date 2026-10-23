@@ -121,45 +121,51 @@ struct PromptBar: View {
 
     var body: some View {
         GlassEffectContainer(spacing: 12) {
-            VStack(alignment: .leading, spacing: 12) {
-                whereAndWhat
-                atItsLimit
-                startingOnOut
-                if !attachments.isEmpty {
-                    AttachmentStrip(attachments: attachments,
-                                    refusal: { $0.refusal(from: promptCapabilities) },
-                                    remove: { attachment in
-                                        attachments.removeAll { $0.id == attachment.id }
-                                    })
+            // Voice mode (#2322) is the whole bar, field and pills: what it hears and says,
+            // and × to end it (#2375).
+            if VoiceMode.shared.isOn(in: agent?.id) {
+                VoiceModeBar()
+                    // Left before its first words: a new session's voice mode ends (#2388).
+                    .onDisappear { if agent == nil { VoiceMode.shared.leave(nil) } }
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    whereAndWhat
+                    atItsLimit
+                    startingOnOut
+                    if !attachments.isEmpty {
+                        AttachmentStrip(attachments: attachments,
+                                        refusal: { $0.refusal(from: promptCapabilities) },
+                                        remove: { attachment in
+                                            attachments.removeAll { $0.id == attachment.id }
+                                        })
+                    }
+                    if draftLostSomething {
+                        Text(PromptWords.draftLostSomething)
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                    }
+                    if isCompleting {
+                        CommandList(commands: matchingCommands, selected: selectedCommand,
+                                    choose: accept)
+                            .transition(.opacity)
+                    }
+                    if isMentioning {
+                        MentionList(mentions: mentions, selected: selectedMention, choose: accept)
+                            .transition(.opacity)
+                    }
+                    if agent == nil, let refusal = model.draftSandboxRefusal {
+                        sandboxRefusal(refusal)
+                    }
+                    // On its way (#87): a start can take seconds, making a worktree and a
+                    // runtime, and a send to a slow host as long.
+                    if agent == nil, model.isStarting {
+                        Telling(host: recipient, doing: AgentState.startingLabel)
+                    } else if agent != nil, sending > 0, sendingIsSlow {
+                        Telling(host: recipient, doing: "Sending")
+                    }
+                    field
+                    options
                 }
-                if draftLostSomething {
-                    Text(PromptWords.draftLostSomething)
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                }
-                if isCompleting {
-                    CommandList(commands: matchingCommands, selected: selectedCommand,
-                                choose: accept)
-                        .transition(.opacity)
-                }
-                if isMentioning {
-                    MentionList(mentions: mentions, selected: selectedMention, choose: accept)
-                        .transition(.opacity)
-                }
-                if agent == nil, let refusal = model.draftSandboxRefusal {
-                    sandboxRefusal(refusal)
-                }
-                // On its way (#87): a start can take seconds, making a worktree and a
-                // runtime, and a send to a slow host as long.
-                if agent == nil, model.isStarting {
-                    Telling(host: recipient, doing: AgentState.startingLabel)
-                } else if agent != nil, sending > 0, sendingIsSlow {
-                    Telling(host: recipient, doing: "Sending")
-                }
-                // Voice mode in this chat (#2322): what it hears and says.
-                if let agent { VoiceModeStrip(agentID: agent.id) }
-                field
-                options
             }
         }
         // A send is usually back before anyone could read a word; the spinner in the
@@ -602,10 +608,9 @@ struct PromptBar: View {
             .help("Dictate, as the Mac does everywhere")
             .accessibilityLabel("Dictate")
 
-            // Voice mode (#2322), while Settings ▸ Appearance has it on.
-            if let agent {
-                VoiceModeButton(agentID: agent.id) { await model.send($0, to: agent.id, voice: true) }
-            }
+            // Voice mode (#2322), while Settings ▸ Appearance has it on: in this chat, or in a
+            // new session that its first words start (#2375).
+            VoiceModeButton(agentID: agent?.id, send: sendSpoken)
 
             // While it works and nothing is typed, send is stop. Type and it is send
             // again, queueing what is typed for when the turn ends.
@@ -1121,6 +1126,18 @@ struct PromptBar: View {
             .task(id: model.draftCwd.map { ProjectKey(host: model.selectedProjectHost, folder: $0) }) {
                 if let folder = model.draftCwd { await model.loadLabelVocabulary(in: folder, on: model.selectedProjectHost) }
             }
+    }
+
+    /// Words from voice mode: to this chat, or the start of a new session with this bar's
+    /// labels (#2375). Says which chat took them.
+    private func sendSpoken(_ words: String) async -> UUID? {
+        if let agent {
+            return await model.send(words, to: agent.id, voice: true) ? agent.id : nil
+        }
+        var started: UUID?
+        guard await model.startDraft(prompt: words, labels: draftLabels, voice: true, started: { started = $0 }) else { return nil }
+        draftLabels = []
+        return started
     }
 
     private func send() {

@@ -5,11 +5,13 @@ import Foundation
 ///
 /// The next sentence is made while the one before it plays, so there is no gap after the
 /// first. `stop()` stops at once: the person pressed Stop, or spoke, and what was not said
-/// is still on the screen.
+/// is still on the screen. It plays through voice mode's engine (`VoiceAudio`), so the
+/// microphone can leave it out (#2375).
 @MainActor
 final class VoiceSpeaker {
     private let voice: ParadeeVoice
-    private let engine = AVAudioEngine()
+    private let audio: VoiceAudio
+    private var engine: AVAudioEngine { audio.engine }
     private let player = AVAudioPlayerNode()
     private let format = AVAudioFormat(standardFormatWithSampleRate: ParadeeVoice.sampleRate, channels: 1)
     private var run = 0
@@ -19,8 +21,9 @@ final class VoiceSpeaker {
         didSet { engine.mainMixerNode.outputVolume = isMuted ? 0 : 1 }
     }
 
-    init(voice: ParadeeVoice) {
+    init(voice: ParadeeVoice, audio: VoiceAudio) {
         self.voice = voice
+        self.audio = audio
         engine.attach(player)
     }
 
@@ -28,19 +31,36 @@ final class VoiceSpeaker {
     /// been heard, or at once when stopped. Throws when the voice cannot be loaded or the
     /// audio would not start.
     func say(_ sentences: [String], onSentence: (String) -> Void = { _ in }) async throws {
-        guard let format, !sentences.isEmpty else { return }
+        var rest = sentences[...]
+        try await say(next: { rest.popFirst() }, onSentence: onSentence)
+    }
+
+    /// Says each sentence `next` gives, until it gives none: a reply is spoken while it is
+    /// still being written (#2375). `next` is asked again once a sentence has been heard,
+    /// so one that came meanwhile is said too.
+    func say(next: () -> String?, onSentence: (String) -> Void = { _ in }) async throws {
+        guard let format, var sentence = next() else { return }
         run += 1
         let thisRun = run
         try openOutput()
         defer { if thisRun == run { closeOutput() } }
-        var next: [Float]? = try await voice.audio(for: sentences[0])
-        for index in sentences.indices {
-            guard thisRun == run, let samples = next, let buffer = Self.buffer(samples, format: format) else { return }
-            onSentence(sentences[index])
+        var samples = try await voice.audio(for: sentence)
+        while thisRun == run {
+            guard let buffer = Self.buffer(samples, format: format) else { return }
+            onSentence(sentence)
             let playing = try play(buffer)
             // The next one is made while this one is heard.
-            next = index + 1 < sentences.count ? try await voice.audio(for: sentences[index + 1]) : nil
+            var following = next()
+            var made: [Float]?
+            if let following { made = try await voice.audio(for: following) }
             await playing.value
+            if following == nil, thisRun == run, let late = next() {
+                following = late
+                made = try await voice.audio(for: late)
+            }
+            guard let following, let made else { return }
+            sentence = following
+            samples = made
         }
     }
 
@@ -61,30 +81,21 @@ final class VoiceSpeaker {
         return Task { for await _ in heard {} }
     }
 
+    /// The route is voice mode's (`VoiceAudio.open`): this joins the player and starts the engine.
     private func openOutput() throws {
-        #if os(iOS)
-        // Spoken audio: other sound ducks under it, and the silent switch does not mute it,
-        // since the person asked to hear the reply.
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
-        try session.setActive(true)
-        #endif
-        if !isConnected, let format {
+        try audio.open()
+        // Again each time the engine is stopped: voice processing turned off and on
+        // remakes the engine's graph.
+        if !isConnected || !engine.isRunning, let format {
             try engine.connectNode(player, to: engine.mainMixerNode, format: format)
             isConnected = true
         }
-        if !engine.isRunning {
-            engine.prepare()
-            try engine.start()
-        }
+        try audio.start()
     }
 
+    /// The engine goes on for the microphone; the voice only stops.
     private func closeOutput() {
         player.stop()
-        if engine.isRunning { engine.stop() }
-        #if os(iOS)
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        #endif
     }
 
     private static func buffer(_ samples: [Float], format: AVAudioFormat) -> AVAudioPCMBuffer? {

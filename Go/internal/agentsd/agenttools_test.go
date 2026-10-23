@@ -66,6 +66,23 @@ func TestSuggestingTheNextPrompt(t *testing.T) {
 	}
 }
 
+func TestHangingUpVoiceMode(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	a := seeded(t, d, t.TempDir(), nil)
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+	if d.Store.Agent(a.ID).VoiceHungUpAt != nil {
+		t.Fatal("hung up before hang_up")
+	}
+	if text, isErr := m.tool(2, "hang_up", map[string]any{}); isErr || !strings.HasPrefix(text, "Voice mode ends") {
+		t.Fatal(text)
+	}
+	if d.Store.Agent(a.ID).VoiceHungUpAt == nil {
+		t.Fatal("hang_up left no mark for the client")
+	}
+}
+
 func TestAskingThePersonAForm(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()

@@ -38,6 +38,8 @@ public enum AppTool {
 
     /// Offer one optional prompt for the person to send next.
     public static let suggestNextPrompt = "suggest_next_prompt"
+    /// Ends voice mode once the reply is said: the person is done talking (#2375).
+    public static let hangUp = "hang_up"
 
     // The session tools (#638): one family for every session, a helper an agent
     // started included (#940). The project's helper limits bound how many there are.
@@ -151,7 +153,7 @@ public enum AppTool {
 
     /// Every tool the app's MCP server serves.
     public static let all: [String] = [
-        finishTurn, showFile, manageWorkflows, askForm, suggestNextPrompt, startSession, stopSession, archiveSession,
+        finishTurn, showFile, manageWorkflows, askForm, suggestNextPrompt, hangUp, startSession, stopSession, archiveSession,
         leaseResource, releaseResource, listResources, waitForEvent,
         cancelWait, listSessions, readSession,
         setSessionLabels, moveWorktree, messageSession,

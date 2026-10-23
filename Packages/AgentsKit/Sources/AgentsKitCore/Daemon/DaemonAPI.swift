@@ -933,6 +933,8 @@ public enum DaemonAPI {
         public var purpose: AgentPurpose?
         /// The added account the session uses (#840); nil for the runtime's own sign-in.
         public var accountID: String?
+        /// Started from voice mode (#2375): the first reply is heard, as a voice prompt's is.
+        public var voice: Bool?
 
         public init(runtimeID: String, cwd: URL, prompt: String,
                     attachments: [Attachment] = [],
@@ -940,8 +942,9 @@ public enum DaemonAPI {
                     additionalDirectories: [URL] = [], mcpServers: [MCPServer] = [],
                     worktree: WorktreeChoice? = nil, requestID: UUID? = nil,
                     sandbox: SandboxChoice? = nil, labels: [String] = [], persona: String? = nil,
-                    purpose: AgentPurpose? = nil, accountID: String? = nil) {
+                    purpose: AgentPurpose? = nil, accountID: String? = nil, voice: Bool? = nil) {
             self.accountID = accountID
+            self.voice = voice
             self.persona = persona
             self.purpose = purpose
             self.sandbox = sandbox
@@ -978,6 +981,7 @@ public enum DaemonAPI {
             persona = try c.decodeIfPresent(String.self, forKey: .persona)
             purpose = try c.decodeIfPresent(AgentPurpose.self, forKey: .purpose)
             accountID = try c.decodeIfPresent(String.self, forKey: .accountID)
+            voice = try c.decodeIfPresent(Bool.self, forKey: .voice)
         }
 
         /// What goes to the runtime: the words, then whatever was attached.

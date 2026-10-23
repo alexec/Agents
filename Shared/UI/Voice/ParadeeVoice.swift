@@ -19,6 +19,8 @@ actor ParadeeVoice {
 
     /// 24 kHz mono.
     static let sampleRate = Double(ParadeeConstants.sampleRate)
+    /// A fifth faster than Paradee's own pace (Alex, #2375).
+    static let speed = ParadeeConstants.defaultSpeed * 1.2
 
     private var manager: ParadeeManager?
 
@@ -48,7 +50,7 @@ actor ParadeeVoice {
     func audio(for sentence: String) async throws -> [Float] {
         if manager == nil { try await load() }
         guard let manager else { throw Failure.notInThisBuild }
-        return try await manager.synthesize(text: sentence)
+        return try await manager.synthesize(text: sentence, speed: Self.speed)
     }
 
     func unload() async {

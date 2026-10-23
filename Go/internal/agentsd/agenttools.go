@@ -132,6 +132,16 @@ func (d *Daemon) suggestNextPrompt(id wire.UUID, args map[string]json.RawMessage
 	return shownNote, nil
 }
 
+// hangUp is hang_up (#2375): the person said they were done talking, so the client in
+// voice mode on this chat says the reply and turns voice mode off.
+func (d *Daemon) hangUp(id wire.UUID, _ map[string]json.RawMessage) (string, error) {
+	t := now()
+	if d.change(id, func(a *wire.Agent) { a.VoiceHungUpAt = &t }) == nil {
+		return "", &Error{Code: CodeNoSuchAgent, Message: "That conversation is not open any more."}
+	}
+	return "Voice mode ends once your reply has been said. Keep the goodbye short.", nil
+}
+
 // askForm is ask_form: the person asked, as a form held like the runtime's own, and the
 // call answered with what they said.
 func (d *Daemon) askForm(id wire.UUID, args map[string]json.RawMessage) (string, error) {

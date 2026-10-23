@@ -67,6 +67,7 @@ func appToolCalls() []appTool {
 		{"cancel_wait", (*Daemon).cancelWait},
 		{"show_file", (*Daemon).showFile},
 		{"suggest_next_prompt", (*Daemon).suggestNextPrompt},
+		{"hang_up", (*Daemon).hangUp},
 		{"ask_form", (*Daemon).askForm},
 		{"list_sessions", (*Daemon).listSessions},
 		{"read_session", (*Daemon).readSession},

@@ -102,10 +102,14 @@ struct PromptBar: View {
             if sending > 0, sendingIsSlow {
                 Telling(host: model.answerRecipient(agent.id), doing: "Sending")
             }
-            // Voice mode in this chat (#2322): what it hears and says.
-            VoiceModeStrip(agentID: agent.id)
-            field
-            if isShowingEverything { options }
+            // Voice mode (#2322) is the whole bar, field and options: what it hears and
+            // says, and × to end it (#2375).
+            if VoiceMode.shared.isOn(in: agent.id) {
+                VoiceModeBar()
+            } else {
+                field
+                if isShowingEverything { options }
+            }
         }
         .task(id: sending > 0) {
             sendingIsSlow = false
@@ -259,7 +263,7 @@ struct PromptBar: View {
             DictateButton(dictation: dictation, begin: beginDictation)
 
             // Voice mode (#2322), while Settings ▸ Voice has it on.
-            VoiceModeButton(agentID: agent.id) { await model.send($0, to: agent.id, voice: true) }
+            VoiceModeButton(agentID: agent.id) { await model.send($0, to: agent.id, voice: true) ? agent.id : nil }
 
             // While it works and nothing is typed, send is stop. Type and it is send
             // again, queueing what is typed for when the turn ends.

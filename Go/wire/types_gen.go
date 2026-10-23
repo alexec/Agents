@@ -262,6 +262,9 @@ type Agent struct {
 
 	// The added account its runtime runs with (#840); absent for the runtime's own sign-in.
 	AccountID *string `json:"accountID,omitzero"`
+
+	// When the agent last ended voice mode with hang_up (#2375): the person said they were done talking. A client in voice mode on this chat says the reply, then turns voice mode off.
+	VoiceHungUpAt *Date `json:"voiceHungUpAt,omitzero"`
 }
 
 type AgentArchivedReason string
@@ -8573,6 +8576,9 @@ type StartRequest struct {
 
 	// The added account the session uses (#840); absent for the runtime's own sign-in.
 	AccountID *string `json:"accountID,omitzero"`
+
+	// Started from voice mode (#2375): its first prompt asks for a short spoken reply, as agents/prompt's voice does.
+	Voice *bool `json:"voice,omitzero"`
 }
 
 // A started machine in people/removePreview: the branches and worktrees on it with work that is not pushed. `unknown` says why it could not be asked (offline, or it did not answer), and then `unpushed` is empty.

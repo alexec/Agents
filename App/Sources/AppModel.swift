@@ -4646,7 +4646,10 @@ final class AppModel {
     /// Whether the agent was started, so the prompt bar can give back what it sent
     /// when it was not.
     @discardableResult
-    func startDraft(prompt: String, attachments: [Attachment] = [], labels: [String] = []) async -> Bool {
+    /// `voice`: started from voice mode (#2375), so the first reply is short and fit to be
+    /// heard; `started` is told the new agent's id.
+    func startDraft(prompt: String, attachments: [Attachment] = [], labels: [String] = [],
+                    voice: Bool = false, started: (UUID) -> Void = { _ in }) async -> Bool {
         guard !isStarting, let runtimeID = draftRuntimeID, let cwd = draftCwd else { return false }
         isStarting = true
         defer { isStarting = false }
@@ -4660,7 +4663,8 @@ final class AppModel {
                                              mcpServers: draftServers,
                                              worktree: draftWorktree,
                                              sandbox: draftSandbox, labels: labels, persona: draftPersona,
-                                             accountID: draftAccountChoices?.sent(draftAccountID))
+                                             accountID: draftAccountChoices?.sent(draftAccountID),
+                                             voice: voice ? true : nil)
         // A stopped workspace that starts when used: kept, and shown under this prompt (#691 US3).
         if draftHost != .mac, hosts.isOffline(draftHost), startsWhenUsed(draftHost) {
             var kept = request
@@ -4672,6 +4676,7 @@ final class AppModel {
         }
         do {
             let id = try await draftHostClient.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
+            started(id)
             draftID = nil
             // The last project used is the one a session was started in, from any window (#2160).
             rememberNewSessionProject(ProjectKey(host: draftHost, folder: cwd))
