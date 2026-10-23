@@ -100,30 +100,58 @@ func (m *Methods) fleet(ctx context.Context) wire.FleetBoard {
 }
 
 const (
-	// liveStale is how old a machine's list may be before console/live asks it again.
-	liveStale = 10 * time.Second
+	// liveStale is how old a machine's list may be before console/live asks it again: more
+	// than the page's 15 s poll (#2432), so one open tab asks each machine at most every
+	// other poll, not at each.
+	liveStale = 20 * time.Second
 	// mostLiveAsks bounds the machines one console/live asks again, each for at most
 	// liveAskPatience, at once.
 	mostLiveAsks    = 50
 	liveAskPatience = 3 * time.Second
 )
 
-// refreshLive asks each online machine whose list is older than liveStale for it again
-// (agents/list, lean), at most mostLiveAsks at once: a machine's list is kept only when a
-// window asks for it, and Live Now is about now.
+// liveCandidate is an online machine and when its list was last heard; zero for never.
+type liveCandidate struct {
+	host  string
+	heard time.Time
+}
+
+// liveAsks is which machines console/live asks again (#2432): those whose list is older
+// than liveStale, the stalest first, at most mostLiveAsks. Stalest first is a round: the
+// machines past the first 50 are asked on the next call, not never.
+func liveAsks(candidates []liveCandidate, now time.Time) []string {
+	stale := []liveCandidate{}
+	for _, c := range candidates {
+		if c.heard.IsZero() || now.Sub(c.heard) >= liveStale {
+			stale = append(stale, c)
+		}
+	}
+	sort.SliceStable(stale, func(i, j int) bool { return stale[i].heard.Before(stale[j].heard) })
+	if len(stale) > mostLiveAsks {
+		stale = stale[:mostLiveAsks]
+	}
+	asks := make([]string, len(stale))
+	for i, c := range stale {
+		asks[i] = c.host
+	}
+	return asks
+}
+
+// refreshLive asks the online machines liveAsks names for their lists again (agents/list,
+// lean): a machine's list is kept only when a window asks for it, and Live Now is about now.
 func (m *Methods) refreshLive(ctx context.Context, from Caller) {
-	var stale []string
+	var candidates []liveCandidate
 	for _, h := range m.records.Hosts() {
 		if state, _ := m.router.Described(h.ID)["state"].(string); state != "online" && state != "needsUpdate" {
 			continue
 		}
-		if copy := m.s.copies.current(ctx, h.ID); copy != nil && time.Since(copy.HeardAt.Time) < liveStale {
-			continue
+		c := liveCandidate{host: h.ID}
+		if copy := m.s.copies.current(ctx, h.ID); copy != nil {
+			c.heard = copy.HeardAt.Time
 		}
-		if stale = append(stale, h.ID); len(stale) == mostLiveAsks {
-			break
-		}
+		candidates = append(candidates, c)
 	}
+	stale := liveAsks(candidates, time.Now())
 	var wg sync.WaitGroup
 	for _, host := range stale {
 		wg.Go(func() { m.listAgain(host, from) })
