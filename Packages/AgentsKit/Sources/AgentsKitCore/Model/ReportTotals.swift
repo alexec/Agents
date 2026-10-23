@@ -131,6 +131,19 @@ public enum ReportWords {
         }
     }
 
+    /// The range's name as VoiceOver says it: "D" alone means nothing (#2440).
+    public static func spoken(_ range: DaemonAPI.ReportRange) -> String {
+        switch range {
+        case .day: "Day"
+        case .week: "Week"
+        case .month: "Month"
+        case .threeMonths: "3 months"
+        }
+    }
+
+    /// What Spend's bars measure (#2440).
+    public static let barCaption = "Each bar is the cost against the largest, or the tokens when nothing has a price."
+
     /// What the range covers, in words.
     public static func span(_ range: DaemonAPI.ReportRange) -> String {
         switch range {

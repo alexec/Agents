@@ -54,4 +54,12 @@ struct ReportTotalsTests {
         #expect(ReportWords.meNote(seesMore: true).contains("Reports ▸ Spend"))
         #expect(ReportWords.meNote(seesMore: false) == "Your machines. An admin or a group’s lead sees more.")
     }
+
+    /// VoiceOver says a range's name, not its letter, and each page says what its bars measure (#2440).
+    @Test func eachRangeHasASpokenNameAndEachPageABarCaption() {
+        #expect(DaemonAPI.ReportRange.allCases.map(ReportWords.spoken) == ["Day", "Week", "Month", "3 months"])
+        let captions = ReportOutcomes.Page.allCases.map(ReportOutcomeWords.barCaption) + [ReportWords.barCaption]
+        #expect(Set(captions).count == captions.count)
+        #expect(captions.allSatisfy { $0.hasPrefix("Each bar is") })
+    }
 }

@@ -11,6 +11,10 @@ export const dimensionTitle: Record<ReportDimension, string> = { person: "Person
   workflow: "Workflow" };
 export const ranges: readonly ReportRange[] = ["day", "week", "month", "threeMonths"];
 export const rangeShort: Record<ReportRange, string> = { day: "D", week: "W", month: "M", threeMonths: "3M" };
+/** The range's name as a screen reader says it: "D" alone means nothing (#2440). */
+export const rangeSpoken: Record<ReportRange, string> = { day: "Day", week: "Week", month: "Month", threeMonths: "3 months" };
+/** What Spend's bars measure (#2440). */
+export const spendBarCaption = "Each bar is the cost against the largest, or the tokens when nothing has a price.";
 export const rangeSpan: Record<ReportRange, string> = { day: "The last 24 hours", week: "The last 7 days", month: "The last 30 days", threeMonths: "The last 90 days" };
 
 export const removedOwner = "A removed machine";
@@ -317,6 +321,13 @@ export function workflowLine(g: OutcomeGroup): string {
   return parts.join(" · ");
 }
 
+/** What each page's bars measure: each page's bar is a different thing (#2440). */
+export const barCaption = {
+  outcomes: "Each bar is the merged pull requests against the most.",
+  time: "Each bar is the part of the time that waits for a person.",
+  runtimes: "Each bar is the cost against the largest.",
+  workflows: "Each bar is the part of the runs that failed.",
+} as const;
 export const workflowsNote = "The workflows with the most failed runs come first. A run fails when its agent ends in an error. By Person shows each bot’s runs under its name.";
 export const noWorkflows = "No workflow ran in this time.";
 

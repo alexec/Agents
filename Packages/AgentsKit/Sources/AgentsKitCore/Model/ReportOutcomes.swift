@@ -296,6 +296,16 @@ public enum ReportOutcomeWords {
         }
     }
 
+    /// What the page's bars measure: each page's bar is a different thing (#2440).
+    public static func barCaption(_ page: ReportOutcomes.Page) -> String {
+        switch page {
+        case .outcomes: "Each bar is the merged pull requests against the most."
+        case .time: "Each bar is the part of the time that waits for a person."
+        case .runtimes: "Each bar is the cost against the largest."
+        case .workflows: "Each bar is the part of the runs that failed."
+        }
+    }
+
     static func plural(_ n: Int, _ one: String, _ many: String) -> String {
         "\(n) \(n == 1 ? one : many)"
     }
