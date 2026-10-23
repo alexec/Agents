@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -54,6 +55,22 @@ func startPlane(t *testing.T, st store.Store, private []byte) *plane {
 
 // startPlaneWith is startPlane with something of its Config changed first.
 func startPlaneWith(t *testing.T, st store.Store, private []byte, change func(*Config)) *plane {
+	// freePort lets its port go before the plane binds it, and the tests run in parallel
+	// (#2512), so another test can take it in between: try a new one then.
+	for range 4 {
+		p, err := tryStartPlane(t, st, private, change)
+		if err == nil {
+			return p
+		}
+		if !errors.Is(err, syscall.EADDRINUSE) {
+			t.Fatal(err)
+		}
+	}
+	t.Fatal("no free port for the plane")
+	return nil
+}
+
+func tryStartPlane(t *testing.T, st store.Store, private []byte, change func(*Config)) (*plane, error) {
 	port := freePort(t)
 	p := &plane{t: t, url: "http://127.0.0.1:" + itoa(port), store: st, private: private, lines: make(chan string, 1000)}
 	cfg := Config{Store: st, PrivateKey: private, URL: p.url, Bind: "127.0.0.1", Port: port,
@@ -71,11 +88,11 @@ func startPlaneWith(t *testing.T, st store.Store, private []byte, change func(*C
 		t.Fatal(err)
 	}
 	if _, err := s.Start(context.Background()); err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	t.Cleanup(s.Stop)
 	p.s = s
-	return p
+	return p, nil
 }
 
 func itoa(n int) string { return strconv.Itoa(n) }
@@ -814,8 +831,18 @@ func TestHostsHearThePairedWindows(t *testing.T) {
 	if err := p.s.methods.forget(context.Background(), m.Client, 0); err != nil {
 		t.Fatal(err)
 	}
-	if line := readUntil(t, host, "host/clients"); strings.Contains(line, m.Client) {
-		t.Fatal("a forgotten window is still listed:", line)
+	// A listing sent before the forget can still be on its way (the pairing can send more
+	// than one), so read on until one leaves the window out, for at most 10 s (#2512).
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	for {
+		line, err := host.Read(ctx)
+		if err != nil {
+			t.Fatal("a forgotten window is still listed:", err)
+		}
+		if strings.Contains(line, "host/clients") && !strings.Contains(line, m.Client) {
+			return
+		}
 	}
 }
 
