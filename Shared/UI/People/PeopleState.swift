@@ -19,6 +19,9 @@ final class PeopleState {
     /// Goes up on `control/governanceRequested` (#2335), so Settings ▸ Policy loads the person's
     /// own requests again.
     private(set) var governanceRevision = 0
+    /// Goes up on `control/policyChanged`, `control/stopAll` and `control/orgRoutesChanged`
+    /// (#2392), so an open Settings ▸ Policy loads the rules, the kill switch and the routes again.
+    private(set) var policyRevision = 0
     /// The people an admin can send a link request on to (#1762); empty for a member.
     private(set) var linkPeople: [DaemonAPI.PersonRow] = []
     /// Who this client belongs to, as `control/status` said. Nil from an older control plane.
@@ -151,6 +154,9 @@ final class PeopleState {
             linksRevision += 1
         case DaemonAPI.Notification.controlGovernanceRequested:
             governanceRevision += 1
+        case DaemonAPI.Notification.controlPolicyChanged, DaemonAPI.Notification.controlStopAll,
+             DaemonAPI.Notification.controlOrgRoutesChanged:
+            policyRevision += 1
         case DaemonAPI.Notification.controlPeopleChanged:
             // A role changed or a person went: who this is, what they may approve, and the list.
             await connected(control)
