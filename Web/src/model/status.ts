@@ -32,13 +32,14 @@ export const endingSummaries: Record<EndedReason, string | null> = {
   rateLimited: "Rate limited, and still limited after retrying",
   sandboxFailed: "Its sandbox could not start",
   imported: "Imported from another set-up, so not run here",
+  stoppedByAdmin: "Stopped by an admin in the Console",
 };
 
 export const comingBackDescription = "Coming back after a restart";
 export const waitingLabel = "Waiting";
 export const startingLabel = "Starting";
 
-const pausedEndings: readonly (EndedReason | undefined)[] = ["cancelled", "stoppedByAgent", "allowanceSpent"];
+const pausedEndings: readonly (EndedReason | undefined)[] = ["cancelled", "stoppedByAgent", "stoppedByAdmin", "allowanceSpent"];
 
 /** StatusShape(row:isComingBack:). */
 export function shapeOf(agent: Agent, isComingBack = false): StatusShape {

@@ -138,7 +138,7 @@ func (d *Daemon) idleStanding(a *wire.Agent) string {
 	case wire.AgentStateWaitingOnUser:
 		return "waiting_on_you"
 	case wire.AgentStateStopped:
-		if r := a.EndedReason; r == nil || *r == wire.EndedReasonCancelled || *r == wire.EndedReasonCostLimit {
+		if r := a.EndedReason; r == nil || *r == wire.EndedReasonCancelled || *r == wire.EndedReasonCostLimit || *r == wire.EndedReasonStoppedByAdmin {
 			return "stopped"
 		}
 		return "failed"

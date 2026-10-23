@@ -681,6 +681,7 @@ var endedSummary = map[wire.EndedReason]string{
 	wire.EndedReasonRuntimeError: "The runtime reported an error", wire.EndedReasonAllowanceSpent: "Its allowance ran out",
 	wire.EndedReasonRateLimited: "Rate limited, and still limited after retrying", wire.EndedReasonSandboxFailed: "Its sandbox could not start",
 	wire.EndedReasonImported: "Imported from another set-up, so not run here",
+	wire.EndedReasonStoppedByAdmin: "Stopped by an admin in the Console",
 }
 
 // endedCode is EndedReason.code: allowanceSpent → allowance_spent.
@@ -719,12 +720,14 @@ func (d *Daemon) raiseAgentEnding(id wire.UUID, next wire.AgentState, why *wire.
 		d.raiseAgentEvent("agent.finished", id, sentence, details)
 		return
 	}
-	if why == nil || *why == wire.EndedReasonCancelled || *why == wire.EndedReasonCostLimit {
+	if why == nil || *why == wire.EndedReasonCancelled || *why == wire.EndedReasonCostLimit || *why == wire.EndedReasonStoppedByAdmin {
 		by := "unknown"
 		if why == nil || *why == wire.EndedReasonCancelled {
 			by = "you"
 		} else if *why == wire.EndedReasonCostLimit {
 			by = "cost_limit"
+		} else if *why == wire.EndedReasonStoppedByAdmin {
+			by = "admin"
 		}
 		d.raiseAgentEvent("agent.stopped", id, "was stopped.", map[string]string{"by": by})
 		return

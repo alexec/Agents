@@ -133,7 +133,7 @@ func (m *Methods) stopBotRun(request wire.BotStopRun, from Caller) error {
 // stopAgentOn stops one agent on a machine for an admin (bots/stopRun, console/stopAgent):
 // the machine's own agents/stop, kept for it for 10 seconds.
 func (m *Methods) stopAgentOn(host string, agent wire.UUID, from Caller) error {
-	answer := m.router.DeliverKept(wire.CallAgentsStop.Name, wire.AgentRequest{AgentID: agent}, from.Client, from.Kind, host,
+	answer := m.router.DeliverKept(wire.CallAgentsStop.Name, wire.AgentStopRequest{AgentID: agent, ByAdmin: new(true)}, from.Client, from.Kind, host,
 		10*time.Second)
 	if answer == nil {
 		return fail(hostOffline, "%s is not online.", m.records.Host(host).Name)

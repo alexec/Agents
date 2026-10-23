@@ -5035,7 +5035,7 @@ final class AppModel {
 
     func stop(_ id: UUID) async {
         await act(.stop, on: id) {
-            try await self.client(forAgent: id).call(DaemonAPI.Method.agentsStop, DaemonAPI.AgentRequest(agentID: id))
+            try await self.client(forAgent: id).call(DaemonAPI.Method.agentsStop, DaemonAPI.AgentStopRequest(agentID: id))
         }
     }
 

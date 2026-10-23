@@ -328,6 +328,16 @@ export type AgentState =
   | "archived"
   | "queued";
 
+/**
+ * agents/stop (#2435): the agent, and whether an admin stopped it from the Console, so its owner
+ * reads who stopped it. Only a label on the owner's own transcript: whoever sends it could already
+ * stop the agent.
+ */
+export interface AgentStopRequest {
+  agentID: UUID;
+  byAdmin?: boolean;
+}
+
 /** workspaces/forAgent: what list_workspaces shows an agent. */
 export interface AgentWorkspaces {
   providers: AgentWorkspacesProvider[];
@@ -2553,7 +2563,8 @@ export type EndedReason =
   | "allowanceSpent"
   | "rateLimited"
   | "sandboxFailed"
-  | "imported";
+  | "imported"
+  | "stoppedByAdmin";
 
 export interface EntryNotification {
   agentID: UUID;
@@ -7945,7 +7956,7 @@ export interface Methods {
   "agents/setSandbox": { params: SetSandboxRequest; result: Agent };
   "agents/setUnread": { params: SetUnreadRequest; result: Empty };
   "agents/start": { params: StartRequest; result: UUID };
-  "agents/stop": { params: AgentRequest; result: Empty };
+  "agents/stop": { params: AgentStopRequest; result: Empty };
   "agents/stopBackground": { params: StopBackgroundRequest; result: JSONValue };
   "agents/touchedPaths": { params: AgentRequest; result: string[] };
   "agents/transcript": { params: TranscriptRequest; result: TranscriptPage };
@@ -8510,6 +8521,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "voiceHungUpAt"] },
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },
+  AgentStopRequest: { required: ["agentID"], optional: ["byAdmin"] },
   AgentWorkspaces: { required: ["providers"], optional: [] },
   AgentWorkspacesProvider: { required: ["id", "name", "canMake", "canDelete", "workspaces"], optional: ["options"] },
   AgentWorkspacesWorkspace: { required: ["id", "name", "state"], optional: ["host", "hostState", "cost"] },

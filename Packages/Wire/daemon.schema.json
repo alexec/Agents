@@ -614,6 +614,22 @@
       "x-fallback": "stopped",
       "description": "A state this build does not know reads as `stopped` (Agent's init(from:)), with endedReason `unrecognised`."
     },
+    "AgentStopRequest": {
+      "type": "object",
+      "description": "agents/stop (#2435): the agent, and whether an admin stopped it from the Console, so its owner reads who stopped it. Only a label on the owner's own transcript: whoever sends it could already stop the agent.",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "byAdmin": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "agentID"
+      ],
+      "additionalProperties": false
+    },
     "AgentWorkspaces": {
       "type": "object",
       "description": "workspaces/forAgent: what list_workspaces shows an agent.",
@@ -7027,7 +7043,8 @@
         "allowanceSpent",
         "rateLimited",
         "sandboxFailed",
-        "imported"
+        "imported",
+        "stoppedByAdmin"
       ],
       "x-fallback": "unrecognised",
       "description": "A reason this build does not know reads as `unrecognised`."

@@ -966,6 +966,10 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 			d.noteCutOff(l.id, a.State)
 		}
 	}
+	// An admin's stop from the Console (#2435) says so to the owner, not "Stopped by you".
+	if adminStopped := d.takeAdminStop(l.id); adminStopped && s == wire.AgentStateStopped && why == wire.EndedReasonCancelled {
+		why = wire.EndedReasonStoppedByAdmin
+	}
 	var requested, archiveNow bool
 	l.forgetTools()
 	d.change(l.id, func(a *wire.Agent) {
