@@ -21,6 +21,13 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
   land first.
 - **Priority:** build speed and PR throughput, then bugs, then enhancements; `expedite`
   first within each. Take the next issue whose `area:` is free.
+- **One agent per issue (#2504).** Every issue gets its own agent, worktree and pull
+  request. A follow-up in an area a running lane holds waits until that lane's PR has
+  auto-merge on, then a new agent starts on it; the parts of one spec and a change's
+  per-client follow-ups go one after another, each by its own agent. Never message a
+  running lane to take another issue: `lead-on-idle.md`'s "message the agent that owns
+  its branch" is for a stuck PR only (conflicts, failing checks, behind, auto-merge off),
+  never to widen a lane's work. A stack (#1777) is still one agent per PR.
 - **Standing lanes for polish and competitor gaps** (#1570): always at least one. It
   takes the open issues labelled `polish` or `competitor` with no milestone, highest
   RICE first, alongside the milestone lanes and under the same area and open-PR limits.
