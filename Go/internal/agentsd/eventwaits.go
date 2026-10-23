@@ -346,7 +346,7 @@ func parsePattern(given string, filters map[string][]string) (waitPattern, strin
 	p := waitPattern{name: name, filters: clean}
 	if name == "custom" || strings.HasPrefix(name, "custom.") {
 		return p, `"` + name + `" is never raised: agents no longer publish events, so there are no custom.* events to wait or trigger on. ` +
-			"Use one the app raises, such as agent.finished or branch.moved; to wait for particular agents, use wait_for_event with agents."
+			"Use one the app raises, such as agent.finished or branch.moved; to wait for particular agents, use wait_for_agents."
 	}
 	unknown := func() (waitPattern, string) {
 		kinds, _ := catalogue()
@@ -399,7 +399,7 @@ func parsePattern(given string, filters map[string][]string) (waitPattern, strin
 	}
 	if problem != "" {
 		if strings.HasPrefix(name, "agent.") {
-			problem += " To wait for particular agents, use wait_for_event with agents."
+			problem += " To wait for particular agents, use wait_for_agents."
 		}
 		return p, problem
 	}
@@ -540,11 +540,11 @@ func wakeWords(e wire.Event, extra int) string {
 		lines = append(lines, "message: "+*e.Message)
 	}
 	if extra > 0 {
-		more, them := fmt.Sprintf("%d more matches arrived", extra), "them."
+		more := fmt.Sprintf("%d more matches arrived", extra)
 		if extra == 1 {
-			more, them = "1 more match arrived", "it."
+			more = "1 more match arrived"
 		}
-		lines = append(lines, "", more+" before you resumed; wait_for_event with action \"recent\" to see "+them)
+		lines = append(lines, "", more+" before you resumed; they are in this project's events.")
 	}
 	return strings.Join(lines, "\n")
 }
@@ -683,77 +683,11 @@ func defaultBranch(dir string) string {
 	return "main"
 }
 
-// waitForEvent is wait_for_event on events, and its recent and list.
+// waitForEvent is wait_for_event on events. The call is held open up to eventHoldLimit.
 func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) (string, error) {
 	a := d.Store.Agent(agent)
 	if a == nil {
 		return "", &Error{Code: CodeNoSuchAgent, Message: leaseNoCall}
-	}
-	action := strings.ToLower(argString(args, "action"))
-	if action == "" {
-		action = "wait"
-	}
-	agentList, err := stringList(args, "agents")
-	if err != nil {
-		return "", err
-	}
-	var agentNames []string
-	for _, n := range agentList {
-		if strings.TrimSpace(n) != "" {
-			agentNames = append(agentNames, n)
-		}
-	}
-	hasEvents := false
-	if es, err := stringList(args, "events"); err == nil && len(es) > 0 {
-		hasEvents = true
-	}
-	_, hasMinutes := argInt(args, "until_minutes")
-	if action == "wait" && (len(agentNames) > 0 && !hasEvents || len(agentNames) == 0 && !hasEvents && hasMinutes) {
-		var minutes *int
-		if n, ok := argInt(args, "until_minutes"); ok {
-			minutes = &n
-		}
-		return d.waitOn(agent, agentNames, argString(args, "wake_on"), minutes, argString(args, "message"))
-	}
-	if action == "wait" && len(agentNames) > 0 && hasEvents {
-		return "", Invalid("Nothing is waited for: name agents or events, not both. Wait on agent.finished for events about agents.")
-	}
-	switch action {
-	case "list":
-		return d.mcpEventList(projectFolder(a)), nil
-	case "recent":
-		limit := 20
-		if n, ok := argInt(args, "limit"); ok {
-			limit = n
-		}
-		limit = min(max(limit, 1), 50)
-		var lines []string
-		d.eventMu.Lock()
-		head := d.eventHead()
-		for i := len(d.eventList) - 1; i >= 0 && len(lines) < limit; i-- {
-			e := d.eventList[i]
-			if !d.inScope(e, a) {
-				continue
-			}
-			count := ""
-			if e.Count > 1 {
-				count = fmt.Sprintf(" ×%d", e.Count)
-			}
-			line := fmt.Sprintf("%d · %s · %s%s · %s", e.Position, clock(e.At), e.Name, count, e.Sentence)
-			if dl := detailsLine(e); dl != "" {
-				line += " · " + dl
-			}
-			lines = append(lines, line)
-		}
-		d.eventMu.Unlock()
-		footer := fmt.Sprintf("Head: %d — wait with from: %d to catch anything after this.", head, head)
-		if len(lines) == 0 {
-			return "Nothing has happened in this project or on this Mac yet.\n" + footer, nil
-		}
-		return strings.Join(append(lines, footer), "\n"), nil
-	case "wait":
-	default:
-		return "", eventRefused("action is wait, recent or list.")
 	}
 
 	var names []string
@@ -765,7 +699,7 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 		}
 	}
 	if len(names) == 0 {
-		return "", eventRefused(`Say what to wait for in events, e.g. ["agent.finished"]. wait_for_event with action "list" gives every name.`)
+		return "", eventRefused(`Say what to wait for in events, e.g. ["agent.finished"]. Unknown events and filters say what is offered.`)
 	}
 	minutes, ok := argInt(args, "until_minutes")
 	if !ok {
@@ -828,9 +762,6 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 	d.eventMu.Lock()
 	from := d.eventHead()
 	d.eventMu.Unlock()
-	if n, ok := argInt(args, "from"); ok {
-		from = int64(n)
-	}
 	at := now()
 	deadline := wire.DateOf(at.Time().Add(time.Duration(minutes) * time.Minute))
 	wait := wire.EventWait{ID: store.NewUUID(), From: from, Deadline: &deadline, Since: at}
@@ -1112,7 +1043,7 @@ func (d *Daemon) sendEventResume(id, promptID wire.UUID, position *int64) {
 }
 
 // eventHoldReached answers a call held as long as a call may: still waiting, and the
-// agent is blocked now.
+// agent is waiting now.
 func (d *Daemon) eventHoldReached(agent, waitID wire.UUID) {
 	a := d.Store.Agent(agent)
 	if a == nil || a.EventWait == nil || a.EventWait.ID != waitID || a.EventWait.Ending != nil {
@@ -1128,7 +1059,7 @@ func (d *Daemon) eventHoldReached(agent, waitID wire.UUID) {
 	d.waitMu.Unlock()
 	c.answer <- stillWaitingWords(a.EventWait)
 	label := waitLabel(a.EventWait)
-	d.raiseAgentEvent("agent.blocked", agent, "is waiting for "+label+".", map[string]string{"waiting_on": label})
+	d.raiseAgentEvent("agent.waiting", agent, "is waiting for "+label+".", map[string]string{"waiting_on": label})
 }
 
 // armWaitTimer aims the one timer at the earliest deadline of any open wait.

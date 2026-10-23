@@ -27,9 +27,9 @@ import (
 // (#763). A writer (purpose, #858) has none: its prompt is its whole brief.
 
 // eventsBrief is EventWords.briefing (042): wait rather than poll.
-const eventsBrief = "Wait for something to happen (checks passing, an agent finishing, this Mac waking) " +
-	"with wait_for_event, not repeated checks. If told you are still waiting, you may " +
-	"end your turn; you will be started again when it happens."
+const eventsBrief = "Wait for an event (checks passing, this Mac waking) with wait_for_event, for sessions " +
+	"with wait_for_agents, and to resume at a time with check_again, not repeated checks. " +
+	"If told you are still waiting, you may end your turn; you will be started again when it happens."
 
 // leasesBrief is LeaseWords.briefing (036 FR-015).
 const leasesBrief = "Lease a shared resource with lease_resource before using it and release_resource " +

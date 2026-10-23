@@ -437,7 +437,7 @@ func (d *Daemon) runWorkflowForAgent(a *wire.Agent, project, id string) (string,
 	case o == nil:
 		return "", &Error{Code: wire.FailureNoSuchWorkflow, Message: "Nothing was run: " + id + " does not run on this computer."}
 	case o.Ran != nil:
-		return "Ran " + id + ": it started agent " + string(o.Ran.AgentID) + ". Use wait_for_event with that id to wait for it to finish, or read_session to see it.", nil
+		return "Ran " + id + ": it started agent " + string(o.Ran.AgentID) + ". Use wait_for_agents with that id to wait for it to finish, or read_session to see it.", nil
 	}
 	return "", &Error{Code: wire.FailureNotAllowed, Message: "Nothing was run: " + id + " did not run, as " + refusalWords(o.Refused.Value) + "."}
 }

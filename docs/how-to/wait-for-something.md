@@ -39,7 +39,7 @@ and then carry on.
    never wake it, and a wait on it is refused. Anything else, such as
    `agent.finished` with `{"labels": "deploy"}`, is refused saying what the event takes, so
    the agent fixes it rather than waiting for something that never comes. To wait for
-   particular agents to finish, the agent names them in `agents` instead.
+   particular agents to finish, the agent calls `wait_for_agents`.
 
    An agent can also wait on a connector's event, such as `pr.merged` or `pr.closed`
    from a `github` server. Then `where` is what the server is asked for, such as `{"pr": 640}`
@@ -76,7 +76,7 @@ Stopping or archiving the agent also ends its wait.
 - **Any one of several.** An agent can wait for several events at once; the first to
   happen wakes it. It can also wait for a whole subject, such as `agent.*`.
 - **Nothing is missed.** If more matching events happen before the agent is running again,
-  it is told how many, and can look them up.
+  it is told how many, and they are in this project's events.
 - **Across a restart.** A wait survives Agents stopping, crashing or being updated. When it
   next wakes, the agent is told how long Agents was down and which of the events it waits on
   may have been missed in that time, so it can catch up. See
@@ -94,12 +94,12 @@ tell it to wait for that agent:
 Wait for the agent titled "Build" to finish, then deploy the docs.
 ```
 
-It calls `wait_for_event` with `agents`, and is started again with how the other agent
+It calls `wait_for_agents`, and is started again with how the other agent
 ended. A workflow can start when an agent finishes too, on `agent.finished`: see
 [Workflow triggers and actions](../reference/workflows.md).
 
 ## See also
 
 - [Events](../reference/events.md), for every name and its details
-- [Statuses and groups](../reference/statuses.md), for **Waiting** and blocks under **Needs you**
+- [Statuses and groups](../reference/statuses.md), for **Waiting**
 - [Set up a workflow](set-up-a-workflow.md), to start a new agent when something happens

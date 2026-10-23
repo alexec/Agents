@@ -93,7 +93,7 @@ one line per turn.
 of a turn: the outcome, the title, the next prompt, labels, parking, waiting on agents or a
 time, and moves. Its description explained which arguments could not go together, and
 agents still got that wrong. It now says only how the turn went. Waiting is on
-`wait_for_event` (`agents`, `wake_on`, `until_minutes`), parking itself on `park_agent`
+`wait_for_event`, `wait_for_agents` and `check_again` (#1915), parking itself on `park_agent`
 with no id (asking to be archived on `request_archive` since #584, `archive_session` since #638), moves on `move_worktree`, and labels on `set_session_labels`. The next prompt
 was dropped. Old calls still work: `finish_turn` reads every argument it took before.
 

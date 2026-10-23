@@ -42,7 +42,7 @@ struct WaitStatusTests {
         let names: (UUID) -> String? = { [fixLogin: "Fix login", docs: "Docs"][$0] }
 
         var blocked = agent()
-        blocked.report = WorkReport(outcome: .blocked, message: "waiting", at: since,
+        blocked.report = WorkReport(outcome: .waiting, message: "waiting", at: since,
                                     block: Block(waits: [Wait(agentID: fixLogin, nameAtReport: "Fix login")]))
         var waiting = agent()
         waiting.eventWait = EventWait(patterns: [EventPattern("agent.finished", filters: ["agent": DetailFilter(fixLogin.uuidString)])],
@@ -55,7 +55,7 @@ struct WaitStatusTests {
         #expect(block?.cancellable == false)
 
         var both = agent()
-        both.report = WorkReport(outcome: .blocked, message: "waiting", at: since,
+        both.report = WorkReport(outcome: .waiting, message: "waiting", at: since,
                                  block: Block(waits: [Wait(agentID: fixLogin, nameAtReport: "Fix login"),
                                                       Wait(agentID: docs, nameAtReport: "Docs")]))
         #expect(WaitStatus.of(both, names: names)?.mark == "◷ Waiting for “Fix login” and “Docs” to finish")

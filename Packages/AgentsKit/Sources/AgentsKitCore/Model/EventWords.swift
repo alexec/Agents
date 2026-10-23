@@ -90,21 +90,7 @@ public enum EventWords {
     }
 
     public static let nothingNamed = "Say what to wait for in events, e.g. [\"agent.finished\"]. "
-        + "wait_for_event with action \"list\" gives every name."
-
-    /// One line of `action: recent`.
-    public static func recentLine(_ event: Event) -> String {
-        let details = detailsLine(event)
-        let count = event.count > 1 ? " ×\(event.count)" : ""
-        return "\(event.position) · \(clock(event.at)) · \(event.name)\(count) · \(event.sentence)"
-            + (details.isEmpty ? "" : " · \(details)")
-    }
-
-    public static func recentFooter(head: EventPosition) -> String {
-        "Head: \(head) — wait with from: \(head) to catch anything after this."
-    }
-
-    public static let noRecent = "Nothing has happened in this project or on this Mac yet."
+        + "Unknown events and filters say what is offered."
 
     // MARK: The wake prompt
 
@@ -118,8 +104,7 @@ public enum EventWords {
         if let message = event.message { lines.append("message: \(message)") }
         if extraMatches > 0 {
             let more = extraMatches == 1 ? "1 more match arrived" : "\(extraMatches) more matches arrived"
-            lines += ["", "\(more) before you resumed; wait_for_event with action \"recent\" to see "
-                      + (extraMatches == 1 ? "it." : "them.")]
+            lines += ["", "\(more) before you resumed; they are in this project's events."]
         }
         return lines.joined(separator: "\n")
     }
@@ -155,8 +140,7 @@ public enum EventWords {
         if missing.isEmpty {
             lines.append("What you wait on was caught up after it: \(names.joined(separator: ", ")).")
         } else {
-            lines.append("Events in that time may be missing: \(missing.joined(separator: ", ")). Check with "
-                         + "wait_for_event action \"recent\", and check the state yourself (for example the branch or the PR).")
+            lines.append("Events in that time may be missing: \(missing.joined(separator: ", ")). Check the state yourself (for example the branch or the PR).")
         }
         return "\n" + lines.joined(separator: "\n")
     }

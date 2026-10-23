@@ -44,7 +44,7 @@ func TestATurnsPhaseIsWhatItsActivitySays(t *testing.T) {
 		{agent(wire.AgentStateFinished, reason(wire.EndedReasonProcessDied)), nil, wire.TurnPhaseFailed},
 		{reported(wire.WorkOutcomeDone, nil), nil, wire.TurnPhaseDone},
 		// Only a question needs the person (#1916): a block with nothing to wait on is done.
-		{reported(wire.WorkOutcomeBlocked, &wire.Block{}), nil, wire.TurnPhaseDone},
+		{reported(wire.WorkOutcomeWaiting, &wire.Block{}), nil, wire.TurnPhaseDone},
 		{reported(wire.WorkOutcomeNeedsAnswer, nil), nil, wire.TurnPhaseNeedsYou},
 		{unknown, nil, wire.TurnPhaseNeedsYou},
 		{agent(wire.AgentStateStopped, nil), nil, wire.TurnPhaseFailed},

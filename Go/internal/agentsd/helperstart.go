@@ -399,7 +399,7 @@ func (d *Daemon) queueHelper(caller *wire.Agent, prompt, runtimeID, model string
 		ahead = strings.ToUpper(full[:1]) + full[1:] + " "
 	}
 	note := fmt.Sprintf("Queued %s (id %s), %s in this project's queue: %sIt starts by itself, oldest first, once a running place and a "+
-		"not-archived place are both free. Wait for it with wait_for_event as for any session, or take it off the queue with stop_session. "+
+		"not-archived place are both free. Wait for it with wait_for_agents as for any session, or take it off the queue with stop_session. "+
 		"This project now has %s.", quotedTitle(a.Title), a.ID, ordinal(position), ahead, d.helperPlaces(folder))
 	d.checkQueueSoon(folder)
 	return note, nil

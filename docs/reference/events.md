@@ -49,31 +49,29 @@ agent event, nor a drop box arrival's, a lease's, the disk's, a cost's or a serv
   event's, so the sentences read alike. Any other key is an error naming what the event
   takes: *branch.moved takes branch; "to" is not one of its arguments.* For an agent event
   it says how to wait for particular agents instead: *agent.finished takes no arguments;
-  "outcome" is not one of its arguments. To wait for particular agents, use wait_for_event
-  with agents.* A workflow file with one is unreadable, and says so, rather than firing for
+  "outcome" is not one of its arguments. To wait for particular agents, use wait_for_agents.* A workflow file with one is unreadable, and says so, rather than firing for
   every event of its kind.
 - **A wrong value is an error too**: *person.away: why is one of locked, idle, not asleep.*
   `branch` takes any value.
 - **A wait already waiting** when this changed keeps matching as it was written.
 
-### The one list
+### What an agent can wait on
 
-`wait_for_event` with action `list` gives every event an agent can wait on, in one list: the
-app's, then each of the project's MCP servers' that it offers by poll. Each is one line of
-JSON with its `name`, `source` (`app`, or the server's name in `mcp.json`), `description`,
-`inputSchema` and `payloadSchema`. A server that could not be asked is named on a line of
-its own. The workflow tool's description carries the app's part of the same list.
+An unknown event name is refused, and the refusal names the events that are offered: the
+app's, then each of the project's MCP servers' that it offers by poll. The workflow tool's
+description carries the app's part of the same list.
 
 Serving the app's own events over `events/poll` from the app's MCP endpoint, so any MCP
 client could subscribe to them, would be possible in this shape; it is not done.
 
 An agent can wait for its own project's events and for this Mac's. It cannot wait for
-another project's events.
+another project's events. To wait for particular sessions, it calls `wait_for_agents`. To
+resume at a time, it calls `check_again`.
 
 ## Agents
 
 All are about agents in the same project. None takes a filter: to wait for particular
-agents, use `wait_for_event` with `agents`. Each shows:
+agents, use `wait_for_agents`. Each shows:
 
 - `agent`, the agent's id;
 - `labels`, the agent's labels;
@@ -87,10 +85,10 @@ an event already on the log.
 | Event | Filter by | Details | What it means |
 | --- | --- | --- | --- |
 | `agent.started` | — | agent | An agent started working. |
-| `agent.finished` | — | agent, outcome, afterwards | An agent ended a turn having done its work. `afterwards` is `archive_requested` when the turn ends waiting for you to approve archiving it, `archived` when the session is archived as the turn ends, else `stay`. `outcome` is `done`, `nothing_to_do`, `needs_answer` or `blocked` (#1916 removed `partly_done` and `stuck`). |
+| `agent.finished` | — | agent, outcome, afterwards | An agent ended a turn having done its work. `afterwards` is `archive_requested` when the turn ends waiting for you to approve archiving it, `archived` when the session is archived as the turn ends, else `stay`. `outcome` is `done`, `nothing_to_do`, `needs_answer` or `waiting` (#1916 removed `partly_done` and `stuck`). |
 | `agent.asked_permission` | — | agent | An agent is asking for permission. |
 | `agent.asked_form` | — | agent | An agent raised a form to fill in. |
-| `agent.blocked` | — | agent, waiting_on | An agent ended its turn waiting on something. When `waiting_on` names agents or a time to check again, the agent resumes by itself; otherwise it needs you to carry it on. See [Statuses and groups](statuses.md). |
+| `agent.waiting` | — | agent, waiting_on | An agent ended its turn waiting on something. When `waiting_on` names agents or a time to check again, the agent resumes by itself. See [Statuses and groups](statuses.md). |
 | `agent.stopped` | — | agent, by | An agent was stopped before finishing. `by` is `you`, `admin` (an admin in the Console, #2435), `cost_limit` or `unknown`. |
 | `agent.failed` | — | agent, reason | An agent ended in an error. `reason` is `allowance_spent`, `rate_limited`, `process_died`, `sign_in_refused`, `runtime_error`, `sandbox_failed`, `max_tokens`, `max_turn_requests`, `refusal`, `daemon_gone`, `stopped_by_agent` or `unrecognised`. |
 | `agent.archive_requested` | — | agent, outcome | An agent's turn ended after `archive_session`, and its session waits for you to approve archiving it. `outcome` is its last report's, when it made one. |
@@ -102,7 +100,7 @@ an event already on the log.
 
 | Event | Filter by | Details | What it means |
 | --- | --- | --- | --- |
-| `project.idle` | — | agents, finished, blocked, waiting_on_you, stopped, failed, since, ids | Every agent in this project has stopped working. Raised once, a minute after the last agent stops, when none has started since. `agents` is how many worked since the project was last quiet, and `ids` their ids, comma-separated. `finished`, `blocked`, `waiting_on_you`, `stopped` and `failed` count how each of those stands now. `since` is when the first of them started. |
+| `project.idle` | — | agents, finished, waiting, waiting_on_you, stopped, failed, since, ids | Every agent in this project has stopped working. Raised once, a minute after the last agent stops, when none has started since. `agents` is how many worked since the project was last quiet, and `ids` their ids, comma-separated. `finished`, `waiting`, `waiting_on_you`, `stopped` and `failed` count how each of those stands now. `since` is when the first of them started. |
 
 An agent asking for permission is not working, so it does not hold `project.idle` back: it
 is counted under `waiting_on_you`. The agent a workflow on `project.idle` (or `project.*`)
@@ -185,8 +183,8 @@ by the Agents window, and a change while the daemon was down is not told again.
 
 An agent whose wait was open over a restart is not woken only to be told. At its next wake,
 by its event or its time limit, the wake says when Agents restarted, for how long it was down,
-and which of the events it waits on may be missing, so it can check with `wait_for_event`
-action `recent` and look at the state itself. A wait only on events that are had again says
+and which of the events it waits on may be missing, so it can check the state itself (the
+branch or the pull request). A wait only on events that are had again says
 that they were caught up. To be woken by the restart itself, wait on `system.restarted`.
 
 ## No custom events
@@ -194,7 +192,7 @@ that they were caught up. To be woken by the restart itself, wait on `system.res
 Agents do not raise events of their own. The `publish_event` tool and the `custom.` events it
 raised were removed (#639). A wait on a `custom.` name is refused, saying why, and a workflow
 whose `on:` names one does not run: its page says what is wrong. To wait for another agent,
-use `wait_for_event` with `agents`. A `custom.` event already on the log still shows, with the
+use `wait_for_agents`. A `custom.` event already on the log still shows, with the
 agent that published it.
 
 ## Events from MCP servers

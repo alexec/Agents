@@ -6,7 +6,7 @@ description: Every status an agent can have, the group it is listed under, and w
 
 # Statuses and groups
 
-Only a question puts a session under **Needs you** (#1916): the app does not assume an agent needs you unless it asks. An agent that is blocked or stuck asks you, as a question.
+Only a question puts a session under **Needs you** (#1916): the app does not assume an agent needs you unless it asks. An agent that waits on other agents or a time is under **Waiting**.
 
 This page lists every status an agent can show, and the group it sits under on its
 project's page. The groups appear in this order: **Needs you**, **Waiting**,

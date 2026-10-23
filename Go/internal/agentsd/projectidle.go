@@ -104,7 +104,7 @@ func (d *Daemon) idleSettled(folder string, generation int) {
 }
 
 func (d *Daemon) raiseProjectIdle(folder string, period *busyPeriod) {
-	keys := []string{"finished", "blocked", "waiting_on_you", "stopped", "failed"}
+	keys := []string{"finished", "waiting", "waiting_on_you", "stopped", "failed"}
 	counts := map[string]int{}
 	for _, id := range period.worked {
 		if a := d.Store.Agent(id); a != nil {
@@ -144,14 +144,14 @@ func (d *Daemon) idleStanding(a *wire.Agent) string {
 		return "failed"
 	}
 	if d.waitStatus(a) != nil {
-		return "blocked"
+		return "waiting"
 	}
 	if a.Report != nil {
 		switch a.Report.Outcome {
 		case wire.WorkOutcomeNeedsAnswer:
 			return "waiting_on_you"
-		case wire.WorkOutcomeBlocked:
-			return "blocked"
+		case wire.WorkOutcomeWaiting:
+			return "waiting"
 		}
 	}
 	return "finished"

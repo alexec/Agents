@@ -119,16 +119,9 @@ func (r assessRecord) callsOf(method string) []appToolCall {
 	return out
 }
 
-// waitsOnSessions is wait_for_event's calls on agents (`events/wait` with agents), which
-// were `agents/waitOn` before #2172.
+// waitsOnSessions is wait_for_agents (`agents/wait`).
 func (r assessRecord) waitsOnSessions() []appToolCall {
-	var out []appToolCall
-	for _, c := range r.callsOf("events/wait") {
-		if _, ok := c.Arguments["agents"]; ok {
-			out = append(out, c)
-		}
-	}
-	return out
+	return r.callsOf("agents/wait")
 }
 
 // listsOwnHelpers and listsSessions are list_sessions with started_by me, and without
@@ -474,29 +467,35 @@ func (r assessRecord) eventSteps() (verdict, string) {
 		}
 		return false
 	}
-	var waited []appToolCall
+	// from is gone, so a wait after the ping lease cannot see the already-raised event.
+	// Require an unknown name to be refused, naming what is offered.
+	var unknown []appToolCall
 	for _, c := range r.callsOf("events/wait") {
-		if c.Ok && waitsOn(c, assessPingEvent) {
-			waited = append(waited, c)
+		if c.Ok {
+			continue
 		}
-	}
-	var heard *appToolCall
-	for i := range waited {
-		a := answerOfCall(waited[i])
-		if strings.Contains(a, assessPingEvent) && !strings.Contains(strings.ToLower(a), "still waiting") {
-			heard = &waited[i]
+		for _, e := range listArg(c, "events") {
+			if e == assessPingEvent || e == assessNeverEvent {
+				continue
+			}
+			unknown = append(unknown, c)
 			break
 		}
 	}
-	if heard == nil {
-		if len(waited) == 0 {
-			return failedStep, "never waited for " + assessPingEvent
-		}
-		return failedStep, "the wait for " + assessPingEvent + " did not come back with it"
+	if len(unknown) == 0 {
+		return failedStep, "never waited on an unknown event name"
 	}
-	seconds := ""
-	if heard.Seconds != nil {
-		seconds = fmt.Sprintf(" in %.1f s", *heard.Seconds)
+	namedOffers := false
+	for _, c := range unknown {
+		a := answerOfCall(c)
+		if strings.Contains(a, "is not an event") || strings.Contains(a, "Events you can wait on") ||
+			strings.Contains(a, "Did you mean") {
+			namedOffers = true
+			break
+		}
+	}
+	if !namedOffers {
+		return failedStep, "an unknown event name was refused without naming what is offered"
 	}
 	var onNever []appToolCall
 	for _, c := range r.callsOf("events/wait") {
@@ -511,7 +510,7 @@ func (r assessRecord) eventSteps() (verdict, string) {
 		}
 	}
 	if len(unbounded) == 0 {
-		return failedStep, "heard " + assessPingEvent + ", but never waited with no until_minutes"
+		return failedStep, assessPingEvent + " is on the log, but never waited with no until_minutes"
 	}
 	if anyOk(unbounded) {
 		return failedStep, "a wait for " + assessNeverEvent + " with no until_minutes was kept, not refused"
@@ -524,7 +523,7 @@ func (r assessRecord) eventSteps() (verdict, string) {
 		}
 	}
 	if open == nil {
-		return failedStep, "heard " + assessPingEvent + ", but never made a second wait to cancel"
+		return failedStep, assessPingEvent + " is on the log, but never made a second wait to cancel"
 	}
 	var cancelled []appToolCall
 	for _, c := range r.callsOf("events/cancel") {
@@ -535,8 +534,7 @@ func (r assessRecord) eventSteps() (verdict, string) {
 	if !anyOk(cancelled) {
 		return failedStep, said(cancelled, "cancel_wait")
 	}
-	return passed, "a second lease raised " + assessPingEvent + "; the wait came back with it" + seconds +
-		"; a wait with no until_minutes was refused; `cancel_wait` cleared the second"
+	return passed, "a second lease raised " + assessPingEvent + " on the log; an unknown event name was refused; a wait with no until_minutes was refused; `cancel_wait` cleared the second"
 }
 
 type formQuestion struct {
@@ -678,7 +676,7 @@ func (r assessRecord) helperSteps() (verdict, string) {
 	}
 	resumed := false
 	for _, p := range r.appPrompts() {
-		resumed = resumed || p.at > call.At && strings.Contains(p.text, "The block you reported has cleared")
+		resumed = resumed || p.at > call.At && strings.Contains(p.text, "The wait you reported has cleared")
 	}
 	if !resumed && !r.blockFoundHelperDone(&id) {
 		return failedStep, "never started again when the helper finished"
@@ -743,7 +741,7 @@ func (r assessRecord) ending() (verdict, string) {
 			refused++
 			continue
 		}
-		outcomes = append(outcomes, "blocked")
+		outcomes = append(outcomes, "waiting")
 		if len(listArg(c, "agents")) > 0 {
 			onHelper = true
 		}
@@ -751,11 +749,10 @@ func (r assessRecord) ending() (verdict, string) {
 			withTime = true
 		}
 	}
-	// A wait on a time alone, as this host keeps it: wait_for_event with no events and no agents.
-	for _, c := range r.callsOf("events/wait") {
-		if _, ok := intArg(c, "until_minutes", "untilMinutes"); c.Ok && ok && len(listArg(c, "events")) == 0 &&
-			len(listArg(c, "agents")) == 0 && arg(c, "action") == "" {
-			outcomes = append(outcomes, "blocked")
+	// A wait on a time alone: check_again.
+	for _, c := range r.callsOf("waits/checkAgain") {
+		if _, ok := intArg(c, "in_minutes", "inMinutes"); c.Ok && ok {
+			outcomes = append(outcomes, "waiting")
 			withTime = true
 		}
 	}
@@ -765,10 +762,10 @@ func (r assessRecord) ending() (verdict, string) {
 	}
 	var missing []string
 	if !onHelper {
-		missing = append(missing, "blocked on the helper")
+		missing = append(missing, "waiting on the helper")
 	}
 	if !withTime {
-		missing = append(missing, "blocked with a check-again time")
+		missing = append(missing, "waiting with a check-again time")
 	}
 	recorded := strings.Join(outcomes, ", ")
 	if len(missing) > 0 {

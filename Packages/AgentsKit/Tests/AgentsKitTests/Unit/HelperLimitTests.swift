@@ -60,7 +60,7 @@ struct HelperLimitTests {
     /// carries it on by itself, so it holds a running place.
     @Test func aHelperTheAppWillResumeIsRunning() {
         var blocked = helper(.finished)
-        blocked.report = WorkReport(outcome: .blocked, message: "Waiting on the build", at: Date(),
+        blocked.report = WorkReport(outcome: .waiting, message: "Waiting on the build", at: Date(),
                                     block: Block(checkAgainAt: Date().addingTimeInterval(600)))
         #expect(HelperLimit.isRunning(blocked))
 
@@ -81,7 +81,7 @@ struct HelperLimitTests {
     /// A block that named nothing waits for the person, not the app.
     @Test func aHelperOnlyThePersonCanCarryOnIsNotRunning() {
         var blocked = helper(.finished)
-        blocked.report = WorkReport(outcome: .blocked, message: "Needs a key", at: Date(), block: Block())
+        blocked.report = WorkReport(outcome: .waiting, message: "Needs a key", at: Date(), block: Block())
         #expect(!HelperLimit.isRunning(blocked))
     }
 

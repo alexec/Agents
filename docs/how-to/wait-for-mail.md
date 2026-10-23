@@ -74,7 +74,7 @@ another sender, add a trigger with its address as `from`.
 
 ## Wait for a mail in a session
 
-An agent can wait for a mail itself, with `wait_for_event`:
+An agent can wait for a mail itself, with `wait_for_event` on the mail server's event:
 
 - event `email.received`
 - where `{"from": "*@gitlab.com", "subject": "*code*"}`

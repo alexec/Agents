@@ -77,7 +77,7 @@ struct EventPatternFinerTests {
             let problem = EventPattern.parse(name, filters: [key: "x"]).failure
             #expect(problem?.isBadFilter == true, "\(name) \(key)")
             #expect(problem?.message == "\(name) takes no arguments; \"\(key)\" is not one of its arguments. "
-                    + "To wait for particular agents, use wait_for_event with agents.")
+                    + "To wait for particular agents, use wait_for_agents.")
         }
     }
 

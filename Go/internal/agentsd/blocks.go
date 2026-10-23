@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"sort"
@@ -11,8 +12,8 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Waiting on other agents (039, #481), as DaemonCore+Blocks keeps it on the Swift host:
-// wait_for_event with agents ends the turn blocked, with a block naming them on the report;
+// Waiting on other agents (039, #481, #1915), as DaemonCore+Blocks keeps it on the Swift host:
+// wait_for_agents ends the turn waiting, with a block naming them on the report;
 // as each ends its wait closes, and when they have (all, or any with wake_on any) or the
 // time to check again comes, the agent is started again with what they said.
 
@@ -22,7 +23,7 @@ const (
 )
 
 func isOpenBlock(r *wire.WorkReport) bool {
-	return r != nil && r.Outcome == wire.WorkOutcomeBlocked && (r.Block == nil || r.Block.ClearedAt == nil)
+	return r != nil && r.Outcome == wire.WorkOutcomeWaiting && (r.Block == nil || r.Block.ClearedAt == nil)
 }
 
 func blockRefusal(why string) error { return Invalid("Nothing was recorded: %s", why) }
@@ -191,17 +192,51 @@ func (d *Daemon) blockedNote(b *wire.Block) string {
 	return note
 }
 
-// waitOn is wait_for_event with agents, or a time alone: the turn ends blocked, waiting.
-func (d *Daemon) waitOn(caller wire.UUID, names []string, wakeOn string, minutes *int, message string) (string, error) {
+// waitForAgents is wait_for_agents: the turn ends waiting on the named sessions.
+func (d *Daemon) waitForAgents(caller wire.UUID, args map[string]json.RawMessage) (string, error) {
+	list, err := stringList(args, "agents")
+	if err != nil {
+		return "", err
+	}
+	var names []string
+	for _, n := range list {
+		if n = strings.TrimSpace(n); n != "" {
+			names = append(names, n)
+		}
+	}
+	if len(names) == 0 {
+		return "", Invalid("Nothing is waited for: name the sessions in agents, by id or exact title.")
+	}
+	var minutes *int
+	if n, ok := argInt(args, "until_minutes"); ok {
+		minutes = &n
+	}
+	return d.waitOn(caller, names, argString(args, "wake_on"), minutes, argString(args, "message"), "until_minutes")
+}
+
+// checkAgain is check_again: the turn ends waiting until in_minutes.
+func (d *Daemon) checkAgain(caller wire.UUID, args map[string]json.RawMessage) (string, error) {
+	var minutes *int
+	if n, ok := argInt(args, "in_minutes"); ok {
+		minutes = &n
+	}
+	return d.waitOn(caller, nil, "", minutes, argString(args, "message"), "in_minutes")
+}
+
+// waitOn ends the turn waiting on named sessions, or on a time alone.
+func (d *Daemon) waitOn(caller wire.UUID, names []string, wakeOn string, minutes *int, message, minutesKey string) (string, error) {
 	me := d.Store.Agent(caller)
 	if me == nil {
 		return "", &Error{Code: CodeNoSuchAgent, Message: "That conversation is not open any more, so nothing is waited for."}
 	}
 	if minutes == nil {
+		if minutesKey == "in_minutes" {
+			return "", Invalid("Nothing is waited for: in_minutes is required: say how many minutes until you resume, from %d to %d.", blockMinutesLow, blockMinutesHigh)
+		}
 		return "", Invalid("Nothing is waited for: %s", deadlineRequiredWords())
 	}
 	if *minutes < blockMinutesLow || *minutes > blockMinutesHigh {
-		return "", Invalid("Nothing is waited for: until_minutes has to be a whole number from %d to %d.", blockMinutesLow, blockMinutesHigh)
+		return "", Invalid("Nothing is waited for: %s has to be a whole number from %d to %d.", minutesKey, blockMinutesLow, blockMinutesHigh)
 	}
 	var wake *wire.BlockWakeOn
 	switch wakeOn {
@@ -266,7 +301,7 @@ func (d *Daemon) waitOn(caller wire.UUID, names []string, wakeOn string, minutes
 	if wake != nil && *wake == wire.BlockWakeOnAny && len(block.Waits) > 0 {
 		block.WakeOn = wake
 	}
-	report := wire.WorkReport{Outcome: wire.WorkOutcomeBlocked, Message: strings.TrimSpace(message), At: at, Block: &block}
+	report := wire.WorkReport{Outcome: wire.WorkOutcomeWaiting, Message: strings.TrimSpace(message), At: at, Block: &block}
 	d.record(caller, wire.TranscriptEntryKind{WorkReported: &wire.TranscriptEntryKindWorkReported{Value: report}})
 	l.mu.Lock()
 	l.reported = true
@@ -278,14 +313,14 @@ func (d *Daemon) waitOn(caller wire.UUID, names []string, wakeOn string, minutes
 		waiting = append(waiting, "“"+d.waitName(w)+"”")
 	}
 	if len(waiting) == 0 {
-		d.raiseAgentEvent("agent.blocked", caller, "is blocked.", nil)
+		d.raiseAgentEvent("agent.waiting", caller, "is waiting.", nil)
 	} else {
 		anyOf := ""
 		if block.WakeOn != nil && len(block.Waits) > 1 {
 			anyOf = "any of "
 		}
 		joined := strings.Join(waiting, ", ")
-		d.raiseAgentEvent("agent.blocked", caller, "is waiting for "+anyOf+joined+" to finish.", map[string]string{"waiting_on": joined})
+		d.raiseAgentEvent("agent.waiting", caller, "is waiting for "+anyOf+joined+" to finish.", map[string]string{"waiting_on": joined})
 	}
 	d.armBlockTimer()
 	return d.blockedNote(&block), nil
@@ -383,11 +418,11 @@ func (d *Daemon) resumePrompt(b *wire.Block, message string, why wire.BlockClear
 	var lines []string
 	switch {
 	case why == wire.BlockClearingWaits && anyOf:
-		lines = append(lines, "The block you reported has cleared: you asked to carry on when any of the agents you were waiting on finished, and one has.")
+		lines = append(lines, "The wait you reported has cleared: you asked to carry on when any of the agents you were waiting on finished, and one has.")
 	case why == wire.BlockClearingWaits && len(b.Waits) == 1:
-		lines = append(lines, "The block you reported has cleared: the agent you were waiting on has finished.")
+		lines = append(lines, "The wait you reported has cleared: the agent you were waiting on has finished.")
 	case why == wire.BlockClearingWaits:
-		lines = append(lines, "The block you reported has cleared: every agent you were waiting on has finished.")
+		lines = append(lines, "The wait you reported has cleared: every agent you were waiting on has finished.")
 	default:
 		lines = append(lines, "The time you asked to check again has come.")
 	}
@@ -434,9 +469,9 @@ func (d *Daemon) resumePrompt(b *wire.Block, message string, why wire.BlockClear
 	case why == wire.BlockClearingWaits && len(going) == 0:
 		lines = append(lines, "Carry on from here.")
 	case why == wire.BlockClearingWaits:
-		lines = append(lines, "Carry on from here. To wait on the rest, end your turn blocked again, naming them in waiting_on.")
+		lines = append(lines, "Carry on from here. To wait on the rest, call wait_for_agents again, naming them.")
 	default:
-		lines = append(lines, "Check on it, and carry on or end your turn blocked again.")
+		lines = append(lines, "Check on it, and carry on or call check_again.")
 	}
 	return strings.Join(lines, "\n")
 }
@@ -444,7 +479,7 @@ func (d *Daemon) resumePrompt(b *wire.Block, message string, why wire.BlockClear
 // resumeIfCleared queues the resume of a blocked agent whose block has cleared, and sends it.
 func (d *Daemon) resumeIfCleared(id wire.UUID) {
 	a := d.Store.Agent(id)
-	if a == nil || a.State != wire.AgentStateFinished || a.Report == nil || a.Report.Outcome != wire.WorkOutcomeBlocked ||
+	if a == nil || a.State != wire.AgentStateFinished || a.Report == nil || a.Report.Outcome != wire.WorkOutcomeWaiting ||
 		a.Report.Block == nil || a.Report.Block.ClearedAt != nil || len(a.QueuedPrompts) > 0 {
 		return
 	}
@@ -588,7 +623,7 @@ func (d *Daemon) resumeBlocks() {
 		}
 	}
 	for _, a := range d.Store.Agents() {
-		if a.State == wire.AgentStateFinished && a.Report != nil && a.Report.Outcome == wire.WorkOutcomeBlocked &&
+		if a.State == wire.AgentStateFinished && a.Report != nil && a.Report.Outcome == wire.WorkOutcomeWaiting &&
 			a.Report.Block != nil && a.Report.Block.ClearedAt != nil &&
 			(a.Report.Block.ClearedBy == nil || *a.Report.Block.ClearedBy != wire.BlockClearingDropped) &&
 			len(a.QueuedPrompts) > 0 && a.QueuedPrompts[0].From == wire.PromptOriginApp {

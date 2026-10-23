@@ -225,7 +225,7 @@ func line(tc wire.ToolCall) string {
 
 var headings = map[wire.WorkOutcome]string{wire.WorkOutcomeDone: "Complete", wire.WorkOutcomeNothingToDo: "Nothing to do",
 	wire.WorkOutcomeNeedsAnswer: "Waiting on your answer",
-	wire.WorkOutcomeBlocked: "Waiting"} // waiting, not blocked (#2045)
+	wire.WorkOutcomeWaiting: "Waiting"}
 
 func cut(s string, budget int) string {
 	if utf8.RuneCountInString(s) > budget {

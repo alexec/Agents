@@ -78,7 +78,7 @@ func TestARestartIsSaidAndAWaitOpenOverItIsTold(t *testing.T) {
 		for _, u := range userMessages(d, id) {
 			if strings.HasPrefix(u, "The event you were waiting for happened.") && strings.Contains(u, "\nAgents restarted at ") &&
 				strings.Contains(u, " while you waited. It was down for about 3 min (from ") &&
-				strings.HasSuffix(u, "Events in that time may be missing: lease.granted. Check with wait_for_event action \"recent\", and check the state yourself (for example the branch or the PR).") {
+				strings.HasSuffix(u, "Events in that time may be missing: lease.granted. Check the state yourself (for example the branch or the PR).") {
 				return true
 			}
 		}

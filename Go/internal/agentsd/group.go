@@ -49,7 +49,7 @@ func settled(wantsAPerson bool, r *wire.WorkReport, waitingOnEvents bool) string
 	if wantsAPerson {
 		return "needsAttention"
 	}
-	open := r != nil && r.Outcome == wire.WorkOutcomeBlocked && (r.Block == nil || r.Block.ClearedAt == nil)
+	open := r != nil && r.Outcome == wire.WorkOutcomeWaiting && (r.Block == nil || r.Block.ClearedAt == nil)
 	if open && r.Block != nil && (len(r.Block.Waits) > 0 || r.Block.CheckAgainAt != nil) || waitingOnEvents {
 		return "waiting"
 	}

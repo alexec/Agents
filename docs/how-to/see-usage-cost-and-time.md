@@ -83,7 +83,7 @@ each kind of time:
 - **Agent**: the agent thinks or writes.
 - **Tools**: a tool call is open.
 - **Waiting on others**: the agent waits on something it does not control, such as
-  `wait_for_event` or `lease_resource`.
+  `wait_for_event`, `wait_for_agents`, `check_again` or `lease_resource`.
 - **Waiting for you**: a question, a permission or a form waits for your answer.
 
 When kinds overlap, **Waiting for you** counts first, then **Waiting on others**, then

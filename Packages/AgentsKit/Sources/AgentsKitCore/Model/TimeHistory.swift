@@ -112,7 +112,7 @@ public enum TimeKind: String, Codable, CaseIterable, Sendable, Hashable, Identif
     case agent
     /// A tool call open, other than an ask or a wait.
     case tools
-    /// Waiting on other agents or shared things: `wait_for_event`, `lease_resource`.
+    /// Waiting on other agents or shared things: `wait_for_event`, `wait_for_agents`, `check_again`, `lease_resource`.
     case others
     /// Waiting for the person: a question, a form, a permission.
     case person
@@ -246,7 +246,8 @@ public enum TimeMark: Sendable, Hashable {
         }
         // `release_resource` ends with `lease_resource`: a release is quick, and a tool.
         if name.hasSuffix(AppTool.releaseResource) { return .tools }
-        if name.hasSuffix(AppTool.waitForEvent) || name.hasSuffix(AppTool.leaseResource) { return .others }
+        if name.hasSuffix(AppTool.waitForEvent) || name.hasSuffix(AppTool.waitForAgents)
+            || name.hasSuffix(AppTool.checkAgain) || name.hasSuffix(AppTool.leaseResource) { return .others }
         return .tools
     }
 
