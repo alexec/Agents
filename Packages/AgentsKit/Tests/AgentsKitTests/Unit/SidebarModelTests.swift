@@ -44,6 +44,25 @@ struct SidebarModelTests {
     /// A folded project holds no rows of any kind (#356): an Archived fold, pinned pages or
     /// "No sessions yet" coming and going under it left NSOutlineView's count of its
     /// children apart from SwiftUI's, and Apple Intelligence reading the list crashed.
+    /// #2032: a server's list views come with the pins, apart from them, and a Hide is
+    /// shown at once; a selected row finds a view as it finds a pin.
+    @Test func aServersListViewsAreHeldApartFromThePins() {
+        let model = AgentsModel()
+        let server = PinnerView(kind: .server, id: "github", name: "GitHub")
+        let pulls = PinView(path: "ui://github/pulls", title: "GitHub · Pull requests", kind: .view, missing: false,
+                            pinnedBy: server, view: ViewPin(server: "github", uri: "ui://github/pulls", tool: "show_pull_requests"))
+        let issues = PinView(path: "ui://github/issues", title: "GitHub · Issues", kind: .view, missing: false,
+                             pinnedBy: server, view: ViewPin(server: "github", uri: "ui://github/issues", tool: "show_issues"),
+                             hidden: true)
+        model.replacePins([ProjectPins(folder: api, pins: [], views: [pulls, issues])])
+        #expect(model.pins(in: api).isEmpty)
+        #expect(model.serverViews(in: api).map(\.title) == ["GitHub · Pull requests", "GitHub · Issues"])
+        #expect(model.pinOrView("ui://github/pulls", in: api)?.isServerView == true)
+        model.setViewHidden("ui://github/pulls", true, in: api)
+        model.setViewHidden("ui://github/issues", false, in: api)
+        #expect(model.serverViews(in: api).map(\.hidden) == [true, nil])
+    }
+
     @Test func aFoldedProjectHasNothingUnderItsRow() {
         let model = AgentsModel()
         model.replaceAgents([agent(api, .archived, "old", at: 1)])

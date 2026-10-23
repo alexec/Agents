@@ -523,3 +523,55 @@ struct PinnedPageRows: View {
         Task { await model.arrangePins(paths, in: project.folder) }
     }
 }
+
+/// A connected server's list views (#2032), after the project's pins: a row each, named by
+/// the service ("GitHub · Issues"), without a pin. A long press hides one; the project's
+/// long press shows them again.
+struct ServerViewRows: View {
+    @Environment(RemoteModel.self) private var model
+    let project: ProjectKey
+
+    var body: some View {
+        ForEach(model.serverViews(in: project.folder).filter { $0.hidden != true }) { view in
+            HStack(spacing: 8) {
+                Image(systemName: "square.grid.2x2")
+                    .sidebarMark(Paper.accent)
+                    .frame(width: 20)
+                    .accessibilityHidden(true)
+                Text(view.title)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+            }
+            .appText(.supporting)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(view.title), view")
+            .tag(SidebarItem.pin(view.path, in: project))
+            .contextMenu {
+                Button("Hide", systemImage: "eye.slash") {
+                    Task { await model.setViewHidden(view.path, true, in: project.folder) }
+                }
+            }
+        }
+    }
+}
+
+/// The project's long press: every server view hidden in it, back in the sidebar (#2032).
+/// Left out when none is hidden.
+struct ShowHiddenViewsButton: View {
+    @Environment(RemoteModel.self) private var model
+    let summary: DaemonAPI.ProjectSummary
+
+    var body: some View {
+        let hidden = model.serverViews(in: summary.folder).filter { $0.hidden == true }
+        if !hidden.isEmpty {
+            Button {
+                Task {
+                    for view in hidden { await model.setViewHidden(view.path, false, in: summary.folder) }
+                }
+            } label: {
+                Label("Show Hidden Views (\(hidden.count))", systemImage: "eye")
+            }
+            .disabled(model.isStale(on: summary.host))
+        }
+    }
+}

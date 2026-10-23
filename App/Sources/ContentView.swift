@@ -144,10 +144,17 @@ struct ContentView: View {
             VStack(spacing: 0) {
                 OfflineStrip(host: summary.host)
                 DiskStrip(host: summary.host)
-                if let pin = model.pins(in: key.folder).first(where: { $0.path == path }), let view = pin.view {
+                // Or a server's list view (#2032), whose Hide is its Unpin.
+                if let pin = model.work.pinOrView(path, in: key.folder), let view = pin.view {
                     PinnedViewPage(folder: key.folder, pin: pin, view: view,
                                    call: { method, params in try await model.client(for: key.host).call(method, params) },
-                                   unpin: { await model.unpin(path, in: key) },
+                                   unpin: {
+                                       if pin.isServerView {
+                                           await model.setViewHidden(path, true, in: key)
+                                       } else {
+                                           await model.unpin(path, in: key)
+                                       }
+                                   },
                                    startAgent: { model.offerStart($0, in: key) },
                                    recipient: { model.recipient(of: $0, in: key) },
                                    sendTo: { id, text in await model.send(text, to: id) },

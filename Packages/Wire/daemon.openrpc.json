@@ -3745,6 +3745,31 @@
       ]
     },
     {
+      "name": "pins/hideView",
+      "x-capability": "pins/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PinHideViewRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "pins/list",
       "x-capability": "pins/1",
       "tags": [

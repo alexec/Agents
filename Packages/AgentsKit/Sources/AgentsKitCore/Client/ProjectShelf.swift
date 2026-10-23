@@ -203,6 +203,13 @@ final class PinShelf {
         if self.pins != pins { self.pins = pins }
     }
 
+    /// The servers' list views (#2032), the hidden ones marked.
+    private(set) var views: [PinView] = []
+
+    func setViews(_ views: [PinView]) {
+        if self.views != views { self.views = views }
+    }
+
     func setSessions(_ sessions: [UUID]) {
         if self.sessions != sessions { self.sessions = sessions }
     }

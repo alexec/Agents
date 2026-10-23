@@ -336,9 +336,11 @@ public struct PinView: Codable, Sendable, Hashable, Identifiable {
     public var view: ViewPin?
     /// Why a view pin is missing here, in a few words: `PinMissing`.
     public var missingReason: String?
+    /// A server's list view (#2032) that the person hid from the sidebar.
+    public var hidden: Bool?
 
     public init(path: String, title: String, kind: PinKind, missing: Bool, pinnedBy: PinnerView,
-                view: ViewPin? = nil, missingReason: String? = nil) {
+                view: ViewPin? = nil, missingReason: String? = nil, hidden: Bool? = nil) {
         self.path = path
         self.title = title
         self.kind = kind
@@ -346,7 +348,11 @@ public struct PinView: Codable, Sendable, Hashable, Identifiable {
         self.pinnedBy = pinnedBy
         self.view = view
         self.missingReason = missingReason
+        self.hidden = hidden
     }
+
+    /// A server's list view, shown without a pin (#2032): Hide, not Unpin.
+    public var isServerView: Bool { pinnedBy.kind == .server }
 }
 
 /// Why a view pin shows as missing (#189), as a pinned file does until its branch lands.
@@ -377,6 +383,9 @@ public struct PinnerView: Codable, Sendable, Hashable {
 
 public enum PinnerKind: String, Codable, Sendable, Hashable {
     case person, agent, workflow
+    /// A connected server shows its list views itself (#2032): `id` is its name in
+    /// mcp.json, `name` its title ("GitHub").
+    case server
 }
 
 /// One project's pins, for the sidebar.
@@ -387,11 +396,15 @@ public struct ProjectPins: Codable, Sendable, Hashable {
     public var sessions: [UUID]?
     /// Its pinned workflows' ids in their order (#432). Nil from a host that has none to say.
     public var workflows: [String]?
+    /// Its servers' list views (#2032), the hidden ones marked. Nil from a host with none.
+    public var views: [PinView]?
 
-    public init(folder: URL, pins: [PinView], sessions: [UUID] = [], workflows: [String] = []) {
+    public init(folder: URL, pins: [PinView], sessions: [UUID] = [], workflows: [String] = [],
+                views: [PinView] = []) {
         self.folder = folder
         self.pins = pins
         self.sessions = sessions.isEmpty ? nil : sessions
         self.workflows = workflows.isEmpty ? nil : workflows
+        self.views = views.isEmpty ? nil : views
     }
 }

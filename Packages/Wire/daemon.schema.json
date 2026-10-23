@@ -13704,6 +13704,26 @@
       ],
       "additionalProperties": false
     },
+    "PinHideViewRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "uri": {
+          "type": "string"
+        },
+        "hidden": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "folder",
+        "uri",
+        "hidden"
+      ],
+      "additionalProperties": false
+    },
     "PinKind": {
       "type": "string",
       "enum": [
@@ -13808,6 +13828,9 @@
         },
         "missingReason": {
           "type": "string"
+        },
+        "hidden": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -13856,7 +13879,8 @@
       "enum": [
         "person",
         "agent",
-        "workflow"
+        "workflow",
+        "server"
       ]
     },
     "PinnerView": {
@@ -13901,6 +13925,12 @@
           "type": "array",
           "items": {
             "type": "string"
+          }
+        },
+        "views": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PinView"
           }
         }
       },
@@ -14682,6 +14712,12 @@
           "type": "array",
           "items": {
             "type": "string"
+          }
+        },
+        "views": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PinView"
           }
         }
       },

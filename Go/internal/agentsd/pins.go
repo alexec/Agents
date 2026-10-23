@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -27,6 +28,8 @@ const (
 	pinTitleLength = 60
 	viewArguments  = 2048
 	pinsFilePath   = ".agents/pins.json"
+	// hiddenViewsPerProject bounds the server views hidden in one project (#2032).
+	hiddenViewsPerProject = 50
 )
 
 type pinner struct {
@@ -61,10 +64,13 @@ type pinsFile struct {
 	unread    []json.RawMessage
 	sessions  []sessionPin
 	workflows []workflowPin
+	// hiddenViews is the ui:// addresses of the server views a person hid (#2032).
+	hiddenViews []string
 }
 
 func (f pinsFile) empty() bool {
-	return len(f.pins) == 0 && len(f.unread) == 0 && len(f.sessions) == 0 && len(f.workflows) == 0
+	return len(f.pins) == 0 && len(f.unread) == 0 && len(f.sessions) == 0 && len(f.workflows) == 0 &&
+		len(f.hiddenViews) == 0
 }
 
 func pinRefused(msg string) error { return &Error{Code: wire.FailurePinRefused, Message: msg} }
@@ -155,6 +161,7 @@ func readPinsFile(data []byte) (pinsFile, error) {
 		Pins      []json.RawMessage `json:"pins"`
 		Sessions  []sessionPin      `json:"sessions"`
 		Workflows []workflowPin     `json:"workflows"`
+		Hidden    []string          `json:"hidden_views"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return pinsFile{}, err
@@ -214,6 +221,11 @@ func readPinsFile(data []byte) (pinsFile, error) {
 			f.workflows = append(f.workflows, w)
 		}
 	}
+	for _, h := range raw.Hidden {
+		if strings.HasPrefix(h, "ui://") && !slices.Contains(f.hiddenViews, h) && len(f.hiddenViews) < hiddenViewsPerProject {
+			f.hiddenViews = append(f.hiddenViews, h)
+		}
+	}
 	return f, nil
 }
 
@@ -248,6 +260,9 @@ func (f pinsFile) data() ([]byte, error) {
 	}
 	if len(f.workflows) > 0 {
 		tree["workflows"] = asTree(f.workflows)
+	}
+	if len(f.hiddenViews) > 0 {
+		tree["hidden_views"] = asTree(f.hiddenViews)
 	}
 	b, err := diskjson.Pretty(tree)
 	return append(b, '\n'), err
@@ -311,7 +326,7 @@ func (d *Daemon) pinsChanged(project string) {
 		d.pinMu.Unlock()
 		pp := d.projectPins(project)
 		Broadcast(d, wire.NotifyPinsChanged, wire.PinsChangedNotification{Folder: pp.Folder, Pins: pp.Pins,
-			Sessions: pp.Sessions, Workflows: pp.Workflows})
+			Sessions: pp.Sessions, Workflows: pp.Workflows, Views: pp.Views})
 	})
 }
 
@@ -377,7 +392,7 @@ func (d *Daemon) pinViews(project string, f pinsFile) []wire.PinView {
 
 func (d *Daemon) projectPins(project string) wire.ProjectPins {
 	f := d.readPins(project)
-	pp := wire.ProjectPins{Folder: fileURL(project, true), Pins: d.pinViews(project, f)}
+	pp := wire.ProjectPins{Folder: fileURL(project, true), Pins: d.pinViews(project, f), Views: d.serverViews(project, f)}
 	for _, s := range f.sessions {
 		pp.Sessions = append(pp.Sessions, s.Session)
 	}
@@ -446,7 +461,7 @@ func (d *Daemon) registerPins() {
 		out := []wire.ProjectPins{}
 		for _, s := range ps {
 			pp := d.projectPins(store.FolderPath(s.Project.Folder))
-			if len(pp.Pins) > 0 || len(pp.Sessions) > 0 || len(pp.Workflows) > 0 {
+			if len(pp.Pins) > 0 || len(pp.Sessions) > 0 || len(pp.Workflows) > 0 || len(pp.Views) > 0 {
 				out = append(out, pp)
 			}
 		}
@@ -535,6 +550,29 @@ func (d *Daemon) registerPins() {
 			}
 		}
 		return wire.Empty{}, pinRefused("Nothing was unpinned: " + r.Path + " is not pinned in this project.")
+	})
+	On(d, wire.CallPinsHideView, func(ctx context.Context, c *Client, r wire.PinHideViewRequest) (wire.Empty, error) {
+		project, err := d.knownPinProject(r.Folder)
+		if err != nil {
+			return wire.Empty{}, err
+		}
+		if !strings.HasPrefix(r.URI, "ui://") {
+			return wire.Empty{}, Invalid("A view's address starts ui://.")
+		}
+		f := d.readPins(project)
+		at := slices.Index(f.hiddenViews, r.URI)
+		switch {
+		case r.Hidden && at < 0:
+			if len(f.hiddenViews) >= hiddenViewsPerProject {
+				return wire.Empty{}, pinRefused("Nothing was hidden: this project already hides 50 views, the most it can.")
+			}
+			f.hiddenViews = append(f.hiddenViews, r.URI)
+		case !r.Hidden && at >= 0:
+			f.hiddenViews = slices.Delete(f.hiddenViews, at, at+1)
+		default:
+			return wire.Empty{}, nil
+		}
+		return wire.Empty{}, d.writePins(f, project)
 	})
 	On(d, wire.CallPinsArrange, func(ctx context.Context, c *Client, r wire.PinArrangeRequest) (wire.Empty, error) {
 		project, err := d.knownPinProject(r.Folder)

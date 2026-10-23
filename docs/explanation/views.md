@@ -72,6 +72,30 @@ How each client enforces it:
 | `notifications/message` | A line in the daemon's log. |
 | `ui/resource-teardown` | Sent before a view goes: when you open another conversation, or when more than eight views are open in one chat. The app waits up to two seconds for the answer. |
 
+## A server's list views in the sidebar
+
+A connected server's **list views** show under each project by themselves, with no pin
+(#2032), on the Mac, the Remote and the web page. A list view is one that a read-only tool
+a view may call feeds with no required argument: the `github` server's
+`ui://github/pulls` and `ui://github/issues`, but not `ui://github/pr`, which needs a
+pull request's number. **This is our extension of MCP Apps (SEP-1865)**, as pins are.
+
+- **Where.** In the project's group, after its pinned pages and before its sessions.
+- **Its name.** The service, then the view: **GitHub · Pull requests**, **GitHub · Issues**,
+  **Linear · Issues**. The service is the catalogue's title for a connector Agents makes, else
+  the server's own (`serverInfo.title`), else its name in `mcp.json`. A view title that
+  starts with the service's ("Linear issues") loses it.
+- **Which servers.** Each server set up and approved for the project that can show views
+  here, as for a pin. A server waiting for approval, missing a secret or run over stdio shows
+  no row. The GitHub connector's views show only in a project whose `origin` is on
+  github.com, and GitLab's only where it is on another host.
+- **Opening one.** As a pinned view opens: the host calls the feeding tool afresh.
+- **Hide.** The row's menu, or **Hide** at the top of the view, takes it out of the sidebar.
+  The hidden addresses are kept in `.agents/pins.json` as `hidden_views` (at most 50).
+  **Show Hidden Views** in the project's menu puts them back.
+- **Pinned.** A list view that is pinned shows as its pin only. List views do not count
+  towards the 10 pins.
+
 ## Pinning a view
 
 A view can be pinned under a project, beside its pinned pages, on the Mac,

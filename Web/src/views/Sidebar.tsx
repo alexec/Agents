@@ -43,7 +43,7 @@ import { openInNewTab, RenameInput, runSessionAction, sessionActions, startedBy 
 import { markAgentOf, treeRows, type TreeRow } from "../model/tree";
 import { WorkflowRow } from "./WorkflowRow";
 import { footLine, offersStart } from "./OfflineStrip";
-import { PinnedPageRows } from "./Pins";
+import { PinnedPageRows, ServerViewRows, showHiddenViewsItem } from "./Pins";
 import { ApprovalRow, FailedWorkflowRow } from "./Approval";
 import { JoinRequests } from "./JoinRequest";
 import { LinkRequests } from "./ChannelLinks";
@@ -562,6 +562,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
       run: () => void window.open(aloneURL(host.id, folder), "_blank", "noopener") },
     { label: "Put Files in Drop Box…", disabled: down, help: "Put files into this project's .agents/dropbox/ (#231)",
       run: () => putFilesInDropbox(host.id, folder, label) },
+    ...showHiddenViewsItem(store, host.id, folder, down),
     // To the top of the sidebar, as the window's Pin.
     { label: projectPinned ? "Unpin" : "Pin", disabled: down,
       help: projectPinned ? "Let this project take its place among the others" : "Keep this project at the top of the sidebar",
@@ -626,6 +627,8 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
         <div class="fold-body">
           {/* The project's pinned pages first (#159), not while searching: the search is for sessions. */}
           {!searching && <PinnedPageRows store={store} host={host.id} folder={folder} down={down} chosen={here ? r.page : undefined} />}
+          {/* Then its servers' list views, without a pin (#2032). */}
+          {!searching && <ServerViewRows store={store} host={host.id} folder={folder} down={down} chosen={here ? r.page : undefined} />}
           {groupsSessions ? (
             <details class="sessions" open={sessionsOpen}
               onToggle={(e) => {

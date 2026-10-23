@@ -4621,6 +4621,12 @@ export interface PinArrangeWorkflowsRequest {
   workflowIDs: string[];
 }
 
+export interface PinHideViewRequest {
+  folder: URLString;
+  uri: string;
+  hidden: boolean;
+}
+
 export type PinKind =
   | "markdown"
   | "html"
@@ -4657,6 +4663,7 @@ export interface PinView {
   pinnedBy: PinnerView;
   view?: ViewPin;
   missingReason?: string;
+  hidden?: boolean;
 }
 
 export interface PinWriteRequest {
@@ -4672,7 +4679,8 @@ export interface PingResponse {
 export type PinnerKind =
   | "person"
   | "agent"
-  | "workflow";
+  | "workflow"
+  | "server";
 
 export interface PinnerView {
   kind: PinnerKind;
@@ -4685,6 +4693,7 @@ export interface PinsChangedNotification {
   pins: PinView[];
   sessions?: UUID[];
   workflows?: string[];
+  views?: PinView[];
 }
 
 export interface Plan {
@@ -4965,6 +4974,7 @@ export interface ProjectPins {
   pins: PinView[];
   sessions?: UUID[];
   workflows?: string[];
+  views?: PinView[];
 }
 
 export interface ProjectPlugin {
@@ -8029,6 +8039,7 @@ export interface Methods {
   "pins/arrange": { params: PinArrangeRequest; result: Empty };
   "pins/arrangeSessions": { params: PinArrangeSessionsRequest; result: Empty };
   "pins/arrangeWorkflows": { params: PinArrangeWorkflowsRequest; result: Empty };
+  "pins/hideView": { params: PinHideViewRequest; result: Empty };
   "pins/list": { params: Empty; result: ProjectPins[] };
   "pins/pin": { params: PinRequest; result: PinView[] };
   "pins/pinSession": { params: PinSessionRequest; result: Empty };
@@ -8294,6 +8305,7 @@ export const MethodTarget = {
   "pins/arrange": "host",
   "pins/arrangeSessions": "host",
   "pins/arrangeWorkflows": "host",
+  "pins/hideView": "host",
   "pins/list": "host",
   "pins/pin": "host",
   "pins/pinSession": "host",
@@ -8895,15 +8907,16 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PinArrangeRequest: { required: ["folder", "paths"], optional: [] },
   PinArrangeSessionsRequest: { required: ["folder", "agentIDs"], optional: [] },
   PinArrangeWorkflowsRequest: { required: ["folder", "workflowIDs"], optional: [] },
+  PinHideViewRequest: { required: ["folder", "uri", "hidden"], optional: [] },
   PinPathRequest: { required: ["folder", "path"], optional: [] },
   PinReadRequest: { required: ["folder", "path"], optional: ["knownStamp"] },
   PinRequest: { required: ["folder", "path"], optional: ["title", "view"] },
   PinSessionRequest: { required: ["folder", "agentID"], optional: [] },
-  PinView: { required: ["path", "title", "kind", "missing", "pinnedBy"], optional: ["view", "missingReason"] },
+  PinView: { required: ["path", "title", "kind", "missing", "pinnedBy"], optional: ["view", "missingReason", "hidden"] },
   PinWriteRequest: { required: ["folder", "path", "text"], optional: [] },
   PingResponse: { required: ["ok"], optional: [] },
   PinnerView: { required: ["kind", "id", "name"], optional: [] },
-  PinsChangedNotification: { required: ["folder", "pins"], optional: ["sessions", "workflows"] },
+  PinsChangedNotification: { required: ["folder", "pins"], optional: ["sessions", "workflows", "views"] },
   Plan: { required: ["entries", "state", "at"], optional: ["planID"] },
   PlanEntry: { required: ["content", "priority", "status"], optional: [] },
   PluginApproveRequest: { required: ["plugin", "digest"], optional: [] },
@@ -8932,7 +8945,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Project: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits", "diskSpace", "pinned"] },
   ProjectDetection: { required: ["enabled", "paths"], optional: [] },
   ProjectMCPServer: { required: ["name", "summary", "approval", "missingSecrets", "secretNames", "entryDigest"], optional: ["managed", "signIn", "views"] },
-  ProjectPins: { required: ["folder", "pins"], optional: ["sessions", "workflows"] },
+  ProjectPins: { required: ["folder", "pins"], optional: ["sessions", "workflows", "views"] },
   ProjectPlugin: { required: ["project", "folder", "name", "carries"], optional: ["awaitingApproval"] },
   ProjectRemovedNotification: { required: ["folder"], optional: [] },
   ProjectRequest: { required: ["folder"], optional: [] },

@@ -262,6 +262,7 @@ public enum Capability {
         "pins/arrange": "pins/1",
         "pins/arrangeSessions": "pins/1",
         "pins/arrangeWorkflows": "pins/1",
+        "pins/hideView": "pins/1",
         "pins/list": "pins/1",
         "pins/pin": "pins/1",
         "pins/pinSession": "pins/1",

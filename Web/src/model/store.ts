@@ -285,6 +285,8 @@ export class Work {
   readonly sessionPins = signal<Record<string, string[]>>({});
   /** Each project's pinned workflows' ids by `host|folder` (#432), in their order, kept by pins/changed. */
   readonly workflowPins = signal<Record<string, string[]>>({});
+  /** Each project's servers' list views by `host|folder` (#2032), the hidden ones marked, kept by pins/changed. */
+  readonly serverViews = signal<Record<string, PinView[]>>({});
   /** Bumped by pages/changed: a page shown may have changed on disk; read it again. */
   readonly pageRevisions = signal<Record<string, number>>({});
 
@@ -575,6 +577,7 @@ export class Work {
         this.pins.value = { ...this.pins.value, [`${host}|${folderKey(note.folder)}`]: note.pins };
         this.sessionPins.value = { ...this.sessionPins.value, [`${host}|${folderKey(note.folder)}`]: note.sessions ?? [] };
         this.workflowPins.value = { ...this.workflowPins.value, [`${host}|${folderKey(note.folder)}`]: note.workflows ?? [] };
+        this.serverViews.value = { ...this.serverViews.value, [`${host}|${folderKey(note.folder)}`]: note.views ?? [] };
         return true;
       }
       case "pages/changed": {
@@ -1515,6 +1518,7 @@ export class Store extends Work {
       this.pins.value = notOf(this.pins.value);
       this.sessionPins.value = notOf(this.sessionPins.value);
       this.workflowPins.value = notOf(this.workflowPins.value);
+      this.serverViews.value = notOf(this.serverViews.value);
       this.leases.value = without(this.leases.value);
       this.hostedMCP.value = without(this.hostedMCP.value);
       this.mcpHealth.value = without(this.mcpHealth.value);
@@ -1587,7 +1591,9 @@ export class Store extends Work {
       const held = Object.fromEntries(Object.entries(this.pins.value).filter(([key]) => !key.startsWith(`${host}|`)));
       const sessions = Object.fromEntries(Object.entries(this.sessionPins.value).filter(([key]) => !key.startsWith(`${host}|`)));
       const flows = Object.fromEntries(Object.entries(this.workflowPins.value).filter(([key]) => !key.startsWith(`${host}|`)));
+      const views = Object.fromEntries(Object.entries(this.serverViews.value).filter(([key]) => !key.startsWith(`${host}|`)));
       for (const project of listed) {
+        views[`${host}|${folderKey(project.folder)}`] = project.views ?? [];
         held[`${host}|${folderKey(project.folder)}`] = project.pins;
         sessions[`${host}|${folderKey(project.folder)}`] = project.sessions ?? [];
         flows[`${host}|${folderKey(project.folder)}`] = project.workflows ?? [];
@@ -1595,6 +1601,7 @@ export class Store extends Work {
       this.pins.value = held;
       this.sessionPins.value = sessions;
       this.workflowPins.value = flows;
+      this.serverViews.value = views;
     }).catch(failed("pins/list"));
     // A host from before #251 doesn't answer, and nothing is said to be coming back.
     void this.link.call("agents/resuming", {}, host).then((response) => {
@@ -2594,6 +2601,28 @@ export class Store extends Work {
 
   pinsIn(host: string, folder: string): PinView[] {
     return this.pins.value[`${host}|${folderKey(folder)}`] ?? [];
+  }
+
+  /** A project's servers' list views (#2032), the hidden ones too, in the servers' order. */
+  serverViewsIn(host: string, folder: string): PinView[] {
+    return this.serverViews.value[`${host}|${folderKey(folder)}`] ?? [];
+  }
+
+  /** A pin or a server's list view at this path: what a sidebar row opens. */
+  pinOrViewIn(host: string, folder: string, path: string): PinView | undefined {
+    return this.pinsIn(host, folder).find((p) => p.path === path) ?? this.serverViewsIn(host, folder).find((p) => p.path === path);
+  }
+
+  /** Hide or Show on a server's list view (#2032): shown at once, then the host told. */
+  async setViewHidden(host: string, folder: string, uri: string, hidden: boolean): Promise<void> {
+    const key = `${host}|${folderKey(folder)}`;
+    this.serverViews.value = { ...this.serverViews.value,
+      [key]: this.serverViewsIn(host, folder).map((v) => {
+        if (v.path !== uri) return v;
+        const { hidden: _was, ...rest } = v;
+        return hidden ? { ...rest, hidden: true } : rest;
+      }) };
+    await this.act("pins/hideView", { folder: folder as never, uri, hidden }, host);
   }
 
   /** A file of the project's: a pinned page, or what an HTML page draws from. */
