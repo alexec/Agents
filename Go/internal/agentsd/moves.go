@@ -390,21 +390,22 @@ func movePreface(a *wire.Agent, old string, leftBehind bool) string {
 // afterTurnMove makes a move asked for in the turn that has just ended, and starts the
 // agent again in the new folder when it moved itself and the turn finished: with the
 // person's queued words when there are some, else the app's carry-on. Not when it asked to
-// be archived: it stays there, waiting for approval.
-func (d *Daemon) afterTurnMove(id wire.UUID, s wire.AgentState, archiving bool) {
+// be archived: it stays there, waiting for approval. It says whether the agent goes on: then
+// the turn that ended is not its finish (#1955).
+func (d *Daemon) afterTurnMove(id wire.UUID, s wire.AgentState, archiving bool) bool {
 	a := d.Store.Agent(id)
 	if a == nil || a.PendingMove == nil {
-		return
+		return false
 	}
 	askedBy := a.PendingMove.AskedBy
 	old := store.FolderPath(a.Cwd)
 	leftBehind := porcelainCount(old) > 0
 	if !d.applyPendingMove(id) || askedBy != wire.MoveAskerAgent || s != wire.AgentStateFinished {
-		return
+		return false
 	}
 	moved := d.Store.Agent(id)
 	if moved == nil || archiving || moved.ArchiveRequest != nil || moved.State == wire.AgentStateArchived {
-		return
+		return false
 	}
 	preface := movePreface(moved, old, leftBehind)
 	if len(moved.QueuedPrompts) > 0 {
@@ -418,11 +419,13 @@ func (d *Daemon) afterTurnMove(id wire.UUID, s wire.AgentState, archiving bool) 
 			}
 			q.Preface = &preface
 		})
-		return
+		return true
 	}
 	if err := d.enqueue(id, wire.QueuedPrompt{ID: store.NewUUID(), Text: carryOn, QueuedAt: now(), From: wire.PromptOriginApp, Preface: &preface}, false); err != nil {
 		d.record(id, runtimeNote("Could not start again after the move: "+err.Error()))
+		return false
 	}
+	return true
 }
 
 // whyNotRemoveLeft is why an agent leaving a worktree with remove may not take it away, or
