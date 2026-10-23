@@ -30,3 +30,17 @@ extension View {
         modifier(SidebarMarkStyle(style: style))
     }
 }
+
+/// The microphone on the session voice mode listens in (#2518). Accent, and the ground
+/// on a row filled with the accent (#2382). The row draws it only while
+/// `VoiceMode.isOn(in:)` is true for that session, so it moves with the chat and goes
+/// when voice mode ends.
+struct ListeningMark: View {
+    var body: some View {
+        Image(systemName: "mic.fill")
+            .appText(.fine)
+            .sidebarMark(Paper.accent)
+            .help("Voice mode listens in this chat")
+            .accessibilityLabel("Listening")
+    }
+}

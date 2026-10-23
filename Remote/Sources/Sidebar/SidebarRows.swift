@@ -101,6 +101,10 @@ struct SidebarSessionRow: View {
                             .foregroundStyle(.tertiary)
                             .accessibilityLabel(MuteWords.muted)
                     }
+                    // Voice mode listens in this chat (#2518), beside the mute mark.
+                    if VoiceMode.shared.isOn(in: agent.id) {
+                        ListeningMark()
+                    }
                     // A file it showed that the person has not looked at (#1802), as on the Mac.
                     if let file = FileToSeeWords.line(agent) {
                         Image(systemName: FileToSeeWords.symbol)
