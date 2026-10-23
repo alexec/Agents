@@ -268,7 +268,7 @@ struct PromptBar: View {
             DictateButton(dictation: dictation, begin: beginDictation)
 
             // Voice mode (#2322), while Settings ▸ Voice has it on.
-            VoiceModeButton(agentID: agent.id) { await model.send($0, to: agent.id, voice: true) ? agent.id : nil }
+            VoiceModeButton(agentID: agent.id, vocabulary: speechSeeds) { await model.send($0, to: agent.id, voice: true) ? agent.id : nil }
 
             // While it works and nothing is typed, send is stop. Type and it is send
             // again, queueing what is typed for when the turn ends.
@@ -374,11 +374,16 @@ struct PromptBar: View {
 
     // MARK: Said instead of typed
 
+    /// The open projects, and this project's titles and issue numbers (#2515).
+    private var speechSeeds: [String] {
+        DictationVocabulary.seeds(projects: model.work.projects, agents: model.work.agents, in: agent.projectFolder)
+    }
+
     private func beginDictation() {
         focused = true
         // What is already in the field stays, and the words go in at the cursor.
         dictation.start(in: text, selection: DictationCursor.range(of: selection, in: text),
-                        vocabulary: [agent.title].compactMap { $0 }) { field, cursor in
+                        vocabulary: speechSeeds) { field, cursor in
             text = field
             selection = DictationCursor.selection(cursor, in: field)
         }

@@ -49,11 +49,11 @@ private final class BufferSink: @unchecked Sendable {
 
 /// Talking into the prompt instead of typing it.
 ///
-/// Apple's dictation transcriber, on the device, as one continuous session for as long
-/// as the button is on: a pause is a pause, not the end of a request (#427). What it
-/// hears goes in at the cursor, the words it is still unsure of are the only ones it
-/// replaces, and the person can go on editing and typing while it listens. `DictationText`
-/// keeps track of all that.
+/// Apple's `SpeechTranscriber`, on the device, as one continuous session for as long
+/// as the button is on: a pause is a pause, not the end of a request (#427, #2515).
+/// What it hears goes in at the cursor, the words it is still unsure of are the only
+/// ones it replaces, and the person can go on editing and typing while it listens.
+/// `DictationText` keeps track of all that. No cloud transcription.
 ///
 /// It asks for the microphone and for speech recognition the first time and not again,
 /// and it asks at the moment of use rather than at launch.
@@ -98,6 +98,9 @@ final class Dictation {
     #endif
 
     private(set) var isListening = false
+    /// The first volatile words of this run trailed the audio. The underline stays off
+    /// and the button's pulse is the listening mark (#2515).
+    private(set) var volatileIsLate = false
     private(set) var problem: Problem?
 
     private let engine: AVAudioEngine
@@ -117,10 +120,22 @@ final class Dictation {
     /// it has been stopped, and that result belongs to the run that is over: it must not
     /// be written over what has been typed since.
     private var run = 0
+    private let clock = ContinuousClock()
+    /// When the microphone opened for this run. Compared with a result's audio time.
+    private var listeningSince: ContinuousClock.Instant?
+    /// The first volatile result is the one that says whether the words are late.
+    /// A later revision of the same words is expected to arrive after it.
+    private var judgedVolatile = false
+    /// A first volatile result that trails its audio by more than this is late.
+    static let lateVolatile: Duration = .milliseconds(1_200)
 
     /// The words in the field still being heard, as character offsets, while dictation
-    /// is on. The field underlines them until they settle (#448).
-    var heardWords: Range<Int>? { isListening ? text.heardWords : nil }
+    /// is on. The field underlines them until they settle (#448). Nil when those words
+    /// came late: the pulse shows instead (#2515).
+    var heardWords: Range<Int>? {
+        guard isListening, !volatileIsLate else { return nil }
+        return text.heardWords
+    }
 
     /// Whether the system has been asked yet. Used to put our own words in front of
     /// the system's alert the first time.
@@ -209,17 +224,16 @@ final class Dictation {
     }
 
     private func listen(for thisRun: Int, vocabulary: [String]) async {
-        guard let locale = await DictationTranscriber.supportedLocale(equivalentTo: Locale.current) else {
+        guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale.current) else {
             guard thisRun == run else { return }
             problem = Problem(message: "Dictation is not available for \(Locale.current.identifier).")
             return
         }
-        // Punctuation and capitals as system dictation writes them, and the words still
-        // being heard as they are heard, so they can be shown and settled in place.
-        let transcriber = DictationTranscriber(locale: locale, contentHints: [],
-                                               transcriptionOptions: [.punctuation],
-                                               reportingOptions: [.volatileResults, .frequentFinalization],
-                                               attributeOptions: [])
+        // The newer on-device model (#2515). Volatile results are the live words. It has
+        // no punctuation switch: the model writes the punctuation.
+        let transcriber = SpeechTranscriber(locale: locale, transcriptionOptions: [],
+                                            reportingOptions: [.volatileResults],
+                                            attributeOptions: [])
         do {
             // The model for this language, the first time: a download the system shares
             // with every app, and a no-op once it is there.
@@ -237,11 +251,9 @@ final class Dictation {
         let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber])
         let (input, feed) = AsyncStream<AnalyzerInput>.makeStream()
         do {
-            if !vocabulary.isEmpty {
-                let context = AnalysisContext()
-                context.contextualStrings[.general] = vocabulary
-                try await analyzer.setContext(context)
-            }
+            let context = AnalysisContext()
+            context.contextualStrings[.general] = DictationVocabulary.merging(vocabulary)
+            try await analyzer.setContext(context)
             try await analyzer.start(inputSequence: input)
         } catch {
             feed.finish()
@@ -272,6 +284,9 @@ final class Dictation {
             return
         }
         self.analyzer = analyzer
+        listeningSince = clock.now
+        judgedVolatile = false
+        volatileIsLate = false
         isListening = true
 
         // Called with every result, on the analyser's own schedule. Each is the words for
@@ -294,6 +309,11 @@ final class Dictation {
     }
 
     private func heard(_ words: String, final: Bool, from start: Double) {
+        if !final, !judgedVolatile, let listeningSince {
+            judgedVolatile = true
+            let lag = clock.now - listeningSince - Duration.seconds(start)
+            if lag > Self.lateVolatile { volatileIsLate = true }
+        }
         guard text.heard(words, final: final, from: start) else { return }
         onChange?(text.text, text.selection)
     }
@@ -392,6 +412,9 @@ final class Dictation {
         run += 1
         onChange = nil
         isListening = false
+        volatileIsLate = false
+        listeningSince = nil
+        judgedVolatile = false
         closeMicrophone()
         results?.cancel()
         results = nil

@@ -9,7 +9,7 @@ import Observation
 /// Voice mode (#2322): the person talks to one chat and hears its replies.
 ///
 /// One chat at a time, for the whole app. While it is on, the microphone listens through
-/// `Dictation` (on the device). A pause of 2 seconds after some words sends them, with
+/// `Dictation` (`SpeechTranscriber`, on the device, #2515). A pause of 2 seconds after some words sends them, with
 /// `voice` set so the daemon asks for a short spoken reply. Words said while a turn runs
 /// are sent the same way, and wait on the chat's queue (#95). The reply
 /// (`TurnParts.replyText`, never the thoughts or the steps) is cleaned by `Speakable` and

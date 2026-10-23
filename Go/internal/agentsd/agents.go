@@ -130,9 +130,12 @@ func (d *Daemon) editQueued(r wire.EditQueuedRequest) (wire.EditQueuedResult, er
 }
 
 // voicePreface is what the runtime reads before words sent from voice mode (#2322): the
-// person hears the reply and does not see it. The spike's text (#1792) took Claude's
-// replies from a median of 138 words to 48, with no markdown and no paths.
+// person hears the reply and does not see it. It also says the words were dictated, so a
+// word that sounds like another is read as the one that was meant (#2515). The spike's
+// text (#1792) took Claude's replies from a median of 138 words to 48, with no markdown
+// and no paths.
 const voicePreface = "You are in voice mode. The person hears your reply and does not see it. " +
+	"The person's words were dictated. A word may be the wrong word that sounds the same. Use the names of this project. " +
 	"Answer in one to three short spoken sentences. Use plain words. " +
 	"Do not use markdown, lists, tables, code or file paths. " +
 	"If the work changed files, say what changed in one sentence. " +
