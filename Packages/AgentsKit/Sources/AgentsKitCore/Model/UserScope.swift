@@ -202,6 +202,30 @@ public enum UserScopeWords {
             : "\(partTitle(part)): turn it on to give every machine of yours what this Mac has."
     }
 
+    /// Asked before a part is turned on (#2390): on replaces every other machine's copy, and
+    /// off does not bring it back. `machines` are the person's other machines, when known.
+    public static let take = "Replace on Every Machine"
+    public static func takeTitle(_ part: DaemonAPI.UserSettingsPartName) -> String {
+        "\(partTitle(part)): the same on all your machines?"
+    }
+    public static func takeMessage(_ part: DaemonAPI.UserSettingsPartName, machines: [String]) -> String {
+        let what = partInLine(part)
+        let where_ = machines.isEmpty ? "every other machine of yours" : joined(machines)
+        return "Replaces the \(what) on \(where_) with this Mac’s, and gives each new machine of yours this Mac’s too. "
+            + "Turning this off later does not bring the old ones back."
+    }
+
+    /// A part's title inside a sentence.
+    static func partInLine(_ part: DaemonAPI.UserSettingsPartName) -> String {
+        part == .mcpServers ? partTitle(part) : partTitle(part).lowercased()
+    }
+
+    /// "A", "A and B", "A, B and C".
+    static func joined(_ names: [String]) -> String {
+        guard let last = names.last, names.count > 1 else { return names.first ?? "" }
+        return names.dropLast().joined(separator: ", ") + " and " + last
+    }
+
     public static let stop = "Each Machine Its Own"
     public static func stopTitle(_ part: DaemonAPI.UserSettingsPartName) -> String { "\(partTitle(part)): each machine its own?" }
     public static let stopMessage = "Each machine keeps what it has now, and changes it in its own pane."
