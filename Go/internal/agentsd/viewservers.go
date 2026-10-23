@@ -238,8 +238,8 @@ func (c *viewCatalog) appTool(name string) bool {
 	return false
 }
 
-// viewCatalogVersion is what a catalog made now holds: 2 added NeedsArguments and Title.
-const viewCatalogVersion = 2
+// viewCatalogVersion is what a catalog made now holds: 3 requires a listed resource for each view tool.
+const viewCatalogVersion = 3
 
 // viewCatalogFresh is how long a catalog is kept: a server's tools can change without its
 // entry changing.
@@ -248,6 +248,24 @@ const viewCatalogFresh = 24 * time.Hour
 // makeViewCatalog is ServerViewCatalog.make, from tools/list and resources/list.
 func makeViewCatalog(server string, tools, resources []json.RawMessage, at time.Time) viewCatalog {
 	c := viewCatalog{Version: viewCatalogVersion, Server: server, MadeAt: at, Tools: []viewTool{}, AppTools: []string{}, Resources: []viewResource{}}
+	resourceURIs := make(map[string]struct{}, len(resources))
+	for _, raw := range resources {
+		var r struct {
+			URI      string  `json:"uri"`
+			Name     *string `json:"name"`
+			Title    *string `json:"title"`
+			MimeType *string `json:"mimeType"`
+		}
+		if json.Unmarshal(raw, &r) != nil || !strings.HasPrefix(r.URI, "ui://") {
+			continue
+		}
+		resourceURIs[r.URI] = struct{}{}
+		name := r.Name
+		if name == nil {
+			name = r.Title
+		}
+		c.Resources = append(c.Resources, viewResource{URI: r.URI, Name: name, MimeType: r.MimeType, Title: r.Title})
+	}
 	for _, raw := range tools {
 		var t struct {
 			Name string `json:"name"`
@@ -285,24 +303,13 @@ func makeViewCatalog(server string, tools, resources []json.RawMessage, at time.
 		if !strings.HasPrefix(uri, "ui://") {
 			continue
 		}
-		c.Tools = append(c.Tools, viewTool{Name: t.Name, ResourceURI: uri, Visibility: seen, ReadOnly: t.Annotations.ReadOnlyHint,
-			NeedsArguments: len(t.InputSchema.Required) > 0})
-	}
-	for _, raw := range resources {
-		var r struct {
-			URI      string  `json:"uri"`
-			Name     *string `json:"name"`
-			Title    *string `json:"title"`
-			MimeType *string `json:"mimeType"`
-		}
-		if json.Unmarshal(raw, &r) != nil || !strings.HasPrefix(r.URI, "ui://") {
+		// A tool's metadata alone does not make it a view. Require the server to list the
+		// resource too, or a successful ordinary tool call can become an unreadable view.
+		if _, listed := resourceURIs[uri]; !listed {
 			continue
 		}
-		name := r.Name
-		if name == nil {
-			name = r.Title
-		}
-		c.Resources = append(c.Resources, viewResource{URI: r.URI, Name: name, MimeType: r.MimeType, Title: r.Title})
+		c.Tools = append(c.Tools, viewTool{Name: t.Name, ResourceURI: uri, Visibility: seen, ReadOnly: t.Annotations.ReadOnlyHint,
+			NeedsArguments: len(t.InputSchema.Required) > 0})
 	}
 	return c
 }

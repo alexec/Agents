@@ -8,8 +8,11 @@ description: How the app draws a tool's ui:// view (MCP Apps) on the Mac, the iP
 A tool can come with a view of its own: a small page, drawn in the conversation where the
 tool was called, that shows the result better than text could and that you can work with.
 This is MCP Apps ([SEP-1865, 2026-01-26](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx)):
-a tool names a `ui://` resource, the resource is HTML, and the view talks to the app over
+a tool names a `ui://` resource that its server also lists, the resource is HTML, and the view talks to the app over
 `postMessage` in JSON-RPC.
+
+If the resource is not listed, the host treats the call as a normal tool call. If a listed
+resource cannot be read, the call's result stays visible below the view error.
 
 The app draws views from its own `agents` server, from the `github` server
 ([The github server's views](#the-github-servers-views)), and from your own connectors (MCP servers)
