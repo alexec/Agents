@@ -74,8 +74,36 @@ struct VoiceModeButton: View {
 /// Escape) to end it.
 struct VoiceModeBar: View {
     private var voice: VoiceMode { VoiceMode.shared }
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverIsOn
+
+    /// VoiceOver, or a walk that says it is on (#2446).
+    private var tellsVoiceOver: Bool { voiceOverIsOn || voice.walkVoiceOver }
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            strip
+            // Its speech is a voice the microphone hears (#2446).
+            if tellsVoiceOver {
+                Text(VoiceModeWords.voiceOverNote)
+                    .appText(.supporting)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 14)
+            }
+        }
+        // VoiceOver is told what only the strip says: on, off, and what it waits for. The
+        // voice and the sounds say the rest (#2446).
+        .onAppear {
+            if tellsVoiceOver { voice.announce(VoiceModeWords.on) }
+        }
+        .onDisappear {
+            if tellsVoiceOver { voice.announce(VoiceModeWords.off) }
+        }
+        .onChange(of: voice.phase == .listening ? voice.hint : "") { _, hint in
+            if tellsVoiceOver { voice.announce(hint) }
+        }
+    }
+
+    private var strip: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "waveform")
                 .appText(.reading)

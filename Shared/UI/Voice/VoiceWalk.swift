@@ -11,6 +11,7 @@ import Foundation
 ///     {"cmd": "voice", "heard": "Fix the bug."}         words as if heard, then the pause
 ///     {"cmd": "voice", "sendFails": true}               the prompts heard next do not go, until false
 ///     {"cmd": "voice", "refuse": true}                  the microphone as if refused: voice mode's alert
+///     {"cmd": "voice", "voiceOver": true}               as if VoiceOver were on: its note and announcements
 ///     {"cmd": "voice", "wake": "Hey Agents, hi."}       words as if the wake listener heard them (Mac, #2420)
 @MainActor
 enum VoiceWalk {
@@ -27,6 +28,9 @@ enum VoiceWalk {
         }
         if request["refuse"] as? Bool == true {
             voice.walkRefuseMicrophone()
+        }
+        if let voiceOver = request["voiceOver"] as? Bool {
+            voice.walkVoiceOver = voiceOver
         }
         if let heard = request["heard"] as? String {
             voice.walkHeard(heard)
@@ -46,6 +50,7 @@ enum VoiceWalk {
             "hint": voice.hint,
             "waitingForReply": voice.isWaitingForReply,
             "said": voice.said,
+            "announced": voice.announcements,
             "problem": voice.problem ?? "",
             "woke": woke as Any,
         ]
