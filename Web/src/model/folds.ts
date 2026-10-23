@@ -51,14 +51,6 @@ export class Folds {
   readonly showsArchivedProjects = computed(() => boolPreference(preferenceKeys.showsArchivedProjects) ?? false);
   readonly showsStatus = computed(() => boolPreference(preferenceKeys.showsActivity) ?? true);
   readonly showsUsage = computed(() => boolPreference(preferenceKeys.showsUsage) ?? true);
-  /** A project's sessions under a Sessions row (#2312), as the window's groupsSessions: on until turned off. */
-  readonly groupsSessions = computed(() => boolPreference(preferenceKeys.groupsSessions) ?? true);
-
-  setGroupsSessions(on: boolean): void {
-    if (this.groupsSessions.peek() === on) return;
-    setPreferences({ [preferenceKeys.groupsSessions]: on });
-  }
-
   setShowsArchivedProjects(isOpen: boolean): void {
     if (this.showsArchivedProjects.peek() === isOpen) return;
     setPreferences({ [preferenceKeys.showsArchivedProjects]: isOpen });

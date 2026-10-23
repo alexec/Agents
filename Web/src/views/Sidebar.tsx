@@ -540,9 +540,9 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   const workflows = allWorkflows.filter((w) => !w.isArchived && !flowPins.includes(w.workflow.workflowID));
   const archivedWorkflows = allWorkflows.filter((w) => w.isArchived);
   const workflowsOpen = searching || folds.isWorkflowsOpen(host.id, folder);
-  // Under a Sessions row, as the workflows are under theirs (#2312), unless Settings ▸ Sidebar turns it
-  // off; not in a tab of the project alone, whose group is headed Sessions already. A search holds it open.
-  const groupsSessions = folds.groupsSessions.value && !isAlone && sessions.length > 0;
+  // Under a Sessions row, as the workflows are under theirs (#2312), the only layout (#2381); not in a
+  // tab of the project alone, whose group is headed Sessions already. A search holds it open.
+  const groupsSessions = !isAlone && sessions.length > 0;
   const sessionsOpen = searching || folds.isSessionsOpen(host.id, folder);
   const nameMatches = label.toLowerCase().includes(query.toLowerCase());
   if (searching && sessions.length === 0 && archived.length === 0 && workflows.length === 0

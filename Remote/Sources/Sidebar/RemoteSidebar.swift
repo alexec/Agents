@@ -565,8 +565,6 @@ struct RemoteProjectFold: View {
     @State private var fillingDropbox = false
     /// The smart groups turned off in Settings ▸ Sidebar (#846).
     @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = SidebarSmartRow.offAtFirst
-    /// Settings ▸ Sidebar: the sessions under a Sessions row (#2312), kept on the Mac's host.
-    @AppStorage(DisplayPreference.groupsSessions) private var groupsSessions = DisplayPreference.groupsSessionsDefault
     /// The smart groups the list draws, when not those Settings turns on (#1089).
     var smartGroups: Set<SidebarSmartRow>? = nil
     /// Drawn in a project's own scene (#1089).
@@ -646,10 +644,11 @@ struct RemoteProjectFold: View {
     }
 
     /// The project's live sessions, as the Mac's `ProjectFold` draws them (#2312): under a
-    /// Sessions row, open until closed and kept per project, held open by a search.
+    /// Sessions row, open until closed and kept per project, held open by a search. The
+    /// only layout (#2381); not in a project's own scene, whose group is Sessions already.
     @ViewBuilder
     private func sessionsFold(_ fold: SidebarProjectFold) -> some View {
-        let grouped = groupsSessions && !inScene && !fold.sessions.isEmpty
+        let grouped = !inScene && !fold.sessions.isEmpty
         let isOpen = !grouped || fold.isSearching || folds.isOpen(key, .sessions)
         if grouped {
             SidebarFoldRow(title: "Sessions", count: fold.sessions.count, isOpen: isOpen) {

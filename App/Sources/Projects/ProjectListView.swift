@@ -458,9 +458,6 @@ struct ProjectFold: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
     @AppStorage(SidebarSmartRow.offDefaultsKey, store: WindowDefaults.store) private var smartOff = SidebarSmartRow.offAtFirst
-    /// Settings ▸ Sidebar: the sessions under a Sessions row (#2312), kept on the host.
-    @AppStorage(DisplayPreference.groupsSessions, store: WindowDefaults.store)
-    private var groupsSessions = DisplayPreference.groupsSessionsDefault
     @Environment(WindowRequests.self) private var requests
     let summary: DaemonAPI.ProjectSummary
     let folds: SidebarFolds
@@ -499,9 +496,9 @@ struct ProjectFold: View {
                 // Then every other live session, newest first, its state a mark on the
                 // row rather than a heading over it (#495). Each under the session that
                 // started it, folded (#835). Under a Sessions row, as the workflows are
-                // under theirs (#2312), unless Settings ▸ Sidebar turns it off; not in a
-                // project's own window, whose group is headed Sessions already.
-                let grouped = groupsSessions && !inWindow && !fold.sessions.isEmpty
+                // under theirs (#2312), the only layout (#2381); not in a project's own
+                // window, whose group is headed Sessions already.
+                let grouped = !inWindow && !fold.sessions.isEmpty
                 let sessionsOpen = !grouped || fold.isSearching || folds.isOpen(key, .sessions)
                 if grouped {
                     SidebarFoldRow(title: "Sessions", count: fold.sessions.count, isOpen: Binding(
