@@ -84,6 +84,21 @@ final class VoiceMode {
 
     func isOn(in agentID: UUID) -> Bool { self.agentID == agentID && phase != .off }
 
+    /// What the prompt field says while it is empty in voice mode: what it waits for, or
+    /// the sentence being said.
+    var hint: String {
+        switch phase {
+        case .off: ""
+        case .loading: "Getting the voice ready…"
+        case .sending: "Sending…"
+        case .speaking: saying ?? "Speaking…"
+        case .listening:
+            if isAsking { "Say your answer." }
+            else if isWaitingForReply { "Working on it. You can say more." }
+            else { "Say what you want. Esc ends voice mode." }
+        }
+    }
+
     /// Turns voice mode on in a chat. `send` sends words to it as a voice prompt, and says
     /// whether the host took them.
     func turnOn(in agentID: UUID, vocabulary: [String] = [], send: @escaping (String) async -> Bool) {

@@ -102,13 +102,7 @@ struct PromptBar: View {
             if sending > 0, sendingIsSlow {
                 Telling(host: model.answerRecipient(agent.id), doing: "Sending")
             }
-            // Voice mode in this chat (#2322) takes the field's place: what it hears and
-            // says (#2375).
-            if VoiceMode.shared.isOn(in: agent.id) {
-                VoiceModeField(agentID: agent.id)
-            } else {
-                field
-            }
+            field
             if isShowingEverything { options }
         }
         .task(id: sending > 0) {
@@ -181,7 +175,10 @@ struct PromptBar: View {
 
     private var field: some View {
         HStack(alignment: .bottom, spacing: 8) {
-            TextField(policyRefusal ?? PromptWords.placeholder(for: agent), text: $text, selection: $selection, axis: .vertical)
+            // Voice mode writes what it hears here, and says what it is doing (#2375).
+            TextField(policyRefusal ?? (VoiceMode.shared.isOn(in: agent.id) ? VoiceMode.shared.hint : PromptWords.placeholder(for: agent)),
+                      text: $text, selection: $selection, axis: .vertical)
+                .voiceModeWrites(into: $text, in: agent.id)
                 .textFieldStyle(.plain)
                 .appText(.reading)
                 .lineLimit(1...8)
