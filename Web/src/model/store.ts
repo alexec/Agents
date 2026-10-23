@@ -14,7 +14,7 @@ import type {
   GuardedChange, GuardedChangeReading, HostJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
-  PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest } from "../protocol/generated";
+  PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, RemoveRequest } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
@@ -429,6 +429,9 @@ export class Work {
   readonly linkRequests = signal<ChannelLinkRequest[]>([]);
   /** Requests for an MCP server or skill waiting for an admin (#2019, M5); empty for a member. */
   readonly governanceRequests = signal<CatalogRequest[]>([]);
+  /** People their provider's SCIM deleted, suspended until an admin removes them (#1002); empty for a member. Here,
+   * not in the Requests page, so the Console's count has them (#2436). */
+  readonly removeRequests = signal<RemoveRequest[]>([]);
   /** Goes up on each control/governanceRequested, so a person's own requests load again. */
   readonly governanceChanges = signal(0);
   /** Whom an admin may send a link request on to (#1762); empty for a member. */
@@ -1218,7 +1221,8 @@ export class Store extends Work {
         return;
       }
       if (method === "control/peopleChanged") {
-        void this.loadPeople().then(() => this.loadLinkRequests()).then(() => { this.peopleChanges.value += 1; });
+        void this.loadPeople().then(() => Promise.all([this.loadLinkRequests(), this.loadRemoveRequests()]))
+          .then(() => { this.peopleChanges.value += 1; });
         return;
       }
       if (method === "control/capReached") {
@@ -1286,7 +1290,7 @@ export class Store extends Work {
   load(): Promise<void> {
     return this.once("*", async () => {
       const [hosts] = await Promise.all([this.link.call("hosts/list", {}), this.loadPlane(), this.loadKept(), this.loadJoinRequests(),
-        this.loadPeople().then(() => Promise.all([this.loadLinkRequests(), this.loadGovernanceRequests()])),
+        this.loadPeople().then(() => Promise.all([this.loadLinkRequests(), this.loadGovernanceRequests(), this.loadRemoveRequests()])),
         this.loadSignInRequests()]);
       this.takeHosts(hosts);
       await Promise.all(this.hosts.value.filter((host) => hostAnswers(host.state)).map((host) => this.onHost(host.id, async () => {
@@ -1389,6 +1393,12 @@ export class Store extends Work {
     const listed = admin ? await this.link.call("governance/requests", {}).then((l) => l.requests, () => []) : [];
     // An admin's own decided ones come too, for Settings ▸ Policy: the Console has the waiting ones.
     this.governanceRequests.value = listed.filter((r) => r.state === "waiting");
+  }
+
+  /** An admin's SCIM removals waiting (#1002, #2436); a member, or a control plane before SCIM, has none. */
+  async loadRemoveRequests(): Promise<void> {
+    const admin = this.people.value?.admin ?? false;
+    this.removeRequests.value = admin ? await this.link.call("people/removeRequests", {}).then((r) => r.requests, () => []) : [];
   }
 
   /** Link requests (#1762), and for an admin whom to send them on to; a control plane before links has none. */

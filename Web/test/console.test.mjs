@@ -103,3 +103,8 @@ test("Live Now (#2019, M9) says each agent's state and cost, and adds up the boa
   assert.deepEqual(c.liveMachines(board).map((m) => [m.host, m.agents.length]), [["H1", 2], ["H2", 1]]);
   assert.ok(c.consoleSections.some((s) => s.id === "live" && s.built));
 });
+
+test("the Requests count has the people SCIM removed (#2436)", () => {
+  assert.equal(c.waitingCount({ joins: 0, links: 0, capped: 0, governance: 0, removals: 2 }), 2);
+  assert.equal(c.waitingCount({ joins: 1, links: 1, capped: 1, governance: 1, removals: 1 }), 5);
+});

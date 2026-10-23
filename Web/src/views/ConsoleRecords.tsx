@@ -5,7 +5,7 @@ import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import type { ChannelLinkRequest, PersonRow, RemoveRequest } from "../protocol/generated";
-import { failedWords, linkWords, noRequests, requestsFoot } from "../model/console";
+import { failedWords, linkWords, noRequests, requestsFoot, waitingCount } from "../model/console";
 import { capReachedWords } from "../model/teamGroups";
 import { liveJoins } from "../model/people";
 import { liveRequests, withoutRequest } from "../model/channelLinks";
@@ -57,13 +57,12 @@ export function RequestsPage({ store, down }: { store: Store; down: boolean }) {
   // Every bot stopped at a cap, while it is true (#2073, #2088).
   const capped = store.capped.value;
   // A person their provider's SCIM deleted, suspended until an admin removes them (#1002, FR-017, FR-031).
-  const removals = useSignal<RemoveRequest[]>([]);
+  // In the store, so the Console's count has them too (#2436).
+  const removals = store.removeRequests;
   const removing = useSignal<PersonRow | null>(null);
-  const loadRemovals = () => store.link.call("people/removeRequests", {}).then((r) => { removals.value = r.requests; }, () => {});
-  const changes = store.peopleChanges.value;
-  useEffect(() => { if (!down) void loadRemovals(); }, [down, changes]);
-  const none = joins.length === 0 && links.length === 0 && capped.length === 0 && removals.value.length === 0 &&
-    store.governanceRequests.value.length === 0;
+  const loadRemovals = () => store.loadRemoveRequests();
+  useEffect(() => { if (!down) void loadRemovals(); }, [down]);
+  const none = requestCount(store) === 0;
   return (
     <div class="requests">
       {problem.value && <p class="hint" role="alert">{problem.value}</p>}
@@ -140,11 +139,11 @@ export function RequestsPage({ store, down }: { store: Store; down: boolean }) {
   );
 }
 
-/** How many requests wait, for the Console's list and its Overview: machines, channel identities, capped bots (#2070), and
- * asks for an MCP server or skill (#2019, M5). */
+/** How many requests wait, for the Console's list and its Overview: machines, channel identities, capped bots (#2070),
+ * asks for an MCP server or skill (#2019, M5), and people SCIM removed (#2436). */
 export function requestCount(store: Store): number {
-  return liveJoins(store.joinRequests.value).length + liveRequests(store.linkRequests.value).length + store.capped.value.length +
-    store.governanceRequests.value.length;
+  return waitingCount({ joins: liveJoins(store.joinRequests.value).length, links: liveRequests(store.linkRequests.value).length,
+    capped: store.capped.value.length, governance: store.governanceRequests.value.length, removals: store.removeRequests.value.length });
 }
 
 /** "Acme Okta deleted Bea on 12 Oct at 09:30. Bea is suspended until you remove them." */
