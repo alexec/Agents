@@ -60,6 +60,8 @@ const (
 	Labelled  Kind = "labelled"
 	Commented Kind = "commented"
 	Closed    Kind = "closed"
+	// Assigned is to the connection's owner (#2034).
+	Assigned Kind = "assigned"
 )
 
 // Activity is one thing that happened to an issue.
@@ -89,6 +91,8 @@ func (a Activity) data() map[string]any {
 		d["commentedAt"] = a.At
 	case Closed:
 		d["reason"], d["by"], d["closedAt"] = a.Reason, a.By.name(), a.At
+	case Assigned:
+		d["by"], d["assignedAt"] = a.By.name(), a.At
 	}
 	return d
 }

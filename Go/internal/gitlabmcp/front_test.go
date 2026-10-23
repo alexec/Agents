@@ -151,7 +151,7 @@ func TestTheFrontOffersEventsAndTools(t *testing.T) {
 	equal(t, missing["result"].(map[string]any)["isError"], true, "no such comment")
 
 	events := call(20, "events/list", map[string]any{})["result"].(map[string]any)["events"].([]any)
-	equal(t, len(events), 10, "events")
+	equal(t, len(events), 12, "events")
 	poll := call(21, "events/poll", map[string]any{"name": "pr.merged", "arguments": map[string]any{}, "cursor": nil})
 	equal(t, poll["result"].(map[string]any)["events"], []any{}, "first poll")
 	unknown := call(22, "events/poll", map[string]any{"name": "pr.reopened", "arguments": map[string]any{}, "cursor": nil})

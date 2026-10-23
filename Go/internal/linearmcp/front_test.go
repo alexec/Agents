@@ -85,7 +85,7 @@ func TestTheFrontOffersEventsAndTheIssuesView(t *testing.T) {
 	equal(t, refused["isError"], true, "a closed state is refused")
 
 	events := call(5, "events/list", map[string]any{})["result"].(map[string]any)["events"].([]any)
-	equal(t, len(events), 4, "events")
+	equal(t, len(events), 5, "events")
 	poll := call(6, "events/poll", map[string]any{"name": "issue.opened", "arguments": map[string]any{"team": "ENG"}, "cursor": nil})
 	equal(t, poll["result"].(map[string]any)["events"], []any{}, "first poll")
 	unknown := call(7, "events/poll", map[string]any{"name": "issue.reopened", "arguments": map[string]any{}, "cursor": nil})

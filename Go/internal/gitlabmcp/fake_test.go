@@ -8,7 +8,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -213,7 +215,7 @@ func (f *fakeGitLab) serve(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.Atoi(parts[1])
 		answer(200, orEmpty(f.labelled[id]))
 	case len(parts) == 1 && parts[0] == "merge_requests":
-		answer(200, stated(f.mrs, "state", q.Get("state")))
+		answer(200, whose(stated(f.mrs, "state", q.Get("state")), q))
 	case len(parts) == 2 && parts[0] == "merge_requests":
 		if o, ok := byIID(f.mrs, "iid", parts[1]); ok {
 			answer(200, o)
@@ -266,7 +268,7 @@ func (f *fakeGitLab) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		answer(200, list)
 	case len(parts) == 1 && parts[0] == "issues":
-		answer(200, stated(f.issues, "state", q.Get("state")))
+		answer(200, whose(stated(f.issues, "state", q.Get("state")), q))
 	case len(parts) == 2 && parts[0] == "issues":
 		if o, ok := byIID(f.issues, "iid", parts[1]); ok {
 			answer(200, o)
@@ -292,4 +294,33 @@ func orEmpty(list []obj) []obj {
 		return []obj{}
 	}
 	return list
+}
+
+// whose narrows a list as GitLab's author_username, reviewer_username and assignee_username do (#2034).
+func whose(list []obj, q url.Values) []obj {
+	named := func(o obj, key string) []string {
+		var out []string
+		switch v := o[key].(type) {
+		case obj:
+			out = append(out, fmt.Sprint(v["username"]))
+		case []obj:
+			for _, u := range v {
+				out = append(out, fmt.Sprint(u["username"]))
+			}
+		}
+		return out
+	}
+	out := []obj{}
+	for _, o := range list {
+		keep := true
+		for param, key := range map[string]string{"author_username": "author", "reviewer_username": "reviewers", "assignee_username": "assignees"} {
+			if want := q.Get(param); want != "" && !slices.Contains(named(o, key), want) {
+				keep = false
+			}
+		}
+		if keep {
+			out = append(out, o)
+		}
+	}
+	return out
 }

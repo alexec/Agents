@@ -59,11 +59,11 @@ var Made = []Ours{
 }
 
 var (
-	githubEvents = []string{"checks.failed", "pr.opened", "pr.merged", "pr.closed", "pr.conflicted",
-		"review.posted", "review.comment", "issue.opened", "issue.labelled", "issue.commented", "issue.closed"}
-	linearEvents = []string{"issue.opened", "issue.labelled", "issue.commented", "issue.closed"}
-	gitlabEvents = []string{"checks.failed", "pr.opened", "pr.merged", "pr.closed", "pr.conflicted", "review.comment",
-		"issue.opened", "issue.labelled", "issue.commented", "issue.closed"}
+	githubEvents = []string{"checks.failed", "pr.opened", "pr.merged", "pr.closed", "pr.conflicted", "review.requested",
+		"review.posted", "review.comment", "issue.opened", "issue.labelled", "issue.commented", "issue.closed", "issue.assigned"}
+	linearEvents = []string{"issue.opened", "issue.labelled", "issue.commented", "issue.closed", "issue.assigned"}
+	gitlabEvents = []string{"checks.failed", "pr.opened", "pr.merged", "pr.closed", "pr.conflicted", "review.requested", "review.comment",
+		"issue.opened", "issue.labelled", "issue.commented", "issue.closed", "issue.assigned"}
 	emailEvents = []string{"email.received"}
 )
 

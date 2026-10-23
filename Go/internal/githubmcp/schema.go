@@ -63,7 +63,7 @@ func (s schema) lookup(name string) (property, bool) {
 type args struct {
 	repo, branch, label string
 	pr, issue           int
-	anyone              bool
+	anyone, mine        bool
 }
 
 // check reads raw (null or missing as {}) and checks it: no unknown keys, types, shapes.
@@ -114,7 +114,11 @@ func (s schema) check(raw json.RawMessage) (args, *rpcError) {
 			if err := json.Unmarshal(value, &b); err != nil || string(value) == "null" {
 				return a, invalidParams("%s must be true or false", key)
 			}
-			a.anyone = b
+			if key == "mine" {
+				a.mine = b
+			} else {
+				a.anyone = b
+			}
 		default:
 			var text string
 			if err := json.Unmarshal(value, &text); err != nil || string(value) == "null" {

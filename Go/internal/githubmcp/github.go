@@ -173,6 +173,26 @@ type GitHub interface {
 	CodeRabbitPRs(ctx context.Context, repo string) ([]ReviewedPR, error)
 	// CodeRabbitComments are CodeRabbit's review comments made at or after since.
 	CodeRabbitComments(ctx context.Context, repo, since string) (comments []CodeRabbitComment, truncated bool, err error)
+	// Yours is what the connection's owner has in the repo (#2034).
+	Yours(ctx context.Context, repo string) (Yours, error)
+}
+
+// Yours is what the connection's owner has in a repo (#2034): their login, their open PRs, the
+// open PRs that ask them for a review, and the open issues assigned to them.
+type Yours struct {
+	Login    string
+	PRs      []int
+	Reviews  []OpenPR
+	Assigned []Issue
+}
+
+func (y Yours) owns(pr int) bool {
+	for _, n := range y.PRs {
+		if n == pr {
+			return true
+		}
+	}
+	return false
 }
 
 // ErrorKind is why a GitHub call failed.
