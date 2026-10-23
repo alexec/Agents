@@ -34,6 +34,11 @@ struct OrgPolicyPane: View {
 
     private var isAdmin: Bool { people.you?.isAdmin == true }
 
+    private struct Reload: Hashable {
+        var connected: Bool
+        var policy: Int
+    }
+
     private struct Ask: Identifiable {
         var on: Bool
         var running: Int?
@@ -125,7 +130,9 @@ struct OrgPolicyPane: View {
             }
         }
         .paperForm()
-        .task(id: control != nil) {
+        // Again when another admin or client changes the policy, the kill switch or the routes
+        // (#2392), as the web page does.
+        .task(id: Reload(connected: control != nil, policy: people.policyRevision)) {
             while !(await load()), !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(3))
             }
