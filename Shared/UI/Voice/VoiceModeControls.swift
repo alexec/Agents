@@ -89,6 +89,12 @@ struct VoiceModeBar: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
+            // While an answer waits two seconds for a "no", a touch can stop it too (#2443).
+            if voice.confirmLine != nil {
+                Button("Don't Send") { voice.dontSend() }
+                    .buttonStyle(.paper)
+                    .help("Don't send this answer; the question is asked again")
+            }
             Button {
                 voice.turnOff()
             } label: {
@@ -111,7 +117,7 @@ struct VoiceModeBar: View {
     /// The words heard, or the sentence being said, or what it waits for.
     private var words: String {
         switch voice.phase {
-        case .listening, .sending: voice.heard.isEmpty ? voice.hint : voice.heard
+        case .listening, .sending: voice.heard.isEmpty || voice.confirmLine != nil ? voice.hint : voice.heard
         default: voice.hint
         }
     }
