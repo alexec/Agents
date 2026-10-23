@@ -336,6 +336,72 @@ func TestAGitHubSignInWaitsForThePersonsApprove(t *testing.T) {
 	noSecretKept(t, p, token, second)
 }
 
+// #2097 (FR-014a, FR-014b): a browser asks by a sign-in's email; the person's card has no
+// code, and Approve needs the code the browser shows. An account nobody has waits the same.
+func TestABrowserPairsByApprovalWithItsCode(t *testing.T) {
+	f := newProvidersFake(t)
+	p, _, owner := signInPlane(t, f)
+	sam := p.invite(owner, "Sam", wire.UserRoleMember)
+	if _, e := addToMe(t, sam.window, sam.member, signin.Google, func(n string) string {
+		return f.mint(signin.Google, "sam-google", n, signintest.Claims{"email": "sam@example.com"})
+	}); e != "" {
+		t.Fatal(e)
+	}
+	ask := func(account string) (chan error, func() string, chan *controllink.ClientMembership, context.CancelFunc) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		var mu sync.Mutex
+		shown := ""
+		done, member := make(chan error, 1), make(chan *controllink.ClientMembership, 1)
+		go func() {
+			m, err := controllink.SignInByApproval(ctx, p.url, "", nil, "Chrome on Mac", account, func(w wire.SignInWaiting) {
+				mu.Lock()
+				shown = w.Code
+				mu.Unlock()
+			})
+			member <- m
+			done <- err
+		}()
+		return done, func() string { mu.Lock(); defer mu.Unlock(); return shown }, member, cancel
+	}
+
+	// Nobody has this account: a code is shown, and nobody is asked.
+	_, shownNobody, _, stop := ask("nobody@example.com")
+	p.waitFor(func() bool { return shownNobody() != "" }, "the code for an account nobody has")
+	var requests []wire.SignInRequest
+	for _, s := range []*controllink.Session{sam.window, owner} {
+		json.Unmarshal(call(t, s, "", "signIn/requests", nil), &requests)
+		if len(requests) != 0 {
+			t.Fatalf("an account nobody has asked %+v", requests)
+		}
+	}
+	stop()
+
+	done, shown, member, cancel := ask("SAM@example.com")
+	defer cancel()
+	note := waitNote(t, sam.window, "control/signInRequested")
+	var asked wire.SignInRequest
+	json.Unmarshal(note.Params, &asked)
+	p.waitFor(func() bool { return shown() != "" }, "the code in the browser")
+	if asked.Code != "" || asked.Provider != "browser" || asked.Kind != "browser" || deref(asked.Login) != "SAM@example.com" {
+		t.Fatalf("the card is %+v", asked)
+	}
+	for _, typed := range []*string{nil, new("WRONG1")} {
+		if e := callError(t, sam.window, "", "signIn/approve", wire.SignInDecide{Request: asked.Request, Code: typed}); !strings.Contains(e, "not the code") {
+			t.Fatalf("approved with %v: %s", typed, e)
+		}
+	}
+	typed := strings.ToLower(shown()[:3]) + " " + shown()[3:]
+	call(t, sam.window, "", "signIn/approve", wire.SignInDecide{Request: asked.Request, Code: &typed})
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	// A browser connects as the page does, not as a window: its record says whose it is.
+	got := p.s.Records().Client((<-member).Client)
+	if got == nil || got.Kind != records.KindBrowser || got.Owner == nil || *got.Owner != sam.id {
+		t.Fatalf("paired as %+v", got)
+	}
+}
+
 // FR-006: with organisations allowed, a GitHub sign-in outside them is refused, to add or
 // to pair; inside one it works.
 func TestAllowedGitHubOrganisations(t *testing.T) {

@@ -144,6 +144,15 @@ Pair it again to carry on.**
 Clearing the site's data for `localhost`, or closing a private window, also loses the key.
 The control plane still lists the browser until you forget it there.
 
+### Pair by your account
+
+When a sign-in provider is on, the page on the control plane's own address shows **Sign in
+with your account** above the code. Type the email of your Google or Apple sign-in, or your
+GitHub login. The page shows a code. On one of your signed-in Macs, iPhones or iPads, type that
+code on the card that says the browser wants to sign in as you, and select **Approve**. The
+browser pairs as you. See [Sign in with Google, Apple or
+GitHub](sign-in-with-google-apple-or-github.md#pair-a-browser-by-your-approval).
+
 ### Sign in with your organisation's provider
 
 When the organisation added its own sign-in provider, the page on the control plane's own

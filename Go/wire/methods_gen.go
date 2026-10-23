@@ -512,6 +512,7 @@ var CallScimTokensMake = Method[SCIMTokenMake, SCIMTokenMade]{"scim/tokens/make"
 var CallScimTokensRevoke = Method[SCIMTokenRequest, Empty]{"scim/tokens/revoke"}
 var CallSignInAddToMe = Method[SignInAdd, SignIn]{"signIn/addToMe"}
 var CallSignInApprove = Method[SignInDecide, Empty]{"signIn/approve"}
+var CallSignInAsk = Method[SignInAsk, Admitted]{"signIn/ask"}
 var CallSignInConfigure = Method[SignInConfigure, SignInProviders]{"signIn/configure"}
 var CallSignInDeny = Method[SignInDecide, Empty]{"signIn/deny"}
 var CallSignInDiscover = Method[SignInDiscover, SignInDiscovered]{"signIn/discover"}

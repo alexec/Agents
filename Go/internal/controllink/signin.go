@@ -61,6 +61,28 @@ func SignIn(ctx context.Context, base, pin string, controlKey []byte, name, kind
 	return s.Membership(*admitted.Client)
 }
 
+// SignInByApproval pairs a browser by approval (#2097): signIn/ask with the account typed,
+// waiting is told the code to show, and it pairs once the person types it on one of their
+// clients and approves.
+func SignInByApproval(ctx context.Context, base, pin string, controlKey []byte, name, account string,
+	waiting func(wire.SignInWaiting)) (*ClientMembership, error) {
+	s, err := OpenSignIn(ctx, base, pin, controlKey, "browser")
+	if err != nil {
+		return nil, err
+	}
+	defer s.Close()
+	s.Waiting = waiting
+	raw, err := s.Call(ctx, "signIn/ask", wire.SignInAsk{Account: account, Name: name})
+	if err != nil {
+		return nil, err
+	}
+	var admitted wire.Admitted
+	if json.Unmarshal(raw, &admitted) != nil || admitted.Client == nil {
+		return nil, fmt.Errorf("signIn/ask: %s", raw)
+	}
+	return s.Membership(*admitted.Client)
+}
+
 // SignInOrg pairs a client by an org provider (#1002, D2, D3): signIn/orgStart, then
 // browse opens the address it gives in a browser and says the ticket the browser came
 // back with, then signIn/ticket on the same connection.

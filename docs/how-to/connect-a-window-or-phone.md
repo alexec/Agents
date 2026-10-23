@@ -32,7 +32,9 @@ for why every client is trusted alike, and what that risks.
 
    If Agents Host runs on that Mac, the window says **Agents Host is running on this Mac**
    instead. Click **Connect to a different control plane…**.
-4. Paste the code under **CODE** and click **Connect**.
+4. The sheet shows **SIGN IN** first. Click **Use a Code Instead…**, paste the code under
+   **CODE**, and click **Connect**. To pair with no code, see [Sign in with Google, Apple or
+   GitHub](sign-in-with-google-apple-or-github.md).
 
    The window is paired, and lists the projects on every host.
 
@@ -44,8 +46,9 @@ On the Mac that runs Agents Host, you can also get a code from Agents Host itsel
 1. In a paired window, open **Settings ▸ Control plane**, and click **Show** beside
    **Clients**.
 2. Click **Pair a Device…**. The window shows a code to scan.
-3. On the iPhone or iPad, open Agents. It says **Connect to your agents**. Tap **Scan the
-   Code** and point the camera at the code.
+3. On the iPhone or iPad, open Agents. It says **Connect to your agents**, with the sign-in
+   first. Tap **Use a Code Instead…**, then **Scan the Code**, and point the camera at the
+   code.
 
    The device is paired, and lists the projects on every host, each under its host's
    heading.

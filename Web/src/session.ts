@@ -1,11 +1,13 @@
 // The page's one connection to the control plane, and what it says about itself (071 US1):
 // unpaired, pairing, connecting, open, down, forgotten, suspended. Views read `session.state`.
-// It pairs with a code, or with the organisation's provider in the same tab (#1002, FR-026, FR-027).
+// It pairs with a code, by approval on one of the person's clients (#2097), or with the organisation's
+// provider in the same tab (#1002, FR-026, FR-027).
 import { signal } from "@preact/signals";
 import { log } from "./log";
 import { onThisMac } from "./place";
-import type { SignInDiscovered, SignInOrgProvider, SignInOrgStarted, SignInProviders, SignInTicketResult } from "./protocol/generated";
-import { byOrder, noOrgForEmail, type OIDCReturn, oidcErrorWords, pendingLive, personSuspended, requiredProvider, signInExpired } from "./model/signIn";
+import type { Admitted, SignInDiscovered, SignInOrgProvider, SignInOrgStarted, SignInProviders, SignInTicketResult,
+  SignInWaiting } from "./protocol/generated";
+import { askExpired, byOrder, noOrgForEmail, type OIDCReturn, oidcErrorWords, pendingLive, personSuspended, requiredProvider, signInExpired } from "./model/signIn";
 import { AnnounceRefused, BadServerProof, pair, Refused, type RefusalReason, WrongControlPlane } from "./wire/auth";
 import { base64url } from "./wire/bytes";
 import { parseCode } from "./wire/code";
@@ -74,6 +76,12 @@ export class Session {
   readonly orgRequired = signal<SignInOrgProvider | null>(null);
   /** An org sign-in is going: its buttons wait. */
   readonly orgBusy = signal(false);
+  /** A built-in sign-in provider is on: the page offers Sign in with your account (#2097). */
+  readonly askOn = signal(false);
+  /** The code this browser shows while it waits for approval (#2097), or null. */
+  readonly askCode = signal<string | null>(null);
+  /** The approval sign-in going, so Cancel closes it. */
+  private asking: SignInConnection | null = null;
 
   constructor(
     readonly keys: KeyStore = new IndexedKeyStore(),
@@ -173,6 +181,7 @@ export class Session {
       connection = await this.signInOnce();
       const providers = await connection.call<SignInProviders>("signIn/providers", {});
       this.orgProviders.value = byOrder(providers.orgProviders);
+      this.askOn.value = providers.providers.some((p) => p.on);
       this.discover.value = providers.discover === true && this.orgProviders.value.length > 0;
     } catch (error) {
       log("signIn.providersFailed", error instanceof CallFailed ? error.code : undefined);
@@ -199,6 +208,57 @@ export class Session {
     } finally {
       connection?.close();
     }
+  }
+
+  /**
+   * **Sign in with your account** (#2097): signIn/ask with the email or GitHub login typed, on `s:` with
+   * a new key. The page shows the code control/signInWaiting gives; once the person types it on one of
+   * their clients and approves, the key becomes this browser's and the link starts. An account nobody
+   * has waits the same, and runs out after 10 minutes.
+   */
+  async askToPair(account: string): Promise<void> {
+    if (this.asking || !account.trim()) return;
+    this.pairingError.value = null;
+    this.askCode.value = null;
+    let connection: SignInConnection | null = null;
+    try {
+      const { pair: keyPair } = await makeKeyPair();
+      const client = newClientID();
+      connection = await this.signInWith(client, keyPair.privateKey, keyPair.publicKey);
+      this.asking = connection;
+      const admitted = await connection.call<Admitted>("signIn/ask", { account: account.trim(), name: browserName() }, 11 * 60_000,
+        (method, params) => {
+          if (method === "control/signInWaiting") this.askCode.value = (params as SignInWaiting).code;
+        });
+      if (!admitted.client || admitted.client.toUpperCase() !== client) throw new Refused("bad-message");
+      // As a code's pairing keeps it: read back before it counts, so a browser that can't keep it never pairs.
+      await this.keys.save({ privateKey: keyPair.privateKey, publicKey: keyPair.publicKey, client,
+        control: connection.signedIn.control, paired: new Date().toISOString() });
+      log("pair.ask");
+      this.wasForgotten.value = false;
+      this.tabs?.postMessage("paired");
+      this.link.start();
+    } catch (error) {
+      // Cancel closed it: nothing to say.
+      if (this.asking === connection) this.pairingError.value = this.askFailure(error);
+    } finally {
+      if (this.asking === connection) this.asking = null;
+      this.askCode.value = null;
+      connection?.close();
+    }
+  }
+
+  /** Cancel while the page waits for approval. */
+  cancelAsk(): void {
+    const connection = this.asking;
+    this.asking = null;
+    this.askCode.value = null;
+    connection?.close();
+  }
+
+  private askFailure(error: unknown): string | null {
+    if (error instanceof CallFailed && /10 minutes/.test(error.message)) return askExpired;
+    return this.orgFailure(error);
   }
 
   /**

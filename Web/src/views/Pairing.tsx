@@ -1,11 +1,12 @@
 // Frame E: with no key, the page shows this and nothing else (071 US1). A code is pasted,
 // or arrives in the address from Open in Browser (#109, pairLink.ts). On the control plane's own
 // domain, its organisation's providers come first (#1002, FR-026): a button each, then Use an
-// Email when a claimed domain sends people to one, then the code.
+// Email when a claimed domain sends people to one, then Sign in with your account when a built-in
+// provider is on (#2097: approval on one of the person's clients), then the code.
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import { emailPlaceholder, looksLikeEmail, orgButton, required, suspendedFoot, suspendedFootUnpaired, suspendedLine,
-  useEmail } from "../model/signIn";
+import { askFoot, askPlaceholder, askTitle, askWaiting, emailPlaceholder, looksLikeEmail, orgButton, required, suspendedFoot,
+  suspendedFootUnpaired, suspendedLine, useEmail } from "../model/signIn";
 import { onThisMac } from "../place";
 import type { Session } from "../session";
 import { Huddle } from "./Huddle";
@@ -58,12 +59,64 @@ function OrgSignIn({ session, busy }: { session: Session; busy: boolean }) {
   );
 }
 
+/**
+ * Sign in with your account (#2097): an email or GitHub login, then the code to type on one of the
+ * person's signed-in clients while the page waits. Nothing when no built-in provider is on.
+ */
+function AskSignIn({ session, busy }: { session: Session; busy: boolean }) {
+  const account = useSignal("");
+  const going = useSignal(false);
+  if (!session.askOn.value) return null;
+  const code = session.askCode.value;
+  const ask = async () => {
+    if (busy || going.value || !account.value.trim()) return;
+    going.value = true;
+    try {
+      await session.askToPair(account.value);
+    } finally {
+      going.value = false;
+    }
+  };
+  if (going.value) {
+    return (
+      <div class="pairing-ask" role="status">
+        {code ? (
+          <>
+            <p>{askWaiting}</p>
+            <p class="pairing-ask-code"><code>{code}</code></p>
+          </>
+        ) : <p>Asking…</p>}
+        <div class="pairing-actions">
+          <button type="button" onClick={() => session.cancelAsk()}>Cancel</button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div class="pairing-ask">
+      <h2>{askTitle}</h2>
+      <div class="pairing-email">
+        <input type="text" aria-label={askPlaceholder} placeholder={askPlaceholder} autocomplete="username" spellcheck={false}
+          value={account.value} onInput={(e) => (account.value = (e.currentTarget as HTMLInputElement).value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              void ask();
+            }
+          }} />
+        <button type="button" disabled={busy || !account.value.trim()} onClick={() => void ask()}>Continue</button>
+      </div>
+      <p class="pairing-note">{askFoot}</p>
+    </div>
+  );
+}
+
 export function Pairing({ session }: { session: Session }) {
   const code = useSignal("");
   const busy = session.state.value.kind === "pairing";
   // The org providers, read once on a short sign-in connection; none on this Mac's page.
   useEffect(() => void session.loadOrgProviders(), []);
-  const org = session.orgProviders.value.length > 0 || session.orgRequired.value !== null;
+  const org = session.orgProviders.value.length > 0 || session.orgRequired.value !== null || session.askOn.value;
   const submit = (event: Event) => {
     event.preventDefault();
     if (!busy && code.value.trim()) void session.pair(code.value);
@@ -78,6 +131,7 @@ export function Pairing({ session }: { session: Session }) {
         <Huddle focused={false} typed={0} />
         <h1>Connect this browser to your agents</h1>
         <OrgSignIn session={session} busy={busy} />
+        <AskSignIn session={session} busy={busy} />
         {onThisMac() ? (
           <p>
             Get a code from Agents on this Mac: in the window,{" "}

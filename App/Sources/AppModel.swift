@@ -3205,8 +3205,8 @@ final class AppModel {
     }
 
     /// Approve or Deny on a GitHub sign-in's card (#995): a refusal is the window's alert.
-    func answerSignIn(_ request: DaemonAPI.SignInRequest, approve: Bool) async {
-        if let refused = await signIn.answer(request, approve: approve, on: controlRequests) {
+    func answerSignIn(_ request: DaemonAPI.SignInRequest, approve: Bool, code: String? = nil) async {
+        if let refused = await signIn.answer(request, approve: approve, code: code, on: controlRequests) {
             problem = refused
         }
     }

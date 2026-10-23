@@ -132,6 +132,31 @@ a[href] { cursor: pointer; }
 
 .pairing-email input { flex: 1; min-width: 0; }
 
+/* Sign in with your account (#2097): the account, then the code to type on another client. */
+.pairing-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.pairing-ask h2 { font-size: 0.875rem; margin: 0; }
+
+.pairing-ask-code code {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+}
+
+/* A browser's sign-in card (#2097): the code the person types. */
+.join-request .sign-in-code {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.join-request .sign-in-code input { max-width: 10em; font-family: var(--mono, ui-monospace, monospace); }
+
 .pairing-required {
   background: var(--paper-well);
   border-radius: var(--radius-card);

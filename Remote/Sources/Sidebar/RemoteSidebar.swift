@@ -101,7 +101,7 @@ struct RemoteSidebar: View {
                 Section {
                     ForEach(signingIn) { request in
                         SignInRequestCard(request: request, isAnswering: model.signIn.answering.contains(request.request),
-                                          answer: { approve in Task { await model.answerSignIn(request, approve: approve) } })
+                                          answer: { approve, code in Task { await model.answerSignIn(request, approve: approve, code: code) } })
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
                             .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))

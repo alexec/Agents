@@ -111,7 +111,7 @@ struct ProjectListView: View {
                 Section {
                     ForEach(signingIn) { request in
                         SignInRequestCard(request: request, isAnswering: model.signIn.answering.contains(request.request),
-                                          answer: { approve in Task { await model.answerSignIn(request, approve: approve) } })
+                                          answer: { approve, code in Task { await model.answerSignIn(request, approve: approve, code: code) } })
                             .listRowSeparator(.hidden)
                             .selectionDisabled()
                     }

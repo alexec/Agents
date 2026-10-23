@@ -19,6 +19,10 @@ struct ConnectSheet: View {
     @State private var joined: String?
     /// The pairing in flight, so Cancel stops it rather than leaving it to land later.
     @State private var attempt: Task<Void, Never>?
+    /// The code's way, not the sign-in's (#2097): sign-in comes first.
+    @State private var usingCode = false
+    /// Why the code's way came by itself: the address had no provider on.
+    @State private var noneOn = false
 
     /// What the pasted code is for, as soon as it reads as one.
     private var parsed: ControlCode? { ControlCode(text: code.trimmingCharacters(in: .whitespacesAndNewlines)) }
@@ -55,26 +59,48 @@ struct ConnectSheet: View {
             .background(.background, in: RoundedRectangle(cornerRadius: 10))
             .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(Color.secondary.opacity(0.25)) }
 
-            // With no code (#995): sign in as a person the control plane knows. First, with the
-            // organisation's own providers first in it, then the code (#1002, FR-026).
-            if joined == nil {
+            // With no code (#995): sign in as a person the control plane knows, with the
+            // organisation's own providers first in it (#1002, FR-026). First (#2097); the code
+            // is behind Use a Code Instead…, and comes by itself when no provider is on.
+            if joined == nil, !usingCode {
                 Text("SIGN IN").appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
                 SignInToPair(pair: { url, signIn, waiting in
                     let membership = try await ControlConfig.signIn(at: url, with: signIn, waiting: waiting)
                     Task { await model.adopt(.remote(membership)) }
                 }, sentence: { error in
-                    (error as? MachinePin.Refused)?.words ?? SignInToPair.words(error)
+                    let words = SignInToPair.words(error)
+                    if words == SignInWords.noneOn {
+                        Task { @MainActor in
+                            noneOn = true
+                            usingCode = true
+                        }
+                    }
+                    return (error as? MachinePin.Refused)?.words ?? words
                         ?? PairingAttempt.sentence(for: error, device: "this Mac")
                 }, done: { dismiss() })
                 Text("Type the control plane’s address. Sign in with an account added to your person there.")
                     .appText(.supporting).foregroundStyle(.secondary)
+                Button(SignInWords.useCode) {
+                    noneOn = false
+                    usingCode = true
+                }
+                .buttonStyle(.link)
+            } else {
+                Text("CODE").appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
+                if noneOn {
+                    Text(SignInWords.noneOn).appText(.supporting).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                TextField("AGT-…", text: $code)
+                    .textFieldStyle(.roundedBorder)
+                    .appText(.code)
+                Text("Paste the code, or its link. It works once, for five minutes.")
+                    .appText(.supporting).foregroundStyle(.secondary)
+                if joined == nil {
+                    Button(SignInWords.useSignIn) { usingCode = false }
+                        .buttonStyle(.link)
+                }
             }
-            Text(joined == nil ? "OR USE A CODE" : "CODE").appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
-            TextField("AGT-…", text: $code)
-                .textFieldStyle(.roundedBorder)
-                .appText(.code)
-            Text("Paste the code, or its link. It works once, for five minutes.")
-                .appText(.supporting).foregroundStyle(.secondary)
             if isHostCode, joined == nil {
                 Text(hostCodeWords)
                     .appText(.supporting)
@@ -99,9 +125,11 @@ struct ConnectSheet: View {
                         dismiss()
                     }
                     if connecting { ProgressView().controlSize(.small) }
-                    Button(answer == nil ? "Connect" : "Try Again") { connect() }
-                        .keyboardShortcut(.defaultAction)
-                        .disabled(code.trimmingCharacters(in: .whitespaces).isEmpty || connecting || isHostCode)
+                    if usingCode {
+                        Button(answer == nil ? "Connect" : "Try Again") { connect() }
+                            .keyboardShortcut(.defaultAction)
+                            .disabled(code.trimmingCharacters(in: .whitespaces).isEmpty || connecting || isHostCode)
+                    }
                 }
             }
         }

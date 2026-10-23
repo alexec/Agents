@@ -65,13 +65,13 @@ final class SignInState {
     }
 
     /// Approve or Deny on a card. Nil once answered; else why not, and the card stays.
-    func answer(_ request: DaemonAPI.SignInRequest, approve: Bool, on control: DaemonClient?) async -> String? {
+    func answer(_ request: DaemonAPI.SignInRequest, approve: Bool, code: String? = nil, on control: DaemonClient?) async -> String? {
         guard let control else { return "The control plane can’t be reached, so the sign-in was not answered." }
         guard answering.insert(request.request).inserted else { return nil }
         defer { answering.remove(request.request) }
         do {
             _ = try await control.call(approve ? DaemonAPI.Method.signInApprove : DaemonAPI.Method.signInDeny,
-                                       DaemonAPI.SignInDecide(request: request.request))
+                                       DaemonAPI.SignInDecide(request: request.request, code: approve ? code : nil))
             queue.remove(request.request)
             return nil
         } catch {

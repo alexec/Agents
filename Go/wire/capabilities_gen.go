@@ -105,6 +105,7 @@ const CapRuntimes1 = "runtimes/1"
 const CapSandbox1 = "sandbox/1"
 const CapSessions1 = "sessions/1"
 const CapShell1 = "shell/1"
+const CapSigninAsk1 = "signin.ask/1"
 const CapSignin1 = "signin/1"
 const CapSimulators1 = "simulators/1"
 const CapSkills1 = "skills/1"
@@ -607,6 +608,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"scim/tokens/revoke", "org-identity/1"},
 	{"signIn/addToMe", "signin/1"},
 	{"signIn/approve", "signin/1"},
+	{"signIn/ask", "signin.ask/1"},
 	{"signIn/configure", "signin/1"},
 	{"signIn/deny", "signin/1"},
 	{"signIn/discover", "org-identity/1"},

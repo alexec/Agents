@@ -1335,9 +1335,9 @@ export class Store extends Work {
    * Approve or deny a GitHub sign-in on a new client (#995). The card goes at once; a refusal is
    * said, and the card stays.
    */
-  async decideSignIn(request: string, approve: boolean): Promise<void> {
+  async decideSignIn(request: string, approve: boolean, code?: string): Promise<void> {
     try {
-      await this.link.call(approve ? "signIn/approve" : "signIn/deny", { request });
+      await this.link.call(approve ? "signIn/approve" : "signIn/deny", code === undefined ? { request } : { request, code });
       this.signInRequests.value = withoutSignIn(this.signInRequests.value, request);
     } catch (error) {
       this.say(describe(error));
