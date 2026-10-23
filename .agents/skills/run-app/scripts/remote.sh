@@ -11,7 +11,8 @@
 #   remote.sh log [N]                      the last N (40) lines of the Remote's own log: a
 #                                          pairing that failed says why there (#2272)
 #   remote.sh udid                         the walk simulator's id (made if missing)
-#   remote.sh down                         quit the Remote and shut the simulator down (it is kept)
+#   remote.sh down                         quit and uninstall the Remote and shut the simulator
+#                                          down (the simulator is kept, #2400)
 #
 # APP is build/DD-sim/Build/Products/Debug-iphonesimulator/Agents.app after the generic
 # simulator build in SKILL.md. AGENTS_WALK_SIM names another device type (iPad: "iPad Pro
@@ -80,6 +81,7 @@ log)
 down)
 	id=$(udid)
 	xcrun simctl terminate "$id" "$BUNDLE" 2>/dev/null || true
+	xcrun simctl uninstall "$id" "$BUNDLE" 2>/dev/null || true
 	xcrun simctl shutdown "$id" 2>/dev/null || true
 	;;
 *)
