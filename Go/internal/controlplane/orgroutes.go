@@ -103,6 +103,9 @@ type orgRouteBook struct {
 	tokens map[string]orgToken
 	// resending is a resend running; again is another asked for while it ran (#2424).
 	resending, again bool
+	// resent is when the last resend to every machine here began, once it ended: a token
+	// that ended before it and that it did not ask for is one nobody here uses (#2431).
+	resent time.Time
 	// making is held while a token is made, so machines that join at once share one.
 	making sync.Mutex
 }
@@ -899,7 +902,7 @@ func (s *Service) resendOrgRoutes() {
 	s.orgRoutes.mu.Unlock()
 	go func() {
 		for {
-			s.sendOrgRoutesTo(s.router.HostsHeldHere())
+			s.resendTo(s.router.HostsHeldHere())
 			s.orgRoutes.mu.Lock()
 			if !s.orgRoutes.again {
 				s.orgRoutes.resending = false
@@ -910,6 +913,15 @@ func (s *Service) resendOrgRoutes() {
 			s.orgRoutes.mu.Unlock()
 		}
 	}()
+}
+
+// resendTo sends each of hosts, every machine here, its routes, and notes when it began.
+func (s *Service) resendTo(hosts []string) {
+	began := s.endpoints().Now()
+	s.sendOrgRoutesTo(hosts)
+	s.orgRoutes.mu.Lock()
+	s.orgRoutes.resent = began
+	s.orgRoutes.mu.Unlock()
 }
 
 // orgResendWorkers is how many machines a resend sends to at once.

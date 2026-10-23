@@ -761,3 +761,62 @@ func TestThePolicyReachAndAntigravityTerms(t *testing.T) {
 	}
 	_ = context.Background
 }
+
+// A token whose route no machine here uses any more is dropped once it ends, and brings no
+// resend each minute after (#2431); a machine that asks again gets a new one.
+func TestAnEndedTokenNobodyUsesStopsTheResends(t *testing.T) {
+	clouds := newFakeClouds(t)
+	var clock atomic.Int64
+	clock.Store(time.Now().UnixNano())
+	endpoints := &orgEndpoints{
+		GoogleToken: clouds.server.URL + "/google",
+		Client:      clouds.server.Client(),
+		Now:         func() time.Time { return time.Unix(0, clock.Load()) },
+	}
+	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) {
+		withKeeper(newKeeperKey())(c)
+		c.orgEndpoints = endpoints
+	})
+	told := newRoutesTold()
+	p.told = told.heard
+	_, window := p.client("Alex's Mac")
+	alex := &person{id: p.s.localOwner(), window: window}
+	box := p.machineSaying(alex, routesHello("MACHINE-2"))
+	setRoute(t, window, wire.OrgRoute{ID: "vertex", Name: "Acme Vertex", Kind: wire.OrgRouteKindVertex, Runtimes: []string{"claude"},
+		Settings: &wire.OrgRouteSettings{Project: optional("acme-ai"), Location: optional("us-east5")}},
+		map[string]string{"serviceAccount": fakeServiceAccount(t)}, nil)
+	p.waitFor(func() bool { return told.route(box.member.Host, "vertex") != nil }, "the machine told the route")
+	p.waitFor(func() bool {
+		p.s.orgRoutes.mu.Lock()
+		defer p.s.orgRoutes.mu.Unlock()
+		return !p.s.orgRoutes.resent.IsZero() && !p.s.orgRoutes.resending
+	}, "the resend done")
+
+	// The machine stops using the route (none of the machines here asks for it), and the
+	// token ends: ten ticks of renewTokensEvery bring one resend, not ten.
+	clock.Add(int64(2 * time.Hour))
+	resends := 0
+	for range 10 {
+		clock.Add(int64(time.Minute))
+		if p.s.tokensEndingSoon() {
+			resends++
+			p.s.resendTo(nil)
+		}
+	}
+	t.Logf("10 ticks after the token ended: %d resends", resends)
+	if resends > 1 {
+		t.Fatalf("%d resends for a token nobody uses", resends)
+	}
+	p.s.orgRoutes.mu.Lock()
+	left := len(p.s.orgRoutes.tokens)
+	p.s.orgRoutes.mu.Unlock()
+	if left != 0 {
+		t.Fatalf("%d tokens kept", left)
+	}
+	// A machine that uses it again is sent a new token.
+	made := clouds.google.Load()
+	p.s.resendTo([]string{box.member.Host})
+	if clouds.google.Load() != made+1 {
+		t.Fatal("no new token made")
+	}
+}
