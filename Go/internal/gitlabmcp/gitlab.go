@@ -200,6 +200,26 @@ type GitLab interface {
 	IssueActivity(ctx context.Context, project string, kind IssueKind, since string) (items []IssueActivity, listed Listed, err error)
 	// ReviewComments are the comments on merge requests' diffs made at or after since.
 	ReviewComments(ctx context.Context, project, since string) (comments []ReviewComment, listed Listed, err error)
+	// Yours is what the connection's owner has in the project (#2034).
+	Yours(ctx context.Context, project string) (Yours, error)
+}
+
+// Yours is what the connection's owner has in a project (#2034): their username, their open
+// merge requests, the open ones they are a reviewer of, and the open issues assigned to them.
+type Yours struct {
+	Login    string
+	MRs      []int
+	Reviews  []OpenMR
+	Assigned []Issue
+}
+
+func (y Yours) owns(mr int) bool {
+	for _, n := range y.MRs {
+		if n == mr {
+			return true
+		}
+	}
+	return false
 }
 
 // ErrorKind is why a GitLab call failed.

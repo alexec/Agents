@@ -166,3 +166,15 @@ func TestLinearsRefusals(t *testing.T) {
 		t.Fatalf("no key: %v", err)
 	}
 }
+
+// issue.assigned (#2034): an assignment to the connection's owner, by anyone, from the same history.
+func TestAssignedIsToTheViewerFromTheSameHistory(t *testing.T) {
+	_, l := newRecorded(t)
+	got, _, err := l.Activity(context.Background(), Assigned, "", "2026-10-16T12:00:00.000Z")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].ID != "h5" || got[0].data()["by"] != "bob" || got[0].data()["assignedAt"] == nil {
+		t.Fatalf("assigned %+v", got)
+	}
+}

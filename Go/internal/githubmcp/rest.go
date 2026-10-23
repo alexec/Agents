@@ -619,6 +619,107 @@ func (g *RealGitHub) ConflictPRs(ctx context.Context, repo string) ([]ConflictPR
 	return out, nil
 }
 
+// yoursQuery is the connection's owner and, in one repo, their open PRs, the open PRs that ask
+// them for a review, and the open issues assigned to them (#2034): GitHub's search, as @me.
+const yoursQuery = `query($mine: String!, $reviews: String!, $assigned: String!) { viewer { login }
+  mine: search(query: $mine, type: ISSUE, first: 100) { nodes { ... on PullRequest { number } } }
+  reviews: search(query: $reviews, type: ISSUE, first: 100) { nodes { ... on PullRequest {
+    number title headRefName url author { login } } } }
+  assigned: search(query: $assigned, type: ISSUE, first: 100) { nodes { ... on Issue {
+    number title url author { login } labels(first: 20) { nodes { name } } assignees(first: 10) { nodes { login } } } } } }`
+
+func (g *RealGitHub) Yours(ctx context.Context, repo string) (Yours, error) {
+	in := "repo:" + repo + " is:open "
+	request, _ := json.Marshal(map[string]any{"query": yoursQuery, "variables": map[string]string{
+		"mine": in + "is:pr author:@me", "reviews": in + "is:pr review-requested:@me", "assigned": in + "is:issue assignee:@me"}})
+	body, err := g.shared("graphql yours "+repo, func() ([]byte, error) {
+		return g.do(ctx, http.MethodPost, "graphql", request, false)
+	})
+	if err != nil {
+		return Yours{}, err
+	}
+	type login struct {
+		Login string `json:"login"`
+	}
+	var answer struct {
+		Data struct {
+			Viewer login `json:"viewer"`
+			Mine   struct {
+				Nodes []struct {
+					Number int `json:"number"`
+				} `json:"nodes"`
+			} `json:"mine"`
+			Reviews struct {
+				Nodes []struct {
+					Number      int    `json:"number"`
+					Title       string `json:"title"`
+					HeadRefName string `json:"headRefName"`
+					URL         string `json:"url"`
+					Author      *login `json:"author"`
+				} `json:"nodes"`
+			} `json:"reviews"`
+			Assigned struct {
+				Nodes []struct {
+					Number int    `json:"number"`
+					Title  string `json:"title"`
+					URL    string `json:"url"`
+					Author *login `json:"author"`
+					Labels struct {
+						Nodes []struct {
+							Name string `json:"name"`
+						} `json:"nodes"`
+					} `json:"labels"`
+					Assignees struct {
+						Nodes []login `json:"nodes"`
+					} `json:"assignees"`
+				} `json:"nodes"`
+			} `json:"assigned"`
+		} `json:"data"`
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if json.Unmarshal(body, &answer) != nil {
+		return Yours{}, &GitHubError{Kind: Failed, Message: "GitHub's answer is not JSON"}
+	}
+	if len(answer.Errors) > 0 {
+		return Yours{}, &GitHubError{Kind: Failed, Message: "GitHub: " + answer.Errors[0].Message}
+	}
+	y := Yours{Login: answer.Data.Viewer.Login}
+	for _, n := range answer.Data.Mine.Nodes {
+		if n.Number > 0 {
+			y.PRs = append(y.PRs, n.Number)
+		}
+	}
+	for _, n := range answer.Data.Reviews.Nodes {
+		if n.Number == 0 {
+			continue
+		}
+		r := OpenPR{PR: PR{Number: n.Number, Title: n.Title, Branch: n.HeadRefName, URL: n.URL}}
+		if n.Author != nil {
+			r.Author = n.Author.Login
+		}
+		y.Reviews = append(y.Reviews, r)
+	}
+	for _, n := range answer.Data.Assigned.Nodes {
+		if n.Number == 0 {
+			continue
+		}
+		i := Issue{Number: n.Number, Title: n.Title, URL: n.URL, Labels: []string{}, Assignees: []string{}}
+		if n.Author != nil {
+			i.Author = n.Author.Login
+		}
+		for _, l := range n.Labels.Nodes {
+			i.Labels = append(i.Labels, l.Name)
+		}
+		for _, a := range n.Assignees.Nodes {
+			i.Assignees = append(i.Assignees, a.Login)
+		}
+		y.Assigned = append(y.Assigned, i)
+	}
+	return y, nil
+}
+
 // newest pages path (newest first) until an item older than since by its time.
 func newest[T any](ctx context.Context, g *RealGitHub, path, since string, at func(T) string) ([]T, bool, error) {
 	var items []T

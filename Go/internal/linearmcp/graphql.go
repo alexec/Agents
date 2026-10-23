@@ -333,6 +333,10 @@ type gqlHistory struct {
 	ToState *struct {
 		Type string `json:"type"`
 	} `json:"toState"`
+	// ToAssignee is who it was assigned to, for issue.assigned (#2034).
+	ToAssignee *struct {
+		ID string `json:"id"`
+	} `json:"toAssignee"`
 }
 
 // changed reads the latest history of the issues updated since: a label added is labelled, a
@@ -344,6 +348,9 @@ func (l *RealLinear) changed(ctx context.Context, kind Kind, team, since string)
 		filter["team"] = teamFilter(team)
 	}
 	var out struct {
+		Viewer struct {
+			ID string `json:"id"`
+		} `json:"viewer"`
 		Issues struct {
 			Nodes []struct {
 				gqlIssue
@@ -355,11 +362,12 @@ func (l *RealLinear) changed(ctx context.Context, kind Kind, team, since string)
 		} `json:"issues"`
 	}
 	q := `query Changed($filter: IssueFilter, $first: Int, $history: Int) {
+  viewer { id }
   issues(filter: $filter, first: $first, orderBy: updatedAt) {
     nodes {
       ...I
       history(first: $history) {
-        nodes { id createdAt actor { ...P } botActor { name } addedLabels { name } fromState { type } toState { type } }
+        nodes { id createdAt actor { ...P } botActor { name } addedLabels { name } fromState { type } toState { type } toAssignee { id } }
       }
     }
     pageInfo { hasNextPage }
@@ -383,6 +391,11 @@ func (l *RealLinear) changed(ctx context.Context, kind Kind, team, since string)
 				case Closed:
 					if h.ToState != nil && isClosed(h.ToState.Type) && (h.FromState == nil || !isClosed(h.FromState.Type)) {
 						items = append(items, Activity{ID: h.ID, At: h.CreatedAt, Issue: i, Kind: Closed, By: by, Reason: h.ToState.Type})
+					}
+				// To the connection's owner (#2034), by anyone.
+				case Assigned:
+					if h.ToAssignee != nil && h.ToAssignee.ID != "" && h.ToAssignee.ID == out.Viewer.ID {
+						items = append(items, Activity{ID: h.ID, At: h.CreatedAt, Issue: i, Kind: Assigned, By: by})
 					}
 				}
 			}
