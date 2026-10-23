@@ -210,6 +210,11 @@ jobs:
           }
           clean_retry "$RESTORED" build/DD -- build
 
+      # arm64 only. A generic simulator destination builds every simulator arch, so the
+      # Remote, its widget and AgentsKitCore were compiled a second time for x86_64, a
+      # slice nothing runs on these Apple Silicon runners and nothing ships: in October
+      # 2026 that was about half of this step's 3–6.5 minutes, the longest pole of a
+      # pull request's run. The sources compiled are the same either way.
       - name: Build Remote (iOS Simulator)
         id: build-remote
         env:
@@ -219,7 +224,7 @@ jobs:
           clean_retry "$RESTORED" build/DD -- \
             xcodebuild build -project Agents.xcodeproj -scheme Remote \
             -destination 'generic/platform=iOS Simulator' -derivedDataPath build/DD \
-            -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO
+            -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO ARCHS=arm64
 
       # Only when both app builds actually ran. They are skipped whenever an earlier
       # step fails, and a skipped step used to read as "not successful", so a job that
