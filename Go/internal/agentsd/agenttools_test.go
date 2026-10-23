@@ -91,7 +91,7 @@ func TestAskingThePersonAForm(t *testing.T) {
 	m.post("initialize", map[string]any{}, 1)
 	question := map[string]any{"questions": []any{map[string]any{"id": "colour", "prompt": "Which colour?",
 		"options": []any{map[string]any{"id": "red", "label": "Red"}, map[string]any{"id": "blue"}}}}}
-	if text, isErr := m.tool(2, "ask_form", question); !isErr || text != "A question can only be asked while this agent is working." {
+	if text, isErr := m.tool(2, "ask_question", question); !isErr || text != "A question can only be asked while this agent is working." {
 		t.Fatal(text)
 	}
 	l := d.live(a.ID)
@@ -99,7 +99,7 @@ func TestAskingThePersonAForm(t *testing.T) {
 	l.inTurn = true
 	l.mu.Unlock()
 	answered := make(chan string, 1)
-	go func() { text, _ := m.tool(3, "ask_form", question); answered <- text }()
+	go func() { text, _ := m.tool(3, "ask_question", question); answered <- text }()
 	var pending []wire.ElicitationRequest
 	waitFor(t, "the form", func() bool {
 		json.Unmarshal(c.call(t, 1, "elicitations/pending", nil), &pending)
@@ -113,7 +113,7 @@ func TestAskingThePersonAForm(t *testing.T) {
 	if text := <-answered; text != "They answered:\n- Which colour?: Red" {
 		t.Fatal(text)
 	}
-	if text, isErr := m.tool(4, "ask_form", map[string]any{"questions": []any{map[string]any{"id": "x"}}}); !isErr || text != "Nothing was asked: each question needs an `id` and a `prompt`." {
+	if text, isErr := m.tool(4, "ask_question", map[string]any{"questions": []any{map[string]any{"id": "x"}}}); !isErr || text != "Nothing was asked: each question needs an `id` and a `prompt`." {
 		t.Fatal(text)
 	}
 }
@@ -137,7 +137,7 @@ func TestAFormLeftOpenBringsItsAnswerLater(t *testing.T) {
 	l.mu.Unlock()
 	question := map[string]any{"title": "Pick a colour", "questions": []any{map[string]any{"id": "colour", "prompt": "Which colour?",
 		"options": []any{map[string]any{"id": "red", "label": "Red"}}}}}
-	if text, isErr := m.tool(2, "ask_form", question); isErr || text != formStillOpen {
+	if text, isErr := m.tool(2, "ask_question", question); isErr || text != formStillOpen {
 		t.Fatal(text)
 	}
 	if s := d.Store.Agent(a.ID).State; s != wire.AgentStateRunning {
@@ -157,7 +157,7 @@ func TestAFormLeftOpenBringsItsAnswerLater(t *testing.T) {
 	}
 	c.call(t, 2, "elicitations/answer", map[string]any{"requestID": pending[0].ID, "action": "accept", "content": map[string]any{"colour": "red"}})
 	waitFor(t, "the answer in its chat", func() bool {
-		return slices.Contains(userMessages(d, a.ID), "The person replied to your form \"Pick a colour\" (ask_form). They answered:\n- Which colour?: Red")
+		return slices.Contains(userMessages(d, a.ID), "The person replied to your form \"Pick a colour\" (ask_question). They answered:\n- Which colour?: Red")
 	})
 	json.Unmarshal(c.call(t, 3, "elicitations/pending", nil), &pending)
 	if len(pending) != 0 {

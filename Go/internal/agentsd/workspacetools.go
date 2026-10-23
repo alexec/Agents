@@ -248,7 +248,7 @@ func (d *Daemon) personSaysYes(agent wire.UUID, title, question, yes string) (bo
 	q, _ := json.Marshal([]map[string]any{{"id": "go", "prompt": question,
 		"options": []map[string]string{{"id": "yes", "label": yes}, {"id": "no", "label": "Don’t"}}}})
 	t, _ := json.Marshal(title)
-	note, err := d.askForm(agent, map[string]json.RawMessage{"title": t, "questions": q})
+	note, err := d.askQuestion(agent, map[string]json.RawMessage{"title": t, "questions": q})
 	if err != nil {
 		return false, err
 	}

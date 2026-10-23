@@ -323,7 +323,7 @@ subagents and task tracker, Antigravity takes a deny list under `_meta.agy` and 
 `start_subagent`, and OpenCode takes an `OPENCODE_CONFIG_CONTENT` laid over the person's own
 config that removes `task`, turns sharing and self-update off, and makes edits, commands and
 web fetches ask. OpenCode's own question tool is left off, so its questions go through the
-app's `ask_form`.
+app's `ask_question`.
 
 Nothing the work needs is touched: reading, searching, editing, writing, running commands,
 planning and keeping a to-do list stay, and so does the question tool each runtime raises

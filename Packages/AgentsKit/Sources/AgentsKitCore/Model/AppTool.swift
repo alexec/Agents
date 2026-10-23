@@ -32,9 +32,10 @@ public enum AppTool {
 
     /// Ask the person a question or a short form and wait for the answer. The
     /// fallback for runtimes whose own ask tool never reaches the model, and the
-    /// only channel on runtimes that have none. Named `ask_form` rather than
-    /// `ask_question` so it does not collide with Antigravity's own tool.
-    public static let askForm = "ask_form"
+    /// only channel on runtimes that have none. It was `ask_form` until #2298. Antigravity's
+    /// own tool has the same name: the two are told apart by server (`mcp__agents__`), and
+    /// assessments score the app's by its own call log, not by the name.
+    public static let askQuestion = "ask_question"
 
     /// Offer one optional prompt for the person to send next.
     public static let suggestNextPrompt = "suggest_next_prompt"
@@ -153,7 +154,7 @@ public enum AppTool {
 
     /// Every tool the app's MCP server serves.
     public static let all: [String] = [
-        finishTurn, showFile, manageWorkflows, askForm, suggestNextPrompt, hangUp, startSession, stopSession, archiveSession,
+        finishTurn, showFile, manageWorkflows, askQuestion, suggestNextPrompt, hangUp, startSession, stopSession, archiveSession,
         leaseResource, releaseResource, listResources, waitForEvent,
         cancelWait, listSessions, readSession,
         setSessionLabels, moveWorktree, messageSession,

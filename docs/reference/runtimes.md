@@ -271,7 +271,7 @@ on Linux).
 | | Keys in the environment ignored | `GEMINI_API_KEY`, `GOOGLE_API_KEY` removed | It signs in with a Google account only. |
 | **OpenCode** | Asks before editing, running commands and fetching pages; sharing and self-update off | `OPENCODE_CONFIG_CONTENT`, `OPENCODE_DISABLE_SHARE`, `OPENCODE_DISABLE_AUTOUPDATE` | Left alone, it does all three without asking; no conversation is published; the app's copy is never replaced under a running agent. |
 | | A temporary folder of its own | `TMPDIR` | It walks that folder at every turn: 40 seconds before the first word with the Mac's own. |
-| | Its question tool off | `OPENCODE_ENABLE_QUESTION_TOOL` removed | Questions go through the app's `ask_form`. |
+| | Its question tool off | `OPENCODE_ENABLE_QUESTION_TOOL` removed | Questions go through the app's `ask_question`. |
 | **Grok** | Asks, whatever you saved in its own config | `--permission-mode default` | The app's **Default** or **Always-approve** decides (Settings ▸ Agent Runtimes). |
 | | Its scheduler, workflow, monitor and feedback tools off; its subagents and question tool stay; the app's rules | `_meta.agentProfile.disallowedTools`, `_meta.rules` | Its `--disallowed-tools` does nothing here, so the list is in a profile of the app's. It was an allowlist until Grok 1.0.52 stopped giving the subagent tools it named (#1447). |
 | | Image and video generation off | `GROK_CONFIG_PATH`, a file of the app's | Its config file is the only place for them, and yours is yours. |

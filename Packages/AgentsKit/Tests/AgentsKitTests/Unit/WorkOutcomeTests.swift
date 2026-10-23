@@ -87,7 +87,7 @@ struct WorkOutcomeTests {
         #expect(told.contains("Call this again"))
         let asked = WorkReport.tooLong(.needsAnswer)
         #expect(asked.hasPrefix("Nothing was recorded: keep the question to one sentence under 200"))
-        #expect(asked.contains("ask_form"))
+        #expect(asked.contains("ask_question"))
     }
 
     /// The limit is on what arrives. A report kept before it came down still reads back

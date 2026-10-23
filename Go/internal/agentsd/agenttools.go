@@ -11,7 +11,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// show_file, suggest_next_prompt and ask_form, as DaemonCore+AppTools answers them on the
+// show_file, suggest_next_prompt and ask_question, as DaemonCore+AppTools answers them on the
 // Swift host.
 
 const (
@@ -142,9 +142,9 @@ func (d *Daemon) hangUp(id wire.UUID, _ map[string]json.RawMessage) (string, err
 	return "Voice mode ends once your reply has been said. Keep the goodbye short.", nil
 }
 
-// askForm is ask_form: the person asked, as a form held like the runtime's own, and the
+// askQuestion is ask_question: the person asked, as a form held like the runtime's own, and the
 // call answered with what they said.
-func (d *Daemon) askForm(id wire.UUID, args map[string]json.RawMessage) (string, error) {
+func (d *Daemon) askQuestion(id wire.UUID, args map[string]json.RawMessage) (string, error) {
 	title := strings.TrimSpace(argString(args, "title"))
 	var raw []struct {
 		ID            string `json:"id"`
@@ -214,5 +214,5 @@ func (d *Daemon) askForm(id wire.UUID, args map[string]json.RawMessage) (string,
 	if r.action == wire.AnswerElicitationRequestActionAccept {
 		said = answers(schema, r.content, message)
 	}
-	return askFormNote(r.action, said), nil
+	return askQuestionNote(r.action, said), nil
 }

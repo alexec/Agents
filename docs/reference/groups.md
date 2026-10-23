@@ -42,7 +42,7 @@ in one group. Its machines are enrolled by an admin, with a host code made for t
 - **Nobody acts on a bot's machine.** A client cannot start, message or answer an agent
   there. An admin is told the machine is a bot's; anyone else is told there is no such
   machine. An admin can stop a run (`bots/stopRun`).
-- **Nobody answers there.** A bot's agents have no ask tools (`ask_form`). A question
+- **Nobody answers there.** A bot's agents have no ask tools (`ask_question`). A question
   from the runtime is declined, and a permission the bot's permission mode did not already
   allow is refused; the agent carries on. A need for attention goes to the admins.
 - **It runs once per trigger.** A workflow whose `runs-on:` names the bot runs on its

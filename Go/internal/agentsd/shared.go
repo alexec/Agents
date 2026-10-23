@@ -481,7 +481,7 @@ func sharedMCP(home string, present []sharedRule, secrets map[string]string, loo
 			appReach[r.id] = gets("through the bridge")
 		}
 	}
-	result.App = []wire.SharedServer{{Name: appName, Transport: "stdio", Summary: "show_file, ask_form and the rest",
+	result.App = []wire.SharedServer{{Name: appName, Transport: "stdio", Summary: "show_file, ask_question and the rest",
 		EnvNames: []string{}, HeaderNames: []string{}, Clash: map[string]string{}, Reach: appReach}}
 	seen := map[string]bool{appName: true}
 	sseLeftOut := map[string][]string{}

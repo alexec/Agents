@@ -41,16 +41,16 @@ func TestABotsMachineAsksNobodyAndClaimsItsRuns(t *testing.T) {
 		t.Fatalf("%s %v", b, err)
 	}
 	for _, raw := range offeredTools(false, true) {
-		if strings.Contains(string(raw), `"ask_form"`) {
-			t.Fatal("ask_form offered on a bot's machine")
+		if strings.Contains(string(raw), `"ask_question"`) {
+			t.Fatal("ask_question offered on a bot's machine")
 		}
 	}
 	found := false
 	for _, raw := range offeredTools(false, false) {
-		found = found || strings.Contains(string(raw), `"ask_form"`)
+		found = found || strings.Contains(string(raw), `"ask_question"`)
 	}
 	if !found {
-		t.Fatal("ask_form not offered on a person's machine")
+		t.Fatal("ask_question not offered on a person's machine")
 	}
 
 	// Claimed first: a lost claim runs nothing; a won one, or Run now, runs.

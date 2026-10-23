@@ -265,10 +265,10 @@ answered; AXPress went round it, so only a click shows it. After a change to the
 (`ChatTranscript`, `SwipeToShowPane`, a card), walk a card:
 
 ```sh
-$S/rpc.py $ROOT start claude $ROOT/work "Call ask_form once with two questions: id 'pick', \
+$S/rpc.py $ROOT start claude $ROOT/work "Call ask_question once with two questions: id 'pick', \
   prompt 'Which colour?', options Red and Blue; and id 'words', prompt 'Any other words?', \
   with no options." 300 &
-$S/walk.py $ROOT select "Call ask_form"
+$S/walk.py $ROOT select "Call ask_question"
 $S/walk.py $ROOT click "=Blue"   # must say "clicked …HostingScrollView…", never "…SwipeAnchorView…"
 ```
 
