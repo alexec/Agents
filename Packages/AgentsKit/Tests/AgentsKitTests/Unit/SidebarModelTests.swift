@@ -333,8 +333,8 @@ struct SidebarModelTests {
     @Test func aFailedWorkflowStandsForItsRunsAgent() {
         let model = AgentsModel()
         let asking = started(api, .waitingOnUser, "asking", at: 1)
-        var failed = started(api, .finished, "nightly run", at: 2)
-        failed.report = WorkReport(outcome: .stuck, message: "No network", at: t0)
+        var failed = started(api, .stopped, "nightly run", at: 2)
+        failed.endedReason = .runtimeError
         model.replaceAgents([asking, failed])
         var api = summary(self.api)
         api.approvals = [Approval(kind: .workflowFailed, key: "nightly", title: "Nightly", digest: "ran:x",

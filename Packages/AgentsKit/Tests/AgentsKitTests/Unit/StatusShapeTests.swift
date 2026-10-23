@@ -20,7 +20,7 @@ struct StatusShapeTests {
     @Test("Anything waiting on a person is needs-you, and only that gets colour")
     func needsYou() {
         #expect(StatusShape(state: .waitingOnUser, outcome: nil, isWaiting: false, isComingBack: false) == .needsYou)
-        for outcome in [WorkOutcome.needsAnswer, .partlyDone, .stuck] {
+        for outcome in [WorkOutcome.needsAnswer] {
             #expect(StatusShape(state: .finished, outcome: outcome, isWaiting: false, isComingBack: false) == .needsYou,
                     "\(outcome) should want a person")
         }
@@ -45,18 +45,17 @@ struct StatusShapeTests {
         // An outcome from an earlier turn does not dress a stopped agent up as done.
         #expect(StatusShape(state: .stopped, outcome: .done, isWaiting: false, isComingBack: false,
                             endedReason: .cancelled) == .stopped)
-        #expect(StatusShape(state: .stopped, outcome: .stuck, isWaiting: false, isComingBack: false,
-                            endedReason: .cancelled) == .stopped)
         #expect(StatusShape(state: .stopped, outcome: nil, isWaiting: false, isComingBack: false,
                             endedReason: .processDied) == .needsYou)
     }
 
-    /// Waiting on something that is not a person (039): its own shape, and no colour.
-    @Test("A turn that ended blocked is blocked, and wants nobody")
+    /// A block the app will not clear (an old record's) is done: only a question needs the
+    /// person (#1916).
+    @Test("A turn that ended blocked on nothing is done, and wants nobody")
     func blocked() {
         let shape = StatusShape(state: .finished, outcome: .blocked, isWaiting: false, isComingBack: false)
-        #expect(shape == .needsYou)
-        #expect(shape.wantsAPerson)
+        #expect(shape == .done)
+        #expect(!shape.wantsAPerson)
         #expect(StatusShape(state: .stopped, outcome: .blocked, isWaiting: false, isComingBack: false,
                             endedReason: .cancelled) == .stopped)
         #expect(StatusShape(state: .running, outcome: .blocked, isWaiting: false, isComingBack: false) == .working)
@@ -71,7 +70,7 @@ struct StatusShapeTests {
         #expect(!shape.wantsAPerson)
         #expect(shape.symbol != StatusShape.needsYou.symbol)
         #expect(StatusShape(state: .finished, outcome: .done, isWaiting: true, isComingBack: false) == .waiting)
-        #expect(StatusShape(state: .finished, outcome: .stuck, isWaiting: true, isComingBack: false) == .needsYou)
+        #expect(StatusShape(state: .finished, outcome: .needsAnswer, isWaiting: true, isComingBack: false) == .needsYou)
         #expect(StatusShape(state: .stopped, outcome: .blocked, isWaiting: true, isComingBack: false,
                             endedReason: .cancelled) == .stopped)
     }

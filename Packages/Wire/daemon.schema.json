@@ -22747,10 +22747,10 @@
         "done",
         "nothing_to_do",
         "needs_answer",
-        "partly_done",
-        "stuck",
         "blocked"
-      ]
+      ],
+      "x-fallback": "done",
+      "description": "How a turn ended (#1916): only a question needs the person. An old record's `stuck` or `partly_done` (finish_turn's, before #494) reads as `done`."
     },
     "WorkReport": {
       "type": "object",

@@ -101,5 +101,5 @@ test("when done offers the three choices in the window's words (#433)", () => {
   assert.deepEqual(ws.whenDoneChoices, ["keep", "archive-allowed", "archive"]);
   assert.deepEqual(ws.whenDoneChoices.map(ws.whenDoneWords),
     ["Keep each run", "Let a run archive itself", "Archive each finished run"]);
-  assert.match(ws.whenDoneSentence("archive"), /needs you, is stuck or is blocked stays/);
+  assert.match(ws.whenDoneSentence("archive"), /asks you something or waits stays/);
 });

@@ -90,17 +90,10 @@ struct TurnActivityContentTests {
         return content
     }
 
-    @Test func partlyDoneNeedsYou() throws {
-        #expect(try endedNeedingYou(.partlyDone).line == "Partly done: The rest is yours.")
+    @Test func aQuestionNeedsYou() throws {
+        #expect(try endedNeedingYou(.needsAnswer).line == "Waiting on your answer: The rest is yours.")
     }
 
-    @Test func stuckNeedsYou() throws {
-        #expect(try endedNeedingYou(.stuck).line == "Stuck: The rest is yours.")
-    }
-
-    @Test func blockedOnWhatTheAppCannotWatchNeedsYou() throws {
-        #expect(try endedNeedingYou(.blocked, block: Block()).line == "Waiting: The rest is yours.")
-    }
 
     @Test func outcomeUnknownNeedsYou() throws {
         #expect(try endedNeedingYou(nil).line == "Outcome unknown")

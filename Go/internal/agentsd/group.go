@@ -38,7 +38,8 @@ func Group(a *wire.Agent) string {
 
 func needsAPerson(o wire.WorkOutcome) bool {
 	switch o {
-	case wire.WorkOutcomeNeedsAnswer, wire.WorkOutcomePartlyDone, wire.WorkOutcomeStuck:
+	// Only a question (#1916): the app never assumes an agent needs the person.
+	case wire.WorkOutcomeNeedsAnswer:
 		return true
 	}
 	return false
@@ -52,8 +53,6 @@ func settled(wantsAPerson bool, r *wire.WorkReport, waitingOnEvents bool) string
 	if open && r.Block != nil && (len(r.Block.Waits) > 0 || r.Block.CheckAgainAt != nil) || waitingOnEvents {
 		return "waiting"
 	}
-	if open {
-		return "needsAttention"
-	}
+	// A block with nothing the app watches (an old record's) is done, not Needs you (#1916).
 	return "finished"
 }

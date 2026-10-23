@@ -129,7 +129,7 @@ export function whenDoneSentence(w: WhenDone): string {
   switch (w) {
     case "keep": return "Every run stays in the list when it is done. A run may ask you to archive it.";
     case "archive-allowed": return "A run that finishes done or with nothing to do may archive itself when there is nothing to look at. Otherwise it stays.";
-    case "archive": return "A run that finishes done or with nothing to do is archived. One that needs you, is stuck or is blocked stays.";
+    case "archive": return "A run that finishes done or with nothing to do is archived. One that asks you something or waits stays.";
   }
 }
 

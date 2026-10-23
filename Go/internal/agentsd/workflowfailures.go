@@ -9,7 +9,7 @@ import (
 )
 
 // Needs You lists a workflow that has stopped working (#989), as the Swift host did (#1036):
-// its last run's agent stopped short, is stuck or is blocked on the person, or a refusal
+// its last run's agent stopped short, or a refusal
 // repeats until somebody acts. Only Dismiss answers it; that keeps the failure's key on the
 // workflow's record (dismissedFailure) until it fails again.
 
@@ -65,8 +65,7 @@ func (d *Daemon) failureOf(w wire.Workflow, last *wire.WorkflowOutcome) (workflo
 	return workflowFailure{}, false
 }
 
-// runFailure is WorkflowFailure.runFailure: how a run's agent ended, when it failed or is
-// blocked on the person. A question is the agent's own row in Needs You, not a failure.
+// runFailure is WorkflowFailure.runFailure: how a run's agent ended, when it failed. A question is the agent's own row in Needs You, not a failure.
 func runFailure(a *wire.Agent) (string, bool) {
 	switch a.State {
 	case wire.AgentStateStopped:
@@ -80,19 +79,8 @@ func runFailure(a *wire.Agent) (string, bool) {
 			}
 		}
 		return "Run failed — " + why, true
-	case wire.AgentStateFinished:
-		r := a.Report
-		if r == nil {
-			return "", false
-		}
-		if r.Outcome == wire.WorkOutcomeStuck {
-			return "Run failed — " + r.Message, true
-		}
-		resumesByItself := r.Block != nil && (len(r.Block.Waits) > 0 || r.Block.CheckAgainAt != nil)
-		if isOpenBlock(r) && !resumesByItself {
-			return "Run blocked — " + r.Message, true
-		}
 	}
+	// A finished run is never a failure: only a question wants the person (#1916).
 	return "", false
 }
 

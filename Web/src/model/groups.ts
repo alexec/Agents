@@ -18,9 +18,9 @@ export const groupTitles: Record<AgentGroup, string> = {
  */
 export const liveGroups: readonly AgentGroup[] = ["needsAttention", "waiting", "running", "finished", "stopped"];
 
-/** Whether somebody has to do something about this outcome (WorkOutcome.needsAPerson). */
+/** Whether somebody has to do something about this outcome (WorkOutcome.needsAPerson): only a question (#1916). */
 export function outcomeNeedsAPerson(outcome: WorkOutcome): boolean {
-  return outcome === "needs_answer" || outcome === "partly_done" || outcome === "stuck";
+  return outcome === "needs_answer";
 }
 
 /** A blocked report whose block has not cleared (WorkReport.isOpenBlock). */
@@ -71,7 +71,7 @@ export function endingIsUnaccountedFor(agent: Agent): boolean {
 function settled(wantsAPerson: boolean, report: WorkReport | undefined, waitingOnEvents: boolean): AgentGroup {
   if (wantsAPerson) return "needsAttention";
   if (resumesByItself(report) || waitingOnEvents) return "waiting";
-  if (isOpenBlock(report)) return "needsAttention";
+  // A block the app will not clear (an old record's) is done, not Needs you (#1916).
   return "finished";
 }
 

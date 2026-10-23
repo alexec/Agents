@@ -51,7 +51,8 @@ func TestAFailedRunIsListedUntilDismissed(t *testing.T) {
 			t.Fatalf("a run that finished well is no failure: %+v", failedWorkflows(d, dir))
 		}
 		a := d.Store.Agent(agent)
-		a.Report = &wire.WorkReport{Outcome: wire.WorkOutcomeStuck, Message: "The build machine is unreachable.", At: now()}
+		// A run that stopped short (#1916: a finished run is never a failure).
+		a.State, a.EndedReason = wire.AgentStateStopped, reason(wire.EndedReasonRuntimeError)
 		d.Store.Save(*a)
 		return agent
 	}
@@ -61,7 +62,7 @@ func TestAFailedRunIsListedUntilDismissed(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 	item := got[0]
-	if item.Key != "nightly" || item.Title != "Nightly" || item.Line != "Run failed — The build machine is unreachable." ||
+	if item.Key != "nightly" || item.Title != "Nightly" || item.Line != "Run failed — The runtime reported an error" ||
 		item.AgentID == nil || *item.AgentID != agent || item.Digest == nil ||
 		len(item.Actions) != 1 || item.Actions[0] != wire.ApprovalActionDismiss {
 		t.Fatalf("%+v", item)

@@ -82,7 +82,7 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
                                 waitingOnEvents: Bool) -> AgentGroup {
         if wantsAPerson { return .needsAttention }
         if report?.resumesByItself == true || waitingOnEvents { return .waiting }
-        if report?.isOpenBlock == true { return .needsAttention }
+        // A block the app will not clear (an old record's) is done, not Needs you (#1916).
         return .finished
     }
 }

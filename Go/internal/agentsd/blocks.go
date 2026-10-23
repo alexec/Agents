@@ -497,7 +497,8 @@ func (d *Daemon) couldNotCarryOn(id, promptID wire.UUID, why string) {
 			}
 		}
 		a.QueuedPrompts = kept
-		a.Report = &wire.WorkReport{Outcome: wire.WorkOutcomeStuck, Message: text, At: now()}
+		// An unexpected stop, not an ending the agent chose (#1916).
+		a.State, a.EndedReason = wire.AgentStateStopped, reason(wire.EndedReasonRuntimeError)
 	})
 	d.record(id, runtimeNote(text))
 	d.reconsider()

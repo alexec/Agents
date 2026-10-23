@@ -362,7 +362,7 @@ func (d *Daemon) scoreAssessmentIfDue(id wire.UUID) {
 			labelled = true
 		}
 	}
-	if !labelled || a.Report != nil && (a.Report.Outcome == wire.WorkOutcomeBlocked || a.Report.Outcome == wire.WorkOutcomePartlyDone) {
+	if !labelled || a.Report != nil && a.Report.Outcome == wire.WorkOutcomeBlocked {
 		return
 	}
 	// A turn that ends on a wait still open (wait_for_event, "your place is kept") is not

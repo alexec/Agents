@@ -305,88 +305,6 @@
   {
     "expected" : {
       "asksToArchive" : false,
-      "group" : "needsAttention",
-      "isWaiting" : false,
-      "needsAPerson" : true,
-      "showsUnread" : false,
-      "title" : "Needs you"
-    },
-    "input" : {
-      "agent" : {
-        "advertisedOptions" : [
-
-        ],
-        "availableCommands" : [
-
-        ],
-        "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
-        "id" : "00000000-0000-0000-0000-000000000010",
-        "lastActivityAt" : 812500000,
-        "report" : {
-          "at" : 812500060,
-          "message" : "It went.",
-          "outcome" : "partly_done"
-        },
-        "runtimeID" : "claude",
-        "startOptions" : {
-          "extraArguments" : [
-
-          ],
-          "values" : {
-
-          }
-        },
-        "state" : "finished",
-        "title" : "Session 10"
-      }
-    },
-    "name" : "finished, partly done"
-  },
-  {
-    "expected" : {
-      "asksToArchive" : false,
-      "group" : "needsAttention",
-      "isWaiting" : false,
-      "needsAPerson" : true,
-      "showsUnread" : false,
-      "title" : "Needs you"
-    },
-    "input" : {
-      "agent" : {
-        "advertisedOptions" : [
-
-        ],
-        "availableCommands" : [
-
-        ],
-        "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
-        "id" : "00000000-0000-0000-0000-000000000011",
-        "lastActivityAt" : 812500000,
-        "report" : {
-          "at" : 812500060,
-          "message" : "It went.",
-          "outcome" : "stuck"
-        },
-        "runtimeID" : "claude",
-        "startOptions" : {
-          "extraArguments" : [
-
-          ],
-          "values" : {
-
-          }
-        },
-        "state" : "finished",
-        "title" : "Session 11"
-      }
-    },
-    "name" : "finished, stuck"
-  },
-  {
-    "expected" : {
-      "asksToArchive" : false,
       "group" : "waiting",
       "isWaiting" : true,
       "needsAPerson" : false,
@@ -483,11 +401,11 @@
   {
     "expected" : {
       "asksToArchive" : false,
-      "group" : "needsAttention",
+      "group" : "finished",
       "isWaiting" : false,
       "needsAPerson" : false,
       "showsUnread" : false,
-      "title" : "Needs you"
+      "title" : "Done"
     },
     "input" : {
       "agent" : {
@@ -1206,11 +1124,11 @@
   {
     "expected" : {
       "asksToArchive" : true,
-      "group" : "needsAttention",
+      "group" : "finished",
       "isWaiting" : false,
-      "needsAPerson" : true,
+      "needsAPerson" : false,
       "showsUnread" : true,
-      "title" : "Needs you"
+      "title" : "Done"
     },
     "input" : {
       "agent" : {
@@ -1233,7 +1151,7 @@
         "report" : {
           "at" : 812500060,
           "message" : "It went.",
-          "outcome" : "partly_done"
+          "outcome" : "nothing_to_do"
         },
         "runtimeID" : "claude",
         "startOptions" : {
@@ -1248,7 +1166,7 @@
         "title" : "Session 32"
       }
     },
-    "name" : "asks to archive, partly done, unread"
+    "name" : "asks to archive, nothing to do, unread"
   },
   {
     "expected" : {

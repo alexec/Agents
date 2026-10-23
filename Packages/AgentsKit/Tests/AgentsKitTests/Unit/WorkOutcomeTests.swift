@@ -14,12 +14,13 @@ struct WorkOutcomeTests {
             #expect(!outcome.heading.isEmpty)
             _ = outcome.needsAPerson
         }
-        #expect(WorkOutcome.allCases.count == 6)
+        #expect(WorkOutcome.allCases.count == 4)
     }
 
-    @Test("the three that want a person are the three the spec names")
+    /// Only a question (#1916).
+    @Test("only a question wants a person")
     func whichOnesWantAPerson() {
-        #expect(WorkOutcome.allCases.filter(\.needsAPerson) == [.needsAnswer, .partlyDone, .stuck])
+        #expect(WorkOutcome.allCases.filter(\.needsAPerson) == [.needsAnswer])
         #expect(WorkOutcome.allCases.filter { !$0.needsAPerson } == [.done, .nothingToDo, .blocked])
     }
 
@@ -43,10 +44,19 @@ struct WorkOutcomeTests {
     @Test("the wire spellings are the ones the tool offers")
     func wireSpellings() {
         #expect(WorkOutcome.allCases.map(\.rawValue)
-            == ["done", "nothing_to_do", "needs_answer", "partly_done", "stuck", "blocked"])
+            == ["done", "nothing_to_do", "needs_answer", "blocked"])
         for outcome in WorkOutcome.allCases {
             #expect(WorkOutcome(wire: outcome.rawValue) == outcome)
         }
+    }
+
+    /// #1916: an old record's stuck or partly_done (finish_turn's) reads as done.
+    @Test("an old stuck or partly_done reads as done")
+    func oldEndingsReadAsDone() throws {
+        for word in ["stuck", "partly_done"] {
+            #expect(try JSONDecoder().decode(WorkOutcome.self, from: Data("\"\(word)\"".utf8)) == .done)
+        }
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(WorkOutcome.self, from: Data("\"later\"".utf8)) }
     }
 
     /// FR-027. A newer runtime's sixth word is a report that never arrived, never a

@@ -9655,14 +9655,31 @@ const WeekdayThu Weekday = "thu"
 const WeekdayFri Weekday = "fri"
 const WeekdaySat Weekday = "sat"
 
+// How a turn ended (#1916): only a question needs the person. An old record's `stuck` or `partly_done` (finish_turn's, before #494) reads as `done`.
 type WorkOutcome string
 
 const WorkOutcomeDone WorkOutcome = "done"
 const WorkOutcomeNothingToDo WorkOutcome = "nothing_to_do"
 const WorkOutcomeNeedsAnswer WorkOutcome = "needs_answer"
-const WorkOutcomePartlyDone WorkOutcome = "partly_done"
-const WorkOutcomeStuck WorkOutcome = "stuck"
 const WorkOutcomeBlocked WorkOutcome = "blocked"
+
+// UnmarshalJSON reads a value this build does not know as "done".
+func (v *WorkOutcome) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	switch WorkOutcome(s) {
+	case WorkOutcomeDone,
+		WorkOutcomeNothingToDo,
+		WorkOutcomeNeedsAnswer,
+		WorkOutcomeBlocked:
+		*v = WorkOutcome(s)
+	default:
+		*v = WorkOutcomeDone
+	}
+	return nil
+}
 
 type WorkReport struct {
 	Outcome WorkOutcome `json:"outcome"`

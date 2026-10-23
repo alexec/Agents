@@ -296,86 +296,6 @@
   },
   {
     "expected" : {
-      "shape" : "needsYou",
-      "symbol" : "exclamationmark.circle.fill",
-      "tinted" : true,
-      "words" : "Partly done"
-    },
-    "input" : {
-      "agent" : {
-        "advertisedOptions" : [
-
-        ],
-        "availableCommands" : [
-
-        ],
-        "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
-        "id" : "00000000-0000-0000-0000-000000000010",
-        "lastActivityAt" : 812500000,
-        "report" : {
-          "at" : 812500060,
-          "message" : "It went.",
-          "outcome" : "partly_done"
-        },
-        "runtimeID" : "claude",
-        "startOptions" : {
-          "extraArguments" : [
-
-          ],
-          "values" : {
-
-          }
-        },
-        "state" : "finished",
-        "title" : "Session 10"
-      },
-      "isComingBack" : false
-    },
-    "name" : "finished, partly done"
-  },
-  {
-    "expected" : {
-      "shape" : "needsYou",
-      "symbol" : "exclamationmark.circle.fill",
-      "tinted" : true,
-      "words" : "Stuck"
-    },
-    "input" : {
-      "agent" : {
-        "advertisedOptions" : [
-
-        ],
-        "availableCommands" : [
-
-        ],
-        "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
-        "id" : "00000000-0000-0000-0000-000000000011",
-        "lastActivityAt" : 812500000,
-        "report" : {
-          "at" : 812500060,
-          "message" : "It went.",
-          "outcome" : "stuck"
-        },
-        "runtimeID" : "claude",
-        "startOptions" : {
-          "extraArguments" : [
-
-          ],
-          "values" : {
-
-          }
-        },
-        "state" : "finished",
-        "title" : "Session 11"
-      },
-      "isComingBack" : false
-    },
-    "name" : "finished, stuck"
-  },
-  {
-    "expected" : {
       "shape" : "waiting",
       "symbol" : "zzz",
       "tinted" : false,
@@ -470,9 +390,9 @@
   },
   {
     "expected" : {
-      "shape" : "needsYou",
-      "symbol" : "exclamationmark.circle.fill",
-      "tinted" : true,
+      "shape" : "done",
+      "symbol" : "checkmark",
+      "tinted" : false,
       "words" : "Waiting"
     },
     "input" : {
@@ -510,9 +430,9 @@
   },
   {
     "expected" : {
-      "shape" : "needsYou",
-      "symbol" : "exclamationmark.circle.fill",
-      "tinted" : true,
+      "shape" : "done",
+      "symbol" : "checkmark",
+      "tinted" : false,
       "words" : "Waiting"
     },
     "input" : {
@@ -1176,10 +1096,10 @@
   },
   {
     "expected" : {
-      "shape" : "needsYou",
-      "symbol" : "exclamationmark.circle.fill",
-      "tinted" : true,
-      "words" : "Unread · Partly done"
+      "shape" : "done",
+      "symbol" : "checkmark",
+      "tinted" : false,
+      "words" : "Unread · Nothing to do"
     },
     "input" : {
       "agent" : {
@@ -1202,7 +1122,7 @@
         "report" : {
           "at" : 812500060,
           "message" : "It went.",
-          "outcome" : "partly_done"
+          "outcome" : "nothing_to_do"
         },
         "runtimeID" : "claude",
         "startOptions" : {
@@ -1218,7 +1138,7 @@
       },
       "isComingBack" : false
     },
-    "name" : "asks to archive, partly done, unread"
+    "name" : "asks to archive, nothing to do, unread"
   },
   {
     "expected" : {

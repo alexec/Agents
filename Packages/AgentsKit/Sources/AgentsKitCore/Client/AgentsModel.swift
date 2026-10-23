@@ -1516,7 +1516,9 @@ public final class AgentsModel {
     /// was `blocked` and has not cleared. Nil for a running agent even when its report
     /// still says blocked — that is the resumed turn, and it is working.
     public func openBlock(_ agent: Agent) -> (report: WorkReport, block: Block)? {
-        guard agent.state == .finished, let report = agent.report, report.isOpenBlock
+        // Only a wait the app clears by itself (#1916): an old record's block with nothing to
+        // wait on is done, and has no Carry on.
+        guard agent.state == .finished, let report = agent.report, report.isOpenBlock, agent.isWaiting
         else { return nil }
         return (report, report.block ?? Block())
     }
@@ -1577,11 +1579,9 @@ public final class AgentsModel {
     /// The name of the button that ends a block by hand.
     public static let carryOnLabel = "Carry on"
 
-    /// Help for Carry on: Waiting (the app would resume itself) vs Blocked (only the person).
+    /// Help for Carry on, which only a wait has (#1916).
     public static func carryOnHelp(for agent: Agent) -> String {
-        agent.isWaiting
-            ? "Stop waiting and carry on now"
-            : "Tell it the block has cleared, and let it carry on"
+        "Stop waiting and carry on now"
     }
 
     /// Whether a client should offer Stop for this chat: the daemon holds a runtime for

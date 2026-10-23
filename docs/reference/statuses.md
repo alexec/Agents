@@ -6,6 +6,8 @@ description: Every status an agent can have, the group it is listed under, and w
 
 # Statuses and groups
 
+Only a question puts a session under **Needs you** (#1916): the app does not assume an agent needs you unless it asks. An agent that is blocked or stuck asks you, as a question.
+
 This page lists every status an agent can show, and the group it sits under on its
 project's page. The groups appear in this order: **Needs you**, **Waiting**,
 **Working**, **Done**, **Paused**. A group with no agents in it is not
@@ -29,13 +31,10 @@ Session labels appear beneath the title on Mac rows and phone cards; agent-owned
 | **Coming back after a restart** | Working | The app is bringing the conversation back by itself after the app or the Mac restarted. | **Stop**. |
 | **Waiting on you** | Needs you | The agent has asked you something in the middle of its turn, such as permission to run a command, and is paused until you answer. | Answer the card above the prompt. **Stop**, **Archive**, **Branch**. |
 | **Waiting on your answer** | Needs you | The turn ended with a question for you. | Reply in the prompt. **Archive**, **Branch**. |
-| **Partly done** | Needs you | The turn ended with some of the work done; the rest needs a decision from you. | Reply in the prompt. **Archive**, **Branch**. |
-| **Stuck** | Needs you | The turn ended without the work done, and the agent says why. | Reply in the prompt. **Archive**, **Branch**. |
-| **Waiting** (old records) | Needs you | An old record only: the turn ended waiting on something the app cannot watch, such as a review, and named no agents and no time. A new wait always names agents or a time, so it is under **Waiting** below (#2045). | **Carry on**, once the wait is over. **Stop**, **Archive**, **Branch**. |
 | **Outcome unknown** | Needs you | The turn ended without a report saying how the work went. | Read the conversation and reply if needed. |
 | **Unexpected stop** | Needs you | The runtime crashed, failed, hit a limit or otherwise stopped short without you choosing to stop it. | Read the reason on the row and reply to resume. |
 | **Waiting** | Waiting | The agent is waiting on something the app watches: agents it started, a time to check again, or an event such as checks passing. The card says what it is waiting for. It carries on by itself when that comes, so you need not do anything. Its icon is Zs: asleep until what it waits for comes. | **Carry on**, to tell it the wait is over early. **Stop**, so it does not carry on. **Archive**, **Branch**. |
-| **Complete** | Done | The agent did what was asked. | Reply in the prompt. **Mark as Unread**, **Archive**, **Branch**. |
+| **Complete** | Done | The agent did what was asked. A turn with no question, no file and no archive ends so. An old record's **Stuck**, **Partly done** or a wait on nothing the app watches shows as **Complete** too (#1916). | Reply in the prompt. **Mark as Unread**, **Archive**, **Branch**. |
 | **Nothing to do** | Done | The agent found nothing that needed doing. | Reply in the prompt. **Mark as Unread**, **Archive**, **Branch**. |
 | **Stopped by you** or **Stopped by the agent that started it** | Paused | The turn was deliberately cut short. | Reply in the prompt to start a new turn. **Archive**, **Branch**. |
 | **Its allowance ran out** | Paused | The runtime refused the turn because its plan's allowance, or a key's credit, is spent. The chat stays on that runtime, and nothing carries it on until you ask. | **Continue at 07:00** (or **Continue when it is back**), so the chat carries on by itself when the allowance is back. Or start a new chat on another runtime and ask it to continue this one; see [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md). Or reply here once the runtime is back. **Archive**, **Branch**. |
@@ -54,8 +53,7 @@ unresolved problem is under **Needs you** whether you have read it or not.
 
 Each group heading counts what is unread under it, such as **Done 5 · 2 unread**, and so
 does the project's row in the sidebar and on the phone. The Dock badge, the app icon badge,
-the Home-screen widget and the tab's title count only what needs you: a question, a block or
-an unexpected stop. An unread finish is not counted there (#1565).
+the Home-screen widget and the tab's title count only what needs you: a question or an unexpected stop. An unread finish is not counted there (#1565).
 
 ## A file to see
 
