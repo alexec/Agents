@@ -72,15 +72,17 @@ export function formFields(schema: JSONValue | undefined): FormField[] {
   });
 }
 
-/** What Start sends: providers/create with the repository and the form's values, typed. */
-export function createRequest(provider: string, name: string, repository: Repository, fields: readonly FormField[]): ProviderCreate {
+/** What Start sends: providers/create with the repository, if any (#2131), and the form's values, typed. */
+export function createRequest(provider: string, name: string, repository: Repository | null, fields: readonly FormField[]): ProviderCreate {
   const options: Record<string, JSONValue> = {};
   for (const f of fields) {
     const v = f.value.trim();
     if (!v) continue;
     options[f.key] = f.kind === "integer" ? Number(v) : f.kind === "boolean" ? v === "true" : v;
   }
-  return { id: provider as ProviderID, name, options, repository: repository.url };
+  const request: ProviderCreate = { id: provider as ProviderID, name, options };
+  if (repository) request.repository = repository.url;
+  return request;
 }
 
 export const machineWords = {

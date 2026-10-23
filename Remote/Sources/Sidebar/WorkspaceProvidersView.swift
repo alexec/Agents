@@ -13,6 +13,7 @@ struct WorkspaceProvidersView: View {
     @State private var linking: Linking?
     @State private var removing: DaemonAPI.ProviderSummary?
     @State private var said: String?
+    @State private var making: DaemonAPI.ProviderSummary?
 
     struct Linking: Identifiable {
         let provider: DaemonAPI.ProviderSummary
@@ -56,6 +57,9 @@ struct WorkspaceProvidersView: View {
         .refreshable { await model.loadWorkspaceProviders() }
         .sheet(isPresented: $adding) { AddWorkspaceProviderSheet(editing: nil) }
         .sheet(item: $editing) { AddWorkspaceProviderSheet(editing: $0) }
+        .sheet(item: $making) { provider in
+            NavigationStack { NewMachinePage(picked: provider.id, close: { making = nil }) }
+        }
         .sheet(item: $linking) { LinkWorkspaceToHostSheet(provider: $0.provider, workspace: $0.workspace) }
         .confirmationDialog(removing.map { WorkspaceProviderWords.removeTitle($0.name) } ?? "",
                             isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
@@ -80,6 +84,10 @@ struct WorkspaceProvidersView: View {
                 Text(provider.name)
                 Spacer()
                 Menu {
+                    // The same New Machine as Add a Machine…, at this provider (#2131).
+                    if provider.capabilities.contains("create"), provider.usable {
+                        Button("New Machine…", systemImage: "plus") { making = provider }
+                    }
                     Button("List Again", systemImage: "arrow.clockwise") {
                         Task { await model.listWorkspacesAgain(provider.id) }
                     }
@@ -191,7 +199,7 @@ private struct WorkspaceProviderRow: View {
 
 /// Add a Provider (kind first, then its form), or Edit… one: its name and its secrets again.
 /// What is typed lives in this sheet only, and goes when it closes.
-private struct AddWorkspaceProviderSheet: View {
+struct AddWorkspaceProviderSheet: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     let editing: DaemonAPI.ProviderSummary?

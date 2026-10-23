@@ -9,7 +9,6 @@ import SwiftUI
 /// the same ticks.
 struct ConnectorSetupView: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.openSettings) private var openSettings
     var project: ProjectKey
     var projectName: String
     /// Opens the catalogue (Add Connector…), for Linear and the others.
@@ -24,6 +23,17 @@ struct ConnectorSetupView: View {
     @State private var connectingLinear = false
     /// Linear connected in that sheet: the catalogue opens next, for its connector.
     @State private var linearConnected = false
+    /// The control plane, for Where agents run (#2131): the machines and providers, and Add a
+    /// Machine… in place. Nil with none.
+    @State private var control: ControlSettingsModel?
+    @State private var addingMachine: Adding?
+
+    /// Add a Machine… or Add Provider…, both the one sheet: Add Provider goes on to a machine.
+    enum Adding: String, Identifiable {
+        case machine, provider
+        var id: String { rawValue }
+        var start: AddMachineSheet.Step { self == .machine ? .choose : .addProvider }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -51,6 +61,13 @@ struct ConnectorSetupView: View {
             }
         }
         .task(id: project) { await load(.cached) }
+        .task {
+            control = ControlConfig.endpoint.flatMap { ControlSettingsModel(endpoint: $0) }
+            await control?.refresh()
+        }
+        .sheet(item: $addingMachine, onDismiss: { Task { await control?.refresh() } }) { step in
+            if let control { AddMachineSheet(control: control, start: step.start).paperSheet() }
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // Back from github.com (an install, a grant): read again.
             Task { await load(.cached) }
@@ -127,13 +144,29 @@ struct ConnectorSetupView: View {
     @ViewBuilder private func slots(_ setup: DaemonAPI.ConnectorSetup) -> some View {
         LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
             ForEach(setup.slots.filter { $0.slot != changing }) { slot in
-                SlotCard(slot: slot, setup: setup, projectName: projectName, reading: reading,
+                SlotCard(slot: slot, setup: setup, projectName: projectName, place: place, reading: reading,
                          change: { changing = slot.slot }, act: act)
             }
         }
         if let changing, let slot = setup.slot(changing) {
-            SlotChange(slot: slot, setup: setup, act: act, done: { self.changing = nil })
+            SlotChange(slot: slot, setup: setup, place: place, canAdd: control != nil,
+                       act: act, done: { self.changing = nil })
         }
+    }
+
+    /// Where agents run (#2131): the machine the project's folder is on, and what else is yours.
+    private var place: Place {
+        let hosts = control?.hosts ?? []
+        let here = model.isOnThisMac(project.host)
+        let title = WhereAgentsRun.title(onThisMac: here, hostName: hosts.first { $0.id == project.host }?.name)
+        let others = hosts.filter { $0.id != project.host && $0.runsAgents }
+            .map { $0.id == control?.thisMacHost?.id ? "This Mac" : $0.name }
+        return Place(title: title, line: WhereAgentsRun.line(others: others, providers: control?.providers.map(\.name) ?? []))
+    }
+
+    struct Place {
+        var title: String
+        var line: String
     }
 
     // MARK: The events
@@ -170,7 +203,7 @@ struct ConnectorSetupView: View {
 
     enum Action {
         case connect, tryAgain, skip(DaemonAPI.ConnectorSlotKind), setUp(DaemonAPI.ConnectorSlotKind), catalogue, open(String),
-             providers
+             addMachine, addProvider
         /// Linear for Tasks: Connect Linear first when it is not connected, then the catalogue.
         case linear
     }
@@ -184,9 +217,8 @@ struct ConnectorSetupView: View {
         case .catalogue: addConnector()
         case .linear: Task { await useLinear() }
         case .open(let address): open(address)
-        case .providers:
-            model.settingsPaneAsked = .providers
-            openSettings()
+        case .addMachine: addingMachine = .machine
+        case .addProvider: addingMachine = .provider
         }
     }
 
@@ -229,6 +261,7 @@ private struct SlotCard: View {
     let slot: DaemonAPI.ConnectorSlot
     let setup: DaemonAPI.ConnectorSetup
     let projectName: String
+    let place: ConnectorSetupView.Place
     let reading: Bool
     let change: () -> Void
     let act: (ConnectorSetupView.Action) -> Void
@@ -244,7 +277,8 @@ private struct SlotCard: View {
                     Button("Change\u{2026}", action: change).buttonStyle(.link).appText(.fine)
                 }
             }
-            Text(ConnectorSetupWords.title(slot)).appText(.supporting).fontWeight(.semibold)
+            Text(slot.slot == .workspace ? place.title : ConnectorSetupWords.title(slot))
+                .appText(.supporting).fontWeight(.semibold)
             proofOrLine
             actions
         }
@@ -274,7 +308,8 @@ private struct SlotCard: View {
             .appText(.fine)
             .accessibilityElement(children: .combine)
         } else {
-            Text(ConnectorSetupWords.line(slot, project: projectName, repository: setup.repository, forge: setup.forgeOrGitHub))
+            Text(slot.slot == .workspace ? place.line
+                 : ConnectorSetupWords.line(slot, project: projectName, repository: setup.repository, forge: setup.forgeOrGitHub))
                 .appText(.fine)
                 .tinted([.failed, .refused, .noRemote].contains(slot.state) ? .attention : .none)
                 .foregroundStyle(.secondary)
@@ -360,6 +395,9 @@ private struct SlotMark: View {
 private struct SlotChange: View {
     let slot: DaemonAPI.ConnectorSlot
     let setup: DaemonAPI.ConnectorSetup
+    let place: ConnectorSetupView.Place
+    /// A control plane to add a machine or provider to.
+    let canAdd: Bool
     let act: (ConnectorSetupView.Action) -> Void
     let done: () -> Void
 
@@ -425,10 +463,14 @@ private struct SlotChange: View {
         let skipped = slot.state == .skipped
         switch slot.slot {
         case .workspace:
+            // With no control plane the two adds say what they need, and do nothing (#2131).
+            let need = AddMachine.Words.needsControlPlane
             return [
-                Choice(title: "This Mac", note: "Nothing to set up.", chosen: true, pick: done),
-                Choice(title: "Docker, DigitalOcean, Coder\u{2026}", note: "Set up in Providers\u{2026}", chosen: false,
-                       pick: { act(.providers) }),
+                Choice(title: place.title, note: WhereAgentsRun.hereNote, chosen: true, pick: done),
+                Choice(title: AddMachine.Words.menuItem, note: canAdd ? WhereAgentsRun.addMachineNote : need, chosen: false,
+                       pick: { if canAdd { act(.addMachine) } }),
+                Choice(title: AddMachine.Words.addProvider, note: canAdd ? WhereAgentsRun.addProviderNote : need, chosen: false,
+                       pick: { if canAdd { act(.addProvider) } }),
             ]
         case .tasks:
             return [

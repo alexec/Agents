@@ -9,6 +9,7 @@ struct MachinesSettingsRow: View {
 
     var body: some View {
         SettingsPageLink("Machines", systemImage: "desktopcomputer") {
+            if !model.needsPairing { AddMachineSection() }
             VersionsSettingsSection()
             GitAccessSettingsSection()
             // The folder is the Mac's disk, so it is chosen on the Mac.
@@ -22,5 +23,19 @@ struct MachinesSettingsRow: View {
             }
         }
         .task { await model.refreshBackupState() }
+    }
+}
+
+/// Add a Machine… (#2131): a provider, a server or another Mac, as the window's Machines has it.
+private struct AddMachineSection: View {
+    @State private var adding = false
+
+    var body: some View {
+        Section {
+            Button(AddMachine.Words.menuItem) { adding = true }
+        } footer: {
+            Text(AddMachine.Words.machinesFoot)
+        }
+        .sheet(isPresented: $adding) { AddMachineSheet() }
     }
 }

@@ -9,6 +9,8 @@ import {
   providerKinds, providerLine, providerRequest, providerWords as words, workspaceLine, type ProviderKind,
 } from "../model/workspaceProviders";
 import { Modal } from "./Modal";
+import { MachineDialog } from "./MachineDialog";
+import { makers } from "../model/machineFromRepository";
 import { adminsOnly, providerLine as groupLine } from "../model/teamGroups";
 
 const time = (at: Date) => at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -58,6 +60,7 @@ function ProviderCard({ store, provider, say, edit, link }: {
   const groups = store.providers.groups.value;
   const admin = store.person.value?.role !== "member";
   const line = [providerLine(provider, time), groupLine(provider, groups)].filter(Boolean).join(" · ");
+  const [making, setMaking] = useState(false);
   const setGroup = async (group: string) => say(await store.providers.setGroup(provider.id, group || null));
   const remove = async () => {
     if (!window.confirm(`${words.removeTitle(provider.name)} ${words.removeNote}`)) return;
@@ -70,6 +73,10 @@ function ProviderCard({ store, provider, say, edit, link }: {
           <p class="strong">{provider.name} <span class="chip">{kindChip(provider)}</span></p>
           {line && <p class="small quiet">{line}</p>}
         </div>
+        {/* The same New Machine as Add a Machine…, at this provider (#2131). */}
+        {makers([provider]).length > 0 && (
+          <button type="button" onClick={() => setMaking(true)}>New Machine…</button>
+        )}
         <button type="button" class="link small" onClick={() => void store.providers.refresh(provider.id)}>List Again</button>
         {/* Who may start machines from it (#1761): an admin gives it to a group. */}
         {admin && (
@@ -85,6 +92,7 @@ function ProviderCard({ store, provider, say, edit, link }: {
       {provider.workspaces.map((w) => (
         <WorkspaceRow key={w.id} store={store} provider={provider} workspace={w} hosts={hosts} say={say} link={() => link(w)} />
       ))}
+      {making && <MachineDialog store={store} machine picked={provider.id} close={() => setMaking(false)} />}
     </ul>
   );
 }
@@ -134,7 +142,10 @@ function WorkspaceRow({ store, provider, workspace, hosts, say, link }: {
 }
 
 /** Add a Provider (kind first, then its form), or Edit… one: its name and its secrets again. */
-function AddProviderDialog({ store, editing, close }: { store: Store; editing?: ProviderSummary | undefined; close: () => void }) {
+/** Add a Provider, or Edit… one. With `added` (Add a Machine, #2131) it goes on with the provider it added, in place of closing. */
+export function AddProviderDialog({ store, editing, close, added }: {
+  store: Store; editing?: ProviderSummary | undefined; close: () => void; added?: (id: string | undefined) => void;
+}) {
   const [kind, setKind] = useState<ProviderKind | undefined>(kindOfPreset(editing?.preset));
   const [name, setName] = useState(editing?.name ?? "");
   // The values, secrets among them, live in this sheet's state only, and go when it closes.
@@ -154,9 +165,11 @@ function AddProviderDialog({ store, editing, close }: { store: Store; editing?: 
     if (typeof request === "string") return setProblem(request);
     setWorking(true);
     setProblem(undefined);
+    const before = new Set((store.providers.list.peek() ?? []).map((p) => p.id));
     const refused = await store.providers.save(request);
     setWorking(false);
     if (refused) setProblem(refused);
+    else if (added) added((store.providers.list.peek() ?? []).find((p) => !before.has(p.id))?.id);
     else close();
   };
   return (

@@ -203,9 +203,6 @@ public enum ConnectorSetupWords {
         events.workflows.isEmpty ? "No workflow here starts on them yet." : "Now usable by"
     }
 
-    /// The Change… slot's other places, on the Remote and the web page.
-    public static let otherProvidersElsewhere = "Other providers are set up on the Mac."
-
     /// The Tasks slot's way to Linear (#1682): the connection first, then its connector.
     public static let connectLinear = "Connect Linear\u{2026}"
 
