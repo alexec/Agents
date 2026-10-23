@@ -72,11 +72,16 @@ public struct TurnParts: Hashable, Sendable {
     public var stepCount: Int
     /// The latest step, while the turn runs and has said nothing after it.
     public var live: TranscriptItem?
+    /// The thought the agent is thinking now (#2380): the last item drawn in a turn still
+    /// going, when that is a thought and the turn draws its steps (a thought is drawn only
+    /// among them). Its line has the thinking mark, and the chat's foot then has none.
+    public var liveThought: TranscriptItem.ID?
 
     /// `items` is everything drawn after the ask. `isLive` is whether the turn is still
     /// going: its reply is only a reply once nothing follows it.
     public init(_ items: [TranscriptItem], isLive: Bool) {
-        let shown = Self.drawn(items, isLive: isLive).filter { !$0.isThought }
+        let drawn = Self.drawn(items, isLive: isLive)
+        let shown = drawn.filter { !$0.isThought }
         let reply = Self.reply(in: shown, isLive: isLive)
         var outcome: [TranscriptItem] = []
         var reports: [TranscriptItem] = []
@@ -97,6 +102,7 @@ public struct TurnParts: Hashable, Sendable {
         self.outcome = outcome + reports
         self.stepCount = steps
         self.live = isLive && reply.isEmpty ? shown.last(where: { !$0.isOutcome }) : nil
+        self.liveThought = isLive && steps != 0 && drawn.last?.isThought == true ? drawn.last?.id : nil
     }
 
     /// The reply's words, its messages joined: what voice mode speaks (#2322). Never the
