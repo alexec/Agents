@@ -68,6 +68,7 @@ var appToolMethods = map[string]string{
 	"list_sessions":       "sessions/list",
 	"read_session":        "sessions/read",
 	"message_session":     "sessions/message",
+	"cancel_message":      "sessions/cancelMessage",
 	"set_session_labels":  "sessions/setLabels",
 	"move_worktree":       "worktrees/move",
 	"show_file":           "files/show",

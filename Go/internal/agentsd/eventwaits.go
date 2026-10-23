@@ -822,6 +822,18 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 	}
 }
 
+func argBool(args map[string]json.RawMessage, key string) bool {
+	raw, ok := args[key]
+	if !ok || string(raw) == "null" {
+		return false
+	}
+	var b bool
+	if json.Unmarshal(raw, &b) == nil {
+		return b
+	}
+	return false
+}
+
 func argInt(args map[string]json.RawMessage, key string) (int, bool) {
 	raw, ok := args[key]
 	if !ok || string(raw) == "null" {

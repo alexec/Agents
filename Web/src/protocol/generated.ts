@@ -5252,7 +5252,6 @@ export interface QueuedPrompt {
   from: PromptOrigin;
   preface?: string;
   sender?: MessageSender;
-  hops?: number;
 }
 
 export interface QueuedStart {
@@ -9054,7 +9053,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProviderRuntimes: { required: ["runtimes"], optional: ["host", "why"] },
   ProviderSummary: { required: ["id", "name", "kind", "secrets", "capabilities", "contract", "mapped", "workspaces", "current"], optional: ["preset", "listedAt", "problem", "group", "mayUse"] },
   PushToken: { required: ["environment"], optional: ["token"] },
-  QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface", "sender", "hops"] },
+  QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface", "sender"] },
   QueuedStart: { required: ["labels"], optional: ["runtimeID", "permissionMode", "model", "worktree"] },
   QuickAnswer: { required: ["kind", "id", "title", "isDestructive"], optional: ["field"] },
   QuitRequest: { required: ["stopAgents"], optional: [] },
