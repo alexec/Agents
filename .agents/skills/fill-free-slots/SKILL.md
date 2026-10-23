@@ -64,14 +64,17 @@ none, guess one from its text and the paths in `.agents/areas`, and add it
 is held by an open pull request with that label
 (`gh pr list --state open --json number,labels`), by the issue of a running agent (its
 `#<n>` session label), and by an issue you start in this run. Skip an issue whose area
-is held and take the next one. An issue without an area is never held.
+is held and take the next one. A skipped issue is started by a later run, by a new agent of
+its own, once the area is free: it is never handed to the lane that holds the area, and no
+running lane is messaged to take it (#2504). An issue without an area is never held.
 
 If there is nothing to start, say "No unassigned issues to start." and call
 `archive_session` (no id).
 
 ## 3. Start one agent per free slot
 
-For each of the first (free slots) issues, in order:
+Every issue gets its own agent, worktree and pull request (#2504); an agent never takes a
+second issue. For each of the first (free slots) issues, in order:
 
 1. Assign it first, so no other run picks it up: `gh issue edit <n> --add-assignee alexec`.
 2. start_session with a new worktree named `fix-github-issue-<n>` (for a bug) or
