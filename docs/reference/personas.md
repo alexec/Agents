@@ -50,6 +50,13 @@ Every key is optional, and so is the front matter: a file with none is all promp
 
 The body is the persona's prompt. It can name the skills the persona relies on.
 
+## Manage them in Agents
+
+On the Mac, iPhone, iPad and web, choose **Manage personas…** on the new-session form.
+Choose the project or personal scope, then open a file, create one, edit its Markdown or
+delete it. The editor keeps the whole Markdown file, including front matter fields the app
+does not know, so a saved persona is available to future session starts in that scope.
+
 ## Picking one
 
 The choice is a menu under the project's name at the top of the new-session form, on the

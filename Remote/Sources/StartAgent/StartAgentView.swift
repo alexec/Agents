@@ -33,6 +33,7 @@ struct StartAgentView: View {
     @State private var pointer: CGPoint?
     /// This showing of the page (#1044): only it lets the page go when it goes.
     @State private var page = UUID()
+    @State private var managingPersonas = false
 
     var body: some View {
         form
@@ -89,6 +90,7 @@ struct StartAgentView: View {
         }
         // A start on a server with no key of its own asks for one here, over the page (#344).
         .tokenAskSheet(model)
+        .sheet(isPresented: $managingPersonas) { PersonaManagerView(project: project) }
     }
 
     private var form: some View {
@@ -100,6 +102,11 @@ struct StartAgentView: View {
                     .listRowBackground(Color.clear)
             }
             personaHeading
+            Section {
+                Button("Manage personas…") { managingPersonas = true }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .listRowBackground(Color.clear)
+            }
             // Starts kept for this project's stopped workspace (#691 US3, layouts.md L6a): the
             // agent each makes opens once the host is up.
             if case let starts = model.keptStarts(in: project), !starts.isEmpty {

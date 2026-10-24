@@ -292,6 +292,10 @@ public enum DaemonAPI {
         public static let workflowsList = "workflows/list"
         /// The personas a start in a project can pick (#760), as `[Persona]`.
         public static let personasList = "personas/list"
+        /// Persona Markdown files in one storage scope, without project shadowing.
+        public static let personasFiles = "personas/files"
+        /// Save or delete one persona Markdown file.
+        public static let personasSave = "personas/save"
         public static let workflowsRun = "workflows/run"
         /// Put one away, or bring it back. The user's one way of overruling a workflow
         /// an agent wrote, which is why it is here and not only in the file system.

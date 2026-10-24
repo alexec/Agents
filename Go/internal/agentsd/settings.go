@@ -350,6 +350,113 @@ func (d *Daemon) registerSettings() {
 	On(d, wire.CallPersonasList, func(ctx context.Context, c *Client, r wire.PersonasListRequest) ([]wire.Persona, error) {
 		return personas(store.FolderPath(r.Folder), personaHome()), nil
 	})
+	On(d, wire.CallPersonasFiles, func(ctx context.Context, c *Client, r wire.PersonasFilesRequest) (wire.PersonaFilesAnswer, error) {
+		base, err := personaFilesBase(r.Folder, r.Origin)
+		if err != nil {
+			return nil, err
+		}
+		return listPersonaFiles(base, r.Origin)
+	})
+	On(d, wire.CallPersonasSave, func(ctx context.Context, c *Client, r wire.PersonaFileSaveRequest) (wire.Empty, error) {
+		base, err := personaFilesBase(r.Folder, r.Origin)
+		if err != nil {
+			return wire.Empty{}, err
+		}
+		return wire.Empty{}, savePersonaFile(base, r)
+	})
+}
+
+func personaFilesBase(folder *wire.URL, origin wire.PersonaOrigin) (string, error) {
+	var base string
+	switch origin {
+	case wire.PersonaOriginPersonal:
+		base = personaHome()
+	case wire.PersonaOriginProject:
+		if folder == nil {
+			return "", Invalid("Choose a project for project personas.")
+		}
+		base = store.FolderPath(*folder)
+		root, err := store.Resolve(base)
+		if err != nil {
+			return "", Invalid("That project folder is not available.")
+		}
+		if !inside(root, resolved(filepath.Join(base, ".agents", "personas"))) {
+			return "", Invalid("The project's persona folder has to stay inside the project.")
+		}
+	default:
+		return "", Invalid("Choose personal or project personas.")
+	}
+	if base == "" {
+		return "", Invalid("Personal personas are not available on this host.")
+	}
+	return base, nil
+}
+
+func listPersonaFiles(base string, origin wire.PersonaOrigin) (wire.PersonaFilesAnswer, error) {
+	folder := filepath.Join(base, ".agents", "personas")
+	entries, err := os.ReadDir(folder)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, fileError(CodeFileNotReadable, "Persona files can't be opened.")
+	}
+	out := wire.PersonaFilesAnswer{}
+	for _, entry := range entries {
+		name := entry.Name()
+		if strings.HasPrefix(name, ".") || !strings.HasSuffix(name, ".md") {
+			continue
+		}
+		id := strings.TrimSuffix(name, ".md")
+		bytes, ok := regularFileBytes(filepath.Join(folder, name))
+		if ok {
+			out = append(out, wire.PersonaFile{ID: id, Origin: origin, Content: string(bytes)})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return strings.ToLower(out[i].ID) < strings.ToLower(out[j].ID) })
+	return out, nil
+}
+
+func savePersonaFile(base string, r wire.PersonaFileSaveRequest) error {
+	if r.ID == "" || r.ID == "." || r.ID == ".." || strings.HasPrefix(r.ID, ".") ||
+		strings.HasSuffix(r.ID, ".md") || filepath.Base(r.ID) != r.ID || strings.ContainsAny(r.ID, `/\\`) {
+		return Invalid("Use a persona name without a folder path.")
+	}
+	if len(r.Content) > 256<<10 {
+		return Invalid("A persona file has to be smaller than 256 KB.")
+	}
+	folder := filepath.Join(base, ".agents", "personas")
+	path := filepath.Join(folder, r.ID+".md")
+	if r.Delete != nil && *r.Delete {
+		info, err := os.Lstat(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return fileError(CodeFileGone, r.ID+".md is gone.")
+			}
+			return fileError(CodeFileNotReadable, r.ID+".md can't be opened.")
+		}
+		if !info.Mode().IsRegular() || links(info) != 1 {
+			return Invalid("That persona file can't be safely removed.")
+		}
+		if err := os.Remove(path); err != nil {
+			return fileError(CodeFileNotReadable, r.ID+".md can't be removed.")
+		}
+		return nil
+	}
+	if err := os.MkdirAll(folder, 0o755); err != nil {
+		return fileError(CodeFileNotReadable, "The persona folder can't be created.")
+	}
+	if root, err := store.Resolve(base); err != nil || !inside(root, resolved(folder)) {
+		return Invalid("The project's persona folder has to stay inside the project.")
+	}
+	info, err := os.Lstat(path)
+	if err == nil && (!info.Mode().IsRegular() || links(info) != 1) {
+		return Invalid("That persona file can't be safely replaced.")
+	}
+	if err != nil && !os.IsNotExist(err) {
+		return fileError(CodeFileNotReadable, r.ID+".md can't be opened.")
+	}
+	if err := store.WriteAtomically(path, []byte(r.Content), 0o644); err != nil {
+		return fileError(CodeFileNotReadable, r.ID+".md can't be saved.")
+	}
+	return nil
 }
 
 // personaHome is the folder whose .agents/personas are the person's own.

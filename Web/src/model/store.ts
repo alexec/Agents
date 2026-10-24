@@ -2915,6 +2915,16 @@ export class Store extends Work {
       .catch((error: unknown) => (error instanceof CallFailed && error.code === methodNotFound ? [] : null));
   }
 
+  async personaFiles(host: string, folder: string, origin: "project" | "personal") {
+    return this.link.call("personas/files", { folder: folder as never, origin }, host).catch(() => null);
+  }
+
+  async savePersonaFile(host: string, folder: string, origin: "project" | "personal", id: string, content: string,
+    remove = false): Promise<boolean> {
+    return this.link.call("personas/save", { folder: folder as never, origin, id, content, delete: remove }, host)
+      .then(() => true).catch(() => false);
+  }
+
   async worktrees(host: string, folder: string): Promise<WorktreesListResponse | null> {
     return this.link.call("worktrees/list", { folder: folder as never }, host).catch(() => null);
   }

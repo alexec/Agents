@@ -4663,9 +4663,30 @@ export interface Persona {
   problem?: string;
 }
 
+export interface PersonaFile {
+  id: string;
+  origin: PersonaOrigin;
+  content: string;
+}
+
+export interface PersonaFileSaveRequest {
+  folder?: URLString;
+  origin: PersonaOrigin;
+  id: string;
+  content: string;
+  delete?: boolean;
+}
+
+export type PersonaFilesAnswer = PersonaFile[];
+
 export type PersonaOrigin =
   | "project"
   | "personal";
+
+export interface PersonasFilesRequest {
+  folder?: URLString;
+  origin: PersonaOrigin;
+}
 
 export interface PersonasListRequest {
   folder: URLString;
@@ -8146,7 +8167,9 @@ export interface Methods {
   "people/setRole": { params: PersonRoleRequest; result: Empty };
   "permissions/answer": { params: AnswerRequest; result: Empty };
   "permissions/pending": { params: Empty; result: PermissionRequest[] };
+  "personas/files": { params: PersonasFilesRequest; result: PersonaFilesAnswer };
   "personas/list": { params: PersonasListRequest; result: Persona[] };
+  "personas/save": { params: PersonaFileSaveRequest; result: Empty };
   "pins/arrange": { params: PinArrangeRequest; result: Empty };
   "pins/arrangeSessions": { params: PinArrangeSessionsRequest; result: Empty };
   "pins/arrangeWorkflows": { params: PinArrangeWorkflowsRequest; result: Empty };
@@ -8414,7 +8437,9 @@ export const MethodTarget = {
   "people/setRole": "control",
   "permissions/answer": "host",
   "permissions/pending": "host",
+  "personas/files": "host",
   "personas/list": "host",
+  "personas/save": "host",
   "pins/arrange": "host",
   "pins/arrangeSessions": "host",
   "pins/arrangeWorkflows": "host",
@@ -9024,6 +9049,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PersonSettings: { required: [], optional: ["name", "pronouns"] },
   PersonSuspended: { required: ["by", "provider", "at"], optional: ["why"] },
   Persona: { required: ["id", "name", "origin", "settings"], optional: ["description", "problem"] },
+  PersonaFile: { required: ["id", "origin", "content"], optional: [] },
+  PersonaFileSaveRequest: { required: ["origin", "id", "content"], optional: ["folder", "delete"] },
+  PersonasFilesRequest: { required: ["origin"], optional: ["folder"] },
   PersonasListRequest: { required: ["folder"], optional: [] },
   PinArrangeRequest: { required: ["folder", "paths"], optional: [] },
   PinArrangeSessionsRequest: { required: ["folder", "agentIDs"], optional: [] },

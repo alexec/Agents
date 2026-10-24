@@ -231,6 +231,36 @@ func TestPersonas(t *testing.T) {
 	}
 }
 
+func TestPersonaFilesCanBeManagedInEachScope(t *testing.T) {
+	personal := t.TempDir()
+	t.Setenv("AGENTS_PERSONAL_HOME", personal)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := project(t, c, 1)
+	projectFolder := store.FolderURL(dir)
+	content := "---\nname: Review\nfuture-key: keep me\n---\n\nRead carefully.\n"
+	c.call(t, 2, "personas/save", map[string]any{"folder": projectFolder, "origin": "project", "id": "review", "content": content})
+	var files wire.PersonaFilesAnswer
+	json.Unmarshal(c.call(t, 3, "personas/files", map[string]any{"folder": projectFolder, "origin": "project"}), &files)
+	if len(files) != 1 || files[0].ID != "review" || files[0].Content != content || files[0].Origin != wire.PersonaOriginProject {
+		t.Fatalf("project files: %+v", files)
+	}
+	personalContent := "Plain personal prompt\n"
+	c.call(t, 4, "personas/save", map[string]any{"origin": "personal", "id": "review", "content": personalContent})
+	json.Unmarshal(c.call(t, 5, "personas/files", map[string]any{"origin": "personal"}), &files)
+	if len(files) != 1 || files[0].Content != personalContent || files[0].Origin != wire.PersonaOriginPersonal {
+		t.Fatalf("personal files: %+v", files)
+	}
+	c.call(t, 6, "personas/save", map[string]any{"folder": projectFolder, "origin": "project", "id": "review", "content": content, "delete": true})
+	json.Unmarshal(c.call(t, 7, "personas/files", map[string]any{"folder": projectFolder, "origin": "project"}), &files)
+	if len(files) != 0 {
+		t.Fatalf("deleted project persona remains: %+v", files)
+	}
+	if e := c.callError(t, 8, "personas/save", map[string]any{"folder": projectFolder, "origin": "project", "id": "../escape", "content": "x"}); e.Code == 0 {
+		t.Fatal("accepted a persona path traversal")
+	}
+}
+
 func TestTheAppsYAML(t *testing.T) {
 	m, err := yamlnode.MappingFrom([]string{"name: \"a: b\"", "on:", "  - schedule:", "      at: \"09:00\"", "days: [mon, 'tue']", "url: http://x#y"})
 	if err != nil {

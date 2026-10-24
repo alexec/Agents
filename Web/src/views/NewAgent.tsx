@@ -42,6 +42,7 @@ import { GuardedChangeCards } from "./GuardedChange";
 import { KeptBubbles } from "./Kept";
 import { composerReason, line, setBy as setByWords } from "../model/orgPolicy";
 import { optionLabel } from "./OrgPolicyLine";
+import { PersonaManager } from "./PersonaManager";
 
 type Where = { kind: "project" } | { kind: "new" } | { kind: "existing"; root: string } | { kind: "branch"; name: string }
   | { kind: "named"; name: string };
@@ -101,6 +102,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   const asking = useSignal(0);
   /** The project's personas (#760), the one picked by id, and one picked before its runtime's menus came. */
   const personas = useSignal<Persona[]>([]);
+  const managePersonas = useSignal(false);
   const persona = useSignal<string | undefined>(undefined);
   const pendingPersona = useRef<Persona | undefined>(undefined);
   /** The project the personas came for, when they came: asked again once the host answers if not (#1096). */
@@ -393,6 +395,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
       <div class="scroll new-heading">
         <Huddle focused={promptFocused.value} typed={typed.value} />
         <ProjectSwitch store={store} host={host} folder={folder} projectName={projectName} down={down} />
+        <button class="link persona-manage" type="button" onClick={() => { managePersonas.value = true; }}>Manage personas…</button>
         {personas.value.length > 0 && (
           <div class="persona-choice">
             {usablePersonas.length > 0 && (
@@ -541,6 +544,8 @@ export function NewAgent({ store, host, folder, projectName, down }: {
           {poolNote && <p class="quiet small">{runtimeName}: {poolNote}</p>}
         </Prompt>
       </footer>
+      {managePersonas.value && <PersonaManager store={store} host={host} folder={folder} close={() => { managePersonas.value = false; }}
+        saved={() => { void askPersonas(); }} />}
     </section>
   );
 }

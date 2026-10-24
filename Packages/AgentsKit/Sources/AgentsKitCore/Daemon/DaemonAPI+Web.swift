@@ -88,6 +88,8 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 Row(Method.workflowsList, params: WorkflowsListRequest.self, result: [WorkflowSummary].self, kind: .hostRequest),
                 Row(Method.personasList, params: PersonasListRequest.self, result: [Persona].self, kind: .hostRequest),
+                Row(Method.personasFiles, params: PersonasFilesRequest.self, result: [PersonaFile].self, kind: .hostRequest),
+                Row(Method.personasSave, params: PersonaFileSaveRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.filesList, params: FilesListRequest.self, result: DirectoryListing.self, kind: .hostRequest),
                 Row(Method.filesRead, params: FilesReadRequest.self, result: FileReading.self, kind: .hostRequest),
                 Row(Method.changesList, params: ChangesListRequest.self, result: ChangesList.self, kind: .hostRequest),

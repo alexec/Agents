@@ -5940,10 +5940,38 @@ type Persona struct {
 	Problem *string `json:"problem,omitzero"`
 }
 
+type PersonaFile struct {
+	ID string `json:"id"`
+
+	Origin PersonaOrigin `json:"origin"`
+
+	Content string `json:"content"`
+}
+
+type PersonaFileSaveRequest struct {
+	Folder *URL `json:"folder,omitzero"`
+
+	Origin PersonaOrigin `json:"origin"`
+
+	ID string `json:"id"`
+
+	Content string `json:"content"`
+
+	Delete *bool `json:"delete,omitzero"`
+}
+
+type PersonaFilesAnswer []PersonaFile
+
 type PersonaOrigin string
 
 const PersonaOriginProject PersonaOrigin = "project"
 const PersonaOriginPersonal PersonaOrigin = "personal"
+
+type PersonasFilesRequest struct {
+	Folder *URL `json:"folder,omitzero"`
+
+	Origin PersonaOrigin `json:"origin"`
+}
 
 type PersonasListRequest struct {
 	Folder URL `json:"folder"`
