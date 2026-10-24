@@ -45,6 +45,7 @@ control/status
     "hosts/1",
     "links/1",
     "liveactivity/1",
+    "machines/1",
     "org-identity/1",
     "org-routes/1",
     "people/1",
@@ -59,8 +60,7 @@ control/status
     "signin.ask/1",
     "signin/1",
     "tunnel/1",
-    "user/1",
-    "workspaces/1"
+    "user/1"
   ],
   "required": {
     "host": [
@@ -277,6 +277,7 @@ control/status
     "hosts/1",
     "links/1",
     "liveactivity/1",
+    "machines/1",
     "org-identity/1",
     "org-routes/1",
     "people/1",
@@ -291,8 +292,7 @@ control/status
     "signin.ask/1",
     "signin/1",
     "tunnel/1",
-    "user/1",
-    "workspaces/1"
+    "user/1"
   ],
   "required": {
     "host": [
