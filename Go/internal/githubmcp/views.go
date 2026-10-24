@@ -61,6 +61,11 @@ type issuesArgs struct {
 	Label string `json:"label,omitempty" jsonschema:"only issues with this label"`
 }
 
+type issueDetailsArgs struct {
+	Repo   string `json:"repo,omitempty" jsonschema:"owner/name; the repo this folder pushes to when left out"`
+	Number int    `json:"number" jsonschema:"the issue's number"`
+}
+
 type prArgs struct {
 	Repo   string `json:"repo,omitempty" jsonschema:"owner/name; the repo this folder pushes to when left out"`
 	Number int    `json:"number" jsonschema:"the pull request's number"`
@@ -163,7 +168,7 @@ func AddViews(server *mcp.Server, gh Views, person bool) {
 
 	mcp.AddTool(server, &mcp.Tool{Name: "show_issues", Title: "Show issues",
 		Description: "The repo's open issues (not pull requests), newest created first, at most 100, each with its labels, " +
-			"assignees (logins) and comment count. Its view is the Issues page, with Start Agent on each issue.",
+			"assignees (logins), milestone and comment count. Its view is the Issues page, where a person can expand an issue to read its description and linked pull requests.",
 		Annotations: readOnly, Meta: uiMeta(issuesURI, "model", "app")},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in issuesArgs) (*mcp.CallToolResult, any, error) {
 			repo, err := repoOf(ctx, in.Repo)
@@ -179,6 +184,24 @@ func AddViews(server *mcp.Server, gh Views, person bool) {
 				issues[i] = l.json()
 			}
 			return structured(map[string]any{"repo": repo, "issues": issues, "count": len(issues)}), nil, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "show_issue_details", Title: "Show issue details",
+		Description: "One issue's description and the pull requests GitHub's issue_read tool links to it by closing keywords.",
+		Annotations: readOnly, Meta: uiMeta("", "model", "app")},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in issueDetailsArgs) (*mcp.CallToolResult, any, error) {
+			repo, err := repoOf(ctx, in.Repo)
+			if err != nil {
+				return failed(err), nil, nil
+			}
+			if in.Number < 1 {
+				return failed(fmt.Errorf("issue number must be positive")), nil, nil
+			}
+			details, err := gh.IssueDetails(ctx, repo, in.Number)
+			if err != nil {
+				return failed(err), nil, nil
+			}
+			return structured(details), nil, nil
 		})
 
 	mcp.AddTool(server, &mcp.Tool{Name: "show_pull_request", Title: "Show a pull request",

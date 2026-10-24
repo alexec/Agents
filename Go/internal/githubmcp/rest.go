@@ -29,7 +29,8 @@ type RealGitHub struct {
 	Token  func() string
 	Client *http.Client
 	// Repo is the repo the server's folder pushes to, read from git once it is needed.
-	Repo func(ctx context.Context) (string, error)
+	Repo        func(ctx context.Context) (string, error)
+	IssueReader IssueReader
 
 	mu        sync.Mutex
 	etags     map[string]etagged
@@ -68,15 +69,19 @@ const (
 )
 
 // NewRealGitHub reads api (https://api.github.com/ when empty) with token's answer.
-func NewRealGitHub(api string, token func() string, repo func(ctx context.Context) (string, error)) *RealGitHub {
+func NewRealGitHub(api string, token func() string, repo func(ctx context.Context) (string, error), issueReader ...IssueReader) *RealGitHub {
 	if api == "" {
 		api = "https://api.github.com/"
 	}
 	if !strings.HasSuffix(api, "/") {
 		api += "/"
 	}
-	return &RealGitHub{API: api, Token: token, Repo: repo, Client: &http.Client{Timeout: 30 * time.Second},
+	g := &RealGitHub{API: api, Token: token, Repo: repo, Client: &http.Client{Timeout: 30 * time.Second},
 		etags: map[string]etagged{}, recent: map[string]sharedBody{}, running: map[string]*fetch{}, sharing: sharedFor}
+	if len(issueReader) > 0 {
+		g.IssueReader = issueReader[0]
+	}
+	return g
 }
 
 // MARK: HTTP
@@ -359,6 +364,18 @@ type issueJSON struct {
 	PullRequest json.RawMessage `json:"pull_request"`
 	Comments    int             `json:"comments"`
 	UpdatedAt   string          `json:"updated_at"`
+	Milestone   *issueMilestone `json:"milestone"`
+}
+
+type issueMilestone struct {
+	Title string `json:"title"`
+}
+
+func (m *issueMilestone) title() string {
+	if m == nil {
+		return ""
+	}
+	return m.Title
 }
 
 func (i issueJSON) isPR() bool { return len(i.PullRequest) > 0 && string(i.PullRequest) != "null" }

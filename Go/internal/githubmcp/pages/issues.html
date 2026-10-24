@@ -7,6 +7,12 @@
 /*common.css*/
 .start { grid-column: 3; grid-row: 1 / span 2; white-space: nowrap; }
 .meta { grid-column: 2; }
+.issue-details { grid-column: 1 / -1; min-width: 0; padding: 8px 10px; border-radius: var(--border-radius-sm);
+  background: var(--color-background-secondary); }
+.issue-details[hidden] { display: none; }
+.issue-body { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.linked-prs { display: grid; gap: 4px; margin-top: 8px; }
+.linked-pr { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
 </style></head>
 <body><main>
   <header><h1>Issues</h1><span id="repo" class="muted"></span><span id="label"></span><span class="grow"></span>
@@ -55,6 +61,12 @@
     const comments = issue.comments ? ` · ${issue.comments} comment${issue.comments === 1 ? "" : "s"}` : "";
     const start = button("Start Agent", () => startAgent(issue),
       { className: "start", title: `A new agent for #${issue.number}, in a worktree of its own` });
+    const expand = button("Show details", () => toggleDetails(issue, expand, details),
+      { className: "details-toggle", title: "Read the issue description and linked pull requests" });
+    expand.setAttribute("aria-expanded", "false");
+    const details = el("div", { className: "issue-details", hidden: true });
+    details.id = `issue-details-${issue.number}`;
+    expand.setAttribute("aria-controls", details.id);
     return el("li", {}, [
       link(`#${issue.number}`, issue.url),
       el("span", { className: "title", textContent: issue.title, title: issue.title }),
@@ -62,9 +74,58 @@
       el("span", { className: "meta" }, [
         ...assignees,
         el("span", { textContent: `${issue.author || "someone"}${comments}${issue.updatedAt ? " · " + ui.ago(issue.updatedAt) : ""}` }),
+        issue.milestone ? el("span", { className: "pill", textContent: issue.milestone, title: "Milestone" }) : null,
         ...labels,
+        expand,
       ]),
+      details,
     ]);
+  };
+
+  const toggleDetails = async (issue, control, target) => {
+    const expanded = control.getAttribute("aria-expanded") === "true";
+    control.setAttribute("aria-expanded", String(!expanded));
+    control.textContent = expanded ? "Show details" : "Hide details";
+    target.hidden = expanded;
+    if (expanded || target.dataset.loaded || target.dataset.loading) return;
+    target.dataset.loading = "true";
+    target.replaceChildren(el("span", { className: "muted", textContent: "Loading issue details…" }));
+    try {
+      const details = await ui.call("show_issue_details", { repo, number: issue.number });
+      drawDetails(target, details);
+      target.dataset.loaded = "true";
+    } catch (e) {
+      target.replaceChildren(el("span", { className: "error", textContent: "Couldn't load issue details: " + e.message }));
+    } finally {
+      delete target.dataset.loading;
+    }
+  };
+
+  const drawDetails = (target, details) => {
+    const body = typeof details.body === "string" && details.body.trim() ? details.body : "No description.";
+    const closing = details.closed_by_pull_requests;
+    const refs = closing && Array.isArray(closing.references) ? closing.references : [];
+    const total = closing ? Number(closing.total_count) || refs.length : 0;
+    const linked = el("div", { className: "linked-prs" });
+    if (!closing) {
+      linked.append(el("span", { className: "muted", textContent: "Linked pull requests are unavailable." }));
+    } else {
+      linked.append(el("span", { className: "muted", textContent: refs.length ? "Linked pull requests" : "No linked pull requests." }));
+    }
+    for (const pr of refs) {
+      const repoName = pr.repository && pr.repository !== repo ? pr.repository + " · " : "";
+      linked.append(el("div", { className: "linked-pr" }, [
+        link(`#${pr.number}`, pr.url),
+        el("span", { textContent: repoName + (pr.title || "Pull request") }),
+        pr.state ? el("span", { className: "pill", textContent: pr.state.toLowerCase() }) : null,
+      ]));
+    }
+    if (total > refs.length) linked.append(el("span", { className: "muted", textContent: `Showing ${refs.length} of ${total} linked pull requests.` }));
+    target.replaceChildren(
+      el("span", { className: "muted", textContent: "Description" }),
+      el("pre", { className: "issue-body", textContent: body }),
+      linked,
+    );
   };
 
   // The app's new-agent form, filled in for this issue (#834). The person starts it, or not;
