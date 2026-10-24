@@ -243,7 +243,7 @@ final class RemoteModel {
     }
 
     private func folderHostClient(for folder: URL) -> DaemonClient {
-        let host = work.folders.first { $0.folder == folder }?.host ?? .mac
+        let host = work.folders.first { $0.folder.folder == folder }?.host ?? .mac
         return host == .mac ? client : otherHosts[host] ?? client
     }
 
@@ -561,8 +561,8 @@ final class RemoteModel {
     func putInDropbox(_ data: Data, name: String, subfolder: String, folder: FolderKey) async -> String? {
         guard !isStale(on: folder.host) else { return notAnswering(folder.host, "\(name) was not sent.") }
         guard data.count <= PhoneAttachment.limit else { return Self.dropboxTooBig(name) }
-        let folder = subfolder.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
-        let request = DaemonAPI.DropboxPutRequest(folder: folder.folder, subfolder: folder.isEmpty ? nil : folder,
+        let subfolder = subfolder.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
+        let request = DaemonAPI.DropboxPutRequest(folder: folder.folder, subfolder: subfolder.isEmpty ? nil : subfolder,
                                                   name: name, data: data)
         do {
             _ = try await client(for: request).call(DaemonAPI.Method.dropboxPut, request,
@@ -995,12 +995,12 @@ final class RemoteModel {
     func offerStart(_ start: AppViewStart, in key: FolderKey) -> String? {
         guard let summary = work.folder(key) else { return "This folder isn’t one the phone knows." }
         guard !isStarting else { return "An agent is starting. Try again once it has." }
-        offeredStart = OfferedStart(folder: summary.folder, start: start)
-        offeredWorktree = start.worktreeChoice.map { (folder: summary.folder, choice: $0) }
+        offeredStart = OfferedStart(folder: summary.folder.folder, start: start)
+        offeredWorktree = start.worktreeChoice.map { (folder: summary.folder.folder, choice: $0) }
         sidebarItem = .folder(summary.key)
         // Already open in this folder: its repository is asked again for the worktree.
-        if start.worktreeChoice != nil, startingIn == summary.folder {
-            Task { await loadStartWorktrees(in: summary.folder) }
+        if start.worktreeChoice != nil, startingIn == summary.folder.folder {
+            Task { await loadStartWorktrees(in: summary.folder.folder) }
         }
         return nil
     }
@@ -2160,7 +2160,7 @@ final class RemoteModel {
         }
         for key in ["folder", "cwd"] {
             guard let folder = value[key]?.stringValue else { continue }
-            if let folder = work.folders.first(where: { $0.folder.absoluteString == folder && $0.host != .mac }) {
+            if let folder = work.folders.first(where: { $0.folder.folder.absoluteString == folder && $0.host != .mac }) {
                 return folder.host
             }
         }
@@ -3734,7 +3734,7 @@ final class RemoteModel {
             return
         }
         do {
-            _ = try await target.call(DaemonAPI.Method.foldersDelete, DaemonAPI.FolderRequest(folder: summary.folder),
+            _ = try await target.call(DaemonAPI.Method.foldersDelete, DaemonAPI.FolderRequest(folder: summary.folder.folder),
                                       returning: DaemonAPI.Empty.self)
             work.removeFolder(summary.key)
             archivedFolders.removeAll { $0.key == summary.key }
@@ -3751,7 +3751,7 @@ final class RemoteModel {
         guard let target = host == .mac ? client : otherHosts[host] else { return }
         do {
             var changed = try await target.call(DaemonAPI.Method.foldersSetPinned,
-                                                DaemonAPI.SetPinnedRequest(folder: summary.folder, pinned: pinned),
+                                                DaemonAPI.SetPinnedRequest(folder: summary.folder.folder, pinned: pinned),
                                                 returning: DaemonAPI.FolderSummary.self)
             changed.host = host
             work.upsert(changed)
@@ -3775,7 +3775,7 @@ final class RemoteModel {
         }
         do {
             var archived = try await target.call(DaemonAPI.Method.foldersArchive,
-                                                 DaemonAPI.FolderRequest(folder: summary.folder),
+                                                 DaemonAPI.FolderRequest(folder: summary.folder.folder),
                                                  returning: DaemonAPI.FolderSummary.self)
             archived.host = host
             work.upsert(archived)
@@ -3795,7 +3795,7 @@ final class RemoteModel {
         guard let target, host == .mac || reachableHosts.contains(host) else { return }
         do {
             var brought = try await target.call(DaemonAPI.Method.foldersUnarchive,
-                                                DaemonAPI.FolderRequest(folder: summary.folder),
+                                                DaemonAPI.FolderRequest(folder: summary.folder.folder),
                                                 returning: DaemonAPI.FolderSummary.self)
             brought.host = host
             work.upsert(brought)
@@ -4302,7 +4302,7 @@ final class RemoteModel {
 
     /// Whether a workflow's host can mute its runs: one from before #2003 cannot.
     func canMute(_ summary: WorkflowSummary) -> Bool {
-        let host = work.folders.first { $0.folder.absoluteString == summary.folder.absoluteString }?.host ?? .mac
+        let host = work.folders.first { $0.folder.folder.absoluteString == summary.folder.absoluteString }?.host ?? .mac
         return !summary.isArchived && self.host(host, has: Capability.mute1)
     }
 
@@ -4509,7 +4509,7 @@ final class RemoteModel {
     /// rather than leaving an empty screen.
     private func settleSelection() {
         guard let selectedFolder else { return }
-        if !folders.contains(where: { $0.folder == selectedFolder }) {
+        if !folders.contains(where: { $0.folder.folder == selectedFolder }) {
             self.selectedFolder = nil
         }
     }
@@ -5358,7 +5358,7 @@ final class RemoteModel {
         if let name = value("-folder"),
            let summary = work.folders.first(where: { $0.name == name }) {
             // Its page is New session (#366).
-            selectedFolder = summary.folder
+            selectedFolder = summary.folder.folder
             composing = true
         }
         if let title = value("-agent"),

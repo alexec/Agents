@@ -425,7 +425,7 @@ struct RemoteSmartFold: View {
     }
 
     private func place(of key: FolderKey) -> String? {
-        guard let summary = folders.first(where: { $0.host == key.host && $0.folder == key.folder }) else { return nil }
+        guard let summary = folders.first(where: { $0.host == key.host && $0.folder.folder == key.folder }) else { return nil }
         return SidebarOrder.label(summary) { model.hostLabel($0) }
     }
 }
@@ -620,7 +620,7 @@ struct RemoteFolderFold: View {
                 if inScene {
                     Text("Sessions")
                         .task(id: isOpen) {
-                            if isOpen { await model.fillFolder(summary.folder) }
+                            if isOpen { await model.fillFolder(summary.folder.folder) }
                         }
                 } else {
                     heading(isOpen)
@@ -645,7 +645,7 @@ struct RemoteFolderFold: View {
             // The rest of its live sessions when the first page did not hold them
             // all. On the heading, which is always there, not on every row.
             .task(id: isOpen) {
-                if isOpen { await model.fillFolder(summary.folder) }
+                if isOpen { await model.fillFolder(summary.folder.folder) }
             }
     }
 
@@ -835,7 +835,7 @@ private struct FolderMenuItems: View {
     let putInDropbox: () -> Void
 
     var body: some View {
-        NewSessionButton(folder: summary.folder)
+        NewSessionButton(folder: summary.folder.folder)
         // The folder alone (#1089): a scene of its own on an iPad, a screen on an iPhone.
         OpenFolderButton(key: summary.key)
         Button(action: putInDropbox) {

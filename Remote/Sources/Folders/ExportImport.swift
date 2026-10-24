@@ -49,7 +49,7 @@ enum RemoteExportImport {
             guard let file = urls.first else { return }
             run(.import, model: model) { progress in
                 defer { try? FileManager.default.removeItem(at: file) }
-                let result = try await AgentsExportTransfer.importFile(file, into: client, folder: summary.folder) { done, whole in
+                let result = try await AgentsExportTransfer.importFile(file, into: client, folder: summary.folder.folder) { done, whole in
                     progress.report(done, whole)
                     if done >= whole { Task { @MainActor in progress.sent = true } }
                 }
@@ -150,7 +150,7 @@ struct ExportImportFolderButtons: View {
 
     var body: some View {
         Button("Export Agents…", systemImage: "square.and.arrow.up") {
-            RemoteExportImport.export(DaemonAPI.AgentsExportRequest(folder: summary.folder), on: summary.host, model: model)
+            RemoteExportImport.export(DaemonAPI.AgentsExportRequest(folder: summary.folder.folder), on: summary.host, model: model)
         }
         .disabled(model.isStale(on: summary.host) || model.exportImport != nil)
         Button("Import Agents…", systemImage: "square.and.arrow.down") {

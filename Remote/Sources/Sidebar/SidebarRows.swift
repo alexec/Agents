@@ -600,11 +600,11 @@ struct ShowHiddenViewsButton: View {
     let summary: DaemonAPI.FolderSummary
 
     var body: some View {
-        let hidden = model.serverViews(in: summary.folder).filter { $0.hidden == true }
+        let hidden = model.serverViews(in: summary.folder.folder).filter { $0.hidden == true }
         if !hidden.isEmpty {
             Button {
                 Task {
-                    for view in hidden { await model.setViewHidden(view.path, false, in: summary.folder) }
+                    for view in hidden { await model.setViewHidden(view.path, false, in: summary.folder.folder) }
                 }
             } label: {
                 Label("Show Hidden Views (\(hidden.count))", systemImage: "eye")

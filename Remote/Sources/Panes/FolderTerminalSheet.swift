@@ -18,7 +18,7 @@ struct FolderTerminalSheet: View {
     private var id: UUID { FolderShell.id(for: folder) }
 
     private var name: String {
-        model.work.folders.first { $0.folder == folder }?.name ?? folder.lastPathComponent
+        model.work.folders.first { $0.folder.folder == folder }?.name ?? folder.lastPathComponent
     }
 
     var body: some View {
