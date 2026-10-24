@@ -31,7 +31,14 @@ type askControl = func(ctx context.Context, method string, params any) (json.Raw
 
 // SetControlAsk is how this host asks its control plane something (host/workspaces): the
 // uplink's Ask. Not set off a control plane.
-func (d *Daemon) SetControlAsk(ask askControl) { d.askControl.Store(&ask) }
+func (d *Daemon) SetControlAsk(ask askControl) {
+	if ask == nil {
+		d.askControl.Store(nil)
+		return
+	}
+	d.askControl.Store(&ask)
+	d.startUserConfigSync()
+}
 
 // askWorkspaces is one host/workspaces call for an agent, named for the control plane's log.
 func (d *Daemon) askWorkspaces(agent wire.UUID, method string, params any) (json.RawMessage, error) {

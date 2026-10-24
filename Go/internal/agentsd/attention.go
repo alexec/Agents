@@ -657,6 +657,7 @@ func (d *Daemon) ControlUplinkChanged(up bool) {
 	d.startHostStatus()
 	// And the usage it has not sent yet (#1811).
 	d.startReports()
+	d.userConfigSyncUplinkRestored()
 	d.reconsider()
 }
 

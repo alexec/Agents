@@ -14,6 +14,11 @@ there: the agents come back archived, so you can read them, search them and brin
 back to the sidebar. An agent from another machine is shown, but never run, because its
 conversation and its folder belong to the machine that made it.
 
+Agent instructions, personas, skills, MCP server settings and plugin files sync across
+your machines when they connect to the same control plane. This keeps the files available
+on those machines. It is not a backup: it does not keep earlier versions or protect the
+files if they are deleted everywhere. Keep a separate backup of configuration you need.
+
 ## Where to find it
 
 - **Mac:** Settings ▸ Machines ▸ This Mac ▸ **Backups**.
@@ -108,3 +113,9 @@ backup is made is left out, never cut in half.
   certificate, which these backups do not hold
 - [Archive and stop agents](archive-and-stop.md)
 - [Move an existing set-up across](move-an-existing-set-up.md)
+# Agent configuration sync is not a backup
+
+Agent instructions, personas, skills, MCP server settings and plugin files sync across
+your machines when they connect to the same control plane. This keeps the files available
+on those machines. It is not a backup: it does not keep earlier versions or protect the
+files if they are deleted everywhere. Keep a separate backup of configuration you need.

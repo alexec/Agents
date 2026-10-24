@@ -544,6 +544,7 @@ var CallTunnelOpen = Method[TunnelOpen, Empty]{"tunnel/open"}
 var CallUsageRollup = Method[UsageRollup, Empty]{"usage/rollup"}
 var CallUserRemoveSecret = Method[UserSecretRequest, Empty]{"user/removeSecret"}
 var CallUserSecretNames = Method[Empty, UserSecretNames]{"user/secretNames"}
+var CallUserSetAgentConfigFile = Method[AgentConfigFileRequest, Empty]{"user/setAgentConfigFile"}
 var CallUserSetSecret = Method[UserSecret, Empty]{"user/setSecret"}
 var CallUserSetSettings = Method[UserSettingsPart, Empty]{"user/setSettings"}
 var CallUserSettings = Method[Empty, UserSettings]{"user/settings"}

@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -39,6 +40,8 @@ import (
 
 const userScopeFile = "from-control-plane.json"
 
+const maxAgentConfigFileBytes = 1 << 20
+
 // userScopeMark is from-control-plane.json. It never holds a secret's value.
 type userScopeMark struct {
 	User    string                      `json:"user"`
@@ -47,12 +50,15 @@ type userScopeMark struct {
 	Secrets []string                    `json:"secrets"`
 	// The agentConfig files written, relative to ~/.agents, so a persona or skill the
 	// control plane no longer sends is taken away again.
-	Files []string `json:"files,omitempty"`
+	Files       []string               `json:"files,omitempty"`
+	ConfigFiles []wire.AgentConfigFile `json:"configFiles,omitempty"`
 }
 
 type userScopeState struct {
-	userScopeMu sync.Mutex
-	userMark    *userScopeMark
+	userScopeMu   sync.Mutex
+	userMark      *userScopeMark
+	configWatchMu sync.Mutex
+	configWatch   *folderWatch
 }
 
 // agentConfigName is a persona's or a skill's name, as one folder or file name.
@@ -92,9 +98,9 @@ func (d *Daemon) refuseUserScoped(part wire.UserSettingsPartName) error {
 // is the control plane's.
 func (d *Daemon) guardUserScope() {
 	guarded := map[string]wire.UserSettingsPartName{
-		wire.CallCostSetLimits.Name:      wire.UserSettingsPartNameCostLimits,
-		wire.CallResourcesDeclare.Name:   wire.UserSettingsPartNameResources,
-		wire.CallResourcesRemove.Name:    wire.UserSettingsPartNameResources,
+		wire.CallCostSetLimits.Name:    wire.UserSettingsPartNameCostLimits,
+		wire.CallResourcesDeclare.Name: wire.UserSettingsPartNameResources,
+		wire.CallResourcesRemove.Name:  wire.UserSettingsPartNameResources,
 	}
 	for method, part := range guarded {
 		next, ok := d.handlers[method]
@@ -149,6 +155,14 @@ func (d *Daemon) ApplyUserSettings(u wire.HostUserSettings) error {
 		// Not the control plane's any more: what it wrote stays, as this machine's own.
 		mark.Files = nil
 	}
+	if s.AgentConfigFiles != nil {
+		files, err := writeAgentConfigFiles(home, s.AgentConfigFiles.Files)
+		mark.ConfigFiles = configFileMarks(s.AgentConfigFiles.Files)
+		mark.Files = append(mark.Files, files...)
+		if err != nil {
+			problems = append(problems, "agent configuration files: "+err.Error())
+		}
+	}
 	if partSent(s.Runtimes) {
 		note(wire.UserSettingsPartNameRuntimes, d.writeRuntimeChoices(s.Runtimes))
 	}
@@ -177,6 +191,82 @@ func (d *Daemon) ApplyUserSettings(u wire.HostUserSettings) error {
 	return nil
 }
 
+func configFileMarks(files []wire.AgentConfigFile) []wire.AgentConfigFile {
+	out := make([]wire.AgentConfigFile, 0, len(files))
+	for _, file := range files {
+		file.Contents = nil
+		out = append(out, file)
+	}
+	return out
+}
+
+func writeAgentConfigFiles(home string, files []wire.AgentConfigFile) ([]string, error) {
+	if home == "" {
+		return nil, errors.New("this machine has no personal home")
+	}
+	base := filepath.Join(home, ".agents")
+	if err := os.MkdirAll(base, 0o755); err != nil {
+		return nil, err
+	}
+	var wrote []string
+	for _, file := range files {
+		if !safeAgentConfigPath(file.Path) {
+			return wrote, fmt.Errorf("%q is not an agent configuration path", file.Path)
+		}
+		if file.Path == "mcp.json" {
+			if file.Deleted != nil && *file.Deleted {
+				if err := removeMCPServers(home); err != nil {
+					return wrote, err
+				}
+				continue
+			}
+			if file.Contents == nil {
+				return wrote, errors.New("mcp.json has no contents")
+			}
+			if len(*file.Contents) > base64.StdEncoding.EncodedLen(maxAgentConfigFileBytes) {
+				return wrote, errors.New("mcp.json is larger than the agent configuration file limit")
+			}
+			contents, err := base64.StdEncoding.DecodeString(*file.Contents)
+			if err != nil {
+				return wrote, errors.New("mcp.json has invalid contents")
+			}
+			if err := writeMCPServers(home, wire.JSONValue(contents)); err != nil {
+				return wrote, err
+			}
+			wrote = append(wrote, file.Path)
+			continue
+		}
+		path, err := safeConfigPath(base, file.Path, file.Deleted == nil || !*file.Deleted)
+		if err != nil {
+			return wrote, err
+		}
+		if file.Deleted != nil && *file.Deleted {
+			if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return wrote, err
+			}
+			continue
+		}
+		if file.Contents == nil {
+			return wrote, fmt.Errorf("%q has no contents", file.Path)
+		}
+		if len(*file.Contents) > base64.StdEncoding.EncodedLen(maxAgentConfigFileBytes) {
+			return wrote, fmt.Errorf("%q is larger than the agent configuration file limit", file.Path)
+		}
+		contents, err := base64.StdEncoding.DecodeString(*file.Contents)
+		if err != nil {
+			return wrote, fmt.Errorf("%q has invalid contents", file.Path)
+		}
+		if len(contents) > maxAgentConfigFileBytes {
+			return wrote, fmt.Errorf("%q is larger than the agent configuration file limit", file.Path)
+		}
+		if err := store.WriteAtomically(path, contents, 0o644); err != nil {
+			return wrote, err
+		}
+		wrote = append(wrote, file.Path)
+	}
+	return wrote, nil
+}
+
 func partSent(v wire.JSONValue) bool { return len(v) > 0 && string(v) != "null" }
 
 // writeMCPServers is mcpServers as ~/.agents/mcp.json, with the file's other keys kept.
@@ -188,7 +278,10 @@ func writeMCPServers(home string, servers wire.JSONValue) error {
 	if json.Unmarshal(servers, &check) != nil {
 		return errors.New("not an object")
 	}
-	path := filepath.Join(home, ".agents", "mcp.json")
+	path, err := safeConfigPath(filepath.Join(home, ".agents"), "mcp.json", true)
+	if err != nil {
+		return err
+	}
 	file := map[string]json.RawMessage{}
 	if b, err := os.ReadFile(path); err == nil {
 		json.Unmarshal(b, &file)
@@ -198,10 +291,37 @@ func writeMCPServers(home string, servers wire.JSONValue) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	return store.WriteAtomically(path, append(b, '\n'), 0o644)
+}
+
+func removeMCPServers(home string) error {
+	if home == "" {
+		return errors.New("this machine has no personal home")
+	}
+	path, err := safeConfigPath(filepath.Join(home, ".agents"), "mcp.json", false)
+	if err != nil {
 		return err
 	}
-	return store.WriteAtomically(path, append(b, '\n'), 0o644)
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	file := map[string]json.RawMessage{}
+	if json.Unmarshal(data, &file) != nil {
+		return errors.New("mcp.json cannot be read")
+	}
+	if _, ok := file["mcpServers"]; !ok {
+		return nil
+	}
+	delete(file, "mcpServers")
+	encoded, err := json.MarshalIndent(file, "", "  ")
+	if err != nil {
+		return err
+	}
+	return store.WriteAtomically(path, append(encoded, '\n'), 0o644)
 }
 
 // writeAgentConfig writes the instructions, personas and skills, and takes away the files
@@ -255,14 +375,85 @@ func writeAgentConfig(home string, raw wire.JSONValue, wroteBefore []string) ([]
 	return wrote, nil
 }
 
-// safeRelative is a path the mark may name: AGENTS.md, or inside personas/ or skills/.
+// safeRelative is a path the mark may name under ~/.agents.
 func safeRelative(rel string) bool {
 	clean := filepath.Clean(rel)
 	if clean != rel || filepath.IsAbs(rel) || strings.Contains(rel, "..") {
 		return false
 	}
-	return rel == "AGENTS.md" || strings.HasPrefix(rel, "personas"+string(filepath.Separator)) ||
-		strings.HasPrefix(rel, "skills"+string(filepath.Separator))
+	return rel == "AGENTS.md" || rel == "mcp.json" || strings.HasPrefix(rel, "personas"+string(filepath.Separator)) ||
+		strings.HasPrefix(rel, "skills"+string(filepath.Separator)) || strings.HasPrefix(rel, "plugins"+string(filepath.Separator))
+}
+
+func safeAgentConfigPath(rel string) bool {
+	if !safeRelative(rel) {
+		return false
+	}
+	if rel == "mcp.json" {
+		return true
+	}
+	parts := strings.Split(filepath.ToSlash(rel), "/")
+	if len(parts) == 1 {
+		return parts[0] == "AGENTS.md"
+	}
+	for _, part := range parts {
+		switch strings.ToLower(part) {
+		case "node_modules", ".git", ".cache", "cache", "caches", "dist", "build", "target", "vendor", "__pycache__":
+			return false
+		}
+	}
+	if len(parts) < 2 || !agentConfigName.MatchString(parts[1]) || strings.Contains(parts[1], "..") {
+		return false
+	}
+	if parts[0] == "personas" {
+		return len(parts) == 2 && strings.HasSuffix(parts[1], ".md")
+	}
+	return len(parts) >= 3
+}
+
+func safeConfigPath(base, rel string, createParents bool) (string, error) {
+	if !safeAgentConfigPath(rel) {
+		return "", errors.New("invalid agent configuration path")
+	}
+	if createParents {
+		if err := os.MkdirAll(base, 0o755); err != nil {
+			return "", err
+		}
+	}
+	if info, err := os.Lstat(base); err == nil {
+		if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+			return "", errors.New("~/.agents is not a regular folder")
+		}
+	} else if !errors.Is(err, os.ErrNotExist) || createParents {
+		return "", err
+	}
+	parts := strings.Split(filepath.FromSlash(rel), string(filepath.Separator))
+	current := base
+	for _, part := range parts[:len(parts)-1] {
+		current = filepath.Join(current, part)
+		if createParents {
+			if err := os.Mkdir(current, 0o755); err != nil && !errors.Is(err, os.ErrExist) {
+				return "", err
+			}
+		}
+		info, err := os.Lstat(current)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) && !createParents {
+				return filepath.Join(base, filepath.FromSlash(rel)), nil
+			}
+			return "", err
+		}
+		if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+			return "", errors.New("agent configuration path crosses a link or file")
+		}
+	}
+	target := filepath.Join(current, parts[len(parts)-1])
+	if info, err := os.Lstat(target); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		return "", errors.New("agent configuration file is a link")
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return "", err
+	}
+	return target, nil
 }
 
 // userRuntimes is the runtimes part: each runtime's choices that follow the person.

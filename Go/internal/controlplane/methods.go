@@ -161,6 +161,7 @@ var own = methodSet(
 	"signIn/ticket",
 	"user/removeSecret",
 	"user/secretNames",
+	"user/setAgentConfigFile",
 	"user/setSecret",
 	"user/setSettings",
 	"user/settings",
@@ -253,6 +254,7 @@ var writes = methodSet(
 	"signIn/removeFromMe",
 	"signIn/ticket",
 	"user/removeSecret",
+	"user/setAgentConfigFile",
 	"user/setSecret",
 	"user/setSettings",
 )
@@ -325,7 +327,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return m.signInMethod(ctx, method, params, from)
 	case "reports/usage", "reports/export":
 		return m.reportMethod(ctx, method, params, from)
-	case "user/settings", "user/setSettings", "user/setSecret", "user/removeSecret", "user/secretNames":
+	case "user/settings", "user/setAgentConfigFile", "user/setSettings", "user/setSecret", "user/removeSecret", "user/secretNames":
 		return m.userMethod(ctx, method, params, from)
 	case "hosts/joinRequests":
 		return m.s.joins.list(ctx, m.callerPerson(from))
@@ -959,6 +961,28 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 	switch method {
 	case "control/ping":
 		return map[string]any{}, nil
+	case "user/setAgentConfigFile":
+		request, err := require[wire.AgentConfigFileRequest](params, "AgentConfigFileRequest")
+		if err != nil {
+			return nil, err
+		}
+		record := m.records.Host(host)
+		user := m.s.ownerOf(host)
+		if user == "" || record == nil {
+			return nil, fail(notPermitted, "Only one of your own machines can sync its agent configuration files.")
+		}
+		machine := host
+		if record.MachineID != nil && *record.MachineID != "" {
+			machine = *record.MachineID
+		}
+		changed, err := m.s.users.SetAgentConfigFile(ctx, user, machine, request)
+		if err != nil {
+			return nil, userFailure(err)
+		}
+		if changed {
+			m.s.userAgentConfigChanged(user, host)
+		}
+		return wire.Empty{}, nil
 	case "host/hello":
 		hello, err := require[wire.HostHello](params, "HostHello")
 		if err != nil {

@@ -42,6 +42,22 @@ func (m *Methods) userMethod(ctx context.Context, method string, params json.Raw
 	switch method {
 	case "user/settings":
 		return book.Settings(ctx, user)
+	case "user/setAgentConfigFile":
+		request, err := require[wire.AgentConfigFileRequest](params, "AgentConfigFileRequest")
+		if err != nil {
+			return nil, err
+		}
+		if from.Kind != "host" || !m.owns(from, from.Client) {
+			return nil, fail(notPermitted, "Only one of your own machines can sync its agent configuration files.")
+		}
+		changed, err := book.SetAgentConfigFile(ctx, user, from.Client, request)
+		if err != nil {
+			return nil, userFailure(err)
+		}
+		if changed {
+			m.s.userAgentConfigChanged(user, from.Client)
+		}
+		return wire.Empty{}, nil
 	case "user/secretNames":
 		rows, err := book.Names(ctx, user)
 		if err != nil {
@@ -90,6 +106,18 @@ func (m *Methods) userMethod(ctx context.Context, method string, params json.Raw
 		return wire.Empty{}, nil
 	}
 	return nil, fail(methodNotFound, "No method %s.", method)
+}
+
+// userAgentConfigChanged fans one file edit out to every machine and client of the person.
+func (s *Service) userAgentConfigChanged(user, by string) {
+	s.announce("userSettingsChanged", user, by)
+	yes := true
+	s.router.TellPerson(user, wire.NotifyControlUserSettingsChanged.Name, wire.UserSettingsChanged{AgentConfigFiles: &yes})
+	for _, host := range s.router.HostsHeldHere() {
+		if s.ownerOf(host) == user {
+			go s.sendUserSettings(host, false)
+		}
+	}
 }
 
 // userFailure is a book's error as words for the client. None holds a secret's value.

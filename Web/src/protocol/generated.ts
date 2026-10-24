@@ -295,6 +295,35 @@ export type AgentArchivedReason =
   | "byUser"
   | "byAgent";
 
+/**
+ * One agent configuration file (#2129), or a deletion tombstone. contents is base64 encoded.
+ * Logical time and machine ID resolve concurrent offline edits.
+ */
+export interface AgentConfigFile {
+  path: string;
+  contents?: string;
+  deleted?: boolean;
+  time: number;
+  counter: number;
+  machine: string;
+  digest: string;
+}
+
+/** One local edit or deletion of an agent configuration file (#2129). */
+export interface AgentConfigFileRequest {
+  path: string;
+  contents?: string;
+  deleted?: boolean;
+  time: number;
+  counter: number;
+}
+
+/** The per-path configuration files and tombstones for a person (#2129). */
+export interface AgentConfigFiles {
+  files: AgentConfigFile[];
+  updated?: string;
+}
+
 export type AgentGroup =
   | "needsAttention"
   | "blocked"
@@ -7356,8 +7385,8 @@ export interface UsageRollupRow {
 }
 
 /**
- * The agentConfig part (#1760): the person's own instructions, personas and skills, as ~/.agents
- * keeps them on each machine.
+ * Legacy agentConfig snapshot (#1760); new agent configuration uses per-file state in
+ * AgentConfigFiles (#2129).
  */
 export interface UserAgentConfig {
   /** ~/.agents/AGENTS.md. */
@@ -7434,6 +7463,8 @@ export interface UserSecretRow {
 export interface UserSettings {
   mcpServers?: JSONValue;
   agentConfig?: JSONValue;
+  /** Per-file agent configuration state (#2129), with tombstones and logical timestamps. */
+  agentConfigFiles?: AgentConfigFiles;
   runtimes?: JSONValue;
   costLimits?: JSONValue;
   resources?: JSONValue;
@@ -7447,6 +7478,8 @@ export interface UserSettings {
  */
 export interface UserSettingsChanged {
   parts?: UserSettingsPartName[];
+  /** A per-file agent configuration change (#2129). */
+  agentConfigFiles?: boolean;
   secrets?: boolean;
 }
 
@@ -7457,9 +7490,9 @@ export interface UserSettingsPart {
 }
 
 /**
- * A part of a person's user settings (#1760, spec 736 FR-023). Each keeps the shape its file has on
- * a machine today: mcpServers is mcp.json's mcpServers, agentConfig is UserAgentConfig, runtimes is
- * each runtime's choices, costLimits is CostLimits, resources is a list of DeclaredResource.
+ * A part of a person's user settings (#1760, spec 736 FR-023). New agent configuration and MCP
+ * server edits use per-file state (#2129); runtimes, costLimits and resources retain their existing
+ * parts.
  */
 export type UserSettingsPartName =
   | "mcpServers"
@@ -8565,6 +8598,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Admitted: { required: [], optional: ["client", "host", "grant"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
   Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "voiceHungUpAt"] },
+  AgentConfigFile: { required: ["path", "time", "counter", "machine", "digest"], optional: ["contents", "deleted"] },
+  AgentConfigFileRequest: { required: ["path", "time", "counter"], optional: ["contents", "deleted"] },
+  AgentConfigFiles: { required: ["files"], optional: ["updated"] },
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },
   AgentStopRequest: { required: ["agentID"], optional: ["byAdmin"] },
@@ -9275,8 +9311,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   UserSecretNames: { required: ["secrets", "sealing"], optional: [] },
   UserSecretRequest: { required: ["name"], optional: [] },
   UserSecretRow: { required: ["name", "updated", "machines"], optional: ["leftOn"] },
-  UserSettings: { required: [], optional: ["mcpServers", "agentConfig", "runtimes", "costLimits", "resources", "updated"] },
-  UserSettingsChanged: { required: [], optional: ["parts", "secrets"] },
+  UserSettings: { required: [], optional: ["mcpServers", "agentConfig", "agentConfigFiles", "runtimes", "costLimits", "resources", "updated"] },
+  UserSettingsChanged: { required: [], optional: ["parts", "agentConfigFiles", "secrets"] },
   UserSettingsPart: { required: ["part", "value"], optional: [] },
   UserSuspended: { required: ["user", "provider", "at"], optional: ["off"] },
   ViewAsk: { required: ["server", "uri", "hash", "isNew"], optional: [] },

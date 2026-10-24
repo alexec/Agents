@@ -151,8 +151,8 @@ struct SettingsWindow: View {
         case .spending: .costLimits
         case .resources: .resources
         case .runtimes: .runtimes
-        // Its Connectors page edits the MCP servers; its other pages, the configuration.
-        case .agentConfiguration: sharedPage.wrappedValue == .mcp ? .mcpServers : .agentConfig
+        // Agent configuration and MCP servers sync automatically (#2129).
+        case .agentConfiguration: nil
         default: nil
         }
     }

@@ -593,6 +593,7 @@ public enum Capability {
         "usage/rollup": "reports/1",
         "user/removeSecret": "user/1",
         "user/secretNames": "user/1",
+        "user/setAgentConfigFile": "user/1",
         "user/setSecret": "user/1",
         "user/setSettings": "user/1",
         "user/settings": "user/1",

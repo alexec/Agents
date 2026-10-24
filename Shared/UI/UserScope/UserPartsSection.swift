@@ -15,7 +15,14 @@ struct UserPartsSection: View {
 
     var body: some View {
         Section {
-            ForEach(DaemonAPI.UserSettingsPartName.allCases, id: \.self) { part in
+            VStack(alignment: .leading, spacing: 4) {
+                Text(UserScopeWords.agentConfigurationTitle).appText(.reading)
+                Text(UserScopeWords.agentConfigurationDetail).appText(.fine).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(UserScopeWords.agentConfigurationUpdated(state.settings?.agentConfigFiles?.updated))
+                    .appText(.fine).foregroundStyle(.secondary)
+            }
+            ForEach(DaemonAPI.UserSettingsPartName.allCases.filter { $0 != .mcpServers && $0 != .agentConfig }, id: \.self) { part in
                 VStack(alignment: .leading, spacing: 4) {
                     Text(UserScopeWords.partTitle(part)).appText(.reading)
                     Text(UserScopeWords.partDetail(part)).appText(.fine).foregroundStyle(.secondary)
