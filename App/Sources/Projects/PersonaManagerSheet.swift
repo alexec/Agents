@@ -7,6 +7,7 @@ struct PersonaManagerSheet: View {
     @Environment(\.dismiss) private var dismiss
     let host: HostID
     let folder: URL
+    var personalOnly = false
 
     @State private var origin: Persona.Origin = .project
     @State private var files: [DaemonAPI.PersonaFile] = []
@@ -24,12 +25,16 @@ struct PersonaManagerSheet: View {
                 Spacer()
                 Button("Done") { dismiss() }.buttonStyle(.paper)
             }
-            Picker("Scope", selection: $origin) {
-                Text("This project").tag(Persona.Origin.project)
-                Text("Personal").tag(Persona.Origin.personal)
+            if personalOnly {
+                Text("Personal personas").appText(.fine).foregroundStyle(.secondary)
+            } else {
+                Picker("Scope", selection: $origin) {
+                    Text("This project").tag(Persona.Origin.project)
+                    Text("Personal").tag(Persona.Origin.personal)
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: origin) { clear(); Task { await load() } }
             }
-            .pickerStyle(.segmented)
-            .onChange(of: origin) { clear(); Task { await load() } }
             HStack(spacing: 6) {
                 ForEach(files) { file in
                     Button(file.id) { select(file) }
@@ -59,7 +64,10 @@ struct PersonaManagerSheet: View {
         }
         .padding(20)
         .frame(minWidth: 600, minHeight: 560)
-        .task { await load() }
+        .task {
+            if personalOnly { origin = .personal }
+            await load()
+        }
         .confirmationDialog("Delete this persona?", isPresented: $deleting, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { Task { await save(remove: true) } }
         }
