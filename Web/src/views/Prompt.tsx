@@ -4,9 +4,9 @@
 // is typed, Send is Stop; what is typed then is queued, and Send says so. The agent's suggestion
 // is the empty field's placeholder, taken with Tab and put away with Escape, as the window's.
 //
-// Laid out as the window's PromptBar (#108): where it works and its labels above the input on the
-// left, the runtime above on the right, attach and send inside the input, and the runtime's
-// menus under it.
+// Laid out as the window's PromptBar (#108): where it works and its labels above the composer on
+// the left, the runtime above on the right, attachments above the field, and attach and send in
+// the bottom row. The runtime's menus stay under the composer.
 //
 // A `/` at the start of a word lists the runtime's commands, and an `@` the files the host finds
 // under the agent's folders (#255), over the field as the window's CommandList and MentionList:
@@ -76,6 +76,7 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
   const sending = useSignal(false);
   const slow = useSignal(false);
   const picker = useRef<HTMLInputElement>(null);
+  const field = useRef<HTMLTextAreaElement>(null);
   // Escape puts the suggestion away until the agent offers another.
   const dismissed = useSignal<string | null>(null);
   const mentions = useSignal<FileMentionDTO[]>([]);
@@ -85,6 +86,13 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
   // The word whose list Escape put away; typing on brings it back.
   const putAway = useSignal<string | null>(null);
   const search = useRef(0);
+
+  useEffect(() => {
+    const element = field.current;
+    if (!element) return;
+    element.style.height = "auto";
+    element.style.height = `${element.scrollHeight}px`;
+  }, [text.value]);
 
   const command = commandQuery(text.value);
   const matching = command ? matchingCommands(command.term, commands) : [];
@@ -136,7 +144,6 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
   }, [given, draftKey]);
   // Quote in Prompt (#1553): added after what is typed, the caret after it.
   const quoted = store.offeredQuote.value;
-  const field = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     if (!quoted || quoted.draftKey !== draftKey) return;
     text.value = quoteInto(quoted.words, text.value);
@@ -352,6 +359,8 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
                 void take(files);
               }
             }} />
+        </div>
+        <div class="prompt-actions">
           <button class="icon attach" aria-label="Attach" title="Attach a picture or a text file" disabled={disabled}
             onClick={() => picker.current?.click()}>📎</button>
           <input ref={picker} type="file" multiple hidden onChange={(e) => {

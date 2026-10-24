@@ -7,8 +7,8 @@ import SwiftUI
 /// and the one suggestion. Starting an agent is still its own screen (029). But talking
 /// to one is now the same as on the Mac, from top to bottom: where it is working, how
 /// full it is and what runs it; the cost limit when it has been reached; what is
-/// attached; the runtime's commands and the Mac's files; the field with attach, dictate
-/// and send; and the agent's own controls under it.
+/// attached; the runtime's commands and the Mac's files; then one outlined composer with
+/// its field above its attach, dictate, voice and send actions; and the agent's controls under it.
 ///
 /// Two things differ, both because this is a touch screen. The suggestion is a chip
 /// rather than the field's placeholder (031), and a touched file opens the change in a
@@ -74,10 +74,6 @@ struct PromptBar: View {
                                 goOn: { Task { await model.letThisAgentGoOn(agent) } }) {
                     RaiseTheLimitOnTheMac()
                 }
-            }
-            if !attachments.isEmpty {
-                AttachmentStrip(attachments: $attachments,
-                                capabilities: model.promptCapabilities(for: agent.runtimeID))
             }
             if let attachRefusal {
                 Text(attachRefusal).appText(.fine).tinted(.failure)
@@ -185,11 +181,15 @@ struct PromptBar: View {
     // MARK: What you want done
 
     private var field: some View {
-        HStack(alignment: .bottom, spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
+            if !attachments.isEmpty {
+                AttachmentStrip(attachments: $attachments,
+                                capabilities: model.promptCapabilities(for: agent.runtimeID))
+            }
             TextField(policyRefusal ?? PromptWords.placeholder(for: agent), text: $text, selection: $selection, axis: .vertical)
                 .textFieldStyle(.plain)
                 .appText(.reading)
-                .lineLimit(1...8)
+                .lineLimit(2...8)
                 .overlay(alignment: .topLeading) { HeardUnderline(dictation: dictation, text: text) }
                 .focused($focused)
                 .onChange(of: focused) { _, now in model.isTyping = now }
@@ -262,66 +262,71 @@ struct PromptBar: View {
                     dismissedSuggestions = true
                     return .handled
                 }
+                .frame(minHeight: 44, alignment: .topLeading)
 
-            AttachButton(attachments: $attachments, refusal: $attachRefusal)
+            HStack(spacing: 8) {
+                AttachButton(attachments: $attachments, refusal: $attachRefusal)
 
-            DictateButton(dictation: dictation, begin: beginDictation, send: send)
+                DictateButton(dictation: dictation, begin: beginDictation, send: send)
 
-            // Voice mode (#2322), while Settings ▸ Voice has it on.
-            VoiceModeButton(agentID: agent.id, vocabulary: speechSeeds) { words, stopping in
-                if let stopping { await model.stop(stopping) }
-                return await model.send(words, to: agent.id, voice: true) ? agent.id : nil
-            }
-
-            // While it works and nothing is typed, send is stop. Type and it is send
-            // again, queueing what is typed for when the turn ends.
-            if model.canStop(agent), !model.isStale(agent), text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-               sending == 0 {
-                let acting = model.acting(agent.id)
-                Button {
-                    Task { await model.stop(agent.id) }
-                } label: {
-                    Group {
-                        if acting == .stop {
-                            ProgressView()
-                        } else {
-                            Image(systemName: PromptWords.stopSymbol)
-                                .appText(.reading).fontWeight(.semibold)
-                        }
-                    }
-                    .frame(width: 22, height: 22)
+                // Voice mode (#2322), while Settings ▸ Voice has it on.
+                VoiceModeButton(agentID: agent.id, vocabulary: speechSeeds) { words, stopping in
+                    if let stopping { await model.stop(stopping) }
+                    return await model.send(words, to: agent.id, voice: true) ? agent.id : nil
                 }
-                .buttonStyle(.paperProminent)
-                .buttonBorderShape(.circle)
-                // Held while something else is on its way to this agent. Not while it is Stop: (#87).
-                // the one that went stays bright, as on the answer cards (#86), and the
-                // model refuses a second press.
-                .disabled(acting != nil && acting != .stop)
-                .help(PromptWords.stopHelp)
-                .accessibilityLabel("Stop")
-                .accessibilityValue(acting == .stop ? Telling.words(doing: "Stopping", host: "your Mac") : "")
-            } else {
-                Button(action: send) {
-                    Group {
-                        if sending > 0 {
-                            ProgressView()
-                        } else {
-                            Image(systemName: PromptWords.sendSymbol(willQueue: willQueue))
-                                .appText(.reading).fontWeight(.semibold)
+
+                Spacer(minLength: 0)
+                // While it works and nothing is typed, send is stop. Type and it is send
+                // again, queueing what is typed for when the turn ends.
+                if model.canStop(agent), !model.isStale(agent), text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                   sending == 0 {
+                    let acting = model.acting(agent.id)
+                    Button {
+                        Task { await model.stop(agent.id) }
+                    } label: {
+                        Group {
+                            if acting == .stop {
+                                ProgressView()
+                            } else {
+                                Image(systemName: PromptWords.stopSymbol)
+                                    .appText(.reading).fontWeight(.semibold)
+                            }
                         }
+                        .frame(width: 22, height: 22)
                     }
-                    .frame(width: 22, height: 22)
+                    .buttonStyle(.paperProminent)
+                    .buttonBorderShape(.circle)
+                    // Held while something else is on its way to this agent. Not while it is Stop: (#87).
+                    // the one that went stays bright, as on the answer cards (#86), and the
+                    // model refuses a second press.
+                    .disabled(acting != nil && acting != .stop)
+                    .help(PromptWords.stopHelp)
+                    .accessibilityLabel("Stop")
+                    .accessibilityValue(acting == .stop ? Telling.words(doing: "Stopping", host: "your Mac") : "")
+                } else {
+                    Button(action: send) {
+                        Group {
+                            if sending > 0 {
+                                ProgressView()
+                            } else {
+                                Image(systemName: PromptWords.sendSymbol(willQueue: willQueue))
+                                    .appText(.reading).fontWeight(.semibold)
+                            }
+                        }
+                        .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(.paperProminent)
+                    .buttonBorderShape(.circle)
+                    // Bright while its own spinner turns, as the answer that went stays bright
+                    // on the cards (#86); `send()` refuses the press meanwhile.
+                    .disabled(!canSend && sending == 0)
+                    .accessibilityLabel(PromptWords.sendLabel(willQueue: willQueue))
+                    .accessibilityHint(willQueue ? PromptWords.sendHelp(willQueue: true) : "")
                 }
-                .buttonStyle(.paperProminent)
-                .buttonBorderShape(.circle)
-                // Bright while its own spinner turns, as the answer that went stays bright
-                // on the cards (#86); `send()` refuses the press meanwhile.
-                .disabled(!canSend && sending == 0)
-                .accessibilityLabel(PromptWords.sendLabel(willQueue: willQueue))
-                .accessibilityHint(willQueue ? PromptWords.sendHelp(willQueue: true) : "")
             }
         }
-        .padding(14)
+        .padding(10)
+        .frame(minHeight: 94, alignment: .topLeading)
         .paperRaised(in: RoundedRectangle(cornerRadius: 18))
     }
 

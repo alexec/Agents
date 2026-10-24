@@ -715,13 +715,18 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 .bar-runtime { flex: none; margin-left: auto; }
 
 .prompt {
+  display: flex;
+  flex-direction: column;
+  min-height: 94px;
+  max-height: min(50vh, 24rem);
   background: var(--paper-raised);
   border: 1px solid var(--paper-rule);
   border-radius: var(--radius-floating);
   padding: 12px 12px 12px 14px;
 }
 
-.prompt-field { display: flex; align-items: flex-end; gap: 8px; }
+.prompt-field { display: flex; flex: 1 1 auto; min-height: 0; align-items: stretch; }
+.prompt-actions { display: flex; flex: none; align-items: center; gap: 8px; padding-top: 6px; }
 
 /* The runtime's commands and the host's files, over the field (CommandList, MentionList; #255). */
 .completions { list-style: none; margin: 0 0 8px; padding: 6px; max-height: 220px; overflow-y: auto;
@@ -734,6 +739,8 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 .prompt textarea {
   flex: 1;
   min-width: 0;
+  min-height: 2.8em;
+  max-height: min(40vh, 18rem);
   box-sizing: border-box;
   border: none;
   resize: none;
@@ -742,6 +749,7 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
   color: inherit;
   outline: none;
   align-self: stretch;
+  overflow-y: auto;
 }
 
 .send, .prompt .attach {
@@ -906,6 +914,7 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .attachments { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.prompt > .attachments { flex: 0 1 auto; max-height: 25%; overflow-y: auto; }
 .attachments li {
   display: flex;
   flex-wrap: wrap;
