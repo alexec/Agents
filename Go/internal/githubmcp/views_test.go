@@ -3,6 +3,7 @@ package githubmcp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -84,7 +85,10 @@ func (a *viewsAPI) serve(t *testing.T) *httptest.Server {
 			io.WriteString(w, pageAnswer)
 		case r.URL.Path == "/repos/o/r/issues":
 			io.WriteString(w, `[{"number":3,"title":"Mean is off by one","html_url":"https://github.com/o/r/issues/3","user":{"login":"kim"},
-			  "labels":[{"name":"bug"}],"assignees":[{"login":"sam"}],"comments":2,"updated_at":"2026-10-18T07:00:00Z"},
+			  "labels":[{"name":"bug"}],"assignees":[{"login":"sam"}],"comments":2,"updated_at":"2026-10-18T07:00:00Z",
+			  "milestone":{"title":"0.13 Lineage and value"}},
+			 {"number":4,"title":"No milestone yet","html_url":"https://github.com/o/r/issues/4","user":{"login":"kim"},
+			  "labels":[],"assignees":[],"comments":0,"updated_at":"2026-10-18T07:00:00Z"},
 			 {"number":7,"title":"a PR","pull_request":{"url":"x"}}]`)
 		case r.URL.Path == "/repos/o/r/pulls/7" && r.Method == http.MethodGet:
 			io.WriteString(w, `{"node_id":"PR_7","head":{"ref":"fix-mean","sha":"c0ffee","repo":{"full_name":"o/r"}}}`)
@@ -193,7 +197,16 @@ func viewsClientAs(t *testing.T, person bool) (*mcp.ClientSession, *viewsAPI) {
 	t.Helper()
 	api := &viewsAPI{}
 	s := api.serve(t)
-	gh := NewRealGitHub(s.URL, func() string { return "token" }, func(context.Context) (string, error) { return "o/r", nil })
+	gh := NewRealGitHub(s.URL, func() string { return "token" }, func(context.Context) (string, error) { return "o/r", nil },
+		func(_ context.Context, owner, repo string, number int) (map[string]any, error) {
+			if owner != "o" || repo != "r" || number != 3 {
+				return nil, fmt.Errorf("unexpected issue lookup: %s/%s#%d", owner, repo, number)
+			}
+			return map[string]any{"number": 3, "body": "A description", "closed_by_pull_requests": map[string]any{
+				"total_count": 1, "references": []any{map[string]any{"number": 7, "title": "Fix the mean", "state": "MERGED",
+					"url": "https://github.com/o/r/pull/7", "repository": "o/r"}},
+			}}, nil
+		})
 	server := mcp.NewServer(&mcp.Implementation{Name: "github-mcp", Version: "test"}, nil)
 	AddViews(server, gh, person)
 	ct, st := mcp.NewInMemoryTransports()
@@ -254,6 +267,7 @@ func TestEachViewHasAToolThatFeedsItAndAPage(t *testing.T) {
 	}
 	visibility := map[string][]any{}
 	feeds := map[string]string{}
+	detailsReadOnly := false
 	for _, tool := range tools.Tools {
 		ui, _ := tool.Meta["ui"].(map[string]any)
 		visibility[tool.Name], _ = ui["visibility"].([]any)
@@ -263,12 +277,18 @@ func TestEachViewHasAToolThatFeedsItAndAPage(t *testing.T) {
 				t.Errorf("%s feeds a view but is not read-only, so it can't feed a pin", tool.Name)
 			}
 		}
+		if tool.Name == "show_issue_details" {
+			detailsReadOnly = tool.Annotations != nil && tool.Annotations.ReadOnlyHint
+		}
 	}
 	want := map[string]string{"show_pull_requests": pullsURI, "show_issues": issuesURI, "show_pull_request": prURI}
 	for name, uri := range want {
 		if feeds[name] != uri {
 			t.Errorf("%s feeds %q, not %s", name, feeds[name], uri)
 		}
+	}
+	if v := visibility["show_issue_details"]; !detailsReadOnly || len(v) != 2 || v[0] != "model" || v[1] != "app" {
+		t.Errorf("show_issue_details must be read-only and visible to the issue view and agent; visibility=%v", v)
 	}
 	// A person merges, reviews and comments from a page: no agent is offered those.
 	for _, name := range []string{"merge_pr", "review_pr", "comment_on_pr"} {
@@ -288,6 +308,13 @@ func TestEachViewHasAToolThatFeedsItAndAPage(t *testing.T) {
 		}
 		if uri != issuesURI && !strings.Contains(html, "const prPage") {
 			t.Errorf("%s has no pull request page in it", uri)
+		}
+		if uri == issuesURI {
+			for _, want := range []string{"show_issue_details", "closed_by_pull_requests", "milestone", "aria-expanded"} {
+				if !strings.Contains(html, want) {
+					t.Errorf("issues page is missing %q", want)
+				}
+			}
 		}
 	}
 }
@@ -314,15 +341,37 @@ func TestTheIssuesListLeavesOutPullRequests(t *testing.T) {
 	c, _ := viewsClient(t)
 	_, data := callTool(t, c, "show_issues", map[string]any{"repo": "o/r"})
 	issues, _ := data["issues"].([]any)
-	if len(issues) != 1 {
+	if len(issues) != 2 {
 		t.Fatalf("issues: %v", data)
 	}
 	i := issues[0].(map[string]any)
-	if i["number"] != 3.0 || i["comments"] != 2.0 || i["assignees"].([]any)[0] != "sam" || i["labels"].([]any)[0] != "bug" {
+	if i["number"] != 3.0 || i["comments"] != 2.0 || i["assignees"].([]any)[0] != "sam" || i["labels"].([]any)[0] != "bug" ||
+		i["milestone"] != "0.13 Lineage and value" {
 		t.Errorf("#3: %v", i)
+	}
+	if second := issues[1].(map[string]any); second["number"] != 4.0 {
+		t.Errorf("#4: %v", second)
+	} else if _, ok := second["milestone"]; ok {
+		t.Errorf("#4 should have no milestone: %v", second)
 	}
 	if r, _ := callTool(t, c, "show_issues", map[string]any{"repo": "not a repo"}); !r.IsError {
 		t.Error("a repo that is not owner/name was read")
+	}
+}
+
+func TestIssueDetailsUseIssueReadAndShowClosingPullRequests(t *testing.T) {
+	c, _ := viewsClient(t)
+	r, data := callTool(t, c, "show_issue_details", map[string]any{"repo": "o/r", "number": 3})
+	if r.IsError || data["body"] != "A description" {
+		t.Fatalf("issue details: %v", data)
+	}
+	closing, ok := data["closed_by_pull_requests"].(map[string]any)
+	if !ok || closing["total_count"] != 1.0 {
+		t.Fatalf("closing pull requests: %v", data["closed_by_pull_requests"])
+	}
+	refs, ok := closing["references"].([]any)
+	if !ok || len(refs) != 1 || refs[0].(map[string]any)["url"] != "https://github.com/o/r/pull/7" {
+		t.Fatalf("linked pull requests: %v", closing["references"])
 	}
 }
 

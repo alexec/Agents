@@ -3,6 +3,7 @@ package githubmcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -11,6 +12,9 @@ import (
 	"strconv"
 	"strings"
 )
+
+// IssueReader reads the upstream issue_read result for a single issue.
+type IssueReader func(ctx context.Context, owner, repo string, number int) (map[string]any, error)
 
 // What the views read and do on GitHub (#1341): the open pull requests and issues, one pull
 // request's page, a failed run's log, and a person's merge, review and comment. As the
@@ -21,6 +25,7 @@ type Views interface {
 	DefaultRepo(ctx context.Context) (string, error)
 	BoardPRs(ctx context.Context, repo string) (Board, error)
 	OpenIssues(ctx context.Context, repo, label string) ([]ListedIssue, error)
+	IssueDetails(ctx context.Context, repo string, number int) (map[string]any, error)
 	PRPage(ctx context.Context, repo string, number int) (map[string]any, error)
 	PRDiff(ctx context.Context, repo string, number int, sha string) (map[string]any, error)
 	FailedLog(ctx context.Context, repo string, runID int, job string) (string, error)
@@ -77,12 +82,27 @@ type ListedIssue struct {
 	Issue
 	Comments  int
 	UpdatedAt string
+	Milestone string
 }
 
 func (i ListedIssue) json() map[string]any {
 	j := i.Issue.json()
 	j["comments"], j["updatedAt"] = i.Comments, i.UpdatedAt
+	if i.Milestone != "" {
+		j["milestone"] = i.Milestone
+	}
 	return j
+}
+
+func (g *RealGitHub) IssueDetails(ctx context.Context, repo string, number int) (map[string]any, error) {
+	if g.IssueReader == nil {
+		return nil, errors.New("issue details are unavailable")
+	}
+	owner, name, err := ownerName(repo)
+	if err != nil {
+		return nil, err
+	}
+	return g.IssueReader(ctx, owner, name, number)
 }
 
 // MARK: Checks
@@ -322,7 +342,8 @@ func (g *RealGitHub) OpenIssues(ctx context.Context, repo, label string) ([]List
 		}
 		for _, i := range list {
 			if !i.isPR() && len(out) < perPage {
-				out = append(out, ListedIssue{Issue: i.issue(), Comments: i.Comments, UpdatedAt: i.UpdatedAt})
+				out = append(out, ListedIssue{Issue: i.issue(), Comments: i.Comments, UpdatedAt: i.UpdatedAt,
+					Milestone: i.Milestone.title()})
 			}
 		}
 		if len(list) < perPage {
