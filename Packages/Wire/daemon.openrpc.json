@@ -6790,7 +6790,7 @@
     {
       "name": "workflows/setLimit",
       "x-capability": "workflows/1",
-      "description": "Set how many workflows may be turned on at once. A total is from 1 to 50. No total is the default.",
+      "description": "Set how many approved workflows may be turned on in each project. The value is from 1 to 100. An unset value means 20.",
       "paramStructure": "by-name",
       "params": [
         {

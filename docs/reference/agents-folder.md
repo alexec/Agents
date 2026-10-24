@@ -30,7 +30,7 @@ Agents app writes.
 | --- | --- | --- |
 | `limits.json` | The spending limits per agent and per day | **Settings ▸ Cost** |
 | `retention.json` | How long archived agents are kept | **Settings ▸ Machines ▸ This Mac** |
-| `workflow-limit.json` | How many workflows may be on. No file is the default. | **Settings ▸ Cost** |
+| `workflow-limit.json` | How many approved workflows may be on in each project. No file is the default. | **Settings ▸ Cost** |
 | `person.json` | What agents call you, and your pronouns | **Settings ▸ Account** |
 | `client-permissions.json` | The permission mode of each runtime | **Settings ▸ Agent Runtimes** |
 | `sandbox.json` | The command sandbox of each runtime | **Settings ▸ Agent Runtimes** |

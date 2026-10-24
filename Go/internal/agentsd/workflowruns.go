@@ -61,10 +61,7 @@ func refusalWords(r wire.WorkflowRefusal) string {
 		if r.OverLimit.Allowed != nil {
 			n = *r.OverLimit.Allowed
 		}
-		if r.OverLimit.Value == wire.WorkflowLimitProject {
-			return fmt.Sprintf("this project already has %d workflows waiting for approval", n)
-		}
-		return fmt.Sprintf("%d workflows are already running, across every project", n)
+		return fmt.Sprintf("%d workflows are already running in this project", n)
 	case r.Unreadable != nil:
 		return r.Unreadable.Value
 	case r.TriggerNotSupported != nil:
@@ -259,10 +256,7 @@ func (d *Daemon) refusalLocked(fr fireRequest, f *workflowFile) *wire.WorkflowRe
 		return r(func(x *wire.WorkflowRefusal) { x.FolderGone = &struct{}{} })
 	}
 	if l, ok := d.ceilingsLocked()[workflowKey(fr.folder, fr.id)]; ok {
-		n := int64(workflowsWaitingPerProject)
-		if l == wire.WorkflowLimitTotal {
-			n = d.workflowTotal()
-		}
+		n := d.workflowTotal()
 		return r(func(x *wire.WorkflowRefusal) { x.OverLimit = &wire.WorkflowRefusalOverLimit{Value: l, Allowed: &n} })
 	}
 	if w.Cooldown != nil && !fr.byHand {

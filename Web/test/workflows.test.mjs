@@ -109,15 +109,13 @@ test("off says why when it started off, as the Mac and the Remote do (#124)", ()
     "New — approve it on its page to let it run · Off: written by an agent. Turn it on when you are ready");
 });
 
-test("a waiting workflow past the three says why, with no Approve (#132)", () => {
+test("an approved workflow past the project's running limit says why", () => {
   const summary = { workflow: { workflowID: "d", triggers: [schedule], mode: "new", prompt: "", settings: {}, unknownFields: {} },
-    isArchived: false, isEnabled: false, isRunning: false, nextFireAtByTrigger: [],
-    awaitingApproval: { digest: "x", isNew: true }, overLimit: "project" };
-  assert.equal(w.waitsItsTurn(summary), true);
+    isArchived: false, isEnabled: true, isRunning: false, nextFireAtByTrigger: [],
+    overLimit: "project", totalLimit: 20 };
   assert.equal(w.happening(summary),
-    "This project already has 3 workflows waiting for approval. Approve or remove one of the 3 workflows waiting for approval first");
+    "This project already has 20 workflows running. Turn one off or archive one in this project to let it run");
   assert.equal(w.workflowStatus(summary).words, "Over the limit");
-  assert.equal(w.waitsItsTurn({ ...summary, overLimit: undefined }), false);
 });
 
 test("a workflow denied on this host stays listed, runs nothing here, and can be approved back (#391)", () => {
@@ -131,9 +129,9 @@ test("a workflow denied on this host stays listed, runs nothing here, and can be
   assert.equal(w.canBeDenied(summary), false);
   assert.equal(w.happening(summary), "Denied on this machine — it does not run here");
   assert.equal(w.nextLine(summary, 0), "No next time until you approve it");
-  const waiting = { ...summary, deniedHere: undefined, awaitingApproval: { digest: "x", isNew: true }, overLimit: "project" };
-  assert.equal(w.canBeDenied(waiting), true, "even one waiting its turn can be denied");
-  assert.equal(w.canBeApproved(waiting), false);
+  const waiting = { ...summary, deniedHere: undefined, awaitingApproval: { digest: "x", isNew: true } };
+  assert.equal(w.canBeDenied(waiting), true);
+  assert.equal(w.canBeApproved(waiting), true);
   assert.equal(w.refusalMessage({ deniedHere: {} }), "it is denied on this machine");
 });
 

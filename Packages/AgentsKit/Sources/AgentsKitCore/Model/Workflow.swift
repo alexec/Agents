@@ -367,16 +367,12 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         }
     }
 
-    /// Waiting for approval behind the three a project may have waiting (#132): listed
-    /// and inert, with no Approve until one ahead of it is approved or removed.
-    public var waitsItsTurn: Bool { awaitingApproval != nil && overLimit == .project }
+    /// Whether Approve is offered: waiting for an OK, or denied on this host, where
+    /// Approve takes the denial back (#391).
+    public var canBeApproved: Bool { awaitingApproval != nil || deniedHere != nil }
 
-    /// Whether Approve is offered: waiting, and one of the ones allowed to wait, or
-    /// denied on this host, where Approve takes the denial back (#391).
-    public var canBeApproved: Bool { (awaitingApproval != nil && !waitsItsTurn) || deniedHere != nil }
-
-    /// Whether Deny is offered (#391): waiting for an OK, even behind the ones allowed
-    /// to wait, since denying runs nothing and only takes it out of the queue here.
+    /// Whether Deny is offered (#391): waiting for an OK, since denying runs nothing and
+    /// only takes it out of the queue here.
     public var canBeDenied: Bool { awaitingApproval != nil && !isArchived }
 
     /// Waiting for an OK, or denied on this host: either way it runs nothing here until

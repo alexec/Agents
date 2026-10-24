@@ -24,14 +24,13 @@ import (
 // file in its project; what the host remembers of each (whether the person approved it as
 // it stands, who turned it off, when it last ran and how) in <root>/workflows.json, the
 // approved bytes in <root>/workflow-copies/<sha256>. A workflow that is new or changed
-// since it was approved runs nothing until the person approves it here; at most 3 wait
-// in a project, and at most 10 (workflow-limit.json) are on across every project.
+// since it was approved runs nothing until the person approves it here; at most 20
+// (workflow-limit.json) are on in each project.
 
 const (
-	workflowsWaitingPerProject = 3
-	workflowsTotalDefault      = 10
-	workflowsTotalMax          = 50
-	approvalsBeganNote         = "Approval began here; see #205.\n"
+	workflowsTotalDefault = 20
+	workflowsTotalMax     = 100
+	approvalsBeganNote    = "Approval began here; see #205.\n"
 )
 
 // workflowState is WorkflowState in workflows.json, in its order.
@@ -350,11 +349,11 @@ func (d *Daemon) workflowLimitSettings() wire.WorkflowLimitSettings {
 	return wire.WorkflowLimitSettings{Total: l.Total}
 }
 
-// setWorkflowLimit is workflows/setLimit. A total outside 1 to 50 is refused in the
+// setWorkflowLimit is workflows/setLimit. A total outside 1 to 100 is refused in the
 // words the window already shows.
 func (d *Daemon) setWorkflowLimit(s wire.WorkflowLimitSettings) (wire.WorkflowLimitSettings, error) {
 	if s.Total != nil && (*s.Total < 1 || *s.Total > workflowsTotalMax) {
-		return wire.WorkflowLimitSettings{}, Invalid("Workflows turned on must be between 1 and 50.")
+		return wire.WorkflowLimitSettings{}, Invalid("Workflows turned on must be between 1 and 100.")
 	}
 	if err := d.writeSetting("workflow-limit.json", s); err != nil {
 		return wire.WorkflowLimitSettings{}, &Error{Code: wire.FailureCouldNotSave, Message: "workflow-limit.json: " + err.Error()}
@@ -362,8 +361,7 @@ func (d *Daemon) setWorkflowLimit(s wire.WorkflowLimitSettings) (wire.WorkflowLi
 	return d.workflowLimitSettings(), nil
 }
 
-// ceilingsLocked is which workflows are over a ceiling: past the 3 waiting in a project,
-// or past the total on across every project.
+// ceilingsLocked marks approved workflows past the active limit in each project.
 func (d *Daemon) ceilingsLocked() map[string]wire.WorkflowLimit {
 	over := map[string]wire.WorkflowLimit{}
 	total := d.workflowTotal()
@@ -372,14 +370,13 @@ func (d *Daemon) ceilingsLocked() map[string]wire.WorkflowLimit {
 		folders = append(folders, f)
 	}
 	sort.Strings(folders)
-	approved := 0
 	for _, folder := range folders {
 		var ids []string
 		for id := range d.workflowFiles[folder] {
 			ids = append(ids, id)
 		}
 		sort.Strings(ids)
-		waiting := 0
+		approved := 0
 		for _, id := range ids {
 			f := d.workflowFiles[folder][id]
 			if isArchived(f.wf) || !d.listedHere(f.wf) {
@@ -389,14 +386,10 @@ func (d *Daemon) ceilingsLocked() map[string]wire.WorkflowLimit {
 			switch {
 			case denied != nil:
 			case awaiting != nil:
-				waiting++
-				if waiting > workflowsWaitingPerProject {
-					over[folder+"/"+id] = wire.WorkflowLimitProject
-				}
 			case !isOff(f.wf):
 				approved++
 				if int64(approved) > total {
-					over[folder+"/"+id] = wire.WorkflowLimitTotal
+					over[folder+"/"+id] = wire.WorkflowLimitProject
 				}
 			}
 		}
@@ -421,10 +414,8 @@ func (d *Daemon) summaryLocked(folder, id string, over map[string]wire.WorkflowL
 	s.IsEnabled = !isOff(f.wf)
 	if l, ok := over[folder+"/"+id]; ok {
 		s.OverLimit = &l
-		if l == wire.WorkflowLimitTotal {
-			t := d.workflowTotal()
-			s.TotalLimit = &t
-		}
+		t := d.workflowTotal()
+		s.TotalLimit = &t
 	}
 	s.AwaitingApproval, s.DeniedHere = d.approvalOf(folder, id, f)
 	s.IsRunning = d.runningLocked(folder, id)
@@ -651,17 +642,15 @@ func (d *Daemon) enableWorkflow(r wire.WorkflowEnableRequest, by string) (wire.W
 		awaiting, denied := d.approvalOf(folder, r.WorkflowID, f)
 		if awaiting == nil && denied == nil {
 			approved := 0
-			for fo, ws := range d.workflowFiles {
-				for id, g := range ws {
-					if a, dd := d.approvalOf(fo, id, g); a == nil && dd == nil && !isOff(g.wf) && !isArchived(g.wf) && d.listedHere(g.wf) {
-						approved++
-					}
+			for id, g := range d.workflowFiles[folder] {
+				if a, dd := d.approvalOf(folder, id, g); a == nil && dd == nil && !isOff(g.wf) && !isArchived(g.wf) && d.listedHere(g.wf) {
+					approved++
 				}
 			}
 			if total := d.workflowTotal(); int64(approved) >= total {
 				d.workflowMu.Unlock()
 				return wire.WorkflowSummary{}, &Error{Code: wire.FailureWorkflowLimitReached, Message: fmt.Sprintf(
-					"%d workflows are already running, across every project, so %s was left off. Turn one off or archive one, in any project, to let it run.", total, r.WorkflowID)}
+					"%d workflows are already running in this project, so %s was left off. Turn one off or archive one to let it run.", total, r.WorkflowID)}
 			}
 		}
 	}
@@ -903,12 +892,6 @@ func (d *Daemon) approveWorkflow(r wire.WorkflowApproveRequest, approve bool) (w
 	}
 	st := d.stateLocked(folder, r.WorkflowID, true)
 	if approve {
-		if over := d.ceilingsLocked()[folder+"/"+r.WorkflowID]; over == wire.WorkflowLimitProject {
-			d.workflowMu.Unlock()
-			return wire.WorkflowSummary{}, &Error{Code: wire.FailureWorkflowLimitReached, Message: fmt.Sprintf(
-				"This project already has %d workflows waiting for approval. Approve or remove one of the %d workflows waiting for approval first.",
-				workflowsWaitingPerProject, workflowsWaitingPerProject)}
-		}
 		if d.recordsLocked().ApprovalsBegan == nil {
 			t := now()
 			d.workflowRecs.ApprovalsBegan = &t

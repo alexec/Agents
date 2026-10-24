@@ -469,23 +469,6 @@ func (d *Daemon) writeWorkflow(project, id, content string) (string, error) {
 	d.scanLocked()
 	existing := d.fileLocked(project, id)
 	archived := existing != nil && isArchived(existing.wf)
-	var waiting []string
-	for wid, f := range d.workflowFiles[project] {
-		if a, _ := d.approvalOf(project, wid, f); a != nil && !isArchived(f.wf) {
-			waiting = append(waiting, wid)
-		}
-	}
-	sortStrings(waiting)
-	isWaiting := false
-	for _, w := range waiting {
-		isWaiting = isWaiting || w == id
-	}
-	if !archived && !isWaiting && len(waiting) >= workflowsWaitingPerProject {
-		d.workflowMu.Unlock()
-		return "", &Error{Code: wire.FailureWorkflowLimitReached, Message: fmt.Sprintf("Approve or remove one of the %d workflows waiting for approval first. "+
-			"Nothing was written: %s are waiting for their OK in this project. Change one of those instead, or ask them to approve or remove one to make room.",
-			workflowsWaitingPerProject, strings.Join(waiting[:workflowsWaitingPerProject], ", "))}
-	}
 	text := content
 	var err error
 	off := existing == nil || isOff(existing.wf)

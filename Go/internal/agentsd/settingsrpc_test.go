@@ -44,7 +44,15 @@ func TestTheWindowSavesTheSettingsTheHostHadNoWriteFor(t *testing.T) {
 	if limit.Total == nil || *limit.Total != 12 || d.workflowTotal() != 12 {
 		t.Fatalf("%+v total %d", limit, d.workflowTotal())
 	}
-	if e := c.callError(t, 6, "workflows/setLimit", map[string]any{"total": 0}); e == nil || e.Message != "Workflows turned on must be between 1 and 50." {
+	if e := c.callError(t, 6, "workflows/setLimit", map[string]any{"total": 0}); e == nil || e.Message != "Workflows turned on must be between 1 and 100." {
+		t.Fatalf("%+v", e)
+	}
+	max := int64(100)
+	c.call(t, 7, "workflows/setLimit", wire.WorkflowLimitSettings{Total: &max})
+	if d.workflowTotal() != 100 {
+		t.Fatalf("total %d", d.workflowTotal())
+	}
+	if e := c.callError(t, 8, "workflows/setLimit", map[string]any{"total": 101}); e == nil || e.Message != "Workflows turned on must be between 1 and 100." {
 		t.Fatalf("%+v", e)
 	}
 	if d.workflowTotal() != 12 {
