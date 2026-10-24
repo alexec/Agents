@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -107,4 +108,30 @@ func restartLaunchAgents() error {
 	}
 	// launchd stops this process (a SIGTERM, which ends it as a stop does) and starts it again.
 	return exec.Command("/bin/launchctl", "kickstart", "-k", domain+label).Start()
+}
+
+// turnsRunning is how many agents are in a turn: one waiting on the person is too.
+// Only a Mac's self-update asks (serveSelfUpdate); a Linux build would call it unused.
+func (d *Daemon) turnsRunning() int {
+	n := 0
+	for _, a := range d.Store.Agents() {
+		if d.turnIsRunning(a.ID) {
+			n++
+		}
+	}
+	return n
+}
+
+// serveSelfUpdate serves selfUpdate/status and selfUpdate/set for an updater.
+func (d *Daemon) serveSelfUpdate(u *selfUpdater) {
+	u.ctx = d.ctx
+	u.turns = d.turnsRunning
+	u.tell = func(s wire.SelfUpdate) { Broadcast(d, wire.NotifySelfUpdateChanged, s) }
+	d.selfUpdateState.updater = u
+	On(d, wire.CallSelfUpdateStatus, func(context.Context, *Client, wire.Empty) (wire.SelfUpdate, error) {
+		return u.Status(), nil
+	})
+	On(d, wire.CallSelfUpdateSet, func(_ context.Context, _ *Client, r wire.SelfUpdateSet) (wire.SelfUpdate, error) {
+		return u.Set(r)
+	})
 }

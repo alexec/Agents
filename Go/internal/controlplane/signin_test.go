@@ -164,16 +164,19 @@ func TestEveryRefusedSignInPairsNothing(t *testing.T) {
 		"bad signature": {signin.Google, func(n string) string {
 			return f.google.Forge(signintest.Claims{"sub": "alex", "aud": googleApp, "nonce": n})
 		}, "signature"},
-		"wrong aud":       {signin.Google, func(n string) string { return f.mint(signin.Google, "alex", n, signintest.Claims{"aud": "other-app"}) }, "another app"},
-		"expired":         {signin.Google, func(n string) string { return f.mint(signin.Google, "alex", n, signintest.Claims{"exp": time.Now().Add(-time.Hour).Unix()}) }, "expired"},
-		"replayed nonce":  {signin.Google, func(string) string { return earlier }, "another sign-in"},
-		"wrong issuer":    {signin.Google, func(n string) string { return f.apple.Mint(signintest.Claims{"sub": "alex", "aud": googleApp, "nonce": n}) }, "signature"},
-		"nobody has it":   {signin.Google, func(n string) string { return f.mint(signin.Google, "stranger", n, nil) }, "Ask an admin for an invite"},
-		"Apple stranger":  {signin.Apple, func(n string) string { return f.mint(signin.Apple, "stranger", n, nil) }, "Ask an admin for an invite"},
-		"GitHub stranger": {signin.GitHub, func(string) string { return f.github.Token(99, "stranger") }, "Ask an admin for an invite"},
+		"wrong aud": {signin.Google, func(n string) string { return f.mint(signin.Google, "alex", n, signintest.Claims{"aud": "other-app"}) }, "another app"},
+		"expired": {signin.Google, func(n string) string {
+			return f.mint(signin.Google, "alex", n, signintest.Claims{"exp": time.Now().Add(-time.Hour).Unix()})
+		}, "expired"},
+		"replayed nonce": {signin.Google, func(string) string { return earlier }, "another sign-in"},
+		"wrong issuer": {signin.Google, func(n string) string {
+			return f.apple.Mint(signintest.Claims{"sub": "alex", "aud": googleApp, "nonce": n})
+		}, "signature"},
+		"nobody has it":    {signin.Google, func(n string) string { return f.mint(signin.Google, "stranger", n, nil) }, "Ask an admin for an invite"},
+		"Apple stranger":   {signin.Apple, func(n string) string { return f.mint(signin.Apple, "stranger", n, nil) }, "Ask an admin for an invite"},
+		"GitHub stranger":  {signin.GitHub, func(string) string { return f.github.Token(99, "stranger") }, "Ask an admin for an invite"},
 		"GitHub bad token": {signin.GitHub, func(string) string { return "ghu_nope" }, "did not accept"},
 	}
-	before := len(p.s.Records().Clients())
 	for name, c := range cases {
 		_, err := p.signInAs(c.provider, c.token, nil)
 		if err == nil || !strings.Contains(err.Error(), c.want) {
@@ -182,7 +185,7 @@ func TestEveryRefusedSignInPairsNothing(t *testing.T) {
 	}
 	// Removed (FR-029): Sam's sign-in is refused until a new invite.
 	call(t, owner, "", "people/remove", map[string]string{"user": sam.id})
-	before = len(p.s.Records().Clients())
+	before := len(p.s.Records().Clients())
 	if _, err := p.signInAs(signin.Apple, func(n string) string { return f.mint(signin.Apple, "sam", n, nil) }, nil); err == nil ||
 		!strings.Contains(err.Error(), "removed") {
 		t.Errorf("removed: %v", err)

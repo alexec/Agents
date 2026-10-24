@@ -55,15 +55,6 @@ func grantedWords(l wire.Lease, capped bool) string {
 	return s
 }
 
-func grantedAfterWaitingWords(l wire.Lease, waited int, capped bool) string {
-	s := fmt.Sprintf("%s is yours now, until %s (%d minutes). You waited %d seconds.",
-		l.DisplayName, clock(l.ExpiresAt), leaseMinutes(l.GrantedAt, l.ExpiresAt), waited)
-	if capped {
-		s += leaseCappedWords
-	}
-	return s
-}
-
 func extendedWords(l wire.Lease, capped bool) string {
 	s := "You still hold " + l.DisplayName + ", now until " + clock(l.ExpiresAt) + "."
 	if capped {
@@ -166,16 +157,6 @@ func (d *Daemon) resolveResource(given string) (wire.ResourceName, wire.Resource
 		return name, "screen", "Screen, mouse and keyboard", true
 	}
 	return name, "named", strings.TrimSpace(given), true
-}
-
-func (e *leaseEntry) nextToEnd() *wire.Lease {
-	var next *wire.Lease
-	for i := range e.Leases {
-		if next == nil || e.Leases[i].ExpiresAt < next.ExpiresAt {
-			next = &e.Leases[i]
-		}
-	}
-	return next
 }
 
 // leaseResource is lease_resource.

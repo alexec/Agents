@@ -16,6 +16,11 @@
 # With LINT_BASE set (CI: the pull request's base), a report linter also says which of its
 # findings are in the files changed since LINT_BASE.
 #
+# go (golangci-lint) is one run (#2162). unused and ineffassign are required: a finding
+# from them fails this script and CI's lint job. errcheck, gosec, staticcheck and govet
+# only report. One run, not a second with only those two: the second would load every
+# package again, which is the slow part even when the cache is warm.
+#
 # On Linux a linter on the PATH is run as it is (CI, after --tools). Otherwise, as on a Mac,
 # it runs in a pinned container, so nothing is installed on the Mac: Docker must be running.
 # Go's caches are Go/scripts/go.sh's, in ~/Library/Caches/Agents-build/go.
@@ -267,6 +272,8 @@ for linter in $linters; do
 	esac
 	mode=report
 	case "$REQUIRED" in *" $linter "*) mode=required ;; esac
+	# unused and ineffassign fail; the rest of this one run only reports (#2162).
+	[ "$linter" = go ] && mode="unused, ineffassign required"
 	if [ "$linter" != checks ] && ! native "$(tool "$linter")" && ! docker_ok; then
 		echo "== $linter: skipped, as it is not on the PATH and Docker is not running"
 		continue
@@ -283,7 +290,13 @@ for linter in $linters; do
 	else
 		count=$(grep -cE '^[^:[:space:]]+:[0-9]+(:[0-9]+)?: ' "$out")
 	fi
+	raw=$count
 	[ "$status" != 0 ] && [ "$count" = 0 ] && count="failed ($status)"
+	# Lines whose linter, in the trailing parentheses, is one that fails the script.
+	go_required=
+	if [ "$linter" = go ]; then
+		go_required=$(grep -E ' \((unused|ineffassign)\)$' "$out" || true)
+	fi
 	mine=-
 	if [ -s "$changed" ] && [ "$linter" != govulncheck ]; then
 		# The findings whose path, before its first colon, this branch changed.
@@ -299,6 +312,16 @@ for linter in $linters; do
 	rm -f "$out"
 	printf '| %s | %s | %s | %s | %s |\n' "$linter" "$mode" "$count" "$mine" "$took" >>"$summary"
 	echo "-- $linter: $count finding(s), ${took}s, exit $status"
+	if [ "$linter" = go ]; then
+		if [ -n "$go_required" ]; then
+			echo "-- go: unused and ineffassign are required:"
+			printf '%s\n' "$go_required"
+			failed="$failed go"
+		elif [ "$status" != 0 ] && [ "$raw" = 0 ]; then
+			# The run did not finish, so those two rules were not checked.
+			failed="$failed go"
+		fi
+	fi
 	[ "$mode" = required ] && [ "$status" != 0 ] && failed="$failed $linter"
 done
 
