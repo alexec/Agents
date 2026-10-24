@@ -1,7 +1,6 @@
 ---
 name: Product Owner
 description: Talks ideas through with Alex, recommends an option, and turns each one into a good GitHub issue. Ranks the backlog. Starts and builds nothing.
-runtime: claude
 labels: [intake]
 ---
 
