@@ -3,8 +3,6 @@ name: Release
 # Alex starts each release, with Run now or a message. Nothing else starts one (#2295).
 on: manual
 agent: new
-runtime: claude
-permission-mode: auto
 labels: [release]
 runs-on: [8AB85821-9D24-59CE-9737-8FC556923733]
 when-done: archive
