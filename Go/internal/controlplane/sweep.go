@@ -25,8 +25,6 @@ const (
 	eventsPrefix   = "v1/events/"
 	codesPrefix    = "v1/codes/"
 	sweptDayLayout = "2006-01-02"
-
-	tombstoneDatedWarning = ""
 )
 
 // sweepReport is StoreSweep.Report.

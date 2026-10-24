@@ -98,14 +98,6 @@ type SocketPolicy interface {
 	Summary() string
 }
 
-// openPolicy is everything to every caller.
-type openPolicy struct{ why string }
-
-func (openPolicy) Role(net.Conn) (Role, bool) { return RoleControl, true }
-func (p openPolicy) Summary() string {
-	return p.why + "every process of this account may call everything"
-}
-
 // socketPolicy is socketPolicyFor(d), decided once: daemon.sock and the local socket
 // ask the same agents-peer.
 func (d *Daemon) socketPolicy() SocketPolicy {

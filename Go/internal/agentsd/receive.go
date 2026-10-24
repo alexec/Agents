@@ -308,7 +308,9 @@ func (d *Daemon) receive(r wire.ReceiveRequest) (summary wire.ProjectSummary, er
 		return summary, err
 	}
 	if r.Origin != nil && *r.Origin != "" {
-		if _, err := git(path, "remote", "get-url", "origin"); err == nil {
+		// err is the named result. := here would hide it, and the check below would
+		// not see a failed set-url or add.
+		if _, err = git(path, "remote", "get-url", "origin"); err == nil {
 			_, err = git(path, "remote", "set-url", "origin", *r.Origin)
 		} else {
 			_, err = git(path, "remote", "add", "origin", *r.Origin)

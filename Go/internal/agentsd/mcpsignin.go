@@ -512,8 +512,6 @@ type loopback struct {
 	server   *http.Server
 	once     sync.Once
 	arrived  chan map[string]string
-	got      map[string]string
-	ok       bool
 	page     chan [2]string
 	stopped  chan struct{}
 	stopOnce sync.Once

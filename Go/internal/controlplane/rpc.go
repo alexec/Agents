@@ -52,9 +52,6 @@ func notFound(method string) *RPCError {
 	return &RPCError{Code: methodNotFound, Message: "Method not found", Data: data}
 }
 
-// notHere is ControlMethods.notHere.
-var notHere = fail(notSupported, "This control plane cannot do that yet.")
-
 // noSSHHere is a hosted copy's answer to a method that reaches a machine over ssh (#1807).
 var noSSHHere = fail(notSupported, "This control plane runs on our servers, which have no ssh of yours. Add a machine with its join command or a code, or from a workspace provider.")
 

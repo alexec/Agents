@@ -330,15 +330,3 @@ func sameTime(a, b *time.Time) bool {
 	}
 	return a.Equal(*b)
 }
-
-// agentsInFlight counts the agents starting or running: what keeps the Mac awake. One
-// waiting on a person is not counted, so a question left overnight holds nothing.
-func (d *Daemon) agentsInFlight() int {
-	n := 0
-	for _, a := range d.Store.Agents() {
-		if a.State == wire.AgentStateStarting || a.State == wire.AgentStateRunning {
-			n++
-		}
-	}
-	return n
-}

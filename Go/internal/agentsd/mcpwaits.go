@@ -328,58 +328,6 @@ func (d *Daemon) startMCPWait(check mcpWaitCheck) {
 	d.kickMCPEvents()
 }
 
-// mcpEventList is the one list of events (#579): the app's, then each of the project's
-// servers' that it offers by poll, then a line for each server that could not be asked.
-func (d *Daemon) mcpEventList(project string) string {
-	_, text := catalogue()
-	names := d.mcpServerNames(project)
-	sort.Strings(names)
-	offered, mayComeBack := d.mcpOfferedEvents(names, project)
-	var extra []string
-	for _, name := range names {
-		o, ok := offered[name]
-		if !ok {
-			continue
-		}
-		events := append([]mcpEventDef(nil), o.events...)
-		sort.Slice(events, func(i, j int) bool { return events[i].Name < events[j].Name })
-		for _, e := range events {
-			if e.offersPoll() {
-				extra = append(extra, eventListLine(e, name))
-			}
-		}
-	}
-	for _, why := range mayComeBack {
-		extra = append(extra, "Not listed: "+why)
-	}
-	if len(extra) == 0 {
-		return text
-	}
-	// The servers' lines go before the last line, which says how .* and lists match.
-	lines := strings.Split(text, "\n")
-	last := lines[len(lines)-1]
-	return strings.Join(append(append(lines[:len(lines)-1:len(lines)-1], extra...), last), "\n")
-}
-
-// eventListLine is EventList.line: one entry as a line of JSON, name first and the
-// schemas last.
-func eventListLine(e mcpEventDef, source string) string {
-	object := json.RawMessage(`{"type":"object"}`)
-	fields := []string{`"name":` + canonicalJSON(mustRaw(e.Name)), `"source":` + canonicalJSON(mustRaw(source))}
-	if e.Description != nil {
-		fields = append(fields, `"description":`+canonicalJSON(mustRaw(*e.Description)))
-	}
-	input, payload := e.InputSchema, e.PayloadSchema
-	if len(input) == 0 {
-		input = object
-	}
-	if len(payload) == 0 {
-		payload = object
-	}
-	fields = append(fields, `"inputSchema":`+canonicalJSON(input), `"payloadSchema":`+canonicalJSON(payload))
-	return "{" + strings.Join(fields, ",") + "}"
-}
-
 // waitingOnServers is every open wait's server events, by agent, for the subscriptions.
 type serverWait struct {
 	agent   wire.UUID

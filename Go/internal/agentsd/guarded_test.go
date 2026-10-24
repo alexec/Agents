@@ -92,9 +92,8 @@ func TestAPullsChangeWaits(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, ".agents", "project.json"), pulled, 0o644)
 	git(dir, "add", ".agents/project.json")
 	git(dir, "commit", "-q", "-m", "pulled")
-	s, _ := d.summaryFor(dir)
 	d.checkGuarded(dir, ".agents/project.json", nil)
-	s, _ = d.summaryFor(dir)
+	s, _ := d.summaryFor(dir)
 	if len(s.GuardedChanges) != 1 || !s.GuardedChanges[0].ByGit || s.Approvals[0].Line != "Changed with the last pull" ||
 		s.Project.DiskSpace == nil || *s.Project.DiskSpace.LowGB != 30 {
 		t.Fatalf("%+v %+v %+v", s.GuardedChanges, s.Approvals, s.Project.DiskSpace)

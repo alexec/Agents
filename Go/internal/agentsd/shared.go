@@ -295,11 +295,6 @@ func linksTo(path, target string) bool {
 	return filepath.Clean(dest) == filepath.Clean(target)
 }
 
-func isLink(path string) bool {
-	_, err := os.Readlink(path)
-	return err == nil
-}
-
 // visibleNames is a folder's entries that are not hidden, sorted.
 func visibleNames(dir string) []string {
 	entries, err := os.ReadDir(dir)
