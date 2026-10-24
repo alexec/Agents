@@ -15,6 +15,7 @@ enum ProjectSettingsPane: String, Hashable, CaseIterable, Identifiable {
         case .overview: self = .overview
         case .instructions: self = .instructions
         case .skills: self = .skills
+        case .workflows: self = .other
         case .mcp: self = .mcp
         case .plugins: self = .plugins
         case .other: self = .other
