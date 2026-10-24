@@ -182,6 +182,12 @@ struct AgentRow: View {
                         .appText(isCompact ? .fine : .supporting)
                         .foregroundStyle(.secondary)
                         .help("Starts by itself when this project has a place free for another helper")
+                } else if let reason = needsYouLine {
+                    Text(reason)
+                        .appText(isCompact ? .fine : .supporting)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(isCompact ? 1 : 2)
+                        .fixedSize(horizontal: false, vertical: true)
                 } else if agent.missingFolder != nil, agent.state != .archived {
                     // Its folder gone (#119): said before anybody types, as a project's
                     // row says it, in the report's place.
@@ -362,6 +368,14 @@ struct AgentRow: View {
         }
     }
 
+    /// What the session asked, or why it stopped, while this row needs a person.
+    private var needsYouLine: String? {
+        let question = model.work.permission(for: agent.id)?.toolCall.line
+            ?? model.work.elicitation(for: agent.id)?.message
+            ?? model.work.elicitation(for: agent.id)?.title
+        return StatusShape.needsYouLine(row: agent, isComingBack: isComingBack, question: question)
+    }
+
     /// The session whose mark the row shows: its own, or for a folded parent the most
     /// urgent of it and the sessions it started (#835).
     private var markAgent: Agent {
@@ -429,10 +443,12 @@ private struct FoldCount: View {
 private struct SessionMark: View {
     private enum Kind { case needsYou, working, queued, waiting, paused, done, asksToArchive }
     private let kind: Kind
+    private let agent: Agent
     /// The tool a working session runs (#1902): a wrench in the spinner's place.
     private var tool: String?
 
     init?(agent: Agent, group: AgentGroup) {
+        self.agent = agent
         tool = group == .running ? RunningToolWords.tool(agent) : nil
         switch group {
         case .needsAttention, .blocked: kind = .needsYou
@@ -480,14 +496,15 @@ private struct SessionMark: View {
         }
         .frame(width: 16 * scale, height: 16 * scale)
         // The tool by name on the pointer (#1902); the other marks say theirs in the row.
-        .help(tool.map(RunningToolWords.label) ?? "")
+        .help(kind == .needsYou ? StatusShape.words(row: agent, isComingBack: false)
+            : tool.map(RunningToolWords.label) ?? "")
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
     }
 
     private var label: String {
         switch kind {
-        case .needsYou: "Needs you"
+        case .needsYou: StatusShape.words(row: agent, isComingBack: false)
         case .working: tool.map(RunningToolWords.label) ?? "Working"
         case .queued: "Queued"
         case .waiting: "Waiting"

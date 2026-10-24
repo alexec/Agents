@@ -12,13 +12,14 @@ import { backgroundMark } from "../model/background";
 import { drawsUnread, projectFolder } from "../model/groups";
 import { archiveLine, archiveMark } from "../model/archiveWords";
 import { fileToSeeLine, reportLine } from "../model/fileToSeeWords";
-import { queuedLine, rowStatus, type StatusShape } from "../model/status";
+import { needsYouLine, queuedLine, rowStatus, type StatusShape } from "../model/status";
 import { fromWireDate } from "../protocol/dates";
 import { Telling } from "./Telling";
 import { folderIsMissing, folderPath, missingFolderLabel } from "../model/missingFolder";
 import { shortAgo } from "../model/activity";
 import { runningTool, runningToolLabel, sessionMark, type SessionMark } from "../model/sidebar";
 import { isMuted, muteMark, mutedHelp, mutedWords } from "../model/mute";
+import { callLine } from "../model/turns";
 
 const glyphs: Record<StatusShape, string> = { working: "", needsYou: "!", waiting: "", done: "✓", stopped: "■" };
 
@@ -46,10 +47,11 @@ const markWords: Record<SessionMark, string> = { needsYou: "Needs you", working:
  * status mark.
  */
 export function SidebarMark({ agent, comingBack = false }: { agent: Agent; comingBack?: boolean }) {
+  const status = rowStatus(agent, comingBack);
   const mark = comingBack ? null : sessionMark(agent);
   if (!mark) return <StatusMark agent={agent} comingBack={comingBack} />;
   const tool = mark === "tool" ? runningTool(agent) : null;
-  const words = tool !== null ? runningToolLabel(tool) : markWords[mark];
+  const words = tool !== null ? runningToolLabel(tool) : mark === "needsYou" ? status.words : markWords[mark];
   return (
     <span class={`sidebar-mark ${mark}`} role="img" aria-label={words} title={words}>
       {mark === "needsYou" && <span class="glyph" aria-hidden="true">✋&#xFE0E;</span>}
@@ -108,6 +110,8 @@ export interface RowExtras {
   queued: string | null;
   /** While the sidebar searches: the line it said that matches (#1585). */
   said?: string | null;
+  /** The first question this session is waiting for an answer to (#1324). */
+  question?: string | null;
 }
 
 /** A row's extras, read from the store: only what this agent names is looked up. */
@@ -117,6 +121,11 @@ export function rowExtras(store: Store, host: string, agent: Agent): RowExtras {
   const snapshot = store.leases.value[host];
   // A place in line that its wait says is said once, by the wait (#2361).
   const leases = leaseMark(agent.id, snapshot, title, lineResource(agent));
+  const permission = store.permissionsFor(host, agent.id)[0];
+  const elicitation = store.elicitationsFor(host, agent.id)[0];
+  const question = permission ? callLine(permission.toolCall)
+    : elicitation?.message ?? (elicitation && ("form" in elicitation.mode
+      ? elicitation.mode.form._0.title : elicitation.mode.url._0));
   return {
     comingBack: store.isComingBack(host, agent.id),
     // Its id when the file has since gone, so the mark never goes with it, as the window's.
@@ -130,6 +139,7 @@ export function rowExtras(store: Store, host: string, agent: Agent): RowExtras {
       : { names: [], lines: [] }, leases, title, snapshot),
     queued: agent.state === "queued" ? queuedLine(agent, store.projectAgents(host, projectFolder(agent))) : null,
     said: store.saidLines.value[agent.id] ?? null,
+    question: question ?? null,
   };
 }
 
@@ -154,6 +164,7 @@ export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = f
   const asks = archiveLine(agent);
   const fileToSee = fileToSeeLine(agent);
   const report = reportLine(agent);
+  const reason = needsYouLine(agent, extras?.question, extras?.comingBack);
   const activity = fromWireDate(agent.lastActivityAt);
   const labels = agent.labels ?? [];
   return (
@@ -185,6 +196,7 @@ export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = f
           : extras?.queued ? <span class="subtitle queued">{extras.queued}</span>
           // While the sidebar searches: the line it said that matches, in the report's place,
           // so a row found by what it said says why (#1663). The page's row has it below.
+          : inSidebar && reason ? <span class="subtitle needs-you-reason">{reason}</span>
           : inSidebar && extras?.said && !folderIsMissing(agent) ? <span class="subtitle said" title={extras.said}>{extras.said}</span>
           : report && !(inSidebar && folderIsMissing(agent)) && <span class="subtitle report">{report}</span>}
         {/* Its folder gone (#119), as a project's row says it. */}

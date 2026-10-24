@@ -131,3 +131,15 @@ export function rowStatus(agent: Agent, isComingBack = false): { shape: StatusSh
   const shape = shapeOf(agent, isComingBack);
   return { shape, tinted: isTinted(shape), words: statusWords(agent, isComingBack) };
 }
+
+/** The sidebar's one grey line while a session needs you (#1324). */
+export function needsYouLine(agent: Agent, question?: string | null, isComingBack = false): string | null {
+  if (shapeOf(agent, isComingBack) !== "needsYou") return null;
+  if ((agent.state === "waitingOnUser" || agent.report?.outcome === "needs_answer") && question) {
+    const first = question.split(/\r?\n/, 1)[0]?.trim();
+    if (first) return first;
+  }
+  if (agent.state === "stopped" && agent.endedReason) return endingSummaries[agent.endedReason];
+  if (endingIsUnaccountedFor(agent)) return "Finished without saying how it went";
+  return null;
+}

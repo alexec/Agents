@@ -128,6 +128,21 @@ public extension StatusShape {
               tool: agent.state == .running ? agent.runningTool : nil)
     }
 
+    /// The single grey line for a session under Needs You: its pending question, why it
+    /// stopped, or why its finished turn has no report. The report returns when the row
+    /// leaves Needs You (#1324).
+    static func needsYouLine(row agent: Agent, isComingBack: Bool = false, question: String? = nil) -> String? {
+        guard StatusShape(row: agent, isComingBack: isComingBack) == .needsYou else { return nil }
+        if agent.state == .waitingOnUser || agent.report?.outcome == .needsAnswer,
+           let question, let first = question.split(whereSeparator: { $0.isNewline }).first {
+            let line = first.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !line.isEmpty { return line }
+        }
+        if agent.state == .stopped, let summary = agent.endedReason?.summary { return summary }
+        if agent.endingIsUnaccountedFor { return "Finished without saying how it went" }
+        return nil
+    }
+
     /// "Running: swift test": a running agent's words while it runs a tool (#1902), in the
     /// sidebar, the rows, the cards and the chat's working line alike.
     static func runningLabel(_ tool: String) -> String { "Running: \(tool)" }
