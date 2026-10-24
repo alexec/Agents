@@ -13,8 +13,7 @@ import SwiftUI
 /// from a chat in a scene of its own.
 struct WaitCard: View {
     let status: WaitStatus
-    let eventWaitSince: Date?
-    let eventWaitDeadline: Date?
+    let eventWait: EventWait?
     let isLineWait: Bool
     var open: (() -> Void)?
     let stop: () async -> Void
@@ -24,11 +23,9 @@ struct WaitCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if let since = eventWaitSince, let deadline = eventWaitDeadline, !isLineWait {
+            if let eventWait, eventWait.isOpen, !isLineWait {
                 TimelineView(.periodic(from: .now, by: 60)) { context in
-                    Text(eventLine(since: since, deadline: deadline, now: context.date))
-                        .appText(.reading).fontWeight(.semibold)
-                        .fixedSize(horizontal: false, vertical: true)
+                    eventContent(eventWait, now: context.date)
                 }
             } else {
                 Text(status.line)
@@ -55,16 +52,72 @@ struct WaitCard: View {
                 }
             }
         }
-        .padding(14)
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.secondary.opacity(0.25)))
         .accessibilityElement(children: .contain)
     }
 
-    private func eventLine(since: Date, deadline: Date, now: Date) -> String {
-        let what = status.mark.replacingOccurrences(of: "\(WaitStatus.symbol) Waiting for ", with: "")
-        let duration = max(1, Int(ceil(deadline.timeIntervalSince(since) / 60)))
-        let elapsed = max(0, Int(now.timeIntervalSince(since) / 60))
-        return "Waiting for \(duration) min for:\n\(what)\n\n\(elapsed) min elapsed so far."
+    @ViewBuilder
+    private func eventContent(_ wait: EventWait, now: Date) -> some View {
+        let total = wait.deadline.map { max(1, Int(ceil($0.timeIntervalSince(wait.since) / 60))) }
+        let elapsed = max(0, Int(now.timeIntervalSince(wait.since) / 60))
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 7) {
+                Image(systemName: "dot.radiowaves.left.and.right").foregroundStyle(.blue)
+                Text("Waiting for event").fontWeight(.semibold)
+                Spacer(minLength: 6)
+                Text(total.map { "\(elapsed) / \($0) min" } ?? "\(elapsed) min")
+                    .appText(.fine).foregroundStyle(.secondary).monospacedDigit()
+            }
+            ForEach(Array(wait.patterns.enumerated()), id: \.offset) { _, pattern in
+                let server = wait.serverEvents?.first { $0.trigger.event == pattern.name }
+                let source = server.map { $0.servers.map(\.capitalized).joined(separator: " or ") }
+                    .flatMap { $0.isEmpty ? nil : $0 } ?? Self.sourceName(pattern.name)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Image(systemName: server == nil ? "app" : "puzzlepiece.extension")
+                            .foregroundStyle(.secondary)
+                        Text(source).foregroundStyle(.secondary)
+                        Text("·").foregroundStyle(.tertiary)
+                        Text(pattern.name).fontWeight(.medium)
+                    }
+                    let filters = server.map { $0.trigger.arguments.sorted { $0.key < $1.key }.map { "\($0.key) \(Self.valueWords($0.value))" } }
+                        ?? pattern.filters.sorted { $0.key < $1.key }.map { "\($0.key) \($0.value)" }
+                    if !filters.isEmpty {
+                        Text(filters.joined(separator: " · ")).appText(.fine).foregroundStyle(.secondary)
+                            .padding(.leading, 22)
+                    }
+                }
+                .appText(.fine)
+            }
+            if let deadline = wait.deadline {
+                ProgressView(value: min(1, max(0, now.timeIntervalSince(wait.since) / deadline.timeIntervalSince(wait.since))))
+                    .tint(.blue)
+                    .controlSize(.mini)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private static func sourceName(_ event: String) -> String {
+        switch event.split(separator: ".").first.map(String.init) {
+        case "mac", "machine", "person", "system", "cost", "lease": "This Mac"
+        case "workflow": "Workflows"
+        case "branch": "Branches"
+        case "dropbox": "Drop box"
+        default: "Agents"
+        }
+    }
+
+    private static func valueWords(_ value: JSONValue) -> String {
+        switch value {
+        case .string(let text): text
+        case .int(let number): String(number)
+        case .double(let number): String(number)
+        case .bool(let flag): String(flag)
+        case .null: "null"
+        case .array, .object: String(describing: value)
+        }
     }
 }
