@@ -77,6 +77,12 @@ func TestTheFrontOffersEventsAndTheIssuesView(t *testing.T) {
 	page := call(3, "resources/read", map[string]any{"uri": "ui://linear/issues"})["result"].(map[string]any)["contents"].([]any)
 	if text, _ := page[0].(map[string]any)["text"].(string); !strings.Contains(text, "const bridge") || strings.Contains(text, "/*bridge.js*/") {
 		t.Fatal("the page does not carry its bridge")
+	} else {
+		for _, want := range []string{"Add a label filter", "label-tags", "removeLabel", "Promise.all"} {
+			if !strings.Contains(text, want) {
+				t.Errorf("issues page is missing %q", want)
+			}
+		}
 	}
 	shown := call(4, "tools/call", map[string]any{"name": "show_issues", "arguments": map[string]any{"team": "ENG"}})["result"].(map[string]any)
 	issues := shown["structuredContent"].(map[string]any)["issues"].([]any)

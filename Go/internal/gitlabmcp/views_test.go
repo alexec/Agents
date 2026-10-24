@@ -182,6 +182,13 @@ func TestEachViewHasAToolThatFeedsItAndAPage(t *testing.T) {
 		if uri != issuesURI && !strings.Contains(html, "const mrPage") {
 			t.Errorf("%s has no merge request page in it", uri)
 		}
+		if uri == issuesURI {
+			for _, want := range []string{"Add a label filter", "label-tags", "removeLabel", "Promise.all"} {
+				if !strings.Contains(html, want) {
+					t.Errorf("issues page is missing %q", want)
+				}
+			}
+		}
 		// Every tool a page calls is one this server has.
 		for _, called := range []string{"show_merge_requests", "show_merge_request", "show_merge_request_diff", "failed_log",
 			"retry_pipeline", "comment_on_merge_request", "approve_merge_request", "merge_merge_request", "show_issues"} {
