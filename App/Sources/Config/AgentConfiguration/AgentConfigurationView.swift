@@ -10,6 +10,7 @@ import SwiftUI
 /// Its pages are chosen in a list inside the pane, with their counts (#1076). The window
 /// holds the one snapshot from the daemon that feeds every page.
 struct AgentConfigurationView: View {
+    @Environment(AppModel.self) private var model
     let place: AgentsPlace
     let snapshot: DaemonAPI.SharedSnapshot?
     @Binding var page: AgentConfigurationPage
@@ -19,10 +20,31 @@ struct AgentConfigurationView: View {
     var refresh: () async -> Void = {}
 
     var body: some View {
-        HStack(spacing: 0) {
-            AgentConfigurationPageList(snapshot: snapshot, chosen: page, waiting: waiting, choose: { page = $0 })
-            chosenPage
+        VStack(alignment: .leading, spacing: 0) {
+            if showsSyncState {
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(UserScopeWords.partsHeading).appText(.supporting).fontWeight(.semibold)
+                        Text(UserScopeWords.agentConfigurationUpdated(model.userScope.settings?.agentConfigFiles?.updated))
+                            .appText(.fine).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+                Divider()
+            }
+            HStack(spacing: 0) {
+                AgentConfigurationPageList(snapshot: snapshot, chosen: page, waiting: waiting, choose: { page = $0 })
+                chosenPage
+            }
         }
+        .task { if showsSyncState { await model.userScope.load(model.controlRequests) } }
+    }
+
+    private var showsSyncState: Bool {
+        if case .you = place { return true }
+        return false
     }
 
     private var chosenPage: some View {

@@ -272,6 +272,43 @@ type AgentArchivedReason string
 const AgentArchivedReasonByUser AgentArchivedReason = "byUser"
 const AgentArchivedReasonByAgent AgentArchivedReason = "byAgent"
 
+// One agent configuration file (#2129), or a deletion tombstone. contents is base64 encoded. Logical time and machine ID resolve concurrent offline edits.
+type AgentConfigFile struct {
+	Path string `json:"path"`
+
+	Contents *string `json:"contents,omitzero"`
+
+	Deleted *bool `json:"deleted,omitzero"`
+
+	Time int64 `json:"time"`
+
+	Counter int64 `json:"counter"`
+
+	Machine string `json:"machine"`
+
+	Digest string `json:"digest"`
+}
+
+// One local edit or deletion of an agent configuration file (#2129).
+type AgentConfigFileRequest struct {
+	Path string `json:"path"`
+
+	Contents *string `json:"contents,omitzero"`
+
+	Deleted *bool `json:"deleted,omitzero"`
+
+	Time int64 `json:"time"`
+
+	Counter int64 `json:"counter"`
+}
+
+// The per-path configuration files and tombstones for a person (#2129).
+type AgentConfigFiles struct {
+	Files []AgentConfigFile `json:"files"`
+
+	Updated *string `json:"updated,omitzero"`
+}
+
 type AgentGroup string
 
 const AgentGroupNeedsAttention AgentGroup = "needsAttention"
@@ -9401,7 +9438,7 @@ type UsageRollupRow struct {
 	Route *string `json:"route,omitzero"`
 }
 
-// The agentConfig part (#1760): the person's own instructions, personas and skills, as ~/.agents keeps them on each machine.
+// Legacy agentConfig snapshot (#1760); new agent configuration uses per-file state in AgentConfigFiles (#2129).
 type UserAgentConfig struct {
 	// ~/.agents/AGENTS.md.
 	Instructions *string `json:"instructions,omitzero"`
@@ -9476,6 +9513,9 @@ type UserSettings struct {
 
 	AgentConfig JSONValue `json:"agentConfig,omitzero"`
 
+	// Per-file agent configuration state (#2129), with tombstones and logical timestamps.
+	AgentConfigFiles *AgentConfigFiles `json:"agentConfigFiles,omitzero"`
+
 	Runtimes JSONValue `json:"runtimes,omitzero"`
 
 	CostLimits JSONValue `json:"costLimits,omitzero"`
@@ -9490,6 +9530,9 @@ type UserSettings struct {
 type UserSettingsChanged struct {
 	Parts []UserSettingsPartName `json:"parts,omitzero"`
 
+	// A per-file agent configuration change (#2129).
+	AgentConfigFiles *bool `json:"agentConfigFiles,omitzero"`
+
 	Secrets *bool `json:"secrets,omitzero"`
 }
 
@@ -9500,7 +9543,7 @@ type UserSettingsPart struct {
 	Value JSONValue `json:"value"`
 }
 
-// A part of a person's user settings (#1760, spec 736 FR-023). Each keeps the shape its file has on a machine today: mcpServers is mcp.json's mcpServers, agentConfig is UserAgentConfig, runtimes is each runtime's choices, costLimits is CostLimits, resources is a list of DeclaredResource.
+// A part of a person's user settings (#1760, spec 736 FR-023). New agent configuration and MCP server edits use per-file state (#2129); runtimes, costLimits and resources retain their existing parts.
 type UserSettingsPartName string
 
 const UserSettingsPartNameMcpServers UserSettingsPartName = "mcpServers"

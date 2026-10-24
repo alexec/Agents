@@ -25,20 +25,39 @@ public extension DaemonAPI {
         }
     }
 
+    /// Per-file configuration state (#2129). Clients get metadata only; machines receive
+    /// the base64 file contents on host/userSettings.
+    struct AgentConfigFile: Codable, Sendable, Hashable {
+        public var path: String
+        public var contents: String?
+        public var deleted: Bool?
+        public var time: Int64
+        public var counter: Int64
+        public var machine: String
+        public var digest: String
+    }
+
+    struct AgentConfigFiles: Codable, Sendable, Hashable {
+        public var files: [AgentConfigFile]
+        public var updated: String?
+    }
+
     /// `user/settings`: a part that is absent is not set at the user scope, and each machine
     /// keeps its own.
     struct UserSettings: Codable, Sendable, Hashable {
         public var mcpServers: JSONValue?
         public var agentConfig: JSONValue?
+        public var agentConfigFiles: AgentConfigFiles?
         public var runtimes: JSONValue?
         public var costLimits: JSONValue?
         public var resources: JSONValue?
         public var updated: String?
 
-        public init(mcpServers: JSONValue? = nil, agentConfig: JSONValue? = nil, runtimes: JSONValue? = nil,
+        public init(mcpServers: JSONValue? = nil, agentConfig: JSONValue? = nil, agentConfigFiles: AgentConfigFiles? = nil, runtimes: JSONValue? = nil,
                     costLimits: JSONValue? = nil, resources: JSONValue? = nil, updated: String? = nil) {
             self.mcpServers = mcpServers
             self.agentConfig = agentConfig
+            self.agentConfigFiles = agentConfigFiles
             self.runtimes = runtimes
             self.costLimits = costLimits
             self.resources = resources
@@ -111,6 +130,7 @@ public extension DaemonAPI {
     /// `control/userSettingsChanged`: read the user scope again.
     struct UserSettingsChanged: Codable, Sendable, Hashable {
         public var parts: [UserSettingsPartName]?
+        public var agentConfigFiles: Bool?
         public var secrets: Bool?
     }
 
@@ -142,6 +162,8 @@ public extension DaemonAPI.Method {
     static let userSettings = "user/settings"
     /// `UserSettingsPart` → `{}` (#1760).
     static let userSetSettings = "user/setSettings"
+    /// `AgentConfigFileRequest` → `{}` (#2129).
+    static let userSetAgentConfigFile = "user/setAgentConfigFile"
     /// `UserSecret` → `{}` (#1760).
     static let userSetSecret = "user/setSecret"
     /// `UserSecretRequest` → `{}` (#1760).
@@ -167,6 +189,12 @@ public enum UserScopeWords {
     public static let secretsTitle = "Secrets"
     /// The parts at the end of Machines on the Remote and the web page, and each pane's switch.
     public static let partsHeading = "The same on all your machines"
+    public static let agentConfigurationTitle = "Agent configuration"
+    public static let agentConfigurationDetail = "Instructions, personas, skills, connectors and plugins sync automatically."
+    public static func agentConfigurationUpdated(_ updated: String?) -> String {
+        guard let updated, let date = ISO8601DateFormatter().date(from: updated) else { return "Waiting for the first sync" }
+        return "Last synced \(date.formatted(date: .abbreviated, time: .shortened))"
+    }
 
     public static func partTitle(_ part: DaemonAPI.UserSettingsPartName) -> String {
         switch part {
@@ -182,7 +210,7 @@ public enum UserScopeWords {
     public static func partDetail(_ part: DaemonAPI.UserSettingsPartName) -> String {
         switch part {
         case .mcpServers: "Your own servers in ~/.agents/mcp.json."
-        case .agentConfig: "Your instructions, personas and one-file skills in ~/.agents."
+        case .agentConfig: "Your instructions, personas, skills and plugins in ~/.agents."
         case .runtimes: "Each runtime's sandbox and permission choices. Sign-ins stay on each machine."
         case .costLimits: "The most an agent and a day may spend."
         case .resources: "What agents take turns with, such as build."

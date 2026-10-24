@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
@@ -82,6 +83,40 @@ func TestSettingsAndSecretsGoOnlyToTheirPersonsMachines(t *testing.T) {
 	older := p.machineSaying(sam, notTakingHello("MACHINE-22"))
 	p.waitFor(func() bool { _, ok := told.last(samBox.member.Host); return ok }, "Sam's machine told at its join")
 
+	// Sam's server and token, under You.
+	contents := base64.StdEncoding.EncodeToString([]byte("Sam's shared instructions"))
+	if _, err := samBox.uplink.Ask(t.Context(), wire.CallUserSetAgentConfigFile.Name, wire.AgentConfigFileRequest{
+		Path: "AGENTS.md", Contents: &contents, Time: time.Now().UnixMilli(),
+	}); err != nil {
+		t.Fatalf("host could not sync its configuration: %v", err)
+	}
+	p.waitFor(func() bool {
+		u, _ := told.last(samBox.member.Host)
+		return u.Settings.AgentConfigFiles != nil && len(u.Settings.AgentConfigFiles.Files) == 1
+	}, "Sam's machine gets its synced configuration")
+	if got, _ := told.last(samBox.member.Host); got.Settings.AgentConfigFiles.Files[0].Machine != "MACHINE-21" {
+		t.Fatalf("clock uses host id instead of machine id: %+v", got.Settings.AgentConfigFiles.Files[0])
+	}
+	var stored wire.UserSettings
+	json.Unmarshal(call(t, sam.window, "", "user/settings", nil), &stored)
+	if stored.AgentConfigFiles == nil || stored.AgentConfigFiles.Files[0].Contents != nil {
+		t.Fatalf("client saw file contents: %+v", stored.AgentConfigFiles)
+	}
+	if _, err := samBox.uplink.Ask(t.Context(), wire.CallUserSetAgentConfigFile.Name, wire.AgentConfigFileRequest{
+		Path: "AGENTS.md", Contents: &contents, Time: time.Now().UnixMilli(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	alexContents := base64.StdEncoding.EncodeToString([]byte("Alex's own instructions"))
+	if _, err := alexBox.uplink.Ask(t.Context(), wire.CallUserSetAgentConfigFile.Name, wire.AgentConfigFileRequest{
+		Path: "AGENTS.md", Contents: &alexContents, Time: time.Now().UnixMilli(),
+	}); err != nil {
+		t.Fatalf("Alex's machine could not sync its own configuration: %v", err)
+	}
+	json.Unmarshal(call(t, sam.window, "", "user/settings", nil), &stored)
+	if stored.AgentConfigFiles.Files[0].Contents != nil || stored.AgentConfigFiles.Files[0].Digest == "" {
+		t.Fatalf("Sam's configuration was not kept independently: %+v", stored.AgentConfigFiles)
+	}
 	// Sam's server and token, under You.
 	call(t, sam.window, "", "user/setSettings", map[string]any{"part": "mcpServers",
 		"value": map[string]any{"github": map[string]any{"url": "https://api.githubcopilot.com/mcp/"}}})
@@ -160,7 +195,10 @@ func TestSettingsAndSecretsGoOnlyToTheirPersonsMachines(t *testing.T) {
 	count := func() int { told.mu.Lock(); defer told.mu.Unlock(); return len(told.got[next.member.Host]) }
 	before := count()
 	call(t, sam.window, "", "user/setSecret", wire.UserSecret{Name: "GITHUB_TOKEN", Value: "ghp_rotated"})
-	p.waitFor(func() bool { u, _ := told.last(samBox.member.Host); return secretsOf(u)["GITHUB_TOKEN"] == "ghp_rotated" }, "the new token")
+	p.waitFor(func() bool {
+		u, _ := told.last(samBox.member.Host)
+		return secretsOf(u)["GITHUB_TOKEN"] == "ghp_rotated"
+	}, "the new token")
 	if count() != before {
 		t.Fatal("a removed machine was sent the new token")
 	}

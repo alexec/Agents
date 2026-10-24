@@ -4504,6 +4504,27 @@
       }
     },
     {
+      "name": "user/setAgentConfigFile",
+      "x-capability": "user/1",
+      "description": "A machine reports one local agent configuration file edit or deletion (#2129).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AgentConfigFileRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "user/setSecret",
       "x-capability": "user/1",
       "tags": [

@@ -8,7 +8,7 @@ import type { Store } from "../model/store";
 import type { UserSecretNames, UserSecretRow, UserSettings, UserSettingsPartName } from "../protocol/generated";
 import { CallFailed } from "../wire/link";
 import { describe, methodNotFound } from "../model/errors";
-import { addSecret, follows, isSecretName, leftOn, machines, nameHint, noSealing, partDetail, partsFoot, partsHeading, partState,
+import { addSecret, agentConfigurationDetail, agentConfigurationTitle, agentConfigurationUpdated, follows, isSecretName, leftOn, machines, nameHint, noSealing, partDetail, partsFoot, partsHeading, partState,
   partTitle, parts, secretsFoot, secretsLeft, secretsTitle, stop, stopMessage, stopTitle } from "../model/userScope";
 import { Modal } from "./Modal";
 
@@ -145,6 +145,12 @@ export function UserPartsSection({ store, down }: { store: Store; down: boolean 
       <h3 class="section-head" id="settings-user-parts">{partsHeading}</h3>
       {problem.value && <p class="hint">{problem.value}</p>}
       <ul class="user-parts">
+        <li>
+          <span>{agentConfigurationTitle}</span>
+          <span class="hint">{agentConfigurationDetail}</span>
+          <span>{partsHeading}</span>
+          <span class="hint">{agentConfigurationUpdated(settings.value?.agentConfigFiles?.updated)}</span>
+        </li>
         {parts.map((part) => (
           <li key={part}>
             <span>{partTitle(part)}</span>

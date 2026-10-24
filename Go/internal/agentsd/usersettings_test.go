@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -92,6 +93,29 @@ func TestUserSettingsGoIntoTheMachinesFiles(t *testing.T) {
 		t.Fatal("secrets.env after")
 	}
 	c.call(t, 4, "cost/setLimits", map[string]any{"dailyTokens": 1})
+}
+
+func TestAgentConfigFilesAreAppliedAndMarkedWithoutContents(t *testing.T) {
+	root, home := t.TempDir(), t.TempDir()
+	t.Setenv("AGENTS_PERSONAL_HOME", home)
+	d, _ := start(t, root)
+	defer d.Shutdown()
+	contents := base64.StdEncoding.EncodeToString([]byte("Follow the shared rules."))
+	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(wire.HostUserSettings{
+		User: "sam",
+		Settings: wire.UserSettings{AgentConfigFiles: &wire.AgentConfigFiles{Files: []wire.AgentConfigFile{{
+			Path: "skills/review/SKILL.md", Contents: &contents, Time: 10, Machine: "other", Digest: "abc",
+		}}}},
+	}))
+	written, err := os.ReadFile(filepath.Join(home, ".agents", "skills", "review", "SKILL.md"))
+	if err != nil || string(written) != "Follow the shared rules." {
+		t.Fatalf("%q %v", written, err)
+	}
+	var mark userScopeMark
+	data, err := os.ReadFile(d.userScopeFile())
+	if err != nil || json.Unmarshal(data, &mark) != nil || len(mark.ConfigFiles) != 1 || mark.ConfigFiles[0].Contents != nil {
+		t.Fatalf("mark retained file contents: %+v %v", mark.ConfigFiles, err)
+	}
 }
 
 func TestAgentConfigNamesStayInTheirFolders(t *testing.T) {

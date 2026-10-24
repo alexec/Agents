@@ -7,7 +7,12 @@ export const secretsTitle = "Secrets";
 export const partsHeading = "The same on all your machines";
 
 /** The parts, in the order the section shows them. */
-export const parts: UserSettingsPartName[] = ["mcpServers", "agentConfig", "runtimes", "costLimits", "resources"];
+export const parts: UserSettingsPartName[] = ["runtimes", "costLimits", "resources"];
+export const agentConfigurationTitle = "Agent configuration";
+export const agentConfigurationDetail = "Instructions, personas, skills, connectors and plugins sync automatically.";
+export function agentConfigurationUpdated(updated?: string): string {
+  return updated ? `Last synced ${new Date(updated).toLocaleString()}` : "Waiting for the first sync";
+}
 
 const titles: Record<UserSettingsPartName, string> = {
   mcpServers: "MCP servers",
@@ -47,8 +52,7 @@ export const secretsFoot = "A secret goes only to your own machines, into ~/.age
 export const noSealing = "This control plane has no key to seal secrets with, so it keeps none. "
   + "Its operator starts it with a key file or AGENTS_CONTROL_KMS.";
 /** Under the parts: the page cannot read a machine's files, so one is turned on on the Mac. */
-export const partsFoot = "Turn one on in its own pane on the Mac. A change there then goes to every machine of yours, "
-  + "and to each new one.";
+export const partsFoot = "Turn on runtime choices, cost limits or resources in their own pane on the Mac. Those changes then go to every machine of yours, and to each new one.";
 export const nameHint = "Capital letters, digits and _, such as GITHUB_TOKEN.";
 
 /** A secret's row: where it is. */
