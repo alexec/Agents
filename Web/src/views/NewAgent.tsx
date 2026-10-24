@@ -74,12 +74,14 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   const openedRuntime = useRef<{ host: string; folder: string; runtimeID?: string }>({ host, folder });
   if (openedRuntime.current.host !== host || openedRuntime.current.folder !== folder) openedRuntime.current = { host, folder };
   if (openedRuntime.current.runtimeID === undefined) {
-    const opening = newSessionRuntime(left.runtimeID, startable);
+    const lastUsed = (store.agents.value[host] ?? [])[0]?.runtimeID;
+    const opening = newSessionRuntime(lastUsed, left.runtimeID, startable);
     if (opening !== undefined) openedRuntime.current = { host, folder, runtimeID: opening };
   }
   // A runtime picked here counts only while this host offers it: the bar can move to another host.
   const picked = runtimeID.value !== undefined && startable.includes(runtimeID.value) ? runtimeID.value : undefined;
-  const chosenRuntime = formRuntime(openedRuntime.current.runtimeID, picked, startable, left.runtimeID);
+  const lastUsedRuntime = (store.agents.value[host] ?? [])[0]?.runtimeID;
+  const chosenRuntime = formRuntime(openedRuntime.current.runtimeID, picked, startable, lastUsedRuntime, left.runtimeID);
   /** The added account the session uses (#840); undefined for the runtime's own sign-in. */
   const accountID = useSignal<string | undefined>(undefined);
   const where = useSignal<Where>({ kind: "project" });

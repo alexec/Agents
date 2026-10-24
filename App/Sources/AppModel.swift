@@ -4898,10 +4898,10 @@ final class AppModel {
         if labelVocabularies[key] != values { labelVocabularies[key] = values }
     }
 
-    /// Which runtime a new agent gets when nobody has said: the start form's, by the kit's
-    /// rule, so a phone and the page offer the same one (029, #264).
+    /// Which runtime a new agent gets: the most recently active agent's runtime on this
+    /// project's host, then the kept form choice, then the first available (#264).
     var defaultRuntimeID: String? {
-        work.defaultRuntimeID(available: availableRuntimes.map(\.runtime.id), kept: draftRuntimeID)
+        work.defaultRuntimeID(available: availableRuntimes.map(\.runtime.id), kept: draftRuntimeID, host: selectedProjectHost)
     }
 
     /// Take something back off the queue before it goes.

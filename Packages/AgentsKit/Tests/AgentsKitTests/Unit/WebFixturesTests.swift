@@ -1044,20 +1044,24 @@ struct WebFixturesTests {
             try input.decode(RuntimeStatus.self).unavailableReason.map(JSONValue.string) ?? .null
         }
 
-        let starts: [(String, String?, [String])] = [
-            ("kept and startable", "grok", ["claude", "codex", "grok"]),
-            ("kept but gone", "gemini", ["claude", "codex"]),
-            ("nothing kept", nil, ["codex", "claude"]),
-            ("no Claude", nil, ["gemini", "codex"]),
-            ("kept, no Claude", "opencode", ["codex", "gemini"]),
-            ("none can start", "claude", []),
+        let starts: [(String, String?, String?, [String])] = [
+            ("last used wins over Claude and the kept choice", "codex", "grok", ["claude", "codex", "grok"]),
+            ("unavailable last used falls back to kept choice", "gemini", "grok", ["claude", "grok"]),
+            ("kept and startable", nil, "grok", ["claude", "codex", "grok"]),
+            ("kept but gone", nil, "gemini", ["claude", "codex"]),
+            ("nothing kept", nil, nil, ["codex", "claude"]),
+            ("no Claude", nil, nil, ["gemini", "codex"]),
+            ("kept, no Claude", nil, "opencode", ["codex", "gemini"]),
+            ("none can start", nil, "claude", []),
         ]
-        let startCases = starts.map { name, kept, available in
-            Case(name: name, input: .object(["kept": kept.map(JSONValue.string) ?? .null,
+        let startCases = starts.map { name, lastUsed, kept, available in
+            Case(name: name, input: .object(["lastUsed": lastUsed.map(JSONValue.string) ?? .null,
+                                             "kept": kept.map(JSONValue.string) ?? .null,
                                              "available": .array(available.map(JSONValue.string))]))
         }
         try pin("runtimes/new-session.json", startCases) { input in
-            RuntimeCatalog.newSessionRuntime(kept: input["kept"]?.stringValue,
+            RuntimeCatalog.newSessionRuntime(lastUsed: input["lastUsed"]?.stringValue,
+                                             kept: input["kept"]?.stringValue,
                                              available: (input["available"]?.arrayValue ?? []).compactMap(\.stringValue))
                 .map(JSONValue.string) ?? .null
         }

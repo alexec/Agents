@@ -1166,11 +1166,11 @@ final class RemoteModel {
         queueOpenStart(folder)
     }
 
-    /// The one rule (#264): the runtime this page is on while it can start, else the one it
-    /// was last left on, kept across launches. The list is this project's host's (#240), not
-    /// every runtime the Mac knows.
+    /// The runtime this page is on while it can start; when it first opens, use the most
+    /// recently active runtime on this project's host, then the kept choice (#264).
     private var pickedStartRuntime: String? {
         RuntimeCatalog.startFormRuntime(current: startRuntimeID,
+                                        lastUsed: work.agents.first { $0.host == startHost }?.runtimeID,
                                         kept: UserDefaults.standard.string(forKey: Self.keptStartRuntime),
                                         available: startAvailableRuntimeIDs)
     }

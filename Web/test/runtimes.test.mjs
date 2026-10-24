@@ -32,7 +32,7 @@ test("runtimes: a chooser's runs are available, out and cannot start", () => {
 });
 
 for (const { name, input, expected } of (await import("./fixtures.mjs")).cases("runtimes/new-session.json")) {
-  test(`runtimes: a new session opens on, ${name}`, () => assert.equal(r.newSessionRuntime(input.kept ?? undefined, input.available) ?? null, expected));
+  test(`runtimes: a new session opens on, ${name}`, () => assert.equal(r.newSessionRuntime(input.lastUsed ?? undefined, input.kept ?? undefined, input.available) ?? null, expected));
 }
 
 test("runtimes: an empty list says so when nothing on this Mac can start (#257)", () => {
@@ -54,11 +54,11 @@ test("runtimes: an empty list says so when nothing on this Mac can start (#257)"
 });
 
 test("runtimes: a new session stays on the runtime it opened with (#291)", () => {
-  assert.equal(r.formRuntime("codex", undefined, ["claude", "codex"], "claude"), "codex", "a later listing does not move it");
-  assert.equal(r.formRuntime("codex", "claude", ["claude", "codex"], "codex"), "claude", "a pick here wins");
-  assert.equal(r.formRuntime("codex", undefined, ["claude"], "claude"), "claude", "one that can no longer start falls through");
-  assert.equal(r.formRuntime(undefined, undefined, ["codex"], undefined), "codex");
-  assert.equal(r.formRuntime(undefined, undefined, ["codex", "claude"], undefined), "claude");
+  assert.equal(r.formRuntime("codex", undefined, ["claude", "codex"], "claude", "claude"), "codex", "a later listing does not move it");
+  assert.equal(r.formRuntime("codex", "claude", ["claude", "codex"], "codex", undefined), "claude", "a pick here wins");
+  assert.equal(r.formRuntime("codex", undefined, ["claude"], "claude", undefined), "claude", "one that can no longer start falls through");
+  assert.equal(r.formRuntime(undefined, undefined, ["codex"], undefined, undefined), "codex");
+  assert.equal(r.formRuntime(undefined, undefined, ["codex", "claude"], undefined, undefined), "codex");
 });
 
 test("runtimes: the Runtimes row counts working out of installed (#379)", () => {

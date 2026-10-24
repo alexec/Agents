@@ -35,7 +35,7 @@ struct AgentConfigurationView: View {
                 Divider()
             }
             HStack(spacing: 0) {
-                AgentConfigurationPageList(snapshot: snapshot, chosen: page, waiting: waiting, choose: { page = $0 })
+                AgentConfigurationPageList(snapshot: snapshot, chosen: page, waiting: waiting, choose: { page = $0 }, place: place)
                 chosenPage
             }
         }
@@ -70,6 +70,7 @@ struct AgentConfigurationView: View {
         case .overview: AgentConfigurationOverview(place: place, snapshot: snapshot, page: $page)
         case .instructions: AgentsSetupPage { AgentsInstructionsSection(place: place) }.task { await refresh() }
         case .skills: AgentsSetupPage { AgentsSkillsSection(place: place) }.task { await refresh() }
+        case .workflows: if case .you = place { UserWorkflowsSettingsView() }
         case .mcp: AgentsSetupPage { ProjectMCPSection(place: place) }.task { await refresh() }
         case .plugins: AgentsSetupPage { AgentsPluginsSection(place: place) }.task { await refresh() }
         case .other: AgentConfigurationOtherFiles(place: place, snapshot: snapshot)
@@ -79,7 +80,7 @@ struct AgentConfigurationView: View {
 
 /// Every page, in the order the pane lists them.
 enum AgentConfigurationPage: String, Hashable, CaseIterable {
-    case overview, instructions, skills, mcp, plugins, other
+    case overview, instructions, skills, workflows, mcp, plugins, other
 
     init(_ page: DaemonAPI.Look.Page) {
         switch page {
@@ -96,6 +97,7 @@ enum AgentConfigurationPage: String, Hashable, CaseIterable {
         case .overview: "Overview"
         case .instructions: "Instructions"
         case .skills: "Skills"
+        case .workflows: "Workflows"
         case .mcp: "Connectors"
         case .plugins: "Plugins"
         case .other: "Other files"
@@ -108,6 +110,7 @@ enum AgentConfigurationPage: String, Hashable, CaseIterable {
         case .overview: nil
         case .instructions: snapshot.instructions?.exists == true ? 1 : 0
         case .skills: snapshot.skills.count
+        case .workflows: nil
         case .mcp: snapshot.mcp.problem == nil ? snapshot.mcp.servers.count : nil
         case .plugins: snapshot.plugins.count
         case .other: snapshot.otherFiles.count
@@ -116,7 +119,7 @@ enum AgentConfigurationPage: String, Hashable, CaseIterable {
 
     func warns(in snapshot: DaemonAPI.SharedSnapshot) -> Bool {
         switch self {
-        case .overview, .other: false
+        case .overview, .other, .workflows: false
         case .instructions: snapshot.warns(.instructions)
         case .skills: snapshot.warns(.skills)
         case .mcp: snapshot.warns(.mcp)
@@ -333,10 +336,19 @@ struct AgentConfigurationPageList: View {
     let chosen: AgentConfigurationPage
     var waiting: Set<AgentConfigurationPage> = []
     let choose: (AgentConfigurationPage) -> Void
+    var place: AgentsPlace = .you
+
+    private var pages: [AgentConfigurationPage] {
+        AgentConfigurationPage.allCases.filter { page in
+            guard page == .workflows else { return true }
+            if case .you = place { return true }
+            return false
+        }
+    }
 
     var body: some View {
         PageList {
-            ForEach(AgentConfigurationPage.allCases, id: \.self) { each in
+            ForEach(pages, id: \.self) { each in
                 if each == .overview || snapshot?.laidOut == true {
                     line(each)
                 }

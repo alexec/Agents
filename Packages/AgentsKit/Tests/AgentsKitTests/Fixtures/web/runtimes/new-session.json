@@ -1,5 +1,30 @@
 [
   {
+    "expected" : "codex",
+    "input" : {
+      "available" : [
+        "claude",
+        "codex",
+        "grok"
+      ],
+      "kept" : "grok",
+      "lastUsed" : "codex"
+    },
+    "name" : "last used wins over Claude and the kept choice"
+  },
+  {
+    "expected" : "grok",
+    "input" : {
+      "available" : [
+        "claude",
+        "grok"
+      ],
+      "kept" : "grok",
+      "lastUsed" : "gemini"
+    },
+    "name" : "unavailable last used falls back to kept choice"
+  },
+  {
     "expected" : "grok",
     "input" : {
       "available" : [
@@ -7,7 +32,8 @@
         "codex",
         "grok"
       ],
-      "kept" : "grok"
+      "kept" : "grok",
+      "lastUsed" : null
     },
     "name" : "kept and startable"
   },
@@ -18,18 +44,20 @@
         "claude",
         "codex"
       ],
-      "kept" : "gemini"
+      "kept" : "gemini",
+      "lastUsed" : null
     },
     "name" : "kept but gone"
   },
   {
-    "expected" : "claude",
+    "expected" : "codex",
     "input" : {
       "available" : [
         "codex",
         "claude"
       ],
-      "kept" : null
+      "kept" : null,
+      "lastUsed" : null
     },
     "name" : "nothing kept"
   },
@@ -40,7 +68,8 @@
         "gemini",
         "codex"
       ],
-      "kept" : null
+      "kept" : null,
+      "lastUsed" : null
     },
     "name" : "no Claude"
   },
@@ -51,15 +80,19 @@
         "codex",
         "gemini"
       ],
-      "kept" : "opencode"
+      "kept" : "opencode",
+      "lastUsed" : null
     },
     "name" : "kept, no Claude"
   },
   {
     "expected" : null,
     "input" : {
-      "available" : [],
-      "kept" : "claude"
+      "available" : [
+
+      ],
+      "kept" : "claude",
+      "lastUsed" : null
     },
     "name" : "none can start"
   }

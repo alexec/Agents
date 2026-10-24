@@ -25,8 +25,11 @@ struct RemoteSettings: View {
                 .paperListRow()
                 Section(SettingsScope.machines.title) {
                     MachinesSettingsRow()
-                    UserWorkflowsSettingsRow()
                     SecretsSettingsRow()
+                }
+                .paperListRow()
+                Section("Agent Configuration") {
+                    UserWorkflowsSettingsRow()
                 }
                 .paperListRow()
                 // Not paired yet: no control plane, so no group for it (#2260). The window hides

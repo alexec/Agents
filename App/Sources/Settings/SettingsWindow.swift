@@ -190,7 +190,6 @@ struct SettingsWindow: View {
         case .agentConfiguration: AgentConfigurationView(place: .you, snapshot: sharedSnapshot, page: sharedPage, refresh: { await refreshShared() })
         case .spending: FormColumn { CostSettingsView() }
         case .resources: FormColumn { ResourcesSettingsView() }
-        case .workflows: UserWorkflowsSettingsView()
         case .controlPlane:
             if let control { ControlSettingsView(control: control, page: .overview) }
         case .providers:
@@ -230,7 +229,7 @@ extension SettingsScope {
         // How this app draws: Sidebar is kept on the Mac's host so every client draws the
         // same (#1033, #2079), but its subject is the app (#2157).
         case .thisApp: [.appearance, .sidebar]
-        case .machines: [.machines, .runtimes, .agentConfiguration, .spending, .resources, .workflows, .secrets]
+        case .machines: [.machines, .runtimes, .agentConfiguration, .spending, .resources, .secrets]
         // The person's account first, shown with no control plane too (#2157).
         case .controlPlane: [.account, .signIns, .people, .bots, .groups, .channels, .signIn, .policy, .providers, .clients, .controlPlane]
         }
@@ -244,7 +243,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
     /// Every machine, and this Mac's own settings (#1759). Was the Mac pane: its raw value is
     /// what a window left open on it kept.
     case machines = "mac"
-    case runtimes, spending, resources, workflows
+    case runtimes, spending, resources
     /// The control plane's Overview.
     case controlPlane
     /// The control plane's workspace providers (#691) and its clients, pages of Control plane
@@ -279,7 +278,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         switch self {
         case .runtimes, .agentConfiguration, .spending, .resources: true
         case .appearance, .sidebar, .account, .machines, .controlPlane, .providers, .clients, .people, .bots, .groups,
-             .channels, .signIn, .signIns, .secrets, .policy, .workflows: false
+             .channels, .signIn, .signIns, .secrets, .policy: false
         }
     }
 
@@ -300,7 +299,6 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .agentConfiguration: "Agent Configuration"
         case .spending: "Cost"
         case .resources: "Resources"
-        case .workflows: "Workflows"
         case .controlPlane: "Overview"
         case .providers: "Workspace Providers"
         case .clients: "Clients"
@@ -325,7 +323,6 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .agentConfiguration: "square.on.square"
         case .spending: "dollarsign.circle"
         case .resources: "lock"
-        case .workflows: "arrow.trianglehead.2.clockwise.rotate.90"
         case .controlPlane: "point.3.connected.trianglepath.dotted"
         case .providers: "cloud"
         case .clients: "iphone"

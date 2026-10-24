@@ -49,7 +49,7 @@ import { comingBackDescription, footStatusWords } from "../model/status";
 import { ArchiveCard } from "./ArchiveCard";
 import { showsThoughts, shownItems } from "../model/thoughts";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
-import { eventWaitCardLines, eventWaitLine, leaseMark, lineResource } from "../model/rowLines";
+import { eventWaitLine, leaseMark, lineResource } from "../model/rowLines";
 import { routeHash } from "../route";
 import { sessionRuntimeName } from "../model/runtimes";
 import { GuardedChangeCard } from "./GuardedChange";
@@ -820,14 +820,40 @@ function WaitCard({ agent, title, disabled, stop }: { agent: Agent; title: (id: 
     const timer = window.setInterval(() => { now.value = Date.now(); }, 60_000);
     return () => window.clearInterval(timer);
   }, []);
-  const lines = eventWaitCardLines(agent, title, new Date(now.value));
-  const line = lines ? null : eventWaitLine(agent, title);
-  if (!lines && !line) return null;
+  const wait = agent.eventWait;
+  const line = eventWaitLine(agent, title);
+  if (!wait || (!line && wait.patterns.length === 0)) return null;
+  const since = new Date(wait.since).getTime();
+  const deadline = wait.deadline ? new Date(wait.deadline).getTime() : undefined;
+  const total = deadline === undefined ? undefined : Math.max(1, Math.ceil((deadline - since) / 60_000));
+  const elapsed = Math.max(0, Math.floor((now.value - since) / 60_000));
   return (
     <div class="cards">
       <div class="card wait-card">
-        {lines ? <p class="strong wait-card-lines">{lines.map((item) =>
-          <span key={item}>{item}</span>)}</p> : <p class="strong">{line}</p>}
+        {lineResource(agent) !== undefined ? <p class="strong">{line}</p> : <>
+          <div class="wait-card-heading">
+            <span class="wait-card-title"><span class="wait-card-broadcast" aria-hidden="true">◉</span>Waiting for event</span>
+            <span class="wait-card-time">{total === undefined ? `${elapsed} min` : `${elapsed} / ${total} min`}</span>
+          </div>
+          <div class="wait-card-events">
+            {wait.patterns.map((pattern, index) => {
+              const server = wait.serverEvents?.find((entry) => entry.trigger.event === pattern.name);
+              const source = server?.servers.map((name) => name.replace(/(^|[-_])\w/g, (letter) => letter.toUpperCase())).join(" or ") || sourceName(pattern.name);
+              const filters = server
+                ? Object.entries(server.trigger.arguments).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => `${key} ${valueWords(value)}`)
+                : Object.entries(pattern.anyOf ?? pattern.filters).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => `${key} ${value}`);
+              return <div class="wait-card-event" key={`${pattern.name}-${index}`}>
+                <div class="wait-card-event-line"><span class="wait-card-source-icon" aria-hidden="true">{server ? "⌘" : "◉"}</span>
+                  <span class="wait-card-source">{source}</span><span class="wait-card-separator">·</span><span class="wait-card-kind">{pattern.name}</span></div>
+                {filters.length > 0 && <div class="wait-card-filters">{filters.join(" · ")}</div>}
+              </div>;
+            })}
+          </div>
+          {total !== undefined && deadline !== undefined && <div class="wait-card-progress" role="progressbar" aria-label="Event wait time"
+            aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, Math.max(0, (now.value - since) / (deadline! - since) * 100))}>
+            <span style={{ width: `${Math.min(100, Math.max(0, (now.value - since) / (deadline - since) * 100))}%` }} />
+          </div>}
+        </>}
         <p class="wait-answers">
           <button onClick={() => { location.hash = routeHash({ activity: "events" }); }}>Show in Events</button>
           <button disabled={disabled || busy.value} title="Stop waiting. Nothing will start it again for this wait."
@@ -836,6 +862,21 @@ function WaitCard({ agent, title, disabled, stop }: { agent: Agent; title: (id: 
       </div>
     </div>
   );
+}
+
+function sourceName(event: string): string {
+  const subject = event.split(".", 1)[0] ?? "";
+  if (["mac", "machine", "person", "system", "cost", "lease"].includes(subject)) return "This Mac";
+  if (subject === "workflow") return "Workflows";
+  if (subject === "branch") return "Branches";
+  if (subject === "dropbox") return "Drop box";
+  return "Agents";
+}
+
+function valueWords(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value === null || typeof value === "number" || typeof value === "boolean") return String(value);
+  return JSON.stringify(value);
 }
 
 /**
