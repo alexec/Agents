@@ -54,9 +54,9 @@ public final class SidebarFolds {
     }
 
     /// What can be folded: a folder; one of its Archived folds; one of its session
-    /// groups, its pinned sessions or its Workflows.
+    /// groups, its Recently archived sessions group, its pinned sessions or its Workflows.
     public enum Fold: Hashable, Sendable {
-        case folder, archivedSessions, archivedWorkflows
+        case folder, archivedSessions, archivedWorkflows, recentArchivedSessions
         case group(AgentGroup)
         /// The pinned sessions (#180).
         case pinned
@@ -72,7 +72,7 @@ public final class SidebarFolds {
         public var startsOpen: Bool {
             switch self {
             case .folder, .archivedSessions, .archivedWorkflows, .workflows: false
-            case .group, .pinned, .sessions: true
+            case .group, .pinned, .sessions, .recentArchivedSessions: true
             case .smart(let row): row.startsOpen
             }
         }
@@ -82,6 +82,7 @@ public final class SidebarFolds {
             case .folder: "folder"
             case .archivedSessions: "archivedSessions"
             case .archivedWorkflows: "archivedWorkflows"
+            case .recentArchivedSessions: "recentArchivedSessions"
             case .group(let group): "group.\(group.rawValue)"
             case .pinned: "pinned"
             case .workflows: "workflows"

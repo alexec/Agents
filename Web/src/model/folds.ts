@@ -92,6 +92,15 @@ export class Folds {
     this.change(this.closed, closedKey, `sessions:${foldName(host, folder)}`, !isOpen);
   }
 
+  /** Whether a project's Recently archived sessions fold is open: open until folded. */
+  isRecentArchivedSessionsOpen(host: string, folder: string): boolean {
+    return !this.closed.value.has(`recentArchivedSessions:${foldName(host, folder)}`);
+  }
+
+  setRecentArchivedSessions(host: string, folder: string, isOpen: boolean): void {
+    this.change(this.closed, closedKey, `recentArchivedSessions:${foldName(host, folder)}`, !isOpen);
+  }
+
   /** Whether a session's children are shown under it (#835): folded until opened. */
   isSessionOpen(id: string): boolean {
     return this.openSessions.value.includes(id);

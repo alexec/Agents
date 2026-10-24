@@ -500,10 +500,10 @@ struct FolderFold: View {
                 // started it, folded (#835). Under a Sessions row, as the workflows are
                 // under theirs (#2312), the only layout (#2381); not in a folder's own
                 // window, whose group is headed Sessions already.
-                let grouped = !inWindow && (!fold.sessions.isEmpty || !fold.recentArchived.isEmpty)
+                let grouped = !inWindow && !fold.sessions.isEmpty
                 let sessionsOpen = !grouped || fold.isSearching || folds.isOpen(key, .sessions)
                 if grouped {
-                    SidebarFoldRow(title: "Sessions", count: fold.sessions.count + fold.recentArchived.count, isOpen: Binding(
+                    SidebarFoldRow(title: "Sessions", count: fold.sessions.count, isOpen: Binding(
                         get: { sessionsOpen },
                         set: { folds.set(key, .sessions, open: $0) }))
                 }
@@ -512,9 +512,13 @@ struct FolderFold: View {
                                        in: .sessions)) { row in
                     SessionSidebarRow(agent: row.item.agent, tree: row.item, folds: folds, isNested: grouped)
                 }
-                if sessionsOpen {
-                    ForEach(fold.recentArchived) { agent in
-                        SessionSidebarRow(agent: agent, isNested: grouped)
+                if !fold.recentArchived.isEmpty {
+                    let recentOpen = fold.isSearching || folds.isOpen(key, .recentArchivedSessions)
+                    SidebarFoldRow(title: "Recently archived sessions", count: fold.recentArchived.count, isOpen: Binding(
+                        get: { recentOpen },
+                        set: { folds.set(key, .recentArchivedSessions, open: $0) }))
+                    ForEach(FoldedRow.rows(recentOpen ? fold.recentArchived : [], in: .recentArchivedSessions)) { row in
+                        SessionSidebarRow(agent: row.item, isNested: true)
                     }
                 }
                 // Then its workflows, after the sessions (Alex, #495), in a Workflows fold

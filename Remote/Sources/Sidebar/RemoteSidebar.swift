@@ -654,10 +654,10 @@ struct RemoteFolderFold: View {
     /// only layout (#2381); not in a folder's own scene, whose group is Sessions already.
     @ViewBuilder
     private func sessionsFold(_ fold: SidebarFolderFold) -> some View {
-        let grouped = !inScene && (!fold.sessions.isEmpty || !fold.recentArchived.isEmpty)
+        let grouped = !inScene && !fold.sessions.isEmpty
         let isOpen = !grouped || fold.isSearching || folds.isOpen(key, .sessions)
         if grouped {
-            SidebarFoldRow(title: "Sessions", count: fold.sessions.count + fold.recentArchived.count, isOpen: isOpen) {
+            SidebarFoldRow(title: "Sessions", count: fold.sessions.count, isOpen: isOpen) {
                 folds.set(key, .sessions, open: !isOpen)
             }
         }
@@ -665,9 +665,13 @@ struct RemoteFolderFold: View {
         ForEach(isOpen ? SidebarTree.rows(fold.sessions, in: model.work, folds: folds) : []) { row in
             SidebarSessionRow(agent: row.agent, tree: row, folds: folds, isNested: grouped)
         }
-        if isOpen {
-            ForEach(fold.recentArchived) { agent in
-                SidebarSessionRow(agent: agent, isNested: grouped)
+        if !fold.recentArchived.isEmpty {
+            let recentOpen = fold.isSearching || folds.isOpen(key, .recentArchivedSessions)
+            SidebarFoldRow(title: "Recently archived sessions", count: fold.recentArchived.count, isOpen: recentOpen) {
+                folds.set(key, .recentArchivedSessions, open: !recentOpen)
+            }
+            ForEach(FoldedRow.rows(recentOpen ? fold.recentArchived : [], in: .recentArchivedSessions)) { row in
+                SidebarSessionRow(agent: row.item, isNested: true)
             }
         }
     }
