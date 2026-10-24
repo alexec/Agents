@@ -95,7 +95,7 @@ final class VoiceMode {
     @ObservationIgnored private let speaker: VoiceSpeaker
     /// Sends words as a voice prompt, and says which chat took them: nil when none did.
     /// A new session's starts the chat with them (#2375).
-    typealias Send = (String) async -> UUID?
+    typealias Send = (String, UUID?) async -> UUID?
     private var send: Send?
     private var vocabulary: [String] = []
     private var pauseTimer: Task<Void, Never>?
@@ -119,6 +119,16 @@ final class VoiceMode {
     /// The turn the person last talked over: the host stops it (#2375), and what it says
     /// after is not read out.
     private var talkedOver: UUID?
+    /// A quick second phrase can join the prompt before the agent adds to its transcript.
+    private var joinTarget: UUID?
+    private var joinFirstText: String?
+    private var joinText: String?
+    private var joinStarted = false
+    private var joinDeadline: ContinuousClock.Instant?
+    private var joinBaselineItemIDs: Set<UUID> = []
+    private var observedItemIDs: Set<UUID> = []
+    private var observedAgentResponseIDs: Set<UUID> = []
+    private static let joinFor: Duration = .milliseconds(2_500)
 
     private init() {
         let audio = VoiceAudio()
@@ -185,6 +195,7 @@ final class VoiceMode {
         turnedOnAt = Date()
         isHangingUp = false
         talkedOver = nil
+        clearJoin()
         phase = .loading
         Task {
             do {
@@ -220,6 +231,7 @@ final class VoiceMode {
         queue = []
         afterSpeaking = nil
         stream = nil
+        clearJoin()
         agentID = nil
         send = nil
         phase = .off
@@ -228,6 +240,8 @@ final class VoiceMode {
         saying = nil
         isWaitingForReply = false
         asking = nil
+        questionReplay?.cancel()
+        questionReplay = nil
         confirming?.cancel()
         confirming = nil
         pendingConfirm = nil
@@ -312,6 +326,8 @@ final class VoiceMode {
         // Answered on the screen, or withdrawn: it is not asked any more.
         if let asking, asking.request.id != question?.id {
             self.asking = nil
+            questionReplay?.cancel()
+            questionReplay = nil
             confirming?.cancel()
             confirming = nil
             confirmLine = nil
@@ -334,6 +350,15 @@ final class VoiceMode {
         }
         if let hung = agent.voiceHungUpAt, hung > turnedOnAt { isHangingUp = true }
         let last = items.turns().last
+        if joinTarget != nil {
+            let responseStarted = items.contains { item in
+                !joinBaselineItemIDs.contains(item.id)
+                    && Self.isAgentResponse(item)
+            }
+            if responseStarted { clearJoin() }
+        }
+        observedItemIDs = Set(items.map(\.id))
+        observedAgentResponseIDs = Set(items.filter(Self.isAgentResponse).map(\.id))
         latestTurn = last?.id
         if needsBaseline {
             needsBaseline = false
@@ -366,8 +391,9 @@ final class VoiceMode {
     private var stream: (turn: UUID, said: [String])?
 
     /// Says what is new in a reply. While the turn goes on, its last sentence may be half
-    /// written, so it waits; a long reply says its first sentences and that the rest is on
-    /// the screen (`Speakable.spoken`). A reply that is not the one being said (the agent
+    /// written, so it waits; a reply still being written speaks only a few sentences until
+    /// it ends, then `Speakable.spoken` supplies every sentence (#2534). A reply that is
+    /// not the one being said (the agent
     /// went on to a step, then wrote again) is said from its start.
     private func streamReply(in turn: UUID, _ text: String, isDone: Bool) {
         // No more are said while it is written than the first three, and one more shows
@@ -398,6 +424,10 @@ final class VoiceMode {
     private var asking: (request: ElicitationRequest, spoken: SpokenQuestion, misses: Int)?
     /// Questions already read out, so each is read once.
     private var asked: Set<UUID> = []
+    /// A question is repeated once after eight seconds of silence (#2358).
+    private var questionReplay: Task<Void, Never>?
+    private var replayedQuestions: Set<UUID> = []
+    private static let questionRepeatAfter: Duration = .seconds(8)
     /// "Sending: File.", and two seconds to say no.
     private var confirming: Task<Void, Never>?
     /// The answer to send when the confirm wait ends, or Enter ends it early (#2519).
@@ -508,7 +538,44 @@ final class VoiceMode {
             return
         }
         asking = (question, spoken, 0)
-        speak(spoken.sentences)
+        speak(spoken.sentences) { [weak self] in self?.armQuestionReplay(for: question.id) }
+    }
+
+    /// Repeats an unanswered question once, eight seconds after its first reading ends.
+    private func armQuestionReplay(for id: UUID) {
+        questionReplay?.cancel()
+        guard !replayedQuestions.contains(id) else { return }
+        questionReplay = Task { [weak self] in
+            try? await Task.sleep(for: Self.questionRepeatAfter)
+            guard !Task.isCancelled, let self,
+                  self.phase == .listening, self.heard.isEmpty, self.confirming == nil,
+                  self.asking?.request.id == id, self.waiting?.id == id,
+                  self.replayedQuestions.insert(id).inserted else { return }
+            self.questionReplay = nil
+            self.sound(.question)
+            self.speak(self.asking?.spoken.sentences ?? [])
+        }
+    }
+
+    private func clearJoin() {
+        joinTarget = nil
+        joinFirstText = nil
+        joinText = nil
+        joinStarted = false
+        joinDeadline = nil
+        joinBaselineItemIDs = []
+    }
+
+    private static func isAgentResponse(_ item: TranscriptItem) -> Bool {
+        return switch item {
+        case .toolRun:
+            true
+        case .entry(let entry):
+            switch entry.kind {
+            case .agentMessage, .agentThought, .toolCall, .toolCallUpdate: true
+            default: false
+            }
+        }
     }
 
     /// The person's words, as the answer to the question being asked.
@@ -521,7 +588,8 @@ final class VoiceMode {
                 speak(["It stays on the screen."])
             } else {
                 self.asking = asking
-                speak([SpokenQuestion.notCaught])
+                let id = asking.request.id
+                speak([SpokenQuestion.notCaught]) { [weak self] in self?.armQuestionReplay(for: id) }
             }
             return
         }
@@ -668,6 +736,18 @@ final class VoiceMode {
             quiet()
             phase = .listening
         }
+        if !text.isEmpty {
+            questionReplay?.cancel()
+            questionReplay = nil
+            if joinStarted, joinTarget != nil {
+                joinText = text
+            } else if let deadline = joinDeadline, ContinuousClock.now < deadline, joinTarget != nil {
+                joinStarted = true
+                joinText = text
+            } else if joinDeadline != nil {
+                clearJoin()
+            }
+        }
         heard = text
         if !text.isEmpty { unsent = nil }
         pauseTimer?.cancel()
@@ -695,7 +775,10 @@ final class VoiceMode {
         heard = ""
         pauseTimer?.cancel()
         dictation.stop()
-        if let asking { speak(["Not sent."] + asking.spoken.sentences) }
+        if let asking {
+            let id = asking.request.id
+            speak(["Not sent."] + asking.spoken.sentences) { [weak self] in self?.armQuestionReplay(for: id) }
+        }
         else if let approving { speak(["Not sent."] + approving.spoken.sentences) }
     }
 
@@ -713,7 +796,13 @@ final class VoiceMode {
         phase = .sending
         armTick()
         let agent = agentID
-        let target = walkSendFails ? nil : await send(words)
+        let itemBaseline = observedItemIDs
+        let responseBaseline = observedAgentResponseIDs
+        let joined = joinTarget != nil && joinText != nil && joinStarted
+        let outgoing = joined ? [joinFirstText, joinText].compactMap { $0 }.joined(separator: " ") : words
+        let stop = joined ? joinTarget : nil
+        clearJoin()
+        let target = walkSendFails ? nil : await send(outgoing, stop)
         guard agentID == agent, phase == .sending else { return }
         if let target {
             sound(.sent)
@@ -728,6 +817,14 @@ final class VoiceMode {
             isWaitingForReply = true
             sawWork = false
             turnAtSend = latestTurn
+            if observedAgentResponseIDs.subtracting(responseBaseline).isEmpty {
+                joinTarget = target
+                joinFirstText = words
+                joinText = nil
+                joinStarted = false
+                joinDeadline = ContinuousClock.now.advanced(by: Self.joinFor)
+                joinBaselineItemIDs = itemBaseline
+            }
             saidSteps = []
         } else {
             // The words are not lost: the strip keeps them, and the voice says so first.

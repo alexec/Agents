@@ -70,16 +70,16 @@ struct SpeakableTests {
         #expect(Speakable.sentences("Use a cache, e.g. this one. Then rest!") == ["Use a cache, e.g. this one.", "Then rest!"])
     }
 
-    @Test func aLongReplyIsCut() {
+    @Test func aLongReplyIsSpokenInFull() {
         let sentence = "This sentence has exactly ten words in it, you see."
         let reply = Array(repeating: sentence, count: 8).joined(separator: " ")
-        #expect(Speakable.spoken(reply) == [sentence, sentence, sentence, Speakable.restOnTheScreen])
+        #expect(Speakable.spoken(reply) == Array(repeating: sentence, count: 8))
         #expect(Speakable.spoken("Done. All tests pass.") == ["Done.", "All tests pass."])
     }
 }
 
-/// #2429: a long reply is cleaned only as far as what is said.
-@Suite("A long reply is not cleaned to its end")
+/// #2429: streaming is bounded until #2534's full final reply is known.
+@Suite("A long reply is fully spoken when complete")
 struct SpeakableBoundTests {
     private static let long: String = (0..<200)
         .map { "Line \($0) changes `Sources/File\($0).swift` for issue #\($0), and it is fine." }
@@ -91,9 +91,9 @@ struct SpeakableBoundTests {
         #expect(Speakable.sentences("One. Two.", limit: 4) == ["One.", "Two."])
     }
 
-    @Test func spokenIsTheSameAsCleaningItAll() {
+    @Test func spokenIsTheSameAsCleaningTheFullReply() {
         let all = Speakable.sentences(Self.long)
-        #expect(Speakable.spoken(Self.long) == Array(all.prefix(Speakable.longReplySentences)) + [Speakable.restOnTheScreen])
+        #expect(Speakable.spoken(Self.long) == all)
         let short = "It works. The tests pass."
         #expect(Speakable.spoken(short) == ["It works.", "The tests pass."])
         // Many short sentences, under 60 words: all said.
@@ -101,9 +101,10 @@ struct SpeakableBoundTests {
         #expect(Speakable.spoken(few).count == 10)
     }
 
-    /// A code block after the cut is never reached, and one before it is still a line.
-    @Test func blocksBeforeTheCutAreStillSaid() {
+    /// Code blocks remain a short spoken description, even in a full reply.
+    @Test func codeBlocksStayOnTheScreen() {
         let reply = "```swift\nlet a = 1\n```\n" + Self.long
         #expect(Speakable.spoken(reply).first == "A Swift code block, 1 line, is on the screen.")
+        #expect(Speakable.spoken(reply).count == Speakable.sentences(reply).count)
     }
 }

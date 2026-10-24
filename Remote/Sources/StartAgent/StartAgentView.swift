@@ -287,7 +287,7 @@ struct StartAgentView: View {
 
                 AttachButton(attachments: $attachments, refusal: $attachNote)
 
-                DictateButton(dictation: dictation, begin: beginDictation)
+                DictateButton(dictation: dictation, begin: beginDictation, send: send)
                     .disabled(model.isStarting)
 
                 Button {
