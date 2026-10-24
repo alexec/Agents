@@ -7,6 +7,13 @@
 - **For a task a skill covers:** USE the skill in `.agents/skills/`.
 - **When a task calls for a specialist perspective:** ADOPT a persona from `.agents/personas/`.
 
+## Libraries before our own code
+
+- Before writing a parser, protocol, client, format or algorithm, look for a library. Use it when one fits.
+- A fit library has a permissive licence (MIT, Apache-2.0, BSD or ISC; no GPL/AGPL in the apps), was released or updated in the last 12 months, has users, and has a pinned version that Dependabot watches (`Package.resolved`, `go.sum` or an exact `package.json` version).
+- Prefer the platform library (Foundation, Go standard library or the browser), then the protocol or service's official SDK, then a widely used community library.
+- Write our own code only when no fit library exists or the library costs too much where it runs. State the reason in the PR. For a library added by a PR, state its purpose, licence and size.
+
 ## Durable data
 
 - Store data in the project itself when possible.
