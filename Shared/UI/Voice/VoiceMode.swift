@@ -135,7 +135,13 @@ final class VoiceMode {
         let voice = ParadeeVoice()
         self.audio = audio
         self.voice = voice
+        #if os(macOS)
+        // Mac voice mode favors fast, live words over the newer model's lower word error
+        // rate. Its vocabulary is still supplied by the prompt bar (#2575).
+        dictation = Dictation(shared: audio, model: .systemDictation)
+        #else
         dictation = Dictation(shared: audio)
+        #endif
         speaker = VoiceSpeaker(voice: voice, audio: audio)
         #if os(iOS)
         // A call, an alarm or a locked phone takes the audio: voice mode ends (Alex,
