@@ -39,10 +39,10 @@ struct PersonaManagerView: View {
                         .autocorrectionDisabled()
                         .disabled(selected != nil)
                     TextEditor(text: $content)
-                        .font(.system(.body, design: .monospaced))
+                        .appText(.code)
                         .frame(minHeight: 260)
                         .accessibilityLabel("Persona Markdown")
-                    if let problem { Text(problem).foregroundStyle(.red) }
+                    if let problem { Text(problem).appText(.fine).tinted(.failure) }
                 } header: { Text("Markdown") } footer: {
                     Text("The full file stays intact, including front matter fields this app does not know.")
                 }

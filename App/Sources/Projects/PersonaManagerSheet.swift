@@ -42,14 +42,14 @@ struct PersonaManagerSheet: View {
                 .textFieldStyle(.roundedBorder)
                 .disabled(selected != nil)
             TextEditor(text: $content)
-                .font(.system(.body, design: .monospaced))
+                .appText(.code)
                 .frame(minHeight: 280)
                 .padding(6)
                 .background(Paper.raised, in: RoundedRectangle(cornerRadius: 8))
                 .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Paper.rule, lineWidth: 1))
             Text("Edit the full Markdown file to keep front matter fields the app does not know.")
                 .appText(.fine).foregroundStyle(.secondary)
-            if let problem { Text(problem).appText(.fine).foregroundStyle(.red) }
+            if let problem { Text(problem).appText(.fine).tinted(.failure) }
             HStack {
                 if selected != nil { Button("Delete…", role: .destructive) { deleting = true }.buttonStyle(.paper) }
                 Spacer()
