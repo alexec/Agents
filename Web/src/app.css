@@ -490,15 +490,15 @@ button.link.reading:hover { text-decoration: underline; }
 .archive-card .archive-answers { display: flex; justify-content: flex-end; gap: 10px; }
 .wait-card p { margin: 0; }
 .wait-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.wait-card-title, .wait-card-event-line { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.wait-card-title { display: flex; align-items: center; gap: 7px; min-width: 0; }
 .wait-card-title { font-weight: 600; }
 .wait-card-broadcast { color: var(--accent); }
 .wait-card-time { color: var(--paper-ink); opacity: .68; font-size: .9em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .wait-card-events { display: flex; flex-direction: column; gap: 8px; }
-.wait-card-event-line { flex-wrap: wrap; }
+.wait-card-event { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 5px; }
 .wait-card-source, .wait-card-separator { color: var(--paper-ink); opacity: .68; }
 .wait-card-kind { font-weight: 500; overflow-wrap: anywhere; }
-.wait-card-filters { padding-left: 22px; color: var(--paper-ink); opacity: .68; font-size: .9em; overflow-wrap: anywhere; }
+.wait-card-filters { color: var(--paper-ink); opacity: .68; overflow-wrap: anywhere; }
 .wait-card-progress { height: 3px; overflow: hidden; border-radius: 99px; background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .wait-card-progress span { display: block; height: 100%; background: var(--accent); transition: width .2s linear; }
 .wait-card .wait-answers { display: flex; justify-content: flex-end; gap: 10px; }

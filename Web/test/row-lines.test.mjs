@@ -69,6 +69,22 @@ test("an event wait card separates its timeout, event and elapsed minutes (#2565
   assert.equal(lines.eventWaitCardLines({ ...agent, eventWait: { ...agent.eventWait, ending: { timedOut: {} } } }, title, since), null);
 });
 
+test("the event wait card groups events with the same source and filters", () => {
+  const wait = { id: "w", from: 0, since: 0, patterns: [
+    { name: "checks.failed", filters: {} },
+    { name: "pr.merged", filters: {} },
+    { name: "pr.closed", filters: {} },
+  ], serverEvents: [
+    { trigger: { event: "checks.failed", servers: ["github"], arguments: { pr: 123 } }, servers: ["github"] },
+    { trigger: { event: "pr.merged", servers: ["github"], arguments: { pr: 123 } }, servers: ["github"] },
+    { trigger: { event: "pr.closed", servers: ["github"], arguments: { pr: 456 } }, servers: ["github"] },
+  ] };
+  assert.deepEqual(lines.eventWaitSummaryLines(wait), [
+    { id: "GitHub\u0000pr 123", source: "GitHub", events: ["checks.failed", "pr.merged"], arguments: ["pr 123"] },
+    { id: "GitHub\u0000pr 456", source: "GitHub", events: ["pr.closed"], arguments: ["pr 456"] },
+  ]);
+});
+
 test("a waiting row is one line: the first thing it waits for and how many more (#582)", () => {
   assert.equal(lines.rowWaitLine([]), null);
   assert.equal(lines.rowWaitLine(["“Fix login”"]), "◷ Waiting for “Fix login”");

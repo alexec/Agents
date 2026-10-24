@@ -49,7 +49,7 @@ import { comingBackDescription, footStatusWords } from "../model/status";
 import { ArchiveCard } from "./ArchiveCard";
 import { showsThoughts, shownItems } from "../model/thoughts";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
-import { eventWaitLine, leaseMark, lineResource } from "../model/rowLines";
+import { eventWaitLine, eventWaitSummaryLines, leaseMark, lineResource } from "../model/rowLines";
 import { routeHash } from "../route";
 import { sessionRuntimeName } from "../model/runtimes";
 import { GuardedChangeCard } from "./GuardedChange";
@@ -836,18 +836,11 @@ function WaitCard({ agent, title, disabled, stop }: { agent: Agent; title: (id: 
             <span class="wait-card-time">{total === undefined ? `${elapsed} min` : `${elapsed} / ${total} min`}</span>
           </div>
           <div class="wait-card-events">
-            {wait.patterns.map((pattern, index) => {
-              const server = wait.serverEvents?.find((entry) => entry.trigger.event === pattern.name);
-              const source = server?.servers.map((name) => name.replace(/(^|[-_])\w/g, (letter) => letter.toUpperCase())).join(" or ") || sourceName(pattern.name);
-              const filters = server
-                ? Object.entries(server.trigger.arguments).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => `${key} ${valueWords(value)}`)
-                : Object.entries(pattern.anyOf ?? pattern.filters).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => `${key} ${value}`);
-              return <div class="wait-card-event" key={`${pattern.name}-${index}`}>
-                <div class="wait-card-event-line"><span class="wait-card-source-icon" aria-hidden="true">{server ? "⌘" : "◉"}</span>
-                  <span class="wait-card-source">{source}</span><span class="wait-card-separator">·</span><span class="wait-card-kind">{pattern.name}</span></div>
-                {filters.length > 0 && <div class="wait-card-filters">{filters.join(" · ")}</div>}
-              </div>;
-            })}
+            {eventWaitSummaryLines(wait).map((line) => <p class="wait-card-event" key={line.id}>
+              <span class="wait-card-source">{line.source}</span><span class="wait-card-separator">·</span>
+              <span class="wait-card-kind">{line.events.join(", ")}</span>
+              {line.arguments.length > 0 && <span class="wait-card-filters">({line.arguments.join(", ")})</span>}
+            </p>)}
           </div>
           {total !== undefined && deadline !== undefined && <div class="wait-card-progress" role="progressbar" aria-label="Event wait time"
             aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, Math.max(0, (now.value - since) / (deadline! - since) * 100))}>
@@ -862,21 +855,6 @@ function WaitCard({ agent, title, disabled, stop }: { agent: Agent; title: (id: 
       </div>
     </div>
   );
-}
-
-function sourceName(event: string): string {
-  const subject = event.split(".", 1)[0] ?? "";
-  if (["mac", "machine", "person", "system", "cost", "lease"].includes(subject)) return "This Mac";
-  if (subject === "workflow") return "Workflows";
-  if (subject === "branch") return "Branches";
-  if (subject === "dropbox") return "Drop box";
-  return "Agents";
-}
-
-function valueWords(value: unknown): string {
-  if (typeof value === "string") return value;
-  if (value === null || typeof value === "number" || typeof value === "boolean") return String(value);
-  return JSON.stringify(value);
 }
 
 /**

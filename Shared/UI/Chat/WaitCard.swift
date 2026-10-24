@@ -70,26 +70,17 @@ struct WaitCard: View {
                 Text(total.map { "\(elapsed) / \($0) min" } ?? "\(elapsed) min")
                     .appText(.fine).foregroundStyle(.secondary).monospacedDigit()
             }
-            ForEach(Array(wait.patterns.enumerated()), id: \.offset) { _, pattern in
-                let server = wait.serverEvents?.first { $0.trigger.event == pattern.name }
-                let source = server.map { $0.servers.map(\.capitalized).joined(separator: " or ") }
-                    .flatMap { $0.isEmpty ? nil : $0 } ?? Self.sourceName(pattern.name)
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Image(systemName: server == nil ? "app" : "puzzlepiece.extension")
-                            .foregroundStyle(.secondary)
-                        Text(source).foregroundStyle(.secondary)
-                        Text("·").foregroundStyle(.tertiary)
-                        Text(pattern.name).fontWeight(.medium)
-                    }
-                    let filters = server.map { $0.trigger.arguments.sorted { $0.key < $1.key }.map { "\($0.key) \(Self.valueWords($0.value))" } }
-                        ?? pattern.filters.sorted { $0.key < $1.key }.map { "\($0.key) \($0.value)" }
-                    if !filters.isEmpty {
-                        Text(filters.joined(separator: " · ")).appText(.fine).foregroundStyle(.secondary)
-                            .padding(.leading, 22)
+            ForEach(Self.eventLines(for: wait)) { line in
+                HStack(spacing: 5) {
+                    Text(line.source).foregroundStyle(.secondary)
+                    Text("·").foregroundStyle(.tertiary)
+                    Text(line.events.joined(separator: ", ")).fontWeight(.medium)
+                    if !line.arguments.isEmpty {
+                        Text("(\(line.arguments.joined(separator: ", ")))").foregroundStyle(.secondary)
                     }
                 }
                 .appText(.fine)
+                .fixedSize(horizontal: false, vertical: true)
             }
             if let deadline = wait.deadline {
                 ProgressView(value: min(1, max(0, now.timeIntervalSince(wait.since) / deadline.timeIntervalSince(wait.since))))
@@ -110,6 +101,41 @@ struct WaitCard: View {
         }
     }
 
+    private static func eventLines(for wait: EventWait) -> [WaitEventSummary] {
+        var lines: [WaitEventSummary] = []
+        for pattern in wait.patterns {
+            let server = wait.serverEvents?.first { $0.trigger.event == pattern.name }
+            let names = server.map { $0.servers.isEmpty ? ($0.trigger.servers ?? []) : $0.servers } ?? []
+            let source = if server == nil {
+                sourceName(pattern.name)
+            } else if names.isEmpty {
+                "Connected tools"
+            } else {
+                names.map(serverName).joined(separator: " or ")
+            }
+            let arguments = server.map {
+                $0.trigger.arguments.sorted { $0.key < $1.key }.map { "\($0.key) \(valueWords($0.value))" }
+            } ?? pattern.filters.sorted { $0.key < $1.key }.map { "\($0.key) \($0.value.label)" }
+            let id = source + "\u{0}" + arguments.joined(separator: "\u{0}")
+            if let index = lines.firstIndex(where: { $0.id == id }) {
+                if !lines[index].events.contains(pattern.name) { lines[index].events.append(pattern.name) }
+            } else {
+                lines.append(WaitEventSummary(id: id, source: source, events: [pattern.name], arguments: arguments))
+            }
+        }
+        return lines
+    }
+
+    private static func serverName(_ name: String) -> String {
+        switch name.lowercased() {
+        case "github": "GitHub"
+        case "gitlab": "GitLab"
+        case "linear": "Linear"
+        case "email": "Email"
+        default: name.replacingOccurrences(of: "_", with: " ").replacingOccurrences(of: "-", with: " ").capitalized
+        }
+    }
+
     private static func valueWords(_ value: JSONValue) -> String {
         switch value {
         case .string(let text): text
@@ -120,4 +146,11 @@ struct WaitCard: View {
         case .array, .object: String(describing: value)
         }
     }
+}
+
+private struct WaitEventSummary: Identifiable {
+    let id: String
+    let source: String
+    var events: [String]
+    let arguments: [String]
 }
