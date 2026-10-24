@@ -2,12 +2,15 @@ name: slow-tests
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '17 9 * * *'
 
 permissions:
   contents: read
 
 jobs:
   slow-tests:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: xcode-27
     timeout-minutes: 20
     env:
@@ -36,6 +39,7 @@ jobs:
   # The wall-clock budgets (#225): held only here and by scripts/perf-tests.sh on a quiet
   # Mac. Everywhere else these tests check what they compute and print the time.
   perf-tests:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: xcode-27
     timeout-minutes: 20
     env:
@@ -45,3 +49,64 @@ jobs:
 
       - name: Run the performance budgets
         run: scripts/perf-tests.sh
+
+  # Swift coverage took longer than the PR job's test budget. Run it at night so it
+  # cannot hold a pull request or a main push; this workflow is not a required check.
+  coverage-swift:
+    if: github.event_name == 'schedule'
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [AgentsKit, CodeText]
+    runs-on: xcode-27
+    timeout-minutes: 60
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          if [[ "${{ matrix.package }}" == AgentsKit ]]; then
+            xcodebuild -downloadComponent MetalToolchain
+          fi
+
+      - name: Test with coverage
+        timeout-minutes: 55
+        run: |
+          if [[ "${{ matrix.package }}" == AgentsKit ]]; then
+            swift test --enable-code-coverage --package-path Packages/AgentsKit \
+              --experimental-maximum-parallelization-width 3
+          else
+            swift test --enable-code-coverage --package-path Packages/CodeText
+          fi
+
+      - name: Report Swift coverage
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          package_path="Packages/${{ matrix.package }}"
+          profile=""
+          binary=""
+          if [[ -d "$package_path/.build" ]]; then
+            profile=$(find "$package_path/.build" -path '*/codecov/default.profdata' -type f -print -quit)
+            binary=$(find "$package_path/.build" -path "*/debug/${{ matrix.package }}*Tests.xctest/Contents/MacOS/*Tests" -type f -print -quit)
+          fi
+          if [[ -f "$profile" && -n "$binary" ]]; then
+            echo '### ${{ matrix.package }} coverage' >> "$GITHUB_STEP_SUMMARY"
+            xcrun llvm-cov report -instr-profile="$profile" "$binary" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Coverage profile not available; the test may have timed out.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload Swift coverage profiles
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v5
+        with:
+          name: swift-coverage-${{ matrix.package }}
+          path: Packages/${{ matrix.package }}/.build/**/codecov/*
+          if-no-files-found: ignore
+          retention-days: 14

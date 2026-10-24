@@ -574,7 +574,40 @@ jobs:
       - name: Vet
         run: go vet ./...
       - name: Test
-        run: go test -race ./...
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF" == refs/heads/main ]]; then
+            go test -race -coverprofile=coverage.out ./... | tee "$RUNNER_TEMP/go-coverage-tests.txt"
+          else
+            go test -race ./...
+          fi
+      - name: Report Go coverage
+        if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          {
+            echo '### Go coverage by package'
+            echo '| Package | Coverage |'
+            echo '|---|---:|'
+            awk '/coverage:/ { print "| " $2 " | " $(NF - 2) " |" }' \
+              "$RUNNER_TEMP/go-coverage-tests.txt"
+            if [[ -f coverage.out ]]; then
+              echo
+              echo '### Go coverage total'
+              go tool cover -func=coverage.out | tail -n 1
+            else
+              echo 'Coverage profile not available (tests may have been skipped or failed before producing one).'
+            fi
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload Go coverage profile
+        if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v5
+        with:
+          name: go-coverage
+          path: Go/coverage.out
+          if-no-files-found: ignore
+          retention-days: 14
       # A failed test still leaves good compiled packages; a cancelled run may not finish
       # writing, so it saves nothing. Each ref keeps only its newest, as the Xcode caches do.
       - name: Save Go build cache
@@ -651,7 +684,32 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run build
       - run: npm run check
-      - run: npm test
+      - name: Test with coverage
+        run: |
+          mkdir -p coverage/v8
+          NODE_V8_COVERAGE=coverage/v8 node --experimental-test-coverage \
+            --test test/*.test.mjs 2>&1 | tee "$RUNNER_TEMP/web-coverage.txt"
+      - name: Report web coverage
+        if: always()
+        continue-on-error: true
+        run: |
+          {
+            echo '### Web coverage'
+            if [[ -f "$RUNNER_TEMP/web-coverage.txt" ]]; then
+              sed -n '/^ℹ file /,$p' "$RUNNER_TEMP/web-coverage.txt" || cat "$RUNNER_TEMP/web-coverage.txt"
+            else
+              echo 'Coverage report not available (tests did not start).'
+            fi
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload web coverage profiles
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v5
+        with:
+          name: web-coverage
+          path: Web/coverage/v8/*.json
+          if-no-files-found: ignore
+          retention-days: 14
 
   # The linters (#1224), through scripts/lint.sh, on every change: shellcheck, zsh -n, our
   # own text checks, and golangci-lint's unused and ineffassign (#2162) are required (a
