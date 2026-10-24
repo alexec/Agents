@@ -1,5 +1,5 @@
 // A workflow's settings on its page (#162; the window's WorkflowPage form and the Remote's): the
-// runtime, the permission mode on the left and the model, effort and the runtime's other options
+// permission mode on the left and the model, effort and the runtime's other options
 // on the right, as the prompt's menus are laid out; then its labels, in the tag input sessions
 // use; and, under the triggers, its cooldown and what a run may do when done (#433). Each control writes its one key in the file through
 // the daemon (`workflows/settings`) and is drawn from what the file says, so a refusal leaves the
@@ -32,42 +32,9 @@ function writer(change: (change: Change) => void) {
 }
 
 /** One of the keys the file names on its own, set, or taken out for the default. */
-function without(s: WorkflowSettings, key: "permissionMode" | "runtimeID" | "model" | "effort", value: string | undefined): WorkflowSettings {
+function without(s: WorkflowSettings, key: "permissionMode" | "model" | "effort", value: string | undefined): WorkflowSettings {
   const { [key]: _old, ...rest } = s;
   return (value === undefined ? rest : { ...rest, [key]: value }) as WorkflowSettings;
-}
-
-/**
- * The file top left and the runtime top right, above the prompt, as the window has them. The
- * runtimes are the ones this host has; a value it does not know is shown and marked, because
- * that workflow is refusing every fire on it.
- */
-export function RuntimeRow({ store, host, summary, disabled, change }: {
-  store: Store; host: string; summary: WorkflowSummary; disabled: boolean; change: (change: Change) => void;
-}) {
-  const workflow = summary.workflow;
-  const named = workflow.settings.runtimeID;
-  const runtimes = (store.runtimes.value[host] ?? []).map((r) => r.runtime);
-  const option: ConfigOption = {
-    id: "runtime", name: "Runtime", type: "select", currentValue: null,
-    options: [
-      { value: null, name: `Default (${runtimes.find((r) => r.id === defaultRuntime)?.name ?? defaultRuntime})` },
-      ...runtimes.map((r) => ({ value: r.id, name: r.name })),
-    ],
-  };
-  return (
-    <>
-      <div class="menus file-and-runtime" role="group" aria-label="Runtime">
-        <span class="quiet small">.agents/workflows/{workflow.workflowID}.md</span>
-        <span class="spacer" />
-        <OptionControl option={option} value={named ?? null} disabled={disabled}
-          onChange={writer(change)((s, v) => without(s, "runtimeID", v))} />
-      </div>
-      {named !== undefined && runtimes.length > 0 && !runtimes.some((r) => r.id === named) && (
-        <p class="marked small">⚠︎ "{named}" is not a runtime this machine knows</p>
-      )}
-    </>
-  );
 }
 
 /** The menus, the labels and what went wrong, for one workflow. */
@@ -77,7 +44,7 @@ export function WorkflowSettingsForm({ store, host, summary, disabled, problem, 
 }) {
   const workflow = summary.workflow;
   const settings = workflow.settings;
-  const runtimeID = settings.runtimeID ?? defaultRuntime;
+  const runtimeID = settings.runtimeID ?? store.agents.value[host]?.[0]?.runtimeID ?? defaultRuntime;
   const runtimes = (store.runtimes.value[host] ?? []).map((r) => r.runtime);
   const runtimeName = runtimes.find((r) => r.id === runtimeID)?.name ?? runtimeID;
   const remembered = useSignal<ConfigOption[] | null>(null);

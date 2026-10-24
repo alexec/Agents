@@ -230,7 +230,7 @@
           "type": "string"
         },
         "runtime": {
-          "description": "Optional. The runtime to run it on, by id, as a workflow's `runtime:`; leave out for your runtime. list_sessions with started_by me ends with the ones available here and each one's model. One that is not available (not installed, not signed in, out of the pool) is refused before anything starts, naming the ones that are.",
+          "description": "Optional. The runtime to run it on, by id, as a workflow's `runtime:`; leave it out to use the most recently active runtime on the host that runs the workflow. list_sessions with started_by me ends with the ones available here and each one's model. One that is not available (not installed, not signed in, out of the pool) is refused before anything starts, naming the ones that are.",
           "type": "string"
         },
         "worktree": {

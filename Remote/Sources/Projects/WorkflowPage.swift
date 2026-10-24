@@ -6,7 +6,7 @@ import SwiftUI
 /// The same reading and the same reach, in the same order (#142): why it is or isn't
 /// running, what it does (who gets the prompt, the prompt, what it may do, its labels),
 /// what the file says that this version does not understand, and the agents it has run.
-/// The same things change here as change there — the runtime, the permission mode, the
+/// The same things change here as change there — the permission mode, the
 /// model, the effort and the runtime's other options, the labels, which computers run
 /// it, Run now or Approve, and Archive or Unarchive — and the same things do not. The prompt, the triggers
 /// and the agent mode are the author's, and are shown, not edited.
@@ -560,7 +560,6 @@ struct WorkflowPage: View {
                 EmptyView()
             }
             VStack(alignment: .leading, spacing: 14) {
-                runtimeRow(summary)
                 if let runtime {
                     settingRow(summary, name: "Permission mode",
                                setting: WorkflowSettings.Setting.permissionMode,
@@ -601,27 +600,10 @@ struct WorkflowPage: View {
     }
 
     private func runtimeID(_ workflow: Workflow) -> String {
-        workflow.settings.runtimeID ?? RuntimeCatalog.defaultRuntime.id
-    }
-
-    /// The runtime, from the catalog: which runtimes exist is the app's to know. A
-    /// value the catalog does not hold is shown and marked, because that workflow is
-    /// refusing every fire on it (FR-009).
-    private func runtimeRow(_ summary: WorkflowSummary) -> some View {
-        let named = summary.workflow.settings.runtimeID
-        let fallback = RuntimeCatalog.defaultRuntime
-        let choices = [ConfigChoice(value: .null, name: "Default (\(fallback.name))")]
-            + RuntimeCatalog.builtIn.map { ConfigChoice(value: .string($0.id), name: $0.name) }
-        let option = ConfigOption(id: WorkflowSettings.Setting.runtime, name: "Runtime",
-                                  kind: .select([ConfigChoiceGroup(name: nil, choices: choices)]),
-                                  currentValue: .null)
-        return row("Runtime") {
-            OptionMenu(option: option, chosen: binding(summary, \.runtimeID) { $0.runtimeID = $1 })
-        } below: {
-            if let named, RuntimeCatalog.runtime(id: named) == nil {
-                marked("\"\(named)\" is not a runtime this app knows")
-            }
-        }
+        let host = model.work.project(workflow.folder)?.host ?? .mac
+        return workflow.settings.runtimeID
+            ?? model.work.agents.first(where: { $0.host == host })?.runtimeID
+            ?? RuntimeCatalog.defaultRuntime.id
     }
 
     /// One setting the runtime defines: its menu when the choices are known, the file's

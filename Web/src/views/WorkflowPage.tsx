@@ -17,7 +17,7 @@ import {
 import { go } from "../route";
 import { RunNow } from "./WorkflowRow";
 import { rowExtras, SessionRow } from "./SessionRow";
-import { CooldownMenu, RuntimeRow, WhenDoneMenu, WorkflowSettingsForm } from "./WorkflowSettings";
+import { CooldownMenu, WhenDoneMenu, WorkflowSettingsForm } from "./WorkflowSettings";
 import { whenDoneSentence } from "../model/workflowSettings";
 import { workflowContinueSentence, workflowContinueSwitch } from "../model/continueWhenBack";
 import { BackToList } from "./BackToList";
@@ -193,7 +193,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
           ) : (
             <>
             <h2 class="section-head">What it does</h2>
-            <RuntimeRow store={store} host={host} summary={summary} disabled={locked} change={change} />
+            <p class="quiet small">.agents/workflows/{workflow.workflowID}.md</p>
             <p class="agent-mode">
               <span>{agentModeWords(workflow.mode)}</span> <code class="quiet">agent: {workflow.mode}</code>
               {workflow.mode === "standing" && (standing
