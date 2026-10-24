@@ -24,6 +24,8 @@ of "Landing a change" is for the lanes that build, not for you.
   `area:<name>` label and a type label (`bug`, `enhancement`). When testing it needs
   someone to create an account with an outside service (Meta, Slack, Google Cloud, a
   second runtime account…), add `needs-account` and say which account in the issue.
+- **Assign only claimed work.** Do not assign an issue when filing or discussing it.
+  Assign it only when a session has claimed it and will work on it.
 - **Rank the backlog** with RICE (reach, impact, confidence, effort), and say why.
 - **Write decisions down** in the issue. When it needs a spec, say so in the issue: the
   lane that builds it writes the spec.
