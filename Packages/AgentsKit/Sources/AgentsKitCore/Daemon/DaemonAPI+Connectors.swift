@@ -26,6 +26,7 @@ extension DaemonAPI.Method {
     public static let connectionsDisconnect = "connections/disconnect"
     public static let connectorsSetup = "connectors/setup"
     public static let connectorsSetupSkip = "connectors/setup/skip"
+    public static let connectorsCodespaces = "connectors/codespaces"
 }
 
 extension DaemonAPI {
@@ -316,6 +317,39 @@ extension DaemonAPI {
         public var folder: String
         public var reading: ConnectorSetupReading?
         public init(folder: String, reading: ConnectorSetupReading? = nil) { self.folder = folder; self.reading = reading }
+    }
+
+    public struct ConnectorCodespace: Codable, Sendable, Hashable, Identifiable {
+        public var id: String
+        public var name: String
+        public var repository: String
+        public var state: String
+        public var ref: String?
+        public var ssh: String
+
+        public init(id: String, name: String, repository: String, state: String, ref: String? = nil, ssh: String) {
+            self.id = id; self.name = name; self.repository = repository; self.state = state; self.ref = ref; self.ssh = ssh
+        }
+    }
+
+    public struct ConnectorCodespacesRequest: Codable, Sendable, Hashable {
+        public enum Action: String, Codable, Sendable, Hashable { case list, create, start, stop, prepareSSH }
+        public var folder: String
+        public var action: Action
+        public var id: String?
+        public var name: String?
+        public init(folder: String, action: Action, id: String? = nil, name: String? = nil) {
+            self.folder = folder; self.action = action; self.id = id; self.name = name
+        }
+    }
+
+    public struct ConnectorCodespaces: Codable, Sendable, Hashable {
+        public var repository: String?
+        public var codespaces: [ConnectorCodespace]
+        public var message: String?
+        public init(repository: String? = nil, codespaces: [ConnectorCodespace] = [], message: String? = nil) {
+            self.repository = repository; self.codespaces = codespaces; self.message = message
+        }
     }
 
     public struct ConnectorSkipRequest: Codable, Sendable, Hashable {

@@ -16,6 +16,7 @@ public enum ConnectorSetupWords {
         "Read and write pull requests and reviews",
         "Read checks and Actions runs",
         "Read and push code",
+        "Read, create, start and stop Codespaces",
     ]
     public static let sheetSubtitle = "For you, in every project. Agents talks to GitHub's API directly."
     public static let sheetChoose = "On github.com you choose which repositories. You can take it back there, or with Disconnect on Connectors."

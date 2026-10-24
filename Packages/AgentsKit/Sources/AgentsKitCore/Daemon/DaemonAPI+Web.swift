@@ -130,6 +130,8 @@ public extension DaemonAPI {
                     result: ConnectionTokenAnswer.self, kind: .hostRequest),
                 Row(Method.connectionsDisconnect, params: ConnectionProviderRequest.self,
                     result: ConnectionDisconnectAnswer.self, kind: .hostRequest),
+                Row(Method.connectorsCodespaces, params: ConnectorCodespacesRequest.self, result: ConnectorCodespaces.self,
+                    kind: .hostRequest),
                 Row(Method.connectorsSetup, params: ConnectorSetupRequest.self, result: ConnectorSetup.self, kind: .hostRequest),
                 Row(Method.connectorsSetupSkip, params: ConnectorSkipRequest.self, result: ConnectorSetup.self,
                     kind: .hostRequest),

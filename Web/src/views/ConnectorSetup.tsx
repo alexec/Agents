@@ -241,6 +241,9 @@ function SlotCard({ slot, setup, projectName, reading, tryAgain, skip, linearCon
           {admin && (
             <button title={whereAgentsRun.addProviderNote} onClick={() => { add("provider"); setChanging(false); }}>{addMachineWords.addProvider}</button>
           )}
+          {words.forgeOf(setup) === "github" && setup.repository && setup.connection?.state === "connected" && (
+            <p class="quiet small">GitHub Codespaces: Set up on the Mac.</p>
+          )}
           <button class="link" onClick={() => setChanging(false)}>Cancel</button>
           <p class="quiet small">{addMachineWords.providersYours}</p>
         </div>

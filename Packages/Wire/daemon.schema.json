@@ -4524,6 +4524,42 @@
       ],
       "additionalProperties": false
     },
+    "ConnectorCodespace": {
+      "type": "object",
+      "description": "A GitHub Codespace for a project's repository (#1591).",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "repository": { "type": "string" },
+        "state": { "type": "string" },
+        "ref": { "type": "string" },
+        "ssh": { "type": "string" }
+      },
+      "required": ["id", "name", "repository", "state", "ssh"],
+      "additionalProperties": false
+    },
+    "ConnectorCodespaces": {
+      "type": "object",
+      "properties": {
+        "repository": { "type": "string" },
+        "codespaces": { "type": "array", "items": { "$ref": "#/definitions/ConnectorCodespace" } },
+        "message": { "type": "string" }
+      },
+      "required": ["codespaces"],
+      "additionalProperties": false
+    },
+    "ConnectorCodespacesRequest": {
+      "type": "object",
+      "description": "Lists or changes the project's GitHub Codespaces (#1591).",
+      "properties": {
+        "folder": { "$ref": "#/definitions/URLString" },
+        "action": { "type": "string", "enum": ["list", "create", "start", "stop", "prepareSSH"] },
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["folder", "action"],
+      "additionalProperties": false
+    },
     "ConnectorEvents": {
       "type": "object",
       "description": "The github events the set-up turned on, and the project's workflows that start on one of them.",

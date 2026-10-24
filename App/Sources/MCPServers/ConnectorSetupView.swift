@@ -18,6 +18,9 @@ struct ConnectorSetupView: View {
     @State private var problem: String?
     @State private var reading = false
     @State private var changing: DaemonAPI.ConnectorSlotKind?
+    @State private var codespaces: [DaemonAPI.ConnectorCodespace] = []
+    @State private var codespacesProblem: String?
+    @State private var codespacesFlow: CodespacesFlow?
     @State private var connecting = false
     /// Connect Linear, from the Tasks slot (#1682).
     @State private var connectingLinear = false
@@ -33,6 +36,17 @@ struct ConnectorSetupView: View {
         case machine, provider
         var id: String { rawValue }
         var start: AddMachineSheet.Step { self == .machine ? .choose : .addProvider }
+    }
+
+    enum CodespacesFlow: Identifiable {
+        case choose
+        case install(DaemonAPI.ConnectorCodespace)
+        var id: String {
+            switch self {
+            case .choose: "choose"
+            case .install(let codespace): "install/\(codespace.id)"
+            }
+        }
     }
 
     var body: some View {
@@ -67,6 +81,24 @@ struct ConnectorSetupView: View {
         }
         .sheet(item: $addingMachine, onDismiss: { Task { await control?.refresh() } }) { step in
             if let control { AddMachineSheet(control: control, start: step.start).paperSheet() }
+        }
+        .sheet(item: $codespacesFlow, onDismiss: {
+            Task { await control?.refresh(); await loadCodespaces(.list) }
+        }) { flow in
+            switch flow {
+            case .choose:
+                CodespacesSheet(project: project, repository: setup?.repository ?? "", model: model, codespaces: codespaces,
+                                problem: codespacesProblem, onChange: { codespaces = $0 },
+                                onProblem: { codespacesProblem = $0 },
+                                onConnect: { codespacesFlow = .install($0) },
+                                onClose: { codespacesFlow = nil }).paperSheet()
+            case .install(let codespace):
+                if let control {
+                ControlAddServerSheet(control: control,
+                                          prefill: .init(destination: codespace.ssh, name: codespace.id,
+                                                         tunnel: true, provider: nil, workspace: nil)).paperSheet()
+                }
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // Back from github.com (an install, a grant): read again.
@@ -150,6 +182,7 @@ struct ConnectorSetupView: View {
         }
         if let changing, let slot = setup.slot(changing) {
             SlotChange(slot: slot, setup: setup, place: place, canAdd: control != nil,
+                       codespaces: codespaces, codespacesProblem: codespacesProblem,
                        act: act, done: { self.changing = nil })
         }
     }
@@ -203,7 +236,7 @@ struct ConnectorSetupView: View {
 
     enum Action {
         case connect, tryAgain, skip(DaemonAPI.ConnectorSlotKind), setUp(DaemonAPI.ConnectorSlotKind), catalogue, open(String),
-             addMachine, addProvider
+             addMachine, addProvider, codespaces
         /// Linear for Tasks: Connect Linear first when it is not connected, then the catalogue.
         case linear
     }
@@ -219,6 +252,7 @@ struct ConnectorSetupView: View {
         case .open(let address): open(address)
         case .addMachine: addingMachine = .machine
         case .addProvider: addingMachine = .provider
+        case .codespaces: codespacesFlow = .choose
         }
     }
 
@@ -237,8 +271,22 @@ struct ConnectorSetupView: View {
         reading = true
         defer { reading = false }
         switch await model.connectorSetup(project, reading: how) {
-        case .success(let fresh): setup = fresh; problem = nil
+        case .success(let fresh):
+            setup = fresh; problem = nil
+            if fresh.forgeOrGitHub == .github, fresh.connection?.state == .connected, fresh.repository != nil {
+                await loadCodespaces(.list)
+            } else {
+                codespaces = []; codespacesProblem = nil
+            }
         case .failure(let failure): problem = failure.words
+        }
+    }
+
+    private func loadCodespaces(_ action: DaemonAPI.ConnectorCodespacesRequest.Action) async {
+        guard setup?.forgeOrGitHub == .github, setup?.repository != nil else { return }
+        switch await model.codespaces(project, action: action) {
+        case .success(let result): codespaces = result.codespaces; codespacesProblem = result.message
+        case .failure(let failure): codespacesProblem = failure.words
         }
     }
 
@@ -398,6 +446,8 @@ private struct SlotChange: View {
     let place: ConnectorSetupView.Place
     /// A control plane to add a machine or provider to.
     let canAdd: Bool
+    let codespaces: [DaemonAPI.ConnectorCodespace]
+    let codespacesProblem: String?
     let act: (ConnectorSetupView.Action) -> Void
     let done: () -> Void
 
@@ -465,13 +515,19 @@ private struct SlotChange: View {
         case .workspace:
             // With no control plane the two adds say what they need, and do nothing (#2131).
             let need = AddMachine.Words.needsControlPlane
-            return [
+            var choices = [
                 Choice(title: place.title, note: WhereAgentsRun.hereNote, chosen: true, pick: done),
                 Choice(title: AddMachine.Words.menuItem, note: canAdd ? WhereAgentsRun.addMachineNote : need, chosen: false,
                        pick: { if canAdd { act(.addMachine) } }),
                 Choice(title: AddMachine.Words.addProvider, note: canAdd ? WhereAgentsRun.addProviderNote : need, chosen: false,
                        pick: { if canAdd { act(.addProvider) } }),
             ]
+            if canAdd, setup.forgeOrGitHub == .github, setup.repository != nil, setup.connection?.state == .connected {
+                let note = codespacesProblem ?? codespacesSummary
+                choices.insert(Choice(title: "GitHub Codespaces…", note: note, chosen: false,
+                                      pick: { act(.codespaces) }), at: 1)
+            }
+            return choices
         case .tasks:
             return [
                 Choice(title: slot.choice, note: ConnectorSetupWords.proof(slot) ?? ConnectorSetupWords.comesWith(setup.forgeOrGitHub),
@@ -491,6 +547,177 @@ private struct SlotChange: View {
                        pick: { act(.catalogue) }),
                 Choice(title: "None", note: "Skip it here.", chosen: skipped, pick: { act(.skip(slot.slot)) }),
             ]
+        }
+    }
+
+    private var codespacesSummary: String {
+        switch codespaces.count {
+        case 0: return "Read just now: no Codespaces"
+        case 1:
+            let one = codespaces[0]
+            return "Read just now: 1 Codespace, \(one.state.lowercased())"
+        default:
+            return "Read just now: \(codespaces.count) Codespaces"
+        }
+    }
+}
+
+/// Codespaces from the GitHub connection, reached from the project's Where agents run slot.
+private struct CodespacesSheet: View {
+    let project: ProjectKey
+    let repository: String
+    let model: AppModel
+    let codespaces: [DaemonAPI.ConnectorCodespace]
+    let problem: String?
+    let onChange: ([DaemonAPI.ConnectorCodespace]) -> Void
+    let onProblem: (String?) -> Void
+    let onConnect: (DaemonAPI.ConnectorCodespace) -> Void
+    let onClose: () -> Void
+
+    @State private var displayName = ""
+    @State private var working = false
+    @State private var confirmingCreate = false
+    @State private var confirmingStart = false
+    @State private var pendingStart: DaemonAPI.ConnectorCodespace?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("GitHub Codespaces").appText(.title).fontWeight(.semibold)
+            Text("Use a Codespace for this project, or create one from \(repository). Connect over SSH; Agents installs on the Codespace.")
+                .appText(.supporting).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Text("Connect prepares the Codespaces entries in ~/.ssh/config with GitHub CLI.")
+                .appText(.fine).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Text("GitHub CLI must be signed in as the connected GitHub account.")
+                .appText(.fine).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            if let problem {
+                Text(problem).appText(.fine).tinted(.failure).fixedSize(horizontal: false, vertical: true)
+            }
+            if codespaces.isEmpty {
+                Text("No Codespaces for this repository yet.").appText(.supporting).foregroundStyle(.secondary)
+            }
+            ForEach(codespaces) { codespace in
+                HStack(alignment: .center, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(codespace.name).appText(.supporting).fontWeight(.semibold)
+                        Text("\(codespace.state) · \(codespace.ref ?? codespace.repository)")
+                            .appText(.fine).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 8)
+                    Button(isRunning(codespace) ? "Stop" : (isStarting(codespace) ? "Starting…" : "Start")) {
+                        startOrStop(codespace)
+                    }
+                    .buttonStyle(.link).disabled(working || isStarting(codespace))
+                    Button(isRunning(codespace) ? "Connect over SSH" : "Start to connect") { connectOrStart(codespace) }
+                        .buttonStyle(.paper).disabled(working || isStarting(codespace))
+                }
+                .padding(10)
+                .paperRaised(in: RoundedRectangle(cornerRadius: 8))
+            }
+            HStack(spacing: 8) {
+                TextField("Codespace name", text: $displayName, prompt: Text("Project name"))
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(working)
+                Button("Create…") { confirmingCreate = true }
+                    .buttonStyle(.paperProminent).disabled(working || displayName.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            HStack {
+                if working { ProgressView().controlSize(.small) }
+                Spacer()
+                Button("Refresh") { Task { await refresh() } }.buttonStyle(.link).disabled(working)
+                Button("Done", action: onClose).buttonStyle(.paper).keyboardShortcut(.cancelAction)
+            }
+        }
+        .padding(24)
+        .frame(width: 660)
+        .confirmationDialog("Create a Codespace?", isPresented: $confirmingCreate, titleVisibility: .visible) {
+            Button("Create Codespace") { Task { await create() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("GitHub may charge for Codespaces compute. The Codespace will use \(repository).")
+        }
+        .confirmationDialog("Start a Codespace?", isPresented: $confirmingStart, titleVisibility: .visible) {
+            Button("Start Codespace") {
+                if let pendingStart { Task { await start(pendingStart) } }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("GitHub may charge while \(pendingStart?.name ?? "this Codespace") runs.")
+        }
+    }
+
+    private func isRunning(_ codespace: DaemonAPI.ConnectorCodespace) -> Bool {
+        ["available", "running"].contains(codespace.state.lowercased())
+    }
+
+    private func isStarting(_ codespace: DaemonAPI.ConnectorCodespace) -> Bool {
+        ["starting", "provisioning", "queued", "awaiting", "rebuilding"].contains(codespace.state.lowercased())
+    }
+
+    private func refresh() async {
+        working = true
+        defer { working = false }
+        switch await model.codespaces(project, action: .list) {
+        case .success(let result): onChange(result.codespaces); onProblem(result.message)
+        case .failure(let failure): onProblem(failure.words)
+        }
+    }
+
+    private func change(_ codespace: DaemonAPI.ConnectorCodespace, action: DaemonAPI.ConnectorCodespacesRequest.Action) async {
+        working = true
+        defer { working = false }
+        switch await model.codespaces(project, action: action, id: codespace.id) {
+        case .success(let result): onChange(result.codespaces); onProblem(result.message)
+        case .failure(let failure): onProblem(failure.words)
+        }
+    }
+
+    private func create() async {
+        working = true
+        defer { working = false }
+        switch await model.codespaces(project, action: .create, name: displayName.trimmingCharacters(in: .whitespaces)) {
+        case .success(let result): onChange(result.codespaces); onProblem(result.message); displayName = ""
+        case .failure(let failure): onProblem(failure.words)
+        }
+    }
+
+    private func startOrStop(_ codespace: DaemonAPI.ConnectorCodespace) {
+        if isRunning(codespace) || isStarting(codespace) {
+            Task { await change(codespace, action: .stop) }
+        } else {
+            pendingStart = codespace
+            confirmingStart = true
+        }
+    }
+
+    private func connectOrStart(_ codespace: DaemonAPI.ConnectorCodespace) {
+        if isRunning(codespace) {
+            Task { await prepareSSH(codespace) }
+        } else {
+            pendingStart = codespace
+            confirmingStart = true
+        }
+    }
+
+    private func start(_ codespace: DaemonAPI.ConnectorCodespace) async {
+        confirmingStart = false
+        pendingStart = nil
+        working = true
+        defer { working = false }
+        switch await model.codespaces(project, action: .start, id: codespace.id) {
+        case .success(let result):
+            onChange(result.codespaces); onProblem(result.message)
+        case .failure(let failure): onProblem(failure.words)
+        }
+    }
+
+    private func prepareSSH(_ codespace: DaemonAPI.ConnectorCodespace) async {
+        working = true
+        defer { working = false }
+        switch await model.codespaces(project, action: .prepareSSH) {
+        case .success(let result):
+            onChange(result.codespaces)
+            onConnect(result.codespaces.first(where: { $0.id == codespace.id }) ?? codespace)
+        case .failure(let failure): onProblem(failure.words)
         }
     }
 }

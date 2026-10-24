@@ -32,9 +32,9 @@ struct ControlAddServerSheet: View {
         var destination: String
         var name: String
         var tunnel: Bool
-        var provider: ProviderID
-        var workspace: String
-        var id: String { "\(provider.rawValue)/\(workspace)" }
+        var provider: ProviderID?
+        var workspace: String?
+        var id: String { "\(provider?.rawValue ?? "server")/\(workspace ?? name)" }
 
         /// `alex@127.0.0.1 -p 2222`, as a provider may give it, as ssh takes it in one word.
         var sshDestination: String {
@@ -409,8 +409,9 @@ struct ControlAddServerSheet: View {
             } else {
                 fingerprint = nil
                 outcome = result
-                if case .added(let joined, _) = result, let prefill {
-                    await control.linkWhenJoined(name: joined, provider: prefill.provider, workspace: prefill.workspace)
+                if case .added(let joined, _) = result, let prefill, let provider = prefill.provider,
+                   let workspace = prefill.workspace {
+                    await control.linkWhenJoined(name: joined, provider: provider, workspace: workspace)
                 }
             }
         }
