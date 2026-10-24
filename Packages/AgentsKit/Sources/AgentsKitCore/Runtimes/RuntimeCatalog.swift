@@ -124,22 +124,20 @@ public enum RuntimeCatalog {
     /// The runtime an agent or workflow gets when it names none.
     public static var defaultRuntime: Runtime { claude }
 
-    /// The runtime a new session opens on, the one rule the window, the Remote and the web
-    /// page follow (#264): the one its start form was left on, while that can still start;
-    /// else the default when it can; else the first that can, in the order given (by name,
-    /// #154, so the first is not the default).
-    public static func newSessionRuntime(kept: String?, available: [String]) -> String? {
+    /// The runtime a new session opens on: the most recently used runtime that can start,
+    /// then the form's kept choice, then the first runtime that can start (#264).
+    public static func newSessionRuntime(lastUsed: String?, kept: String?, available: [String]) -> String? {
+        if let lastUsed, available.contains(lastUsed) { return lastUsed }
         if let kept, available.contains(kept) { return kept }
-        if available.contains(defaultRuntime.id) { return defaultRuntime.id }
         return available.first
     }
 
     /// The runtime an open start form stays on (#977): the one it is on while that can
     /// still start, else `newSessionRuntime`. Read again each time the host's list
     /// changes, so a list that comes after the form opened gives it a runtime.
-    public static func startFormRuntime(current: String?, kept: String?, available: [String]) -> String? {
+    public static func startFormRuntime(current: String?, lastUsed: String?, kept: String?, available: [String]) -> String? {
         if let current, available.contains(current) { return current }
-        return newSessionRuntime(kept: kept, available: available)
+        return newSessionRuntime(lastUsed: lastUsed, kept: kept, available: available)
     }
 
     /// Runtimes or anything standing for one, alphabetical by the name shown: compared

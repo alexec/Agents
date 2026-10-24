@@ -1633,15 +1633,16 @@ public final class AgentsModel {
         return cell
     }
 
-    /// Which runtime a new agent gets when nobody has said: `RuntimeCatalog.newSessionRuntime`,
-    /// so the Mac, a phone and the page cannot offer different ones (029, #264). Not the
-    /// last agent's runtime any more: a helper an agent started is not the person's choice.
+    /// Which runtime a new agent gets when nobody has said: the most recently active agent's
+    /// runtime on this host, if it can start, then the kept choice, then the first available.
     ///
     /// - Parameters:
     ///   - available: the runtimes that can be started now, in the host's order.
     ///   - kept: the runtime the client's start form was last left on.
-    public func defaultRuntimeID(available: [String], kept: String?) -> String? {
-        RuntimeCatalog.newSessionRuntime(kept: kept, available: available)
+    ///   - host: the machine that will start the new agent.
+    public func defaultRuntimeID(available: [String], kept: String?, host: HostID = .mac) -> String? {
+        let lastUsed = agents.first { $0.host == host }?.runtimeID
+        return RuntimeCatalog.newSessionRuntime(lastUsed: lastUsed, kept: kept, available: available)
     }
 
     /// The projects worth showing, oldest added first (`SidebarOrder.byAdded`, #357).
