@@ -13,20 +13,19 @@ struct DefaultRuntimeTests {
         return agent
     }
 
-    @Test func withNothingKeptItIsTheCatalogDefaultThenTheFirstAvailableInOrder() {
+    @Test func withNothingUsedItUsesTheFirstAvailableInOrder() {
         let model = AgentsModel()
-        #expect(model.defaultRuntimeID(available: ["antigravity", "claude"], kept: nil) == "claude")
+        #expect(model.defaultRuntimeID(available: ["antigravity", "claude"], kept: nil) == "antigravity")
         #expect(model.defaultRuntimeID(available: ["gemini", "codex"], kept: nil) == "gemini")
         #expect(model.defaultRuntimeID(available: [], kept: nil) == nil)
     }
 
-    /// The start form's runtime, not the last agent's (#264): a helper an agent started on
-    /// another runtime is not the person choosing it.
-    @Test func theKeptRuntimeWinsAndTheLastAgentDoesNot() {
+    /// The most recently active agent reflects the runtime the person last used.
+    @Test func theLastUsedRuntimeWinsOverTheKeptChoiceWhenItCanStart() {
         let model = AgentsModel()
-        model.replaceAgents([agent("codex", minutesAgo: 1)])
-        #expect(model.defaultRuntimeID(available: ["claude", "codex", "grok"], kept: "grok") == "grok")
-        #expect(model.defaultRuntimeID(available: ["claude", "codex"], kept: nil) == "claude")
+        model.replaceAgents([agent("claude", minutesAgo: 20), agent("codex", minutesAgo: 1)])
+        #expect(model.defaultRuntimeID(available: ["claude", "codex", "grok"], kept: "grok") == "codex")
+        #expect(model.defaultRuntimeID(available: ["claude", "codex"], kept: nil) == "codex")
     }
 
     /// The mode is the daemon's memory, kept current by `modes/changed` (029).
@@ -40,19 +39,20 @@ struct DefaultRuntimeTests {
         #expect(model.rememberedMode(for: "codex") == nil)
     }
 
-    @Test func aKeptRuntimeThatCannotStartIsPassedOver() {
+    @Test func lastUsedThenKeptRuntimeThatCannotStartArePassedOver() {
         let model = AgentsModel()
-        #expect(model.defaultRuntimeID(available: ["claude", "codex"], kept: "gemini") == "claude")
+        model.replaceAgents([agent("gemini", minutesAgo: 1)])
+        #expect(model.defaultRuntimeID(available: ["claude", "codex"], kept: "claude") == "claude")
         #expect(model.defaultRuntimeID(available: ["codex"], kept: "gemini") == "codex")
     }
 
     /// A start form opened before its host listed any runtime gets one when they come
     /// (#977), and one already on a runtime that can start stays there.
     @Test func runtimesThatArriveAfterTheFormOpenedGiveItARuntime() {
-        #expect(RuntimeCatalog.startFormRuntime(current: nil, kept: "codex", available: []) == nil)
-        #expect(RuntimeCatalog.startFormRuntime(current: nil, kept: "codex", available: ["claude", "codex"]) == "codex")
-        #expect(RuntimeCatalog.startFormRuntime(current: nil, kept: nil, available: ["claude", "codex"]) == "claude")
-        #expect(RuntimeCatalog.startFormRuntime(current: "codex", kept: "grok", available: ["claude", "codex", "grok"]) == "codex")
-        #expect(RuntimeCatalog.startFormRuntime(current: "codex", kept: nil, available: ["claude"]) == "claude")
+        #expect(RuntimeCatalog.startFormRuntime(current: nil, lastUsed: nil, kept: "codex", available: []) == nil)
+        #expect(RuntimeCatalog.startFormRuntime(current: nil, lastUsed: nil, kept: "codex", available: ["claude", "codex"]) == "codex")
+        #expect(RuntimeCatalog.startFormRuntime(current: nil, lastUsed: "codex", kept: nil, available: ["claude", "codex"]) == "codex")
+        #expect(RuntimeCatalog.startFormRuntime(current: "codex", lastUsed: "claude", kept: "grok", available: ["claude", "codex", "grok"]) == "codex")
+        #expect(RuntimeCatalog.startFormRuntime(current: "codex", lastUsed: nil, kept: nil, available: ["claude"]) == "claude")
     }
 }

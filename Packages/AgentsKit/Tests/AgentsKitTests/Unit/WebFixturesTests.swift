@@ -1057,7 +1057,8 @@ struct WebFixturesTests {
                                              "available": .array(available.map(JSONValue.string))]))
         }
         try pin("runtimes/new-session.json", startCases) { input in
-            RuntimeCatalog.newSessionRuntime(kept: input["kept"]?.stringValue,
+            RuntimeCatalog.newSessionRuntime(lastUsed: input["lastUsed"]?.stringValue,
+                                             kept: input["kept"]?.stringValue,
                                              available: (input["available"]?.arrayValue ?? []).compactMap(\.stringValue))
                 .map(JSONValue.string) ?? .null
         }

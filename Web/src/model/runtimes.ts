@@ -7,9 +7,6 @@ import { fromWireDate } from "../protocol/dates";
 import { fromOrganisation, noPlanLimit, requires, routeMissing, routeRemoved } from "./orgAccounts";
 import { hasTurnInFlight } from "./promptWords";
 
-/** The runtime a new agent gets when nothing else says: RuntimeCatalog.defaultRuntime. */
-export const defaultRuntimeID = "claude";
-
 export function byName(a: { name: string; id: string }, b: { name: string; id: string }): number {
   return a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true })
     || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
@@ -20,13 +17,13 @@ export function sortedRuntimes(runtimes: RuntimeStatus[]): RuntimeStatus[] {
 }
 
 /**
- * The runtime a new session opens on, RuntimeCatalog.newSessionRuntime (#264), the one rule the
- * window, the Remote and the page follow: the start form's, while it can start; else the
- * default; else the first, in order.
+ * The runtime a new session opens on: the most recently used runtime that can start, then the
+ * start form's kept choice, then the first available runtime (#264).
  */
-export function newSessionRuntime(kept: string | undefined, available: readonly string[]): string | undefined {
+export function newSessionRuntime(lastUsed: string | undefined, kept: string | undefined, available: readonly string[]): string | undefined {
+  if (lastUsed !== undefined && available.includes(lastUsed)) return lastUsed;
   if (kept !== undefined && available.includes(kept)) return kept;
-  return available.includes(defaultRuntimeID) ? defaultRuntimeID : available[0];
+  return available[0];
 }
 
 /**
@@ -35,10 +32,10 @@ export function newSessionRuntime(kept: string | undefined, available: readonly 
  * agent's activity does not discard the draft and start a second runtime.
  */
 export function formRuntime(opened: string | undefined, picked: string | undefined,
-                            startable: readonly string[], kept: string | undefined): string | undefined {
+                            startable: readonly string[], lastUsed: string | undefined, kept: string | undefined): string | undefined {
   if (picked !== undefined && startable.includes(picked)) return picked;
   if (opened !== undefined && startable.includes(opened)) return opened;
-  return newSessionRuntime(kept, startable);
+  return newSessionRuntime(lastUsed, kept, startable);
 }
 
 /**

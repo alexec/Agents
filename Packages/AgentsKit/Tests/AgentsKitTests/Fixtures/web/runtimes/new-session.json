@@ -1,66 +1,97 @@
 [
   {
-    "expected" : "grok",
-    "input" : {
-      "available" : [
+    "name": "last used wins over Claude and the kept choice",
+    "input": {
+      "lastUsed": "codex",
+      "kept": "grok",
+      "available": [
+        "claude",
+        "codex",
+        "grok"
+      ]
+    },
+    "expected": "codex"
+  },
+  {
+    "name": "unavailable last used falls back to kept choice",
+    "input": {
+      "lastUsed": "gemini",
+      "kept": "grok",
+      "available": [
+        "claude",
+        "grok"
+      ]
+    },
+    "expected": "grok"
+  },
+  {
+    "expected": "grok",
+    "input": {
+      "available": [
         "claude",
         "codex",
         "grok"
       ],
-      "kept" : "grok"
+      "kept": "grok",
+      "lastUsed": null
     },
-    "name" : "kept and startable"
+    "name": "kept and startable"
   },
   {
-    "expected" : "claude",
-    "input" : {
-      "available" : [
+    "expected": "claude",
+    "input": {
+      "available": [
         "claude",
         "codex"
       ],
-      "kept" : "gemini"
+      "kept": "gemini",
+      "lastUsed": null
     },
-    "name" : "kept but gone"
+    "name": "kept but gone"
   },
   {
-    "expected" : "claude",
-    "input" : {
-      "available" : [
+    "expected": "codex",
+    "input": {
+      "available": [
         "codex",
         "claude"
       ],
-      "kept" : null
+      "kept": null,
+      "lastUsed": null
     },
-    "name" : "nothing kept"
+    "name": "nothing kept"
   },
   {
-    "expected" : "gemini",
-    "input" : {
-      "available" : [
+    "expected": "gemini",
+    "input": {
+      "available": [
         "gemini",
         "codex"
       ],
-      "kept" : null
+      "kept": null,
+      "lastUsed": null
     },
-    "name" : "no Claude"
+    "name": "no Claude"
   },
   {
-    "expected" : "codex",
-    "input" : {
-      "available" : [
+    "expected": "codex",
+    "input": {
+      "available": [
         "codex",
         "gemini"
       ],
-      "kept" : "opencode"
+      "kept": "opencode",
+      "lastUsed": null
     },
-    "name" : "kept, no Claude"
+    "name": "kept, no Claude"
   },
   {
-    "expected" : null,
-    "input" : {
-      "available" : [],
-      "kept" : "claude"
+    "expected": null,
+    "input": {
+      "available": [],
+      "kept": "claude",
+      "lastUsed": null
     },
-    "name" : "none can start"
+    "name": "none can start"
   }
 ]
