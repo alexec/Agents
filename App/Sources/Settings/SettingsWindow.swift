@@ -62,11 +62,9 @@ struct SettingsWindow: View {
                     }
                     Divider()
                 }
-                // A pane whose part can be the same on every machine of the person's says where
-                // an edit in it goes, with the switch (#2069, #2157).
-                if let part = scopePart {
-                    // One per part, so a pane never shows another's switch.
-                    ScopeLine(part: part).id(part)
+                // Each setting states its fixed scope (#2410).
+                if let scope = scopeOnEveryMachine {
+                    ScopeLine(onEveryMachine: scope)
                     Divider()
                 }
                 content
@@ -143,15 +141,11 @@ struct SettingsWindow: View {
         }
     }
 
-    /// The part this pane edits that can be the same on every machine of the person's
-    /// (#1760), with a control plane to keep it and this Mac's host to take it from.
-    private var scopePart: DaemonAPI.UserSettingsPartName? {
-        guard control != nil, !model.noHostOnThisMac else { return nil }
+    /// The part this pane edits, so it can state its fixed scope (#2410).
+    private var scopeOnEveryMachine: Bool? {
         return switch pane.wrappedValue {
-        case .spending: .costLimits
-        case .resources: .resources
-        case .runtimes: .runtimes
-        // Agent configuration and MCP servers sync automatically (#2129).
+        case .spending, .runtimes: true
+        case .resources: false
         case .agentConfiguration: nil
         default: nil
         }
@@ -430,87 +424,15 @@ private struct NoMacHostNotice: View {
     }
 }
 
-/// The top of a pane whose part can be the same on every machine of the person's (#2069,
-/// #2157): where an edit here goes, and the switch. On, asked first (#2390), takes this Mac's
-/// to every machine in place of theirs; off, asked first, leaves each machine what it has.
+/// The top of a settings pane: its scope is fixed (#2410).
 private struct ScopeLine: View {
-    @Environment(AppModel.self) private var model
-    let part: DaemonAPI.UserSettingsPartName
-
-    @State private var busy = false
-    @State private var problem: String?
-    /// The question before the switch moves: true to turn the part on, false to turn it off.
-    @State private var asking: Bool?
-    /// The switch: moved at once by a press, then kept to what the control plane says.
-    @State private var isOn = false
-
-    private var follows: Bool { model.userScope.follows(part) }
-
-    /// The person's other machines that run agents, by name, as the control plane lists them.
-    private var otherMachines: [String] {
-        let you = model.people.you?.id
-        return (model.controlPlaneHosts ?? [])
-            .filter { $0.runsAgents && $0.id != model.thisMacHostID && (you == nil || $0.owner == nil || $0.owner == you) }
-            .map(\.name)
-    }
+    let onEveryMachine: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Label(follows ? UserScopeWords.allMachines : UserScopeWords.thisMacOnly,
-                      systemImage: follows ? "arrow.triangle.2.circlepath" : "desktopcomputer")
-                    .appText(.supporting).fontWeight(.semibold)
-                Spacer()
-                if busy { ProgressView().controlSize(.small) }
-                Toggle(UserScopeWords.partsHeading, isOn: $isOn)
-                    .toggleStyle(.switch).controlSize(.small)
-                    .disabled(busy || model.controlRequests == nil)
-                    .accessibilityIdentifier("sameOnAll-\(part.rawValue)")
-            }
-            if let problem {
-                Text(problem).appText(.fine).tinted(.failure)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else {
-                Text(UserScopeWords.scopeNote(part, follows: follows))
-                    .appText(.fine).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
+        Text(onEveryMachine ? UserScopeWords.yoursOnEveryMachine : UserScopeWords.thisMacOnly)
+            .appText(.supporting).fontWeight(.semibold)
         .frame(maxWidth: 560, alignment: .leading)
         .padding(16)
-        .accessibilityElement(children: .contain)
-        .onChange(of: follows, initial: true) { isOn = follows }
-        .onChange(of: isOn) { turn(isOn) }
-        // Cancel, or the dialog sent away: the switch goes back.
-        .onChange(of: asking) { if asking == nil, !busy { isOn = follows } }
-        .confirmationDialog(asking == true ? UserScopeWords.takeTitle(part) : UserScopeWords.stopTitle(part),
-                            isPresented: Binding(get: { asking != nil }, set: { if !$0 { asking = nil } }),
-                            titleVisibility: .visible, presenting: asking) { on in
-            if on {
-                Button(UserScopeWords.take, role: .destructive) {
-                    Task { await run { await model.takeUserPartFromThisMac(part) } }
-                }
-            } else {
-                Button(UserScopeWords.stop) {
-                    Task { await run { await model.userScope.set(part, to: .null, on: model.controlRequests) } }
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: { on in
-            Text(on ? UserScopeWords.takeMessage(part, machines: otherMachines) : UserScopeWords.stopMessage)
-        }
-    }
-
-    private func turn(_ on: Bool) {
-        guard on != follows, !busy else { return }
-        asking = on
-    }
-
-    private func run(_ change: () async -> String?) async {
-        busy = true
-        problem = await change()
-        busy = false
-        isOn = follows
     }
 }
 

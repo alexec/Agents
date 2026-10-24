@@ -1,15 +1,15 @@
 ---
 diataxis: reference
 devices: [mac, iphone, ipad]
-description: The secrets the control plane keeps for you, and the settings that are the same on all your machines.
+description: The secrets and settings that follow you across your machines.
 ---
 
-# Secrets and the same on all your machines
+# Secrets and what follows you
 
-The control plane keeps your secrets, and the settings that are the same on all your
-machines, and sends them to each machine of yours when it joins and when they change
-(#1760). Nobody else's machine gets them. Your secrets are in **Settings ▸ Machines ▸
-Secrets**. Each setting has its switch at the top of its own pane (#2157).
+The control plane keeps your secrets and the settings that follow you, and sends them to
+each machine of yours when it joins and when they change
+(#1760, #2410). Nobody else's machine gets them. Your secrets are in **Settings ▸ Machines ▸
+Secrets**.
 
 ## Secrets
 
@@ -31,7 +31,7 @@ beside the control key and outside the store. The store holds no readable secret
 
 ## Settings
 
-Each of these parts is either the same on every machine of yours or each machine's own:
+Each setting has one scope:
 
 | Part | Its pane on the Mac | On each machine |
 |---|---|---|
@@ -41,19 +41,10 @@ Each of these parts is either the same on every machine of yours or each machine
 | Cost limits | Cost | `limits.json` |
 | Resources | Resources | `resources.json` |
 
-- On the Mac, each of these panes starts with **All your machines** or **This Mac only**,
-  and the switch **The same on all your machines**. With no control plane, or no host on
-  this Mac, the line is not there.
-- Turn the switch on to take the part from this Mac and send it to every machine of yours.
-  An MCP server with a token written in clear is refused: put the token in a secret first.
-  A skill with other files beside its `SKILL.md` is left out.
-- Turn it off to give the part back to each machine. You are asked first. Each machine
-  keeps what it has now.
-- While a part is the same on every machine, an edit in its pane on the Mac goes to every
-  machine of yours, and a machine's own copy does not change it.
+- Agent configuration, MCP servers, runtime choices and cost limits are **Yours, on every
+  machine**. Their panes have no scope switch. An edit is sent to every machine of yours.
+- Resources are **This Mac's**. Each machine keeps and edits its own `resources.json`.
 - Runtime sign-ins stay on each machine.
 
-The Remote and the web page have no pane for each part, and they cannot read a machine's
-files. **Settings ▸ Machines** ends with **The same on all your machines**: each part, where
-it applies, and **Each Machine Its Own** for one that is the same everywhere. You turn one
-on on the Mac. **Secrets** is a row of its own under Machines, as on the Mac.
+The Remote and web pages do not list these scopes under Machines. **Secrets** is a row of
+its own under Machines, as on the Mac.

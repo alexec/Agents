@@ -22,7 +22,10 @@ idea, in the project's own `.agents` folder.
 | `settings/` | The settings below, one file each | The app |
 
 The top of the folder is configuration that other tools read too. `settings/` is what the
-Agents app writes.
+Agents app writes. **Agent configuration, MCP servers, runtime choices and cost limits**
+have one fixed scope: they belong to you and sync to every machine of yours. Runtime
+sign-ins stay on each machine. Resources are stored in each machine's `resources.json` and
+do not sync (#2410).
 
 ## `settings/`
 

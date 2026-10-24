@@ -10,11 +10,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
 	"github.com/alexec/agents/Go/internal/agentsd/skillcatalog"
@@ -33,21 +31,17 @@ import (
 //	resources     <root>/resources.json
 //	secrets       ~/.agents-secrets/secrets.env, NAME=value
 //
-// <root>/from-control-plane.json marks what came from the control plane: the parts, the
-// secrets and the agentConfig files written. A local edit to a marked part is refused; it
-// is changed under You. A part the control plane no longer sends stays as it was, and is
-// this machine's own again. A secret it no longer sends is taken out of secrets.env.
+// <root>/user-settings-sync.json stores sync metadata: secret names, removed legacy
+// configuration files and file clocks. Settings themselves can be changed on any machine.
 
-const userScopeFile = "from-control-plane.json"
+const userSettingsSyncFile = "user-settings-sync.json"
 
 const maxAgentConfigFileBytes = 1 << 20
 
-// userScopeMark is from-control-plane.json. It never holds a secret's value.
-type userScopeMark struct {
-	User    string                      `json:"user"`
-	At      string                      `json:"at"`
-	Parts   []wire.UserSettingsPartName `json:"parts"`
-	Secrets []string                    `json:"secrets"`
+// userSettingsSyncState never holds a secret's value.
+type userSettingsSyncState struct {
+	User    string   `json:"user,omitempty"`
+	Secrets []string `json:"secrets"`
 	// The agentConfig files written, relative to ~/.agents, so a persona or skill the
 	// control plane no longer sends is taken away again.
 	Files       []string               `json:"files,omitempty"`
@@ -56,7 +50,7 @@ type userScopeMark struct {
 
 type userScopeState struct {
 	userScopeMu   sync.Mutex
-	userMark      *userScopeMark
+	userMark      *userSettingsSyncState
 	configWatchMu sync.Mutex
 	configWatch   *folderWatch
 }
@@ -64,56 +58,25 @@ type userScopeState struct {
 // agentConfigName is a persona's or a skill's name, as one folder or file name.
 var agentConfigName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
 
-func (d *Daemon) userScopeFile() string { return filepath.Join(d.Store.Loc.Root, userScopeFile) }
+func (d *Daemon) userSettingsSyncPath() string {
+	return filepath.Join(d.Store.Loc.Root, userSettingsSyncFile)
+}
 
 // userMarkLocked is the mark, read once.
-func (d *Daemon) userMarkLocked() userScopeMark {
+func (d *Daemon) userMarkLocked() userSettingsSyncState {
 	if d.userMark == nil {
-		var m userScopeMark
-		if b, err := os.ReadFile(d.userScopeFile()); err == nil {
+		var m userSettingsSyncState
+		b, err := os.ReadFile(d.userSettingsSyncPath())
+		if err != nil {
+			// Read the old metadata once so existing two-way sync clocks survive upgrade.
+			b, _ = os.ReadFile(filepath.Join(d.Store.Loc.Root, "from-control-plane.json"))
+		}
+		if len(b) > 0 {
 			json.Unmarshal(b, &m)
 		}
 		d.userMark = &m
 	}
 	return *d.userMark
-}
-
-// FromControlPlane says whether a part of the settings here is the control plane's.
-func (d *Daemon) FromControlPlane(part wire.UserSettingsPartName) bool {
-	d.userScopeMu.Lock()
-	defer d.userScopeMu.Unlock()
-	return slices.Contains(d.userMarkLocked().Parts, part)
-}
-
-// refuseUserScoped is a local edit of a part that is the control plane's.
-func (d *Daemon) refuseUserScoped(part wire.UserSettingsPartName) error {
-	if !d.FromControlPlane(part) {
-		return nil
-	}
-	return &Error{Code: CodeNotSupported, Message: "This is set under You on the control plane, for every machine of yours. Change it there.",
-		Data: map[string]any{"userScope": part}}
-}
-
-// guardUserScope refuses, on the methods that change a part here, a change to a part that
-// is the control plane's.
-func (d *Daemon) guardUserScope() {
-	guarded := map[string]wire.UserSettingsPartName{
-		wire.CallCostSetLimits.Name:    wire.UserSettingsPartNameCostLimits,
-		wire.CallResourcesDeclare.Name: wire.UserSettingsPartNameResources,
-		wire.CallResourcesRemove.Name:  wire.UserSettingsPartNameResources,
-	}
-	for method, part := range guarded {
-		next, ok := d.handlers[method]
-		if !ok {
-			continue
-		}
-		d.handlers[method] = func(ctx context.Context, c *Client, params json.RawMessage) (any, error) {
-			if err := d.refuseUserScoped(part); err != nil {
-				return nil, err
-			}
-			return next(ctx, c, params)
-		}
-	}
 }
 
 // toldUserSettings is host/userSettings.
@@ -133,14 +96,12 @@ func (d *Daemon) ApplyUserSettings(u wire.HostUserSettings) error {
 	d.userScopeMu.Lock()
 	defer d.userScopeMu.Unlock()
 	before := d.userMarkLocked()
-	mark := userScopeMark{User: u.User, At: time.Now().UTC().Format(time.RFC3339), Parts: []wire.UserSettingsPartName{}, Secrets: []string{}}
+	mark := userSettingsSyncState{User: u.User, Secrets: []string{}}
 	var problems []string
 	note := func(part wire.UserSettingsPartName, err error) {
 		if err != nil {
 			problems = append(problems, fmt.Sprintf("%s: %v", part, err))
-			return
 		}
-		mark.Parts = append(mark.Parts, part)
 	}
 	home := d.personalHome()
 	s := u.Settings
@@ -169,22 +130,20 @@ func (d *Daemon) ApplyUserSettings(u wire.HostUserSettings) error {
 	if partSent(s.CostLimits) {
 		note(wire.UserSettingsPartNameCostLimits, d.writeCostLimits(s.CostLimits))
 	}
-	if partSent(s.Resources) {
-		note(wire.UserSettingsPartNameResources, d.writeResources(s.Resources))
-	}
 	names, err := writeSecrets(home, u.Secrets, before.Secrets)
 	if err != nil {
 		problems = append(problems, "secrets: "+err.Error())
 		names = before.Secrets
 	}
 	mark.Secrets = names
-	sort.Slice(mark.Parts, func(i, j int) bool { return mark.Parts[i] < mark.Parts[j] })
 	b, _ := diskjson.Marshal(mark)
-	if err := store.WriteAtomically(d.userScopeFile(), b, 0o644); err != nil {
+	if err := store.WriteAtomically(d.userSettingsSyncPath(), b, 0o644); err != nil {
 		problems = append(problems, err.Error())
+	} else {
+		_ = os.Remove(filepath.Join(d.Store.Loc.Root, "from-control-plane.json"))
 	}
 	d.userMark = &mark
-	log.Printf("user settings from the control plane: %d parts, %d secrets", len(mark.Parts), len(mark.Secrets))
+	log.Printf("user settings synced from the control plane: %d secrets", len(mark.Secrets))
 	if len(problems) > 0 {
 		return errors.New(strings.Join(problems, "; "))
 	}
@@ -505,25 +464,6 @@ func (d *Daemon) writeCostLimits(raw wire.JSONValue) error {
 	return err
 }
 
-// writeResources declares the part's resources, and only those.
-func (d *Daemon) writeResources(raw wire.JSONValue) error {
-	var list []wire.DeclaredResource
-	if err := json.Unmarshal(raw, &list); err != nil {
-		return errors.New("not a list of resources")
-	}
-	var clean []wire.DeclaredResource
-	for _, r := range list {
-		name, ok := resourceName(string(r.Name))
-		if !ok || r.Holders < 1 {
-			continue
-		}
-		r.Name = name
-		clean = append(clean, r)
-	}
-	sort.Slice(clean, func(i, j int) bool { return clean[i].Name < clean[j].Name })
-	return d.declareAll(clean)
-}
-
 // writeSecrets sets each secret in secrets.env, and takes out the ones the control plane
 // set before and no longer sends. A secret the person set here by hand, under a name the
 // control plane never sent, is left alone. It gives the names now from the control plane.
@@ -564,23 +504,6 @@ func writeSecrets(home string, secrets []wire.UserSecret, before []string) ([]st
 
 var secretNameHere = regexp.MustCompile(`^[A-Z_][A-Z0-9_]{0,63}$`)
 
-// declareAll is resources.json as list, and each one's rules, as resources/declare does.
-func (d *Daemon) declareAll(list []wire.DeclaredResource) error {
-	d.leaseMu.Lock()
-	loaded := d.loadLeases()
-	err := d.saveDeclared(list)
-	var events []leaseEvent
-	if err == nil {
-		for _, r := range list {
-			events = append(events, d.setRules(r.Name, rulesOf(r))...)
-		}
-	}
-	d.leasesChanged()
-	d.leaseMu.Unlock()
-	d.settle(append(loaded, events...))
-	return err
-}
-
 // registerUserScope is settings/userPart: a part as this machine has it, for Use This
 // Mac's under You.
 func (d *Daemon) registerUserScope() {
@@ -614,12 +537,6 @@ func (d *Daemon) userPartHere(part wire.UserSettingsPartName) (wire.UserPartHere
 		out.Value = asJSON(userRuntimes{Sandbox: new(d.sandboxSettings()), ClientPermissions: new(d.clientPermissions())})
 	case wire.UserSettingsPartNameCostLimits:
 		out.Value = asJSON(d.costState().Limits)
-	case wire.UserSettingsPartNameResources:
-		declared := d.declaredResources()
-		if declared == nil {
-			declared = []wire.DeclaredResource{}
-		}
-		out.Value = asJSON(declared)
 	default:
 		return out, Invalid("There is no part called %q.", part)
 	}

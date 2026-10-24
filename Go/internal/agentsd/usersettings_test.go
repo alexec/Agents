@@ -11,9 +11,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// The user scope on a machine (#1760): what the control plane sends goes into the files the
-// machine reads, marked as from the control plane, and a local edit of a marked part is
-// refused.
+// The person's settings sync into each machine's files, and resources stay local.
 func TestUserSettingsGoIntoTheMachinesFiles(t *testing.T) {
 	root, home := t.TempDir(), t.TempDir()
 	t.Setenv("AGENTS_PERSONAL_HOME", home)
@@ -31,7 +29,6 @@ func TestUserSettingsGoIntoTheMachinesFiles(t *testing.T) {
 		AgentConfig: mustJSON(wire.UserAgentConfig{Instructions: &instructions, Personas: map[string]string{"reviewer": "You review."}, Skills: map[string]string{"release": "---\nname: release\n---\n"}}),
 		Runtimes:    json.RawMessage(`{"sandbox":{"defaults":{"claude":"on"}}}`),
 		CostLimits:  json.RawMessage(`{"dailyTokens":5000}`),
-		Resources:   json.RawMessage(`[{"name":"build","displayName":"Build","description":"When building.","holders":3}]`),
 	}, Secrets: []wire.UserSecret{{Name: "GITHUB_TOKEN", Value: "ghp_sams"}}}
 	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(sent))
 
@@ -54,9 +51,6 @@ func TestUserSettingsGoIntoTheMachinesFiles(t *testing.T) {
 	if st.Limits.DailyTokens == nil || *st.Limits.DailyTokens != 5000 {
 		t.Fatalf("%+v", st.Limits)
 	}
-	if r := read(root, "resources.json"); !strings.Contains(r, `"build"`) {
-		t.Fatal(r)
-	}
 	secrets := read(home, ".agents-secrets", "secrets.env")
 	if !strings.Contains(secrets, "GITHUB_TOKEN=ghp_sams") || !strings.Contains(secrets, "MINE=kept") {
 		t.Fatal("secrets.env")
@@ -64,21 +58,19 @@ func TestUserSettingsGoIntoTheMachinesFiles(t *testing.T) {
 	if info, _ := os.Stat(filepath.Join(home, ".agents-secrets", "secrets.env")); info.Mode().Perm() != 0o600 {
 		t.Fatal(info.Mode())
 	}
-	mark := read(root, userScopeFile)
-	if strings.Contains(mark, "ghp_sams") || !strings.Contains(mark, "GITHUB_TOKEN") || !strings.Contains(mark, "costLimits") {
+	mark := read(root, userSettingsSyncFile)
+	if strings.Contains(mark, "ghp_sams") || !strings.Contains(mark, "GITHUB_TOKEN") || strings.Contains(mark, "parts") {
 		t.Fatal(mark)
 	}
-
-	// A local edit of a part that is the control plane's is refused.
-	if e := c.callError(t, 2, "cost/setLimits", map[string]any{"dailyTokens": 1}); e == nil || !strings.Contains(e.Message, "under You") {
-		t.Fatalf("%+v", e)
+	if _, err := os.Stat(filepath.Join(root, "from-control-plane.json")); !os.IsNotExist(err) {
+		t.Fatalf("old scope marker remains: %v", err)
 	}
-	if e := c.callError(t, 3, "resources/remove", map[string]any{"name": "build"}); e == nil || !strings.Contains(e.Message, "under You") {
-		t.Fatalf("%+v", e)
-	}
+	c.call(t, 2, "cost/setLimits", map[string]any{"dailyTokens": 1})
+	c.call(t, 3, "resources/declare", wire.DeclareResourceRequest{Resource: wire.DeclaredResource{
+		Name: "build", DisplayName: "Build", Description: "Build jobs", Holders: 3,
+	}})
 
-	// Sent again without the persona, the secret and the cost limits: the persona and the
-	// secret go, the limits stay and are this machine's own again; a secret set by hand stays.
+	// A removed persona and secret are taken away; omitted cost limits stay as they are.
 	sent.Settings.AgentConfig = mustJSON(wire.UserAgentConfig{Instructions: &instructions})
 	sent.Settings.CostLimits = nil
 	sent.Secrets = nil
@@ -111,8 +103,8 @@ func TestAgentConfigFilesAreAppliedAndMarkedWithoutContents(t *testing.T) {
 	if err != nil || string(written) != "Follow the shared rules." {
 		t.Fatalf("%q %v", written, err)
 	}
-	var mark userScopeMark
-	data, err := os.ReadFile(d.userScopeFile())
+	var mark userSettingsSyncState
+	data, err := os.ReadFile(d.userSettingsSyncPath())
 	if err != nil || json.Unmarshal(data, &mark) != nil || len(mark.ConfigFiles) != 1 || mark.ConfigFiles[0].Contents != nil {
 		t.Fatalf("mark retained file contents: %+v %v", mark.ConfigFiles, err)
 	}
@@ -171,8 +163,7 @@ func TestAPartIsTakenFromThisMachine(t *testing.T) {
 	if !strings.Contains(string(got.Value), "${GH}") {
 		t.Fatalf("%s", got.Value)
 	}
-	json.Unmarshal(c.call(t, 4, "settings/userPart", wire.UserPartRequest{Part: wire.UserSettingsPartNameResources}), &got)
-	if string(got.Value) != "[]" {
-		t.Fatalf("%s", got.Value)
+	if err := c.callError(t, 4, "settings/userPart", wire.UserPartRequest{Part: wire.UserSettingsPartName("resources")}); err == nil {
+		t.Fatal("resources were returned as a person-scoped setting")
 	}
 }

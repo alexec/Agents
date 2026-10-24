@@ -424,14 +424,12 @@ func (b *Book) Forget(ctx context.Context, user string) error {
 	return nil
 }
 
-// kinds is the JSON a part must be: an object, but for resources, a list.
+// kinds is the JSON object shape each person-scoped part must have.
 func partKind(part wire.UserSettingsPartName) (string, bool) {
 	switch part {
 	case wire.UserSettingsPartNameMcpServers, wire.UserSettingsPartNameAgentConfig,
 		wire.UserSettingsPartNameRuntimes, wire.UserSettingsPartNameCostLimits:
 		return "{", true
-	case wire.UserSettingsPartNameResources:
-		return "[", true
 	}
 	return "", false
 }
@@ -504,9 +502,8 @@ func partOf(s *wire.UserSettings, part wire.UserSettingsPartName) *wire.JSONValu
 		return &s.Runtimes
 	case wire.UserSettingsPartNameCostLimits:
 		return &s.CostLimits
-	default:
-		return &s.Resources
 	}
+	return nil
 }
 
 // change writes key as edit makes it from what is there (nil for nothing), on the record

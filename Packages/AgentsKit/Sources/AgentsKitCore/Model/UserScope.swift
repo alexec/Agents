@@ -6,7 +6,7 @@ import Foundation
 public extension DaemonAPI {
     /// A part of the user settings. Each keeps the shape its file has on a machine.
     enum UserSettingsPartName: String, Codable, Sendable, Hashable, CaseIterable {
-        case mcpServers, agentConfig, runtimes, costLimits, resources
+        case mcpServers, agentConfig, runtimes, costLimits
     }
 
     /// The agentConfig part: the person's own instructions, personas and skills.
@@ -42,25 +42,23 @@ public extension DaemonAPI {
         public var updated: String?
     }
 
-    /// `user/settings`: a part that is absent is not set at the user scope, and each machine
-    /// keeps its own.
+    /// `user/settings`: the person's fixed-scope settings. An omitted part has no value yet;
+    /// it does not make that setting machine-local.
     struct UserSettings: Codable, Sendable, Hashable {
         public var mcpServers: JSONValue?
         public var agentConfig: JSONValue?
         public var agentConfigFiles: AgentConfigFiles?
         public var runtimes: JSONValue?
         public var costLimits: JSONValue?
-        public var resources: JSONValue?
         public var updated: String?
 
         public init(mcpServers: JSONValue? = nil, agentConfig: JSONValue? = nil, agentConfigFiles: AgentConfigFiles? = nil, runtimes: JSONValue? = nil,
-                    costLimits: JSONValue? = nil, resources: JSONValue? = nil, updated: String? = nil) {
+                    costLimits: JSONValue? = nil, updated: String? = nil) {
             self.mcpServers = mcpServers
             self.agentConfig = agentConfig
             self.agentConfigFiles = agentConfigFiles
             self.runtimes = runtimes
             self.costLimits = costLimits
-            self.resources = resources
             self.updated = updated
         }
 
@@ -70,7 +68,6 @@ public extension DaemonAPI {
             case .agentConfig: agentConfig
             case .runtimes: runtimes
             case .costLimits: costLimits
-            case .resources: resources
             }
         }
     }
@@ -181,92 +178,23 @@ public extension DaemonAPI.Notification {
     static let controlSecretsLeft = "control/secretsLeft"
 }
 
-/// The words of the user scope (#1760, #2157): the scope line at the top of each Mac pane
-/// whose part can be the same on every machine, Machines ▸ Secrets, and the parts at the end
-/// of Machines on the Remote. The web page says the same in `Web/src/model/userScope.ts`.
+/// The words for settings with a fixed scope (#2410) and the Secrets page.
 public enum UserScopeWords {
     /// Machines ▸ Secrets.
     public static let secretsTitle = "Secrets"
-    /// The parts at the end of Machines on the Remote and the web page, and each pane's switch.
-    public static let partsHeading = "The same on all your machines"
-    public static let agentConfigurationTitle = "Agent configuration"
-    public static let agentConfigurationDetail = "Instructions, personas, skills, connectors and plugins sync automatically."
+    public static let yoursOnEveryMachine = "Yours, on every machine"
     public static func agentConfigurationUpdated(_ updated: String?) -> String {
         guard let updated, let date = ISO8601DateFormatter().date(from: updated) else { return "Waiting for the first sync" }
         return "Last synced \(date.formatted(date: .abbreviated, time: .shortened))"
     }
 
-    public static func partTitle(_ part: DaemonAPI.UserSettingsPartName) -> String {
-        switch part {
-        case .mcpServers: "MCP servers"
-        case .agentConfig: "Agent configuration"
-        case .runtimes: "Agent runtime choices"
-        case .costLimits: "Cost limits"
-        case .resources: "Resources"
-        }
-    }
-
-    /// What each part holds, under its title.
-    public static func partDetail(_ part: DaemonAPI.UserSettingsPartName) -> String {
-        switch part {
-        case .mcpServers: "Your own servers in ~/.agents/mcp.json."
-        case .agentConfig: "Your instructions, personas, skills and plugins in ~/.agents."
-        case .runtimes: "Each runtime's sandbox and permission choices. Sign-ins stay on each machine."
-        case .costLimits: "The most an agent and a day may spend."
-        case .resources: "What agents take turns with, such as build."
-        }
-    }
-
-    public static func partState(_ value: JSONValue?, updated: String?) -> String {
-        value == nil ? "Each machine its own" : allMachines
-    }
-
-    /// The scope line over a Mac pane (#2157): where an edit in it goes.
-    public static let allMachines = "All your machines"
-    public static let thisMacOnly = "This Mac only"
-    public static func scopeNote(_ part: DaemonAPI.UserSettingsPartName, follows: Bool) -> String {
-        follows
-            ? "\(partTitle(part)): a change here goes to every machine of yours, and to each new one."
-            : "\(partTitle(part)): turn it on to give every machine of yours what this Mac has."
-    }
-
-    /// Asked before a part is turned on (#2390): on replaces every other machine's copy, and
-    /// off does not bring it back. `machines` are the person's other machines, when known.
-    public static let take = "Replace on Every Machine"
-    public static func takeTitle(_ part: DaemonAPI.UserSettingsPartName) -> String {
-        "\(partTitle(part)): the same on all your machines?"
-    }
-    public static func takeMessage(_ part: DaemonAPI.UserSettingsPartName, machines: [String]) -> String {
-        let what = partInLine(part)
-        let where_ = machines.isEmpty ? "every other machine of yours" : joined(machines)
-        return "Replaces the \(what) on \(where_) with this Mac’s, and gives each new machine of yours this Mac’s too. "
-            + "Turning this off later does not bring the old ones back."
-    }
-
-    /// A part's title inside a sentence.
-    static func partInLine(_ part: DaemonAPI.UserSettingsPartName) -> String {
-        part == .mcpServers ? partTitle(part) : partTitle(part).lowercased()
-    }
-
-    /// "A", "A and B", "A, B and C".
-    static func joined(_ names: [String]) -> String {
-        guard let last = names.last, names.count > 1 else { return names.first ?? "" }
-        return names.dropLast().joined(separator: ", ") + " and " + last
-    }
-
-    public static let stop = "Each Machine Its Own"
-    public static func stopTitle(_ part: DaemonAPI.UserSettingsPartName) -> String { "\(partTitle(part)): each machine its own?" }
-    public static let stopMessage = "Each machine keeps what it has now, and changes it in its own pane."
+    public static let thisMacOnly = "This Mac's"
     public static let addSecret = "Add a Secret…"
 
     public static let secretsFoot = "A secret goes only to your own machines, into ~/.agents-secrets/secrets.env. "
         + "Write ${NAME} for it in an MCP server's env or headers. Nobody can read it back, you included: to change it, replace it."
     public static let noSealing = "This control plane has no key to seal secrets with, so it keeps none. "
         + "Its operator starts it with a key file or AGENTS_CONTROL_KMS."
-    /// Under the parts on the Remote and the web page, which cannot read a machine's files.
-    public static let partsFoot = "Turn one on in its own pane on the Mac. A change there then goes to every machine of yours, "
-        + "and to each new one."
-
     /// A secret's row: where it is.
     public static func machines(_ row: DaemonAPI.UserSecretRow) -> String {
         switch row.machines.count {

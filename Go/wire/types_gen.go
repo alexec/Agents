@@ -9569,7 +9569,7 @@ type UserSecretRow struct {
 	LeftOn []SecretLeftOn `json:"leftOn,omitzero"`
 }
 
-// user/settings (#1760, spec 736 FR-023, FR-024): what the control plane keeps for a person and sends to each of that person's machines. A part that is absent is not set at the user scope, and each machine keeps its own. The control plane does not read inside a part.
+// user/settings (#1760, #2410): the person's settings that follow them to each of their machines. An omitted part has no value yet, but does not make that setting machine-local. The control plane does not read inside a part.
 type UserSettings struct {
 	McpServers JSONValue `json:"mcpServers,omitzero"`
 
@@ -9581,8 +9581,6 @@ type UserSettings struct {
 	Runtimes JSONValue `json:"runtimes,omitzero"`
 
 	CostLimits JSONValue `json:"costLimits,omitzero"`
-
-	Resources JSONValue `json:"resources,omitzero"`
 
 	// When a part last changed.
 	Updated *string `json:"updated,omitzero"`
@@ -9605,14 +9603,13 @@ type UserSettingsPart struct {
 	Value JSONValue `json:"value"`
 }
 
-// A part of a person's user settings (#1760, spec 736 FR-023). New agent configuration and MCP server edits use per-file state (#2129); runtimes, costLimits and resources retain their existing parts.
+// A part of a person's user settings (#1760, #2410). Each part has one fixed scope: MCP servers, agent configuration, runtimes and cost limits follow the person. Resources belong to each machine.
 type UserSettingsPartName string
 
 const UserSettingsPartNameMcpServers UserSettingsPartName = "mcpServers"
 const UserSettingsPartNameAgentConfig UserSettingsPartName = "agentConfig"
 const UserSettingsPartNameRuntimes UserSettingsPartName = "runtimes"
 const UserSettingsPartNameCostLimits UserSettingsPartName = "costLimits"
-const UserSettingsPartNameResources UserSettingsPartName = "resources"
 
 // user/suspended (#1002, FR-018): to each machine of a suspended person, at hello before its settings and within 5 seconds of a change; off: true ends it.
 type UserSuspended struct {

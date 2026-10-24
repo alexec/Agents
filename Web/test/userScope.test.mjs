@@ -1,18 +1,9 @@
-// The user scope (#1760, #2157): the same words as UserScopeWords in Packages/AgentsKit.
+// Secrets follow the person across machines; fixed-scope settings have no switch here.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";
 
 const u = await load("src/model/userScope.ts");
-
-test("user scope: a part follows the person only when the control plane keeps it", () => {
-  assert.equal(u.follows(null, "costLimits"), false);
-  assert.equal(u.follows({ costLimits: null }, "costLimits"), false);
-  assert.equal(u.follows({ costLimits: { dailyTokens: 5 } }, "costLimits"), true);
-  assert.equal(u.partState({ resources: [] }, "resources"), "All your machines");
-  assert.equal(u.partState({}, "mcpServers"), "Each machine its own");
-  assert.deepEqual(u.parts, ["runtimes", "costLimits", "resources"]);
-});
 
 test("user scope: a secret's row says where it is, and a removed machine it was on", () => {
   assert.equal(u.machines({ machines: [] }), "On no machine yet");
@@ -29,9 +20,4 @@ test("user scope: a secret's name is an environment variable's", () => {
   assert.equal(u.isSecretName("github_token"), false);
   assert.equal(u.isSecretName("../X"), false);
   assert.equal(u.isSecretName(""), false);
-});
-
-test("user scope: the parts say a part is turned on in its own pane on the Mac (#2069, #2157)", () => {
-  assert.match(u.partsFoot, /^Turn on runtime choices, cost limits or resources in their own pane on the Mac\./);
-  assert.equal(u.stopTitle("resources"), "Resources: each machine its own?");
 });

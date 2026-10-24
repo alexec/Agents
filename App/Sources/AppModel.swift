@@ -2018,12 +2018,6 @@ final class AppModel {
     /// The person adding or changing a declared resource (#116). The host's refusal,
     /// in its words, when it will not keep it.
     func declareResource(_ resource: DeclaredResource, replacing: ResourceName?) async -> String? {
-        // The same on every machine (#1760): changed at the user scope, which the host writes.
-        if userScope.follows(.resources) {
-            var list = userResources.filter { $0.name != resource.name && $0.name != replacing }
-            list.append(resource)
-            return await setUserPart(.resources, list.sorted { $0.name.key < $1.name.key })
-        }
         do {
             let snapshot = try await macClient.call(DaemonAPI.Method.resourcesDeclare,
                                                  DaemonAPI.DeclareResourceRequest(resource: resource,
@@ -2040,10 +2034,6 @@ final class AppModel {
 
     /// The person taking a declaration away (#116). Whoever holds it keeps the lease.
     func removeDeclaredResource(_ name: ResourceName) async {
-        if userScope.follows(.resources) {
-            _ = await setUserPart(.resources, userResources.filter { $0.name != name })
-            return
-        }
         guard let snapshot = try? await macClient.call(DaemonAPI.Method.resourcesRemove,
                                                     DaemonAPI.RemoveResourceRequest(name: name.key),
                                                     returning: DaemonAPI.LeaseSnapshot.self) else { return }
@@ -2061,39 +2051,16 @@ final class AppModel {
 
     // MARK: The user scope (#1760)
 
-    /// The resources declared at the user scope.
-    private var userResources: [DeclaredResource] {
-        (try? userScope.settings?.resources?.decode([DeclaredResource].self)) ?? []
-    }
-
     /// Sets a part at the user scope: nil once done, else why not.
     func setUserPart(_ part: DaemonAPI.UserSettingsPartName, _ value: some Encodable) async -> String? {
         guard let encoded = try? JSONValue.encoding(value) else { return "That could not be written." }
         return await userScope.set(part, to: encoded, on: controlRequests)
     }
 
-    /// The switch at the top of a pane turned on (#2157): this Mac's host's own part, set at the
-    /// user scope. Nil once done, else why not, in the host's words (a token in clear).
-    func takeUserPartFromThisMac(_ part: DaemonAPI.UserSettingsPartName) async -> String? {
-        do {
-            let here = try await macClient.call(DaemonAPI.Method.settingsUserPart, DaemonAPI.UserPartRequest(part: part),
-                                                returning: DaemonAPI.UserPartHere.self)
-            if let refused = await userScope.set(part, to: here.value, on: controlRequests) { return refused }
-            if let left = here.leftOut, !left.isEmpty {
-                return "Not taken, as a skill with other files beside its SKILL.md: " + left.joined(separator: ", ") + "."
-            }
-            return nil
-        } catch let error as JSONRPCError {
-            return error.message
-        } catch {
-            return error.localizedDescription
-        }
-    }
-
     /// After an edit in Agent Configuration or Agent Runtimes: a part that follows the person
     /// is set again from this Mac, when it changed here.
     func keepFollowingParts() async {
-        for part in [DaemonAPI.UserSettingsPartName.mcpServers, .agentConfig, .runtimes] where userScope.follows(part) {
+        for part in [DaemonAPI.UserSettingsPartName.mcpServers, .agentConfig, .runtimes] {
             guard let here = try? await macClient.call(DaemonAPI.Method.settingsUserPart, DaemonAPI.UserPartRequest(part: part),
                                                        returning: DaemonAPI.UserPartHere.self),
                 here.value != userScope.settings?[part] else { continue }
@@ -2349,28 +2316,26 @@ final class AppModel {
 
     func setCostLimits(perAgent: Cost?? = nil, daily: Cost?? = nil,
                        perAgentTokens: Int?? = nil, dailyTokens: Int?? = nil) async {
-        // The same on every machine (#1760): changed at the user scope, which the host writes.
-        if userScope.follows(.costLimits) {
-            var limits = (try? userScope.settings?.costLimits?.decode(CostLimits.self)) ?? costLimits
-            if let perAgent { limits.perAgent = perAgent }
-            if let daily { limits.daily = daily }
-            if let perAgentTokens { limits.perAgentTokens = perAgentTokens }
-            if let dailyTokens { limits.dailyTokens = dailyTokens }
+        // Cost limits belong to the person (#2410), so a paired Mac writes the user setting.
+        var limits = (try? userScope.settings?.costLimits?.decode(CostLimits.self)) ?? costLimits
+        if let perAgent { limits.perAgent = perAgent }
+        if let daily { limits.daily = daily }
+        if let perAgentTokens { limits.perAgentTokens = perAgentTokens }
+        if let dailyTokens { limits.dailyTokens = dailyTokens }
+        if controlRequests != nil {
             if let refused = await setUserPart(.costLimits, limits) { problem = refused }
             return
         }
         var set: DaemonAPI.CostState?
-        // A limit that did not take is said, not left looking set (073).
         await attempt {
             set = try await self.macClient.call(DaemonAPI.Method.costSetLimits,
-                                             DaemonAPI.SetLimitsRequest(perAgent: perAgent, daily: daily,
-                                                                        perAgentTokens: perAgentTokens,
-                                                                        dailyTokens: dailyTokens),
-                                             returning: DaemonAPI.CostState.self)
+                                                DaemonAPI.SetLimitsRequest(perAgent: perAgent, daily: daily,
+                                                                           perAgentTokens: perAgentTokens,
+                                                                           dailyTokens: dailyTokens),
+                                                returning: DaemonAPI.CostState.self)
         }
         guard let state = set else { return }
         work.replaceCostState(state)
-        // Every connected server keeps to the same limits, each on its own (037, R7).
         for host in hosts.hosts.all where !hosts.isOffline(host.id) {
             serverCosts[host.id] = try? await client(for: host.id).call(
                 DaemonAPI.Method.costSetLimits,

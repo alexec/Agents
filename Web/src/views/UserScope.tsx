@@ -5,11 +5,11 @@
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
-import type { UserSecretNames, UserSecretRow, UserSettings, UserSettingsPartName } from "../protocol/generated";
+import type { UserSecretNames, UserSecretRow } from "../protocol/generated";
 import { CallFailed } from "../wire/link";
 import { describe, methodNotFound } from "../model/errors";
-import { addSecret, agentConfigurationDetail, agentConfigurationTitle, agentConfigurationUpdated, follows, isSecretName, leftOn, machines, nameHint, noSealing, partDetail, partsFoot, partsHeading, partState,
-  partTitle, parts, secretsFoot, secretsLeft, secretsTitle, stop, stopMessage, stopTitle } from "../model/userScope";
+import { addSecret, isSecretName, leftOn, machines, nameHint, noSealing,
+  secretsFoot, secretsLeft, secretsTitle } from "../model/userScope";
 import { Modal } from "./Modal";
 
 function sentence(error: unknown): string {
@@ -73,12 +73,10 @@ function SecretItem({ row, replace, remove, down }: { row: UserSecretRow; replac
 /** What the control plane keeps for the person, read again on each control/userSettingsChanged and on each
  * connection. */
 function useUserScope(store: Store, down: boolean) {
-  const settings = useSignal<UserSettings | null>(null);
   const names = useSignal<UserSecretNames | null>(null);
   const problem = useSignal<string | null>(null);
   const load = async () => {
     try {
-      settings.value = await store.link.call("user/settings", {});
       names.value = await store.link.call("user/secretNames", {});
       problem.value = null;
     } catch (error) {
@@ -87,7 +85,7 @@ function useUserScope(store: Store, down: boolean) {
   };
   const changes = store.userScopeChanges.value;
   useEffect(() => { if (!down) void load(); }, [changes, down]);
-  return { settings, names, problem, load };
+  return { names, problem, load };
 }
 
 export function SecretsSection({ store, down }: { store: Store; down: boolean }) {
@@ -125,42 +123,6 @@ export function SecretsSection({ store, down }: { store: Store; down: boolean })
       <p class="hint">{secretsFoot}</p>
       {adding.value && <SecretSheet store={store} replacing={null} close={() => { adding.value = false; void load(); }} />}
       {replacing.value && <SecretSheet store={store} replacing={replacing.value} close={() => { replacing.value = null; void load(); }} />}
-    </section>
-  );
-}
-
-export function UserPartsSection({ store, down }: { store: Store; down: boolean }) {
-  const { settings, problem, load } = useUserScope(store, down);
-  const giveBack = async (part: UserSettingsPartName) => {
-    if (!window.confirm(`${stopTitle(part)} ${stopMessage}`)) return;
-    try {
-      await store.link.call("user/setSettings", { part, value: null });
-    } catch (error) {
-      store.say(sentence(error));
-    }
-    await load();
-  };
-  return (
-    <section aria-labelledby="settings-user-parts">
-      <h3 class="section-head" id="settings-user-parts">{partsHeading}</h3>
-      {problem.value && <p class="hint">{problem.value}</p>}
-      <ul class="user-parts">
-        <li>
-          <span>{agentConfigurationTitle}</span>
-          <span class="hint">{agentConfigurationDetail}</span>
-          <span>{partsHeading}</span>
-          <span class="hint">{agentConfigurationUpdated(settings.value?.agentConfigFiles?.updated)}</span>
-        </li>
-        {parts.map((part) => (
-          <li key={part}>
-            <span>{partTitle(part)}</span>
-            <span class="hint">{partDetail(part)}</span>
-            <span>{partState(settings.value, part)}</span>
-            {follows(settings.value, part) && <button type="button" disabled={down} onClick={() => void giveBack(part)}>{stop}</button>}
-          </li>
-        ))}
-      </ul>
-      <p class="hint">{partsFoot}</p>
     </section>
   );
 }
