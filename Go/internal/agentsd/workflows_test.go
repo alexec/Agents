@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,81 @@ import (
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/wire"
 )
+
+func TestWorkflowLimitsArePerProjectAndDoNotLimitApprovals(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	first := project(t, c, 1)
+	second := project(t, c, 2)
+	for _, dir := range []string{first, second} {
+		if err := os.MkdirAll(workflowsFolder(dir), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		for i := 0; i < 21; i++ {
+			id := fmt.Sprintf("workflow-%02d", i)
+			text := "---\non: agent.finished\n---\nReview.\n"
+			if err := os.WriteFile(filepath.Join(workflowsFolder(dir), id+".md"), []byte(text), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	// On first start, these existing files are approved as they stand. Each project
+	// gets its own default of twenty, so both twenty-first workflows are over limit.
+	approveAll(t, c, store.FolderURL(first))
+	approveAll(t, c, store.FolderURL(second))
+	for _, item := range []struct {
+		dir string
+		id  int
+	}{{first, 200}, {second, 201}} {
+		var summaries []wire.WorkflowSummary
+		json.Unmarshal(c.call(t, item.id, "workflows/list", map[string]any{"folder": store.FolderURL(item.dir)}), &summaries)
+		if len(summaries) != 21 {
+			t.Fatalf("got %d workflows", len(summaries))
+		}
+		over := 0
+		for _, s := range summaries {
+			if s.OverLimit != nil {
+				if *s.OverLimit != wire.WorkflowLimitProject || s.TotalLimit == nil || *s.TotalLimit != 20 {
+					t.Fatalf("unexpected limit: %+v", s)
+				}
+				over++
+			}
+		}
+		if over != 1 {
+			t.Fatalf("project %s has %d workflows over limit", item.dir, over)
+		}
+	}
+
+	// More than three additional workflows can wait, and approval still succeeds.
+	for i := 0; i < 5; i++ {
+		id := fmt.Sprintf("pending-%02d", i)
+		if err := os.WriteFile(filepath.Join(workflowsFolder(first), id+".md"), []byte("---\non: agent.finished\n---\nReview.\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var summaries []wire.WorkflowSummary
+	json.Unmarshal(c.call(t, 202, "workflows/list", map[string]any{"folder": store.FolderURL(first)}), &summaries)
+	waiting := 0
+	for _, s := range summaries {
+		if s.AwaitingApproval != nil {
+			waiting++
+			if s.OverLimit != nil {
+				t.Fatalf("pending workflow was marked over limit: %+v", s)
+			}
+			var approved wire.WorkflowSummary
+			json.Unmarshal(c.call(t, 203+waiting, "workflows/approve", map[string]any{
+				"folder": store.FolderURL(first), "workflowID": s.Workflow.WorkflowID, "digest": s.AwaitingApproval.Digest,
+			}), &approved)
+			if approved.AwaitingApproval != nil {
+				t.Fatalf("approval did not apply: %+v", approved)
+			}
+		}
+	}
+	if waiting != 5 {
+		t.Fatalf("got %d waiting approvals", waiting)
+	}
+}
 
 // Ports WorkflowFileTests, FrontMatterEditTests and WorkflowApprovalTests: a file read as
 // the Swift host reads it, the problems it says, one key changed and nothing else, and a

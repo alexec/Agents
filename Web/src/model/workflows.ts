@@ -274,7 +274,6 @@ export function isOn(s: WorkflowSummary): boolean {
 export function workflowStatus(s: WorkflowSummary): { mark: string; words: string; tinted: boolean } {
   const tinted = workflowNeedsAPerson(s);
   if (s.isArchived) return { mark: "▣", words: "Archived", tinted };
-  if (waitsItsTurn(s)) return { mark: "✋", words: "Over the limit", tinted };
   // A shield, not a hand (#587): the hand is a session's Needs You mark, and a workflow waiting
   // for an OK beside it read as one more session asking.
   if (s.awaitingApproval) return { mark: "🛡\uFE0E", words: "Waiting for your OK", tinted };
@@ -486,18 +485,12 @@ export function lastRanLine(summary: WorkflowSummary, now = new Date()): string 
   return summary.lastFiredBy ? `${when}, ${causePhrase(summary.lastFiredBy)}` : when;
 }
 
-/** WorkflowLimit.projectAllowed and .defaultTotal: the total is the person's (#506), sent as WorkflowSummary.totalLimit. */
-const projectAllowed = 3;
-const defaultTotal = 10;
+/** The person's workflow limit is applied separately in each project (#506). */
+const defaultTotal = 20;
 
-/** WorkflowSummary.limitTotal: the total in force on its host, or ten from a host before #506. */
+/** WorkflowSummary.limitTotal: the per-project limit in force on its host. */
 export function limitTotal(s: WorkflowSummary): number {
   return s.totalLimit ?? defaultTotal;
-}
-
-/** WorkflowSummary.waitsItsTurn (#132): waiting behind the three a project may have waiting. */
-export function waitsItsTurn(s: WorkflowSummary): boolean {
-  return !!s.awaitingApproval && s.overLimit === "project";
 }
 
 /** WorkflowSummary.isUnapproved (#391): waiting for an OK, or denied on this host. */
@@ -525,7 +518,7 @@ export function approveDetail(s: WorkflowSummary): string {
 
 /** WorkflowSummary.canBeApproved: waiting and allowed to, or denied here, where Approve takes it back. */
 export function canBeApproved(s: WorkflowSummary): boolean {
-  return (!!s.awaitingApproval && !waitsItsTurn(s)) || !!s.deniedHere;
+  return !!s.awaitingApproval || !!s.deniedHere;
 }
 
 /** WorkflowSummary.canBeDenied (#391): waiting, even behind the ones allowed to. */
@@ -560,14 +553,12 @@ export function turnedOffSentenceFor(s: WorkflowSummary): string {
     + "It doesn't count towards the workflows running, and Run now still runs it";
 }
 
-function limitSentence(limit: WorkflowLimit, total: number): string {
-  return limit === "project" ? `This project already has ${projectAllowed} workflows waiting for approval`
-    : `${total} workflows are already running, across every project`;
+function limitSentence(_limit: WorkflowLimit, total: number): string {
+  return `This project already has ${total} workflows running`;
 }
 
-function limitRemedy(limit: WorkflowLimit): string {
-  return limit === "project" ? `Approve or remove one of the ${projectAllowed} workflows waiting for approval first`
-    : "Turn one off or archive one, in any project, to let it run";
+function limitRemedy(_limit: WorkflowLimit): string {
+  return "Turn one off or archive one in this project to let it run";
 }
 
 /** WorkflowSummary.queued, read leniently: a host from before #422 sends none, and has none. */
@@ -590,8 +581,7 @@ export function refusalMessage(refusal: WorkflowRefusal): string {
   if ("disabled" in refusal) return "it is turned off";
   if ("overLimit" in refusal) {
     const over = refusal.overLimit;
-    return over._0 === "project" ? `this project already has ${projectAllowed} workflows waiting for approval`
-      : `${over.allowed ?? defaultTotal} workflows are already running, across every project`;
+    return `this project already has ${over.allowed ?? defaultTotal} workflows running`;
   }
   if ("unreadable" in refusal) return refusal.unreadable._0;
   if ("triggerNotSupported" in refusal) return `"${refusal.triggerNotSupported.name}" is not something this version can watch for`;
@@ -631,9 +621,7 @@ function refusedSummary(outcome: Extract<WorkflowOutcome, { refused: unknown }>)
 export function happening(summary: WorkflowSummary, now = new Date()): string | null {
   const parts: string[] = [];
   if (summary.isArchived) parts.push("Archived — it will not run until it is restored");
-  else if (waitsItsTurn(summary) && summary.overLimit) {
-    return `${limitSentence(summary.overLimit, limitTotal(summary))}. ${limitRemedy(summary.overLimit)}`;
-  } else if (summary.awaitingApproval) {
+  else if (summary.awaitingApproval) {
     const waiting = summary.awaitingApproval.note !== undefined
       ? `Waiting for your OK — ${summary.awaitingApproval.note}`
       : (summary.awaitingApproval.isNew ? "New" : "Changed since you approved it") + " — approve it on its page to let it run";
@@ -683,9 +671,7 @@ export function workflowStatusLines(s: WorkflowSummary, now = new Date()): Statu
       detail: needs ? "Fix its file to let it run" : "Left alone until this version knows it", tint: needs ? "failure" : undefined });
   }
   lines.push(...mcpArgumentLines(s));
-  if (waitsItsTurn(s) && s.overLimit) {
-    lines.push({ glyph: "⧗", text: `Waiting its turn: ${limitSentence(s.overLimit, limitTotal(s))}`, detail: limitRemedy(s.overLimit), tint: "attention" });
-  } else if (s.awaitingApproval) {
+  if (s.awaitingApproval) {
     const note = s.awaitingApproval.note;
     lines.push({ glyph: "✋", text: note !== undefined ? `Waiting for your OK — ${note}`
       : s.awaitingApproval.isNew ? "New — waiting for your OK" : "Changed since you approved it — waiting for your OK",
@@ -695,7 +681,7 @@ export function workflowStatusLines(s: WorkflowSummary, now = new Date()): Statu
       detail: "Other machines still see it waiting. Approve to let it run here" });
   }
   if (!s.isArchived) lines.push(enabledLine(s));
-  if (s.overLimit && !waitsItsTurn(s)) {
+  if (s.overLimit) {
     lines.push({ glyph: "⚠︎", text: `Over the limit: ${limitSentence(s.overLimit, limitTotal(s))}`, detail: limitRemedy(s.overLimit), tint: "attention" });
   }
   if (s.isRunning) {

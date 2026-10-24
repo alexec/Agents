@@ -7751,13 +7751,11 @@ export interface WorkflowEnableRequest {
   enabled: boolean;
 }
 
-export type WorkflowLimit =
-  | "project"
-  | "total";
+export type WorkflowLimit = "project";
 
 /**
- * How many workflows may be turned on at once. No total is the default, 10. Kept in
- * workflow-limit.json.
+ * How many approved workflows may be turned on in each project. An unset value means 20. The range
+ * is 1 to 100. Kept in workflow-limit.json.
  */
 export interface WorkflowLimitSettings {
   total?: number;

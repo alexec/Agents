@@ -9912,9 +9912,8 @@ type WorkflowEnableRequest struct {
 type WorkflowLimit string
 
 const WorkflowLimitProject WorkflowLimit = "project"
-const WorkflowLimitTotal WorkflowLimit = "total"
 
-// How many workflows may be turned on at once. No total is the default, 10. Kept in workflow-limit.json.
+// How many approved workflows may be turned on in each project. An unset value means 20. The range is 1 to 100. Kept in workflow-limit.json.
 type WorkflowLimitSettings struct {
 	Total *int64 `json:"total,omitzero"`
 }

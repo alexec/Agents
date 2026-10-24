@@ -215,9 +215,9 @@ A workflow does not run, and its page says why, when:
   workflow's page in Agents count as approved unless the workflow was already waiting,
   and workflows that existed before this version were approved as they stood;
 - you denied it on this Mac or server. See [Approve, Deny and Archive](#approve-deny-and-archive);
-- it is approved and on, but not one of the first ten (or the number you set) approved
-  workflows turned on across every project, taken in order of project folder and then
-  file name. Turning one off or archiving one anywhere makes room. See [Limits](#limits);
+- it is approved and on, but the project already has twenty (or the number you set)
+  approved workflows turned on, taken in file-name order. Turning one off or archiving
+  one in this project makes room. See [Limits](#limits);
 - it was set off by a chain of workflows already three deep;
 - the day's spending limit has been reached;
 - the project folder is not there;
@@ -345,31 +345,21 @@ once every 15 minutes" after the triggers.
 
 ## Limits
 
-Two limits:
+- **There is no limit on workflows waiting for approval.** Every workflow is listed and
+  can be approved, denied or archived.
+- **At most twenty approved workflows turned on run in each project.** Twenty is the
+  default; set another number, from 1 to 100, in **Settings ▸ Cost ▸ The most workflows
+  that may run in each project** on the Mac. Only you can: agents can't, through the
+  app's tools. The setting is kept by this Mac and copied to each server, which applies
+  it separately in each project. Past it, a workflow is listed and says *20 workflows are
+  already running in this project. Turn one off or archive one in this project to let it
+  run*, with the number in force. Turning one on when the limit is reached is refused
+  with the same words, and it stays off. A change takes effect at once: raising it lets
+  the ones past it run from their next trigger, and lowering it stops the last ones in
+  file-name order from their next trigger; a run already going finishes.
 
-- **At most three workflows waiting for approval in one project.** Approved workflows do
-  not count, so a project may have as many approved workflows as the next limit allows.
-  An agent writing a fourth with `manage_workflows`, or changing an approved one so it
-  would wait, is refused: *Approve or remove one of the 3 workflows waiting for approval
-  first.* A file that arrives in `.agents/workflows/` some other way, such as a merge or a
-  copy, is still listed, but past the first three waiting (in order of file name) it is
-  inert: its row says *This project already has 3 workflows waiting for approval. Approve
-  or remove one of the 3 workflows waiting for approval first*, and it has no
-  **Approve** until one of the three ahead of it is approved, archived or removed.
-- **At most ten approved workflows turned on run, across every project.** Ten is the
-  default; set another number, from 1 to 50, in **Settings ▸ Cost ▸ The most workflows
-  that may run** on the Mac. Only you can: agents can't, through the app's tools. It is
-  kept by this Mac, outside every project, and copied to each server, which counts its
-  own. Past it, a workflow is listed and says *10 workflows are already running, across
-  every project. Turn one off or archive one, in any project, to let it run*, with the
-  number in force. Turning one on when they are all taken is refused with the same words,
-  and it stays off. A change takes effect at once: raising it lets the ones past it run
-  from their next trigger, and lowering it stops the last ones, in the same order as
-  ever, from their next trigger; a run already going finishes.
-
-Archived workflows count towards neither, and nor do ones denied on this Mac or server.
-Turned-off ones take no place among the ones that run; one waiting for approval counts
-towards the three waiting whether it is on or off.
+Archived workflows and workflows denied on this Mac or server do not count. Turned-off
+ones take no place among the ones that run.
 
 ## Approve, Deny and Archive
 

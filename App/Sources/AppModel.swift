@@ -137,7 +137,7 @@ final class AppModel {
     /// How this Mac's host updates Agents Host by itself (#2178). Nil from a host that
     /// cannot (a test's, or one older than the method), and Settings draws nothing for it.
     private(set) var selfUpdate: DaemonAPI.SelfUpdate?
-    /// How many workflows turned on may run across every project (#506): the Mac's,
+    /// How many workflows turned on may run in each project (#506): the Mac's,
     /// copied to every server.
     private(set) var workflowLimit: WorkflowLimitSettings?
 

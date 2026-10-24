@@ -308,7 +308,7 @@ public enum DaemonAPI {
         /// Deny one on this host only (#391): it does not run here, and the file is not
         /// touched, so other hosts still see it waiting. Takes a `WorkflowApproveRequest`.
         public static let workflowsDeny = "workflows/deny"
-        /// How many workflows turned on may run across every project (#506): the
+        /// How many workflows turned on may run in each project (#506): the
         /// person's setting, as `WorkflowLimitSettings`.
         public static let workflowsLimit = "workflows/limit"
         /// Set it. The person's alone: not in an agent's allowlist, since a ceiling an
