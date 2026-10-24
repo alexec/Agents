@@ -1,7 +1,7 @@
 import Foundation
 
 /// Groups (#1761, spec 736 FR-027, FR-028): everyone, or named users. A group owns
-/// workspace providers: only its users see them and start machines from them. A provider
+/// machine providers: only its users see them and start machines from them. A provider
 /// with no group is the admins' alone.
 public extension DaemonAPI {
     /// A group, in `groups/list` and as `groups/set` answers.
@@ -74,7 +74,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// `groups/remove`. Refused while a workspace provider or a bot has the group.
+    /// `groups/remove`. Refused while a machine provider or a bot has the group.
     struct GroupRequest: Codable, Sendable, Hashable {
         public var id: String
 
@@ -262,8 +262,8 @@ public enum GroupWords {
 
     public static func foot(admin: Bool) -> String {
         admin
-            ? "A group is everyone, or the people you name. Give a workspace provider to a group, and only its people see it and start machines from it. A provider with no group is for admins only."
-            : "The groups you are in. Their workspace providers are the ones you can start machines from."
+            ? "A group is everyone, or the people you name. Give a machine provider to a group, and only its people see it and start machines from it. A provider with no group is for admins only."
+            : "The groups you are in. Their machine providers are the ones you can start machines from."
     }
 
     public static func removeTitle(_ group: DaemonAPI.Group) -> String { "Remove \(group.name)?" }

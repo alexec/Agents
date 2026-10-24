@@ -2360,14 +2360,14 @@ final class RemoteModel {
         }
     }
 
-    // MARK: Workspace providers (#1819)
+    // MARK: Machine providers (#1819)
 
-    /// The control plane's workspace providers, as Settings ▸ Workspace providers last listed
+    /// The control plane's machine providers, as Settings ▸ Machine providers last listed
     /// them (the web page's Providers, the window's ControlProvidersPage); nil before the first.
-    var workspaceProviders: [DaemonAPI.ProviderSummary]?
+    var machineProviders: [DaemonAPI.ProviderSummary]?
     /// Why none are shown: a control plane with several copies, or a list that failed.
-    var workspaceProvidersProblem: String?
-    /// Whether the control plane runs workspace providers: one with several copies does not,
+    var machineProvidersProblem: String?
+    /// Whether the control plane runs machine providers: one with several copies does not,
     /// so Settings lists no row for them, as the window does (#2260).
     private(set) var providersHere = true
     /// The groups providers are given to (#1761): every one for an admin, a member's own.
@@ -2376,34 +2376,34 @@ final class RemoteModel {
     var isAdmin: Bool { people.you?.isAdmin ?? true }
 
     /// Lists them, and asks every provider to list again (FR-004), as the page opens.
-    func loadWorkspaceProviders() async {
+    func loadMachineProviders() async {
         guard let control = controlPlane else {
             // An empty list, so the page does not wait for one for ever (#2260).
-            workspaceProviders = []
-            workspaceProvidersProblem = "The control plane isn’t answering."
+            machineProviders = []
+            machineProvidersProblem = "The control plane isn’t answering."
             return
         }
         do {
             let answer = try await control.call(DaemonAPI.Method.providersList, DaemonAPI.Empty())
-            workspaceProviders = (try? answer["providers"]?.decode([DaemonAPI.ProviderSummary].self)) ?? []
-            workspaceProvidersProblem = nil
+            machineProviders = (try? answer["providers"]?.decode([DaemonAPI.ProviderSummary].self)) ?? []
+            machineProvidersProblem = nil
             providersHere = true
             providerGroups = (try? await control.call(DaemonAPI.Method.groupsList, DaemonAPI.Empty(),
                                                       returning: DaemonAPI.GroupList.self))?.groups ?? []
         } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.providersNeedOneCopy {
-            workspaceProviders = []
-            workspaceProvidersProblem = WorkspaceProviderWords.oneCopy
+            machineProviders = []
+            machineProvidersProblem = MachineProviderWords.oneCopy
             providersHere = false
             return
         } catch {
-            workspaceProviders = []
-            workspaceProvidersProblem = sentence(for: error)
+            machineProviders = []
+            machineProvidersProblem = sentence(for: error)
             return
         }
-        await listWorkspacesAgain()
+        await listMachinesAgain()
     }
 
-    /// Whether Settings lists Workspace providers: asks the control plane for its list, and
+    /// Whether Settings lists Machine providers: asks the control plane for its list, and
     /// asks no provider to list again (#2260). As the window's `providersHere`.
     func checkProvidersHere() async {
         guard let control = controlPlane else { return }
@@ -2417,7 +2417,7 @@ final class RemoteModel {
     }
 
     /// List Again: one provider, or every one. The new list comes as control/providersChanged.
-    func listWorkspacesAgain(_ provider: ProviderID? = nil) async {
+    func listMachinesAgain(_ provider: ProviderID? = nil) async {
         _ = try? await controlPlane?.call(DaemonAPI.Method.providersRefresh, DaemonAPI.ProviderRequest(id: provider))
     }
 
@@ -2427,9 +2427,9 @@ final class RemoteModel {
         do {
             let saved = try await control.call(request.id == nil ? DaemonAPI.Method.providersAdd : DaemonAPI.Method.providersUpdate,
                                                request, returning: DaemonAPI.ProviderSummary.self)
-            var list = workspaceProviders ?? []
+            var list = machineProviders ?? []
             if let index = list.firstIndex(where: { $0.id == saved.id }) { list[index] = saved } else { list.append(saved) }
-            workspaceProviders = list
+            machineProviders = list
             return nil
         } catch {
             return sentence(for: error)
@@ -2444,7 +2444,7 @@ final class RemoteModel {
     /// Remove, Link, Unlink: nil, or why the control plane refused it.
     func removeWorkspaceProvider(_ id: ProviderID) async -> String? {
         let refused = await controlRequest(DaemonAPI.Method.providersRemove, DaemonAPI.ProviderRequest(id: id))
-        if refused == nil { workspaceProviders?.removeAll { $0.id == id } }
+        if refused == nil { machineProviders?.removeAll { $0.id == id } }
         return refused
     }
 
@@ -2460,7 +2460,7 @@ final class RemoteModel {
     }
 
     /// Stop. With agents at work there and not `confirmed`, answers the question to ask first.
-    func stopWorkspace(host: HostID, confirmed: Bool = false) async -> (refused: String?, ask: String?) {
+    func stopMachine(host: HostID, confirmed: Bool = false) async -> (refused: String?, ask: String?) {
         guard let control = controlPlane else { return ("The control plane isn’t answering.", nil) }
         do {
             _ = try await control.call(DaemonAPI.Method.hostsStop, DaemonAPI.HostStop(host: host, confirmRunning: confirmed ? true : nil))
@@ -2549,7 +2549,7 @@ final class RemoteModel {
                     for await change in control.notifications() {
                         guard let self, !Task.isCancelled else { return }
                         if await self.people.heard(change.method, change.params, on: control) {
-                            // A provider's group's name, on Settings ▸ Workspace providers (#1761),
+                            // A provider's group's name, on Settings ▸ Machine providers (#1761),
                             // from the groups people loaded once (#2055).
                             if change.method == DaemonAPI.Notification.controlGroupsChanged {
                                 self.providerGroups = self.people.groups
@@ -2563,10 +2563,10 @@ final class RemoteModel {
                             await self.heardKept(change.method, change.params)
                             continue
                         }
-                        // Settings ▸ Workspace providers keeps up (#1819).
+                        // Settings ▸ Machine providers keeps up (#1819).
                         if change.method == DaemonAPI.Notification.controlProvidersChanged {
                             if let listed = try? change.params?["providers"]?.decode([DaemonAPI.ProviderSummary].self) {
-                                self.workspaceProviders = listed
+                                self.machineProviders = listed
                             }
                             continue
                         }

@@ -79,11 +79,11 @@ func appToolCalls() []appTool {
 		{"stop_session", (*Daemon).stopSession},
 		{"start_session", (*Daemon).startSession},
 		{"manage_workflows", (*Daemon).manageWorkflows},
-		{"list_workspaces", (*Daemon).listWorkspaces},
-		{"start_workspace", (*Daemon).startWorkspace},
-		{"stop_workspace", (*Daemon).stopWorkspace},
-		{"make_workspace", (*Daemon).makeWorkspace},
-		{"delete_workspace", (*Daemon).deleteWorkspace},
+		{"list_machines", (*Daemon).listMachines},
+		{"start_machine", (*Daemon).startMachine},
+		{"stop_machine", (*Daemon).stopMachine},
+		{"make_machine", (*Daemon).makeMachine},
+		{"delete_machine", (*Daemon).deleteMachine},
 		{"move_worktree", (*Daemon).moveWorktree},
 	}
 }

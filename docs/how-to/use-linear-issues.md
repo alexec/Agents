@@ -11,8 +11,9 @@ Two connectors (MCP servers) work together:
 - **Tools** come from Linear's own MCP server, `https://mcp.linear.app/mcp`. Agents use it
   to find, read and change issues.
 - **The Linear issues page and the events** come from `linear-mcp`, a small server that
-  Agents ships. Its one tool, `show_issues`, feeds the **Linear issues** page: the open
-  issues, narrowed by team, state or label, with **Start Agent** on each. Its events are
+  Agents ships. Its tools feed the **Linear issues** page: the open issues, narrowed by team,
+  state or label, with **Start Agent** on each. Click a row to expand its rich-text description.
+  Its events are
   `issue.opened`, `issue.labelled`, `issue.commented` and `issue.closed`. A workflow or a
   wait can use them. See
   [Start a workflow from an MCP event](start-a-workflow-from-an-mcp-event.md).

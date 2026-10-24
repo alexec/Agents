@@ -547,7 +547,7 @@ func serve() {
 	if cfg.MachineID == "" {
 		cfg.MachineID = controlplane.MachineID()
 	}
-	// Workspace providers (#691) keep their secrets beside the control plane's own key.
+	// Machine providers (#691) keep their secrets beside the control plane's own key.
 	cfg.ProviderHome = home()
 	if cfg.ProviderHome == "" && os.Getenv("AGENTS_CONTROL_PROVIDER_HOME") != "" {
 		cfg.ProviderHome = expand(os.Getenv("AGENTS_CONTROL_PROVIDER_HOME"))

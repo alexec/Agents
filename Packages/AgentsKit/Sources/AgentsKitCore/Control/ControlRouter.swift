@@ -89,7 +89,7 @@ public actor ControlRouter {
     private var states: [HostID: HostState] = [:]
     /// A linked host's workspace (#691), laid over its state: a host whose workspace is
     /// stopped is shown stopped, not offline.
-    private var workspaces: [HostID: DaemonAPI.HostWorkspace] = [:]
+    private var workspaces: [HostID: DaemonAPI.HostMachine] = [:]
     /// Keeps a prompt or agent start for a stopped host (#691 US3); nil where nothing is kept.
     private var keeper: (any KeptHandling)?
     /// Told each host's answer to a whole list (#962), for `hosts/lastHeard`; nil where none is kept.
@@ -365,11 +365,11 @@ public actor ControlRouter {
 
     // MARK: Workspaces (#691)
 
-    public func workspace(of host: HostID) -> DaemonAPI.HostWorkspace? { workspaces[host] }
+    public func workspace(of host: HostID) -> DaemonAPI.HostMachine? { workspaces[host] }
 
     /// A linked host's workspace changed (its state, a start's phase), or the link went: said
     /// to every client when it differs.
-    public func setWorkspace(_ workspace: DaemonAPI.HostWorkspace?, of host: HostID) {
+    public func setWorkspace(_ workspace: DaemonAPI.HostMachine?, of host: HostID) {
         guard workspaces[host] != workspace else { return }
         workspaces[host] = workspace
         guard known.contains(host) else { return }

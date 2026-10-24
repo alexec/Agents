@@ -12,7 +12,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 )
 
-// Start a workspace by using it (#691 US3): a prompt or an agent start for a stopped host
+// Start a machine by using it (#691 US3): a prompt or an agent start for a stopped host
 // is kept, starts it, and goes once the host connects. Ports KeptRequestsTests.swift; the
 // router's part (a client's line, a host's uplink) is the fake router's.
 
@@ -215,7 +215,7 @@ func TestWithStartWhenUsedOffAPromptIsRefusedAsToday(t *testing.T) {
 	h := newHarness(t)
 	h.link(h.add(), devbox, "agents-devbox")
 	off := false
-	h.must(MethodHostsSetOptions, HostWorkspaceOptions{Host: devbox, StartWhenUsed: &off})
+	h.must(MethodHostsSetOptions, HostMachineOptions{Host: devbox, StartWhenUsed: &off})
 	kept := h.keeper()
 	if f := kept.Keep(devbox, MethodAgentsPrompt, promptParams("hello"), h.caller); f != nil {
 		t.Errorf("%v", f)

@@ -496,31 +496,31 @@ docs/explanation/scoped-tools.md                       agent-tools
 # brief: what every agent is told when it starts (#599, #601, #615).
 Packages/AgentsKit/Sources/AgentsKitCore/Model/LeaseWords.swift  brief
 
-# workspaces: workspace providers and the tools that start them (#691).
-App/Sources/Control/ControlProvidersPage.swift         workspaces
-App/Sources/Control/NewWorkspaceSheet.swift            workspaces
-Packages/AgentsKit/Sources/AgentsKitCore/Control/Workspace*.swift  workspaces
-Packages/AgentsKit/Sources/AgentsKitCore/Control/ShippedToolMaps.swift  workspaces
-Packages/AgentsKit/Tests/AgentsKitTests/Control/HostWorkspaceOverlayTests.swift  workspaces
-Go/cmd/workspace-commands/                             workspaces
-Go/internal/workspacecommands/                         workspaces
-Shared/UI/Chat/KeptPromptRow.swift                     workspaces
-Web/src/views/Kept.tsx                                 workspaces
-Web/test/kept*                                         workspaces
-docs/reference/workspace-providers.md                  workspaces
-docs/how-to/add-a-workspace-provider.md                workspaces
-docs/how-to/start-workspaces-from-agents.md            workspaces
-specs/691-*/                                           workspaces
-specs/858-*/                                           workspaces
+# machine-providers: providers that make, start and stop machines (#691).
+App/Sources/Control/ControlProvidersPage.swift         machine-providers
+App/Sources/Control/NewMachineSheet.swift            machine-providers
+Packages/AgentsKit/Sources/AgentsKitCore/Control/Workspace*.swift  machine-providers
+Packages/AgentsKit/Sources/AgentsKitCore/Control/ShippedToolMaps.swift  machine-providers
+Packages/AgentsKit/Tests/AgentsKitTests/Control/HostWorkspaceOverlayTests.swift  machine-providers
+Go/cmd/workspace-commands/                             machine-providers
+Go/internal/workspacecommands/                         machine-providers
+Shared/UI/Chat/KeptPromptRow.swift                     machine-providers
+Web/src/views/Kept.tsx                                 machine-providers
+Web/test/kept*                                         machine-providers
+docs/reference/machine-providers.md                  machine-providers
+docs/how-to/add-a-machine-provider.md                machine-providers
+docs/how-to/start-machines-from-agents.md            machine-providers
+specs/691-*/                                           machine-providers
+specs/858-*/                                           machine-providers
 
-# workspaces also takes the control plane's providers and its workspaces (#2017), and
+# machine-providers also takes the control plane's providers and its workspaces (#2017), and
 # Start a Machine from a Repository (#1809).
-Go/internal/controlplane/providers/                    workspaces
-Go/internal/controlplane/workspaces*.go                workspaces
-Packages/AgentsKit/Sources/AgentsKitCore/Control/MachineFromRepository.swift  workspaces
-Web/src/model/machineFromRepository.ts                 workspaces
-Web/src/views/MachineDialog.tsx                        workspaces
-Web/test/machineFromRepository.test.mjs                workspaces
+Go/internal/controlplane/providers/                    machine-providers
+Go/internal/controlplane/workspaces*.go                machine-providers
+Packages/AgentsKit/Sources/AgentsKitCore/Control/MachineFromRepository.swift  machine-providers
+Web/src/model/machineFromRepository.ts                 machine-providers
+Web/src/views/MachineDialog.tsx                        machine-providers
+Web/test/machineFromRepository.test.mjs                machine-providers
 
 # team: people, groups, bots, the user scope and the person's settings on every machine
 # (spec 736, #994, #1760, #1761), on the control plane and on the three clients (#2017).

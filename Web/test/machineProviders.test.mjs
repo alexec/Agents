@@ -1,11 +1,11 @@
-// Workspace providers on the web (#1808): the API kinds' requests, with their secrets only in
+// Machine providers on the web (#1808): the API kinds' requests, with their secrets only in
 // `secrets`; an edit that keeps what it leaves out; the card's lines; Link to Host's choices; and
 // the model against a fake control plane, Stop's question included.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";
 
-const w = await load("test/workspaceProviders.ts");
+const w = await load("test/machineProviders.ts");
 
 test("only the API kinds are offered, with the window's titles", () => {
   assert.deepEqual([...w.providerKinds], ["digitalOcean", "codespaces", "coder", "aws", "compute"]);

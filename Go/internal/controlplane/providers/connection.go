@@ -16,14 +16,14 @@ import (
 // or a stand-in in tests.
 type Provider interface {
 	Check() (Checked, error)
-	List() ([]WorkspaceInfo, error)
+	List() ([]MachineInfo, error)
 	// Start starts the workspace; its state after, when the provider said.
-	Start(id string) (*WorkspaceInfo, error)
-	Stop(id string) (*WorkspaceInfo, error)
-	// Options is the New Workspace form, a JSON Schema object (US5).
+	Start(id string) (*MachineInfo, error)
+	Stop(id string) (*MachineInfo, error)
+	// Options is the New Machine form, a JSON Schema object (US5).
 	Options() (any, error)
 	// Create makes one: what it made when the provider said, and whether firstBoot will run.
-	Create(name string, options any, firstBoot *string) (*WorkspaceInfo, bool, error)
+	Create(name string, options any, firstBoot *string) (*MachineInfo, bool, error)
 	Delete(id string) error
 	// Tools is every tool the server offers, as it described them (#858).
 	Tools() ([]any, error)
@@ -35,7 +35,7 @@ type Provider interface {
 type CannotMake struct{}
 
 func (CannotMake) Options() (any, error) { return nil, providerFailure("It can’t make workspaces.") }
-func (CannotMake) Create(string, any, *string) (*WorkspaceInfo, bool, error) {
+func (CannotMake) Create(string, any, *string) (*MachineInfo, bool, error) {
 	return nil, false, providerFailure("It can’t make workspaces.")
 }
 func (CannotMake) Delete(string) error   { return providerFailure("It can’t delete workspaces.") }
@@ -45,7 +45,7 @@ func (CannotMake) Tools() ([]any, error) { return nil, providerFailure("It can�
 type Checked struct {
 	Capabilities []string
 	Contract     int
-	Workspaces   []WorkspaceInfo
+	Workspaces   []MachineInfo
 	// For a tool map: how many items were at list.items, and the first, so a writer can see
 	// what a map that reads none of them missed (#858). Items is -1 when not said.
 	Items     int
@@ -200,7 +200,7 @@ func (c *Connection) Check() (Checked, error) {
 			}
 		}
 		if len(missing) > 0 {
-			return Checked{}, providerFailure("It isn’t a workspace provider: it has no %s tool.", orList(missing))
+			return Checked{}, providerFailure("It isn’t a machine provider: it has no %s tool.", orList(missing))
 		}
 	} else if missing := c.mapping.Missing(tools); missing != "" {
 		return Checked{}, providerFailure("The tool map names %s, which the server doesn’t have.", missing)
@@ -267,7 +267,7 @@ func (c *Connection) Tools() ([]any, error) {
 	return tools, err
 }
 
-func (c *Connection) List() ([]WorkspaceInfo, error) {
+func (c *Connection) List() ([]MachineInfo, error) {
 	content, err := c.call(c.mapping.List, map[string]any{"id": ""}, c.timing.Quick)
 	if err != nil {
 		return nil, err
@@ -275,12 +275,12 @@ func (c *Connection) List() ([]WorkspaceInfo, error) {
 	return c.mapping.Workspaces(content), nil
 }
 
-func (c *Connection) Start(id string) (*WorkspaceInfo, error) { return c.act(c.mapping.Start, id) }
-func (c *Connection) Stop(id string) (*WorkspaceInfo, error)  { return c.act(c.mapping.Stop, id) }
+func (c *Connection) Start(id string) (*MachineInfo, error) { return c.act(c.mapping.Start, id) }
+func (c *Connection) Stop(id string) (*MachineInfo, error)  { return c.act(c.mapping.Stop, id) }
 
 func (c *Connection) Options() (any, error) {
 	if c.mapping.Options == nil {
-		return nil, providerFailure("It has no choices for a new workspace.")
+		return nil, providerFailure("It has no choices for a new machine.")
 	}
 	content, err := c.call(*c.mapping.Options, map[string]any{}, c.timing.Quick)
 	if err != nil {
@@ -295,7 +295,7 @@ func (c *Connection) Options() (any, error) {
 	return map[string]any{}, nil
 }
 
-func (c *Connection) Create(name string, options any, firstBoot *string) (*WorkspaceInfo, bool, error) {
+func (c *Connection) Create(name string, options any, firstBoot *string) (*MachineInfo, bool, error) {
 	if c.mapping.Create == nil {
 		return nil, false, providerFailure("It can’t make workspaces.")
 	}
@@ -332,7 +332,7 @@ func (c *Connection) Delete(id string) error {
 	return err
 }
 
-func (c *Connection) act(call Call, id string) (*WorkspaceInfo, error) {
+func (c *Connection) act(call Call, id string) (*MachineInfo, error) {
 	content, err := c.call(call, map[string]any{"id": id}, c.timing.Long)
 	if err != nil {
 		return nil, err

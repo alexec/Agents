@@ -40,8 +40,8 @@ func TestTheLeaseBriefSaysWhatWasDeclared(t *testing.T) {
 	}
 }
 
-// Claude's is _meta.systemPrompt.append, Grok's goes before its rules, and a runtime with
-// no system prompt has its _meta as it was.
+// Claude's is _meta.systemPrompt.append, Grok's goes before its rules, Codex's uses AIR
+// custom instructions, and a runtime with no system prompt has its _meta as it was.
 func TestTheBriefGoesWhereTheRuntimeTakesASystemPrompt(t *testing.T) {
 	claude := withSystemPrompt(sessionMeta("claude"), "claude", "words")
 	if systemPromptOf(claude) != "words" || claude["claudeCode"] == nil {
@@ -50,6 +50,11 @@ func TestTheBriefGoesWhereTheRuntimeTakesASystemPrompt(t *testing.T) {
 	grok := withSystemPrompt(map[string]any{"rules": "cards"}, "grok", "words")
 	if systemPromptOf(grok) != "words\n\ncards" {
 		t.Fatalf("%v", grok)
+	}
+	codex := withSystemPrompt(map[string]any{"jetbrains": map[string]any{"air": map[string]any{"version": 1, "capabilities": []string{"sessionFailure"}}}}, "codex", "words")
+	air := codex["jetbrains"].(map[string]any)["air"].(map[string]any)
+	if air["customInstructions"] != "words" || len(air["capabilities"].([]string)) != 1 || systemPromptOf(codex) != "words" {
+		t.Fatalf("%v", codex)
 	}
 	if m := withSystemPrompt(nil, "cursor", "words"); m != nil {
 		t.Fatalf("%v", m)
@@ -68,7 +73,7 @@ func agentMessages(d *Daemon, id wire.UUID) string {
 }
 
 // Each runtime has the brief the way it takes one: Claude as _meta.systemPrompt.append,
-// Grok as _meta.rules before the app's tool cards, the rest before the words of the first
+// Grok as _meta.rules, Codex as session custom instructions, and the rest before the first
 // prompt. The transcript records only the person's words.
 func TestEachRuntimeHasTheBriefTheWayItTakesIt(t *testing.T) {
 	fakeRuntimes(t)
@@ -90,6 +95,8 @@ func TestEachRuntimeHasTheBriefTheWayItTakesIt(t *testing.T) {
 				system, before = brief, ""
 			case "grok":
 				system, before = brief+"\n\n"+grokRules(), ""
+			case "codex":
+				system, before = brief, ""
 			}
 			if said := agentMessages(d, id); said != "System: "+system+"\nBefore: "+before {
 				t.Fatalf("said %q", said)

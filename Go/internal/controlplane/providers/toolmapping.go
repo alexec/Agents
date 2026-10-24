@@ -19,7 +19,7 @@ type ToolMapping struct {
 	Options *Call
 	Create  *Call
 	Delete  *Call
-	// A map's create: whether the server runs {firstBoot} on the new workspace.
+	// A map's create: whether the server runs {firstBoot} on the new machine.
 	FirstBootRuns bool
 	Listing       Listing
 	// The contract's own tools, read as the contract says; false for a map.
@@ -247,12 +247,12 @@ func Content(result any) (any, error) {
 
 // Workspaces is ToolMapping.workspaces: the workspaces a list result holds, at most 200.
 // One with no id or name is left out.
-func (m ToolMapping) Workspaces(content any) []WorkspaceInfo {
+func (m ToolMapping) Workspaces(content any) []MachineInfo {
 	items, _ := arr(pathValue(m.Listing.Items, content))
 	if len(items) > 200 {
 		items = items[:200]
 	}
-	out := []WorkspaceInfo{}
+	out := []MachineInfo{}
 	listed := map[string]bool{}
 	for _, item := range items {
 		// A second workspace with an id already listed is left out: a link and a start name
@@ -267,7 +267,7 @@ func (m ToolMapping) Workspaces(content any) []WorkspaceInfo {
 
 // Workspace is ToolMapping.workspace: one workspace, from an item of a list, or a start's
 // or stop's workspace.
-func (m ToolMapping) Workspace(item any) *WorkspaceInfo {
+func (m ToolMapping) Workspace(item any) *MachineInfo {
 	id, ok := pathText(m.Listing.ID, item)
 	if !ok || id == "" {
 		return nil
@@ -287,7 +287,7 @@ func (m ToolMapping) Workspace(item any) *WorkspaceInfo {
 			state = said
 		}
 	}
-	w := &WorkspaceInfo{ID: id, Name: name, State: state}
+	w := &MachineInfo{ID: id, Name: name, State: state}
 	if m.Listing.SSH != "" {
 		ssh, _ := pathText(m.Listing.SSH, item)
 		w.SSH = optional(ssh)

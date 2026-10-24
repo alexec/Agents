@@ -86,9 +86,9 @@ nav:
       - how-to/pin-machines-with-mdm.md
       - how-to/add-an-org-key-or-gateway.md
       - how-to/send-a-project-to-a-server.md
-      - how-to/start-workspaces-from-agents.md
-      - how-to/add-a-workspace-provider.md
-      - how-to/set-up-a-cloud-workspace-provider.md
+      - how-to/start-machines-from-agents.md
+      - how-to/add-a-machine-provider.md
+      - how-to/set-up-a-cloud-machine-provider.md
       - how-to/turn-the-relay-on-or-off.md
       - how-to/run-the-control-plane-in-the-cloud.md
       - how-to/run-the-hosted-service.md
@@ -161,7 +161,7 @@ nav:
       - reference/on-every-machine.md
       - reference/reports.md
       - reference/console.md
-      - reference/workspace-providers.md
+      - reference/machine-providers.md
       - reference/integrations.md
       - reference/sign-in.md
       - reference/ssh-options.md

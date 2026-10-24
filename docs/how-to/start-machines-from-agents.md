@@ -1,16 +1,16 @@
 ---
 diataxis: how-to
 devices: [mac, iphone, ipad, server]
-description: Let the control plane start and stop the machines your servers run on, through a workspace provider, and press Start on a stopped server from any screen.
+description: Let the control plane start and stop the machines your servers run on, through a machine provider, and press Start on a stopped server from any screen.
 ---
 
-# Start workspaces from Agents
+# Start machines from Agents
 
 Some servers stop: a cloud machine you turn off to save money, a Codespace that idles out, a
 Docker container you stopped. Usually a stopped server is just offline, and you have to start
 it yourself in the provider's console or in Terminal.
 
-Give the control plane a **workspace provider** and link the server to its workspace. A
+Give the control plane a **machine provider** and link the server to its machine. A
 stopped server then shows **Start** on every screen. The control plane starts the machine,
 waits for its agentsd to connect, and the server comes online by itself.
 
@@ -18,7 +18,7 @@ waits for its agentsd to connect, and the server comes online by itself.
 
 - **A control plane on one machine.** The one on your Mac works. Several copies sharing a
   bucket can't run providers yet.
-- **A server already added**, or a workspace you can reach over ssh. See
+- **A server already added**, or a machine you can reach over ssh. See
   [Add a server](add-a-server.md).
 - **The provider's command-line tool** on the Mac that runs the control plane, signed in:
   `docker`, `doctl`, `gh`, `coder` or `gcloud`. The provider runs there, not on the server.
@@ -26,35 +26,35 @@ waits for its agentsd to connect, and the server comes online by itself.
 
 ## Add a provider
 
-1. Open **Settings ▸ Workspace Providers** on the Mac and choose **Add Provider…**.
+1. Open **Settings ▸ Machine Providers** on the Mac and choose **Add Provider…**.
 2. Pick the kind:
    - **Docker Containers**: containers on the Mac that runs the control plane.
    - **DigitalOcean Droplets**: droplets with a tag. Agents reaches each one as `root@` its address
      unless you say another user.
-   - **GitHub Codespaces**, **Coder Workspaces**, or **Google Cloud Workstations**.
-   - **Your commands**: one workspace, given as the commands you already use to start and
+   - **GitHub Codespaces**, **Coder Machines**, or **Google Cloud Workstations**.
+   - **Your commands**: one machine, given as the commands you already use to start and
      stop it, such as `cws start devstack-1`. A status command is optional; it prints
      `running` or `stopped`.
    - **MCP server**: a provider of its own, or another MCP server with a tool map. See
-     [Add a workspace provider](add-a-workspace-provider.md).
+     [Add a machine provider](add-a-machine-provider.md).
 3. Fill in its few fields. If it needs a token, add it under **Secrets**. A secret stays on
    the control plane and is never shown again.
-4. Choose **Add**. Agents checks the provider and lists its workspaces. If it can't, the
+4. Choose **Add**. Agents checks the provider and lists its machines. If it can't, the
    sheet says why, in the provider's words.
 
-## Link a server to its workspace
+## Link a server to its machine
 
 - **For a server you already have:** in **Settings ▸ Machines**, open its `···`
-  menu, choose **Link to Provider…**, pick the workspace and choose **Link**.
-- **For a workspace that isn't a server yet:** start it, then choose **Add as Machine…** beside
+  menu, choose **Link to Provider…**, pick the machine and choose **Link**.
+- **For a machine that isn't a server yet:** start it, then choose **Add as Machine…** beside
   it on the Providers page. Add a Server opens over ssh, with the provider's address filled
-  in. The new server is linked to the workspace once it joins.
+  in. The new server is linked to the machine once it joins.
 
-A workspace belongs to one server at a time: linking it to another moves the link.
+A machine belongs to one server at a time: linking it to another moves the link.
 
 ## Start a stopped server
 
-When a linked server's workspace is stopped, its row says **Stopped** and the strip over
+When a linked server's machine is stopped, its row says **Stopped** and the strip over
 its chats says **devbox is stopped**, with **Start**. Press it on the Mac, the iPhone, the
 iPad or the browser.
 
@@ -95,7 +95,7 @@ With **Start when used** on, you don't have to press **Start**. Send a prompt to
 the stopped server, or start a new agent in one of its projects, on the Mac, the iPhone or
 the web page:
 
-- The control plane keeps what you sent and starts the workspace.
+- The control plane keeps what you sent and starts the machine.
 - The chat shows your prompt as a dashed bubble, with **Waiting for devbox to start** under
   it. A new agent's chat opens at once with its first prompt waiting the same way.
 - When the server connects, the prompt goes, once, in the order it was sent. A new agent is
@@ -104,17 +104,17 @@ the web page:
 What was sent is kept by the control plane, not by the app. You can close the app or lock the
 phone, and it still goes. Up to 20 can wait for one server.
 
-- **To take one back**, press × beside it. The workspace keeps starting.
+- **To take one back**, press × beside it. The machine keeps starting.
 - **If the start fails**, each waiting prompt says **Not sent** and why, with **Try Again**.
 - **Attachments can't wait.** Send the words alone, or start the server first.
 
-Only prompts and new agents start a workspace. Reading a chat or a file on a stopped server
+Only prompts and new agents start a machine. Reading a chat or a file on a stopped server
 doesn't. With **Start when used** off, a prompt to a stopped server is refused, and its strip
 offers **Start**.
 
 ### Stop when idle
 
-A workspace costs money while it runs. With **Stop when idle** on, Agents stops it once its
+A machine costs money while it runs. With **Stop when idle** on, Agents stops it once its
 server has been idle for the whole time you chose: 15, 30 or 60 minutes, or 2 hours. Idle
 means:
 
@@ -132,7 +132,7 @@ stopped as idle. Update it from its row.
 ### Start for scheduled workflows
 
 A stopped server runs nothing, so its scheduled workflows would not run. With **Start for
-scheduled workflows** on, Agents starts the workspace a little before the server's next
+scheduled workflows** on, Agents starts the machine a little before the server's next
 scheduled workflow is due:
 
 - The server's own clock still fires the workflow. Agents only starts the machine.
@@ -155,21 +155,21 @@ Only scheduled workflows start a server. An event (such as `issue.opened`) is st
 when the server is next up. Agents knows only the due time the server last sent: a workflow
 added while it is stopped is not seen until it is next up.
 
-## Make a new workspace
+## Make a new machine
 
-For a provider that can make workspaces, its card in **Settings ▸ Control plane ▸
+For a provider that can make machines, its card in **Settings ▸ Control plane ▸
 Providers** has **New Machine…**.
 
 1. Give it a name, and make its choices: its size or region, say.
 2. Choose **Make…**. Agents says what it will make and, if the provider says, what it costs.
 3. Choose **Make**.
 
-The new workspace shows **Joining…** until it has installed Agents and joined. Then it is
+The new machine shows **Joining…** until it has installed Agents and joined. Then it is
 linked to its host. A provider that can't install on first boot opens **Add a Server** with
-the new workspace filled in, as **Add as Machine…** does.
+the new machine filled in, as **Add as Machine…** does.
 
 To delete one, choose **Delete Machine…** in its server's `···` menu on Settings ▸ Machines.
-Agents names what is lost first: the workspace, everything on its disk, and the server with
+Agents names what is lost first: the machine, everything on its disk, and the server with
 its agents.
 
 ## If it doesn't work
@@ -177,16 +177,16 @@ its agents.
 - **The provider can't list.** Its card says why, and shows what it last listed. Check its
   command-line tool is installed and signed in on the Mac that runs the control plane, then
   choose **List Again** in its `···` menu.
-- **"workspace-commands isn't installed beside the control plane".** This build of Agents
+- **"machine-commands isn't installed beside the control plane".** This build of Agents
   Host doesn't carry the command provider yet. Set `AGENTS_WORKSPACE_COMMANDS` to a build
   of it for the control plane, or wait for a build that has it.
 - **The server starts but never connects.** Make agentsd start when the machine boots: on
   Linux, `loginctl enable-linger $USER` keeps the user's services running with nobody
-  logged in. Or give the workspace an ssh address, so Agents can start agentsd itself.
+  logged in. Or give the machine an ssh address, so Agents can start agentsd itself.
 
 ## Related
 
-- [Add a workspace provider](add-a-workspace-provider.md): presets, your own commands, a
+- [Add a machine provider](add-a-machine-provider.md): presets, your own commands, a
   tool map, or a provider of your own.
-- [Workspace providers](../reference/workspace-providers.md): the tools a provider offers.
+- [Machine providers](../reference/machine-providers.md): the tools a provider offers.
 - [The control plane](../explanation/control-plane.md): why providers run there.

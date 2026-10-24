@@ -10,7 +10,13 @@
 .issue-details { grid-column: 1 / -1; min-width: 0; padding: 8px 10px; border-radius: var(--border-radius-sm);
   background: var(--color-background-secondary); }
 .issue-details[hidden] { display: none; }
-.issue-body { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.issue-body { margin-top: 6px; overflow-wrap: anywhere; }
+.issue-body > :first-child { margin-top: 0; }
+.issue-body > :last-child { margin-bottom: 0; }
+.issue-body pre { overflow-x: auto; padding: 8px; background: var(--color-background-tertiary); border-radius: var(--border-radius-sm); }
+.issue-row { cursor: pointer; }
+.issue-row:hover { background: var(--color-background-secondary); }
+.issue-row:focus-visible { outline: 2px solid var(--color-text-info); outline-offset: -2px; }
 .linked-prs { display: grid; gap: 4px; margin-top: 8px; }
 .linked-pr { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
 .label-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0; }
@@ -30,9 +36,9 @@
 <script>
 /*bridge.js*/
 (() => {
-  let repo = "", labels = [];
+  let repo = "", activeLabels = [];
   const ui = bridge("github-issues", {
-    input: (args) => { repo = args.repo || ""; labels = args.label ? [args.label] : []; drawLabel(); ui.$("repo").textContent = repo; say("Listing…"); },
+    input: (args) => { repo = args.repo || ""; activeLabels = args.label ? [args.label] : []; drawLabel(); ui.$("repo").textContent = repo; say("Listing…"); },
     result: (result) => draw(result),
     cancelled: (why) => say("Cancelled: " + why, true),
     started: () => say("Waiting for the issues…"),
@@ -40,10 +46,9 @@
   const { $, el, link, button } = ui;
   const say = (text, isError) => { $("state").textContent = text; $("state").className = isError ? "error" : "muted"; ui.size(); };
 
-  // The label the list is narrowed to, with a way back to every open issue.
   const drawLabel = () => {
-    $("label").replaceChildren();
-    $("label-tags").replaceChildren(...labels.map((name) => button(name + " ✕", () => removeLabel(name), { className: "pill chosen", title: `Remove ${name} label filter` })));
+    $("label-tags").replaceChildren(...activeLabels.map((name) => button(name + " ✕", () => removeLabel(name),
+      { className: "pill chosen", title: `Remove ${name} label filter` })));
   };
 
   const draw = (result) => {
@@ -51,32 +56,28 @@
     if (!found) { say("Couldn't list issues: " + ui.errorText(result), true); $("refresh").disabled = !repo; return; }
     if (found.repo) { repo = found.repo; $("repo").textContent = repo; }
     const issues = Array.isArray(found.issues) ? found.issues : [];
-    const options = [...new Set(issues.flatMap((issue) => issue.labels || []))].filter((name) => !labels.includes(name));
+    const options = [...new Set(issues.flatMap((issue) => issue.labels || []))].filter((name) => !activeLabels.includes(name));
     $("label-options").replaceChildren(...options.map((name) => el("option", { value: name })));
     $("issues").replaceChildren(...issues.map(row));
     drawLabel();
     const assigned = issues.filter((issue) => (issue.assignees || []).length).length;
     say(issues.length ? `${issues.length} open · ${assigned} assigned · as of ${new Date().toLocaleTimeString()}`
-      : labels.length ? `No open issues labelled ${labels.join(" and ")}.` : "No open issues.");
+      : activeLabels.length ? `No open issues labelled ${activeLabels.join(" and ")}.` : "No open issues.");
     $("refresh").disabled = !repo;
   };
 
   const row = (issue) => {
     const issueLabels = (issue.labels || []).map((name) => button(name, () => addLabel(name),
-      { className: labels.includes(name) ? "pill chosen" : "pill", title: "Filter by label " + name }));
+      { className: activeLabels.includes(name) ? "pill chosen" : "pill", title: "Filter by label " + name }));
     // Who works on it (#905): an issue is taken by assigning it.
     const assignees = (issue.assignees || []).map((login) =>
       el("span", { className: "pill assigned", textContent: "@" + login, title: "Assigned to " + login }));
     const comments = issue.comments ? ` · ${issue.comments} comment${issue.comments === 1 ? "" : "s"}` : "";
     const start = button("Start Agent", () => startAgent(issue),
       { className: "start", title: `A new agent for #${issue.number}, in a worktree of its own` });
-    const expand = button("Show details", () => toggleDetails(issue, expand, details),
-      { className: "details-toggle", title: "Read the issue description and linked pull requests" });
-    expand.setAttribute("aria-expanded", "false");
     const details = el("div", { className: "issue-details", hidden: true });
     details.id = `issue-details-${issue.number}`;
-    expand.setAttribute("aria-controls", details.id);
-    return el("li", {}, [
+    const item = el("li", { className: "issue-row" }, [
       link(`#${issue.number}`, issue.url),
       el("span", { className: "title", textContent: issue.title, title: issue.title }),
       start,
@@ -85,23 +86,35 @@
         el("span", { textContent: `${issue.author || "someone"}${comments}${issue.updatedAt ? " · " + ui.ago(issue.updatedAt) : ""}` }),
         issue.milestone ? el("span", { className: "pill", textContent: issue.milestone, title: "Milestone" }) : null,
         ...issueLabels,
-        expand,
       ]),
       details,
     ]);
+    item.tabIndex = 0;
+    item.setAttribute("aria-label", `Issue #${issue.number}: ${issue.title}`);
+    item.setAttribute("aria-expanded", "false");
+    item.setAttribute("aria-controls", details.id);
+    const toggle = () => toggleDetails(issue, item, details);
+    item.addEventListener("click", (event) => {
+      if (event.target.closest("a, button, select, .issue-details")) return;
+      toggle();
+    });
+    item.addEventListener("keydown", (event) => {
+      if (event.target !== item || (event.key !== "Enter" && event.key !== " ")) return;
+      event.preventDefault(); toggle();
+    });
+    return item;
   };
 
-  const toggleDetails = async (issue, control, target) => {
-    const expanded = control.getAttribute("aria-expanded") === "true";
-    control.setAttribute("aria-expanded", String(!expanded));
-    control.textContent = expanded ? "Show details" : "Hide details";
+  const toggleDetails = async (issue, item, target) => {
+    const expanded = item.getAttribute("aria-expanded") === "true";
+    item.setAttribute("aria-expanded", String(!expanded));
     target.hidden = expanded;
     if (expanded || target.dataset.loaded || target.dataset.loading) return;
     target.dataset.loading = "true";
     target.replaceChildren(el("span", { className: "muted", textContent: "Loading issue details…" }));
     try {
       const details = await ui.call("show_issue_details", { repo, number: issue.number });
-      drawDetails(target, details);
+      drawDetails(target, details, issue);
       target.dataset.loaded = "true";
     } catch (e) {
       target.replaceChildren(el("span", { className: "error", textContent: "Couldn't load issue details: " + e.message }));
@@ -110,7 +123,7 @@
     }
   };
 
-  const drawDetails = (target, details) => {
+  const drawDetails = (target, details, issue) => {
     const body = typeof details.body === "string" && details.body.trim() ? details.body : "No description.";
     const closing = details.closed_by_pull_requests;
     const refs = closing && Array.isArray(closing.references) ? closing.references : [];
@@ -130,11 +143,22 @@
       ]));
     }
     if (total > refs.length) linked.append(el("span", { className: "muted", textContent: `Showing ${refs.length} of ${total} linked pull requests.` }));
-    target.replaceChildren(
-      el("span", { className: "muted", textContent: "Description" }),
-      el("pre", { className: "issue-body", textContent: body }),
-      linked,
-    );
+    const description = el("div", { className: "issue-body" });
+    if (body === "No description.") description.textContent = body;
+    else renderMarkdown(description, details.bodyHTML || "", issue.url);
+    target.replaceChildren(el("span", { className: "muted", textContent: "Description" }), description, linked);
+  };
+
+  const renderMarkdown = (target, html, base) => {
+    target.innerHTML = html;
+    for (const anchor of target.querySelectorAll("a")) {
+      try {
+        const url = new URL(anchor.getAttribute("href"), base);
+        if (!["http:", "https:", "mailto:"].includes(url.protocol)) { anchor.removeAttribute("href"); continue; }
+        anchor.href = url.href;
+        anchor.onclick = (event) => { event.preventDefault(); ui.openLink(url.href); };
+      } catch { anchor.removeAttribute("href"); }
+    }
   };
 
   // The app's new-agent form, filled in for this issue (#834). The person starts it, or not;
@@ -153,9 +177,9 @@
     $("refresh").disabled = true;
     const base = { repo };
     try {
-      const results = await Promise.all((labels.length ? labels : [""]).map((name) => ui.call("show_issues", name ? { ...base, label: name } : base)));
+      const results = await Promise.all((activeLabels.length ? activeLabels : [""]).map((name) => ui.call("show_issues", name ? { ...base, label: name } : base)));
       const first = results[0];
-      const common = labels.length > 1 ? results.slice(1).reduce((items, result) => {
+      const common = activeLabels.length > 1 ? results.slice(1).reduce((items, result) => {
         const ids = new Set((result.issues || []).map((issue) => issue.number));
         return items.filter((issue) => ids.has(issue.number));
       }, first.issues || []) : first.issues || [];
@@ -163,8 +187,8 @@
     }
     catch (e) { say("Couldn't list issues: " + e.message, true); $("refresh").disabled = false; }
   };
-  const addLabel = (name) => { if (name && !labels.includes(name)) { labels = [...labels, name]; $("label-input").value = ""; drawLabel(); say("Listing…"); list(); } };
-  const removeLabel = (name) => { labels = labels.filter((item) => item !== name); drawLabel(); say("Listing…"); list(); };
+  const addLabel = (name) => { if (name && !activeLabels.includes(name)) { activeLabels = [...activeLabels, name]; $("label-input").value = ""; drawLabel(); say("Listing…"); list(); } };
+  const removeLabel = (name) => { activeLabels = activeLabels.filter((item) => item !== name); drawLabel(); say("Listing…"); list(); };
   const labelInput = $("label-input");
   labelInput.onkeydown = (event) => { if (event.key === "Enter" || event.key === ",") { event.preventDefault(); addLabel(labelInput.value.trim().replace(/,$/, "")); } };
   labelInput.onchange = () => addLabel(labelInput.value.trim());

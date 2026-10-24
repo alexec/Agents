@@ -215,7 +215,8 @@ func (d *Daemon) whatItOffers(rt *runtimeDef, path string) (optionEntry, error) 
 	ctx, cancel := context.WithTimeout(d.ctx, 90*time.Second)
 	defer cancel()
 	p := &probe{commands: make(chan []wire.SlashCommand, 1)}
-	s, err := acp.Start(ctx, launch, p, d.sessionMCP(path), sessionMeta(rt.ID), "")
+	meta := sessionMeta(rt.ID)
+	s, err := acp.Start(ctx, launch, p, d.sessionMCP(path), meta, meta, "", "")
 	if err != nil {
 		return optionEntry{}, &Error{Code: CodeRuntimeWillNotStart, Message: rt.Name + " did not start: " + err.Error()}
 	}

@@ -36,7 +36,7 @@ type Router interface {
 	// SetWorkspace is ControlRouter.setWorkspace: a linked host's workspace changed, or the
 	// link went (nil). Said to every client in control/hostChanged when it differs, and laid
 	// over the host's state with Overlay.
-	SetWorkspace(host string, ws *HostWorkspace)
+	SetWorkspace(host string, ws *HostMachine)
 	// BroadcastControl tells every client session a control notification.
 	BroadcastControl(method string, params any)
 	// DeliverKept is ControlRouter.deliverKept: a request sent to a host on a channel of
@@ -132,7 +132,7 @@ type Config struct {
 
 // listed is WorkspaceProviders.Listed: a provider's last list.
 type listed struct {
-	workspaces []WorkspaceInfo
+	workspaces []MachineInfo
 	listedAt   *time.Time
 	// False once a list has failed after a good one.
 	current bool
@@ -388,13 +388,13 @@ func (p *Providers) Answer(method string, params json.RawMessage, from Caller) (
 	return p.answer(method, params, from, "client "+shortID(from.Client))
 }
 
-// HostSaid answers host/workspaces, host/providerDraft and host/status, which a host says
+// HostSaid answers host/machines, host/providerDraft and host/status, which a host says
 // on its channel 0, as ControlMethods.hostSaid does for them.
 func (p *Providers) HostSaid(host, method string, params json.RawMessage) (any, error) {
 	switch method {
-	case MethodHostWorkspaces:
-		var call HostWorkspaceCall
-		if err := requireParams(params, &call, "HostWorkspaceCall", "agent", "method", "params"); err != nil {
+	case MethodHostMachines:
+		var call HostMachineCall
+		if err := requireParams(params, &call, "HostMachineCall", "agent", "method", "params"); err != nil {
 			return nil, err
 		}
 		if !AgentWorkspaceMethods[call.Method] {
@@ -489,9 +489,9 @@ func (p *Providers) AgentCall(host, agent, method string, params json.RawMessage
 
 // forAgent is what an agent is shown (US6 AS1): every provider's workspaces and their
 // hosts, and what a new one could be, never a secret or its name.
-func (p *Providers) forAgent(person string) AgentWorkspaces {
+func (p *Providers) forAgent(person string) AgentMachines {
 	hosts := p.records.Hosts()
-	out := AgentWorkspaces{Providers: []AgentProvider{}}
+	out := AgentMachines{Providers: []AgentProvider{}}
 	for _, summary := range p.SummariesFor(person) {
 		// Only the providers its user may start machines from (#1761).
 		if summary.MayUse != nil && !*summary.MayUse {
@@ -572,8 +572,8 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 		}
 		return p.changeLink(string(request.Host), func(h *records.HostRecord) { setLink(h, nil) }, nil)
 	case MethodHostsSetOptions:
-		var options HostWorkspaceOptions
-		if err := requireParams(params, &options, "HostWorkspaceOptions", "host"); err != nil {
+		var options HostMachineOptions
+		if err := requireParams(params, &options, "HostMachineOptions", "host"); err != nil {
 			return nil, err
 		}
 		return p.changeLink(string(options.Host), func(h *records.HostRecord) {
@@ -650,7 +650,7 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 		if err := requireParams(params, &request, "HostRequest", "host"); err != nil {
 			return nil, err
 		}
-		return map[string]any{}, p.deleteWorkspace(string(request.Host), who, caller)
+		return map[string]any{}, p.deleteMachine(string(request.Host), who, caller)
 	case MethodHostsKeep:
 		var request KeepRequest
 		if err := requireParams(params, &request, "KeepRequest", "host", "method", "params"); err != nil {
@@ -778,7 +778,7 @@ func (p *Providers) Summaries() []ProviderSummary {
 		if !ok {
 			l = listed{current: true}
 		}
-		workspaces := []WorkspaceInfo{}
+		workspaces := []MachineInfo{}
 		for _, w := range l.workspaces {
 			w.Host = optional(wire.HostID(linked[r.ID+"/"+w.ID]))
 			workspaces = append(workspaces, w)
@@ -1037,7 +1037,7 @@ func (p *Providers) Refresh(only string) {
 	}
 	type result struct {
 		id         string
-		workspaces []WorkspaceInfo
+		workspaces []MachineInfo
 		err        error
 		asked      uint64
 	}
@@ -1479,7 +1479,7 @@ func (p *Providers) create(request ProviderCreate, who string, caller *Caller) (
 			clones = append(clones, repository)
 		}
 	}
-	var made *WorkspaceInfo
+	var made *MachineInfo
 	var runs bool
 	_, err = p.providerCall(id, func(c Provider) (any, error) {
 		var err error
@@ -1492,12 +1492,12 @@ func (p *Providers) create(request ProviderCreate, who string, caller *Caller) (
 	}
 	p.Refresh(id)
 	p.mu.Lock()
-	var listedNow []WorkspaceInfo
+	var listedNow []MachineInfo
 	if l := p.listed[id]; l != nil {
 		listedNow = l.workspaces
 	}
 	p.mu.Unlock()
-	var found *WorkspaceInfo
+	var found *MachineInfo
 	if made != nil {
 		found = made
 		for i := range listedNow {
@@ -1551,7 +1551,7 @@ func repositoryPath(address string) (string, bool) {
 	return path, true
 }
 
-// formAsksForRepository is whether the provider's New Workspace form has `repository`: it
+// formAsksForRepository is whether the provider's New Machine form has `repository`: it
 // makes the workspace from the repository itself, as Codespaces does.
 func (p *Providers) formAsksForRepository(id string) bool {
 	schema, err := p.providerCall(id, func(c Provider) (any, error) { return c.Options() })
@@ -1619,9 +1619,9 @@ func (p *Providers) clone(urls []string, host, name string, caller *Caller) {
 	}
 }
 
-// deleteWorkspace deletes a linked host's workspace, then removes the host as Remove does
+// deleteMachine deletes a linked host's workspace, then removes the host as Remove does
 // (FR-042).
-func (p *Providers) deleteWorkspace(host, who string, caller Caller) error {
+func (p *Providers) deleteMachine(host, who string, caller Caller) error {
 	record := p.records.Host(host)
 	if record == nil {
 		return fail(CodeNoSuchHost, "No machine is called %s.", host)
@@ -1992,13 +1992,13 @@ func (p *Providers) sshDestination(link WorkspaceLink, host string) string {
 	return p.hooks.InstalledOver(host)
 }
 
-func (p *Providers) workspace(link WorkspaceLink) *WorkspaceInfo {
+func (p *Providers) workspace(link WorkspaceLink) *MachineInfo {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.workspaceLocked(link)
 }
 
-func (p *Providers) workspaceLocked(link WorkspaceLink) *WorkspaceInfo {
+func (p *Providers) workspaceLocked(link WorkspaceLink) *MachineInfo {
 	l := p.listed[link.Provider]
 	if l == nil {
 		return nil
@@ -2025,7 +2025,7 @@ func (p *Providers) changed() {
 }
 
 // Workspace is a host's workspace as it is laid over its state now, or nil.
-func (p *Providers) Workspace(host string) *HostWorkspace {
+func (p *Providers) Workspace(host string) *HostMachine {
 	if h := p.records.Host(host); h != nil {
 		return p.overlay(*h)
 	}
@@ -2033,7 +2033,7 @@ func (p *Providers) Workspace(host string) *HostWorkspace {
 }
 
 // overlay is WorkspaceProviders.overlay.
-func (p *Providers) overlay(record records.HostRecord) *HostWorkspace {
+func (p *Providers) overlay(record records.HostRecord) *HostMachine {
 	link := LinkOf(&record)
 	if link == nil {
 		return nil
@@ -2062,7 +2062,7 @@ func (p *Providers) overlay(record records.HostRecord) *HostWorkspace {
 		hostState = state
 	}
 	problem := p.problems[record.ID]
-	ws := &HostWorkspace{Provider: wire.ProviderID(link.Provider), ProviderName: provider.record.Name, Workspace: link.Workspace,
+	ws := &HostMachine{Provider: wire.ProviderID(link.Provider), ProviderName: provider.record.Name, Workspace: link.Workspace,
 		WorkspaceName: link.Workspace, WorkspaceState: state, HostState: optional(hostState), Problem: optional(problem),
 		// A running one whose start failed can be started again: its agentsd is what is down (#960).
 		CanStart:      a == nil && (state != "running" && state != "starting" || state == "running" && problem != ""),

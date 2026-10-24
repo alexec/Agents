@@ -110,8 +110,8 @@ feeds it. Ask, for example, "Show the open pull requests" or "Show the open issu
   CodeRabbit's status. A failing one has **Rerun**, which runs its failed jobs again.
   Click a title to open the pull request's page in the same view.
 - **Issues** (`show_issues`): each open issue with its labels, its assignees and its
-  comment count. Click a label to show only the issues with that label. Click the label
-  again to show all of them.
+  comment count. Click a row to expand its rich-text description and linked pull requests.
+  Click a label to show only the issues with that label. Click the label again to show all of them.
 
 To keep a page, choose **Pin to Project** in the view's menu, beside its name. The pin sits
 under the project in the sidebar. Each time you open it, the host reads GitHub again, so it

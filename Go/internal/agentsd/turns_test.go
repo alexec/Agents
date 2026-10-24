@@ -52,7 +52,7 @@ type fakeRuntime struct {
 	sandboxOff bool
 	// rateLimited is whether "rate limit me" was refused once already.
 	rateLimited bool
-	// systemPrompt is _meta.systemPrompt.append or _meta.rules from session/new or resume.
+	// systemPrompt is the runtime's system-prompt field from session/new or resume.
 	systemPrompt string
 }
 
@@ -62,6 +62,14 @@ func systemPromptOf(meta any) string {
 	if sp, ok := m["systemPrompt"].(map[string]any); ok {
 		s, _ := sp["append"].(string)
 		return s
+	}
+	if jetbrains, ok := m["jetbrains"].(map[string]any); ok {
+		if air, ok := jetbrains["air"].(map[string]any); ok {
+			s, _ := air["customInstructions"].(string)
+			if s != "" {
+				return s
+			}
+		}
 	}
 	s, _ := m["rules"].(string)
 	return s

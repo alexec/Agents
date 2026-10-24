@@ -44,7 +44,7 @@ Open issues: `is:open label:integration runtime`.
 | Grok | Mac, Remote, web, server | broken (terminal commands fail) | 2026-10-23, 1.0.67: `agent stdio --help` has no `--sandbox`; flag removed from launches | `RuntimeCatalog.swift`, `runtimes.go` | Sandbox control unavailable until Grok supports it over ACP |
 | Copilot | Mac, Remote, web, server | broken (fails at turn) | 2026-10-17, 1.0.93-1: failed at turn, in `.agents/reviews/runtimes/copilot-2026-10-17.md` (skipped 2026-10-22: Copilot its allowance is spent on this Mac) | `RuntimeCatalog.swift`, `runtimes.go` | |
 | Cursor | Mac, Remote, web, server | broken (fails at turn) | 2026-10-17, 2026.10.01-e373342: failed at turn, in `.agents/reviews/runtimes/cursor-2026-10-17.md` | `RuntimeCatalog.swift`, `runtimes.go` | |
-| Codex | Mac, Remote, web, server | broken (`ending`, `own_ask`, `scope`, `sessions`, `wait`, `workspaces` failed) | 2026-10-17, 2.2.2: assessment: 7 of 15 passed, in `.agents/reviews/runtimes/codex-2026-10-17.md` | `RuntimeCatalog.swift`, `runtimes.go` | `scope` and `permissions` fail on a root in `/tmp` (the nightly's): Codex's own `agent` mode (workspace-write) may write `/tmp` without asking, so no card comes (#1432). #1444, #1445 |
+| Codex | Mac, Remote, web, server | broken (`ending`, `own_ask`, `scope`, `sessions`, `wait`, `workspaces` failed) | 2026-10-17, 2.2.2: assessment: 7 of 15 passed, in `.agents/reviews/runtimes/codex-2026-10-17.md` | `RuntimeCatalog.swift`, `runtimes.go`, `App/Resources/toolsets/codex/manifest.json`, `Go/internal/agentsd/brief.go` | `scope` and `permissions` fail on a root in `/tmp` (the nightly's): Codex's own `agent` mode (workspace-write) may write `/tmp` without asking, so no card comes (#1432). #1444, #1445 |
 | Gemini | Mac, Remote, web, server | broken (fails at turn) | 2026-10-17, 0.64.0: failed at turn, in `.agents/reviews/runtimes/gemini-2026-10-17.md` | `RuntimeCatalog.swift`, `runtimes.go` | |
 | Antigravity | Mac, Remote, web (Mac host only) | broken (fails at turn) | 2026-10-17, 1.4.1: failed at turn, in `.agents/reviews/runtimes/antigravity-2026-10-17.md` | `RuntimeCatalog.swift` | |
 | OpenCode | Mac, Remote, web, server | tested on a real account | 2026-10-22, 1.19.4: a real turn passed, not assessed, in `.agents/reviews/runtimes/opencode-2026-10-22.md` | `RuntimeCatalog.swift`, `runtimes.go` | |
@@ -99,9 +99,9 @@ Open issues: `is:open label:integration install`.
 | OpenCode from GitHub releases | Mac, server | built | — | `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/ArchiveToolset.swift` | |
 | Grok, Copilot and Cursor install scripts | Mac, server | built | — | `App/Sources/AppModel+GetStarted.swift`, `Go/internal/agentsd/install.go` | |
 
-## Workspace providers
+## Machine providers
 
-The machines hosts run on. The contract is in [Workspace providers](workspace-providers.md).
+The machines hosts run on. The contract is in [Machine providers](machine-providers.md).
 The presets are in `Go/internal/workspacecommands/presets.go` (Swift until #1364).
 Open issues: `is:open label:integration workspace`.
 

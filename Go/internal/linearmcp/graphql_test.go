@@ -10,6 +10,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -133,6 +134,17 @@ func TestOneAnswerIsSharedForAPoll(t *testing.T) {
 	}
 	if len(r.names) != 1 {
 		t.Fatalf("asked %d times", len(r.names))
+	}
+}
+
+func TestIssueDetailsRenderMarkdown(t *testing.T) {
+	r, l := newRecorded(t)
+	details, err := l.IssueDetails(context.Background(), "ENG-5")
+	if err != nil || details["identifier"] != "ENG-5" || !strings.Contains(details["descriptionHTML"].(string), "<strong>Inspect</strong>") {
+		t.Fatalf("details %v, %v", details, err)
+	}
+	if len(r.names) != 1 || r.names[0] != "IssueDetails" || r.asked[0]["id"] != "ENG-5" {
+		t.Fatalf("query: %v %v", r.names, r.asked)
 	}
 }
 

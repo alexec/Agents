@@ -260,7 +260,7 @@ type draft struct {
 	ended          bool
 	tools          []any
 	helpSeen       string
-	workspaces     []WorkspaceInfo
+	workspaces     []MachineInfo
 	stop           chan struct{}
 }
 
@@ -681,7 +681,7 @@ func (s *Drafts) check(d *draft, given any) string {
 			noSSH = noSSH && deref(w.SSH) == ""
 		}
 	}
-	var withSSH *WorkspaceInfo
+	var withSSH *MachineInfo
 	for i := range checked.Workspaces {
 		if deref(checked.Workspaces[i].SSH) != "" {
 			withSSH = &checked.Workspaces[i]
@@ -722,7 +722,7 @@ func (s *Drafts) prove(d *draft, start bool, arguments any) string {
 	}
 	named := strOr(get(arguments, "workspace"))
 	s.mu.Lock()
-	var workspace *WorkspaceInfo
+	var workspace *MachineInfo
 	for i := range d.workspaces {
 		if d.workspaces[i].ID == named {
 			workspace = &d.workspaces[i]
@@ -777,7 +777,7 @@ func (s *Drafts) prove(d *draft, start bool, arguments any) string {
 	d.paused = true
 	s.mu.Unlock()
 	s.tell(d)
-	var after *WorkspaceInfo
+	var after *MachineInfo
 	connection, err := s.hooks.Connect(draftRecord(d, given), d.secrets)
 	if err == nil {
 		if start {
@@ -1218,7 +1218,7 @@ func sample(item any) string {
 }
 
 // workspaceLine is ProviderDrafts.line.
-func workspaceLine(w WorkspaceInfo) string {
+func workspaceLine(w MachineInfo) string {
 	parts := []string{fmt.Sprintf("%s (id %s): %s", w.Name, w.ID, w.State)}
 	if deref(w.SSH) != "" {
 		parts = append(parts, "ssh "+*w.SSH)

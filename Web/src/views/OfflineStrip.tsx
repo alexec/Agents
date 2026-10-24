@@ -5,13 +5,13 @@
 // runs on a provider's workspace (#691, layouts.md L1): then a stopped or failed one offers Start,
 // and a starting one shows a spinner and how long so far. The words are OfflineWords.swift's.
 import { useEffect, useState } from "preact/hooks";
-import type { ControlHost, HostWorkspace } from "../protocol/generated";
+import type { ControlHost, HostMachine } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import type { Store } from "../model/store";
 
 /** What a workspace host's strip says while it is stopped, starting or failed to start, or null
  *  when the ordinary offline line says it (OfflineWords.workspaceLine). */
-export function workspaceLine(name: string, state: string, workspace: HostWorkspace): string | null {
+export function workspaceLine(name: string, state: string, workspace: HostMachine): string | null {
   if (state === "starting") {
     switch (workspace.phase) {
       case "connecting": return `Waiting for ${name} to connect…`;
@@ -32,7 +32,7 @@ export function workspaceLine(name: string, state: string, workspace: HostWorksp
 
 /** "Starts at 02:55 for Nightly review" (#1004; OfflineWords.wakeLine): when the control plane
  *  will start it for its next scheduled workflow, or null when it won't. */
-export function wakeLine(workspace: HostWorkspace, now: number = Date.now()): string | null {
+export function wakeLine(workspace: HostMachine, now: number = Date.now()): string | null {
   if (workspace.wakeAt == null || !workspace.nextWorkflow) return null;
   return `Starts ${clock(fromWireDate(workspace.wakeAt).getTime(), now)} for ${workspace.nextWorkflow}`;
 }
@@ -53,7 +53,7 @@ export function footLine(host: ControlHost): string {
 }
 
 /** Whether the strip offers Start: a stopped or failed workspace, with nothing under way. */
-export function offersStart(state: string, workspace: HostWorkspace): boolean {
+export function offersStart(state: string, workspace: HostMachine): boolean {
   return workspace.canStart && state !== "online" && state !== "starting" && state !== "stopping";
 }
 

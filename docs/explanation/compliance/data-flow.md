@@ -30,7 +30,7 @@ flowchart LR
     apns["Apple Push Notification service"]
     vendor["Each runtime's vendor"]
     integrations["GitHub, GitLab, Linear, mail, MCP servers"]
-    providers["Workspace providers"]
+    providers["Machine providers"]
     kms["KMS: Google Cloud or Vault"]
 
     mac -->|"wss"| control
@@ -71,7 +71,7 @@ drawn as C4 diagrams in [Architecture](../architecture.md).
 | A server to the control plane, for a backup | The backup, in parts of 8 MiB | Inside the host's connection (TLS, as above). The control plane seals each part when it arrives. |
 | The control plane to Apple Push Notification service | A notification, and Live Activity updates | HTTPS to Apple. The words of a notification are sealed with the device's own key (HPKE: P-256, HKDF-SHA256, AES-256-GCM), and the visible alert says only "An agent needs you". A Live Activity update is not sealed. It carries only the turn's phase and times. |
 | A phone away from home, through iCloud | Requests and updates, when **Relay for my devices** is on | Each frame is sealed (HPKE, P-256 and AES-256-GCM) between the device's key and the relay's key on your Mac, then posted to your own iCloud private database. Apple sees only sealed frames. The relay on your Mac opens them and passes them on to the control plane over its own connection. |
-| The control plane to a workspace provider | Calls that start, stop and make machines, with the credentials you give | HTTPS, an MCP server or a provider's CLI, run by the control plane. |
+| The control plane to a machine provider | Calls that start, stop and make machines, with the credentials you give | HTTPS, an MCP server or a provider's CLI, run by the control plane. |
 | The control plane to KMS | Calls to seal and open the control plane's key | HTTPS to Google Cloud KMS or HashiCorp Vault. |
 
 ### A borrowed sign-in

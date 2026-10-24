@@ -49,7 +49,7 @@ removes people. A control plane always keeps one admin at least.
 ## Removing a person
 
 **Remove** first lists what it takes: the person's clients, the machines started for them
-by a workspace provider, and their other machines. Each started machine is asked for the
+by a machine provider, and their other machines. Each started machine is asked for the
 work on it that is not pushed (commits not pushed, a branch never pushed, changes not
 committed), because Remove deletes it. Within 5 seconds on every copy of the control
 plane, their clients are cut off and every machine of theirs leaves. Each started machine
@@ -67,7 +67,7 @@ join this team" (`docs/explanation/versions.md`).
 - **Approval:** a machine with no code asks to join as a person, and shows a short code.
   That person approves it on one of their clients within 10 minutes. A request that names
   nobody goes to the admins.
-- **A workspace provider's start:** the machine is the person's who started it.
+- **A machine provider's start:** the machine is the person's who started it.
 
 ## What comes later
 

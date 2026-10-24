@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/alexec/agents/Go/internal/richtext"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -90,7 +91,7 @@ func addViews(server *mcp.Server, g *RealGitLab, projectOf func(context.Context,
 
 	tool(server, &mcp.Tool{Name: "show_issues", Title: "Show issues",
 		Description: "The project's open issues, newest created first, at most 100, each with its labels, assignees (usernames) " +
-			"and comment count. Its view is the Issues page, with Start Agent on each issue.",
+			"and comment count. Its view is the Issues page, where a person expands a row for its Markdown description or chooses Start Agent.",
 		Annotations: readOnly, Meta: uiMeta(issuesURI, "model", "app")},
 		func(ctx context.Context, in issuesViewArgs) (map[string]any, error) {
 			project, err := projectOf(ctx, in.Project)
@@ -98,6 +99,24 @@ func addViews(server *mcp.Server, g *RealGitLab, projectOf func(context.Context,
 				return nil, err
 			}
 			return g.OpenIssues(ctx, project, in.Label)
+		})
+
+	tool(server, &mcp.Tool{Name: "show_issue_details", Title: "Show issue details",
+		Description: "One issue's description, rendered as rich text for the Issues page.",
+		Annotations: readOnly, Meta: uiMeta("", "model", "app")},
+		func(ctx context.Context, in numberArgs) (map[string]any, error) {
+			project, err := projectOf(ctx, in.Project)
+			if err != nil {
+				return nil, err
+			}
+			if in.Number < 1 {
+				return nil, fmt.Errorf("issue number must be positive")
+			}
+			var issue issueJSON
+			if err := g.get(ctx, fmt.Sprintf("projects/%s/issues/%d", pid(project), in.Number), false, &issue); err != nil {
+				return nil, err
+			}
+			return map[string]any{"description": issue.Description, "descriptionHTML": richtext.Markdown(issue.Description)}, nil
 		})
 
 	tool(server, &mcp.Tool{Name: "show_merge_request", Title: "Show a merge request",
@@ -176,7 +195,7 @@ func addViews(server *mcp.Server, g *RealGitLab, projectOf func(context.Context,
 		{mrsURI, "merge-requests", "Merge requests", "The project's open merge requests, newest created first, with their pipeline, conflict, approvals " +
 			"and auto-merge; a merge request opens its page. Fed by show_merge_requests.", "mrs.html"},
 		{issuesURI, "issues", "Issues", "The project's open issues, newest created first, with their labels and assignees, and Start Agent; a label narrows " +
-			"the list. Fed by show_issues.", "issues.html"},
+			"the list. A person expands a row to read its Markdown description. Fed by show_issues.", "issues.html"},
 		{mrURI, "mr", "Merge request", "One merge request's page: description, comments, discussions on lines, files with the app's " +
 			"diff, and its pipeline with a failed job's log, with Comment, Approve, Merge, Auto-merge and Ask an Agent. Fed by show_merge_request.", "mr.html"},
 	} {

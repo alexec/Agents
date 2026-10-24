@@ -198,8 +198,8 @@ Project**.
   requests, each with its checks, review, conflict, auto-merge and CodeRabbit's status
   (*CodeRabbit reviewing* or *CodeRabbit reviewed*), and **Rerun** on a failing one. A title opens the pull request's page in the same view.
 - **Issues** (`ui://github/issues`, from `show_issues`): the open issues, with their labels
-  and assignees. A label narrows the list. **Start Agent** opens the new-agent form for the
-  issue.
+  and assignees. A label narrows the list. Click a row to expand its rich-text description
+  and linked pull requests. **Start Agent** opens the new-agent form for the issue.
 - **A pull request's page** (`ui://github/pr`, from `show_pull_request`): the description
   and the conversation, the comments on lines of code, the files, and the checks, where a
   failed check shows the end of its log (`failed_log`). An app's words are marked *bot*;

@@ -136,7 +136,7 @@ func viewsFake(t *testing.T) *fakeGitLab {
 			{"id": 33, "type": "DiffNote", "body": "Then it raises.", "author": dev, "created_at": at(3)}}},
 		{"id": "d3", "notes": []obj{{"id": 34, "body": "added 1 commit", "system": true, "author": dev, "created_at": at(0)}}},
 	}
-	f.issues = []obj{issueObj(5, dev, obj{"labels": []string{"bug"}, "assignees": []obj{alex}, "user_notes_count": 2})}
+	f.issues = []obj{issueObj(5, dev, obj{"description": "## Work\n\n- **Inspect**", "labels": []string{"bug"}, "assignees": []obj{alex}, "user_notes_count": 2})}
 	return f
 }
 
@@ -191,13 +191,16 @@ func TestEachViewHasAToolThatFeedsItAndAPage(t *testing.T) {
 		}
 		// Every tool a page calls is one this server has.
 		for _, called := range []string{"show_merge_requests", "show_merge_request", "show_merge_request_diff", "failed_log",
-			"retry_pipeline", "comment_on_merge_request", "approve_merge_request", "merge_merge_request", "show_issues"} {
+			"retry_pipeline", "comment_on_merge_request", "approve_merge_request", "merge_merge_request", "show_issues", "show_issue_details"} {
 			if strings.Contains(html, `"`+called+`"`) && visibility[called] == nil {
 				t.Errorf("%s calls %s, which is not a tool", uri, called)
 			}
 		}
 		if strings.Contains(html, "GitHub") || strings.Contains(html, "gh pr") || strings.Contains(html, "CodeRabbit") {
 			t.Errorf("%s still speaks of GitHub", uri)
+		}
+		if uri == issuesURI && (!strings.Contains(html, "aria-expanded") || strings.Contains(html, "Show details")) {
+			t.Error("issues page does not expand issue rows without a details button")
 		}
 	}
 }
@@ -247,6 +250,14 @@ func TestTheIssuesListHasLabelsAndAssignees(t *testing.T) {
 	asked := f.asked()
 	if last := asked[len(asked)-1]; !strings.Contains(last, "state=opened") || !strings.Contains(last, "labels=bug") {
 		t.Fatalf("asked %s", last)
+	}
+}
+
+func TestIssueDetailsRenderMarkdownForTheView(t *testing.T) {
+	c := viewsClient(t, viewsFake(t))
+	_, details := callTool(t, c, "show_issue_details", map[string]any{"number": 5})
+	if details["description"] != "## Work\n\n- **Inspect**" || !strings.Contains(details["descriptionHTML"].(string), "<strong>Inspect</strong>") {
+		t.Fatalf("issue details: %v", details)
 	}
 }
 

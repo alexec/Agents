@@ -1,35 +1,35 @@
 ---
 diataxis: how-to
 devices: [mac, iphone, ipad, web, server]
-description: Make anything that can start and stop a machine a workspace provider - a preset, your own commands, a tool map over another MCP server, or a server of your own.
+description: Make anything that can start and stop a machine a machine provider - a preset, your own commands, a tool map over another MCP server, or a server of your own.
 ---
 
-# Add a workspace provider
+# Add a machine provider
 
-A workspace provider is an MCP server that lists workspaces, starts them and stops them.
+A machine provider is an MCP server that lists machines, starts them and stops them.
 Agents talks to every provider in the same way, so it has no code for any one cloud. There
 are three ways to make one, and only the last needs any code.
 
 ## A preset, or your own commands
 
-Agents ships one provider, the **command provider**. Each of its workspaces is a few
+Agents ships one provider, the **command provider**. Each of its machines is a few
 shell commands or web requests, and its presets fill those in for the common tools.
 
 DigitalOcean, GitHub Codespaces and Coder can be reached in two ways. Add Provider shows
 **Its API** first: a token, and nothing to install (#1119). **Its CLI** uses the CLI, signed
 in, as before.
 
-| Preset | Through its API, it needs | Through its CLI, it needs | Workspaces |
+| Preset | Through its API, it needs | Through its CLI, it needs | Machines |
 | --- | --- | --- | --- |
-| Docker Containers | — | `docker` | the containers you name, or the containers labelled `agents.workspace` |
+| Docker Containers | — | `docker` | the containers you name, or the containers labelled `agents.machine` |
 | DigitalOcean Droplets | a token with custom scopes: droplet read and update (and create and delete, to make and delete droplets) | `doctl`, signed in | droplets with a tag |
 | GitHub Codespaces | a token: fine-grained with Codespaces lifecycle admin, or classic with `codespace`; and `gh` for ssh, after `gh codespace ssh --config >> ~/.ssh/config` | `gh`, signed in | your codespaces, or one repository's |
-| Coder Workspaces | the deployment's address and a session token (`coder tokens create`); and `coder` for ssh, after `coder config-ssh` | `coder`, signed in, after `coder config-ssh` | your Coder workspaces |
+| Coder Machines | the deployment's address and a session token (`coder tokens create`); and `coder` for ssh, after `coder config-ssh` | `coder`, signed in, after `coder config-ssh` | your Coder machines |
 | Google Cloud Workstations | — | `gcloud`, signed in | one cluster and configuration's workstations |
 | AWS EC2 Instances | an IAM user's access key (the policy is below) | — | instances with a tag in one region |
 
 The token goes in only as the provider's secret. It is sent in a request's header, never in
-an address, a log or an error. A codespace and a Coder workspace have no ssh port of their
+an address, a log or an error. A codespace and a Coder machine have no ssh port of their
 own, so ssh to them still goes through `gh` or `coder`, as the ssh ProxyCommand; the
 Providers page says "needs gh for ssh" or "needs coder for ssh". A droplet is reached with
 plain ssh to its public address, and so is an EC2 instance.
@@ -59,25 +59,25 @@ For anything else, choose **Your commands** and give:
 - **Status** (optional): a command that prints `running` or `stopped`. Without it, Agents
   goes by what it last did.
 - **ssh**: how the control plane's Mac reaches it, such as `devstack-1.cws` or
-  `alex@devbox.example -p 2222`. Agents uses it to add the workspace as a server, and to start
+  `alex@devbox.example -p 2222`. Agents uses it to add the machine as a server, and to start
   agentsd if it doesn't start on boot.
 
 The commands run with `/bin/sh` on the Mac that runs the control plane, as you, never as
 root. A secret you add goes to them as an environment variable of the same name: write
 `$TOKEN` in a command to use it.
 
-To make and delete workspaces from Agents as well, configure the command provider with a
+To make and delete machines from Agents as well, configure the command provider with a
 `list` command and add:
 
 - **`create`**: the command that makes one. `${name}`, `${firstBoot}` and each option's
-  key are filled in, each as one shell word. With `${firstBoot}` in it, the new workspace
+  key are filled in, each as one shell word. With `${firstBoot}` in it, the new machine
   installs Agents on its first boot. Without it, you add it over ssh once it is made.
 - **`delete`**: the command that deletes one, with `${id}` and its list's columns.
 - **`options`**: the New Machine form, as a JSON Schema object. A property's `default`
   fills in a choice the form leaves empty.
 
-The Docker preset makes workspaces when you give it an **Image** and no containers. New
-Workspace… runs `docker run -d --name <name> --label agents.workspace <image>`, then the
+The Docker preset makes machines when you give it an **Image** and no containers. New
+Machine… runs `docker run -d --name <name> --label agents.machine <image>`, then the
 install command in it with `docker exec`, so the container joins by itself. The image must
 keep running and have `curl`. Delete Machine… runs `docker rm -f -v`, which also removes
 the container's anonymous volumes.
@@ -86,18 +86,18 @@ DigitalOcean through its API makes droplets too. New Machine… makes a droplet 
 tag, in the region, size and image you choose (an image with systemd, such as
 `ubuntu-24-04-x64`). Its first boot makes a user, `agents`, with root's ssh keys, and
 installs Agents as that user, never as root. The host starts with the droplet. Delete
-Workspace… deletes the droplet. Any other preset needs **An MCP server** or a provider
-configured by hand to make workspaces.
+Machine… deletes the droplet. Any other preset needs **An MCP server** or a provider
+configured by hand to make machines.
 
-The command provider is the `workspace-commands` binary. The control plane looks for it
+The command provider is the `machine-commands` binary. The control plane looks for it
 beside itself, then where `AGENTS_WORKSPACE_COMMANDS` says, then on its `PATH`. Its configuration is described in full in
-[Workspace providers](../reference/workspace-providers.md#the-command-provider).
+[Machine providers](../reference/machine-providers.md#the-command-provider).
 
 ## A tool map, for a provider's own MCP server
 
 Some providers have an MCP server of their own, with tools named their own way. Choose
 **MCP server**, give its command or address, and write a **tool map**. The map says which of
-its tools lists, starts and stops, and where the workspaces are in what it answers.
+its tools lists, starts and stops, and where the machines are in what it answers.
 
 Agents ships one for DigitalOcean's server: choose **Use DigitalOcean's** under the tool map.
 It fills in `npx -y @digitalocean/mcp`, the map below, and a `DIGITALOCEAN_API_TOKEN`
@@ -126,11 +126,11 @@ It lists every droplet in the account. Its server's `droplet-create` can't run a
 first boot, so use the DigitalOcean preset through its API to make droplets.
 
 - A path is dotted keys, with `[0]` for an item of a list.
-- `{path}` inside text is filled in from the workspace.
-- `{id}` in arguments is the workspace's id, and `{id:number}` the same as a number.
+- `{path}` inside text is filled in from the machine.
+- `{id}` in arguments is the machine's id, and `{id:number}` the same as a number.
 - `create`, `delete` and `options` are optional, with the same shape as `start`.
   `create`'s arguments take `{name}`, `{firstBoot}`, `{options}` and each choice's key, and
-  `"firstBootRuns": true` says the server runs `{firstBoot}` on the new workspace.
+  `"firstBootRuns": true` says the server runs `{firstBoot}` on the new machine.
 - `states` turns the provider's words into running, starting, stopping or stopped.
 
 The tool names in this example show the shape. Check the server's own tool list for the
@@ -172,9 +172,9 @@ What the agent can and cannot do:
 - The control plane runs `cws ‹words› --help` only for subcommands that the help printed.
   It runs a check alone only if the check is plainly a list. For any other check, the sheet
   asks you first, with **Run Check**.
-- The agent can ask to start or stop one workspace to prove the map. The sheet asks you
-  each time, with the workspace and its cost. **Don't**, or no answer in 2 minutes, is a no.
-  A workspace that you start this way stays running until you stop it.
+- The agent can ask to start or stop one machine to prove the map. The sheet asks you
+  each time, with the machine and its cost. **Don't**, or no answer in 2 minutes, is a no.
+  A machine that you start this way stays running until you stop it.
 - It has 5 minutes, 8 checks and 40 tool calls. Then the sheet shows its last draft.
 
 When a provider's server changes, use **Write the Map Again…** (or **Write the Commands
@@ -187,11 +187,11 @@ Start and Stop never use the agent: they use the map that you kept.
 ## On the iPhone, the iPad and the web page
 
 The Remote and the web page add, edit and remove the API presets: DigitalOcean Droplets,
-GitHub Codespaces, Coder workspaces, Google Compute Engine VMs and AWS EC2 instances.
+GitHub Codespaces, Coder machines, Google Compute Engine VMs and AWS EC2 instances.
 
-- **iPhone and iPad:** open **Settings**, tap **Workspace providers**, then tap
+- **iPhone and iPad:** open **Settings**, tap **Machine providers**, then tap
   **Add Provider…**.
-- **Web page:** open **Settings**, go to **Workspace providers**, then click **Add
+- **Web page:** open **Settings**, go to **Machine providers**, then click **Add
   Provider…**.
 
 Each one asks for the same fields and the same token as the Mac. The token goes to the
@@ -205,11 +205,11 @@ a CLI or a map, which the Remote and the page do not edit.
 
 Any MCP server that offers `workspaces_list`, `workspace_start` and `workspace_stop` is a
 provider as it is. It needs no map. The tools, their arguments and their answers are in
-[Workspace providers](../reference/workspace-providers.md).
+[Machine providers](../reference/machine-providers.md).
 
 ## Related
 
-- [Start workspaces from Agents](start-workspaces-from-agents.md): link a server and press
+- [Start machines from Agents](start-machines-from-agents.md): link a server and press
   Start.
 - [Add a connector by hand](add-a-connector-by-hand.md): connectors (MCP servers) for agents, which are
   set up per project, not on the control plane.

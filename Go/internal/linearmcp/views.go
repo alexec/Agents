@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/alexec/agents/Go/internal/richtext"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -47,6 +48,8 @@ type Views interface {
 	// OpenIssues is the workspace's issues not completed or canceled, newest updated first,
 	// at most 100, narrowed to a team key, a state type and a label when they are not empty.
 	OpenIssues(ctx context.Context, team, stateType, label string) ([]ListedIssue, error)
+	// IssueDetails reads one issue's Markdown description.
+	IssueDetails(ctx context.Context, identifier string) (map[string]any, error)
 	// Teams is the workspace's teams, for the page's team choice.
 	Teams(ctx context.Context) ([]Team, error)
 }
@@ -79,6 +82,10 @@ type issuesArgs struct {
 	Label string `json:"label,omitempty" jsonschema:"only issues with this label"`
 }
 
+type issueDetailsArgs struct {
+	Identifier string `json:"identifier" jsonschema:"the issue identifier, such as ENG-12"`
+}
+
 func structured(data map[string]any) *mcp.CallToolResult {
 	text, _ := json.Marshal(data)
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(text)}}, StructuredContent: data}
@@ -98,7 +105,7 @@ func AddViews(server *mcp.Server, linear Views) {
 		Description: "The Linear workspace's open issues (not completed or canceled), newest updated first, at most 100, each with " +
 			"its identifier (ENG-12), team, state, priority, labels, assignee and comment count, and the workspace's teams. " +
 			"A team key, a state type (triage, backlog, unstarted, started) or a label narrows it. " +
-			"Its view is the Linear issues page, with Start Agent on each issue.",
+			"Its view is the Linear issues page, where a person expands a row for its Markdown description or chooses Start Agent.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true}, Meta: uiMeta(issuesURI, "model", "app")},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in issuesArgs) (*mcp.CallToolResult, any, error) {
 			if in.State != "" && !contains(openStateTypes, in.State) {
@@ -124,15 +131,48 @@ func AddViews(server *mcp.Server, linear Views) {
 				"teams": names, "states": openStateTypes, "issues": issues, "count": len(issues)}), nil, nil
 		})
 
+	mcp.AddTool(server, &mcp.Tool{Name: "show_issue_details", Title: "Show issue details",
+		Description: "One issue's description, rendered as rich text for the Issues page.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true}, Meta: uiMeta("", "model", "app")},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in issueDetailsArgs) (*mcp.CallToolResult, any, error) {
+			if strings.TrimSpace(in.Identifier) == "" {
+				return failed(fmt.Errorf("issue identifier is required")), nil, nil
+			}
+			details, err := linear.IssueDetails(ctx, in.Identifier)
+			if err != nil {
+				return failed(err), nil, nil
+			}
+			return structured(details), nil, nil
+		})
+
 	// No network at all: an empty csp, so the host draws it under its strictest policy.
 	meta := mcp.Meta{"ui": map[string]any{"csp": map[string]any{}, "prefersBorder": true}}
 	html := page("issues.html")
 	server.AddResource(&mcp.Resource{URI: issuesURI, Name: "issues", Title: "Linear issues",
 		Description: "The workspace's open Linear issues, with their team, state, priority, labels and assignee, and Start Agent; " +
-			"a team, a state or a label narrows the list. Fed by show_issues.", MIMEType: viewMime, Meta: meta},
+			"a team, a state or a label narrows the list. A person expands a row to read its Markdown description. Fed by show_issues.", MIMEType: viewMime, Meta: meta},
 		func(context.Context, *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
 			return &mcp.ReadResourceResult{Contents: []*mcp.ResourceContents{{URI: issuesURI, MIMEType: viewMime, Text: html, Meta: meta}}}, nil
 		})
+}
+
+// IssueDetails reads and renders one issue's Markdown description.
+func (l *RealLinear) IssueDetails(ctx context.Context, identifier string) (map[string]any, error) {
+	var out struct {
+		Issue *struct {
+			Identifier  string `json:"identifier"`
+			Description string `json:"description"`
+		} `json:"issue"`
+	}
+	q := `query IssueDetails($id: String!) { issue(id: $id) { identifier description } }`
+	if err := l.query(ctx, q, map[string]any{"id": identifier}, &out); err != nil {
+		return nil, err
+	}
+	if out.Issue == nil {
+		return nil, fmt.Errorf("Linear issue %s was not found", identifier)
+	}
+	return map[string]any{"identifier": out.Issue.Identifier, "description": out.Issue.Description,
+		"descriptionHTML": richtext.Markdown(out.Issue.Description)}, nil
 }
 
 // MARK: Read from Linear

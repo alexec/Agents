@@ -1,13 +1,13 @@
 ---
 diataxis: reference
 devices: [mac, iphone, ipad]
-description: Groups of people, and the workspace providers each group may start machines from.
+description: Groups of people, and the machine providers each group may start machines from.
 ---
 
 # Groups
 
 **Settings ▸ Control plane ▸ Groups** lists the groups on the control plane (#1761). A group
-is **everyone**, or the people you name. A group owns workspace providers: only its people
+is **everyone**, or the people you name. A group owns machine providers: only its people
 see a provider and start machines from it. A machine that a person starts is theirs.
 
 ## What an admin does
@@ -16,7 +16,7 @@ see a provider and start machines from it. A machine that a person starts is the
   people. Everyone takes in each person who joins later too.
 - **Edit…** changes the name or the people. **Remove…** removes the group. You cannot remove
   a group that a provider still has: give the provider to another group first.
-- On **Workspace Providers**, each provider has a group picker. **Admins only** is the
+- On **Machine Providers**, each provider has a group picker. **Admins only** is the
   default, and every provider made before groups has it.
 
 Only an admin adds, changes or removes a provider. An admin sees every provider, but starts

@@ -1,12 +1,12 @@
 ---
 diataxis: how-to
 devices: [mac, iphone, ipad, web]
-description: Add AWS EC2, Google Compute Engine, Google Cloud Workstations, DigitalOcean, GitHub Codespaces or Coder as a workspace provider, with the credentials each one needs and where they go.
+description: Add AWS EC2, Google Compute Engine, Google Cloud Workstations, DigitalOcean, GitHub Codespaces or Coder as a machine provider, with the credentials each one needs and where they go.
 ---
 
-# Set up a cloud workspace provider
+# Set up a cloud machine provider
 
-A workspace provider starts and stops the machines that your hosts run on. It runs on the
+A machine provider starts and stops the machines that your hosts run on. It runs on the
 control plane, not on a host, so it can start a host that is down. This page tells you how
 to add one for a cloud, and which credentials each cloud needs.
 
@@ -14,22 +14,22 @@ Most clouds have an **API preset**: you give a token or a key, and there is noth
 install. A **CLI preset** uses the cloud's own CLI, which must be installed and signed in
 on the Mac that runs the control plane.
 
-| Cloud | Through its API | Through its CLI | Its workspaces |
+| Cloud | Through its API | Through its CLI | Its machines |
 | --- | --- | --- | --- |
 | AWS EC2 Instances | an IAM user's access key | no | instances with a tag, in one region |
 | Google Compute Engine VMs | a service account's JSON key | no | VMs with a label, in one zone |
 | Google Cloud Workstations | no | `gcloud` | one cluster and configuration's workstations |
 | DigitalOcean Droplets | an API token | `doctl` | droplets with a tag |
 | GitHub Codespaces | a GitHub token | `gh` | your codespaces, or one repository's |
-| Coder Workspaces | a session token | `coder` | your Coder workspaces |
+| Coder Machines | a session token | `coder` | your Coder machines |
 
 ## Where to add one
 
 - **On the Mac:** **Settings ▸ Control plane ▸ Providers**, then **Add Provider…**. Choose
   the cloud. For DigitalOcean, Codespaces and Coder, **Reach it with** offers **Its API**
   (first) and **Its CLI**. The Mac also adds Docker, your own commands and MCP servers.
-- **On the iPhone or iPad:** **Settings ▸ Workspace providers**, then **Add Provider…**.
-- **On the web page:** the **Workspace providers** section of Settings, then
+- **On the iPhone or iPad:** **Settings ▸ Machine providers**, then **Add Provider…**.
+- **On the web page:** the **Machine providers** section of Settings, then
   **Add Provider…**.
 
 The Remote and the web page offer only the API presets: DigitalOcean, Codespaces, Coder,
@@ -125,7 +125,7 @@ This one is on the Mac only, through `gcloud`. It has no API preset.
 
 A workstation makes a new ssh host key each time it starts. After a Start that the control
 plane made, its ssh start takes the new key and pins it again. At any other time a changed
-key is refused. See [Integrations](../reference/integrations.md#workspace-providers) for
+key is refused. See [Integrations](../reference/integrations.md#machine-providers) for
 its state.
 
 ## DigitalOcean Droplets
@@ -162,7 +162,7 @@ Agents on its first boot: add it with **Add as Host…** on the Mac.
 
 Through its CLI, install `gh` and sign it in.
 
-## Coder Workspaces
+## Coder Machines
 
 Through its API, you need your deployment's address and a session token.
 
@@ -177,18 +177,18 @@ Through its CLI, install `coder`, sign it in, and run `coder config-ssh`.
 
 ## After you add it
 
-When you choose **Add**, the control plane checks that the provider lists its workspaces.
+When you choose **Add**, the control plane checks that the provider lists its machines.
 If it can't, it says why, in the cloud's own words. The provider's card then shows its
-workspaces, and you can link each one to a host. See
-[Start workspaces from Agents](start-workspaces-from-agents.md).
+machines, and you can link each one to a host. See
+[Start machines from Agents](start-machines-from-agents.md).
 
-Workspace providers need a control plane with one copy, such as the one on your Mac. A
+Machine providers need a control plane with one copy, such as the one on your Mac. A
 control plane with several copies does not run them yet.
 
 ## See also
 
-- [Add a workspace provider](add-a-workspace-provider.md): your own commands, a tool map,
+- [Add a machine provider](add-a-machine-provider.md): your own commands, a tool map,
   or a server of your own.
-- [Workspace providers](../reference/workspace-providers.md): every preset's parameters
+- [Machine providers](../reference/machine-providers.md): every preset's parameters
   and the contract.
-- [Start workspaces from Agents](start-workspaces-from-agents.md)
+- [Start machines from Agents](start-machines-from-agents.md)
