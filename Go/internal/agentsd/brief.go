@@ -57,9 +57,10 @@ func endingBrief(runtimeID string) string {
 		"archive_session with no id."
 }
 
-// compatibilitySystemPromptDelivery describes runtime-specific legacy routes, used only
-// when initialize does not advertise ACP's session system-prompt capability.
-var compatibilitySystemPromptDelivery = map[string]string{"claude": "append", "grok": "rules"}
+// compatibilitySystemPromptDelivery describes runtime-specific fallback routes, used only
+// when initialize does not advertise ACP's session system-prompt capability. Codex ACP 2.2.2
+// reads customInstructions from JetBrains AIR metadata. Cursor and Gemini have no fallback.
+var compatibilitySystemPromptDelivery = map[string]string{"claude": "append", "grok": "rules", "codex": "customInstructions"}
 
 // brief is the whole of it for an agent, in the order it is said: who is who first, since
 // the paragraphs after it say "I" and "me" and that is the person it names; then the three
@@ -411,6 +412,23 @@ func withSystemPrompt(meta map[string]any, runtimeID, words string) map[string]a
 			words += "\n\n" + rules
 		}
 		out["rules"] = words
+	case "customInstructions":
+		jetbrains, _ := out["jetbrains"].(map[string]any)
+		jetbrains = cloneMeta(jetbrains)
+		air, _ := jetbrains["air"].(map[string]any)
+		air = cloneMeta(air)
+		air["version"] = 1
+		air["customInstructions"] = words
+		jetbrains["air"] = air
+		out["jetbrains"] = jetbrains
 	}
 	return out
+}
+
+func cloneMeta(meta map[string]any) map[string]any {
+	copy := make(map[string]any, len(meta)+1)
+	for key, value := range meta {
+		copy[key] = value
+	}
+	return copy
 }
