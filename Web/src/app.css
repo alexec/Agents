@@ -489,6 +489,8 @@ button.link.reading:hover { text-decoration: underline; }
 .archive-card .strong { color: var(--tint-attention); }
 .archive-card .archive-answers { display: flex; justify-content: flex-end; gap: 10px; }
 .wait-card p { margin: 0; }
+.wait-card .wait-card-lines { display: flex; flex-direction: column; gap: 3px; }
+.wait-card .wait-card-lines span:last-child { margin-top: 7px; }
 .wait-card .wait-answers { display: flex; justify-content: flex-end; gap: 10px; }
 .note.switch {
   padding: 10px 12px;

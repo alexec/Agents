@@ -380,7 +380,9 @@ struct ChatView: View {
         // the prompt.
         if agent.eventWait?.isOpen == true, let status = model.work.waitStatus(of: agent) {
             cards.append(WaitingCard(id: "wait:" + agent.id.uuidString) {
-                WaitCard(status: status,
+                WaitCard(status: status, eventWaitSince: agent.eventWait?.since,
+                         eventWaitDeadline: agent.eventWait?.deadline,
+                         isLineWait: agent.eventWait?.lineResource != nil,
                          open: { model.showEvents(at: .waitingNow) },
                          stop: { await model.cancelWait(of: agent.id) },
                          isDisabled: selectedHostOffline)

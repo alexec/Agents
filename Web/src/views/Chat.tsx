@@ -49,7 +49,7 @@ import { comingBackDescription, footStatusWords } from "../model/status";
 import { ArchiveCard } from "./ArchiveCard";
 import { showsThoughts, shownItems } from "../model/thoughts";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
-import { eventWaitLine, leaseMark, lineResource } from "../model/rowLines";
+import { eventWaitCardLines, eventWaitLine, leaseMark, lineResource } from "../model/rowLines";
 import { routeHash } from "../route";
 import { sessionRuntimeName } from "../model/runtimes";
 import { GuardedChangeCard } from "./GuardedChange";
@@ -430,7 +430,6 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   // What waits on the person is in the conversation, not over it (#723), after all of it (#1995),
   // and the agent's wait on events under it.
   const asked = useWaitingCards({ store, host, session, down });
-  const waitLine = agent && eventWaitLine(agent, (id) => store.agent(host, id)?.title, store.leases.value[host]);
   const cards: WaitingCard[] = [
     // A change its agent made to the project's own files, asked here (#531).
     ...store.guardedChanges(host, { session }).map(({ folder, change }) => ({
@@ -610,7 +609,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           </div>
         )}
         {/* Under them, and not in "Waiting for you": the agent waits, not the person (#2084). */}
-        {agent && waitLine && <WaitCard line={waitLine} disabled={down} stop={() => store.cancelWait(host, agent.id)} />}
+        {agent?.eventWait && <WaitCard agent={agent} title={(id) => store.agent(host, id)?.title}
+          disabled={down} stop={() => store.cancelWait(host, agent.id)} />}
         {agent && !store.isComingBack(host, agent.id) && agent.state !== "running" && agent.state !== "starting" && (
           <QuietLine since={lastEntryAt(store.entries.value, store.turns.value) ?? fromWireDate(agent.lastActivityAt)} />
         )}
@@ -812,12 +812,22 @@ function LeaseLine({ store, host, agent }: { store: Store; host: string; agent: 
  * The agent's wait on events, as a card under the questions (WaitCard.swift, #1995): what, since
  * when, until when, a way to it on the Events page, and Stop Waiting. Not tinted.
  */
-function WaitCard({ line, disabled, stop }: { line: string; disabled: boolean; stop: () => Promise<void> }) {
+function WaitCard({ agent, title, disabled, stop }: { agent: Agent; title: (id: string) => string | undefined;
+  disabled: boolean; stop: () => Promise<void> }) {
   const busy = useSignal(false);
+  const now = useSignal(Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => { now.value = Date.now(); }, 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const lines = eventWaitCardLines(agent, title, new Date(now.value));
+  const line = lines ? null : eventWaitLine(agent, title);
+  if (!lines && !line) return null;
   return (
     <div class="cards">
       <div class="card wait-card">
-        <p class="strong">{line}</p>
+        {lines ? <p class="strong wait-card-lines">{lines.map((item) =>
+          <span key={item}>{item}</span>)}</p> : <p class="strong">{line}</p>}
         <p class="wait-answers">
           <button onClick={() => { location.hash = routeHash({ activity: "events" }); }}>Show in Events</button>
           <button disabled={disabled || busy.value} title="Stop waiting. Nothing will start it again for this wait."

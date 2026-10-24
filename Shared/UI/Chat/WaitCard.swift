@@ -13,6 +13,9 @@ import SwiftUI
 /// from a chat in a scene of its own.
 struct WaitCard: View {
     let status: WaitStatus
+    let eventWaitSince: Date?
+    let eventWaitDeadline: Date?
+    let isLineWait: Bool
     var open: (() -> Void)?
     let stop: () async -> Void
     var isDisabled = false
@@ -21,9 +24,17 @@ struct WaitCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(status.line)
-                .appText(.reading).fontWeight(.semibold)
-                .fixedSize(horizontal: false, vertical: true)
+            if let since = eventWaitSince, let deadline = eventWaitDeadline, !isLineWait {
+                TimelineView(.periodic(from: .now, by: 60)) { context in
+                    Text(eventLine(since: since, deadline: deadline, now: context.date))
+                        .appText(.reading).fontWeight(.semibold)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } else {
+                Text(status.line)
+                    .appText(.reading).fontWeight(.semibold)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             HStack(spacing: 10) {
                 Spacer()
                 if let open {
@@ -48,6 +59,12 @@ struct WaitCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.secondary.opacity(0.25)))
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(status.line)
+    }
+
+    private func eventLine(since: Date, deadline: Date, now: Date) -> String {
+        let what = status.mark.replacingOccurrences(of: "\(WaitStatus.symbol) Waiting for ", with: "")
+        let duration = max(1, Int(ceil(deadline.timeIntervalSince(since) / 60)))
+        let elapsed = max(0, Int(now.timeIntervalSince(since) / 60))
+        return "Waiting for \(duration) min for:\n\(what)\n\n\(elapsed) min elapsed so far."
     }
 }
