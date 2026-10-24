@@ -127,7 +127,7 @@ test("who started it, and the worktree's help", () => {
   assert.equal(lines.startedByAgentLabel({ startedByAgent: "a" }, title), "Started by “Fix login”");
   assert.equal(lines.startedByAgentLabel({ startedByAgent: "gone" }, title), "Started by another agent");
   assert.equal(lines.startedByAgentLabel({}, title), null);
-  const worktree = { name: "fix", root: "file:///w/Agents%20wt/fix/", branch: "agents/fix", project: "file:///w/Agents/", madeByApp: true };
+  const worktree = { name: "fix", root: "file:///w/Agents%20wt/fix/", branch: "agents/fix", folder: "file:///w/Agents/", madeByApp: true };
   assert.equal(lines.worktreeHelp(worktree, false), "agents/fix — /w/Agents wt/fix/");
   assert.equal(lines.worktreeHelp({ ...worktree, branch: undefined }, true), "detached — /w/Agents wt/fix/, which is not there any more");
 });

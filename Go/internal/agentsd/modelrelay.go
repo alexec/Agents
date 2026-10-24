@@ -442,7 +442,7 @@ var vendorAddress = map[wire.OrgRouteVendor]string{
 	wire.OrgRouteVendorXai:       "https://api.x.ai",
 }
 
-// vertexPublishers is a Vertex path without its project and location, as Gemini's express
+// vertexPublishers is a Vertex path without its folder and location, as Gemini's express
 // mode sends it: the relay puts the route's in.
 var vertexPublishers = regexp.MustCompile(`^/(v1|v1beta1)/publishers/`)
 

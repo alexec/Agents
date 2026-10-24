@@ -14,7 +14,7 @@ import SwiftUI
 /// the one read: a change since is refused, and the refusal is said here.
 struct ReviewPage: View {
     let approval: Approval
-    /// Which project it is in, as the sidebar names it.
+    /// Which folder it is in, as the sidebar names it.
     var place: String?
     /// What it is; nil when it could not be read, which the client has said.
     let read: () async -> GuardedChangeReading?
@@ -59,7 +59,7 @@ struct ReviewPage: View {
                     }
                     if reading.isCut {
                         Text("The change is longer than \(GuardedDiffLine.limit) lines. The rest is not shown here; "
-                             + "open \(reading.path) in the project to read it all.")
+                             + "open \(reading.path) in the folder to read it all.")
                             .appText(.fine)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)

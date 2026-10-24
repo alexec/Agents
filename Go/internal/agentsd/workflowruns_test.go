@@ -17,7 +17,7 @@ import (
 // its run ends with the agent's turn; an event fires the workflow that waits on it, never
 // on news of its own agents; a fire while a run goes queues, and goes when it ends.
 
-// approveAll is the person approving every workflow waiting in a project.
+// approveAll is the person approving every workflow waiting in a folder.
 func approveAll(t *testing.T, c *conn, folder wire.URL) {
 	t.Helper()
 	var list []wire.WorkflowSummary
@@ -33,7 +33,7 @@ func TestAWorkflowRuns(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	lastUsed := now() + 1
 	seeded(t, d, dir, func(a *wire.Agent) {
 		a.RuntimeID = "grok"
@@ -86,7 +86,7 @@ func TestAWorkflowRuns(t *testing.T) {
 func TestAllowanceFailureDoesNotAutoarchiveWorkflowRun(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	const id = "allowance"
 	if err := os.MkdirAll(workflowsFolder(dir), 0o755); err != nil {
 		t.Fatal(err)
@@ -119,7 +119,7 @@ func TestAFireWhileARunGoesQueues(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "slow.md"), []byte("---\non: server.online\n---\nwait for me\n"), 0o644)
@@ -173,7 +173,7 @@ func TestAWorkflowPinnedHereRuns(t *testing.T) {
 	t.Setenv("AGENTS_MACHINE_ID", "")
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "here.md"), []byte("---\nname: Here\non: lease.granted\nruns-on: ["+machine.ID()+"]\n---\nLook.\n"), 0o644)

@@ -8,15 +8,15 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Ports HelperStartTests and HelperQueueTests: a lead starts a session in its project; past
+// Ports HelperStartTests and HelperQueueTests: a lead starts a session in its folder; past
 // the running limit the next queues, and starts by itself once a place is free.
 
 func TestALeadStartsSessionsAndTheyQueue(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
-	c.call(t, 2, "projects/setHelperLimits", map[string]any{"folder": "file://" + dir + "/", "limits": map[string]any{"running": 1}})
+	dir := folder(t, c, 1)
+	c.call(t, 2, "folders/setHelperLimits", map[string]any{"folder": "file://" + dir + "/", "limits": map[string]any{"running": 1}})
 	title := "Lead"
 	lead := seeded(t, d, dir, func(a *wire.Agent) { a.Title = &title })
 	m := appClient(t, d, lead.ID)
@@ -28,7 +28,7 @@ func TestALeadStartsSessionsAndTheyQueue(t *testing.T) {
 		t.Fatal(text)
 	}
 	text, _ := m.tool(4, "start_session", map[string]any{"prompt": "wait for me", "labels": []string{"helper"}})
-	if !strings.HasPrefix(text, "Started “wait for me” (id ") || !strings.HasSuffix(text, "This project now has 1 of 1 running, 1 of 5 not archived.") {
+	if !strings.HasPrefix(text, "Started “wait for me” (id ") || !strings.HasSuffix(text, "This folder now has 1 of 1 running, 1 of 5 not archived.") {
 		t.Fatal(text)
 	}
 	first := wire.UUID(strings.Fields(text)[5][:36])
@@ -37,7 +37,7 @@ func TestALeadStartsSessionsAndTheyQueue(t *testing.T) {
 	}
 	waitFor(t, "the first working", func() bool { return d.Store.Agent(first).State == wire.AgentStateRunning })
 	text, _ = m.tool(5, "start_session", map[string]any{"prompt": "Write it"})
-	if !strings.HasPrefix(text, "Queued “Write it” (id ") || !strings.Contains(text, ", 1st in this project's queue: This project already has 1 of 1 sessions started by sessions running") {
+	if !strings.HasPrefix(text, "Queued “Write it” (id ") || !strings.Contains(text, ", 1st in this folder's queue: This folder already has 1 of 1 sessions started by sessions running") {
 		t.Fatal(text)
 	}
 	second := wire.UUID(strings.Fields(text)[4][:36])
@@ -62,7 +62,7 @@ func TestStartSessionInheritsCallerRuntimeAndMode(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	lead := seeded(t, d, dir, func(a *wire.Agent) {
 		a.RuntimeID = "codex"
 		cat := "mode"
@@ -99,8 +99,8 @@ func TestStartSessionInheritsCallerRuntimeWhenQueued(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
-	c.call(t, 2, "projects/setHelperLimits", map[string]any{"folder": "file://" + dir + "/", "limits": map[string]any{"running": 1}})
+	dir := folder(t, c, 1)
+	c.call(t, 2, "folders/setHelperLimits", map[string]any{"folder": "file://" + dir + "/", "limits": map[string]any{"running": 1}})
 	title := "Lead"
 	lead := seeded(t, d, dir, func(a *wire.Agent) { a.Title = &title; a.RuntimeID = "codex" })
 	startedBy := lead.ID

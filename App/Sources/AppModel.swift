@@ -12,7 +12,7 @@ import os
 @MainActor
 @Observable
 final class AppModel {
-    /// The work, as any client sees it: the agents, the projects, the questions
+    /// The work, as any client sees it: the agents, the folders, the questions
     /// waiting, and the page of transcript being read.
     ///
     /// Held rather than copied, and shared with the phone. What each notification does
@@ -52,9 +52,9 @@ final class AppModel {
     /// kit's, so a phone shows the same (033).
     var terminalOutput: [String: String] { work.terminalOutput }
     private(set) var isConnected = false
-    /// Whether the daemon's list of projects has arrived at least once. Until it has,
+    /// Whether the daemon's list of folders has arrived at least once. Until it has,
     /// an empty sidebar means "not yet", not "none".
-    private(set) var hasLoadedProjects = false
+    private(set) var hasLoadedFolders = false
     /// The same for the live agents: until they have come, no agent has not run yet.
     private(set) var hasLoadedAgents = false
     /// 021: the Mac's banner, and the window's report of where the person is. Neither
@@ -88,13 +88,13 @@ final class AppModel {
     /// do not each raise it again. Forgotten when the runtime says it is signed in.
     private var signInsPutAway: Set<String> = []
     /// Clones under way on this Mac, from whichever window started them (027). Each is
-    /// a row in the Projects column until it becomes a project or fails.
+    /// a row in the Folders column until it becomes a folder or fails.
     private(set) var clones: [DaemonAPI.CloneSummary] = []
 
     // What the window reads, which is the shared model under another name. Forwarded
     // rather than mirrored: a copy is a thing that can fall behind.
     var agents: [Agent] { work.agents }
-    var projects: [DaemonAPI.ProjectSummary] { work.projects }
+    var folders: [DaemonAPI.FolderSummary] { work.folders }
     var permissions: [PermissionRequest] { work.permissions }
     var elicitations: [ElicitationRequest] { work.elicitations }
     var entries: [TranscriptEntry] { work.entries }
@@ -137,45 +137,45 @@ final class AppModel {
     /// How this Mac's host updates Agents Host by itself (#2178). Nil from a host that
     /// cannot (a test's, or one older than the method), and Settings draws nothing for it.
     private(set) var selfUpdate: DaemonAPI.SelfUpdate?
-    /// How many workflows turned on may run in each project (#506): the Mac's,
+    /// How many workflows turned on may run in each folder (#506): the Mac's,
     /// copied to every server.
     private(set) var workflowLimit: WorkflowLimitSettings?
 
-    /// Which project this window is looking at.
+    /// Which folder this window is looking at.
     ///
     /// Kept here and in `WindowDefaults` rather than in the daemon: the daemon owns what
     /// is true about the work, and which of it somebody happens to be reading is not
     /// that. It is also what keeps two windows independent.
-    var selectedProject: URL? {
+    var selectedFolder: URL? {
         didSet {
-            guard selectedProject != oldValue else { return }
-            WindowDefaults.store.set(selectedProjectKey?.stored, forKey: Self.selectedProjectDefault)
-            // Picking a project shows the project, not a conversation, and not a
+            guard selectedFolder != oldValue else { return }
+            WindowDefaults.store.set(selectedFolderKey?.stored, forKey: Self.selectedFolderDefault)
+            // Picking a folder shows the folder, not a conversation, and not a
             // workflow either. Both are things you go into from here, and come back
             // out of.
             selection = nil
             openWorkflow = nil
             openPin = nil
-            projectPage = nil
+            folderPage = nil
             composing = false
         }
     }
 
-    static let selectedProjectDefault = "selectedProjectFolder"
+    static let selectedFolderDefault = "selectedFolderPath"
 
-    /// Which machine the selected project is on (037). Set with it, by `select`, never
-    /// on its own: a folder names a project only together with its host.
-    private(set) var selectedProjectHost: HostID = .mac
+    /// Which machine the selected folder is on (037). Set with it, by `select`, never
+    /// on its own: a folder names a folder only together with its host.
+    private(set) var selectedFolderHost: HostID = .mac
 
-    /// The selected project as the window identifies projects now that a server can
+    /// The selected folder as the window identifies folders now that a server can
     /// have the same path as this Mac.
-    var selectedProjectKey: ProjectKey? {
-        selectedProject.map { ProjectKey(host: selectedProjectHost, folder: $0) }
+    var selectedFolderKey: FolderKey? {
+        selectedFolder.map { FolderKey(host: selectedFolderHost, folder: $0) }
     }
 
-    /// Whether the window is showing Spending rather than a project.
+    /// Whether the window is showing Spending rather than a folder.
     ///
-    /// Not persisted, unlike the selected project. Spending is somewhere you go to
+    /// Not persisted, unlike the selected folder. Spending is somewhere you go to
     /// answer a question — what has this cost — and a window that reopens on the bill
     /// rather than on the work would be answering a question nobody asked twice.
     var showsSpending = false {
@@ -189,13 +189,13 @@ final class AppModel {
             showsMilestones = false
             showsTokens = false
             showsWorktrees = false
-            // The same rule as picking a project: what you picked is what you see,
+            // The same rule as picking a folder: what you picked is what you see,
             // and a conversation or a workflow left open underneath would be waiting
             // to reappear when the bill is closed, which is a place nobody chose to
             // come back to.
             selection = nil
             openWorkflow = nil
-            projectPage = nil
+            folderPage = nil
             composing = false
         }
     }
@@ -216,7 +216,7 @@ final class AppModel {
             showsWorktrees = false
             selection = nil
             openWorkflow = nil
-            projectPage = nil
+            folderPage = nil
             composing = false
         }
     }
@@ -236,7 +236,7 @@ final class AppModel {
             showsWorktrees = false
             selection = nil
             openWorkflow = nil
-            projectPage = nil
+            folderPage = nil
             composing = false
         }
     }
@@ -259,7 +259,7 @@ final class AppModel {
             showsWorktrees = false
             selection = nil
             openWorkflow = nil
-            projectPage = nil
+            folderPage = nil
             composing = false
         }
     }
@@ -280,7 +280,7 @@ final class AppModel {
             showsWorktrees = false
             selection = nil
             openWorkflow = nil
-            projectPage = nil
+            folderPage = nil
             composing = false
         }
     }
@@ -300,7 +300,7 @@ final class AppModel {
             showsWorktrees = false
             selection = nil
             openWorkflow = nil
-            projectPage = nil
+            folderPage = nil
             composing = false
         }
     }
@@ -320,7 +320,7 @@ final class AppModel {
             showsWorktrees = false
             selection = nil
             openWorkflow = nil
-            projectPage = nil
+            folderPage = nil
             composing = false
         }
     }
@@ -340,14 +340,14 @@ final class AppModel {
             showsWorktrees = false
             selection = nil
             openWorkflow = nil
-            projectPage = nil
+            folderPage = nil
             composing = false
         }
     }
 
-    /// Whether the window is showing Worktrees: every project's, and how much each holds
+    /// Whether the window is showing Worktrees: every folder's, and how much each holds
     /// on disk (#790). A page like MCP Servers, and not persisted for the same reason; it
-    /// was in Project Settings, which are for what a person sets, not what changes.
+    /// was in Folder Settings, which are for what a person sets, not what changes.
     var showsWorktrees = false {
         didSet {
             guard showsWorktrees, showsWorktrees != oldValue else { return }
@@ -361,7 +361,7 @@ final class AppModel {
             showsTokens = false
             selection = nil
             openWorkflow = nil
-            projectPage = nil
+            folderPage = nil
             composing = false
         }
     }
@@ -383,8 +383,8 @@ final class AppModel {
 
     /// A workflow's page, from an event that fired or was refused by it.
     func showWorkflow(folder: URL, workflowID: String) {
-        showProject(ProjectKey(folder: folder))
-        openWorkflow = Project.standardize(folder).path + "/" + workflowID
+        showFolder(FolderKey(folder: folder))
+        openWorkflow = Folder.standardize(folder).path + "/" + workflowID
     }
 
     /// The resource a capsule in a chat asked to be shown. Scrolled to, once.
@@ -402,7 +402,7 @@ final class AppModel {
     }
 
     /// An agent's chat, from the Resources page or a capsule naming its holder: its
-    /// own project first, as a banner does, so the sidebar and the page agree.
+    /// own folder first, as a banner does, so the sidebar and the page agree.
     func openAgent(_ agentID: UUID) {
         showsSpending = false
         showsResources = false
@@ -415,9 +415,9 @@ final class AppModel {
         showsWorktrees = false
         if let agent = agents.first(where: { $0.id == agentID }) {
             pendingOpen = nil
-            select(ProjectKey(host: agent.host, folder: agent.projectFolder))
+            select(FolderKey(host: agent.host, folder: agent.folderPath))
         } else {
-            // Not listed yet (a banner tapped at launch): picking its project when the
+            // Not listed yet (a banner tapped at launch): picking its folder when the
             // lists arrive would empty the selection, so it is opened again then (#1055).
             pendingOpen = .agent(agentID)
         }
@@ -425,9 +425,9 @@ final class AppModel {
         selection = agentID
     }
 
-    /// A project's own page, from a banner with no session behind it (#531): where a
+    /// A folder's own page, from a banner with no session behind it (#531): where a
     /// change git brought to its files is asked.
-    func openProject(_ key: ProjectKey) {
+    func openFolder(_ key: FolderKey) {
         showsSpending = false
         showsResources = false
         showsEvents = false
@@ -438,25 +438,25 @@ final class AppModel {
         showsTokens = false
         showsWorktrees = false
         // Not listed yet: settling the selection would pick another, so it waits (#1055).
-        pendingOpen = liveProjects.contains { $0.key == key } ? nil : .project(key)
+        pendingOpen = liveFolders.contains { $0.key == key } ? nil : .folder(key)
         select(key)
         openWorkflow = nil
-        projectPage = nil
+        folderPage = nil
         selection = nil
     }
 
-    /// What a banner asked for before the agents and projects it names were listed, as
+    /// What a banner asked for before the agents and folders it names were listed, as
     /// the Remote keeps a tapped need (#1045). Opened once they are; anything picked in
     /// the sidebar first drops it.
-    private enum PendingOpen { case agent(UUID), project(ProjectKey) }
+    private enum PendingOpen { case agent(UUID), folder(FolderKey) }
     @ObservationIgnored private var pendingOpen: PendingOpen?
 
     private func openPending() {
         switch pendingOpen {
         case .agent(let id) where agents.contains { $0.id == id }:
             openAgent(id)
-        case .project(let key) where liveProjects.contains { $0.key == key }:
-            openProject(key)
+        case .folder(let key) where liveFolders.contains { $0.key == key }:
+            openFolder(key)
         default:
             break
         }
@@ -464,11 +464,11 @@ final class AppModel {
 
     /// What is picked in the sidebar, as one value.
     ///
-    /// Activity, the projects and their sessions and workflows share one list (#145), so
+    /// Activity, the folders and their sessions and workflows share one list (#145), so
     /// they have to share a selection: two bindings would let both look picked at once.
-    /// `selectedProject` stays the stored fact — it is what New Session starts in — and
-    /// this is the view of it the list is driven by. A project's new session lights its
-    /// project's row, since that is where it will be.
+    /// `selectedFolder` stays the stored fact — it is what New Session starts in — and
+    /// this is the view of it the list is driven by. A folder's new session lights its
+    /// folder's row, since that is where it will be.
     var sidebarItem: SidebarItem? {
         get {
             if showsEvents { return .events }
@@ -480,14 +480,14 @@ final class AppModel {
             if showsTokens { return .tokens }
             if showsTime { return .time }
             if showsMilestones { return .milestones }
-            guard let key = selectedProjectKey else { return nil }
+            guard let key = selectedFolderKey else { return nil }
             if let id = openWorkflow { return .workflow(id, in: key) }
-            if case .review(let id)? = projectPage { return .review(id, in: key) }
-            if projectPage == .archive { return .archive(key) }
-            if projectPage == .mcpServers { return .projectMCPServers(key) }
+            if case .review(let id)? = folderPage { return .review(id, in: key) }
+            if folderPage == .archive { return .archive(key) }
+            if folderPage == .mcpServers { return .folderMCPServers(key) }
             if let openPin { return .pin(openPin, in: key) }
             if let selection { return .session(selection) }
-            return composing ? .project(key) : nil
+            return composing ? .folder(key) : nil
         }
         set {
             // The person's own pick wins over a banner still waiting for its lists.
@@ -510,11 +510,11 @@ final class AppModel {
             case .pin(let path, let key):
                 showPin(path, in: key)
             case .archive(let key):
-                showProjectPage(.archive, of: key)
-            case .projectMCPServers(let key):
-                showProjectPage(.mcpServers, of: key)
+                showFolderPage(.archive, of: key)
+            case .folderMCPServers(let key):
+                showFolderPage(.mcpServers, of: key)
             case .review(let id, let key):
-                showProjectPage(.review(id), of: key)
+                showFolderPage(.review(id), of: key)
             case .spending:
                 showsSpending = true
             case .tokens:
@@ -533,7 +533,7 @@ final class AppModel {
                 showsMCPServers = true
             case .worktrees:
                 showsWorktrees = true
-            case .project(let key):
+            case .folder(let key):
                 showsSpending = false
                 showsResources = false
                 showsEvents = false
@@ -543,7 +543,7 @@ final class AppModel {
                 showsMilestones = false
                 showsTokens = false
                 showsWorktrees = false
-                showProject(key)
+                showFolder(key)
             case nil:
                 // A list that clears its own selection — which macOS does while rows
                 // come and go — must not empty the detail column. Nothing is picked
@@ -553,8 +553,8 @@ final class AppModel {
         }
     }
 
-    /// A project's workflows or its archive, from its row in the sidebar (#495).
-    func showProjectPage(_ page: ProjectPage, of key: ProjectKey) {
+    /// A folder's workflows or its archive, from its row in the sidebar (#495).
+    func showFolderPage(_ page: FolderPage, of key: FolderKey) {
         showsSpending = false
         showsResources = false
         showsEvents = false
@@ -565,24 +565,24 @@ final class AppModel {
         showsTokens = false
         showsWorktrees = false
         select(key)
-        projectPage = page
+        folderPage = page
     }
 
-    /// Go to a project's page, whether or not it was already the selected one.
+    /// Go to a folder's page, whether or not it was already the selected one.
     ///
-    /// `selectedProject`'s `didSet` says the rule — picking a project shows the
-    /// project, not a conversation — but it can only fire on a change, and macOS drives
+    /// `selectedFolder`'s `didSet` says the rule — picking a folder shows the
+    /// folder, not a conversation — but it can only fire on a change, and macOS drives
     /// a `List` selection binding from a selection-*changed* notification. Clicking the
     /// row that is already highlighted never calls the setter at all. From inside a
-    /// conversation the highlighted row is that conversation's own project, so the one
+    /// conversation the highlighted row is that conversation's own folder, so the one
     /// click a person would make to go back up was the one the framework discarded.
     ///
     /// This is that rule as something callable. It touches no agent: `selection` only
     /// decides which transcript this window is watching, and the turn belongs to the
     /// daemon.
-    func showProject(_ key: ProjectKey) {
-        // Going to a project is going away from Spending, wherever the ask came from
-        // — a new project being added, a menu item, its New session row. And from
+    func showFolder(_ key: FolderKey) {
+        // Going to a folder is going away from Spending, wherever the ask came from
+        // — a new folder being added, a menu item, its New session row. And from
         // Resources, for the same reason.
         showsSpending = false
         showsResources = false
@@ -594,33 +594,33 @@ final class AppModel {
         showsTokens = false
         showsWorktrees = false
         select(key)
-        // A new session in it (#366): the project's own page is where a session starts,
-        // as New Session has it. The project's row in the sidebar only folds (#375).
+        // A new session in it (#366): the folder's own page is where a session starts,
+        // as New Session has it. The folder's row in the sidebar only folds (#375).
         composing = true
         // The next New Session starts here too (#495).
-        rememberNewSessionProject(key)
+        rememberNewSessionFolder(key)
         draftWorktree = nil
     }
 
-    /// The project New Session at the top of the sidebar starts in (#495, #2160):
-    /// `NewSessionProject`, the Remote's rule too.
-    var newSessionProject: ProjectKey? {
-        NewSessionProject.choose(live: liveProjects.map(\.key), remembered: rememberedNewSessionProject,
-                                 selected: selectedProjectKey)?.key
+    /// The folder New Session at the top of the sidebar starts in (#495, #2160):
+    /// `NewSessionFolder`, the Remote's rule too.
+    var newSessionFolder: FolderKey? {
+        NewSessionFolder.choose(live: liveFolders.map(\.key), remembered: rememberedNewSessionFolder,
+                                 selected: selectedFolderKey)?.key
     }
 
-    private var rememberedNewSessionProject: ProjectKey? =
-        WindowDefaults.store.string(forKey: AppModel.newSessionProjectDefault).flatMap(ProjectKey.init(stored:))
+    private var rememberedNewSessionFolder: FolderKey? =
+        WindowDefaults.store.string(forKey: AppModel.newSessionFolderDefault).flatMap(FolderKey.init(stored:))
 
-    static let newSessionProjectDefault = "newSessionProject"
+    static let newSessionFolderDefault = "newSessionFolder"
 
-    private func rememberNewSessionProject(_ key: ProjectKey) {
-        guard rememberedNewSessionProject != key else { return }
-        rememberedNewSessionProject = key
-        WindowDefaults.store.set(key.stored, forKey: Self.newSessionProjectDefault)
+    private func rememberNewSessionFolder(_ key: FolderKey) {
+        guard rememberedNewSessionFolder != key else { return }
+        rememberedNewSessionFolder = key
+        WindowDefaults.store.set(key.stored, forKey: Self.newSessionFolderDefault)
     }
 
-    /// A new session in the selected project: the empty chat with its prompt, where a
+    /// A new session in the selected folder: the empty chat with its prompt, where a
     /// session starts (066). A sibling of `selection`, exclusive with the others.
     var composing = false {
         didSet {
@@ -628,31 +628,31 @@ final class AppModel {
             selection = nil
             openWorkflow = nil
             openPin = nil
-            projectPage = nil
+            folderPage = nil
         }
     }
 
-    /// Nothing picked: the help text, not a page (#145). The project stays selected, so
+    /// Nothing picked: the help text, not a page (#145). The folder stays selected, so
     /// New Session still knows where to start.
     func showNothing() {
         selection = nil
         openWorkflow = nil
         openPin = nil
-        projectPage = nil
+        folderPage = nil
         composing = false
     }
 
-    /// Pick a project on a host. The host goes first, so the folder's `didSet` stores
+    /// Pick a folder on a host. The host goes first, so the folder's `didSet` stores
     /// and compares the pair rather than a folder paired with the last host (037).
-    func select(_ key: ProjectKey?) {
-        let timing = Perf.begin("project-switch")
+    func select(_ key: FolderKey?) {
+        let timing = Perf.begin("folder-switch")
         defer { Perf.endWhenDrawn(timing) }
-        if let key, key.host != selectedProjectHost {
-            selectedProjectHost = key.host
-            // The same folder on another host is another project.
-            if selectedProject == key.folder { selectedProject = nil }
+        if let key, key.host != selectedFolderHost {
+            selectedFolderHost = key.host
+            // The same folder on another host is another folder.
+            if selectedFolder == key.folder { selectedFolder = nil }
         }
-        selectedProject = key?.folder
+        selectedFolder = key?.folder
     }
 
     /// Bumped when something asks the conversation to go to its end.
@@ -666,14 +666,14 @@ final class AppModel {
     var popouts: [UUID: PoppedChat] = [:]
     /// The one of them in the key window, if one is: what the person is watching.
     @ObservationIgnored var popoutInFront: UUID?
-    /// The projects open in windows of their own (#1089), each with what it shows.
-    var projectWindows: [ProjectKey: ProjectWindowState] = [:]
-    /// The project whose window's prompt the draft is for, while one is (#1089): there is
+    /// The folders open in windows of their own (#1089), each with what it shows.
+    var folderWindows: [FolderKey: FolderWindowState] = [:]
+    /// The folder whose window's prompt the draft is for, while one is (#1089): there is
     /// one draft, and it follows the window last composing in.
-    var composingWindow: ProjectKey?
-    /// Brings a project's window forward, or opens it: the scene's own action, handed
+    var composingWindow: FolderKey?
+    /// Brings a folder's window forward, or opens it: the scene's own action, handed
     /// over by the first window to draw, for what is not a view (a notification).
-    @ObservationIgnored var openProjectWindow: ((ProjectKey) -> Void)?
+    @ObservationIgnored var openFolderWindow: ((FolderKey) -> Void)?
 
     func scrollToEnd() { scrollToEndToken += 1 }
 
@@ -691,7 +691,7 @@ final class AppModel {
             if selection != nil {
                 openWorkflow = nil
                 openPin = nil
-                projectPage = nil
+                folderPage = nil
                 composing = false
             }
             if let left = chatOpening { Perf.end(left.timing, "left before it opened") }
@@ -728,19 +728,19 @@ final class AppModel {
         didSet {
             if openWorkflow != nil {
                 openPin = nil
-                projectPage = nil
+                folderPage = nil
                 composing = false
             }
         }
     }
 
-    /// A page about the selected project's work (#495), open where the chat would be: its
+    /// A page about the selected folder's work (#495), open where the chat would be: its
     /// workflows, or what it has archived. A fourth sibling of `selection`, `openWorkflow`
-    /// and `openPin`, so the sidebar's project fold is one row for each and never a fold
+    /// and `openPin`, so the sidebar's folder fold is one row for each and never a fold
     /// inside a fold.
-    var projectPage: ProjectPage? {
+    var folderPage: FolderPage? {
         didSet {
-            guard projectPage != nil else { return }
+            guard folderPage != nil else { return }
             selection = nil
             openWorkflow = nil
             openPin = nil
@@ -748,7 +748,7 @@ final class AppModel {
         }
     }
 
-    enum ProjectPage: Equatable {
+    enum FolderPage: Equatable {
         case archive
         /// Its MCP servers and how each is doing (#753).
         case mcpServers
@@ -756,20 +756,20 @@ final class AppModel {
         case review(String)
     }
 
-    /// The selected project's pinned page (#159) open in the chat's place, by its path in
-    /// the project: a third sibling of `selection` and `openWorkflow`.
+    /// The selected folder's pinned page (#159) open in the chat's place, by its path in
+    /// the folder: a third sibling of `selection` and `openWorkflow`.
     var openPin: String? {
         didSet {
             guard openPin != nil else { return }
             selection = nil
             openWorkflow = nil
-            projectPage = nil
+            folderPage = nil
             composing = false
         }
     }
 
-    /// A project's pinned page, from its row.
-    func showPin(_ path: String, in key: ProjectKey) {
+    /// A folder's pinned page, from its row.
+    func showPin(_ path: String, in key: FolderKey) {
         showsSpending = false
         showsResources = false
         showsEvents = false
@@ -793,7 +793,7 @@ final class AppModel {
             draftWorktree = nil
             draftWorktrees = .notARepository
             Task { await loadDraftWorktrees() }
-            // A persona is a file in one project, or the home's (#760).
+            // A persona is a file in one folder, or the home's (#760).
             draftPersona = nil
             draftPersonas = []
             Task { await loadDraftPersonas() }
@@ -811,14 +811,14 @@ final class AppModel {
     /// nil for the runtime's account for new sessions. Back to that whenever the runtime changes.
     var draftAccountID: String?
     /// The accounts the draft's runtime offers beyond its own sign-in, the organisation's
-    /// included: this Mac's, so none for a project on a server. The picker shows only when
+    /// included: this Mac's, so none for a folder on a server. The picker shows only when
     /// there is one.
     var draftAccounts: [AccountProfile] { draftAccountChoices?.accounts ?? [] }
     var draftAccountChoices: AccountChoices? {
         guard draftHost == .mac, let runtimeID = draftRuntimeID else { return nil }
         return AccountChoices(runtimeID: runtimeID, profiles: accountProfiles, policy: policyState?.policy)
     }
-    /// The kinds of session the draft folder offers (#760): the project's personas and
+    /// The kinds of session the draft folder offers (#760): the folder's personas and
     /// the home's, as the host lists them.
     private(set) var draftPersonas: [Persona] = []
     /// The one picked, by id, sent with the start so the agent gets its prompt.
@@ -826,15 +826,15 @@ final class AppModel {
     /// A persona picked while its runtime's options were still to come: laid over them
     /// when they arrive.
     private var pendingPersona: Persona?
-    /// Where in the project the next agent works, when not the project folder (030).
+    /// Where in the folder the next agent works, when not the folder (030).
     /// Deliberately not kept with the rest of the form: a worktree is decided per
-    /// agent, so it goes back to the project folder after every start (FR-004).
+    /// agent, so it goes back to the folder after every start (FR-004).
     var draftWorktree: WorktreeChoice?
     /// What the draft folder's repository has, for the Worktree chooser. Not a
     /// repository until the daemon says otherwise, which keeps the chooser hidden.
     private(set) var draftWorktrees: DaemonAPI.WorktreesListResponse = .notARepository
     private var draftWorktreesGeneration = 0
-    /// Each open agent's project's worktrees, for the Worktree choice on its page (053).
+    /// Each open agent's folder's worktrees, for the Worktree choice on its page (053).
     /// Asked when the page opens and after each move, never polled.
     private(set) var agentWorktrees: [URL: DaemonAPI.WorktreesListResponse] = [:]
     /// Why the last move asked for an agent was refused, shown under its choice until
@@ -863,7 +863,7 @@ final class AppModel {
     /// Words quoted from a reply for that chat's prompt bar (#1553, #1679): added to what is
     /// there as a quote, then cleared.
     var offeredQuote: PromptOffer?
-    /// A new agent a view filled in (#834), for the project page's bar to take once its
+    /// A new agent a view filled in (#834), for the folder page's bar to take once its
     /// folder is this one: the prompt, the labels and the worktree. Starting it is still
     /// the person's move.
     var offeredStart: OfferedStart?
@@ -895,14 +895,14 @@ final class AppModel {
         // From the start, not once connected: a banner tapped to launch the app arrives
         // before then, and was dropped (#1055).
         notifier.open = { [weak self] agentID in
-            // In its project's own window when one is open (#1089, Alex).
-            if self?.showInProjectWindow(agentID) == true { return }
-            // Its own project first, because picking a project empties the selection:
-            // a chat opened from a banner under some other project's heading is a
+            // In its folder's own window when one is open (#1089, Alex).
+            if self?.showInFolderWindow(agentID) == true { return }
+            // Its own folder first, because picking a folder empties the selection:
+            // a chat opened from a banner under some other folder's heading is a
             // sidebar and a page that disagree about where you are.
             self?.openAgent(agentID)
         }
-        notifier.openProject = { [weak self] folder in self?.openProject(ProjectKey(host: .mac, folder: folder)) }
+        notifier.openFolder = { [weak self] folder in self?.openFolder(FolderKey(host: .mac, folder: folder)) }
         notifier.answer = { [weak self] token, quick, typed in await self?.answerFromBanner(token, quick, typed: typed) }
         #if DEBUG
         openFromLaunchArguments()
@@ -959,9 +959,9 @@ final class AppModel {
     }
 
     /// Where an agent lives: the host it was listed from, or, for one not yet listed
-    /// (just started, say), the selected project's host when there is no Mac host.
+    /// (just started, say), the selected folder's host when there is no Mac host.
     private func host(ofAgent id: UUID?) -> HostID {
-        work.agent(id)?.host ?? id.flatMap { projectShellHosts[$0] } ?? (hasMacHost ? .mac : selectedProjectHost)
+        work.agent(id)?.host ?? id.flatMap { folderShellHosts[$0] } ?? (hasMacHost ? .mac : selectedFolderHost)
     }
     /// The name `control/status` last gave, so the away strip can still say it.
     private(set) var controlPlaneName: String?
@@ -998,7 +998,7 @@ final class AppModel {
         return hosts.client(for: host) ?? Self.unreachable
     }
 
-    /// This Mac's host, for what is this Mac's own rather than a project's: its runtimes,
+    /// This Mac's host, for what is this Mac's own rather than a folder's: its runtimes,
     /// pool, settings and catalogue. `client`, or, with a control plane elsewhere that gave
     /// this Mac's host an id of its own, that host's client (#1496): no host is `.mac` then.
     private var macClient: DaemonClient {
@@ -1169,8 +1169,8 @@ final class AppModel {
 
     /// An agent on `host` whose folders include `folder`, so `files/read` can be scoped.
     func anAgent(in folder: URL, on host: HostID) -> UUID? {
-        let wanted = Project.standardize(folder)
-        return agents.first { $0.host == host && Project.standardize($0.projectFolder) == wanted }?.id
+        let wanted = Folder.standardize(folder)
+        return agents.first { $0.host == host && Folder.standardize($0.folderPath) == wanted }?.id
     }
 
     /// The text of a file, from its host: `files/read`, or `files/readText` with no agent (R11).
@@ -1193,11 +1193,11 @@ final class AppModel {
     }
 
     /// Where a new agent, a draft, a worktree or a session list for the selected
-    /// project goes: that project's host.
-    private var selectedHostClient: DaemonClient { client(for: selectedProjectHost) }
-    /// Where a new session's prompt starts it: the project whose own window it is in
+    /// folder goes: that folder's host.
+    private var selectedHostClient: DaemonClient { client(for: selectedFolderHost) }
+    /// Where a new session's prompt starts it: the folder whose own window it is in
     /// (#1089), or the selected one.
-    private var draftHost: HostID { composingWindow?.host ?? selectedProjectHost }
+    private var draftHost: HostID { composingWindow?.host ?? selectedFolderHost }
     private var draftHostClient: DaemonClient { client(for: draftHost) }
     private var listening: Task<Void, Never>?
 
@@ -1215,9 +1215,9 @@ final class AppModel {
     @ObservationIgnored private var parkedShells: [ShellKey] = []
     private static let parkedShellLimit = 6
 
-    /// The host of each project shell this window has made (#418): it has no agent to
+    /// The host of each folder shell this window has made (#418): it has no agent to
     /// say which.
-    @ObservationIgnored private var projectShellHosts: [UUID: HostID] = [:]
+    @ObservationIgnored private var folderShellHosts: [UUID: HostID] = [:]
 
     struct ShellKey: Hashable {
         var agentID: UUID
@@ -1234,15 +1234,15 @@ final class AppModel {
     var permissionsForSelection: [PermissionRequest] { work.permissions(for: selection) }
 
     /// What a new agent can be started with, on the machine it would start on: the
-    /// selected project's (037). A server's runtimes are the ones installed there.
+    /// selected folder's (037). A server's runtimes are the ones installed there.
     var availableRuntimes: [RuntimeStatus] {
-        runtimes(on: selectedProjectHost).filter(\.canStart)
+        runtimes(on: selectedFolderHost).filter(\.canStart)
     }
 
     /// Installed there, but not allowed by the organisation's policy (#998): the chooser
     /// lists them, dimmed, with why, and never starts one.
     var refusedRuntimes: [RuntimeStatus] {
-        runtimes(on: selectedProjectHost).filter { $0.availability.isAvailable && $0.setBy != nil }
+        runtimes(on: selectedFolderHost).filter { $0.availability.isAvailable && $0.setBy != nil }
     }
 
     /// This Mac's, whatever is selected: for saying nothing is installed on this Mac.
@@ -1264,30 +1264,30 @@ final class AppModel {
         }
     }
 
-    // MARK: Projects
+    // MARK: Folders
 
     /// The ones the sidebar lists.
-    var liveProjects: [DaemonAPI.ProjectSummary] { work.liveProjects }
+    var liveFolders: [DaemonAPI.FolderSummary] { work.liveFolders }
 
-    var archivedProjects: [DaemonAPI.ProjectSummary] { work.archivedProjects }
+    var archivedFolders: [DaemonAPI.FolderSummary] { work.archivedFolders }
 
-    var selectedProjectSummary: DaemonAPI.ProjectSummary? { work.project(selectedProjectKey) }
+    var selectedFolderSummary: DaemonAPI.FolderSummary? { work.folder(selectedFolderKey) }
 
-    /// A project's agents in one group, newest first.
-    func agents(in key: ProjectKey?, group: AgentGroup) -> [Agent] {
+    /// A folder's agents in one group, newest first.
+    func agents(in key: FolderKey?, group: AgentGroup) -> [Agent] {
         work.agents(in: key, group: group)
     }
 
     /// How many archived sessions an Archived fold shows: enough to find last week's; the
     /// rest are on the phone's archive and in Events.
-    static let archivedShown = SidebarProjectFold.archivedShown
+    static let archivedShown = SidebarFolderFold.archivedShown
 
-    /// A project's newest archived sessions, for its Archived fold when it opens (#164):
+    /// A folder's newest archived sessions, for its Archived fold when it opens (#164):
     /// the window holds the live agents, and a page of archived ones per open fold.
     /// Answers whether the host did, so the page can tell an empty archive from a silent
     /// host (#664).
     @discardableResult
-    func loadArchived(in key: ProjectKey) async -> Bool {
+    func loadArchived(in key: FolderKey) async -> Bool {
         let request = DaemonAPI.ListRequest(archivedOnly: true, folder: key.folder,
                                             limit: Self.archivedShown, lean: true)
         guard let listed = try? await client(for: key.host).call(DaemonAPI.Method.agentsList, request,
@@ -1296,9 +1296,9 @@ final class AppModel {
         return true
     }
 
-    /// Let go of a project's archived sessions when its Archived fold closes (#165),
+    /// Let go of a folder's archived sessions when its Archived fold closes (#165),
     /// keeping the one being read.
-    func letGoOfArchived(in key: ProjectKey) {
+    func letGoOfArchived(in key: FolderKey) {
         let held = work.agents(in: key, group: .archived).map(\.id).filter { $0 != selection }
         work.forget(held)
     }
@@ -1358,7 +1358,7 @@ final class AppModel {
         searchNext[host] = page.next
     }
 
-    /// Whether an archived session is on show in its project's open Archived fold.
+    /// Whether an archived session is on show in its folder's open Archived fold.
     /// Held, without making a cell: a search or a history page asking must not leave
     /// one behind for every id it looked at (#285).
     private func heldAgent(_ id: UUID) -> Agent? {
@@ -1368,14 +1368,14 @@ final class AppModel {
     private func isInOpenArchivedFold(_ id: UUID) -> Bool {
         guard let agent = heldAgent(id) else { return false }
         // As the sidebar keeps them: in defaults, read here once per search ended.
-        return SidebarFolds().isOpen(ProjectKey(host: agent.host, folder: agent.projectFolder), .archivedSessions)
+        return SidebarFolds().isOpen(FolderKey(host: agent.host, folder: agent.folderPath), .archivedSessions)
     }
 
     /// A workflow's newest runs, archived ones included, for its History (#164).
     /// Archived runs this page brought in are remembered, so a larger page can let go
     /// of the ones that left it, and closing the page lets go of the rest (#285).
     func loadRuns(of workflowID: String, in folder: URL, on host: HostID, limit: Int) async {
-        let key = RunsKey(host: host, folder: Project.standardize(folder), workflowID: workflowID)
+        let key = RunsKey(host: host, folder: Folder.standardize(folder), workflowID: workflowID)
         let request = DaemonAPI.ListRequest(archivedCommands: false, folder: folder,
                                             startedByWorkflow: workflowID, limit: limit, lean: true)
         guard let listed = try? await client(for: host).call(DaemonAPI.Method.agentsList, request,
@@ -1400,7 +1400,7 @@ final class AppModel {
 
     /// The archived runs one History page brought in, let go when that page closes.
     func letGoOfRuns(of workflowID: String, in folder: URL, on host: HostID) {
-        let key = RunsKey(host: host, folder: Project.standardize(folder), workflowID: workflowID)
+        let key = RunsKey(host: host, folder: Folder.standardize(folder), workflowID: workflowID)
         guard let ids = runsIntroduced.removeValue(forKey: key) else { return }
         work.forget(ids.filter { id in
             id != selection && heldAgent(id)?.state == .archived && !isInOpenArchivedFold(id)
@@ -1416,19 +1416,19 @@ final class AppModel {
     /// Archived agents a History page introduced, by the workflow they belong to.
     @ObservationIgnored private var runsIntroduced: [RunsKey: Set<UUID>] = [:]
 
-    /// This window's own counts for a project, from the grouping its panel uses.
-    func counts(in key: ProjectKey?) -> [AgentGroup: Int] { work.counts(in: key) }
-    func unreadCount(in key: ProjectKey?) -> Int { work.unreadCount(in: key) }
+    /// This window's own counts for a folder, from the grouping its panel uses.
+    func counts(in key: FolderKey?) -> [AgentGroup: Int] { work.counts(in: key) }
+    func unreadCount(in key: FolderKey?) -> Int { work.unreadCount(in: key) }
 
-    /// How many sessions across every project need the person: Needs you and Blocked,
+    /// How many sessions across every folder need the person: Needs you and Blocked,
     /// not unread finishes (#1565). Drives the Dock badge.
     var needsPersonCount: Int {
-        liveProjects.reduce(0) { $0 + work.attentionCount(in: $1.key) }
+        liveFolders.reduce(0) { $0 + work.attentionCount(in: $1.key) }
     }
 
     /// The Blob's mood on the Dock tile (#1317), from the same groups the sidebar shows.
     var iconMood: IconMood {
-        IconMood(counts: liveProjects.lazy.map { self.work.counts(in: $0.key) })
+        IconMood(counts: liveFolders.lazy.map { self.work.counts(in: $0.key) })
     }
 
     /// Whether the daemon is bringing this chat back by itself after a restart.
@@ -1454,7 +1454,7 @@ final class AppModel {
                                                         DaemonAPI.WorkflowsListRequest(),
                                                         returning: [WorkflowSummary].self))
         } catch {
-            // Same as the projects above: the next notification brings it back.
+            // Same as the folders above: the next notification brings it back.
         }
     }
 
@@ -1505,8 +1505,8 @@ final class AppModel {
     /// and says so on the summary, which is why nothing here second-guesses it first.
     func runWorkflow(_ summary: WorkflowSummary) async {
         // Its refusal is said, not swallowed: a Run now that does nothing looked broken (073).
-        await attempt(on: selectedProjectHost) {
-            try await self.client(for: self.selectedProjectHost).call(
+        await attempt(on: selectedFolderHost) {
+            try await self.client(for: self.selectedFolderHost).call(
                 DaemonAPI.Method.workflowsRun,
                 DaemonAPI.WorkflowRequest(folder: summary.folder, workflowID: summary.workflowID))
         }
@@ -1516,8 +1516,8 @@ final class AppModel {
     /// wrote, which is what makes writing one not need asking first.
     @discardableResult
     func setWorkflowArchived(_ summary: WorkflowSummary, _ archived: Bool) async -> Bool {
-        await attempt(on: selectedProjectHost) {
-            try await self.client(for: self.selectedProjectHost).call(
+        await attempt(on: selectedFolderHost) {
+            try await self.client(for: self.selectedFolderHost).call(
                 DaemonAPI.Method.workflowsArchive,
                 DaemonAPI.WorkflowArchiveRequest(folder: summary.folder,
                                                  workflowID: summary.workflowID,
@@ -1525,9 +1525,9 @@ final class AppModel {
         }
     }
 
-    /// Delete a workflow's file from its project (#605).
+    /// Delete a workflow's file from its folder (#605).
     func deleteWorkflow(_ summary: WorkflowSummary, on host: HostID? = nil) async -> Bool {
-        let host = host ?? selectedProjectHost
+        let host = host ?? selectedFolderHost
         return await attempt(on: host) {
             try await self.client(for: host).call(
                 DaemonAPI.Method.workflowsDelete,
@@ -1538,8 +1538,8 @@ final class AppModel {
     /// Turn one on or off, keeping its place on the list (#100). Turning one on when
     /// the total is already running is refused, and said (#506).
     func setWorkflowEnabled(_ summary: WorkflowSummary, _ enabled: Bool) async {
-        await attempt(on: selectedProjectHost) {
-            try await self.client(for: self.selectedProjectHost).call(
+        await attempt(on: selectedFolderHost) {
+            try await self.client(for: self.selectedFolderHost).call(
                 DaemonAPI.Method.workflowsEnable,
                 DaemonAPI.WorkflowEnableRequest(folder: summary.folder,
                                                 workflowID: summary.workflowID,
@@ -1549,7 +1549,7 @@ final class AppModel {
 
     /// Mute Notifications for every run of one, or Unmute (#2003): `muted: true` in its file.
     func setWorkflowMuted(_ summary: WorkflowSummary, _ muted: Bool, on host: HostID? = nil) async {
-        let host = host ?? selectedProjectHost
+        let host = host ?? selectedFolderHost
         await attempt(on: host) {
             try await self.client(for: host).call(
                 DaemonAPI.Method.workflowsSetMuted,
@@ -1559,7 +1559,7 @@ final class AppModel {
 
     /// Clear a server's event trigger's missed-events mark (#383).
     func clearMCPMissed(_ summary: WorkflowSummary, _ status: MCPTriggerStatus) async {
-        _ = try? await client(for: selectedProjectHost).call(
+        _ = try? await client(for: selectedFolderHost).call(
             DaemonAPI.Method.workflowsClearMCPMissed,
             DaemonAPI.WorkflowMCPClearMissedRequest(folder: summary.folder, workflowID: summary.workflowID,
                                                     name: status.name, server: status.server))
@@ -1568,25 +1568,25 @@ final class AppModel {
     // MARK: Pinned pages (#159)
 
     func pins(in folder: URL?) -> [PinView] { work.pins(in: folder) }
-    /// The project's servers' list views (#2032), the hidden ones too.
+    /// The folder's servers' list views (#2032), the hidden ones too.
     func serverViews(in folder: URL?) -> [PinView] { work.serverViews(in: folder) }
     func pageRevision(in folder: URL?) -> Int { work.pageRevision(in: folder) }
 
     func refreshPins() async {
         guard let listed = try? await client.call(DaemonAPI.Method.pinsList, DaemonAPI.Empty(),
-                                                  returning: [ProjectPins].self) else { return }
+                                                  returning: [FolderPins].self) else { return }
         work.replacePins(listed)
     }
 
-    /// A file of a project's, for a pinned page, a page tile, or what an HTML page draws.
-    func readPage(_ path: String, in key: ProjectKey, known: FileStamp? = nil) async throws -> FileReading {
+    /// A file of a folder's, for a pinned page, a page tile, or what an HTML page draws.
+    func readPage(_ path: String, in key: FolderKey, known: FileStamp? = nil) async throws -> FileReading {
         try await client(for: key.host).call(DaemonAPI.Method.pinsRead,
                                              DaemonAPI.PinReadRequest(folder: key.folder, path: path, knownStamp: known),
                                              returning: FileReading.self)
     }
 
     /// What the person typed on a pinned Markdown page. Why it was not saved, or nil.
-    func writePage(_ path: String, in key: ProjectKey, text: String) async -> String? {
+    func writePage(_ path: String, in key: FolderKey, text: String) async -> String? {
         do {
             try await client(for: key.host).call(DaemonAPI.Method.pinsWrite,
                                                  DaemonAPI.PinWriteRequest(folder: key.folder, path: path, text: text))
@@ -1598,8 +1598,8 @@ final class AppModel {
         }
     }
 
-    /// Pin to Project, from the files pane: a path absolute on the project's host.
-    func pin(_ path: String, in key: ProjectKey) async {
+    /// Pin to Folder, from the files pane: a path absolute on the folder's host.
+    func pin(_ path: String, in key: FolderKey) async {
         await attempt(on: key.host) {
             let pins = try await self.client(for: key.host).call(DaemonAPI.Method.pinsPin,
                                                                  DaemonAPI.PinRequest(folder: key.folder, path: path),
@@ -1608,28 +1608,28 @@ final class AppModel {
         }
     }
 
-    /// Pin a view under a project (#189), from its menu in a chat. Why it was not, or nil.
-    /// A view's `agents/start-agent` (#834): the project's page, its bar filled in. Why
+    /// Pin a view under a folder (#189), from its menu in a chat. Why it was not, or nil.
+    /// A view's `agents/start-agent` (#834): the folder's page, its bar filled in. Why
     /// not, or nil.
-    func offerStart(_ start: AppViewStart, in key: ProjectKey) -> String? {
-        let wanted = Project.standardize(key.folder)
-        guard let project = projects.first(where: {
-            $0.host == key.host && Project.standardize($0.project.folder) == wanted
+    func offerStart(_ start: AppViewStart, in key: FolderKey) -> String? {
+        let wanted = Folder.standardize(key.folder)
+        guard let folder = folders.first(where: {
+            $0.host == key.host && Folder.standardize($0.folder.folder) == wanted
         }) else {
-            return "\(key.folder.lastPathComponent) is not a project here."
+            return "\(key.folder.lastPathComponent) is not a folder here."
         }
-        showProject(ProjectKey(host: key.host, folder: project.project.folder))
-        offeredStart = OfferedStart(folder: project.project.folder, start: start)
+        showFolder(FolderKey(host: key.host, folder: folder.folder.folder))
+        offeredStart = OfferedStart(folder: folder.folder.folder, start: start)
         return nil
     }
 
-    /// The session a view's `agents/message-agent` goes to (#837): on the branch, in this project.
-    func recipient(of message: AppViewAgentMessage, in key: ProjectKey) -> AppViewRecipient? {
-        message.recipient(among: agents, host: key.host, project: key.folder)
+    /// The session a view's `agents/message-agent` goes to (#837): on the branch, in this folder.
+    func recipient(of message: AppViewAgentMessage, in key: FolderKey) -> AppViewRecipient? {
+        message.recipient(among: agents, host: key.host, folder: key.folder)
             .map { AppViewRecipient(id: $0.id, name: AppViewAgentMessage.name(of: $0)) }
     }
 
-    func pinView(_ view: ViewPin, in key: ProjectKey) async -> String? {
+    func pinView(_ view: ViewPin, in key: FolderKey) async -> String? {
         do {
             let pins = try await client(for: key.host).call(DaemonAPI.Method.pinsPin,
                                                             DaemonAPI.PinRequest(folder: key.folder, view: view),
@@ -1643,9 +1643,9 @@ final class AppModel {
         }
     }
 
-    func unpin(_ path: String, in key: ProjectKey) async {
+    func unpin(_ path: String, in key: FolderKey) async {
         work.setPins(pins(in: key.folder).filter { $0.path != path }, in: key.folder)
-        if openPin == path, selectedProjectKey == key { showProject(key) }
+        if openPin == path, selectedFolderKey == key { showFolder(key) }
         await attempt(on: key.host) {
             try await self.client(for: key.host).call(DaemonAPI.Method.pinsUnpin,
                                                       DaemonAPI.PinPathRequest(folder: key.folder, path: path))
@@ -1653,9 +1653,9 @@ final class AppModel {
     }
 
     /// Hide or Show on a server's list view (#2032): shown at once, then the host told.
-    func setViewHidden(_ uri: String, _ hidden: Bool, in key: ProjectKey) async {
+    func setViewHidden(_ uri: String, _ hidden: Bool, in key: FolderKey) async {
         work.setViewHidden(uri, hidden, in: key.folder)
-        if hidden, openPin == uri, selectedProjectKey == key { showProject(key) }
+        if hidden, openPin == uri, selectedFolderKey == key { showFolder(key) }
         await attempt(on: key.host) {
             try await self.client(for: key.host).call(DaemonAPI.Method.pinsHideView,
                                                       DaemonAPI.PinHideViewRequest(folder: key.folder, uri: uri, hidden: hidden))
@@ -1663,7 +1663,7 @@ final class AppModel {
     }
 
     /// A drop or a Move item: shown at once, then the whole order sent once.
-    func arrangePins(_ paths: [String], in key: ProjectKey) async {
+    func arrangePins(_ paths: [String], in key: FolderKey) async {
         let held = pins(in: key.folder)
         work.setPins(paths.compactMap { path in held.first { $0.path == path } }, in: key.folder)
         await attempt(on: key.host) {
@@ -1677,12 +1677,12 @@ final class AppModel {
     func pinnedSessions(in folder: URL?) -> [UUID] { work.pinnedSessions(in: folder) }
 
     func isPinned(_ agent: Agent) -> Bool {
-        pinnedSessions(in: agent.projectFolder).contains(agent.id)
+        pinnedSessions(in: agent.folderPath).contains(agent.id)
     }
 
     /// Pin or Unpin from a session's menu or swipe: shown at once, then the host told.
     func setPinned(_ agent: Agent, _ pinned: Bool) async {
-        let folder = agent.projectFolder
+        let folder = agent.folderPath
         let held = pinnedSessions(in: folder).filter { $0 != agent.id }
         work.setSessionPins(pinned ? held + [agent.id] : held, in: folder)
         await attempt(on: agent.host) {
@@ -1693,7 +1693,7 @@ final class AppModel {
     }
 
     /// A drop or a Move item among the pinned sessions: shown at once, the order sent once.
-    func arrangeSessionPins(_ ids: [UUID], in key: ProjectKey) async {
+    func arrangeSessionPins(_ ids: [UUID], in key: FolderKey) async {
         work.setSessionPins(ids, in: key.folder)
         await attempt(on: key.host) {
             try await self.client(for: key.host).call(DaemonAPI.Method.pinsArrangeSessions,
@@ -1722,7 +1722,7 @@ final class AppModel {
     }
 
     /// A drop among the pinned workflows: shown at once, the order sent once.
-    func arrangeWorkflowPins(_ ids: [String], in key: ProjectKey) async {
+    func arrangeWorkflowPins(_ ids: [String], in key: FolderKey) async {
         work.setWorkflowPins(ids, in: key.folder)
         await attempt(on: key.host) {
             try await self.client(for: key.host).call(
@@ -1731,9 +1731,9 @@ final class AppModel {
         }
     }
 
-    /// A project's plugins, asked for when its page opens; kept current after that by
+    /// A folder's plugins, asked for when its page opens; kept current after that by
     /// `plugins/changed`.
-    func plugins(in folder: URL?) -> [ProjectPlugin] { work.plugins(in: folder) }
+    func plugins(in folder: URL?) -> [FolderPlugin] { work.plugins(in: folder) }
 
     func refreshPlugins(in folder: URL) async {
         guard let list: DaemonAPI.PluginsList = try? await client.call(
@@ -1744,7 +1744,7 @@ final class AppModel {
 
     /// Approve a plugin's folder as the row showed it. Said when it fails: most likely the
     /// folder changed after the person looked.
-    func approvePlugin(_ plugin: ProjectPlugin) async {
+    func approvePlugin(_ plugin: FolderPlugin) async {
         guard let waiting = plugin.awaitingApproval else { return }
         do {
             let list: DaemonAPI.PluginsList = try await client.call(
@@ -1754,7 +1754,7 @@ final class AppModel {
             work.replacePlugins(list)
         } catch {
             problem = describe(error)
-            await refreshPlugins(in: plugin.project)
+            await refreshPlugins(in: plugin.folder)
         }
     }
 
@@ -1773,7 +1773,7 @@ final class AppModel {
     private func answerWorkflow(_ summary: WorkflowSummary, _ method: String) async {
         guard let waiting = summary.approvable else { return }
         do {
-            let host = selectedProjectHost
+            let host = selectedFolderHost
             let updated: WorkflowSummary = try await client(for: host).call(
                 method,
                 DaemonAPI.WorkflowApproveRequest(folder: summary.folder, workflowID: summary.workflowID,
@@ -1800,7 +1800,7 @@ final class AppModel {
                              cooldown: String? = nil, labels: [String]? = nil,
                              runsOn: [String]? = nil, whenDone: String? = nil,
                              continueWhenBack: Bool? = nil) async {
-        let host = selectedProjectHost
+        let host = selectedFolderHost
         do {
             let updated: WorkflowSummary = try await client(for: host).call(
                 DaemonAPI.Method.workflowsSettings,
@@ -1919,10 +1919,10 @@ final class AppModel {
         work.replaceMCPHealth(snapshot, from: host)
     }
 
-    /// Check Now on the person's own servers (no project) or a project's (#753).
-    func checkMCPHealth(project: ProjectKey?) async {
-        let host = project?.host ?? .mac
-        let request = DaemonAPI.MCPHealthCheckRequest(project: project?.folder.path)
+    /// Check Now on the person's own servers (no folder) or a folder's (#753).
+    func checkMCPHealth(folder: FolderKey?) async {
+        let host = folder?.host ?? .mac
+        let request = DaemonAPI.MCPHealthCheckRequest(folder: folder?.folder.path)
         guard let snapshot = try? await client(for: host).call(DaemonAPI.Method.mcpHealthCheck, request,
                                                                returning: DaemonAPI.MCPHealthSnapshot.self) else { return }
         work.replaceMCPHealth(snapshot, from: host)
@@ -2375,13 +2375,13 @@ final class AppModel {
         work.upsert(changed)
     }
 
-    func refreshProjects() async {
+    func refreshFolders() async {
         do {
-            let listed = try await client.call(DaemonAPI.Method.projectsList, DaemonAPI.ProjectsListRequest(),
-                                               returning: [DaemonAPI.ProjectSummary].self)
-            work.replaceProjects(listed, from: .mac)
-            hasLoadedProjects = true
-            settleProjectSelection()
+            let listed = try await client.call(DaemonAPI.Method.foldersList, DaemonAPI.FoldersListRequest(),
+                                               returning: [DaemonAPI.FolderSummary].self)
+            work.replaceFolders(listed, from: .mac)
+            hasLoadedFolders = true
+            settleFolderSelection()
             weighGetStarted()
         } catch {
             // A list that failed is not worth an alert: the notification that follows
@@ -2389,15 +2389,15 @@ final class AppModel {
         }
     }
 
-    /// Pick a project when there is none, or when the one we had has gone or been
+    /// Pick a folder when there is none, or when the one we had has gone or been
     /// archived. Falls back to what the sidebar puts at the top.
-    private func settleProjectSelection() {
-        let live = liveProjects
-        if let selectedProjectKey, live.contains(where: { $0.key == selectedProjectKey }) { return }
+    private func settleFolderSelection() {
+        let live = liveFolders
+        if let selectedFolderKey, live.contains(where: { $0.key == selectedFolderKey }) { return }
         // `host|path`.
-        let stored = WindowDefaults.store.string(forKey: Self.selectedProjectDefault)
-            .flatMap(ProjectKey.init(stored:))
-            .map { ProjectKey(host: $0.host, folder: Project.standardize($0.folder)) }
+        let stored = WindowDefaults.store.string(forKey: Self.selectedFolderDefault)
+            .flatMap(FolderKey.init(stored:))
+            .map { FolderKey(host: $0.host, folder: Folder.standardize($0.folder)) }
         if let stored, live.contains(where: { $0.key == stored }) {
             select(stored)
         } else {
@@ -2406,20 +2406,20 @@ final class AppModel {
         openPending()
     }
 
-    func addProject(_ folder: URL, on host: HostID = .mac) async {
-        await callProject(DaemonAPI.Method.projectsAdd, ProjectKey(host: host, folder: folder)) { [weak self] summary in
+    func addFolder(_ folder: URL, on host: HostID = .mac) async {
+        await callFolder(DaemonAPI.Method.foldersAdd, FolderKey(host: host, folder: folder)) { [weak self] summary in
             self?.select(summary.key)
         }
     }
 
     /// The folders the person picked on a host (#656), added one by one without moving the
     /// window's selection: those that could not be, each with why.
-    func addProjects(_ folders: [URL], on host: HostID) async -> [URL: String] {
+    func addFolders(_ folders: [URL], on host: HostID) async -> [URL: String] {
         var failed: [URL: String] = [:]
         for folder in folders {
             do {
-                var summary = try await client(for: host).call(DaemonAPI.Method.projectsAdd, DaemonAPI.ProjectRequest(folder: folder),
-                                                               returning: DaemonAPI.ProjectSummary.self)
+                var summary = try await client(for: host).call(DaemonAPI.Method.foldersAdd, DaemonAPI.FolderRequest(folder: folder),
+                                                               returning: DaemonAPI.FolderSummary.self)
                 summary.host = host
                 upsert(summary)
             } catch {
@@ -2429,20 +2429,20 @@ final class AppModel {
         return failed
     }
 
-    /// Files dragged onto a project's row, or one of its sessions', or chosen in its Drop
-    /// Box sheet, put into that project's drop box (#231): its main folder's, never a
-    /// session's worktree, and inside `subfolder` when one is named. Sent to the project's
-    /// host like an attachment, so a server's project gets them too. The event that fires
+    /// Files dragged onto a folder's row, or one of its sessions', or chosen in its Drop
+    /// Box sheet, put into that folder's drop box (#231): its main folder's, never a
+    /// session's worktree, and inside `subfolder` when one is named. Sent to the folder's
+    /// host like an attachment, so a server's folder gets them too. The event that fires
     /// is the host's; nothing is said here unless one could not go, and then it is false.
     @discardableResult
-    func putInDropbox(_ files: [URL], subfolder: String = "", project: ProjectKey) async -> Bool {
-        let folder = subfolder.trimmingCharacters(in: CharacterSet(charactersIn: "/").union(.whitespaces))
+    func putInDropbox(_ files: [URL], subfolder: String = "", folder: FolderKey) async -> Bool {
+        let folderSubpath = subfolder.trimmingCharacters(in: CharacterSet(charactersIn: "/").union(.whitespaces))
         for file in files {
             let name = file.lastPathComponent
             // Looked at before it is read: a film dragged by mistake is not read whole first.
             let size = (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
             guard size <= DaemonAPI.dropboxPutLimit else {
-                problem = "\(name) is too big to send. Copy it into .agents/dropbox/ in \(project.folder.lastPathComponent) instead."
+                problem = "\(name) is too big to send. Copy it into .agents/dropbox/ in \(folder.folder.lastPathComponent) instead."
                 return false
             }
             let data: Data
@@ -2456,9 +2456,9 @@ final class AppModel {
                 return false
             }
             do {
-                _ = try await client(for: project.host).call(
+                _ = try await client(for: folder.host).call(
                     DaemonAPI.Method.dropboxPut,
-                    DaemonAPI.DropboxPutRequest(folder: project.folder, subfolder: folder.isEmpty ? nil : folder,
+                    DaemonAPI.DropboxPutRequest(folder: folder.folder, subfolder: folderSubpath.isEmpty ? nil : folderSubpath,
                                                 name: name, data: data),
                     returning: DaemonAPI.DropboxPutResponse.self)
             } catch {
@@ -2469,19 +2469,19 @@ final class AppModel {
         return true
     }
 
-    /// Clone a Git URL into the home folder and select the project it becomes (027).
+    /// Clone a Git URL into the home folder and select the folder it becomes (027).
     ///
     /// Returns as soon as the daemon answers, which is when the clone has finished; the
     /// row the window draws meanwhile comes from `clone/changed`, not from waiting here.
-    func cloneProject(_ url: String, on host: HostID = .mac) async {
+    func cloneFolder(_ url: String, on host: HostID = .mac) async {
         do {
-            var summary = try await client(for: host).call(DaemonAPI.Method.projectsClone,
+            var summary = try await client(for: host).call(DaemonAPI.Method.foldersClone,
                                                 DaemonAPI.CloneRequest(url: url),
-                                                returning: DaemonAPI.ProjectSummary.self)
+                                                returning: DaemonAPI.FolderSummary.self)
             summary.host = host
             upsert(summary)
             select(summary.key)
-            settleProjectSelection()
+            settleFolderSelection()
         } catch {
             // Written for the person already: which host, which folder, what to do.
             problem = describe(error)
@@ -2489,31 +2489,31 @@ final class AppModel {
     }
 
     func refreshClones() async {
-        guard let running = try? await client.call(DaemonAPI.Method.projectsClones,
+        guard let running = try? await client.call(DaemonAPI.Method.foldersClones,
                                                    returning: [DaemonAPI.CloneSummary].self) else { return }
         clones = running
     }
 
-    func archiveProject(_ key: ProjectKey) async {
-        await callProject(DaemonAPI.Method.projectsArchive, key)
+    func archiveFolder(_ key: FolderKey) async {
+        await callFolder(DaemonAPI.Method.foldersArchive, key)
     }
 
-    func unarchiveProject(_ key: ProjectKey) async {
-        await callProject(DaemonAPI.Method.projectsUnarchive, key) { [weak self] summary in
+    func unarchiveFolder(_ key: FolderKey) async {
+        await callFolder(DaemonAPI.Method.foldersUnarchive, key) { [weak self] summary in
             self?.select(summary.key)
         }
     }
 
-    /// Delete an archived project (#677): every session in it and its record; its folder
-    /// stays. Out of the list at once, as `project/removed` would take it; a refusal says
+    /// Delete an archived folder (#677): every session in it and its record; its folder
+    /// stays. Out of the list at once, as `folder/removed` would take it; a refusal says
     /// which sessions hold it.
-    func deleteProject(_ key: ProjectKey) async -> Result<Void, JSONRPCError> {
+    func deleteFolder(_ key: FolderKey) async -> Result<Void, JSONRPCError> {
         do {
-            _ = try await client(for: key.host).call(DaemonAPI.Method.projectsDelete,
-                                                     DaemonAPI.ProjectRequest(folder: key.folder),
+            _ = try await client(for: key.host).call(DaemonAPI.Method.foldersDelete,
+                                                     DaemonAPI.FolderRequest(folder: key.folder),
                                                      returning: DaemonAPI.Empty.self)
-            work.removeProject(key)
-            settleProjectSelection()
+            work.removeFolder(key)
+            settleFolderSelection()
             return .success(())
         } catch let error as JSONRPCError {
             return .failure(error)
@@ -2522,14 +2522,14 @@ final class AppModel {
         }
     }
 
-    /// The person's helper limits for a project (#64). Through the window only: the
+    /// The person's helper limits for a folder (#64). Through the window only: the
     /// daemon refuses the method to agents and phones.
-    func setHelperLimits(_ limits: HelperLimits, for key: ProjectKey) async {
+    func setHelperLimits(_ limits: HelperLimits, for key: FolderKey) async {
         do {
             var summary = try await client(for: key.host).call(
-                DaemonAPI.Method.projectsSetHelperLimits,
+                DaemonAPI.Method.foldersSetHelperLimits,
                 DaemonAPI.SetHelperLimitsRequest(folder: key.folder, limits: limits),
-                returning: DaemonAPI.ProjectSummary.self)
+                returning: DaemonAPI.FolderSummary.self)
             summary.host = key.host
             upsert(summary)
         } catch {
@@ -2537,13 +2537,13 @@ final class AppModel {
         }
     }
 
-    /// A project pinned to the top of the sidebar, or not.
-    func setPinned(_ pinned: Bool, for key: ProjectKey) async {
+    /// A folder pinned to the top of the sidebar, or not.
+    func setPinned(_ pinned: Bool, for key: FolderKey) async {
         do {
             var summary = try await client(for: key.host).call(
-                DaemonAPI.Method.projectsSetPinned,
+                DaemonAPI.Method.foldersSetPinned,
                 DaemonAPI.SetPinnedRequest(folder: key.folder, pinned: pinned),
-                returning: DaemonAPI.ProjectSummary.self)
+                returning: DaemonAPI.FolderSummary.self)
             summary.host = key.host
             upsert(summary)
         } catch {
@@ -2551,12 +2551,12 @@ final class AppModel {
         }
     }
 
-    /// The person's disk space lines for a project (#195), through the window only.
+    /// The person's disk space lines for a folder (#195), through the window only.
     /// What a guarded file in `.agents` was and is (#502), for the person deciding.
-    func readGuardedChange(_ change: GuardedChange, for key: ProjectKey) async -> GuardedChangeReading? {
+    func readGuardedChange(_ change: GuardedChange, for key: FolderKey) async -> GuardedChangeReading? {
         do {
             return try await client(for: key.host).call(
-                DaemonAPI.Method.projectsReadGuardedChange,
+                DaemonAPI.Method.foldersReadGuardedChange,
                 DaemonAPI.GuardedChangeRequest(folder: key.folder, path: change.path),
                 returning: GuardedChangeReading.self)
         } catch {
@@ -2567,12 +2567,12 @@ final class AppModel {
 
     /// Keep (the change is used from now on) or Undo (the approved copy goes back), of the
     /// file as the person was shown it (#502).
-    func settleGuardedChange(_ reading: GuardedChangeReading, keep: Bool, for key: ProjectKey) async {
+    func settleGuardedChange(_ reading: GuardedChangeReading, keep: Bool, for key: FolderKey) async {
         do {
             var summary = try await client(for: key.host).call(
-                keep ? DaemonAPI.Method.projectsKeepGuardedChange : DaemonAPI.Method.projectsUndoGuardedChange,
+                keep ? DaemonAPI.Method.foldersKeepGuardedChange : DaemonAPI.Method.foldersUndoGuardedChange,
                 DaemonAPI.GuardedChangeRequest(folder: key.folder, path: reading.path, digest: reading.digest),
-                returning: DaemonAPI.ProjectSummary.self)
+                returning: DaemonAPI.FolderSummary.self)
             summary.host = key.host
             upsert(summary)
         } catch {
@@ -2581,7 +2581,7 @@ final class AppModel {
     }
 
     /// What a waiting item in Needs You is (#773), for the person deciding.
-    func readApproval(_ approval: Approval, for key: ProjectKey) async -> GuardedChangeReading? {
+    func readApproval(_ approval: Approval, for key: FolderKey) async -> GuardedChangeReading? {
         do {
             return try await client(for: key.host).call(
                 DaemonAPI.Method.approvalsRead,
@@ -2596,12 +2596,12 @@ final class AppModel {
     /// Approve, Deny or Request changes on a waiting item (#773), of the version shown;
     /// nil when it went, else why not, for the sheet to say.
     func answerApproval(_ approval: Approval, _ action: Approval.Action, digest: String?, note: String?,
-                        for key: ProjectKey) async -> String? {
+                        for key: FolderKey) async -> String? {
         var answer = ApprovalAnswer(approval, in: key.folder, action: action, note: note)
         answer.digest = digest ?? approval.digest
         do {
             var summary = try await client(for: key.host).call(
-                DaemonAPI.Method.approvalsAnswer, answer, returning: DaemonAPI.ProjectSummary.self)
+                DaemonAPI.Method.approvalsAnswer, answer, returning: DaemonAPI.FolderSummary.self)
             summary.host = key.host
             upsert(summary)
             return nil
@@ -2612,22 +2612,22 @@ final class AppModel {
 
     /// Approve or Deny from a row's menu, of the version the row shows; a refusal is the
     /// window's problem to say, as there is no sheet to say it in.
-    func settleApproval(_ approval: Approval, _ action: Approval.Action, for key: ProjectKey) async {
+    func settleApproval(_ approval: Approval, _ action: Approval.Action, for key: FolderKey) async {
         if let why = await answerApproval(approval, action, digest: approval.digest, note: nil, for: key) { problem = why }
     }
 
     /// Deny a session's ask to be archived (#773): the mark goes and the session stays.
     func keepSession(_ agent: Agent) async {
         let denial = ArchiveActions.denial(for: agent)
-        await settleApproval(denial.approval, .deny, for: denial.project)
+        await settleApproval(denial.approval, .deny, for: denial.folder)
     }
 
-    func setDiskSpace(_ lines: DiskThresholds, for key: ProjectKey) async {
+    func setDiskSpace(_ lines: DiskThresholds, for key: FolderKey) async {
         do {
             var summary = try await client(for: key.host).call(
-                DaemonAPI.Method.projectsSetDiskSpace,
+                DaemonAPI.Method.foldersSetDiskSpace,
                 DaemonAPI.SetDiskSpaceRequest(folder: key.folder, diskSpace: lines),
-                returning: DaemonAPI.ProjectSummary.self)
+                returning: DaemonAPI.FolderSummary.self)
             summary.host = key.host
             upsert(summary)
         } catch {
@@ -2635,15 +2635,15 @@ final class AppModel {
         }
     }
 
-    private func callProject(_ method: String, _ key: ProjectKey,
-                             then: ((DaemonAPI.ProjectSummary) -> Void)? = nil) async {
+    private func callFolder(_ method: String, _ key: FolderKey,
+                             then: ((DaemonAPI.FolderSummary) -> Void)? = nil) async {
         do {
-            var summary = try await client(for: key.host).call(method, DaemonAPI.ProjectRequest(folder: key.folder),
-                                                                returning: DaemonAPI.ProjectSummary.self)
+            var summary = try await client(for: key.host).call(method, DaemonAPI.FolderRequest(folder: key.folder),
+                                                                returning: DaemonAPI.FolderSummary.self)
             summary.host = key.host
             upsert(summary)
             then?(summary)
-            settleProjectSelection()
+            settleFolderSelection()
         } catch {
             // A refusal here is the daemon naming the agents to stop, which is exactly
             // what the user needs to read.
@@ -2651,11 +2651,11 @@ final class AppModel {
         }
     }
 
-    func upsert(_ summary: DaemonAPI.ProjectSummary) {
+    func upsert(_ summary: DaemonAPI.FolderSummary) {
         work.upsert(summary)
-        // The one thing filing a project means to a window and to nothing else: the
-        // project being read may have just been archived, or may have just arrived.
-        settleProjectSelection()
+        // The one thing filing a folder means to a window and to nothing else: the
+        // folder being read may have just been archived, or may have just arrived.
+        settleFolderSelection()
     }
 
     // MARK: Connecting
@@ -2903,11 +2903,11 @@ final class AppModel {
         // so the window and the phone cannot drift apart. What is left here is the
         // Mac's own: the shells and terminals a phone has no business with.
         if let update {
-            // A project added has workflows no notification brings (#1798).
-            let added = work.addsProject(update)
+            // A folder added has workflows no notification brings (#1798).
+            let added = work.addsFolder(update)
             work.apply(update)
             applyToPopouts(update)
-            if case .projectChanged = update { settleProjectSelection() }
+            if case .folderChanged = update { settleFolderSelection() }
             if added { await refreshWorkflows() }
             // And the other way: every server hears what the Mac learned about a plan it
             // relays (052, R6). Only a newer word changes anything there.
@@ -3216,10 +3216,10 @@ final class AppModel {
         kept.filter { !$0.isStart && $0.agentID == agentID }
     }
 
-    /// The agent starts kept for one project.
+    /// The agent starts kept for one folder.
     func keptStarts(on host: HostID, in folder: URL) -> [DaemonAPI.KeptRequest] {
-        let folder = Project.standardize(folder)
-        return kept.filter { $0.isStart && $0.host == host && $0.folder.map(Project.standardize) == folder }
+        let folder = Folder.standardize(folder)
+        return kept.filter { $0.isStart && $0.host == host && $0.folder.map(Folder.standardize) == folder }
     }
 
     /// A kept request, as the control plane said it when it answered: shown at once,
@@ -3320,17 +3320,17 @@ final class AppModel {
         }
         // One offline or stopped when this window started lists what it last did, greyed, as
         // one that went while it ran (#962).
-        for host in others where !host.answers && !work.holdsProjects(of: host.id) {
+        for host in others where !host.answers && !work.holdsFolders(of: host.id) {
             if let heard = try? await control.call(DaemonAPI.Method.hostsLastHeard, DaemonAPI.HostRequest(host: host.id),
                                                    returning: DaemonAPI.HostLastHeard.self) {
                 work.takeLastHeard(heard)
             }
         }
-        // A host removed from the control plane leaves the window too: its projects and
+        // A host removed from the control plane leaves the window too: its folders and
         // agents are no longer anybody's to show here (FR-014; they carry on where they are).
         for id in controlHosts.keys where !others.contains(where: { $0.id == id }) {
             await controlHosts.removeValue(forKey: id)?.disconnect()
-            work.replaceProjects([], from: id)
+            work.replaceFolders([], from: id)
             work.replaceAgents([], from: id)
         }
     }
@@ -3452,10 +3452,10 @@ final class AppModel {
             break
         }
         if let update {
-            let added = work.addsProject(update, from: host)
+            let added = work.addsFolder(update, from: host)
             work.apply(update, from: host)
             applyToPopouts(update)
-            if method == DaemonAPI.Notification.projectChanged { settleProjectSelection() }
+            if method == DaemonAPI.Notification.folderChanged { settleFolderSelection() }
             if added { await refreshWorkflows() }
             return
         }
@@ -3483,11 +3483,11 @@ final class AppModel {
     func removeServer(_ host: HostID, purge: Bool) async {
         await hosts.remove(host, purge: purge)
         work.replaceAgents([], from: host)
-        work.replaceProjects([], from: host)
+        work.replaceFolders([], from: host)
         serverRuntimes[host] = nil
         serverDisks[host] = nil
         serverFilesByHost[host] = nil
-        if selectedProjectHost == host { select(liveProjects.first?.key) }
+        if selectedFolderHost == host { select(liveFolders.first?.key) }
     }
 
     func refreshServer(_ host: HostID) async {
@@ -3541,13 +3541,13 @@ final class AppModel {
             work.replaceAgents(listed + work.agents.filter { $0.host == host && $0.state == .archived && !live.contains($0.id) },
                                from: host)
         }
-        if let listed = try? await server.call(DaemonAPI.Method.projectsList, DaemonAPI.ProjectsListRequest(),
-                                               returning: [DaemonAPI.ProjectSummary].self) {
-            work.replaceProjects(listed, from: host)
-            hosts.noteProjects(host, listed: listed)
-            settleProjectSelection()
+        if let listed = try? await server.call(DaemonAPI.Method.foldersList, DaemonAPI.FoldersListRequest(),
+                                               returning: [DaemonAPI.FolderSummary].self) {
+            work.replaceFolders(listed, from: host)
+            hosts.noteFolders(host, listed: listed)
+            settleFolderSelection()
         }
-        // Its projects' MCP servers, for their rows in the sidebar (#753).
+        // Its folders' MCP servers, for their rows in the sidebar (#753).
         if let health = try? await server.call(DaemonAPI.Method.mcpHealth, Optional<String>.none,
                                                returning: DaemonAPI.MCPHealthSnapshot.self) {
             work.replaceMCPHealth(health, from: host)
@@ -3580,7 +3580,7 @@ final class AppModel {
     ]
 
     /// What is this Mac's own, from this Mac's host by an id of its own (#1496). Its
-    /// agents and projects come with `refreshServer`, under that id.
+    /// agents and folders come with `refreshServer`, under that id.
     private func refreshThisMacsOwn() async {
         async let runtimes: Void = refreshRuntimes()
         async let accounts: Void = refreshAccounts()
@@ -3605,9 +3605,9 @@ final class AppModel {
 
     func refreshEverything() async {
         await refreshAgents()
-        // After the agents, because a project's counts are worked out from them and a
-        // sidebar drawn before them would say every project is empty.
-        await refreshProjects()
+        // After the agents, because a folder's counts are worked out from them and a
+        // sidebar drawn before them would say every folder is empty.
+        await refreshFolders()
         // The rest at once. Each is its own round trip to the daemon and none
         // depends on another, so one after the other was ten waits where the window
         // sat with a list and no conversation.
@@ -3686,7 +3686,7 @@ final class AppModel {
         await attempt {
             // Lean: the sessions column reads none of the option and command lists, and
             // they were 4 MB of 200 agents (#107). The open chat's come with `loadWholeAgent`.
-            // Live only, a page at a time (#164, #165). Archived agents come a project at a
+            // Live only, a page at a time (#164, #165). Archived agents come a folder at a
             // time when its Archived fold opens, or by search; the ones already here (an
             // open fold, the chat being read) are kept, and the live copy wins.
             let listed = try await self.client.listAgents(DaemonAPI.ListRequest(includeArchived: false, lean: true))
@@ -3702,14 +3702,14 @@ final class AppModel {
     }
 
     /// What every agent shares, for Settings ▸ Agent Configuration (054, #754), or with a
-    /// project's folder what its `.agents` holds, for the same pages in Project Settings.
+    /// folder what its `.agents` holds, for the same pages in Folder Settings.
     /// Nil when it could not be read; the page then keeps what it last had.
-    func sharedSnapshot(project: URL? = nil) async -> DaemonAPI.SharedSnapshot? {
+    func sharedSnapshot(folder: URL? = nil) async -> DaemonAPI.SharedSnapshot? {
         var snapshot: DaemonAPI.SharedSnapshot?
         _ = await attempt(quietWhenDown: true) {
-            if let project {
+            if let folder {
                 snapshot = try await self.macClient.call(DaemonAPI.Method.personalShared,
-                                                      DaemonAPI.SharedRequest(folder: project.path),
+                                                      DaemonAPI.SharedRequest(folder: folder.path),
                                                       returning: DaemonAPI.SharedSnapshot.self)
             } else {
                 snapshot = try await self.macClient.call(DaemonAPI.Method.personalShared, Optional<String>.none,
@@ -3766,13 +3766,13 @@ final class AppModel {
         }
     }
 
-    /// A project's (or worktree's) own skills, for its page (frame D). Nil when they could
+    /// A folder's (or worktree's) own skills, for its page (frame D). Nil when they could
     /// not be read, so the section keeps what it last had.
-    func projectSkills(_ folder: URL) async -> [DaemonAPI.ListedSkill]? {
-        await skills(at: .project(folder: folder.path))
+    func folderSkills(_ folder: URL) async -> [DaemonAPI.ListedSkill]? {
+        await skills(at: .folder(folder: folder.path))
     }
 
-    /// Skills in `~/.agents/skills` or a project's `.agents/skills`.
+    /// Skills in `~/.agents/skills` or a folder's `.agents/skills`.
     func skills(at destination: DaemonAPI.SkillDestination) async -> [DaemonAPI.ListedSkill]? {
         try? await macClient.call(DaemonAPI.Method.skillsList,
                                DaemonAPI.SkillsListRequest(destination: destination),
@@ -3823,7 +3823,7 @@ final class AppModel {
 
     // MARK: Marketplaces (#687)
 
-    /// The marketplaces for a kind, a project's among them when it is the destination. Nil
+    /// The marketplaces for a kind, a folder's among them when it is the destination. Nil
     /// when the daemon could not be asked.
     func marketplaces(_ kind: DaemonAPI.CatalogKind,
                       for destination: DaemonAPI.SkillDestination?) async -> DaemonAPI.MarketplacesListAnswer? {
@@ -3901,8 +3901,8 @@ final class AppModel {
         }
     }
 
-    /// Takes a connector out of its mcp.json on `host`: a server project's on its own
-    /// host (#2199), the person's own and this Mac's projects' on this Mac's.
+    /// Takes a connector out of its mcp.json on `host`: a server folder's on its own
+    /// host (#2199), the person's own and this Mac's folders' on this Mac's.
     func mcpRemove(_ name: String, at destination: DaemonAPI.SkillDestination,
                    forgetSecret: String?, on host: HostID = .mac) async -> DaemonAPI.MCPCatalogError? {
         do {
@@ -3934,10 +3934,10 @@ final class AppModel {
     }
 
     /// Approve the entry the row showed. A digest that no longer matches comes back as an error.
-    func approveProjectMCP(_ name: String, digest: String, in folder: URL) async -> DaemonAPI.MCPCatalogError? {
+    func approveFolderMCP(_ name: String, digest: String, in folder: URL) async -> DaemonAPI.MCPCatalogError? {
         do {
             _ = try await macClient.call(DaemonAPI.Method.mcpApprove,
-                                      DaemonAPI.MCPApproveRequest(destination: .project(folder: folder.path),
+                                      DaemonAPI.MCPApproveRequest(destination: .folder(folder: folder.path),
                                                                   name: name, digest: digest),
                                       returning: DaemonAPI.MCPListAnswer.self)
             return nil
@@ -4362,7 +4362,7 @@ final class AppModel {
 
     /// Where the draft session is made: in a worktree already there when one is chosen,
     /// so the start can use it (research R2). A new worktree has no folder until the
-    /// start makes it, so its draft is the project folder's and the start lets it go.
+    /// start makes it, so its draft is the folder's and the start lets it go.
     private var draftOptionsFolder: URL? {
         if case .existing(let root) = draftWorktree { return root }
         return draftCwd
@@ -4377,20 +4377,20 @@ final class AppModel {
         }
     }
 
-    /// Every project's worktrees on this Mac, for Activity ▸ Worktrees (#790). Sizes the
+    /// Every folder's worktrees on this Mac, for Activity ▸ Worktrees (#790). Sizes the
     /// daemon has not measured yet come later, on `worktrees/sized`.
     func loadWorktrees() async {
         guard let listed = try? await macClient.call(DaemonAPI.Method.worktreesAll, DaemonAPI.Empty(),
-                                                  returning: [DaemonAPI.ProjectWorktrees].self) else { return }
+                                                  returning: [DaemonAPI.FolderWorktrees].self) else { return }
         work.replaceWorktrees(listed)
     }
 
-    /// What removing one of a project's worktrees would lose, or nil when it could
+    /// What removing one of a folder's worktrees would lose, or nil when it could
     /// not be asked (and `problem` says why).
-    func checkWorktreeRemoval(_ root: URL, in project: URL) async -> DaemonAPI.RemovalCheck? {
+    func checkWorktreeRemoval(_ root: URL, in folder: URL) async -> DaemonAPI.RemovalCheck? {
         do {
             return try await macClient.call(DaemonAPI.Method.worktreesCheck,
-                                         DaemonAPI.WorktreeRemovalRequest(project: project, root: root),
+                                         DaemonAPI.WorktreeRemovalRequest(folder: folder, root: root),
                                          returning: DaemonAPI.RemovalCheck.self)
         } catch {
             problem = describe(error)
@@ -4398,12 +4398,12 @@ final class AppModel {
         }
     }
 
-    /// Remove one of a project's worktrees. `confirmed` is the person having seen
+    /// Remove one of a folder's worktrees. `confirmed` is the person having seen
     /// what would be lost; the daemon checks again either way.
-    func removeWorktree(_ root: URL, in project: URL, confirmed: Bool) async {
+    func removeWorktree(_ root: URL, in folder: URL, confirmed: Bool) async {
         do {
             _ = try await macClient.call(DaemonAPI.Method.worktreesRemove,
-                                      DaemonAPI.WorktreeRemovalRequest(project: project, root: root,
+                                      DaemonAPI.WorktreeRemovalRequest(folder: folder, root: root,
                                                                        confirmed: confirmed),
                                       returning: DaemonAPI.WorktreeRemoved.self)
         } catch {
@@ -4415,11 +4415,11 @@ final class AppModel {
 
     /// Delete an idle worktree's build output (#790), and say what it freed; nil when it
     /// could not (and `problem` says why).
-    func removeBuildOutput(_ root: URL, in project: URL) async -> String? {
+    func removeBuildOutput(_ root: URL, in folder: URL) async -> String? {
         defer { Task { await loadWorktrees() } }
         do {
             let removed = try await macClient.call(DaemonAPI.Method.worktreesRemoveBuildOutput,
-                                                DaemonAPI.WorktreeRemovalRequest(project: project, root: root),
+                                                DaemonAPI.WorktreeRemovalRequest(folder: folder, root: root),
                                                 returning: DaemonAPI.BuildOutputRemoved.self)
             return WorktreeTally.freedWords(removed)
         } catch {
@@ -4428,9 +4428,9 @@ final class AppModel {
         }
     }
 
-    /// Clean up worktrees (030): a new session in the project, offered the words.
-    func offerCleanUp(in project: URL) {
-        showProject(ProjectKey(folder: project))
+    /// Clean up worktrees (030): a new session in the folder, offered the words.
+    func offerCleanUp(in folder: URL) {
+        showFolder(FolderKey(folder: folder))
         offeredPrompt = PromptOffer(agentID: nil, words: WorktreeTally.cleanUpPrompt)
     }
 
@@ -4486,16 +4486,16 @@ final class AppModel {
     }
 
     func personaFiles(on host: HostID, folder: URL, origin: Persona.Origin) async -> [DaemonAPI.PersonaFile]? {
-        let request = DaemonAPI.PersonasFilesRequest(folder: origin == .project ? folder : nil, origin: origin)
+        let request = DaemonAPI.PersonasFilesRequest(folder: origin == .folder ? folder : nil, origin: origin)
         return try? await client(for: host).call(DaemonAPI.Method.personasFiles, request, returning: [DaemonAPI.PersonaFile].self)
     }
 
     func savePersonaFile(on host: HostID, folder: URL, origin: Persona.Origin, id: String, content: String,
                          delete: Bool = false) async -> Bool {
-        let request = DaemonAPI.PersonaFileSaveRequest(folder: origin == .project ? folder : nil, origin: origin,
+        let request = DaemonAPI.PersonaFileSaveRequest(folder: origin == .folder ? folder : nil, origin: origin,
                                                        id: id, content: content, delete: delete ? true : nil)
         guard (try? await client(for: host).call(DaemonAPI.Method.personasSave, request)) != nil else { return false }
-        if selectedProjectHost == host { await loadDraftPersonas() }
+        if selectedFolderHost == host { await loadDraftPersonas() }
         return true
     }
 
@@ -4519,9 +4519,9 @@ final class AppModel {
         }
     }
 
-    /// What the open agent's project has, for the Worktree choice on its page (053).
+    /// What the open agent's folder has, for the Worktree choice on its page (053).
     func loadAgentWorktrees(of agent: Agent) async {
-        let folder = agent.projectFolder
+        let folder = agent.folderPath
         let answer = (try? await client(forAgent: agent.id).call(DaemonAPI.Method.worktreesList,
                                                                 DaemonAPI.WorktreesListRequest(folder: folder),
                                                                 returning: DaemonAPI.WorktreesListResponse.self))
@@ -4680,22 +4680,22 @@ final class AppModel {
             let id = try await draftHostClient.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
             started(id)
             draftID = nil
-            // The last project used is the one a session was started in, from any window (#2160).
-            rememberNewSessionProject(ProjectKey(host: draftHost, folder: cwd))
-            // Back to the project folder, and the list fetched again: the start may
+            // The last folder used is the one a session was started in, from any window (#2160).
+            rememberNewSessionFolder(FolderKey(host: draftHost, folder: cwd))
+            // Back to the folder, and the list fetched again: the start may
             // have made a worktree, and it has put an agent in one.
             draftWorktree = nil
             Task { await loadDraftWorktrees() }
             if draftHost == .mac {
                 await refreshAgents()
-                await refreshProjects()
+                await refreshFolders()
             } else {
                 await refreshServer(draftHost)
             }
             // Gone to, as the phone does: what you just asked for is what you want to
             // see start. Once the list has it, so the chat opens on a row that is there.
-            // Started in a project's own window, it opens there (#1089).
-            if let window = composingWindow.flatMap({ projectWindows[$0] }) {
+            // Started in a folder's own window, it opens there (#1089).
+            if let window = composingWindow.flatMap({ folderWindows[$0] }) {
                 window.show(started: id)
             } else {
                 justStarted = id
@@ -4765,15 +4765,15 @@ final class AppModel {
 
     // MARK: A folder that has gone (#119)
 
-    /// Start a successor in the project folder that reads this session and carries on,
+    /// Start a successor in the folder that reads this session and carries on,
     /// with whatever was typed, and open it.
     @discardableResult
-    func continueInProject(_ agentID: UUID, text: String = "", attachments: [Attachment] = []) async -> Bool {
+    func continueInFolder(_ agentID: UUID, text: String = "", attachments: [Attachment] = []) async -> Bool {
         var made: UUID?
         let went = await attempt(on: host(ofAgent: agentID)) {
             made = try await self.client(forAgent: agentID).call(
-                DaemonAPI.Method.agentsContinueInProject,
-                DaemonAPI.ContinueInProjectRequest(agentID: agentID, text: text, attachments: attachments,
+                DaemonAPI.Method.agentsContinueInFolder,
+                DaemonAPI.ContinueInFolderRequest(agentID: agentID, text: text, attachments: attachments,
                                                    requestID: UUID()),
                 returning: UUID.self)
         }
@@ -4845,9 +4845,9 @@ final class AppModel {
         }
     }
 
-    /// Start an agent on this, in this project's folder.
+    /// Start an agent on this, in this folder.
     ///
-    /// What the prompt at the top of a project does. There is no separate button for
+    /// What the prompt at the top of a folder does. There is no separate button for
     /// it because there is nothing else the prompt could mean: you are looking at a
     /// folder and saying what you want done in it.
     func startAgent(in folder: URL, prompt: String, labels: [String] = []) async {
@@ -4872,19 +4872,19 @@ final class AppModel {
         }
     }
 
-    /// A project's labels as its host keeps them, archived sessions' included, read when
+    /// A folder's labels as its host keeps them, archived sessions' included, read when
     /// a label input appears and when its session's labels change (#213). Not worked out here from the
     /// agents held: that was a pass over every one of them on each redraw of the chat,
     /// and it missed what only archived sessions carry.
     func labelSuggestions(in folder: URL, on host: HostID) -> [String] {
-        labelVocabularies[ProjectKey(host: host, folder: Project.standardize(folder))] ?? []
+        labelVocabularies[FolderKey(host: host, folder: Folder.standardize(folder))] ?? []
     }
 
-    /// Each project's label vocabulary, by host and folder, as last read.
-    private(set) var labelVocabularies: [ProjectKey: [String]] = [:]
+    /// Each folder's label vocabulary, by host and folder, as last read.
+    private(set) var labelVocabularies: [FolderKey: [String]] = [:]
 
     func loadLabelVocabulary(in folder: URL, on host: HostID) async {
-        let key = ProjectKey(host: host, folder: Project.standardize(folder))
+        let key = FolderKey(host: host, folder: Folder.standardize(folder))
         let values: [String]
         if let read = try? await client(for: host).call(
             DaemonAPI.Method.agentsLabelVocabulary, DaemonAPI.LabelVocabularyRequest(folder: key.folder),
@@ -4899,9 +4899,9 @@ final class AppModel {
     }
 
     /// Which runtime a new agent gets: the most recently active agent's runtime on this
-    /// project's host, then the kept form choice, then the first available (#264).
+    /// folder's host, then the kept form choice, then the first available (#264).
     var defaultRuntimeID: String? {
-        work.defaultRuntimeID(available: availableRuntimes.map(\.runtime.id), kept: draftRuntimeID, host: selectedProjectHost)
+        work.defaultRuntimeID(available: availableRuntimes.map(\.runtime.id), kept: draftRuntimeID, host: selectedFolderHost)
     }
 
     /// Take something back off the queue before it goes.
@@ -5287,39 +5287,39 @@ final class AppModel {
         return fresh
     }
 
-    /// One of the project's own shells (#418), on the project's host, made once per
-    /// project and tab per window and held by the same count as an agent's.
-    func acquireProjectShell(_ project: ProjectKey, shell: Int = 0) -> ShellClient {
-        let id = ProjectShell.id(for: project.folder)
+    /// One of the folder's own shells (#418), on the folder's host, made once per
+    /// folder and tab per window and held by the same count as an agent's.
+    func acquireFolderShell(_ folder: FolderKey, shell: Int = 0) -> ShellClient {
+        let id = FolderShell.id(for: folder.folder)
         let key = ShellKey(agentID: id, shell: shell)
-        projectShellHosts[id] = project.host
+        folderShellHosts[id] = folder.host
         if shellClients[key] == nil {
-            shellClients[key] = ShellClient(agentID: id, shell: shell, project: project.folder,
-                                            client: client(for: project.host),
+            shellClients[key] = ShellClient(agentID: id, shell: shell, folderContext: folder.folder,
+                                            client: client(for: folder.host),
                                             describe: { [weak self] error in self?.describeForShell(error) ?? "\(error)" })
         }
         return acquireShell(for: id, shell: shell)
     }
 
-    /// The shells the project's host holds for the project, so the panel opens with the
+    /// The shells the folder's host holds for the folder, so the panel opens with the
     /// tabs it had. Nil from a host too old to list them.
-    func projectShellNumbers(_ project: ProjectKey) async -> [Int]? {
-        let id = ProjectShell.id(for: project.folder)
-        projectShellHosts[id] = project.host
+    func folderShellNumbers(_ folder: FolderKey) async -> [Int]? {
+        let id = FolderShell.id(for: folder.folder)
+        folderShellHosts[id] = folder.host
         return await shellNumbers(for: id)
     }
 
-    /// A new tab in the project's panel, numbered by its host. Nil from a host too old to
-    /// open one for a project, and the panel numbers it itself.
-    func openProjectShell(_ project: ProjectKey) async -> Int? {
-        let id = ProjectShell.id(for: project.folder)
-        projectShellHosts[id] = project.host
-        return await ShellClient.open(agentID: id, project: project.folder, on: client(for: project.host))
+    /// A new tab in the folder's panel, numbered by its host. Nil from a host too old to
+    /// open one for a folder, and the panel numbers it itself.
+    func openFolderShell(_ folder: FolderKey) async -> Int? {
+        let id = FolderShell.id(for: folder.folder)
+        folderShellHosts[id] = folder.host
+        return await ShellClient.open(agentID: id, folder: folder.folder, on: client(for: folder.host))
     }
 
     /// This window's ends of the shells one host holds.
     private func shellClients(on host: HostID) -> [ShellClient] {
-        shellClients.values.filter { (projectShellHosts[$0.agentID] ?? self.host(ofAgent: $0.agentID)) == host }
+        shellClients.values.filter { (folderShellHosts[$0.agentID] ?? self.host(ofAgent: $0.agentID)) == host }
     }
 
     /// A server's new connection knows none of this window's screens: they attach
@@ -5559,7 +5559,7 @@ final class AppModel {
             await refreshAgents()
             selection = id
         } catch {
-            fail(error, on: selectedProjectHost)
+            fail(error, on: selectedFolderHost)
         }
     }
 
@@ -5840,7 +5840,7 @@ struct OfferedStart: Equatable {
 }
 
 /// A send refused because the agent's folder has gone (#119): what the daemon said, and
-/// what was typed, for Continue in the project folder to carry on with.
+/// what was typed, for Continue in the folder to carry on with.
 struct FolderGoneAsk: Identifiable, Equatable {
     let id = UUID()
     let agentID: UUID

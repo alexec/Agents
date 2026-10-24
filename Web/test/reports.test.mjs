@@ -6,7 +6,7 @@ import { load } from "./load.mjs";
 const r = await load("src/model/reports.ts");
 
 const row = (over = {}) => ({
-  at: "2026-10-21", person: "bea", personName: "Bea", host: "H1", hostName: "Bea's Mac", project: "shop", runtime: "claude",
+  at: "2026-10-21", person: "bea", personName: "Bea", host: "H1", hostName: "Bea's Mac", folder: "shop", runtime: "claude",
   cost: {}, inputTokens: 0, outputTokens: 0, thoughtTokens: 0, cachedReadTokens: 0, cachedWriteTokens: 0, turns: 0,
   unpricedTurns: 0, workingSeconds: 0, waitingSeconds: 0, ...over,
 });
@@ -14,7 +14,7 @@ const row = (over = {}) => ({
 test("rows add up by each dimension, largest first", () => {
   const rows = [
     row({ cost: { USD: 1 }, inputTokens: 100, turns: 1, workingSeconds: 60 }),
-    row({ person: "", personName: "", host: "H9", hostName: "Old box", project: "", cost: { USD: 3 }, turns: 2 }),
+    row({ person: "", personName: "", host: "H9", hostName: "Old box", folder: "", cost: { USD: 3 }, turns: 2 }),
     row({ person: "al", personName: "Al", host: "H2", hostName: "Al's Mac", runtime: "codex", cost: { USD: 2 }, cachedReadTokens: 999 }),
     row({ at: "2026-10-20", cost: { USD: 0.5 }, outputTokens: 50, thoughtTokens: 5, cachedWriteTokens: 5 }),
   ];
@@ -23,7 +23,7 @@ test("rows add up by each dimension, largest first", () => {
   assert.equal(people.total.cost.USD, 6.5);
   assert.equal(people.groups[2].tokens, 160);
   assert.equal(people.groups[2].turns, 1);
-  assert.deepEqual(r.reportTotals(rows, "project").groups.map((g) => g.name), ["shop", r.noProject]);
+  assert.deepEqual(r.reportTotals(rows, "folder").groups.map((g) => g.name), ["shop", r.noFolder]);
   assert.deepEqual(r.reportTotals(rows, "machine").groups.map((g) => g.name), ["Old box", "Al's Mac", "Bea's Mac"]);
   const runtimes = r.reportTotals(rows, "runtime", (id) => id === "claude" ? "Claude" : "Codex");
   assert.deepEqual(runtimes.groups.map((g) => g.name), ["Claude", "Codex"]);
@@ -32,7 +32,7 @@ test("rows add up by each dimension, largest first", () => {
 });
 
 test("nothing priced is shared out by tokens", () => {
-  const t = r.reportTotals([row({ inputTokens: 10 }), row({ project: "b", inputTokens: 40 })], "project");
+  const t = r.reportTotals([row({ inputTokens: 10 }), row({ folder: "b", inputTokens: 40 })], "folder");
   assert.deepEqual(t.currencies, []);
   assert.equal(r.share(t, t.groups[1]), 0.25);
   assert.equal(r.line(t.groups[0]), "40 tokens · 0 turns · 0s working");
@@ -44,9 +44,9 @@ test("an export is named by its range and day", () => {
 });
 
 test("scopes (#1804): a group dimension past Me, none naming a person when hidden, a budget's words", () => {
-  assert.deepEqual(r.scopedDimensions({ scope: { kind: "me" } }), ["person", "project", "machine", "runtime"]);
-  assert.deepEqual(r.scopedDimensions({ scope: { kind: "org" } }), ["person", "project", "machine", "runtime", "group"]);
-  assert.deepEqual(r.scopedDimensions({ scope: { kind: "group", group: "g" }, personsHidden: true }), ["project", "runtime", "group"]);
+  assert.deepEqual(r.scopedDimensions({ scope: { kind: "me" } }), ["person", "folder", "machine", "runtime"]);
+  assert.deepEqual(r.scopedDimensions({ scope: { kind: "org" } }), ["person", "folder", "machine", "runtime", "group"]);
+  assert.deepEqual(r.scopedDimensions({ scope: { kind: "group", group: "g" }, personsHidden: true }), ["folder", "runtime", "group"]);
   assert.equal(r.scopeKey({ kind: "group", group: "g1" }), "group:g1");
   const rows = [row({ groups: ["g1", "g2"], cost: { USD: 2 } }), row({ person: "al", personName: "Al", groups: [], cost: { USD: 1 } })];
   const t = r.reportTotals(rows, "group", (id) => id, { g1: "Platform", g2: "Web" });
@@ -132,8 +132,8 @@ test("runtimes by cost, workflows failing first, adoption by the week", () => {
 // Saved views and digests (#2019).
 test("a saved view's words and its digest", () => {
   const usd = (n) => new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(n);
-  const view = { id: "v1", name: "Monday digest", page: "outcomes", scope: { kind: "org" }, range: "week", by: "project" };
-  assert.equal(r.viewWords(view, "Acme"), "Outcomes · Acme · The last 7 days · By Project");
+  const view = { id: "v1", name: "Monday digest", page: "outcomes", scope: { kind: "org" }, range: "week", by: "folder" };
+  assert.equal(r.viewWords(view, "Acme"), "Outcomes · Acme · The last 7 days · By Folder");
   assert.equal(r.viewWords({ ...view, by: "colour" }, "Acme"), "Outcomes · Acme · The last 7 days");
   const rows = [
     row({ cost: { USD: 10 }, counts: counts({ sessions: 4, prsMerged: 2, failedSessions: 1, waits: 1, waitBuckets: [0, 1, 0, 0, 0, 0] }) }),

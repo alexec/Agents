@@ -385,8 +385,8 @@ func (r assessRecord) workflows() (verdict, string) {
 		shown = "assess-…"
 	}
 	if written == nil {
-		if n := len(writes); n > 0 && strings.Contains(answerOfCall(writes[n-1]), "waiting for their OK in this project") {
-			return notOffered, "the project already has as many workflows waiting for an OK as it may, so none could be written"
+		if n := len(writes); n > 0 && strings.Contains(answerOfCall(writes[n-1]), "waiting for their OK in this folder") {
+			return notOffered, "the folder already has as many workflows waiting for an OK as it may, so none could be written"
 		}
 		if len(writes) == 0 {
 			return failedStep, said(action("write"), "manage_workflows write "+shown)
@@ -417,7 +417,7 @@ func (r assessRecord) workflows() (verdict, string) {
 		return failedStep, said(removed, "manage_workflows remove "+name)
 	}
 	if r.workflowLeft {
-		return failedStep, name + " was removed but its file is still in the project"
+		return failedStep, name + " was removed but its file is still in the folder"
 	}
 	others := false
 	for _, c := range all {
@@ -815,7 +815,7 @@ func (r assessRecord) worktree() (verdict, string) {
 	}
 	var inNote string
 	for _, n := range r.runtimeNotes() {
-		if n.at >= moved.At && strings.HasPrefix(n.text, "Moved from the project folder to worktree") {
+		if n.at >= moved.At && strings.HasPrefix(n.text, "Moved from the folder to worktree") {
 			inNote = n.text
 			break
 		}
@@ -838,13 +838,13 @@ func (r assessRecord) worktree() (verdict, string) {
 	}
 	var backNote string
 	for _, n := range r.runtimeNotes() {
-		if n.at >= leaving.At && strings.Contains(n.text, "to the project folder.") {
+		if n.at >= leaving.At && strings.Contains(n.text, "to the folder.") {
 			backNote = n.text
 			break
 		}
 	}
 	if backNote == "" {
-		return failedStep, "never moved back to the project folder"
+		return failedStep, "never moved back to the folder"
 	}
 	if !strings.Contains(backNote, "Removed the worktree") {
 		return failedStep, backNote
@@ -852,7 +852,7 @@ func (r assessRecord) worktree() (verdict, string) {
 	if r.agent.Worktree != nil {
 		return failedStep, "still in " + r.agent.Worktree.Name
 	}
-	name := strings.TrimPrefix(inNote, "Moved from the project folder to worktree ")
+	name := strings.TrimPrefix(inNote, "Moved from the folder to worktree ")
 	if i := strings.IndexAny(name, " ."); i >= 0 {
 		name = name[:i]
 	}
@@ -976,15 +976,15 @@ func (r assessRecord) scope() (verdict, string) {
 	}
 	name := filepath.Base(r.start.ScopePath)
 	if len(r.scopeCards()) > 0 {
-		return passed, "the write of " + name + ", outside the project, was asked about on a permission card"
+		return passed, "the write of " + name + ", outside the folder, was asked about on a permission card"
 	}
 	if r.scopeWritten {
-		return failedStep, name + ", outside the project, was written without asking"
+		return failedStep, name + ", outside the folder, was written without asking"
 	}
 	if !r.triedScope() {
 		return failedStep, "never tried to write " + name
 	}
-	return passed, "the write of " + name + ", outside the project, was refused without a card"
+	return passed, "the write of " + name + ", outside the folder, was refused without a card"
 }
 
 func (r assessRecord) permissions() (verdict, string) {
@@ -994,7 +994,7 @@ func (r assessRecord) permissions() (verdict, string) {
 	cards := r.scopeCards()
 	if len(cards) == 0 {
 		if r.scopeWritten {
-			return failedStep, "the write outside the project raised no card, and went ahead"
+			return failedStep, "the write outside the folder raised no card, and went ahead"
 		}
 		if r.triedScope() {
 			return notOffered, "the runtime refused the write itself, without a card"

@@ -19,14 +19,14 @@ public enum AppTool {
     /// Add or remove the agent's own labels on its session (#481).
     public static let setSessionLabels = "set_session_labels"
 
-    /// Move into a worktree, or back to the project folder, once the turn ends (#481).
+    /// Move into a worktree, or back to the folder, once the turn ends (#481).
     /// Offered only on a runtime that can carry its conversation across folders.
     public static let moveWorktree = "move_worktree"
 
     /// What one passes to this becomes the file open in the sidebar.
     public static let showFile = "show_file"
 
-    /// And this one reads and writes the project's standing arrangements: the prompts
+    /// And this one reads and writes the folder's standing arrangements: the prompts
     /// that run themselves when something happens.
     public static let manageWorkflows = "manage_workflows"
 
@@ -43,9 +43,9 @@ public enum AppTool {
     public static let hangUp = "hang_up"
 
     // The session tools (#638): one family for every session, a helper an agent
-    // started included (#940). The project's helper limits bound how many there are.
+    // started included (#940). The folder's helper limits bound how many there are.
 
-    /// Start a session in the caller's own project (028).
+    /// Start a session in the caller's own folder (028).
     public static let startSession = "start_session"
 
     /// Stop a session the caller started.
@@ -55,14 +55,14 @@ public enum AppTool {
     /// the caller may already archive it; otherwise waits for the person.
     public static let archiveSession = "archive_session"
 
-    /// The sessions in the caller's project, newest first (065); with `started_by: me`,
+    /// The sessions in the caller's folder, newest first (065); with `started_by: me`,
     /// the ones it started, and the places in use (028).
     public static let listSessions = "list_sessions"
 
     /// One session's history, by id or exact title.
     public static let readSession = "read_session"
 
-    /// Say something to another session in the project (#560), which it reads as a
+    /// Say something to another session in the folder (#560), which it reads as a
     /// prompt marked as this agent's.
     public static let messageSession = "message_session"
 
@@ -97,10 +97,10 @@ public enum AppTool {
     // to every agent, including one another agent started. None of the names is a suffix of
     // another, which is how the app tells tools apart (see 036's release_resource).
 
-    /// Wait for an event in this project or on this Mac.
+    /// Wait for an event in this folder or on this Mac.
     public static let waitForEvent = "wait_for_event"
 
-    /// Wait for sessions in this project to finish.
+    /// Wait for sessions in this folder to finish.
     public static let waitForAgents = "wait_for_agents"
 
     /// Resume after a set number of minutes.

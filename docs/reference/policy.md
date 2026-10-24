@@ -23,7 +23,7 @@ The types are in `Packages/Wire/daemon.schema.json` (`OrgPolicy`, `SignedPolicy`
 | `runtimes` | `{<runtime id>: {models?: [id], reach?: [way]}}` | Only these runtimes. `models` names the models allowed; `*` at the end matches more than one (`claude-sonnet-*`, which also takes the family `claude-sonnet`). A pattern is matched with the runtime's own value, that value without its context suffix (`opus[1m]` is `opus`) and, for Claude, whose values are aliases, the model the option's name says (`Sonnet 5` is `claude-sonnet-5`) and its family (#2274). Claude's `default` is matched as the model its description names. `reach` (#999) names the ways the runtime may reach the model: `signIn` (the person's own sign-in), `orgKey`, `gateway`. Absent: every way. `[orgKey, gateway]` is the org path only. Console ▸ Policy shows it as **Any way**, **Org key or gateway only** and **Own sign-in only**; to set it with no runtime list, the Console names every runtime. |
 | `marketplaces` | `{allowed: [id], customServers: allow \| refuse}` | Only these marketplaces, and whether an MCP server added by hand is allowed. |
 | `budgets` | `{daily?, dailyTokens?, perAgent?, perAgentTokens?, allowUnmetered: [runtime id], raises: [...]}` | Each person's budget, in US dollars and tokens, per UTC day and per agent. A ceiling over the person's own cost limits. |
-| `helpers` | `{mostRunning?, mostNotArchived?}` | The ceiling over each project's helper limits. |
+| `helpers` | `{mostRunning?, mostNotArchived?}` | The ceiling over each folder's helper limits. |
 | `environment` | `{passThrough: [name]}` | The variable names that a person's own pass-through list can name; `*` at the end allowed. |
 | `notices` | `{antigravityTerms?: show \| accepted \| refuse}` | Google's terms notice for Antigravity (#999): `show` (as absent), `accepted` (your organisation reviewed the terms; members see no notice, and the Policy pane says so), `refuse` (Antigravity is refused). Console ▸ Policy names them **Show the notice**, **Reviewed by your organisation** and **Do not allow**. |
 | `stopAll` | `{on, by, at, note?}` | The kill switch. Only `policy/stopAll` changes it. |
@@ -87,7 +87,7 @@ A machine says `host.policy/1` when it follows the policy (slice 2a). How it fol
 The lists marked with `setBy` (`{by: "organisation", rule, words}`): `runtimes/list` on each
 runtime, each mode and model value of an agent's options and of `agents/options`,
 `sandbox/state`, `cost/state` (with `organisation`, the budgets in force today), and
-`helperLimitsSetBy` on a project. Each roll-up row of `usage/rollup` has `limitTokens`.
+`helperLimitsSetBy` on a folder. Each roll-up row of `usage/rollup` has `limitTokens`.
 
 A refusal is the error `policyRefused` (-32076). Its data is a `PolicyRefusal`: the reason
 (`policy`, `budget`, `stopAll`, `noPolicy`, `mustJoin` or `update`), the rule, and the

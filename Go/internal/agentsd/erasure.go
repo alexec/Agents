@@ -344,8 +344,8 @@ func eraseRuntimeFiles(runtimeID, sessionID string, env []string) (known bool, r
 	case "claude":
 		home := envHome(env, "CLAUDE_CONFIG_DIR", ".claude")
 		patterns = []string{
-			filepath.Join(home, "projects", "*", sessionID+".jsonl"),
-			filepath.Join(home, "projects", "*", sessionID),
+			filepath.Join(home, "folders", "*", sessionID+".jsonl"),
+			filepath.Join(home, "folders", "*", sessionID),
 			filepath.Join(home, "todos", sessionID+"-*.json"),
 			filepath.Join(home, "file-history", sessionID),
 			filepath.Join(home, "session-env", sessionID),

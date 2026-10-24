@@ -262,7 +262,7 @@ func (g *githubCodespaces) request(ctx context.Context, method, path string, bod
 func repositoryPathFromOwnerName(repository string) (string, error) {
 	owner, name, ok := strings.Cut(repository, "/")
 	if !ok || owner == "" || name == "" || strings.Contains(name, "/") {
-		return "", fmt.Errorf("The project repository must be owner/name")
+		return "", fmt.Errorf("The folder repository must be owner/name")
 	}
 	return url.PathEscape(owner) + "/" + url.PathEscape(name), nil
 }
@@ -270,13 +270,13 @@ func repositoryPathFromOwnerName(repository string) (string, error) {
 func (d *Daemon) connectorCodespaces(ctx context.Context, request wire.ConnectorCodespacesRequest) (wire.ConnectorCodespaces, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	folder, err := d.setupProject(string(request.Folder))
+	folder, err := d.setupFolder(string(request.Folder))
 	if err != nil {
 		return wire.ConnectorCodespaces{}, err
 	}
 	f, connection, connected := d.forgeAt(ctx, folder)
 	if f.provider != wire.ConnectionProviderGithub || f.repo == "" {
-		return wire.ConnectorCodespaces{}, invalid("This project needs a GitHub repository for Codespaces.")
+		return wire.ConnectorCodespaces{}, invalid("This folder needs a GitHub repository for Codespaces.")
 	}
 	if !connected || !connection.Usable(time.Now()) {
 		return wire.ConnectorCodespaces{}, invalid("Connect GitHub before using Codespaces.")
@@ -319,7 +319,7 @@ func (d *Daemon) connectorCodespaces(ctx context.Context, request wire.Connector
 		found = found || codespace.ID == id
 	}
 	if !found {
-		return result, Invalid("That Codespace is not in this project's repository.")
+		return result, Invalid("That Codespace is not in this folder's repository.")
 	}
 	switch request.Action {
 	case "start":

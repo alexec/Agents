@@ -29,7 +29,7 @@ public struct RolePolicy: Sendable {
     /// The bundle identifiers that are control. The helper is the daemon's own binary.
     public static let controlIdentifiers = ["com.alexecollins.agents", "com.alexecollins.agents.bridge"]
     public static let helperIdentifier = "agentsd"
-    /// Agents Host, whose window counts this Mac's host's projects and working agents.
+    /// Agents Host, whose window counts this Mac's host's folders and working agents.
     public static let hostAppIdentifier = "com.alexecollins.agents.host"
 
     /// Who gets what, each signed by this daemon's team, tried in order. Exact

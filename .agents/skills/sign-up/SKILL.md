@@ -103,10 +103,10 @@ What the 0.7 sign-ups found (2026-10-19). Pages change; read the page before you
   Continue. No setting undoes it later, only an unsubscribe link.
 - Cookies: "Do Not Sell or Share My Personal Information", untick every group, "Confirm My
   Choices". The banner comes back each time the incognito browser starts.
-- Alex enters the emailed code. The welcome form (company, group, project, then dropdowns
-  whose choices are `[role=option]`) makes the first group and project.
+- Alex enters the emailed code. The welcome form (company, group, folder, then dropdowns
+  whose choices are `[role=option]`) makes the first group and folder.
 - Token: Access tokens, Generate token, Legacy token (by scope) or Fine-grained (by
-  project). Tick only the scopes needed, set an expiry, save the `glpat-` token by script.
+  folder). Tick only the scopes needed, set an expiry, save the `glpat-` token by script.
 - An OAuth application is made under the user's Applications settings once its redirect
   URI is known.
 

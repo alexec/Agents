@@ -1,5 +1,5 @@
-// Put Files in Drop Box… (#231), from a project row's menu: a folder inside the project's
-// `.agents/dropbox/`, if any, then files chosen from this computer. A file dropped on a project's
+// Put Files in Drop Box… (#231), from a folder row's menu: a folder inside the folder's
+// `.agents/dropbox/`, if any, then files chosen from this computer. A file dropped on a folder's
 // or a session's row goes to the drop box's top without asking, as the window's drop does, and
 // a note under the row says where it went (#934).
 import { signal, useSignal } from "@preact/signals";
@@ -21,7 +21,7 @@ export function carriesFiles(event: DragEvent): boolean {
   return Array.from(event.dataTransfer?.types ?? []).includes("Files");
 }
 
-/** The project's name as its folder says it, for the note under a row a drop went in by. */
+/** The folder's name as its folder says it, for the note under a row a drop went in by. */
 export function dropboxName(folder: string): string {
   let path = folder;
   try {
@@ -39,10 +39,10 @@ export function dropboxNote(count: number, name: string): string {
 const noteSeconds = 4;
 
 /**
- * A row taking files dragged onto it (#231): into the project's drop box, at its top. Anything
+ * A row taking files dragged onto it (#231): into the folder's drop box, at its top. Anything
  * else dragged over the row is left alone. `targeted` lights the row while files are over it;
  * `note` says for a moment where the files went once they are in (#934), as a session's row
- * sends them to its project and not to the chat.
+ * sends them to its folder and not to the chat.
  */
 export function useDropboxDrop(store: Store, host: string, folder: string, down: boolean) {
   const over = useSignal(false);

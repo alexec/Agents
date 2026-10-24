@@ -1,18 +1,18 @@
 ---
 diataxis: how-to
 devices: [mac, server]
-description: Add a Linux server, or another Mac, to your control plane as a host, so every window and phone sees its projects.
+description: Add a Linux server, or another Mac, to your control plane as a host, so every window and phone sees its folders.
 ---
 
 # Add a server
 
 A server is a Linux machine that runs agents for you. Once it is a host of your control
-plane, a project can live on it: its agents run there, on its files, and keep working when
+plane, a folder can live on it: its agents run there, on its files, and keep working when
 your Mac is asleep or closed. Every paired window, iPhone and iPad sees it within seconds,
 with nothing to do on each.
 
 A server joins by connecting out to the control plane over HTTPS, so nothing has to reach
-it and no port needs opening. See [Projects, hosts and worktrees](../explanation/projects-hosts-worktrees.md).
+it and no port needs opening. See [Folders, hosts and worktrees](../explanation/folders-hosts-worktrees.md).
 
 ## Before you start
 
@@ -48,8 +48,8 @@ it and no port needs opening. See [Projects, hosts and worktrees](../explanation
    the `loginctl enable-linger` line it prints.
 
    The sheet says **devbox joined.** and lists the git repositories it found on the server,
-   unticked (see [Choose its projects](#choose-its-projects)). The server is listed under
-   **Machines**, and has a heading of its own in the projects list.
+   unticked (see [Choose its folders](#choose-its-folders)). The server is listed under
+   **Machines**, and has a heading of its own in the folders list.
 
 The host then installs Claude by itself, into `~/.agents-server/tools`, from the pins
 the control plane gives with the host (#1312). This takes about a minute and 500 MB. Until
@@ -117,28 +117,28 @@ changes. When you remove the server, the tunnel closes.
 What the control plane passes to ssh, and how each common `~/.ssh/config` option fares, is in
 [ssh options](../reference/ssh-options.md).
 
-### Choose its projects
+### Choose its folders
 
-Nothing on the server becomes a project by itself (#656). Once it joins, Add a Server lists each
+Nothing on the server becomes a folder by itself (#656). Once it joins, Add a Server lists each
 git repository directly inside the paths under **Auto-detect** (`~`, `~/src` and the like, `~`
 being the server's home), each unticked, and the same list opens later from **Choose
-Projects…** on the server's row under **Machines**, or on **This Mac**'s.
+Folders…** on the server's row under **Machines**, or on **This Mac**'s.
 
-1. Tick the repositories to add. One that is already a project is shown ticked and greyed.
+1. Tick the repositories to add. One that is already a folder is shown ticked and greyed.
 2. To add a folder that is not listed, type its path on the server, such as `~/work/app`, and
    click **Add Folder**. It joins the list, ticked.
-3. Click **Add N Projects**, or **Skip** to add none.
+3. Click **Add N Folders**, or **Skip** to add none.
 
-With **Suggest projects on a host** off, nothing is listed and only the folder box is there.
+With **Suggest folders on a host** off, nothing is listed and only the folder box is there.
 
-### Put a project on it
+### Put a folder on it
 
-1. Choose **File ▸ Add Project On** or **File ▸ Clone Project On**, then the server's
+1. Choose **File ▸ Add Folder On** or **File ▸ Clone Folder On**, then the server's
    name.
-2. For a folder, choose one on the server, then click **Add as project**. A clone goes
+2. For a folder, choose one on the server, then click **Add as folder**. A clone goes
    into your home folder on the server.
 
-   The project appears under the server's heading. Start agents in it the usual way; the
+   The folder appears under the server's heading. Start agents in it the usual way; the
    runtime menu offers the runtimes on the server.
 
 ### Let the server use this Mac's Claude sign-in
@@ -178,7 +178,7 @@ A second Mac joins the same way, with Agents Host.
    code and click **Join**.
 
    Agents Host says **This Mac runs its agents for a control plane elsewhere.** It runs no
-   control plane of its own. Its projects appear under its own heading in every window.
+   control plane of its own. Its folders appear under its own heading in every window.
 
 ### Remove a server
 
@@ -194,16 +194,16 @@ If the server is a workspace of a provider you have added (a Docker container, a
 droplet, a Codespace), open **Settings ▸ Machine Providers** and choose **Add as
 Host…** beside it. Add a Server opens over ssh, with the address the provider gives already
 filled in. Once the server joins, it is linked to its workspace, so it can be started and
-stopped from Agents. See [Start machines from Agents](start-machines-from-agents.md).
+stopped from Agents. See [Start workspaces from Agents](start-machines-from-agents.md).
 
-**New Machine…** on a provider's card has **Clone these projects**: git URLs, one a line.
-Once the new machine joins, it clones each one, with this Mac's git access when you allow
+**New Machine…** on a provider's card has **Clone these folders**: git URLs, one a line.
+Once the new workspace joins, it clones each one, with this Mac's git access when you allow
 it, and they appear under its heading.
 
 ## When the server is offline
 
 If the server loses its network, or the host stops, **Machines** marks it offline and its
-projects go grey. Agents already working there keep working. The host reconnects by
+folders go grey. Agents already working there keep working. The host reconnects by
 itself when it can, and you see everything that happened meanwhile. **Check again**, in
 its `···` menu, asks at once.
 
@@ -223,7 +223,7 @@ A server whose host is older than the control plane needs says **Needs an update
    Update**.
 
 The control plane checks that the server is that host, copies its version of Agents there,
-and starts the host again. Its agents, projects and membership stay. It stops the host for a
+and starts the host again. Its agents, folders and membership stay. It stops the host for a
 moment, so do it when no agent there is in the middle of a turn.
 
 A server you added with a command can be updated the same way when you can ssh to it.
@@ -244,6 +244,6 @@ Otherwise, add it again: click **Add a Server…** and run the new command on th
 
 ## Related
 
-- [Projects, hosts and worktrees](../explanation/projects-hosts-worktrees.md).
+- [Folders, hosts and worktrees](../explanation/folders-hosts-worktrees.md).
 - [The control plane](../explanation/control-plane.md).
-- [Start machines from Agents](start-machines-from-agents.md).
+- [Start workspaces from Agents](start-machines-from-agents.md).

@@ -19,7 +19,7 @@ agentsd $joined --host-name "Demo host" &
 daemon=$!
 # The project, once the daemon answers on its socket.
 for _ in $(seq 1 60); do
-  if printf '{"jsonrpc":"2.0","id":1,"method":"projects/add","params":{"folder":"file://%s"}}\n' "$project" \
+  if printf '{"jsonrpc":"2.0","id":1,"method":"folders/add","params":{"folder":"file://%s"}}\n' "$project" \
        | nc -U -w 2 "$AGENTS_ROOT/daemon.sock" | grep -q '"result"'; then
     break
   fi

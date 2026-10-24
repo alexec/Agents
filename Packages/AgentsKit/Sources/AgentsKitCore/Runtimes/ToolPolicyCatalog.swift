@@ -316,7 +316,7 @@ public enum ToolPolicyCatalog {
     ///
     /// Beside it, system defaults named by `GEMINI_CLI_SYSTEM_DEFAULTS_PATH`, the one
     /// settings file below the person's own: Gemini reads `GEMINI.md` and, from these,
-    /// `AGENTS.md` too — the project's, and `~/.gemini/AGENTS.md`, which links to
+    /// `AGENTS.md` too — the folder's, and `~/.gemini/AGENTS.md`, which links to
     /// `~/.agents/AGENTS.md` (054). `GEMINI.md` stays first because Gemini's memory tool
     /// writes to the first name, and it must not append to the file every agent shares. A
     /// `context.fileName` of the person's own replaces this one, as it should. Read off
@@ -489,7 +489,7 @@ public extension ToolPolicyCatalog {
     ]
 
     /// The `_meta` a writer's session is made with, or nil when this runtime can't be a
-    /// writer. Not merged with the runtime's usual scoping or the project's plugins: a
+    /// writer. Not merged with the runtime's usual scoping or the folder's plugins: a
     /// plugin can bring tools and servers of its own.
     static func writerMeta(for runtimeID: String) -> JSONValue? {
         switch runtimeID {

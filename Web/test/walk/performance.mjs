@@ -1,16 +1,16 @@
-// SC-004 (T070): with 20 projects and 200 sessions on the host, how long from navigating to the
-// page until the chosen project's sessions column is painted, in headless Chrome. The browser
+// SC-004 (T070): with 20 folders and 200 sessions on the host, how long from navigating to the
+// page until the chosen folder's sessions column is painted, in headless Chrome. The browser
 // pairs once; each run after is a fresh navigation that connects with the stored key, loads
 // everything, and draws, as opening the page does. Also the gzipped size of what it loads.
 //
-//   node Web/test/walk/performance.mjs <WEB_URL> <device code> <project name> <sessions expected> <out dir>
+//   node Web/test/walk/performance.mjs <WEB_URL> <device code> <folder name> <sessions expected> <out dir>
 
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 import { join } from "node:path";
 import { launch } from "./cdp.mjs";
 
-const [webURL, deviceCode, projectName, expected, out] = process.argv.slice(2);
+const [webURL, deviceCode, folderName, expected, out] = process.argv.slice(2);
 const runs = 7;
 const notes = [];
 const say = (line) => { notes.push(line); console.log(line); };
@@ -19,9 +19,9 @@ const say = (line) => { notes.push(line); console.log(line); };
 const probe = `(() => {
   const want = ${Number(expected)};
   const seen = () => document.querySelectorAll(".sessions .session").length >= want;
-  const projects = () => document.querySelectorAll(".projects .row").length;
+  const folders = () => document.querySelectorAll(".folders .row").length;
   const done = () => requestAnimationFrame(() => setTimeout(() => {
-    window.__painted = { at: performance.now(), projects: projects(), sessions: document.querySelectorAll(".sessions .session").length };
+    window.__painted = { at: performance.now(), folders: folders(), sessions: document.querySelectorAll(".sessions .session").length };
   }, 0));
   new MutationObserver((_, observer) => { if (seen()) { observer.disconnect(); done(); } })
     .observe(document, { childList: true, subtree: true });
@@ -33,11 +33,11 @@ await page.waitFor(`document.querySelector("textarea")`);
 await page.focus("textarea");
 await page.type(deviceCode);
 await page.press("Connect");
-await page.waitFor(`document.querySelectorAll(".projects .row").length >= 20`, 30_000);
-await page.eval(`[...document.querySelectorAll(".projects .row")].find((r) => r.textContent.startsWith(${JSON.stringify(projectName)}))?.click()`);
+await page.waitFor(`document.querySelectorAll(".folders .row").length >= 20`, 30_000);
+await page.eval(`[...document.querySelectorAll(".folders .row")].find((r) => r.textContent.startsWith(${JSON.stringify(folderName)}))?.click()`);
 await page.waitFor(`document.querySelectorAll(".sessions .session").length >= ${Number(expected)}`, 30_000);
 const url = await page.eval("location.href");
-say(`paired; the project is at ${url.slice(webURL.length - 1)}`);
+say(`paired; the folder is at ${url.slice(webURL.length - 1)}`);
 
 await page.onNewDocument(probe);
 const times = [];
@@ -49,7 +49,7 @@ for (let i = 0; i < runs; i++) {
   const painted = await page.eval("window.__painted");
   const nav = await page.eval(`(() => { const n = performance.getEntriesByType("navigation")[0]; return { dom: n.domContentLoadedEventEnd, load: n.loadEventEnd }; })()`);
   times.push(painted.at);
-  say(`run ${i + 1}: ${painted.projects} projects, ${painted.sessions} sessions painted at ${painted.at.toFixed(0)} ms (DOMContentLoaded ${nav.dom.toFixed(0)} ms)`);
+  say(`run ${i + 1}: ${painted.folders} folders, ${painted.sessions} sessions painted at ${painted.at.toFixed(0)} ms (DOMContentLoaded ${nav.dom.toFixed(0)} ms)`);
 }
 const sorted = [...times].sort((a, b) => a - b);
 say(`median ${sorted[Math.floor(runs / 2)].toFixed(0)} ms, slowest ${sorted[runs - 1].toFixed(0)} ms, fastest ${sorted[0].toFixed(0)} ms, over ${runs} runs`);

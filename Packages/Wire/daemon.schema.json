@@ -543,38 +543,82 @@
       "type": "object",
       "description": "One agent configuration file (#2129), or a deletion tombstone. contents is base64 encoded. Logical time and machine ID resolve concurrent offline edits.",
       "properties": {
-        "path": { "type": "string" },
-        "contents": { "type": "string" },
-        "deleted": { "type": "boolean" },
-        "time": { "type": "integer" },
-        "counter": { "type": "integer" },
-        "machine": { "type": "string" },
-        "digest": { "type": "string" }
+        "path": {
+          "type": "string"
+        },
+        "contents": {
+          "type": "string"
+        },
+        "deleted": {
+          "type": "boolean"
+        },
+        "time": {
+          "type": "integer"
+        },
+        "counter": {
+          "type": "integer"
+        },
+        "machine": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string"
+        }
       },
-      "required": ["path", "time", "counter", "machine", "digest"],
+      "required": [
+        "path",
+        "time",
+        "counter",
+        "machine",
+        "digest"
+      ],
       "additionalProperties": false
     },
     "AgentConfigFileRequest": {
       "type": "object",
       "description": "One local edit or deletion of an agent configuration file (#2129).",
       "properties": {
-        "path": { "type": "string" },
-        "contents": { "type": "string" },
-        "deleted": { "type": "boolean" },
-        "time": { "type": "integer" },
-        "counter": { "type": "integer" }
+        "path": {
+          "type": "string"
+        },
+        "contents": {
+          "type": "string"
+        },
+        "deleted": {
+          "type": "boolean"
+        },
+        "time": {
+          "type": "integer"
+        },
+        "counter": {
+          "type": "integer"
+        }
       },
-      "required": ["path", "time", "counter"],
+      "required": [
+        "path",
+        "time",
+        "counter"
+      ],
       "additionalProperties": false
     },
     "AgentConfigFiles": {
       "type": "object",
       "description": "The per-path configuration files and tombstones for a person (#2129).",
       "properties": {
-        "files": { "type": "array", "items": { "$ref": "#/definitions/AgentConfigFile" } },
-        "updated": { "type": "string", "format": "date-time" }
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AgentConfigFile"
+          }
+        },
+        "updated": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["files"],
+      "required": [
+        "files"
+      ],
       "additionalProperties": false
     },
     "AgentGroup": {
@@ -759,20 +803,20 @@
         "branch": {
           "type": "string"
         },
-        "project": {
-          "$ref": "#/definitions/URLString"
-        },
         "base": {
           "type": "string"
         },
         "madeByApp": {
           "type": "boolean"
+        },
+        "folder": {
+          "$ref": "#/definitions/URLString"
         }
       },
       "required": [
         "name",
         "root",
-        "project",
+        "folder",
         "madeByApp"
       ],
       "additionalProperties": false
@@ -800,7 +844,7 @@
     },
     "AgentsExportRequest": {
       "type": "object",
-      "description": "agents/export (#1001): one agent (`agentID`) or every agent of one project (`folder`). Give one of the two.",
+      "description": "agents/export (#1001): one agent (`agentID`) or every agent of one folder (`folder`). Give one of the two.",
       "properties": {
         "agentID": {
           "$ref": "#/definitions/UUID"
@@ -813,7 +857,7 @@
     },
     "AgentsImportRequest": {
       "type": "object",
-      "description": "What agents/import takes (#1001): the export sent with agents/importUpload. Its agents come back archived, as a restore brings them; one this machine has, or deleted, is skipped. With `folder`, a project on this machine (the one whose menu was used, #2389), every agent comes back in that project; without it, each in the folder it had where it was exported.",
+      "description": "What agents/import takes (#1001): the export sent with agents/importUpload. Its agents come back archived, as a restore brings them; one this machine has, or deleted, is skipped. With `folder`, a folder on this machine (the one whose menu was used, #2389), every agent comes back in that folder; without it, each in the folder it had where it was exported.",
       "properties": {
         "upload": {
           "$ref": "#/definitions/UUID"
@@ -2419,7 +2463,7 @@
     },
     "BringBack": {
       "type": "object",
-      "description": "What projects/bringBack did (#1473): the branches that moved forward or were made, and whether the uncommitted changes were applied.",
+      "description": "What folders/bringBack did (#1473): the branches that moved forward or were made, and whether the uncommitted changes were applied.",
       "properties": {
         "moved": {
           "type": "array",
@@ -2932,7 +2976,7 @@
         {
           "type": "object",
           "properties": {
-            "notAProject": {
+            "notAFolder": {
               "type": "object",
               "properties": {
                 "path": {
@@ -2946,7 +2990,7 @@
             }
           },
           "required": [
-            "notAProject"
+            "notAFolder"
           ],
           "additionalProperties": false
         },
@@ -3403,12 +3447,6 @@
     "CatchUpSnapshot": {
       "type": "object",
       "properties": {
-        "projects": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/ProjectSummary"
-          }
-        },
         "agents": {
           "type": "array",
           "items": {
@@ -3454,15 +3492,21 @@
         "pins": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/ProjectPins"
+            "$ref": "#/definitions/FolderPins"
           }
         },
         "leases": {
           "$ref": "#/definitions/CatchUpLeases"
+        },
+        "folders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FolderSummary"
+          }
         }
       },
       "required": [
-        "projects",
+        "folders",
         "agents",
         "permissions",
         "elicitations",
@@ -4526,43 +4570,90 @@
     },
     "ConnectorCodespace": {
       "type": "object",
-      "description": "A GitHub Codespace for a project's repository (#1591).",
+      "description": "A GitHub Codespace for a folder's repository (#1591).",
       "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "repository": { "type": "string" },
-        "state": { "type": "string" },
-        "ref": { "type": "string" },
-        "ssh": { "type": "string" }
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "repository": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        },
+        "ssh": {
+          "type": "string"
+        }
       },
-      "required": ["id", "name", "repository", "state", "ssh"],
+      "required": [
+        "id",
+        "name",
+        "repository",
+        "state",
+        "ssh"
+      ],
       "additionalProperties": false
     },
     "ConnectorCodespaces": {
       "type": "object",
       "properties": {
-        "repository": { "type": "string" },
-        "codespaces": { "type": "array", "items": { "$ref": "#/definitions/ConnectorCodespace" } },
-        "message": { "type": "string" }
+        "repository": {
+          "type": "string"
+        },
+        "codespaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConnectorCodespace"
+          }
+        },
+        "message": {
+          "type": "string"
+        }
       },
-      "required": ["codespaces"],
+      "required": [
+        "codespaces"
+      ],
       "additionalProperties": false
     },
     "ConnectorCodespacesRequest": {
       "type": "object",
-      "description": "Lists or changes the project's GitHub Codespaces (#1591).",
+      "description": "Lists or changes the folder's GitHub Codespaces (#1591).",
       "properties": {
-        "folder": { "$ref": "#/definitions/URLString" },
-        "action": { "type": "string", "enum": ["list", "create", "start", "stop", "prepareSSH"] },
-        "id": { "type": "string" },
-        "name": { "type": "string" }
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "list",
+            "create",
+            "start",
+            "stop",
+            "prepareSSH"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
       },
-      "required": ["folder", "action"],
+      "required": [
+        "folder",
+        "action"
+      ],
       "additionalProperties": false
     },
     "ConnectorEvents": {
       "type": "object",
-      "description": "The github events the set-up turned on, and the project's workflows that start on one of them.",
+      "description": "The github events the set-up turned on, and the folder's workflows that start on one of them.",
       "properties": {
         "state": {
           "$ref": "#/definitions/ConnectorEventsState"
@@ -4597,7 +4688,7 @@
     },
     "ConnectorEventsState": {
       "type": "string",
-      "description": "on: the github connector is in the project's or the person's mcp.json, so its events reach this project. off: not yet (nothing connected, or every GitHub slot skipped). taken: an mcp.json entry not made by Agents already has the name github, and it is left alone. failed: the entry could not be written; message says why.",
+      "description": "on: the github connector is in the folder's or the person's mcp.json, so its events reach this folder. off: not yet (nothing connected, or every GitHub slot skipped). taken: an mcp.json entry not made by Agents already has the name github, and it is left alone. failed: the entry could not be written; message says why.",
       "enum": [
         "on",
         "off",
@@ -4635,14 +4726,14 @@
     },
     "ConnectorSetup": {
       "type": "object",
-      "description": "A project's Connectors set-up (#1336): its GitHub or GitLab repository (#1632), the person's connection to that forge, four slots that each prove themselves with one read, and the events.",
+      "description": "A folder's Connectors set-up (#1336): its GitHub or GitLab repository (#1632), the person's connection to that forge, four slots that each prove themselves with one read, and the events.",
       "properties": {
         "folder": {
           "type": "string"
         },
         "repository": {
           "type": "string",
-          "description": "owner/name on GitHub, or group/project on GitLab, from the project's git remote (origin first). Absent with no GitHub or GitLab remote."
+          "description": "owner/name on GitHub, or group/project on GitLab, from the folder's git remote (origin first). Absent with no GitHub or GitLab remote."
         },
         "forge": {
           "$ref": "#/definitions/ConnectionProvider",
@@ -4694,7 +4785,7 @@
     },
     "ConnectorSetupReading": {
       "type": "string",
-      "description": "stored: no call to the provider, only what was read before (for a list of every project). cached: a read at most five minutes old is used again. fresh: read now (Try Again).",
+      "description": "stored: no call to the provider, only what was read before (for a list of every folder). cached: a read at most five minutes old is used again. fresh: read now (Try Again).",
       "enum": [
         "stored",
         "cached",
@@ -4718,7 +4809,7 @@
     },
     "ConnectorSkipRequest": {
       "type": "object",
-      "description": "Skip a slot, or set it up again. Kept in the project's .agents/project.json.",
+      "description": "Skip a slot, or set it up again. Kept in the folder's .agents/folder.json.",
       "properties": {
         "folder": {
           "type": "string"
@@ -4771,7 +4862,7 @@
     },
     "ConnectorSlotKind": {
       "type": "string",
-      "description": "One slot of a project's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci, and workspace (where agents run).",
+      "description": "One slot of a folder's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci, and workspace (where agents run).",
       "enum": [
         "tasks",
         "codeReview",
@@ -4781,7 +4872,7 @@
     },
     "ConnectorSlotState": {
       "type": "string",
-      "description": "notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the project has no GitHub or GitLab remote. skipped: the person skipped it; it counts as done.",
+      "description": "notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the folder has no GitHub or GitLab remote. skipped: the person skipped it; it counts as done.",
       "enum": [
         "notConnected",
         "notRead",
@@ -5090,27 +5181,7 @@
       },
       "additionalProperties": false
     },
-    "ContinueInNewRequest": {
-      "type": "object",
-      "description": "agents/continueInNew (#999): a new session in the same folder that reads this one and carries on, on another account of its runtime.",
-      "properties": {
-        "agentID": {
-          "$ref": "#/definitions/UUID"
-        },
-        "accountID": {
-          "description": "The account the new session uses: an added account, an org account (org:<route id>) or default for the runtime's own sign-in. Absent: the runtime's account for new sessions (Reaches the Model By).",
-          "type": "string"
-        },
-        "requestID": {
-          "$ref": "#/definitions/UUID"
-        }
-      },
-      "required": [
-        "agentID"
-      ],
-      "additionalProperties": false
-    },
-    "ContinueInProjectRequest": {
+    "ContinueInFolderRequest": {
       "type": "object",
       "properties": {
         "agentID": {
@@ -5133,6 +5204,26 @@
         "agentID",
         "text",
         "attachments"
+      ],
+      "additionalProperties": false
+    },
+    "ContinueInNewRequest": {
+      "type": "object",
+      "description": "agents/continueInNew (#999): a new session in the same folder that reads this one and carries on, on another account of its runtime.",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "accountID": {
+          "description": "The account the new session uses: an added account, an org account (org:<route id>) or default for the runtime's own sign-in. Absent: the runtime's account for new sessions (Reaches the Model By).",
+          "type": "string"
+        },
+        "requestID": {
+          "$ref": "#/definitions/UUID"
+        }
+      },
+      "required": [
+        "agentID"
       ],
       "additionalProperties": false
     },
@@ -5606,8 +5697,8 @@
         "thisMacHost": {
           "$ref": "#/definitions/HostJoinStatus"
         },
-        "projectDetection": {
-          "$ref": "#/definitions/ProjectDetection"
+        "folderDetection": {
+          "$ref": "#/definitions/FolderDetection"
         },
         "unjoinedTunnels": {
           "type": "array",
@@ -7356,7 +7447,7 @@
         {
           "type": "object",
           "properties": {
-            "project": {
+            "folder": {
               "type": "object",
               "properties": {
                 "_0": {
@@ -7370,7 +7461,7 @@
             }
           },
           "required": [
-            "project"
+            "folder"
           ],
           "additionalProperties": false
         }
@@ -8132,6 +8223,59 @@
       ],
       "additionalProperties": false
     },
+    "Folder": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "archivedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "addedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "laidOutAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "layoutVersion": {
+          "type": "integer"
+        },
+        "helperLimits": {
+          "$ref": "#/definitions/HelperLimits"
+        },
+        "diskSpace": {
+          "$ref": "#/definitions/DiskThresholds"
+        },
+        "pinned": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "folder",
+        "addedAt"
+      ],
+      "additionalProperties": false
+    },
+    "FolderDetection": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "enabled",
+        "paths"
+      ],
+      "additionalProperties": false
+    },
     "FolderHunk": {
       "type": "object",
       "properties": {
@@ -8159,6 +8303,278 @@
       ],
       "additionalProperties": false
     },
+    "FolderMCPServer": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "managed": {
+          "$ref": "#/definitions/ManagedMCPServer"
+        },
+        "approval": {
+          "$ref": "#/definitions/MCPApprovalState"
+        },
+        "missingSecrets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "secretNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "entryDigest": {
+          "type": "string"
+        },
+        "signIn": {
+          "$ref": "#/definitions/MCPSignInState"
+        },
+        "views": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "summary",
+        "approval",
+        "missingSecrets",
+        "secretNames",
+        "entryDigest"
+      ],
+      "additionalProperties": false
+    },
+    "FolderPins": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "pins": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PinView"
+          }
+        },
+        "sessions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/UUID"
+          }
+        },
+        "workflows": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "views": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PinView"
+          }
+        }
+      },
+      "required": [
+        "folder",
+        "pins"
+      ],
+      "additionalProperties": false
+    },
+    "FolderPlugin": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "name": {
+          "type": "string"
+        },
+        "carries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "awaitingApproval": {
+          "$ref": "#/definitions/WorkflowApproval"
+        },
+        "folderPath": {
+          "$ref": "#/definitions/URLString"
+        }
+      },
+      "required": [
+        "folderPath",
+        "folder",
+        "name",
+        "carries"
+      ],
+      "additionalProperties": false
+    },
+    "FolderRemovedNotification": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        }
+      },
+      "required": [
+        "folder"
+      ],
+      "additionalProperties": false
+    },
+    "FolderRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        }
+      },
+      "required": [
+        "folder"
+      ],
+      "additionalProperties": false
+    },
+    "FolderSummary": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "exists": {
+          "type": "boolean"
+        },
+        "lastActivityAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "counts": {
+          "type": "object",
+          "properties": {
+            "needsAttention": {
+              "type": "integer"
+            },
+            "blocked": {
+              "type": "integer"
+            },
+            "waiting": {
+              "type": "integer"
+            },
+            "running": {
+              "type": "integer"
+            },
+            "finished": {
+              "type": "integer"
+            },
+            "stopped": {
+              "type": "integer"
+            },
+            "archived": {
+              "type": "integer"
+            }
+          },
+          "additionalProperties": false,
+          "x-ts-type": "Partial<Record<AgentGroup, number>>"
+        },
+        "costToDate": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
+        "unmeasuredAgents": {
+          "type": "integer"
+        },
+        "retiredCount": {
+          "type": "integer"
+        },
+        "guardedChanges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/GuardedChange"
+          }
+        },
+        "approvals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Approval"
+          }
+        },
+        "helperLimitsSetBy": {
+          "$ref": "#/definitions/PolicySetBy",
+          "description": "Set when the organisation's policy caps this folder's helper limits (#998, #64): the lower number is used."
+        },
+        "folder": {
+          "$ref": "#/definitions/Folder"
+        }
+      },
+      "required": [
+        "folder",
+        "name",
+        "exists",
+        "lastActivityAt",
+        "counts",
+        "costToDate",
+        "unmeasuredAgents",
+        "retiredCount"
+      ],
+      "additionalProperties": false
+    },
+    "FolderWorktrees": {
+      "type": "object",
+      "properties": {
+        "worktrees": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorktreeSummary"
+          }
+        },
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        }
+      },
+      "required": [
+        "folder",
+        "worktrees"
+      ],
+      "additionalProperties": false
+    },
+    "FoldersFindRequest": {
+      "type": "object",
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "folders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "FoldersListRequest": {
+      "type": "object",
+      "properties": {
+        "includeArchived": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "includeArchived"
+      ],
+      "additionalProperties": false
+    },
     "FoundFolder": {
       "type": "object",
       "properties": {
@@ -8174,7 +8590,7 @@
         "isRepository": {
           "type": "boolean"
         },
-        "isProject": {
+        "isFolder": {
           "type": "boolean"
         }
       },
@@ -8182,7 +8598,7 @@
         "folder",
         "exists",
         "isRepository",
-        "isProject"
+        "isFolder"
       ],
       "additionalProperties": false
     },
@@ -8740,7 +9156,7 @@
     },
     "HostCatalog": {
       "type": "object",
-      "description": "governance/report (#2019, M5): the MCP servers and skills a machine has from a catalogue, personal and in its projects, at most 500. Sent at start and each hour; each replaces the last.",
+      "description": "governance/report (#2019, M5): the MCP servers and skills a machine has from a catalogue, personal and in its folders, at most 500. Sent at start and each hour; each replaces the last.",
       "properties": {
         "items": {
           "type": "array",
@@ -8989,10 +9405,10 @@
         "host": {
           "$ref": "#/definitions/HostID"
         },
-        "projects": {
+        "folders": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/ProjectSummary"
+            "$ref": "#/definitions/FolderSummary"
           }
         },
         "agents": {
@@ -9453,9 +9869,6 @@
         "name": {
           "type": "string"
         },
-        "project": {
-          "type": "string"
-        },
         "state": {
           "$ref": "#/definitions/HostedMCPState"
         },
@@ -9473,6 +9886,9 @@
         },
         "users": {
           "type": "integer"
+        },
+        "folder": {
+          "type": "string"
         }
       },
       "required": [
@@ -10394,7 +10810,7 @@
         {
           "type": "object",
           "properties": {
-            "notAProject": {
+            "notAFolder": {
               "type": "object",
               "properties": {
                 "path": {
@@ -10408,7 +10824,7 @@
             }
           },
           "required": [
-            "notAProject"
+            "notAFolder"
           ],
           "additionalProperties": false
         },
@@ -10738,7 +11154,7 @@
     "MCPHealthCheckRequest": {
       "type": "object",
       "properties": {
-        "project": {
+        "folder": {
           "type": "string"
         }
       },
@@ -10747,10 +11163,10 @@
     "MCPHealthFileProblem": {
       "type": "object",
       "properties": {
-        "project": {
+        "message": {
           "type": "string"
         },
-        "message": {
+        "folder": {
           "type": "string"
         }
       },
@@ -10820,7 +11236,7 @@
         "servers": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/ProjectMCPServer"
+            "$ref": "#/definitions/FolderMCPServer"
           }
         },
         "problem": {
@@ -11133,9 +11549,6 @@
         "name": {
           "type": "string"
         },
-        "project": {
-          "type": "string"
-        },
         "transport": {
           "$ref": "#/definitions/MCPTransportName"
         },
@@ -11159,6 +11572,9 @@
         },
         "levels": {
           "$ref": "#/definitions/MCPLevels"
+        },
+        "folder": {
+          "type": "string"
         }
       },
       "required": [
@@ -12019,7 +12435,7 @@
       "enum": [
         "provided",
         "personal",
-        "project"
+        "folder"
       ]
     },
     "MarketplaceSetEnabledRequest": {
@@ -12206,7 +12622,7 @@
         {
           "type": "object",
           "properties": {
-            "projectFolder": {
+            "folderPath": {
               "type": "object",
               "additionalProperties": {
                 "not": {}
@@ -12214,7 +12630,7 @@
             }
           },
           "required": [
-            "projectFolder"
+            "folderPath"
           ],
           "additionalProperties": false
         }
@@ -13001,7 +13417,7 @@
     },
     "OrgRouteSettings": {
       "type": "object",
-      "description": "An org route's settings that are not secret (#999, data-model.md). bedrock: region. vertex: project, location. azure: resource or address, apiVersion, and tenant and clientID for an Entra app. baseURL: address, and header, the header the key goes in.",
+      "description": "An org route's settings that are not secret (#999, data-model.md). bedrock: region. vertex: folder, location. azure: resource or address, apiVersion, and tenant and clientID for an Entra app. baseURL: address, and header, the header the key goes in.",
       "properties": {
         "address": {
           "type": "string"
@@ -13018,9 +13434,6 @@
         "location": {
           "type": "string"
         },
-        "project": {
-          "type": "string"
-        },
         "region": {
           "type": "string"
         },
@@ -13028,6 +13441,9 @@
           "type": "string"
         },
         "tenant": {
+          "type": "string"
+        },
+        "project": {
           "type": "string"
         }
       },
@@ -13823,43 +14239,75 @@
     "PersonaFile": {
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "origin": { "$ref": "#/definitions/PersonaOrigin" },
-        "content": { "type": "string" }
+        "id": {
+          "type": "string"
+        },
+        "origin": {
+          "$ref": "#/definitions/PersonaOrigin"
+        },
+        "content": {
+          "type": "string"
+        }
       },
-      "required": ["id", "origin", "content"],
+      "required": [
+        "id",
+        "origin",
+        "content"
+      ],
       "additionalProperties": false
     },
     "PersonaFileSaveRequest": {
       "type": "object",
       "properties": {
-        "folder": { "$ref": "#/definitions/URLString" },
-        "origin": { "$ref": "#/definitions/PersonaOrigin" },
-        "id": { "type": "string" },
-        "content": { "type": "string" },
-        "delete": { "type": "boolean" }
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "origin": {
+          "$ref": "#/definitions/PersonaOrigin"
+        },
+        "id": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "delete": {
+          "type": "boolean"
+        }
       },
-      "required": ["origin", "id", "content"],
+      "required": [
+        "origin",
+        "id",
+        "content"
+      ],
       "additionalProperties": false
     },
     "PersonaFilesAnswer": {
       "type": "array",
-      "items": { "$ref": "#/definitions/PersonaFile" }
+      "items": {
+        "$ref": "#/definitions/PersonaFile"
+      }
     },
     "PersonaOrigin": {
       "type": "string",
       "enum": [
-        "project",
+        "folder",
         "personal"
       ]
     },
     "PersonasFilesRequest": {
       "type": "object",
       "properties": {
-        "folder": { "$ref": "#/definitions/URLString" },
-        "origin": { "$ref": "#/definitions/PersonaOrigin" }
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "origin": {
+          "$ref": "#/definitions/PersonaOrigin"
+        }
       },
-      "required": ["origin"],
+      "required": [
+        "origin"
+      ],
       "additionalProperties": false
     },
     "PersonasListRequest": {
@@ -14273,7 +14721,7 @@
         "plugins": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/ProjectPlugin"
+            "$ref": "#/definitions/FolderPlugin"
           }
         }
       },
@@ -14363,7 +14811,7 @@
     },
     "PolicyHelpers": {
       "type": "object",
-      "description": "The ceiling over each project's helper limits (#998, #64).",
+      "description": "The ceiling over each folder's helper limits (#998, #64).",
       "properties": {
         "mostRunning": {
           "type": "integer"
@@ -14828,331 +15276,6 @@
         "opened",
         "typing"
       ]
-    },
-    "Project": {
-      "type": "object",
-      "properties": {
-        "folder": {
-          "$ref": "#/definitions/URLString"
-        },
-        "archivedAt": {
-          "$ref": "#/definitions/WireDate"
-        },
-        "addedAt": {
-          "$ref": "#/definitions/WireDate"
-        },
-        "laidOutAt": {
-          "$ref": "#/definitions/WireDate"
-        },
-        "layoutVersion": {
-          "type": "integer"
-        },
-        "helperLimits": {
-          "$ref": "#/definitions/HelperLimits"
-        },
-        "diskSpace": {
-          "$ref": "#/definitions/DiskThresholds"
-        },
-        "pinned": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "folder",
-        "addedAt"
-      ],
-      "additionalProperties": false
-    },
-    "ProjectDetection": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "paths": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      },
-      "required": [
-        "enabled",
-        "paths"
-      ],
-      "additionalProperties": false
-    },
-    "ProjectMCPServer": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "summary": {
-          "type": "string"
-        },
-        "managed": {
-          "$ref": "#/definitions/ManagedMCPServer"
-        },
-        "approval": {
-          "$ref": "#/definitions/MCPApprovalState"
-        },
-        "missingSecrets": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "secretNames": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "entryDigest": {
-          "type": "string"
-        },
-        "signIn": {
-          "$ref": "#/definitions/MCPSignInState"
-        },
-        "views": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "name",
-        "summary",
-        "approval",
-        "missingSecrets",
-        "secretNames",
-        "entryDigest"
-      ],
-      "additionalProperties": false
-    },
-    "ProjectPins": {
-      "type": "object",
-      "properties": {
-        "folder": {
-          "$ref": "#/definitions/URLString"
-        },
-        "pins": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/PinView"
-          }
-        },
-        "sessions": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/UUID"
-          }
-        },
-        "workflows": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "views": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/PinView"
-          }
-        }
-      },
-      "required": [
-        "folder",
-        "pins"
-      ],
-      "additionalProperties": false
-    },
-    "ProjectPlugin": {
-      "type": "object",
-      "properties": {
-        "project": {
-          "$ref": "#/definitions/URLString"
-        },
-        "folder": {
-          "$ref": "#/definitions/URLString"
-        },
-        "name": {
-          "type": "string"
-        },
-        "carries": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "awaitingApproval": {
-          "$ref": "#/definitions/WorkflowApproval"
-        }
-      },
-      "required": [
-        "project",
-        "folder",
-        "name",
-        "carries"
-      ],
-      "additionalProperties": false
-    },
-    "ProjectRemovedNotification": {
-      "type": "object",
-      "properties": {
-        "folder": {
-          "$ref": "#/definitions/URLString"
-        }
-      },
-      "required": [
-        "folder"
-      ],
-      "additionalProperties": false
-    },
-    "ProjectRequest": {
-      "type": "object",
-      "properties": {
-        "folder": {
-          "$ref": "#/definitions/URLString"
-        }
-      },
-      "required": [
-        "folder"
-      ],
-      "additionalProperties": false
-    },
-    "ProjectSummary": {
-      "type": "object",
-      "properties": {
-        "project": {
-          "$ref": "#/definitions/Project"
-        },
-        "name": {
-          "type": "string"
-        },
-        "exists": {
-          "type": "boolean"
-        },
-        "lastActivityAt": {
-          "$ref": "#/definitions/WireDate"
-        },
-        "counts": {
-          "type": "object",
-          "properties": {
-            "needsAttention": {
-              "type": "integer"
-            },
-            "blocked": {
-              "type": "integer"
-            },
-            "waiting": {
-              "type": "integer"
-            },
-            "running": {
-              "type": "integer"
-            },
-            "finished": {
-              "type": "integer"
-            },
-            "stopped": {
-              "type": "integer"
-            },
-            "archived": {
-              "type": "integer"
-            }
-          },
-          "additionalProperties": false,
-          "x-ts-type": "Partial<Record<AgentGroup, number>>"
-        },
-        "costToDate": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "number"
-          }
-        },
-        "unmeasuredAgents": {
-          "type": "integer"
-        },
-        "retiredCount": {
-          "type": "integer"
-        },
-        "guardedChanges": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/GuardedChange"
-          }
-        },
-        "approvals": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/Approval"
-          }
-        },
-        "helperLimitsSetBy": {
-          "$ref": "#/definitions/PolicySetBy",
-          "description": "Set when the organisation's policy caps this project's helper limits (#998, #64): the lower number is used."
-        }
-      },
-      "required": [
-        "project",
-        "name",
-        "exists",
-        "lastActivityAt",
-        "counts",
-        "costToDate",
-        "unmeasuredAgents",
-        "retiredCount"
-      ],
-      "additionalProperties": false
-    },
-    "ProjectWorktrees": {
-      "type": "object",
-      "properties": {
-        "project": {
-          "$ref": "#/definitions/URLString"
-        },
-        "worktrees": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/WorktreeSummary"
-          }
-        }
-      },
-      "required": [
-        "project",
-        "worktrees"
-      ],
-      "additionalProperties": false
-    },
-    "ProjectsFindRequest": {
-      "type": "object",
-      "properties": {
-        "paths": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "folders": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      },
-      "required": [],
-      "additionalProperties": false
-    },
-    "ProjectsListRequest": {
-      "type": "object",
-      "properties": {
-        "includeArchived": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "includeArchived"
-      ],
-      "additionalProperties": false
     },
     "PromptOrigin": {
       "type": "string",
@@ -15879,7 +16002,7 @@
     },
     "ReceiveRequest": {
       "type": "object",
-      "description": "Makes or brings up to date a host's copy of a Mac's repository (#1123): fetches the `bundle` upload, moves `branches` forward only, checks out `checkout`, sets `origin`, applies the `patch` upload (uncommitted changes), and adds the folder as a project. It stops, and changes nothing, when the host has changes or commits of its own.",
+      "description": "Makes or brings up to date a host's copy of a Mac's repository (#1123): fetches the `bundle` upload, moves `branches` forward only, checks out `checkout`, sets `origin`, applies the `patch` upload (uncommitted changes), and adds the folder as a folder. It stops, and changes nothing, when the host has changes or commits of its own.",
       "properties": {
         "folder": {
           "type": "string"
@@ -15957,7 +16080,7 @@
     },
     "ReceiveUploadRequest": {
       "type": "object",
-      "description": "One part of a file a Mac sends (#1123), at `offset` in the upload. A part is at most 16 MB; the host keeps the upload until projects/receive uses it.",
+      "description": "One part of a file a Mac sends (#1123), at `offset` in the upload. A part is at most 16 MB; the host keeps the upload until folders/receive uses it.",
       "properties": {
         "upload": {
           "$ref": "#/definitions/UUID"
@@ -16443,7 +16566,7 @@
     },
     "ReportRow": {
       "type": "object",
-      "description": "One hour or day of one machine's project and runtime, with its person (#1811).",
+      "description": "One hour or day of one machine's folder and runtime, with its person (#1811).",
       "properties": {
         "at": {
           "type": "string",
@@ -16459,9 +16582,6 @@
           "$ref": "#/definitions/HostID"
         },
         "hostName": {
-          "type": "string"
-        },
-        "project": {
           "type": "string"
         },
         "runtime": {
@@ -16517,6 +16637,9 @@
         "counts": {
           "$ref": "#/definitions/ReportCounts",
           "description": "What the agents did (#2019): sessions, pull requests and waits."
+        },
+        "folder": {
+          "type": "string"
         }
       },
       "required": [
@@ -16525,7 +16648,7 @@
         "personName",
         "host",
         "hostName",
-        "project",
+        "folder",
         "runtime",
         "cost",
         "inputTokens",
@@ -16625,7 +16748,7 @@
         },
         "by": {
           "type": "string",
-          "description": "The way the page adds up: person, project, machine, runtime, group or workflow."
+          "description": "The way the page adds up: person, folder, machine, runtime, group or workflow."
         }
       },
       "required": [
@@ -17721,7 +17844,7 @@
     },
     "SaidSearchRequest": {
       "type": "object",
-      "description": "agents/said (#1585): the sessions whose prompts or replies hold the text, any case, in one project when folder says.",
+      "description": "agents/said (#1585): the sessions whose prompts or replies hold the text, any case, in one folder when folder says.",
       "properties": {
         "text": {
           "type": "string"
@@ -17980,7 +18103,7 @@
     },
     "SendFile": {
       "type": "object",
-      "description": "A file the host made for a send, read with projects/sendRead (#1123).",
+      "description": "A file the host made for a send, read with folders/sendRead (#1123).",
       "properties": {
         "id": {
           "$ref": "#/definitions/UUID"
@@ -17997,7 +18120,7 @@
     },
     "SendPack": {
       "type": "object",
-      "description": "What projects/sendPack made (#1123): each branch at its commit, the bundle (none when the receiving host has every commit) and the patch (none when nothing is uncommitted).",
+      "description": "What folders/sendPack made (#1123): each branch at its commit, the bundle (none when the receiving host has every commit) and the patch (none when nothing is uncommitted).",
       "properties": {
         "commits": {
           "type": "array",
@@ -18067,7 +18190,7 @@
     },
     "SendReadRequest": {
       "type": "object",
-      "description": "One part of a file projects/sendPack made, from `offset` (#1123).",
+      "description": "One part of a file folders/sendPack made, from `offset` (#1123).",
       "properties": {
         "id": {
           "$ref": "#/definitions/UUID"
@@ -18657,7 +18780,7 @@
       "type": "object",
       "properties": {
         "path": {
-          "description": "Relative to `~/.agents`, or to a project's `.agents`.",
+          "description": "Relative to `~/.agents`, or to a folder's `.agents`.",
           "type": "string"
         },
         "kind": {
@@ -18841,7 +18964,7 @@
       ]
     },
     "SharedRequest": {
-      "description": "`personal/shared`'s params: none reads the person's `~/.agents`; `folder` reads that project's `.agents` (#754), which has no per-runtime reach.",
+      "description": "`personal/shared`'s params: none reads the person's `~/.agents`; `folder` reads that folder's `.agents` (#754), which has no per-runtime reach.",
       "type": "object",
       "properties": {
         "folder": {
@@ -19001,7 +19124,7 @@
       "type": "object",
       "properties": {
         "home": {
-          "description": "`~/.agents`, or a project's `.agents` (#754).",
+          "description": "`~/.agents`, or a folder's `.agents` (#754).",
           "type": "string"
         },
         "laidOut": {
@@ -20125,7 +20248,7 @@
       "type": "string",
       "enum": [
         "personal",
-        "project"
+        "folder"
       ]
     },
     "SkillNameRequest": {
@@ -20742,7 +20865,7 @@
     },
     "TeamTrigger": {
       "type": "object",
-      "description": "workflows/trigger and workflows/fire (#2011, spec 736 FR-035): a project or control-plane event (a server's, such as github or a channel's) or a schedule that a runs-on: workflow's trigger matched. A machine sends it to the control plane, which sends it once to one of the bot's machines. workflow is the project folder's name and the workflow's id; trigger, the same words on every machine that heard it; event, the event (none for a schedule); dueAt, a schedule's due time.",
+      "description": "workflows/trigger and workflows/fire (#2011, spec 736 FR-035): a folder or control-plane event (a server's, such as github or a channel's) or a schedule that a runs-on: workflow's trigger matched. A machine sends it to the control plane, which sends it once to one of the bot's machines. workflow is the folder's name and the workflow's id; trigger, the same words on every machine that heard it; event, the event (none for a schedule); dueAt, a schedule's due time.",
       "properties": {
         "workflow": {
           "type": "string"
@@ -21904,9 +22027,6 @@
       "type": "object",
       "description": "A worktree with work that is not pushed: commits ahead of its upstream (`ahead`), or on a branch with no upstream (`unmerged`, commits not on the base), and changes not committed (`uncommitted`).",
       "properties": {
-        "project": {
-          "$ref": "#/definitions/URLString"
-        },
         "worktree": {
           "$ref": "#/definitions/URLString"
         },
@@ -21921,10 +22041,13 @@
         },
         "uncommitted": {
           "type": "integer"
+        },
+        "folder": {
+          "$ref": "#/definitions/URLString"
         }
       },
       "required": [
-        "project",
+        "folder",
         "worktree"
       ],
       "additionalProperties": false
@@ -22195,12 +22318,8 @@
     },
     "UsageRollupRow": {
       "type": "object",
-      "description": "One project and runtime's usage in an hour or a day (#1811), as a machine adds it up.",
+      "description": "One folder and runtime's usage in an hour or a day (#1811), as a machine adds it up.",
       "properties": {
-        "project": {
-          "type": "string",
-          "description": "The project's folder name, so the same repository on two machines adds up."
-        },
         "runtime": {
           "type": "string"
         },
@@ -22255,10 +22374,14 @@
         "route": {
           "type": "string",
           "description": "The org route of this row's turns (#999, FR-021); absent for the person's own sign-in and accounts."
+        },
+        "folder": {
+          "type": "string",
+          "description": "The folder name, so the same repository on two machines adds up."
         }
       },
       "required": [
-        "project",
+        "folder",
         "runtime",
         "cost",
         "inputTokens",
@@ -22562,9 +22685,6 @@
         "agentID": {
           "$ref": "#/definitions/UUID"
         },
-        "project": {
-          "$ref": "#/definitions/URLString"
-        },
         "viewID": {
           "$ref": "#/definitions/UUID"
         },
@@ -22579,6 +22699,9 @@
         },
         "server": {
           "type": "string"
+        },
+        "folder": {
+          "$ref": "#/definitions/URLString"
         }
       },
       "required": [
@@ -22670,7 +22793,7 @@
         "server": {
           "type": "string"
         },
-        "project": {
+        "folder": {
           "$ref": "#/definitions/URLString"
         }
       },
@@ -22720,9 +22843,6 @@
         "agentID": {
           "$ref": "#/definitions/UUID"
         },
-        "project": {
-          "$ref": "#/definitions/URLString"
-        },
         "server": {
           "type": "string"
         },
@@ -22734,6 +22854,9 @@
         },
         "show": {
           "type": "boolean"
+        },
+        "folder": {
+          "$ref": "#/definitions/URLString"
         }
       },
       "required": [
@@ -23303,12 +23426,12 @@
     "WorkflowLimit": {
       "type": "string",
       "enum": [
-        "project"
+        "folder"
       ]
     },
     "WorkflowLimitSettings": {
       "type": "object",
-      "description": "How many approved workflows may be turned on in each project. An unset value means 20. The range is 1 to 100. Kept in workflow-limit.json.",
+      "description": "How many approved workflows may be turned on in each folder. An unset value means 20. The range is 1 to 100. Kept in workflow-limit.json.",
       "properties": {
         "total": {
           "type": "integer"
@@ -23971,8 +24094,16 @@
     "WorkflowSummary": {
       "type": "object",
       "properties": {
-        "scope": { "type": "string", "enum": ["project", "user"] },
-        "content": { "type": "string" },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "folder",
+            "user"
+          ]
+        },
+        "content": {
+          "type": "string"
+        },
         "workflow": {
           "$ref": "#/definitions/Workflow"
         },
@@ -24135,10 +24266,17 @@
     "WorkflowWriteRequest": {
       "type": "object",
       "properties": {
-        "workflowID": { "type": "string" },
-        "content": { "type": "string" }
+        "workflowID": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        }
       },
-      "required": ["workflowID", "content"],
+      "required": [
+        "workflowID",
+        "content"
+      ],
       "additionalProperties": false
     },
     "WorkflowsListRequest": {
@@ -24149,7 +24287,10 @@
         },
         "scope": {
           "type": "string",
-          "enum": ["project", "user"]
+          "enum": [
+            "folder",
+            "user"
+          ]
         }
       },
       "additionalProperties": false
@@ -24239,18 +24380,18 @@
     "WorktreeRemovalRequest": {
       "type": "object",
       "properties": {
-        "project": {
-          "$ref": "#/definitions/URLString"
-        },
         "root": {
           "$ref": "#/definitions/URLString"
         },
         "confirmed": {
           "type": "boolean"
+        },
+        "folder": {
+          "$ref": "#/definitions/URLString"
         }
       },
       "required": [
-        "project",
+        "folder",
         "root",
         "confirmed"
       ],
@@ -24333,9 +24474,6 @@
         "branch": {
           "type": "string"
         },
-        "isProjectFolder": {
-          "type": "boolean"
-        },
         "exists": {
           "type": "boolean"
         },
@@ -24353,12 +24491,15 @@
         },
         "size": {
           "$ref": "#/definitions/WorktreeSize"
+        },
+        "isFolder": {
+          "type": "boolean"
         }
       },
       "required": [
         "name",
         "root",
-        "isProjectFolder",
+        "isFolder",
         "exists",
         "madeByApp",
         "agents"

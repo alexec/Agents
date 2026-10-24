@@ -12,7 +12,7 @@ at the keyboard, that is true only of a run of the workflow.
 
 ## Rules for the whole run
 
-- **Never touch the project folder you start in.** It is the shared checkout of `main`.
+- **Never touch the folder you start in.** It is the shared checkout of `main`.
   Do everything in the review worktree below.
 - **Never** merge, push, rebase `main`, open pull requests, ship or restart the app, or
   call the live app's `daemon.sock`. Walk only a scratch set-up of your own (the
@@ -71,7 +71,7 @@ For each screen the release's changes touched:
 
 1. **Read the code** of all three clients side by side, from the parity table's paths.
 2. **See it where you can.** Launch a scratch set-up with the `run-app` skill (under the
-   build lease), seeded enough to show the screen (projects, sessions in each state,
+   build lease), seeded enough to show the screen (folders, sessions in each state,
    a question card, a long chat; its seed scripts and `scripts/seed-*.py` help).
    - **Web:** walk it in headless Chrome with `Web/test/walk/cdp.mjs` and the scenes of
      `Web/test/walk/parity.mjs`, at desktop width and at phone width (390×844). This

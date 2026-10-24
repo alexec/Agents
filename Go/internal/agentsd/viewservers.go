@@ -25,7 +25,7 @@ import (
 // viewServer is a server a view may come from, set up and approved here.
 type viewServer struct {
 	name string
-	// scope is where its entry is, for its view answers: the project's folder, or personal.
+	// scope is where its entry is, for its view answers: the folder, or personal.
 	scope  string
 	filled sdk.McpServer
 	// entry is the catalog's key: a digest of the entry as written, ${NAME} and all.
@@ -78,21 +78,21 @@ func (p viewTrouble) pinReason() string {
 	return "server not set up here"
 }
 
-// viewScope is MCPApprovals.viewScope: the project's folder, or personal.
-func viewScope(project string) string {
-	if project == "" {
+// viewScope is MCPApprovals.viewScope: the folder, or personal.
+func viewScope(folder string) string {
+	if folder == "" {
 		return "personal"
 	}
-	return filepath.Clean(project)
+	return filepath.Clean(folder)
 }
 
-// viewServerFor is name as a session in project is given it: the project's approved
+// viewServerFor is name as a session in folder is given it: the folder's approved
 // entries, then the person's (the first of a name wins, as for sessions), secrets filled.
-func (d *Daemon) viewServerFor(name, project string) (viewServer, viewTrouble) {
+func (d *Daemon) viewServerFor(name, folder string) (viewServer, viewTrouble) {
 	if name == appServerName {
 		return viewServer{}, viewNotSetUp
 	}
-	project = filepath.Clean(project)
+	folder = filepath.Clean(folder)
 	ready := func(e mcpEntry, scope string) (viewServer, viewTrouble) {
 		switch {
 		case e.server.Stdio != nil && !e.hosted:
@@ -109,7 +109,7 @@ func (d *Daemon) viewServerFor(name, project string) (viewServer, viewTrouble) {
 			var in *string
 			cwd := d.personalHome()
 			if scope != viewScope("") {
-				in, cwd = &project, project
+				in, cwd = &folder, folder
 			}
 			return viewServer{name: name, scope: scope, filled: filled, entry: entryDigest(e.raw),
 				connect: d.hostedViewConnect(*filled.Stdio, in, cwd)}, 0
@@ -120,7 +120,7 @@ func (d *Daemon) viewServerFor(name, project string) (viewServer, viewTrouble) {
 		}
 		return viewServer{name: name, scope: scope, filled: signed[0], entry: entryDigest(e.raw)}, 0
 	}
-	entries, _ := readMCPFile(filepath.Join(project, ".agents", "mcp.json"))
+	entries, _ := readMCPFile(filepath.Join(folder, ".agents", "mcp.json"))
 	for _, e := range entries {
 		if e.name != name {
 			continue
@@ -128,10 +128,10 @@ func (d *Daemon) viewServerFor(name, project string) (viewServer, viewTrouble) {
 		d.mcpMu.Lock()
 		approved, _, _ := d.mcpApprovalsLocked()
 		d.mcpMu.Unlock()
-		if approved == nil || approved[mcpApprovalKey(project, name)] != entryDigest(e.raw) {
+		if approved == nil || approved[mcpApprovalKey(folder, name)] != entryDigest(e.raw) {
 			return viewServer{}, viewWaiting
 		}
-		return ready(e, viewScope(project))
+		return ready(e, viewScope(folder))
 	}
 	if home := d.personalHome(); home != "" {
 		entries, _ := readMCPFile(filepath.Join(home, ".agents", "mcp.json"))
@@ -144,11 +144,11 @@ func (d *Daemon) viewServerFor(name, project string) (viewServer, viewTrouble) {
 	return viewServer{}, viewNotSetUp
 }
 
-// viewServerNames is every server name a session in project could have been given, but
+// viewServerNames is every server name a session in folder could have been given, but
 // the app's own.
-func (d *Daemon) viewServerNames(project string) []string {
+func (d *Daemon) viewServerNames(folder string) []string {
 	var names []string
-	entries, _ := readMCPFile(filepath.Join(project, ".agents", "mcp.json"))
+	entries, _ := readMCPFile(filepath.Join(folder, ".agents", "mcp.json"))
 	for _, e := range entries {
 		names = append(names, e.name)
 	}

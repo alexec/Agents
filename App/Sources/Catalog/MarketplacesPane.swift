@@ -39,7 +39,7 @@ struct MarketplaceMenu: View {
     }
 }
 
-/// The marketplaces for one kind (#687): the app's own, the person's, and the project's,
+/// The marketplaces for one kind (#687): the app's own, the person's, and the folder's,
 /// each with a switch; the person's own can be removed, and more added.
 struct MarketplacesPane: View {
     @Environment(AppModel.self) private var model
@@ -101,8 +101,8 @@ struct MarketplacesPane: View {
                 Text(marketplace.url).appText(.code).foregroundStyle(.secondary).lineLimit(1)
                 if let about = marketplace.about {
                     Text(about).appText(.fine).foregroundStyle(.secondary)
-                } else if marketplace.origin == .project && !marketplace.enabled {
-                    Text("Committed with the project. Turn it on to search it\(marketplace.token.map { " with your \($0)" } ?? "").")
+                } else if marketplace.origin == .folder && !marketplace.enabled {
+                    Text("Committed with the folder. Turn it on to search it\(marketplace.token.map { " with your \($0)" } ?? "").")
                         .appText(.fine).foregroundStyle(.secondary)
                 }
             }
@@ -121,7 +121,7 @@ struct MarketplacesPane: View {
         switch origin {
         case .provided: "provided"
         case .personal: "yours"
-        case .project: "project"
+        case .folder: "folder"
         }
     }
 

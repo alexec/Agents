@@ -14,7 +14,7 @@ import (
 )
 
 // What the control plane adds up across machines (#1811): cost, tokens and time by the
-// UTC hour, project and runtime, in <root>/report-hours.json. The hours are kept 8 days,
+// UTC hour, folder and runtime, in <root>/report-hours.json. The hours are kept 8 days,
 // so a UTC day's hours are all here to add up. Each hour, and each time the uplink comes
 // back, the hours that changed since they were last sent go to the control plane
 // (usage/rollup) with the UTC days they fall in. The control plane keeps hours 7 days and
@@ -63,10 +63,10 @@ func (d *Daemon) reportPath() string { return filepath.Join(d.Store.Loc.Root, "r
 
 func utcHour(t time.Time) string { return t.UTC().Format("2006-01-02T15") }
 
-// reportKey is a row's key: its project, runtime and, for a workflow's agents, the workflow
+// reportKey is a row's key: its folder, runtime and, for a workflow's agents, the workflow
 // (#2019), and for an org account's turns its route (#999). The rows before keep their keys.
-func reportKey(project, runtime, workflow, route string) string {
-	k := project + "\t" + runtime
+func reportKey(folder, runtime, workflow, route string) string {
+	k := folder + "\t" + runtime
 	if workflow != "" {
 		k += "\t" + workflow
 	}
@@ -114,12 +114,12 @@ func reportWorkflow(a *wire.Agent) string {
 	return *a.StartedByWorkflow
 }
 
-// reportProject is an agent's project as the reports name it: its folder's name.
-func reportProject(a *wire.Agent) string {
+// reportFolder is an agent's folder as the reports name it: its folder's name.
+func reportFolder(a *wire.Agent) string {
 	if a == nil {
 		return ""
 	}
-	f := projectFolder(a)
+	f := folderPath(a)
 	if f == "" || f == "/" {
 		return ""
 	}
@@ -187,22 +187,22 @@ func pruneReport(r *reportFile, now time.Time) {
 	}
 }
 
-// addReport adds to an agent's project and runtime in the UTC hour at holds.
+// addReport adds to an agent's folder and runtime in the UTC hour at holds.
 func (d *Daemon) addReport(a *wire.Agent, runtime string, at time.Time, add wire.UsageRollupRow) {
 	d.reportMu.Lock()
 	defer d.reportMu.Unlock()
-	d.addReportLocked(reportProject(a), runtime, reportWorkflow(a), reportRoute(a), utcHour(at), add)
+	d.addReportLocked(reportFolder(a), runtime, reportWorkflow(a), reportRoute(a), utcHour(at), add)
 	d.reportChangedLocked()
 }
 
-func (d *Daemon) addReportLocked(project, runtime, workflow, route, hour string, add wire.UsageRollupRow) {
+func (d *Daemon) addReportLocked(folder, runtime, workflow, route, hour string, add wire.UsageRollupRow) {
 	r := d.reportLocked()
 	if r.Hours[hour] == nil {
 		r.Hours[hour] = map[string]wire.UsageRollupRow{}
 	}
-	k := reportKey(project, runtime, workflow, route)
+	k := reportKey(folder, runtime, workflow, route)
 	row := r.Hours[hour][k]
-	row.Project, row.Runtime = project, runtime
+	row.Folder, row.Runtime = folder, runtime
 	if workflow != "" {
 		row.Workflow = &workflow
 	}
@@ -262,7 +262,7 @@ func (d *Daemon) reportTime(agent wire.UUID, runtime string, segments []timeSegm
 		return
 	}
 	a := d.Store.Agent(agent)
-	project, workflow, route := reportProject(a), reportWorkflow(a), reportRoute(a)
+	folder, workflow, route := reportFolder(a), reportWorkflow(a), reportRoute(a)
 	d.reportMu.Lock()
 	defer d.reportMu.Unlock()
 	for _, s := range segments {
@@ -282,7 +282,7 @@ func (d *Daemon) reportTime(agent wire.UUID, runtime string, segments []timeSegm
 			} else {
 				add.WorkingSeconds = next.Sub(from).Seconds()
 			}
-			d.addReportLocked(project, runtime, workflow, route, utcHour(from), add)
+			d.addReportLocked(folder, runtime, workflow, route, utcHour(from), add)
 			from = next
 		}
 	}
@@ -347,7 +347,7 @@ func (d *Daemon) rollupLocked() (wire.UsageRollup, map[string]int64) {
 			}
 			for k, row := range hr {
 				s := sum[k]
-				s.Project, s.Runtime, s.Workflow = row.Project, row.Runtime, row.Workflow
+				s.Folder, s.Runtime, s.Workflow = row.Folder, row.Runtime, row.Workflow
 				addRollupRow(&s, row)
 				sum[k] = s
 			}

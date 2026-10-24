@@ -1,21 +1,21 @@
 import AgentsKitCore
 import SwiftUI
 
-/// One session under its project: the Mac's compact `AgentRow`, tagged into the sidebar's
+/// One session under its folder: the Mac's compact `AgentRow`, tagged into the sidebar's
 /// one selection (#226). A swipe from the leading edge pins it, from the trailing edge
 /// archives it or brings it back, and a long press is the Mac's row menu.
 struct SidebarSessionRow: View {
     @Environment(RemoteModel.self) private var model
     /// The agent as the list had it when it drew this row. Only its id is trusted.
     private let given: Agent
-    /// Which project it is in, after the title: under a smart group of the sidebar
-    /// (#495, #498), which gathers sessions from every project, and nowhere else.
+    /// Which folder it is in, after the title: under a smart group of the sidebar
+    /// (#495, #498), which gathers sessions from every folder, and nowhere else.
     private let place: String?
     /// Where it sits in its list's tree (#835): a parent with its count and fold, or a
     /// child one indent in, as on the Mac.
     private let tree: SidebarTree.Row?
     private let folds: SidebarFolds?
-    /// In its project's Sessions fold: one level in, under the word Sessions (#2312).
+    /// In its folder's Sessions fold: one level in, under the word Sessions (#2312).
     private let isNested: Bool
     /// The mark's well and the gap after it, as the Workflows fold's rows have them (#750).
     @ScaledMetric private var scale: CGFloat = 1
@@ -47,7 +47,7 @@ struct SidebarSessionRow: View {
 
     private var startedByWorkflowName: String? {
         guard let id = agent.startedByWorkflow else { return nil }
-        return model.work.workflows(in: agent.projectFolder)
+        return model.work.workflows(in: agent.folderPath)
             .first { $0.workflow.workflowID == id }?.workflow.name ?? id
     }
 
@@ -73,7 +73,7 @@ struct SidebarSessionRow: View {
             }
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
-                    // The project's name whole up to 40% of the line, then cut (#936), as on the Mac.
+                    // The folder's name whole up to 40% of the line, then cut (#936), as on the Mac.
                     TitleAndPlace {
                         Text(agent.title ?? "Untitled")
                             .appText(.supporting)
@@ -123,7 +123,7 @@ struct SidebarSessionRow: View {
                 if let acting = model.acting(agent.id) {
                     Telling(host: model.answerRecipient(agent.id), doing: acting.doing)
                 } else if let queued = model.queuedLine(agent) {
-                    // Its place in its project's queue (#362), as the Mac's row says it.
+                    // Its place in its folder's queue (#362), as the Mac's row says it.
                     Text(queued)
                         .appText(.fine)
                         .foregroundStyle(.secondary)
@@ -311,15 +311,15 @@ private struct SessionMark: View {
     }
 }
 
-/// One workflow under its project: its name, and at its end when it last ran, as a
+/// One workflow under its folder: its name, and at its end when it last ran, as a
 /// session's row has its time (#755), or nothing if it never has: off is its pause mark,
 /// said to VoiceOver (#100). What it does is its page's to say (#495). Its page opens in
 /// the detail as a session's chat does.
 struct SidebarWorkflowRow: View {
     @Environment(RemoteModel.self) private var model
     let summary: WorkflowSummary
-    let project: ProjectKey
-    /// In its project's Workflows fold: one level in, under the word Workflows (#1079).
+    let folder: FolderKey
+    /// In its folder's Workflows fold: one level in, under the word Workflows (#1079).
     var isNested = false
     @State private var confirmsDelete = false
     /// The mark's well and the gap after it, as a session's row has them (#750).
@@ -356,7 +356,7 @@ struct SidebarWorkflowRow: View {
         .padding(.leading, isNested ? 20 * scale + 10 : 0)
         .accessibilityElement(children: .combine)
         .accessibilityValue(!summary.isEnabled && !summary.isArchived ? "turned off" : "")
-        .tag(SidebarItem.workflow(summary.id, in: project))
+        .tag(SidebarItem.workflow(summary.id, in: folder))
         // Pin or Unpin (#432), from the leading edge, as a session's row has it.
         .swipeActions(edge: .leading) {
             if !summary.isArchived {
@@ -428,7 +428,7 @@ struct SidebarWorkflowRow: View {
             Button("Delete", role: .destructive) { Task { await model.deleteWorkflow(summary) } }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("The file can be restored from the project's git history.")
+            Text("The file can be restored from the folder's git history.")
         }
     }
 
@@ -505,14 +505,14 @@ struct WorkflowMark: View {
     }
 }
 
-/// A project's pinned pages (#159), first in its fold, right under the project's row. A long
+/// A folder's pinned pages (#159), first in its fold, right under the folder's row. A long
 /// press moves or unpins one; in the list's edit mode they drag.
 struct PinnedPageRows: View {
     @Environment(RemoteModel.self) private var model
-    let project: ProjectKey
+    let folder: FolderKey
 
     var body: some View {
-        let pins = model.pins(in: project.folder)
+        let pins = model.pins(in: folder.folder)
         ForEach(Array(pins.enumerated()), id: \.element.path) { index, pin in
             HStack(spacing: 8) {
                 Image(systemName: pin.kind == .view ? "square.grid.2x2" : pin.kind == .html ? "globe" : "doc.text")
@@ -529,21 +529,21 @@ struct PinnedPageRows: View {
             .appText(.supporting)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("\(pin.title), pinned \(pin.kind == .view ? "view" : "page")" + (pin.missing ? ", missing" : ""))
-            .tag(SidebarItem.pin(pin.path, in: project))
+            .tag(SidebarItem.pin(pin.path, in: folder))
             .contextMenu {
                 Button("Move Up", systemImage: "arrow.up") { step(pin, -1, in: pins) }
                     .disabled(index == 0)
                 Button("Move Down", systemImage: "arrow.down") { step(pin, 1, in: pins) }
                     .disabled(index == pins.count - 1)
                 Button("Unpin", systemImage: "pin.slash", role: .destructive) {
-                    Task { await model.unpin(pin.path, in: project.folder) }
+                    Task { await model.unpin(pin.path, in: folder.folder) }
                 }
             }
         }
         .onMove { from, to in
             var paths = pins.map(\.path)
             paths.move(fromOffsets: from, toOffset: to)
-            Task { await model.arrangePins(paths, in: project.folder) }
+            Task { await model.arrangePins(paths, in: folder.folder) }
         }
     }
 
@@ -551,19 +551,19 @@ struct PinnedPageRows: View {
         var paths = pins.map(\.path)
         guard let index = paths.firstIndex(of: pin.path), paths.indices.contains(index + by) else { return }
         paths.swapAt(index, index + by)
-        Task { await model.arrangePins(paths, in: project.folder) }
+        Task { await model.arrangePins(paths, in: folder.folder) }
     }
 }
 
-/// A connected server's list views (#2032), after the project's pins: a row each, named by
-/// the service ("GitHub · Issues"), without a pin. A long press hides one; the project's
+/// A connected server's list views (#2032), after the folder's pins: a row each, named by
+/// the service ("GitHub · Issues"), without a pin. A long press hides one; the folder's
 /// long press shows them again.
 struct ServerViewRows: View {
     @Environment(RemoteModel.self) private var model
-    let project: ProjectKey
+    let folder: FolderKey
 
     var body: some View {
-        ForEach(model.serverViews(in: project.folder).filter { $0.hidden != true }) { view in
+        ForEach(model.serverViews(in: folder.folder).filter { $0.hidden != true }) { view in
             HStack(spacing: 8) {
                 Image(systemName: "square.grid.2x2")
                     .sidebarMark(Paper.accent)
@@ -583,21 +583,21 @@ struct ServerViewRows: View {
             .accessibilityElement(children: .ignore)
             // VoiceOver says the count (#590).
             .accessibilityLabel("\(view.title), view" + (view.count.map { ", \($0)" } ?? ""))
-            .tag(SidebarItem.pin(view.path, in: project))
+            .tag(SidebarItem.pin(view.path, in: folder))
             .contextMenu {
                 Button("Hide", systemImage: "eye.slash") {
-                    Task { await model.setViewHidden(view.path, true, in: project.folder) }
+                    Task { await model.setViewHidden(view.path, true, in: folder.folder) }
                 }
             }
         }
     }
 }
 
-/// The project's long press: every server view hidden in it, back in the sidebar (#2032).
+/// The folder's long press: every server view hidden in it, back in the sidebar (#2032).
 /// Left out when none is hidden.
 struct ShowHiddenViewsButton: View {
     @Environment(RemoteModel.self) private var model
-    let summary: DaemonAPI.ProjectSummary
+    let summary: DaemonAPI.FolderSummary
 
     var body: some View {
         let hidden = model.serverViews(in: summary.folder).filter { $0.hidden == true }

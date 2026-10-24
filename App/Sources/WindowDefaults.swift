@@ -8,7 +8,7 @@ import Foundation
 /// window (run-app, `--walk <name>`) reads the standard root, so the root alone does not
 /// tell it apart; a branch build on another root (`--root`, `AGENTS_ROOT`) does. Either
 /// keeps its keys in `<bundle id>.walk.<name>` or `<bundle id>.root.<name>`, and nothing
-/// it chooses (a project, a sidebar width, the appearance) reaches the person's window.
+/// it chooses (a folder, a sidebar width, the appearance) reaches the person's window.
 /// No key in App/ goes to `UserDefaults.standard` or a bare `@AppStorage` but through
 /// here: `scripts/check-window-defaults.py` fails the build on one.
 enum WindowDefaults {

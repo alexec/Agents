@@ -12,9 +12,9 @@ test("who, where and the call", () => {
   assert.equal(a.who(e.actor), "Local owner · MacBook Pro");
   assert.equal(a.place(e, () => "box"), "on box");
   assert.equal(a.call(e), "agents/stop · A1");
-  const own = entry({ method: "control/setProjectDetection" });
+  const own = entry({ method: "control/setFolderDetection" });
   assert.equal(a.place(own, (h) => h), "on the control plane");
-  assert.equal(a.call(own), "control/setProjectDetection");
+  assert.equal(a.call(own), "control/setFolderDetection");
   assert.equal(a.who(own.actor), "Someone");
   assert.equal(a.who({ user: "b", userName: "Nightly", event: { kind: "pr.merged", id: "42" } }), "Nightly · for pr.merged");
   assert.equal(a.kept(1), "Kept for 1 day");

@@ -6,7 +6,7 @@ import { Fragment } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
-import type { AccountProfile, AllowanceReading, AllowanceState, Consequence, ControlHost, CostState, Event, ProjectSummary, RuntimeAvailability, RuntimeStatus } from "../protocol/generated";
+import type { AccountProfile, AllowanceReading, AllowanceState, Consequence, ControlHost, CostState, Event, FolderSummary, RuntimeAvailability, RuntimeStatus } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import { who } from "../model/audit";
 import type { ActivityPage } from "../route";
@@ -19,7 +19,7 @@ import { ReportsPane } from "./Reports";
 import { forCleanup, pageLine, rowWords, tally as worktreeTally, worktreesIntro } from "../model/worktrees";
 import { BackToList } from "./BackToList";
 import { Modal } from "./Modal";
-import { folderKey, projectFolder } from "../model/groups";
+import { folderKey, folderPath } from "../model/groups";
 import { accountChoices, accountRows, accountState, agentsHolding, allowanceLine, defaultAccountName, isOrgRow, orgAllowanceLine, ownRow, ownSignInID, reachesFoot, reachesTheModelBy, removeMessage, rowTitle, runtimeTally, runtimeTime, signInOnTheMac } from "../model/runtimes";
 import { fromOrganisation } from "../model/orgAccounts";
 import { setBy as setByWords } from "../model/orgPolicy";
@@ -37,8 +37,8 @@ import { isComplete } from "../model/milestones";
 import { Capability } from "../protocol/capabilities.generated";
 import { OrgBudget, OrgPolicyLine, PassThroughList } from "./OrgPolicyLine";
 
-function navigate(destination: { host: string; project: string; session?: string; workflow?: string }): void {
-  const parts = ["h", destination.host, "p", destination.project];
+function navigate(destination: { host: string; folder: string; session?: string; workflow?: string }): void {
+  const parts = ["h", destination.host, "p", destination.folder];
   if (destination.session) parts.push("s", destination.session);
   else if (destination.workflow) parts.push("w", destination.workflow);
   location.hash = "#/" + parts.map(encodeURIComponent).join("/");
@@ -95,10 +95,10 @@ export function dayLimitReached(state: CostState | undefined): boolean {
   return !!daily && daily.amount > 0 && (state?.today[daily.currency] ?? 0) >= daily.amount;
 }
 
-/** All time, folded from the projects' cost ledgers as Spending does on the other clients. */
-export function lifetimeTotals(projects: ProjectSummary[]): Record<string, number> {
+/** All time, folded from the folders' cost ledgers as Spending does on the other clients. */
+export function lifetimeTotals(folders: FolderSummary[]): Record<string, number> {
   const total: Record<string, number> = {};
-  for (const project of projects) for (const [currency, amount] of Object.entries(project.costToDate)) {
+  for (const folder of folders) for (const [currency, amount] of Object.entries(folder.costToDate)) {
     total[currency] = (total[currency] ?? 0) + amount;
   }
   return total;
@@ -248,7 +248,7 @@ export function ActivityRows({ group, store, chosen, onPick }: {
   const mac = costs[store.macHostID.value];
   const milestones = store.milestones.value[milestonesHost(store) ?? ""];
   const left = headroom(mac);
-  // The page's name in the projects' type, after its icon in the accent, as the window's rows
+  // The page's name in the folders' type, after its icon in the accent, as the window's rows
   // have it (#155, #495). Nothing at its end, which is only a session's (#587): what it would say
   // at a glance is its tooltip's, and the icon turns red when the page has something wrong to say.
   const row = (page: ActivityPage, title: string, help: string, figures: string | null, warns = false) => (
@@ -284,7 +284,7 @@ export function ActivityRows({ group, store, chosen, onPick }: {
         tally?.working === 0)}
       {row("mcp", "Connectors", "Every connector in your own mcp.json, and how each is doing",
         mcp?.words ?? null, mcp?.failing ?? false)}
-      {row("worktrees", "Worktrees", "Every project's worktrees, and how much each holds", worktrees)}
+      {row("worktrees", "Worktrees", "Every folder's worktrees, and how much each holds", worktrees)}
     </>
   );
 }
@@ -446,12 +446,12 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
 
 /**
  * Where Events reads from (#541), as the other clients' one menu has it: "all", "mac" (an event
- * about a host itself), or one host's project as `host|folderKey`.
+ * about a host itself), or one host's folder as `host|folderKey`.
  */
 export function eventIsIn(where: string, host: string, event: Event): boolean {
   if (where === "all") return true;
   if ("mac" in event.scope) return where === "mac";
-  return where === `${host}|${folderKey(event.scope.project._0)}`;
+  return where === `${host}|${folderKey(event.scope.folder._0)}`;
 }
 
 /** Everything one event carries, in the rows the window's detail and the Remote's sheet show. */
@@ -475,13 +475,13 @@ function EventsList({ store, hostName }: { store: Store; hostName: (host: string
   const several = store.hosts.value.length > 1;
   const scopeName = (host: string, event: Event) => {
     if ("mac" in event.scope) return "This Mac";
-    const folder = event.scope.project._0;
-    return (store.projects.value[host] ?? []).find((project) => folderKey(project.project.folder) === folderKey(folder))?.name
-      ?? decodeURIComponent(folder.split("/").pop() ?? "Project");
+    const folder = event.scope.folder._0;
+    return (store.folders.value[host] ?? []).find((candidate) => folderKey(candidate.folder.folder) === folderKey(folder))?.name
+      ?? decodeURIComponent(folder.split("/").pop() ?? "Folder");
   };
-  const places = store.hosts.value.flatMap((host) => (store.projects.value[host.id] ?? [])
-    .filter((project) => !project.project.archivedAt)
-    .map((project) => ({ value: `${host.id}|${folderKey(project.project.folder)}`, name: several ? `${hostName(host.id)}: ${project.name}` : project.name })))
+  const places = store.hosts.value.flatMap((host) => (store.folders.value[host.id] ?? [])
+    .filter((folder) => !folder.folder.archivedAt)
+    .map((folder) => ({ value: `${host.id}|${folderKey(folder.folder.folder)}`, name: several ? `${hostName(host.id)}: ${folder.name}` : folder.name })))
     .sort((a, b) => a.name.localeCompare(b.name));
   const events: { host: string; event: Event }[] = Object.entries(store.events.value)
     .flatMap(([host, page]) => page.events.filter((event) => eventIsIn(where.value, host, event)).map((event) => ({ host, event })))
@@ -503,7 +503,7 @@ function EventsList({ store, hostName }: { store: Store; hostName: (host: string
   }
   const openAgent = async (host: string, id: string) => {
     const agent = await store.loadEventAgent(host, id);
-    if (agent) navigate({ host, project: projectFolder(agent), session: id });
+    if (agent) navigate({ host, folder: folderPath(agent), session: id });
   };
   const showOlder = () => { for (const [host, page] of Object.entries(store.events.value)) if (page.hasMore) void store.loadOlderEvents(host); };
   const hasOlder = Object.values(store.events.value).some((page) => page.hasMore);
@@ -515,7 +515,7 @@ function EventsList({ store, hostName }: { store: Store; hostName: (host: string
           <h2 class="section-head">Waiting now</h2>
           <ul class="event-list waiting-list">
             {waiting.map(({ host, w }) => <li key={`${host}|${w.agentID}`}>
-              <button class="event-waiting" onClick={() => navigate({ host, project: w.folder, session: w.agentID })}>
+              <button class="event-waiting" onClick={() => navigate({ host, folder: w.folder, session: w.agentID })}>
                 <span class="strong">{w.title}</span><span class="quiet small">{w.status.line}</span>
               </button>
               {w.status.cancellable && <button class="event-stop" aria-label={`Stop ${w.title} waiting`}
@@ -528,7 +528,7 @@ function EventsList({ store, hostName }: { store: Store; hostName: (host: string
       <div class="event-head">
         <h2 class="section-head">What happened</h2>
         <select aria-label="Where" value={where.value} onChange={(e) => (where.value = (e.currentTarget as HTMLSelectElement).value)}>
-          <option value="all">All projects</option>
+          <option value="all">All folders</option>
           <option value="mac">This Mac</option>
           {places.map((place) => <option key={place.value} value={place.value}>{place.name}</option>)}
         </select>
@@ -581,11 +581,11 @@ function ConsequenceLine({ consequence, host, store, openAgent }: {
   if ("couldNotWake" in consequence) return <span class="quiet small event-consequence">↳ Could not wake {consequence.couldNotWake.title} — {consequence.couldNotWake.reason}</span>;
   if ("fired" in consequence) {
     const item = consequence.fired;
-    const openWorkflow = () => navigate({ host, project: item.folder, workflow: item.workflowID });
+    const openWorkflow = () => navigate({ host, folder: item.folder, workflow: item.workflowID });
     return <span class="quiet small event-consequence">↳ Fired <button class="link" onClick={openWorkflow}>{item.workflowID}</button>{item.agentID && <> · <button class="link" onClick={() => openAgent(host, item.agentID!)}>{store.agent(host, item.agentID)?.title ?? "Open agent"}</button></>}</span>;
   }
   const item = consequence.refused;
-  const openWorkflow = () => navigate({ host, project: item.folder, workflow: item.workflowID });
+  const openWorkflow = () => navigate({ host, folder: item.folder, workflow: item.workflowID });
   // Put off, not refused (#422): what comes of it later takes this line's place.
   const verb = "queued" in item.reason ? "Queued for" : "Refused by";
   return <span class="quiet small event-consequence">↳ {verb} <button class="link" onClick={openWorkflow}>{item.workflowID}</button> — {refusalMessage(item.reason)}</span>;
@@ -671,10 +671,10 @@ function TokensPage({ store, hostName }: { store: Store; hostName: (host: string
 }
 
 function SpendingPage({ store, hostName }: { store: Store; hostName: (host: string) => string }) {
-  const projects = Object.values(store.projects.value).flat();
-  const totals = lifetimeTotals(projects);
+  const folders = Object.values(store.folders.value).flat();
+  const totals = lifetimeTotals(folders);
   const currencies = Object.keys(totals).sort();
-  const unmeasured = projects.reduce((count, project) => count + project.unmeasuredAgents, 0);
+  const unmeasured = folders.reduce((count, folder) => count + folder.unmeasuredAgents, 0);
   const costs = Object.entries(store.costs.value);
   const today = totalWords(todayTotals(store.costs.value));
   // The charts are every host's, in this browser's days, as on the window and the Remote (#1267).
@@ -690,12 +690,12 @@ function SpendingPage({ store, hostName }: { store: Store; hostName: (host: stri
       {currencies.map((currency) => (
         <section key={currency}>
           {currencies.length > 1 && <h2 class="section-head">{currency}</h2>}
-          {projects.filter((project) => project.costToDate[currency] !== undefined)
+          {folders.filter((folder) => folder.costToDate[currency] !== undefined)
             .sort((a, b) => (b.costToDate[currency] ?? 0) - (a.costToDate[currency] ?? 0) || a.name.localeCompare(b.name))
-            .map((project) => (
-              <p key={project.project.folder}>
-                {project.name}{project.project.archivedAt ? <span class="quiet small"> · Archived</span> : ""}
-                <span class="detail">{money(project.costToDate[currency] ?? 0, currency)}</span>
+            .map((folder) => (
+              <p key={folder.folder.folder}>
+                {folder.name}{folder.folder.archivedAt ? <span class="quiet small"> · Archived</span> : ""}
+                <span class="detail">{money(folder.costToDate[currency] ?? 0, currency)}</span>
               </p>
             ))}
         </section>

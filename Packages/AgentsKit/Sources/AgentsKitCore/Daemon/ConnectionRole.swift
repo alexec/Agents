@@ -24,7 +24,7 @@ public enum ConnectionRole: String, Sendable, Hashable {
     /// is and nothing more. Once it has, it hangs up and comes back as a device.
     case pairing
     /// Agents Host's window, as its code signature says: whether this Mac's host is
-    /// there and how much it holds, its projects and its agents, and nothing more (#168).
+    /// there and how much it holds, its folders and its agents, and nothing more (#168).
     /// It starts and stops the host through launchd, never over the socket.
     case hostApp
     /// Anything else of this account: whether the daemon is there, and no more.
@@ -32,8 +32,8 @@ public enum ConnectionRole: String, Sendable, Hashable {
 
     /// What an agent's connection may call on the socket, and nothing a window does: the
     /// app tools are served over MCP, so only those the host serves on the socket too (#2172),
-    /// as the Go host's `agentMethods`. Not `projects/setHelperLimits`: an agent reads its
-    /// project's helper limits in its tools' results and never sets them (#64).
+    /// as the Go host's `agentMethods`. Not `folders/setHelperLimits`: an agent reads its
+    /// folder's helper limits in its tools' results and never sets them (#64).
     public static let agentMethods: Set<String> = Set<String>([
         DaemonAPI.Method.resourcesLease,
         DaemonAPI.Method.resourcesRelease,
@@ -45,9 +45,9 @@ public enum ConnectionRole: String, Sendable, Hashable {
     public static let pairingMethods: Set<String> = Set<String>([DaemonAPI.Method.devicesAnnounce])
         .union(strangerMethods)
 
-    /// Reading what Agents Host's window counts: projects, and agents working.
+    /// Reading what Agents Host's window counts: folders, and agents working.
     public static let hostAppMethods: Set<String> = Set<String>([
-        DaemonAPI.Method.projectsList,
+        DaemonAPI.Method.foldersList,
         DaemonAPI.Method.agentsList,
     ]).union(strangerMethods)
 

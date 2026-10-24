@@ -51,13 +51,13 @@ public extension DaemonAPI {
     struct KeptRequest: Codable, Sendable, Hashable, Identifiable {
         public var id: UUID
         public var host: HostID
-        /// `prompt` (to an agent there) or `start` (a new agent in a project there).
+        /// `prompt` (to an agent there) or `start` (a new agent in a folder there).
         public var kind: String
         /// For a prompt.
         public var agentID: UUID?
         /// The prompt's words, or the new agent's first prompt.
         public var text: String
-        /// For a start: the project folder, and the runtime it starts.
+        /// For a start: the folder, and the runtime it starts.
         public var folder: URL?
         public var runtimeID: String?
         public var at: Date

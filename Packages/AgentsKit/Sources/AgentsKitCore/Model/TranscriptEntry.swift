@@ -9,7 +9,7 @@ public enum PromptOrigin: String, Codable, Hashable, Sendable {
     case person
     /// The app asking on its own behalf. Today: the one question after a silent ending.
     case app
-    /// Another agent in the project, with `message_session` (#560). Who is on the entry's
+    /// Another agent in the folder, with `message_session` (#560). Who is on the entry's
     /// `sender`: drawn as theirs, never as the person's.
     case agent
 }

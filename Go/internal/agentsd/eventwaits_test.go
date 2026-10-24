@@ -32,7 +32,7 @@ func TestAWaitSaysWhatIsWrongWithIt(t *testing.T) {
 			"person.away: why is one of locked, idle, not asleep."},
 		{map[string]any{"events": []string{"mac.wake", "person.back"}, "until_minutes": 5},
 			"mac.wake, person.back are only raised on a Mac, and this machine is a Linux server, so they never happen here. Nothing is waiting."},
-		{map[string]any{"events": "pr.merged", "until_minutes": 5}, "No server here offers pr.merged. This project has no MCP server that offers events."},
+		{map[string]any{"events": "pr.merged", "until_minutes": 5}, "No server here offers pr.merged. This folder has no MCP server that offers events."},
 	} {
 		text, isErr := m.tool(10+i, "wait_for_event", c.args)
 		if !isErr || !strings.HasPrefix(text, c.want) {
@@ -90,11 +90,11 @@ func TestAHeldWaitWakesTheAgentLater(t *testing.T) {
 		t.Fatal(text)
 	}
 	waitFor(t, "agent.waiting on the log", func() bool { n := names(d); return len(n) > 0 && n[len(n)-1] == "agent.waiting" })
-	d.raise(wire.EventDraft{Name: "branch.moved", At: now(), Scope: projectScope(dir), Sentence: "other moved.", Details: map[string]string{"branch": "other"}})
+	d.raise(wire.EventDraft{Name: "branch.moved", At: now(), Scope: folderScope(dir), Sentence: "other moved.", Details: map[string]string{"branch": "other"}})
 	if w := d.Store.Agent(a.ID).EventWait; w == nil || w.Ending != nil {
 		t.Fatal("woken by an event it did not wait for")
 	}
-	d.raise(wire.EventDraft{Name: "branch.moved", At: now(), Scope: projectScope(dir), Sentence: "cd moved.", Details: map[string]string{"branch": "cd"}})
+	d.raise(wire.EventDraft{Name: "branch.moved", At: now(), Scope: folderScope(dir), Sentence: "cd moved.", Details: map[string]string{"branch": "cd"}})
 	waitFor(t, "the wake in its chat", func() bool {
 		for _, u := range userMessages(d, a.ID) {
 			if strings.HasPrefix(u, "The event you were waiting for happened.\n\nbranch.moved at ") && strings.Contains(u, "\ncd moved.\nbranch: cd") {

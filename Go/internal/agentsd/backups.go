@@ -631,7 +631,7 @@ const restoredElsewhere = "restored"
 // restoreArchive restores the archive at path; madeIn is the root that made it, and mine
 // whether it is this machine's own backup. An import (#1001) takes no root files
 // (withRoot false): an export has none, and one made by hand must not change this
-// machine's history or its erased list. into, when not empty, is the project folder every
+// machine's history or its erased list. into, when not empty, is the folder every
 // agent is put in (#2389); empty keeps each agent's own.
 func (d *Daemon) restoreArchive(archive, madeIn string, mine, withRoot bool, into string) (wire.BackupRestoreResult, error) {
 	res := wire.BackupRestoreResult{}

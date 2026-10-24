@@ -21,8 +21,8 @@ try {
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  await page.waitFor(`document.querySelector(".projects .row")`, 30_000);
-  await page.eval(`[...document.querySelectorAll(".projects .row")].find((r) => r.textContent.includes("work"))?.click()`);
+  await page.waitFor(`document.querySelector(".folders .row")`, 30_000);
+  await page.eval(`[...document.querySelectorAll(".folders .row")].find((r) => r.textContent.includes("work"))?.click()`);
   await page.waitFor(`document.querySelector(".sessions .row.session")`, 30_000);
   await page.eval(`(() => { const r = [...document.querySelectorAll(".sessions .row.session")].find((r) => r.textContent.includes(${JSON.stringify(title)})); (r?.querySelector(".pick") ?? r)?.click(); })()`);
   await page.waitFor(`document.querySelector(".chat .transcript")`, 30_000);

@@ -11,7 +11,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// failedWorkflows is the project's failed-workflow rows in its approvals.
+// failedWorkflows is the folder's failed-workflow rows in its approvals.
 func failedWorkflows(d *Daemon, dir string) []wire.Approval {
 	s, _ := d.summaryFor(dir)
 	var out []wire.Approval
@@ -24,13 +24,13 @@ func failedWorkflows(d *Daemon, dir string) []wire.Approval {
 }
 
 // Ports WorkflowFiringTests.aFailedRunIsListedUntilDismissed (#989, #1983): a run whose agent
-// got stuck is in the project's approvals with Dismiss only; Dismiss takes it out, on the
+// got stuck is in the folder's approvals with Dismiss only; Dismiss takes it out, on the
 // workflow's record, until it fails again.
 func TestAFailedRunIsListedUntilDismissed(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "nightly.md"), []byte("---\nname: Nightly\non: lease.granted\n---\nCheck the build.\n"), 0o644)
@@ -79,7 +79,7 @@ func TestAFailedRunIsListedUntilDismissed(t *testing.T) {
 	if e := c.callError(t, 5, "approvals/answer", answer("dismiss", "stale")); e.Code != wire.FailureNotChanged {
 		t.Fatalf("a failure not shown is not dismissed: %+v", e)
 	}
-	var s wire.ProjectSummary
+	var s wire.FolderSummary
 	json.Unmarshal(c.call(t, 6, "approvals/answer", answer("dismiss", *item.Digest)), &s)
 	for _, a := range s.Approvals {
 		if a.Kind == wire.ApprovalKindWorkflowFailed {

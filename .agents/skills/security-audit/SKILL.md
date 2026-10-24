@@ -1,6 +1,6 @@
 ---
 name: security-audit
-description: Review what changed on main since the last release tag for security threats (tokens, socket roles, servers, foreign files, git, Keychain, logs) and read the open Dependabot alerts, write the findings under .agents/reviews/security/ and never publish them (an alert, which is public already, goes to an issue), and have helpers fix the critical and high ones on branches for Alex. Use when the Security review workflow runs in a release (#1462), or when Alex asks for this project's security audit. It is not the general security-review skill, but it uses the method of that skill.
+description: Review what changed on main since the last release tag for security threats (tokens, socket roles, servers, foreign files, git, Keychain, logs) and read the open Dependabot alerts, write the findings under .agents/reviews/security/ and never publish them (an alert, which is public already, goes to an issue), and have helpers fix the critical and high ones on branches for Alex. Use when the Security review workflow runs in a release (#1462), or when Alex asks for this folder's security audit. It is not the general security-review skill, but it uses the method of that skill.
 ---
 
 # Security audit
@@ -12,7 +12,7 @@ at the keyboard, that is true only of a run of the workflow.
 
 ## Rules for the whole run
 
-- **Never touch the project folder you start in.** It is the shared checkout of `main`.
+- **Never touch the folder you start in.** It is the shared checkout of `main`.
   Do everything in the review worktree below, and have helpers work in their own.
 - **Never** merge, push, rebase `main`, open pull requests, file GitHub issues, ship or
   restart the app, or call the live app's `daemon.sock`. The repository is public and
@@ -148,7 +148,7 @@ worked. A dependency alert is not given a helper: its issue goes to the Scrum Ma
 lanes through the release (step 3).
 
 - At most **2 helpers per run**. Call `list_sessions` with `started_by: me` first and start no more than
-  the free running places allow (the project's helper limits are 3 running and 5 not
+  the free running places allow (the folder's helper limits are 3 running and 5 not
   archived unless Alex changed them). A finding without a helper is recorded as
   "needs a decision: no helper place this run" and is picked up next run.
 - Start each with `start_session`: runtime Claude, permission mode no looser than yours,

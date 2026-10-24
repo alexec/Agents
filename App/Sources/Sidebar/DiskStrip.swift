@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Under a host's offline strip, over its chats and its project's page, while a volume
+/// Under a host's offline strip, over its chats and its folder's page, while a volume
 /// that host's agents write to is low on space (#195): how much is free, and which
 /// worktrees are largest when they could be measured. Said where the host's work is,
 /// not across the window, so it never reads as the client's own disk (#1329). Gone by

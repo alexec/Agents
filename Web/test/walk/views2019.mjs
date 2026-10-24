@@ -1,5 +1,5 @@
 // The #2019 walk of saved views (R8) on a scratch control plane with synthetic days: Save View…
-// on Outcomes by Project over M, then Reports ▸ Saved Views lists it, Open brings back its range and
+// on Outcomes by Folder over M, then Reports ▸ Saved Views lists it, Open brings back its range and
 // way, Copy Digest copies its numbers (a refused copy says so), and Delete… asks, then takes it away. Shots go to <out dir>.
 //
 //   node Web/test/walk/views2019.mjs <WEB_URL> <browser code> <out dir>
@@ -24,7 +24,7 @@ try {
   await page.eval(`location.hash = "#/reports/outcomes"`);
   await page.waitFor(`${pane}?.textContent.includes("merged of")`, 20_000);
   await page.press("M");
-  await page.press("Project");
+  await page.press("Folder");
   await page.press("Save View…");
   await page.focus("input[aria-label='View name']");
   await page.type("Monday digest");
@@ -35,7 +35,7 @@ try {
   await page.eval(`location.hash = "#/reports/saved"`);
   await page.waitFor(`${pane}?.textContent.includes("Monday digest")`, 10_000);
   const said = (await page.text(".reports-pane")).replace(/\s+/g, " ");
-  check(said.includes("Outcomes · Me · The last 30 days · By Project"), `Saved lists it: ${said.slice(0, 200)}`);
+  check(said.includes("Outcomes · Me · The last 30 days · By Folder"), `Saved lists it: ${said.slice(0, 200)}`);
   await page.shot(`${out}/web-saved.png`);
 
   await page.eval(`(async () => { const b = [...document.querySelectorAll("button")].find((x) => x.textContent === "Copy Digest"); b.click(); })()`);
@@ -50,8 +50,8 @@ try {
   check(refused.startsWith("Couldn’t copy."), `a refused copy: ${refused}`);
 
   await page.press("Open");
-  await page.waitFor(`location.hash === "#/reports/outcomes" && ${on("M")} && ${on("Project")}`, 10_000);
-  check(true, "Open brings back M and By Project on Outcomes");
+  await page.waitFor(`location.hash === "#/reports/outcomes" && ${on("M")} && ${on("Folder")}`, 10_000);
+  check(true, "Open brings back M and By Folder on Outcomes");
   await page.shot(`${out}/web-opened.png`);
 
   await page.eval(`location.hash = "#/reports/saved"`);

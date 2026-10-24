@@ -19,7 +19,7 @@ import UIKit
 ///
 ///     TOKEN     LIGHT     DARK      FOR
 ///     ground    #F7F8F9   #1C1D20   the page every column sits on
-///     sidebar   #F0F1F3   #161719   the projects column, one shade deeper
+///     sidebar   #F0F1F3   #161719   the folders column, one shade deeper
 ///     raised    #FFFFFF   #26282C   what floats: prompt bar, cards, menus
 ///     well      #F0F2F4   #2A2D31   what is set into the page: code, your own message
 ///     wash      #E7EAEE   #33363B   a row under the pointer, a picked item

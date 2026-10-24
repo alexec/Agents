@@ -83,8 +83,8 @@ func TestTheDevLoopWorkflowsHearGitLab(t *testing.T) {
 }
 
 // Address review comments pushes in auto mode, so its skill acts only on the comments of
-// the project's own people, on both forges: GitLab's trusted notes, GitHub's by association.
-func TestAddressReviewCommentsActsOnlyOnTheProjectsOwn(t *testing.T) {
+// the folder's own people, on both forges: GitLab's trusted notes, GitHub's by association.
+func TestAddressReviewCommentsActsOnlyOnTheFoldersOwn(t *testing.T) {
 	_, skill := readyMadeText("address-review-comments")
 	for _, want := range []string{"`trusted: true`", "`author_association`", "`get_reviews`", "outside content"} {
 		if !strings.Contains(skill, want) {
@@ -107,29 +107,29 @@ func TestWorkAnIssueAsksBeforeItActs(t *testing.T) {
 	}
 }
 
-func TestReadyMadeWorkflowsLiveInUserFolderAndProjectsUseThem(t *testing.T) {
+func TestReadyMadeWorkflowsLiveInUserFolderAndFoldersUseThem(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
 	home := t.TempDir()
 	d.PersonalHome = home
-	first := project(t, c, 1)
-	second := project(t, c, 2)
+	first := folder(t, c, 1)
+	second := folder(t, c, 2)
 	for _, dir := range []string{first, second} {
 		os.MkdirAll(filepath.Join(dir, ".git"), 0o755)
 		os.WriteFile(filepath.Join(dir, ".git", "config"), []byte("[remote \"origin\"]\n\turl = git@github.com:o/n.git\n"), 0o644)
 	}
-	folder := store.FolderURL(first)
+	folderURL := store.FolderURL(first)
 	userFolder := filepath.Join(home, ".agents", "workflows")
 
-	// A normal project has no workflows from the user's folder.
-	plain := project(t, c, 3)
+	// A normal folder has no workflows from the user's folder.
+	plain := folder(t, c, 3)
 	var list []wire.WorkflowSummary
 	json.Unmarshal(c.call(t, 3, "workflows/list", map[string]any{"folder": store.FolderURL(plain)}), &list)
 	if len(list) != 0 {
 		t.Fatalf("%+v", list)
 	}
-	// A forge project lists all built-ins as user workflows, off by default.
-	json.Unmarshal(c.call(t, 4, "workflows/list", map[string]any{"folder": folder}), &list)
+	// A forge folder lists all built-ins as user workflows, off by default.
+	json.Unmarshal(c.call(t, 4, "workflows/list", map[string]any{"folder": folderURL}), &list)
 	if len(list) != 5 || list[0].IsEnabled || list[0].AwaitingApproval != nil || list[4].Workflow.Name != "Work an issue" || list[0].Scope == nil || *list[0].Scope != "user" {
 		t.Fatalf("%+v", list)
 	}
@@ -144,31 +144,31 @@ func TestReadyMadeWorkflowsLiveInUserFolderAndProjectsUseThem(t *testing.T) {
 		t.Fatalf("user workflows: %+v", userList)
 	}
 
-	// Enabling a project copy changes only that project's record.
+	// Enabling a folder copy changes only that folder's record.
 	var s wire.WorkflowSummary
 	original, _ := os.ReadFile(filepath.Join(userFolder, "work-an-issue.md"))
-	json.Unmarshal(c.call(t, 6, "workflows/enable", map[string]any{"folder": folder, "workflowID": "work-an-issue", "enabled": true}), &s)
+	json.Unmarshal(c.call(t, 6, "workflows/enable", map[string]any{"folder": folderURL, "workflowID": "work-an-issue", "enabled": true}), &s)
 	if !s.IsEnabled || s.AwaitingApproval != nil || s.DeniedHere != nil {
 		t.Fatalf("%+v", s)
 	}
 	after, _ := os.ReadFile(filepath.Join(userFolder, "work-an-issue.md"))
 	if string(original) != string(after) {
-		t.Fatal("enabling the project copy changed the user's file")
+		t.Fatal("enabling the folder copy changed the user's file")
 	}
 	other, err := d.oneWorkflow(second, "work-an-issue")
 	if err != nil || other.IsEnabled {
-		t.Fatalf("other project state: %+v, %v", other, err)
+		t.Fatalf("other folder state: %+v, %v", other, err)
 	}
 
-	// A project file with the same ID takes precedence.
-	projectCopy := "---\nname: Project copy\non: manual\n---\nProject-only prompt.\n"
-	projectPath := filepath.Join(workflowsFolder(first), "work-an-issue.md")
-	os.MkdirAll(filepath.Dir(projectPath), 0o755)
-	os.WriteFile(projectPath, []byte(projectCopy), 0o644)
+	// A folder file with the same ID takes precedence.
+	folderCopy := "---\nname: Folder copy\non: manual\n---\nFolder-only prompt.\n"
+	folderPath := filepath.Join(workflowsFolder(first), "work-an-issue.md")
+	os.MkdirAll(filepath.Dir(folderPath), 0o755)
+	os.WriteFile(folderPath, []byte(folderCopy), 0o644)
 	d.rescanWorkflows(first)
-	projectSummary, err := d.oneWorkflow(first, "work-an-issue")
-	if err != nil || projectSummary.Scope == nil || *projectSummary.Scope != "project" || projectSummary.Workflow.Name != "Project copy" {
-		t.Fatalf("project precedence: %+v, %v", projectSummary, err)
+	folderSummary, err := d.oneWorkflow(first, "work-an-issue")
+	if err != nil || folderSummary.Scope == nil || *folderSummary.Scope != "folder" || folderSummary.Workflow.Name != "Folder copy" {
+		t.Fatalf("folder precedence: %+v, %v", folderSummary, err)
 	}
 
 	// Deleting a built-in records its ID, so the next scan does not restore it.
@@ -189,7 +189,7 @@ func TestReadyMadeWorkflowsLiveInUserFolderAndProjectsUseThem(t *testing.T) {
 	if custom.Content == nil || *custom.Content != content || custom.Scope == nil || *custom.Scope != "user" {
 		t.Fatalf("new user workflow: %+v", custom)
 	}
-	json.Unmarshal(c.call(t, 9, "workflows/list", map[string]any{"folder": folder}), &list)
+	json.Unmarshal(c.call(t, 9, "workflows/list", map[string]any{"folder": folderURL}), &list)
 	for _, summary := range list {
 		if summary.Workflow.WorkflowID == "custom-workflow" {
 			if summary.IsEnabled || summary.Scope == nil || *summary.Scope != "user" {
@@ -198,7 +198,7 @@ func TestReadyMadeWorkflowsLiveInUserFolderAndProjectsUseThem(t *testing.T) {
 			return
 		}
 	}
-	t.Fatalf("new user workflow is not listed off in the forge project: %+v", list)
+	t.Fatalf("new user workflow is not listed off in the forge folder: %+v", list)
 }
 
 func fileHas(t *testing.T, path, want string) bool {

@@ -9,8 +9,8 @@ import Foundation
 public enum DisplayPreference {
     /// The smart groups that are off, comma-separated (`SidebarSmartRow.offDefaultsKey`).
     public static let smartGroupsOff = "sidebarSmartGroupsOff"
-    /// Whether the sidebar shows archived projects, and its Activity and Usage sections.
-    public static let showsArchivedProjects = "showsArchivedProjects"
+    /// Whether the sidebar shows archived folders, and its Activity and Usage sections.
+    public static let showsArchivedFolders = "showsArchivedFolders"
     public static let showsActivity = "showsActivity"
     public static let showsUsage = "showsUsage"
     /// The runtime the start form offers first.
@@ -29,7 +29,7 @@ public enum DisplayPreference {
     public enum Kind: Sendable { case bool, string }
     public static let mirrored: [String: Kind] = [
         smartGroupsOff: .string,
-        showsArchivedProjects: .bool, showsActivity: .bool, showsUsage: .bool,
+        showsArchivedFolders: .bool, showsActivity: .bool, showsUsage: .bool,
         startRuntimeID: .string, skillsMarketplace: .string, mcpMarketplace: .string,
         agentsMayArchiveMyChats: .bool,
     ]

@@ -54,7 +54,7 @@ struct TurnActivityWidget: Widget {
     }
 }
 
-/// The Lock Screen's banner: the mark, the title, the word with the runtime and project,
+/// The Lock Screen's banner: the mark, the title, the word with the runtime and folder,
 /// the line, and the time on the right.
 struct TurnLockScreen: View {
     let attributes: TurnActivityAttributes
@@ -69,7 +69,7 @@ struct TurnLockScreen: View {
                 Text(state.title(startedWith: attributes.title))
                     .appText(.reading)
                     .lineLimit(1)
-                Text([state.word, attributes.runtime, attributes.project].joined(separator: " · "))
+                Text([state.word, attributes.runtime, attributes.folder].joined(separator: " · "))
                     .appText(.fine)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

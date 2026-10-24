@@ -3,7 +3,7 @@ import AppKit
 import Foundation
 
 /// A click or a key made in process (#1172), for what has no accessibility action: a
-/// SwiftUI tap gesture (a project's heading folds on one), Return in the prompt. The event
+/// SwiftUI tap gesture (a folder's heading folds on one), Return in the prompt. The event
 /// is handed to the view itself, never posted to the window server or HID, and the window
 /// is never made key, so nothing reaches another app or takes the focus from one.
 @MainActor

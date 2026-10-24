@@ -43,7 +43,7 @@ This holds on the machine too:
 
 An admin sees every person in **Settings ▸ People**, with their clients by name, and their
 machines by name and state (online, offline). Nothing inside another person's machine:
-not its projects, its agents or its files. An admin invites people, changes roles and
+not its folders, its agents or its files. An admin invites people, changes roles and
 removes people. A control plane always keeps one admin at least.
 
 ## Removing a person

@@ -91,8 +91,8 @@ func (d *Daemon) registerAgents() {
 	On(d, wire.CallAgentsResuming, func(ctx context.Context, c *Client, _ wire.Empty) (wire.ResumingResponse, error) {
 		return wire.ResumingResponse{AgentIDs: d.resumingNow()}, nil
 	})
-	On(d, wire.CallAgentsContinueInProject, func(ctx context.Context, c *Client, r wire.ContinueInProjectRequest) (wire.UUID, error) {
-		return d.continueInProject(r)
+	On(d, wire.CallAgentsContinueInFolder, func(ctx context.Context, c *Client, r wire.ContinueInFolderRequest) (wire.UUID, error) {
+		return d.continueInFolder(r)
 	})
 	On(d, wire.CallAgentsContinueInNew, func(ctx context.Context, c *Client, r wire.ContinueInNewRequest) (wire.UUID, error) {
 		return d.continueInNew(r)
@@ -135,7 +135,7 @@ func (d *Daemon) editQueued(r wire.EditQueuedRequest) (wire.EditQueuedResult, er
 // text (#1792) took Claude's replies from a median of 138 words to 48, with no markdown
 // and no paths.
 const voicePreface = "You are in voice mode. The person hears your reply and does not see it. " +
-	"The person's words were dictated. A word may be the wrong word that sounds the same. Use the names of this project. " +
+	"The person's words were dictated. A word may be the wrong word that sounds the same. Use the names of this folder. " +
 	"Answer in one to three short spoken sentences. Use plain words. " +
 	"Do not use markdown, lists, tables, code or file paths. " +
 	"If the work changed files, say what changed in one sentence. " +
@@ -367,13 +367,13 @@ func cleanedLabel(v string) (string, error) {
 }
 
 // changeLabels is SessionLabelPolicy.change for the person.
-func changeLabels(current []wire.SessionLabel, add, remove []string, project []wire.SessionLabel) ([]wire.SessionLabel, error) {
-	return changeLabelsAs(wire.SessionLabelOwnerPerson, current, add, remove, project)
+func changeLabels(current []wire.SessionLabel, add, remove []string, folder []wire.SessionLabel) ([]wire.SessionLabel, error) {
+	return changeLabelsAs(wire.SessionLabelOwnerPerson, current, add, remove, folder)
 }
 
 // changeLabelsAs is SessionLabelPolicy.change by an actor: an agent cannot change a label
 // the person gave.
-func changeLabelsAs(actor wire.SessionLabelOwner, current []wire.SessionLabel, add, remove []string, project []wire.SessionLabel) ([]wire.SessionLabel, error) {
+func changeLabelsAs(actor wire.SessionLabelOwner, current []wire.SessionLabel, add, remove []string, folder []wire.SessionLabel) ([]wire.SessionLabel, error) {
 	ownedByPerson := func(v string) error {
 		return Invalid("The label %s belongs to the person, so an agent cannot change it.", v)
 	}
@@ -432,7 +432,7 @@ func changeLabelsAs(actor wire.SessionLabelOwner, current []wire.SessionLabel, a
 			return nil, Invalid("A session can have at most five labels.")
 		}
 		canonical := v
-		for _, l := range project {
+		for _, l := range folder {
 			if labelKey(l.Value) == labelKey(v) {
 				canonical = l.Value
 				break
@@ -443,12 +443,12 @@ func changeLabelsAs(actor wire.SessionLabelOwner, current []wire.SessionLabel, a
 	return result, nil
 }
 
-// vocabulary is SessionLabelPolicy.vocabulary: every label in the project, oldest first,
+// vocabulary is SessionLabelPolicy.vocabulary: every label in the folder, oldest first,
 // once each.
 func vocabulary(folder string, agents []wire.Agent) []wire.SessionLabel {
 	var all []wire.SessionLabel
 	for _, a := range agents {
-		if projectFolder(&a) == folder {
+		if folderPath(&a) == folder {
 			all = append(all, a.Labels...)
 		}
 	}
@@ -474,7 +474,7 @@ func (d *Daemon) setLabels(r wire.SetLabelsRequest) (wire.Agent, error) {
 	if a == nil {
 		return wire.Agent{}, &Error{Code: CodeNoSuchAgent, Message: "That session no longer exists."}
 	}
-	labels, err := changeLabels(a.Labels, r.Add, r.Remove, vocabulary(projectFolder(a), d.Store.Agents()))
+	labels, err := changeLabels(a.Labels, r.Add, r.Remove, vocabulary(folderPath(a), d.Store.Agents()))
 	if err != nil {
 		return wire.Agent{}, err
 	}
@@ -552,7 +552,7 @@ func (d *Daemon) deleteArchivedThen(a *wire.Agent, because string, erase func(*w
 	Broadcast(d, wire.NotifyAgentRemoved, wire.AgentRemovedNotification{AgentID: a.ID})
 	d.raiseAbout(a, "agent.deleted", "was deleted with its conversation.", map[string]string{"because": because, "runtimeCopy": copyOf})
 	d.takeActor(a.ID) // a helper's deletion raises nothing to take it
-	d.projectChanged(projectFolder(a))
+	d.folderChanged(folderPath(a))
 	return nil
 }
 
@@ -671,7 +671,7 @@ func (d *Daemon) continueInNew(r wire.ContinueInNewRequest) (wire.UUID, error) {
 	}
 	cwd := a.Cwd
 	if !isDir(store.FolderPath(cwd)) {
-		cwd = store.FolderURL(projectFolder(a))
+		cwd = store.FolderURL(folderPath(a))
 	}
 	name := string(a.ID)
 	if a.Title != nil {
@@ -697,23 +697,23 @@ func (d *Daemon) continueInNew(r wire.ContinueInNewRequest) (wire.UUID, error) {
 	return id, nil
 }
 
-// continueInProject starts a successor in the project folder that reads this session and
+// continueInFolder starts a successor in the folder that reads this session and
 // carries on (065), with its runtime, choices and the person's labels.
-func (d *Daemon) continueInProject(r wire.ContinueInProjectRequest) (wire.UUID, error) {
+func (d *Daemon) continueInFolder(r wire.ContinueInFolderRequest) (wire.UUID, error) {
 	a := d.Store.Agent(r.AgentID)
 	if a == nil {
 		return "", noSuchAgent()
 	}
-	project := projectFolder(a)
-	if !isDir(project) {
-		return "", &Error{Code: wire.FailureFolderGone, Message: "The project folder isn't there either (" + shortPath(project) + ")."}
+	folder := folderPath(a)
+	if !isDir(folder) {
+		return "", &Error{Code: wire.FailureFolderGone, Message: "The folder isn't there either (" + shortPath(folder) + ")."}
 	}
 	name := string(a.ID)
 	if a.Title != nil {
 		name = "“" + *a.Title + "” (" + string(a.ID) + ")"
 	}
 	prompt := "Continue the work of the session " + name + ". Its folder, " + shortPath(store.FolderPath(a.Cwd)) +
-		", is not there any more, so you are in the project folder, " + shortPath(project) +
+		", is not there any more, so you are in the folder, " + shortPath(folder) +
 		", instead. Read that session with read_session to see what it did and what is left, then carry on."
 	if said := strings.TrimSpace(r.Text); said != "" {
 		prompt += "\n\n" + said
@@ -724,7 +724,7 @@ func (d *Daemon) continueInProject(r wire.ContinueInProjectRequest) (wire.UUID, 
 			labels = append(labels, l.Value)
 		}
 	}
-	id, err := d.start(wire.StartRequest{RuntimeID: a.RuntimeID, Cwd: store.FolderURL(project), Prompt: prompt,
+	id, err := d.start(wire.StartRequest{RuntimeID: a.RuntimeID, Cwd: store.FolderURL(folder), Prompt: prompt,
 		Attachments: r.Attachments, StartOptions: a.StartOptions, AdditionalDirectories: a.AdditionalDirectories,
 		McpServers: a.McpServers, RequestID: r.RequestID, Sandbox: a.SandboxOverride, Labels: labels, AccountID: a.AccountID})
 	if err != nil {

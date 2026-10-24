@@ -21,11 +21,11 @@ import (
 )
 
 // Workflows, as DaemonCore+Workflows and WorkflowStore keep them on the Swift host: each a
-// file in its project; what the host remembers of each (whether the person approved it as
+// file in its folder; what the host remembers of each (whether the person approved it as
 // it stands, who turned it off, when it last ran and how) in <root>/workflows.json, the
 // approved bytes in <root>/workflow-copies/<sha256>. A workflow that is new or changed
 // since it was approved runs nothing until the person approves it here; at most 20
-// (workflow-limit.json) are on in each project.
+// (workflow-limit.json) are on in each folder.
 
 const (
 	workflowsTotalDefault = 20
@@ -96,7 +96,7 @@ type workflowRecords struct {
 type workflowFile struct {
 	wf wire.Workflow
 	// sourceFolder is where the file and its named skills live. A user workflow shown in
-	// a project has a project folder on wf, so its run and state stay project-scoped.
+	// a folder has a folder on wf, so its run and state stay folder-scoped.
 	sourceFolder string
 	scope        string
 	digest       string
@@ -261,7 +261,7 @@ func (d *Daemon) keepBytes(text string) (string, bool) {
 	return name, store.WriteAtomically(filepath.Join(d.workflowCopies(), name), []byte(text), 0o644) == nil
 }
 
-// scanLocked reads every project's workflows afresh, and on the first start approves
+// scanLocked reads every folder's workflows afresh, and on the first start approves
 // every file as it stands.
 func (d *Daemon) scanLocked() {
 	files := map[string]map[string]*workflowFile{}
@@ -279,7 +279,7 @@ func (d *Daemon) scanLocked() {
 			files[home][id] = f
 		}
 	}
-	for _, folder := range d.projectFolders() {
+	for _, folder := range d.folderPaths() {
 		if files[folder] == nil {
 			files[folder] = map[string]*workflowFile{}
 		}
@@ -290,7 +290,7 @@ func (d *Daemon) scanLocked() {
 				files[folder] = map[string]*workflowFile{}
 			}
 			f := workflowFileOf(folder, id, text, digest, why)
-			f.sourceFolder, f.scope = folder, "project"
+			f.sourceFolder, f.scope = folder, "folder"
 			files[folder][id] = f
 		}
 		if home == "" || !pushesToForge(folder) {
@@ -316,8 +316,8 @@ func (d *Daemon) scanLocked() {
 	d.workflowFiles = files
 	// A server's event a workflow names, or no longer does (#383).
 	d.kickMCPEvents()
-	// A project added, archived or gone since: the watches follow it.
-	d.kickProjectWatches()
+	// A folder added, archived or gone since: the watches follow it.
+	d.kickFolderWatches()
 	// A workflow made here can earn the first workflow (#984).
 	defer d.checkMilestonesSoon()
 	r := d.recordsLocked()
@@ -347,7 +347,7 @@ func isArchived(w wire.Workflow) bool { return w.Archived != nil && *w.Archived 
 
 // approvalOf says whether a workflow waits for the person, or is denied here.
 func (d *Daemon) approvalOf(folder, id string, f *workflowFile) (awaiting, denied *wire.WorkflowApproval) {
-	// A file in the person's own workflow folder is trusted by its owner. Projects still
+	// A file in the person's own workflow folder is trusted by its owner. Folders still
 	// keep it off by default, and their enabled state stays in their own record.
 	if f.scope == "user" {
 		return nil, nil
@@ -407,7 +407,7 @@ func (d *Daemon) setWorkflowLimit(s wire.WorkflowLimitSettings) (wire.WorkflowLi
 	return d.workflowLimitSettings(), nil
 }
 
-// ceilingsLocked marks approved workflows past the active limit in each project.
+// ceilingsLocked marks approved workflows past the active limit in each folder.
 func (d *Daemon) ceilingsLocked() map[string]wire.WorkflowLimit {
 	over := map[string]wire.WorkflowLimit{}
 	total := d.workflowTotal()
@@ -438,7 +438,7 @@ func (d *Daemon) ceilingsLocked() map[string]wire.WorkflowLimit {
 			case !isOff(f.wf):
 				approved++
 				if int64(approved) > total {
-					over[folder+"/"+id] = wire.WorkflowLimitProject
+					over[folder+"/"+id] = wire.WorkflowLimitFolder
 				}
 			}
 		}
@@ -594,7 +594,7 @@ func (d *Daemon) workflowSummaries(folder string) []wire.WorkflowSummary {
 }
 
 func noSuchWorkflow(id string) error {
-	return &Error{Code: wire.FailureNoSuchWorkflow, Message: "There is no workflow called " + id + " in this project."}
+	return &Error{Code: wire.FailureNoSuchWorkflow, Message: "There is no workflow called " + id + " in this folder."}
 }
 
 // editWorkflowLocked rewrites a workflow's file with an edit, carrying a person's approval
@@ -651,14 +651,14 @@ func (d *Daemon) tellWorkflow(folder, id string) {
 	if f == nil {
 		d.workflowMu.Unlock()
 		Broadcast(d, wire.NotifyWorkflowRemoved, wire.WorkflowRemovedNotification{Folder: store.FolderURL(folder), WorkflowID: id})
-		d.sendProject(folder)
+		d.sendFolder(folder)
 		return
 	}
 	s := d.summaryLocked(folder, id, d.ceilingsLocked())
 	d.workflowMu.Unlock()
 	Broadcast(d, wire.NotifyWorkflowChanged, s)
-	// What waits for an OK rides on the project's summary and in Needs You (#1322).
-	d.sendProject(folder)
+	// What waits for an OK rides on the folder's summary and in Needs You (#1322).
+	d.sendFolder(folder)
 }
 
 // tellEveryWorkflow says each again: a ceiling or an approval moves them all.
@@ -669,7 +669,7 @@ func (d *Daemon) tellEveryWorkflow() {
 		folders[store.FolderPath(s.Workflow.Folder)] = true
 	}
 	for f := range folders {
-		d.sendProject(f)
+		d.sendFolder(f)
 	}
 }
 
@@ -751,7 +751,7 @@ func (d *Daemon) enableWorkflow(r wire.WorkflowEnableRequest, by string) (wire.W
 			if total := d.workflowTotal(); int64(approved) >= total {
 				d.workflowMu.Unlock()
 				return wire.WorkflowSummary{}, &Error{Code: wire.FailureWorkflowLimitReached, Message: fmt.Sprintf(
-					"%d workflows are already running in this project, so %s was left off. Turn one off or archive one to let it run.", total, r.WorkflowID)}
+					"%d workflows are already running in this folder, so %s was left off. Turn one off or archive one to let it run.", total, r.WorkflowID)}
 			}
 		}
 	}
@@ -888,7 +888,7 @@ func (d *Daemon) deleteWorkflow(r wire.WorkflowRequest) error {
 	d.workflowMu.Unlock()
 	d.unpinWorkflow(folder, r.WorkflowID)
 	Broadcast(d, wire.NotifyWorkflowRemoved, wire.WorkflowRemovedNotification{Folder: store.FolderURL(folder), WorkflowID: r.WorkflowID})
-	d.sendProject(folder)
+	d.sendFolder(folder)
 	d.tellEveryWorkflow()
 	return nil
 }
@@ -1110,13 +1110,13 @@ func (d *Daemon) registerWorkflows() {
 	})
 }
 
-// unpinWorkflow takes a workflow out of its project's pins (unpinArchived).
-func (d *Daemon) unpinWorkflow(project, id string) {
-	f := d.readPins(project)
+// unpinWorkflow takes a workflow out of its folder's pins (unpinArchived).
+func (d *Daemon) unpinWorkflow(folder, id string) {
+	f := d.readPins(folder)
 	for i, w := range f.workflows {
 		if w.Workflow == id {
 			f.workflows = append(f.workflows[:i], f.workflows[i+1:]...)
-			d.writePins(f, project)
+			d.writePins(f, folder)
 			return
 		}
 	}

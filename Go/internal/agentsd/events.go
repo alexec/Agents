@@ -390,16 +390,16 @@ func sameScope(a, b wire.EventScope) bool {
 	if a.Mac != nil || b.Mac != nil {
 		return a.Mac != nil && b.Mac != nil
 	}
-	if a.Project == nil || b.Project == nil {
+	if a.Folder == nil || b.Folder == nil {
 		return false
 	}
-	return store.FolderPath(a.Project.Value) == store.FolderPath(b.Project.Value)
+	return store.FolderPath(a.Folder.Value) == store.FolderPath(b.Folder.Value)
 }
 
 func macScope() wire.EventScope { return wire.EventScope{Mac: &struct{}{}} }
 
-func projectScope(folder string) wire.EventScope {
-	return wire.EventScope{Project: &wire.EventScopeProject{Value: store.FolderURL(folder)}}
+func folderScope(folder string) wire.EventScope {
+	return wire.EventScope{Folder: &wire.EventScopeFolder{Value: store.FolderURL(folder)}}
 }
 
 func sameDetails(a, b map[string]string) bool {
@@ -427,8 +427,8 @@ func (d *Daemon) raiseAs(draft wire.EventDraft, actor *wire.AuditActor) wire.Eve
 	if draft.Details == nil {
 		draft.Details = map[string]string{}
 	}
-	if draft.Scope.Project != nil {
-		draft.Scope = projectScope(store.FolderPath(draft.Scope.Project.Value))
+	if draft.Scope.Folder != nil {
+		draft.Scope = folderScope(store.FolderPath(draft.Scope.Folder.Value))
 	}
 	d.eventMu.Lock()
 	t := nowFunc()
@@ -513,7 +513,7 @@ func eventGroup(name string) (wire.EventGroup, bool) {
 		return "", false
 	}
 	switch subject {
-	case "agent", "project":
+	case "agent", "folder":
 		return wire.EventGroupAgents, true
 	case "workflow":
 		return wire.EventGroupWorkflows, true
@@ -623,7 +623,7 @@ func agentDetails(a *wire.Agent) map[string]string {
 		"runtime": a.RuntimeID, "started_by": startedBy}
 }
 
-// raiseAgentEvent is an event about one agent, in its project; a writer raises nothing.
+// raiseAgentEvent is an event about one agent, in its folder; a writer raises nothing.
 func (d *Daemon) raiseAgentEvent(name string, id wire.UUID, sentence string, extra map[string]string) {
 	if a := d.Store.Agent(id); a != nil {
 		d.raiseAbout(a, name, sentence, extra)
@@ -643,7 +643,7 @@ func (d *Daemon) raiseAbout(a *wire.Agent, name, sentence string, extra map[stri
 	if personMade(name, details) {
 		actor = d.takeActor(a.ID)
 	}
-	d.raiseAs(wire.EventDraft{Name: name, At: now(), Scope: projectScope(projectFolder(a)),
+	d.raiseAs(wire.EventDraft{Name: name, At: now(), Scope: folderScope(folderPath(a)),
 		Sentence: agentName(a.Title) + " " + sentence, Details: details, ChainDepth: d.chainDepth(a)}, actor)
 }
 

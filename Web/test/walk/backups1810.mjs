@@ -15,7 +15,7 @@ try {
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  await page.waitFor(`document.querySelector(".sidebar .row.project")`, 20_000);
+  await page.waitFor(`document.querySelector(".sidebar .row.folder")`, 20_000);
   await page.eval(`location.hash = "#/settings"`);
   await page.waitFor(`!!document.getElementById("settings-backups")`, 20_000);
   await page.eval(`document.getElementById("settings-backups").scrollIntoView()`);

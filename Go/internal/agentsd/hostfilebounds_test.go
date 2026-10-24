@@ -30,7 +30,7 @@ func dirNames(t *testing.T, dir string) []string {
 func TestOnlyTheNamedWorkflowCopiesAreKept(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	file := filepath.Join(workflowsFolder(dir), "nightly.md")
@@ -111,9 +111,9 @@ func TestTheNewestServerLogsAreKept(t *testing.T) {
 	}
 }
 
-// A folder that is no longer a project leaves events-state.json's branch tips. On the
-// map alone: a started daemon's own project watch drops "/kept" too, as it has no project.
-func TestBranchTipsOfAGoneProjectGo(t *testing.T) {
+// A folder that is no longer a folder leaves events-state.json's branch tips. On the
+// map alone: a started daemon's own folder watch drops "/kept" too, as it has no folder.
+func TestBranchTipsOfAGoneFolderGo(t *testing.T) {
 	tips := map[string]map[string]string{"/kept": {"main": "a"}, "/gone": {"main": "b"}}
 	if !dropGone(tips, map[string]bool{"/kept": true}) {
 		t.Fatal("nothing went")

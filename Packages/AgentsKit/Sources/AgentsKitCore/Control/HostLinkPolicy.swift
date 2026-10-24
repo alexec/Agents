@@ -2,7 +2,7 @@ import Foundation
 
 /// How Agents Host's window keeps its one connection to this Mac's host (#168).
 ///
-/// The window counts the host's projects and working agents over a socket it keeps. It
+/// The window counts the host's folders and working agents over a socket it keeps. It
 /// used to treat any failed count as the host gone: it hung up and dialled again on the
 /// next tick, every five seconds. A host that refused it (a stranger to its signature)
 /// was dialled 25,000 times in two and a half days, each a code-signature check and a

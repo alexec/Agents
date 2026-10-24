@@ -14,7 +14,7 @@ const accepted = [
   ["github.com:octocat/Hello-World", "github.com", "octocat/Hello-World", "Hello-World"],
   ["ssh://git@github.com/octocat/Hello-World.git", "github.com", "octocat/Hello-World.git", "Hello-World"],
   ["ssh://git@git.example.com:2222/team/sub/api.git", "git.example.com", "team/sub/api.git", "api"],
-  ["https://user@gitlab.com/group/project.git", "gitlab.com", "group/project.git", "project"],
+  ["https://user@gitlab.com/group/folder.git", "gitlab.com", "group/folder.git", "folder"],
 ];
 for (const [text, host, path, folder] of accepted) {
   test(`git remote: ${JSON.stringify(text)} is cloned into ${folder}`, () => {

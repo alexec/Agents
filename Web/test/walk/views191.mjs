@@ -1,12 +1,12 @@
-// The #191 walk: a person's own MCP server's view on the web page. Pairs, opens the project's
+// The #191 walk: a person's own MCP server's view on the web page. Pairs, opens the folder's
 // first session, waits for the server's view to ask Show, says Show, waits for it to be drawn
-// through the sandbox proxy, then opens the project's pinned view of the same server. Fails on
+// through the sandbox proxy, then opens the folder's pinned view of the same server. Fails on
 // any error the page throws.
 //
-//   node Web/test/walk/views191.mjs <WEB_URL> <browser code> <project name> <out dir>
+//   node Web/test/walk/views191.mjs <WEB_URL> <browser code> <folder name> <out dir>
 //
 // Expects a session whose agent called the server's tool with a view, the view's Show answer
-// forgotten (`mcp/forgetViews`), and the view pinned in the project.
+// forgotten (`mcp/forgetViews`), and the view pinned in the folder.
 
 import { setTimeout as sleep } from "node:timers/promises";
 import { launch } from "./cdp.mjs";
@@ -20,14 +20,14 @@ const chrome = await launch({ profile: `/tmp/191-views-chrome-${process.pid}` })
 try {
   const page = await chrome.page(webURL, { width: 1440, height: 900 });
   const unfold = () => page.eval(`(() => {
-    const b = [...document.querySelectorAll(".sidebar .row.project .disclosure")].find((d) => d.getAttribute("aria-label").endsWith(" " + ${js(name)}));
+    const b = [...document.querySelectorAll(".sidebar .row.folder .disclosure")].find((d) => d.getAttribute("aria-label").endsWith(" " + ${js(name)}));
     if (b && b.getAttribute("aria-expanded") !== "true") b.click();
   })()`);
   await page.waitFor(`document.querySelector("textarea")`);
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  await page.waitFor(`document.querySelectorAll(".sidebar .row.project").length >= 1`, 20_000);
+  await page.waitFor(`document.querySelectorAll(".sidebar .row.folder").length >= 1`, 20_000);
   await unfold();
   await page.waitFor(`document.querySelector(".sidebar .row.session")`, 20_000);
   await page.eval(`document.querySelector(".sidebar .row.session").click()`);

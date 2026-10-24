@@ -16,7 +16,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// A project's attachments (#1556), in <agent folder>/.agents/attachments, are bound: one
+// A folder's attachments (#1556), in <agent folder>/.agents/attachments, are bound: one
 // that no kept agent's transcript names goes after attachmentDays, and the folder is kept
 // under attachmentFolderBytes, oldest first. A temporary file a cut-off write left goes
 // after a day. A write applies only the size bound; the hourly sweep looks for the names
@@ -48,7 +48,7 @@ func (d *Daemon) writeAttachment(root, name string, data []byte) (string, error)
 }
 
 // attachmentsDir is root's attachments folder, made when create is set. .agents and
-// .agents/attachments each have to be a real folder, not a link: a project can commit
+// .agents/attachments each have to be a real folder, not a link: a folder can commit
 // either as a link to a folder outside it, and the sweep would delete what is there.
 func attachmentsDir(root string, create bool) (string, error) {
 	dir := root

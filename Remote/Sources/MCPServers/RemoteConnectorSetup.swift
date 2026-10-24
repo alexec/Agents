@@ -2,15 +2,15 @@ import AgentsKitCore
 import AuthenticationServices
 import SwiftUI
 
-/// A project's Connectors set-up on the iPhone and iPad (#1336, frame F): the same page as
+/// A folder's Connectors set-up on the iPhone and iPad (#1336, frame F): the same page as
 /// the window's, in the same order, with the slots as a list. Each slot opens its own screen
 /// with its proof and its choices. The state is the host's, so all three clients show the
 /// same ticks. Where agents run has Add a Machine… and Add Provider… (#2131).
 /// The page that shows it reads it (MCPServersListView): at first, when the app comes back
 /// to the front, and on a pull (#1684).
 struct RemoteConnectorSetup: View {
-    let project: ProjectKey
-    let projectName: String
+    let folder: FolderKey
+    let folderName: String
     @Binding var setup: DaemonAPI.ConnectorSetup?
     let problem: String?
     let reload: (DaemonAPI.ConnectorSetupReading) async -> Void
@@ -28,20 +28,20 @@ struct RemoteConnectorSetup: View {
                 ProgressView().paperListRow()
             }
         } footer: {
-            Text(ConnectorSetupWords.intro(project: projectName, repository: setup?.repository,
+            Text(ConnectorSetupWords.intro(folder: folderName, repository: setup?.repository,
                                            site: setup?.siteOrGitHub ?? "github.com"))
         }
         .sheet(isPresented: $connecting) {
-            RemoteConnectSheet(provider: setup?.forgeOrGitHub ?? .github, host: project.host, project: project,
+            RemoteConnectSheet(provider: setup?.forgeOrGitHub ?? .github, host: folder.host, folder: folder,
                                onConnected: { Task { await reload(.fresh) } })
         }
         if let setup {
             Section(ConnectorSetupWords.setUpHeading(setup)) {
                 ForEach(setup.slots) { slot in
                     NavigationLink {
-                        RemoteSlotView(project: project, projectName: projectName, kind: slot.slot, setup: $setup)
+                        RemoteSlotView(folder: folder, folderName: folderName, kind: slot.slot, setup: $setup)
                     } label: {
-                        RemoteSlotRow(project: project, slot: slot, setup: setup, projectName: projectName)
+                        RemoteSlotRow(folder: folder, slot: slot, setup: setup, folderName: folderName)
                     }
                     .paperListRow()
                 }
@@ -92,13 +92,13 @@ struct RemoteConnectorSetup: View {
 /// One slot in the list: its mark, "Tasks · GitHub Issues", and one grey line.
 private struct RemoteSlotRow: View {
     @Environment(RemoteModel.self) private var model
-    let project: ProjectKey
+    let folder: FolderKey
     let slot: DaemonAPI.ConnectorSlot
     let setup: DaemonAPI.ConnectorSetup
-    let projectName: String
+    let folderName: String
 
     private var title: String {
-        slot.slot == .workspace ? model.whereAgentsRun(project.host).title : ConnectorSetupWords.title(slot)
+        slot.slot == .workspace ? model.whereAgentsRun(folder.host).title : ConnectorSetupWords.title(slot)
     }
 
     var body: some View {
@@ -115,8 +115,8 @@ private struct RemoteSlotRow: View {
     private var subtitle: String {
         if let proof = ConnectorSetupWords.proof(slot) { return proof }
         if slot.state == .notConnected, slot.slot != .workspace { return "Comes with \(ConnectorSetupWords.name(setup.forgeOrGitHub))" }
-        if slot.slot == .workspace { return model.whereAgentsRun(project.host).line }
-        return ConnectorSetupWords.line(slot, project: projectName, repository: setup.repository, forge: setup.forgeOrGitHub)
+        if slot.slot == .workspace { return model.whereAgentsRun(folder.host).line }
+        return ConnectorSetupWords.line(slot, folder: folderName, repository: setup.repository, forge: setup.forgeOrGitHub)
     }
 }
 
@@ -144,8 +144,8 @@ private struct RemoteSlotMark: View {
 private struct RemoteSlotView: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.openURL) private var openURL
-    let project: ProjectKey
-    let projectName: String
+    let folder: FolderKey
+    let folderName: String
     let kind: DaemonAPI.ConnectorSlotKind
     @Binding var setup: DaemonAPI.ConnectorSetup?
     @State private var problem: String?
@@ -167,7 +167,7 @@ private struct RemoteSlotView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 8) {
                             RemoteSlotMark(state: slot.state)
-                            Text(kind == .workspace ? model.whereAgentsRun(project.host).title : ConnectorSetupWords.title(slot))
+                            Text(kind == .workspace ? model.whereAgentsRun(folder.host).title : ConnectorSetupWords.title(slot))
                                 .appText(.reading).fontWeight(.semibold)
                         }
                         if let proof = slot.proof {
@@ -184,8 +184,8 @@ private struct RemoteSlotView: View {
                             }
                             .appText(.supporting)
                         } else {
-                            Text(slot.slot == .workspace ? model.whereAgentsRun(project.host).line
-                                 : ConnectorSetupWords.line(slot, project: projectName, repository: setup.repository,
+                            Text(slot.slot == .workspace ? model.whereAgentsRun(folder.host).line
+                                 : ConnectorSetupWords.line(slot, folder: folderName, repository: setup.repository,
                                                             forge: setup.forgeOrGitHub))
                                 .appText(.supporting)
                                 .tinted([.failed, .refused, .noRemote].contains(slot.state) ? .attention : .none)
@@ -238,40 +238,40 @@ private struct RemoteSlotView: View {
         .navigationTitle(ConnectorSetupWords.heading(kind))
         .task {
             if kind == .tasks { await readLinear() }
-            if kind == .workspace { await model.loadMachineProviders() }
+            if kind == .workspace { await model.loadWorkspaceProviders() }
         }
         .sheet(isPresented: $addingMachine) { AddMachineSheet() }
         .sheet(isPresented: $addingProvider, onDismiss: {
             Task {
-                await model.loadMachineProviders()
-                making = model.machineProviders?.first { !before.contains($0.id) }
+                await model.loadWorkspaceProviders()
+                making = model.workspaceProviders?.first { !before.contains($0.id) }
             }
         }) {
-            AddMachineProviderSheet(editing: nil)
-                .onAppear { before = Set((model.machineProviders ?? []).map(\.id)) }
+            AddWorkspaceProviderSheet(editing: nil)
+                .onAppear { before = Set((model.workspaceProviders ?? []).map(\.id)) }
         }
         .sheet(item: $making) { provider in
             NavigationStack { NewMachinePage(picked: provider.id, close: { making = nil }) }
         }
         .sheet(isPresented: $connectingLinear) {
-            RemoteConnectSheet(provider: .linear, host: project.host, onConnected: { Task { await readLinear() } })
+            RemoteConnectSheet(provider: .linear, host: folder.host, onConnected: { Task { await readLinear() } })
         }
     }
 
     private func readLinear() async {
-        guard case .success(let list) = await model.connections(on: project.host) else { return }
+        guard case .success(let list) = await model.connections(on: folder.host) else { return }
         linearConnected = list.contains { $0.provider == .linear && $0.state == .connected }
     }
 
     private func skip(_ skipped: Bool) async {
-        switch await model.skipConnectorSlot(project, kind, skipped: skipped) {
+        switch await model.skipConnectorSlot(folder, kind, skipped: skipped) {
         case .success(let fresh): setup = fresh; problem = nil
         case .failure(let failure): problem = failure.words
         }
     }
 
     private func reload() async {
-        switch await model.connectorSetup(project, reading: .fresh) {
+        switch await model.connectorSetup(folder, reading: .fresh) {
         case .success(let fresh): setup = fresh; problem = nil
         case .failure(let failure): problem = failure.words
         }
@@ -290,16 +290,16 @@ struct RemoteConnectSheet: View {
     @Environment(\.webAuthenticationSession) private var webAuthenticationSession
     var provider: DaemonAPI.ConnectionProvider = .github
     let host: HostID
-    var project: ProjectKey?
+    var folder: FolderKey?
     var onConnected: () -> Void = {}
 
     /// again is the ended GitLab connection Connect Again\u{2026} is for: the sheet opens the way
     /// it was made, with its address (#1865).
-    init(provider: DaemonAPI.ConnectionProvider = .github, host: HostID, project: ProjectKey? = nil,
+    init(provider: DaemonAPI.ConnectionProvider = .github, host: HostID, folder: FolderKey? = nil,
          again: DaemonAPI.Connection? = nil, onConnected: @escaping () -> Void = {}) {
         self.provider = provider
         self.host = host
-        self.project = project
+        self.folder = folder
         self.onConnected = onConnected
         let start = provider == .gitlab ? again.map(ConnectorSetupWords.GitLab.again) : nil
         _withToken = State(initialValue: start?.withToken ?? false)
@@ -491,7 +491,7 @@ struct RemoteConnectSheet: View {
             case .connected:
                 step = .starting
                 onConnected()
-                if let project, case .success(let setup) = await model.connectorSetup(project, reading: .fresh),
+                if let folder, case .success(let setup) = await model.connectorSetup(folder, reading: .fresh),
                    setup.installed == false, let repository = setup.repository {
                     step = .install(login: flow.connection?.login ?? "you", repository: repository)
                     return
@@ -659,7 +659,7 @@ struct RemoteConnectEmailSheet: View {
 }
 
 /// Connectors ▸ Connections on the iPhone and iPad (frame E). The page that shows them
-/// reads them, as a project's set-up (#1684).
+/// reads them, as a folder's set-up (#1684).
 struct RemoteConnections: View {
     @Environment(RemoteModel.self) private var model
     let connections: [DaemonAPI.Connection]?
@@ -758,11 +758,11 @@ private extension View {
 }
 
 extension RemoteModel {
-    /// Where agents run (#2131): the machine the project's folder is on, and its line of what
+    /// Where agents run (#2131): the machine the folder is on, and its line of what
     /// else is yours: the other machines and the providers.
     func whereAgentsRun(_ host: HostID) -> (title: String, line: String) {
-        let others = projectHosts.filter { $0.id != host }.map(\.title)
-        let providers = (machineProviders ?? []).map(\.name)
+        let others = folderHosts.filter { $0.id != host }.map(\.title)
+        let providers = (workspaceProviders ?? []).map(\.name)
         return (WhereAgentsRun.title(onThisMac: false, hostName: hostLabel(host)),
                 WhereAgentsRun.line(others: others, providers: providers))
     }

@@ -1,5 +1,5 @@
 /* The one sidebar (#151), as the window's (#145) and Things-style since #495 (#499): New Session,
-   Activity, the smart groups, a group per project folding open on its sessions and workflows, the
+   Activity, the smart groups, a group per folder folding open on its sessions and workflows, the
    hosts' state at the foot; then the chat. Every rule is under .with-sidebar, so it outweighs the
    three-column rules in app.css. */
 
@@ -36,22 +36,22 @@
 .with-sidebar .activity-row .activity-icon.warns { color: var(--tint-failure); }
 .with-sidebar .activity-row .title { font-weight: 500; }
 
-/* A project's row: the disclosure, the name, and a grey count of its own sessions (#587). */
-.with-sidebar .row.project { grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; padding: 0 8px 0 0;
+/* A folder's row: the disclosure, the name, and a grey count of its own sessions (#587). */
+.with-sidebar .row.folder { grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; padding: 0 8px 0 0;
   column-gap: 2px; }
-.with-sidebar .row.project .disclosure { border: none; background: none; padding: 0; width: 16px; font-size: 0.75rem;
+.with-sidebar .row.folder .disclosure { border: none; background: none; padding: 0; width: 16px; font-size: 0.75rem;
   opacity: 0.55; line-height: 1; }
-.with-sidebar .row.project .pick { display: flex; flex-direction: column; align-items: flex-start; min-width: 0;
+.with-sidebar .row.folder .pick { display: flex; flex-direction: column; align-items: flex-start; min-width: 0;
   border: none; background: none; padding: 4px 0; text-align: left; font: inherit; color: inherit; }
-/* The project is its group's heading (#495): its name in grey, so the sessions under it read first. */
-.with-sidebar .row.project .title { font-weight: 600; font-size: 0.75rem; opacity: 0.6; max-width: 100%; }
-.with-sidebar .row.project .subtitle { font-size: 0.71875rem; }
-.with-sidebar .row.project .count { grid-column: 3; grid-row: 1; font-size: 0.6875rem; font-weight: 500; }
-.with-sidebar .project-fold.greyed .row, .with-sidebar .project-fold.greyed .subhead { opacity: 0.55; }
+/* The folder is its group's heading (#495): its name in grey, so the sessions under it read first. */
+.with-sidebar .row.folder .title { font-weight: 600; font-size: 0.75rem; opacity: 0.6; max-width: 100%; }
+.with-sidebar .row.folder .subtitle { font-size: 0.71875rem; }
+.with-sidebar .row.folder .count { grid-column: 3; grid-row: 1; font-size: 0.6875rem; font-weight: 500; }
+.with-sidebar .folder-fold.greyed .row, .with-sidebar .folder-fold.greyed .subhead { opacity: 0.55; }
 
-/* A project's rows sit at the sidebar's edge under its heading, as a group's do (#495). */
+/* A folder's rows sit at the sidebar's edge under its heading, as a group's do (#495). */
 .with-sidebar .fold-body { margin-bottom: 6px; }
-/* A project's Workflows fold (#885), as a mailbox with sub-mailboxes in Mail: a row with a chevron
+/* A folder's Workflows fold (#885), as a mailbox with sub-mailboxes in Mail: a row with a chevron
    and a grey count, and its workflows one level in. Measured from a session's row (#1079): its 8px
    edge, then the chevron in the 18px mark column, the word at the title (8px on), and each
    workflow's mark under the word. */
@@ -62,7 +62,7 @@
 .with-sidebar details:is(.workflows, .sessions)[open] > summary::before { content: "⌄"; }
 .with-sidebar details:is(.workflows, .sessions) > summary .count { margin-left: auto; font-variant-numeric: tabular-nums; }
 .with-sidebar details.workflows .row.workflow .pick { padding-left: calc(8px + 26px); }
-/* A project's sessions under its Sessions row (#2312): one level in, as the workflows; a child one more. */
+/* A folder's sessions under its Sessions row (#2312): one level in, as the workflows; a child one more. */
 .with-sidebar details.sessions .nav-item > .row.session { padding-left: calc(8px + 26px); }
 .with-sidebar details.sessions .nav-item.child > .row.session { padding-left: calc(8px + 52px); }
 
@@ -74,9 +74,9 @@
 .with-sidebar details.smart > summary .count.needs { color: var(--tint-attention); }
 .with-sidebar details.smart > summary .updated { margin-left: 0.5em; font-weight: 400; opacity: 0.6; white-space: nowrap; }
 
-/* Which project a row is in, after its title, under a group at the top (#495). */
+/* Which folder a row is in, after its title, under a group at the top (#495). */
 .with-sidebar .sidebar .place { font-size: 0.6875rem; font-weight: 400; opacity: 0.45; }
-/* The project's name whole up to 40% of the line, then cut, so a long one never pushes the
+/* The folder's name whole up to 40% of the line, then cut, so a long one never pushes the
    title out (#936); cut to "p" it said nothing (#587). */
 .with-sidebar .sidebar .title.placed { display: flex; align-items: baseline; min-width: 0; }
 .with-sidebar .sidebar .title.placed .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -97,7 +97,7 @@
 /* Waiting for an OK (#773): a shield, in the attention tint as the hand is, whatever its kind. */
 .sidebar-mark.approval { color: var(--tint-attention); }
 
-/* A project's Archived row (#495), opening its page: in the rows' type, its count on the right. */
+/* A folder's Archived row (#495), opening its page: in the rows' type, its count on the right. */
 .row.page-row { grid-template-columns: minmax(0, 1fr); padding: 0; }
 .row.page-row .pick { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; column-gap: 8px; align-items: center;
   border: none; background: none; padding: 5px 8px; text-align: left; font: inherit; color: inherit; min-width: 0; }
@@ -107,11 +107,11 @@
 /* The Connectors row's count, small and grey just after the title (#1569). */
 .row.page-row .title .count { margin-left: 6px; font-size: 0.6875rem; font-variant-numeric: tabular-nums; }
 
-/* A project's archive, in the chat's place (#499). */
+/* A folder's archive, in the chat's place (#499). */
 .with-sidebar .archive-page .column-head .quiet { font-size: 0.75rem; }
 .with-sidebar .archive-body { max-width: 760px; padding: 8px 12px; }
 .with-sidebar .archive-body .hint { padding: 8px; font-size: 0.75rem; opacity: 0.6; }
-/* Show all N under a fold's first archived matches, and More matches… after the projects (#193):
+/* Show all N under a fold's first archived matches, and More matches… after the folders (#193):
    fine and secondary, as the window's. */
 .sidebar button.link.show-all, .sidebar button.link.more-matches {
   display: block; padding: 3px 8px; font-size: 0.75rem; color: inherit; opacity: 0.6; cursor: pointer; text-align: left;
@@ -122,14 +122,14 @@
 .with-sidebar :is(details.archived, details.smart, details.activity) > summary::before { content: "›"; display: inline-block; width: 12px; opacity: 0.7; }
 .with-sidebar :is(details.archived, details.smart, details.activity)[open] > summary::before { content: "⌄"; }
 
-/* Archived projects (#343): a heading that folds, as the window's section, and each project in
+/* Archived folders (#343): a heading that folds, as the window's section, and each folder in
    secondary type, when it was put away under it, and Unarchive at its end. */
-.with-sidebar :is(details.archived-projects, details.activity) > summary.sidebar-head-label { margin-left: 0; }
-.with-sidebar .row.archived-project { align-items: baseline; column-gap: 8px; padding: 4px 8px 4px 18px; cursor: default; }
-.with-sidebar .row.archived-project .title { font-weight: 400; opacity: 0.65; }
-.with-sidebar .row.archived-project .subtitle { font-size: 0.71875rem; opacity: 0.45; }
-.with-sidebar .row.archived-project button.link { font-size: 0.75rem; cursor: pointer; }
-.with-sidebar .row.archived-project button.link:disabled { opacity: 0.45; cursor: default; }
+.with-sidebar :is(details.archived-folders, details.activity) > summary.sidebar-head-label { margin-left: 0; }
+.with-sidebar .row.archived-folder { align-items: baseline; column-gap: 8px; padding: 4px 8px 4px 18px; cursor: default; }
+.with-sidebar .row.archived-folder .title { font-weight: 400; opacity: 0.65; }
+.with-sidebar .row.archived-folder .subtitle { font-size: 0.71875rem; opacity: 0.45; }
+.with-sidebar .row.archived-folder button.link { font-size: 0.75rem; cursor: pointer; }
+.with-sidebar .row.archived-folder button.link:disabled { opacity: 0.45; cursor: default; }
 
 /* A row the keys or the list landed on. */
 .with-sidebar .sidebar :is(.row.session, .row.activity-row, summary):focus-visible,
@@ -184,7 +184,7 @@
 .context-menu button { text-align: left; border: none; background: none; padding: 5px 10px; border-radius: var(--radius-control); }
 .context-menu button:hover:not(:disabled), .context-menu button:focus-visible { background: var(--paper-selection); outline: none; }
 
-/* A project's pinned pages (#159), and New Session at the sidebar's top (#495): a mark in the
+/* A folder's pinned pages (#159), and New Session at the sidebar's top (#495): a mark in the
    accent and a title, as a session's row is tall. */
 .row.pin, .row.new-session { grid-template-columns: minmax(0, 1fr); padding: 0; }
 .row.pin .pick, .row.new-session .pick { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; column-gap: 8px; align-items: center;
@@ -212,7 +212,7 @@
   .with-sidebar .sidebar-head .search { flex: 1; }
 }
 
-/* A row with files dragged over it, which a drop puts in the project's drop box (#231). */
+/* A row with files dragged over it, which a drop puts in the folder's drop box (#231). */
 .with-sidebar .sidebar .drop-target { outline: 2px dashed var(--accent); outline-offset: -2px; border-radius: 6px; }
 .with-sidebar .waiting-list li { display: flex; align-items: center; gap: 4px; }
 .with-sidebar .event-stop { border: 0; background: none; padding: 4px 8px; font-size: 0.75rem; opacity: 0.55; }
@@ -243,7 +243,7 @@
 @media (pointer: coarse) {
   .with-sidebar .sidebar .row { min-height: 44px; align-content: center; }
   .with-sidebar .fold-count { min-height: 44px; min-width: 44px; }
-  .with-sidebar .sidebar .row.project .pick { align-self: stretch; justify-content: center; }
+  .with-sidebar .sidebar .row.folder .pick { align-self: stretch; justify-content: center; }
   .with-sidebar .sidebar .row, .with-sidebar .sidebar .nav-item {
     -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
   }
@@ -252,8 +252,8 @@
 .with-sidebar .sidebar .drop-note { padding: 0 10px 4px 26px; font-size: 0.6875rem; color: var(--accent); }
 .with-sidebar .sidebar .drop-note:empty { padding: 0; }
 
-/* A tab holding one project alone (#1089): ‹ All and the project's name over its own list, and
-   "✋ N elsewhere" under it while another project needs the person. */
+/* A tab holding one folder alone (#1089): ‹ All and the folder's name over its own list, and
+   "✋ N elsewhere" under it while another folder needs the person. */
 .with-sidebar .sidebar-head button.link.back-all { flex: none; padding: 4px 2px; cursor: pointer; }
 .with-sidebar .sidebar-head h1.alone-title { flex-basis: 100%; margin: 6px 0 2px; font-size: 1.0625rem; text-align: left; }
 .sidebar button.link.elsewhere { display: block; margin: 12px 8px; padding: 0; font-size: 0.8125rem; cursor: pointer; text-align: left; }

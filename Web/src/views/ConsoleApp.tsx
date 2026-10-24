@@ -66,7 +66,7 @@ export function SubAppPage({ store, app, down }: { store: Store; app: SubApp; do
   const gated = app === "console" && isAdmin !== true;
   return (
     <div class="columns sub-app" aria-busy={down}>
-      <nav class="projects sub-app-list" aria-label={appTitle[app]}>
+      <nav class="folders sub-app-list" aria-label={appTitle[app]}>
         {grouped(sectionsOf(app)).map(([group, list]) => (
           <div key={group} class="sub-app-group">
             <h2 class="section-head">{group}</h2>

@@ -79,7 +79,7 @@ public enum APIProviderKind: String, CaseIterable, Identifiable, Sendable {
              Field(id: "user", label: "ssh user", value: "ec2-user")]
         case .compute:
             [Field(id: "serviceKey", label: "Service account key (JSON)", isSecret: true, isLong: true),
-             Field(id: "project", label: "Project"),
+             Field(id: "folder", label: "Folder"),
              Field(id: "zone", label: "Zone", prompt: "europe-west2-a"),
              Field(id: "label", label: "Label", value: "agents"),
              Field(id: "user", label: "ssh user", value: "agents"),

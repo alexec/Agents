@@ -6,13 +6,13 @@ import Testing
 /// does not let go of the page on screen.
 @Suite("A page held by its showing")
 struct PageHoldTests {
-    private let project = URL(filePath: "/tmp/project")
+    private let folder = URL(filePath: "/tmp/folder")
 
     @Test func theFirstShowingOpensAndItsGoingLetsGo() {
         var hold = PageHold<URL>()
         let first = UUID()
-        hold.appeared(project, showing: first)
-        #expect(hold.key == project)
+        hold.appeared(folder, showing: first)
+        #expect(hold.key == folder)
         let went = hold.disappeared(first)
         #expect(went)
         #expect(hold.key == nil)
@@ -22,11 +22,11 @@ struct PageHoldTests {
     @Test func aLateGoingOfTheOldShowingKeepsTheNewOne() {
         var hold = PageHold<URL>()
         let old = UUID(), new = UUID()
-        hold.appeared(project, showing: old)
-        hold.appeared(project, showing: new)
+        hold.appeared(folder, showing: old)
+        hold.appeared(folder, showing: new)
         let oldWent = hold.disappeared(old)
         #expect(!oldWent)
-        #expect(hold.key == project)
+        #expect(hold.key == folder)
         let newWent = hold.disappeared(new)
         #expect(newWent)
         #expect(hold.key == nil)
@@ -37,27 +37,27 @@ struct PageHoldTests {
     @Test func afterAReleaseTheNextShowingHoldsIt() {
         var hold = PageHold<URL>()
         let first = UUID()
-        hold.appeared(project, showing: first)
+        hold.appeared(folder, showing: first)
         hold.release()
         #expect(hold.key == nil)
-        hold.appeared(project, showing: UUID())
+        hold.appeared(folder, showing: UUID())
         let went = hold.disappeared(first)
         #expect(!went)
-        #expect(hold.key == project)
+        #expect(hold.key == folder)
     }
 
-    /// Two showings on screen at once (#2089): an iPhone's project screen over the sidebar
-    /// of every project. The one on top holds it; when it goes, the one under it does again.
+    /// Two showings on screen at once (#2089): an iPhone's folder screen over the sidebar
+    /// of every folder. The one on top holds it; when it goes, the one under it does again.
     @Test func whenTheTopShowingGoesTheOneUnderItHoldsThePage() {
         var hold = PageHold<URL>()
         let other = URL(filePath: "/tmp/other")
         let under = UUID(), over = UUID()
-        hold.appeared(project, showing: under)
+        hold.appeared(folder, showing: under)
         hold.appeared(other, showing: over)
         #expect(hold.key == other)
         let went = hold.disappeared(over)
         #expect(went)
-        #expect(hold.key == project)
+        #expect(hold.key == folder)
     }
 
     /// What the top showing started opened in its place: the one under it holds the page.
@@ -65,13 +65,13 @@ struct PageHoldTests {
         var hold = PageHold<URL>()
         let other = URL(filePath: "/tmp/other")
         let under = UUID(), over = UUID()
-        hold.appeared(project, showing: under)
+        hold.appeared(folder, showing: under)
         hold.appeared(other, showing: over)
         hold.release()
-        #expect(hold.key == project)
+        #expect(hold.key == folder)
         let overWent = hold.disappeared(over)
         #expect(!overWent)
-        #expect(hold.key == project)
+        #expect(hold.key == folder)
     }
 
     /// A showing that went without saying so (#2089) is dropped once its page is no longer
@@ -81,8 +81,8 @@ struct PageHoldTests {
         let other = URL(filePath: "/tmp/other")
         let ghost = UUID(), shown = UUID()
         hold.appeared(other, showing: ghost)
-        hold.appeared(project, showing: shown)
-        hold.keep { $0 == project }
+        hold.appeared(folder, showing: shown)
+        hold.keep { $0 == folder }
         let went = hold.disappeared(shown)
         #expect(went)
         #expect(hold.key == nil)
@@ -93,10 +93,10 @@ struct PageHoldTests {
         var hold = PageHold<URL>()
         let other = URL(filePath: "/tmp/other")
         let first = UUID(), second = UUID()
-        hold.appeared(project, showing: first)
+        hold.appeared(folder, showing: first)
         hold.appeared(other, showing: second)
-        hold.appeared(project, showing: first)
-        #expect(hold.key == project)
+        hold.appeared(folder, showing: first)
+        #expect(hold.key == folder)
         _ = hold.disappeared(first)
         #expect(hold.key == other)
         _ = hold.disappeared(second)

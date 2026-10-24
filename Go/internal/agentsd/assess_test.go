@@ -18,13 +18,13 @@ func TestARuntimeAssessedFromTheRecord(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	project := t.TempDir()
-	c.call(t, 1, "projects/add", map[string]any{"folder": "file://" + project})
+	folder := t.TempDir()
+	c.call(t, 1, "folders/add", map[string]any{"folder": "file://" + folder})
 
 	var started wire.AssessRuntimeResult
-	json.Unmarshal(c.call(t, 2, "runtimes/assess", map[string]any{"runtimeID": "claude", "folder": "file://" + project, "model": "default"}), &started)
+	json.Unmarshal(c.call(t, 2, "runtimes/assess", map[string]any{"runtimeID": "claude", "folder": "file://" + folder, "model": "default"}), &started)
 	a := d.Store.Agent(started.AgentID)
-	if a == nil || started.Model != nil || !strings.Contains(started.ReportPath, filepath.Join(project, ".agents", "reviews", "runtimes", "claude-")) {
+	if a == nil || started.Model != nil || !strings.Contains(started.ReportPath, filepath.Join(folder, ".agents", "reviews", "runtimes", "claude-")) {
 		t.Fatalf("%+v %+v", started, a)
 	}
 	if len(a.Labels) != 1 || a.Labels[0].Value != assessLabel {

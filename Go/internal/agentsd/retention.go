@@ -43,14 +43,14 @@ func (d *Daemon) dueArchived(keep wire.RetentionKeepFor) (count int, bytes int64
 		if a.State != wire.AgentStateArchived || a.ArchivedAt == nil || !a.ArchivedAt.Time().Before(cutoff) {
 			continue
 		}
-		project := projectFolder(&a)
-		if pinned[project] == nil {
-			pinned[project] = map[wire.UUID]bool{}
-			for _, s := range d.readPins(project).sessions {
-				pinned[project][wire.UUID(strings.ToUpper(string(s.Session)))] = true
+		folder := folderPath(&a)
+		if pinned[folder] == nil {
+			pinned[folder] = map[wire.UUID]bool{}
+			for _, s := range d.readPins(folder).sessions {
+				pinned[folder][wire.UUID(strings.ToUpper(string(s.Session)))] = true
 			}
 		}
-		if pinned[project][wire.UUID(strings.ToUpper(string(a.ID)))] {
+		if pinned[folder][wire.UUID(strings.ToUpper(string(a.ID)))] {
 			continue
 		}
 		count++
@@ -130,14 +130,14 @@ func (d *Daemon) sweepArchived() (deleted int) {
 		if !ok || !a.ArchivedAt.Time().Before(cutoff) {
 			continue
 		}
-		project := projectFolder(&a)
-		if pinned[project] == nil {
-			pinned[project] = map[wire.UUID]bool{}
-			for _, s := range d.readPins(project).sessions {
-				pinned[project][wire.UUID(strings.ToUpper(string(s.Session)))] = true
+		folder := folderPath(&a)
+		if pinned[folder] == nil {
+			pinned[folder] = map[wire.UUID]bool{}
+			for _, s := range d.readPins(folder).sessions {
+				pinned[folder][wire.UUID(strings.ToUpper(string(s.Session)))] = true
 			}
 		}
-		if pinned[project][wire.UUID(strings.ToUpper(string(a.ID)))] {
+		if pinned[folder][wire.UUID(strings.ToUpper(string(a.ID)))] {
 			continue
 		}
 		// Unarchived since the list was read: kept.

@@ -30,10 +30,10 @@ struct EventAuditTests {
     }
 
     @Test func theControlPlanesOwnAndABotsAreSaidSo() {
-        var entry = DaemonAPI.AuditEntry(id: "x", at: .now, action: "Changed project detection",
-                                         method: "control/setProjectDetection", actor: .init(user: "u"))
+        var entry = DaemonAPI.AuditEntry(id: "x", at: .now, action: "Changed folder detection",
+                                         method: "control/setFolderDetection", actor: .init(user: "u"))
         #expect(AuditWords.place(entry) { $0.rawValue } == "on the control plane")
-        #expect(AuditWords.call(entry) == "control/setProjectDetection")
+        #expect(AuditWords.call(entry) == "control/setFolderDetection")
         #expect(AuditWords.who(entry.actor) == "Someone")
         entry.actor = .init(user: "b", userName: "Nightly", event: .init(kind: "pr.merged", id: "42"))
         #expect(AuditWords.who(entry.actor) == "Nightly · for pr.merged")

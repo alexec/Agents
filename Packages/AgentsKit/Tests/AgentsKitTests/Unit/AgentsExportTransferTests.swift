@@ -122,14 +122,14 @@ struct AgentsExportTransferTests {
         let bytes = Data((0..<(AgentsExportTransfer.partSize * 2 + 10)).map { UInt8($0 % 251) })
         try bytes.write(to: file)
 
-        let project = URL(fileURLWithPath: "/tmp/B", isDirectory: true)
-        let result = try await AgentsExportTransfer.importFile(file, into: client, folder: project)
+        let folder = URL(fileURLWithPath: "/tmp/B", isDirectory: true)
+        let result = try await AgentsExportTransfer.importFile(file, into: client, folder: folder)
         #expect(result == DaemonAPI.BackupRestoreResult(restored: 2, skipped: 1))
         #expect(host.received.map(\.offset) == [0, AgentsExportTransfer.partSize, AgentsExportTransfer.partSize * 2])
         #expect(host.received.reduce(Data()) { $0 + $1.data } == bytes)
         #expect(host.imported != nil)
-        // Into the project whose menu was used (#2389).
-        #expect(host.importedInto == project.absoluteString)
+        // Into the folder whose menu was used (#2389).
+        #expect(host.importedInto == folder.absoluteString)
     }
 
     @Test func theWordsSayWhatAnImportDid() {

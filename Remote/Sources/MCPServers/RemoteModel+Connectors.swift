@@ -1,23 +1,23 @@
 import AgentsKitCore
 import Foundation
 
-/// The person's connections (#1335) and a project's Connectors set-up (#1336), on the host
-/// that has the project, as the window's AppModel+Connectors.
+/// The person's connections (#1335) and a folder's Connectors set-up (#1336), on the host
+/// that has the folder, as the window's AppModel+Connectors.
 extension RemoteModel {
-    func connectorSetup(_ project: ProjectKey, reading: DaemonAPI.ConnectorSetupReading = .cached) async
+    func connectorSetup(_ folder: FolderKey, reading: DaemonAPI.ConnectorSetupReading = .cached) async
         -> Result<DaemonAPI.ConnectorSetup, RemoteConnectorProblem> {
-        await connectorCall(project.host) {
+        await connectorCall(folder.host) {
             try await $0.call(DaemonAPI.Method.connectorsSetup,
-                              DaemonAPI.ConnectorSetupRequest(folder: project.folder.path, reading: reading),
+                              DaemonAPI.ConnectorSetupRequest(folder: folder.folder.path, reading: reading),
                               returning: DaemonAPI.ConnectorSetup.self)
         }
     }
 
-    func skipConnectorSlot(_ project: ProjectKey, _ slot: DaemonAPI.ConnectorSlotKind, skipped: Bool) async
+    func skipConnectorSlot(_ folder: FolderKey, _ slot: DaemonAPI.ConnectorSlotKind, skipped: Bool) async
         -> Result<DaemonAPI.ConnectorSetup, RemoteConnectorProblem> {
-        await connectorCall(project.host) {
+        await connectorCall(folder.host) {
             try await $0.call(DaemonAPI.Method.connectorsSetupSkip,
-                              DaemonAPI.ConnectorSkipRequest(folder: project.folder.path, slot: slot, skipped: skipped),
+                              DaemonAPI.ConnectorSkipRequest(folder: folder.folder.path, slot: slot, skipped: skipped),
                               returning: DaemonAPI.ConnectorSetup.self)
         }
     }
@@ -103,24 +103,24 @@ extension RemoteModel {
         }
     }
 
-    /// Takes one connector out of its mcp.json (#2154), the person's own or a project's, then
+    /// Takes one connector out of its mcp.json (#2154), the person's own or a folder's, then
     /// reads the servers again. Its secrets stay. Nil when it went, else why not.
-    func removeConnector(_ name: String, project: ProjectKey?) async -> RemoteConnectorProblem? {
-        let destination: DaemonAPI.SkillDestination = project.map { .project(folder: $0.folder.path) } ?? .personal
-        let answer = await connectorCall(project?.host ?? .mac) {
+    func removeConnector(_ name: String, folder: FolderKey?) async -> RemoteConnectorProblem? {
+        let destination: DaemonAPI.SkillDestination = folder.map { .folder(folder: $0.folder.path) } ?? .personal
+        let answer = await connectorCall(folder?.host ?? .mac) {
             try await $0.call(DaemonAPI.Method.mcpRemove,
                               DaemonAPI.MCPRemoveRequest(destination: destination, name: name, forgetSecret: nil),
                               returning: DaemonAPI.MCPRemoveAnswer.self)
         }
         if case .failure(let problem) = answer { return problem }
-        await checkMCPHealth(project: project)
+        await checkMCPHealth(folder: folder)
         return nil
     }
 
     private func connectorCall<T: Sendable>(_ host: HostID, _ body: (DaemonClient) async throws -> T) async
         -> Result<T, RemoteConnectorProblem> {
         guard let target = hostClient(host) else {
-            return .failure(RemoteConnectorProblem(words: "The Mac that has this project can't be reached."))
+            return .failure(RemoteConnectorProblem(words: "The Mac that has this folder can't be reached."))
         }
         do {
             return .success(try await body(target))

@@ -21,10 +21,10 @@ struct AttentionSnapshotTests {
               lastActivityAt: at, isUnread: isUnread ?? (state == .finished), report: report)
     }
 
-    private func model(_ agents: [Agent], in summary: DaemonAPI.ProjectSummary? = nil) -> AgentsModel {
+    private func model(_ agents: [Agent], in summary: DaemonAPI.FolderSummary? = nil) -> AgentsModel {
         let model = AgentsModel()
-        model.replaceProjects([summary ?? DaemonAPI.ProjectSummary(
-            project: Project(folder: folder), name: "api", exists: true,
+        model.replaceFolders([summary ?? DaemonAPI.FolderSummary(
+            folder: Folder(folder: folder), name: "api", exists: true,
             lastActivityAt: Date(), counts: [:])])
         model.replaceAgents(agents)
         return model
@@ -48,7 +48,7 @@ struct AttentionSnapshotTests {
     /// that did not change the other would be a change to this, once.
     @Test func theCountIsTheDockBadgesCount() {
         let model = model([agent(), agent(), agent(state: .running), agent(state: .finished)])
-        let badge = model.liveProjects.reduce(0) { $0 + model.attentionCount(in: $1.key) }
+        let badge = model.liveFolders.reduce(0) { $0 + model.attentionCount(in: $1.key) }
         #expect(AttentionSnapshot.make(model: model).total == badge)
     }
 
@@ -71,12 +71,12 @@ struct AttentionSnapshotTests {
         #expect(snapshot.sessions.map(\.id) == [asked.id])
     }
 
-    @Test func anArchivedProjectIsNotCounted() {
+    @Test func anArchivedFolderIsNotCounted() {
         let model = AgentsModel()
-        model.replaceProjects([
-            DaemonAPI.ProjectSummary(project: Project(folder: URL(filePath: "/tmp/work/api")),
+        model.replaceFolders([
+            DaemonAPI.FolderSummary(folder: Folder(folder: URL(filePath: "/tmp/work/api")),
                                      name: "api", exists: true, lastActivityAt: Date(), counts: [:]),
-            DaemonAPI.ProjectSummary(project: Project(folder: URL(filePath: "/tmp/work/old"), archivedAt: Date()),
+            DaemonAPI.FolderSummary(folder: Folder(folder: URL(filePath: "/tmp/work/old"), archivedAt: Date()),
                                      name: "old", exists: true, lastActivityAt: Date(), counts: [:]),
         ])
         model.replaceAgents([agent(), Agent(id: UUID(), runtimeID: "claude",
@@ -110,7 +110,7 @@ struct AttentionSnapshotTests {
         #expect(row.id == id)
         #expect(row.wanted == "which branch")
         #expect(row.kind == .elicitation)
-        #expect(row.project == "api")
+        #expect(row.folder == "api")
         #expect(row.title == "Fix the widget")
     }
 
@@ -168,7 +168,7 @@ struct AttentionSnapshotTests {
     /// rest, rather than drawing nothing until the app catches up.
     @Test func aFileOfFourStillFillsALargeWidgetAsFarAsItGoes() {
         let sessions = (0..<4).map {
-            AttentionSnapshotSession(id: UUID(), project: "api", title: "Row \($0)", wanted: nil,
+            AttentionSnapshotSession(id: UUID(), folder: "api", title: "Row \($0)", wanted: nil,
                                      kind: nil, since: Date())
         }
         let snapshot = AttentionSnapshot(writtenAt: Date(), total: 9, sessions: sessions)
@@ -188,7 +188,7 @@ struct AttentionSnapshotTests {
     @Test func howLongARowHasWaitedIsShort() {
         let now = Date()
         func waited(_ seconds: TimeInterval) -> String {
-            AttentionSnapshotSession(id: UUID(), project: "api", title: "t", wanted: nil, kind: nil,
+            AttentionSnapshotSession(id: UUID(), folder: "api", title: "t", wanted: nil, kind: nil,
                                      since: now.addingTimeInterval(-seconds)).waited(at: now)
         }
         #expect(waited(-30) == "now", "a clock a little ahead is not a negative wait")
@@ -204,7 +204,7 @@ struct AttentionSnapshotTests {
         let directory = try TemporaryDirectory()
         defer { directory.remove() }
         let snapshot = AttentionSnapshot(writtenAt: Date(), total: 2, sessions: [
-            AttentionSnapshotSession(id: UUID(), project: "api", title: "Fix the widget",
+            AttentionSnapshotSession(id: UUID(), folder: "api", title: "Fix the widget",
                                      wanted: "which branch", kind: .permission, since: Date()),
         ])
         #expect(AttentionSnapshotStore.read(from: directory.url) == nil, "no file is no snapshot, never a zero")
@@ -382,7 +382,7 @@ struct AttentionSnapshotTests {
         #expect(AttentionLink.parse(AttentionLink.attention.url) == .attention)
         #expect(AttentionLink.parse(AttentionLink.agent(id).url) == .agent(id))
         #expect(AttentionLink.attention.url.scheme == AttentionLink.scheme)
-        let guarded = NeedID.guardedChange(URL(filePath: "/tmp/work/api"), ".agents/project.json").token
+        let guarded = NeedID.guardedChange(URL(filePath: "/tmp/work/api"), ".agents/folder.json").token
         #expect(AttentionLink.parse(AttentionLink.need(guarded).url) == .need(guarded))
     }
 

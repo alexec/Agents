@@ -36,7 +36,7 @@ func (c *toldStatus) all() []wire.HostStatus {
 func TestAHostTellsItsControlPlaneWhetherItIsIdle(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "nightly.md"), []byte("---\nname: Nightly\non:\n  - schedule:\n      at: \":00\"\n---\nTidy up.\n"), 0o644)
 	approveAll(t, c, store.FolderURL(dir))

@@ -52,7 +52,7 @@ const (
 	CodeFolderGone          = -32004
 	CodeNoSuchAgent         = -32005
 	CodeNotSupported        = -32009
-	CodeNoSuchProject       = -32012
+	CodeNoSuchFolder       = -32012
 	CodeCredentialWanted    = -32036
 )
 

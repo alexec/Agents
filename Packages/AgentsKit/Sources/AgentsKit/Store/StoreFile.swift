@@ -12,7 +12,7 @@ import AgentsKitCore
 ///   is tried once more. If it still does not read it is left where it is and the store
 ///   is held: it reads as empty and every write to it is refused for the rest of the
 ///   run (#205). A good `devices.json` is never moved aside for a passing error.
-/// - A file outside the daemon's root (a project's `pins.json`) is never moved inside the person's tree: a copy goes under the root
+/// - A file outside the daemon's root (a folder's `pins.json`) is never moved inside the person's tree: a copy goes under the root
 ///   (`outside`), the file stays, and writes to it are refused until it reads again.
 /// - At most `StoreCoding.asidesKept` copies of one file are kept.
 /// - Every write is whole: a temporary file, synced, then renamed into place.
@@ -30,7 +30,7 @@ enum StoreFile {
         /// It did not decode, and is now at this name, or still in place when even the
         /// move failed (`nil`), and then nothing may be written over it.
         case setAside(URL?)
-        /// It did not decode and is a project's: a copy is at this name (nil when even
+        /// It did not decode and is a folder's: a copy is at this name (nil when even
         /// that failed); the file is where it was, and held until it reads.
         case copied(URL?)
         /// It did not read, twice; it is where it was, and held for the run.
@@ -144,7 +144,7 @@ enum StoreFile {
         return aside
     }
 
-    /// Copy a project's unreadable `url` under the daemon's `root`, once for the bytes
+    /// Copy a folder's unreadable `url` under the daemon's `root`, once for the bytes
     /// it has, and hold it until it reads.
     @discardableResult
     static func copyAside(_ url: URL, under root: URL, meaning: String) -> URL? {
@@ -198,7 +198,7 @@ enum StoreFile {
 }
 
 /// The files no write may touch in this run (#205): one that would not read is held for
-/// the run; a project's that would not decode, until it reads again.
+/// the run; a folder's that would not decode, until it reads again.
 final class StoreHolds: @unchecked Sendable {
     static let shared = StoreHolds()
     private let lock = NSLock()
@@ -215,7 +215,7 @@ final class StoreHolds: @unchecked Sendable {
         }
     }
 
-    /// A read that worked lets a project's file be written again.
+    /// A read that worked lets a folder's file be written again.
     func released(_ url: URL, unlessForRun: Bool) {
         let key = url.standardizedFileURL.path
         let released: Bool = lock.withLock {

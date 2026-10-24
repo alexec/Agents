@@ -69,7 +69,7 @@ struct IdlessFailureTests {
             try await client.call(DaemonAPI.Method.agentsList)
         }
         // The next call still goes through.
-        _ = try await client.call(DaemonAPI.Method.projectsList)
+        _ = try await client.call(DaemonAPI.Method.foldersList)
         #expect(await client.isConnected)
     }
 

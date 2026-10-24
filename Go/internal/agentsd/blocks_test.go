@@ -25,7 +25,7 @@ func TestALeadWaitsOnItsHelper(t *testing.T) {
 	m := appClient(t, d, lead.ID)
 	m.post("initialize", map[string]any{}, 1)
 	if text, isErr := m.tool(2, "wait_for_agents", map[string]any{"agents": []string{"Nobody"}, "until_minutes": 30}); !isErr ||
-		!strings.HasPrefix(text, "Nothing was recorded: no agent in this project is called “Nobody”. The agents here are: ") {
+		!strings.HasPrefix(text, "Nothing was recorded: no agent in this folder is called “Nobody”. The agents here are: ") {
 		t.Fatal(text)
 	}
 	if text, isErr := m.tool(3, "wait_for_agents", map[string]any{"agents": []string{"Done one"}, "until_minutes": 30}); !isErr ||

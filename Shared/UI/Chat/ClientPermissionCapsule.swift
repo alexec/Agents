@@ -51,6 +51,6 @@ enum ClientPermissionWords {
     }
 
     static func scope(runtimeName: String) -> String {
-        "Applies to every \(runtimeName) agent, including workflows and server projects."
+        "Applies to every \(runtimeName) agent, including workflows and server folders."
     }
 }

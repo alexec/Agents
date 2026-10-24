@@ -15,9 +15,9 @@ import (
 )
 
 // The marketplaces a catalogue sheet can search (Marketplaces): the app's own list, then
-// the person's ~/.agents/marketplaces.json, then the destination project's
+// the person's ~/.agents/marketplaces.json, then the destination folder's
 // .agents/marketplaces.json. A token names a line in secrets.env, sent as a bearer token.
-// off and on are the person's only. A project's marketplaces start off, and are used once
+// off and on are the person's only. A folder's marketplaces start off, and are used once
 // the person names them in on: a committed file could otherwise send one of their secrets
 // to any host it names.
 
@@ -95,7 +95,7 @@ func (e UnreadableMarketplaces) Error() string {
 func PersonalMarketplaces(home string) string {
 	return filepath.Join(home, ".agents", "marketplaces.json")
 }
-func ProjectMarketplaces(folder string) string {
+func FolderMarketplaces(folder string) string {
 	return filepath.Join(folder, ".agents", "marketplaces.json")
 }
 
@@ -132,17 +132,17 @@ func SaveMarketplaces(f MarketplaceFile, path string) error {
 }
 
 // ListMarketplaces is every marketplace for a kind (all for nil), provided first, then the
-// person's, then the project's.
-func ListMarketplaces(kind *wire.CatalogKind, personal MarketplaceFile, project *MarketplaceFile,
+// person's, then the folder's.
+func ListMarketplaces(kind *wire.CatalogKind, personal MarketplaceFile, folder *MarketplaceFile,
 	secretIsSet func(string) bool, env func(string) string) []wire.Marketplace {
 	off, on := set(personal.Off), set(personal.On)
 	all := Provided(env)
 	for _, e := range personal.Marketplaces {
 		all = append(all, fromEntry(e, wire.MarketplaceOriginPersonal, secretIsSet))
 	}
-	if project != nil {
-		for _, e := range project.Marketplaces {
-			all = append(all, fromEntry(e, wire.MarketplaceOriginProject, secretIsSet))
+	if folder != nil {
+		for _, e := range folder.Marketplaces {
+			all = append(all, fromEntry(e, wire.MarketplaceOriginFolder, secretIsSet))
 		}
 	}
 	seen := map[string]bool{}
@@ -152,7 +152,7 @@ func ListMarketplaces(kind *wire.CatalogKind, personal MarketplaceFile, project 
 			continue
 		}
 		seen[m.ID] = true
-		if m.Origin == wire.MarketplaceOriginProject {
+		if m.Origin == wire.MarketplaceOriginFolder {
 			m.Enabled = on[m.ID]
 		} else {
 			m.Enabled = !off[m.ID]
@@ -180,7 +180,7 @@ func fromEntry(e MarketplaceEntry, origin wire.MarketplaceOrigin, secretIsSet fu
 }
 
 // SetEnabled turns one on or off in the person's file.
-func SetEnabled(id string, project bool, enabled bool, f *MarketplaceFile) {
+func SetEnabled(id string, folder bool, enabled bool, f *MarketplaceFile) {
 	without := func(xs []string) []string {
 		var out []string
 		for _, x := range xs {
@@ -190,7 +190,7 @@ func SetEnabled(id string, project bool, enabled bool, f *MarketplaceFile) {
 		}
 		return out
 	}
-	if project {
+	if folder {
 		f.On = without(f.On)
 		if enabled {
 			f.On = append(f.On, id)

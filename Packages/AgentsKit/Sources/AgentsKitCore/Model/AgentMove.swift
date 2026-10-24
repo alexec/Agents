@@ -1,7 +1,7 @@
 import Foundation
 
 /// Where an agent is to move (053): into a new worktree, into one already there, or back
-/// to its project folder.
+/// to its folder.
 ///
 /// A move changes the folder an agent works in during its life. It is only ever made
 /// between turns, because the one thing every runtime honours is the folder it is given
@@ -10,10 +10,10 @@ public enum MoveTarget: Codable, Hashable, Sendable {
     /// A worktree made for the move, from the commit the agent's current folder has
     /// checked out. Named from the name given, or from the agent's title.
     case newWorktree(name: String?)
-    /// A worktree of the project's repository that is already there.
+    /// A worktree of the folder's repository that is already there.
     case existing(URL)
-    /// The project folder the agent was started from.
-    case projectFolder
+    /// The folder the agent was started from.
+    case folderPath
 }
 
 /// Who asked for a move. The agent asked in order to carry on working, so it is started
@@ -27,7 +27,7 @@ public enum MoveAsker: String, Codable, Hashable, Sendable {
 /// restart, and applied when the turn it was asked in ends.
 public struct PendingMove: Codable, Hashable, Sendable {
     public var target: MoveTarget
-    /// Take away the worktree the agent leaves, on 030's terms. Only with `projectFolder`.
+    /// Take away the worktree the agent leaves, on 030's terms. Only with `folderPath`.
     public var removeLeft: Bool
     /// Remove it even though uncommitted or unmerged work would go with it. Only with
     /// `removeLeft`: the confirmation 030 asks the person for.

@@ -37,6 +37,7 @@ export const Failure = {
   fileGone: -32032,
   fileNotReadable: -32033,
   folderGone: -32004,
+  folderHasLiveAgents: -32013,
   folderInTheWay: -32025,
   hostOffline: -32090,
   importedAgent: -32096,
@@ -46,8 +47,8 @@ export const Failure = {
   managedByProvider: -32079,
   needsSignIn: -32007,
   noSuchAgent: -32005,
+  noSuchFolder: -32012,
   noSuchHost: -32091,
-  noSuchProject: -32012,
   noSuchWorkflow: -32014,
   noWait: -32051,
   notACloneURL: -32024,
@@ -71,7 +72,6 @@ export const Failure = {
   personSuspended: -32078,
   pinRefused: -32061,
   policyRefused: -32076,
-  projectHasLiveAgents: -32013,
   providerFailed: -32066,
   providersNeedOneCopy: -32064,
   runtimeNotFound: -32001,
@@ -394,9 +394,9 @@ export interface AgentWorktree {
   name: string;
   root: URLString;
   branch?: string;
-  project: URLString;
   base?: string;
   madeByApp: boolean;
+  folder: URLString;
 }
 
 /**
@@ -410,8 +410,8 @@ export interface AgentsExport {
 }
 
 /**
- * agents/export (#1001): one agent (`agentID`) or every agent of one project (`folder`). Give one
- * of the two.
+ * agents/export (#1001): one agent (`agentID`) or every agent of one folder (`folder`). Give one of
+ * the two.
  */
 export interface AgentsExportRequest {
   agentID?: UUID;
@@ -421,8 +421,8 @@ export interface AgentsExportRequest {
 /**
  * What agents/import takes (#1001): the export sent with agents/importUpload. Its agents come back
  * archived, as a restore brings them; one this machine has, or deleted, is skipped. With `folder`,
- * a project on this machine (the one whose menu was used, #2389), every agent comes back in that
- * project; without it, each in the folder it had where it was exported.
+ * a folder on this machine (the one whose menu was used, #2389), every agent comes back in that
+ * folder; without it, each in the folder it had where it was exported.
  */
 export interface AgentsImportRequest {
   upload: UUID;
@@ -1005,8 +1005,8 @@ export interface BranchSummary {
 }
 
 /**
- * What projects/bringBack did (#1473): the branches that moved forward or were made, and whether
- * the uncommitted changes were applied.
+ * What folders/bringBack did (#1473): the branches that moved forward or were made, and whether the
+ * uncommitted changes were applied.
  */
 export interface BringBack {
   moved: string[];
@@ -1126,7 +1126,7 @@ export type CatalogError =
   | { lockUnreadable: { path: string } }
   | { noPersonalHome: Record<string, never> }
   | { previewExpired: Record<string, never> }
-  | { notAProject: { path: string } }
+  | { notAFolder: { path: string } }
   | { replaceMismatch: Record<string, never> }
   | { cannotAdd: { _0: PreviewProblem[] } }
   | { notManaged: { name: string } }
@@ -1277,7 +1277,6 @@ export interface CatchUpRequest {
 }
 
 export interface CatchUpSnapshot {
-  projects: ProjectSummary[];
   agents: Agent[];
   permissions: PermissionRequest[];
   elicitations: ElicitationRequest[];
@@ -1287,8 +1286,9 @@ export interface CatchUpSnapshot {
   storeNotes?: StoreNotes;
   milestones?: Milestones;
   workflows?: WorkflowSummary[];
-  pins?: ProjectPins[];
+  pins?: FolderPins[];
   leases?: CatchUpLeases;
+  folders: FolderSummary[];
 }
 
 export type ChangeSource =
@@ -1742,7 +1742,7 @@ export interface ConnectionsList {
   connections: Connection[];
 }
 
-/** A GitHub Codespace for a project's repository (#1591). */
+/** A GitHub Codespace for a folder's repository (#1591). */
 export interface ConnectorCodespace {
   id: string;
   name: string;
@@ -1758,7 +1758,7 @@ export interface ConnectorCodespaces {
   message?: string;
 }
 
-/** Lists or changes the project's GitHub Codespaces (#1591). */
+/** Lists or changes the folder's GitHub Codespaces (#1591). */
 export interface ConnectorCodespacesRequest {
   folder: URLString;
   action: "list" | "create" | "start" | "stop" | "prepareSSH";
@@ -1766,9 +1766,7 @@ export interface ConnectorCodespacesRequest {
   name?: string;
 }
 
-/**
- * The github events the set-up turned on, and the project's workflows that start on one of them.
- */
+/** The github events the set-up turned on, and the folder's workflows that start on one of them. */
 export interface ConnectorEvents {
   state: ConnectorEventsState;
   /** The events, such as pr.opened. */
@@ -1780,8 +1778,8 @@ export interface ConnectorEvents {
 }
 
 /**
- * on: the github connector is in the project's or the person's mcp.json, so its events reach this
- * project. off: not yet (nothing connected, or every GitHub slot skipped). taken: an mcp.json entry
+ * on: the github connector is in the folder's or the person's mcp.json, so its events reach this
+ * folder. off: not yet (nothing connected, or every GitHub slot skipped). taken: an mcp.json entry
  * not made by Agents already has the name github, and it is left alone. failed: the entry could not
  * be written; message says why.
  */
@@ -1804,13 +1802,13 @@ export interface ConnectorProof {
 }
 
 /**
- * A project's Connectors set-up (#1336): its GitHub or GitLab repository (#1632), the person's
+ * A folder's Connectors set-up (#1336): its GitHub or GitLab repository (#1632), the person's
  * connection to that forge, four slots that each prove themselves with one read, and the events.
  */
 export interface ConnectorSetup {
   folder: string;
   /**
-   * owner/name on GitHub, or group/project on GitLab, from the project's git remote (origin first).
+   * owner/name on GitHub, or group/project on GitLab, from the folder's git remote (origin first).
    * Absent with no GitHub or GitLab remote.
    */
   repository?: string;
@@ -1842,7 +1840,7 @@ export interface ConnectorSetup {
 }
 
 /**
- * stored: no call to the provider, only what was read before (for a list of every project). cached:
+ * stored: no call to the provider, only what was read before (for a list of every folder). cached:
  * a read at most five minutes old is used again. fresh: read now (Try Again).
  */
 export type ConnectorSetupReading =
@@ -1855,7 +1853,7 @@ export interface ConnectorSetupRequest {
   reading?: ConnectorSetupReading;
 }
 
-/** Skip a slot, or set it up again. Kept in the project's .agents/project.json. */
+/** Skip a slot, or set it up again. Kept in the folder's .agents/folder.json. */
 export interface ConnectorSkipRequest {
   folder: string;
   slot: ConnectorSlotKind;
@@ -1878,7 +1876,7 @@ export interface ConnectorSlot {
 }
 
 /**
- * One slot of a project's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci,
+ * One slot of a folder's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci,
  * and workspace (where agents run).
  */
 export type ConnectorSlotKind =
@@ -1891,7 +1889,7 @@ export type ConnectorSlotKind =
  * notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not
  * read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach
  * the provider; message says why. refused: the provider refused the read, so the person grants it
- * on the provider's site. noRemote: the project has no GitHub or GitLab remote. skipped: the person
+ * on the provider's site. noRemote: the folder has no GitHub or GitLab remote. skipped: the person
  * skipped it; it counts as done.
  */
 export type ConnectorSlotState =
@@ -1950,6 +1948,13 @@ export interface ContentBlockAnnotations {
   priority?: number;
 }
 
+export interface ContinueInFolderRequest {
+  agentID: UUID;
+  text: string;
+  attachments: Attachment[];
+  requestID?: UUID;
+}
+
 /**
  * agents/continueInNew (#999): a new session in the same folder that reads this one and carries on,
  * on another account of its runtime.
@@ -1962,13 +1967,6 @@ export interface ContinueInNewRequest {
    * Model By).
    */
   accountID?: string;
-  requestID?: UUID;
-}
-
-export interface ContinueInProjectRequest {
-  agentID: UUID;
-  text: string;
-  attachments: Attachment[];
   requestID?: UUID;
 }
 
@@ -2186,7 +2184,7 @@ export interface ControlStatus {
    */
   publicViews?: string;
   thisMacHost?: HostJoinStatus;
-  projectDetection?: ProjectDetection;
+  folderDetection?: FolderDetection;
   unjoinedTunnels?: HostTunnelChanged[];
   /** The capabilities the control plane has (#1748). */
   capabilities?: string[];
@@ -2693,7 +2691,7 @@ export interface EventRaiseRequest {
 
 export type EventScope =
   | { mac: Record<string, never> }
-  | { project: { _0: URLString } };
+  | { folder: { _0: URLString } };
 
 export interface EventWait {
   id: UUID;
@@ -2923,6 +2921,22 @@ export interface FleetMachine {
   heardAt?: WireDate;
 }
 
+export interface Folder {
+  folder: URLString;
+  archivedAt?: WireDate;
+  addedAt: WireDate;
+  laidOutAt?: WireDate;
+  layoutVersion?: number;
+  helperLimits?: HelperLimits;
+  diskSpace?: DiskThresholds;
+  pinned?: boolean;
+}
+
+export interface FolderDetection {
+  enabled: boolean;
+  paths: string[];
+}
+
 export interface FolderHunk {
   oldStart: number;
   newStart: number;
@@ -2930,12 +2944,80 @@ export interface FolderHunk {
   lines: DiffLine[];
 }
 
+export interface FolderMCPServer {
+  name: string;
+  summary: string;
+  managed?: ManagedMCPServer;
+  approval: MCPApprovalState;
+  missingSecrets: string[];
+  secretNames: string[];
+  entryDigest: string;
+  signIn?: MCPSignInState;
+  views?: string;
+}
+
+export interface FolderPins {
+  folder: URLString;
+  pins: PinView[];
+  sessions?: UUID[];
+  workflows?: string[];
+  views?: PinView[];
+}
+
+export interface FolderPlugin {
+  folder: URLString;
+  name: string;
+  carries: string[];
+  awaitingApproval?: WorkflowApproval;
+  folderPath: URLString;
+}
+
+export interface FolderRemovedNotification {
+  folder: URLString;
+}
+
+export interface FolderRequest {
+  folder: URLString;
+}
+
+export interface FolderSummary {
+  name: string;
+  exists: boolean;
+  lastActivityAt: WireDate;
+  counts: Partial<Record<AgentGroup, number>>;
+  costToDate: Record<string, number>;
+  unmeasuredAgents: number;
+  retiredCount: number;
+  guardedChanges?: GuardedChange[];
+  approvals?: Approval[];
+  /**
+   * Set when the organisation's policy caps this folder's helper limits (#998, #64): the lower
+   * number is used.
+   */
+  helperLimitsSetBy?: PolicySetBy;
+  folder: Folder;
+}
+
+export interface FolderWorktrees {
+  worktrees: WorktreeSummary[];
+  folder: URLString;
+}
+
+export interface FoldersFindRequest {
+  paths?: string[];
+  folders?: string[];
+}
+
+export interface FoldersListRequest {
+  includeArchived: boolean;
+}
+
 export interface FoundFolder {
   typed?: string;
   folder: URLString;
   exists: boolean;
   isRepository: boolean;
-  isProject: boolean;
+  isFolder: boolean;
 }
 
 export interface GitAsk {
@@ -3113,7 +3195,7 @@ export interface HostAnnounce {
 
 /**
  * governance/report (#2019, M5): the MCP servers and skills a machine has from a catalogue,
- * personal and in its projects, at most 500. Sent at start and each hour; each replaces the last.
+ * personal and in its folders, at most 500. Sent at start and each hour; each replaces the last.
  */
 export interface HostCatalog {
   items: CatalogItem[];
@@ -3225,7 +3307,7 @@ export interface HostJoinTicket {
 
 export interface HostLastHeard {
   host: HostID;
-  projects?: ProjectSummary[];
+  folders?: FolderSummary[];
   agents?: Agent[];
   heardAt?: WireDate;
 }
@@ -3399,13 +3481,13 @@ export type HostedMCPState =
 
 export interface HostedMCPStatus {
   name: string;
-  project?: string;
   state: HostedMCPState;
   since?: WireDate;
   retryAt?: WireDate;
   lastError?: string;
   restarts: number;
   users: number;
+  folder?: string;
 }
 
 export interface JoinApproved {
@@ -3630,7 +3712,7 @@ export type MCPCatalogError =
   | { previewExpired: Record<string, never> }
   | { noRunnableWay: Record<string, never> }
   | { replaceMismatch: Record<string, never> }
-  | { notAProject: { path: string } }
+  | { notAFolder: { path: string } }
   | { nameTaken: { name: string } }
   | { invalid: { _0: string } }
   | { failed: { _0: string } };
@@ -3693,12 +3775,12 @@ export interface MCPHandValue {
 }
 
 export interface MCPHealthCheckRequest {
-  project?: string;
+  folder?: string;
 }
 
 export interface MCPHealthFileProblem {
-  project?: string;
   message: string;
+  folder?: string;
 }
 
 export interface MCPHealthSnapshot {
@@ -3721,7 +3803,7 @@ export interface MCPLevels {
 }
 
 export interface MCPListAnswer {
-  servers: ProjectMCPServer[];
+  servers: FolderMCPServer[];
   problem?: string;
   approvalsProblem?: string;
 }
@@ -3797,7 +3879,6 @@ export interface MCPServer {
 
 export interface MCPServerHealth {
   name: string;
-  project?: string;
   transport: MCPTransportName;
   hosted: boolean;
   live?: HostedMCPStatus;
@@ -3806,6 +3887,7 @@ export interface MCPServerHealth {
   lastError?: string;
   tools?: number;
   levels?: MCPLevels;
+  folder?: string;
 }
 
 export type MCPServerTransport =
@@ -4038,7 +4120,7 @@ export interface MarketplaceIDRequest {
 export type MarketplaceOrigin =
   | "provided"
   | "personal"
-  | "project";
+  | "folder";
 
 export interface MarketplaceSetEnabledRequest {
   id: string;
@@ -4090,7 +4172,7 @@ export interface MoveRequest {
 export type MoveTarget =
   | { newWorktree: { name?: string } }
   | { existing: { _0: URLString } }
-  | { projectFolder: Record<string, never> };
+  | { folderPath: Record<string, never> };
 
 export type MoveWhen =
   | "now"
@@ -4416,7 +4498,7 @@ export interface OrgRouteSet {
 
 /**
  * An org route's settings that are not secret (#999, data-model.md). bedrock: region. vertex:
- * project, location. azure: resource or address, apiVersion, and tenant and clientID for an Entra
+ * folder, location. azure: resource or address, apiVersion, and tenant and clientID for an Entra
  * app. baseURL: address, and header, the header the key goes in.
  */
 export interface OrgRouteSettings {
@@ -4425,10 +4507,10 @@ export interface OrgRouteSettings {
   clientID?: string;
   header?: string;
   location?: string;
-  project?: string;
   region?: string;
   resource?: string;
   tenant?: string;
+  project?: string;
 }
 
 /** Who changed an org route, and when (#999). */
@@ -4723,7 +4805,7 @@ export interface PersonaFileSaveRequest {
 export type PersonaFilesAnswer = PersonaFile[];
 
 export type PersonaOrigin =
-  | "project"
+  | "folder"
   | "personal";
 
 export interface PersonasFilesRequest {
@@ -4863,7 +4945,7 @@ export interface PluginApproveRequest {
 
 export interface PluginsList {
   folder: URLString;
-  plugins: ProjectPlugin[];
+  plugins: FolderPlugin[];
 }
 
 export interface PluginsListRequest {
@@ -4900,7 +4982,7 @@ export interface PolicyEnvironment {
   passThrough: string[];
 }
 
-/** The ceiling over each project's helper limits (#998, #64). */
+/** The ceiling over each folder's helper limits (#998, #64). */
 export interface PolicyHelpers {
   mostRunning?: number;
   mostNotArchived?: number;
@@ -5073,90 +5155,6 @@ export interface PrewarmRequest {
 export type PrewarmRequestWhy =
   | "opened"
   | "typing";
-
-export interface Project {
-  folder: URLString;
-  archivedAt?: WireDate;
-  addedAt: WireDate;
-  laidOutAt?: WireDate;
-  layoutVersion?: number;
-  helperLimits?: HelperLimits;
-  diskSpace?: DiskThresholds;
-  pinned?: boolean;
-}
-
-export interface ProjectDetection {
-  enabled: boolean;
-  paths: string[];
-}
-
-export interface ProjectMCPServer {
-  name: string;
-  summary: string;
-  managed?: ManagedMCPServer;
-  approval: MCPApprovalState;
-  missingSecrets: string[];
-  secretNames: string[];
-  entryDigest: string;
-  signIn?: MCPSignInState;
-  views?: string;
-}
-
-export interface ProjectPins {
-  folder: URLString;
-  pins: PinView[];
-  sessions?: UUID[];
-  workflows?: string[];
-  views?: PinView[];
-}
-
-export interface ProjectPlugin {
-  project: URLString;
-  folder: URLString;
-  name: string;
-  carries: string[];
-  awaitingApproval?: WorkflowApproval;
-}
-
-export interface ProjectRemovedNotification {
-  folder: URLString;
-}
-
-export interface ProjectRequest {
-  folder: URLString;
-}
-
-export interface ProjectSummary {
-  project: Project;
-  name: string;
-  exists: boolean;
-  lastActivityAt: WireDate;
-  counts: Partial<Record<AgentGroup, number>>;
-  costToDate: Record<string, number>;
-  unmeasuredAgents: number;
-  retiredCount: number;
-  guardedChanges?: GuardedChange[];
-  approvals?: Approval[];
-  /**
-   * Set when the organisation's policy caps this project's helper limits (#998, #64): the lower
-   * number is used.
-   */
-  helperLimitsSetBy?: PolicySetBy;
-}
-
-export interface ProjectWorktrees {
-  project: URLString;
-  worktrees: WorktreeSummary[];
-}
-
-export interface ProjectsFindRequest {
-  paths?: string[];
-  folders?: string[];
-}
-
-export interface ProjectsListRequest {
-  includeArchived: boolean;
-}
 
 export type PromptOrigin =
   | "person"
@@ -5425,7 +5423,7 @@ export interface ReadTokenRevoke {
 /**
  * Makes or brings up to date a host's copy of a Mac's repository (#1123): fetches the `bundle`
  * upload, moves `branches` forward only, checks out `checkout`, sets `origin`, applies the `patch`
- * upload (uncommitted changes), and adds the folder as a project. It stops, and changes nothing,
+ * upload (uncommitted changes), and adds the folder as a folder. It stops, and changes nothing,
  * when the host has changes or commits of its own.
  */
 export interface ReceiveRequest {
@@ -5460,7 +5458,7 @@ export interface ReceiveStateRequest {
 
 /**
  * One part of a file a Mac sends (#1123), at `offset` in the upload. A part is at most 16 MB; the
- * host keeps the upload until projects/receive uses it.
+ * host keeps the upload until folders/receive uses it.
  */
 export interface ReceiveUploadRequest {
   upload: UUID;
@@ -5655,7 +5653,7 @@ export type ReportRange =
   | "month"
   | "threeMonths";
 
-/** One hour or day of one machine's project and runtime, with its person (#1811). */
+/** One hour or day of one machine's folder and runtime, with its person (#1811). */
 export interface ReportRow {
   /** The UTC hour ("2026-10-21T15") or day ("2026-10-21"). */
   at: string;
@@ -5663,7 +5661,6 @@ export interface ReportRow {
   personName: string;
   host: HostID;
   hostName: string;
-  project: string;
   runtime: string;
   /**
    * The workflow that started the agents of this row (#2019), by its id; absent for agents a person
@@ -5690,6 +5687,7 @@ export interface ReportRow {
   groups?: string[];
   /** What the agents did (#2019): sessions, pull requests and waits. */
   counts?: ReportCounts;
+  folder: string;
 }
 
 /** Whose rows a report adds up (#1804). */
@@ -5731,7 +5729,7 @@ export interface ReportView {
   page: ReportPage;
   scope: ReportScope;
   range: ReportRange;
-  /** The way the page adds up: person, project, machine, runtime, group or workflow. */
+  /** The way the page adds up: person, folder, machine, runtime, group or workflow. */
   by?: string;
 }
 
@@ -6063,8 +6061,8 @@ export interface SaidMatch {
 }
 
 /**
- * agents/said (#1585): the sessions whose prompts or replies hold the text, any case, in one
- * project when folder says.
+ * agents/said (#1585): the sessions whose prompts or replies hold the text, any case, in one folder
+ * when folder says.
  */
 export interface SaidSearchRequest {
   text: string;
@@ -6186,14 +6184,14 @@ export interface SendFactsRequest {
   folder: URLString;
 }
 
-/** A file the host made for a send, read with projects/sendRead (#1123). */
+/** A file the host made for a send, read with folders/sendRead (#1123). */
 export interface SendFile {
   id: UUID;
   size: number;
 }
 
 /**
- * What projects/sendPack made (#1123): each branch at its commit, the bundle (none when the
+ * What folders/sendPack made (#1123): each branch at its commit, the bundle (none when the
  * receiving host has every commit) and the patch (none when nothing is uncommitted).
  */
 export interface SendPack {
@@ -6222,7 +6220,7 @@ export interface SendRead {
   end: boolean;
 }
 
-/** One part of a file projects/sendPack made, from `offset` (#1123). */
+/** One part of a file folders/sendPack made, from `offset` (#1123). */
 export interface SendReadRequest {
   id: UUID;
   offset: number;
@@ -6376,7 +6374,7 @@ export interface SharedMCP {
 }
 
 export interface SharedOtherFile {
-  /** Relative to `~/.agents`, or to a project's `.agents`. */
+  /** Relative to `~/.agents`, or to a folder's `.agents`. */
   path: string;
   kind: SharedOtherFileKind;
 }
@@ -6420,7 +6418,7 @@ export interface SharedProblem {
 export type SharedReach = "unchecked" | { gets: string } | { ownCopy: string } | { leftOut: string } | { noWay: string } | { unchecked: string };
 
 /**
- * `personal/shared`'s params: none reads the person's `~/.agents`; `folder` reads that project's
+ * `personal/shared`'s params: none reads the person's `~/.agents`; `folder` reads that folder's
  * `.agents` (#754), which has no per-runtime reach.
  */
 export interface SharedRequest {
@@ -6472,7 +6470,7 @@ export type SharedSkillSource = "personal" | { plugin: string };
  * `mcp.json`: env and headers go by name only (FR-023).
  */
 export interface SharedSnapshot {
-  /** `~/.agents`, or a project's `.agents` (#754). */
+  /** `~/.agents`, or a folder's `.agents` (#754). */
   home: string;
   /**
    * False for a copy of the app with no personal home (a scratch root), when everything else is
@@ -6900,7 +6898,7 @@ export interface SkillDestination {
 
 export type SkillDestinationKind =
   | "personal"
-  | "project";
+  | "folder";
 
 export interface SkillNameRequest {
   destination: SkillDestination;
@@ -7096,12 +7094,11 @@ export interface TeamBotRun {
 }
 
 /**
- * workflows/trigger and workflows/fire (#2011, spec 736 FR-035): a project or control-plane event
- * (a server's, such as github or a channel's) or a schedule that a runs-on: workflow's trigger
+ * workflows/trigger and workflows/fire (#2011, spec 736 FR-035): a folder or control-plane event (a
+ * server's, such as github or a channel's) or a schedule that a runs-on: workflow's trigger
  * matched. A machine sends it to the control plane, which sends it once to one of the bot's
- * machines. workflow is the project folder's name and the workflow's id; trigger, the same words on
- * every machine that heard it; event, the event (none for a schedule); dueAt, a schedule's due
- * time.
+ * machines. workflow is the folder's name and the workflow's id; trigger, the same words on every
+ * machine that heard it; event, the event (none for a schedule); dueAt, a schedule's due time.
  */
 export interface TeamTrigger {
   workflow: string;
@@ -7319,12 +7316,12 @@ export interface TurnsRequest {
  * (`uncommitted`).
  */
 export interface UnpushedWork {
-  project: URLString;
   worktree: URLString;
   branch?: string;
   ahead?: number;
   unmerged?: number;
   uncommitted?: number;
+  folder: URLString;
 }
 
 export interface UnqueueRequest {
@@ -7410,10 +7407,8 @@ export interface UsageRollupPeriod {
   rows: UsageRollupRow[];
 }
 
-/** One project and runtime's usage in an hour or a day (#1811), as a machine adds it up. */
+/** One folder and runtime's usage in an hour or a day (#1811), as a machine adds it up. */
 export interface UsageRollupRow {
-  /** The project's folder name, so the same repository on two machines adds up. */
-  project: string;
   runtime: string;
   /**
    * The workflow that started the agents of this row (#2019), by its id; absent for agents a person
@@ -7446,6 +7441,8 @@ export interface UsageRollupRow {
    * accounts.
    */
   route?: string;
+  /** The folder name, so the same repository on two machines adds up. */
+  folder: string;
 }
 
 /**
@@ -7587,12 +7584,12 @@ export interface ViewAsk {
 
 export interface ViewCallRequest {
   agentID: UUID;
-  project?: URLString;
   viewID: UUID;
   name: string;
   arguments?: JSONValue;
   feed?: boolean;
   server?: string;
+  folder?: URLString;
 }
 
 export interface ViewContextRequest {
@@ -7621,7 +7618,7 @@ export interface ViewReadRequest {
   agentID: UUID;
   uri: string;
   server?: string;
-  project?: URLString;
+  folder?: URLString;
 }
 
 export interface ViewResource {
@@ -7635,11 +7632,11 @@ export interface ViewResource {
 
 export interface ViewShowRequest {
   agentID: UUID;
-  project?: URLString;
   server: string;
   uri: string;
   hash: string;
   show: boolean;
+  folder?: URLString;
 }
 
 /** An agent's call of one of the agents server's tools that has a view, relayed with its token. */
@@ -7813,10 +7810,10 @@ export interface WorkflowEnableRequest {
   enabled: boolean;
 }
 
-export type WorkflowLimit = "project";
+export type WorkflowLimit = "folder";
 
 /**
- * How many approved workflows may be turned on in each project. An unset value means 20. The range
+ * How many approved workflows may be turned on in each folder. An unset value means 20. The range
  * is 1 to 100. Kept in workflow-limit.json.
  */
 export interface WorkflowLimitSettings {
@@ -7924,7 +7921,7 @@ export interface WorkflowSettingsRequest {
  * its default (`isEnabled` true; false, 0, [] or absent for the rest).
  */
 export interface WorkflowSummary {
-  scope?: "project" | "user";
+  scope?: "folder" | "user";
   content?: string;
   workflow: Workflow;
   isArchived: boolean;
@@ -7973,7 +7970,7 @@ export interface WorkflowWriteRequest {
 
 export interface WorkflowsListRequest {
   folder?: URLString;
-  scope?: "project" | "user";
+  scope?: "folder" | "user";
 }
 
 export type WorktreeChoice =
@@ -7983,9 +7980,9 @@ export type WorktreeChoice =
   | { branch: { _0: string } };
 
 export interface WorktreeRemovalRequest {
-  project: URLString;
   root: URLString;
   confirmed: boolean;
+  folder: URLString;
 }
 
 export interface WorktreeRemoved {
@@ -8013,12 +8010,12 @@ export interface WorktreeSummary {
   name: string;
   root: URLString;
   branch?: string;
-  isProjectFolder: boolean;
   exists: boolean;
   madeByApp: boolean;
   agents: UUID[];
   status?: WorktreeStatus;
   size?: WorktreeSize;
+  isFolder: boolean;
 }
 
 export interface WorktreesListRequest {
@@ -8055,8 +8052,8 @@ export interface Methods {
   "agents/archive": { params: AgentRequest; result: Empty };
   "agents/branchFrom": { params: BranchFromRequest; result: UUID };
   "agents/cancelContinue": { params: AgentRequest; result: Agent };
+  "agents/continueInFolder": { params: ContinueInFolderRequest; result: UUID };
   "agents/continueInNew": { params: ContinueInNewRequest; result: UUID };
-  "agents/continueInProject": { params: ContinueInProjectRequest; result: UUID };
   "agents/continueWhenBack": { params: AgentRequest; result: Agent };
   "agents/delete": { params: AgentRequest; result: Empty };
   "agents/discardDraft": { params: DiscardDraftRequest; result: Empty };
@@ -8091,7 +8088,7 @@ export interface Methods {
   "agents/turns": { params: TurnsRequest; result: TurnsPage };
   "agents/unarchive": { params: AgentRequest; result: Empty };
   "agents/unqueue": { params: UnqueueRequest; result: Empty };
-  "approvals/answer": { params: ApprovalAnswer; result: ProjectSummary };
+  "approvals/answer": { params: ApprovalAnswer; result: FolderSummary };
   "approvals/read": { params: ApprovalReadRequest; result: GuardedChangeReading };
   "artifact/write": { params: ArtifactWriteRequest; result: Empty };
   "attention/pending": { params: Empty; result: AttentionPending };
@@ -8147,6 +8144,17 @@ export interface Methods {
   "files/read": { params: FilesReadRequest; result: FileReading };
   "files/unwatch": { params: FilesWatchRequest; result: Empty };
   "files/watch": { params: FilesWatchRequest; result: Empty };
+  "folders/add": { params: FolderRequest; result: FolderSummary };
+  "folders/archive": { params: FolderRequest; result: FolderSummary };
+  "folders/clone": { params: CloneRequest; result: FolderSummary };
+  "folders/clones": { params: Empty; result: CloneSummary[] };
+  "folders/delete": { params: FolderRequest; result: Empty };
+  "folders/keepGuardedChange": { params: GuardedChangeRequest; result: FolderSummary };
+  "folders/list": { params: FoldersListRequest; result: FolderSummary[] };
+  "folders/readGuardedChange": { params: GuardedChangeRequest; result: GuardedChangeReading };
+  "folders/setPinned": { params: SetPinnedRequest; result: FolderSummary };
+  "folders/unarchive": { params: FolderRequest; result: FolderSummary };
+  "folders/undoGuardedChange": { params: GuardedChangeRequest; result: FolderSummary };
   "governance/approvals": { params: Empty; result: CatalogApprovalList };
   "governance/decide": { params: CatalogDecide; result: CatalogRequest };
   "governance/request": { params: CatalogAsk; result: CatalogRequest };
@@ -8205,7 +8213,7 @@ export interface Methods {
   "pins/arrangeSessions": { params: PinArrangeSessionsRequest; result: Empty };
   "pins/arrangeWorkflows": { params: PinArrangeWorkflowsRequest; result: Empty };
   "pins/hideView": { params: PinHideViewRequest; result: Empty };
-  "pins/list": { params: Empty; result: ProjectPins[] };
+  "pins/list": { params: Empty; result: FolderPins[] };
   "pins/pin": { params: PinRequest; result: PinView[] };
   "pins/pinSession": { params: PinSessionRequest; result: Empty };
   "pins/pinWorkflow": { params: WorkflowRequest; result: Empty };
@@ -8222,17 +8230,6 @@ export interface Methods {
   "preferences/get": { params: Empty; result: Record<string, JSONValue> };
   "preferences/set": { params: Record<string, JSONValue>; result: Record<string, JSONValue> };
   "presence/report": { params: PresenceReport; result: Empty };
-  "projects/add": { params: ProjectRequest; result: ProjectSummary };
-  "projects/archive": { params: ProjectRequest; result: ProjectSummary };
-  "projects/clone": { params: CloneRequest; result: ProjectSummary };
-  "projects/clones": { params: Empty; result: CloneSummary[] };
-  "projects/delete": { params: ProjectRequest; result: Empty };
-  "projects/keepGuardedChange": { params: GuardedChangeRequest; result: ProjectSummary };
-  "projects/list": { params: ProjectsListRequest; result: ProjectSummary[] };
-  "projects/readGuardedChange": { params: GuardedChangeRequest; result: GuardedChangeReading };
-  "projects/setPinned": { params: SetPinnedRequest; result: ProjectSummary };
-  "projects/unarchive": { params: ProjectRequest; result: ProjectSummary };
-  "projects/undoGuardedChange": { params: GuardedChangeRequest; result: ProjectSummary };
   "providers/add": { params: ProviderAdd; result: ProviderSummary };
   "providers/create": { params: ProviderCreate; result: ProviderCreated };
   "providers/list": { params: Empty; result: ProviderList };
@@ -8314,7 +8311,7 @@ export interface Methods {
   "workflows/setMuted": { params: WorkflowMuteRequest; result: WorkflowSummary };
   "workflows/settings": { params: WorkflowSettingsRequest; result: WorkflowSummary };
   "workflows/write": { params: WorkflowWriteRequest; result: WorkflowSummary };
-  "worktrees/all": { params: Empty; result: ProjectWorktrees[] };
+  "worktrees/all": { params: Empty; result: FolderWorktrees[] };
   "worktrees/check": { params: WorktreeRemovalRequest; result: RemovalCheck };
   "worktrees/list": { params: WorktreesListRequest; result: WorktreesListResponse };
   "worktrees/remove": { params: WorktreeRemovalRequest; result: WorktreeRemoved };
@@ -8327,8 +8324,8 @@ export const MethodTarget = {
   "agents/archive": "host",
   "agents/branchFrom": "host",
   "agents/cancelContinue": "host",
+  "agents/continueInFolder": "host",
   "agents/continueInNew": "host",
-  "agents/continueInProject": "host",
   "agents/continueWhenBack": "host",
   "agents/delete": "host",
   "agents/discardDraft": "host",
@@ -8419,6 +8416,17 @@ export const MethodTarget = {
   "files/read": "host",
   "files/unwatch": "host",
   "files/watch": "host",
+  "folders/add": "host",
+  "folders/archive": "host",
+  "folders/clone": "host",
+  "folders/clones": "host",
+  "folders/delete": "host",
+  "folders/keepGuardedChange": "host",
+  "folders/list": "host",
+  "folders/readGuardedChange": "host",
+  "folders/setPinned": "host",
+  "folders/unarchive": "host",
+  "folders/undoGuardedChange": "host",
   "governance/approvals": "control",
   "governance/decide": "control",
   "governance/request": "control",
@@ -8494,17 +8502,6 @@ export const MethodTarget = {
   "preferences/get": "host",
   "preferences/set": "host",
   "presence/report": "host",
-  "projects/add": "host",
-  "projects/archive": "host",
-  "projects/clone": "host",
-  "projects/clones": "host",
-  "projects/delete": "host",
-  "projects/keepGuardedChange": "host",
-  "projects/list": "host",
-  "projects/readGuardedChange": "host",
-  "projects/setPinned": "host",
-  "projects/unarchive": "host",
-  "projects/undoGuardedChange": "host",
   "providers/add": "control",
   "providers/create": "control",
   "providers/list": "control",
@@ -8630,6 +8627,8 @@ export interface Notifications {
   "daemon/policyStateChanged": PolicyState;
   "disk/changed": DiskState;
   "files/changed": FilesChangedNotification;
+  "folder/changed": FolderSummary;
+  "folder/removed": FolderRemovedNotification;
   "mcp/healthChanged": MCPHealthSnapshot;
   "mcp/hostedChanged": HostedMCPSnapshot;
   "milestones/changed": Milestones;
@@ -8637,8 +8636,6 @@ export interface Notifications {
   "pages/changed": PagesChangedNotification;
   "pins/changed": PinsChangedNotification;
   "preferences/changed": Record<string, JSONValue>;
-  "project/changed": ProjectSummary;
-  "project/removed": ProjectRemovedNotification;
   "resources/changed": LeaseSnapshot;
   "runtimes/accountProfilesChanged": AccountProfile[];
   "storage/writeFailed": WriteFailure;
@@ -8669,7 +8666,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },
   AgentStopRequest: { required: ["agentID"], optional: ["byAdmin"] },
-  AgentWorktree: { required: ["name", "root", "project", "madeByApp"], optional: ["branch", "base"] },
+  AgentWorktree: { required: ["name", "root", "madeByApp", "folder"], optional: ["branch", "base"] },
   AgentsExport: { required: ["file", "agents", "name"], optional: [] },
   AgentsExportRequest: { required: [], optional: ["agentID", "folder"] },
   AgentsImportRequest: { required: ["upload"], optional: ["folder"] },
@@ -8753,7 +8750,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   CatalogUseRow: { required: ["kind", "name", "version", "machines", "people"], optional: ["source"] },
   CatchUpLeases: { required: ["leases", "hosted", "health"], optional: [] },
   CatchUpRequest: { required: [], optional: ["agents", "parts"] },
-  CatchUpSnapshot: { required: ["projects", "agents", "permissions", "elicitations", "attention", "resuming"], optional: ["disk", "storeNotes", "milestones", "workflows", "pins", "leases"] },
+  CatchUpSnapshot: { required: ["agents", "permissions", "elicitations", "attention", "resuming", "folders"], optional: ["disk", "storeNotes", "milestones", "workflows", "pins", "leases"] },
   ChangedFile: { required: ["path", "source", "state", "editCount", "beyondReported", "inProgress", "outsideFolder"], optional: ["relativePath", "added", "removed", "firstLine", "oldPath"] },
   ChangedFileDetail: { required: ["file", "edits"], optional: ["hunks", "whole"] },
   ChangesFileRequest: { required: ["agentID", "path", "whole"], optional: [] },
@@ -8803,8 +8800,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConnectorWorkflow: { required: ["id", "name"], optional: [] },
   ConsoleStopAgent: { required: ["host", "agent"], optional: [] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
+  ContinueInFolderRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
   ContinueInNewRequest: { required: ["agentID"], optional: ["accountID", "requestID"] },
-  ContinueInProjectRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
   ContinueWhenBack: { required: ["at", "resetKnown"], optional: [] },
   ControlAuth: { required: ["id", "nonce", "mac", "kind"], optional: ["for", "epoch", "capabilities", "page", "publicKey"] },
   ControlClientChanged: { required: [], optional: ["client", "removed"] },
@@ -8821,7 +8818,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ControlPerson: { required: ["id", "name", "role"], optional: ["localOwner"] },
   ControlPush: { required: ["sealed"], optional: [] },
   ControlPushItem: { required: ["needID", "alert"], optional: ["headline"] },
-  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "publicWeb", "publicViews", "thisMacHost", "projectDetection", "unjoinedTunnels", "capabilities", "required", "person", "joinCommand"] },
+  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "publicWeb", "publicViews", "thisMacHost", "folderDetection", "unjoinedTunnels", "capabilities", "required", "person", "joinCommand"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
   CostState: { required: ["limits", "today", "day", "tokensToday"], optional: ["note", "organisation", "setBy"] },
@@ -8904,8 +8901,19 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FindResult: { required: ["matches", "more"], optional: [] },
   FleetBoard: { required: ["machines"], optional: [] },
   FleetMachine: { required: ["host", "ownerName", "bot"], optional: ["running", "heardAt"] },
+  Folder: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits", "diskSpace", "pinned"] },
+  FolderDetection: { required: ["enabled", "paths"], optional: [] },
   FolderHunk: { required: ["oldStart", "newStart", "noNewlineAtEnd", "lines"], optional: [] },
-  FoundFolder: { required: ["folder", "exists", "isRepository", "isProject"], optional: ["typed"] },
+  FolderMCPServer: { required: ["name", "summary", "approval", "missingSecrets", "secretNames", "entryDigest"], optional: ["managed", "signIn", "views"] },
+  FolderPins: { required: ["folder", "pins"], optional: ["sessions", "workflows", "views"] },
+  FolderPlugin: { required: ["folder", "name", "carries", "folderPath"], optional: ["awaitingApproval"] },
+  FolderRemovedNotification: { required: ["folder"], optional: [] },
+  FolderRequest: { required: ["folder"], optional: [] },
+  FolderSummary: { required: ["name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount", "folder"], optional: ["guardedChanges", "approvals", "helperLimitsSetBy"] },
+  FolderWorktrees: { required: ["worktrees", "folder"], optional: [] },
+  FoldersFindRequest: { required: [], optional: ["paths", "folders"] },
+  FoldersListRequest: { required: ["includeArchived"], optional: [] },
+  FoundFolder: { required: ["folder", "exists", "isRepository", "isFolder"], optional: ["typed"] },
   GitAsk: { required: ["server", "from"], optional: [] },
   GitCredential: { required: ["username", "password"], optional: [] },
   GitCredentialRequest: { required: ["protocol", "host"], optional: ["path"] },
@@ -8935,7 +8943,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HostJoinDecision: { required: ["result"], optional: ["host", "controlKey", "name"] },
   HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
   HostJoinTicket: { required: ["request", "code", "expires"], optional: [] },
-  HostLastHeard: { required: ["host"], optional: ["projects", "agents", "heardAt"] },
+  HostLastHeard: { required: ["host"], optional: ["folders", "agents", "heardAt"] },
   HostLink: { required: ["host", "provider", "workspace"], optional: ["startWhenUsed", "stopWhenIdleMinutes"] },
   HostMachine: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },
   HostMachineCall: { required: ["agent", "method", "params"], optional: [] },
@@ -8954,7 +8962,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HostUser: { required: ["user", "kind", "name", "labels"], optional: ["capReachedUntil", "bots"] },
   HostUserSettings: { required: ["user", "settings", "secrets"], optional: [] },
   HostedMCPSnapshot: { required: ["servers", "at"], optional: [] },
-  HostedMCPStatus: { required: ["name", "state", "restarts", "users"], optional: ["project", "since", "retryAt", "lastError"] },
+  HostedMCPStatus: { required: ["name", "state", "restarts", "users"], optional: ["since", "retryAt", "lastError", "folder"] },
   JoinApproved: { required: ["host"], optional: [] },
   JoinDecided: { required: ["request", "result"], optional: [] },
   JoinRequest: { required: ["request", "name", "platform", "code", "expires", "for"], optional: ["forName"] },
@@ -8987,8 +8995,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MCPEventTrigger: { required: ["event", "arguments"], optional: ["servers"] },
   MCPHandServer: { required: ["name", "kind", "command", "args", "env", "url", "headers"], optional: [] },
   MCPHandValue: { required: ["name", "value", "secret"], optional: ["secretName"] },
-  MCPHealthCheckRequest: { required: [], optional: ["project"] },
-  MCPHealthFileProblem: { required: ["message"], optional: ["project"] },
+  MCPHealthCheckRequest: { required: [], optional: ["folder"] },
+  MCPHealthFileProblem: { required: ["message"], optional: ["folder"] },
   MCPHealthSnapshot: { required: ["servers", "problems", "at"], optional: [] },
   MCPLevels: { required: ["tools", "events", "views", "workflows", "tested"], optional: [] },
   MCPListAnswer: { required: ["servers"], optional: ["problem", "approvalsProblem"] },
@@ -9001,7 +9009,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MCPRemoveRequest: { required: ["destination", "name"], optional: ["forgetSecret"] },
   MCPSearchAnswer: { required: ["results"], optional: ["error"] },
   MCPServer: { required: ["name", "transport"], optional: [] },
-  MCPServerHealth: { required: ["name", "transport", "hosted", "check"], optional: ["project", "live", "checkedAt", "lastError", "tools", "levels"] },
+  MCPServerHealth: { required: ["name", "transport", "hosted", "check"], optional: ["live", "checkedAt", "lastError", "tools", "levels", "folder"] },
   MCPSetSecretAnswer: { required: ["set"], optional: [] },
   MCPSetSecretRequest: { required: ["name", "value"], optional: [] },
   MCPSignInAnswer: { required: [], optional: ["flowID", "authorizationURL", "needsClient", "callback", "error"] },
@@ -9056,7 +9064,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   OrgRouteReplaceKey: { required: ["id", "secrets", "rev"], optional: [] },
   OrgRouteRequest: { required: ["id"], optional: ["rev"] },
   OrgRouteSet: { required: ["route"], optional: ["secrets", "rev"] },
-  OrgRouteSettings: { required: [], optional: ["address", "apiVersion", "clientID", "header", "location", "project", "region", "resource", "tenant"] },
+  OrgRouteSettings: { required: [], optional: ["address", "apiVersion", "clientID", "header", "location", "region", "resource", "tenant", "project"] },
   OrgRouteStamp: { required: ["by", "at"], optional: [] },
   OrgRouteVersion: { required: ["id", "version"], optional: [] },
   OrgRoutesApplied: { required: ["routes"], optional: [] },
@@ -9129,17 +9137,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PresenceReport: { required: ["active"], optional: ["watching", "mayNotify", "showing", "alsoShowing"] },
   PreviewFile: { required: ["path", "bytes", "runnable", "via"], optional: [] },
   PrewarmRequest: { required: ["agentID", "why"], optional: [] },
-  Project: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits", "diskSpace", "pinned"] },
-  ProjectDetection: { required: ["enabled", "paths"], optional: [] },
-  ProjectMCPServer: { required: ["name", "summary", "approval", "missingSecrets", "secretNames", "entryDigest"], optional: ["managed", "signIn", "views"] },
-  ProjectPins: { required: ["folder", "pins"], optional: ["sessions", "workflows", "views"] },
-  ProjectPlugin: { required: ["project", "folder", "name", "carries"], optional: ["awaitingApproval"] },
-  ProjectRemovedNotification: { required: ["folder"], optional: [] },
-  ProjectRequest: { required: ["folder"], optional: [] },
-  ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: ["guardedChanges", "approvals", "helperLimitsSetBy"] },
-  ProjectWorktrees: { required: ["project", "worktrees"], optional: [] },
-  ProjectsFindRequest: { required: [], optional: ["paths", "folders"] },
-  ProjectsListRequest: { required: ["includeArchived"], optional: [] },
   PromptRequest: { required: ["agentID", "text", "attachments", "from"], optional: ["sendID", "voice"] },
   ProviderAdd: { required: ["name", "kind"], optional: ["id", "command", "args", "url", "headers", "commands", "map", "secrets", "cli", "draft"] },
   ProviderCreate: { required: ["id", "name"], optional: ["options", "clones", "repository"] },
@@ -9192,7 +9189,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ReportExport: { required: ["text", "count", "format"], optional: [] },
   ReportPolicy: { required: ["totalsOnly", "leads", "budgetsUSD"], optional: [] },
   ReportQuery: { required: ["range"], optional: ["format", "scope"] },
-  ReportRow: { required: ["at", "person", "personName", "host", "hostName", "project", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds"], optional: ["workflow", "groups", "counts"] },
+  ReportRow: { required: ["at", "person", "personName", "host", "hostName", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds", "folder"], optional: ["workflow", "groups", "counts"] },
   ReportScope: { required: ["kind"], optional: ["group"] },
   ReportScopeOption: { required: ["scope", "name"], optional: [] },
   ReportScopes: { required: ["scopes", "admin"], optional: [] },
@@ -9364,7 +9361,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   TurnUsage: { required: ["totalTokens", "inputTokens", "outputTokens"], optional: ["thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "cost", "route", "relayTokens"] },
   TurnsPage: { required: ["turns", "firstTurn", "openStart"], optional: ["firstPrompt"] },
   TurnsRequest: { required: ["agentID", "limit"], optional: ["before"] },
-  UnpushedWork: { required: ["project", "worktree"], optional: ["branch", "ahead", "unmerged", "uncommitted"] },
+  UnpushedWork: { required: ["worktree", "folder"], optional: ["branch", "ahead", "unmerged", "uncommitted"] },
   UnqueueRequest: { required: ["agentID", "promptID"], optional: [] },
   Usage: { required: ["used", "size", "at"], optional: ["cost"] },
   UsageBucket: { required: ["cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns"], optional: [] },
@@ -9372,7 +9369,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   UsageReport: { required: ["range", "rows", "admin"], optional: ["scope", "personsHidden", "groupNames", "budgetUSD", "monthSpentUSD"] },
   UsageRollup: { required: ["hours", "days"], optional: [] },
   UsageRollupPeriod: { required: ["at", "rows"], optional: [] },
-  UsageRollupRow: { required: ["project", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds"], optional: ["workflow", "counts", "limitTokens", "route"] },
+  UsageRollupRow: { required: ["runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds", "folder"], optional: ["workflow", "counts", "limitTokens", "route"] },
   UserAgentConfig: { required: [], optional: ["instructions", "personas", "skills"] },
   UserPartHere: { required: ["part", "value"], optional: ["leftOut"] },
   UserPartRequest: { required: ["part"], optional: [] },
@@ -9385,13 +9382,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   UserSettingsPart: { required: ["part", "value"], optional: [] },
   UserSuspended: { required: ["user", "provider", "at"], optional: ["off"] },
   ViewAsk: { required: ["server", "uri", "hash", "isNew"], optional: [] },
-  ViewCallRequest: { required: ["agentID", "viewID", "name"], optional: ["project", "arguments", "feed", "server"] },
+  ViewCallRequest: { required: ["agentID", "viewID", "name"], optional: ["arguments", "feed", "server", "folder"] },
   ViewContextRequest: { required: ["agentID", "viewID"], optional: ["uri", "content", "structuredContent"] },
   ViewLogRequest: { required: ["agentID", "viewID"], optional: ["level", "data"] },
   ViewPin: { required: ["server", "uri", "tool"], optional: ["arguments"] },
-  ViewReadRequest: { required: ["agentID", "uri"], optional: ["server", "project"] },
+  ViewReadRequest: { required: ["agentID", "uri"], optional: ["server", "folder"] },
   ViewResource: { required: ["uri", "mimeType", "html", "policy", "variables"], optional: ["prefersBorder"] },
-  ViewShowRequest: { required: ["agentID", "server", "uri", "hash", "show"], optional: ["project"] },
+  ViewShowRequest: { required: ["agentID", "server", "uri", "hash", "show"], optional: ["folder"] },
   ViewToolCallRequest: { required: ["token", "name"], optional: ["arguments"] },
   Wait: { required: ["agentID", "nameAtReport"], optional: ["ending"] },
   WaitEnding: { required: ["at", "how"], optional: [] },
@@ -9420,12 +9417,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["scope", "content", "overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "hearsFor", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
   WorkflowWriteRequest: { required: ["workflowID", "content"], optional: [] },
   WorkflowsListRequest: { required: [], optional: ["folder", "scope"] },
-  WorktreeRemovalRequest: { required: ["project", "root", "confirmed"], optional: [] },
+  WorktreeRemovalRequest: { required: ["root", "confirmed", "folder"], optional: [] },
   WorktreeRemoved: { required: ["removedBranch"], optional: [] },
   WorktreeSize: { required: ["bytes", "partial"], optional: [] },
   WorktreeSizeNote: { required: ["root", "size"], optional: [] },
   WorktreeStatus: { required: ["uncommitted"], optional: ["ahead", "behind", "unmerged"] },
-  WorktreeSummary: { required: ["name", "root", "isProjectFolder", "exists", "madeByApp", "agents"], optional: ["branch", "status", "size"] },
+  WorktreeSummary: { required: ["name", "root", "exists", "madeByApp", "agents", "isFolder"], optional: ["branch", "status", "size"] },
   WorktreesListRequest: { required: ["folder"], optional: [] },
   WorktreesListResponse: { required: ["isRepository", "canMakeNew", "worktrees", "branches"], optional: ["whyNot"] },
   WorktreesSized: { required: ["sizes"], optional: [] },

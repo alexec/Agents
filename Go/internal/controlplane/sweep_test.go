@@ -291,10 +291,10 @@ func TestWhatAHostLastListedIsKept(t *testing.T) {
 	box.stop()
 	var heard map[string]json.RawMessage
 	json.Unmarshal(call(t, window, "", "hosts/lastHeard", map[string]string{"host": box.member.Host}), &heard)
-	if string(heard["agents"]) != "[]" || heard["heardAt"] == nil || heard["projects"] != nil {
+	if string(heard["agents"]) != "[]" || heard["heardAt"] == nil || heard["folders"] != nil {
 		t.Fatalf("%s", heard)
 	}
-	if !keepsList("projects/list", nil) || keepsList("agents/list", json.RawMessage(`{"lean":true,"includeArchived":true}`)) {
+	if !keepsList("folders/list", nil) || keepsList("agents/list", json.RawMessage(`{"lean":true,"includeArchived":true}`)) {
 		t.Fatal("keeps the wrong lists")
 	}
 	// A removed host's copy goes.

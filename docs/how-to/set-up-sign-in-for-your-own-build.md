@@ -116,7 +116,7 @@ any id in the list. Google sends the person back to the app on the client id tur
    key.
 8. In `Go/internal/controlplane/signin/config.go`, set `AppGitHubClientID` to the client id.
 
-Use a GitHub App for sign-in only. Do not use the App that connects GitHub to your projects.
+Use a GitHub App for sign-in only. Do not use the App that connects GitHub to your folders.
 Then a token that is passed on has no rights on your repositories.
 
 The **Members** permission lets the control plane check **Allowed GitHub organisations**: it

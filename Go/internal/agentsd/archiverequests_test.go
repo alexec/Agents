@@ -130,7 +130,7 @@ func TestALeadStopsAndArchivesItsHelpers(t *testing.T) {
 		t.Fatal(text)
 	}
 	// One below one it started is its to archive too.
-	if text, _ := m.tool(4, "archive_session", map[string]any{"id": string(below.ID)}); text != "Archived “Below”, freeing its place; the person can unarchive it. This project now has 0 of 3 running, 1 of 5 not archived." {
+	if text, _ := m.tool(4, "archive_session", map[string]any{"id": string(below.ID)}); text != "Archived “Below”, freeing its place; the person can unarchive it. This folder now has 0 of 3 running, 1 of 5 not archived." {
 		t.Fatal(text)
 	}
 	if a := d.Store.Agent(below.ID); a.State != wire.AgentStateArchived || *a.ArchivedReason != wire.AgentArchivedReasonByAgent {

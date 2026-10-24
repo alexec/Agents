@@ -51,8 +51,8 @@ A workflow's run or a session started by a session can wait by itself, with nobo
 - **A workflow:** on its page, turn on **Continue when the allowance is back**, or add
   `continue-when-back: true` to its file's front matter. Each run whose turn is refused for a
   spent allowance waits at once, and its row says **Continues at 07:00**.
-- **Helpers:** on the Mac, open the project's **Project Settings ▸ General** and turn on
-  **Helpers continue when the allowance is back**. It is kept in `.agents/project.json`.
+- **Helpers:** on the Mac, open the folder's **Folder Settings ▸ General** and turn on
+  **Helpers continue when the allowance is back**. It is kept in `.agents/folder.json`.
 
 Both are off unless you set them. A chat you started waits only when you choose **Continue**.
 
@@ -82,17 +82,17 @@ choose it. A new chat you start on one begins there.
 
 ## Continue the work in a new chat
 
-1. Start a new chat in the same project, on a runtime that isn't out.
+1. Start a new chat in the same folder, on a runtime that isn't out.
 2. Ask it to continue the other chat by its title: **Please continue the work of Login
    redirect.**
 
-The agent finds that chat in the project and reads its history: what you asked, what it said,
+The agent finds that chat in the folder and reads its history: what you asked, what it said,
 the tools it ran and the files they touched, and its plan as it last stood. A long chat is
 shortened from the middle, and the history says how many turns were left out. The files are
 already as the first chat left them.
 
 If two chats have that title, the agent is told and shows you each, and you say which. It can
-also list the chats in the project, or be given a chat's id.
+also list the chats in the folder, or be given a chat's id.
 
 ## Bring a runtime back
 

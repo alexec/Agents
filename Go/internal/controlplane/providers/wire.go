@@ -136,7 +136,7 @@ const (
 	MethodAgentsPrompt      = "agents/prompt"
 	MethodAgentsStart       = "agents/start"
 	MethodAgentsStop        = "agents/stop"
-	MethodProjectsClone     = "projects/clone"
+	MethodFoldersClone     = "folders/clone"
 )
 
 // Notification names (DaemonAPI.Notification).

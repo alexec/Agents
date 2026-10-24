@@ -96,7 +96,7 @@ on `agents/reviews-dead-code`.
 
 Group `sure` findings by client or language: Mac/Host, Remote, each independent Swift
 package, Go and Web. Start no more than one helper for a group at a time, and stay within
-the project's session limits. Give each helper a new worktree off `main` and one group.
+the folder's session limits. Give each helper a new worktree off `main` and one group.
 The helper removes only that group's code, updates any necessary tests, runs the unit
 tests for touched paths, and opens one pull request with `Fixes #<finding issue>`.
 The PR explains the reachability proof and includes the client parity lines if a deletion

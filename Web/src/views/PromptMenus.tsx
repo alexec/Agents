@@ -94,7 +94,7 @@ function ClientPermissionControl({ runtime, mode, onChange, disabled }: {
     : "Answers every permission request for you. Questions that are not permission still wait.";
   return (
     <details class="client-permission-control">
-      <summary class="pill" title={`Permission for ${runtime}. Applies to every ${runtime} agent, including workflows and server projects.`}
+      <summary class="pill" title={`Permission for ${runtime}. Applies to every ${runtime} agent, including workflows and server folders.`}
         aria-label={`${runtime} permission: ${title}`} aria-disabled={disabled}>
         {title} <span aria-hidden="true">▾</span>
       </summary>
@@ -111,7 +111,7 @@ function ClientPermissionControl({ runtime, mode, onChange, disabled }: {
             <span class="quiet small">{description(choice)}</span>
           </button>
         ))}
-        <p class="quiet small">Applies to every {runtime} agent, including workflows and server projects.</p>
+        <p class="quiet small">Applies to every {runtime} agent, including workflows and server folders.</p>
       </div>
     </details>
   );

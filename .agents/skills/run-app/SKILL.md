@@ -31,9 +31,9 @@ S=.claude/skills/run-app/scripts
 # 1. build and launch on a fresh root (prints ROOT, APP_PID, WINDOW_ID, WINDOW_ON, DAEMON_PID, CONTROL_PID, CONTROL_URL)
 eval "$($S/launch.sh --slug mychange)"        # /tmp/run-mychange
 
-# 2. give it something to work in — you may create scratch projects freely
+# 2. give it something to work in — you may create scratch folders freely
 mkdir -p $ROOT/work && git -C $ROOT/work init -q
-$S/rpc.py $ROOT call projects/add "{\"folder\":\"file://$ROOT/work\"}"
+$S/rpc.py $ROOT call folders/add "{\"folder\":\"file://$ROOT/work\"}"
 
 # 3. drive it and read what came back
 $S/rpc.py $ROOT call agents/list '{"includeArchived":false}'
@@ -121,7 +121,7 @@ Host.app`.
    when nobody is at the keyboard:
    `ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF/1e9)}'`.
 6. **Never seed a root from the real one** (`~/Library/Application Support/Agents`), not
-   its `agents/`, not one record, not `projects.json` or `workflows.json` (#228). A copied
+   its `agents/`, not one record, not `folders.json` or `workflows.json` (#228). A copied
    record carries a real runtime session, worktree and folder: a scratch host that resumed
    copies of live agents once had them merge, archive and start agents in the real repo.
    Seed synthetic agents under the scratch root instead:
@@ -132,7 +132,7 @@ Host.app`.
    runs it.
 7. **A scratch host runs agents only inside its root.** Started on a root that is not the
    real one, `agentsd` refuses a folder outside it (`--allow-outside-root` lifts that), so
-   keep projects under `$ROOT`, as `$ROOT/work` below. It also claims each runtime session
+   keep folders under `$ROOT`, as `$ROOT/work` below. It also claims each runtime session
    it runs in `~/Library/Application Support/Agents Session Locks/`, which every daemon on
    this Mac shares, and will not resume a conversation another daemon holds.
 8. **Never install.** Do not copy the app into `~/Applications`, `/Applications` or
@@ -150,7 +150,7 @@ same protocol the window speaks through the control plane. Every method is in
 
 ```sh
 $S/rpc.py $ROOT call daemon/ping
-$S/rpc.py $ROOT call projects/list
+$S/rpc.py $ROOT call folders/list
 $S/rpc.py $ROOT call agents/transcript '{"agentID":"…"}'
 $S/rpc.py $ROOT watch 60 agent/changed agent/entry --showing <agentID>
 #   notifications as they arrive; an agent's entries and terminal output go only to a
@@ -179,7 +179,7 @@ For anything longer than one call, import it:
 import sys; sys.path.insert(0, ".claude/skills/run-app/scripts")
 from rpc import Client
 c = Client("/tmp/run-mychange")
-c.call("projects/add", {"folder": "file:///tmp/run-mychange/work"})
+c.call("folders/add", {"folder": "file:///tmp/run-mychange/work"})
 agent = c.call("agents/start", {"runtimeID": "claude",
                                 "cwd": "file:///tmp/run-mychange/work",
                                 "prompt": "…"})
@@ -212,7 +212,7 @@ $S/walk.py $ROOT shot /tmp/run-mychange-1.png   # the window, its sheet over it;
 $S/walk.py $ROOT tree 20                        # the accessibility tree, frames as in the shot
 $S/walk.py $ROOT find "Not now"                 # every element whose label holds the text
 $S/walk.py $ROOT press "=Not now"               # AXPress the innermost match (=: whole label)
-$S/walk.py $ROOT unfold proj00                  # a sidebar project, as its chevron does
+$S/walk.py $ROOT unfold proj00                  # a sidebar folder, as its chevron does
 $S/walk.py $ROOT select "Fix the build"         # a sidebar row, as a click selects it
 $S/walk.py $ROOT set "What do you want to do" "Write hello.txt"   # a field, by label or placeholder
 $S/walk.py $ROOT click proj00                   # a click on a label's middle, for a tap gesture
@@ -249,7 +249,7 @@ swift $S/ui.swift dump <APP_PID> 14 # the accessibility tree through the AX serv
 swift $S/ui.swift find <APP_PID> "Start"
 swift $S/ui.swift press <APP_PID> "Start"   # AXPress, no pointer, no focus stolen
 swift $S/ui.swift select <APP_PID> "Agents"  # AXSelected on a list row: picks it
-swift $S/ui.swift unfold <APP_PID> "Agents"  # AXDisclosing on a sidebar project (or fold)
+swift $S/ui.swift unfold <APP_PID> "Agents"  # AXDisclosing on a sidebar folder (or fold)
 ```
 
 `ui.swift` needs Accessibility permission for whatever process runs it, and the AX server

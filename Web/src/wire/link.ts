@@ -50,12 +50,12 @@ export const defaultCallTimeout = 30_000;
  * or a draft of one, is the same kind of wait, shorter.
  */
 const slowCallTimeout: Readonly<Record<string, number>> = {
-  "projects/clone": 65 * 60_000,
+  "folders/clone": 65 * 60_000,
   "agents/start": 2 * 60_000,
   "agents/options": 2 * 60_000,
   // A restore from the control plane's store reads every part first (#1815): hundreds of MB.
   "backups/restore": 30 * 60_000,
-  // An export or an import of a project's agents (#1001) packs or unpacks every transcript.
+  // An export or an import of a folder's agents (#1001) packs or unpacks every transcript.
   "agents/export": 10 * 60_000,
   "agents/import": 10 * 60_000,
 };

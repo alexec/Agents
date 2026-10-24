@@ -204,7 +204,7 @@ func sameJSON(a, b any) bool {
 	return string(x) == string(y)
 }
 
-// whatItOffers opens a session in the folder, with the project's servers and the
+// whatItOffers opens a session in the folder, with the folder's servers and the
 // person's, and reads what it offers: its options with the session, its commands a moment
 // after.
 func (d *Daemon) whatItOffers(rt *runtimeDef, path string) (optionEntry, error) {

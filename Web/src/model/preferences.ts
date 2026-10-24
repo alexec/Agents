@@ -8,7 +8,7 @@ import type { JSONValue } from "../protocol/generated";
 
 export const preferenceKeys = {
   smartGroupsOff: "sidebarSmartGroupsOff",
-  showsArchivedProjects: "showsArchivedProjects",
+  showsArchivedFolders: "showsArchivedFolders",
   showsActivity: "showsActivity",
   showsUsage: "showsUsage",
   startRuntimeID: "startRuntimeID",

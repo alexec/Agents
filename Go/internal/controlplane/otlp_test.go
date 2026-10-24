@@ -1,7 +1,7 @@
 package controlplane
 
 // The OTLP exporter (#2019, #1804 decision 4): off unless set, today's figures by runtime
-// with no person, project or machine named, and each send's outcome kept for the page.
+// with no person, folder or machine named, and each send's outcome kept for the page.
 
 import (
 	"encoding/json"
@@ -62,9 +62,9 @@ func TestOTLPSendsTodaysFiguresByRuntime(t *testing.T) {
 	owner := p.host("OWNERS-MAC")
 	_, admin := p.client("Owner's window")
 	sendUsage(t, p, owner.member.Host,
-		wire.UsageRollupRow{Project: "secret-project", Runtime: "claude", Cost: map[string]float64{"USD": 2}, InputTokens: 100, Turns: 2,
+		wire.UsageRollupRow{Folder: "secret-folder", Runtime: "claude", Cost: map[string]float64{"USD": 2}, InputTokens: 100, Turns: 2,
 			WorkingSeconds: 60, Counts: &wire.ReportCounts{Sessions: 3, FailedSessions: 1, PrsMerged: 1}},
-		wire.UsageRollupRow{Project: "site", Runtime: "codex", Cost: map[string]float64{"USD": 1}, InputTokens: 50, Turns: 1})
+		wire.UsageRollupRow{Folder: "site", Runtime: "codex", Cost: map[string]float64{"USD": 1}, InputTokens: 50, Turns: 1})
 
 	p.s.ExportOTLP(OTLPConfig{Endpoint: collector.URL + "/v1/metrics?key=x", Headers: map[string]string{"Authorization": "Bearer abc"}, Every: time.Hour})
 	e := p.s.otlp
@@ -82,7 +82,7 @@ func TestOTLPSendsTodaysFiguresByRuntime(t *testing.T) {
 			t.Fatalf("no %s in %s", want, text)
 		}
 	}
-	for _, never := range []string{"secret-project", "OWNERS-MAC", "Local owner"} {
+	for _, never := range []string{"secret-folder", "OWNERS-MAC", "Local owner"} {
 		if strings.Contains(text, never) {
 			t.Fatalf("%s named in %s", never, text)
 		}

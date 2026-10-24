@@ -31,7 +31,7 @@
 <rect x="60" y="330" width="300" height="130" rx="8" fill="#8a8a8a" stroke="#8a8a8a"/>
 <text class="t" x="210.0" y="356">MCP servers</text>
 <text class="k" x="210.0" y="373">[External Software System]</text>
-<text class="d" x="210.0" y="394">the person&#x27;s and projects&#x27; own;</text>
+<text class="d" x="210.0" y="394">the person&#x27;s and folders&#x27; own;</text>
 <text class="d" x="210.0" y="409">e.g. the github server</text>
 <text class="d" x="210.0" y="424">(Go/cmd/github-mcp)</text>
 <rect x="60" y="560" width="300" height="110" rx="8" fill="#8a8a8a" stroke="#8a8a8a"/>

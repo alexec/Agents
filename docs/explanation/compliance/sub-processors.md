@@ -50,8 +50,8 @@ gateway that the organisation sets (#999) sends the data to that provider or gat
 | Apple | Apple Push Notification service | A notification's words, sealed with the device's own key; a Live Activity's phase and times, never a title or a line of the chat | Yes. No notifications reach a phone or iPad then. |
 | Your store's host | The bucket that holds the control plane's store (S3, MinIO or another S3-compatible service) | The control plane's records (see [Data and retention](data-and-retention.md)); a server's backups, sealed | Yes. The store can be a folder on the control plane's own disk. |
 | Google | Cloud KMS, when the control plane uses it | Calls to seal and open the control plane's key. The key in KMS never leaves Google Cloud. | Yes. A control plane can keep its key in a file, or use HashiCorp Vault. |
-| GitHub | The github server, GitHub sign-in, git | Issues, pull requests, checks and code of the projects you connect; your git pushes | Yes, if you do not connect GitHub. |
-| GitLab (gitlab.com or your own) | The gitlab server, GitLab sign-in | Issues, merge requests and pipelines of the projects you connect | Yes. A self-managed GitLab keeps it in your organisation. |
+| GitHub | The github server, GitHub sign-in, git | Issues, pull requests, checks and code of the folders you connect; your git pushes | Yes, if you do not connect GitHub. |
+| GitLab (gitlab.com or your own) | The gitlab server, GitLab sign-in | Issues, merge requests and pipelines of the folders you connect | Yes. A self-managed GitLab keeps it in your organisation. |
 | Linear | The linear server, Linear sign-in | The issues you read and change | Yes, if you do not connect Linear. |
 | Your mail provider | Email over IMAP | Reads one mailbox. Agents never sends mail. | Yes, if you do not connect a mailbox. |
 | Each MCP server's maker | Connectors | What your agents send to its tools | Yes. Add only the servers your organisation allows. |

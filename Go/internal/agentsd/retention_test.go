@@ -16,7 +16,7 @@ func TestRetentionDeletesOldArchivedAgents(t *testing.T) {
 	root := t.TempDir()
 	d, c := start(t, root)
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	byUser := wire.AgentArchivedReasonByUser
 	archived := func(ago time.Duration) wire.Agent {
 		return seeded(t, d, dir, func(a *wire.Agent) {

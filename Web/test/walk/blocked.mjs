@@ -1,7 +1,7 @@
 // The #157 walk: a blocked agent's wait lines on the page. Its row and its chat say what it
 // waits on, any of or all of, each agent's state and when it checks again, as the window's row
 // does. Needs a scratch root with blocked agents titled "Lead, all of" and "Lead, any of" in
-// project "work".
+// folder "work".
 //
 //   node Web/test/walk/blocked.mjs <WEB_URL> <browser code> <out dir> [width]
 
@@ -16,9 +16,9 @@ try {
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  // The one sidebar (#151), from 760 wide: a project folds open on its sessions.
-  await page.waitFor(`document.querySelector(".row.project")`);
-  await page.eval(`[...document.querySelectorAll(".row.project")].find((e) => e.textContent.includes("work"))?.querySelector(".disclosure[aria-expanded=false]")?.click()`);
+  // The one sidebar (#151), from 760 wide: a folder folds open on its sessions.
+  await page.waitFor(`document.querySelector(".row.folder")`);
+  await page.eval(`[...document.querySelectorAll(".row.folder")].find((e) => e.textContent.includes("work"))?.querySelector(".disclosure[aria-expanded=false]")?.click()`);
   for (const title of ["Lead, all of", "Lead, any of"]) {
     await page.waitFor(`${row(title)}?.querySelector(".wait-line")`, 30_000);
     console.log(`row "${title}": ${await page.eval(`[...${row(title)}.querySelectorAll(".wait-line")].map((e) => e.textContent).join(" | ")`)}`);

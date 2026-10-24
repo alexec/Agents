@@ -1,11 +1,11 @@
 import Testing
 @testable import AgentsKitCore
 
-/// What a project's Archived page says under its sessions (#664): loading, a silent
+/// What a folder's Archived page says under its sessions (#664): loading, a silent
 /// host and a capped page are not an empty archive.
 @Suite("The Archived page's note")
 struct ArchivedSessionsNoteTests {
-    private let cap = SidebarProjectFold.archivedShown
+    private let cap = SidebarFolderFold.archivedShown
 
     @Test func anEmptyListIsLoadingUntilTheHostAnswers() {
         #expect(ArchivedSessionsNote.note(shown: 0, total: 3, answered: nil, hostOffline: false) == .loading)

@@ -68,7 +68,7 @@ public enum WorkflowTrigger: Hashable, Sendable {
         return nil
     }
 
-    /// The trigger in the words the project page uses.
+    /// The trigger in the words the folder page uses.
     public var summary: String {
         switch self {
         case .schedule(let schedule): return schedule.summary
@@ -114,7 +114,7 @@ extension WorkflowTrigger {
 
 /// Written by hand so that event triggers go over the wire in the shape `.unrecognised`
 /// has (042 FR-025). An older Mac or phone then reads one as a trigger it does not know
-/// yet, and lists it as inert, rather than failing to read the whole project's
+/// yet, and lists it as inert, rather than failing to read the whole folder's
 /// workflows. Every other case keeps exactly the shape the compiler gave it, through
 /// `Stored`.
 extension WorkflowTrigger: Codable {

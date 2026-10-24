@@ -2,7 +2,7 @@ import Foundation
 
 /// The organisation's policy (#998, spec 998): one document of rules, kept by the control plane,
 /// signed by its control key and followed by every machine as a ceiling over the person's and
-/// the project's own settings. The window and the Remote read it in Settings ▸ Control plane ▸
+/// the folder's own settings. The window and the Remote read it in Settings ▸ Control plane ▸
 /// Policy; an admin edits it in Console ▸ Policy on the web page, and has the kill switch on
 /// every client. The types are hand-written against `Packages/Wire/daemon.schema.json`
 /// (`WireSchemaTests`); the words are `OrgPolicyWords`, the same as `Web/src/model/orgPolicy.ts`.
@@ -72,7 +72,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// The ceiling over each project's helper limits (#64).
+    /// The ceiling over each folder's helper limits (#64).
     struct PolicyHelpers: Codable, Sendable, Hashable {
         public var mostRunning: Int?
         public var mostNotArchived: Int?
@@ -541,12 +541,12 @@ public enum OrgPolicyWords {
         return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
 
-    /// "At most 3 running and 10 not archived in a project"; nil when neither is set.
+    /// "At most 3 running and 10 not archived in a folder"; nil when neither is set.
     public static func helperWords(_ h: DaemonAPI.PolicyHelpers) -> String? {
         var parts: [String] = []
         if let n = h.mostRunning { parts.append("\(n) running") }
         if let n = h.mostNotArchived { parts.append("\(n) not archived") }
-        return parts.isEmpty ? nil : "At most \(parts.joined(separator: " and ")) in a project"
+        return parts.isEmpty ? nil : "At most \(parts.joined(separator: " and ")) in a folder"
     }
 
     /// Console ▸ Policy on the web page, for **Edit in Console**: on the control plane's own domain

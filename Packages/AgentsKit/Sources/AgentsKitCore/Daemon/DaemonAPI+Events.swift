@@ -23,7 +23,7 @@ public extension DaemonAPI.Notification {
 
 public extension DaemonAPI.Failure {
     /// An event name, filter or scope the app will not take: unknown, outside the
-    /// caller's project, or a `custom.` one (#639). The message says which, and what
+    /// caller's folder, or a `custom.` one (#639). The message says which, and what
     /// would do (042 R16).
     static let eventRefused = -32050
     /// Cancelling a wait when there is none.

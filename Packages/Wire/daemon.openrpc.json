@@ -14,7 +14,7 @@
     {
       "name": "agents.move-worktree/1",
       "by": "host",
-      "description": "The host serves the app tool move_worktree to the runtimes that can move (#1821): an agent moves into a new or existing worktree of its project when its turn ends, and back with leave_worktree remove, which removes the worktree once its work is pushed. An app tool, not a method, so declared."
+      "description": "The host serves the app tool move_worktree to the runtimes that can move (#1821): an agent moves into a new or existing worktree of its folder when its turn ends, and back with leave_worktree remove, which removes the worktree once its work is pushed. An app tool, not a method, so declared."
     },
     {
       "name": "host.team/1",
@@ -270,6 +270,31 @@
       }
     },
     {
+      "name": "agents/continueInFolder",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ContinueInFolderRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/UUID"
+        }
+      }
+    },
+    {
       "name": "agents/continueInNew",
       "description": "Continue in New (#999): start a session in the same folder that reads this one and carries on, with its runtime, choices and the person's labels, on another account: the one given, else the runtime's account for new sessions. For a session whose account the organisation removed or no longer allows. Refused with policyRefused when the policy refuses that account.",
       "x-capability": "host.org-routes/1",
@@ -285,31 +310,6 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/ContinueInNewRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/UUID"
-        }
-      }
-    },
-    {
-      "name": "agents/continueInProject",
-      "x-capability": "agents/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ContinueInProjectRequest"
           }
         }
       ],
@@ -1245,7 +1245,7 @@
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/ProjectSummary"
+          "$ref": "daemon.schema.json#/definitions/FolderSummary"
         }
       }
     },
@@ -1911,19 +1911,25 @@
       "name": "connectors/codespaces",
       "x-capability": "connectors.setup/1",
       "tags": [
-        { "name": "web" }
+        {
+          "name": "web"
+        }
       ],
       "paramStructure": "by-name",
       "params": [
         {
           "name": "params",
           "required": true,
-          "schema": { "$ref": "daemon.schema.json#/definitions/ConnectorCodespacesRequest" }
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ConnectorCodespacesRequest"
+          }
         }
       ],
       "result": {
         "name": "result",
-        "schema": { "$ref": "daemon.schema.json#/definitions/ConnectorCodespaces" }
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ConnectorCodespaces"
+        }
       }
     },
     {
@@ -2826,6 +2832,530 @@
       }
     },
     {
+      "name": "folder/changed",
+      "x-capability": "folder/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/FolderSummary"
+          }
+        }
+      ]
+    },
+    {
+      "name": "folder/removed",
+      "x-capability": "folder/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/FolderRemovedNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "folders/add",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/FolderRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
+      "name": "folders/archive",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/FolderRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
+      "name": "folders/bringBack",
+      "x-capability": "folders/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BringBackRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BringBack"
+        }
+      }
+    },
+    {
+      "name": "folders/clone",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/CloneRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
+      "name": "folders/clones",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "daemon.schema.json#/definitions/CloneSummary"
+          }
+        }
+      }
+    },
+    {
+      "name": "folders/delete",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/FolderRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "folders/find",
+      "x-capability": "folders/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/FoldersFindRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "daemon.schema.json#/definitions/FoundFolder"
+          }
+        }
+      }
+    },
+    {
+      "name": "folders/keepGuardedChange",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/GuardedChangeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
+      "name": "folders/list",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/FoldersListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "daemon.schema.json#/definitions/FolderSummary"
+          }
+        }
+      }
+    },
+    {
+      "name": "folders/readGuardedChange",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/GuardedChangeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/GuardedChangeReading"
+        }
+      }
+    },
+    {
+      "name": "folders/receive",
+      "x-capability": "folders/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ReceiveRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
+      "name": "folders/receiveState",
+      "x-capability": "folders/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ReceiveStateRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ReceiveState"
+        }
+      }
+    },
+    {
+      "name": "folders/receiveUpload",
+      "x-capability": "folders/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ReceiveUploadRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "folders/sendFacts",
+      "x-capability": "folders/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SendFactsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SendFacts"
+        }
+      }
+    },
+    {
+      "name": "folders/sendPack",
+      "x-capability": "folders/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SendPackRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SendPack"
+        }
+      }
+    },
+    {
+      "name": "folders/sendRead",
+      "x-capability": "folders/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SendReadRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SendRead"
+        }
+      }
+    },
+    {
+      "name": "folders/setDiskSpace",
+      "x-capability": "folders/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SetDiskSpaceRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
+      "name": "folders/setHelperLimits",
+      "x-capability": "folders/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SetHelperLimitsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
+      "name": "folders/setPinned",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SetPinnedRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
+      "name": "folders/unarchive",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/FolderRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
+      "name": "folders/undoGuardedChange",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/GuardedChangeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
       "name": "git/fill",
       "x-capability": "git/1",
       "description": "Asked by the control plane on the lending host's channel 0, for a lend a person allowed (#1122).",
@@ -3697,19 +4227,25 @@
       "name": "personas/files",
       "x-capability": "personas/2",
       "tags": [
-        { "name": "web" }
+        {
+          "name": "web"
+        }
       ],
       "paramStructure": "by-name",
       "params": [
         {
           "name": "params",
           "required": true,
-          "schema": { "$ref": "daemon.schema.json#/definitions/PersonasFilesRequest" }
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PersonasFilesRequest"
+          }
         }
       ],
       "result": {
         "name": "result",
-        "schema": { "$ref": "daemon.schema.json#/definitions/PersonaFilesAnswer" }
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/PersonaFilesAnswer"
+        }
       }
     },
     {
@@ -3744,19 +4280,25 @@
       "name": "personas/save",
       "x-capability": "personas/2",
       "tags": [
-        { "name": "web" }
+        {
+          "name": "web"
+        }
       ],
       "paramStructure": "by-name",
       "params": [
         {
           "name": "params",
           "required": true,
-          "schema": { "$ref": "daemon.schema.json#/definitions/PersonaFileSaveRequest" }
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PersonaFileSaveRequest"
+          }
         }
       ],
       "result": {
         "name": "result",
-        "schema": { "$ref": "daemon.schema.json#/definitions/Empty" }
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
       }
     },
     {
@@ -3902,7 +4444,7 @@
         "schema": {
           "type": "array",
           "items": {
-            "$ref": "daemon.schema.json#/definitions/ProjectPins"
+            "$ref": "daemon.schema.json#/definitions/FolderPins"
           }
         }
       }
@@ -4289,530 +4831,6 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "project/changed",
-      "x-capability": "project/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ProjectSummary"
-          }
-        }
-      ]
-    },
-    {
-      "name": "project/removed",
-      "x-capability": "project/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ProjectRemovedNotification"
-          }
-        }
-      ]
-    },
-    {
-      "name": "projects/add",
-      "x-capability": "projects/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ProjectRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ProjectSummary"
-        }
-      }
-    },
-    {
-      "name": "projects/archive",
-      "x-capability": "projects/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ProjectRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ProjectSummary"
-        }
-      }
-    },
-    {
-      "name": "projects/bringBack",
-      "x-capability": "projects/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/BringBackRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/BringBack"
-        }
-      }
-    },
-    {
-      "name": "projects/clone",
-      "x-capability": "projects/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/CloneRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ProjectSummary"
-        }
-      }
-    },
-    {
-      "name": "projects/clones",
-      "x-capability": "projects/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "type": "array",
-          "items": {
-            "$ref": "daemon.schema.json#/definitions/CloneSummary"
-          }
-        }
-      }
-    },
-    {
-      "name": "projects/delete",
-      "x-capability": "projects/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ProjectRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "projects/find",
-      "x-capability": "projects/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ProjectsFindRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "type": "array",
-          "items": {
-            "$ref": "daemon.schema.json#/definitions/FoundFolder"
-          }
-        }
-      }
-    },
-    {
-      "name": "projects/keepGuardedChange",
-      "x-capability": "projects/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/GuardedChangeRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ProjectSummary"
-        }
-      }
-    },
-    {
-      "name": "projects/list",
-      "x-capability": "projects/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ProjectsListRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "type": "array",
-          "items": {
-            "$ref": "daemon.schema.json#/definitions/ProjectSummary"
-          }
-        }
-      }
-    },
-    {
-      "name": "projects/readGuardedChange",
-      "x-capability": "projects/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/GuardedChangeRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/GuardedChangeReading"
-        }
-      }
-    },
-    {
-      "name": "projects/receive",
-      "x-capability": "projects/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ReceiveRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ProjectSummary"
-        }
-      }
-    },
-    {
-      "name": "projects/receiveState",
-      "x-capability": "projects/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ReceiveStateRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ReceiveState"
-        }
-      }
-    },
-    {
-      "name": "projects/receiveUpload",
-      "x-capability": "projects/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ReceiveUploadRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "projects/sendFacts",
-      "x-capability": "projects/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/SendFactsRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/SendFacts"
-        }
-      }
-    },
-    {
-      "name": "projects/sendPack",
-      "x-capability": "projects/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/SendPackRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/SendPack"
-        }
-      }
-    },
-    {
-      "name": "projects/sendRead",
-      "x-capability": "projects/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/SendReadRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/SendRead"
-        }
-      }
-    },
-    {
-      "name": "projects/setDiskSpace",
-      "x-capability": "projects/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/SetDiskSpaceRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ProjectSummary"
-        }
-      }
-    },
-    {
-      "name": "projects/setHelperLimits",
-      "x-capability": "projects/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/SetHelperLimitsRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ProjectSummary"
-        }
-      }
-    },
-    {
-      "name": "projects/setPinned",
-      "x-capability": "projects/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/SetPinnedRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ProjectSummary"
-        }
-      }
-    },
-    {
-      "name": "projects/unarchive",
-      "x-capability": "projects/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ProjectRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ProjectSummary"
-        }
-      }
-    },
-    {
-      "name": "projects/undoGuardedChange",
-      "x-capability": "projects/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/GuardedChangeRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ProjectSummary"
         }
       }
     },
@@ -6862,7 +6880,7 @@
     {
       "name": "workflows/setLimit",
       "x-capability": "workflows/1",
-      "description": "Set how many approved workflows may be turned on in each project. The value is from 1 to 100. An unset value means 20.",
+      "description": "Set how many approved workflows may be turned on in each folder. The value is from 1 to 100. An unset value means 20.",
       "paramStructure": "by-name",
       "params": [
         {
@@ -6933,16 +6951,26 @@
     {
       "name": "workflows/write",
       "x-capability": "workflows/1",
-      "tags": [{ "name": "web" }],
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
-      "params": [{
-        "name": "params",
-        "required": true,
-        "schema": { "$ref": "daemon.schema.json#/definitions/WorkflowWriteRequest" }
-      }],
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/WorkflowWriteRequest"
+          }
+        }
+      ],
       "result": {
         "name": "result",
-        "schema": { "$ref": "daemon.schema.json#/definitions/WorkflowSummary" }
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/WorkflowSummary"
+        }
       }
     },
     {
@@ -6968,7 +6996,7 @@
         "schema": {
           "type": "array",
           "items": {
-            "$ref": "daemon.schema.json#/definitions/ProjectWorktrees"
+            "$ref": "daemon.schema.json#/definitions/FolderWorktrees"
           }
         }
       }
@@ -7201,9 +7229,9 @@
         "code": -32091,
         "message": "noSuchHost"
       },
-      "noSuchProject": {
+      "noSuchFolder": {
         "code": -32012,
-        "message": "noSuchProject"
+        "message": "noSuchFolder"
       },
       "noSuchWorkflow": {
         "code": -32014,
@@ -7297,9 +7325,9 @@
         "code": -32076,
         "message": "policyRefused"
       },
-      "projectHasLiveAgents": {
+      "folderHasLiveAgents": {
         "code": -32013,
-        "message": "projectHasLiveAgents"
+        "message": "folderHasLiveAgents"
       },
       "providerFailed": {
         "code": -32066,

@@ -14,7 +14,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// The skills in the person's ~/.agents/skills or a project's .agents/skills, each with
+// The skills in the person's ~/.agents/skills or a folder's .agents/skills, each with
 // where a lock says it came from, and taking out one a tool added (DaemonCore+Catalog).
 // A person's: an agent's own connection is never sent these.
 
@@ -37,7 +37,7 @@ func (d *Daemon) registerSkills() {
 		}
 		where := "personal"
 		if place.Folder != "" {
-			where = "project " + filepath.Base(place.Folder)
+			where = "folder " + filepath.Base(place.Folder)
 		}
 		log.Printf("catalog: remove %s → %s", r.Name, where)
 		return wire.SkillRemoveAnswer{TrashedTo: trashed}, nil
@@ -51,7 +51,7 @@ func (d *Daemon) skillInstaller() skillcatalog.Installer {
 // skillPlace is where a destination is. A scratch root or a named personal home never
 // uses the person's real Trash.
 func (d *Daemon) skillPlace(dest wire.SkillDestination) (skillcatalog.Place, error) {
-	return skillcatalog.Resolve(dest, d.personalHome(), d.Store.Loc.Root, d.usesRealTrash(), os.Getenv, d.isProjectFolder)
+	return skillcatalog.Resolve(dest, d.personalHome(), d.Store.Loc.Root, d.usesRealTrash(), os.Getenv, d.isFolderPath)
 }
 
 // usesRealTrash is the ordinary daemon on a Mac: the standard root, with no personal home
@@ -60,18 +60,18 @@ func (d *Daemon) usesRealTrash() bool {
 	return goruntime.GOOS == "darwin" && os.Getenv("AGENTS_PERSONAL_HOME") == "" && store.IsStandard(d.Store.Loc.Root)
 }
 
-// isProjectFolder is a project here, one an agent has worked in, or a worktree of either
-// (DaemonCore.isProjectFolder).
-func (d *Daemon) isProjectFolder(folder string) bool {
+// isFolderPath is a folder here, one an agent has worked in, or a worktree of either
+// (DaemonCore.isFolderPath).
+func (d *Daemon) isFolderPath(folder string) bool {
 	folder = filepath.Clean(folder)
 	known := func(f string) bool {
-		for _, p := range d.Store.Projects() {
+		for _, p := range d.Store.Folders() {
 			if store.FolderPath(p.Folder) == f {
 				return true
 			}
 		}
 		for _, a := range d.Store.Agents() {
-			if projectFolder(&a) == f || store.FolderPath(a.Cwd) == f {
+			if folderPath(&a) == f || store.FolderPath(a.Cwd) == f {
 				return true
 			}
 		}

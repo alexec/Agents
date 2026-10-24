@@ -1,16 +1,16 @@
 import AgentsKitCore
 import SwiftUI
 
-/// A project's Connectors page, with its set-up first (#1336), or the person's own Connectors page, with
+/// A folder's Connectors page, with its set-up first (#1336), or the person's own Connectors page, with
 /// their connections first. Then every MCP server in one `mcp.json` and how each is doing
 /// (#753), as the window's: under Activity, the person's own on the Mac (#589); under a
-/// project, its `.agents/mcp.json`.
+/// folder, its `.agents/mcp.json`.
 /// Read-only but for Check Now and Remove… (#2154): servers are edited in Settings.
 struct MCPServersListView: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.scenePhase) private var scenePhase
     /// Nil for the person's own servers, on the Mac.
-    var project: ProjectKey?
+    var folder: FolderKey?
     @State private var checking = false
     @State private var setup: DaemonAPI.ConnectorSetup?
     @State private var connections: [DaemonAPI.Connection]?
@@ -21,29 +21,29 @@ struct MCPServersListView: View {
     /// Why the last Remove… did not take it out.
     @State private var removeProblem: String?
 
-    private var snapshot: DaemonAPI.MCPHealthSnapshot? { model.work.mcpHealthSnapshot(project?.host ?? .mac) }
+    private var snapshot: DaemonAPI.MCPHealthSnapshot? { model.work.mcpHealthSnapshot(folder?.host ?? .mac) }
 
     private var servers: [DaemonAPI.MCPServerHealth] {
-        guard let project else { return snapshot?.personal ?? [] }
-        return model.work.mcpServers(in: project)
+        guard let folder else { return snapshot?.personal ?? [] }
+        return model.work.mcpServers(in: folder)
     }
 
-    private var problem: String? { snapshot?.problem(in: project?.folder.path) }
+    private var problem: String? { snapshot?.problem(in: folder?.folder.path) }
 
     /// The machine whose mcp.json this is (#2266).
-    private var host: HostID { project?.host ?? .mac }
+    private var host: HostID { folder?.host ?? .mac }
     /// Remove… waits for it to come back (#2266), as on the window and the page.
     private var offline: Bool { model.hostIsOffline(host) }
 
     var body: some View {
         List {
-            // The set-up first (#1336): a project's slots, or the person's connections; on a
+            // The set-up first (#1336): a folder's slots, or the person's connections; on a
             // host too old to have them (#1748), the line that says so in their place (#1866).
-            if let project, model.host(project.host, has: Capability.connectorsSetup1) {
-                RemoteConnectorSetup(project: project, projectName: model.work.project(project)?.name
-                                         ?? project.folder.lastPathComponent, setup: $setup,
+            if let folder, model.host(folder.host, has: Capability.connectorsSetup1) {
+                RemoteConnectorSetup(folder: folder, folderName: model.work.folder(folder)?.name
+                                         ?? folder.folder.lastPathComponent, setup: $setup,
                                      problem: setupProblem, reload: readSetUp)
-            } else if project == nil, model.host(.mac, has: Capability.connections1) {
+            } else if folder == nil, model.host(.mac, has: Capability.connections1) {
                 RemoteConnections(connections: connections, problem: $setupProblem, reload: { await readSetUp(.cached) })
             } else {
                 Section {
@@ -54,7 +54,7 @@ struct MCPServersListView: View {
                 if let problem {
                     Text(problem).foregroundStyle(StateTint.failure.style(or: .secondary))
                 } else if servers.isEmpty {
-                    Text(project == nil ? MCPHealthWords.personalEmpty : MCPHealthWords.projectEmpty)
+                    Text(folder == nil ? MCPHealthWords.personalEmpty : MCPHealthWords.folderEmpty)
                         .foregroundStyle(.secondary)
                 }
                 if let removeProblem {
@@ -74,20 +74,20 @@ struct MCPServersListView: View {
                 }
                 .paperListRow()
             } header: {
-                Text(project == nil ? "User connectors" : "Project connectors")
+                Text(folder == nil ? "User connectors" : "Folder connectors")
             } footer: {
-                Text(project == nil ? MCPHealthWords.personalIntro : MCPHealthWords.projectIntro)
+                Text(folder == nil ? MCPHealthWords.personalIntro : MCPHealthWords.folderIntro)
             }
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(Paper.ground)
-        .navigationTitle(project.flatMap { model.work.project($0)?.name }.map { "\($0): Connectors" } ?? "Connectors")
+        .navigationTitle(folder.flatMap { model.work.folder($0)?.name }.map { "\($0): Connectors" } ?? "Connectors")
         .toolbar {
             Button("Check Now") {
                 checking = true
                 Task {
-                    await model.checkMCPHealth(project: project)
+                    await model.checkMCPHealth(folder: folder)
                     checking = false
                 }
             }
@@ -98,20 +98,20 @@ struct MCPServersListView: View {
                             titleVisibility: .visible, presenting: removing) { server in
             Button("Remove", role: .destructive) {
                 Task {
-                    removeProblem = await model.removeConnector(server.name, project: project).map {
+                    removeProblem = await model.removeConnector(server.name, folder: folder).map {
                         offline ? MCPHealthWords.notRemoved(server.name, offline: model.hostLabel(host))
                             : MCPHealthWords.notRemoved(server.name, because: $0.words)
                     }
                 }
             }
         } message: { server in
-            Text(MCPHealthWords.removes(server.name, inProject: project != nil,
+            Text(MCPHealthWords.removes(server.name, inFolder: folder != nil,
                                         on: host == .mac ? nil : model.hostLabel(host))
-                 + (project != nil ? " " + MCPHealthWords.removesCommitted : ""))
+                 + (folder != nil ? " " + MCPHealthWords.removesCommitted : ""))
         }
         // The servers are read with the leases.
         .shows([.leases])
-        .task(id: project) { await readSetUp(.cached) }
+        .task(id: folder) { await readSetUp(.cached) }
         // Back from github.com (an install, a grant): read again, as the window does (#1684).
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await readSetUp(.cached) } }
@@ -120,11 +120,11 @@ struct MCPServersListView: View {
         .refreshable { await readSetUp(.fresh) }
     }
 
-    /// A project's set-up, or the person's connections.
+    /// A folder's set-up, or the person's connections.
     private func readSetUp(_ how: DaemonAPI.ConnectorSetupReading) async {
-        if let project {
-            guard model.host(project.host, has: Capability.connectorsSetup1) else { return }
-            switch await model.connectorSetup(project, reading: how) {
+        if let folder {
+            guard model.host(folder.host, has: Capability.connectorsSetup1) else { return }
+            switch await model.connectorSetup(folder, reading: how) {
             case .success(let fresh): setup = fresh; setupProblem = nil
             case .failure(let failure): setupProblem = failure.words
             }

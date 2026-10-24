@@ -18,7 +18,7 @@ import (
 // folderWatch is FolderWatch on a Mac (#1138): FSEvents, through agents-watch beside this
 // binary in Agents Host's Helpers (Host/AgentsWatch), one for each watch. What changed is
 // gathered for a quarter of a second and said as the folders it was in (or the paths, for a
-// project's watch), leaving out what the Linux watch leaves out. With no agents-watch (a
+// folder's watch), leaving out what the Linux watch leaves out. With no agents-watch (a
 // build that carries none) a watch hears nothing, as before, and says so once.
 type folderWatch struct {
 	root     string
@@ -45,15 +45,15 @@ var watchHelper = func() string {
 
 var missingWatchHelper sync.Once
 
-func newFolderWatch(root string, changed func([]string)) (*folderWatch, error) {
+func newFilesWatch(root string, changed func([]string)) (*folderWatch, error) {
 	return startFolderWatch(&folderWatch{root: root, changed: changed}, "files watch")
 }
 
-// newProjectWatch is a project's one watch (#173): every folder but the ones skipWatched
+// newFolderWatch is a folder's one watch (#173): every folder but the ones skipWatched
 // leaves out, said as the paths that changed.
-func newProjectWatch(root string, changed func([]string)) (*folderWatch, error) {
+func newFolderWatch(root string, changed func([]string)) (*folderWatch, error) {
 	return startFolderWatch(&folderWatch{root: root, changed: changed, files: true,
-		skip: func(p, name string) bool { return skipWatched(root, p, name) }}, "project watch")
+		skip: func(p, name string) bool { return skipWatched(root, p, name) }}, "folder watch")
 }
 
 func startFolderWatch(w *folderWatch, name string) (*folderWatch, error) {
@@ -134,7 +134,7 @@ func (w *folderWatch) gather(paths <-chan string, ready chan struct{}) {
 				continue
 			}
 			if gone && p == "gone" {
-				// The root itself went (a project folder removed): nothing more is heard.
+				// The root itself went (a folder removed): nothing more is heard.
 				go w.stop()
 				gone = false
 				continue

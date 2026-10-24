@@ -1,5 +1,5 @@
 // Console ▸ Policy (#998, spec 998 FR-023): the organisation's one policy, which every machine follows as a
-// ceiling over the person's and the project's own settings. A control per rule, what the change does before
+// ceiling over the person's and the folder's own settings. A control per rule, what the change does before
 // it is saved (the rules that change, and what they refuse), and Save with the tag that was read, so that
 // two admins saving at once are told. The kill switch is here as well as in every client's Settings ▸ Policy.
 //
@@ -34,7 +34,7 @@ export function orgPolicyNotSaved(store: Store): boolean {
   return draft.value?.store === store;
 }
 
-export const orgPolicyFoot = "Every machine follows the policy within seconds, and keeps it offline. A rule only caps a person’s or a project’s own setting: it comes back when the rule does. Budgets are for each person, per UTC day.";
+export const orgPolicyFoot = "Every machine follows the policy within seconds, and keeps it offline. A rule only caps a person’s or a folder’s own setting: it comes back when the rule does. Budgets are for each person, per UTC day.";
 
 export function OrgPolicyPage({ store, down }: { store: Store; down: boolean }) {
   const kept = useSignal<PolicyKept | null>(null);
@@ -206,7 +206,7 @@ export function OrgPolicyPage({ store, down }: { store: Store; down: boolean }) 
       </section>
 
       <section aria-labelledby="org-policy-helpers">
-        <h3 class="section-head" id="org-policy-helpers">Helper Sessions in a Project</h3>
+        <h3 class="section-head" id="org-policy-helpers">Helper Sessions in a Folder</h3>
         <label class="setting">
           <span>Most running</span>
           <span class="budget-field"><input type="text" inputMode="numeric" placeholder="None" aria-label="Most running" value={form.mostRunning} onInput={text("mostRunning")} /></span>

@@ -3,7 +3,7 @@
 // and the phone use; docs/explanation/views.md says what each message does in Agents, and the
 // two are kept to it. Pure, so test/appViews.test.mjs reads every row.
 import type { Agent, AppViewCall, AppViewPolicy, JSONValue, UUID, ViewPin } from "../../protocol/generated";
-import { folderKey, projectFolder } from "../../model/groups";
+import { folderKey, folderPath } from "../../model/groups";
 import type { Hunk } from "../../model/fileDiff";
 
 export const protocolVersion = "2026-01-26";
@@ -14,7 +14,7 @@ export const startAgentMethod = "agents/start-agent";
 export const messageAgentMethod = "agents/message-agent";
 /** Our extension of MCP Apps (#1341): a view asks the page to draw a diff in its own diff (#1472). */
 export const openDiffMethod = "agents/open-diff";
-/** The error code of an agents/message-agent that no session in the view's project works on. */
+/** The error code of an agents/message-agent that no session in the view's folder works on. */
 export const noAgentCode = -32001;
 
 type Id = string | number;
@@ -182,7 +182,7 @@ export function readDiff(params: Record<string, unknown>): { diff: Diff } | { re
 }
 
 /** What a view filled the new-agent form with (#834, `agents/start-agent`): AppViewStart. The
- *  form opens in the view's project, and the person starts the agent, or doesn't. */
+ *  form opens in the view's folder, and the person starts the agent, or doesn't. */
 export interface Start {
   /** The prompt, as the person will see it in the field. */
   prompt: string;
@@ -244,11 +244,11 @@ export function readAgentMessage(params: Record<string, unknown>): { message: Ag
   return { message: { branch, text } };
 }
 
-/** The session it goes to (AppViewAgentMessage.recipient): in `project`, on the branch, not archived,
+/** The session it goes to (AppViewAgentMessage.recipient): in `folder`, on the branch, not archived,
  *  the latest active first. Its id and what the person sees it called, or null. */
-export function recipient(agents: Agent[], message: AgentMessage, project: string): { id: string; name: string } | null {
+export function recipient(agents: Agent[], message: AgentMessage, folder: string): { id: string; name: string } | null {
   const found = agents
-    .filter((a) => !a.archivedAt && a.worktree?.branch === message.branch && projectFolder(a) === folderKey(project))
+    .filter((a) => !a.archivedAt && a.worktree?.branch === message.branch && folderPath(a) === folderKey(folder))
     .sort((a, b) => b.lastActivityAt - a.lastActivityAt)[0];
   if (!found) return null;
   return { id: found.id, name: found.title?.trim() || found.worktree?.name || "the agent" };
@@ -418,10 +418,10 @@ export function pinnedViewCall(id: UUID, view: ViewPin, answer?: JSONValue): App
 /** The host's feeding call for a pinned view: views/call, marked as the host's own. */
 export function feedParams(id: UUID, folder: string, view: ViewPin): Record<string, unknown> {
   return {
-    agentID: id, viewID: id, name: view.tool, project: folder, feed: true, ...serverParam(view.server),
+    agentID: id, viewID: id, name: view.tool, folder: folder, feed: true, ...serverParam(view.server),
     ...(view.arguments === undefined ? {} : { arguments: view.arguments }),
   };
 }
 
-/** What a view on a project's page is told when it asks to reach an agent: there is none. */
-export const noAgentWords = "A view on a project's page has no agent to tell.";
+/** What a view on a folder's page is told when it asks to reach an agent: there is none. */
+export const noAgentWords = "A view on a folder's page has no agent to tell.";

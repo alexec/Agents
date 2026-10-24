@@ -66,7 +66,7 @@ await page.waitFor(`document.querySelector("textarea")`);
 await page.focus("textarea");
 await page.type(deviceCode);
 await page.press("Connect");
-await page.waitFor(`document.querySelector(".projects .row")`);
+await page.waitFor(`document.querySelector(".folders .row")`);
 say(`§2 paired: ${JSON.stringify(await page.eval(`document.querySelector(".identity span")?.textContent ?? ""`))}`);
 // Whether an answer on its way was ever drawn as one (#86), on the page's own clock.
 await page.eval(`(() => { window.__telling = []; new MutationObserver(() => {
@@ -74,7 +74,7 @@ await page.eval(`(() => { window.__telling = []; new MutationObserver(() => {
 }).observe(document.body, { subtree: true, childList: true }); })()`);
 
 // 1. Start in a new worktree, with a picture attached.
-if (!(await clickText(".projects .row", "work"))) throw new Error("no work project");
+if (!(await clickText(".folders .row", "work"))) throw new Error("no work folder");
 await page.waitFor(`document.querySelector(".sessions .section-head")`);
 await page.press("New session");
 await page.waitFor(`[...document.querySelectorAll("select[aria-label='Works in'] option")].some((o) => o.value === "new")`, 15_000);

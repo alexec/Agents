@@ -1,21 +1,21 @@
 ---
 diataxis: how-to
 devices: [mac, iphone, ipad, browser, server]
-description: Drop a file into a project's drop box, and have a workflow pick it up and work on it.
+description: Drop a file into a folder's drop box, and have a workflow pick it up and work on it.
 ---
 
 # Hand files to a workflow
 
-Each project has a drop box: the folder `.agents/dropbox/` in the project. A file that
-arrives there raises the event `dropbox.file_added`, and a workflow in that project can
+Each folder has a drop box: the folder `.agents/dropbox/` in the folder. A file that
+arrives there raises the event `dropbox.file_added`, and a workflow in that folder can
 run on it. This guide sets up a workflow that reviews every PDF or Markdown file dropped
 into `dropbox/review/`, and leaves every other file alone.
 
 ## Before you start
 
-- A project. The drop box is a folder in it, wherever the project lives: a project on a
+- A folder. The drop box is a folder in it, wherever the folder lives: a folder on a
   server has its drop box on that server.
-- Workflows in that project are approved and on. See [Set up a workflow](set-up-a-workflow.md).
+- Workflows in that folder are approved and on. See [Set up a workflow](set-up-a-workflow.md).
 
 ## Steps
 
@@ -31,7 +31,7 @@ into `dropbox/review/`, and leaves every other file alone.
 
    If the event's folder is not review, or its extension is not pdf or md, stop: it is
    not yours. Otherwise read the dropped file and review it, then move it out of
-   .agents/dropbox/, to reviewed/ at the project's top.
+   .agents/dropbox/, to reviewed/ at the folder's top.
    ```
 
    An arrival can't be narrowed in `on:`, so the workflow runs for every file and the
@@ -42,21 +42,21 @@ into `dropbox/review/`, and leaves every other file alone.
 2. Put a file into `.agents/dropbox/review/`, from Finder, a script, `cp` or `scp`. Make
    the folder if it is not there.
 
-   On the Mac, you can also drag files from Finder onto the project's row in the sidebar,
-   or onto any of its sessions' rows. They go into the top of the project's drop box,
+   On the Mac, you can also drag files from Finder onto the folder's row in the sidebar,
+   or onto any of its sessions' rows. They go into the top of the folder's drop box,
    never into a session's worktree, so a prompt that takes only `review` leaves them.
-   To put them in a folder such as `review`, right click the project's row,
+   To put them in a folder such as `review`, right click the folder's row,
    choose **Put Files in Drop Box…**, type the folder, then drag the files onto the
    sheet or press **Choose Files…**. A file sent from the Mac can be up to 25 MB; copy a
    bigger one into the folder in Finder. A folder dragged onto the list is added as a
-   project, as before.
+   folder, as before.
 
-   On the iPhone or iPad, touch and hold the project in the list, choose **Put Files in
+   On the iPhone or iPad, touch and hold the folder in the list, choose **Put Files in
    Drop Box…**, type a folder such as `review` if you want one, then **Choose Files…**.
 
-   On the web page, open the project's menu (right click, or the menu key) and choose
+   On the web page, open the folder's menu (right click, or the menu key) and choose
    **Put Files in Drop Box…**, type a folder if you want one, choose files and press
-   **Put in Drop Box**. You can also drag files onto a project's or a session's row, which
+   **Put in Drop Box**. You can also drag files onto a folder's or a session's row, which
    puts them at the drop box's top.
 
    From the phone or the web page, a file can be up to 900 KB, the most that crosses the
@@ -82,7 +82,7 @@ it: leave it, move it or delete it.
 - **Names starting with a dot are passed over**, so a copy's temporary file and Finder's
   `.DS_Store` never fire.
 - **There is no size or rate limit**, and `.gitignore` does not apply. Whether to commit
-  dropped files is up to the project: add `.agents/dropbox/` to its `.gitignore` to keep
+  dropped files is up to the folder: add `.agents/dropbox/` to its `.gitignore` to keep
   them out of git.
 
 ## See also

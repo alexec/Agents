@@ -28,7 +28,7 @@ func TestWireTypesKeepTheirBytes(t *testing.T) {
 		"LendGit":              func() any { return new(wire.LendGit) },
 		"HostRelayRequest":     func() any { return new(wire.HostRelayRequest) },
 		"TunnelOpen":           func() any { return new(wire.TunnelOpen) },
-		"ProjectDetection":     func() any { return new(wire.ProjectDetection) },
+		"FolderDetection":     func() any { return new(wire.FolderDetection) },
 		"ChannelOpen":          func() any { return new(wire.ChannelOpen) },
 		"PresenceReport":       func() any { return new(wire.PresenceReport) },
 		"HandoverStatus":       func() any { return new(wire.HandoverStatus) },

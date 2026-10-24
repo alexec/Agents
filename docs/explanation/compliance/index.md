@@ -44,7 +44,7 @@ built:
   `daemon.log` when they are written (see [Security overview](security-overview.md#logs)).
 - **Erasure:** Delete also removes the runtime's own copy, and a restore never brings a
   deleted agent back (see [Data and retention](data-and-retention.md#erasure)).
-- **Export and import:** an agent or a project's agents as a `.tar.gz`, and brought back,
+- **Export and import:** an agent or a folder's agents as a `.tar.gz`, and brought back,
   archived, on another machine (see [Data and retention](data-and-retention.md#export-and-import)).
 
 - **A tamper-evident audit:** a hash chain on the audit's entries, a seal for each day,

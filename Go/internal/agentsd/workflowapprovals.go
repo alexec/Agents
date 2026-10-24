@@ -12,7 +12,7 @@ import (
 )
 
 // A workflow waiting for an OK is asked as a changed guarded file is (#569, #1322), as
-// DaemonCore+WorkflowQuestions asks it: in the project's guardedChanges by its file's path,
+// DaemonCore+WorkflowQuestions asks it: in the folder's guardedChanges by its file's path,
 // in its approvals as the workflow kind, and so in Needs You on every client. Keep is
 // Approve; Undo writes back the copy last approved, or removes a file never approved.
 
@@ -30,7 +30,7 @@ func workflowIDInPath(path string) (string, bool) {
 	return id, id != "" && !strings.Contains(id, "/")
 }
 
-// waitingWorkflowChanges is the project's workflows that run here, are not archived and
+// waitingWorkflowChanges is the folder's workflows that run here, are not archived and
 // wait for an OK, as changes. Since is when the file last changed.
 func (d *Daemon) waitingWorkflowChanges(folder string) []wire.GuardedChange {
 	d.workflowMu.Lock()
@@ -144,9 +144,9 @@ func (d *Daemon) approvedCopyLocked(folder, id string) (string, []workflowSkill,
 
 // keepOrUndoWorkflow is Keep (Approve) or Undo of a waiting workflow, for the version the
 // person was shown.
-func (d *Daemon) keepOrUndoWorkflow(folder, id string, digest *string, keep bool) (wire.ProjectSummary, error) {
+func (d *Daemon) keepOrUndoWorkflow(folder, id string, digest *string, keep bool) (wire.FolderSummary, error) {
 	if digest == nil {
-		return wire.ProjectSummary{}, Invalid("Say which version you were shown.")
+		return wire.FolderSummary{}, Invalid("Say which version you were shown.")
 	}
 	if keep {
 		return d.answerWorkflow(folder, id, digest, true)
@@ -156,11 +156,11 @@ func (d *Daemon) keepOrUndoWorkflow(folder, id string, digest *string, keep bool
 	f := d.fileLocked(folder, id)
 	if f == nil {
 		d.workflowMu.Unlock()
-		return wire.ProjectSummary{}, noSuchWorkflow(id)
+		return wire.FolderSummary{}, noSuchWorkflow(id)
 	}
 	if f.digest != *digest {
 		d.workflowMu.Unlock()
-		return wire.ProjectSummary{}, &Error{Code: wire.FailureNotChanged, Message: f.wf.Name + " changed after you looked at it, so it was not undone. Look again."}
+		return wire.FolderSummary{}, &Error{Code: wire.FailureNotChanged, Message: f.wf.Name + " changed after you looked at it, so it was not undone. Look again."}
 	}
 	approved, skills, had := d.approvedCopyLocked(folder, id)
 	d.workflowMu.Unlock()
@@ -185,21 +185,21 @@ func (d *Daemon) keepOrUndoWorkflow(folder, id string, digest *string, keep bool
 		}
 	}
 	if err != nil {
-		return wire.ProjectSummary{}, &Error{Code: CodeInternal, Message: workflowChangePath(id) + " could not be put back: " + err.Error()}
+		return wire.FolderSummary{}, &Error{Code: CodeInternal, Message: workflowChangePath(id) + " could not be put back: " + err.Error()}
 	}
-	d.rescanWorkflows(folder) // tells the clients, the project's summary with them
+	d.rescanWorkflows(folder) // tells the clients, the folder's summary with them
 	s, _ := d.summaryFor(folder)
 	return s, nil
 }
 
 // answerWorkflow is Approve or Deny from Needs You: workflows/approve or workflows/deny,
-// which tell every client, then the project as it stands.
-func (d *Daemon) answerWorkflow(folder, id string, digest *string, approve bool) (wire.ProjectSummary, error) {
+// which tell every client, then the folder as it stands.
+func (d *Daemon) answerWorkflow(folder, id string, digest *string, approve bool) (wire.FolderSummary, error) {
 	if digest == nil {
-		return wire.ProjectSummary{}, Invalid("Say which version you were shown.")
+		return wire.FolderSummary{}, Invalid("Say which version you were shown.")
 	}
 	if _, err := d.approveWorkflow(wire.WorkflowApproveRequest{Folder: store.FolderURL(folder), WorkflowID: id, Digest: *digest}, approve); err != nil {
-		return wire.ProjectSummary{}, err
+		return wire.FolderSummary{}, err
 	}
 	s, _ := d.summaryFor(folder)
 	return s, nil

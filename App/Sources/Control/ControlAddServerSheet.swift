@@ -51,7 +51,7 @@ struct ControlAddServerSheet: View {
     @State private var shown: DaemonAPI.ControlCodeShown?
     @State private var before: Set<HostID> = []
     @State private var joined: String?
-    /// The host that joined, once it has: the sheet's last step picks its projects (#656).
+    /// The host that joined, once it has: the sheet's last step picks its folders (#656).
     @State private var joinedHost: HostID?
 
     // Over ssh
@@ -77,7 +77,7 @@ struct ControlAddServerSheet: View {
                 sshPage
             } else if let joinedHost, let joined {
                 Label("\(joined) joined.", systemImage: "checkmark.circle.fill").appText(.reading).tinted(.vouched)
-                HostProjectsPicker(host: joinedHost, hostName: joined, paths: control.suggestedPaths,
+                HostFoldersPicker(host: joinedHost, hostName: joined, paths: control.suggestedPaths,
                                    leaveTitle: "Skip") { dismiss() }
             } else {
                 Picker("How", selection: $way) {
@@ -163,7 +163,7 @@ struct ControlAddServerSheet: View {
     }
 
     /// Makes the code once, then watches for a host that was not there before, and goes on
-    /// to its projects when one joins (#656).
+    /// to its folders when one joins (#656).
     private func watchForJoin() async {
         await control.refresh()
         before = Set(control.hosts.map(\.id))
@@ -245,7 +245,7 @@ struct ControlAddServerSheet: View {
         .task { configHosts = control.isOnThisMac ? await control.sshHosts() : [] }
         .task(id: destination) { await resolveTyped() }
         if let updating {
-            Text("The server \(updating.name) runs on, as you reach it over ssh. The control plane checks it is \(updating.name), copies its version of Agents there and starts it again. Its agents and projects stay. The key is used for this update only and not kept.")
+            Text("The server \(updating.name) runs on, as you reach it over ssh. The control plane checks it is \(updating.name), copies its version of Agents there and starts it again. Its agents and folders stay. The key is used for this update only and not kept.")
                 .appText(.supporting).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         } else {

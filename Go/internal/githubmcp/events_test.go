@@ -343,7 +343,7 @@ func TestPRMergedAndClosed(t *testing.T) {
 	equal(t, ids(h.poll("pr.closed", args, closed["cursor"])), []string{"pr.closed:" + repo + ":408:" + closedAt}, "closed")
 }
 
-func TestRepoLeftOutIsTheProjectsAndNoRepoIsInvalidParams(t *testing.T) {
+func TestRepoLeftOutIsTheFoldersAndNoRepoIsInvalidParams(t *testing.T) {
 	h := newHarness(t)
 	first := h.poll("pr.merged", map[string]any{}, nil)
 	h.fake.addPR(407, "agents/pr-407", func(p *fakePR) { p.state, p.mergedAt = "merged", h.at(5) })

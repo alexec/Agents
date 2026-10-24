@@ -90,14 +90,14 @@ func TestAWaitThatIsDueGoesAndCancelStopsOne(t *testing.T) {
 }
 
 // #1918: nobody watches a helper or a workflow's run, so one set to waits by itself. A
-// helper in a project whose helpers are set to waits as soon as its turn is refused; a
+// helper in a folder whose helpers are set to waits as soon as its turn is refused; a
 // chat the person started does not, and nor does a run of a workflow that is not set to.
 func TestHelpersAndRunsSetToContinueWaitByThemselves(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
-	c.call(t, 2, "projects/setHelperLimits", map[string]any{"folder": "file://" + dir + "/", "limits": map[string]any{"continueWhenBack": true}})
+	dir := folder(t, c, 1)
+	c.call(t, 2, "folders/setHelperLimits", map[string]any{"folder": "file://" + dir + "/", "limits": map[string]any{"continueWhenBack": true}})
 	lead := seeded(t, d, dir, nil)
 	if d.continuesByItself(&lead) {
 		t.Fatal("the person's own chat waits by itself")

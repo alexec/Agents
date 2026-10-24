@@ -13,8 +13,8 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Ports MCPPreviewAndAddTests, MCPProjectTests and MCPRemoveSecretTests: a server found in
-// a registry, previewed and added to a project with its secret, listed approved; a
+// Ports MCPPreviewAndAddTests, MCPFolderTests and MCPRemoveSecretTests: a server found in
+// a registry, previewed and added to a folder with its secret, listed approved; a
 // hand-written one waits until approved; taking one out keeps a secret another still names.
 
 const registryServer = `{"name":"io.github.acme/weather","title":"Weather","description":"Forecasts.","version":"1.2.0",
@@ -43,9 +43,9 @@ func TestAnMCPServerFoundAddedListedAndRemoved(t *testing.T) {
 	t.Setenv("AGENTS_PERSONAL_HOME", home)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	project := t.TempDir()
-	c.call(t, 1, "projects/add", map[string]any{"folder": "file://" + project})
-	dest := map[string]any{"kind": "project", "folder": project}
+	folder := t.TempDir()
+	c.call(t, 1, "folders/add", map[string]any{"folder": "file://" + folder})
+	dest := map[string]any{"kind": "folder", "folder": folder}
 
 	var found wire.MCPSearchAnswer
 	json.Unmarshal(c.call(t, 2, "catalog/search", map[string]any{"query": "weather", "kind": "mcp"}), &found)
@@ -73,13 +73,13 @@ func TestAnMCPServerFoundAddedListedAndRemoved(t *testing.T) {
 	if added.Server == nil || added.Server.Name != "weather" || added.Server.RegistryName != "io.github.acme/weather" {
 		t.Fatalf("%+v", added)
 	}
-	file, _ := os.ReadFile(filepath.Join(project, ".agents", "mcp.json"))
+	file, _ := os.ReadFile(filepath.Join(folder, ".agents", "mcp.json"))
 	if string(file) != "{\n  \"mcpServers\": {\n    \"weather\": {\n      \"type\": \"http\",\n      \"url\": \"https://api.githubcopilot.com/weather\",\n      \"headers\": {\n        \"Authorization\": \"Bearer ${GITHUB_TOKEN}\"\n      }\n    }\n  }\n}\n" {
 		t.Fatal(string(file))
 	}
 
 	// A hand-written server beside it waits for approval; the one the sheet wrote does not.
-	os.WriteFile(filepath.Join(project, ".agents", "mcp.json"), []byte(strings.Replace(string(file), "\"mcpServers\": {\n",
+	os.WriteFile(filepath.Join(folder, ".agents", "mcp.json"), []byte(strings.Replace(string(file), "\"mcpServers\": {\n",
 		"\"mcpServers\": {\n    \"mine\": {\"command\": \"my-server\", \"args\": [\"--key\", \"${GITHUB_TOKEN}\"]},\n", 1)), 0o644)
 	var list wire.MCPListAnswer
 	json.Unmarshal(c.call(t, 7, "mcp/list", map[string]any{"destination": dest}), &list)
@@ -97,7 +97,7 @@ func TestAnMCPServerFoundAddedListedAndRemoved(t *testing.T) {
 	if list.Servers[0].Approval.Approved == nil || list.Servers[1].Approval.Approved == nil {
 		t.Fatalf("%+v", list)
 	}
-	// The project's pinned pages are said again: one of the server's waited for this (#1780).
+	// The folder's pinned pages are said again: one of the server's waited for this (#1780).
 	c.until(t, "pins/changed after mcp/approve", func(method string, _ json.RawMessage) bool { return method == "pins/changed" })
 
 	// A secret another names stays; a server that is not there is refused.
@@ -108,7 +108,7 @@ func TestAnMCPServerFoundAddedListedAndRemoved(t *testing.T) {
 		t.Fatalf("%+v", e)
 	}
 	c.call(t, 12, "mcp/remove", map[string]any{"destination": dest, "name": "weather"})
-	if _, ok, _ := mcpEntryAt(filepath.Join(project, ".agents", "mcp.json"), "weather"); ok {
+	if _, ok, _ := mcpEntryAt(filepath.Join(folder, ".agents", "mcp.json"), "weather"); ok {
 		t.Fatal("still there")
 	}
 
@@ -124,7 +124,7 @@ func TestAnMCPServerFoundAddedListedAndRemoved(t *testing.T) {
 	c.call(t, 15, "mcp/forgetViews", map[string]any{"destination": dest, "name": "mine"})
 
 	// A hand-written server is removed too (#2154), and the rest of the file stays as it was.
-	path := filepath.Join(project, ".agents", "mcp.json")
+	path := filepath.Join(folder, ".agents", "mcp.json")
 	os.WriteFile(path, []byte("{\n  \"note\": \"kept\",\n  \"mcpServers\": {\n    \"mine\": {\"command\": \"my-server\"},\n    \"theirs\": {\"command\": \"their-server\"}\n  }\n}\n"), 0o644)
 	c.call(t, 16, "mcp/remove", map[string]any{"destination": dest, "name": "mine"})
 	if _, ok, _ := mcpEntryAt(path, "mine"); ok {
@@ -249,9 +249,9 @@ func TestOursAreListedAndAddedLikeAnyConnector(t *testing.T) {
 	t.Setenv("AGENTS_PERSONAL_HOME", home)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	project := t.TempDir()
-	c.call(t, 1, "projects/add", map[string]any{"folder": "file://" + project})
-	dest := map[string]any{"kind": "project", "folder": project}
+	folder := t.TempDir()
+	c.call(t, 1, "folders/add", map[string]any{"folder": "file://" + folder})
+	dest := map[string]any{"kind": "folder", "folder": folder}
 
 	var ours wire.MCPSearchAnswer
 	json.Unmarshal(c.call(t, 2, "catalog/search", map[string]any{"query": "", "kind": "mcp", "marketplace": "provided:agents"}), &ours)
@@ -281,12 +281,12 @@ func TestOursAreListedAndAddedLikeAnyConnector(t *testing.T) {
 	if added.Server == nil || added.Server.RegistryName != "agents/linear" {
 		t.Fatalf("%+v", added)
 	}
-	file, _ := os.ReadFile(filepath.Join(project, ".agents", "mcp.json"))
+	file, _ := os.ReadFile(filepath.Join(folder, ".agents", "mcp.json"))
 	if !strings.Contains(string(file), `"command": "linear-mcp"`) || !strings.Contains(string(file), `"hosted": true`) ||
 		strings.Contains(string(file), "LINEAR_API_KEY") {
 		t.Fatal(string(file))
 	}
-	// Its row on the project's Connectors page is hosted, as any hosted connector's.
+	// Its row on the folder's Connectors page is hosted, as any hosted connector's.
 	var snap wire.MCPHealthSnapshot
 	json.Unmarshal(c.call(t, 5, "mcp/health", nil), &snap)
 	for _, h := range snap.Servers {

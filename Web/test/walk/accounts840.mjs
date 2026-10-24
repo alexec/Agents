@@ -4,7 +4,7 @@
 //
 //   node Web/test/walk/accounts840.mjs <WEB_URL> <browser code> <out dir>
 //
-// Expects the host to have one Claude account called Work, and a project, as the run-app walk
+// Expects the host to have one Claude account called Work, and a folder, as the run-app walk
 // leaves them (`rpc.py $ROOT call runtimes/addAccount '{"runtimeID":"claude","name":"Work"}'`).
 
 import { setTimeout as sleep } from "node:timers/promises";
@@ -21,7 +21,7 @@ try {
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  await page.waitFor(`document.querySelectorAll(".sidebar .row.project").length >= 1`, 20_000);
+  await page.waitFor(`document.querySelectorAll(".sidebar .row.folder").length >= 1`, 20_000);
 
   await page.eval(`location.hash = "#/a/runtimes"`);
   const rows = () => page.eval(`[...document.querySelectorAll(".runtime-list li .strong")].map((s) => s.textContent)`);

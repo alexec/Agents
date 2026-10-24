@@ -31,8 +31,8 @@ serving it at a public address (issue #61).
    The page, **http://localhost:8792**, opens in your default browser. The first time, it
    pairs that browser in the same step: there is nothing to copy or paste.
 
-   The page lists the projects on every host. With none yet, it says **No projects yet**, with
-   **Add Project…** and **Clone Project from Git URL…** beside it. Its footer names the browser, as
+   The page lists the folders on every host. With none yet, it says **No folders yet**, with
+   **Add Folder…** and **Clone Folder from Git URL…** beside it. Its footer names the browser, as
    **Chrome on this Mac**. The window lists it under **Clients** as
    **Chrome on** followed by this Mac's name.
 
@@ -90,11 +90,11 @@ and iPad show, on every host:
   shown (see [Read a chat](read-a-chat.md));
 - send a prompt with files or pictures attached, use **Send now** on a queued prompt, and
   change the mode, model or runtime;
-- add a project with **+** at the head of the projects column: **Add Project…** chooses a
-  folder on the host by typing a path or clicking into folders, and **Clone Project from Git
+- add a folder with **+** at the head of the folders column: **Add Folder…** chooses a
+  folder on the host by typing a path or clicking into folders, and **Clone Folder from Git
   URL…** clones an HTTPS or SSH address into the host's home folder. With more than one
   host, the menu names each one;
-- start an agent in the project folder or in a new or existing worktree;
+- start an agent in the folder or in a new or existing worktree;
 - stop, archive and unarchive a session, archive one that asks to be archived, mark it read
   or unread, and add or remove its labels;
 - open a workflow's page, see its runs and run it now;
@@ -102,7 +102,7 @@ and iPad show, on every host:
   type on it;
 - answer a change that waits for an OK on its **Review** page;
 - see a simulator on the session's Mac in the **Simulator** pane, and touch its screen;
-- use a project's connector views, such as the GitHub **Pull requests** and **Issues**, the
+- use a folder's connector views, such as the GitHub **Pull requests** and **Issues**, the
   GitLab merge requests and pipelines, and **Linear issues** (see [Use GitHub](use-github.md),
   [Use GitLab](use-gitlab.md) and [Use Linear issues](use-linear-issues.md));
 - see **Cost**, **Tokens**, **Time**, **Events**, **Resources**, **Runtimes**, **Your
@@ -113,9 +113,9 @@ and iPad show, on every host:
 
 The tab's title counts the sessions that need you, as **(2) Agents**.
 
-A folder can't be dragged in from Finder to add a project. Signing runtimes in, pairing a
+A folder can't be dragged in from Finder to add a folder. Signing runtimes in, pairing a
 window or a phone, and adding a server by ssh have no screens on the page yet, so do them in
-the window. **Clone Project from Git URL…** doesn't fill in a
+the window. **Clone Folder from Git URL…** doesn't fill in a
 copied address, because the page doesn't read the clipboard. The page has no terminal and no
 dictation.
 

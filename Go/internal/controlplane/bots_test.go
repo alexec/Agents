@@ -161,7 +161,7 @@ func TestABotRunsOncePerTriggerAndStopsAtItsCap(t *testing.T) {
 	call(t, admin, "", "bots/setCaps", wire.BotCaps{User: bot, Caps: wire.SpendCaps{DailyUSD: &cap}})
 	today := time.Now().UTC().Format(usageDayLayout)
 	rollup, _ := json.Marshal(wire.UsageRollup{Hours: []wire.UsageRollupPeriod{},
-		Days: []wire.UsageRollupPeriod{{At: today, Rows: []wire.UsageRollupRow{{Project: "app", Runtime: "claude", Cost: map[string]float64{"USD": 3}}}}}})
+		Days: []wire.UsageRollupPeriod{{At: today, Rows: []wire.UsageRollupRow{{Folder: "app", Runtime: "claude", Cost: map[string]float64{"USD": 3}}}}}})
 	if _, err := p.s.methods.HostSaid(host, "usage/rollup", rollup); err != nil {
 		t.Fatal(err)
 	}

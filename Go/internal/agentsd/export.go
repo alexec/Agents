@@ -15,7 +15,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Export and import of one agent or one project's agents (#1001, slice c1). An export is
+// Export and import of one agent or one folder's agents (#1001, slice c1). An export is
 // a backup archive (backups.go) of the chosen agents and none of the root's files. The
 // host writes it into Outgoing, and the client reads it in parts (agents/exportRead), as
 // a send's bundle is read. An import is sent in parts into Incoming (agents/importUpload),
@@ -44,11 +44,11 @@ func (d *Daemon) registerExports() {
 	})
 }
 
-// exportAgents is what an export request names: one agent, or a project's agents.
+// exportAgents is what an export request names: one agent, or a folder's agents.
 func (d *Daemon) exportAgents(r wire.AgentsExportRequest) ([]wire.Agent, string, error) {
 	switch {
 	case r.AgentID != nil && r.Folder != nil:
-		return nil, "", Invalid("Export one agent or one project, not both.")
+		return nil, "", Invalid("Export one agent or one folder, not both.")
 	case r.AgentID != nil:
 		a := d.Store.Agent(*r.AgentID)
 		if a == nil {
@@ -70,7 +70,7 @@ func (d *Daemon) exportAgents(r wire.AgentsExportRequest) ([]wire.Agent, string,
 		}
 		return agents, filepath.Base(folder), nil
 	}
-	return nil, "", Invalid("Name an agent or a project to export.")
+	return nil, "", Invalid("Name an agent or a folder to export.")
 }
 
 func (d *Daemon) export(r wire.AgentsExportRequest) (wire.AgentsExport, error) {
@@ -127,17 +127,17 @@ func exportFileName(s string) string {
 }
 
 // importExport restores the agents of an uploaded export, archived, and removes the upload.
-// With a folder, the project whose menu the person used, every agent comes back in that
-// project (#2389); without one, each in the folder it had where it was exported.
+// With a folder, the folder whose menu the person used, every agent comes back in that
+// folder (#2389); without one, each in the folder it had where it was exported.
 func (d *Daemon) importExport(r wire.AgentsImportRequest) (wire.BackupRestoreResult, error) {
 	into := ""
 	if r.Folder != nil {
 		into = store.FolderPath(*r.Folder)
 		s, ok := d.summaryFor(into)
 		if !ok {
-			return wire.BackupRestoreResult{}, noSuchProject(shortPath(into) + " is not a project.")
+			return wire.BackupRestoreResult{}, noSuchFolder(shortPath(into) + " is not a folder.")
 		}
-		into = store.FolderPath(s.Project.Folder)
+		into = store.FolderPath(s.Folder.Folder)
 	}
 	path, err := d.incomingFile(r.Upload)
 	if err != nil {

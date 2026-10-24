@@ -7,15 +7,15 @@ import SwiftUI
 /// with the keyboard up the words and Send are what is in view, and the choices are a
 /// scroll away rather than behind it.
 ///
-/// The project's own page (#366): what its row opens, in the detail rather than a sheet
-/// over it, as the Mac's project row opens its new-session chat. Leaving keeps what was
+/// The folder's own page (#366): what its row opens, in the detail rather than a sheet
+/// over it, as the Mac's folder row opens its new-session chat. Leaving keeps what was
 /// typed. It goes only when the agent it was typed for exists, which is the model's to
 /// say, not this view's: by then the page has gone.
 struct StartAgentView: View {
     @Environment(RemoteModel.self) private var model
-    /// The project of the scene this is in, when that is a project's own (#1089).
-    @Environment(\.sceneProject) private var sceneProject
-    let project: URL
+    /// The folder of the scene this is in, when that is a folder's own (#1089).
+    @Environment(\.sceneFolder) private var sceneFolder
+    let folder: URL
 
     @State private var text = ""
     @State private var attachments: [Attachment] = []
@@ -33,14 +33,15 @@ struct StartAgentView: View {
     @State private var pointer: CGPoint?
     /// This showing of the page (#1044): only it lets the page go when it goes.
     @State private var page = UUID()
+    @State private var managingPersonas = false
 
     var body: some View {
         form
         .onAppear {
             // What it starts opens in this scene (#1089).
-            model.composingScene = sceneProject
-            model.startPageAppeared(in: project, page: page)
-            let kept = StartDraftKeeper.shared.draft(in: project)
+            model.composingScene = sceneFolder
+            model.startPageAppeared(in: folder, page: page)
+            let kept = StartDraftKeeper.shared.draft(in: folder)
             text = kept?.text ?? ""
             attachments = kept?.attachments ?? []
             if kept?.droppedInlineData == true {
@@ -61,9 +62,9 @@ struct StartAgentView: View {
         // came, and it stays on screen with nothing behind it: a showing still told of
         // changes takes the page back when nothing holds it. Not one that holds nothing
         // because it is going: the model knows which started their agent. A count, not
-        // `startingIn`: that went to the project and back to nil before a frame was drawn.
+        // `startingIn`: that went to the folder and back to nil before a frame was drawn.
         .onChange(of: model.startPageLetGo) {
-            model.startPageStillShown(in: project, page: page)
+            model.startPageStillShown(in: folder, page: page)
         }
         // Said once, when it arrives: a refusal is the one thing on this page a person
         // using VoiceOver would otherwise have to go looking for.
@@ -89,6 +90,7 @@ struct StartAgentView: View {
         }
         // A start on a server with no key of its own asks for one here, over the page (#344).
         .tokenAskSheet(model)
+        .sheet(isPresented: $managingPersonas) { PersonaManagerView(folder: folder) }
     }
 
     private var form: some View {
@@ -100,9 +102,14 @@ struct StartAgentView: View {
                     .listRowBackground(Color.clear)
             }
             personaHeading
-            // Starts kept for this project's stopped workspace (#691 US3, layouts.md L6a): the
+            Section {
+                Button("Manage personas…") { managingPersonas = true }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .listRowBackground(Color.clear)
+            }
+            // Starts kept for this folder's stopped workspace (#691 US3, layouts.md L6a): the
             // agent each makes opens once the host is up.
-            if case let starts = model.keptStarts(in: project), !starts.isEmpty {
+            if case let starts = model.keptStarts(in: folder), !starts.isEmpty {
                 Section {
                     ForEach(starts) { KeptPromptRow(kept: $0) }
                         .listRowBackground(Color.clear)
@@ -112,9 +119,9 @@ struct StartAgentView: View {
                     retryKept: { [model] in await model.retryKept($0) },
                     hostName: { [model] in model.hostName($0) }))
             }
-            // A change to the project's own files that no session can be asked about (#531).
-            if let key = model.work.project(project)?.key {
-                ForEach(model.work.guardedChanges(ofProject: key)) { change in
+            // A change to the folder's own files that no session can be asked about (#531).
+            if let key = model.work.folder(folder)?.key {
+                ForEach(model.work.guardedChanges(ofFolder: key)) { change in
                     Section {
                         GuardedChangeQuestion(change: change, key: key)
                             .listRowInsets(EdgeInsets())
@@ -145,7 +152,7 @@ struct StartAgentView: View {
             }
             Section("Labels") {
                 LabelTagField(labels: draftLabels.map { SessionLabel(value: $0, owner: .person) },
-                              suggestions: model.labelSuggestions(in: project),
+                              suggestions: model.labelSuggestions(in: folder),
                               add: { draftLabels += $0 },
                               remove: { value in
                                   draftLabels.removeAll { SessionLabelPolicy.key($0) == SessionLabelPolicy.key(value) }
@@ -156,7 +163,7 @@ struct StartAgentView: View {
         .onContinuousHover(coordinateSpace: .global) { phase in
             if case let .active(location) = phase { pointer = location } else { pointer = nil }
         }
-        .navigationTitle(model.work.project(project)?.name ?? "New session")
+        .navigationTitle(model.work.folder(folder)?.name ?? "New session")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
@@ -169,7 +176,7 @@ struct StartAgentView: View {
 
     /// The kind of session to start (#760), at the top of the page as a heading-style menu
     /// (#913), with what the picked one is for, and any persona file that cannot be read,
-    /// under it. The project stays the title. Not drawn where there are none.
+    /// under it. The folder stays the title. Not drawn where there are none.
     @ViewBuilder private var personaHeading: some View {
         let usable = model.startPersonas.filter { $0.problem == nil }
         let broken = model.startPersonas.filter { $0.problem != nil }
@@ -242,7 +249,7 @@ struct StartAgentView: View {
     /// What a view filled the page with (#834): its prompt in the field, unsent, and its
     /// labels beside any already there. Its worktree is the model's to choose.
     private func takeOffer() {
-        guard let start = model.takeOfferedStart(in: project) else { return }
+        guard let start = model.takeOfferedStart(in: folder) else { return }
         text = start.prompt
         // Held to what a session takes, as a label typed here is.
         draftLabels += SessionLabelPolicy.accepted(start.labels, existing: draftLabels)
@@ -326,14 +333,14 @@ struct StartAgentView: View {
 
     private var canSend: Bool {
         guard policyRefusal == nil else { return false }
-        // Off while the project's host is not answering, the Mac or its server (#239).
+        // Off while the folder's host is not answering, the Mac or its server (#239).
         // A stopped workspace that starts when used keeps the start until it is up (#691 US3).
         return !model.isStarting && (!model.isStale(on: model.startHost) || model.startsWhenUsed(model.startHost))
             && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private func keep() {
-        StartDraftKeeper.shared.note(text, attachments, in: project)
+        StartDraftKeeper.shared.note(text, attachments, in: folder)
     }
 
     private func send() {
@@ -344,7 +351,7 @@ struct StartAgentView: View {
         focused = false
         let words = text
         let attached = attachments
-        Task { _ = await model.startAgent(prompt: words, attachments: attached, labels: draftLabels, in: project, page: page) }
+        Task { _ = await model.startAgent(prompt: words, attachments: attached, labels: draftLabels, in: folder, page: page) }
     }
 
     /// Listens, as the chat's bar does: what is in the field stays, and the words go in at
@@ -352,8 +359,8 @@ struct StartAgentView: View {
     private func beginDictation() {
         focused = true
         dictation.start(in: text, selection: DictationCursor.range(of: selection, in: text),
-                        vocabulary: DictationVocabulary.seeds(projects: model.work.projects,
-                                                             agents: model.work.agents, in: project)) { field, cursor in
+                        vocabulary: DictationVocabulary.seeds(folders: model.work.folders,
+                                                             agents: model.work.agents, in: folder)) { field, cursor in
             text = field
             selection = DictationCursor.selection(cursor, in: field)
         }

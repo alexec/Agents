@@ -15,12 +15,12 @@ is a release check, so that the bugs are found before GA, not by a full disk or 
 
 ## Rules for the whole run
 
-- **Never touch the project folder you start in.** It is the shared checkout of `main`.
+- **Never touch the folder you start in.** It is the shared checkout of `main`.
   Do everything in the review worktree below, and have helpers work in their own.
 - **Never** merge, push, rebase `main`, open pull requests, file GitHub issues, ship or
   restart the app, or call the live app's `daemon.sock`. The Release run files the issues
   from your findings (its step 3).
-- **Never touch the live control plane** (control.agentloops.dev, the GCP project, its
+- **Never touch the live control plane** (control.agentloops.dev, the GCP folder, its
   VM, disk and bucket) or a real host's data. Read `deploy/`; never run `up.sh`, `down.sh`,
   `move.sh` or `gcloud`. Every drill runs on a scratch set-up.
 - **Never copy real agent records** into a scratch root (`~/.agents`, `~/Library/Application
@@ -169,12 +169,12 @@ Only **critical** and **high** findings are fixed; medium and low stay recorded,
 Release run files the medium ones.
 
 - A finding whose fix changes the live set-up (a snapshot policy or a bucket on the GCP
-  project, a second VM, DNS) costs money or changes an outside account. That is Alex's:
+  folder, a second VM, DNS) costs money or changes an outside account. That is Alex's:
   record it as "needs a decision: <the choice, and what it costs>", and start no helper
   for it.
 - For the others, at most **1 helper per run**. Take the most severe finding. Call
   `list_sessions` with `started_by: me` first and start it only if a running place is free
-  (the project's helper limits are 3 running and 5 not archived unless Alex changed them).
+  (the folder's helper limits are 3 running and 5 not archived unless Alex changed them).
   Every other critical or high finding is recorded as "needs a decision: no helper place
   this run" and is picked up next run.
 - Start it with `start_session`: runtime Claude, permission mode no looser than yours, a

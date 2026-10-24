@@ -10,14 +10,14 @@ In this tutorial you put Agents on your iPhone, find the agent you started in
 [Your first agent](first-agent.md), and start a second one from the phone. It takes about
 ten minutes. The same steps work on an iPad.
 
-**What you'll have at the end:** your Mac's projects and agents on your phone, and a second
+**What you'll have at the end:** your Mac's folders and agents on your phone, and a second
 agent started and finished from the phone without going back to the Mac.
 
-![The project on the phone, with two finished agents under Complete](images/follow-from-iphone-05.png){ width="300" }
+![The folder on the phone, with two finished agents under Complete](images/follow-from-iphone-05.png){ width="300" }
 
 ## Before you start
 
-- You have finished [Your first agent](first-agent.md), so your Mac has a project with an
+- You have finished [Your first agent](first-agent.md), so your Mac has a folder with an
   agent in it.
 - Agents Host runs on your Mac, and the Agents window is paired with it. See
   [Set up Agents on this Mac](../how-to/set-up-on-this-mac.md).
@@ -52,16 +52,16 @@ On your phone, tap **Scan the Code** and point the camera at the code. The first
 phone asks to use the camera; allow it.
 
 You should see your phone listed under **Clients** on the Mac, as a **Device**, and the
-phone show **Projects**, with the project you made in the first tutorial.
+phone show **Folders**, with the folder you made in the first tutorial.
 
 ## 4. Find your first agent
 
-Tap your project.
+Tap your folder.
 
 You should see the agent from the first tutorial in the **Complete** group, with its
 summary under its name.
 
-![The weather-app project on the phone, with the first agent under Complete](images/follow-from-iphone-01.png){ width="300" }
+![The weather-app folder on the phone, with the first agent under Complete](images/follow-from-iphone-01.png){ width="300" }
 
 Tap it to read the whole conversation, exactly as it is on the Mac: the summary, the
 agent's explanation, and the fix it suggests you commit next.
@@ -70,7 +70,7 @@ agent's explanation, and the fix it suggests you commit next.
 
 ## 5. Start an agent from the phone
 
-1. Go back to the list, tap the project to unfold it, and tap **New session**, the first row under it.
+1. Go back to the list, tap the folder to unfold it, and tap **New session**, the first row under it.
 2. Leave **Runtime** as it is. It is the runtime your Mac has set up. If you open the
    row, the runtimes are in two runs, **Available** and **Out**, with what is wrong with
    each out one said under its name, exactly as the Mac's own chooser shows them. An out
@@ -92,7 +92,7 @@ reads the code.
 ## 6. Watch it finish, and answer it if it asks
 
 Whether the agent stops to ask before it changes a file depends on **Mode** on the form.
-With **Auto**, as in the picture above, Claude goes ahead with changes inside the project
+With **Auto**, as in the picture above, Claude goes ahead with changes inside the folder
 without asking. With a mode that asks, a card appears in its conversation naming what it
 wants to do, and you tap **Yes**, just as you clicked it on the Mac.
 
@@ -113,6 +113,6 @@ this build Agents Host cannot switch the relay on yet; see
 
 - [Answer a question or a permission request](../how-to/answer-a-question.md), including from a
   notification when your Mac is not in use.
-- [Start an agent in its own worktree](../how-to/start-in-a-worktree.md), so two agents in one project
+- [Start an agent in its own worktree](../how-to/start-in-a-worktree.md), so two agents in one folder
   do not change the same files.
 - [How the phone and iPad reach your agents](../explanation/phone-and-ipad.md).

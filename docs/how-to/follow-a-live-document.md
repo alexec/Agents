@@ -15,7 +15,7 @@ short plan while you watch.
 
 - An agent on any runtime. Every runtime gets the app's `show_file` tool, which opens the
   page; see [Runtimes](../reference/runtimes.md).
-- The document is an ordinary Markdown file inside the agent's project folder or worktree.
+- The document is an ordinary Markdown file inside the agent's folder or worktree.
 
 ## Steps
 

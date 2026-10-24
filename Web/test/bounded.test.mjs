@@ -11,9 +11,9 @@ const w = await load("test/wire.ts");
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function agent(id, project, at, extra = {}) {
+function agent(id, folder, at, extra = {}) {
   return {
-    id, title: `Session ${id}`, cwd: `file:///w/${project}/`, createdAt: at, lastActivityAt: at, runtimeID: "claude",
+    id, title: `Session ${id}`, cwd: `file:///w/${folder}/`, createdAt: at, lastActivityAt: at, runtimeID: "claude",
     state: "finished", advertisedOptions: [], availableCommands: [], startOptions: { extraArguments: [], values: {} }, ...extra,
   };
 }
@@ -25,23 +25,23 @@ function runs(read) {
   return { get count() { return count; }, stop };
 }
 
-test("one agent's change redraws its own project and no other", () => {
+test("one agent's change redraws its own folder and no other", () => {
   const work = new Work();
   const listed = [];
   for (let p = 0; p < 5; p++) for (let i = 0; i < 20; i++) listed.push(agent(`${p}-${i}`, `p${p}`, p * 100 + i));
   work.replaceAgents(listed, "mac");
-  const views = [0, 1, 2, 3, 4].map((p) => runs(() => work.projectView("mac", `file:///w/p${p}`)));
-  const before = work.projectView("mac", "file:///w/p1");
+  const views = [0, 1, 2, 3, 4].map((p) => runs(() => work.folderView("mac", `file:///w/p${p}`)));
+  const before = work.folderView("mac", "file:///w/p1");
   work.apply("agent/changed", { ...listed[25], isUnread: true, lastActivityAt: 10_000 }, "mac");
   assert.deepEqual(views.map((v) => v.count), [0, 1, 0, 0, 0], "only p1 was worked out again");
-  assert.notEqual(work.projectView("mac", "file:///w/p1"), before);
-  assert.equal(work.projectView("mac", "file:///w/p1").subtitle, "1 unread");
+  assert.notEqual(work.folderView("mac", "file:///w/p1"), before);
+  assert.equal(work.folderView("mac", "file:///w/p1").subtitle, "1 unread");
   assert.equal(work.agents.value.mac[0].id, "1-5", "newest first");
-  // Moving to another project tells both.
+  // Moving to another folder tells both.
   work.apply("agent/changed", { ...listed[25], cwd: "file:///w/p3/", lastActivityAt: 10_001 }, "mac");
   assert.deepEqual(views.map((v) => v.count), [0, 2, 0, 1, 0]);
-  assert.equal(work.projectAgents("mac", "file:///w/p3").length, 21);
-  // A whole list again tells only the projects whose agents differ.
+  assert.equal(work.folderAgents("mac", "file:///w/p3").length, 21);
+  // A whole list again tells only the folders whose agents differ.
   work.replaceAgents(work.agents.value.mac, "mac");
   assert.deepEqual(views.map((v) => v.count), [1, 3, 1, 2, 1], "keepingLists makes every record anew");
   work.apply("agent/removed", { agentID: "4-0" }, "mac");
@@ -432,17 +432,17 @@ test("a heartbeat answered with an error keeps the link (#214)", async () => {
 test("a slow call waits longer than an ordinary one, unless a test says otherwise (#291)", () => {
   assert.equal(w.callTimeoutFor("hosts/list"), 30_000);
   assert.equal(w.callTimeoutFor("agents/prompt"), 30_000);
-  assert.ok(w.callTimeoutFor("projects/clone") > w.callTimeoutFor("agents/start"));
+  assert.ok(w.callTimeoutFor("folders/clone") > w.callTimeoutFor("agents/start"));
   assert.equal(w.callTimeoutFor("agents/start"), 2 * 60_000);
   assert.equal(w.callTimeoutFor("agents/options"), w.callTimeoutFor("agents/start"));
-  assert.equal(w.callTimeoutFor("projects/clone", 20), 20);
+  assert.equal(w.callTimeoutFor("folders/clone", 20), 20);
   assert.equal(w.callTimeoutFor("hosts/list", 20), 20);
 });
 
 test("one start keeps its request until it succeeds (#291)", () => {
   const store = new Store(fakeLink(() => undefined));
   const first = store.startRequestID("mac", "file:///w/p");
-  assert.equal(store.startRequestID("mac", "file:///w/p/"), first, "the same project, slash or none");
+  assert.equal(store.startRequestID("mac", "file:///w/p/"), first, "the same folder, slash or none");
   assert.notEqual(store.startRequestID("mac", "file:///w/q"), first);
   store.finishStartRequest("mac", "file:///w/p");
   assert.notEqual(store.startRequestID("mac", "file:///w/p"), first);
@@ -510,14 +510,14 @@ test("pages changed in a burst bump the revision once (#291)", async () => {
   assert.equal(work.pageRevisions.value["mac|file:///w/p"], 1);
 });
 
-test("a workflow change redraws that project's list and no other (#291)", async () => {
+test("a workflow change redraws that folder's list and no other (#291)", async () => {
   const link = fakeLink((method) => (method === "workflows/list" ? [] : undefined));
   const store = new Store(link);
   store.holdWorkflows("mac", "file:///w/p1");
   store.holdWorkflows("mac", "file:///w/p2");
   await wait(20);
-  const first = runs(() => store.projectWorkflows("mac", "file:///w/p1"));
-  const second = runs(() => store.projectWorkflows("mac", "file:///w/p2"));
+  const first = runs(() => store.folderWorkflows("mac", "file:///w/p1"));
+  const second = runs(() => store.folderWorkflows("mac", "file:///w/p2"));
   store.apply("workflow/changed", { workflow: { folder: "file:///w/p1", workflowID: "w" } }, "mac");
   assert.deepEqual([first.count, second.count], [1, 0]);
   first.stop();
@@ -536,10 +536,10 @@ test("a workflow whose runs-on: names other computers leaves this host's list (#
   store.apply("workflow/changed", { workflow: { folder: "file:///w/p", workflowID: "here", runsOn: [THIS] } }, "mac");
   store.apply("workflow/changed", { workflow: { folder: "file:///w/p", workflowID: "there", runsOn: [OTHER] } }, "mac");
   store.apply("workflow/changed", row, "mac");
-  assert.deepEqual(store.projectWorkflows("mac", "file:///w/p").map((item) => item.workflow.workflowID), ["here", "open"]);
-  const summary = store.projectWorkflows("mac", "file:///w/p").find((item) => item.workflow.workflowID === "open");
+  assert.deepEqual(store.folderWorkflows("mac", "file:///w/p").map((item) => item.workflow.workflowID), ["here", "open"]);
+  const summary = store.folderWorkflows("mac", "file:///w/p").find((item) => item.workflow.workflowID === "open");
   assert.equal(await store.setWorkflowSettings("mac", summary, { runsOn: [OTHER] }), null);
-  assert.deepEqual(store.projectWorkflows("mac", "file:///w/p").map((item) => item.workflow.workflowID), ["here"]);
+  assert.deepEqual(store.folderWorkflows("mac", "file:///w/p").map((item) => item.workflow.workflowID), ["here"]);
 });
 
 test("a reconnect lists the workflow folds still open, and no other (#291)", async () => {

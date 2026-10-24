@@ -6,8 +6,8 @@ import Testing
 @Suite("The event log")
 struct EventLogTests {
     private let t0 = Date(timeIntervalSince1970: 1_000_000)
-    private let p = EventScope.project(folder: URL(fileURLWithPath: "/tmp/p"))
-    private let q = EventScope.project(folder: URL(fileURLWithPath: "/tmp/q"))
+    private let p = EventScope.folder(folder: URL(fileURLWithPath: "/tmp/p"))
+    private let q = EventScope.folder(folder: URL(fileURLWithPath: "/tmp/q"))
 
     private func draft(_ name: String, _ scope: EventScope? = nil, _ details: [String: String] = [:],
                        at: Date? = nil) -> EventDraft {

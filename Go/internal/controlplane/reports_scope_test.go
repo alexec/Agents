@@ -28,7 +28,7 @@ func TestReportScopesAndTheGroupLead(t *testing.T) {
 
 	day := time.Now().UTC().Format(usageDayLayout)
 	for _, h := range []*fakeHost{beas, cys, dees} {
-		r := wire.UsageRollup{Days: []wire.UsageRollupPeriod{{At: day, Rows: []wire.UsageRollupRow{{Project: "shop", Runtime: "claude",
+		r := wire.UsageRollup{Days: []wire.UsageRollupPeriod{{At: day, Rows: []wire.UsageRollupRow{{Folder: "shop", Runtime: "claude",
 			Cost: map[string]float64{"USD": 2}, Turns: 1, WorkingSeconds: 60}}}}}
 		params, _ := json.Marshal(r)
 		if _, err := p.s.methods.HostSaid(h.member.Host, "usage/rollup", params); err != nil {

@@ -1,6 +1,6 @@
 import Foundation
 
-/// Reports (#1811): usage, cost and time by person, project, machine and runtime, added up
+/// Reports (#1811): usage, cost and time by person, folder, machine and runtime, added up
 /// on the control plane from what each machine sends it each hour. Hours and days are UTC,
 /// so machines in other time zones add up into the same ones.
 public extension DaemonAPI {
@@ -85,7 +85,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// One hour or day of one machine's project and runtime, with its person.
+    /// One hour or day of one machine's folder and runtime, with its person.
     struct ReportRow: Codable, Sendable, Hashable {
         /// The UTC hour ("2026-10-21T15") or day ("2026-10-21").
         public var at: String
@@ -93,7 +93,7 @@ public extension DaemonAPI {
         public var personName: String
         public var host: String
         public var hostName: String
-        public var project: String
+        public var folder: String
         public var runtime: String
         /// The workflow that started the agents of this row (#2019), by its id; nil for agents
         /// a person or another agent started.
@@ -118,7 +118,7 @@ public extension DaemonAPI {
         public var counts: ReportCounts?
 
         public init(at: String, person: String, personName: String, host: String, hostName: String,
-                    project: String, runtime: String, workflow: String? = nil, cost: [String: Decimal] = [:],
+                    folder: String, runtime: String, workflow: String? = nil, cost: [String: Decimal] = [:],
                     inputTokens: Int = 0, outputTokens: Int = 0, thoughtTokens: Int = 0, cachedReadTokens: Int = 0,
                     cachedWriteTokens: Int = 0, turns: Int = 0, unpricedTurns: Int = 0,
                     workingSeconds: Double = 0, waitingSeconds: Double = 0, groups: [String]? = nil,
@@ -128,7 +128,7 @@ public extension DaemonAPI {
             self.personName = personName
             self.host = host
             self.hostName = hostName
-            self.project = project
+            self.folder = folder
             self.runtime = runtime
             self.workflow = workflow
             self.cost = cost
@@ -230,7 +230,7 @@ public extension DaemonAPI {
         public var page: ReportPage
         public var scope: ReportScope
         public var range: ReportRange
-        /// person, project, machine, runtime, group or workflow.
+        /// person, folder, machine, runtime, group or workflow.
         public var by: String?
 
         public init(id: String = "", name: String, page: ReportPage, scope: ReportScope, range: ReportRange, by: String? = nil) {

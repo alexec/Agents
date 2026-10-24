@@ -9,13 +9,13 @@ control/status
   "awayFromHome": true,
   "you": "<UUID>",
   "relayKey": "<secret>",
-  "projectDetection": {
+  "folderDetection": {
     "enabled": true,
     "paths": [
       "~",
       "~/src",
       "~/code",
-      "~/projects",
+      "~/folders",
       "~/Developer",
       "~/dev",
       "~/git"
@@ -32,6 +32,7 @@ control/status
     "control/1",
     "events.audit/1",
     "events.team/1",
+    "folders/1",
     "git/1",
     "governance/1",
     "groups/1",
@@ -50,7 +51,6 @@ control/status
     "org-routes/1",
     "people/1",
     "policy/1",
-    "projects/1",
     "providers/1",
     "readapi/1",
     "relay/1",
@@ -217,7 +217,7 @@ hosts/lastHeard
   "host": "<host a>"
 }
 
-control/setProjectDetection
+control/setFolderDetection
 {
   "enabled": true,
   "paths": [
@@ -246,7 +246,7 @@ control/status
   "awayFromHome": true,
   "you": "<UUID>",
   "relayKey": "<secret>",
-  "projectDetection": {
+  "folderDetection": {
     "enabled": true,
     "paths": [
       "~/src",
@@ -264,6 +264,7 @@ control/status
     "control/1",
     "events.audit/1",
     "events.team/1",
+    "folders/1",
     "git/1",
     "governance/1",
     "groups/1",
@@ -282,7 +283,6 @@ control/status
     "org-routes/1",
     "people/1",
     "policy/1",
-    "projects/1",
     "providers/1",
     "readapi/1",
     "relay/1",

@@ -68,7 +68,7 @@ public enum DaemonAPI {
         /// listening is put right rather than left guessing.
         public static let attentionPending = "attention/pending"
         /// What a client catching up after a connection needs before anything else, in
-        /// one answer (#175): the live projects, the first page of live agents, and what is
+        /// one answer (#175): the live folders, the first page of live agents, and what is
         /// waiting on a person. A host from before it answers method-not-found, and the
         /// client asks for each part on its own.
         public static let clientCatchUp = "client/catchUp"
@@ -173,9 +173,9 @@ public enum DaemonAPI {
         /// Change that, confirming first when the change deletes agents at once (051).
         public static let retentionSet = "retention/set"
         /// The ways on from an agent whose folder has gone (#119): a successor in the
-        /// project folder that reads this session, or the worktree made again from its
+        /// folder that reads this session, or the worktree made again from its
         /// branch. The person's, from the error and the chat header.
-        public static let agentsContinueInProject = "agents/continueInProject"
+        public static let agentsContinueInFolder = "agents/continueInFolder"
         public static let agentsRecreateWorktree = "agents/recreateWorktree"
         /// A chat paused by a spent allowance carries on when it is back, or no longer
         /// does (#1859). The person's, from the chat.
@@ -214,32 +214,32 @@ public enum DaemonAPI {
         /// (022). The daemon writes rather than the window, so that it knows the
         /// person did — that is what lets it tell the agent on its next turn.
         public static let artifactWrite = "artifact/write"
-        // A project is a folder. These five are everything that can be done to one,
+        // A folder is a directory. These five are everything that can be done to one,
         // which is to say: notice it, put it away, and forget it.
-        public static let projectsList = "projects/list"
-        public static let projectsAdd = "projects/add"
-        public static let projectsArchive = "projects/archive"
-        public static let projectsUnarchive = "projects/unarchive"
-        /// Delete an archived project (#677): every session in it, as `agents/delete`
+        public static let foldersList = "folders/list"
+        public static let foldersAdd = "folders/add"
+        public static let foldersArchive = "folders/archive"
+        public static let foldersUnarchive = "folders/unarchive"
+        /// Delete an archived folder (#677): every session in it, as `agents/delete`
         /// deletes one, and its record. Its folder is not touched. The person's alone;
         /// each client asks first.
-        public static let projectsDelete = "projects/delete"
-        /// The person setting a project's two helper limits (#64), from any window or
+        public static let foldersDelete = "folders/delete"
+        /// The person setting a folder's two helper limits (#64), from any window or
         /// paired client (#111). Not in `ConnectionRole.agentMethods`, so no agent and no
         /// workflow can raise a ceiling over agents.
-        public static let projectsSetHelperLimits = "projects/setHelperLimits"
-        /// The person pinning a project to the top of the sidebar, or unpinning it, from
+        public static let foldersSetHelperLimits = "folders/setHelperLimits"
+        /// The person pinning a folder to the top of the sidebar, or unpinning it, from
         /// any client. Not in `ConnectionRole.agentMethods`: the sidebar is the person's.
-        public static let projectsSetPinned = "projects/setPinned"
-        /// A project's disk space lines (#195), kept in its `.agents/project.json`.
-        public static let projectsSetDiskSpace = "projects/setDiskSpace"
+        public static let foldersSetPinned = "folders/setPinned"
+        /// A folder's disk space lines (#195), kept in its `.agents/folder.json`.
+        public static let foldersSetDiskSpace = "folders/setDiskSpace"
         /// A change to an app-owned file in `.agents` made outside the app (#502): what the
         /// file was and is, line by line; and the person's Keep (the change is used from
         /// now on) or Undo (the approved copy is written back). Not in
         /// `ConnectionRole.agentMethods`: an agent cannot approve its own change.
-        public static let projectsReadGuardedChange = "projects/readGuardedChange"
-        public static let projectsKeepGuardedChange = "projects/keepGuardedChange"
-        public static let projectsUndoGuardedChange = "projects/undoGuardedChange"
+        public static let foldersReadGuardedChange = "folders/readGuardedChange"
+        public static let foldersKeepGuardedChange = "folders/keepGuardedChange"
+        public static let foldersUndoGuardedChange = "folders/undoGuardedChange"
         /// Approve, Deny or Request changes on anything in Needs You (#773).
         public static let approvalsAnswer = "approvals/answer"
         /// What a waiting item is, before the choice (#773).
@@ -258,7 +258,7 @@ public enum DaemonAPI {
         public static let backupsMake = "backups/make"
         /// Bring a backup's agents back, archived. One already here is skipped.
         public static let backupsRestore = "backups/restore"
-        /// Export one agent or one project's agents (#1001): a .tar.gz in the backup format,
+        /// Export one agent or one folder's agents (#1001): a .tar.gz in the backup format,
         /// made on the host and read in parts. Import sends one in parts, then brings its
         /// agents back archived, as a restore does.
         public static let agentsExport = "agents/export"
@@ -266,33 +266,33 @@ public enum DaemonAPI {
         public static let agentsImportUpload = "agents/importUpload"
         public static let agentsImport = "agents/import"
         /// Clone a Git URL into the home folder and add it (027). Answers when the
-        /// project exists, which for a big repository is minutes: the window shows the
+        /// folder exists, which for a big repository is minutes: the window shows the
         /// clone from `clone/changed`, not from waiting on this.
-        public static let projectsClone = "projects/clone"
+        public static let foldersClone = "folders/clone"
         /// The clones under way, for a window that connects in the middle of one.
-        public static let projectsClones = "projects/clones"
+        public static let foldersClones = "folders/clones"
         /// Send to ‹host›… (#1123): what the host has at the folder a send names, one part
         /// of the bundle or the patch, and the send itself, which makes or brings up to
-        /// date the host's copy and adds it as a project.
-        public static let projectsReceiveState = "projects/receiveState"
-        public static let projectsReceiveUpload = "projects/receiveUpload"
-        public static let projectsReceive = "projects/receive"
+        /// date the host's copy and adds it as a folder.
+        public static let foldersReceiveState = "folders/receiveState"
+        public static let foldersReceiveUpload = "folders/receiveUpload"
+        public static let foldersReceive = "folders/receive"
         /// The sending side, on this Mac's host, since the window reads no repository
         /// itself: the sheet's facts, the bundle and patch made, and one part of either.
-        public static let projectsBringBack = "projects/bringBack"
-        public static let projectsSendFacts = "projects/sendFacts"
-        public static let projectsSendPack = "projects/sendPack"
-        public static let projectsSendRead = "projects/sendRead"
-        /// The folders a person may add as projects on this host (#656): the git
+        public static let foldersBringBack = "folders/bringBack"
+        public static let foldersSendFacts = "folders/sendFacts"
+        public static let foldersSendPack = "folders/sendPack"
+        public static let foldersSendRead = "folders/sendRead"
+        /// The folders a person may add as folders on this host (#656): the git
         /// repositories directly inside each of `paths`, and each of `folders` as typed.
-        /// Adds nothing; the window adds the ones the person ticks with `projects/add`.
-        public static let projectsFind = "projects/find"
+        /// Adds nothing; the window adds the ones the person ticks with `folders/add`.
+        public static let foldersFind = "folders/find"
 
-        // Workflows: the prompts a project keeps that run themselves.
+        // Workflows: the prompts a folder keeps that run themselves.
         public static let workflowsList = "workflows/list"
-        /// The personas a start in a project can pick (#760), as `[Persona]`.
+        /// The personas a start in a folder can pick (#760), as `[Persona]`.
         public static let personasList = "personas/list"
-        /// Persona Markdown files in one storage scope, without project shadowing.
+        /// Persona Markdown files in one storage scope, without folder shadowing.
         public static let personasFiles = "personas/files"
         /// Save or delete one persona Markdown file.
         public static let personasSave = "personas/save"
@@ -312,13 +312,13 @@ public enum DaemonAPI {
         /// Deny one on this host only (#391): it does not run here, and the file is not
         /// touched, so other hosts still see it waiting. Takes a `WorkflowApproveRequest`.
         public static let workflowsDeny = "workflows/deny"
-        /// How many workflows turned on may run in each project (#506): the
+        /// How many workflows turned on may run in each folder (#506): the
         /// person's setting, as `WorkflowLimitSettings`.
         public static let workflowsLimit = "workflows/limit"
         /// Set it. The person's alone: not in an agent's allowlist, since a ceiling an
         /// agent could raise for itself is not one. Answers the setting as kept.
         public static let workflowsSetLimit = "workflows/setLimit"
-        /// A project's plugins and which are waiting for the person's OK (security review, S2).
+        /// A folder's plugins and which are waiting for the person's OK (security review, S2).
         public static let pluginsList = "plugins/list"
         public static let pluginsApprove = "plugins/approve"
         /// Change what a workflow is allowed to do, by writing its own file. The daemon
@@ -348,17 +348,17 @@ public enum DaemonAPI {
         public static let resourcesDeclare = "resources/declare"
         public static let resourcesRemove = "resources/remove"
         /// A folder's repository and its worktrees, for the start bar's chooser and the
-        /// project page (030). Asked for when something is shown, never polled.
+        /// folder page (030). Asked for when something is shown, never polled.
         public static let worktreesList = "worktrees/list"
         /// What removing a worktree would lose, asked before it is removed.
         public static let worktreesCheck = "worktrees/check"
         /// Remove a worktree the app made, and its branch when that is safe.
         public static let worktreesRemove = "worktrees/remove"
-        /// Every project's worktrees on this host, for Activity ▸ Worktrees (#790).
+        /// Every folder's worktrees on this host, for Activity ▸ Worktrees (#790).
         public static let worktreesAll = "worktrees/all"
         /// Delete the build output git ignores in an idle worktree the app made (#790).
         public static let worktreesRemoveBuildOutput = "worktrees/removeBuildOutput"
-        /// The person moving an agent into a worktree or back to its project folder, or
+        /// The person moving an agent into a worktree or back to its folder, or
         /// taking back a move still waiting for the turn to end (053).
         public static let agentsMove = "agents/move"
 
@@ -385,14 +385,14 @@ public enum DaemonAPI {
         public static let credentialsLend = "credentials/lend"
         /// A window lends this Mac's own file sign-in for one runtime (049: OpenCode's).
         public static let credentialsLendSignIn = "credentials/lendSignIn"
-        /// The folders at a path, before there is any project or agent to scope it to:
-        /// what the window browses to choose a server folder as a project (037).
+        /// The folders at a path, before there is any folder or agent to scope it to:
+        /// what the window browses to choose a server folder as a folder (037).
         public static let filesBrowse = "files/browse"
         /// A file attached on one machine, for an agent on another (037): written into
         /// the agent's folder so it can read it, and the path handed back.
         public static let filesWrite = "files/write"
-        /// A file put into a project's drop box (#231), from any window, phone or page:
-        /// written into `<project>/.agents/dropbox/<folder>/`, where the project's watch
+        /// A file put into a folder's drop box (#231), from any window, phone or page:
+        /// written into `<folder>/.agents/dropbox/<folder>/`, where the folder's watch
         /// hears it arrive like any other.
         public static let dropboxPut = "dropbox/put"
 
@@ -458,7 +458,7 @@ public enum DaemonAPI {
         /// for half an hour.
         public static let wakeState = "wake/state"
         /// What this host keeps that could not be read in this run (#205): files set aside
-        /// or held, said so a person sees why paired devices or projects "disappeared".
+        /// or held, said so a person sees why paired devices or folders "disappeared".
         public static let storeNotes = "store/notes"
         /// The switch and the grace. The window's, like retention: a phone does not set it.
         public static let wakeSettings = "wake/settings"
@@ -514,12 +514,12 @@ public enum DaemonAPI {
         /// hears it, and that is safe: a need id, a device id and ciphertext name
         /// nothing (021 FR-022).
         public static let mailboxPost = "mailbox/post"
-        /// A project appeared, was archived, or its counts moved. Windows upsert by
+        /// A folder appeared, was archived, or its counts moved. Windows upsert by
         /// folder, the way they upsert agents by id.
-        public static let projectChanged = "project/changed"
-        /// A project was deleted (#677). Carries `ProjectRemovedNotification`; windows
+        public static let folderChanged = "folder/changed"
+        /// A folder was deleted (#677). Carries `FolderRemovedNotification`; windows
         /// drop it by folder.
-        public static let projectRemoved = "project/removed"
+        public static let folderRemoved = "folder/removed"
         /// A clone began, or ended either way (027). Every window hears it, because a
         /// clone belongs to the Mac and not to the window that asked for it.
         public static let cloneChanged = "clone/changed"
@@ -529,11 +529,11 @@ public enum DaemonAPI {
         public static let writeFailed = "storage/writeFailed"
 
         /// A workflow appeared, changed, ran, was refused, or was archived. Carries the
-        /// whole resolved summary rather than a delta, for the reason `project/changed`
+        /// whole resolved summary rather than a delta, for the reason `folder/changed`
         /// does: two windows cannot then disagree, and one that missed a notification
         /// is put right by the next rather than drifting.
         public static let workflowChanged = "workflow/changed"
-        /// A project's plugins, sent whole, when one is found waiting or is approved.
+        /// A folder's plugins, sent whole, when one is found waiting or is approved.
         public static let pluginsChanged = "plugins/changed"
         public static let workflowRemoved = "workflow/removed"
         /// The user's shell printed something. Raw bytes, base64. Not the agent's
@@ -546,7 +546,7 @@ public enum DaemonAPI {
 
         /// A limit changed, a turn's cost was banked, or the local day rolled over.
         /// Carries the whole resolved fact rather than a delta, for the reason
-        /// `project/changed` does: two windows cannot then disagree, and one that
+        /// `folder/changed` does: two windows cannot then disagree, and one that
         /// missed a notification is put right by the next rather than drifting.
         public static let costChanged = "cost/changed"
         /// Cursor and Grok permission mode changed (061).
@@ -594,9 +594,9 @@ public enum DaemonAPI {
 
     // MARK: Requests
 
-    /// Which projects to list. Archived ones come back too by default, the same way
+    /// Which folders to list. Archived ones come back too by default, the same way
     /// archived agents do: the window decides what to draw, not us.
-    public struct ProjectsListRequest: Codable, Sendable {
+    public struct FoldersListRequest: Codable, Sendable {
         public var includeArchived: Bool
         public init(includeArchived: Bool = true) { self.includeArchived = includeArchived }
 
@@ -606,14 +606,14 @@ public enum DaemonAPI {
         }
     }
 
-    /// One project, named by its folder, because the folder is the identity.
-    public struct ProjectRequest: Codable, Sendable {
+    /// One folder, named by its folder, because the folder is the identity.
+    public struct FolderRequest: Codable, Sendable {
         public var folder: URL
         public init(folder: URL) { self.folder = folder }
     }
 
-    /// `projects/find` (#656). `~` is the host's own home, in both.
-    public struct ProjectsFindRequest: Codable, Sendable {
+    /// `folders/find` (#656). `~` is the host's own home, in both.
+    public struct FoldersFindRequest: Codable, Sendable {
         /// Where to look: each folder directly inside one that has `.git` in it.
         public var paths: [String]
         /// Folders the person typed, each said back as it stands.
@@ -624,7 +624,7 @@ public enum DaemonAPI {
         }
     }
 
-    /// A folder `projects/find` found or was asked about, as it stands on that host.
+    /// A folder `folders/find` found or was asked about, as it stands on that host.
     public struct FoundFolder: Codable, Sendable, Hashable, Identifiable {
         /// As typed, for one of `folders`; nil for one found under `paths`.
         public var typed: String?
@@ -633,20 +633,20 @@ public enum DaemonAPI {
         public var exists: Bool
         /// Has `.git` in it, a folder or a worktree's file.
         public var isRepository: Bool
-        /// A project on this host already.
-        public var isProject: Bool
+        /// A folder on this host already.
+        public var isFolder: Bool
         public var id: String { folder.path(percentEncoded: false) }
-        public init(typed: String? = nil, folder: URL, exists: Bool, isRepository: Bool, isProject: Bool) {
+        public init(typed: String? = nil, folder: URL, exists: Bool, isRepository: Bool, isFolder: Bool) {
             self.typed = typed
             self.folder = folder
             self.exists = exists
             self.isRepository = isRepository
-            self.isProject = isProject
+            self.isFolder = isFolder
         }
     }
 
-    /// A project's helper limits as the person set them (#64). A nil limit is its
-    /// default; both nil puts the project back to the defaults.
+    /// A folder's helper limits as the person set them (#64). A nil limit is its
+    /// default; both nil puts the folder back to the defaults.
     public struct SetHelperLimitsRequest: Codable, Sendable {
         public var folder: URL
         public var limits: HelperLimits
@@ -656,7 +656,7 @@ public enum DaemonAPI {
         }
     }
 
-    /// A project pinned to the top of the sidebar, or not.
+    /// A folder pinned to the top of the sidebar, or not.
     public struct SetPinnedRequest: Codable, Sendable {
         public var folder: URL
         public var pinned: Bool
@@ -666,8 +666,8 @@ public enum DaemonAPI {
         }
     }
 
-    /// A project's disk space lines as the person set them (#195). A nil field is its
-    /// default; all nil puts the project back to the defaults.
+    /// A folder's disk space lines as the person set them (#195). A nil field is its
+    /// default; all nil puts the folder back to the defaults.
     public struct SetDiskSpaceRequest: Codable, Sendable {
         public var folder: URL
         public var diskSpace: DiskThresholds
@@ -701,7 +701,7 @@ public enum DaemonAPI {
     public struct CloneSummary: Codable, Hashable, Sendable, Identifiable {
         public var id: UUID
         public var url: String
-        /// Where the project will be. Nothing is there until the clone has finished.
+        /// Where the folder will be. Nothing is there until the clone has finished.
         public var folder: URL
         public var startedAt: Date
         public init(id: UUID, url: String, folder: URL, startedAt: Date) {
@@ -714,7 +714,7 @@ public enum DaemonAPI {
 
     public struct CloneNotification: Codable, Sendable {
         public var clone: CloneSummary
-        /// Ended, whichever way. Success is the `project/changed` that follows; failure
+        /// Ended, whichever way. Success is the `folder/changed` that follows; failure
         /// is the error the caller was answered with.
         public var finished: Bool
         public init(clone: CloneSummary, finished: Bool) {
@@ -723,14 +723,14 @@ public enum DaemonAPI {
         }
     }
 
-    /// A project, plus the parts only the daemon can know.
+    /// A folder, plus the parts only the daemon can know.
     ///
     /// The name and the counts are worked out here rather than in the window, so that
-    /// two windows cannot disagree and so a sidebar row can say a project needs you
-    /// without that window having looked at the project's agents at all.
-    public struct ProjectSummary: Codable, Hashable, Sendable, Identifiable {
-        public var project: Project
-        /// Disambiguated against every project in the same response.
+    /// two windows cannot disagree and so a sidebar row can say a folder needs you
+    /// without that window having looked at the folder's agents at all.
+    public struct FolderSummary: Codable, Hashable, Sendable, Identifiable {
+        public var folder: Folder
+        /// Disambiguated against every folder in the same response.
         public var name: String
         /// Whether the directory is there, stamped when this was made.
         public var exists: Bool
@@ -758,46 +758,45 @@ public enum DaemonAPI {
         /// person's Keep or Undo (#502); absent when none is, so an older reader sees
         /// nothing new. Until then the app goes on using the copy last approved.
         public var guardedChanges: [GuardedChange]?
-        /// Everything here waiting for the person's approval (#773): project MCP servers,
+        /// Everything here waiting for the person's approval (#773): folder MCP servers,
         /// workflows, plugins, guarded files and sessions asking to be archived, as Needs
         /// You lists them on every client. Absent when nothing waits.
         public var approvals: [Approval]?
-        /// Set when the organisation's policy caps this project's helper limits (#998, #64):
+        /// Set when the organisation's policy caps this folder's helper limits (#998, #64):
         /// the lower number is used, and the rows say so. Absent with no cap.
         public var helperLimitsSetBy: PolicySetBy?
-        /// Which machine the project is on, stamped by the window that heard of it and
+        /// Which machine the folder is on, stamped by the window that heard of it and
         /// never sent (037). Not in `CodingKeys`.
         public var host: HostID = .mac
 
-        /// Archived projects, newest archived first (#2153); one archived before
+        /// Archived folders, newest archived first (#2153); one archived before
         /// `archivedAt` was kept goes by its last activity.
-        public static func byArchived(_ a: ProjectSummary, _ b: ProjectSummary) -> Bool {
-            (a.project.archivedAt ?? a.lastActivityAt) > (b.project.archivedAt ?? b.lastActivityAt)
+        public static func byArchived(_ a: FolderSummary, _ b: FolderSummary) -> Bool {
+            (a.folder.archivedAt ?? a.lastActivityAt) > (b.folder.archivedAt ?? b.lastActivityAt)
         }
 
-        public var id: URL { project.folder }
-        public var folder: URL { project.folder }
-        public var key: ProjectKey { ProjectKey(host: host, folder: project.folder) }
+        public var id: URL { folder.folder }
+        public var key: FolderKey { FolderKey(host: host, folder: folder.folder) }
         /// The helper limits enforced here (#64): the person's, or the defaults.
         public var helperLimits: (running: Int, notArchived: Int) {
-            (project.helperLimits ?? HelperLimits()).effective
+            (folder.helperLimits ?? HelperLimits()).effective
         }
 
         enum CodingKeys: String, CodingKey {
-            case project, name, exists, lastActivityAt, counts, costToDate, unmeasuredAgents
+            case folder, name, exists, lastActivityAt, counts, costToDate, unmeasuredAgents
             case retiredCount, guardedChanges, approvals, helperLimitsSetBy
         }
 
-        /// Whether anything in this project wants the user.
+        /// Whether anything in this folder wants the user.
         /// From the daemon's counts, so with the same blind spot: an agent waiting to be
         /// looked at is not in here. The phone's dot; the Mac asks its own window.
         public var needsInput: Bool { (counts[.needsAttention] ?? 0) > 0 }
 
-        public init(project: Project, name: String, exists: Bool, lastActivityAt: Date,
+        public init(folder: Folder, name: String, exists: Bool, lastActivityAt: Date,
                     counts: [AgentGroup: Int],
                     costToDate: [String: Decimal] = [:],
                     unmeasuredAgents: Int = 0) {
-            self.project = project
+            self.folder = folder
             self.name = name
             self.exists = exists
             self.lastActivityAt = lastActivityAt
@@ -810,13 +809,13 @@ public enum DaemonAPI {
         /// this build has not heard of.
         public init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
-            project = try c.decode(Project.self, forKey: .project)
+            folder = try c.decode(Folder.self, forKey: .folder)
             name = try c.decode(String.self, forKey: .name)
             exists = try c.decode(Bool.self, forKey: .exists)
             lastActivityAt = try c.decode(Date.self, forKey: .lastActivityAt)
             // By the group's name, dropping any this build has never heard of. A plain
             // `[AgentGroup: Int]` decode throws on an unknown key, which would take the
-            // whole project list down on a phone older than the group (039's `blocked`), or
+            // whole folder list down on a phone older than the group (039's `blocked`), or
             // newer than one that went (040's `parked`, gone in #584).
             counts = [:]
             for (name, count) in try c.decode([String: Int].self, forKey: .counts) {
@@ -917,8 +916,8 @@ public enum DaemonAPI {
         public var draftID: UUID?
         public var additionalDirectories: [URL]
         public var mcpServers: [MCPServer]
-        /// Where in the project to work, when it is not the project folder itself
-        /// (030). `cwd` stays the project folder: the worktree is made, or found, from it.
+        /// Where in the folder to work, when it is not the folder itself
+        /// (030). `cwd` stays the folder: the worktree is made, or found, from it.
         public var worktree: WorktreeChoice?
         /// Minted once per send by the caller and reused on every retry of that send.
         /// A second start with the same one answers with the first start's agent
@@ -1022,11 +1021,11 @@ public enum DaemonAPI {
         }
     }
 
-    /// `agents/continueInProject` (#119): start a successor of an agent whose folder has
-    /// gone, in its project folder, on the same runtime and choices, told to read this
+    /// `agents/continueInFolder` (#119): start a successor of an agent whose folder has
+    /// gone, in its folder, on the same runtime and choices, told to read this
     /// session and carry on. `text` is whatever was in the prompt bar, said after that.
     /// Answered with the new agent's id.
-    public struct ContinueInProjectRequest: Codable, Sendable {
+    public struct ContinueInFolderRequest: Codable, Sendable {
         public var agentID: UUID
         public var text: String
         public var attachments: [Attachment]
@@ -2034,11 +2033,11 @@ public enum DaemonAPI {
         /// nine tenths of a 5.4 MB `agents/list` on 2026-09-25 (seventy commands each,
         /// 220 archived agents). Unarchiving sends the whole agent again.
         public var archivedCommands: Bool
-        /// Only archived agents. With `folder`, one project's Archived section, which
+        /// Only archived agents. With `folder`, one folder's Archived section, which
         /// the phone asks for when it is opened rather than with everything else:
         /// archived agents outnumber the live ones many times over.
         public var archivedOnly: Bool
-        /// Only agents in this project.
+        /// Only agents in this folder.
         public var folder: URL?
         /// Only the agents this workflow started, for its Recent runs.
         public var startedByWorkflow: String?
@@ -2356,8 +2355,8 @@ public enum DaemonAPI {
         /// megabytes it already shows (#401).
         public var since: Int?
         public var startedAt: Date?
-        /// The project whose own shell this is (#418), when it is not an agent's: the
-        /// daemon starts it in this folder, and `agentID` is `ProjectShell.id(for:)` it.
+        /// The folder whose own shell this is (#418), when it is not an agent's: the
+        /// daemon starts it in this folder, and `agentID` is `FolderShell.id(for:)` it.
         /// A daemon from before #418 knows no such agent and says so.
         public var folder: URL?
 
@@ -2614,14 +2613,14 @@ public enum DaemonAPI {
         public static let notAllowed = -32060
         /// A destructive call that nobody confirmed.
         public static let notConfirmed = -32010
-        /// A folder that is not a project, on archive or unarchive.
-        public static let noSuchProject = -32012
-        /// Archiving a project while one of its agents is still working. Deliberately
+        /// A folder that is not a folder, on archive or unarchive.
+        public static let noSuchFolder = -32012
+        /// Archiving a folder while one of its agents is still working. Deliberately
         /// unlike archiving an agent, which stops the one it was given: cancelling
         /// several turns because somebody tidied their sidebar is not a small thing,
         /// so this refuses and names them.
-        public static let projectHasLiveAgents = -32013
-        /// A workflow id that is not one of this project's.
+        public static let folderHasLiveAgents = -32013
+        /// A workflow id that is not one of this folder's.
         public static let noSuchWorkflow = -32014
         /// Front matter that could not be read, on a write. Refused before anything is
         /// written: a file that could never fire is worth telling the agent about while
@@ -2629,7 +2628,7 @@ public enum DaemonAPI {
         public static let workflowUnreadable = -32015
         /// A path outside the calling agent's own workflow folder.
         public static let notInWorkflowFolder = -32016
-        /// A new workflow in a project that already has all the waiting ones it may
+        /// A new workflow in a folder that already has all the waiting ones it may
         /// have, or one turned on when the total is already running (#506).
         public static let workflowLimitReached = -32017
         /// An agent turning back on a workflow the person turned off (#100). Only an
@@ -2677,7 +2676,7 @@ public enum DaemonAPI {
         /// Git could not clone it. The message says why in a sentence.
         public static let cloneFailed = -32026
         /// An agent asked to do something to an agent that is not its to touch, or
-        /// past its project's limit, or was itself started by an agent (028). The
+        /// past its folder's limit, or was itself started by an agent (028). The
         /// message is the sentence the agent is shown.
         public static let notYours = -32027
         /// Making a worktree failed, or it could not be made at all (030). The message
@@ -2685,7 +2684,7 @@ public enum DaemonAPI {
         public static let worktreeFailed = -32028
         /// The worktree an agent works in is not there any more.
         public static let worktreeMissing = -32029
-        /// The folder named is not a worktree of this project's repository, or not one
+        /// The folder named is not a worktree of this folder's repository, or not one
         /// the app made, where only those will do.
         public static let notAWorktree = -32030
         /// An agent is still working in the worktree to be removed.
@@ -2763,7 +2762,7 @@ public enum DaemonAPI {
         }
     }
 
-    public struct ProjectRemovedNotification: Codable, Sendable {
+    public struct FolderRemovedNotification: Codable, Sendable {
         public var folder: URL
         public init(folder: URL) {
             self.folder = folder
@@ -2835,17 +2834,17 @@ public enum DaemonAPI {
         }
     }
 
-    /// A project's plugins.
+    /// A folder's plugins.
     public struct PluginsListRequest: Codable, Sendable {
         public var folder: URL
         public init(folder: URL) { self.folder = folder }
     }
 
-    /// Every plugin in one project, for `plugins/list` and `plugins/changed`.
+    /// Every plugin in one folder, for `plugins/list` and `plugins/changed`.
     public struct PluginsList: Codable, Sendable {
         public var folder: URL
-        public var plugins: [ProjectPlugin]
-        public init(folder: URL, plugins: [ProjectPlugin]) {
+        public var plugins: [FolderPlugin]
+        public init(folder: URL, plugins: [FolderPlugin]) {
             self.folder = folder
             self.plugins = plugins
         }
@@ -2964,7 +2963,7 @@ public enum DaemonAPI {
     // MARK: Agents started by agents (028)
 
     /// What an agent passes to `start_session`. There is no folder: the new session
-    /// always starts in the caller's own project, which the token decides.
+    /// always starts in the caller's own folder, which the token decides.
     public struct StartHelperRequest: Codable, Sendable {
         public var token: String
         public var prompt: String
@@ -3075,7 +3074,7 @@ public enum DaemonAPI {
     }
 
     /// What an agent passes to `list_sessions` (065): who it is, and which page. Its
-    /// project is its own, never a parameter.
+    /// folder is its own, never a parameter.
     public struct ListSessionsRequest: Codable, Sendable {
         public var token: String
         /// How many sessions; nil is `SessionLookup.pageSize` (#210).
@@ -3101,7 +3100,7 @@ public enum DaemonAPI {
         }
     }
 
-    /// `message_session` (#560): `to` is a session id or exact title in the caller's project.
+    /// `message_session` (#560): `to` is a session id or exact title in the caller's folder.
     public struct MessageAgentRequest: Codable, Sendable {
         public var token: String
         public var to: String
@@ -3340,17 +3339,17 @@ public enum DaemonAPI {
             self.branches = branches
         }
 
-        /// The branch the project folder is on, "detached" when it is on none. Nil
+        /// The branch the folder is on, "detached" when it is on none. Nil
         /// when it is in no repository, or not listed yet.
-        public var projectFolderBranch: String? {
-            worktrees.first(where: \.isProjectFolder).map { $0.branch ?? "detached" }
+        public var folderPathBranch: String? {
+            worktrees.first(where: \.isFolderPath).map { $0.branch ?? "detached" }
         }
 
-        /// What the chooser says under "Project folder": its branch first, since the
-        /// project folder is not always on main.
-        public var projectFolderDescription: String {
+        /// What the chooser says under "Folder": its branch first, since the
+        /// folder is not always on main.
+        public var folderPathDescription: String {
             let alongside = "Work alongside anything else here"
-            guard let branch = projectFolderBranch else { return alongside }
+            guard let branch = folderPathBranch else { return alongside }
             return "\(branch) · \(alongside.lowercased())"
         }
 
@@ -3387,8 +3386,8 @@ public enum DaemonAPI {
         public var root: URL
         /// Nil when its HEAD is detached.
         public var branch: String?
-        /// The project folder itself, listed so the chooser can leave it out.
-        public var isProjectFolder: Bool
+        /// The folder itself, listed so the chooser can leave it out.
+        public var isFolderPath: Bool
         /// False when its folder is gone.
         public var exists: Bool
         public var madeByApp: Bool
@@ -3397,7 +3396,7 @@ public enum DaemonAPI {
         /// What git says about it. Nil when its folder is gone, or from an older daemon.
         public var status: WorktreeStatus?
         /// How much it holds on disk (#790), as last measured in the background. Nil until
-        /// it has been, for the project folder, and from an older daemon: a list never
+        /// it has been, for the folder, and from an older daemon: a list never
         /// waits for a walk.
         public var size: WorktreeSize?
 
@@ -3407,13 +3406,13 @@ public enum DaemonAPI {
         /// what Activity ▸ Worktrees puts first.
         public var isIdle: Bool { agents.isEmpty }
 
-        public init(name: String, root: URL, branch: String?, isProjectFolder: Bool,
+        public init(name: String, root: URL, branch: String?, isFolderPath: Bool,
                     exists: Bool, madeByApp: Bool, agents: [UUID], status: WorktreeStatus? = nil,
                     size: WorktreeSize? = nil) {
             self.name = name
             self.root = root
             self.branch = branch
-            self.isProjectFolder = isProjectFolder
+            self.isFolderPath = isFolderPath
             self.exists = exists
             self.madeByApp = madeByApp
             self.agents = agents
@@ -3426,7 +3425,7 @@ public enum DaemonAPI {
             name = try c.decode(String.self, forKey: .name)
             root = try c.decode(URL.self, forKey: .root)
             branch = try c.decodeIfPresent(String.self, forKey: .branch)
-            isProjectFolder = try c.decodeIfPresent(Bool.self, forKey: .isProjectFolder) ?? false
+            isFolderPath = try c.decodeIfPresent(Bool.self, forKey: .isFolderPath) ?? false
             exists = try c.decodeIfPresent(Bool.self, forKey: .exists) ?? true
             madeByApp = try c.decodeIfPresent(Bool.self, forKey: .madeByApp) ?? false
             agents = try c.decodeIfPresent([UUID].self, forKey: .agents) ?? []
@@ -3475,13 +3474,13 @@ public enum DaemonAPI {
         }
     }
 
-    /// One project's worktrees, the project folder left out, for `worktrees/all`.
-    public struct ProjectWorktrees: Codable, Hashable, Sendable, Identifiable {
-        public var project: URL
+    /// One folder's worktrees, the folder left out, for `worktrees/all`.
+    public struct FolderWorktrees: Codable, Hashable, Sendable, Identifiable {
+        public var folder: URL
         public var worktrees: [WorktreeSummary]
-        public var id: URL { project }
-        public init(project: URL, worktrees: [WorktreeSummary]) {
-            self.project = project
+        public var id: URL { folder }
+        public init(folder: URL, worktrees: [WorktreeSummary]) {
+            self.folder = folder
             self.worktrees = worktrees
         }
     }
@@ -3498,15 +3497,15 @@ public enum DaemonAPI {
         }
     }
 
-    /// A worktree's git status, as its row on the project page says it.
+    /// A worktree's git status, as its row on the folder page says it.
     public struct WorktreeStatus: Codable, Hashable, Sendable {
         /// Lines of `git status --porcelain`.
         public var uncommitted: Int
         /// Against what its branch tracks; nil when it tracks nothing.
         public var ahead: Int?
         public var behind: Int?
-        /// Commits on its branch the project folder's branch doesn't have. Nil for the
-        /// project folder itself, and when its HEAD is detached.
+        /// Commits on its branch the folder's branch doesn't have. Nil for the
+        /// folder itself, and when its HEAD is detached.
         public var unmerged: Int?
 
         public init(uncommitted: Int, ahead: Int? = nil, behind: Int? = nil, unmerged: Int? = nil) {
@@ -3533,20 +3532,20 @@ public enum DaemonAPI {
 
     /// `worktrees/check` and `worktrees/remove`.
     public struct WorktreeRemovalRequest: Codable, Sendable {
-        public var project: URL
+        public var folder: URL
         public var root: URL
         /// The person has seen what would be lost and said yes.
         public var confirmed: Bool
 
-        public init(project: URL, root: URL, confirmed: Bool = false) {
-            self.project = project
+        public init(folder: URL, root: URL, confirmed: Bool = false) {
+            self.folder = folder
             self.root = root
             self.confirmed = confirmed
         }
 
         public init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
-            project = try c.decode(URL.self, forKey: .project)
+            folder = try c.decode(URL.self, forKey: .folder)
             root = try c.decode(URL.self, forKey: .root)
             confirmed = try c.decodeIfPresent(Bool.self, forKey: .confirmed) ?? false
         }
@@ -4078,7 +4077,7 @@ public extension DaemonAPI {
     /// The most `files/write` takes, and the most the window sends.
     static let attachmentLimit = 25 * 1024 * 1024
 
-    /// `dropbox/put` (#231). `folder` is the project's main folder, never a worktree;
+    /// `dropbox/put` (#231). `folder` is the folder's main folder, never a worktree;
     /// `subfolder` a path inside the drop box, empty or nil for its top. `data` travels as
     /// base64 in the JSON, so it is held to `dropboxPutLimit`; a file copied into the
     /// folder by any other means has no limit.
@@ -4096,7 +4095,7 @@ public extension DaemonAPI {
     }
 
     struct DropboxPutResponse: Codable, Hashable, Sendable {
-        /// Where the file now is, absolute, on the project's host.
+        /// Where the file now is, absolute, on the folder's host.
         public var path: String
         public init(path: String) { self.path = path }
     }
@@ -4106,7 +4105,7 @@ public extension DaemonAPI {
 
     // MARK: Send to ‹host›… (#1123)
 
-    /// `projects/receiveState`. `folder` is absolute on the host, or starts with ~/.
+    /// `folders/receiveState`. `folder` is absolute on the host, or starts with ~/.
     struct ReceiveStateRequest: Codable, Hashable, Sendable {
         public var folder: String
         public init(folder: String) { self.folder = folder }
@@ -4130,7 +4129,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// `projects/sendFacts`, on this Mac's host.
+    /// `folders/sendFacts`, on this Mac's host.
     struct SendFactsRequest: Codable, Hashable, Sendable {
         public var folder: URL
         public init(folder: URL) { self.folder = folder }
@@ -4151,7 +4150,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// `projects/sendPack`: a bundle of `branches` less the commits in `leavingOut` (the
+    /// `folders/sendPack`: a bundle of `branches` less the commits in `leavingOut` (the
     /// receiving host's heads), and with `includeChanges` a patch of what is uncommitted.
     struct SendPackRequest: Codable, Hashable, Sendable {
         public var folder: URL
@@ -4188,7 +4187,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// `projects/sendRead`: a part of at most 8 MB from `offset`. The host removes the file
+    /// `folders/sendRead`: a part of at most 8 MB from `offset`. The host removes the file
     /// once its last part (`end`) is read.
     struct SendReadRequest: Codable, Hashable, Sendable {
         public var id: UUID
@@ -4208,7 +4207,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// `projects/receiveUpload`: one part of a file, at `offset`. `data` is base64 in the JSON.
+    /// `folders/receiveUpload`: one part of a file, at `offset`. `data` is base64 in the JSON.
     struct ReceiveUploadRequest: Codable, Hashable, Sendable {
         public var upload: UUID
         public var offset: Int
@@ -4229,9 +4228,9 @@ public extension DaemonAPI {
         }
     }
 
-    /// `projects/receive`: the uploads to use (no bundle when the host has every commit, no
+    /// `folders/receive`: the uploads to use (no bundle when the host has every commit, no
     /// patch when nothing is uncommitted), the branches at the Mac's commits, the one to
-    /// check out, and the Mac's origin. Answers with the project it added.
+    /// check out, and the Mac's origin. Answers with the folder it added.
     struct ReceiveRequest: Codable, Hashable, Sendable {
         public var folder: String
         public var bundle: UUID?
@@ -4250,7 +4249,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// `projects/bringBack` (#1473): this Mac's repository at `folder` takes the host's
+    /// `folders/bringBack` (#1473): this Mac's repository at `folder` takes the host's
     /// `branches` from the `bundle` upload, forward only, and the `patch` upload (the host's
     /// uncommitted changes, on `patchOn`) when it came.
     struct BringBackRequest: Codable, Hashable, Sendable {
@@ -4268,7 +4267,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// What `projects/bringBack` did: the branches that moved or were made, and whether the
+    /// What `folders/bringBack` did: the branches that moved or were made, and whether the
     /// uncommitted changes were applied.
     struct BringBack: Codable, Hashable, Sendable {
         public var moved: [String]
@@ -4416,7 +4415,7 @@ public extension DaemonAPI {
         public init(id: String) { self.id = id }
     }
 
-    /// `agents/export` (#1001): one agent, or every agent of one project (its main folder).
+    /// `agents/export` (#1001): one agent, or every agent of one folder (its main folder).
     struct AgentsExportRequest: Codable, Hashable, Sendable {
         public var agentID: UUID?
         public var folder: URL?
@@ -4441,8 +4440,8 @@ public extension DaemonAPI {
         }
     }
 
-    /// `agents/import`: the upload sent with `agents/importUpload`, and the project whose menu
-    /// was used: its agents come back in that project (#2389).
+    /// `agents/import`: the upload sent with `agents/importUpload`, and the folder whose menu
+    /// was used: its agents come back in that folder (#2389).
     struct AgentsImportRequest: Codable, Hashable, Sendable {
         public var upload: UUID
         public var folder: URL?

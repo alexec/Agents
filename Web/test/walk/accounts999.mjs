@@ -5,7 +5,7 @@
 // org account is gone. Then the policy's reach of the org path only: the own sign-in dimmed, and the
 // strip over a session on it. Leaves the route and the policy set, for the window's and the Remote's walk.
 //
-//   node Web/test/walk/accounts999.mjs <WEB_URL> <browser code> <browser code> <project folder> <gone agent> <own agent> <out dir>
+//   node Web/test/walk/accounts999.mjs <WEB_URL> <browser code> <browser code> <folder> <gone agent> <own agent> <out dir>
 
 import { setTimeout as sleep } from "node:timers/promises";
 import { load } from "../load.mjs";
@@ -91,7 +91,7 @@ try {
   await page.focus("textarea");
   await page.type(pageCode);
   await page.press("Connect");
-  await page.waitFor(`document.querySelector(".sidebar .row.project")`, 20_000);
+  await page.waitFor(`document.querySelector(".sidebar .row.folder")`, 20_000);
 
   await page.eval(`location.hash = "#/a/runtimes"`);
   await page.waitFor(`[...document.querySelectorAll(".runtime-list li .strong")].some((s) => s.textContent === "Claude · Fake Gateway")`, 15_000);
@@ -102,8 +102,8 @@ try {
   check(JSON.stringify(reaches) === JSON.stringify(["Your Own Sign-In", "✓Fake Gateway"]), `Reaches the Model By: ${JSON.stringify(reaches)}`);
   await page.shot(`${out}/web-1-runtimes.png`);
 
-  const project = `#/h/${host}/p/${encodeURIComponent(`file://${folder}`)}/n/1`;
-  await page.eval(`location.hash = ${JSON.stringify(project)}`);
+  const folder = `#/h/${host}/p/${encodeURIComponent(`file://${folder}`)}/n/1`;
+  await page.eval(`location.hash = ${JSON.stringify(folder)}`);
   await page.waitFor(`document.querySelector("select[aria-label=Runtime]")`, 15_000);
   await page.eval(`(() => { const s = document.querySelector("select[aria-label=Runtime]"); s.value = "claude"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
   await page.waitFor(`document.querySelector("select[aria-label=Account]")`, 10_000);

@@ -1,15 +1,15 @@
-// The #1336 walk on a scratch root: a project's Connectors page opens with its set-up (frame F,
+// The #1336 walk on a scratch root: a folder's Connectors page opens with its set-up (frame F,
 // the Mac's grid), Skip and Set Up go through the host, the Connect GitHub sheet shows the host's
 // device-flow code (frame B), and Connectors lists the connections (frame E). Screenshots go
 // to <out dir>; the sign-in is left waiting, so a person can approve the code it prints.
 //
-//   node Web/test/walk/connect1336.mjs <WEB_URL> <browser code> <project name> <out dir> [stop]
+//   node Web/test/walk/connect1336.mjs <WEB_URL> <browser code> <folder name> <out dir> [stop]
 //
 // With "stop", it stops after the page, before Connect GitHub.
 
 import { launch } from "./cdp.mjs";
 
-const [webURL, code, projectName, out, stop] = process.argv.slice(2);
+const [webURL, code, folderName, out, stop] = process.argv.slice(2);
 let failed = 0;
 const say = (line) => console.log(line);
 const check = (ok, line) => { if (!ok) failed += 1; say(`${ok ? "ok  " : "FAIL"} ${line}`); };
@@ -22,10 +22,10 @@ await page.waitFor(`document.querySelector("textarea")`);
 await page.focus("textarea");
 await page.type(code);
 await page.press("Connect");
-await page.waitFor(has(projectName), 20_000);
-// The project's Connectors page, by its address (the folder's title attribute is its path).
+await page.waitFor(has(folderName), 20_000);
+// The folder's Connectors page, by its address (the folder's title attribute is its path).
 await page.eval(`location.hash = "#/h/mac/p/" + encodeURIComponent("file://" +
-  document.querySelector('button[data-fold=project]').title + "/") + "/m/1"`);
+  document.querySelector('button[data-fold=folder]').title + "/") + "/m/1"`);
 await page.waitFor(has("Set up · "), 20_000).catch(async (e) => {
   await page.shot(`${out}/1336-web-failed.png`);
   say(`at ${await page.eval("location.hash")}: ${(await page.text()).replace(/\s+/g, " ").slice(0, 300)}`);

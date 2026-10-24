@@ -156,10 +156,10 @@ func (d *Daemon) mcpServersFor(id wire.UUID) []sdk.McpServer {
 	servers := []sdk.McpServer{{Http: &sdk.McpServerHttpInline{Name: appServerName, Type: "http",
 		Url:     "http://127.0.0.1:" + strconv.Itoa(port) + appToolsPath,
 		Headers: []sdk.HttpHeader{{Name: "Authorization", Value: "Bearer " + token}}}}}
-	// Then the project's approved servers and the person's own (SessionServers.plan), each
+	// Then the folder's approved servers and the person's own (SessionServers.plan), each
 	// hosted one swapped for its route on this endpoint (#488).
 	if a != nil {
-		servers = append(servers, d.hostedSwapped(d.sessionEntries(projectFolder(a)), port, token, a.RuntimeID)...)
+		servers = append(servers, d.hostedSwapped(d.sessionEntries(folderPath(a)), port, token, a.RuntimeID)...)
 	}
 	return servers
 }
@@ -480,7 +480,7 @@ func (d *Daemon) setSessionLabels(id wire.UUID, args map[string]json.RawMessage)
 	if a == nil {
 		return "", &Error{Code: CodeNoSuchAgent, Message: "That conversation is not open any more, so nothing was changed."}
 	}
-	labels, err := changeLabelsAs(wire.SessionLabelOwnerAgent, a.Labels, add, remove, vocabulary(projectFolder(a), d.Store.Agents()))
+	labels, err := changeLabelsAs(wire.SessionLabelOwnerAgent, a.Labels, add, remove, vocabulary(folderPath(a), d.Store.Agents()))
 	if err != nil {
 		msg := err.Error()
 		if e, ok := err.(*Error); ok {

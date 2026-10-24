@@ -4,7 +4,7 @@
 
 export type IconMood = "asleep" | "happy" | "quizzical";
 
-/** What a project's view says for the mood: Needs you, and Working. */
+/** What a folder's view says for the mood: Needs you, and Working. */
 export interface MoodCounts {
   needsYou: boolean;
   working: boolean;

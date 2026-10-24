@@ -21,7 +21,7 @@ const copiesPrefix = "v1/copies/"
 // written at once.
 const copyRestamp = 10 * time.Minute
 
-// hostCopies is HostCopies: what each host last listed (#962), its projects and its
+// hostCopies is HostCopies: what each host last listed (#962), its folders and its
 // agents, kept in the store, so a window that starts while the host is offline sees what
 // it had (hosts/lastHeard).
 type hostCopies struct {
@@ -34,7 +34,7 @@ type hostCopies struct {
 }
 
 type hostCopy struct {
-	Projects json.RawMessage `json:"projects,omitempty"`
+	Folders json.RawMessage `json:"folders,omitempty"`
 	Agents   json.RawMessage `json:"agents,omitempty"`
 	HeardAt  records.Stamp   `json:"heardAt"`
 }
@@ -45,11 +45,11 @@ func newHostCopies(s store.Store) *hostCopies {
 
 func copyKey(host string) string { return copiesPrefix + host + ".json" }
 
-// keepsList is HostCopies.keeps: only the whole lists a window opens with, projects/list,
+// keepsList is HostCopies.keeps: only the whole lists a window opens with, folders/list,
 // and agents/list asked lean with nothing narrowing it.
 func keepsList(method string, params json.RawMessage) bool {
 	switch method {
-	case "projects/list":
+	case "folders/list":
 		return true
 	case "agents/list":
 		var asked map[string]json.RawMessage
@@ -89,9 +89,9 @@ func (c *hostCopies) take(host, method, reply string) {
 		next = *copy
 	}
 	same := false
-	if method == "projects/list" {
-		same = copy != nil && bytes.Equal(next.Projects, answer.Result)
-		next.Projects = answer.Result
+	if method == "folders/list" {
+		same = copy != nil && bytes.Equal(next.Folders, answer.Result)
+		next.Folders = answer.Result
 	} else {
 		if len(items) > agentsKept {
 			items = items[:agentsKept]
@@ -125,8 +125,8 @@ func (c *hostCopies) lastHeard(host string) map[string]any {
 	if copy == nil {
 		return said
 	}
-	if copy.Projects != nil {
-		said["projects"] = copy.Projects
+	if copy.Folders != nil {
+		said["folders"] = copy.Folders
 	}
 	if copy.Agents != nil {
 		said["agents"] = copy.Agents

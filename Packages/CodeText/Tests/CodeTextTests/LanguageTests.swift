@@ -10,7 +10,7 @@ struct LanguageTests {
         ("Dockerfile", .dockerfile), ("Makefile", .make), ("x.mk", .make),
         ("Gemfile", .ruby), (".zshrc", .bash), ("deploy.sh", .bash),
         ("config.yml", .yaml), ("Cargo.toml", .toml), ("README.md", .markdown),
-        ("/Users/x/Project/Sources/App.swift", .swift),
+        ("/Users/x/Folder/Sources/App.swift", .swift),
     ])
     func aFileIsKnownByItsNameOrExtension(path: String, expected: CodeLanguage) {
         #expect(CodeLanguage.detect(path: path, firstLine: nil) == expected)

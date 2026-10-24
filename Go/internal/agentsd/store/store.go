@@ -19,7 +19,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Store holds the root's agents and projects. Agent records are kept in memory, as the
+// Store holds the root's agents and folders. Agent records are kept in memory, as the
 // Swift daemon keeps them; transcripts are read from disk when asked for, never held.
 type Store struct {
 	Loc Locations
@@ -29,7 +29,7 @@ type Store struct {
 
 	mu       sync.Mutex
 	agents   map[wire.UUID]*wire.Agent
-	projects []wire.Project
+	folders []wire.Folder
 	// lines is each transcript's count of lines, once counted, for an entry's index.
 	lines map[wire.UUID]int
 	// ib is where the lines of the transcripts read most recently end (lineindex.go).
@@ -47,7 +47,7 @@ func Open(root string) (*Store, error) {
 	s := &Store{Loc: loc, agents: map[wire.UUID]*wire.Agent{}, lines: map[wire.UUID]int{}}
 	id, adopts := loadOrMakeRootID(loc.RootIdentity(), loc.Root)
 	s.RootID = id
-	s.projects = s.loadProjects()
+	s.folders = s.loadFolders()
 	finishDeleting(loc)
 	entries, _ := os.ReadDir(loc.Agents())
 	for _, e := range entries {
@@ -358,16 +358,16 @@ func (s *Store) Transcript(id wire.UUID, from int) ([]wire.TranscriptEntry, []in
 	return out, at, r.Err()
 }
 
-// MARK: projects.json
+// MARK: folders.json
 
-func (s *Store) loadProjects() []wire.Project {
-	b, err := os.ReadFile(s.Loc.Projects())
+func (s *Store) loadFolders() []wire.Folder {
+	b, err := os.ReadFile(s.Loc.Folders())
 	if err != nil {
 		return nil
 	}
-	var ps []wire.Project
+	var ps []wire.Folder
 	if err := diskjson.Unmarshal(b, &ps); err != nil {
-		log.Printf("projects.json could not be read, starting with no archived projects: %v", err)
+		log.Printf("folders.json could not be read, starting with no archived folders: %v", err)
 		return nil
 	}
 	seen := map[wire.URL]bool{}
@@ -381,26 +381,26 @@ func (s *Store) loadProjects() []wire.Project {
 	return out
 }
 
-// Projects is the projects.json list.
-func (s *Store) Projects() []wire.Project {
+// Folders is the folders.json list.
+func (s *Store) Folders() []wire.Folder {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return append([]wire.Project(nil), s.projects...)
+	return append([]wire.Folder(nil), s.folders...)
 }
 
-// SaveProjects writes the list, sorted by folder path, as ProjectStore.save does.
-func (s *Store) SaveProjects(ps []wire.Project) error {
-	ps = append([]wire.Project(nil), ps...)
+// SaveFolders writes the list, sorted by folder, as FolderStore.save does.
+func (s *Store) SaveFolders(ps []wire.Folder) error {
+	ps = append([]wire.Folder(nil), ps...)
 	sort.SliceStable(ps, func(i, j int) bool { return FolderPath(ps[i].Folder) < FolderPath(ps[j].Folder) })
 	b, err := diskjson.Marshal(ps)
 	if err != nil {
 		return err
 	}
-	if err := WriteAtomically(s.Loc.Projects(), b, 0o644); err != nil {
+	if err := WriteAtomically(s.Loc.Folders(), b, 0o644); err != nil {
 		return err
 	}
 	s.mu.Lock()
-	s.projects = ps
+	s.folders = ps
 	s.mu.Unlock()
 	return nil
 }
@@ -417,7 +417,7 @@ func FolderPath(u wire.URL) string {
 	return p
 }
 
-// FolderURL is a project's folder as Project.standardize makes it: the path cleaned, its
+// FolderURL is a folder as Folder.standardize makes it: the path cleaned, its
 // links resolved, and no trailing slash ("file:///home/a/src/x").
 func FolderURL(path string) wire.URL {
 	path = filepath.Clean(path)

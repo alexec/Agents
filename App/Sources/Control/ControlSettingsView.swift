@@ -273,9 +273,9 @@ struct ControlHostsPage: View {
             ControlCard {
                 if let mac = control.thisMacHost {
                     // This Mac's host has no buttons but this one (the look gate's
-                    // decision; #656 asked for projects to be chosen here too).
+                    // decision; #656 asked for folders to be chosen here too).
                     ControlRow(dot: dot(mac), title: "This Mac", detail: thisMacLine(mac)) {
-                        chooseProjects(mac)
+                        chooseFolders(mac)
                     }
                 }
                 ForEach(control.otherHosts) { host in
@@ -304,7 +304,7 @@ struct ControlHostsPage: View {
                 .appText(.supporting).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             SharedSectionLabel("Auto-detect")
-            ProjectDetectionCard(control: control)
+            FolderDetectionCard(control: control)
         }
         .sheet(isPresented: $addingMachine) { AddMachineSheet(control: control).paperSheet() }
         .sheet(item: $updating) { host in ControlAddServerSheet(control: control, updating: host).paperSheet() }
@@ -331,7 +331,7 @@ struct ControlHostsPage: View {
             HostBackupsSheet(host: host).paperSheet()
         }
         .sheet(item: $choosing) { host in
-            ChooseProjectsSheet(host: host.id, hostName: host.id == control.thisMacHost?.id ? "This Mac" : host.name,
+            ChooseFoldersSheet(host: host.id, hostName: host.id == control.thisMacHost?.id ? "This Mac" : host.name,
                                 paths: control.suggestedPaths).paperSheet()
         }
         .confirmationDialog(deleting.map { "Delete \($0.workspace?.workspaceName ?? $0.name)?" } ?? "",
@@ -352,11 +352,11 @@ struct ControlHostsPage: View {
         }
     }
 
-    private func chooseProjects(_ host: DaemonAPI.ControlHost) -> some View {
-        Button("Choose Projects…") { choosing = host }
+    private func chooseFolders(_ host: DaemonAPI.ControlHost) -> some View {
+        Button("Choose Folders…") { choosing = host }
             .buttonStyle(.paper)
             .disabled(!host.answers)
-            .help(host.answers ? "Pick folders on it to add as projects." : "It has to be online to be asked.")
+            .help(host.answers ? "Pick folders on it to add as folders." : "It has to be online to be asked.")
     }
 
     private func dot(_ host: DaemonAPI.ControlHost) -> ControlDot {
@@ -420,9 +420,9 @@ struct ControlHostsPage: View {
                 Button("Update…") { updating = host }
                 Divider()
             }
-            // A relay runs no agents, so it has no projects, and nothing to back up.
+            // A relay runs no agents, so it has no folders, and nothing to back up.
             if host.relay == nil {
-                Button("Choose Projects…") { choosing = host }.disabled(!host.answers)
+                Button("Choose Folders…") { choosing = host }.disabled(!host.answers)
                 if model.host(host.id, has: Capability.backups1) {
                     Button("Backups…") { backingUp = host }.disabled(!host.answers)
                 }
@@ -512,17 +512,17 @@ struct ControlHostsPage: View {
 
     /// The host's workflows that run on a clock (L8): they don't run while it is stopped.
     private func scheduledWorkflows(_ host: HostID) -> Int {
-        model.work.projects.filter { $0.host == host }
-            .flatMap { model.work.workflows(in: $0.folder) }
+        model.work.folders.filter { $0.host == host }
+            .flatMap { model.work.workflows(in: $0.folder.folder) }
             .filter { !$0.isArchived && $0.isEnabled && !$0.workflow.schedules.isEmpty }
             .count
     }
 
     private func thisMacLine(_ host: DaemonAPI.ControlHost) -> String {
-        let projects = model.work.projects.filter { $0.host == host.id }.count
+        let folders = model.work.folders.filter { $0.host == host.id }.count
         let working = model.work.agents.filter { $0.host == host.id && ($0.state == .running || $0.state == .starting) }.count
         var parts = [host.platform.replacingOccurrences(of: " ", with: " · "), UpdateWords.version(host),
-                     count(projects, "project")]
+                     count(folders, "folder")]
         if working > 0 { parts.append("\(count(working, "agent")) working") }
         if host.state != "online" { parts.insert(UpdateWords.state(host), at: 0) }
         return ([parts.joined(separator: " · ")] + [UpdateWords.missing(host, controlVersion: control.status?.version)].compactMap { $0 })
@@ -591,8 +591,8 @@ struct ControlHostsPage: View {
     }
 }
 
-/// Auto-detect (#429, #656): where the projects picker looks on a host. It adds nothing.
-struct ProjectDetectionCard: View {
+/// Auto-detect (#429, #656): where the folders picker looks on a host. It adds nothing.
+struct FolderDetectionCard: View {
     let control: ControlSettingsModel
     /// The paths as typed, one a line; saved with Save.
     @State private var text = ""
@@ -600,12 +600,12 @@ struct ProjectDetectionCard: View {
     @State private var shown = ""
 
     var body: some View {
-        let detection = control.projectDetection
+        let detection = control.folderDetection
         ControlCard {
             VStack(alignment: .leading, spacing: 10) {
-                Toggle("Suggest projects on a machine", isOn: Binding(
+                Toggle("Suggest folders on a machine", isOn: Binding(
                     get: { detection.enabled },
-                    set: { on in Task { await control.setProjectDetection(ProjectDetection(enabled: on, paths: detection.paths)) } }))
+                    set: { on in Task { await control.setFolderDetection(FolderDetection(enabled: on, paths: detection.paths)) } }))
                 TextField("Paths", text: $text, axis: .vertical)
                     .lineLimit(3...10)
                     .textFieldStyle(.roundedBorder).appText(.code)
@@ -615,19 +615,19 @@ struct ProjectDetectionCard: View {
                     Button("Save") {
                         text = paths.joined(separator: "\n")
                         shown = text
-                        Task { await control.setProjectDetection(ProjectDetection(enabled: detection.enabled, paths: paths)) }
+                        Task { await control.setFolderDetection(FolderDetection(enabled: detection.enabled, paths: paths)) }
                     }
                     .buttonStyle(.paper)
                     .disabled(paths == detection.paths)
-                    Button("Use the Defaults") { text = ProjectDetection.defaultPaths.joined(separator: "\n") }
+                    Button("Use the Defaults") { text = FolderDetection.defaultPaths.joined(separator: "\n") }
                         .buttonStyle(.paper)
-                        .disabled(text == ProjectDetection.defaultPaths.joined(separator: "\n"))
+                        .disabled(text == FolderDetection.defaultPaths.joined(separator: "\n"))
                 }
                 .disabled(!detection.enabled)
             }
             .padding(16)
         }
-        Text("When a server joins, and from Choose Projects… on any machine, each git repository directly inside these paths is listed, unticked. Only the ones you tick become projects, and you can add any other folder by its path. ~ is the machine’s own home.")
+        Text("When a server joins, and from Choose Folders… on any machine, each git repository directly inside these paths is listed, unticked. Only the ones you tick become folders, and you can add any other folder by its path. ~ is the machine’s own home.")
             .appText(.supporting).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .onAppear(perform: load)
@@ -640,7 +640,7 @@ struct ProjectDetectionCard: View {
 
     /// The saved paths, unless something has been typed over what was last shown.
     private func load() {
-        let saved = control.projectDetection.paths.joined(separator: "\n")
+        let saved = control.folderDetection.paths.joined(separator: "\n")
         guard text == shown else { return }
         text = saved
         shown = saved

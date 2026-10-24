@@ -26,7 +26,7 @@ func TestSavedViewsArePersonal(t *testing.T) {
 		}
 		return v
 	}
-	by := "project"
+	by := "folder"
 	org := wire.ReportView{Name: " Monday digest ", Page: wire.ReportPageOutcomes, Scope: wire.ReportScope{Kind: wire.ReportScopeKindOrg},
 		Range: wire.ReportRangeWeek, By: &by}
 	got := views(admin, "reports/saveView", org)

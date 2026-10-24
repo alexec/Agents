@@ -42,7 +42,7 @@ export function UserWorkflowsSection({ store, down }: { store: Store; down: bool
 
   return <section aria-labelledby="settings-workflows">
     <h3 class="section-head" id="settings-workflows">Workflows</h3>
-    <p class="hint">Ready-made workflows live here. Projects that use one keep their own on or off switch.</p>
+    <p class="hint">Ready-made workflows live here. Folders that use one keep their own on or off switch.</p>
     <div class="setting">
       <label htmlFor="new-workflow-id">New workflow ID</label>
       <input id="new-workflow-id" value={newID} onInput={(event) => setNewID(event.currentTarget.value)} />

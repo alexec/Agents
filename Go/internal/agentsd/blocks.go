@@ -64,14 +64,14 @@ func agentListing(as []wire.Agent) string {
 	return strings.Join(each, ", ")
 }
 
-// waitTarget is the agent a name means, in the caller's project.
+// waitTarget is the agent a name means, in the caller's folder.
 func (d *Daemon) waitTarget(name string, caller *wire.Agent) (*wire.Agent, error) {
-	folder := projectFolder(caller)
+	folder := folderPath(caller)
 	var target *wire.Agent
 	if isUUID(name) {
 		if found := d.Store.Agent(wire.UUID(strings.ToUpper(name))); found != nil {
-			if projectFolder(found) != folder {
-				return nil, blockRefusal(name + " is in another project. You can only wait on agents in this one.")
+			if folderPath(found) != folder {
+				return nil, blockRefusal(name + " is in another folder. You can only wait on agents in this one.")
 			}
 			target = found
 		}
@@ -79,7 +79,7 @@ func (d *Daemon) waitTarget(name string, caller *wire.Agent) (*wire.Agent, error
 	if target == nil {
 		var here, matches []wire.Agent
 		for _, a := range d.Store.Agents() {
-			if projectFolder(&a) == folder && a.State != wire.AgentStateArchived {
+			if folderPath(&a) == folder && a.State != wire.AgentStateArchived {
 				here = append(here, a)
 				if a.Title != nil && strings.EqualFold(strings.TrimSpace(*a.Title), name) {
 					matches = append(matches, a)
@@ -101,9 +101,9 @@ func (d *Daemon) waitTarget(name string, caller *wire.Agent) (*wire.Agent, error
 				}
 			}
 			if len(known) == 0 {
-				return nil, blockRefusal("no agent in this project is called “" + name + "”. There are no other agents here.")
+				return nil, blockRefusal("no agent in this folder is called “" + name + "”. There are no other agents here.")
 			}
-			return nil, blockRefusal("no agent in this project is called “" + name + "”. The agents here are: " + agentListing(byAge(known)) + ".")
+			return nil, blockRefusal("no agent in this folder is called “" + name + "”. The agents here are: " + agentListing(byAge(known)) + ".")
 		default:
 			return nil, blockRefusal("“" + name + "” could be any of " + agentListing(byAge(matches)) + ". Use the id.")
 		}

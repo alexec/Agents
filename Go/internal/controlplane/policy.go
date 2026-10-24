@@ -55,7 +55,7 @@ const (
 // the policy, when it says requireFollowing: those that start work.
 var policyGated = methodSet(
 	"agents/branchFrom",
-	"agents/continueInProject",
+	"agents/continueInFolder",
 	"agents/fork",
 	"agents/prompt",
 	"agents/sendNow",

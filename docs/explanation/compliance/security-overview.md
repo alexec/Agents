@@ -32,7 +32,7 @@ names its issue.
   control plane always keeps one admin at least. A **bot** is a user that admins make for
   team workflows.
 - **What an admin sees.** People, their clients by name, and their machines by name and
-  state. Not another person's projects, agents or files.
+  state. Not another person's folders, agents or files.
 - **Removing a person** cuts off their clients and their machines on every copy of the
   control plane within 5 seconds.
 
@@ -211,7 +211,7 @@ the host runs as that user, who can change the program.
 
 ## Report a vulnerability
 
-Report it privately on the project's GitHub page: **Security ▸ Report a vulnerability**.
+Report it privately on the folder's GitHub page: **Security ▸ Report a vulnerability**.
 Do not open a public issue for it. Each release has a security review of what changed
 since the last one.
 

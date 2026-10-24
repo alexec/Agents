@@ -1,6 +1,6 @@
 // The #119 walk: an agent whose worktree was removed. Its row and chat say Folder is missing, a
 // send is refused with the folder named and the words kept in the prompt, and Continue in the
-// project folder opens a successor. Needs a scratch root with such an agent in project "work".
+// folder opens a successor. Needs a scratch root with such an agent in folder "work".
 //
 //   node Web/test/walk/foldergone.mjs <WEB_URL> <browser code> <out dir> [width]
 
@@ -15,8 +15,8 @@ try {
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  await page.waitFor(`document.querySelector(".projects .row")`);
-  await page.eval(`[...document.querySelectorAll(".projects .row")].find((e) => e.textContent.includes("work"))?.click()`);
+  await page.waitFor(`document.querySelector(".folders .row")`);
+  await page.eval(`[...document.querySelectorAll(".folders .row")].find((e) => e.textContent.includes("work"))?.click()`);
   await page.waitFor(`[...document.querySelectorAll(".sessions .session")].some((e) => e.textContent.includes("Folder is missing"))`, 30_000);
   console.log(`row: ${await page.eval(`[...document.querySelectorAll(".sessions .session")].find((e) => e.textContent.includes("Folder is missing")).textContent`)}`);
   await page.eval(`[...document.querySelectorAll(".sessions .session")].find((e) => e.textContent.includes("Folder is missing")).click()`);
@@ -34,7 +34,7 @@ try {
   await page.shot(`${out}/119-web-refused-${width}.png`);
 
   const before = await page.eval(`location.hash`);
-  await page.eval(`[...document.querySelectorAll(".folder-gone button")].find((b) => b.textContent.includes("Continue in the project folder")).click()`);
+  await page.eval(`[...document.querySelectorAll(".folder-gone button")].find((b) => b.textContent.includes("Continue in the folder")).click()`);
   await page.waitFor(`location.hash !== ${JSON.stringify(before)} && location.hash.includes("/s/")`, 30_000);
   await page.waitFor(`!document.querySelector(".missing-folder-strip")`, 20_000);
   await new Promise((done) => setTimeout(done, 1500));

@@ -145,7 +145,7 @@ func stateChanged(s wire.AgentState, reason *wire.EndedReason) wire.TranscriptEn
 	return wire.TranscriptEntryKind{StateChanged: &wire.TranscriptEntryKindStateChanged{Value: s, Reason: reason}}
 }
 
-// change saves an agent's record, moved on to now, and tells every client and its project.
+// change saves an agent's record, moved on to now, and tells every client and its folder.
 func (d *Daemon) change(id wire.UUID, edit func(a *wire.Agent)) *wire.Agent {
 	return d.changeAgent(id, true, edit)
 }
@@ -169,21 +169,21 @@ func (d *Daemon) changeAgent(id wire.UUID, moveOn bool, edit func(a *wire.Agent)
 		return nil
 	}
 	d.tellChanged(*a, &before)
-	d.projectChanged(projectFolder(a))
-	// A project quiet after working says project.idle (#1368).
+	d.folderChanged(folderPath(a))
+	// A folder quiet after working says folder.idle (#1368).
 	if before.State != a.State {
-		folder := projectFolder(a)
-		safe.Go("project idle", func() { d.watchForIdle(folder) })
+		folder := folderPath(a)
+		safe.Go("folder idle", func() { d.watchForIdle(folder) })
 	}
 	// Every place a need begins or ends moves the record (DaemonCore.move's reconsider).
 	safe.Go("reconsider", d.reconsider)
 	return a
 }
 
-func (d *Daemon) projectChanged(folder string) {
-	for _, s := range d.projects(true) {
-		if store.FolderPath(s.Project.Folder) == folder {
-			Broadcast(d, wire.NotifyProjectChanged, s)
+func (d *Daemon) folderChanged(folder string) {
+	for _, s := range d.folders(true) {
+		if store.FolderPath(s.Folder.Folder) == folder {
+			Broadcast(d, wire.NotifyFolderChanged, s)
 			return
 		}
 	}
@@ -330,7 +330,7 @@ func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) 
 	}
 	d.actedOn(a.ID, by.actor)
 	d.tellChanged(a, nil)
-	d.projectChanged(projectFolder(&a))
+	d.folderChanged(folderPath(&a))
 	if wt != nil {
 		d.record(a.ID, runtimeNote(worktreeNote(*wt)))
 	}
@@ -930,7 +930,7 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 		l.forgetTools()
 		d.workflowRunFinished(l.id)
 		d.guardedTurnEnded(l.id)
-		d.checkQueueSoon(projectFolder(a))
+		d.checkQueueSoon(folderPath(a))
 		d.agentEnded(l.id)
 		return
 	}
@@ -983,7 +983,7 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 	d.guardedTurnEnded(l.id)
 	// A place may have come free for a queued helper, and those waiting on it may go on.
 	if a := d.Store.Agent(l.id); a != nil {
-		d.checkQueueSoon(projectFolder(a))
+		d.checkQueueSoon(folderPath(a))
 	}
 	if goesOn {
 		return

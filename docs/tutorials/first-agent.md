@@ -1,16 +1,16 @@
 ---
 diataxis: tutorial
 devices: [mac]
-description: Install Agents, add a project, and have an agent find and fix a failing test.
+description: Install Agents, add a folder, and have an agent find and fix a failing test.
 ---
 
 # Your first agent
 
-In this tutorial you install Agents on your Mac, give it a small project with a failing
+In this tutorial you install Agents on your Mac, give it a small folder with a failing
 test, and ask an agent to fix it. You answer the agent's questions as it works, and at the
 end you read what it changed. It takes about fifteen minutes.
 
-**What you'll have at the end:** a finished agent, its fix in your project, and a feel for
+**What you'll have at the end:** a finished agent, its fix in your folder, and a feel for
 how every agent in the app works.
 
 ![The finished conversation: the question, the steps the agent took, its answer, and the one file it changed](images/first-agent-01.png)
@@ -52,15 +52,15 @@ done:
    runtime the app knows and whether it is on this Mac. If Claude's row says **Not on this
    Mac**, click **Install** on it and wait for it to finish. You need none of the others for
    this tutorial. The same rows are in **Settings ▸ Agent Runtimes**.
-3. **Add a project**: steps 2 and 3 of this tutorial.
+3. **Add a folder**: steps 2 and 3 of this tutorial.
 4. **Start your first agent**: step 4.
 5. **Pair a phone or browser**: optional, and not part of this tutorial.
 
 Click **×** on the card to put it away before you are done; it does not come back.
 
-## 2. Make a project to work on
+## 2. Make a folder to work on
 
-A project is a folder you work in. For this tutorial, make a small one with a bug in it:
+A folder is a directory you work in. For this tutorial, make a small one with a bug in it:
 a weather forecast that converts Fahrenheit to Celsius the wrong way round. In Terminal:
 
 ```sh
@@ -116,14 +116,14 @@ git init -q && git add -A && git commit -qm "First version"
 
 ## 3. Add it to Agents
 
-In the Agents window, click **Add Project…** on the **Get started** card or in the empty
-project list (once you have projects, it is **File ▸ Add Project…**), and pick
+In the Agents window, click **Add Folder…** on the **Get started** card or in the empty
+folder list (once you have folders, it is **File ▸ Add Folder…**), and pick
 `weather-app` in your `Demo` folder.
 
 You should see `weather-app` in the list on the left, and beside it an empty new session:
-the project's name in the middle, and the prompt at the bottom.
+the folder's name in the middle, and the prompt at the bottom.
 
-![The project page: New session, with the folder, the runtime (Claude) and the prompt](images/first-agent-02.png)
+![The folder page: New session, with the folder, the runtime (Claude) and the prompt](images/first-agent-02.png)
 
 ## 4. Start the agent
 
@@ -154,7 +154,7 @@ prompt, naming what it wants to do.
 Click **Yes**. It will ask two or three times: to read the files and run the tests, to
 edit `Forecast.swift`, and to run the tests again. Click **Yes** each time.
 
-While it waits for you, the project in the list says **Needs you**. That is how
+While it waits for you, the folder in the list says **Needs you**. That is how
 you know an agent wants you, even when you are looking at something else.
 
 ## 6. Read what it did
@@ -172,10 +172,10 @@ as *Commit the fix.* You can take it, change it, or ignore it.
 
 Click the back arrow at the top of the conversation.
 
-You should see the agent on the project's page under **Done**, named for what it
+You should see the agent on the folder's page under **Done**, named for what it
 did, with its summary under the name.
 
-![The project page, with the finished agent under Complete](images/first-agent-05.png)
+![The folder page, with the finished agent under Complete](images/first-agent-05.png)
 
 That is the whole loop: ask, answer, read. Every agent in the app works this way,
 whether it runs for a minute or an afternoon.
@@ -185,16 +185,16 @@ whether it runs for a minute or an afternoon.
 Press Command-N (**File ▸ New Session**). The new session page for `weather-app` opens
 again, as in step 3.
 
-Look at the three Blobs above the project's name. Click in the prompt and move the pointer:
+Look at the three Blobs above the folder's name. Click in the prompt and move the pointer:
 they look at it. Keep the pointer still, or type, and they look down at the prompt. They go
 away when your first prompt starts the session. With **Reduce motion** on in System
 Settings, their eyes stay still.
 
-The project's name is a menu. Click it to start the session in another project instead.
+The folder's name is a menu. Click it to start the session in another folder instead.
 
 A persona is a kind of session that you can start again and again. It sets the runtime,
 model, effort, mode and labels of the new session in one go, and gives the agent a prompt
-of its own. Make one for this project. In Terminal:
+of its own. Make one for this folder. In Terminal:
 
 ```sh
 mkdir -p ~/Demo/weather-app/.agents/personas
@@ -210,7 +210,7 @@ You review changes. Say what you would change before you change anything.
 EOF
 ```
 
-Go back to the window and press Command-N again. Under the project's name there is now a
+Go back to the window and press Command-N again. Under the folder's name there is now a
 menu that says **No persona**. Click it and choose **Reviewer**.
 
 You should see the persona's description under the menu, and the label `review` with the
@@ -224,7 +224,7 @@ else you can keep one.
 
 - [Follow your agents from your iPhone](follow-from-iphone.md), the next tutorial.
 - [Start an agent in its own worktree](../how-to/start-in-a-worktree.md), so two agents
-  in one project do not change the same files.
+  in one folder do not change the same files.
 - [Read an agent's changes](../how-to/read-an-agents-changes.md), file by file and word by
   word.
 - [Why agents keep working when the window is closed](../explanation/window-and-daemon.md).

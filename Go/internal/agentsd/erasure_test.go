@@ -48,16 +48,16 @@ func TestDeleteLeavesNoRuntimeSessionFile(t *testing.T) {
 	t.Setenv("AGENTS_FAKE_DELETED", deleted)
 
 	d, c := start(t, t.TempDir())
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	session := "5b0f6a1e-1c2d-4e3f-8a9b-0c1d2e3f4a5b"
 	a := archivedWithSession(t, d, dir, session)
 	theirs := []string{
-		filepath.Join(claude, "projects", "-w", session+".jsonl"),
-		filepath.Join(claude, "projects", "-w", session, "subagents", "agent-1.jsonl"),
+		filepath.Join(claude, "folders", "-w", session+".jsonl"),
+		filepath.Join(claude, "folders", "-w", session, "subagents", "agent-1.jsonl"),
 		filepath.Join(claude, "todos", session+"-agent-"+session+".json"),
 		filepath.Join(claude, "file-history", session, "a.txt"),
 	}
-	other := filepath.Join(claude, "projects", "-w", "another-session.jsonl")
+	other := filepath.Join(claude, "folders", "-w", "another-session.jsonl")
 	for _, f := range append(theirs, other) {
 		writeFile(t, f, "{}\n")
 	}
@@ -69,7 +69,7 @@ func TestDeleteLeavesNoRuntimeSessionFile(t *testing.T) {
 			t.Errorf("left behind: %s (%v)", f, err)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(claude, "projects", "-w", session)); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(claude, "folders", "-w", session)); !os.IsNotExist(err) {
 		t.Error("the session's folder is left")
 	}
 	if _, err := os.Stat(other); err != nil {
@@ -116,7 +116,7 @@ func TestCodexFilesGoWithoutTheRuntime(t *testing.T) {
 func TestTheErasureQueueIsBounded(t *testing.T) {
 	root := t.TempDir()
 	d, c := start(t, root)
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	full := make([]erasure, erasuresMost)
 	for i := range full {
 		full[i] = erasure{AgentID: store.NewUUID(), RuntimeID: "claude", SessionID: "s", QueuedAt: nowFunc()}
@@ -172,7 +172,7 @@ func TestARestoreSkipsAnErasedAgent(t *testing.T) {
 	atTime(t, &clock)
 	shared := t.TempDir()
 	a, ca := start(t, t.TempDir())
-	dir := project(t, ca, 1)
+	dir := folder(t, ca, 1)
 	ca.call(t, 2, "backups/configure", map[string]any{"every": "off", "keep": 3, "folder": shared})
 	kept := archivedWithSession(t, a, dir, "kept")
 	gone := archivedWithSession(t, a, dir, "gone")
@@ -243,7 +243,7 @@ func TestASweepStartsTheRuntimeOnce(t *testing.T) {
 	}
 
 	d, c := start(t, t.TempDir())
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	// Nobody reads this client's notifications: drop them, so a broadcast never waits.
 	quiet := make(chan struct{})
 	t.Cleanup(func() { close(quiet) })

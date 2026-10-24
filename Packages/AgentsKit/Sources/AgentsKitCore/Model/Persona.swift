@@ -1,7 +1,7 @@
 import Foundation
 
 /// A kind of session the person can start (#760): a file in `.agents/personas/`, in the
-/// project or in `~/.agents`, whose front matter is a `name`, a `description` and the
+/// folder or in `~/.agents`, whose front matter is a `name`, a `description` and the
 /// settings a workflow names, and whose body is the prompt it starts with.
 ///
 /// Its own folder rather than a skill, so no runtime reads one as a skill and the model
@@ -9,9 +9,9 @@ import Foundation
 /// what it names and leaves the rest as the form has it; the body goes to the agent
 /// with the briefing, never into the transcript.
 public struct Persona: Codable, Hashable, Sendable, Identifiable {
-    /// Where the file is. A project's wins over one in `~/.agents` with the same id.
+    /// Where the file is. A folder's wins over one in `~/.agents` with the same id.
     public enum Origin: String, Codable, Hashable, Sendable {
-        case project
+        case folder
         case personal
     }
 
@@ -36,7 +36,7 @@ public struct Persona: Codable, Hashable, Sendable, Identifiable {
         self.problem = problem
     }
 
-    /// Where both kinds of persona live, under a project or a home folder.
+    /// Where both kinds of persona live, under a folder or a home folder.
     public static let folderName = ".agents/personas"
     public static let fileExtension = "md"
 
@@ -91,8 +91,8 @@ extension DaemonAPI {
         }
     }
 
-    /// `personas/list`: the personas a start in this project can pick, the project's and
-    /// the home's together, one per id with the project's winning, by name.
+    /// `personas/list`: the personas a start in this folder can pick, the folder's and
+    /// the home's together, one per id with the folder's winning, by name.
     public struct PersonasListRequest: Codable, Sendable {
         public var folder: URL
         public init(folder: URL) { self.folder = folder }

@@ -19,8 +19,8 @@ import (
 
 // The pull requests merged from the branches the app makes (#985, #1987), for the Time
 // page's recap and records and the firstLandedPR milestone, as DaemonCore+MergedPRs did.
-// Asked of the person's own gh once an hour, in each project that is a git repository; a
-// project whose remote is not GitHub, or a machine with no gh, says nothing, and the page
+// Asked of the person's own gh once an hour, in each folder that is a git repository; a
+// folder whose remote is not GitHub, or a machine with no gh, says nothing, and the page
 // shows a dash.
 
 const (
@@ -30,7 +30,7 @@ const (
 	mergedPRsDaysAsked = 7
 )
 
-// mergedPRsDelay is how long after the start the first ask is, when the projects are known.
+// mergedPRsDelay is how long after the start the first ask is, when the folders are known.
 var mergedPRsDelay = time.Minute
 
 // findGH is the person's gh, or "" when it is not installed. A test puts a fake one here.
@@ -71,7 +71,7 @@ func (d *Daemon) countMergedPRsEveryHour() {
 	})
 }
 
-// countMergedPRs asks every project's gh, and writes what they said for the days asked
+// countMergedPRs asks every folder's gh, and writes what they said for the days asked
 // about. The first answer goes back as far as the Time page keeps days.
 func (d *Daemon) countMergedPRs() {
 	gh := findGH()
@@ -92,7 +92,7 @@ func (d *Daemon) countMergedPRs() {
 	for i := range stamps {
 		stamps[i] = dayStamp(today.AddDate(0, 0, -i))
 	}
-	folders := d.projectFolders()
+	folders := d.folderPaths()
 	sort.Strings(folders)
 	var pulls []mergedPull
 	answered := false

@@ -1,8 +1,8 @@
 ---
 name: "speckit-constitution"
-description: "Create or update the project constitution from interactive or provided principle inputs."
-argument-hint: "Principles or values for the project constitution"
-compatibility: "Requires spec-kit project structure with .specify/ directory"
+description: "Create or update the folder constitution from interactive or provided principle inputs."
+argument-hint: "Principles or values for the folder constitution"
+compatibility: "Requires spec-kit folder structure with .specify/ directory"
 metadata:
   author: "github-spec-kit"
   source: "templates/commands/constitution.md"
@@ -21,7 +21,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Scope Guard
 
-This command's own work is limited to updating the project constitution itself. Dependent templates
+This command's own work is limited to updating the folder constitution itself. Dependent templates
 and commands read the constitution at runtime and are not modified here.
 
 - Classify every part of the user input as either constitution content or a separate,
@@ -41,7 +41,7 @@ and commands read the constitution at runtime and are not modified here.
 ## Pre-Execution Checks
 
 **Check for extension hooks (before constitution update)**:
-- Check if `.specify/extensions.yml` exists in the project root.
+- Check if `.specify/extensions.yml` exists in the folder root.
 - If it exists, read it and look for entries under the `hooks.before_constitution` key
 - If the YAML cannot be parsed or is invalid, do not skip silently: tell the user that `.specify/extensions.yml` could not be read (include the parser error) and that no hooks were checked, including any mandatory (`optional: false`) hooks registered there, then continue normally
 - Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
@@ -76,18 +76,18 @@ and commands read the constitution at runtime and are not modified here.
 
 ## Outline
 
-You are updating the project constitution at `.specify/memory/constitution.md`. The active
+You are updating the folder constitution at `.specify/memory/constitution.md`. The active
 constitution scaffold is resolved at command time from `constitution-template` through the Spec Kit
 preset/template resolution stack.
 
 Follow this execution flow:
 
 1. Run `.specify/scripts/bash/resolve-template.sh constitution-template --json` from the repository root and parse `TEMPLATE_CONTENT` as the active template.
-   - The shared resolver applies project overrides, composing preset layers, and extension layers
+   - The shared resolver applies folder overrides, composing preset layers, and extension layers
      before the core template fallback. It MUST succeed before continuing.
    - If it fails, stop and report the resolution error; do not continue with only one contributing
      template layer.
-   - If `.specify/memory/constitution.md` exists, load it as the source of current project-specific
+   - If `.specify/memory/constitution.md` exists, load it as the source of current folder-specific
      values and amendments. Preserve information that is still applicable when applying the newly
      resolved scaffold.
    - If it does not exist, use the resolved template as the initial document.
@@ -106,7 +106,7 @@ Follow this execution flow:
    - If version bump type ambiguous, propose reasoning before finalizing.
 
 3. Draft the updated constitution content using the resolved template as the required structure:
-   - Replace every placeholder with concrete text (no bracketed tokens left except intentionally retained template slots that the project has chosen not to define yet—explicitly justify any left).
+   - Replace every placeholder with concrete text (no bracketed tokens left except intentionally retained template slots that the folder has chosen not to define yet—explicitly justify any left).
    - Preserve heading hierarchy and comments can be removed once replaced unless they still add clarifying guidance.
    - Ensure each Principle section: succinct name line, paragraph (or bullet list) capturing non‑negotiable rules, explicit rationale if not obvious.
    - Ensure Governance section lists amendment procedure, versioning policy, and compliance review expectations.
@@ -150,7 +150,7 @@ Write only `.specify/memory/constitution.md`; do not create or modify template s
 ## Post-Execution Checks
 
 **Check for extension hooks (after constitution update)**:
-Check if `.specify/extensions.yml` exists in the project root.
+Check if `.specify/extensions.yml` exists in the folder root.
 - If it exists, read it and look for entries under the `hooks.after_constitution` key
 - If the YAML cannot be parsed or is invalid, do not skip silently: tell the user that `.specify/extensions.yml` could not be read (include the parser error) and that no hooks were checked, including any mandatory (`optional: false`) hooks registered there, then continue normally
 - Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.

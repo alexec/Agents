@@ -15,7 +15,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000001",
         "lastActivityAt" : 812500000,
         "runtimeID" : "claude",
@@ -50,7 +50,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000002",
         "lastActivityAt" : 812500000,
         "runtimeID" : "claude",
@@ -85,7 +85,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000003",
         "lastActivityAt" : 812500000,
         "runtimeID" : "claude",
@@ -120,7 +120,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000005",
         "lastActivityAt" : 812500000,
         "outcomeAsked" : true,
@@ -156,7 +156,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000006",
         "lastActivityAt" : 812500000,
         "outcomeAsked" : true,
@@ -197,7 +197,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "endTurn",
         "id" : "00000000-0000-0000-0000-000000000007",
         "lastActivityAt" : 812500000,
@@ -233,7 +233,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "endTurn",
         "id" : "00000000-0000-0000-0000-000000000008",
         "isUnread" : true,
@@ -270,7 +270,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000009",
         "lastActivityAt" : 812500000,
         "report" : {
@@ -310,7 +310,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000012",
         "lastActivityAt" : 812500000,
         "report" : {
@@ -358,7 +358,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000013",
         "lastActivityAt" : 812500000,
         "report" : {
@@ -404,7 +404,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000014",
         "lastActivityAt" : 812500000,
         "report" : {
@@ -444,7 +444,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000015",
         "lastActivityAt" : 812500000,
         "report" : {
@@ -494,7 +494,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "endTurn",
         "eventWait" : {
           "from" : 4,
@@ -543,7 +543,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "endTurn",
         "eventWait" : {
           "ending" : {
@@ -597,7 +597,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "endTurn",
         "id" : "00000000-0000-0000-0000-000000000018",
         "lastActivityAt" : 812500000,
@@ -634,7 +634,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "endTurn",
         "id" : "00000000-0000-0000-0000-000000000019",
         "lastActivityAt" : 812500000,
@@ -675,7 +675,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000020",
         "lastActivityAt" : 812500000,
         "report" : {
@@ -715,7 +715,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000021",
         "isUnread" : true,
         "lastActivityAt" : 812500000,
@@ -756,7 +756,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "eventWait" : {
           "from" : 4,
           "id" : "00000000-0000-0000-0000-000000000900",
@@ -809,7 +809,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "cancelled",
         "id" : "00000000-0000-0000-0000-000000000024",
         "lastActivityAt" : 812500000,
@@ -845,7 +845,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "stoppedByAgent",
         "id" : "00000000-0000-0000-0000-000000000025",
         "lastActivityAt" : 812500000,
@@ -881,7 +881,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "allowanceSpent",
         "id" : "00000000-0000-0000-0000-000000000026",
         "lastActivityAt" : 812500000,
@@ -917,7 +917,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "processDied",
         "id" : "00000000-0000-0000-0000-000000000027",
         "lastActivityAt" : 812500000,
@@ -953,7 +953,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "daemonGone",
         "id" : "00000000-0000-0000-0000-000000000028",
         "lastActivityAt" : 812500000,
@@ -989,7 +989,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000029",
         "lastActivityAt" : 812500000,
         "runtimeID" : "claude",
@@ -1024,7 +1024,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "cancelled",
         "id" : "00000000-0000-0000-0000-000000000030",
         "lastActivityAt" : 812500000,
@@ -1070,7 +1070,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000031",
         "lastActivityAt" : 812500000,
         "report" : {
@@ -1115,7 +1115,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000032",
         "isUnread" : true,
         "lastActivityAt" : 812500000,
@@ -1161,7 +1161,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "cancelled",
         "id" : "00000000-0000-0000-0000-000000000033",
         "lastActivityAt" : 812500000,
@@ -1202,7 +1202,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000034",
         "lastActivityAt" : 812500000,
         "runtimeID" : "claude",
@@ -1237,7 +1237,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000035",
         "lastActivityAt" : 812500000,
         "runtimeID" : "claude",
@@ -1277,7 +1277,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000036",
         "lastActivityAt" : 812500000,
         "runtimeID" : "claude",
@@ -1312,7 +1312,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000037",
         "lastActivityAt" : 812500000,
         "runtimeID" : "claude",
@@ -1347,7 +1347,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "daemonGone",
         "id" : "00000000-0000-0000-0000-000000000040",
         "lastActivityAt" : 812500000,
@@ -1383,7 +1383,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000041",
         "lastActivityAt" : 812500000,
         "runningTool" : "swift test",

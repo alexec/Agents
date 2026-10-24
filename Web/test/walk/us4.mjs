@@ -21,7 +21,7 @@ await page.waitFor(`document.querySelector("textarea")`);
 await page.focus("textarea");
 await page.type(deviceCode);
 await page.press("Connect");
-await page.waitFor(`document.querySelector(".projects .row")`);
+await page.waitFor(`document.querySelector(".folders .row")`);
 
 const prompt = [
   "Do these steps in order, each with your own file tools, and nothing else:",
@@ -41,7 +41,7 @@ turn.stdout.on("data", (chunk) => {
 while (!agentID) await sleep(200);
 say(`started ${agentID}`);
 
-await page.eval(`[...document.querySelectorAll(".projects .row")].find((r) => r.textContent.startsWith("work"))?.click()`);
+await page.eval(`[...document.querySelectorAll(".folders .row")].find((r) => r.textContent.startsWith("work"))?.click()`);
 await page.waitFor(`document.querySelector(".group[aria-label=Working] .session")`, 60_000);
 await page.eval(`document.querySelector(".group[aria-label=Working] .session").click()`);
 

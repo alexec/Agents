@@ -50,7 +50,7 @@ long chat or remember a session's title.
 
 **Where it is not**
 
-- On the Mac, **Find in Chat** is in the main window only. In a project's own window, or
+- On the Mac, **Find in Chat** is in the main window only. In a folder's own window, or
   a chat in a window of its own, **⌘F** is **Find Session**.
 - On iPhone and iPad, a chat in a window of its own has no **Find in Chat**.
 - A host that is too old to search shows **Find in Chat** greyed, and asks you to update

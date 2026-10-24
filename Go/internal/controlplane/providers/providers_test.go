@@ -553,7 +553,7 @@ func TestAWorkspaceThatInstallsOnFirstBootJoinsAndIsLinked(t *testing.T) {
 	}
 }
 
-func TestANewWorkspaceClonesItsProjectsOnceItJoins(t *testing.T) {
+func TestANewWorkspaceClonesItsFoldersOnceItJoins(t *testing.T) {
 	h := newHarness(t)
 	h.add()
 	h.router.answer = func(string, string, json.RawMessage) *Reply { return &Reply{Result: json.RawMessage(`{}`)} }
@@ -565,7 +565,7 @@ func TestANewWorkspaceClonesItsProjectsOnceItJoins(t *testing.T) {
 	eventually(t, func() bool { return len(h.router.deliveries()) == 2 })
 	var got []string
 	for _, d := range h.router.deliveries() {
-		if d.method != MethodProjectsClone || d.host != "build004" || d.client != h.caller.Client {
+		if d.method != MethodFoldersClone || d.host != "build004" || d.client != h.caller.Client {
 			t.Errorf("%+v", d)
 		}
 		var params map[string]string

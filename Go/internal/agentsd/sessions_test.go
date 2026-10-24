@@ -8,7 +8,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Ports SessionLookupTests, SessionHistoryTests and AgentMessageTests: the project's
+// Ports SessionLookupTests, SessionHistoryTests and AgentMessageTests: the folder's
 // sessions listed and read in SessionLookup's words, and a message from one to another
 // that wakes it, with the loop guard and the archived refused.
 
@@ -34,7 +34,7 @@ func TestReadingAndMessagingSessions(t *testing.T) {
 	m := appClient(t, d, lead.ID)
 	m.post("initialize", map[string]any{}, 1)
 	text, _ := m.tool(2, "list_sessions", map[string]any{"limit": 2})
-	if !strings.HasPrefix(text, "Sessions in this project, not archived first, most recent first.") ||
+	if !strings.HasPrefix(text, "Sessions in this folder, not archived first, most recent first.") ||
 		!strings.Contains(text, string(lead.ID)+": “Lead” (you) — Claude, Done, last active ") ||
 		strings.Contains(text, "Elsewhere") || strings.Contains(text, string(gone.ID)) ||
 		!strings.Contains(text, "\n\n1 more, all archived. For the next page, call list_sessions with after: \"") {
@@ -45,7 +45,7 @@ func TestReadingAndMessagingSessions(t *testing.T) {
 		!strings.Contains(text, "## The conversation\n\n**The person:** Fix the login\n**Claude:** I fixed it.\n") {
 		t.Fatal(text)
 	}
-	if text, _ := m.tool(4, "read_session", map[string]any{"session": "Nobody"}); text != "There is no session named “Nobody” in this project." {
+	if text, _ := m.tool(4, "read_session", map[string]any{"session": "Nobody"}); text != "There is no session named “Nobody” in this folder." {
 		t.Fatal(text)
 	}
 	if text, isErr := m.tool(5, "message_session", map[string]any{"to": "Old", "message": "hi"}); !isErr || text != "Nothing was sent: “Old” is archived. Only the person can unarchive it." {

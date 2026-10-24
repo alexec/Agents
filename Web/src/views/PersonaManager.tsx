@@ -8,7 +8,7 @@ import { Modal } from "./Modal";
 export function PersonaManager({ store, host, folder, close, saved }: {
   store: Store; host: string; folder: string; close: () => void; saved: () => void;
 }) {
-  const origin = useSignal<"project" | "personal">("project");
+  const origin = useSignal<"folder" | "personal">("folder");
   const files = useSignal<PersonaFile[]>([]);
   const selected = useSignal<string | null>(null);
   const id = useSignal("");
@@ -58,11 +58,11 @@ export function PersonaManager({ store, host, folder, close, saved }: {
         <p class="sheet-note">Edit the full Markdown file. Front matter fields the app does not know stay intact.</p>
         <label>Storage scope
           <select value={origin.value} disabled={busy.value} onChange={(event) => {
-            origin.value = (event.currentTarget as HTMLSelectElement).value as "project" | "personal";
+            origin.value = (event.currentTarget as HTMLSelectElement).value as "folder" | "personal";
             selected.value = null; id.value = ""; content.value = "";
             void load(origin.value);
           }}>
-            <option value="project">This project</option><option value="personal">Personal</option>
+            <option value="folder">This folder</option><option value="personal">Personal</option>
           </select>
         </label>
         <div class="persona-manager-list" aria-label="Persona files">

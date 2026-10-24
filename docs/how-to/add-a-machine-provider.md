@@ -212,4 +212,4 @@ provider as it is. It needs no map. The tools, their arguments and their answers
 - [Start machines from Agents](start-machines-from-agents.md): link a server and press
   Start.
 - [Add a connector by hand](add-a-connector-by-hand.md): connectors (MCP servers) for agents, which are
-  set up per project, not on the control plane.
+  set up per folder, not on the control plane.

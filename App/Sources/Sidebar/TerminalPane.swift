@@ -91,13 +91,13 @@ struct TerminalPane: View {
 }
 
 /// One shell's screen, and what it says when that shell will not start or has ended.
-/// An agent's tab's, or the project's own shell (#418).
+/// An agent's tab's, or the folder's own shell (#418).
 struct ShellScreen: View {
     @Environment(AppModel.self) private var model
-    /// Whose shell: the agent's, or the project's shell's id. Attached again when it changes.
+    /// Whose shell: the agent's, or the folder's shell's id. Attached again when it changes.
     let id: UUID
     /// Where its owner works now, and what to call that, for the strip that offers the
-    /// `cd` once the agent has moved (053). Nil for the project's shell, which is
+    /// `cd` once the agent has moved (053). Nil for the folder's shell, which is
     /// not going anywhere.
     let home: (folder: URL, name: String)?
     /// This window's end of the shell, counted until the screen goes.

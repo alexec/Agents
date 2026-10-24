@@ -1,7 +1,7 @@
 import Foundation
 
 /// Outcomes, Time, Runtimes and Workflows (#2019, #2183): what the agents did, from the
-/// counts each machine adds to its report rows (`ReportCounts`), added up by person, project,
+/// counts each machine adds to its report rows (`ReportCounts`), added up by person, folder,
 /// machine, runtime or workflow. A machine before #2019 sends no counts, so its rows count as
 /// nothing done. The web page adds up the same way (`Web/src/model/reports.ts`, `outcomeTotals`).
 public struct ReportOutcomes: Sendable, Hashable {
@@ -40,7 +40,7 @@ public struct ReportOutcomes: Sendable, Hashable {
         }
     }
 
-    /// One person's, project's, machine's, runtime's or workflow's counts.
+    /// One person's, folder's, machine's, runtime's or workflow's counts.
     public struct Group: Identifiable, Sendable, Hashable {
         public var id: String
         public var name: String

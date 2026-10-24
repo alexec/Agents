@@ -16,9 +16,9 @@ struct AddMachineTests {
     }
 
     @Test func whereAgentsRunSaysWhatElseIsYours() {
-        #expect(WhereAgentsRun.line(others: [], providers: []) == "Agents run where this project’s folder is.")
+        #expect(WhereAgentsRun.line(others: [], providers: []) == "Agents run where this folder is.")
         #expect(WhereAgentsRun.line(others: ["devbox", "build-2"], providers: ["Docker"])
-            == "Agents run where this project’s folder is. Your other machines: devbox, build-2. Providers: Docker.")
+            == "Agents run where this folder is. Your other machines: devbox, build-2. Providers: Docker.")
         #expect(WhereAgentsRun.title(onThisMac: true, hostName: "alex-mbp") == "This Mac")
         #expect(WhereAgentsRun.title(onThisMac: false, hostName: "devbox") == "devbox")
     }

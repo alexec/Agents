@@ -57,8 +57,8 @@ this Mac, with **Agents Host**.
 3. In the window, paste the code under **CODE** and click **Connect**.
 
    The window is paired, may do everything, and shows this Mac under
-   **THIS MAC** in the projects list. Add a project to start; see
-   [Add a project](add-a-project.md).
+   **THIS MAC** in the folders list. Add a folder to start; see
+   [Add a folder](add-a-folder.md).
 
 The code works once, for five minutes. If it runs out, close the sheet and click **Pair**
 again. You can also open the sheet from the Agents Host menu bar item, with **Pair a

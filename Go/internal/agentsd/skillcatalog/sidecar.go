@@ -33,9 +33,9 @@ type SidecarRecord struct {
 	FolderHash *string `json:"folderHash,omitempty"`
 }
 
-// SidecarKey is personal/<name>, or <project folder>/<name>.
+// SidecarKey is personal/<name>, or <folder>/<name>.
 func SidecarKey(d wire.SkillDestination, name string) string {
-	if d.Kind == wire.SkillDestinationKindProject && d.Folder != nil {
+	if d.Kind == wire.SkillDestinationKindFolder && d.Folder != nil {
 		return filepath.Clean(*d.Folder) + "/" + name
 	}
 	return "personal/" + name

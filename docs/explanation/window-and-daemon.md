@@ -33,10 +33,10 @@ real machine is asked of a host, through the control plane or, for this Mac's ho
 reading and writing files, git, installing and signing in runtimes, and your shared skills
 and instructions in `~/.agents`.
 
-That is true of this Mac too. A project on this Mac is on this Mac's host, and the window
+That is true of this Mac too. A folder on this Mac is on this Mac's host, and the window
 reaches its files the same way it reaches a server's. A folder you pick or drop for such a
-project is passed to the host by its path; the window does not keep access to it.
-**Reveal in Finder** and opening a file in another app are offered only for projects on this
+folder is passed to the host by its path; the window does not keep access to it.
+**Reveal in Finder** and opening a file in another app are offered only for folders on this
 Mac, and the host does them for the window.
 
 If no control plane is set up, the window opens on one question, **Where should your agents

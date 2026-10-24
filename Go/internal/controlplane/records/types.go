@@ -155,7 +155,7 @@ type HostRecord struct {
 	ForgottenAt *Stamp
 	KnownEpoch  *int
 	// Set before #656; cleared when the host next says hello.
-	DetectProjects *bool
+	DetectFolders *bool
 	// The provider's workspace this host runs on (#691), as it was written.
 	Workspace json.RawMessage
 	// When its key stops being accepted (#997), as ClientRecord.Expires.
@@ -180,7 +180,7 @@ type hostJSON struct {
 	Forgotten      *bool             `json:"forgotten,omitempty"`
 	ForgottenAt    *Stamp            `json:"forgottenAt,omitempty"`
 	KnownEpoch     *int              `json:"knownEpoch,omitempty"`
-	DetectProjects *bool             `json:"detectProjects,omitempty"`
+	DetectFolders *bool             `json:"detectFolders,omitempty"`
 	Workspace      json.RawMessage   `json:"workspace,omitempty"`
 	Expires        *Stamp            `json:"expires,omitempty"`
 }
@@ -191,7 +191,7 @@ var dialOut = json.RawMessage(`{"dialOut":{}}`)
 
 func (h HostRecord) MarshalJSON() ([]byte, error) {
 	return encodeKeeping(hostJSON{h.ID, h.Name, h.PublicKey, dialOut, h.Platform, h.Version, h.Installed, h.MachineID,
-		h.Relay, h.SignInFrom, h.GitFrom, h.Owner, h.Rev, h.Forgotten, h.ForgottenAt, h.KnownEpoch, h.DetectProjects,
+		h.Relay, h.SignInFrom, h.GitFrom, h.Owner, h.Rev, h.Forgotten, h.ForgottenAt, h.KnownEpoch, h.DetectFolders,
 		h.Workspace, h.Expires}, h.Extra)
 }
 
@@ -202,7 +202,7 @@ func (h *HostRecord) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*h = HostRecord{j.ID, j.Name, j.PublicKey, j.Platform, j.Version, j.Installed, j.MachineID, j.Relay, j.SignInFrom,
-		j.GitFrom, j.Owner, j.Rev, j.Forgotten, j.ForgottenAt, j.KnownEpoch, j.DetectProjects, j.Workspace, j.Expires, extra}
+		j.GitFrom, j.Owner, j.Rev, j.Forgotten, j.ForgottenAt, j.KnownEpoch, j.DetectFolders, j.Workspace, j.Expires, extra}
 	return nil
 }
 
@@ -228,8 +228,8 @@ type Settings struct {
 	Owner      *string
 	Created    *Stamp
 	Rev        *int
-	// Where a host added from now on has its projects found (#429), as written.
-	ProjectDetection json.RawMessage
+	// Where a host added from now on has its folders found (#429), as written.
+	FolderDetection json.RawMessage
 	// Chat apps that reach the person's agents (#1012), as written.
 	Channels json.RawMessage
 	// How many days audit entries are kept (#996); nil is the default, 90.
@@ -258,7 +258,7 @@ type settingsJSON struct {
 	Owner            *string         `json:"owner,omitempty"`
 	Created          *Stamp          `json:"created,omitempty"`
 	Rev              *int            `json:"rev,omitempty"`
-	ProjectDetection json.RawMessage `json:"projectDetection,omitempty"`
+	FolderDetection json.RawMessage `json:"folderDetection,omitempty"`
 	Channels         json.RawMessage `json:"channels,omitempty"`
 	AuditDays        *int            `json:"auditDays,omitempty"`
 	AuditDaysBefore  *int            `json:"auditDaysBefore,omitempty"`
@@ -269,7 +269,7 @@ type settingsJSON struct {
 
 func (s Settings) MarshalJSON() ([]byte, error) {
 	return encodeKeeping(settingsJSON{s.Name, s.Port, s.HomeHost, s.MachineID, s.URL, s.Pin, s.Endpoints, s.Epoch,
-		s.ControlKey, s.Owner, s.Created, s.Rev, s.ProjectDetection, s.Channels, s.AuditDays, s.AuditDaysBefore, s.AuditShortened, s.PreviousKey, s.RotatedAt}, s.Extra)
+		s.ControlKey, s.Owner, s.Created, s.Rev, s.FolderDetection, s.Channels, s.AuditDays, s.AuditDaysBefore, s.AuditShortened, s.PreviousKey, s.RotatedAt}, s.Extra)
 }
 
 func (s *Settings) UnmarshalJSON(data []byte) error {
@@ -279,7 +279,7 @@ func (s *Settings) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*s = Settings{j.Name, j.Port, j.HomeHost, j.MachineID, j.URL, j.Pin, j.Endpoints, j.Epoch, j.ControlKey, j.Owner,
-		j.Created, j.Rev, j.ProjectDetection, j.Channels, j.AuditDays, j.AuditDaysBefore, j.AuditShortened, j.PreviousKey, j.RotatedAt, extra}
+		j.Created, j.Rev, j.FolderDetection, j.Channels, j.AuditDays, j.AuditDaysBefore, j.AuditShortened, j.PreviousKey, j.RotatedAt, extra}
 	return nil
 }
 

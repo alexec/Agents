@@ -28,10 +28,10 @@ command). Only its user can read it (mode 0700).
 | `workflow-copies/` | The approved text of each workflow and its skills | The copies that `workflows.json` names; an older version goes when it is saved |
 | `assessments/` | Each runtime assessment's start, score and scope | The newest 50 |
 | `mcp-logs/`, in the log folder | What each hosted MCP server wrote to stderr | 1 MB and one older file a server, and the newest 32 servers |
-| `events-state.json` | The branch tips that `branch.moved` compares | The live projects only |
+| `events-state.json` | The branch tips that `branch.moved` compares | The live folders only |
 | `<file>.unreadable-<time>`, `<file>.corrupt-<time>` | A store that could not be read, set aside | The newest 3 of each kind for each file |
-| `<project>/.agents/attachments` | Files attached to prompts | A file that no kept conversation names goes after 7 days. The folder stays under 500 MB, oldest first. |
-| `<project>/.agents/dropbox` | Files handed to a workflow | 25 MB a file. Not swept. |
+| `<folder>/.agents/attachments` | Files attached to prompts | A file that no kept conversation names goes after 7 days. The folder stays under 500 MB, oldest first. |
+| `<folder>/.agents/dropbox` | Files handed to a workflow | 25 MB a file. Not swept. |
 | Terminal scrollback | What a terminal showed | In memory only, 4 MiB a terminal |
 | `daemon.log` | What the host did | 4 MB, and one older file |
 | `erasures.json`, `erased.json` | Runtime copies of deleted agents still to erase; every agent deleted here | 1,000 entries for 7 days; 10,000 IDs for 400 days |
@@ -48,7 +48,7 @@ that machine starts.
 | Clients, hosts, people, groups | Who is paired, with their public keys, names and when last seen; which machines there are; a client's push tokens | Until forgotten or removed |
 | Codes | A code's purpose, owner and expiry, never its secret | Deleted 24 hours after it expires |
 | Audit events | Who did what (see [Security overview](security-overview.md#who-did-what)) | 90 days by default; an admin sets 1 to 3,650 days |
-| Usage reports | Usage, cost and time by person, project, machine and runtime, sent by each machine | 7 days by the hour, 90 days by the day |
+| Usage reports | Usage, cost and time by person, folder, machine and runtime, sent by each machine | 7 days by the hour, 90 days by the day |
 | Kept requests | Prompts and agent starts for a stopped workspace | Until the machine starts and takes them; 20 a machine at most |
 | A person's settings and secrets | Settings that follow a person; secrets, sealed | Until changed |
 | Server backups | See below | The newest **Keep** of each server; a removed server's for 90 days after its newest |
@@ -82,12 +82,12 @@ These stay behind:
 
 ## Export and import
 
-**Export…** in an agent's menu, and **Export Agents…** in a project's, on the Mac, the
-Remote and the web page, give a `.tar.gz` of the agent, or of every agent of the project
+**Export…** in an agent's menu, and **Export Agents…** in a folder's, on the Mac, the
+Remote and the web page, give a `.tar.gz` of the agent, or of every agent of the folder
 (T8, #1001). It is in the backup format: each agent's record, conversation, turn summaries
 and tool log. It holds no secret, no usage history and no other agent.
 
-**Import Agents…** in a project's menu sends the file to that project's machine. Its agents
+**Import Agents…** in a folder's menu sends the file to that folder's machine. Its agents
 come back archived, to read and search. They are never run there, and bring no MCP servers.
 An agent that the machine has already, or that it deleted (`erased.json`), is skipped.
 
@@ -123,7 +123,7 @@ The first HADR review (2026-10-21, #1557) found these. Each one is an open issue
   carry them.
 - **A machine's backups are on its own disk by default** (#2139).
 - **Not in a machine's backup:** settings, workflows, secrets, attachments, events and the
-  runtimes' own session files. A project's `.agents/` folder is in the project, and so in its
+  runtimes' own session files. A folder's `.agents/` folder is in the folder, and so in its
   git repository if you commit it.
 - **Writes that are not synced.** Appends to a machine's events, its records' logs and its turn summaries
   are not synced to disk one by one, so a power cut can lose the last lines.

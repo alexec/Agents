@@ -33,7 +33,7 @@ import { quietLine } from "../model/activity";
 import { sentPrompts } from "../model/promptHistory";
 import { sessionPrompts } from "../model/sessionPrompts";
 import { PromptList } from "./chat/PromptList";
-import { asksToArchive, projectFolder } from "../model/groups";
+import { asksToArchive, folderPath } from "../model/groups";
 import { CallActionsContext, fromLine, ItemRow, TurnView, type CallActions } from "./chat/Rows";
 import { Modal } from "./Modal";
 import { nameOf, pathOf, setPane } from "./files/paneState";
@@ -214,15 +214,15 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   // The chat's views (#187): one layer while the chat is open, its views told and taken down
   // when another chat opens, and when the page leaves the chat.
   const layer = useMemo(() => new ViewLayer(), []);
-  const pinFolder = agent ? projectFolder(agent) : undefined;
+  const pinFolder = agent ? folderPath(agent) : undefined;
   const viewHosting = useMemo(() => {
     const actions: ViewActions = {
       agentID: session,
       call: (method, params) => store.link.call(method, params as never, host) as Promise<unknown>,
       send: (text) => store.prompt(host, session, text, []),
-      // Pin (#189): under the project the chat works in.
+      // Pin (#189): under the folder the chat works in.
       ...(pinFolder ? { pin: (call: AppViewCall) => store.pinView(host, pinFolder, viewPin(call)) } : {}),
-      // A new agent, filled in by the view (#834): the form in the chat's project.
+      // A new agent, filled in by the view (#834): the form in the chat's folder.
       ...(pinFolder ? { startAgent: (start: Start) => offerStart(store, host, pinFolder, start) } : {}),
       // The session on a pull request's branch (#837), asked under the view first.
       ...(pinFolder ? { recipient: (message) => recipient(store.agents.value[host] ?? [], message, pinFolder) } : {}),
@@ -431,7 +431,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   // and the agent's wait on events under it.
   const asked = useWaitingCards({ store, host, session, down });
   const cards: WaitingCard[] = [
-    // A change its agent made to the project's own files, asked here (#531).
+    // A change its agent made to the folder's own files, asked here (#531).
     ...store.guardedChanges(host, { session }).map(({ folder, change }) => ({
       key: `guarded:${folder}|${change.path}`,
       node: <div class="cards"><GuardedChangeCard store={store} host={host} folder={folder} change={change} down={down} /></div>,
@@ -649,7 +649,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           where={agent && (
             <>
               <Place store={store} host={host} agent={agent} />
-              {r.project && <Labels store={store} host={host} agent={agent} folder={r.project} disabled={down} />}
+              {r.folder && <Labels store={store} host={host} agent={agent} folder={r.folder} disabled={down} />}
             </>
           )}
           runtime={agent && <RuntimeLabel store={store} host={host} agent={agent} />}>
@@ -674,21 +674,21 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
 }
 
 /**
- * Where it works (PromptBar's placeTitle): its worktree, else the project folder's branch. Said,
+ * Where it works (PromptBar's placeTitle): its worktree, else the folder's branch. Said,
  * not offered: moving a session to another worktree is the window's.
  */
 function Place({ store, host, agent }: { store: Store; host: string; agent: Agent }) {
   const branch = useSignal<string | undefined>(undefined);
-  const folder = projectFolder(agent);
+  const folder = folderPath(agent);
   useEffect(() => {
     branch.value = undefined;
     if (agent.worktree) return;
     void store.worktrees(host, folder).then((list) => {
-      branch.value = list?.worktrees.find((w) => w.isProjectFolder)?.branch;
+      branch.value = list?.worktrees.find((w) => w.isFolder)?.branch;
     });
   }, [host, folder, agent.worktree?.root]);
-  const title = agent.worktree?.name ?? branch.value ?? "Project folder";
-  const help = agent.worktree ? `Worktree ${agent.worktree.name}${agent.worktree.branch ? ` on ${agent.worktree.branch}` : ""}` : "The project folder";
+  const title = agent.worktree?.name ?? branch.value ?? "Folder";
+  const help = agent.worktree ? `Worktree ${agent.worktree.name}${agent.worktree.branch ? ` on ${agent.worktree.branch}` : ""}` : "The folder";
   return <span class="pill place" title={help} aria-label={`Works in: ${title}`}>{title}</span>;
 }
 

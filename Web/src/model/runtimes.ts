@@ -39,7 +39,7 @@ export function formRuntime(opened: string | undefined, picked: string | undefin
 }
 
 /**
- * The window's empty project list (ProjectListView): nothing on this Mac can start an agent.
+ * The window's empty folder list (FolderListView): nothing on this Mac can start an agent.
  * Unknown until the host has listed its runtimes. An empty list counts: there is nothing to start.
  */
 export function noAgentRuntime(runtimes: readonly RuntimeStatus[] | undefined): boolean {

@@ -177,7 +177,7 @@ func TestAWorkflowHearsAServersEvent(t *testing.T) {
 	ci := newEventsServer(t)
 	serverHome(t, d, ci.URL)
 	quickPolls(d)
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	write := func(id, text string) {
@@ -213,7 +213,7 @@ func TestAWorkflowHearsAServersEvent(t *testing.T) {
 	key := mcpTrigger{event: "pr.merged", arguments: map[string]json.RawMessage{"repo": json.RawMessage(`"alexec/Agents"`)}}.subscriptionKey("ci")
 	if e.Name != "pr.merged" || e.Details["server"] != "ci" || e.Details["subscription"] != key || e.Details["time"] != "2026-10-16T12:00:00Z" ||
 		e.Details["payload"] != `{"pr":{"number":5,"url":"https://example.com/5"}}` || e.Details["missed_since"] == "" ||
-		e.Sentence != "ci reported pr.merged" || e.Scope.Project == nil {
+		e.Sentence != "ci reported pr.merged" || e.Scope.Folder == nil {
 		t.Fatalf("%+v", e)
 	}
 	if e.Consequences[0].Fired.WorkflowID != "merged" {
@@ -304,14 +304,14 @@ func TestEventsHalfDeliveredAreRaisedOnceAtTheNextStart(t *testing.T) {
 	ci := newEventsServer(t)
 	serverHome(t, d, ci.URL)
 	quickPolls(d)
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "merged.md"), []byte("---\non:\n  - pr.merged:\n      server: ci\n---\nTidy up.\n"), 0o644)
 	approveAll(t, c, folder)
 	key := mcpTrigger{event: "pr.merged", arguments: map[string]json.RawMessage{}}.subscriptionKey("ci")
 	// e8 reached the log before the host stopped; e9 did not.
-	d.raise(wire.EventDraft{Name: "pr.merged", At: now(), Scope: projectScope(store.FolderPath(folder)), Sentence: "ci reported pr.merged",
+	d.raise(wire.EventDraft{Name: "pr.merged", At: now(), Scope: folderScope(store.FolderPath(folder)), Sentence: "ci reported pr.merged",
 		Details: map[string]string{"server": "ci", "event": "pr.merged", "subscription": key, "mcp_event_id": "e8"}})
 	c1, c2 := "c1", "c2"
 	recs := mcpRecords{Subscriptions: map[string]*mcpRecord{store.FolderPath(folder) + "|" + key: {
@@ -346,7 +346,7 @@ func TestATriggerNoServerHereOffers(t *testing.T) {
 	defer d.Shutdown()
 	quickPolls(d)
 	d.PersonalHome = t.TempDir()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "w.md"), []byte("---\non: pr.mergd\n---\nLook.\n"), 0o644)
@@ -564,7 +564,7 @@ func TestServerEventDataStaysInsideItsFence(t *testing.T) {
 	}
 }
 
-// A workflow for both forges (#1633) listens to the server a project has and says nothing of
+// A workflow for both forges (#1633) listens to the server a folder has and says nothing of
 // the other, or of an event no server here offers, once one of its triggers is heard.
 func TestAWorkflowForTwoServersSaysNothingOfTheOneNotHere(t *testing.T) {
 	d, c := start(t, t.TempDir())
@@ -572,7 +572,7 @@ func TestAWorkflowForTwoServersSaysNothingOfTheOneNotHere(t *testing.T) {
 	ci := newEventsServer(t)
 	serverHome(t, d, ci.URL)
 	quickPolls(d)
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "both.md"),
@@ -603,7 +603,7 @@ func TestAChannelMessageStartsWorkOnlyFromALinkedSender(t *testing.T) {
 	ci := newEventsServer(t)
 	serverHome(t, d, ci.URL)
 	quickPolls(d)
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "merged.md"), []byte("---\nname: Merged\non:\n  - pr.merged:\n      server: ci\n---\nTidy up.\n"), 0o644)

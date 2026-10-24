@@ -15,7 +15,7 @@ public enum MCPCatalogWords {
         case .previewExpired: "That has expired. Open the server, or verify it, again."
         case .noRunnableWay: "There is no way to run this server on this Mac."
         case .replaceMismatch: "The server there has changed. Open it again."
-        case .notAProject(let path): "\(path) is not a project on this Mac."
+        case .notAFolder(let path): "\(path) is not a folder on this Mac."
         case .nameTaken(let name): "There is already a server called \(name) there."
         case .invalid(let why): why
         case .failed(let why): "It could not be added: \(why)."

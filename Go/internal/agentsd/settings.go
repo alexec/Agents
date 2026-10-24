@@ -21,7 +21,7 @@ import (
 // What the window reads of the person's settings on this host, as the Swift host keeps
 // them: display preferences (display.json) and each runtime's last mode (modes.json) in
 // the settings folder, each new agent's options as last seen (option-cache.json, in the
-// cache), and the personas in a project's .agents/personas.
+// cache), and the personas in a folder's .agents/personas.
 
 type settingsState struct {
 	settingsMu  sync.Mutex
@@ -181,12 +181,12 @@ func (d *Daemon) rememberedOptions(r wire.RememberedOptionsRequest) []wire.Confi
 
 // MARK: personas (PersonaFile)
 
-func personas(project string, home string) []wire.Persona {
+func personas(folder string, home string) []wire.Persona {
 	byID := map[string]wire.Persona{}
 	for _, p := range readPersonas(home, "personal") {
 		byID[p.ID] = p
 	}
-	for _, p := range readPersonas(project, "project") {
+	for _, p := range readPersonas(folder, "folder") {
 		byID[p.ID] = p
 	}
 	out := []wire.Persona{}
@@ -371,20 +371,20 @@ func personaFilesBase(folder *wire.URL, origin wire.PersonaOrigin) (string, erro
 	switch origin {
 	case wire.PersonaOriginPersonal:
 		base = personaHome()
-	case wire.PersonaOriginProject:
+	case wire.PersonaOriginFolder:
 		if folder == nil {
-			return "", Invalid("Choose a project for project personas.")
+			return "", Invalid("Choose a folder for folder personas.")
 		}
 		base = store.FolderPath(*folder)
 		root, err := store.Resolve(base)
 		if err != nil {
-			return "", Invalid("That project folder is not available.")
+			return "", Invalid("That folder is not available.")
 		}
 		if !inside(root, resolved(filepath.Join(base, ".agents", "personas"))) {
-			return "", Invalid("The project's persona folder has to stay inside the project.")
+			return "", Invalid("The folder's persona folder has to stay inside the folder.")
 		}
 	default:
-		return "", Invalid("Choose personal or project personas.")
+		return "", Invalid("Choose personal or folder personas.")
 	}
 	if base == "" {
 		return "", Invalid("Personal personas are not available on this host.")
@@ -417,7 +417,7 @@ func listPersonaFiles(base string, origin wire.PersonaOrigin) (wire.PersonaFiles
 func savePersonaFile(base string, r wire.PersonaFileSaveRequest) error {
 	if r.ID == "" || r.ID == "." || r.ID == ".." || strings.HasPrefix(r.ID, ".") ||
 		strings.HasSuffix(r.ID, ".md") || filepath.Base(r.ID) != r.ID || strings.ContainsAny(r.ID, `/\\`) {
-		return Invalid("Use a persona name without a folder path.")
+		return Invalid("Use a persona name without a folder.")
 	}
 	if len(r.Content) > 256<<10 {
 		return Invalid("A persona file has to be smaller than 256 KB.")
@@ -444,7 +444,7 @@ func savePersonaFile(base string, r wire.PersonaFileSaveRequest) error {
 		return fileError(CodeFileNotReadable, "The persona folder can't be created.")
 	}
 	if root, err := store.Resolve(base); err != nil || !inside(root, resolved(folder)) {
-		return Invalid("The project's persona folder has to stay inside the project.")
+		return Invalid("The folder's persona folder has to stay inside the folder.")
 	}
 	info, err := os.Lstat(path)
 	if err == nil && (!info.Mode().IsRegular() || links(info) != 1) {

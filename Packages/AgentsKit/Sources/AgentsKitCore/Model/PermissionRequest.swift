@@ -202,7 +202,7 @@ public struct ToolCall: Codable, Hashable, Sendable {
     ///
     /// Every one of the app's own tools, because none of them is a question worth
     /// putting to somebody. Suggestions and a read-only pane carry no information to
-    /// decide on; a workflow is answerable *after* it exists, on the project page,
+    /// decide on; a workflow is answerable *after* it exists, on the folder page,
     /// where it can be paused or archived by somebody who has seen what it does. A
     /// sheet in front of the writing would only make the uninformed answer the quick
     /// one — and, under a runtime that asks before every call, would stop the writing

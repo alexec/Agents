@@ -11,11 +11,11 @@ struct EventCatalogueTests {
         // less the ten pull-request kinds that went with GitHub support, and the switch,
         // which went with the pool (065), and agent.parked (agent.archive_requested since #584)
         // and agent.archived (#96), and
-        // mac.disk_low and mac.disk_ok (#195, machine.* since #372), project.idle (#360),
+        // mac.disk_low and mac.disk_ok (#195, machine.* since #372), folder.idle (#360),
         // and dropbox.file_added (#231), and agent.messaged (#560), and system.restarted (#1219).
         #expect(names.count == 31)
         for name in ["system.restarted", "cost.allowance_out", "cost.allowance_back", "agent.archive_requested", "agent.archived",
-                     "machine.disk_low", "machine.disk_ok", "project.idle", "dropbox.file_added",
+                     "machine.disk_low", "machine.disk_ok", "folder.idle", "dropbox.file_added",
                      "agent.messaged", "agent.waiting"] {
             #expect(names.contains(name), "\(name)")
         }
@@ -197,7 +197,7 @@ struct EventCatalogueTests {
         }
         #expect(!text.isEmpty)
         // Not raised by the Go host yet (#1368): take each off as it is.
-        let notYet: Set<String> = ["mac.sleep", "mac.wake", "person.away", "person.back", "project.idle"]
+        let notYet: Set<String> = ["mac.sleep", "mac.wake", "person.away", "person.back", "folder.idle"]
         for kind in EventCatalogue.all where !notYet.contains(kind.name) {
             #expect(text.contains("\"\(kind.name)\""), "nothing raises \(kind.name)")
         }

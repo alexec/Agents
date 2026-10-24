@@ -62,7 +62,7 @@ struct ArchiveActionsTests {
         #expect(page.next == nil)
     }
 
-    @Test func denialTargetsTheAgentProject() {
+    @Test func denialTargetsTheAgentFolder() {
         var archived = agent("old session", state: .archived)
         archived.host = HostID(rawValue: "devbox")
 
@@ -71,6 +71,6 @@ struct ArchiveActionsTests {
         #expect(denial.approval.kind == .archive)
         #expect(denial.approval.agentID == archived.id)
         #expect(denial.approval.actions == [.deny])
-        #expect(denial.project == ProjectKey(host: archived.host, folder: archived.projectFolder))
+        #expect(denial.folder == FolderKey(host: archived.host, folder: archived.folderPath))
     }
 }

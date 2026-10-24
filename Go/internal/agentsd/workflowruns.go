@@ -61,7 +61,7 @@ func refusalWords(r wire.WorkflowRefusal) string {
 		if r.OverLimit.Allowed != nil {
 			n = *r.OverLimit.Allowed
 		}
-		return fmt.Sprintf("%d workflows are already running in this project", n)
+		return fmt.Sprintf("%d workflows are already running in this folder", n)
 	case r.Unreadable != nil:
 		return r.Unreadable.Value
 	case r.TriggerNotSupported != nil:
@@ -73,7 +73,7 @@ func refusalWords(r wire.WorkflowRefusal) string {
 	case r.MissedWhileClosed != nil:
 		return "the app was closed"
 	case r.FolderGone != nil:
-		return "the project folder is not there"
+		return "the folder is not there"
 	case r.DayLimitReached != nil:
 		return "the day's spending limit has been reached"
 	case r.SettingRefused != nil:
@@ -134,8 +134,8 @@ func (d *Daemon) fireWorkflows(e wire.Event) {
 		d.scanLocked()
 	}
 	var folders []string
-	if e.Scope.Project != nil {
-		folders = []string{store.FolderPath(e.Scope.Project.Value)}
+	if e.Scope.Folder != nil {
+		folders = []string{store.FolderPath(e.Scope.Folder.Value)}
 	} else {
 		for f := range d.workflowFiles {
 			folders = append(folders, f)
@@ -209,7 +209,7 @@ func (d *Daemon) isOwnAgentLocked(agent wire.UUID, folder string, w wire.Workflo
 	a := d.Store.Agent(agent)
 	for seen := map[wire.UUID]bool{}; a != nil && !seen[a.ID]; {
 		seen[a.ID] = true
-		if a.StartedByWorkflow != nil && *a.StartedByWorkflow == w.WorkflowID && projectFolder(a) == folder && w.Mode != wire.WorkflowModeTriggering {
+		if a.StartedByWorkflow != nil && *a.StartedByWorkflow == w.WorkflowID && folderPath(a) == folder && w.Mode != wire.WorkflowModeTriggering {
 			return true
 		}
 		if a.StartedByAgent == nil {
@@ -599,7 +599,7 @@ func (d *Daemon) recordOutcome(fr fireRequest, name string, o wire.WorkflowOutco
 	}
 	d.saveRecordsLocked(false)
 	d.workflowMu.Unlock()
-	scope := projectScope(fr.folder)
+	scope := folderScope(fr.folder)
 	if o.Ran != nil {
 		title := "Untitled"
 		var t *string
@@ -678,7 +678,7 @@ func (d *Daemon) workflowRunFinished(agent wire.UUID) {
 			details["outcome"] = string(a.Report.Outcome)
 		}
 	}
-	d.raise(wire.EventDraft{Name: "workflow.completed", At: now(), Scope: projectScope(folder), Sentence: "Workflow " + name + " finished.",
+	d.raise(wire.EventDraft{Name: "workflow.completed", At: now(), Scope: folderScope(folder), Sentence: "Workflow " + name + " finished.",
 		Details: details, ChainDepth: run.Depth + 1})
 	// when-done: a run its workflow lets archive itself, ended done or with nothing to do.
 	if a != nil && whenDone != nil && mode != wire.WorkflowModeTriggering && a.StartedByWorkflow != nil && *a.StartedByWorkflow == run.WorkflowID &&

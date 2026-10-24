@@ -150,7 +150,7 @@ func (d *Daemon) saidSearch(r wire.SaidSearchRequest) wire.SaidSearchResult {
 	defer saidMu.Unlock()
 	read := 0
 	for _, a := range d.Store.Agents() {
-		if r.Folder != nil && projectFolder(&a) != store.FolderPath(*r.Folder) {
+		if r.Folder != nil && folderPath(&a) != store.FolderPath(*r.Folder) {
 			continue
 		}
 		if read++; read > saidSessions {

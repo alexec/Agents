@@ -1,5 +1,5 @@
 // The organisation's policy (#998, spec 998): one document of rules, kept by the control plane and
-// followed by every machine as a ceiling over the person's and the project's own settings. Its words
+// followed by every machine as a ceiling over the person's and the folder's own settings. Its words
 // are OrgPolicyWords (Packages/AgentsKit/.../Model/OrgPolicy.swift) on the Mac and the Remote; the
 // same here, for Settings ▸ Policy and Console ▸ Policy. Below them, the Console's form: the policy
 // as fields an admin types in, back to a policy, and what a change does before it is saved.
@@ -160,12 +160,12 @@ export function budgetWords(b: PolicyBudgets): string | null {
   return parts.length === 0 ? null : parts.join(", ");
 }
 
-/** "At most 3 running and 10 not archived in a project"; null when neither is set. */
+/** "At most 3 running and 10 not archived in a folder"; null when neither is set. */
 export function helperWords(h: { mostRunning?: number; mostNotArchived?: number }): string | null {
   const parts: string[] = [];
   if (h.mostRunning !== undefined) parts.push(`${h.mostRunning} running`);
   if (h.mostNotArchived !== undefined) parts.push(`${h.mostNotArchived} not archived`);
-  return parts.length === 0 ? null : `At most ${parts.join(" and ")} in a project`;
+  return parts.length === 0 ? null : `At most ${parts.join(" and ")} in a folder`;
 }
 
 /** Each rule the policy sets, in words, in the pane's order. Empty for a policy that sets none. */

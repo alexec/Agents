@@ -12,7 +12,7 @@ import Foundation
 /// surface in the chat column has to agree on them.
 ///
 /// The two anchors the constants were fixed against, at the default 1,100-point window
-/// (`AgentsApp`), with the project list at its ideal 240 (`ContentView`) and the sidebar
+/// (`AgentsApp`), with the folder list at its ideal 240 (`ContentView`) and the sidebar
 /// at its stored default, which was 380 when these were set and is 460 now that the
 /// document pane needs the room (`SidebarState`):
 ///
@@ -25,7 +25,7 @@ import Foundation
 ///   inside the padding.
 ///
 /// Those widths are arithmetic on the three stored defaults rather than a ruler held
-/// to the screen. The project list is a `NavigationSplitView` column and can be
+/// to the screen. The folder list is a `NavigationSplitView` column and can be
 /// dragged, so the numbers are typical rather than exact; the invariants below hold at
 /// every width regardless.
 ///

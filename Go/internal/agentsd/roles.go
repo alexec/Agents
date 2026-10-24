@@ -45,8 +45,8 @@ var agentMethods = methodSet(append([]string{
 
 var pairingMethods = methodSet(append([]string{"devices/announce"}, strangerMethods...))
 
-// hostAppMethods: what Agents Host's window counts, projects and agents working (#168).
-var hostAppMethods = methodSet(append([]string{"projects/list", "agents/list"}, strangerMethods...))
+// hostAppMethods: what Agents Host's window counts, folders and agents working (#168).
+var hostAppMethods = methodSet(append([]string{"folders/list", "agents/list"}, strangerMethods...))
 
 // A Linux host's git, through `agentsd git-credential` (#1122), is any process of the
 // account, as git runs it for every one of them.

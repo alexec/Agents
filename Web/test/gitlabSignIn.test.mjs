@@ -36,7 +36,7 @@ test("GitLab is the third provider, and its device page is gitlab.com", () => {
 });
 
 // Connect your tools with GitLab (#1632): the set-up's words follow its forge.
-test("a GitLab project's set-up says GitLab, merge requests and pipelines", () => {
+test("a GitLab folder's set-up says GitLab, merge requests and pipelines", () => {
   const setup = { folder: "/p", repository: "group/app", forge: "gitlab", site: "gitlab.example.com",
     repositoryURL: "https://gitlab.example.com/group/app", slots: [], events: { state: "off", names: [], workflows: [] }, done: 1 };
   assert.equal(c.intro("App", setup.repository, setup.site), "What agents in App can reach. Repository gitlab.example.com/group/app, from its git remote.");
@@ -49,6 +49,6 @@ test("a GitLab project's set-up says GitLab, merge requests and pipelines", () =
   assert.equal(c.forgeOf({ ...setup, forge: undefined }), "github");
 });
 
-test("Disconnect GitLab says every project's GitLab slots wait again, as the Mac does (#1868)", () => {
-  assert.match(c.disconnectNoteFor("gitlab"), /^Disconnect deletes the machine's token\. Every project's GitLab slots wait for a connection again\. /);
+test("Disconnect GitLab says every folder's GitLab slots wait again, as the Mac does (#1868)", () => {
+  assert.match(c.disconnectNoteFor("gitlab"), /^Disconnect deletes the machine's token\. Every folder's GitLab slots wait for a connection again\. /);
 });

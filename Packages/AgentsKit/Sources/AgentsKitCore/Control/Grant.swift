@@ -185,9 +185,9 @@ public struct HostRecord: Codable, Hashable, Sendable, Identifiable {
     public var forgottenAt: Date?
     /// As `ClientRecord.knownEpoch`.
     public var knownEpoch: Int?
-    /// Set before #656 on a host that was to add the projects it found (#429). Never set
+    /// Set before #656 on a host that was to add the folders it found (#429). Never set
     /// now; one left over is cleared when that host next says hello, and it is not told.
-    public var detectProjects: Bool?
+    public var detectFolders: Bool?
     /// The provider's workspace this host runs on, which the control plane can start and stop
     /// (#691). Nil for a host nothing can start.
     public var workspace: WorkspaceLink?
@@ -272,8 +272,8 @@ public struct ControlSettings: Codable, Hashable, Sendable {
     public var owner: PersonID?
     public var created: Date?
     public var rev: Int?
-    /// Where a host added from now on has its projects found (#429). Nil: the default.
-    public var projectDetection: ProjectDetection?
+    /// Where a host added from now on has its folders found (#429). Nil: the default.
+    public var folderDetection: FolderDetection?
 
     public init(name: String, port: Int = 8790, homeHost: HostID? = nil, machineID: String,
                 url: String? = nil, pin: String? = nil, controlKey: Data? = nil,
@@ -290,20 +290,20 @@ public struct ControlSettings: Codable, Hashable, Sendable {
     }
 }
 
-/// Projects found on a host when it is added (#429), once: every immediate folder of
-/// each path that has `.git` in it. `~` is the host's own home. After that, projects are
+/// Folders found on a host when it is added (#429), once: every immediate folder of
+/// each path that has `.git` in it. `~` is the host's own home. After that, folders are
 /// the person's to add and remove; nothing looks again.
-public struct ProjectDetection: Codable, Hashable, Sendable {
+public struct FolderDetection: Codable, Hashable, Sendable {
     public var enabled: Bool
     public var paths: [String]
 
-    public init(enabled: Bool = true, paths: [String] = ProjectDetection.defaultPaths) {
+    public init(enabled: Bool = true, paths: [String] = FolderDetection.defaultPaths) {
         self.enabled = enabled
         self.paths = paths
     }
 
-    public static let defaultPaths = ["~", "~/src", "~/code", "~/projects", "~/Developer", "~/dev", "~/git"]
-    public static let standard = ProjectDetection()
+    public static let defaultPaths = ["~", "~/src", "~/code", "~/folders", "~/Developer", "~/dev", "~/git"]
+    public static let standard = FolderDetection()
 }
 
 /// Whom records belong to (FR-012). One person per control plane for now; the id is

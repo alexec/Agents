@@ -1,16 +1,16 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Every project's worktrees on the Mac and how much each holds on disk (#790), as the
+/// Every folder's worktrees on the Mac and how much each holds on disk (#790), as the
 /// window's Activity ▸ Worktrees: idle ones first, largest first, sizes filling in as the
 /// Mac measures them. Remove Build Output and Remove… on an idle worktree the app made,
-/// in its swipe and its long press; Clean Up Worktrees per project.
+/// in its swipe and its long press; Clean Up Worktrees per folder.
 struct WorktreesListView: View {
     @Environment(RemoteModel.self) private var model
     /// What the last Remove Build Output freed, said at the top until the next.
     @State private var freed: String?
 
-    private var groups: [DaemonAPI.ProjectWorktrees] { model.work.worktreesForCleanup() }
+    private var groups: [DaemonAPI.FolderWorktrees] { model.work.worktreesForCleanup() }
 
     var body: some View {
         List {
@@ -25,15 +25,15 @@ struct WorktreesListView: View {
             ForEach(groups) { group in
                 Section {
                     ForEach(group.worktrees) { worktree in
-                        WorktreeListRow(worktree: worktree, project: group.project, freed: $freed)
+                        WorktreeListRow(worktree: worktree, folder: group.folder, freed: $freed)
                     }
                     .paperListRow()
                 } header: {
                     HStack {
-                        Text(model.work.project(ProjectKey(folder: group.project))?.name
-                             ?? group.project.lastPathComponent)
+                        Text(model.work.folder(FolderKey(folder: group.folder))?.name
+                             ?? group.folder.lastPathComponent)
                         Spacer()
-                        Button("Clean Up") { model.offerCleanUp(in: group.project) }
+                        Button("Clean Up") { model.offerCleanUp(in: group.folder) }
                             .appText(.fine)
                             .accessibilityLabel("Clean up worktrees")
                             .accessibilityHint("A new session here, offered the words to remove what has been merged")
@@ -54,7 +54,7 @@ struct WorktreesListView: View {
 private struct WorktreeListRow: View {
     @Environment(RemoteModel.self) private var model
     let worktree: DaemonAPI.WorktreeSummary
-    let project: URL
+    let folder: URL
     @Binding var freed: String?
 
     @State private var asking: DaemonAPI.RemovalCheck?
@@ -97,7 +97,7 @@ private struct WorktreeListRow: View {
         .alert(alertTitle, isPresented: isAsking, presenting: asking) { check in
             if check.blockedBy.isEmpty {
                 Button("Remove", role: .destructive) {
-                    Task { await model.removeWorktree(worktree.root, in: project, confirmed: true) }
+                    Task { await model.removeWorktree(worktree.root, in: folder, confirmed: true) }
                 }
             }
             Button(check.blockedBy.isEmpty ? "Keep It" : "OK", role: .cancel) {}
@@ -107,7 +107,7 @@ private struct WorktreeListRow: View {
     }
 
     private func removeBuildOutput() async {
-        if let words = await model.removeBuildOutput(worktree.root, in: project) {
+        if let words = await model.removeBuildOutput(worktree.root, in: folder) {
             freed = "\(worktree.name): \(words)"
         }
     }
@@ -115,9 +115,9 @@ private struct WorktreeListRow: View {
     /// Asked first, always; removed straight away only when nothing would be lost and
     /// nobody is in it, as the window does.
     private func remove() async {
-        guard let check = await model.checkWorktreeRemoval(worktree.root, in: project) else { return }
+        guard let check = await model.checkWorktreeRemoval(worktree.root, in: folder) else { return }
         if check.blockedBy.isEmpty && !check.losesWork {
-            await model.removeWorktree(worktree.root, in: project, confirmed: false)
+            await model.removeWorktree(worktree.root, in: folder, confirmed: false)
         } else {
             asking = check
         }

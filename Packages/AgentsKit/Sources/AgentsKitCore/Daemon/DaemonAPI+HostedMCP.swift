@@ -29,8 +29,8 @@ extension DaemonAPI {
     public struct HostedMCPStatus: Codable, Sendable, Hashable, Identifiable {
         /// The server's name in `mcp.json`.
         public var name: String
-        /// The project folder whose `.agents/mcp.json` names it, or nil for the person's own.
-        public var project: String?
+        /// The folder whose `.agents/mcp.json` names it, or nil for the person's own.
+        public var folder: String?
         public var state: HostedMCPState
         /// Running since, while it runs.
         public var since: Date?
@@ -44,11 +44,11 @@ extension DaemonAPI {
         /// Sessions and event subscriptions using it now.
         public var users: Int
 
-        public var id: String { (project ?? "~") + "|" + name }
+        public var id: String { (folder ?? "~") + "|" + name }
 
-        public init(name: String, project: String?, state: HostedMCPState, since: Date? = nil,
+        public init(name: String, folder: String?, state: HostedMCPState, since: Date? = nil,
                     retryAt: Date? = nil, lastError: String? = nil, restarts: Int = 0, users: Int = 0) {
-            self.name = name; self.project = project; self.state = state; self.since = since
+            self.name = name; self.folder = folder; self.state = state; self.since = since
             self.retryAt = retryAt; self.lastError = lastError; self.restarts = restarts; self.users = users
         }
     }

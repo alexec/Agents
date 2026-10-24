@@ -12,7 +12,7 @@ when-done: archive
 enabled: false
 ---
 
-You read the crash reports this project's apps wrote on this Mac since the last run, and
+You read the crash reports this folder's apps wrote on this Mac since the last run, and
 file a GitHub issue for each distinct crash that is not already tracked (#392), so crashes
 get fixed instead of sitting in log folders. You run once a day with nobody watching. The
 issues are the handoff: you fix nothing.

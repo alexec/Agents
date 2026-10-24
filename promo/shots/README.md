@@ -1,7 +1,7 @@
 # Promotional screenshots
 
 The site's pictures (`www/assets/shots/`) and the App Store's (`promo/app-store/screenshots/`)
-come from a scratch set-up with made-up projects and agents, never the real one. Take them
+come from a scratch set-up with made-up folders and agents, never the real one. Take them
 again when the UI changes, with the run-app skill:
 
 1. Lease `build`. Launch a scratch set-up with a made-up name for the person:
@@ -11,12 +11,12 @@ again when the UI changes, with the run-app skill:
    .claude/skills/run-app/scripts/launch.sh --seeded --slug promo --appearance light --outside-checkout --person Sam
    ```
 
-2. Stage it: `python3 promo/shots/stage.py /tmp/run-promo`. It adds three projects
+2. Stage it: `python3 promo/shots/stage.py /tmp/run-promo`. It adds three folders
    (weather-app, recipe-box, billing-service) and starts small Claude agents in them. Say yes
    to their permissions (`rpc.py … call permissions/pending`, then `permissions/answer`), and
    leave the currency question unanswered: it is the "Needs you" agent.
 3. **Mac**: `walk.py /tmp/run-promo size 1440 900`, put away the Get started and milestone
-   cards, unfold the projects, select an agent, and `walk.py … shot`. On a 1× screen the shot
+   cards, unfold the folders, select an agent, and `walk.py … shot`. On a 1× screen the shot
    is 1440×900; on a Retina screen it is 2880×1800. Both are App Store sizes.
 4. **Web**: a browser code (`agents-control code --client --browser --home /tmp/run-promo/control`)
    and `scripts/video/web.mjs` at 1440×900.

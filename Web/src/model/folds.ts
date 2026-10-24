@@ -1,9 +1,9 @@
-// Which projects in the sidebar are unfolded (#151) and which of its smart groups (#495) are
-// open, and which projects' Workflows folds (#885) and Sessions folds (#2312) are open, kept across
-// visits in localStorage, as the window keeps them in defaults (SidebarFolds.swift). A project's
+// Which folders in the sidebar are unfolded (#151) and which of its smart groups (#495) are
+// open, and which folders' Workflows folds (#885) and Sessions folds (#2312) are open, kept across
+// visits in localStorage, as the window keeps them in defaults (SidebarFolds.swift). A folder's
 // fold is named by host and folder, so the same folder on two hosts folds apart; its Workflows fold
 // the same, after `workflows:`, and its Sessions fold after `sessions:`; a smart group's by its
-// name. Archived projects (#343), Status (#915), Usage and whether sessions go under a Sessions
+// name. Archived folders (#343), Status (#915), Usage and whether sessions go under a Sessions
 // row (#2312) are the person's, kept on their Mac with the other display choices (#1033).
 import { computed, signal } from "@preact/signals";
 import { boolPreference, preferenceKeys, setPreferences } from "./preferences";
@@ -46,14 +46,14 @@ export class Folds {
     this.openSessions = signal([...read(storage, sessionsKey)]);
   }
 
-  // Archived projects, Status and Usage are the person's display choices, kept on their Mac
-  // (#1033) as the window's showsArchivedProjects, showsActivity and showsUsage.
-  readonly showsArchivedProjects = computed(() => boolPreference(preferenceKeys.showsArchivedProjects) ?? false);
+  // Archived folders, Status and Usage are the person's display choices, kept on their Mac
+  // (#1033) as the window's showsArchivedFolders, showsActivity and showsUsage.
+  readonly showsArchivedFolders = computed(() => boolPreference(preferenceKeys.showsArchivedFolders) ?? false);
   readonly showsStatus = computed(() => boolPreference(preferenceKeys.showsActivity) ?? true);
   readonly showsUsage = computed(() => boolPreference(preferenceKeys.showsUsage) ?? true);
-  setShowsArchivedProjects(isOpen: boolean): void {
-    if (this.showsArchivedProjects.peek() === isOpen) return;
-    setPreferences({ [preferenceKeys.showsArchivedProjects]: isOpen });
+  setShowsArchivedFolders(isOpen: boolean): void {
+    if (this.showsArchivedFolders.peek() === isOpen) return;
+    setPreferences({ [preferenceKeys.showsArchivedFolders]: isOpen });
   }
 
   setShowsStatus(isOpen: boolean): void {
@@ -74,7 +74,7 @@ export class Folds {
     this.change(this.open, storageKey, foldName(host, folder), isOpen);
   }
 
-  /** Whether a project's Workflows fold is open (#885): folded until opened. */
+  /** Whether a folder's Workflows fold is open (#885): folded until opened. */
   isWorkflowsOpen(host: string, folder: string): boolean {
     return this.open.value.has(`workflows:${foldName(host, folder)}`);
   }
@@ -83,7 +83,7 @@ export class Folds {
     this.change(this.open, storageKey, `workflows:${foldName(host, folder)}`, isOpen);
   }
 
-  /** Whether a project's Sessions fold is open (#2312): open until folded. */
+  /** Whether a folder's Sessions fold is open (#2312): open until folded. */
   isSessionsOpen(host: string, folder: string): boolean {
     return !this.closed.value.has(`sessions:${foldName(host, folder)}`);
   }

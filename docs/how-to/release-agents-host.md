@@ -6,7 +6,7 @@ description: Publish Agents Host on GitHub and the app on TestFlight by tagging 
 
 # Release Agents Host
 
-Agents Host is downloaded from the project's GitHub releases, outside the App Store. That
+Agents Host is downloaded from the folder's GitHub releases, outside the App Store. That
 is the page the Agents window's **Get Agents Host…** opens. Pushing a version tag on main
 publishes a release. The tag starts the `release` workflow, which:
 

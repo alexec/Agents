@@ -1,7 +1,7 @@
 import AgentsKitCore
 import Foundation
 
-/// What was half-typed into New session, per project, until it becomes an agent (029),
+/// What was half-typed into New session, per folder, until it becomes an agent (029),
 /// and into each conversation until it is sent (033).
 ///
 /// The rules — what is kept, for how long, a picture too big to keep — are
@@ -19,12 +19,12 @@ final class StartDraftKeeper {
     private var waiting: [DraftKey: Draft] = [:]
     private var pause: Task<Void, Never>?
 
-    func draft(in project: URL) -> Draft? { draft(for: .newAgent(folder: project)) }
-    func note(_ text: String, _ attachments: [Attachment], in project: URL) {
-        note(text, attachments, for: .newAgent(folder: project))
+    func draft(in folder: URL) -> Draft? { draft(for: .newAgent(folder: folder)) }
+    func note(_ text: String, _ attachments: [Attachment], in folder: URL) {
+        note(text, attachments, for: .newAgent(folder: folder))
     }
     /// It became an agent, and a draft exists only until it does.
-    func clear(in project: URL) { clear(.newAgent(folder: project)) }
+    func clear(in folder: URL) { clear(.newAgent(folder: folder)) }
 
     // MARK: Any conversation's (033)
 

@@ -7,7 +7,7 @@ description: Set your organisation's policy in Console ▸ Policy, read it on ev
 # Set an organisation policy
 
 The organisation's policy (#998) is one document of rules on your control plane. Every
-machine follows it as a ceiling above each person's and each project's own settings. A
+machine follows it as a ceiling above each person's and each folder's own settings. A
 person can choose the same or less, never more. See
 [Organisation policy](../explanation/organisation-policy.md) for why, and
 [Policy](../reference/policy.md) for each field.
@@ -40,8 +40,8 @@ A control plane with no policy works as before. Nothing is capped until an admin
      A day is a UTC day. A runtime that reports tokens and no cost (for example, one on a
      subscription) counts against the token budget. A runtime that reports neither (Cursor,
      Antigravity, Grok) is refused while a budget is set, unless you allow it by name.
-   - **Helper Sessions in a Project**: the most helper sessions running, and not archived,
-     in one project.
+   - **Helper Sessions in a Folder**: the most helper sessions running, and not archived,
+     in one folder.
    - **Variables Passed to Runtimes**: turn on **Allow only the variables named**, and type
      the variable names that a person's own pass-through list can name, with `*` at the end.
    - **Machines**: **Refuse agents on machines that do not follow the policy**.
@@ -97,7 +97,7 @@ the rule. On the iPhone, the iPad and the web page, the rule is on the line.
   dimmed, and the machine does not pass it.
 - **Cost**: Settings ▸ Cost on the Mac, and Spending on the other clients, show the
   organisation's budget under your own limits. The lower number applies.
-- **Project Settings** on the Mac: a helper limit above the organisation's cap says so.
+- **Folder Settings** on the Mac: a helper limit above the organisation's cap says so.
 - **Connectors** on the Mac: a marketplace that is not allowed is not listed.
   **Add by Hand** does not add a server when servers added by hand are not allowed.
 

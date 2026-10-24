@@ -5,7 +5,7 @@ import Foundation
 ///
 /// Only the kinds that do not clear by themselves. A cooldown, the day's limit, the app
 /// closed, a run in flight or queued sort themselves out; waiting for an OK is listed as
-/// an approval (#773). A row orange on its project's page was easy to miss: a workflow
+/// an approval (#773). A row orange on its folder's page was easy to miss: a workflow
 /// runs with nobody watching, so its failure has to reach the person where they look.
 public struct WorkflowFailure: Hashable, Sendable {
     /// Which failure this is: the run or the refusal. Dismiss keeps it on the workflow's
@@ -75,8 +75,8 @@ extension WorkflowSummary {
     }
 }
 
-extension DaemonAPI.ProjectSummary {
-    /// Whether a workflow here has stopped working (#989): the project's row says "Needs
+extension DaemonAPI.FolderSummary {
+    /// Whether a workflow here has stopped working (#989): the folder's row says "Needs
     /// you" for it, as for a session waiting.
     public var hasFailedWorkflow: Bool {
         approvals?.contains { $0.kind == .workflowFailed } == true

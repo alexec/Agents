@@ -27,7 +27,7 @@ ControlHost full
 ControlHost zero
 {"id":"","name":"","platform":"","version":"","state":"","reach":""}
 ControlStatus full
-{"name":"NAME","version":"VERSION","homeHost":"HOMEHOST","machineID":"MACHINEID","startedAt":813922215.25,"port":7,"awayFromHome":true,"you":"YOU","relayKey":"AQID","web":{"port":7,"served":true,"reason":"REASON","detail":"DETAIL"},"thisMacHost":{"member":true,"connected":true,"problem":"PROBLEM","at":813922215.25},"projectDetection":{"enabled":true,"paths":["PATHS"]},"unjoinedTunnels":[{"name":"NAME","host":"HOST","tunnel":{"up":true,"problem":"PROBLEM"}}]}
+{"name":"NAME","version":"VERSION","homeHost":"HOMEHOST","machineID":"MACHINEID","startedAt":813922215.25,"port":7,"awayFromHome":true,"you":"YOU","relayKey":"AQID","web":{"port":7,"served":true,"reason":"REASON","detail":"DETAIL"},"thisMacHost":{"member":true,"connected":true,"problem":"PROBLEM","at":813922215.25},"folderDetection":{"enabled":true,"paths":["PATHS"]},"unjoinedTunnels":[{"name":"NAME","host":"HOST","tunnel":{"up":true,"problem":"PROBLEM"}}]}
 ControlStatus zero
 {"name":"","version":"","machineID":""}
 GitAsk full
@@ -76,9 +76,9 @@ LendSignIn zero
 {"host":"","from":"","runtime":"","allowed":false}
 PresenceReport full
 {"watching":"WATCHING","active":true,"mayNotify":true}
-ProjectDetection full
+FolderDetection full
 {"enabled":true,"paths":["PATHS"]}
-ProjectDetection zero
+FolderDetection zero
 {"enabled":false,"paths":null}
 TunnelOpen full
 {"runtime":"RUNTIME","ref":"REF"}

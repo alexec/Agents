@@ -16,10 +16,10 @@ func TestOutcomesGoIntoTheHours(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
 	d.SettingsDir = t.TempDir()
-	project := filepath.Join(t.TempDir(), "shop")
+	folder := filepath.Join(t.TempDir(), "shop")
 	branch := "agents/fix-1"
 	created := time.Now().Add(-2 * time.Hour)
-	a := seeded(t, d, project, func(a *wire.Agent) {
+	a := seeded(t, d, folder, func(a *wire.Agent) {
 		a.Worktree = &wire.AgentWorktree{Name: "fix-1", Branch: &branch}
 		a.CreatedAt = wire.DateOf(created)
 	})
@@ -28,7 +28,7 @@ func TestOutcomesGoIntoTheHours(t *testing.T) {
 	pr := func(name, title, branch, stamp string) {
 		payload, _ := json.Marshal(map[string]any{"pr": map[string]any{"number": 1, "title": title, "branch": branch, "url": "u"},
 			stamp: time.Now().UTC().Format(time.RFC3339)})
-		d.raise(wire.EventDraft{Name: name, At: now(), Scope: projectScope(project), Sentence: "github reported " + name,
+		d.raise(wire.EventDraft{Name: name, At: now(), Scope: folderScope(folder), Sentence: "github reported " + name,
 			Details: map[string]string{"server": "github", "payload": string(payload), "mcp_event_id": name + title + branch}})
 	}
 	pr("pr.opened", "Fix it", branch, "openedAt")
@@ -50,7 +50,7 @@ func TestOutcomesGoIntoTheHours(t *testing.T) {
 		for _, h := range sent[len(sent)-1].Hours {
 			for _, row := range h.Rows {
 				if row.Counts != nil {
-					if row.Project != "shop" || row.Runtime != "claude" {
+					if row.Folder != "shop" || row.Runtime != "claude" {
 						t.Fatalf("%+v", row)
 					}
 					addCounts(&c, *row.Counts)
@@ -72,7 +72,7 @@ func TestOutcomesGoIntoTheHours(t *testing.T) {
 	}
 
 	// Counted once: a later send counts only what is new.
-	b := seeded(t, d, project, nil)
+	b := seeded(t, d, folder, nil)
 	d.raiseAgentEvent("agent.started", b.ID, "started working.", nil)
 	d.sendReport()
 	if c := total(); c.Sessions != 2 || c.PrsMerged != 2 {
@@ -86,11 +86,11 @@ func TestWorkflowRunsAndFailuresGoIntoTheHours(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
 	d.SettingsDir = t.TempDir()
-	project := filepath.Join(t.TempDir(), "shop")
+	folder := filepath.Join(t.TempDir(), "shop")
 	nightly := "nightly"
-	run := seeded(t, d, project, func(a *wire.Agent) { a.StartedByWorkflow = &nightly })
-	mine := seeded(t, d, project, nil)
-	d.raise(wire.EventDraft{Name: "workflow.ran", At: now(), Scope: projectScope(project), Sentence: "Workflow nightly started it.",
+	run := seeded(t, d, folder, func(a *wire.Agent) { a.StartedByWorkflow = &nightly })
+	mine := seeded(t, d, folder, nil)
+	d.raise(wire.EventDraft{Name: "workflow.ran", At: now(), Scope: folderScope(folder), Sentence: "Workflow nightly started it.",
 		Details: map[string]string{"workflow": nightly, "agent": string(run.ID)}})
 	d.raiseAgentEvent("agent.failed", run.ID, "ended in an error.", map[string]string{"reason": "runtime_error"})
 	d.raiseAgentEvent("agent.failed", mine.ID, "ended in an error.", map[string]string{"reason": "runtime_error"})

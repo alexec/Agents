@@ -19,7 +19,7 @@ running, and reads the meter that says how full its context is.
 
 **For a new agent**
 
-1. Unfold the project in the sidebar and click **New session**, the first row under it (or press ⌘N).
+1. Unfold the folder in the sidebar and click **New session**, the first row under it (or press ⌘N).
 2. Click the runtime above the prompt, on the right, and choose one. A runtime that cannot
    be used says why under its name, such as **Needs signing in**.
 3. Under the prompt, the runtime's own choices appear as capsules. Their names and values
@@ -35,7 +35,7 @@ running, and reads the meter that says how full its context is.
    to be asked before an action that needs permission, or **Always-approve** to answer every
    permission request for that runtime. Questions that are not permission still wait. This
    is one Mac-wide value for every agent on that runtime, including workflow agents and
-   agents in server projects. It follows the Mac across the Remote and web page. Cursor's
+   agents in server folders. It follows the Mac across the Remote and web page. Cursor's
    **Agent**, **Plan** and **Ask**, and OpenCode's own modes, stay separate.
 
    Beside the mode is the command sandbox, such as **Sandbox: runtime controlled** or
@@ -77,7 +77,7 @@ A workflow sets the same choices in its file, with `runtime:`, `model:`, `effort
 ## If it doesn't work
 
 - **The runtime I want is not in the menu.** It is not installed on this Mac, or on the
-  server the project is on. See [Runtimes](../reference/runtimes.md).
+  server the folder is on. See [Runtimes](../reference/runtimes.md).
 - **There is no ring.** The runtime does not say how big its context is.
 - **"Claude's sandbox could not start" (or another runtime's) over a new agent's prompt.** The runtime
   cannot set up its sandbox on this computer or server. The prompt stays in the box;

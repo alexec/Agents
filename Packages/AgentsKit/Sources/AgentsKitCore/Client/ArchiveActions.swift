@@ -5,10 +5,10 @@ import Foundation
 /// different effects in the window and on the Remote.
 @MainActor
 public enum ArchiveActions {
-    /// The approval that keeps an archived session and the project that owns it.
+    /// The approval that keeps an archived session and the folder that owns it.
     public struct Denial {
         public let approval: Approval
-        public let project: ProjectKey
+        public let folder: FolderKey
     }
 
     /// A page of archived sessions, stamped with the host that returned it.
@@ -22,7 +22,7 @@ public enum ArchiveActions {
         Denial(
             approval: Approval(kind: .archive, key: agent.id.uuidString, title: agent.title ?? "", digest: nil,
                                line: "", actions: [.deny], agentID: agent.id),
-            project: ProjectKey(host: agent.host, folder: agent.projectFolder))
+            folder: FolderKey(host: agent.host, folder: agent.folderPath))
     }
 
     /// Fetch one page for archived-session search. A cancelled search must not replace

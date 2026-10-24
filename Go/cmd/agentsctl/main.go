@@ -172,8 +172,8 @@ func lend(ctx context.Context, s *controllink.Session, host, from, runtime strin
 
 func turn(ctx context.Context, s *controllink.Session, host, rt, cwd, prompt string, allow bool, wait time.Duration, from string) {
 	folder := "file://" + strings.TrimSuffix(cwd, "/") + "/"
-	if _, err := s.Call(ctx, host, "projects/add", map[string]any{"folder": folder}); err != nil {
-		fmt.Fprintf(os.Stderr, "projects/add: %v\n", err)
+	if _, err := s.Call(ctx, host, "folders/add", map[string]any{"folder": folder}); err != nil {
+		fmt.Fprintf(os.Stderr, "folders/add: %v\n", err)
 	}
 	start := map[string]any{"runtimeID": rt, "cwd": folder, "prompt": prompt, "attachments": []any{},
 		"startOptions": map[string]any{"values": map[string]any{}, "extraArguments": []any{}}}

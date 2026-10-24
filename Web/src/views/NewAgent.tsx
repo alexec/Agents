@@ -1,8 +1,8 @@
-// A new session (071 FR-026): the project's empty pane is the new chat, as in the window (066):
-// the project's name and folder in the middle, and the prompt bar at the foot (#108). Over the
-// input, where it works (the project folder, a new worktree, or one already there), what else it
+// A new session (071 FR-026): the folder's empty pane is the new chat, as in the window (066):
+// the folder's name and folder in the middle, and the prompt bar at the foot (#108). Over the
+// input, where it works (the folder, a new worktree, or one already there), what else it
 // may reach and its labels on the left, and the runtime on the right; under it, the runtime's own
-// menus. Started on the project's host with `agents/start`. A runtime is started behind the bar
+// menus. Started on the folder's host with `agents/start`. A runtime is started behind the bar
 // so its choices are real ones (`agents/options`); a bar answered from memory is put right by
 // `agents/draftOptions`.
 //
@@ -37,13 +37,13 @@ import { OfflineStrip } from "./OfflineStrip";
 import { DiskStrip } from "./DiskStrip";
 import { PromptMenus } from "./PromptMenus";
 import { BackToList } from "./BackToList";
-import { orderedProjects, projectLabel } from "./Sidebar";
+import { orderedFolders, folderLabel } from "./Sidebar";
 import { GuardedChangeCards } from "./GuardedChange";
 import { KeptBubbles } from "./Kept";
 import { composerReason, line, setBy as setByWords } from "../model/orgPolicy";
 import { optionLabel } from "./OrgPolicyLine";
 
-type Where = { kind: "project" } | { kind: "new" } | { kind: "existing"; root: string } | { kind: "branch"; name: string }
+type Where = { kind: "folder" } | { kind: "new" } | { kind: "existing"; root: string } | { kind: "branch"; name: string }
   | { kind: "named"; name: string };
 
 const storage = typeof localStorage === "undefined" ? undefined : localStorage;
@@ -57,8 +57,8 @@ interface Form {
   state: "loading" | "ready" | { failed: string };
 }
 
-export function NewAgent({ store, host, folder, projectName, down }: {
-  store: Store; host: string; folder: string; projectName: string; down: boolean;
+export function NewAgent({ store, host, folder, folderName, down }: {
+  store: Store; host: string; folder: string; folderName: string; down: boolean;
 }) {
   const listed = store.runtimes.value[host] ?? [];
   const runs = runtimeRuns(listed);
@@ -83,7 +83,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   const chosenRuntime = formRuntime(openedRuntime.current.runtimeID, picked, startable, lastUsedRuntime, left.runtimeID);
   /** The added account the session uses (#840); undefined for the runtime's own sign-in. */
   const accountID = useSignal<string | undefined>(undefined);
-  const where = useSignal<Where>({ kind: "project" });
+  const where = useSignal<Where>({ kind: "folder" });
   const worktrees = useSignal<WorktreeSummary[]>([]);
   const branches = useSignal<BranchSummary[]>([]);
   const canMakeNew = useSignal(false);
@@ -101,16 +101,16 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   const keptShown = useRef(new Set<string>());
   /** Asked again by Try again. */
   const asking = useSignal(0);
-  /** The project's personas (#760), the one picked by id, and one picked before its runtime's menus came. */
+  /** The folder's personas (#760), the one picked by id, and one picked before its runtime's menus came. */
   const personas = useSignal<Persona[]>([]);
   const persona = useSignal<string | undefined>(undefined);
   const pendingPersona = useRef<Persona | undefined>(undefined);
-  /** The project the personas came for, when they came: asked again once the host answers if not (#1096). */
+  /** The folder the personas came for, when they came: asked again once the host answers if not (#1096). */
   const personasFor = useRef("");
   /** A new worktree a view named (#834), or a branch it named (#837), made the place once the folder is
    *  known to be a repository. */
   const offeredWorktree = useRef<Where | undefined>(undefined);
-  /** The project whose worktrees are listed, so an offer knows whether it can be placed now. */
+  /** The folder whose worktrees are listed, so an offer knows whether it can be placed now. */
   const listedFor = useRef("");
   /** Counts the offers taken: the prompt field opens afresh on each, with the view's words. */
   const filled = useSignal(0);
@@ -126,7 +126,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   useEffect(() => {
     // What each runtime takes changes once it has run: asked again as the form opens.
     void store.loadRuntimes(host);
-    where.value = { kind: "project" };
+    where.value = { kind: "folder" };
     folders.value = keptForm(storage).folders;
     labels.value = [];
     offeredWorktree.current = undefined;
@@ -138,7 +138,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
     personasFor.current = "";
     askPersonas();
     void store.worktrees(host, folder).then((list) => {
-      worktrees.value = (list?.worktrees ?? []).filter((w) => !w.isProjectFolder);
+      worktrees.value = (list?.worktrees ?? []).filter((w) => !w.isFolder);
       branches.value = list?.branches ?? [];
       canMakeNew.value = list?.canMakeNew ?? false;
       whyNot.value = list?.whyNot;
@@ -155,7 +155,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
     keepForm(storage, next);
   };
 
-  // The project's personas. One the host did not answer stays to be asked again, rather than
+  // The folder's personas. One the host did not answer stays to be asked again, rather than
   // leaving the page with no Persona row until it is opened again (#1096).
   function askPersonas() {
     const key = `${host}|${folderKey(folder)}`;
@@ -332,16 +332,16 @@ export function NewAgent({ store, host, folder, projectName, down }: {
     // The runtime behind the form is the agent's now.
     const { draftID: _taken, ...rest } = form.value;
     form.value = rest;
-    go({ host, project: folder, session: id });
+    go({ host, folder: folder, session: id });
     return true;
   };
 
-  // Starts kept for this project's stopped workspace; the one that reaches it opens (#691 US3).
+  // Starts kept for this folder's stopped workspace; the one that reaches it opens (#691 US3).
   const keptStarts = store.keptStarts(host, folder);
   const delivered = store.keptDelivered.value;
   useEffect(() => {
     if (delivered?.agentID && delivered.host === host && keptShown.current.has(delivered.id)) {
-      go({ host, project: folder, session: delivered.agentID });
+      go({ host, folder: folder, session: delivered.agentID });
     }
   }, [delivered]);
   useEffect(() => { for (const k of keptStarts) keptShown.current.add(k.id); }, [keptStarts]);
@@ -394,7 +394,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
       {!down && <DiskStrip store={store} host={host} />}
       <div class="scroll new-heading">
         <Huddle focused={promptFocused.value} typed={typed.value} />
-        <ProjectSwitch store={store} host={host} folder={folder} projectName={projectName} down={down} />
+        <FolderSwitch store={store} host={host} folder={folder} folderName={folderName} down={down} />
         {personas.value.length > 0 && (
           <div class="persona-choice">
             {usablePersonas.length > 0 && (
@@ -411,7 +411,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
         onFocusIn={(e) => { if (isPrompt(e.target)) { promptFocused.value = true; typed.value = e.target.value.length; } }}
         onFocusOut={(e) => { if (isPrompt(e.target)) promptFocused.value = false; }}
         onInput={(e) => { if (isPrompt(e.target)) typed.value = e.target.value.length; }}>
-        {/* A change to the project's own files that no session can be asked about (#531). */}
+        {/* A change to the folder's own files that no session can be asked about (#531). */}
         <GuardedChangeCards store={store} host={host} where={{ folder }} down={down || !store.hostIsOnline(host)} />
         <Prompt key={filled.value} store={store} draftKey={draftKey} placeholder={refusedHere ?? "What should it do?"}
           capabilities={capabilities} disabled={down || !chosenRuntime || refusedHere !== null
@@ -425,11 +425,11 @@ export function NewAgent({ store, host, folder, projectName, down }: {
                   <select aria-label="Works in" disabled={down} value={whereValue(where.value)}
                     onChange={(e) => {
                       const v = (e.currentTarget as HTMLSelectElement).value;
-                      where.value = v === "project" ? { kind: "project" } : v === "new" ? { kind: "new" }
+                      where.value = v === "folder" ? { kind: "folder" } : v === "new" ? { kind: "new" }
                         : v.startsWith("named:") ? { kind: "named", name: v.slice(6) }
                         : v.startsWith("branch:") ? { kind: "branch", name: v.slice(7) } : { kind: "existing", root: v.slice(9) };
                     }}>
-                    <option value="project">Project folder</option>
+                    <option value="folder">Folder</option>
                     {/* Shown when it can't be made, with why, as the window's (#257). */}
                     <option value="new" disabled={!canMakeNew.value}>
                       New worktree — {canMakeNew.value ? "A new branch from the last commit here" : whyNot.value ?? "Can't be made here"}</option>
@@ -554,7 +554,7 @@ function isPrompt(target: EventTarget | null): target is HTMLTextAreaElement {
 
 /** What the Works in chip says: the window's words for the place. */
 function whereTitle(where: Where, worktrees: WorktreeSummary[]): string {
-  if (where.kind === "project") return "Project folder";
+  if (where.kind === "folder") return "Folder";
   if (where.kind === "new") return "New worktree";
   if (where.kind === "branch" || where.kind === "named") return where.name;
   return worktrees.find((w) => w.root === where.root)?.name ?? "Worktree";
@@ -609,28 +609,28 @@ function SandboxPill({ runtimeID, name, override, runtimeDefault, codexMode, dis
   );
 }
 
-/** A view's agents/start-agent (#834): this form, in the view's project, filled in. Why it was
+/** A view's agents/start-agent (#834): this form, in the view's folder, filled in. Why it was
  *  not, or null. Nothing starts: the form waits for the person's Start. */
 export function offerStart(store: Store, host: string, folder: string, start: Start): string | null {
-  const project = (store.projects.value[host] ?? []).find((p) => folderKey(p.project.folder) === folderKey(folder));
-  if (!project) return `${decodeURIComponent(folderKey(folder).split("/").pop() ?? folder)} is not a project here.`;
-  store.offeredStart.value = { host, folder: project.project.folder, start };
-  go({ host, project: project.project.folder, compose: true });
+  const summary = (store.folders.value[host] ?? []).find((p) => folderKey(p.folder.folder) === folderKey(folder));
+  if (!summary) return `${decodeURIComponent(folderKey(folder).split("/").pop() ?? folder)} is not a folder here.`;
+  store.offeredStart.value = { host, folder: summary.folder.folder, start };
+  go({ host, folder: summary.folder.folder, compose: true });
   return null;
 }
 
 /**
- * The project's name, a menu of every project to start in another instead (#495, #499): the
- * sidebar has one New Session, at its top, in the project last started in.
+ * The folder's name, a menu of every folder to start in another instead (#495, #499): the
+ * sidebar has one New Session, at its top, in the folder last started in.
  */
-/** The kind of session to start (#760), the same control as the project's name, a size smaller,
+/** The kind of session to start (#760), the same control as the folder's name, a size smaller,
     on its own line under it (#913). */
 function PersonaSwitch({ personas, picked, down, choose }: {
   personas: Persona[]; picked: string | undefined; down: boolean; choose: (id: string) => void;
 }) {
   const name = personas.find((p) => p.id === picked)?.name;
   return (
-    <h2 class={`project-switch persona-switch${name ? "" : " none"}`} title="Start a kind of session: a persona sets what it names">
+    <h2 class={`folder-switch persona-switch${name ? "" : " none"}`} title="Start a kind of session: a persona sets what it names">
       <span aria-hidden="true">{name ?? "No persona"} <span class="caret">▾</span></span>
       <select aria-label="Persona" disabled={down} value={picked ?? ""}
         onChange={(e) => choose((e.currentTarget as HTMLSelectElement).value)}>
@@ -641,21 +641,21 @@ function PersonaSwitch({ personas, picked, down, choose }: {
   );
 }
 
-function ProjectSwitch({ store, host, folder, projectName, down }: {
-  store: Store; host: string; folder: string; projectName: string; down: boolean;
+function FolderSwitch({ store, host, folder, folderName, down }: {
+  store: Store; host: string; folder: string; folderName: string; down: boolean;
 }) {
-  const projects = orderedProjects(store.hosts.value, store.projects.value, store.macHostID.value);
-  const at = projects.findIndex((p) => p.host.id === host && folderKey(p.project.project.folder) === folderKey(folder));
-  if (projects.length < 2 || at < 0) return <h1>{projectName}</h1>;
+  const folders = orderedFolders(store.hosts.value, store.folders.value, store.macHostID.value);
+  const at = folders.findIndex((p) => p.host.id === host && folderKey(p.folder.folder.folder) === folderKey(folder));
+  if (folders.length < 2 || at < 0) return <h1>{folderName}</h1>;
   return (
-    <h1 class="project-switch" title="Start it in another project">
-      <span aria-hidden="true">{projectLabel(projects[at]!.host, projects[at]!.project, store.macHostID.value)} <span class="caret">▾</span></span>
-      <select aria-label="Project" disabled={down} value={String(at)}
+    <h1 class="folder-switch" title="Start it in another folder">
+      <span aria-hidden="true">{folderLabel(folders[at]!.host, folders[at]!.folder, store.macHostID.value)} <span class="caret">▾</span></span>
+      <select aria-label="Folder" disabled={down} value={String(at)}
         onChange={(e) => {
-          const picked = projects[Number((e.currentTarget as HTMLSelectElement).value)];
-          if (picked) go({ host: picked.host.id, project: picked.project.project.folder, compose: true });
+          const picked = folders[Number((e.currentTarget as HTMLSelectElement).value)];
+          if (picked) go({ host: picked.host.id, folder: picked.folder.folder.folder, compose: true });
         }}>
-        {projects.map(({ host: h, project: p }, i) => <option key={`${h.id}|${p.project.folder}`} value={String(i)}>{projectLabel(h, p, store.macHostID.value)}</option>)}
+        {folders.map(({ host: h, folder: p }, i) => <option key={`${h.id}|${p.folder.folder}`} value={String(i)}>{folderLabel(h, p, store.macHostID.value)}</option>)}
       </select>
     </h1>
   );

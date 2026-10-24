@@ -415,11 +415,11 @@ type AgentWorktree struct {
 
 	Branch *string `json:"branch,omitzero"`
 
-	Project URL `json:"project"`
-
 	Base *string `json:"base,omitzero"`
 
 	MadeByApp bool `json:"madeByApp"`
+
+	Folder URL `json:"folder"`
 }
 
 // What agents/export made (#1001): a .tar.gz in the backup format, read in parts with agents/exportRead. `name` is a file name to save it as.
@@ -431,14 +431,14 @@ type AgentsExport struct {
 	Name string `json:"name"`
 }
 
-// agents/export (#1001): one agent (`agentID`) or every agent of one project (`folder`). Give one of the two.
+// agents/export (#1001): one agent (`agentID`) or every agent of one folder (`folder`). Give one of the two.
 type AgentsExportRequest struct {
 	AgentID *UUID `json:"agentID,omitzero"`
 
 	Folder *URL `json:"folder,omitzero"`
 }
 
-// What agents/import takes (#1001): the export sent with agents/importUpload. Its agents come back archived, as a restore brings them; one this machine has, or deleted, is skipped. With `folder`, a project on this machine (the one whose menu was used, #2389), every agent comes back in that project; without it, each in the folder it had where it was exported.
+// What agents/import takes (#1001): the export sent with agents/importUpload. Its agents come back archived, as a restore brings them; one this machine has, or deleted, is skipped. With `folder`, a folder on this machine (the one whose menu was used, #2389), every agent comes back in that folder; without it, each in the folder it had where it was exported.
 type AgentsImportRequest struct {
 	Upload UUID `json:"upload"`
 
@@ -1191,7 +1191,7 @@ type BranchSummary struct {
 	Remote *string `json:"remote,omitzero"`
 }
 
-// What projects/bringBack did (#1473): the branches that moved forward or were made, and whether the uncommitted changes were applied.
+// What folders/bringBack did (#1473): the branches that moved forward or were made, and whether the uncommitted changes were applied.
 type BringBack struct {
 	Moved []string `json:"moved"`
 
@@ -1346,7 +1346,7 @@ type CatalogError struct {
 
 	PreviewExpired *struct{} `json:"previewExpired,omitzero"`
 
-	NotAProject *CatalogErrorNotAProject `json:"notAProject,omitzero"`
+	NotAFolder *CatalogErrorNotAFolder `json:"notAFolder,omitzero"`
 
 	ReplaceMismatch *struct{} `json:"replaceMismatch,omitzero"`
 
@@ -1373,7 +1373,7 @@ type CatalogErrorLockUnreadable struct {
 	Path string `json:"path"`
 }
 
-type CatalogErrorNotAProject struct {
+type CatalogErrorNotAFolder struct {
 	Path string `json:"path"`
 }
 
@@ -1563,8 +1563,6 @@ type CatchUpRequest struct {
 }
 
 type CatchUpSnapshot struct {
-	Projects []ProjectSummary `json:"projects"`
-
 	Agents []Agent `json:"agents"`
 
 	Permissions []PermissionRequest `json:"permissions"`
@@ -1583,9 +1581,11 @@ type CatchUpSnapshot struct {
 
 	Workflows []WorkflowSummary `json:"workflows,omitzero"`
 
-	Pins []ProjectPins `json:"pins,omitzero"`
+	Pins []FolderPins `json:"pins,omitzero"`
 
 	Leases *CatchUpLeases `json:"leases,omitzero"`
+
+	Folders []FolderSummary `json:"folders"`
 }
 
 type ChangeSource string
@@ -2117,7 +2117,7 @@ type ConnectionsList struct {
 	Connections []Connection `json:"connections"`
 }
 
-// A GitHub Codespace for a project's repository (#1591).
+// A GitHub Codespace for a folder's repository (#1591).
 type ConnectorCodespace struct {
 	ID string `json:"id"`
 
@@ -2140,7 +2140,7 @@ type ConnectorCodespaces struct {
 	Message *string `json:"message,omitzero"`
 }
 
-// Lists or changes the project's GitHub Codespaces (#1591).
+// Lists or changes the folder's GitHub Codespaces (#1591).
 type ConnectorCodespacesRequest struct {
 	Folder URL `json:"folder"`
 
@@ -2151,7 +2151,7 @@ type ConnectorCodespacesRequest struct {
 	Name *string `json:"name,omitzero"`
 }
 
-// The github events the set-up turned on, and the project's workflows that start on one of them.
+// The github events the set-up turned on, and the folder's workflows that start on one of them.
 type ConnectorEvents struct {
 	State ConnectorEventsState `json:"state"`
 
@@ -2166,7 +2166,7 @@ type ConnectorEvents struct {
 	Message *string `json:"message,omitzero"`
 }
 
-// on: the github connector is in the project's or the person's mcp.json, so its events reach this project. off: not yet (nothing connected, or every GitHub slot skipped). taken: an mcp.json entry not made by Agents already has the name github, and it is left alone. failed: the entry could not be written; message says why.
+// on: the github connector is in the folder's or the person's mcp.json, so its events reach this folder. off: not yet (nothing connected, or every GitHub slot skipped). taken: an mcp.json entry not made by Agents already has the name github, and it is left alone. failed: the entry could not be written; message says why.
 type ConnectorEventsState string
 
 const ConnectorEventsStateOn ConnectorEventsState = "on"
@@ -2190,11 +2190,11 @@ type ConnectorProof struct {
 	At *Date `json:"at,omitzero"`
 }
 
-// A project's Connectors set-up (#1336): its GitHub or GitLab repository (#1632), the person's connection to that forge, four slots that each prove themselves with one read, and the events.
+// A folder's Connectors set-up (#1336): its GitHub or GitLab repository (#1632), the person's connection to that forge, four slots that each prove themselves with one read, and the events.
 type ConnectorSetup struct {
 	Folder string `json:"folder"`
 
-	// owner/name on GitHub, or group/project on GitLab, from the project's git remote (origin first). Absent with no GitHub or GitLab remote.
+	// owner/name on GitHub, or group/project on GitLab, from the folder's git remote (origin first). Absent with no GitHub or GitLab remote.
 	Repository *string `json:"repository,omitzero"`
 
 	// The forge the repository is on, which fills Tasks, Code review and CI: github or gitlab (#1632). Absent is github.
@@ -2224,7 +2224,7 @@ type ConnectorSetup struct {
 	Done int64 `json:"done"`
 }
 
-// stored: no call to the provider, only what was read before (for a list of every project). cached: a read at most five minutes old is used again. fresh: read now (Try Again).
+// stored: no call to the provider, only what was read before (for a list of every folder). cached: a read at most five minutes old is used again. fresh: read now (Try Again).
 type ConnectorSetupReading string
 
 const ConnectorSetupReadingStored ConnectorSetupReading = "stored"
@@ -2237,7 +2237,7 @@ type ConnectorSetupRequest struct {
 	Reading *ConnectorSetupReading `json:"reading,omitzero"`
 }
 
-// Skip a slot, or set it up again. Kept in the project's .agents/project.json.
+// Skip a slot, or set it up again. Kept in the folder's .agents/folder.json.
 type ConnectorSkipRequest struct {
 	Folder string `json:"folder"`
 
@@ -2263,7 +2263,7 @@ type ConnectorSlot struct {
 	Message *string `json:"message,omitzero"`
 }
 
-// One slot of a project's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci, and workspace (where agents run).
+// One slot of a folder's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci, and workspace (where agents run).
 type ConnectorSlotKind string
 
 const ConnectorSlotKindTasks ConnectorSlotKind = "tasks"
@@ -2271,7 +2271,7 @@ const ConnectorSlotKindCodeReview ConnectorSlotKind = "codeReview"
 const ConnectorSlotKindCi ConnectorSlotKind = "ci"
 const ConnectorSlotKindWorkspace ConnectorSlotKind = "workspace"
 
-// notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the project has no GitHub or GitLab remote. skipped: the person skipped it; it counts as done.
+// notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the folder has no GitHub or GitLab remote. skipped: the person skipped it; it counts as done.
 type ConnectorSlotState string
 
 const ConnectorSlotStateNotConnected ConnectorSlotState = "notConnected"
@@ -2373,22 +2373,22 @@ type ContentBlockAnnotations struct {
 	Priority *float64 `json:"priority,omitzero"`
 }
 
+type ContinueInFolderRequest struct {
+	AgentID UUID `json:"agentID"`
+
+	Text string `json:"text"`
+
+	Attachments []Attachment `json:"attachments"`
+
+	RequestID *UUID `json:"requestID,omitzero"`
+}
+
 // agents/continueInNew (#999): a new session in the same folder that reads this one and carries on, on another account of its runtime.
 type ContinueInNewRequest struct {
 	AgentID UUID `json:"agentID"`
 
 	// The account the new session uses: an added account, an org account (org:<route id>) or default for the runtime's own sign-in. Absent: the runtime's account for new sessions (Reaches the Model By).
 	AccountID *string `json:"accountID,omitzero"`
-
-	RequestID *UUID `json:"requestID,omitzero"`
-}
-
-type ContinueInProjectRequest struct {
-	AgentID UUID `json:"agentID"`
-
-	Text string `json:"text"`
-
-	Attachments []Attachment `json:"attachments"`
 
 	RequestID *UUID `json:"requestID,omitzero"`
 }
@@ -2618,7 +2618,7 @@ type ControlStatus struct {
 
 	ThisMacHost *HostJoinStatus `json:"thisMacHost,omitzero"`
 
-	ProjectDetection *ProjectDetection `json:"projectDetection,omitzero"`
+	FolderDetection *FolderDetection `json:"folderDetection,omitzero"`
 
 	UnjoinedTunnels []HostTunnelChanged `json:"unjoinedTunnels,omitzero"`
 
@@ -3366,10 +3366,10 @@ type EventRaiseRequest struct {
 type EventScope struct {
 	Mac *struct{} `json:"mac,omitzero"`
 
-	Project *EventScopeProject `json:"project,omitzero"`
+	Folder *EventScopeFolder `json:"folder,omitzero"`
 }
 
-type EventScopeProject struct {
+type EventScopeFolder struct {
 	Value URL `json:"_0"`
 }
 
@@ -3651,6 +3651,30 @@ type FleetMachine struct {
 	HeardAt *Date `json:"heardAt,omitzero"`
 }
 
+type Folder struct {
+	Folder URL `json:"folder"`
+
+	ArchivedAt *Date `json:"archivedAt,omitzero"`
+
+	AddedAt Date `json:"addedAt"`
+
+	LaidOutAt *Date `json:"laidOutAt,omitzero"`
+
+	LayoutVersion *int64 `json:"layoutVersion,omitzero"`
+
+	HelperLimits *HelperLimits `json:"helperLimits,omitzero"`
+
+	DiskSpace *DiskThresholds `json:"diskSpace,omitzero"`
+
+	Pinned *bool `json:"pinned,omitzero"`
+}
+
+type FolderDetection struct {
+	Enabled bool `json:"enabled"`
+
+	Paths []string `json:"paths"`
+}
+
 type FolderHunk struct {
 	OldStart int64 `json:"oldStart"`
 
@@ -3659,6 +3683,115 @@ type FolderHunk struct {
 	NoNewlineAtEnd bool `json:"noNewlineAtEnd"`
 
 	Lines []DiffLine `json:"lines"`
+}
+
+type FolderMCPServer struct {
+	Name string `json:"name"`
+
+	Summary string `json:"summary"`
+
+	Managed *ManagedMCPServer `json:"managed,omitzero"`
+
+	Approval MCPApprovalState `json:"approval"`
+
+	MissingSecrets []string `json:"missingSecrets"`
+
+	SecretNames []string `json:"secretNames"`
+
+	EntryDigest string `json:"entryDigest"`
+
+	SignIn *MCPSignInState `json:"signIn,omitzero"`
+
+	Views *string `json:"views,omitzero"`
+}
+
+type FolderPins struct {
+	Folder URL `json:"folder"`
+
+	Pins []PinView `json:"pins"`
+
+	Sessions []UUID `json:"sessions,omitzero"`
+
+	Workflows []string `json:"workflows,omitzero"`
+
+	Views []PinView `json:"views,omitzero"`
+}
+
+type FolderPlugin struct {
+	Folder URL `json:"folder"`
+
+	Name string `json:"name"`
+
+	Carries []string `json:"carries"`
+
+	AwaitingApproval *WorkflowApproval `json:"awaitingApproval,omitzero"`
+
+	FolderPath URL `json:"folderPath"`
+}
+
+type FolderRemovedNotification struct {
+	Folder URL `json:"folder"`
+}
+
+type FolderRequest struct {
+	Folder URL `json:"folder"`
+}
+
+type FolderSummary struct {
+	Name string `json:"name"`
+
+	Exists bool `json:"exists"`
+
+	LastActivityAt Date `json:"lastActivityAt"`
+
+	Counts FolderSummaryCounts `json:"counts"`
+
+	CostToDate map[string]float64 `json:"costToDate"`
+
+	UnmeasuredAgents int64 `json:"unmeasuredAgents"`
+
+	RetiredCount int64 `json:"retiredCount"`
+
+	GuardedChanges []GuardedChange `json:"guardedChanges,omitzero"`
+
+	Approvals []Approval `json:"approvals,omitzero"`
+
+	// Set when the organisation's policy caps this folder's helper limits (#998, #64): the lower number is used.
+	HelperLimitsSetBy *PolicySetBy `json:"helperLimitsSetBy,omitzero"`
+
+	Folder Folder `json:"folder"`
+}
+
+type FolderSummaryCounts struct {
+	NeedsAttention *int64 `json:"needsAttention,omitzero"`
+
+	Blocked *int64 `json:"blocked,omitzero"`
+
+	Waiting *int64 `json:"waiting,omitzero"`
+
+	Running *int64 `json:"running,omitzero"`
+
+	Finished *int64 `json:"finished,omitzero"`
+
+	Stopped *int64 `json:"stopped,omitzero"`
+
+	Archived *int64 `json:"archived,omitzero"`
+}
+
+type FolderWorktrees struct {
+	Worktrees []WorktreeSummary `json:"worktrees"`
+
+	Folder URL `json:"folder"`
+}
+
+type FoldersFindRequest struct {
+	Paths []string `json:"paths,omitzero"`
+
+	Folders []string `json:"folders,omitzero"`
+}
+
+type FoldersListRequest struct {
+	IncludeArchived bool `json:"includeArchived"`
 }
 
 type FoundFolder struct {
@@ -3670,7 +3803,7 @@ type FoundFolder struct {
 
 	IsRepository bool `json:"isRepository"`
 
-	IsProject bool `json:"isProject"`
+	IsFolder bool `json:"isFolder"`
 }
 
 type GitAsk struct {
@@ -3901,7 +4034,7 @@ type HostAnnounce struct {
 	Implementation *string `json:"implementation,omitzero"`
 }
 
-// governance/report (#2019, M5): the MCP servers and skills a machine has from a catalogue, personal and in its projects, at most 500. Sent at start and each hour; each replaces the last.
+// governance/report (#2019, M5): the MCP servers and skills a machine has from a catalogue, personal and in its folders, at most 500. Sent at start and each hour; each replaces the last.
 type HostCatalog struct {
 	Items []CatalogItem `json:"items"`
 }
@@ -4016,7 +4149,7 @@ type HostJoinTicket struct {
 type HostLastHeard struct {
 	Host HostID `json:"host"`
 
-	Projects []ProjectSummary `json:"projects,omitzero"`
+	Folders []FolderSummary `json:"folders,omitzero"`
 
 	Agents []Agent `json:"agents,omitzero"`
 
@@ -4226,8 +4359,6 @@ const HostedMCPStateRestarting HostedMCPState = "restarting"
 type HostedMCPStatus struct {
 	Name string `json:"name"`
 
-	Project *string `json:"project,omitzero"`
-
 	State HostedMCPState `json:"state"`
 
 	Since *Date `json:"since,omitzero"`
@@ -4239,6 +4370,8 @@ type HostedMCPStatus struct {
 	Restarts int64 `json:"restarts"`
 
 	Users int64 `json:"users"`
+
+	Folder *string `json:"folder,omitzero"`
 }
 
 type JoinApproved struct {
@@ -4545,7 +4678,7 @@ type MCPCatalogError struct {
 
 	ReplaceMismatch *struct{} `json:"replaceMismatch,omitzero"`
 
-	NotAProject *MCPCatalogErrorNotAProject `json:"notAProject,omitzero"`
+	NotAFolder *MCPCatalogErrorNotAFolder `json:"notAFolder,omitzero"`
 
 	NameTaken *MCPCatalogErrorNameTaken `json:"nameTaken,omitzero"`
 
@@ -4578,7 +4711,7 @@ type MCPCatalogErrorSecretStillInUse struct {
 	Name string `json:"name"`
 }
 
-type MCPCatalogErrorNotAProject struct {
+type MCPCatalogErrorNotAFolder struct {
 	Path string `json:"path"`
 }
 
@@ -4691,13 +4824,13 @@ type MCPHandValue struct {
 }
 
 type MCPHealthCheckRequest struct {
-	Project *string `json:"project,omitzero"`
+	Folder *string `json:"folder,omitzero"`
 }
 
 type MCPHealthFileProblem struct {
-	Project *string `json:"project,omitzero"`
-
 	Message string `json:"message"`
+
+	Folder *string `json:"folder,omitzero"`
 }
 
 type MCPHealthSnapshot struct {
@@ -4722,7 +4855,7 @@ type MCPLevels struct {
 }
 
 type MCPListAnswer struct {
-	Servers []ProjectMCPServer `json:"servers"`
+	Servers []FolderMCPServer `json:"servers"`
 
 	Problem *string `json:"problem,omitzero"`
 
@@ -4834,8 +4967,6 @@ type MCPServer struct {
 type MCPServerHealth struct {
 	Name string `json:"name"`
 
-	Project *string `json:"project,omitzero"`
-
 	Transport MCPTransportName `json:"transport"`
 
 	Hosted bool `json:"hosted"`
@@ -4851,6 +4982,8 @@ type MCPServerHealth struct {
 	Tools *int64 `json:"tools,omitzero"`
 
 	Levels *MCPLevels `json:"levels,omitzero"`
+
+	Folder *string `json:"folder,omitzero"`
 }
 
 type MCPServerTransport struct {
@@ -5209,7 +5342,7 @@ type MarketplaceOrigin string
 
 const MarketplaceOriginProvided MarketplaceOrigin = "provided"
 const MarketplaceOriginPersonal MarketplaceOrigin = "personal"
-const MarketplaceOriginProject MarketplaceOrigin = "project"
+const MarketplaceOriginFolder MarketplaceOrigin = "folder"
 
 type MarketplaceSetEnabledRequest struct {
 	ID string `json:"id"`
@@ -5273,7 +5406,7 @@ type MoveTarget struct {
 
 	Existing *MoveTargetExisting `json:"existing,omitzero"`
 
-	ProjectFolder *struct{} `json:"projectFolder,omitzero"`
+	FolderPath *struct{} `json:"folderPath,omitzero"`
 }
 
 type MoveTargetNewWorktree struct {
@@ -5636,7 +5769,7 @@ type OrgRouteSet struct {
 	Rev *string `json:"rev,omitzero"`
 }
 
-// An org route's settings that are not secret (#999, data-model.md). bedrock: region. vertex: project, location. azure: resource or address, apiVersion, and tenant and clientID for an Entra app. baseURL: address, and header, the header the key goes in.
+// An org route's settings that are not secret (#999, data-model.md). bedrock: region. vertex: folder, location. azure: resource or address, apiVersion, and tenant and clientID for an Entra app. baseURL: address, and header, the header the key goes in.
 type OrgRouteSettings struct {
 	Address *string `json:"address,omitzero"`
 
@@ -5648,13 +5781,13 @@ type OrgRouteSettings struct {
 
 	Location *string `json:"location,omitzero"`
 
-	Project *string `json:"project,omitzero"`
-
 	Region *string `json:"region,omitzero"`
 
 	Resource *string `json:"resource,omitzero"`
 
 	Tenant *string `json:"tenant,omitzero"`
+
+	Project *string `json:"project,omitzero"`
 }
 
 // Who changed an org route, and when (#999).
@@ -6018,7 +6151,7 @@ type PersonaFilesAnswer []PersonaFile
 
 type PersonaOrigin string
 
-const PersonaOriginProject PersonaOrigin = "project"
+const PersonaOriginFolder PersonaOrigin = "folder"
 const PersonaOriginPersonal PersonaOrigin = "personal"
 
 type PersonasFilesRequest struct {
@@ -6202,7 +6335,7 @@ type PluginApproveRequest struct {
 type PluginsList struct {
 	Folder URL `json:"folder"`
 
-	Plugins []ProjectPlugin `json:"plugins"`
+	Plugins []FolderPlugin `json:"plugins"`
 }
 
 type PluginsListRequest struct {
@@ -6236,7 +6369,7 @@ type PolicyEnvironment struct {
 	PassThrough []string `json:"passThrough"`
 }
 
-// The ceiling over each project's helper limits (#998, #64).
+// The ceiling over each folder's helper limits (#998, #64).
 type PolicyHelpers struct {
 	MostRunning *int64 `json:"mostRunning,omitzero"`
 
@@ -6426,139 +6559,6 @@ type PrewarmRequestWhy string
 
 const PrewarmRequestWhyOpened PrewarmRequestWhy = "opened"
 const PrewarmRequestWhyTyping PrewarmRequestWhy = "typing"
-
-type Project struct {
-	Folder URL `json:"folder"`
-
-	ArchivedAt *Date `json:"archivedAt,omitzero"`
-
-	AddedAt Date `json:"addedAt"`
-
-	LaidOutAt *Date `json:"laidOutAt,omitzero"`
-
-	LayoutVersion *int64 `json:"layoutVersion,omitzero"`
-
-	HelperLimits *HelperLimits `json:"helperLimits,omitzero"`
-
-	DiskSpace *DiskThresholds `json:"diskSpace,omitzero"`
-
-	Pinned *bool `json:"pinned,omitzero"`
-}
-
-type ProjectDetection struct {
-	Enabled bool `json:"enabled"`
-
-	Paths []string `json:"paths"`
-}
-
-type ProjectMCPServer struct {
-	Name string `json:"name"`
-
-	Summary string `json:"summary"`
-
-	Managed *ManagedMCPServer `json:"managed,omitzero"`
-
-	Approval MCPApprovalState `json:"approval"`
-
-	MissingSecrets []string `json:"missingSecrets"`
-
-	SecretNames []string `json:"secretNames"`
-
-	EntryDigest string `json:"entryDigest"`
-
-	SignIn *MCPSignInState `json:"signIn,omitzero"`
-
-	Views *string `json:"views,omitzero"`
-}
-
-type ProjectPins struct {
-	Folder URL `json:"folder"`
-
-	Pins []PinView `json:"pins"`
-
-	Sessions []UUID `json:"sessions,omitzero"`
-
-	Workflows []string `json:"workflows,omitzero"`
-
-	Views []PinView `json:"views,omitzero"`
-}
-
-type ProjectPlugin struct {
-	Project URL `json:"project"`
-
-	Folder URL `json:"folder"`
-
-	Name string `json:"name"`
-
-	Carries []string `json:"carries"`
-
-	AwaitingApproval *WorkflowApproval `json:"awaitingApproval,omitzero"`
-}
-
-type ProjectRemovedNotification struct {
-	Folder URL `json:"folder"`
-}
-
-type ProjectRequest struct {
-	Folder URL `json:"folder"`
-}
-
-type ProjectSummary struct {
-	Project Project `json:"project"`
-
-	Name string `json:"name"`
-
-	Exists bool `json:"exists"`
-
-	LastActivityAt Date `json:"lastActivityAt"`
-
-	Counts ProjectSummaryCounts `json:"counts"`
-
-	CostToDate map[string]float64 `json:"costToDate"`
-
-	UnmeasuredAgents int64 `json:"unmeasuredAgents"`
-
-	RetiredCount int64 `json:"retiredCount"`
-
-	GuardedChanges []GuardedChange `json:"guardedChanges,omitzero"`
-
-	Approvals []Approval `json:"approvals,omitzero"`
-
-	// Set when the organisation's policy caps this project's helper limits (#998, #64): the lower number is used.
-	HelperLimitsSetBy *PolicySetBy `json:"helperLimitsSetBy,omitzero"`
-}
-
-type ProjectSummaryCounts struct {
-	NeedsAttention *int64 `json:"needsAttention,omitzero"`
-
-	Blocked *int64 `json:"blocked,omitzero"`
-
-	Waiting *int64 `json:"waiting,omitzero"`
-
-	Running *int64 `json:"running,omitzero"`
-
-	Finished *int64 `json:"finished,omitzero"`
-
-	Stopped *int64 `json:"stopped,omitzero"`
-
-	Archived *int64 `json:"archived,omitzero"`
-}
-
-type ProjectWorktrees struct {
-	Project URL `json:"project"`
-
-	Worktrees []WorktreeSummary `json:"worktrees"`
-}
-
-type ProjectsFindRequest struct {
-	Paths []string `json:"paths,omitzero"`
-
-	Folders []string `json:"folders,omitzero"`
-}
-
-type ProjectsListRequest struct {
-	IncludeArchived bool `json:"includeArchived"`
-}
 
 type PromptOrigin string
 
@@ -6887,7 +6887,7 @@ type ReadTokenRevoke struct {
 	ID string `json:"id"`
 }
 
-// Makes or brings up to date a host's copy of a Mac's repository (#1123): fetches the `bundle` upload, moves `branches` forward only, checks out `checkout`, sets `origin`, applies the `patch` upload (uncommitted changes), and adds the folder as a project. It stops, and changes nothing, when the host has changes or commits of its own.
+// Makes or brings up to date a host's copy of a Mac's repository (#1123): fetches the `bundle` upload, moves `branches` forward only, checks out `checkout`, sets `origin`, applies the `patch` upload (uncommitted changes), and adds the folder as a folder. It stops, and changes nothing, when the host has changes or commits of its own.
 type ReceiveRequest struct {
 	Folder string `json:"folder"`
 
@@ -6920,7 +6920,7 @@ type ReceiveStateRequest struct {
 	Folder string `json:"folder"`
 }
 
-// One part of a file a Mac sends (#1123), at `offset` in the upload. A part is at most 16 MB; the host keeps the upload until projects/receive uses it.
+// One part of a file a Mac sends (#1123), at `offset` in the upload. A part is at most 16 MB; the host keeps the upload until folders/receive uses it.
 type ReceiveUploadRequest struct {
 	Upload UUID `json:"upload"`
 
@@ -7136,7 +7136,7 @@ const ReportRangeWeek ReportRange = "week"
 const ReportRangeMonth ReportRange = "month"
 const ReportRangeThreeMonths ReportRange = "threeMonths"
 
-// One hour or day of one machine's project and runtime, with its person (#1811).
+// One hour or day of one machine's folder and runtime, with its person (#1811).
 type ReportRow struct {
 	// The UTC hour ("2026-10-21T15") or day ("2026-10-21").
 	At string `json:"at"`
@@ -7148,8 +7148,6 @@ type ReportRow struct {
 	Host HostID `json:"host"`
 
 	HostName string `json:"hostName"`
-
-	Project string `json:"project"`
 
 	Runtime string `json:"runtime"`
 
@@ -7184,6 +7182,8 @@ type ReportRow struct {
 
 	// What the agents did (#2019): sessions, pull requests and waits.
 	Counts *ReportCounts `json:"counts,omitzero"`
+
+	Folder string `json:"folder"`
 }
 
 // Whose rows a report adds up (#1804).
@@ -7228,7 +7228,7 @@ type ReportView struct {
 
 	Range ReportRange `json:"range"`
 
-	// The way the page adds up: person, project, machine, runtime, group or workflow.
+	// The way the page adds up: person, folder, machine, runtime, group or workflow.
 	By *string `json:"by,omitzero"`
 }
 
@@ -7700,7 +7700,7 @@ type SaidMatch struct {
 	Line string `json:"line"`
 }
 
-// agents/said (#1585): the sessions whose prompts or replies hold the text, any case, in one project when folder says.
+// agents/said (#1585): the sessions whose prompts or replies hold the text, any case, in one folder when folder says.
 type SaidSearchRequest struct {
 	Text string `json:"text"`
 
@@ -7842,14 +7842,14 @@ type SendFactsRequest struct {
 	Folder URL `json:"folder"`
 }
 
-// A file the host made for a send, read with projects/sendRead (#1123).
+// A file the host made for a send, read with folders/sendRead (#1123).
 type SendFile struct {
 	ID UUID `json:"id"`
 
 	Size int64 `json:"size"`
 }
 
-// What projects/sendPack made (#1123): each branch at its commit, the bundle (none when the receiving host has every commit) and the patch (none when nothing is uncommitted).
+// What folders/sendPack made (#1123): each branch at its commit, the bundle (none when the receiving host has every commit) and the patch (none when nothing is uncommitted).
 type SendPack struct {
 	Commits []SentBranch `json:"commits"`
 
@@ -7876,7 +7876,7 @@ type SendRead struct {
 	End bool `json:"end"`
 }
 
-// One part of a file projects/sendPack made, from `offset` (#1123).
+// One part of a file folders/sendPack made, from `offset` (#1123).
 type SendReadRequest struct {
 	ID UUID `json:"id"`
 
@@ -8097,7 +8097,7 @@ type SharedMCP struct {
 }
 
 type SharedOtherFile struct {
-	// Relative to `~/.agents`, or to a project's `.agents`.
+	// Relative to `~/.agents`, or to a folder's `.agents`.
 	Path string `json:"path"`
 
 	Kind SharedOtherFileKind `json:"kind"`
@@ -8151,7 +8151,7 @@ type SharedProblem struct {
 // What one runtime does with one thing: it gets it (how), uses its own copy at a path, is left out (why), has no way to take it, or is not measured yet (`"unchecked"`, or with a note).
 type SharedReach = JSONValue
 
-// `personal/shared`'s params: none reads the person's `~/.agents`; `folder` reads that project's `.agents` (#754), which has no per-runtime reach.
+// `personal/shared`'s params: none reads the person's `~/.agents`; `folder` reads that folder's `.agents` (#754), which has no per-runtime reach.
 type SharedRequest struct {
 	Folder *string `json:"folder,omitzero"`
 }
@@ -8212,7 +8212,7 @@ type SharedSkillSource = JSONValue
 
 // `personal/shared` (054): what is in the person's `~/.agents` and which runtime gets each thing, for Settings ▸ Agent Configuration. Read from disk on every call. Nothing in it is a value from `mcp.json`: env and headers go by name only (FR-023).
 type SharedSnapshot struct {
-	// `~/.agents`, or a project's `.agents` (#754).
+	// `~/.agents`, or a folder's `.agents` (#754).
 	Home string `json:"home"`
 
 	// False for a copy of the app with no personal home (a scratch root), when everything else is empty.
@@ -8677,7 +8677,7 @@ type SkillDestination struct {
 type SkillDestinationKind string
 
 const SkillDestinationKindPersonal SkillDestinationKind = "personal"
-const SkillDestinationKindProject SkillDestinationKind = "project"
+const SkillDestinationKindFolder SkillDestinationKind = "folder"
 
 type SkillNameRequest struct {
 	Destination SkillDestination `json:"destination"`
@@ -8930,7 +8930,7 @@ type TeamBotRun struct {
 	Since *Date `json:"since,omitzero"`
 }
 
-// workflows/trigger and workflows/fire (#2011, spec 736 FR-035): a project or control-plane event (a server's, such as github or a channel's) or a schedule that a runs-on: workflow's trigger matched. A machine sends it to the control plane, which sends it once to one of the bot's machines. workflow is the project folder's name and the workflow's id; trigger, the same words on every machine that heard it; event, the event (none for a schedule); dueAt, a schedule's due time.
+// workflows/trigger and workflows/fire (#2011, spec 736 FR-035): a folder or control-plane event (a server's, such as github or a channel's) or a schedule that a runs-on: workflow's trigger matched. A machine sends it to the control plane, which sends it once to one of the bot's machines. workflow is the folder's name and the workflow's id; trigger, the same words on every machine that heard it; event, the event (none for a schedule); dueAt, a schedule's due time.
 type TeamTrigger struct {
 	Workflow string `json:"workflow"`
 
@@ -9368,8 +9368,6 @@ type TurnsRequest struct {
 
 // A worktree with work that is not pushed: commits ahead of its upstream (`ahead`), or on a branch with no upstream (`unmerged`, commits not on the base), and changes not committed (`uncommitted`).
 type UnpushedWork struct {
-	Project URL `json:"project"`
-
 	Worktree URL `json:"worktree"`
 
 	Branch *string `json:"branch,omitzero"`
@@ -9379,6 +9377,8 @@ type UnpushedWork struct {
 	Unmerged *int64 `json:"unmerged,omitzero"`
 
 	Uncommitted *int64 `json:"uncommitted,omitzero"`
+
+	Folder URL `json:"folder"`
 }
 
 type UnqueueRequest struct {
@@ -9477,11 +9477,8 @@ type UsageRollupPeriod struct {
 	Rows []UsageRollupRow `json:"rows"`
 }
 
-// One project and runtime's usage in an hour or a day (#1811), as a machine adds it up.
+// One folder and runtime's usage in an hour or a day (#1811), as a machine adds it up.
 type UsageRollupRow struct {
-	// The project's folder name, so the same repository on two machines adds up.
-	Project string `json:"project"`
-
 	Runtime string `json:"runtime"`
 
 	// The workflow that started the agents of this row (#2019), by its id; absent for agents a person or another agent started.
@@ -9518,6 +9515,9 @@ type UsageRollupRow struct {
 
 	// The org route of this row's turns (#999, FR-021); absent for the person's own sign-in and accounts.
 	Route *string `json:"route,omitzero"`
+
+	// The folder name, so the same repository on two machines adds up.
+	Folder string `json:"folder"`
 }
 
 // Legacy agentConfig snapshot (#1760); new agent configuration uses per-file state in AgentConfigFiles (#2129).
@@ -9656,8 +9656,6 @@ type ViewAsk struct {
 type ViewCallRequest struct {
 	AgentID UUID `json:"agentID"`
 
-	Project *URL `json:"project,omitzero"`
-
 	ViewID UUID `json:"viewID"`
 
 	Name string `json:"name"`
@@ -9667,6 +9665,8 @@ type ViewCallRequest struct {
 	Feed *bool `json:"feed,omitzero"`
 
 	Server *string `json:"server,omitzero"`
+
+	Folder *URL `json:"folder,omitzero"`
 }
 
 type ViewContextRequest struct {
@@ -9708,7 +9708,7 @@ type ViewReadRequest struct {
 
 	Server *string `json:"server,omitzero"`
 
-	Project *URL `json:"project,omitzero"`
+	Folder *URL `json:"folder,omitzero"`
 }
 
 type ViewResource struct {
@@ -9728,8 +9728,6 @@ type ViewResource struct {
 type ViewShowRequest struct {
 	AgentID UUID `json:"agentID"`
 
-	Project *URL `json:"project,omitzero"`
-
 	Server string `json:"server"`
 
 	URI string `json:"uri"`
@@ -9737,6 +9735,8 @@ type ViewShowRequest struct {
 	Hash string `json:"hash"`
 
 	Show bool `json:"show"`
+
+	Folder *URL `json:"folder,omitzero"`
 }
 
 // An agent's call of one of the agents server's tools that has a view, relayed with its token.
@@ -9990,9 +9990,9 @@ type WorkflowEnableRequest struct {
 
 type WorkflowLimit string
 
-const WorkflowLimitProject WorkflowLimit = "project"
+const WorkflowLimitFolder WorkflowLimit = "folder"
 
-// How many approved workflows may be turned on in each project. An unset value means 20. The range is 1 to 100. Kept in workflow-limit.json.
+// How many approved workflows may be turned on in each folder. An unset value means 20. The range is 1 to 100. Kept in workflow-limit.json.
 type WorkflowLimitSettings struct {
 	Total *int64 `json:"total,omitzero"`
 }
@@ -10317,11 +10317,11 @@ type WorktreeChoiceBranch struct {
 }
 
 type WorktreeRemovalRequest struct {
-	Project URL `json:"project"`
-
 	Root URL `json:"root"`
 
 	Confirmed bool `json:"confirmed"`
+
+	Folder URL `json:"folder"`
 }
 
 type WorktreeRemoved struct {
@@ -10357,8 +10357,6 @@ type WorktreeSummary struct {
 
 	Branch *string `json:"branch,omitzero"`
 
-	IsProjectFolder bool `json:"isProjectFolder"`
-
 	Exists bool `json:"exists"`
 
 	MadeByApp bool `json:"madeByApp"`
@@ -10368,6 +10366,8 @@ type WorktreeSummary struct {
 	Status *WorktreeStatus `json:"status,omitzero"`
 
 	Size *WorktreeSize `json:"size,omitzero"`
+
+	IsFolder bool `json:"isFolder"`
 }
 
 type WorktreesListRequest struct {

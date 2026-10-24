@@ -13,7 +13,7 @@ import (
 )
 
 // Reports (#1811): each machine's hours and days, kept as it sends them, added up by
-// person, machine, project and runtime. An admin sees every person; a member their own.
+// person, machine, folder and runtime. An admin sees every person; a member their own.
 func TestReportsAddUpWhatMachinesSend(t *testing.T) {
 	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
@@ -24,8 +24,8 @@ func TestReportsAddUpWhatMachinesSend(t *testing.T) {
 
 	now := time.Now().UTC()
 	hour, day := now.Format(usageHourLayout), now.Format(usageDayLayout)
-	row := func(project string, usd float64, tokens int64) wire.UsageRollupRow {
-		return wire.UsageRollupRow{Project: project, Runtime: "claude", Cost: map[string]float64{"USD": usd},
+	row := func(folder string, usd float64, tokens int64) wire.UsageRollupRow {
+		return wire.UsageRollupRow{Folder: folder, Runtime: "claude", Cost: map[string]float64{"USD": usd},
 			InputTokens: tokens, Turns: 1, WorkingSeconds: 60}
 	}
 	send := func(host string, rows ...wire.UsageRollupRow) {
@@ -69,7 +69,7 @@ func TestReportsAddUpWhatMachinesSend(t *testing.T) {
 	json.Unmarshal(call(t, admin, "", "reports/export", wire.ReportQuery{Range: wire.ReportRangeWeek}), &csv)
 	lines := strings.Split(strings.TrimSpace(csv.Text), "\n")
 	if csv.Format != wire.ReportFormatCsv || csv.Count != 3 || len(lines) != 4 ||
-		!strings.HasPrefix(lines[0], "at,person,personName,host,hostName,project,runtime,costUSD,inputTokens") {
+		!strings.HasPrefix(lines[0], "at,person,personName,host,hostName,folder,runtime,costUSD,inputTokens") {
 		t.Fatalf("%+v", csv)
 	}
 	jsonl := wire.ReportFormatJsonl
@@ -134,8 +134,8 @@ func TestReportsKeepWhatTheAgentsDid(t *testing.T) {
 	counts := &wire.ReportCounts{Sessions: 2, FailedSessions: 1, PrsOpened: 1, PrsMerged: 1, MergeSeconds: 3600, Waits: 1,
 		WaitBuckets: []int64{1, 0, 0, 0, 0, 0}, WorkflowRuns: 3, WorkflowFailures: 1}
 	nightly := "nightly"
-	rows := []wire.UsageRollupRow{{Project: "shop", Runtime: "claude", Workflow: &nightly, Cost: map[string]float64{}, Counts: counts},
-		{Project: "site", Runtime: "codex", Cost: map[string]float64{"USD": 1}}}
+	rows := []wire.UsageRollupRow{{Folder: "shop", Runtime: "claude", Workflow: &nightly, Cost: map[string]float64{}, Counts: counts},
+		{Folder: "site", Runtime: "codex", Cost: map[string]float64{"USD": 1}}}
 	params, _ := json.Marshal(wire.UsageRollup{Hours: []wire.UsageRollupPeriod{{At: hour, Rows: rows}}, Days: []wire.UsageRollupPeriod{}})
 	if _, err := p.s.methods.HostSaid(owner.member.Host, "usage/rollup", params); err != nil {
 		t.Fatal(err)

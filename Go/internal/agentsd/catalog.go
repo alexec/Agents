@@ -21,7 +21,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Searching a catalogue, previewing a skill and adding it to the person or a project, its
+// Searching a catalogue, previewing a skill and adding it to the person or a folder, its
 // updates, and the marketplaces searched (DaemonCore+Catalog, DaemonCore+Marketplaces).
 
 // catalogState is a daemon's previews and update answers, kept beside it.
@@ -257,7 +257,7 @@ func (d *Daemon) skillsAdd(r wire.SkillAddRequest) (wire.SkillAddAnswer, error) 
 	}
 	where := "personal"
 	if place.Folder != "" {
-		where = "project " + filepath.Base(place.Folder)
+		where = "folder " + filepath.Base(place.Folder)
 	}
 	log.Printf("catalog: add %s from %s @ %.7s → %s", skill.Name, skill.Source, st.Preview.Commit, where)
 	return wire.SkillAddAnswer{Skill: skill}, nil
@@ -318,15 +318,15 @@ func (d *Daemon) marketplacesList(kind *wire.CatalogKind, dest *wire.SkillDestin
 		}
 		personal = f
 	}
-	var project *skillcatalog.MarketplaceFile
-	if dest != nil && dest.Kind == wire.SkillDestinationKindProject {
+	var folder *skillcatalog.MarketplaceFile
+	if dest != nil && dest.Kind == wire.SkillDestinationKindFolder {
 		if place, err := d.skillPlace(*dest); err == nil {
-			f, err := skillcatalog.LoadMarketplaces(skillcatalog.ProjectMarketplaces(place.Folder))
+			f, err := skillcatalog.LoadMarketplaces(skillcatalog.FolderMarketplaces(place.Folder))
 			if err != nil && problem == nil {
 				s := err.Error()
 				problem = &s
 			}
-			project = &f
+			folder = &f
 		}
 	}
 	secrets := skillcatalog.Secrets{}
@@ -335,7 +335,7 @@ func (d *Daemon) marketplacesList(kind *wire.CatalogKind, dest *wire.SkillDestin
 	}
 	// A marketplace the organisation does not allow is not listed (#998, US3 scenario 1),
 	// so nothing is searched, previewed or added from it.
-	listed := slices.DeleteFunc(skillcatalog.ListMarketplaces(kind, personal, project, secrets.IsSet, os.Getenv),
+	listed := slices.DeleteFunc(skillcatalog.ListMarketplaces(kind, personal, folder, secrets.IsSet, os.Getenv),
 		func(m wire.Marketplace) bool { return !d.marketplaceAllowed(m.ID, m.URL) })
 	return wire.MarketplacesListAnswer{Marketplaces: listed, Problem: problem}
 }
@@ -443,8 +443,8 @@ func (d *Daemon) marketplacesSetEnabled(r wire.MarketplaceSetEnabledRequest) (wi
 	if err != nil {
 		return wire.MarketplacesListAnswer{}, err
 	}
-	// A project's is known by its id alone: the person turns on what the list showed them.
-	skillcatalog.SetEnabled(r.ID, strings.HasPrefix(r.ID, "project:"), r.Enabled, &f)
+	// A folder's is known by its id alone: the person turns on what the list showed them.
+	skillcatalog.SetEnabled(r.ID, strings.HasPrefix(r.ID, "folder:"), r.Enabled, &f)
 	if err := skillcatalog.SaveMarketplaces(f, path); err != nil {
 		return wire.MarketplacesListAnswer{}, marketplaceRefusal("marketplaces.json could not be written: " + err.Error())
 	}

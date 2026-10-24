@@ -183,14 +183,14 @@ a[href] { cursor: pointer; }
   grid-template-columns: 236px 300px minmax(0, 1fr) 420px;
 }
 
-.projects, .sessions, .chat, .files {
+.folders, .sessions, .chat, .files {
   min-height: 0;
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--paper-rule);
 }
 
-.projects { background: var(--paper-sidebar); }
+.folders { background: var(--paper-sidebar); }
 .chat, .files { border-right: none; }
 .files { border-left: 1px solid var(--paper-rule); background: var(--paper-ground); }
 
@@ -478,7 +478,7 @@ button.link.reading:hover { text-decoration: underline; }
 .note { display: flex; flex-direction: column; gap: 3px; }
 .sandbox-failure p { margin: 0; }
 .sandbox-failure .answers { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
-/* A change to a project's own files, asked over the prompt or on the project's page (#531). */
+/* A change to a folder's own files, asked over the prompt or on the folder's page (#531). */
 .guarded-change { border-color: color-mix(in srgb, var(--tint-attention) 25%, transparent); }
 .guarded-change p { margin: 0; }
 .guarded-change .strong { color: var(--tint-attention); }
@@ -773,7 +773,7 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 /* Greyed, with what was shown still readable and scrollable, and the prompt still typable. */
 .down .columns { opacity: 0.55; }
 .down .columns button, .down .columns select, .down .columns input:not([type=search]) { pointer-events: none; }
-.host-offline .row.project { opacity: 0.55; }
+.host-offline .row.folder { opacity: 0.55; }
 .offline-strip { padding: 6px 16px; font-size: 0.75rem; background: var(--paper-well); border-bottom: 1px solid var(--paper-rule);
   display: flex; align-items: center; gap: 8px; }
 .offline-strip .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--tint-attention); }
@@ -812,7 +812,7 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 .continue-strip .what { flex: 1; min-width: 0; opacity: 0.7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .continue-strip button { margin-left: auto; flex: none; }
 .chip.worktree.gone { text-decoration: line-through; }
-/* This Mac's host down, in the projects column (#83): said whole, never cut off. */
+/* This Mac's host down, in the folders column (#83): said whole, never cut off. */
 .host-down { padding: 6px 8px 8px; }
 .host-down p { margin: 0 0 3px; }
 .host-down .strong { color: var(--tint-attention); font-size: 0.78125rem; }
@@ -822,7 +822,7 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 
 .menu-anchor { position: relative; }
 
-.project-menu { font-weight: 600; white-space: nowrap; }
+.folder-menu { font-weight: 600; white-space: nowrap; }
 .menu-anchor { margin-right: auto; }
 
 .popover {
@@ -945,7 +945,7 @@ button.remove:hover { opacity: 1; }
   background: color-mix(in srgb, var(--tint-failure) 10%, var(--paper-ground));
   border-bottom: 1px solid var(--paper-rule);
 }
-/* A new session: the project's name and folder in the middle, the bar at the foot (#108). */
+/* A new session: the folder's name and folder in the middle, the bar at the foot (#108). */
 .new-heading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 20px; text-align: center; }
 .new-heading h1 { margin: 0; font-size: 1.375rem; font-weight: 600; }
 .new-heading .persona-choice { display: flex; flex-direction: column; align-items: center; gap: 4px; max-width: 100%; }
@@ -1291,14 +1291,14 @@ button.remove:hover { opacity: 1; }
 .diff-steps button { font-size: 0.75rem; padding: 2px 8px; }
 .diff-bar .link { margin-left: auto; font-size: 0.75rem; }
 
-/* New project (#115): the + over the projects column, its menu, and the window's two sheets. */
-.menu-anchor.new-project { margin-right: 0; }
+/* New folder (#115): the + over the folders column, its menu, and the window's two sheets. */
+.menu-anchor.new-folder { margin-right: 0; }
 .popover [role^=menuitem]:disabled { background: none; }
 .popover hr { border: none; border-top: 1px solid var(--paper-rule); margin: 4px 0; }
-.new-project-host { display: flex; flex-direction: column; }
+.new-folder-host { display: flex; flex-direction: column; }
 .menu-head { margin: 6px 10px 2px; font-size: 0.6875rem; opacity: 0.55; }
-.empty-projects { display: flex; flex-direction: column; gap: 8px; padding: 12px 8px; }
-.empty-projects .quiet { line-height: 1.45; }
+.empty-folders { display: flex; flex-direction: column; gap: 8px; padding: 12px 8px; }
+.empty-folders .quiet { line-height: 1.45; }
 .empty-runtimes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .empty-runtimes li { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; }
 .empty-runtimes a { font-size: 0.75rem; }
@@ -1456,12 +1456,12 @@ button.plain:hover { opacity: 1; }
 .lease-line .link:hover .words { opacity: 1; }
 @media (hover: none) { .lease-line .link { min-height: 44px; } }
 
-/* The new-session page's project name, a menu of every project (#495, #499): the browser's own
+/* The new-session page's folder name, a menu of every folder (#495, #499): the browser's own
    menu over the name, as a pill's. */
-.new-heading .project-switch { position: relative; cursor: pointer; }
-.new-heading .project-switch .caret { font-size: 0.8125rem; opacity: 0.5; }
-.new-heading .project-switch select { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; font: inherit; }
-/* The persona (#913): the project's control, a size smaller, under it. */
+.new-heading .folder-switch { position: relative; cursor: pointer; }
+.new-heading .folder-switch .caret { font-size: 0.8125rem; opacity: 0.5; }
+.new-heading .folder-switch select { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; font: inherit; }
+/* The persona (#913): the folder's control, a size smaller, under it. */
 .new-heading h2.persona-switch { margin: 0; font-size: 0.9375rem; font-weight: 600; }
 .new-heading h2.persona-switch.none { opacity: 0.65; }
 
@@ -1480,7 +1480,7 @@ button.plain:hover { opacity: 1; }
 .connector-levels span.reached { color: var(--accent); opacity: 1;
   background: color-mix(in srgb, var(--accent) 14%, transparent); }
 
-/* A project's Connectors set-up and the Connect sheet (#1336): the connection card, the slots in the
+/* A folder's Connectors set-up and the Connect sheet (#1336): the connection card, the slots in the
    window's grid, each with its mark (a tick once it read, a dashed circle when skipped), and the events. */
 .connector-setup { margin-bottom: 8px; }
 .setup-heading { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em;
@@ -1630,7 +1630,7 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 /* Its font size is the layout's, set on each <text>: the whole diagram scales to fit, words and all. */
 .mermaid-text { fill: currentColor; }
 
-/* Activity ▸ Worktrees (#790): a project's name with Clean up beside it, each row's size at its end. */
+/* Activity ▸ Worktrees (#790): a folder's name with Clean up beside it, each row's size at its end. */
 .worktrees .worktrees-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 14px 0 4px; }
 .worktrees .worktree p:first-child { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .worktrees .worktree-size { font-variant-numeric: tabular-nums; white-space: nowrap; }

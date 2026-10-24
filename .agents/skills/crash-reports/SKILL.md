@@ -1,6 +1,6 @@
 ---
 name: crash-reports
-description: Read the crash reports that this project's apps wrote on this Mac since the last run, and file a GitHub issue for each crash that no issue tracks yet, or comment on the issue that does (#392). Fix nothing. Use when the Crash reports workflow runs, or when Alex asks which crashes are new.
+description: Read the crash reports that this folder's apps wrote on this Mac since the last run, and file a GitHub issue for each crash that no issue tracks yet, or comment on the issue that does (#392). Fix nothing. Use when the Crash reports workflow runs, or when Alex asks which crashes are new.
 ---
 
 # Crash reports
@@ -12,7 +12,7 @@ run of the workflow.
 
 ## Rules for the whole run
 
-- **Never touch the project folder you start in.** It is the shared checkout of `main`.
+- **Never touch the folder you start in.** It is the shared checkout of `main`.
   Work in the crash worktree below. Never edit source, merge, push, rebase `main`, open
   pull requests, ship or restart the app, or call the live app's `daemon.sock`.
 - **Only read the reports.** Never move, delete or change a report or a crash note.

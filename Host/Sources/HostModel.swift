@@ -27,7 +27,7 @@ final class HostModel {
     private var controlPID: Int32?
     private(set) var clients: Int?
     private(set) var hosts: Int?
-    private(set) var projects: Int?
+    private(set) var folders: Int?
     private(set) var working: Int?
     /// macOS wants the person to allow Agents Host under Login Items.
     private(set) var needsApproval = false
@@ -221,7 +221,7 @@ final class HostModel {
     private func countWork() async {
         guard daemonRunning else {
             await dropHostClient()
-            projects = nil
+            folders = nil
             working = nil
             return
         }
@@ -247,17 +247,17 @@ final class HostModel {
         }
         guard !hostRefused else { return }
         do {
-            let listed = try await client.call(DaemonAPI.Method.projectsList, [String: String](), returning: JSONValue.self)
+            let listed = try await client.call(DaemonAPI.Method.foldersList, [String: String](), returning: JSONValue.self)
             // Every live agent, a page at a time (#164).
             let agents = try await client.listAgents(DaemonAPI.ListRequest(includeArchived: false, lean: true))
-            if case .array(let all) = listed { projects = all.count }
+            if case .array(let all) = listed { folders = all.count }
             working = agents.filter { $0.state == .running }.count
         } catch {
             switch HostLinkPolicy.failure(error) {
             case .refused:
                 // An older host that doesn't know Agents Host: no counts, and no redialling.
                 hostRefused = true
-                projects = nil
+                folders = nil
                 working = nil
             case .gone:
                 await lostHost()

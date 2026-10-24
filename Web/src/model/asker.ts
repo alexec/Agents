@@ -4,7 +4,7 @@ import type { Agent } from "../protocol/generated";
 
 const quoted = (text: string) => `“${text}”`;
 
-/** "Asked by “#116 helper” (Claude), started by “Project lead”"; an untitled agent by its runtime. */
+/** "Asked by “#116 helper” (Claude), started by “Folder lead”"; an untitled agent by its runtime. */
 export function askerLine(title: string | undefined, runtime: string, startedBy?: string, subagent?: string): string {
   const named = title?.trim();
   let asker = named ? `${quoted(named)} (${runtime})` : runtime;

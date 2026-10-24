@@ -483,13 +483,13 @@ final class ControlSettingsModel {
                                        returning: [DaemonAPI.SSHHost].self)) ?? []
     }
 
-    /// Where a host added from now on has its projects found (#429).
-    var projectDetection: ProjectDetection { status?.projectDetection ?? .standard }
-    /// Where the projects picker looks (#656): nowhere with auto-detect off.
-    var suggestedPaths: [String] { projectDetection.enabled ? projectDetection.paths : [] }
+    /// Where a host added from now on has its folders found (#429).
+    var folderDetection: FolderDetection { status?.folderDetection ?? .standard }
+    /// Where the folders picker looks (#656): nowhere with auto-detect off.
+    var suggestedPaths: [String] { folderDetection.enabled ? folderDetection.paths : [] }
 
-    func setProjectDetection(_ detection: ProjectDetection) async {
-        await perform(DaemonAPI.Method.controlSetProjectDetection, detection)
+    func setFolderDetection(_ detection: FolderDetection) async {
+        await perform(DaemonAPI.Method.controlSetFolderDetection, detection)
     }
 
     /// A code for a new client, or for a new host (frame G, Add by Code). A browser's is

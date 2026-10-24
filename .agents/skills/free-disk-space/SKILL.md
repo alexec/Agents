@@ -22,7 +22,7 @@ run out. Stopping at the threshold brings the next low event a few hours later.
 
 ## Rules for the whole run
 
-- **Run every command from the project folder you start in.** It is the shared checkout
+- **Run every command from the folder you start in.** It is the shared checkout
   of `main`: never delete, edit, commit, check out, merge, rebase, stash or push anything
   in it. No builds or tests. The shell is zsh: never name a variable `path`, which is
   `$PATH` there and loses every command.
@@ -55,7 +55,7 @@ df -k "$P" | tail -1
 ## 2. Which worktrees
 
 1. Call `list_sessions` with `limit: 100`, and again with the `after` each page ends with,
-   until a page says no more follow: a project has more sessions than one page (#210). A
+   until a page says no more follow: a folder has more sessions than one page (#210). A
    line with `Worktree: <path> on <branch>.` ties that folder to that session. Group the lines by path.
 2. A path is **finished** if every session naming it is `Done` or
    `Archived` and none says `Holding:`. It is **archived** if every session naming it is
@@ -111,7 +111,7 @@ while IFS= read -r D; do
 done
 ```
 
-A folder git ignores and tracks nothing in is build output, by the project's own
+A folder git ignores and tracks nothing in is build output, by the folder's own
 `.gitignore`: deleting it loses nothing a build cannot make again. Anything else is kept.
 
 ## 5. Remove archived worktrees

@@ -13,7 +13,7 @@
                                                   the end; --ask leaves the
                                                   permissions for you
 
-Everything the window can ask, this can ask: projects/add, agents/start,
+Everything the window can ask, this can ask: folders/add, agents/start,
 agents/prompt, agents/list, agents/transcript, permissions/answer, cost/state,
 workflows/list … see DaemonAPI.Method for the whole list.
 
@@ -21,7 +21,7 @@ Import it instead for anything longer than one call:
 
     from rpc import Client
     c = Client("/tmp/ag-xxxx")
-    c.call("projects/add", {"folder": "file:///tmp/ag-xxxx/work"})
+    c.call("folders/add", {"folder": "file:///tmp/ag-xxxx/work"})
 """
 import json
 import os

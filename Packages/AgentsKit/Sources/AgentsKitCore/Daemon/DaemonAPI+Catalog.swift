@@ -1,6 +1,6 @@
 import Foundation
 
-/// Searching a catalogue and adding skills to the person or a project (059,
+/// Searching a catalogue and adding skills to the person or a folder (059,
 /// contracts/catalog-methods.md).
 ///
 /// Every one of these is for a person's window or paired client (#111). None is in
@@ -26,11 +26,11 @@ extension DaemonAPI.Failure {
 }
 
 extension DaemonAPI {
-    /// Where a skill goes: the person's own `~/.agents/skills`, or a project's (or one of
+    /// Where a skill goes: the person's own `~/.agents/skills`, or a folder's (or one of
     /// its worktrees') `.agents/skills`.
     public enum SkillDestination: Codable, Hashable, Sendable {
         case personal
-        case project(folder: String)
+        case folder(folder: String)
 
         private enum CodingKeys: String, CodingKey { case kind, folder }
 
@@ -38,7 +38,7 @@ extension DaemonAPI {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             switch try c.decode(String.self, forKey: .kind) {
             case "personal": self = .personal
-            case "project": self = .project(folder: try c.decode(String.self, forKey: .folder))
+            case "folder": self = .folder(folder: try c.decode(String.self, forKey: .folder))
             case let other:
                 throw DecodingError.dataCorruptedError(forKey: .kind, in: c, debugDescription: "no destination \(other)")
             }
@@ -48,8 +48,8 @@ extension DaemonAPI {
             var c = encoder.container(keyedBy: CodingKeys.self)
             switch self {
             case .personal: try c.encode("personal", forKey: .kind)
-            case .project(let folder):
-                try c.encode("project", forKey: .kind)
+            case .folder(let folder):
+                try c.encode("folder", forKey: .kind)
                 try c.encode(folder, forKey: .folder)
             }
         }
@@ -101,8 +101,8 @@ extension DaemonAPI {
         case noPersonalHome
         /// The preview was used, swept or never made.
         case previewExpired
-        /// A folder that is not a project on this Mac, or a worktree of one.
-        case notAProject(path: String)
+        /// A folder that is not a folder on this Mac, or a worktree of one.
+        case notAFolder(path: String)
         /// Replace was needed and not asked for, or asked for where there is nothing to replace.
         case replaceMismatch
         /// The preview found something that means it cannot be added.
@@ -119,7 +119,7 @@ extension DaemonAPI {
         public var kind: CatalogKind
         /// The marketplace to ask (#687); nil asks the first one on for the kind.
         public var marketplace: String?
-        /// Where the result would go: a project's own marketplaces are asked only for it.
+        /// Where the result would go: a folder's own marketplaces are asked only for it.
         public var destination: SkillDestination?
         public init(query: String, kind: CatalogKind = .skills, marketplace: String? = nil,
                     destination: SkillDestination? = nil) {
@@ -190,7 +190,7 @@ extension DaemonAPI {
         case managedOther(source: String)
         /// A folder of this name that no lock names: never touched.
         case unmanaged(path: String)
-        /// There is nowhere to put it (no personal home, or not a project).
+        /// There is nowhere to put it (no personal home, or not a folder).
         case unavailable(CatalogError)
     }
 
@@ -293,7 +293,7 @@ extension DaemonAPI {
         /// `owner/repo`.
         public var source: String
         public var skillPath: String?
-        /// What the lock recorded: the folder's tree SHA (personal) or `computedHash` (project).
+        /// What the lock recorded: the folder's tree SHA (personal) or `computedHash` (folder).
         public var recordedHash: String?
         /// From the app's own sidecar; nil for a skill the CLI added.
         public var commit: String?
@@ -331,7 +331,7 @@ extension DaemonAPI {
         public init(destination: SkillDestination) { self.destination = destination }
     }
 
-    /// A skill in a project's `.agents/skills` (frame D).
+    /// A skill in a folder's `.agents/skills` (frame D).
     public struct ListedSkill: Codable, Hashable, Sendable, Identifiable {
         public var name: String
         public var description: String?

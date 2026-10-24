@@ -66,7 +66,7 @@ What a runtime does with the list differs:
 - **Codex, OpenCode, Gemini, Copilot, Cursor and Antigravity** send every listed schema
   with every request: about 10,650 tokens, against the 97 K a Codex turn reads on average.
 
-A project's own connectors (MCP servers) are added on top, in the same way for each runtime. They are
+A folder's own connectors (MCP servers) are added on top, in the same way for each runtime. They are
 the person's choice, and they are not measured here. To measure one, list its tools
 (`tools/list`) and count the bytes of the answer.
 

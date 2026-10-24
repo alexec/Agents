@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Choose a folder on a server as a project (037, wireframes/mac-new-project.svg B).
+/// Choose a folder on a server as a folder (037, wireframes/mac-new-folder.svg B).
 ///
 /// The Mac's own folder picker cannot see a server, so this stands in for it: a path
 /// field, and the folders under it, read with `files/browse` on that server.
@@ -56,10 +56,10 @@ struct RemoteFolderSheet: View {
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Add as project") {
+                Button("Add as folder") {
                     let folder = chosen ?? listing?.url
                     dismiss()
-                    if let folder { Task { await model.addProject(folder, on: host) } }
+                    if let folder { Task { await model.addFolder(folder, on: host) } }
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(listing == nil)

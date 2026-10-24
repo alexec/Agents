@@ -2,18 +2,18 @@
 // ported by hand for the notifications the web remote hears and held to Fixtures/web/reducer
 // (research R7). Nothing here decides anything; the hosts do.
 import { preferencesSaid, sendPreferencesWith } from "./preferences";
-import { projectPath } from "./hostedMCP";
+import { folderPath as hostedFolderPath } from "./hostedMCP";
 import type { ExportImportBusy } from "./exports";
 import { batch, computed, signal, type ReadonlySignal, type Signal } from "@preact/signals";
 import type {
   Agent, AgentRemovedNotification, ResumingNotification, ControlHost, HostID, HostMachine, ElicitationNotification, ElicitationRequest, EntryNotification,
-  PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
-  WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, ProjectRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeStatus,
+  PermissionNotification, PermissionRequest, FolderSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
+  WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, FolderRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
   CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, HostJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
-  BuildOutputRemoved, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
+  BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, RemoveRequest, ClientPermissionSettings } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
@@ -27,7 +27,7 @@ import type { SaveOutcome } from "./sourceEdit";
 import { artifactsIn, withArtifactsOf, type Artifact } from "./artifacts";
 import { log } from "../log";
 import { knowPublicViews } from "../place";
-import { folderKey, projectFolder, projectView, type ProjectView } from "./groups";
+import { folderKey, folderPath as agentFolderPath, folderView, type FolderView } from "./groups";
 import { decideMacHostNotice, type MacHostNotice } from "./macHostNotice";
 import { DisplayBuilder, keepingTurns, storedTurn, turns, type ChatTurn, type Item } from "./turns";
 import { sortedRuntimes } from "./runtimes";
@@ -200,10 +200,10 @@ export function hostStateWords(state: string): string {
 
 export class Work {
   readonly hosts = signal<ControlHost[]>([]);
-  readonly projects = signal<ByHost<ProjectSummary>>({});
+  readonly folders = signal<ByHost<FolderSummary>>({});
   /** The accounts added to each host's runtimes (#840), by host. */
   readonly accountProfiles = signal<Record<string, AccountProfile[]>>({});
-  /** The clones under way on each host (027), drawn where the project will be. */
+  /** The clones under way on each host (027), drawn where the folder will be. */
   readonly clones = signal<ByHost<CloneSummary>>({});
   readonly agents = signal<ByHost<Agent>>({});
   readonly permissions = signal<ByHost<PermissionRequest>>({});
@@ -256,7 +256,7 @@ export class Work {
   /** The last file an agent asked to be put in front of the person (`agent/showFile`). */
   readonly shownFile = signal<{ host: string; agentID: string; path: string; line?: number | undefined; at: number } | null>(null);
   /** A new agent a view filled in (#834, agents/start-agent), for the new-agent form on that
-   *  project to take: the prompt, the labels and the worktree. Starting it is still the person's move. */
+   *  folder to take: the prompt, the labels and the worktree. Starting it is still the person's move. */
   readonly offeredStart = signal<{ host: string; folder: string; start: { prompt: string; labels: string[]; worktree?: string | undefined; branch?: string | undefined } } | null>(null);
   /**
    * How to draw each CSV an agent showed as a chart (#836), by `host|path`: from `agent/showFile`
@@ -280,28 +280,28 @@ export class Work {
   /** The last folders said to have changed, for a pane watching them (`files/changed`). */
   readonly filesChanged = signal<{ host: string; agentID: string; folders: string[]; many: boolean; at: number } | null>(null);
 
-  /** Each project's pinned pages by `host|folder` (#159), kept by pins/changed. */
+  /** Each folder's pinned pages by `host|folder` (#159), kept by pins/changed. */
   readonly pins = signal<Record<string, PinView[]>>({});
-  /** Each project's pinned sessions by `host|folder` (#180), in their order, kept by pins/changed. */
+  /** Each folder's pinned sessions by `host|folder` (#180), in their order, kept by pins/changed. */
   readonly sessionPins = signal<Record<string, string[]>>({});
-  /** Each project's pinned workflows' ids by `host|folder` (#432), in their order, kept by pins/changed. */
+  /** Each folder's pinned workflows' ids by `host|folder` (#432), in their order, kept by pins/changed. */
   readonly workflowPins = signal<Record<string, string[]>>({});
-  /** Each project's servers' list views by `host|folder` (#2032), the hidden ones marked, kept by pins/changed. */
+  /** Each folder's servers' list views by `host|folder` (#2032), the hidden ones marked, kept by pins/changed. */
   readonly serverViews = signal<Record<string, PinView[]>>({});
   /** Bumped by pages/changed: a page shown may have changed on disk; read it again. */
   readonly pageRevisions = signal<Record<string, number>>({});
 
-  /** Each project's workflows by `host|folder`, listed while that project is open. */
+  /** Each folder's workflows by `host|folder`, listed while that folder is open. */
   readonly workflows = signal<Record<string, WorkflowSummary[]>>({});
-  /** One project's list, so a change redraws that fold and no other (#291). */
+  /** One folder's list, so a change redraws that fold and no other (#291). */
   private workflowSlices = new Map<string, Signal<WorkflowSummary[]>>();
-  /** Projects whose workflow list is on screen, and how many views hold it. */
+  /** Folders whose workflow list is on screen, and how many views hold it. */
   protected workflowHolds = new Map<string, number>();
   /** Lists a fetch has answered, so a page can tell "loading" from "gone". */
   protected workflowsLoaded = new Set<string>();
 
-  /** One project's workflows: a reader redraws only when this project's list changes. */
-  projectWorkflows(host: string, folder: string): WorkflowSummary[] {
+  /** One folder's workflows: a reader redraws only when this folder's list changes. */
+  folderWorkflows(host: string, folder: string): WorkflowSummary[] {
     const key = `${host}|${folderKey(folder)}`;
     let slice = this.workflowSlices.get(key);
     if (!slice) {
@@ -319,7 +319,7 @@ export class Work {
       .filter((summary) => summary.scope === "user" && summary.content !== undefined);
   }
 
-  /** Whether `loadWorkflows` has answered for this project since it was opened. */
+  /** Whether `loadWorkflows` has answered for this folder since it was opened. */
   workflowsKnown(host: string, folder: string): boolean {
     return this.workflowsLoaded.has(`${host}|${folderKey(folder)}`);
   }
@@ -339,7 +339,7 @@ export class Work {
 
   upsertWorkflow(summary: WorkflowSummary, host: string): void {
     const key = `${host}|${folderKey(summary.workflow.folder)}`;
-    // A project not on screen keeps no list: the next open asks for the whole of it (#291).
+    // A folder not on screen keeps no list: the next open asks for the whole of it (#291).
     if (this.workflows.peek()[key] === undefined && !this.workflowHolds.has(key)) return;
     const list = (this.workflows.peek()[key] ?? []).filter((w) => w.workflow.workflowID !== summary.workflow.workflowID);
     this.writeWorkflows(key, [...list, summary]);
@@ -383,9 +383,9 @@ export class Work {
   /** The person's Mac's backups (#1810), for Settings ▸ Backups: null until it has said, or from a
    * host too old to keep backups, which leaves the section out. */
   readonly backups = signal<BackupState | null>(null);
-  /** Each host's projects' worktrees (#790), as `worktrees/all` last answered: asked when Activity ▸
+  /** Each host's folders' worktrees (#790), as `worktrees/all` last answered: asked when Activity ▸
    * Worktrees is shown, not kept up by the host. */
-  readonly worktreeLists = signal<Record<string, ProjectWorktrees[]>>({});
+  readonly worktreeLists = signal<Record<string, FolderWorktrees[]>>({});
   /** Each worktree's size as `worktrees/sized` said since the list, by host and root: newer than it. */
   readonly worktreeSizes = signal<Record<string, Record<string, WorktreeSize>>>({});
   /** Each host's files it could not read in this run (#205, #223), replaced whole by each store/notesChanged. */
@@ -546,12 +546,12 @@ export class Work {
       case "runtimes/accountProfilesChanged":
         this.accountProfiles.value = { ...this.accountProfiles.value, [host]: params as AccountProfile[] };
         return true;
-      case "project/removed":
+      case "folder/removed":
         // Deleted (#677); its sessions went before it, each by its own agent/removed.
-        this.removeProject((params as ProjectRemovedNotification).folder, host);
+        this.removeFolder((params as FolderRemovedNotification).folder, host);
         return true;
-      case "project/changed":
-        this.upsertProject(params as ProjectSummary, host);
+      case "folder/changed":
+        this.upsertFolder(params as FolderSummary, host);
         return true;
       case "clone/changed": {
         // Every window hears it: a clone belongs to the host, not to whoever asked (027).
@@ -683,7 +683,7 @@ export class Work {
         const held = this.agents.value[host] ?? [];
         const gone = held.find((a) => a.id === agentID);
         batch(() => {
-          if (gone) this.setAgents(host, held.filter((a) => a !== gone), [projectFolder(gone)]);
+          if (gone) this.setAgents(host, held.filter((a) => a !== gone), [agentFolderPath(gone)]);
           this.permissions.value = { ...this.permissions.value,
             [host]: (this.permissions.value[host] ?? []).filter((p) => p.agentID !== agentID) };
           this.elicitations.value = { ...this.elicitations.value,
@@ -696,19 +696,19 @@ export class Work {
     }
   }
 
-  removeProject(folder: string, host: string): void {
-    const list = (this.projects.value[host] ?? []).filter((p) => folderKey(p.project.folder) !== folderKey(folder));
-    this.projects.value = { ...this.projects.value, [host]: list };
+  removeFolder(folder: string, host: string): void {
+    const list = (this.folders.value[host] ?? []).filter((p) => folderKey(p.folder.folder) !== folderKey(folder));
+    this.folders.value = { ...this.folders.value, [host]: list };
   }
 
-  upsertProject(summary: ProjectSummary, host: string): void {
-    const list = (this.projects.value[host] ?? [])
-      .filter((p) => folderKey(p.project.folder) !== folderKey(summary.project.folder));
-    this.projects.value = { ...this.projects.value, [host]: [...list, summary] };
+  upsertFolder(summary: FolderSummary, host: string): void {
+    const list = (this.folders.value[host] ?? [])
+      .filter((p) => folderKey(p.folder.folder) !== folderKey(summary.folder.folder));
+    this.folders.value = { ...this.folders.value, [host]: [...list, summary] };
   }
 
   /**
-   * One agent as it is now, put where its activity sorts it. Only its project's list, and the
+   * One agent as it is now, put where its activity sorts it. Only its folder's list, and the
    * one it left if it moved, are made again (#170).
    */
   upsertAgent(heard: Agent, host: string): void {
@@ -724,7 +724,7 @@ export class Work {
     let into = 0;
     while (into < list.length && list[into]!.lastActivityAt >= agent.lastActivityAt) into++;
     list.splice(into, 0, agent);
-    this.setAgents(host, list, was ? [projectFolder(was), projectFolder(agent)] : [projectFolder(agent)]);
+    this.setAgents(host, list, was ? [agentFolderPath(was), agentFolderPath(agent)] : [agentFolderPath(agent)]);
   }
 
   /** One host's agents as it just listed them; every other host's are left alone. */
@@ -733,36 +733,36 @@ export class Work {
     this.setAgents(host, newestFirst(listed.map((a) => keepingLists(a, held.get(a.id)))));
   }
 
-  /** Archived agents of one project, listed when the fold opens, added beside the live ones. */
+  /** Archived agents of one folder, listed when the fold opens, added beside the live ones. */
   addAgents(listed: Agent[], host: string): void {
     const held = new Map((this.agents.value[host] ?? []).map((a) => [a.id, a]));
     const incoming = new Set(listed.map((l) => l.id));
     const kept = [...held.values()].filter((a) => !incoming.has(a.id));
     this.setAgents(host, newestFirst([...kept, ...listed.map((a) => keepingLists(a, held.get(a.id)))]),
-      listed.map(projectFolder));
+      listed.map(agentFolderPath));
   }
 
   /**
-   * One project's archived agents let go, when its Archived fold closes: the page holds the live
+   * One folder's archived agents let go, when its Archived fold closes: the page holds the live
    * agents and a page of archived ones per open fold, no more (#170). The open session stays.
    */
   dropArchived(host: string, folder: string): void {
     const key = folderKey(folder);
     const watching = this.watching.value;
     const held = this.agents.value[host] ?? [];
-    const kept = held.filter((a) => a.state !== "archived" || projectFolder(a) !== key
+    const kept = held.filter((a) => a.state !== "archived" || agentFolderPath(a) !== key
       || (watching?.host === host && watching.session === a.id));
     if (kept.length !== held.length) this.setAgents(host, kept, [key]);
   }
 
-  /** Each project's agents by `host|folder`, kept as each change lands: one change redraws one project (#170). */
+  /** Each folder's agents by `host|folder`, kept as each change lands: one change redraws one folder (#170). */
   private slices = new Map<string, Signal<Agent[]>>();
-  private views = new Map<string, ReadonlySignal<ProjectView>>();
+  private views = new Map<string, ReadonlySignal<FolderView>>();
   private byID = new Map<string, ReadonlySignal<Agent | undefined>>();
 
   /**
-   * Every write to a host's agents. `touched` names the projects that changed; without it every
-   * project of the host is worked out again, and only those whose agents differ are told.
+   * Every write to a host's agents. `touched` names the folders that changed; without it every
+   * folder of the host is worked out again, and only those whose agents differ are told.
    */
   protected setAgents(host: string, list: Agent[], touched?: readonly string[]): void {
     const prefix = `${host}|`;
@@ -771,13 +771,13 @@ export class Work {
       if (touched) {
         for (const folder of new Set(touched)) {
           const slice = this.slices.get(prefix + folder);
-          if (slice) slice.value = list.filter((a) => projectFolder(a) === folder);
+          if (slice) slice.value = list.filter((a) => agentFolderPath(a) === folder);
         }
         return;
       }
       const grouped = new Map<string, Agent[]>();
       for (const agent of list) {
-        const folder = projectFolder(agent);
+        const folder = agentFolderPath(agent);
         const group = grouped.get(folder);
         if (group) group.push(agent); else grouped.set(folder, [agent]);
       }
@@ -793,25 +793,25 @@ export class Work {
     const name = `${host}|${folder}`;
     let slice = this.slices.get(name);
     if (!slice) {
-      slice = signal((this.agents.peek()[host] ?? []).filter((a) => projectFolder(a) === folder));
+      slice = signal((this.agents.peek()[host] ?? []).filter((a) => agentFolderPath(a) === folder));
       this.slices.set(name, slice);
     }
     return slice;
   }
 
-  /** One project's agents, newest first: what reads them is redrawn only when they change. */
-  projectAgents(host: string, folder: string): Agent[] {
+  /** One folder's agents, newest first: what reads them is redrawn only when they change. */
+  folderAgents(host: string, folder: string): Agent[] {
     return this.slice(host, folderKey(folder)).value;
   }
 
-  /** One project's headings, archived sessions, subtitle and counts, worked out once per change to it. */
-  projectView(host: string, folder: string): ProjectView {
+  /** One folder's headings, archived sessions, subtitle and counts, worked out once per change to it. */
+  folderView(host: string, folder: string): FolderView {
     const key = folderKey(folder);
     const name = `${host}|${key}`;
     let view = this.views.get(name);
     if (!view) {
       const slice = this.slice(host, key);
-      view = computed(() => projectView(slice.value, key));
+      view = computed(() => folderView(slice.value, key));
       this.views.set(name, view);
     }
     return view.value;
@@ -1072,7 +1072,7 @@ export class Work {
     return this.kept.value.filter((k) => k.host === host && k.kind === "prompt" && k.agentID === agentID);
   }
 
-  /** The agent starts kept for one project. */
+  /** The agent starts kept for one folder. */
   keptStarts(host: string, folder: string): KeptRequest[] {
     return this.kept.value.filter((k) => k.host === host && k.kind === "start" && !!k.folder && folderKey(k.folder) === folderKey(folder));
   }
@@ -1162,7 +1162,7 @@ export function tellingWords(doing: string | null, recipient: string): string {
 export const sentBeforeEdit = "That prompt was sent before your change. Your words are in the prompt bar.";
 
 export class Store extends Work {
-  /** The control plane's machine providers (#1808), for Settings ▸ Control plane. */
+  /** The control plane's workspace providers (#1808), for Settings ▸ Control plane. */
   readonly providers: Providers;
 
   async loadUserWorkflows(host: string): Promise<void> {
@@ -1328,7 +1328,7 @@ export class Store extends Work {
 
   /**
    * Everything again, on every connection, in the window's order (refreshEverything): agents,
-   * then projects, then the cards and the open conversation at once. No cursors on the wire.
+   * then folders, then the cards and the open conversation at once. No cursors on the wire.
    * One at a time: asked again while running, it runs once more after.
    */
   load(): Promise<void> {
@@ -1563,7 +1563,7 @@ export class Store extends Work {
     batch(() => {
       this.setAgents(host, []);
       this.agents.value = without(this.agents.value);
-      this.projects.value = without(this.projects.value);
+      this.folders.value = without(this.folders.value);
       this.clones.value = without(this.clones.value);
       this.permissions.value = without(this.permissions.value);
       this.elicitations.value = without(this.elicitations.value);
@@ -1595,14 +1595,14 @@ export class Store extends Work {
   }
 
   /** What an offline host last listed, from the control plane (#962), when nothing of it is held:
-   *  a page opened while it is stopped lists its projects and sessions as one open when it went. */
+   *  a page opened while it is stopped lists its folders and sessions as one open when it went. */
   private async loadLastHeard(host: string): Promise<void> {
-    if (this.hostIsOnline(host) || this.projects.value[host] !== undefined) return;
+    if (this.hostIsOnline(host) || this.folders.value[host] !== undefined) return;
     const heard = await this.link.call("hosts/lastHeard", { host: host as HostID }).catch(() => null);
-    if (!heard || this.hostIsOnline(host) || this.projects.value[host] !== undefined) return;
+    if (!heard || this.hostIsOnline(host) || this.folders.value[host] !== undefined) return;
     batch(() => {
       if (heard.agents) this.replaceAgents(heard.agents, host);
-      if (heard.projects) this.projects.value = { ...this.projects.value, [host]: heard.projects };
+      if (heard.folders) this.folders.value = { ...this.folders.value, [host]: heard.folders };
     });
   }
 
@@ -1634,11 +1634,11 @@ export class Store extends Work {
       void this.search({ includeArchived: true, archivedCommands: false, archivedOnly: false, lean: true,
         limit: searchShown, query: this.searchWords }, host, this.searchTurn);
     }
-    // Archived ones too, as the window lists them: the sidebar folds them under Archived projects
+    // Archived ones too, as the window lists them: the sidebar folds them under Archived folders
     // (#343), and Spending still counts what they cost.
-    const projects = await this.link.call("projects/list", { includeArchived: true }, host).catch(failed("projects/list"));
-    if (projects) this.projects.value = { ...this.projects.value, [host]: projects };
-    const clones = await this.link.call("projects/clones", {}, host).catch(failed("projects/clones"));
+    const folders = await this.link.call("folders/list", { includeArchived: true }, host).catch(failed("folders/list"));
+    if (folders) this.folders.value = { ...this.folders.value, [host]: folders };
+    const clones = await this.link.call("folders/clones", {}, host).catch(failed("folders/clones"));
     if (clones) this.clones.value = { ...this.clones.value, [host]: clones };
     void this.loadRuntimes(host);
     void this.link.call("pins/list", {}, host).then((listed) => {
@@ -1646,11 +1646,11 @@ export class Store extends Work {
       const sessions = Object.fromEntries(Object.entries(this.sessionPins.value).filter(([key]) => !key.startsWith(`${host}|`)));
       const flows = Object.fromEntries(Object.entries(this.workflowPins.value).filter(([key]) => !key.startsWith(`${host}|`)));
       const views = Object.fromEntries(Object.entries(this.serverViews.value).filter(([key]) => !key.startsWith(`${host}|`)));
-      for (const project of listed) {
-        views[`${host}|${folderKey(project.folder)}`] = project.views ?? [];
-        held[`${host}|${folderKey(project.folder)}`] = project.pins;
-        sessions[`${host}|${folderKey(project.folder)}`] = project.sessions ?? [];
-        flows[`${host}|${folderKey(project.folder)}`] = project.workflows ?? [];
+      for (const folder of listed) {
+        views[`${host}|${folderKey(folder.folder)}`] = folder.views ?? [];
+        held[`${host}|${folderKey(folder.folder)}`] = folder.pins;
+        sessions[`${host}|${folderKey(folder.folder)}`] = folder.sessions ?? [];
+        flows[`${host}|${folderKey(folder.folder)}`] = folder.workflows ?? [];
       }
       this.pins.value = held;
       this.sessionPins.value = sessions;
@@ -1720,11 +1720,11 @@ export class Store extends Work {
     return listed;
   }
 
-  /** The projects whose archived sessions have been listed since this connection opened. */
+  /** The folders whose archived sessions have been listed since this connection opened. */
   private archivedLoaded = new Set<string>();
 
 
-  /** The project's workflow list is on screen. The first holder asks for it. */
+  /** The folder's workflow list is on screen. The first holder asks for it. */
   holdWorkflows(host: string, folder: string): void {
     const key = `${host}|${folderKey(folder)}`;
     const count = this.workflowHolds.get(key) ?? 0;
@@ -1753,7 +1753,7 @@ export class Store extends Work {
     if (listed) this.writeWorkflows(key, listed);
   }
 
-  /** One project's newest archived sessions, a page of them, asked for when its fold opens (#170). */
+  /** One folder's newest archived sessions, a page of them, asked for when its fold opens (#170). */
   async loadArchived(host: string, folder: string): Promise<void> {
     const key = `${host}|${folderKey(folder)}`;
     if (this.archivedLoaded.has(key)) return;
@@ -1846,13 +1846,13 @@ export class Store extends Work {
         && !(watching?.host === host && watching.session === a.id));
       if (gone.length) {
         const without = new Set(gone.map((a) => a.id));
-        this.setAgents(host, held.filter((a) => !without.has(a.id)), [...new Set(gone.map(projectFolder))]);
+        this.setAgents(host, held.filter((a) => !without.has(a.id)), [...new Set(gone.map(agentFolderPath))]);
       }
     }
     this.searched.clear();
   }
 
-  /** Its fold closed: the project's archived sessions are let go, and listed again when it opens. */
+  /** Its fold closed: the folder's archived sessions are let go, and listed again when it opens. */
   unloadArchived(host: string, folder: string): void {
     this.archivedLoaded.delete(`${host}|${folderKey(folder)}`);
     this.dropArchived(host, folder);
@@ -2114,12 +2114,12 @@ export class Store extends Work {
   }
 
   /**
-   * A folder on `host` as a project (#115), as the window's Add Folder… does. Answers the
-   * project, or null with `problem` saying why.
+   * A folder on `host` as a folder (#115), as the window's Add Folder… does. Answers the
+   * folder, or null with `problem` saying why.
    */
-  async addProject(host: string, folder: string): Promise<ProjectSummary | null> {
-    const summary = await this.act("projects/add", { folder: folder as never }, host);
-    if (summary) this.upsertProject(summary, host);
+  async addFolder(host: string, folder: string): Promise<FolderSummary | null> {
+    const summary = await this.act("folders/add", { folder: folder as never }, host);
+    if (summary) this.upsertFolder(summary, host);
     return summary;
   }
 
@@ -2127,54 +2127,54 @@ export class Store extends Work {
    * Clones `url` into the host's home folder and adds it (027, #115). Answers once the clone
    * has finished; the row meanwhile comes from `clone/changed`.
    */
-  async cloneProject(host: string, url: string): Promise<ProjectSummary | null> {
-    const summary = await this.act("projects/clone", { url }, host);
-    if (summary) this.upsertProject(summary, host);
+  async cloneFolder(host: string, url: string): Promise<FolderSummary | null> {
+    const summary = await this.act("folders/clone", { url }, host);
+    if (summary) this.upsertFolder(summary, host);
     return summary;
   }
 
   /**
-   * A project put away (#668), as the window's Archive does: it moves to Archived projects with
+   * A folder put away (#668), as the window's Archive does: it moves to Archived folders with
    * its sessions. A refusal names the sessions to stop first.
    */
-  async archiveProject(host: string, folder: string): Promise<ProjectSummary | null> {
-    const summary = await this.act("projects/archive", { folder: folder as never }, host);
-    if (summary) this.upsertProject(summary, host);
+  async archiveFolder(host: string, folder: string): Promise<FolderSummary | null> {
+    const summary = await this.act("folders/archive", { folder: folder as never }, host);
+    if (summary) this.upsertFolder(summary, host);
     return summary;
   }
 
   /**
-   * An archived project unarchived (#343), as the window's Unarchive does: a project again,
+   * An archived folder unarchived (#343), as the window's Unarchive does: a folder again,
    * with its new-session form open.
    */
-  async unarchiveProject(host: string, folder: string): Promise<ProjectSummary | null> {
-    const summary = await this.act("projects/unarchive", { folder: folder as never }, host);
-    if (summary) this.upsertProject(summary, host);
+  async unarchiveFolder(host: string, folder: string): Promise<FolderSummary | null> {
+    const summary = await this.act("folders/unarchive", { folder: folder as never }, host);
+    if (summary) this.upsertFolder(summary, host);
     return summary;
   }
 
   /**
-   * An archived project deleted (#677), asked first: every session in it and its record; its
+   * An archived folder deleted (#677), asked first: every session in it and its record; its
    * folder stays. A refusal says which sessions hold it.
    */
-  async deleteProject(host: string, folder: string): Promise<boolean> {
-    if (await this.act("projects/delete", { folder: folder as never }, host) === null) return false;
-    this.removeProject(folder, host);
+  async deleteFolder(host: string, folder: string): Promise<boolean> {
+    if (await this.act("folders/delete", { folder: folder as never }, host) === null) return false;
+    this.removeFolder(folder, host);
     return true;
   }
 
   /**
-   * The changes to a project's own files waiting for Keep or Undo (#531): those asked in `session`,
-   * the agent that made them, or with no session, those asked of the project `folder` on its page.
+   * The changes to a folder's own files waiting for Keep or Undo (#531): those asked in `session`,
+   * the agent that made them, or with no session, those asked of the folder `folder` on its page.
    */
   guardedChanges(host: string, where: { session: string } | { folder: string }): { folder: string; change: GuardedChange }[] {
     const found: { folder: string; change: GuardedChange }[] = [];
-    for (const summary of this.projects.value[host] ?? []) {
-      if ("folder" in where && folderKey(summary.project.folder) !== folderKey(where.folder)) continue;
+    for (const summary of this.folders.value[host] ?? []) {
+      if ("folder" in where && folderKey(summary.folder.folder) !== folderKey(where.folder)) continue;
       for (const change of summary.guardedChanges ?? []) {
         const askedIn = change.askedIn ?? null;
         if ("session" in where ? askedIn === where.session : askedIn === null) {
-          found.push({ folder: summary.project.folder, change });
+          found.push({ folder: summary.folder.folder, change });
         }
       }
     }
@@ -2183,14 +2183,14 @@ export class Store extends Work {
 
   /** What a guarded file was and is (#502), for the person deciding. */
   async readGuardedChange(host: string, folder: string, change: GuardedChange): Promise<GuardedChangeReading | null> {
-    return await this.act("projects/readGuardedChange", { folder: folder as never, path: change.path }, host);
+    return await this.act("folders/readGuardedChange", { folder: folder as never, path: change.path }, host);
   }
 
   /** Keep (the change is used from now on) or Undo (the approved copy goes back), of the file as it was shown. */
   async settleGuardedChange(host: string, folder: string, reading: GuardedChangeReading, keep: boolean): Promise<void> {
     const params = { folder: folder as never, path: reading.path, ...(reading.digest !== undefined ? { digest: reading.digest } : {}) };
-    const summary = await this.act(keep ? "projects/keepGuardedChange" : "projects/undoGuardedChange", params, host);
-    if (summary) this.upsertProject(summary, host);
+    const summary = await this.act(keep ? "folders/keepGuardedChange" : "folders/undoGuardedChange", params, host);
+    if (summary) this.upsertFolder(summary, host);
   }
 
   /**
@@ -2204,15 +2204,15 @@ export class Store extends Work {
   /**
    * Approve, Deny or Request Changes of a waiting item (#773), of the version read (`digest`), so a
    * change since is refused and not approved. Throws a refusal, which the sheet says in its place,
-   * staying open; answered, the project's list is the host's again.
+   * staying open; answered, the folder's list is the host's again.
    */
   async answerApproval(host: string, folder: string, approval: Approval, action: ApprovalAction,
-    digest: string | undefined, note?: string): Promise<ProjectSummary> {
+    digest: string | undefined, note?: string): Promise<FolderSummary> {
     const summary = await this.link.call("approvals/answer", {
       folder: folder as never, kind: approval.kind, key: approval.key, action,
       ...(digest !== undefined ? { digest } : {}), ...(note !== undefined ? { note } : {}),
     }, host);
-    this.upsertProject(summary, host);
+    this.upsertFolder(summary, host);
     return summary;
   }
 
@@ -2221,11 +2221,11 @@ export class Store extends Work {
    * where it is. From the row's menu, so a refusal is said in `problem`.
    */
   async keepSession(host: string, agent: Agent): Promise<void> {
-    const folder = projectFolder(agent);
-    const listed = (this.projects.value[host] ?? []).find((p) => folderKey(p.project.folder) === folder)?.project.folder;
+    const folder = agentFolderPath(agent);
+    const listed = (this.folders.value[host] ?? []).find((p) => folderKey(p.folder.folder) === folder)?.folder.folder;
     const summary = await this.act("approvals/answer",
       { folder: (listed ?? folder) as never, kind: "archive", key: agent.id, action: "deny" }, host);
-    if (summary) this.upsertProject(summary, host);
+    if (summary) this.upsertFolder(summary, host);
   }
 
   /**
@@ -2237,16 +2237,16 @@ export class Store extends Work {
       folder: folder as never, kind: approval.kind, key: approval.key, action: "dismiss",
       ...(approval.digest !== undefined ? { digest: approval.digest } : {}),
     }, host);
-    if (summary) this.upsertProject(summary, host);
+    if (summary) this.upsertFolder(summary, host);
   }
 
-  /** A project pinned to the top of the sidebar, or not, as the window's Pin and Unpin. */
-  async setProjectPinned(host: string, folder: string, pinned: boolean): Promise<void> {
-    const summary = await this.act("projects/setPinned", { folder: folder as never, pinned }, host);
-    if (summary) this.upsertProject(summary, host);
+  /** A folder pinned to the top of the sidebar, or not, as the window's Pin and Unpin. */
+  async setFolderPinned(host: string, folder: string, pinned: boolean): Promise<void> {
+    const summary = await this.act("folders/setPinned", { folder: folder as never, pinned }, host);
+    if (summary) this.upsertFolder(summary, host);
   }
 
-  /** The folders at `path` on `host`, for choosing one as a project (037). Throws a refusal. */
+  /** The folders at `path` on `host`, for choosing one as a folder (037). Throws a refusal. */
   browse(host: string, path: string): Promise<DirectoryListing> {
     return this.link.call("files/browse", { path }, host);
   }
@@ -2311,27 +2311,27 @@ export class Store extends Work {
     if (!hosted) return undefined;
     return {
       servers: hosted.servers.map((live) => ({
-        name: live.name, ...(live.project != null ? { project: live.project } : {}),
+        name: live.name, ...(live.folder != null ? { folder: live.folder } : {}),
         transport: "stdio" as const, hosted: true, live, check: "unchecked" as const,
       })),
       problems: [], at: hosted.at,
     };
   }
 
-  /** Check Now on the person's own servers (no folder) or a project's (#753). */
+  /** Check Now on the person's own servers (no folder) or a folder's (#753). */
   async checkMCPHealth(host: string, folder?: string): Promise<void> {
-    const request = folder === undefined ? {} : { project: projectPath(folder) };
+    const request = folder === undefined ? {} : { folder: hostedFolderPath(folder) };
     const snapshot = await this.link.call("mcp/health/check", request, host).catch(() => null);
     if (snapshot) this.mcpHealth.value = { ...this.mcpHealth.value, [host]: snapshot };
   }
 
   /**
-   * Takes one connector out of its mcp.json (#2154), the person's own (no folder) or a project's,
+   * Takes one connector out of its mcp.json (#2154), the person's own (no folder) or a folder's,
    * one the app added or one written by hand, then checks the rest again. Its secrets stay.
    * Undefined when it went, else why not.
    */
   async removeConnector(host: string, name: string, folder?: string): Promise<string | undefined> {
-    const destination = folder === undefined ? { kind: "personal" } : { kind: "project", folder: projectPath(folder) };
+    const destination = folder === undefined ? { kind: "personal" } : { kind: "folder", folder: hostedFolderPath(folder) };
     const why = await this.link.call("mcp/remove", { destination: destination as never, name }, host)
       .then(() => undefined, (error: unknown) => describe(error));
     if (why === undefined) await this.checkMCPHealth(host, folder);
@@ -2455,11 +2455,11 @@ export class Store extends Work {
   readonly folderGone = signal<FolderGoneAsk | null>(null);
 
   /**
-   * Continue in the project folder (#119): a successor that reads this session and carries on,
+   * Continue in the folder (#119): a successor that reads this session and carries on,
    * with whatever was typed. Answers its id, or null with `problem` saying why.
    */
-  async continueInProject(host: string, agentID: string, text = "", attachments: Attachment[] = []): Promise<string | null> {
-    return this.act("agents/continueInProject",
+  async continueInFolder(host: string, agentID: string, text = "", attachments: Attachment[] = []): Promise<string | null> {
+    return this.act("agents/continueInFolder",
       { agentID: agentID as UUID, text, attachments, requestID: crypto.randomUUID().toUpperCase() as UUID }, host);
   }
 
@@ -2655,7 +2655,7 @@ export class Store extends Work {
   }
 
   /**
-   * Files into a project's drop box (#231), one after another, as the window's drop puts them.
+   * Files into a folder's drop box (#231), one after another, as the window's drop puts them.
    * Answers the names sent; the first that could not go is said, and stops the rest.
    */
   async putInDropbox(host: string, folder: string, subfolder: string, files: readonly File[]): Promise<string[]> {
@@ -2679,7 +2679,7 @@ export class Store extends Work {
     return this.pins.value[`${host}|${folderKey(folder)}`] ?? [];
   }
 
-  /** A project's servers' list views (#2032), the hidden ones too, in the servers' order. */
+  /** A folder's servers' list views (#2032), the hidden ones too, in the servers' order. */
   serverViewsIn(host: string, folder: string): PinView[] {
     return this.serverViews.value[`${host}|${folderKey(folder)}`] ?? [];
   }
@@ -2701,7 +2701,7 @@ export class Store extends Work {
     await this.act("pins/hideView", { folder: folder as never, uri, hidden }, host);
   }
 
-  /** A file of the project's: a pinned page, or what an HTML page draws from. */
+  /** A file of the folder's: a pinned page, or what an HTML page draws from. */
   readPage(host: string, folder: string, path: string, knownStamp?: FileStamp) {
     return this.link.call("pins/read", { folder: folder as never, path, ...(knownStamp ? { knownStamp } : {}) }, host);
   }
@@ -2715,7 +2715,7 @@ export class Store extends Work {
     if (pins) this.pins.value = { ...this.pins.value, [`${host}|${folderKey(folder)}`]: pins };
   }
 
-  /** A chat's view pinned to its project (#189): keyed by its ui:// address. Answers whether
+  /** A chat's view pinned to its folder (#189): keyed by its ui:// address. Answers whether
    *  it was; a refusal is said in `problem`. */
   async pinView(host: string, folder: string, view: ViewPin): Promise<boolean> {
     const pins = await this.act("pins/pin", { folder: folder as never, path: view.uri, view }, host);
@@ -2942,18 +2942,18 @@ export class Store extends Work {
     return (await this.link.call("agents/labelVocabulary", { folder: folder as never }, host).catch(() => null)) ?? [];
   }
 
-  /** The personas a start in this project can pick (#760); none from a host too old to know them,
+  /** The personas a start in this folder can pick (#760); none from a host too old to know them,
    *  and null when the host did not answer, so the page asks again once it does (#1096). */
   async personas(host: string, folder: string): Promise<Persona[] | null> {
     return this.link.call("personas/list", { folder: folder as never }, host)
       .catch((error: unknown) => (error instanceof CallFailed && error.code === methodNotFound ? [] : null));
   }
 
-  async personaFiles(host: string, folder: string, origin: "project" | "personal") {
+  async personaFiles(host: string, folder: string, origin: "folder" | "personal") {
     return this.link.call("personas/files", { folder: folder as never, origin }, host).catch(() => null);
   }
 
-  async savePersonaFile(host: string, folder: string, origin: "project" | "personal", id: string, content: string,
+  async savePersonaFile(host: string, folder: string, origin: "folder" | "personal", id: string, content: string,
     remove = false): Promise<boolean> {
     return this.link.call("personas/save", { folder: folder as never, origin, id, content, delete: remove }, host)
       .then(() => true).catch(() => false);
@@ -2968,7 +2968,7 @@ export class Store extends Work {
     return this.worktreeSizes.value[host]?.[worktree.root] ?? worktree.size;
   }
 
-  /** Every project's worktrees on a host, for Activity ▸ Worktrees (#790). */
+  /** Every folder's worktrees on a host, for Activity ▸ Worktrees (#790). */
   async loadWorktrees(host: string): Promise<void> {
     const listed = await this.link.call("worktrees/all", {}, host).catch(() => null);
     if (!listed) return;
@@ -2979,28 +2979,28 @@ export class Store extends Work {
   }
 
   /** What removing a worktree would lose; null when it could not be asked, and the problem says why. */
-  async checkWorktreeRemoval(host: string, project: string, root: string): Promise<RemovalCheck | null> {
-    return this.link.call("worktrees/check", { project: project as never, root: root as never, confirmed: false }, host)
+  async checkWorktreeRemoval(host: string, folder: string, root: string): Promise<RemovalCheck | null> {
+    return this.link.call("worktrees/check", { folder: folder as never, root: root as never, confirmed: false }, host)
       .catch((error: unknown) => { this.say(describe(error)); return null; });
   }
 
   /** Remove a worktree; the host checks again either way. */
-  async removeWorktree(host: string, project: string, root: string, confirmed: boolean): Promise<void> {
-    await this.link.call("worktrees/remove", { project: project as never, root: root as never, confirmed }, host)
+  async removeWorktree(host: string, folder: string, root: string, confirmed: boolean): Promise<void> {
+    await this.link.call("worktrees/remove", { folder: folder as never, root: root as never, confirmed }, host)
       .catch((error: unknown) => this.say(describe(error)));
     await this.loadWorktrees(host);
   }
 
   /** Delete an idle worktree's build output, and say what it freed; null when it could not. */
-  async removeBuildOutput(host: string, project: string, root: string): Promise<BuildOutputRemoved | null> {
+  async removeBuildOutput(host: string, folder: string, root: string): Promise<BuildOutputRemoved | null> {
     const removed = await this.link.call("worktrees/removeBuildOutput",
-      { project: project as never, root: root as never, confirmed: false }, host)
+      { folder: folder as never, root: root as never, confirmed: false }, host)
       .catch((error: unknown) => { this.say(describe(error)); return null; });
     void this.loadWorktrees(host);
     return removed;
   }
 
-  /** One start's id per project, kept until that start succeeds, so a retry is not a second agent (#291). */
+  /** One start's id per folder, kept until that start succeeds, so a retry is not a second agent (#291). */
   private startRequests = new Map<string, UUID>();
 
   startRequestID(host: string, folder: string): UUID {
@@ -3012,7 +3012,7 @@ export class Store extends Work {
     return id;
   }
 
-  /** The start went through. The next one from this project is a new request. */
+  /** The start went through. The next one from this folder is a new request. */
   finishStartRequest(host: string, folder: string): void {
     this.startRequests.delete(`${host}|${folderKey(folder)}`);
   }

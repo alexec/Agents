@@ -9,7 +9,7 @@ description: Every status an agent can have, the group it is listed under, and w
 Only a question puts a session under **Needs you** (#1916): the app does not assume an agent needs you unless it asks. An agent that waits on other agents or a time is under **Waiting**.
 
 This page lists every status an agent can show, and the group it sits under on its
-project's page. The groups appear in this order: **Needs you**, **Waiting**,
+folder's page. The groups appear in this order: **Needs you**, **Waiting**,
 **Working**, **Done**, **Paused**. A group with no agents in it is not
 shown. Archived chats stay under **Archived sessions**, folded away until you open it.
 
@@ -57,7 +57,7 @@ moment it ends, and opening it clears the mark without moving it. A question or 
 unresolved problem is under **Needs you** whether you have read it or not.
 
 Each group heading counts what is unread under it, such as **Done 5 · 2 unread**, and so
-does the project's row in the sidebar and on the phone. The Dock badge, the app icon badge,
+does the folder's row in the sidebar and on the phone. The Dock badge, the app icon badge,
 the Home-screen widget and the tab's title count only what needs you: a question or an unexpected stop. An unread finish is not counted there (#1565).
 
 ## A file to see
@@ -99,7 +99,7 @@ until you archive it.
   (#827).
 - **Approve** is also beside the mark on the Mac's row. On the Remote and the web page,
   **Archive** is in the row's menu and its swipe.
-- **Needs You** lists every session waiting for approval, across every project and host
+- **Needs You** lists every session waiting for approval, across every folder and host
   (#773). Each row is approved on its own; there is no Approve All (#704).
 - The mark goes when you send the session a prompt, when a later turn ends wanting you
   (with a question, stuck, waiting on others or crashed), or when the session is archived. Bringing
@@ -107,7 +107,7 @@ until you archive it.
 - A session that may already archive itself is archived without your approval, if its turn
   ends **Complete** or **Nothing to do**: a chat you started, while **Agents may archive the
   chats I start** is on (the default; not when that turn showed you a file), a workflow's run
-  whose workflow says `when-done: archive-allowed` or `archive`, and a helper in a project
+  whose workflow says `when-done: archive-allowed` or `archive`, and a helper in a folder
   where agents may archive the helpers they started.
 
 A session parked before parking was taken out comes back, on first load, to the group its

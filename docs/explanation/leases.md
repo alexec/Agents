@@ -84,7 +84,7 @@ In the Mac window, the **Resources** row at the bottom of the sidebar opens a pa
 every resource, whether it is free, who holds it and since when, when the lease runs out,
 and who is waiting, in order. At the end of each agent's chat, with the line that says it
 is working, a line says what it holds and what it is waiting for. Click it to open
-**Resources** at that resource. The agent's card on the project page says the same briefly.
+**Resources** at that resource. The agent's card on the folder page says the same briefly.
 
 On iPhone and iPad, the chat and the card show the same leases and waits. Tap the line to
 open **Resources** under **Activity**, which lists the declared resources and anything
@@ -109,7 +109,7 @@ asked, in their briefing, to lease these things before they use them.
 
 Leases belong to one daemon. A scratch copy of the app running on a folder of its own has
 leases of its own, not shared with your everyday app. Agents in different worktrees of the
-same project share one line, because they share one Mac.
+same folder share one line, because they share one Mac.
 
 ## Related
 
