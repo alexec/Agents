@@ -2,12 +2,63 @@ package acp
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/json"
 	"io"
 	"strings"
 	"testing"
 
 	sdk "github.com/coder/acp-go-sdk"
 )
+
+func TestAdvertisedSystemPromptIsAddedToSessionLifecycleRequests(t *testing.T) {
+	c := &client{}
+	response := `{"jsonrpc":"2.0","id":1,"result":{"agentCapabilities":{"sessionCapabilities":{"systemPrompt":{}}}}}` + "\n"
+	_, err := io.ReadAll(&rawElicitations{r: bufio.NewReader(strings.NewReader(response)), c: c})
+	if err != nil || !c.supportsSystemPrompt {
+		t.Fatalf("capability was not retained: %v %v", c.supportsSystemPrompt, err)
+	}
+	c.systemPrompt = "brief"
+	var output bytes.Buffer
+	w := &sessionPromptWriter{w: &output, c: c}
+	for _, method := range []string{"session/new", "session/load", "session/resume", "session/fork"} {
+		output.Reset()
+		request := `{"jsonrpc":"2.0","id":2,"method":"` + method + `","params":{"cwd":"/tmp","mcpServers":[]}}` + "\n"
+		if _, err := w.Write([]byte(request)); err != nil {
+			t.Fatal(err)
+		}
+		var got struct {
+			Params struct {
+				SystemPrompt struct {
+					Mode    string `json:"mode"`
+					Content []struct {
+						Type string `json:"type"`
+						Text string `json:"text"`
+					} `json:"content"`
+				} `json:"systemPrompt"`
+			} `json:"params"`
+		}
+		if err := json.Unmarshal(output.Bytes(), &got); err != nil {
+			t.Fatal(err)
+		}
+		if got.Params.SystemPrompt.Mode != "append" || len(got.Params.SystemPrompt.Content) != 1 || got.Params.SystemPrompt.Content[0].Text != "brief" {
+			t.Fatalf("%s: unexpected systemPrompt: %s", method, output.String())
+		}
+	}
+}
+
+func TestUnadvertisedSystemPromptIsNotSent(t *testing.T) {
+	c := &client{systemPrompt: "brief"}
+	var output bytes.Buffer
+	w := &sessionPromptWriter{w: &output, c: c}
+	request := `{"jsonrpc":"2.0","id":2,"method":"session/new","params":{"cwd":"/tmp","mcpServers":[]}}` + "\n"
+	if _, err := w.Write([]byte(request)); err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(output.Bytes(), []byte(`"systemPrompt"`)) {
+		t.Fatalf("unadvertised field sent: %s", output.String())
+	}
+}
 
 // The runtime's own params reach the daemon, propertyOrder and all, though the SDK's typed
 // request has no place for it; what the SDK reads is unchanged.

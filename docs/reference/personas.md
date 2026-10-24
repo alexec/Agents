@@ -72,8 +72,4 @@ Picking a persona:
 
 You can still change anything before you start.
 
-On Claude and Grok, the prompt goes in the session's system prompt, after the app's
-briefing, and is given again each time the conversation is picked back up. On the other
-runtimes, it is sent with the agent's first prompt, before your words, and again whenever the
-conversation starts over. It is read from the file each time, and is not shown in the
-transcript.
+When a runtime advertises ACP's session system-prompt capability, the persona prompt is appended after the app's briefing on session creation and when the app loads, resumes or forks the session. Otherwise the app uses a runtime compatibility adapter where available, or sends the persona prompt before your words in the first user prompt. It is read from the file each time, and is not shown in the transcript.
