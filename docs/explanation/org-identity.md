@@ -169,7 +169,7 @@ It keeps the state in `<root>/suspended.json`, so a restart keeps it until the c
 says otherwise. `user/suspended {off: true}` ends the pause, and starts nothing by itself:
 a queued prompt waits until its person sends again.
 
-The person's started machines in a workspace provider are **stopped** through the provider,
+The person's started machines in a machine provider are **stopped** through the provider,
 never deleted, so they cost nothing. They are not started while the suspension lasts (by
 hand, for a kept prompt or for a schedule), and stay stopped after it ends until the person
 starts them.

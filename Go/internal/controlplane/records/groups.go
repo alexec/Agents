@@ -8,7 +8,7 @@ import (
 )
 
 // Groups (#1761, spec 736 data-model.md "Group"): everyone, or named users. A group owns
-// workspace providers, and a bot's cost (FR-027, FR-028, FR-033).
+// machine providers, and a bot's cost (FR-027, FR-028, FR-033).
 
 const GroupsPrefix = "v1/groups/"
 

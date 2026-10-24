@@ -1,5 +1,5 @@
 // Settings ▸ Groups (#1761, spec 736 FR-027, FR-028): the same words as GroupWords in
-// Packages/AgentsKit. A group is everyone, or the people named; it owns workspace providers, and
+// Packages/AgentsKit. A group is everyone, or the people named; it owns machine providers, and
 // only its people see them and start machines from them. A provider with no group is the admins'.
 import type { CapReached, Group, PersonRow, ProviderSummary, SpendCaps } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
@@ -53,8 +53,8 @@ export function mayNotUse(provider: ProviderSummary, groups: readonly Group[]): 
 
 export function foot(admin: boolean): string {
   return admin
-    ? "A group is everyone, or the people you name. Give a workspace provider to a group, and only its people see it and start machines from it. A provider with no group is for admins only."
-    : "The groups you are in. Their workspace providers are the ones you can start machines from.";
+    ? "A group is everyone, or the people you name. Give a machine provider to a group, and only its people see it and start machines from it. A provider with no group is for admins only."
+    : "The groups you are in. Their machine providers are the ones you can start machines from.";
 }
 
 export const removeTitle = (group: Group) => `Remove ${group.name}?`;

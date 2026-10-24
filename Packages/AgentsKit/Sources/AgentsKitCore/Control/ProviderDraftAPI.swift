@@ -138,13 +138,13 @@ public extension DaemonAPI {
     /// A draft's last check.
     struct DraftCheck: Codable, Sendable, Hashable {
         public var passed: Bool
-        public var workspaces: [WorkspaceInfo]?
+        public var workspaces: [MachineInfo]?
         public var problem: String?
         /// What `ssh -G` resolved one workspace's destination to, in words (#975).
         public var ssh: String?
         /// The draft gives no ssh destination, so Add as Host… and an ssh start can't work (#975).
         public var noSSH: Bool?
-        public init(passed: Bool, workspaces: [WorkspaceInfo]? = nil, problem: String? = nil, ssh: String? = nil,
+        public init(passed: Bool, workspaces: [MachineInfo]? = nil, problem: String? = nil, ssh: String? = nil,
                     noSSH: Bool? = nil) {
             self.passed = passed
             self.workspaces = workspaces

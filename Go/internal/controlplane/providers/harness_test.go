@@ -21,7 +21,7 @@ import (
 type fakeRouter struct {
 	mu         sync.Mutex
 	online     map[string]bool
-	workspaces map[string]*HostWorkspace
+	workspaces map[string]*HostMachine
 	broadcasts []string
 	told       []any
 	sessions   map[string]bool
@@ -38,7 +38,7 @@ type delivered struct {
 }
 
 func newFakeRouter() *fakeRouter {
-	return &fakeRouter{online: map[string]bool{}, workspaces: map[string]*HostWorkspace{}, sessions: map[string]bool{}}
+	return &fakeRouter{online: map[string]bool{}, workspaces: map[string]*HostMachine{}, sessions: map[string]bool{}}
 }
 
 func (r *fakeRouter) setOnline(host string, on bool) {
@@ -64,13 +64,13 @@ func (r *fakeRouter) HostState(host string) string {
 	return shown
 }
 
-func (r *fakeRouter) SetWorkspace(host string, ws *HostWorkspace) {
+func (r *fakeRouter) SetWorkspace(host string, ws *HostMachine) {
 	r.mu.Lock()
 	r.workspaces[host] = ws
 	r.mu.Unlock()
 }
 
-func (r *fakeRouter) workspace(host string) *HostWorkspace {
+func (r *fakeRouter) workspace(host string) *HostMachine {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.workspaces[host]
@@ -129,7 +129,7 @@ func (r *fakeRouter) Holds(host string) bool { return r.Online(host) }
 type row struct {
 	ID        string
 	State     string
-	Workspace *HostWorkspace
+	Workspace *HostMachine
 }
 
 type fakeMethods struct {
@@ -153,7 +153,7 @@ func (m *fakeMethods) RemoveHost(host string, from Caller) error {
 // counts every call.
 type standIn struct {
 	mu            sync.Mutex
-	workspaces    []WorkspaceInfo
+	workspaces    []MachineInfo
 	refuse        string
 	failStart     string
 	startTakes    time.Duration
@@ -166,7 +166,7 @@ type standIn struct {
 	madeWith       []any
 }
 
-func newStandIn(ws []WorkspaceInfo) *standIn { return &standIn{workspaces: ws, firstBootRuns: true} }
+func newStandIn(ws []MachineInfo) *standIn { return &standIn{workspaces: ws, firstBootRuns: true} }
 
 func (s *standIn) set(refuse, failStart string, startTakes time.Duration) {
 	s.mu.Lock()
@@ -180,13 +180,13 @@ func (s *standIn) Check() (Checked, error) {
 	if s.refuse != "" {
 		return Checked{}, &ProviderFailure{s.refuse}
 	}
-	return Checked{Contract: 1, Capabilities: []string{"create", "delete", "options"}, Workspaces: append([]WorkspaceInfo{}, s.workspaces...), Items: -1}, nil
+	return Checked{Contract: 1, Capabilities: []string{"create", "delete", "options"}, Workspaces: append([]MachineInfo{}, s.workspaces...), Items: -1}, nil
 }
 
-func (s *standIn) List() ([]WorkspaceInfo, error) {
+func (s *standIn) List() ([]MachineInfo, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return append([]WorkspaceInfo{}, s.workspaces...), nil
+	return append([]MachineInfo{}, s.workspaces...), nil
 }
 
 func (s *standIn) setState(id, state string) {
@@ -203,7 +203,7 @@ func (s *standIn) setStateLocked(id, state string) {
 	s.mu.Unlock()
 }
 
-func (s *standIn) find(id string) *WorkspaceInfo {
+func (s *standIn) find(id string) *MachineInfo {
 	for _, w := range s.workspaces {
 		if w.ID == id {
 			return &w
@@ -212,7 +212,7 @@ func (s *standIn) find(id string) *WorkspaceInfo {
 	return nil
 }
 
-func (s *standIn) Start(id string) (*WorkspaceInfo, error) {
+func (s *standIn) Start(id string) (*MachineInfo, error) {
 	s.mu.Lock()
 	s.starts++
 	takes, failStart := s.startTakes, s.failStart
@@ -227,7 +227,7 @@ func (s *standIn) Start(id string) (*WorkspaceInfo, error) {
 	return s.find(id), nil
 }
 
-func (s *standIn) Stop(id string) (*WorkspaceInfo, error) {
+func (s *standIn) Stop(id string) (*MachineInfo, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.stops++
@@ -246,14 +246,14 @@ func (s *standIn) Options() (any, error) {
 		"x-costs": {"small": "$0.01/hour", "big": "$0.05/hour"}}}}`), nil
 }
 
-func (s *standIn) Create(name string, options any, firstBoot *string) (*WorkspaceInfo, bool, error) {
+func (s *standIn) Create(name string, options any, firstBoot *string) (*MachineInfo, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if firstBoot != nil {
 		s.firstBoots = append(s.firstBoots, *firstBoot)
 	}
 	s.madeWith = append(s.madeWith, options)
-	made := WorkspaceInfo{ID: "ws-" + name, Name: name, State: "starting", SSH: new("root@10.0.0.9")}
+	made := MachineInfo{ID: "ws-" + name, Name: name, State: "starting", SSH: new("root@10.0.0.9")}
 	s.workspaces = append(s.workspaces, made)
 	return &made, s.firstBootRuns, nil
 }
@@ -262,7 +262,7 @@ func (s *standIn) Delete(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.deleted = append(s.deleted, id)
-	var kept []WorkspaceInfo
+	var kept []MachineInfo
 	for _, w := range s.workspaces {
 		if w.ID != id {
 			kept = append(kept, w)
@@ -317,7 +317,7 @@ const devbox, other = "devbox01", "other001"
 
 type harnessOptions struct {
 	timing        Timing
-	workspaces    []WorkspaceInfo
+	workspaces    []MachineInfo
 	sshFails      string
 	installedOver string
 	backUp        func(host string, caller Caller) (bool, error)
@@ -329,7 +329,7 @@ func quickTiming() Timing {
 }
 
 func newHarness(t *testing.T, opts ...func(*harnessOptions)) *harness {
-	o := harnessOptions{timing: quickTiming(), workspaces: []WorkspaceInfo{
+	o := harnessOptions{timing: quickTiming(), workspaces: []MachineInfo{
 		{ID: "agents-devbox", Name: "agents-devbox", State: "stopped", SSH: new("alex@127.0.0.1 -p 2222")},
 		{ID: "scratch-1", Name: "scratch-1", State: "running"},
 	}}

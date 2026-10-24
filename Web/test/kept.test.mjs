@@ -1,4 +1,4 @@
-// Start a workspace by using it (#691 US3, layouts.md L6): a prompt or a start for a stopped
+// Start a machine by using it (#691 US3, layouts.md L6): a prompt or a start for a stopped
 // workspace is kept by the control plane, shown as a queued bubble with what it waits for, and
 // dropped with ×. The words are OfflineWords.swift's keptLine.
 import { test } from "node:test";

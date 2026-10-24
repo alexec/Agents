@@ -188,16 +188,16 @@ A second Mac joins the same way, with Agents Host.
    It stops connecting, and every window and device stops seeing it. Its agents are left
    running where they are, and `~/.agents-server` on the server is not touched.
 
-### Or add it from a workspace provider
+### Or add it from a machine provider
 
 If the server is a workspace of a provider you have added (a Docker container, a DigitalOcean
-droplet, a Codespace), open **Settings ▸ Workspace Providers** and choose **Add as
+droplet, a Codespace), open **Settings ▸ Machine Providers** and choose **Add as
 Host…** beside it. Add a Server opens over ssh, with the address the provider gives already
 filled in. Once the server joins, it is linked to its workspace, so it can be started and
-stopped from Agents. See [Start workspaces from Agents](start-workspaces-from-agents.md).
+stopped from Agents. See [Start machines from Agents](start-machines-from-agents.md).
 
 **New Machine…** on a provider's card has **Clone these projects**: git URLs, one a line.
-Once the new workspace joins, it clones each one, with this Mac's git access when you allow
+Once the new machine joins, it clones each one, with this Mac's git access when you allow
 it, and they appear under its heading.
 
 ## When the server is offline
@@ -246,4 +246,4 @@ Otherwise, add it again: click **Add a Server…** and run the new command on th
 
 - [Projects, hosts and worktrees](../explanation/projects-hosts-worktrees.md).
 - [The control plane](../explanation/control-plane.md).
-- [Start workspaces from Agents](start-workspaces-from-agents.md).
+- [Start machines from Agents](start-machines-from-agents.md).

@@ -1,13 +1,13 @@
-// Settings ▸ Workspace providers (#1808), the window's Settings ▸ Workspace Providers: each
+// Settings ▸ Machine providers (#1808), the window's Settings ▸ Machine Providers: each
 // provider as a card of its workspaces, Add Provider… (kind first, then its short form), Edit…,
 // List Again and Remove…, and on a workspace Link to Host…, Start, Stop and Unlink.
 import { useEffect, useState } from "preact/hooks";
-import type { ControlHost, ProviderSummary, WorkspaceInfo } from "../protocol/generated";
+import type { ControlHost, ProviderSummary, MachineInfo } from "../protocol/generated";
 import type { Store } from "../model/store";
 import {
   defaultIdleMinutes, idleChoices, kindChip, kindFields, kindNeeds, kindOfPreset, kindTitle, linkableHosts, mayBe, noHostLine,
   providerKinds, providerLine, providerRequest, providerWords as words, workspaceLine, type ProviderKind,
-} from "../model/workspaceProviders";
+} from "../model/machineProviders";
 import { Modal } from "./Modal";
 import { MachineDialog } from "./MachineDialog";
 import { makers } from "../model/machineFromRepository";
@@ -20,7 +20,7 @@ export function ProvidersSection({ store }: { store: Store }) {
   const problem = store.providers.problem.value;
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<ProviderSummary>();
-  const [linking, setLinking] = useState<{ provider: ProviderSummary; workspace: WorkspaceInfo }>();
+  const [linking, setLinking] = useState<{ provider: ProviderSummary; workspace: MachineInfo }>();
   const [said, setSaid] = useState<string | null>(null);
   // Lists every provider again when the page opens (FR-004).
   useEffect(() => { void store.providers.load(); }, []);
@@ -54,7 +54,7 @@ export function ProvidersSection({ store }: { store: Store }) {
 }
 
 function ProviderCard({ store, provider, say, edit, link }: {
-  store: Store; provider: ProviderSummary; say: (why: string | null) => void; edit: () => void; link: (w: WorkspaceInfo) => void;
+  store: Store; provider: ProviderSummary; say: (why: string | null) => void; edit: () => void; link: (w: MachineInfo) => void;
 }) {
   const hosts = store.hosts.value;
   const groups = store.providers.groups.value;
@@ -98,7 +98,7 @@ function ProviderCard({ store, provider, say, edit, link }: {
 }
 
 function WorkspaceRow({ store, provider, workspace, hosts, say, link }: {
-  store: Store; provider: ProviderSummary; workspace: WorkspaceInfo; hosts: readonly ControlHost[];
+  store: Store; provider: ProviderSummary; workspace: MachineInfo; hosts: readonly ControlHost[];
   say: (why: string | null) => void; link: () => void;
 }) {
   const host = workspace.host ? hosts.find((h) => h.id === workspace.host) : undefined;
@@ -218,9 +218,9 @@ export function AddProviderDialog({ store, editing, close, added }: {
   );
 }
 
-/** Link to Workspace (#691 L5): a host that already runs on this workspace, with when to start and stop it. */
+/** Link to Machine (#691 L5): a host that already runs on this workspace, with when to start and stop it. */
 function LinkDialog({ store, provider, workspace, close }: {
-  store: Store; provider: ProviderSummary; workspace: WorkspaceInfo; close: () => void;
+  store: Store; provider: ProviderSummary; workspace: MachineInfo; close: () => void;
 }) {
   const hosts = linkableHosts(workspace, store.hosts.value);
   const [host, setHost] = useState(hosts[0]?.id ?? "");

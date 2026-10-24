@@ -14,7 +14,7 @@ import (
 
 var update = flag.Bool("update", false, "write testdata/wire.golden from what providers say now")
 
-// What workspace providers say on the wire, byte for byte (#1313): each method's answer or
+// What machine providers say on the wire, byte for byte (#1313): each method's answer or
 // refusal, a host's channel-0 answers, a linked host's workspace and what every window is
 // told. Only a provider's random id, a date's value and a UUID are masked. testdata/wire.golden
 // was made from the hand-written wire types before they moved to Go/wire.
@@ -56,8 +56,8 @@ func TestProvidersWireIsWhatItWas(t *testing.T) {
 	answer(MethodProvidersUpdate, map[string]any{"name": "x"})
 	answer(MethodHostsUnlink, map[string]any{"nothing": true})
 	hostSaid(MethodHostStatus, `{"idle":true,"running":[],"schedule":{"at":812345678.5,"workflow":"nightly"}}`)
-	hostSaid(MethodHostWorkspaces, `{"agent":"Claude (fix-login)","method":"workspaces/forAgent","params":{}}`)
-	hostSaid(MethodHostWorkspaces, `{"agent":"Claude (fix-login)","method":"providers/list","params":{}}`)
+	hostSaid(MethodHostMachines, `{"agent":"Claude (fix-login)","method":"machines/forAgent","params":{}}`)
+	hostSaid(MethodHostMachines, `{"agent":"Claude (fix-login)","method":"providers/list","params":{}}`)
 	answer(MethodProvidersList, nil)
 
 	time.Sleep(100 * time.Millisecond)

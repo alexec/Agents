@@ -27,11 +27,11 @@ something particular done.
 - [Send a project to a server](send-a-project-to-a-server.md): a repository on this Mac,
   with its unpushed branches and uncommitted changes, made a project on the server, and
   the server's work brought back.
-- [Start workspaces from Agents](start-workspaces-from-agents.md): let the control plane
+- [Start machines from Agents](start-machines-from-agents.md): let the control plane
   start and stop the machines your servers run on, and press Start on a stopped one.
-- [Add a workspace provider](add-a-workspace-provider.md): a preset, your own commands, a
+- [Add a machine provider](add-a-machine-provider.md): a preset, your own commands, a
   tool map, or a provider of your own.
-- [Set up a cloud workspace provider](set-up-a-cloud-workspace-provider.md): add AWS EC2,
+- [Set up a cloud machine provider](set-up-a-cloud-machine-provider.md): add AWS EC2,
   Compute Engine, Cloud Workstations, DigitalOcean, Codespaces or Coder, with the credentials
   each one needs.
 - [Turn the relay on or off](turn-the-relay-on-or-off.md): let your iPhone and iPad reach

@@ -146,7 +146,7 @@ func (f *fakeControl) serve(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return
 		}
-		// host/workspaces is answered on channel 0, as the control plane does (#1444).
+		// host/machines is answered on channel 0, as the control plane does (#1444).
 		var ask struct {
 			C int `json:"c"`
 			M struct {
@@ -155,7 +155,7 @@ func (f *fakeControl) serve(w http.ResponseWriter, r *http.Request) {
 				Params json.RawMessage `json:"params"`
 			} `json:"m"`
 		}
-		if json.Unmarshal([]byte(line), &ask) == nil && ask.C == 0 && ask.M.Method == "host/workspaces" {
+		if json.Unmarshal([]byte(line), &ask) == nil && ask.C == 0 && ask.M.Method == "host/machines" {
 			id := strconv.FormatInt(ask.M.ID, 10)
 			if strings.Contains(string(ask.M.Params), "refuse") {
 				l.Write(ctx, `{"c":0,"m":{"jsonrpc":"2.0","id":`+id+`,"error":{"code":-32010,"message":"Agents can’t ask that of the control plane."}}}`)
@@ -238,11 +238,11 @@ func TestEnrolThenUplink(t *testing.T) {
 		t.Fatalf("reply frame %s", line)
 	}
 	// A request on channel 0 waits for its answer (#1444), or for the refusal.
-	if got, err := u.Ask(ctx, "host/workspaces", map[string]any{"agent": "Claude (x)", "method": "workspaces/forAgent", "params": map[string]any{}}); err != nil || string(got) != `{"providers":[]}` {
+	if got, err := u.Ask(ctx, "host/machines", map[string]any{"agent": "Claude (x)", "method": "machines/forAgent", "params": map[string]any{}}); err != nil || string(got) != `{"providers":[]}` {
 		t.Fatalf("ask %s %v", got, err)
 	}
 	var refused *AskError
-	if _, err := u.Ask(ctx, "host/workspaces", map[string]any{"method": "refuse"}); !errors.As(err, &refused) || refused.Code != -32010 || refused.Message != "Agents can’t ask that of the control plane." {
+	if _, err := u.Ask(ctx, "host/machines", map[string]any{"method": "refuse"}); !errors.As(err, &refused) || refused.Code != -32010 || refused.Message != "Agents can’t ask that of the control plane." {
 		t.Fatalf("refused %v", err)
 	}
 	u.WriteFanOut([]int{1, 3}, `{"jsonrpc":"2.0","method":"agent/changed","params":{}}`)

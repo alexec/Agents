@@ -66,6 +66,7 @@ public enum Capability {
     public static let links1 = "links/1"
     public static let liveactivity1 = "liveactivity/1"
     public static let mac1 = "mac/1"
+    public static let machines1 = "machines/1"
     public static let mailbox1 = "mailbox/1"
     public static let marketplaces1 = "marketplaces/1"
     public static let mcp1 = "mcp/1"
@@ -121,7 +122,6 @@ public enum Capability {
     public static let wake1 = "wake/1"
     public static let workflow1 = "workflow/1"
     public static let workflows1 = "workflows/1"
-    public static let workspaces1 = "workspaces/1"
     public static let worktrees1 = "worktrees/1"
 
     /// The capability of each method and notification in daemon.openrpc.json.
@@ -488,16 +488,16 @@ public enum Capability {
         "groups/setRole": "org-identity/1",
         "handover/status": "handover/1",
         "host/hello": "host/1",
+        "host/machines": "host/1",
         "host/orgRoutesAgain": "host.org-routes/1",
         "host/orgRoutesApplied": "host.org-routes/1",
         "host/policyApplied": "host.policy/1",
         "host/providerDraft": "host/1",
         "host/status": "host/1",
-        "host/workspaces": "host/1",
         "hosts/announce": "hosts/1",
         "hosts/approveJoin": "hosts.join/1",
         "hosts/checkAgain": "hosts/1",
-        "hosts/deleteWorkspace": "hosts/1",
+        "hosts/deleteMachine": "hosts/1",
         "hosts/denyJoin": "hosts.join/1",
         "hosts/detect": "hosts/1",
         "hosts/dropKept": "hosts/1",
@@ -512,8 +512,8 @@ public enum Capability {
         "hosts/listKept": "hosts/1",
         "hosts/remove": "hosts/1",
         "hosts/retryKept": "hosts/1",
+        "hosts/setMachineOptions": "hosts/1",
         "hosts/setRelay": "hosts/1",
-        "hosts/setWorkspaceOptions": "hosts/1",
         "hosts/sshHosts": "hosts/1",
         "hosts/start": "hosts/1",
         "hosts/startEnroll": "hosts/1",
@@ -526,6 +526,7 @@ public enum Capability {
         "links/list": "links/1",
         "links/remove": "links/1",
         "links/requests": "links/1",
+        "machines/forAgent": "machines/1",
         "orgRoutes/check": "org-routes/1",
         "orgRoutes/list": "org-routes/1",
         "orgRoutes/mine": "org-routes/1",
@@ -605,7 +606,6 @@ public enum Capability {
         "workflows/claimRun": "bots/1",
         "workflows/fire": "events.team/1",
         "workflows/trigger": "events.team/1",
-        "workspaces/forAgent": "workspaces/1",
         "control/capReached": "bots/1",
         "control/clientChanged": "control/1",
         "control/cutOff": "org-identity/1",

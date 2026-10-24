@@ -77,7 +77,7 @@ struct OfflineStrip: View {
     }
 
     private var row: DaemonAPI.ControlHost? { host == .mac ? nil : model.hosts.controlRows[host] }
-    private var workspace: DaemonAPI.HostWorkspace? { row?.workspace }
+    private var workspace: DaemonAPI.HostMachine? { row?.workspace }
     private var starting: Bool { workspace != nil && row?.state == "starting" }
 
     private var offlineSince: String? {

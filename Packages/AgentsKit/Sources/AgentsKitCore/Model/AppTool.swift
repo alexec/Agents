@@ -113,16 +113,16 @@ public enum AppTool {
     // deleting ask the person first; none ends with another tool's name.
 
     /// Every provider's workspaces, their hosts, and what a new one takes.
-    public static let listWorkspaces = "list_workspaces"
+    public static let listMachines = "list_machines"
     /// Start a host's workspace.
-    public static let startWorkspace = "start_workspace"
+    public static let startMachine = "start_machine"
     /// Stop a host's workspace.
-    public static let stopWorkspace = "stop_workspace"
-    /// Make a new workspace at a provider, once the person says yes.
-    public static let makeWorkspace = "make_workspace"
+    public static let stopMachine = "stop_machine"
+    /// Make a new machine at a provider, once the person says yes.
+    public static let makeMachine = "make_machine"
     /// Delete a host's workspace and the host, once the person says yes.
-    public static let deleteWorkspace = "delete_workspace"
-    public static let workspaceTools = [listWorkspaces, startWorkspace, stopWorkspace, makeWorkspace, deleteWorkspace]
+    public static let deleteMachine = "delete_machine"
+    public static let machineTools = [listMachines, startMachine, stopMachine, makeMachine, deleteMachine]
 
     // Seven for the agent that writes a provider's tool map or commands (#858). Offered to
     // that agent alone, and it is offered nothing else. None ends with another tool's name.
@@ -166,7 +166,7 @@ public enum AppTool {
         leaseResource, releaseResource, listResources, waitForEvent, waitForAgents, checkAgain,
         cancelWait, listSessions, readSession,
         setSessionLabels, moveWorktree, messageSession, cancelMessage,
-    ] + workspaceTools + writerTools
+    ] + machineTools + writerTools
 
     /// How runtimes put the server's name in front of a tool's, as measured: Claude's
     /// adapter says `mcp__agents__finish_turn`, Antigravity `agents_finish_turn` (049).

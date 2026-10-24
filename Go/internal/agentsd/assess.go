@@ -83,11 +83,11 @@ var appToolMethods = map[string]string{
 	"wait_for_agents":     "agents/wait",
 	"check_again":         "waits/checkAgain",
 	"cancel_wait":         "events/cancel",
-	"list_workspaces":     "workspaces/list",
-	"start_workspace":     "workspaces/start",
-	"stop_workspace":      "workspaces/stop",
-	"make_workspace":      "workspaces/make",
-	"delete_workspace":    "workspaces/delete",
+	"list_machines":     "machines/list",
+	"start_machine":     "machines/start",
+	"stop_machine":      "machines/stop",
+	"make_machine":      "machines/make",
+	"delete_machine":    "machines/delete",
 }
 
 // appToolMethod is the method a tool is, or the tool's own name for one not in the table.

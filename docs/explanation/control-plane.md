@@ -326,8 +326,8 @@ that reason, rather than left to time out.
 
 A host that stops (a cloud machine turned off, a container stopped) is offline like any
 other, and nothing reaches it. When it runs on a provider's workspace, the control plane can
-start it again. It asks a **workspace provider**, which is an MCP server, and then waits for
-the host to connect. See [Start workspaces from Agents](../how-to/start-workspaces-from-agents.md).
+start it again. It asks a **machine provider**, which is an MCP server, and then waits for
+the host to connect. See [Start machines from Agents](../how-to/start-machines-from-agents.md).
 
 Providers run on the control plane, not on a host, because the host is what is down. Their
 secrets stay in the control plane's own folder, never in its store. A host linked to a
@@ -406,4 +406,4 @@ special.
 - [The window and the host](window-and-daemon.md).
 - [How the phone and iPad reach your agents](phone-and-ipad.md).
 - [Use Agents in a browser](../how-to/use-agents-in-a-browser.md).
-- [Workspace providers](../reference/workspace-providers.md).
+- [Machine providers](../reference/machine-providers.md).

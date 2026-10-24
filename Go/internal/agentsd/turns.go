@@ -533,8 +533,8 @@ func (l *live) turn() bool {
 		sandbox, why := d.resolveSandbox(a.RuntimeID, a.SandboxOverride, a.StartedByAgent)
 		launch, meta := withSandbox(launch, agentSessionMeta(a), a.RuntimeID, sandbox)
 		brief := d.briefFor(a)
-		meta = withSystemPrompt(meta, a.RuntimeID, brief)
-		s, err := acp.Start(ctx, launch, l, d.mcpServersFor(l.id), meta, continuing)
+		compatibilityMeta := withSystemPrompt(meta, a.RuntimeID, brief)
+		s, err := acp.Start(ctx, launch, l, d.mcpServersFor(l.id), meta, compatibilityMeta, continuing, brief)
 		if err != nil {
 			d.dropAppTokens(l.id)
 		}
@@ -569,7 +569,7 @@ func (l *live) turn() bool {
 		l.session = s
 		// A conversation begun, or begun again because the runtime lost it: the brief it
 		// had lived in the history that is gone.
-		l.briefDue = !s.Continued && brief != "" && systemPromptDelivery[a.RuntimeID] == ""
+		l.briefDue = !s.Continued && brief != "" && !s.SupportsSystemPrompt() && compatibilitySystemPromptDelivery[a.RuntimeID] == ""
 		l.mu.Unlock()
 		// Started as the host goes, after stopAll looked (#1272): it would be left running.
 		if d.going() {

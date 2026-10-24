@@ -22,7 +22,7 @@ import (
 type world struct {
 	mu           sync.Mutex
 	tools        []any
-	workspaces   []WorkspaceInfo
+	workspaces   []MachineInfo
 	checkFails   string
 	helps        map[string]string
 	notInstalled bool
@@ -45,7 +45,7 @@ type world struct {
 
 func newWorld(tools []string, descriptions map[string]string) *world {
 	config := "hostname cws.devstack-1\nuser coder\nport 22\nproxycommand ssh -W %h:%p bastion.cws.example\nproxyjump none\n"
-	w := &world{workspaces: []WorkspaceInfo{{ID: "101", Name: "agents-devbox", State: "running", Cost: new("$0.03/hour")},
+	w := &world{workspaces: []MachineInfo{{ID: "101", Name: "agents-devbox", State: "running", Cost: new("$0.03/hour")},
 		{ID: "102", Name: "scratch-1", State: "stopped"}}, helps: map[string]string{}, sshConfig: &config, ownerHere: true,
 		agent: records.NewUUID()}
 	for _, name := range tools {
@@ -104,7 +104,7 @@ func (s draftServer) Check() (Checked, error) {
 		}
 	}
 	if s.w.unread != nil {
-		return Checked{Workspaces: []WorkspaceInfo{}, Items: len(s.w.unread), FirstItem: s.w.unread[0]}, nil
+		return Checked{Workspaces: []MachineInfo{}, Items: len(s.w.unread), FirstItem: s.w.unread[0]}, nil
 	}
 	items := -1
 	if s.w.firstItem != nil {
@@ -113,9 +113,9 @@ func (s draftServer) Check() (Checked, error) {
 	return Checked{Workspaces: s.w.workspaces, Items: items, FirstItem: s.w.firstItem}, nil
 }
 
-func (s draftServer) List() ([]WorkspaceInfo, error) { return s.w.workspaces, nil }
+func (s draftServer) List() ([]MachineInfo, error) { return s.w.workspaces, nil }
 
-func (s draftServer) Start(id string) (*WorkspaceInfo, error) {
+func (s draftServer) Start(id string) (*MachineInfo, error) {
 	s.w.mu.Lock()
 	defer s.w.mu.Unlock()
 	s.w.starts++
@@ -128,7 +128,7 @@ func (s draftServer) Start(id string) (*WorkspaceInfo, error) {
 	return nil, nil
 }
 
-func (s draftServer) Stop(string) (*WorkspaceInfo, error) {
+func (s draftServer) Stop(string) (*MachineInfo, error) {
 	s.w.mu.Lock()
 	s.w.stops++
 	s.w.mu.Unlock()
@@ -414,7 +414,7 @@ func TestACheckOfAMapWithNoSSHSaysSo(t *testing.T) {
 
 func TestACheckOfAMapWithSSHTestsItWithSSHG(t *testing.T) {
 	w := newWorld(dropletTools, nil)
-	w.workspaces = []WorkspaceInfo{{ID: "d1", Name: "devstack-1", State: "running", SSH: new("coder@cws.devstack-1")},
+	w.workspaces = []MachineInfo{{ID: "d1", Name: "devstack-1", State: "running", SSH: new("coder@cws.devstack-1")},
 		{ID: "d2", Name: "devstack-2", State: "stopped", SSH: new("coder@cws.devstack-2")}}
 	h := newDraftHarness(w, quickDraftTiming(), true, "", nil)
 	id := h.startMap(t)
@@ -434,7 +434,7 @@ func TestACheckOfAMapWithSSHTestsItWithSSHG(t *testing.T) {
 
 func TestThePromptSaysWhereSSHHidesAndAPortIsOneWord(t *testing.T) {
 	w := newWorld(dropletTools, nil)
-	w.workspaces = []WorkspaceInfo{{ID: "d1", Name: "box", State: "running", SSH: new("alex@127.0.0.1 -p 2222")}}
+	w.workspaces = []MachineInfo{{ID: "d1", Name: "box", State: "running", SSH: new("alex@127.0.0.1 -p 2222")}}
 	h := newDraftHarness(w, quickDraftTiming(), true, "", nil)
 	id := h.startMap(t)
 	p := w.started[0].Prompt
@@ -572,7 +572,7 @@ func TestNoSecretsValueReachesTheAgentAStepAnUpdateOrTheLog(t *testing.T) {
 	w := newWorld(dropletTools, map[string]string{"droplet-list": "Lists droplets. Token: " + secretValue})
 	encoded := base64.StdEncoding.EncodeToString([]byte(secretValue))
 	w.checkFails = "401 Unauthorized for token " + secretValue + " (" + encoded + ")"
-	w.workspaces = []WorkspaceInfo{{ID: "1", Name: "box-" + secretValue, State: "running"}}
+	w.workspaces = []MachineInfo{{ID: "1", Name: "box-" + secretValue, State: "running"}}
 	h := newDraftHarness(w, quickDraftTiming(), true, "", nil)
 	id := h.startMap(t)
 	seen := []string{w.started[0].Prompt, h.mustTool(t, id, ToolReadTools, nil), h.mustTool(t, id, ToolCheckDraft, map[string]any{"draft": goodMap})}

@@ -564,14 +564,14 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 	}
 	if workspaceMethods[method] {
 		if m.s.providers == nil {
-			return nil, fail(providersNeedOneCopy, "Workspace providers need a control plane with one copy, for now.")
+			return nil, fail(providersNeedOneCopy, "Machine providers need a control plane with one copy, for now.")
 		}
 		return m.s.providers.Answer(method, params, providersCaller(from))
 	}
 	return nil, notFound(method)
 }
 
-// workspaceMethods is DaemonAPI.Method.workspaceMethods: workspace providers (#691).
+// workspaceMethods is DaemonAPI.Method.workspaceMethods: machine providers (#691).
 var workspaceMethods = providers.WorkspaceMethods
 
 func (m *Methods) status(from Caller) wire.ControlStatus {
@@ -1076,12 +1076,12 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 			return nil, err
 		}
 		return m.s.links.check(ctx, sender)
-	case "host/workspaces", "host/providerDraft", "host/status":
+	case "host/machines", "host/providerDraft", "host/status":
 		if m.s.providers == nil {
 			if method == "host/status" {
 				return map[string]any{}, nil
 			}
-			return nil, fail(providersNeedOneCopy, "Workspace providers need a control plane with one copy, for now.")
+			return nil, fail(providersNeedOneCopy, "Machine providers need a control plane with one copy, for now.")
 		}
 		return m.s.providers.HostSaid(host, method, params)
 	case "backups/stored", "backups/upload", "backups/commit", "backups/download":

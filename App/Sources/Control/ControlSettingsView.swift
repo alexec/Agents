@@ -11,7 +11,7 @@ enum ControlPage: Hashable {
         switch self {
         case .overview: "Overview"
         case .hosts: "Machines"
-        case .providers: "Workspace Providers"
+        case .providers: "Machine Providers"
         case .clients: "Clients"
         }
     }
@@ -256,12 +256,12 @@ struct ControlHostsPage: View {
     @State private var removing: DaemonAPI.ControlHost?
     @State private var addingMachine = false
     @State private var choosing: DaemonAPI.ControlHost?
-    /// Link to Workspace… (#691, L5).
+    /// Link to Machine… (#691, L5).
     @State private var linking: DaemonAPI.ControlHost?
     /// Stop, asked first while agents are working there (L2), with who they are.
     @State private var stopping: DaemonAPI.ControlHost?
     @State private var stoppingNames: [String] = []
-    /// Delete Workspace… (US5, L9).
+    /// Delete Machine… (US5, L9).
     @State private var deleting: DaemonAPI.ControlHost?
     /// Backups… (#1815): the host's own backups page.
     @State private var backingUp: DaemonAPI.ControlHost?
@@ -300,7 +300,7 @@ struct ControlHostsPage: View {
             }
             // One sheet, a provider first (#2131): a server and a code are its other two ways.
             Button(AddMachine.Words.menuItem) { addingMachine = true }.buttonStyle(.paper)
-            Text("A machine comes from a workspace provider, or a server runs one command, or is installed over ssh as you log in from Terminal, through an ssh tunnel when it can’t reach this Mac. Either way it connects out, so nothing has to reach it. Another Mac joins with a code. " + AddMachine.Words.machinesFoot)
+            Text("A machine comes from a machine provider, or a server runs one command, or is installed over ssh as you log in from Terminal, through an ssh tunnel when it can’t reach this Mac. Either way it connects out, so nothing has to reach it. Another Mac joins with a code. " + AddMachine.Words.machinesFoot)
                 .appText(.supporting).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             SharedSectionLabel("Auto-detect")
@@ -337,7 +337,7 @@ struct ControlHostsPage: View {
         .confirmationDialog(deleting.map { "Delete \($0.workspace?.workspaceName ?? $0.name)?" } ?? "",
                             isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
                             titleVisibility: .visible, presenting: deleting) { host in
-            Button("Delete", role: .destructive) { Task { await control.deleteWorkspace(host.id) } }
+            Button("Delete", role: .destructive) { Task { await control.deleteMachine(host.id) } }
             Button("Cancel", role: .cancel) {}
         } message: { host in
             Text(deleteWords(host))
@@ -476,7 +476,7 @@ struct ControlHostsPage: View {
         .accessibilityLabel("More for \(host.name)")
     }
 
-    /// What Delete Workspace… loses (L9): the workspace and its disk, and the host with its
+    /// What Delete Machine… loses (L9): the workspace and its disk, and the host with its
     /// agents, and whether it backs up first (#1815).
     private func deleteWords(_ host: DaemonAPI.ControlHost) -> String {
         let agents = model.work.agents.filter { $0.host == host.id }.count

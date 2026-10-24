@@ -2,7 +2,7 @@ import AgentsKitCore
 import SwiftUI
 
 /// Start a Machine from a Repository (#1809), drawn by the window and the Remote as the web
-/// page's MachineDialog: the repository, a provider that makes machines, its New Workspace
+/// page's MachineDialog: the repository, a provider that makes machines, its New Machine
 /// form, and Start. What comes next is said in the sheet: joining on its first boot, or made
 /// but to add as a host in the Mac app. Each app gives it its way to the control plane.
 struct MachineFromRepositorySheet: View {

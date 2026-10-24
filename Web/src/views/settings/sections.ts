@@ -39,7 +39,7 @@ export const settingsSections: readonly SettingsSection[] = [
   { name: "channels", scope: "controlPlane", order: 30, Section: ChannelsSection },
   { name: "finishedChats", scope: "thisApp", order: 30, Section: FinishedChatsSection },
   { name: "gitAccess", scope: "machines", order: 10, Section: GitAccessSection },
-  // Groups own workspace providers (#1761).
+  // Groups own machine providers (#1761).
   { name: "groups", scope: "controlPlane", order: 20, Section: GroupsSection },
   { name: "machines", scope: "machines", order: 20, Section: VersionsSection },
   // Who belongs to the control plane, and their machines and clients (#994).

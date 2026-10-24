@@ -131,7 +131,7 @@ export function ownerWords(m: FleetMachine): string {
   return m.bot ? `${m.ownerName} (bot)` : m.ownerName;
 }
 
-/** What it runs on: its workspace provider's name, or its platform ("macOS arm64"). */
+/** What it runs on: its machine provider's name, or its platform ("macOS arm64"). */
 export function kindWords(m: FleetMachine): string {
   return m.host.workspace?.providerName || m.host.platform || "Machine";
 }

@@ -477,7 +477,7 @@ func knownHostsOverride(resolved string) []string {
 	return []string{"-o", "UserKnownHostsFile=~/.ssh/known_hosts ~/.ssh/known_hosts2"}
 }
 
-// StartDaemon is the workspace providers' sshStart hook (#691, #965): a host's agentsd
+// StartDaemon is the machine providers' sshStart hook (#691, #965): a host's agentsd
 // started over ssh as an install leaves it, without installing. knownHosts is the key
 // trusted at the install, in known_hosts form, checked whatever address the server has now
 // (#1691); "" reads the person's own known_hosts. With renew, the server's key is made again

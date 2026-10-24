@@ -324,7 +324,7 @@ It is read only.
   limits; approve, deny, run, turn on or off, or delete a workflow; approve a plugin; add,
   approve or remove an MCP server, a skill or a marketplace; add or delete a project;
   pair, forget or remove a client or a machine; lend a sign-in or git access; change a
-  workspace provider. Reads, prompts and presence are not kept. An entry is written when
+  machine provider. Reads, prompts and presence are not kept. An entry is written when
   the control plane passes the call on, so a call that the host refuses is kept too.
 - **How long**: 90 days by default. An admin picks 30, 90, 180 or 365 days in the pane
   (`control/setAuditDays`, 1 to 3,650); the menu marks the time set now. The control

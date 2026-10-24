@@ -208,7 +208,7 @@ var hostNamingMethods = map[string]bool{
 	"hosts/update": true, "hosts/checkAgain": true, "hosts/remove": true, "hosts/setRelay": true,
 	"hosts/lendSignIn": true, "hosts/lendGit": true, "hosts/lastHeard": true,
 	"hosts/link": true, "hosts/unlink": true, "hosts/start": true, "hosts/stop": true, "hosts/keep": true,
-	"hosts/deleteWorkspace": true, "hosts/setWorkspaceOptions": true,
+	"hosts/deleteMachine": true, "hosts/setMachineOptions": true,
 }
 
 // hostNamingParams are params that would do something with host for each of them.

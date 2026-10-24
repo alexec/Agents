@@ -1,6 +1,6 @@
 #!/bin/sh
 # The github MCP server (#1232), or another Go MCP server named last (linear-mcp, #839, gitlab-mcp, #1629, email-mcp, #1780, or
-# workspace-commands, #1364, the command workspace provider agents-control looks for beside
+# workspace-commands, #1364, the command machine provider agents-control looks for beside
 # itself), for Agents Host to carry beside agentsd (#700): what Agents Host's build runs first. Builds
 # Go/out/helpers/<name>, for both Mac architectures, when a Go source is newer than it. With no
 # way to run Go here (no Docker and no Go), it leaves none and warns: the app still builds,

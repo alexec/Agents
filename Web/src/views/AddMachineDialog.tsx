@@ -7,7 +7,7 @@ import type { ControlCodeShown } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
 import { makers } from "../model/machineFromRepository";
-import { providerWords } from "../model/workspaceProviders";
+import { providerWords } from "../model/machineProviders";
 import { addMachineWays, addMachineWords as words, type AddMachineWay } from "../model/addMachine";
 import { AddProviderDialog } from "./Providers";
 import { MachineDialog } from "./MachineDialog";

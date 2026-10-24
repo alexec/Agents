@@ -589,6 +589,85 @@
         "archived"
       ]
     },
+    "AgentMachines": {
+      "type": "object",
+      "description": "machines/forAgent: what list_machines shows an agent.",
+      "properties": {
+        "providers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AgentMachinesProvider"
+          }
+        }
+      },
+      "required": [
+        "providers"
+      ],
+      "additionalProperties": false
+    },
+    "AgentMachinesMachine": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "hostState": {
+          "type": "string"
+        },
+        "cost": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "AgentMachinesProvider": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/ProviderID"
+        },
+        "name": {
+          "type": "string"
+        },
+        "canMake": {
+          "type": "boolean"
+        },
+        "canDelete": {
+          "type": "boolean"
+        },
+        "options": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "workspaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AgentMachinesMachine"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "canMake",
+        "canDelete",
+        "workspaces"
+      ],
+      "additionalProperties": false
+    },
     "AgentPurpose": {
       "anyOf": [
         {
@@ -665,85 +744,6 @@
       },
       "required": [
         "agentID"
-      ],
-      "additionalProperties": false
-    },
-    "AgentWorkspaces": {
-      "type": "object",
-      "description": "workspaces/forAgent: what list_workspaces shows an agent.",
-      "properties": {
-        "providers": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/AgentWorkspacesProvider"
-          }
-        }
-      },
-      "required": [
-        "providers"
-      ],
-      "additionalProperties": false
-    },
-    "AgentWorkspacesProvider": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "$ref": "#/definitions/ProviderID"
-        },
-        "name": {
-          "type": "string"
-        },
-        "canMake": {
-          "type": "boolean"
-        },
-        "canDelete": {
-          "type": "boolean"
-        },
-        "options": {
-          "$ref": "#/definitions/JSONValue"
-        },
-        "workspaces": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/AgentWorkspacesWorkspace"
-          }
-        }
-      },
-      "required": [
-        "id",
-        "name",
-        "canMake",
-        "canDelete",
-        "workspaces"
-      ],
-      "additionalProperties": false
-    },
-    "AgentWorkspacesWorkspace": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "state": {
-          "type": "string"
-        },
-        "host": {
-          "type": "string"
-        },
-        "hostState": {
-          "type": "string"
-        },
-        "cost": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "id",
-        "name",
-        "state"
       ],
       "additionalProperties": false
     },
@@ -5351,7 +5351,7 @@
           "$ref": "#/definitions/HostTunnel"
         },
         "workspace": {
-          "$ref": "#/definitions/HostWorkspace"
+          "$ref": "#/definitions/HostMachine"
         },
         "implementation": {
           "type": "string"
@@ -6507,7 +6507,7 @@
         "workspaces": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/WorkspaceInfo"
+            "$ref": "#/definitions/MachineInfo"
           }
         },
         "problem": {
@@ -8315,7 +8315,7 @@
     },
     "Group": {
       "type": "object",
-      "description": "A group (#1761, spec 736 FR-027): everyone, or named users. It owns workspace providers: only its users see them and start machines from them (FR-028).",
+      "description": "A group (#1761, spec 736 FR-027): everyone, or named users. It owns machine providers: only its users see them and start machines from them (FR-028).",
       "properties": {
         "id": {
           "type": "string"
@@ -8373,7 +8373,7 @@
     },
     "GroupRequest": {
       "type": "object",
-      "description": "groups/remove (#1761): the group. Refused while a workspace provider or a bot has it.",
+      "description": "groups/remove (#1761): the group. Refused while a machine provider or a bot has it.",
       "properties": {
         "id": {
           "type": "string"
@@ -9037,6 +9037,129 @@
       ],
       "additionalProperties": false
     },
+    "HostMachine": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "$ref": "#/definitions/ProviderID"
+        },
+        "providerName": {
+          "type": "string"
+        },
+        "workspace": {
+          "type": "string"
+        },
+        "workspaceName": {
+          "type": "string"
+        },
+        "workspaceState": {
+          "type": "string"
+        },
+        "hostState": {
+          "type": "string"
+        },
+        "phase": {
+          "type": "string"
+        },
+        "since": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "problem": {
+          "type": "string"
+        },
+        "stoppedBy": {
+          "type": "string"
+        },
+        "canStart": {
+          "type": "boolean"
+        },
+        "canStop": {
+          "type": "boolean"
+        },
+        "startWhenUsed": {
+          "type": "boolean"
+        },
+        "stopWhenIdleMinutes": {
+          "type": "integer"
+        },
+        "cost": {
+          "type": "string"
+        },
+        "current": {
+          "type": "boolean"
+        },
+        "startForSchedules": {
+          "type": "boolean"
+        },
+        "tellsSchedule": {
+          "type": "boolean"
+        },
+        "nextWorkflow": {
+          "type": "string"
+        },
+        "nextWorkflowAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "wakeAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "provider",
+        "providerName",
+        "workspace",
+        "workspaceName",
+        "workspaceState",
+        "canStart",
+        "canStop",
+        "startWhenUsed",
+        "current"
+      ],
+      "additionalProperties": false
+    },
+    "HostMachineCall": {
+      "type": "object",
+      "description": "host/machines, for an agent there: who asked, for the log, and its call.",
+      "properties": {
+        "agent": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/definitions/JSONValue"
+        }
+      },
+      "required": [
+        "agent",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    "HostMachineOptions": {
+      "type": "object",
+      "description": "hosts/setMachineOptions. stopWhenIdleMinutes 0 turns it off.",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/HostID"
+        },
+        "startWhenUsed": {
+          "type": "boolean"
+        },
+        "stopWhenIdleMinutes": {
+          "type": "integer"
+        },
+        "startForSchedules": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "host"
+      ],
+      "additionalProperties": false
+    },
     "HostPolicy": {
       "type": "object",
       "description": "host/policy (#998, FR-006): to a machine that says host.policy/1, on its channel 0, at each join and within 5 seconds of each change. A signed policy, or none when no policy was ever set.",
@@ -9293,129 +9416,6 @@
         "user",
         "settings",
         "secrets"
-      ],
-      "additionalProperties": false
-    },
-    "HostWorkspace": {
-      "type": "object",
-      "properties": {
-        "provider": {
-          "$ref": "#/definitions/ProviderID"
-        },
-        "providerName": {
-          "type": "string"
-        },
-        "workspace": {
-          "type": "string"
-        },
-        "workspaceName": {
-          "type": "string"
-        },
-        "workspaceState": {
-          "type": "string"
-        },
-        "hostState": {
-          "type": "string"
-        },
-        "phase": {
-          "type": "string"
-        },
-        "since": {
-          "$ref": "#/definitions/WireDate"
-        },
-        "problem": {
-          "type": "string"
-        },
-        "stoppedBy": {
-          "type": "string"
-        },
-        "canStart": {
-          "type": "boolean"
-        },
-        "canStop": {
-          "type": "boolean"
-        },
-        "startWhenUsed": {
-          "type": "boolean"
-        },
-        "stopWhenIdleMinutes": {
-          "type": "integer"
-        },
-        "cost": {
-          "type": "string"
-        },
-        "current": {
-          "type": "boolean"
-        },
-        "startForSchedules": {
-          "type": "boolean"
-        },
-        "tellsSchedule": {
-          "type": "boolean"
-        },
-        "nextWorkflow": {
-          "type": "string"
-        },
-        "nextWorkflowAt": {
-          "$ref": "#/definitions/WireDate"
-        },
-        "wakeAt": {
-          "$ref": "#/definitions/WireDate"
-        }
-      },
-      "required": [
-        "provider",
-        "providerName",
-        "workspace",
-        "workspaceName",
-        "workspaceState",
-        "canStart",
-        "canStop",
-        "startWhenUsed",
-        "current"
-      ],
-      "additionalProperties": false
-    },
-    "HostWorkspaceCall": {
-      "type": "object",
-      "description": "host/workspaces, for an agent there: who asked, for the log, and its call.",
-      "properties": {
-        "agent": {
-          "type": "string"
-        },
-        "method": {
-          "type": "string"
-        },
-        "params": {
-          "$ref": "#/definitions/JSONValue"
-        }
-      },
-      "required": [
-        "agent",
-        "method",
-        "params"
-      ],
-      "additionalProperties": false
-    },
-    "HostWorkspaceOptions": {
-      "type": "object",
-      "description": "hosts/setWorkspaceOptions. stopWhenIdleMinutes 0 turns it off.",
-      "properties": {
-        "host": {
-          "$ref": "#/definitions/HostID"
-        },
-        "startWhenUsed": {
-          "type": "boolean"
-        },
-        "stopWhenIdleMinutes": {
-          "type": "integer"
-        },
-        "startForSchedules": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "host"
       ],
       "additionalProperties": false
     },
@@ -11796,6 +11796,43 @@
           "type": "string"
         }
       },
+      "additionalProperties": false
+    },
+    "MachineInfo": {
+      "type": "object",
+      "description": "One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or unknown.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "ssh": {
+          "type": "string"
+        },
+        "tunnel": {
+          "type": "boolean"
+        },
+        "hostKeyRenews": {
+          "type": "boolean",
+          "description": "Its ssh host key is made again at each start, as a Google Cloud workstation's is (#1701): after a Start the control plane made, the first ssh takes the key it is offered and pins it again."
+        },
+        "cost": {
+          "type": "string"
+        },
+        "host": {
+          "$ref": "#/definitions/HostID"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "state"
+      ],
       "additionalProperties": false
     },
     "ManagedMCPServer": {
@@ -15241,7 +15278,7 @@
         },
         "repository": {
           "type": "string",
-          "description": "The repository to start it from (#1809), an https git address. A provider whose New Workspace form has `repository`, such as Codespaces, makes the workspace from it; any other has the host clone it once it joins, before `clones`."
+          "description": "The repository to start it from (#1809), an https git address. A provider whose New Machine form has `repository`, such as Codespaces, makes the workspace from it; any other has the host clone it once it joins, before `clones`."
         }
       },
       "required": [
@@ -15255,7 +15292,7 @@
       "description": "What providers/create made.",
       "properties": {
         "workspace": {
-          "$ref": "#/definitions/WorkspaceInfo"
+          "$ref": "#/definitions/MachineInfo"
         },
         "joining": {
           "type": "boolean"
@@ -15442,7 +15479,7 @@
     },
     "ProviderOptions": {
       "type": "object",
-      "description": "providers/options: the New Workspace form, a JSON Schema.",
+      "description": "providers/options: the New Machine form, a JSON Schema.",
       "properties": {
         "schema": {
           "$ref": "#/definitions/JSONValue"
@@ -15542,7 +15579,7 @@
         "workspaces": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/WorkspaceInfo"
+            "$ref": "#/definitions/MachineInfo"
           }
         },
         "listedAt": {
@@ -24115,43 +24152,6 @@
           "enum": ["project", "user"]
         }
       },
-      "additionalProperties": false
-    },
-    "WorkspaceInfo": {
-      "type": "object",
-      "description": "One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or unknown.",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "state": {
-          "type": "string"
-        },
-        "ssh": {
-          "type": "string"
-        },
-        "tunnel": {
-          "type": "boolean"
-        },
-        "hostKeyRenews": {
-          "type": "boolean",
-          "description": "Its ssh host key is made again at each start, as a Google Cloud workstation's is (#1701): after a Start the control plane made, the first ssh takes the key it is offered and pins it again."
-        },
-        "cost": {
-          "type": "string"
-        },
-        "host": {
-          "$ref": "#/definitions/HostID"
-        }
-      },
-      "required": [
-        "id",
-        "name",
-        "state"
-      ],
       "additionalProperties": false
     },
     "WorktreeChoice": {

@@ -79,7 +79,7 @@ export function NewProjectMenu({ store, newSession }: { store: Store; newSession
           {/* As the sidebar's top row starts one, in the project last started in (#628). */}
           <button role="menuitem" disabled={!newSession} onClick={() => { open.value = false; newSession?.(); }}>New Session</button>
           <NewProjectItems store={store} onChoose={() => (open.value = false)} />
-          {/* A machine of its own for a repository (#1809), made by a workspace provider. */}
+          {/* A machine of its own for a repository (#1809), made by a machine provider. */}
           <button role="menuitem" onClick={() => { open.value = false; adding.value = { kind: "machine" }; }}>{machineWords.menuItem}</button>
         </div>
       )}
@@ -99,7 +99,7 @@ export function EmptyProjects({ store }: { store: Store }) {
     return (
       <div class="empty-projects">
         <p class="strong">No machines yet</p>
-        <p class="quiet">A machine runs your agents. Start one from a repository with a workspace provider.</p>
+        <p class="quiet">A machine runs your agents. Start one from a repository with a machine provider.</p>
         <div class="empty-actions">
           <button class="prominent" onClick={() => (adding.value = { kind: "machine" })}>{machineWords.menuItem}</button>
         </div>

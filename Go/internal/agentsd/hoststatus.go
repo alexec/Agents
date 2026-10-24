@@ -13,7 +13,7 @@ import (
 
 // host/status (#691 US4, #1387), as DaemonCore+HostStatus: whether this host is idle, what
 // runs, and its next scheduled workflow, said on channel 0 when it changes (on the
-// 15-second tick, and again when the uplink comes back), so a workspace provider can stop
+// 15-second tick, and again when the uplink comes back), so a machine provider can stop
 // an idle host and wake it for its next schedule.
 
 const hostStatusTick = 15 * time.Second

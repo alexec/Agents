@@ -55,7 +55,7 @@ public enum MachineFromRepository {
         providers.filter { $0.capabilities.contains("create") && $0.usable }
     }
 
-    /// One field of a provider's New Workspace form.
+    /// One field of a provider's New Machine form.
     public struct Field: Identifiable, Equatable, Sendable {
         public enum Kind: Sendable { case string, integer, boolean }
         public var key: String
@@ -116,13 +116,13 @@ public enum MachineFromRepository {
             if let repository { return "The machine clones \(repository.path) and adds it as a project." }
             return typed ? "Give an https address of a repository, such as on GitHub or GitLab." : "The repository to work in."
         }
-        public static let noMakers = "No provider here can make a machine. Add DigitalOcean, Compute Engine or Codespaces in Settings ▸ Workspace providers."
+        public static let noMakers = "No provider here can make a machine. Add DigitalOcean, Compute Engine or Codespaces in Settings ▸ Machine providers."
         public static func starting(_ name: String) -> String { "Starting \(name)…" }
         public static func joining(_ name: String, _ repository: Repository) -> String {
             "\(name) is starting. It installs Agents, joins and clones \(repository.path) on its first boot. The project shows when it has."
         }
         public static func notJoining(_ name: String, provider: String) -> String {
-            "\(provider) made \(name), but can't install Agents on its first boot. Add it as a machine in the Mac app: Settings ▸ Workspace Providers, Add as Machine…."
+            "\(provider) made \(name), but can't install Agents on its first boot. Add it as a machine in the Mac app: Settings ▸ Machine Providers, Add as Machine…."
         }
         public static let privateNote = "A private repository needs git access on the new machine."
     }

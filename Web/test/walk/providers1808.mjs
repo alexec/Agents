@@ -1,4 +1,4 @@
-// The #1808 walk: Settings ▸ Workspace providers on a scratch control plane that has a fake
+// The #1808 walk: Settings ▸ Machine providers on a scratch control plane that has a fake
 // commands provider (two workspaces, their state in files). Lists it, links the scratch host to
 // the workspace of its name, starts and stops it, unlinks it, opens Add a Provider and Edit, and
 // adds a DigitalOcean provider with a token that is not one, which the control plane refuses.

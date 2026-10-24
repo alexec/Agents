@@ -58,7 +58,7 @@ all show the same list. The milestones you have not earned yet are the checklist
 | **First phone or browser paired** | Pair a phone or a browser with **Pair a Device…**. |
 | **First question answered away from the Mac** | Answer an agent's question from the Remote or the web page. |
 | **First workflow made** | Make a workflow that runs an agent on a schedule or an event. |
-| **First cloud host started** | Start a workspace on a cloud provider. |
+| **First cloud host started** | Start a machine on a cloud provider. |
 | **First pull request landed with nobody watching** | Let an agent open a pull request that merges by itself. |
 | **Five agents working at once** | Have five agents in a turn at the same time. |
 
