@@ -90,6 +90,7 @@
   display: inline-flex; align-items: center; justify-content: center; color: var(--accent); }
 .sidebar-mark.needsYou { color: var(--tint-attention); font-size: 0.8125rem; }
 .sidebar-mark.queued, .sidebar-mark.paused, .sidebar-mark.done { font-size: 0.75rem; }
+.sidebar-mark.archived { color: color-mix(in srgb, var(--paper-ink) 55%, transparent); font-size: 0.75rem; }
 /* Archiving needs approval (#584): the window's archive box, in the attention tint, as it is
    listed under Needs You (#817). */
 .sidebar-mark.asksToArchive { color: var(--tint-attention); font-size: 0.75rem; }

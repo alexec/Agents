@@ -626,6 +626,10 @@ struct RemoteProjectFold: View {
                     heading(isOpen)
                 }
             }
+            .task(id: isOpen) {
+                if isOpen { _ = await model.loadArchived(in: key) }
+                else { model.letGoOfArchived(in: key.folder) }
+            }
         }
     }
 
@@ -650,16 +654,21 @@ struct RemoteProjectFold: View {
     /// only layout (#2381); not in a project's own scene, whose group is Sessions already.
     @ViewBuilder
     private func sessionsFold(_ fold: SidebarProjectFold) -> some View {
-        let grouped = !inScene && !fold.sessions.isEmpty
+        let grouped = !inScene && (!fold.sessions.isEmpty || !fold.recentArchived.isEmpty)
         let isOpen = !grouped || fold.isSearching || folds.isOpen(key, .sessions)
         if grouped {
-            SidebarFoldRow(title: "Sessions", count: fold.sessions.count, isOpen: isOpen) {
+            SidebarFoldRow(title: "Sessions", count: fold.sessions.count + fold.recentArchived.count, isOpen: isOpen) {
                 folds.set(key, .sessions, open: !isOpen)
             }
         }
         // A closed fold has no rows at all (#237).
         ForEach(isOpen ? SidebarTree.rows(fold.sessions, in: model.work, folds: folds) : []) { row in
             SidebarSessionRow(agent: row.agent, tree: row, folds: folds, isNested: grouped)
+        }
+        if isOpen {
+            ForEach(fold.recentArchived) { agent in
+                SidebarSessionRow(agent: agent, isNested: grouped)
+            }
         }
     }
 

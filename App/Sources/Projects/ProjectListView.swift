@@ -500,10 +500,10 @@ struct ProjectFold: View {
                 // started it, folded (#835). Under a Sessions row, as the workflows are
                 // under theirs (#2312), the only layout (#2381); not in a project's own
                 // window, whose group is headed Sessions already.
-                let grouped = !inWindow && !fold.sessions.isEmpty
+                let grouped = !inWindow && (!fold.sessions.isEmpty || !fold.recentArchived.isEmpty)
                 let sessionsOpen = !grouped || fold.isSearching || folds.isOpen(key, .sessions)
                 if grouped {
-                    SidebarFoldRow(title: "Sessions", count: fold.sessions.count, isOpen: Binding(
+                    SidebarFoldRow(title: "Sessions", count: fold.sessions.count + fold.recentArchived.count, isOpen: Binding(
                         get: { sessionsOpen },
                         set: { folds.set(key, .sessions, open: $0) }))
                 }
@@ -511,6 +511,11 @@ struct ProjectFold: View {
                 ForEach(FoldedRow.rows(sessionsOpen ? SidebarTree.rows(fold.sessions, in: model.work, folds: folds) : [],
                                        in: .sessions)) { row in
                     SessionSidebarRow(agent: row.item.agent, tree: row.item, folds: folds, isNested: grouped)
+                }
+                if sessionsOpen {
+                    ForEach(fold.recentArchived) { agent in
+                        SessionSidebarRow(agent: agent, isNested: grouped)
+                    }
                 }
                 // Then its workflows, after the sessions (Alex, #495), in a Workflows fold
                 // of their own, one level in, as a mailbox's sub-mailboxes in Mail (#885).
@@ -542,6 +547,10 @@ struct ProjectFold: View {
                 } else {
                     heading(fold, isOpen: isOpen)
                 }
+            }
+            .task(id: isOpen) {
+                if isOpen { _ = await model.loadArchived(in: key) }
+                else { model.letGoOfArchived(in: key) }
             }
         }
     }

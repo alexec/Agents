@@ -47,6 +47,9 @@ const markWords: Record<SessionMark, string> = { needsYou: "Needs you", working:
  * status mark.
  */
 export function SidebarMark({ agent, comingBack = false }: { agent: Agent; comingBack?: boolean }) {
+  if (agent.state === "archived") {
+    return <span class="sidebar-mark archived" role="img" aria-label="Archived" title="Archived">▣</span>;
+  }
   const status = rowStatus(agent, comingBack);
   const mark = comingBack ? null : sessionMark(agent);
   if (!mark) return <StatusMark agent={agent} comingBack={comingBack} />;
