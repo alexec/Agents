@@ -15,7 +15,13 @@ func (fakeViews) OpenIssues(_ context.Context, team, _, _ string) ([]ListedIssue
 		Priority: "High", UpdatedAt: "2026-10-19T10:00:00.000Z"}}, nil
 }
 
-func (fakeViews) Teams(context.Context) ([]Team, error) { return []Team{{Key: "ENG", Name: "Engineering"}}, nil }
+func (fakeViews) Teams(context.Context) ([]Team, error) {
+	return []Team{{Key: "ENG", Name: "Engineering"}}, nil
+}
+
+func (fakeViews) IssueDetails(_ context.Context, identifier string) (map[string]any, error) {
+	return map[string]any{"identifier": identifier, "description": "**Text**", "descriptionHTML": "<p><strong>Text</strong></p>\n"}, nil
+}
 
 func TestTheViewListsOpenIssues(t *testing.T) {
 	r, l := newRecorded(t)

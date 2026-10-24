@@ -13,7 +13,7 @@ import (
 )
 
 // The front as the Agents daemon talks to it: initialize carries the events capability, the
-// events are answered here, and its one tool is show_issues, with its page (Linear's own
+// events are answered here, and its tools are show_issues and show_issue_details, with its page (Linear's own
 // server changes issues).
 
 func equal(t *testing.T, got, want any, what string) {
@@ -70,17 +70,31 @@ func TestTheFrontOffersEventsAndTheIssuesView(t *testing.T) {
 	send(map[string]any{"jsonrpc": "2.0", "method": "notifications/initialized"})
 
 	tools, _ := call(2, "tools/list", map[string]any{})["result"].(map[string]any)["tools"].([]any)
-	if len(tools) != 1 || tools[0].(map[string]any)["name"] != "show_issues" {
+	if len(tools) != 2 {
 		t.Fatalf("tools offered: %v", tools)
 	}
-	equal(t, tools[0].(map[string]any)["_meta"].(map[string]any)["ui/resourceUri"], "ui://linear/issues", "the tool's view")
+	listed := map[string]bool{}
+	for _, tool := range tools {
+		listed[tool.(map[string]any)["name"].(string)] = true
+	}
+	if !listed["show_issues"] || !listed["show_issue_details"] {
+		t.Fatalf("tools offered: %v", tools)
+	}
+	for _, tool := range tools {
+		if tool.(map[string]any)["name"] == "show_issues" {
+			equal(t, tool.(map[string]any)["_meta"].(map[string]any)["ui/resourceUri"], "ui://linear/issues", "the tool's view")
+		}
+	}
 	page := call(3, "resources/read", map[string]any{"uri": "ui://linear/issues"})["result"].(map[string]any)["contents"].([]any)
-	if text, _ := page[0].(map[string]any)["text"].(string); !strings.Contains(text, "const bridge") || strings.Contains(text, "/*bridge.js*/") {
-		t.Fatal("the page does not carry its bridge")
+	if text, _ := page[0].(map[string]any)["text"].(string); !strings.Contains(text, "const bridge") || strings.Contains(text, "/*bridge.js*/") ||
+		!strings.Contains(text, "show_issue_details") || !strings.Contains(text, "issue-row") || strings.Contains(text, "Show details") {
+		t.Fatal("the page does not carry its bridge and expandable issue rows")
 	}
 	shown := call(4, "tools/call", map[string]any{"name": "show_issues", "arguments": map[string]any{"team": "ENG"}})["result"].(map[string]any)
 	issues := shown["structuredContent"].(map[string]any)["issues"].([]any)
 	equal(t, issues[0].(map[string]any)["identifier"], "ENG-5", "the listed issue")
+	details := call(10, "tools/call", map[string]any{"name": "show_issue_details", "arguments": map[string]any{"identifier": "ENG-5"}})["result"].(map[string]any)
+	equal(t, details["structuredContent"].(map[string]any)["descriptionHTML"], "<p><strong>Text</strong></p>\n", "rendered issue description")
 	refused := call(9, "tools/call", map[string]any{"name": "show_issues", "arguments": map[string]any{"state": "completed"}})["result"].(map[string]any)
 	equal(t, refused["isError"], true, "a closed state is refused")
 
