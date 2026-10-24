@@ -140,9 +140,12 @@ In the review worktree:
 
 ## 4. Fix the critical and high ones
 
-Only **critical** and **high** findings are fixed; medium and low stay recorded. A
-dependency alert is not given a helper: its issue goes to the Scrum Master's lanes
-through the release (step 3).
+Only **critical** and **high** findings are fixed during the security audit. A medium
+security finding stays private as a draft advisory for one release. If it is still open
+in the next release, the release gives its advisory URL to the Scrum Master as priority
+work; the release does not wait for the fix. Low findings stay recorded and are not
+worked. A dependency alert is not given a helper: its issue goes to the Scrum Master's
+lanes through the release (step 3).
 
 - At most **2 helpers per run**. Call `list_sessions` with `started_by: me` first and start no more than
   the free running places allow (the project's helper limits are 3 running and 5 not
@@ -187,7 +190,7 @@ When the helpers are done (or if none were started):
    has commits, and its report names the test that failed first and the proof.
 2. Update each finding's status in `findings.md` and in the run file: `fixed on
    <branch> (<commits>)`, `needs a decision: <the choice>`, `won't fix: <why>`, or
-   `recorded` (medium and low). Commit on `agents/reviews-security`. A dependency alert's
+   `recorded` (medium for its one release of grace, and low). Commit on `agents/reviews-security`. A dependency alert's
    status is its issue (`filed #NNN`), or `needs a decision: dismiss …`.
 3. Archive each helper you started with `archive_session`. Never delete its worktree or
    branch yourself: the work is there for Alex. (Archiving lets the app tidy away a
