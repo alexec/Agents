@@ -57,7 +57,7 @@ struct SidebarSessionRow: View {
             // row's mark; unread is the bold title (#1323). Archived keeps its icon.
             if agent.state == .archived {
                 Image(systemName: "archivebox")
-                    .font(.system(size: 13))
+                    .glyph(size: 13)
                     .foregroundStyle(.secondary)
                     .frame(width: 20, height: 20)
                     .accessibilityLabel("Archived")
