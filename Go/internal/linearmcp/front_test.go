@@ -89,6 +89,12 @@ func TestTheFrontOffersEventsAndTheIssuesView(t *testing.T) {
 	if text, _ := page[0].(map[string]any)["text"].(string); !strings.Contains(text, "const bridge") || strings.Contains(text, "/*bridge.js*/") ||
 		!strings.Contains(text, "show_issue_details") || !strings.Contains(text, "issue-row") || strings.Contains(text, "Show details") {
 		t.Fatal("the page does not carry its bridge and expandable issue rows")
+	} else {
+		for _, want := range []string{"Add a label filter", "label-tags", "removeLabel", "Promise.all"} {
+			if !strings.Contains(text, want) {
+				t.Errorf("issues page is missing %q", want)
+			}
+		}
 	}
 	shown := call(4, "tools/call", map[string]any{"name": "show_issues", "arguments": map[string]any{"team": "ENG"}})["result"].(map[string]any)
 	issues := shown["structuredContent"].(map[string]any)["issues"].([]any)
