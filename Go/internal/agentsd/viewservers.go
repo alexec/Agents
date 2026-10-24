@@ -245,6 +245,9 @@ const viewCatalogVersion = 3
 // entry changing.
 const viewCatalogFresh = 24 * time.Hour
 
+// A missing tool triggers a refresh, but a bad view cannot force one network read per call.
+const viewCatalogMissRefreshCooldown = 5 * time.Second
+
 // makeViewCatalog is ServerViewCatalog.make, from tools/list and resources/list.
 func makeViewCatalog(server string, tools, resources []json.RawMessage, at time.Time) viewCatalog {
 	c := viewCatalog{Version: viewCatalogVersion, Server: server, MadeAt: at, Tools: []viewTool{}, AppTools: []string{}, Resources: []viewResource{}}
@@ -360,13 +363,27 @@ func (d *Daemon) keepViewCatalog(key string, c viewCatalog) {
 // could not be read. A server that failed is not asked again for five minutes, and two
 // asking at once share one read.
 func (d *Daemon) loadViewCatalog(ctx context.Context, s viewServer) *viewCatalog {
-	if c := d.cachedViewCatalog(s); c != nil {
+	return d.readViewCatalog(ctx, s, false)
+}
+
+// refreshViewCatalog reads the server's tool list again when a view asks for a tool
+// missing from the cache. A server can add an app-visible tool while the cache is fresh.
+func (d *Daemon) refreshViewCatalog(ctx context.Context, s viewServer) *viewCatalog {
+	if c := d.cachedViewCatalog(s); c != nil && nowFunc().Sub(c.MadeAt) < viewCatalogMissRefreshCooldown {
 		return c
+	}
+	return d.readViewCatalog(ctx, s, true)
+}
+
+func (d *Daemon) readViewCatalog(ctx context.Context, s viewServer, refresh bool) *viewCatalog {
+	cached := d.cachedViewCatalog(s)
+	if cached != nil && !refresh {
+		return cached
 	}
 	d.viewMu.Lock()
 	if failed, ok := d.viewFailures[s.entry]; ok && nowFunc().Sub(failed) < 5*time.Minute {
 		d.viewMu.Unlock()
-		return nil
+		return cached
 	}
 	if loading, ok := d.viewLoads[s.entry]; ok {
 		d.viewMu.Unlock()
@@ -405,7 +422,7 @@ func (d *Daemon) loadViewCatalog(ctx context.Context, s viewServer) *viewCatalog
 		d.viewMu.Lock()
 		d.viewFailures[s.entry] = nowFunc()
 		d.viewMu.Unlock()
-		return nil
+		return cached
 	}
 	if b, err := json.MarshalIndent(c, "", "  "); err == nil {
 		if store.WriteAtomically(d.viewCatalogPath(s.entry), b, 0o644) != nil {
