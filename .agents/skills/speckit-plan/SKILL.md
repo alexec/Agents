@@ -13,6 +13,8 @@ disable-model-invocation: false
 
 ## User Input
 
+Before planning any parser, protocol, client, format or algorithm, apply the **Libraries before our own code** rule in `AGENTS.md`: check for a fit library and prefer platform libraries, official SDKs, then widely used community libraries. Record why a library is or is not fit in the plan, including its licence, maintenance, adoption, pinning and runtime cost where relevant.
+
 ```text
 $ARGUMENTS
 ```
