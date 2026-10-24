@@ -836,7 +836,9 @@ func (d *Daemon) fork(ctx context.Context, id wire.UUID) (wire.UUID, error) {
 	if err != nil {
 		return "", &Error{Code: CodeRuntimeNotFound, Message: err.Error()}
 	}
-	forked, err := acp.Fork(ctx, launch, nobody{}, *a.RuntimeSessionID, cwd, agentSessionMeta(a))
+	meta := agentSessionMeta(a)
+	brief := d.briefFor(a)
+	forked, err := acp.Fork(ctx, launch, nobody{}, *a.RuntimeSessionID, cwd, meta, withSystemPrompt(meta, a.RuntimeID, brief), brief)
 	switch {
 	case errors.Is(err, acp.ErrCannotFork):
 		return "", &Error{Code: wire.FailureNotSupported, Message: a.RuntimeID + " cannot branch a conversation."}

@@ -19,12 +19,12 @@ import (
 // The rest of the old Briefing.swift, its standing words and AppToolPreface came back
 // with #1806.
 //
-// It is said once per conversation: it stays in the runtime's own history, which the
-// runtime replays when the conversation is picked back up. A runtime in
-// systemPromptDelivery has it as its system prompt, on session/new, load and resume (#1080),
-// so its first prompt, and the title it makes from it, is the person's words alone. The
-// others have it before the person's words in the first prompt of a new conversation
-// (#763). A writer (purpose, #858) has none: its prompt is its whole brief.
+// The runtime keeps the brief in the conversation and replays it when the person picks up
+// that conversation. If the runtime advertises the ACP session system-prompt capability,
+// the daemon sends the brief outside the first user prompt on new, load, resume and fork.
+// Otherwise, a compatibility adapter may do this. Other runtimes get it before the
+// person's words in the first prompt of a new conversation (#763). A writer (purpose,
+// #858) has no brief: its prompt is its whole brief.
 
 // eventsBrief is EventWords.briefing (042): wait rather than poll.
 const eventsBrief = "Wait for an event (checks passing, this Mac waking) with wait_for_event, for sessions " +
@@ -57,12 +57,9 @@ func endingBrief(runtimeID string) string {
 		"archive_session with no id."
 }
 
-// systemPromptDelivery is RuntimeCatalog's: how a runtime takes words of ours as its system
-// prompt. "append" is _meta.systemPrompt.append (Claude's adapter gives it to the Agent
-// SDK's preset prompt); "rules" is _meta.rules (Grok). Cursor and Gemini have no append
-// (Gemini's GEMINI_SYSTEM_MD replaces its own prompt), so they have it in the first prompt.
-// A runtime that gains an append comes here.
-var systemPromptDelivery = map[string]string{"claude": "append", "grok": "rules"}
+// compatibilitySystemPromptDelivery describes runtime-specific legacy routes, used only
+// when initialize does not advertise ACP's session system-prompt capability.
+var compatibilitySystemPromptDelivery = map[string]string{"claude": "append", "grok": "rules"}
 
 // brief is the whole of it for an agent, in the order it is said: who is who first, since
 // the paragraphs after it say "I" and "me" and that is the person it names; then the three
@@ -398,7 +395,7 @@ func leasesWithDeclared(declared []wire.DeclaredResource) string {
 
 // withSystemPrompt is meta with words as the system prompt, where runtimeID takes one.
 func withSystemPrompt(meta map[string]any, runtimeID, words string) map[string]any {
-	how := systemPromptDelivery[runtimeID]
+	how := compatibilitySystemPromptDelivery[runtimeID]
 	if words == "" || how == "" {
 		return meta
 	}
