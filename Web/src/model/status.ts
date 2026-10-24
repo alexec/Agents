@@ -39,7 +39,7 @@ export const comingBackDescription = "Coming back after a restart";
 export const waitingLabel = "Waiting";
 export const startingLabel = "Starting";
 
-const pausedEndings: readonly (EndedReason | undefined)[] = ["cancelled", "stoppedByAgent", "stoppedByAdmin", "allowanceSpent"];
+const pausedEndings: readonly (EndedReason | undefined)[] = ["cancelled", "stoppedByAgent", "stoppedByAdmin"];
 
 /** StatusShape(row:isComingBack:). */
 export function shapeOf(agent: Agent, isComingBack = false): StatusShape {

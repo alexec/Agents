@@ -97,19 +97,19 @@ struct RuntimeChooserAllowanceTests {
 /// Where a chat whose allowance ran out sits in the list (065, US2 scenario 2, R7).
 @Suite("A spent allowance in the list")
 struct SpentAllowanceGroupTests {
-    @Test func itIsPausedNotNeedsYouNorWaiting() {
+    @Test func itNeedsAttentionAsAFailedSession() {
         let group = AgentGroup(for: .stopped, report: nil, outcomeAsked: false,
                                endedReason: .allowanceSpent)
-        #expect(group == .stopped)
-        #expect(group.title == "Paused")
+        #expect(group == .needsAttention)
+        #expect(group.title == "Needs you")
         #expect(EndedReason.allowanceSpent.summary == "Its allowance ran out")
     }
 
-    @Test func itIsDrawnWithTheStopMarkNotTheNeedsYouMark() {
+    @Test func itUsesTheNeedsYouMarkAsAFailedSession() {
         let shape = StatusShape(state: .stopped, outcome: nil, isWaiting: false, isComingBack: false,
                                 endedReason: .allowanceSpent)
-        #expect(shape == .stopped)
-        #expect(!shape.wantsAPerson)
+        #expect(shape == .needsYou)
+        #expect(shape.wantsAPerson)
     }
 
     @Test func aRateLimitThatPersistedStillNeedsYou() {

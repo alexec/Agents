@@ -9274,7 +9274,7 @@ type TunnelOpen struct {
 	Ref string `json:"ref"`
 }
 
-// Where a session's turn is, as its Live Activity says it (#1744): working; a question or an approval waiting on the person; done; ended cleanly but wanting the person, as Needs you in the sidebars (#1861); stopped on purpose or out of allowance, as Paused in the sidebars (#1869); ended for another reason; or gone (archived or deleted).
+// Where a session's turn is, as its Live Activity says it (#1744): working; a question or an approval waiting on the person; done; ended cleanly but wanting the person, as Needs you in the sidebars (#1861); stopped on purpose, as Paused in the sidebars (#1869); or ended in error, as Unexpected stop; or gone (archived or deleted).
 type TurnPhase string
 
 const TurnPhaseWorking TurnPhase = "working"

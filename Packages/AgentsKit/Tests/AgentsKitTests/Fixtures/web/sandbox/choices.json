@@ -211,7 +211,9 @@
   },
   {
     "expected" : {
-      "choices" : [],
+      "choices" : [
+
+      ],
       "defaults" : {
         "off" : "Use runtime default (Off)",
         "on" : "Use runtime default (On)",
@@ -242,7 +244,9 @@
   },
   {
     "expected" : {
-      "choices" : [],
+      "choices" : [
+
+      ],
       "defaults" : {
         "off" : "Use runtime default (Off)",
         "on" : "Use runtime default (On)",
@@ -273,7 +277,9 @@
   },
   {
     "expected" : {
-      "choices" : [],
+      "choices" : [
+
+      ],
       "defaults" : {
         "off" : "Use runtime default (Off)",
         "on" : "Use runtime default (On)",

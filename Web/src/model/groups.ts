@@ -34,7 +34,7 @@ export function resumesByItself(report: WorkReport | undefined): boolean {
   return report.block.waits.length > 0 || report.block.checkAgainAt !== undefined;
 }
 
-const pausedEndings: readonly (EndedReason | undefined)[] = ["cancelled", "stoppedByAgent", "stoppedByAdmin", "allowanceSpent"];
+const pausedEndings: readonly (EndedReason | undefined)[] = ["cancelled", "stoppedByAgent", "stoppedByAdmin"];
 
 /** Agent.asksToArchive: an agent asked the person to archive it, and it is not archived yet (#584). */
 export function asksToArchive(agent: Agent): boolean {

@@ -51,9 +51,9 @@ No new case.
 
 | Ending | `EndedReason` | Note already in `PoolWords` | Group |
 |---|---|---|---|
-| Allowance spent | `.allowanceSpent` | `ranOut` — "until ‹time›" only when the runtime gave a time | Paused (`AgentGroup.stopped`) |
-| Credit used up | `.allowanceSpent` | `creditGone` | Paused |
-| Paid extra usage, and the turn failed | `.allowanceSpent` | `overageBegan` | Paused |
+| Allowance spent | `.allowanceSpent` | `ranOut` — "until ‹time›" only when the runtime gave a time | Needs you (`AgentGroup.needsAttention`); a session ended in error |
+| Credit used up | `.allowanceSpent` | `creditGone` | Needs you (`AgentGroup.needsAttention`); a session ended in error |
+| Paid extra usage, and the turn failed | `.allowanceSpent` | `overageBegan` | Needs you (`AgentGroup.needsAttention`); a session ended in error |
 | Paid extra usage, and the turn completed | unchanged (`.endTurn`) | `overageBegan` | wherever a completed turn sits |
 | Rate limit, retries left | `.rateLimited`, then the same prompt is sent again | `rateLimited` | Working while the retry runs |
 | Rate limit, three times in ten minutes on this chat | `.rateLimited` | `stillRateLimited` | Needs you |

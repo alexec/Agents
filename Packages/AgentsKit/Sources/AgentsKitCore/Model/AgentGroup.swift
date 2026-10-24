@@ -66,9 +66,8 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
         case .finished: self = Self.settled(wantsAnswer || (outcomeAsked && report == nil), report,
                                             waitingOnEvents: waitingOnEvents)
         case .stopped where waitingForAllowance: self = .waiting
-        // A spent allowance is Paused, not Needs you (065, R7): the way on is a new chat,
-        // which the chat itself cannot be nagged into.
-        case .stopped: self = [.cancelled, .stoppedByAgent, .stoppedByAdmin, .allowanceSpent].contains(endedReason) ? .stopped : .needsAttention
+        // A spent allowance ended the session in an error. Keep deliberate stops Paused.
+        case .stopped: self = [.cancelled, .stoppedByAgent, .stoppedByAdmin].contains(endedReason) ? .stopped : .needsAttention
         case .archived: self = .archived
         // A queued helper starts by itself when a place frees (#362): nobody has to do
         // anything, which is what Waiting means.
