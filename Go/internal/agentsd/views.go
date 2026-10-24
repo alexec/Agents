@@ -573,6 +573,9 @@ func (d *Daemon) callFromView(ctx context.Context, r wire.ViewCallRequest) (wire
 		return nil, err
 	}
 	catalog := d.loadViewCatalog(ctx, s)
+	if catalog != nil && !catalog.appTool(r.Name) {
+		catalog = d.refreshViewCatalog(ctx, s)
+	}
 	if catalog == nil || !catalog.appTool(r.Name) {
 		log.Printf("view %s of %s asked for %s, which no view may call", r.ViewID, name, r.Name)
 		return nil, viewRefused("A view may not call " + r.Name + ".")
