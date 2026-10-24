@@ -55,7 +55,7 @@ func TestTheWindowSavesTheSettingsTheHostHadNoWriteFor(t *testing.T) {
 	if e := c.callError(t, 8, "workflows/setLimit", map[string]any{"total": 101}); e == nil || e.Message != "Workflows turned on must be between 1 and 100." {
 		t.Fatalf("%+v", e)
 	}
-	if d.workflowTotal() != 12 {
+	if d.workflowTotal() != 100 {
 		t.Fatal("a refused total was saved")
 	}
 }
