@@ -248,6 +248,10 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
 /// next rather than drifting.
 public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     public var workflow: Workflow
+    /// Whether this file belongs to the project or to the person.
+    public var scope: String
+    /// The complete file text. The daemon sends it for the user's Settings list.
+    public var content: String?
     /// Put away by the person. Archived workflows are still listed — under their own
     /// heading, where they can be brought back — and never run.
     public var isArchived: Bool
@@ -323,7 +327,8 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     public var folder: URL { workflow.folder }
     public var workflowID: String { workflow.workflowID }
 
-    public init(workflow: Workflow, isArchived: Bool = false, isEnabled: Bool = true,
+    public init(workflow: Workflow, scope: String = "project", content: String? = nil,
+                isArchived: Bool = false, isEnabled: Bool = true,
                 overLimit: WorkflowLimit? = nil, totalLimit: Int? = nil, nextFireAt: Date? = nil,
                 lastOutcome: WorkflowOutcome? = nil, isRunning: Bool = false,
                 causingEvent: EventPosition? = nil, causingEventName: String? = nil,
@@ -350,6 +355,8 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         self.causingEvent = causingEvent
         self.causingEventName = causingEventName
         self.workflow = workflow
+        self.scope = scope
+        self.content = content
         self.isArchived = isArchived
         self.overLimit = overLimit
         self.totalLimit = totalLimit
@@ -449,6 +456,8 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         workflow = try c.decode(Workflow.self, forKey: .workflow)
+        scope = try c.decodeIfPresent(String.self, forKey: .scope) ?? "project"
+        content = try c.decodeIfPresent(String.self, forKey: .content)
         isArchived = try c.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
         isEnabled = try c.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
         overLimit = try? c.decodeIfPresent(WorkflowLimit.self, forKey: .overLimit)

@@ -10119,6 +10119,10 @@ type WorkflowSettingsRequest struct {
 
 // Read forgivingly (Workflow.swift's init(from:)): a field that is missing or does not read takes its default (`isEnabled` true; false, 0, [] or absent for the rest).
 type WorkflowSummary struct {
+	Scope *string `json:"scope,omitzero"`
+
+	Content *string `json:"content,omitzero"`
+
 	Workflow Workflow `json:"workflow"`
 
 	IsArchived bool `json:"isArchived"`
@@ -10200,8 +10204,16 @@ const WorkflowWhenDoneKeep WorkflowWhenDone = "keep"
 const WorkflowWhenDoneArchiveAllowed WorkflowWhenDone = "archive-allowed"
 const WorkflowWhenDoneArchive WorkflowWhenDone = "archive"
 
+type WorkflowWriteRequest struct {
+	WorkflowID string `json:"workflowID"`
+
+	Content string `json:"content"`
+}
+
 type WorkflowsListRequest struct {
 	Folder *URL `json:"folder,omitzero"`
+
+	Scope *string `json:"scope,omitzero"`
 }
 
 // One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or unknown.

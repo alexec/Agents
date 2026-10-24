@@ -25,6 +25,7 @@ struct RemoteSettings: View {
                 .paperListRow()
                 Section(SettingsScope.machines.title) {
                     MachinesSettingsRow()
+                    UserWorkflowsSettingsRow()
                     SecretsSettingsRow()
                 }
                 .paperListRow()

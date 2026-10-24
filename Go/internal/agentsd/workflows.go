@@ -40,6 +40,8 @@ type workflowState struct {
 	WorkflowID       string                `json:"workflowID"`
 	OffBy            *string               `json:"offBy,omitempty"`
 	OffDigest        *string               `json:"offDigest,omitempty"`
+	UserEnabled      *bool                 `json:"userEnabled,omitempty"`
+	UserArchived     bool                  `json:"userArchived,omitempty"`
 	StandingAgentID  *wire.UUID            `json:"standingAgentID,omitempty"`
 	LastFiredAt      *wire.Date            `json:"lastFiredAt,omitempty"`
 	LastFiredBy      *wire.WorkflowCause   `json:"lastFiredBy,omitempty"`
@@ -93,13 +95,15 @@ type workflowRecords struct {
 
 // workflowFile is one workflow as read now.
 type workflowFile struct {
-	wf     wire.Workflow
-	digest string
-	text   string
+	wf wire.Workflow
+	// sourceFolder is where the file and its named skills live. A user workflow shown in
+	// a project has a project folder on wf, so its run and state stay project-scoped.
+	sourceFolder string
+	scope        string
+	digest       string
+	text         string
 	// skills is the skills it names, which digest covers (S20261019-2).
 	skills []workflowSkill
-	// readyMade is a ready-made workflow with no file in the project yet (#1342).
-	readyMade bool
 }
 
 type workflowBook struct {
@@ -262,16 +266,53 @@ func (d *Daemon) keepBytes(text string) (string, bool) {
 // every file as it stands.
 func (d *Daemon) scanLocked() {
 	files := map[string]map[string]*workflowFile{}
+	d.ensureReadyMadeUserWorkflowsLocked()
+	home := d.personalHome()
+	if home != "" {
+		for _, id := range workflowIDs(home) {
+			path, _ := workflowPath(home, id)
+			text, digest, why := readWorkflowFile(path)
+			f := workflowFileOf(home, id, text, digest, why)
+			f.sourceFolder, f.scope = home, "user"
+			if files[home] == nil {
+				files[home] = map[string]*workflowFile{}
+			}
+			files[home][id] = f
+		}
+	}
 	for _, folder := range d.projectFolders() {
+		if files[folder] == nil {
+			files[folder] = map[string]*workflowFile{}
+		}
 		for _, id := range workflowIDs(folder) {
 			path, _ := workflowPath(folder, id)
 			text, digest, why := readWorkflowFile(path)
 			if files[folder] == nil {
 				files[folder] = map[string]*workflowFile{}
 			}
-			files[folder][id] = workflowFileOf(folder, id, text, digest, why)
+			f := workflowFileOf(folder, id, text, digest, why)
+			f.sourceFolder, f.scope = folder, "project"
+			files[folder][id] = f
 		}
-		d.addReadyMadeLocked(folder, files)
+		if home == "" || !pushesToForge(folder) {
+			continue
+		}
+		for _, id := range workflowIDs(home) {
+			if files[folder][id] != nil || files[home][id] == nil {
+				continue
+			}
+			user := *files[home][id]
+			user.scope = "user"
+			user.wf.Folder = store.FolderURL(folder)
+			state := d.stateLocked(folder, id, false)
+			enabled := state != nil && state.UserEnabled != nil && *state.UserEnabled
+			user.wf.Enabled = &enabled
+			if state != nil && state.UserArchived {
+				archived := true
+				user.wf.Archived = &archived
+			}
+			files[folder][id] = &user
+		}
 	}
 	d.workflowFiles = files
 	// A server's event a workflow names, or no longer does (#383).
@@ -307,6 +348,11 @@ func isArchived(w wire.Workflow) bool { return w.Archived != nil && *w.Archived 
 
 // approvalOf says whether a workflow waits for the person, or is denied here.
 func (d *Daemon) approvalOf(folder, id string, f *workflowFile) (awaiting, denied *wire.WorkflowApproval) {
+	// A file in the person's own workflow folder is trusted by its owner. Projects still
+	// keep it off by default, and their enabled state stays in their own record.
+	if f.scope == "user" {
+		return nil, nil
+	}
 	st := d.stateLocked(folder, id, false)
 	if d.workflowRecsBad {
 		note := "workflows.json could not be read, so nothing is approved until you approve it again."
@@ -374,6 +420,9 @@ func (d *Daemon) ceilingsLocked() map[string]wire.WorkflowLimit {
 	sort.Strings(folders)
 	approved := 0
 	for _, folder := range folders {
+		if folder == d.personalHome() {
+			continue
+		}
 		var ids []string
 		for id := range d.workflowFiles[folder] {
 			ids = append(ids, id)
@@ -416,7 +465,12 @@ func (d *Daemon) runningLocked(folder, id string) bool {
 // summaryLocked is WorkflowSummary as the Swift host fills it.
 func (d *Daemon) summaryLocked(folder, id string, over map[string]wire.WorkflowLimit) wire.WorkflowSummary {
 	f := d.fileLocked(folder, id)
-	s := wire.WorkflowSummary{Workflow: f.wf, NextFireAtByTrigger: []*wire.Date{}}
+	scope := f.scope
+	s := wire.WorkflowSummary{Workflow: f.wf, Scope: &scope, NextFireAtByTrigger: []*wire.Date{}}
+	if folder == d.personalHome() {
+		content := f.text
+		s.Content = &content
+	}
 	s.IsArchived = isArchived(f.wf)
 	s.IsEnabled = !isOff(f.wf)
 	if l, ok := over[folder+"/"+id]; ok {
@@ -433,6 +487,10 @@ func (d *Daemon) summaryLocked(folder, id string, over map[string]wire.WorkflowL
 	}
 	s.McpTriggers = d.mcpTriggerStatuses(folder, id)
 	st := d.stateLocked(folder, id, false)
+	if f.scope == "user" && folder != d.personalHome() {
+		s.IsEnabled = st != nil && st.UserEnabled != nil && *st.UserEnabled
+		s.IsArchived = st != nil && st.UserArchived
+	}
 	if st != nil {
 		s.LastOutcome, s.LastFiredAt, s.LastFiredBy, s.CausingEvent = st.LastOutcome, st.LastFiredAt, st.LastFiredBy, st.LastCausingEvent
 		if s.CausingEvent != nil {
@@ -529,7 +587,7 @@ func (d *Daemon) workflowSummaries(folder string) []wire.WorkflowSummary {
 			continue
 		}
 		for id, wf := range ws {
-			if d.listedHere(wf.wf) {
+			if f == d.personalHome() || d.listedHere(wf.wf) {
 				out = append(out, d.summaryLocked(f, id, over))
 			}
 		}
@@ -555,12 +613,10 @@ func (d *Daemon) editWorkflowLocked(folder, id string, byPerson bool, edit func(
 	if f == nil {
 		return noSuchWorkflow(id)
 	}
-	if f.readyMade {
-		if err := d.writeReadyMadeLocked(folder, id, byPerson); err != nil {
-			return err
-		}
+	if f.scope == "user" && folder != d.personalHome() {
+		return &Error{Code: wire.FailureNotAllowed, Message: "Edit this workflow in Settings ▸ Workflows. Its file belongs to your workflows."}
 	}
-	path, ok := workflowPath(folder, id)
+	path, ok := workflowSourcePath(folder, id, f)
 	if !ok {
 		return notInFolder(id)
 	}
@@ -635,6 +691,51 @@ func (d *Daemon) oneWorkflow(folder, id string) (wire.WorkflowSummary, error) {
 	return d.summaryLocked(folder, id, d.ceilingsLocked()), nil
 }
 
+// writeUserWorkflow creates or replaces one file in ~/.agents/workflows.
+func (d *Daemon) writeUserWorkflow(r wire.WorkflowWriteRequest) (wire.WorkflowSummary, error) {
+	home := d.personalHome()
+	if home == "" {
+		return wire.WorkflowSummary{}, &Error{Code: wire.FailureNotAllowed, Message: "User workflows can only be changed in your own workflow folder."}
+	}
+	path, ok := workflowPath(home, r.WorkflowID)
+	if !ok {
+		return wire.WorkflowSummary{}, notInFolder(r.WorkflowID)
+	}
+	if strings.TrimSpace(r.Content) == "" {
+		return wire.WorkflowSummary{}, Invalid("Nothing was written: content must contain the whole workflow file.")
+	}
+	parsed := parseWorkflow(r.Content, r.WorkflowID, home)
+	if p := parsed.Problem; p != nil && p.Unreadable != nil {
+		return wire.WorkflowSummary{}, &Error{Code: wire.FailureWorkflowUnreadable, Message: "The workflow file could not be read: " + p.Unreadable.Value + ". Nothing was written."}
+	}
+	for _, t := range parsed.Triggers {
+		if t.Schedule == nil && !triggerSupported(t) && !isServerEventName(triggerName(t)) {
+			return wire.WorkflowSummary{}, &Error{Code: wire.FailureWorkflowUnreadable, Message: "\"" + triggerName(t) + "\" is not a trigger. Nothing was written."}
+		}
+	}
+	d.workflowMu.Lock()
+	d.scanLocked()
+	if existing := d.fileLocked(home, r.WorkflowID); existing != nil {
+		if _, _, why := readWorkflowFile(path); why != "" {
+			d.workflowMu.Unlock()
+			return wire.WorkflowSummary{}, &Error{Code: wire.FailureWorkflowUnreadable, Message: why + ". Nothing was written."}
+		}
+	}
+	if err := os.MkdirAll(workflowsFolder(home), 0o755); err != nil {
+		d.workflowMu.Unlock()
+		return wire.WorkflowSummary{}, &Error{Code: wire.FailureCouldNotSave, Message: "The workflow folder could not be created: " + err.Error()}
+	}
+	if err := store.WriteAtomically(path, []byte(r.Content), 0o644); err != nil {
+		d.workflowMu.Unlock()
+		return wire.WorkflowSummary{}, &Error{Code: wire.FailureCouldNotSave, Message: "The workflow was not saved: " + err.Error()}
+	}
+	d.scanLocked()
+	summary := d.summaryLocked(home, r.WorkflowID, d.ceilingsLocked())
+	d.workflowMu.Unlock()
+	d.tellEveryWorkflow()
+	return summary, nil
+}
+
 func strPtr(s string) *string { return &s }
 
 // enableWorkflow is workflows/enable.
@@ -653,8 +754,10 @@ func (d *Daemon) enableWorkflow(r wire.WorkflowEnableRequest, by string) (wire.W
 			approved := 0
 			for fo, ws := range d.workflowFiles {
 				for id, g := range ws {
-					if a, dd := d.approvalOf(fo, id, g); a == nil && dd == nil && !isOff(g.wf) && !isArchived(g.wf) && d.listedHere(g.wf) {
-						approved++
+					if fo != d.personalHome() {
+						if a, dd := d.approvalOf(fo, id, g); a == nil && dd == nil && !isOff(g.wf) && !isArchived(g.wf) && d.listedHere(g.wf) {
+							approved++
+						}
 					}
 				}
 			}
@@ -665,12 +768,19 @@ func (d *Daemon) enableWorkflow(r wire.WorkflowEnableRequest, by string) (wire.W
 			}
 		}
 	}
-	err := d.editWorkflowLocked(folder, r.WorkflowID, by == "person", func(text string) (string, error) {
-		if r.Enabled {
-			return setFrontMatter("enabled", nil, text)
-		}
-		return setFrontMatter("enabled", strPtr("false"), text)
-	})
+	var err error
+	if f.scope == "user" && folder != d.personalHome() {
+		st := d.stateLocked(folder, r.WorkflowID, true)
+		st.UserEnabled = &r.Enabled
+		f.wf.Enabled = &r.Enabled
+	} else {
+		err = d.editWorkflowLocked(folder, r.WorkflowID, by == "person", func(text string) (string, error) {
+			if r.Enabled {
+				return setFrontMatter("enabled", nil, text)
+			}
+			return setFrontMatter("enabled", strPtr("false"), text)
+		})
+	}
 	if err == nil {
 		st := d.stateLocked(folder, r.WorkflowID, true)
 		if r.Enabled {
@@ -704,12 +814,27 @@ func (d *Daemon) archiveWorkflow(r wire.WorkflowArchiveRequest, byPerson bool) (
 	folder := store.FolderPath(r.Folder)
 	d.workflowMu.Lock()
 	d.scanLocked()
-	err := d.editWorkflowLocked(folder, r.WorkflowID, byPerson, func(text string) (string, error) {
+	f := d.fileLocked(folder, r.WorkflowID)
+	var err error
+	if f == nil {
+		err = noSuchWorkflow(r.WorkflowID)
+	} else if f.scope == "user" && folder != d.personalHome() {
+		st := d.stateLocked(folder, r.WorkflowID, true)
+		st.UserArchived = r.Archived
 		if r.Archived {
-			return setFrontMatter("archived", strPtr("true"), text)
+			archived := true
+			f.wf.Archived = &archived
+		} else {
+			f.wf.Archived = nil
 		}
-		return setFrontMatter("archived", nil, text)
-	})
+	} else {
+		err = d.editWorkflowLocked(folder, r.WorkflowID, byPerson, func(text string) (string, error) {
+			if r.Archived {
+				return setFrontMatter("archived", strPtr("true"), text)
+			}
+			return setFrontMatter("archived", nil, text)
+		})
+	}
 	if err == nil {
 		st := d.stateLocked(folder, r.WorkflowID, true)
 		st.LastOutcome, st.HeldFire = nil, nil
@@ -743,14 +868,21 @@ func (d *Daemon) deleteWorkflow(r wire.WorkflowRequest) error {
 	if f := d.fileLocked(folder, r.WorkflowID); f == nil {
 		d.workflowMu.Unlock()
 		return noSuchWorkflow(r.WorkflowID)
-	} else if f.readyMade {
+	} else if f.scope == "user" && folder != d.personalHome() {
 		d.workflowMu.Unlock()
-		return &Error{Code: wire.FailureDeleteRefused, Message: f.wf.Name + " is ready-made and has no file to delete. Archive it to hide it."}
+		return &Error{Code: wire.FailureDeleteRefused, Message: f.wf.Name + " belongs to your workflows. Delete it in Settings ▸ Workflows."}
 	}
-	path, ok := workflowPath(folder, r.WorkflowID)
+	f := d.fileLocked(folder, r.WorkflowID)
+	path, ok := workflowSourcePath(folder, r.WorkflowID, f)
 	if !ok {
 		d.workflowMu.Unlock()
 		return notInFolder(r.WorkflowID)
+	}
+	if folder == d.personalHome() {
+		if err := markReadyMadeRemoved(folder, r.WorkflowID); err != nil {
+			d.workflowMu.Unlock()
+			return &Error{Code: wire.FailureDeleteRefused, Message: "Could not save the removed workflow ID: " + err.Error()}
+		}
 	}
 	if err := os.Remove(path); err != nil {
 		d.workflowMu.Unlock()
@@ -954,8 +1086,13 @@ func (d *Daemon) registerWorkflows() {
 	})
 	On(d, wire.CallWorkflowsList, func(ctx context.Context, c *Client, r wire.WorkflowsListRequest) ([]wire.WorkflowSummary, error) {
 		folder := ""
+		if r.Scope != nil && *r.Scope == "user" {
+			folder = d.personalHome()
+		}
 		if r.Folder != nil {
-			folder = store.FolderPath(*r.Folder)
+			if r.Scope == nil || *r.Scope != "user" {
+				folder = store.FolderPath(*r.Folder)
+			}
 		}
 		return d.workflowSummaries(folder), nil
 	})
@@ -973,6 +1110,9 @@ func (d *Daemon) registerWorkflows() {
 	})
 	On(d, wire.CallWorkflowsSettings, func(ctx context.Context, c *Client, r wire.WorkflowSettingsRequest) (wire.WorkflowSummary, error) {
 		return d.workflowSettingsChange(r, d.byPerson(c))
+	})
+	On(d, wire.CallWorkflowsWrite, func(ctx context.Context, c *Client, r wire.WorkflowWriteRequest) (wire.WorkflowSummary, error) {
+		return d.writeUserWorkflow(r)
 	})
 	// The page's Clear on an MCP trigger's missed events (#383).
 	On(d, wire.CallWorkflowsMcpTriggerClearMissed, func(ctx context.Context, c *Client, r wire.WorkflowMCPClearMissedRequest) (wire.WorkflowSummary, error) {

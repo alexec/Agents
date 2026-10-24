@@ -7864,6 +7864,8 @@ export interface WorkflowSettingsRequest {
  * its default (`isEnabled` true; false, 0, [] or absent for the rest).
  */
 export interface WorkflowSummary {
+  scope?: "project" | "user";
+  content?: string;
   workflow: Workflow;
   isArchived: boolean;
   isEnabled: boolean;
@@ -7904,8 +7906,14 @@ export type WorkflowWhenDone =
   | "archive-allowed"
   | "archive";
 
+export interface WorkflowWriteRequest {
+  workflowID: string;
+  content: string;
+}
+
 export interface WorkflowsListRequest {
   folder?: URLString;
+  scope?: "project" | "user";
 }
 
 /**
@@ -8259,6 +8267,7 @@ export interface Methods {
   "workflows/run": { params: WorkflowRequest; result: WorkflowSummary };
   "workflows/setMuted": { params: WorkflowMuteRequest; result: WorkflowSummary };
   "workflows/settings": { params: WorkflowSettingsRequest; result: WorkflowSummary };
+  "workflows/write": { params: WorkflowWriteRequest; result: WorkflowSummary };
   "worktrees/all": { params: Empty; result: ProjectWorktrees[] };
   "worktrees/check": { params: WorktreeRemovalRequest; result: RemovalCheck };
   "worktrees/list": { params: WorktreesListRequest; result: WorktreesListResponse };
@@ -8525,6 +8534,7 @@ export const MethodTarget = {
   "workflows/run": "host",
   "workflows/setMuted": "host",
   "workflows/settings": "host",
+  "workflows/write": "host",
   "worktrees/all": "host",
   "worktrees/check": "host",
   "worktrees/list": "host",
@@ -9348,8 +9358,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
   WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort"] },
   WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "whenDone", "continueWhenBack", "runsOn"] },
-  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "hearsFor", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
-  WorkflowsListRequest: { required: [], optional: ["folder"] },
+  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["scope", "content", "overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "hearsFor", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
+  WorkflowWriteRequest: { required: ["workflowID", "content"], optional: [] },
+  WorkflowsListRequest: { required: [], optional: ["folder", "scope"] },
   WorkspaceInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host"] },
   WorktreeRemovalRequest: { required: ["project", "root", "confirmed"], optional: [] },
   WorktreeRemoved: { required: ["removedBranch"], optional: [] },

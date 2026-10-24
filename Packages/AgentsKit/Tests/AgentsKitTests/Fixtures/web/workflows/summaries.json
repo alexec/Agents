@@ -14,6 +14,7 @@
 
       ],
       "queued" : 0,
+      "scope" : "project",
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -76,6 +77,7 @@
 
       ],
       "queued" : 0,
+      "scope" : "project",
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "standing",
@@ -137,6 +139,7 @@
 
       ],
       "queued" : 0,
+      "scope" : "project",
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -193,6 +196,7 @@
 
       ],
       "queued" : 0,
+      "scope" : "project",
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -261,6 +265,7 @@
 
       ],
       "queued" : 0,
+      "scope" : "project",
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "triggering",
@@ -324,6 +329,7 @@
 
       ],
       "queued" : 0,
+      "scope" : "project",
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -387,6 +393,7 @@
 
       ],
       "queued" : 0,
+      "scope" : "project",
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -433,6 +440,7 @@
 
       ],
       "queued" : 0,
+      "scope" : "project",
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -484,6 +492,7 @@
 
       ],
       "queued" : 0,
+      "scope" : "project",
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -523,6 +532,7 @@
 
       ],
       "queued" : 0,
+      "scope" : "project",
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -567,6 +577,7 @@
 
       ],
       "queued" : 0,
+      "scope" : "project",
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -634,6 +645,7 @@
 
       ],
       "queued" : 0,
+      "scope" : "project",
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -679,6 +691,7 @@
       ],
       "overLimit" : "project",
       "queued" : 0,
+      "scope" : "project",
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -745,6 +758,7 @@
 
       ],
       "queued" : 0,
+      "scope" : "project",
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -818,6 +832,7 @@
 
       ],
       "queued" : 0,
+      "scope" : "project",
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -891,6 +906,7 @@
 
       ],
       "queued" : 2,
+      "scope" : "project",
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -964,6 +980,7 @@
 
       ],
       "queued" : 10,
+      "scope" : "project",
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -1037,6 +1054,7 @@
 
       ],
       "queued" : 0,
+      "scope" : "project",
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -1099,6 +1117,7 @@
 
       ],
       "queued" : 0,
+      "scope" : "project",
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -1172,6 +1191,7 @@
 
       ],
       "queued" : 0,
+      "scope" : "project",
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -1234,6 +1254,7 @@
 
       ],
       "queued" : 0,
+      "scope" : "project",
       "workflow" : {
         "cooldown" : 5400,
         "folder" : "file:///fixture/project",
@@ -1310,6 +1331,7 @@
 
       ],
       "queued" : 0,
+      "scope" : "project",
       "workflow" : {
         "cooldown" : 86400,
         "folder" : "file:///fixture/project",
@@ -1373,6 +1395,7 @@
 
       ],
       "queued" : 0,
+      "scope" : "project",
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -1420,6 +1443,7 @@
 
       ],
       "queued" : 0,
+      "scope" : "project",
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",

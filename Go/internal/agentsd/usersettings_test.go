@@ -151,9 +151,14 @@ func TestAPartIsTakenFromThisMachine(t *testing.T) {
 	json.Unmarshal(c.call(t, 1, "settings/userPart", wire.UserPartRequest{Part: wire.UserSettingsPartNameAgentConfig}), &got)
 	var config wire.UserAgentConfig
 	json.Unmarshal(got.Value, &config)
-	if config.Instructions == nil || *config.Instructions != "Be brief." || config.Skills["one"] != "one" || len(config.Skills) != 1 ||
+	if config.Instructions == nil || *config.Instructions != "Be brief." || config.Skills["one"] != "one" || len(config.Skills) != 1+len(readyMadeIDs()) ||
 		len(got.LeftOut) != 1 || got.LeftOut[0] != "many" {
 		t.Fatalf("%+v %+v", got, config)
+	}
+	for _, id := range readyMadeIDs() {
+		if _, ok := config.Skills[id]; !ok {
+			t.Fatalf("ready-made skill %q is missing", id)
+		}
 	}
 	// A token in clear is refused, by name only; one in a secret is taken.
 	os.WriteFile(filepath.Join(home, ".agents", "mcp.json"), []byte(`{"mcpServers":{"gh":{"url":"https://x","headers":{"Authorization":"Bearer ghp_clear"}}}}`), 0o644)

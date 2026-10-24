@@ -49,13 +49,13 @@ func (d *Daemon) waitingWorkflowChanges(folder string) []wire.GuardedChange {
 		}
 		digest := awaiting.Digest
 		since := now()
-		if path, ok := workflowPath(folder, id); ok {
+		if path, ok := workflowSourcePath(folder, id, f); ok {
 			if fi, err := os.Stat(path); err == nil {
 				since = wire.DateOf(fi.ModTime())
 			}
 		}
 		for _, s := range f.skills {
-			if path, ok := skillPath(folder, s.name); ok {
+			if path, ok := skillPath(f.sourceFolder, s.name); ok {
 				if fi, err := os.Stat(path); err == nil && wire.DateOf(fi.ModTime()) > since {
 					since = wire.DateOf(fi.ModTime())
 				}
@@ -164,7 +164,7 @@ func (d *Daemon) keepOrUndoWorkflow(folder, id string, digest *string, keep bool
 	}
 	approved, skills, had := d.approvedCopyLocked(folder, id)
 	d.workflowMu.Unlock()
-	path, ok := workflowPath(folder, id)
+	path, ok := workflowSourcePath(folder, id, f)
 	err := errors.New("that is not a workflow's name")
 	if ok {
 		if had {
@@ -173,13 +173,13 @@ func (d *Daemon) keepOrUndoWorkflow(folder, id string, digest *string, keep bool
 			err = nil
 		}
 	}
-	// The skills it named go back too, each only into a folder of the project's own.
+	// The skills it named go back too, in the same scope as the workflow.
 	for _, s := range skills {
 		if err != nil {
 			break
 		}
-		if p, ok := skillPath(folder, s.name); !ok {
-			err = errors.New(skillChangePath(s.name) + " is not a file of the project's own")
+		if p, ok := skillPath(f.sourceFolder, s.name); !ok {
+			err = errors.New(skillChangePath(s.name) + " is not a file in its workflow scope")
 		} else if cur, _, _ := readWorkflowFile(p); cur != s.text {
 			err = store.WriteAtomically(p, []byte(s.text), 0o644)
 		}

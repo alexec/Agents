@@ -23868,6 +23868,8 @@
     "WorkflowSummary": {
       "type": "object",
       "properties": {
+        "scope": { "type": "string", "enum": ["project", "user"] },
+        "content": { "type": "string" },
         "workflow": {
           "$ref": "#/definitions/Workflow"
         },
@@ -24027,11 +24029,24 @@
         "archive"
       ]
     },
+    "WorkflowWriteRequest": {
+      "type": "object",
+      "properties": {
+        "workflowID": { "type": "string" },
+        "content": { "type": "string" }
+      },
+      "required": ["workflowID", "content"],
+      "additionalProperties": false
+    },
     "WorkflowsListRequest": {
       "type": "object",
       "properties": {
         "folder": {
           "$ref": "#/definitions/URLString"
+        },
+        "scope": {
+          "type": "string",
+          "enum": ["project", "user"]
         }
       },
       "additionalProperties": false

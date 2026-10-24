@@ -325,24 +325,48 @@ func (d *Daemon) manageWorkflows(caller wire.UUID, args map[string]json.RawMessa
 		}
 		return strings.Join(lines, "\n"), nil
 	case "read":
-		path, ok := workflowPath(project, id)
-		if !ok {
-			return "", notInFolder(id)
-		}
-		text, _, why := readWorkflowFile(path)
-		if why != "" {
-			d.workflowMu.Lock()
-			f := d.fileLocked(project, id)
+		d.workflowMu.Lock()
+		d.scanLocked()
+		f := d.fileLocked(project, id)
+		if f == nil {
+			path, ok := workflowPath(project, id)
 			d.workflowMu.Unlock()
-			if f != nil && f.readyMade {
-				return f.text, nil // ready-made, with no file yet (#1342)
+			if !ok {
+				return "", notInFolder(id)
+			}
+			if _, _, why := readWorkflowFile(path); why != "" {
+				return "", &Error{Code: wire.FailureWorkflowUnreadable, Message: id + ".md could not be read."}
 			}
 			return "", noSuchWorkflow(id)
 		}
+		if f.scope == "user" {
+			d.workflowMu.Unlock()
+			return "", &Error{Code: wire.FailureNotAllowed, Message: "This workflow belongs to your workflows. Open it in Settings ▸ Workflows."}
+		}
+		if f.wf.Problem != nil && f.wf.Problem.Unreadable != nil {
+			d.workflowMu.Unlock()
+			return "", &Error{Code: wire.FailureWorkflowUnreadable, Message: id + ".md could not be read."}
+		}
+		text := f.text
+		d.workflowMu.Unlock()
 		return text, nil
 	case "write":
+		d.workflowMu.Lock()
+		d.scanLocked()
+		existing := d.fileLocked(project, id)
+		d.workflowMu.Unlock()
+		if existing != nil && existing.scope == "user" {
+			return "", &Error{Code: wire.FailureNotAllowed, Message: "This workflow belongs to your workflows. Edit it in Settings ▸ Workflows."}
+		}
 		return d.writeWorkflow(project, id, argString(args, "content"))
 	case "remove":
+		d.workflowMu.Lock()
+		d.scanLocked()
+		existing := d.fileLocked(project, id)
+		d.workflowMu.Unlock()
+		if existing != nil && existing.scope == "user" {
+			return "", &Error{Code: wire.FailureNotAllowed, Message: "This workflow belongs to your workflows. Remove it in Settings ▸ Workflows."}
+		}
 		path, ok := workflowPath(project, id)
 		if !ok {
 			return "", notInFolder(id)
