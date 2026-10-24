@@ -11,7 +11,7 @@ import { openTurnsHeld, rememberOpen, type Store } from "../model/store";
 import { backgroundAge, backgroundEnded, backgroundNoun, isRunning, subagentNoSteps, subagentStatus } from "../model/background";
 import { callIsUnderway, display, isPersonsAsk, isSummaryOnly, isWorking, turnParts, type ChatTurn, type Item } from "../model/turns";
 import { fromWireDate, toWireDate } from "../protocol/dates";
-import type { Agent, AppViewCall, BackgroundItem, FileMentionDTO, FindMatch, FindResult, TranscriptEntry, TurnSummary } from "../protocol/generated";
+import type { Agent, AppViewCall, BackgroundItem, ClientPermissionSettings, FileMentionDTO, FindMatch, FindResult, TranscriptEntry, TurnSummary } from "../protocol/generated";
 import { replace, route } from "../route";
 import { useWaitingCards, type WaitingCard } from "./Cards";
 import { OfflineStrip } from "./OfflineStrip";
@@ -655,6 +655,9 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           runtime={agent && <RuntimeLabel store={store} host={host} agent={agent} />}>
           {agent && (
           <PromptMenus options={drawable(agent.advertisedOptions, [])} disabled={down} runtime={runtimeNameOn(store, host, agent.runtimeID)}
+              runtimeID={agent.runtimeID}
+              clientPermissionMode={store.clientPermissions.value[store.macHostID.value]?.[agent.runtimeID as keyof ClientPermissionSettings] ?? "default"}
+              onClientPermissionModeChange={(mode) => void store.setClientPermissionMode(agent.runtimeID, mode)}
               value={(o) => store.pendingOptions.value[agent.id]?.[o.id] ?? agent.startOptions.values[o.id] ?? o.currentValue}
               onChange={(o, v) => void store.setOption(host, agent.id, o.id, v)}
               trailing={<ContextMeter agent={agent} costs={store.costs.value[host]} />}

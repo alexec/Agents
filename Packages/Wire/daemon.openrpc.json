@@ -1598,6 +1598,11 @@
     {
       "name": "clientPermissions/changed",
       "x-capability": "client-permissions/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "x-notification": true,
       "description": "The saved permission modes (061).",
       "paramStructure": "by-name",
@@ -1614,6 +1619,11 @@
     {
       "name": "clientPermissions/set",
       "x-capability": "client-permissions/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "Save the permission modes and return what was saved (061).",
       "paramStructure": "by-name",
       "params": [
@@ -1635,6 +1645,11 @@
     {
       "name": "clientPermissions/state",
       "x-capability": "client-permissions/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {

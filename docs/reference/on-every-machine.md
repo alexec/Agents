@@ -37,7 +37,7 @@ Each of these parts is either the same on every machine of yours or each machine
 |---|---|---|
 | MCP servers | Agent Configuration ▸ Connectors | `~/.agents/mcp.json`'s `mcpServers` |
 | Agent configuration | Agent Configuration, its other pages | `~/.agents/AGENTS.md`, `personas/<name>.md`, `skills/<name>/SKILL.md` |
-| Agent runtime choices | Agent Runtimes | `sandbox.json` and `client-permissions.json` in the settings folder |
+| Agent runtime choices | Chat prompt (permission); Agent Runtimes (sandbox) | `sandbox.json` and `client-permissions.json` in the settings folder |
 | Cost limits | Cost | `limits.json` |
 | Resources | Resources | `resources.json` |
 

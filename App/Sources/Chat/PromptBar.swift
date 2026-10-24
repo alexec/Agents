@@ -876,8 +876,14 @@ struct PromptBar: View {
         if case .controls(let shown) = controlsState {
             optionsRow(shown)
         } else {
-            // The same sentences the phone says (033).
-            OptionsNote(state: controlsState, retry: { Task { await model.loadDraftOptions() } })
+            VStack(alignment: .leading, spacing: 8) {
+                // The same sentences the phone says (033).
+                OptionsNote(state: controlsState, retry: { Task { await model.loadDraftOptions() } })
+                if let runtimeID = agent?.runtimeID ?? model.draftRuntimeID,
+                   ClientPermissionSettings.supports(runtimeID) {
+                    optionsRow([])
+                }
+            }
         }
     }
 
@@ -974,6 +980,14 @@ struct PromptBar: View {
 
     @ViewBuilder
     private func permissionOptions(_ shown: [ConfigOption]) -> some View {
+        if let runtimeID = agent?.runtimeID ?? model.draftRuntimeID,
+           ClientPermissionSettings.supports(runtimeID) {
+            ClientPermissionCapsule(runtimeID: runtimeID,
+                                    mode: model.clientPermissions.mode(for: runtimeID)) { mode in
+                let settings = model.clientPermissions.setting(mode, for: runtimeID)
+                Task { await model.setClientPermissions(settings) }
+            }
+        }
         ForEach(shown.filter(\.isAboutPermission)) { option in
             OptionMenu(option: option, chosen: binding(for: option))
         }

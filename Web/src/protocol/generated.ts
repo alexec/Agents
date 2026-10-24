@@ -8059,6 +8059,8 @@ export interface Methods {
   "bots/stopRun": { params: BotStopRun; result: Empty };
   "changes/file": { params: ChangesFileRequest; result: ChangedFileDetail };
   "changes/list": { params: ChangesListRequest; result: ChangesList };
+  "clientPermissions/set": { params: ClientPermissionSettings; result: ClientPermissionSettings };
+  "clientPermissions/state": { params: Empty; result: ClientPermissionSettings };
   "clients/forgetSelf": { params: Empty; result: Empty };
   "connections/disconnect": { params: ConnectionProviderRequest; result: ConnectionDisconnectAnswer };
   "connections/list": { params: Empty; result: ConnectionsList };
@@ -8325,6 +8327,8 @@ export const MethodTarget = {
   "bots/stopRun": "control",
   "changes/file": "host",
   "changes/list": "host",
+  "clientPermissions/set": "host",
+  "clientPermissions/state": "host",
   "clients/forgetSelf": "control",
   "connections/disconnect": "host",
   "connections/list": "host",
@@ -8544,6 +8548,7 @@ export interface Notifications {
   "agents/draftOptions": DraftOptionsNotification;
   "attention/changed": AttentionNotification;
   "backups/changed": BackupState;
+  "clientPermissions/changed": ClientPermissionSettings;
   "clone/changed": CloneNotification;
   "control/capReached": CapReached;
   "control/governanceRequested": CatalogRequest;

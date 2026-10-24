@@ -32,7 +32,7 @@ Agents app writes.
 | `retention.json` | How long archived agents are kept | **Settings ▸ Machines ▸ This Mac** |
 | `workflow-limit.json` | How many workflows may be on. No file is the default. | **Settings ▸ Cost** |
 | `person.json` | What agents call you, and your pronouns | **Settings ▸ Account** |
-| `client-permissions.json` | The permission mode of each runtime | **Settings ▸ Agent Runtimes** |
+| `client-permissions.json` | The permission mode of each runtime | Under a supported runtime's prompt |
 | `sandbox.json` | The command sandbox of each runtime | **Settings ▸ Agent Runtimes** |
 | `runtime-environment.json` | The names of the variables passed through to runtimes, never their values | By hand |
 | `modes.json` | The mode last chosen for each runtime | The start form |

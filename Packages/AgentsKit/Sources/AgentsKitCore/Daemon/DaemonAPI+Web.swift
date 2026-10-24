@@ -57,6 +57,11 @@ public extension DaemonAPI {
                 Row(Method.runtimesAccountProfiles, params: Empty.self, result: [AccountProfile].self, kind: .hostRequest),
                 // Each runtime's sandbox default, for the new session's "Use runtime default (…)" (#257).
                 Row(Method.sandboxState, params: Empty.self, result: SandboxSettings.self, kind: .hostRequest),
+                // The Mac-wide permission choices shown under Cursor, Grok and OpenCode.
+                Row(Method.clientPermissionsState, params: Empty.self, result: ClientPermissionSettings.self,
+                    kind: .hostRequest),
+                Row(Method.clientPermissionsSet, params: ClientPermissionSettings.self, result: ClientPermissionSettings.self,
+                    kind: .hostRequest),
                 // The organisation's policy as the host follows it, for the red strip and the
                 // composer, and the person's pass-through names, marked (#998).
                 Row(Method.daemonPolicyState, params: Empty.self, result: PolicyState.self, kind: .hostRequest),
@@ -425,6 +430,8 @@ public extension DaemonAPI {
                 Row(Method.signInDeny, params: SignInDecide.self, result: Empty.self, kind: .controlRequest),
                 // Heard
                 Row(Notification.agentChanged, params: Agent.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.clientPermissionsChanged, params: ClientPermissionSettings.self, result: Empty.self,
+                    kind: .hostNotification),
                 Row(Notification.daemonPolicyStateChanged, params: PolicyState.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.runtimesAccountProfilesChanged, params: [AccountProfile].self, result: Empty.self,

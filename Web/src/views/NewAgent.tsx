@@ -13,7 +13,7 @@
 // again; and the form's runtime, choices and reach are kept between starts.
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import type { AccountProfile, Attachment, BranchSummary, ConfigOption, JSONValue, Persona, PolicySetBy, RuntimeStatus, SandboxChoice, SlashCommand, StartRequest, UUID, WorktreeSize,
+import type { AccountProfile, Attachment, BranchSummary, ClientPermissionSettings, ConfigOption, JSONValue, Persona, PolicySetBy, RuntimeStatus, SandboxChoice, SlashCommand, StartRequest, UUID, WorktreeSize,
   WorktreeSummary } from "../protocol/generated";
 import type { SandboxWillNotStart, Store } from "../model/store";
 import { drawable, modeOption, modeStartsOn } from "../model/options";
@@ -517,6 +517,13 @@ export function NewAgent({ store, host, folder, projectName, down }: {
           {(!saying || form.value.state === "ready") && (
             <PromptMenus options={form.value.options} value={(o) => form.value.chosen[o.id]}
               onChange={(o, v) => setChosen(o.id, v)} disabled={down} runtime={chosenRuntime ? runtimeName : undefined}
+              runtimeID={chosenRuntime ?? undefined}
+              clientPermissionMode={chosenRuntime
+                ? store.clientPermissions.value[store.macHostID.value]?.[chosenRuntime as keyof ClientPermissionSettings] ?? "default"
+                : undefined}
+              onClientPermissionModeChange={chosenRuntime
+                ? (mode) => void store.setClientPermissionMode(chosenRuntime, mode)
+                : undefined}
               besideMode={chosenRuntime && (
                 <SandboxPill runtimeID={chosenRuntime} name={runtimeName} override={sandbox.value} runtimeDefault={runtimeDefault}
                   codexMode={typeof codexMode === "string" ? codexMode : undefined} disabled={down}

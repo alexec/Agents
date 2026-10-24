@@ -15,7 +15,7 @@ import type {
   GuardedChange, GuardedChangeReading, HostJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
-  PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, RemoveRequest } from "../protocol/generated";
+  PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, RemoveRequest, ClientPermissionSettings } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
@@ -1263,6 +1263,12 @@ export class Store extends Work {
         if (plane) this.plane.value = { ...plane, thisMacHost: (params as HostJoinStatus | null) ?? undefined };
         return;
       }
+      if (method === "clientPermissions/changed") {
+        if (host === this.macHostID.peek()) {
+          this.clientPermissions.value = { ...this.clientPermissions.value, [host]: params as ClientPermissionSettings };
+        }
+        return;
+      }
       if (host) this.apply(method, params, host);
       if (host && method === "daemon/policyStateChanged") {
         // The marks on the lists change with the policy, and the page hears no change of them (#998).
@@ -1952,6 +1958,8 @@ export class Store extends Work {
   readonly sandboxDefaults = signal<Record<string, Record<string, SandboxChoice>>>({});
   /** Each host's mark while the organisation requires the sandbox (SandboxSettings.setBy, #998). */
   readonly sandboxSetBy = signal<Record<string, PolicySetBy>>({});
+  /** The Mac-wide permission choice for Cursor, Grok and OpenCode (061). */
+  readonly clientPermissions = signal<Record<string, ClientPermissionSettings>>({});
   readonly accounts = signal<Record<string, RuntimeAccount[]>>({});
   /** A choice made on a menu that the host hasn't confirmed, by agent then option. */
   readonly pendingOptions = signal<Record<string, Record<string, JSONValue>>>({});
@@ -2211,7 +2219,8 @@ export class Store extends Work {
 
   /** What runs on a host, and what each runtime takes; asked once a connection. */
   async loadRuntimes(host: string): Promise<void> {
-    const [runtimes, accounts, modes, sandbox, allowances, profiles, policy, passThrough] = await Promise.all([
+    const macHost = this.macHostID.peek();
+    const [runtimes, accounts, modes, sandbox, allowances, profiles, policy, passThrough, permissions] = await Promise.all([
       this.link.call("runtimes/list", {}, host).catch(() => null),
       this.link.call("runtimes/accounts", {}, host).catch(() => null),
       this.link.call("modes/remembered", {}, host).catch(() => null),
@@ -2223,6 +2232,8 @@ export class Store extends Work {
       // A host on an older build follows no policy (#998).
       this.link.call("daemon/policyState", {}, host).catch(() => null),
       this.link.call("settings/passThrough", {}, host).catch(() => null),
+      this.clientPermissions.value[macHost] ? Promise.resolve(null)
+        : this.link.call("clientPermissions/state", {}, macHost).catch(() => null),
     ]);
     batch(() => {
       if (sandbox) {
@@ -2237,7 +2248,24 @@ export class Store extends Work {
       if (modes) this.rememberedModes.value = { ...this.rememberedModes.value, [host]: modes };
       if (policy) this.policyStates.value = { ...this.policyStates.value, [host]: policy };
       if (passThrough) this.passThrough.value = { ...this.passThrough.value, [host]: passThrough.names };
+      if (permissions) {
+        this.clientPermissions.value = { ...this.clientPermissions.value, [macHost]: permissions };
+      }
     });
+  }
+
+  /** Set the Mac-wide permission choice, even when this chat belongs to a server. */
+  async setClientPermissionMode(runtimeID: string, mode: ClientPermissionSettings["cursor"]): Promise<void> {
+    if (!["cursor", "grok", "opencode"].includes(runtimeID)) return;
+    const host = this.macHostID.peek();
+    const current = this.clientPermissions.value[host] ?? { cursor: "default", grok: "default", opencode: "default" };
+    const settings = { ...current, [runtimeID]: mode } as ClientPermissionSettings;
+    try {
+      const saved = await this.link.call("clientPermissions/set", settings, host);
+      this.clientPermissions.value = { ...this.clientPermissions.value, [host]: saved };
+    } catch {
+      this.problem.value = "That did not reach your Mac.";
+    }
   }
 
   /** A host's MCP servers (#753); from a host too old to say, its hosted servers alone, as the page

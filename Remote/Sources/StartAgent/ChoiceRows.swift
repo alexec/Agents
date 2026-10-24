@@ -13,6 +13,7 @@ struct ChoiceRows: View {
     var body: some View {
         Section {
             runtimeRow
+            permissionRow
             // Which of the runtime's accounts (#840): only when it has more than one.
             if !model.startAccounts.isEmpty {
                 accountRow
@@ -79,6 +80,39 @@ struct ChoiceRows: View {
         }
         .disabled(model.startRuntimes.isEmpty)
         .accessibilityLabel("Runtime, \(model.startRuntime?.runtime.name ?? "none")")
+    }
+
+    /// The Mac-wide permission choice (061), shown under Runtime for supported runtimes.
+    @ViewBuilder
+    private var permissionRow: some View {
+        if let runtimeID = model.startRuntimeID, ClientPermissionSettings.supports(runtimeID) {
+            let name = model.startRuntime?.runtime.name ?? runtimeID
+            let mode = model.clientPermissions.mode(for: runtimeID)
+            Menu {
+                ForEach([ClientPermissionMode.default, .alwaysApprove], id: \.self) { choice in
+                    Button {
+                        let settings = model.clientPermissions.setting(choice, for: runtimeID)
+                        Task { await model.setClientPermissions(settings) }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            choiceLabel(ClientPermissionWords.title(choice), chosen: choice == mode)
+                            Text(ClientPermissionWords.description(choice, runtimeName: name))
+                                .appText(.supporting)
+                        }
+                    }
+                }
+                Section {
+                    Text(ClientPermissionWords.scope(runtimeName: name))
+                }
+            } label: {
+                LabeledContent("Permission") {
+                    Text(ClientPermissionWords.title(mode)).foregroundStyle(.secondary)
+                }
+                .appText(.reading)
+            }
+            .accessibilityLabel("Permission, \(ClientPermissionWords.title(mode))")
+            .accessibilityHint(ClientPermissionWords.scope(runtimeName: name))
+        }
     }
 
     /// Under an account's name: why it cannot be used, or that its allowance is out, as the
