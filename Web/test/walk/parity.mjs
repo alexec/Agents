@@ -23,7 +23,7 @@ const say = (line) => { notes.push(line); console.log(line); };
 const daemon = readFileSync(`${root}/daemon.lock`, "utf8").trim();
 const signal = (name) => execFileSync("kill", [`-${name}`, daemon]);
 
-const chrome = await launch({ profile: `/tmp/110-parity-chrome-${process.pid}` });
+const chrome = await launch({ profile: `${root}-chrome-${process.pid}` });
 const page = await chrome.page(webURL, { width: 1440, height: 900 });
 await page.waitFor(`document.querySelector("textarea")`);
 await page.focus("textarea");
@@ -96,6 +96,12 @@ for (const scene of scenes) {
       await openSession("Repo notes");
       say(`turns: ${JSON.stringify(await visible(".chat .turn"))}`);
       await shot("chat");
+    } else if (scene === "wait-card") {
+      // Shared source and filters keep related events on one line in the chat card.
+      await openProject();
+      await openSession("Wait for the checks");
+      say(`event lines: ${JSON.stringify(await visible(".wait-card-event"))}`);
+      await shot("wait-card");
     } else if (scene === "plan") {
       // #776: the plan strip is a card with the step, the count and a bar. Opens the session
       // "Fix the sidebar row", so a root seeded with that one agent holding a plan is enough.

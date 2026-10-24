@@ -1,7 +1,7 @@
 // The lines a session's row has under its report, in the window's and the Remote's words (#251):
 // what it holds or waits for (LeaseStatus, 036), what events it waits on (WaitStatus, 042), who
 // started it (028), and its worktree's help (WorktreeBadge). Worked out here, so the row only draws them.
-import type { Agent, AgentWorktree, EventPattern, LeaseSnapshot, ResourceKind } from "../protocol/generated";
+import type { Agent, AgentWorktree, EventPattern, EventWait, LeaseSnapshot, ResourceKind } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 
 /** LeaseWords.clock: "14:12". */
@@ -171,6 +171,57 @@ export function eventWaitCardLines(agent: Agent, title: (id: string) => string |
   const duration = Math.max(1, Math.ceil((deadline.getTime() - since.getTime()) / 60_000));
   const elapsed = Math.max(0, Math.floor((now.getTime() - since.getTime()) / 60_000));
   return [`Waiting for ${duration} min for:`, mark.replace(/^◷ Waiting for /, ""), `${elapsed} min elapsed so far.`];
+}
+
+export interface EventWaitSummaryLine {
+  id: string;
+  source: string;
+  events: string[];
+  arguments: string[];
+}
+
+/** Events from one source with the same filters share a compact line in the wait card. */
+export function eventWaitSummaryLines(wait: EventWait): EventWaitSummaryLine[] {
+  const lines: EventWaitSummaryLine[] = [];
+  for (const pattern of wait.patterns) {
+    const server = wait.serverEvents?.find((entry) => entry.trigger.event === pattern.name);
+    const servers = server ? (server.servers.length > 0 ? server.servers : server.trigger.servers ?? []) : [];
+    const source = server
+      ? servers.length > 0 ? servers.map(serverName).join(" or ") : "Connected tools"
+      : waitSourceName(pattern.name);
+    const args = server
+      ? Object.entries(server.trigger.arguments).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => `${key} ${valueWords(value)}`)
+      : Object.entries(pattern.anyOf ?? pattern.filters).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) =>
+        `${key} ${Array.isArray(value) ? value.join("|") : value}`);
+    const id = `${source}\u0000${args.join("\u0000")}`;
+    const line = lines.find((candidate) => candidate.id === id);
+    if (line) {
+      if (!line.events.includes(pattern.name)) line.events.push(pattern.name);
+    } else {
+      lines.push({ id, source, events: [pattern.name], arguments: args });
+    }
+  }
+  return lines;
+}
+
+function serverName(name: string): string {
+  const known: Record<string, string> = { github: "GitHub", gitlab: "GitLab", linear: "Linear", email: "Email" };
+  return known[name.toLowerCase()] ?? name.replace(/[-_]/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function waitSourceName(event: string): string {
+  const subject = event.split(".", 1)[0] ?? "";
+  if (["mac", "machine", "person", "system", "cost", "lease"].includes(subject)) return "This Mac";
+  if (subject === "workflow") return "Workflows";
+  if (subject === "branch") return "Branches";
+  if (subject === "dropbox") return "Drop box";
+  return "Agents";
+}
+
+function valueWords(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value === null || typeof value === "number" || typeof value === "boolean") return String(value);
+  return JSON.stringify(value) ?? "null";
 }
 
 /** WaitStatus.of(…).mark for a wait on events: "◷ Waiting for “Fix login” to finish". A block's is blockLines'. */
