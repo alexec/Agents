@@ -690,6 +690,7 @@ final class RemoteModel {
     }
     /// The open project's standing arrangements.
     var workflows: [WorkflowSummary] { work.workflows(in: selectedProject) }
+    var userWorkflows: [WorkflowSummary] { work.userWorkflows }
 
     /// The workflow whose page is open, if one is. Its id rather than a copy, for the
     /// Mac page's reason: the file is the truth, and a copy would show what it used to
@@ -4024,11 +4025,24 @@ final class RemoteModel {
     /// Every project's, in one call, the way the window asks for them. `workflow/changed`
     /// keeps them current afterwards; without this first fetch the section would stay
     /// empty until something happened to a workflow, which on a quiet project is never.
-    private func refreshWorkflows() async {
+    func refreshWorkflows() async {
         guard let listed = try? await client.call(DaemonAPI.Method.workflowsList,
                                                   DaemonAPI.WorkflowsListRequest(),
                                                   returning: [WorkflowSummary].self) else { return }
         work.replaceWorkflows(listed)
+    }
+
+    func writeUserWorkflow(id: String, content: String) async -> String? {
+        do {
+            let request = DaemonAPI.WorkflowWriteRequest(workflowID: id, content: content)
+            try await client(for: request).call(DaemonAPI.Method.workflowsWrite, request,
+                                                returning: WorkflowSummary.self)
+            await refreshWorkflows()
+            return nil
+        } catch {
+            await refreshWorkflows()
+            return sentence(for: error)
+        }
     }
 
     /// One of a view's calls (#187), to the Mac.

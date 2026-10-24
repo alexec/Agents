@@ -382,6 +382,7 @@ public enum Capability {
         "workflows/setLimit": "workflows/1",
         "workflows/setMuted": "mute/1",
         "workflows/settings": "workflows/1",
+        "workflows/write": "workflows/1",
         "worktrees/all": "worktrees/1",
         "worktrees/check": "worktrees/1",
         "worktrees/list": "worktrees/1",

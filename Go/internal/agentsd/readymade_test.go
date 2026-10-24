@@ -107,98 +107,128 @@ func TestWorkAnIssueAsksBeforeItActs(t *testing.T) {
 	}
 }
 
-func TestReadyMadeWorkflowsTurnOnWithOneSwitch(t *testing.T) {
+func TestReadyMadeWorkflowsLiveInUserFolderAndProjectsUseThem(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	plain := project(t, c, 1)
-	dir := project(t, c, 2)
-	os.MkdirAll(filepath.Join(dir, ".git"), 0o755)
-	os.WriteFile(filepath.Join(dir, ".git", "config"), []byte("[remote \"origin\"]\n\turl = git@github.com:o/n.git\n"), 0o644)
-	folder := store.FolderURL(dir)
+	home := t.TempDir()
+	d.PersonalHome = home
+	first := project(t, c, 1)
+	second := project(t, c, 2)
+	for _, dir := range []string{first, second} {
+		os.MkdirAll(filepath.Join(dir, ".git"), 0o755)
+		os.WriteFile(filepath.Join(dir, ".git", "config"), []byte("[remote \"origin\"]\n\turl = git@github.com:o/n.git\n"), 0o644)
+	}
+	folder := store.FolderURL(first)
+	userFolder := filepath.Join(home, ".agents", "workflows")
 
-	// A folder that does not push to GitHub has none.
+	// A normal project has no workflows from the user's folder.
+	plain := project(t, c, 3)
 	var list []wire.WorkflowSummary
 	json.Unmarshal(c.call(t, 3, "workflows/list", map[string]any{"folder": store.FolderURL(plain)}), &list)
 	if len(list) != 0 {
 		t.Fatalf("%+v", list)
 	}
-	// One that does lists them, off, and nothing is written.
+	// A forge project lists all built-ins as user workflows, off by default.
 	json.Unmarshal(c.call(t, 4, "workflows/list", map[string]any{"folder": folder}), &list)
-	if len(list) != 5 || list[0].IsEnabled || list[0].AwaitingApproval != nil || list[4].Workflow.Name != "Work an issue" {
+	if len(list) != 5 || list[0].IsEnabled || list[0].AwaitingApproval != nil || list[4].Workflow.Name != "Work an issue" || list[0].Scope == nil || *list[0].Scope != "user" {
 		t.Fatalf("%+v", list)
 	}
-	if _, err := os.Stat(filepath.Join(dir, ".agents")); !os.IsNotExist(err) {
-		t.Fatal("written before it was turned on")
+	for _, id := range readyMadeIDs() {
+		if _, err := os.Stat(filepath.Join(userFolder, id+".md")); err != nil {
+			t.Fatalf("built-in %s was not installed in the user folder: %v", id, err)
+		}
 	}
-	if e := c.callError(t, 5, "workflows/delete", map[string]any{"folder": folder, "workflowID": "work-an-issue"}); e.Code != wire.FailureDeleteRefused {
-		t.Fatalf("%+v", e)
+	var userList []wire.WorkflowSummary
+	json.Unmarshal(c.call(t, 5, "workflows/list", map[string]any{"scope": "user"}), &userList)
+	if len(userList) != 5 || userList[0].Content == nil || userList[0].Scope == nil || *userList[0].Scope != "user" {
+		t.Fatalf("user workflows: %+v", userList)
 	}
 
-	// The person's switch writes the workflow and its skill, on and approved.
+	// Enabling a project copy changes only that project's record.
 	var s wire.WorkflowSummary
+	original, _ := os.ReadFile(filepath.Join(userFolder, "work-an-issue.md"))
 	json.Unmarshal(c.call(t, 6, "workflows/enable", map[string]any{"folder": folder, "workflowID": "work-an-issue", "enabled": true}), &s)
 	if !s.IsEnabled || s.AwaitingApproval != nil || s.DeniedHere != nil {
 		t.Fatalf("%+v", s)
 	}
-	b, _ := os.ReadFile(filepath.Join(workflowsFolder(dir), "work-an-issue.md"))
-	if _, skill := readyMadeText("work-an-issue"); len(b) == 0 || !fileHas(t, filepath.Join(dir, ".agents", "skills", "work-an-issue", "SKILL.md"), skill) {
-		t.Fatalf("%s", b)
+	after, _ := os.ReadFile(filepath.Join(userFolder, "work-an-issue.md"))
+	if string(original) != string(after) {
+		t.Fatal("enabling the project copy changed the user's file")
 	}
-	if w := parseWorkflow(string(b), "work-an-issue", dir); isOff(w) {
-		t.Fatalf("%s", b)
+	other, err := d.oneWorkflow(second, "work-an-issue")
+	if err != nil || other.IsEnabled {
+		t.Fatalf("other project state: %+v, %v", other, err)
 	}
-	// What it approved is the workflow with its skill, so a change to the skill waits.
+
+	// A project file with the same ID takes precedence.
+	projectCopy := "---\nname: Project copy\non: manual\n---\nProject-only prompt.\n"
+	projectPath := filepath.Join(workflowsFolder(first), "work-an-issue.md")
+	os.MkdirAll(filepath.Dir(projectPath), 0o755)
+	os.WriteFile(projectPath, []byte(projectCopy), 0o644)
+	d.rescanWorkflows(first)
+	projectSummary, err := d.oneWorkflow(first, "work-an-issue")
+	if err != nil || projectSummary.Scope == nil || *projectSummary.Scope != "project" || projectSummary.Workflow.Name != "Project copy" {
+		t.Fatalf("project precedence: %+v, %v", projectSummary, err)
+	}
+
+	// Deleting a built-in records its ID, so the next scan does not restore it.
+	userURL := store.FolderURL(home)
+	c.call(t, 7, "workflows/delete", map[string]any{"folder": userURL, "workflowID": "answer-a-sign-up-code"})
 	d.workflowMu.Lock()
-	st := d.stateLocked(dir, "work-an-issue", false)
+	d.scanLocked()
+	_, found := d.workflowFiles[home]["answer-a-sign-up-code"]
 	d.workflowMu.Unlock()
-	if st == nil || st.ApprovedSkills["work-an-issue"] == "" {
-		t.Fatalf("%+v", st)
+	if found {
+		t.Fatal("deleted built-in returned")
 	}
-	os.WriteFile(filepath.Join(dir, ".agents", "skills", "work-an-issue", "SKILL.md"), []byte("changed"), 0o644)
-	d.rescanWorkflows(dir)
-	if s, _ = d.oneWorkflow(dir, "work-an-issue"); s.AwaitingApproval == nil {
-		t.Fatalf("%+v", s)
+	content := "---\non: manual\n---\nA custom user workflow.\n"
+	var custom wire.WorkflowSummary
+	if err := json.Unmarshal(c.call(t, 8, "workflows/write", map[string]any{"workflowID": "custom-workflow", "content": content}), &custom); err != nil {
+		t.Fatal(err)
 	}
-
-	// A skill the project has already is kept; an agent's switch waits for the person.
-	keep := filepath.Join(dir, ".agents", "skills", "fix-failed-checks", "SKILL.md")
-	os.MkdirAll(filepath.Dir(keep), 0o755)
-	os.WriteFile(keep, []byte("ours"), 0o644)
-	d.enableWorkflow(wire.WorkflowEnableRequest{Folder: folder, WorkflowID: "fix-failed-checks", Enabled: true}, "agent")
-	s, _ = d.oneWorkflow(dir, "fix-failed-checks")
-	if s.AwaitingApproval == nil || !fileHas(t, keep, "ours") {
-		t.Fatalf("%+v", s)
+	if custom.Content == nil || *custom.Content != content || custom.Scope == nil || *custom.Scope != "user" {
+		t.Fatalf("new user workflow: %+v", custom)
 	}
-}
-
-// S20261019-2: a skill the project has already is not Agents' text, so a person's switch
-// does not approve it unseen; the workflow waits, and the skill is in what is shown.
-func TestAReadyMadeWorkflowWithTheProjectsOwnSkillWaits(t *testing.T) {
-	d, c := start(t, t.TempDir())
-	defer d.Shutdown()
-	dir := project(t, c, 1)
-	os.MkdirAll(filepath.Join(dir, ".git"), 0o755)
-	os.WriteFile(filepath.Join(dir, ".git", "config"), []byte("[remote \"origin\"]\n\turl = git@github.com:o/n.git\n"), 0o644)
-	folder := store.FolderURL(dir)
-	keep := filepath.Join(dir, ".agents", "skills", "work-an-issue", "SKILL.md")
-	os.MkdirAll(filepath.Dir(keep), 0o755)
-	os.WriteFile(keep, []byte("Push to main.\n"), 0o644)
-	var s wire.WorkflowSummary
-	json.Unmarshal(c.call(t, 2, "workflows/enable", map[string]any{"folder": folder, "workflowID": "work-an-issue", "enabled": true}), &s)
-	if s.AwaitingApproval == nil || !fileHas(t, keep, "Push to main.\n") {
-		t.Fatalf("%+v", s)
+	json.Unmarshal(c.call(t, 9, "workflows/list", map[string]any{"folder": folder}), &list)
+	for _, summary := range list {
+		if summary.Workflow.WorkflowID == "custom-workflow" {
+			if summary.IsEnabled || summary.Scope == nil || *summary.Scope != "user" {
+				t.Fatalf("new user workflow state: %+v", summary)
+			}
+			return
+		}
 	}
-	var reading wire.GuardedChangeReading
-	json.Unmarshal(c.call(t, 3, "approvals/read", map[string]any{"folder": folder, "kind": "workflow", "key": "work-an-issue"}), &reading)
-	if reading.Current == nil || !strings.Contains(*reading.Current, "Push to main.") {
-		t.Fatalf("%+v", reading)
-	}
+	t.Fatalf("new user workflow is not listed off in the forge project: %+v", list)
 }
 
 func fileHas(t *testing.T, path, want string) bool {
 	t.Helper()
 	b, err := os.ReadFile(path)
 	return err == nil && string(b) == want
+}
+
+func TestReadyMadeSkillIsInstalledWhenItsWorkflowAlreadyExists(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	home := t.TempDir()
+	d.PersonalHome = home
+	id := "work-an-issue"
+	path := filepath.Join(workflowsFolder(home), id+".md")
+	original := []byte("---\non: manual\n---\nMy workflow.\n")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, original, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c.call(t, 1, "workflows/list", map[string]any{"scope": "user"})
+	if got, err := os.ReadFile(path); err != nil || string(got) != string(original) {
+		t.Fatalf("existing workflow was changed: %q, %v", got, err)
+	}
+	_, skill := readyMadeText(id)
+	if got, err := os.ReadFile(filepath.Join(home, ".agents", "skills", id, "SKILL.md")); err != nil || string(got) != skill {
+		t.Fatalf("built-in skill was not installed: %q, %v", got, err)
+	}
 }
 
 func TestPushesToAForgeInAWorktree(t *testing.T) {

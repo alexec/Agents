@@ -15,6 +15,7 @@ import { GitAccessSection } from "./GitAccess";
 import { VersionsSection } from "./Machines";
 import { PolicySection } from "./Policy";
 import { SidebarGroupsSection } from "./SidebarGroups";
+import { UserWorkflowsSection } from "./UserWorkflows";
 
 /** Settings' groups by subject (#2157, was by scope #1759): this browser, the machines that run agents, and
  * what the control plane keeps (the person's sign-ins first). */
@@ -57,6 +58,7 @@ export const settingsSections: readonly SettingsSection[] = [
   { name: "signInProviders", scope: "controlPlane", order: 40, Section: SignInSection, shows: (store) => store.person.value?.role === "admin" },
   // How you sign in on your Macs, iPhones and iPads (#995).
   { name: "signIns", scope: "controlPlane", order: 5, Section: SignInsSection },
+  { name: "workflows", scope: "machines", order: 70, Section: UserWorkflowsSection },
 ];
 
 /** One group's sections, in their order, less any not shown now. */

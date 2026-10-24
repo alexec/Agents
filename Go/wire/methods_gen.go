@@ -260,6 +260,7 @@ var CallWorkflowsRun = Method[WorkflowRequest, WorkflowSummary]{"workflows/run"}
 var CallWorkflowsSetLimit = Method[WorkflowLimitSettings, WorkflowLimitSettings]{"workflows/setLimit"}
 var CallWorkflowsSetMuted = Method[WorkflowMuteRequest, WorkflowSummary]{"workflows/setMuted"}
 var CallWorkflowsSettings = Method[WorkflowSettingsRequest, WorkflowSummary]{"workflows/settings"}
+var CallWorkflowsWrite = Method[WorkflowWriteRequest, WorkflowSummary]{"workflows/write"}
 var CallWorktreesAll = Method[Empty, []ProjectWorktrees]{"worktrees/all"}
 var CallWorktreesCheck = Method[WorktreeRemovalRequest, RemovalCheck]{"worktrees/check"}
 var CallWorktreesList = Method[WorktreesListRequest, WorktreesListResponse]{"worktrees/list"}

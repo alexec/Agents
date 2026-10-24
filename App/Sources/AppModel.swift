@@ -1447,6 +1447,7 @@ final class AppModel {
     // MARK: Workflows
 
     func workflows(in folder: URL?) -> [WorkflowSummary] { work.workflows(in: folder) }
+    var userWorkflows: [WorkflowSummary] { work.userWorkflows }
 
     func refreshWorkflows() async {
         do {
@@ -1455,6 +1456,20 @@ final class AppModel {
                                                         returning: [WorkflowSummary].self))
         } catch {
             // Same as the projects above: the next notification brings it back.
+        }
+    }
+
+    func writeUserWorkflow(id: String, content: String) async -> String? {
+        do {
+            _ = try await client.call(
+                DaemonAPI.Method.workflowsWrite,
+                DaemonAPI.WorkflowWriteRequest(workflowID: id, content: content),
+                returning: WorkflowSummary.self)
+            await refreshWorkflows()
+            return nil
+        } catch {
+            await refreshWorkflows()
+            return describe(error)
         }
     }
 

@@ -311,6 +311,14 @@ export class Work {
     return slice.value;
   }
 
+  /** User-scope workflows from this host, with their source Markdown for Settings. */
+  userWorkflows(host: string): WorkflowSummary[] {
+    return Object.entries(this.workflows.value)
+      .filter(([key]) => key.startsWith(`${host}|`))
+      .flatMap(([, workflows]) => workflows)
+      .filter((summary) => summary.scope === "user" && summary.content !== undefined);
+  }
+
   /** Whether `loadWorkflows` has answered for this project since it was opened. */
   workflowsKnown(host: string, folder: string): boolean {
     return this.workflowsLoaded.has(`${host}|${folderKey(folder)}`);
@@ -1156,6 +1164,32 @@ export const sentBeforeEdit = "That prompt was sent before your change. Your wor
 export class Store extends Work {
   /** The control plane's workspace providers (#1808), for Settings ▸ Control plane. */
   readonly providers: Providers;
+
+  async loadUserWorkflows(host: string): Promise<void> {
+    const listed = await this.link.call("workflows/list", { scope: "user" }, host).catch(() => null);
+    if (!listed) return;
+    const byFolder = new Map<string, WorkflowSummary[]>();
+    for (const workflow of listed) {
+      const key = folderKey(workflow.workflow.folder);
+      byFolder.set(key, [...(byFolder.get(key) ?? []), workflow]);
+    }
+    for (const [folder, workflows] of byFolder) {
+      const key = `${host}|${folder}`;
+      this.workflowsLoaded.add(key);
+      this.writeWorkflows(key, workflows);
+    }
+  }
+
+  async writeUserWorkflow(host: string, workflowID: string, content: string): Promise<string | null> {
+    try {
+      const updated = await this.link.call("workflows/write", { workflowID, content }, host);
+      this.upsertWorkflow(updated, host);
+      return null;
+    } catch (error) {
+      log("call.failed", error instanceof CallFailed ? error.code : undefined);
+      return describe(error);
+    }
+  }
 
   constructor(readonly link: Link) {
     super();

@@ -166,8 +166,12 @@ struct WorkflowListRow: View {
             WorkflowStatusIcon(summary: summary, accented: true)
                 .appText(.fine)
         } detail: {
-            // The title only (Alex, #495): what it does is the tooltip and the page's.
-            EmptyView()
+            if summary.scope == "user" {
+                Text("From your workflows")
+            } else {
+                // The title only (Alex, #495): what it does is the tooltip and the page's.
+                EmptyView()
+            }
         } trailing: {
             // When it last ran, as a session's row has its time (#755); nothing if it never
             // has. A running one counts from when this run started. Off is marked where it
