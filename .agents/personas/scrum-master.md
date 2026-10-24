@@ -44,9 +44,9 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
   A security review's fix branch (`agents/review-fix-S*`) lands only that way, never as an
   ordinary pull request from the branch (#1727).
 - **Start the release with the Release workflow's own prompt** (#1726). Add no gate and
-  no question to it: the release skill's rules decide, and only high blocks the tag. The
-  workflow starts it by itself only when the open milestone has no open issue but bugs
-  (#2294): a milestone never closes with its features open.
+  no question to it: the release skill's rules decide, and only high blocks the tag.
+  Alex starts each release, with Run now or a message. The workflow does not start one
+  on its own (#2295).
 - **While a release runs, its helpers go first** (#1730). Start no standing or backlog
   lane while a release helper is queued, and when places are full, stop one (its work
   pushed) to free a place. Archive finished helpers at once.
