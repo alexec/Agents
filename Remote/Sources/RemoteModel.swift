@@ -4035,8 +4035,8 @@ final class RemoteModel {
     func writeUserWorkflow(id: String, content: String) async -> String? {
         do {
             let request = DaemonAPI.WorkflowWriteRequest(workflowID: id, content: content)
-            try await client(for: request).call(DaemonAPI.Method.workflowsWrite, request,
-                                                returning: WorkflowSummary.self)
+            _ = try await client(for: request).call(DaemonAPI.Method.workflowsWrite, request,
+                                                    returning: WorkflowSummary.self)
             await refreshWorkflows()
             return nil
         } catch {
