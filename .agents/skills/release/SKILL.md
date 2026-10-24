@@ -1,6 +1,6 @@
 ---
 name: release
-description: Take main to a new version with nobody watching (#914), started by Alex or by itself once the open milestone is ready: no open issue but bugs, none high, its walks done (#1729, #2294). Run the eight reviews and checks once each on what changed since the last tag, have the high findings fixed through the Scrum Master's lanes (the medium ones are filed, listed as known issues and left to the lanes after the release), check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, deploy the live control plane, close the milestone, unpark the next milestone, which is now the open one, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
+description: Take main to a new version with nobody watching (#914), started by Alex. Run the eight reviews and checks once each on what changed since the last tag, have the high findings fixed through the Scrum Master's lanes (the medium ones are filed, listed as known issues and left to the lanes after the release), check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, deploy the live control plane, close the milestone, unpark the next milestone, which is now the open one, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
 ---
 
 # Release
@@ -12,7 +12,7 @@ is pushed. This skill decides when the tag is pushed, and what it says.
 
 Alex decided (2026-10-13, #914):
 
-- **It runs on its own.** When the gate passes, push the tag. Do not ask for approval.
+- **When the gate passes, push the tag.** Do not ask for approval. Alex has already started the release.
 - **Version:** minor when an `enhancement` merged since the last tag, otherwise patch.
   1.0 and major versions only when Alex says.
 - **Every release runs the seven reviews and checks once each** (#1462, #1557): security,
@@ -55,41 +55,17 @@ Alex decided (2026-10-13, #914):
   ask: decide by these rules and say so in the report. (v0.6.0 waited 8 h on such a
   question.)
 
-## 0. Is the milestone ready? (a run a trigger started)
+## 0. One release a day
 
-Alex chose on 2026-10-21 that the release starts on its own when it is ready (#1729). The
-workflow runs when an issue closes and once a day, so most runs find it is not, and end at
-once. Skip this step when Alex started the run (Run now, or a message): the note at the end
-of the prompt says why it started.
-
-**One release a day (Alex, 2026-10-22, #2462).** Do this check first, also when Alex started
-the run. Find the last tag's time in Alex's time zone:
+**One release a day (Alex, 2026-10-22, #2462).** Do this check first. Alex starts every
+release, with Run now or a message (#2295). Nothing else starts one. Find the last tag's
+time in Alex's time zone:
 `git fetch --quiet --tags origin && git for-each-ref --sort=-taggerdate --count=1 --format='%(refname:short) %(taggerdate:unix)' 'refs/tags/v*'`,
 then `TZ=America/Los_Angeles date -r <unix> '+%F %H:%M'`, and today is
 `TZ=America/Los_Angeles date +%F`. When the tag's date is today, end with `nothing_to_do` and
 the line "released today (vX.Y.Z at HH:MM); next release tomorrow". Change nothing and start
 nothing. Only a prompt from Alex that says to release again today goes on. A day is the
 calendar day in America/Los_Angeles, not 24 hours since the tag.
-
-1. The open milestone is the earliest open one by its version:
-   `gh api 'repos/alexec/Agents/milestones?state=open' --jq '.[]|[.number,.title]|@tsv'`,
-   the lowest `0.x` first.
-2. It is ready when all of these hold:
-   - no open issue of the milestone is anything but a bug (#2294): every issue that
-     `gh issue list --milestone "<title>" --state open --json number,labels` lists has the
-     `bug` label. A milestone never closes with its features open (Alex, 2026-10-22);
-   - none of its open issues is labelled `priority:high`
-     (`gh issue list --milestone "<title>" --state open --label priority:high`);
-   - none of its open issues is labelled `needs-walk`: its walks are done;
-   - no other release is running: no session not archived, other than this one, labelled
-     `release` and working (`list_sessions`).
-   Open bugs that are not high are fine: they go into the notes as known issues (step 6),
-   and move to the next milestone when step 9 closes this one.
-3. Not ready: end with `nothing_to_do`, and one line that says what it waits for ("0.11: 6
-   features open, #998, #1001, …", "0.9: 2 high issues open, #1990 and #1991"). Change
-   nothing and start nothing.
-4. Ready: go on to step 1, which still ends `nothing_to_do` when nothing merged since the
-   last tag.
 
 ## 1. Is a release due?
 
@@ -350,8 +326,8 @@ milestone (none for a patch version):
    then `gh issue edit N --remove-milestone` for each one. A milestone never closes with
    open issues: nothing schedules an issue in a closed milestone. A non-bug goes to the
    backlog, not the next milestone, because an issue gets a milestone only when it serves
-   that milestone's goal (#1340). A run a trigger started has none here (step 0); a run
-   Alex started can.
+   that milestone's goal (#1340). Alex starts the release by hand, so a non-bug can still
+   be open here.
 3. Look again: the list in 2 is empty. Then close it:
    `gh api -X PATCH repos/alexec/Agents/milestones/<number> -f state=closed`.
 
