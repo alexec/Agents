@@ -4,7 +4,6 @@ on:
   - pr.opened
 agent: new
 labels: [review]
-permission-mode: auto
 enabled: false
 when-done: archive
 ---

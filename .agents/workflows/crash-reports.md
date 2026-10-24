@@ -5,9 +5,6 @@ on:
       at: [":00"]
       between: "07:00-07:00"
 agent: new
-runtime: claude
-effort: medium
-permission-mode: auto
 cooldown: 20h
 runs-on: [8AB85821-9D24-59CE-9737-8FC556923733]
 labels: [crashes, review]

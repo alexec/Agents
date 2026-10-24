@@ -2,8 +2,6 @@
 name: Competitor check
 on: manual
 agent: new
-runtime: claude
-permission-mode: auto
 labels: [review, competitors]
 runs-on: [8AB85821-9D24-59CE-9737-8FC556923733]
 when-done: archive

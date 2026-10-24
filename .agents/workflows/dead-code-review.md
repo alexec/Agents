@@ -1,8 +1,6 @@
 ---
 on: manual
 agent: new
-runtime: claude
-permission-mode: auto
 labels: [review, dead-code]
 when-done: archive
 enabled: false

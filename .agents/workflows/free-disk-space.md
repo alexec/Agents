@@ -3,9 +3,6 @@ name: Free disk space
 on:
   - machine.disk_low
 agent: new
-runtime: claude
-effort: low
-permission-mode: auto
 cooldown: 1h
 labels: [disk, clean-up]
 when-done: archive
