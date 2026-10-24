@@ -121,6 +121,11 @@ struct SidebarSessionRow: View {
                     Text(queued)
                         .appText(.fine)
                         .foregroundStyle(.secondary)
+                } else if let reason = needsYouLine {
+                    Text(reason)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 } else if agent.missingFolder != nil, agent.state != .archived {
                     Text(MissingFolderWords.label)
                         .appText(.fine)
@@ -195,6 +200,14 @@ struct SidebarSessionRow: View {
             }
         }
     }
+
+    /// What the session asked, or why it stopped, while this row needs a person.
+    private var needsYouLine: String? {
+        let question = model.work.permission(for: agent.id)?.toolCall.line
+            ?? model.work.elicitation(for: agent.id)?.message
+            ?? model.work.elicitation(for: agent.id)?.title
+        return StatusShape.needsYouLine(row: agent, isComingBack: model.isComingBack(agent), question: question)
+    }
 }
 
 /// A parent's fold as an action of the row, which reads as one element (#835).
@@ -221,10 +234,12 @@ private struct FoldAction: ViewModifier {
 private struct SessionMark: View {
     private enum Kind { case needsYou, working, queued, waiting, paused, done, asksToArchive }
     private let kind: Kind
+    private let agent: Agent
     /// The tool a working session runs (#1902): a wrench in the spinner's place.
     private var tool: String?
 
     init?(agent: Agent, group: AgentGroup) {
+        self.agent = agent
         tool = group == .running ? RunningToolWords.tool(agent) : nil
         switch group {
         case .needsAttention, .blocked: kind = .needsYou
@@ -279,7 +294,7 @@ private struct SessionMark: View {
 
     private var label: String {
         switch kind {
-        case .needsYou: "Needs you"
+        case .needsYou: StatusShape.words(row: agent, isComingBack: false)
         case .working: tool.map(RunningToolWords.label) ?? "Working"
         case .queued: "Queued"
         case .waiting: "Waiting"

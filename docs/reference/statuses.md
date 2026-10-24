@@ -17,6 +17,11 @@ The status is what the agent's icon says when you hover over it, and what a scre
 reads. The Mac, iPhone and iPad use the same words. Only **Needs you** is drawn in
 colour.
 
+While a session is under **Needs you**, its sidebar row uses the grey line to say why: the
+first line of its pending question, why it stopped, or **Finished without saying how it
+went**. The status mark's tooltip and VoiceOver label say the precise status too. The
+session's last report returns to the row when it leaves **Needs you** (#1324).
+
 In the sidebar, each session has a mark for what it wants: an orange hand when it needs
 you, a spinning ring of dots while it works, a numbered list while it is queued, Zs while
 it waits, a pause mark when it is paused, and a tick when it is done. All but the hand

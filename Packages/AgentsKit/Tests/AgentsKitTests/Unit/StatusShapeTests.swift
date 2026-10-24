@@ -88,6 +88,26 @@ struct StatusShapeTests {
         #expect(Set([StatusShape.needsYou, .done, .stopped].compactMap(\.symbol)).count == 3)
         #expect(StatusShape.waiting.symbol == nil)
     }
+
+    @Test("A Needs You row says its question or why it stopped")
+    func needsYouLine() {
+        var asking = Agent(runtimeID: "test", cwd: URL(fileURLWithPath: "/tmp"), state: .waitingOnUser)
+        #expect(StatusShape.needsYouLine(row: asking, question: "May I run this?\nMore detail") == "May I run this?")
+        #expect(StatusShape.needsYouLine(row: asking) == nil)
+
+        asking.state = .stopped
+        asking.endedReason = .daemonGone
+        #expect(StatusShape.needsYouLine(row: asking, question: "Old question") == "Stopped with the daemon")
+
+        asking.state = .finished
+        asking.endedReason = .endTurn
+        asking.outcomeAsked = true
+        #expect(StatusShape.needsYouLine(row: asking) == "Finished without saying how it went")
+
+        asking.outcomeAsked = false
+        asking.report = WorkReport(outcome: .done, message: "The report", at: Date())
+        #expect(StatusShape.needsYouLine(row: asking) == nil)
+    }
 }
 
 @Suite("An agent's own title")
