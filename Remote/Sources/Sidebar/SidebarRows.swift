@@ -55,7 +55,13 @@ struct SidebarSessionRow: View {
         HStack(alignment: .top, spacing: 10) {
             // What it wants, as the window's sidebar says it (#495): the state is the
             // row's mark; unread is the bold title (#1323). Archived keeps its icon.
-            if let mark = SessionMark(agent: markAgent, group: model.work.group(of: markAgent)) {
+            if agent.state == .archived {
+                Image(systemName: "archivebox")
+                    .glyph(size: 13)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 20, height: 20)
+                    .accessibilityLabel("Archived")
+            } else if let mark = SessionMark(agent: markAgent, group: model.work.group(of: markAgent)) {
                 mark
             } else {
                 StatusIcon(state: agent.state, isComingBack: model.isComingBack(agent),

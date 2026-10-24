@@ -42,6 +42,8 @@ public struct SidebarProjectFold {
     public private(set) var sessions: [Agent] = []
     /// The archived sessions held, newest first: a page while the fold is open (#165).
     public private(set) var archived: [Agent] = []
+    /// The three most recently archived sessions, shown under Sessions (#2587).
+    public var recentArchived: [Agent] { Array(archived.prefix(3)) }
     /// Whether the project has a session that is not archived, search or not.
     public private(set) var hasLive = false
     public private(set) var workflows: [WorkflowSummary] = []

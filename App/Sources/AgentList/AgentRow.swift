@@ -71,7 +71,14 @@ struct AgentRow: View {
     private var rowContent: some View {
         // In the sidebar, the icon column every row there has (#495): 16 wide, 6 to the title.
         HStack(alignment: .top, spacing: isCompact ? 6 : 12) {
-            if isCompact, let mark = SessionMark(agent: markAgent, group: model.work.group(of: markAgent)) {
+            if isCompact, agent.state == .archived {
+                Image(systemName: "archivebox")
+                    .glyph(size: 13)
+                    .sidebarMark(.secondary)
+                    .frame(width: 16)
+                    .padding(.top, 1)
+                    .accessibilityLabel("Archived")
+            } else if isCompact, let mark = SessionMark(agent: markAgent, group: model.work.group(of: markAgent)) {
                 mark.padding(.top, 1)
             } else {
             StatusIcon(state: agent.state, isComingBack: isComingBack,

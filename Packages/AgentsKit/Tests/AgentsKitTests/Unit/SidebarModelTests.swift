@@ -179,6 +179,17 @@ struct SidebarModelTests {
         #expect(open.archivedShown(showingAll: false).count == 15)
     }
 
+    @Test func sessionsFoldKeepsTheThreeNewestArchivedSessions() {
+        let model = AgentsModel()
+        let archived = (0..<5).map { agent(api, .archived, "archived \($0)", at: Double($0)) }
+        model.replaceAgents(archived + [agent(api, .running, "live", at: 10)])
+        let fold = SidebarProjectFold(key, label: "api", in: model, isOpen: true)
+        #expect(fold.recentArchived.map(\.id) == archived.suffix(3).reversed().map(\.id))
+
+        let empty = SidebarProjectFold(ProjectKey(host: .mac, folder: web), label: "web", in: model, isOpen: true)
+        #expect(empty.recentArchived.isEmpty)
+    }
+
     @Test func projectsAreThisMacsThenEachServersInHostOrder() {
         let gpu = HostID(rawValue: "gpu00001")
         let stray = HostID(rawValue: "stray001")

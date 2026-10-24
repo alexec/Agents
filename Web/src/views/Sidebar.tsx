@@ -515,7 +515,11 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   useEffect(() => {
     if (!unfolded || !online) return;
     store.holdWorkflows(host.id, folder);
-    return () => store.releaseWorkflows(host.id, folder);
+    void store.loadArchived(host.id, folder);
+    return () => {
+      store.releaseWorkflows(host.id, folder);
+      store.unloadArchived(host.id, folder);
+    };
   }, [unfolded, online, host.id, folder]);
 
   const view = store.projectView(host.id, folder);
@@ -531,6 +535,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   const keptAgent = keptID ? live.find((a) => a.id === keptID) : undefined;
   const kept = keptAgent && keepsInUnread(keptAgent, pins, on) ? keptAgent.id : undefined;
   const sessions = !unfolded ? [] : projectSessions(live, pins, parsed, kept, on);
+  const recentArchived = !parsed ? view.archived.slice(0, 3) : [];
   const archived = !unfolded || !parsed ? [] : view.archived.filter((a) => queryMatches(parsed, a));
   const allWorkflows = (unfolded ? store.projectWorkflows(host.id, folder) : [])
     .filter(workflowMatches(store, host.id, parsed))
@@ -542,7 +547,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   const workflowsOpen = searching || folds.isWorkflowsOpen(host.id, folder);
   // Under a Sessions row, as the workflows are under theirs (#2312), the only layout (#2381); not in a
   // tab of the project alone, whose group is headed Sessions already. A search holds it open.
-  const groupsSessions = !isAlone && sessions.length > 0;
+  const groupsSessions = !isAlone && (sessions.length > 0 || recentArchived.length > 0);
   const sessionsOpen = searching || folds.isSessionsOpen(host.id, folder);
   const nameMatches = label.toLowerCase().includes(query.toLowerCase());
   if (searching && sessions.length === 0 && archived.length === 0 && workflows.length === 0
@@ -635,12 +640,13 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
                 const now = (e.currentTarget as HTMLDetailsElement).open;
                 if (!searching && now !== sessionsOpen) folds.setSessions(host.id, folder, now);
               }}>
-              <summary data-fold="sessions" aria-label={`Sessions, ${sessions.length}`}>
-                Sessions<span class="count">{sessions.length}</span>
+              <summary data-fold="sessions" aria-label={`Sessions, ${sessions.length + recentArchived.length}`}>
+                Sessions<span class="count">{sessions.length + recentArchived.length}</span>
               </summary>
               {sessionsOpen && sessionRows.map((tree) => row(tree.agent, tree))}
+              {sessionsOpen && recentArchived.map((agent) => row(agent))}
             </details>
-          ) : sessionRows.map((tree) => row(tree.agent, tree))}
+          ) : <>{sessionRows.map((tree) => row(tree.agent, tree))}{recentArchived.map((agent) => row(agent))}</>}
           {/* Its workflows after the sessions (#495), in a Workflows fold of their own, one level in,
               as a mailbox's sub-mailboxes in Mail (#885): folded until opened, kept per project, its
               grey count on the right. A search holds it open. */}
