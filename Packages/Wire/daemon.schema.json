@@ -13747,12 +13747,47 @@
       ],
       "additionalProperties": false
     },
+    "PersonaFile": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "origin": { "$ref": "#/definitions/PersonaOrigin" },
+        "content": { "type": "string" }
+      },
+      "required": ["id", "origin", "content"],
+      "additionalProperties": false
+    },
+    "PersonaFileSaveRequest": {
+      "type": "object",
+      "properties": {
+        "folder": { "$ref": "#/definitions/URLString" },
+        "origin": { "$ref": "#/definitions/PersonaOrigin" },
+        "id": { "type": "string" },
+        "content": { "type": "string" },
+        "delete": { "type": "boolean" }
+      },
+      "required": ["origin", "id", "content"],
+      "additionalProperties": false
+    },
+    "PersonaFilesAnswer": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/PersonaFile" }
+    },
     "PersonaOrigin": {
       "type": "string",
       "enum": [
         "project",
         "personal"
       ]
+    },
+    "PersonasFilesRequest": {
+      "type": "object",
+      "properties": {
+        "folder": { "$ref": "#/definitions/URLString" },
+        "origin": { "$ref": "#/definitions/PersonaOrigin" }
+      },
+      "required": ["origin"],
+      "additionalProperties": false
     },
     "PersonasListRequest": {
       "type": "object",

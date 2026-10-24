@@ -10,7 +10,7 @@ import Foundation
 /// with the briefing, never into the transcript.
 public struct Persona: Codable, Hashable, Sendable, Identifiable {
     /// Where the file is. A project's wins over one in `~/.agents` with the same id.
-    public enum Origin: String, Codable, Sendable {
+    public enum Origin: String, Codable, Hashable, Sendable {
         case project
         case personal
     }
@@ -65,6 +65,32 @@ public struct Persona: Codable, Hashable, Sendable, Identifiable {
 }
 
 extension DaemonAPI {
+    public struct PersonaFile: Codable, Hashable, Sendable, Identifiable {
+        public var id: String
+        public var origin: Persona.Origin
+        public var content: String
+        public init(id: String, origin: Persona.Origin, content: String) {
+            self.id = id; self.origin = origin; self.content = content
+        }
+    }
+
+    public struct PersonasFilesRequest: Codable, Sendable {
+        public var folder: URL?
+        public var origin: Persona.Origin
+        public init(folder: URL? = nil, origin: Persona.Origin) { self.folder = folder; self.origin = origin }
+    }
+
+    public struct PersonaFileSaveRequest: Codable, Sendable {
+        public var folder: URL?
+        public var origin: Persona.Origin
+        public var id: String
+        public var content: String
+        public var delete: Bool?
+        public init(folder: URL? = nil, origin: Persona.Origin, id: String, content: String, delete: Bool? = nil) {
+            self.folder = folder; self.origin = origin; self.id = id; self.content = content; self.delete = delete
+        }
+    }
+
     /// `personas/list`: the personas a start in this project can pick, the project's and
     /// the home's together, one per id with the project's winning, by name.
     public struct PersonasListRequest: Codable, Sendable {

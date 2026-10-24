@@ -1302,6 +1302,19 @@ final class RemoteModel {
         startPersonas = listed
     }
 
+    func personaFiles(in folder: URL, origin: Persona.Origin) async -> [DaemonAPI.PersonaFile]? {
+        let request = DaemonAPI.PersonasFilesRequest(folder: origin == .project ? folder : nil, origin: origin)
+        return try? await client(for: request).call(DaemonAPI.Method.personasFiles, request, returning: [DaemonAPI.PersonaFile].self)
+    }
+
+    func savePersonaFile(in folder: URL, origin: Persona.Origin, id: String, content: String, delete: Bool = false) async -> Bool {
+        let request = DaemonAPI.PersonaFileSaveRequest(folder: origin == .project ? folder : nil, origin: origin,
+                                                       id: id, content: content, delete: delete ? true : nil)
+        guard (try? await client(for: request).call(DaemonAPI.Method.personasSave, request)) != nil else { return false }
+        await loadStartPersonas(in: folder)
+        return true
+    }
+
     /// Pick a kind of session (#760): every setting it names is set, every one it leaves
     /// out stays as the page has it. Nil picks none and changes nothing else.
     func choosePersona(_ persona: Persona?) async {

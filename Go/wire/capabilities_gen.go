@@ -81,6 +81,7 @@ const CapPermissions1 = "permissions/1"
 const CapPerson1 = "person/1"
 const CapPersonal1 = "personal/1"
 const CapPersonas1 = "personas/1"
+const CapPersonas2 = "personas/2"
 const CapPins1 = "pins/1"
 const CapPlugins1 = "plugins/1"
 const CapPolicy1 = "policy/1"
@@ -258,7 +259,9 @@ var HostCapabilities = pairs([][2]string{
 	{"person/set", "person/1"},
 	{"person/state", "person/1"},
 	{"personal/shared", "personal/1"},
+	{"personas/files", "personas/2"},
 	{"personas/list", "personas/1"},
+	{"personas/save", "personas/2"},
 	{"pins/arrange", "pins/1"},
 	{"pins/arrangeSessions", "pins/1"},
 	{"pins/arrangeWorkflows", "pins/1"},

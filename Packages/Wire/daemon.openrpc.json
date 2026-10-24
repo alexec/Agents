@@ -3675,6 +3675,25 @@
       }
     },
     {
+      "name": "personas/files",
+      "x-capability": "personas/2",
+      "tags": [
+        { "name": "web" }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": { "$ref": "daemon.schema.json#/definitions/PersonasFilesRequest" }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": { "$ref": "daemon.schema.json#/definitions/PersonaFilesAnswer" }
+      }
+    },
+    {
       "name": "personas/list",
       "x-capability": "personas/1",
       "tags": [
@@ -3700,6 +3719,25 @@
             "$ref": "daemon.schema.json#/definitions/Persona"
           }
         }
+      }
+    },
+    {
+      "name": "personas/save",
+      "x-capability": "personas/2",
+      "tags": [
+        { "name": "web" }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": { "$ref": "daemon.schema.json#/definitions/PersonaFileSaveRequest" }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": { "$ref": "daemon.schema.json#/definitions/Empty" }
       }
     },
     {
