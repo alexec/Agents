@@ -811,14 +811,6 @@
     "costLimits": {
       "dailyTokens": 100000
     },
-    "resources": [
-      {
-        "name": "build",
-        "displayName": "Build",
-        "description": "When building.",
-        "holders": 3
-      }
-    ],
     "updated": "2026-10-21T14:00:00Z"
   },
   "UserSettingsPart": {
