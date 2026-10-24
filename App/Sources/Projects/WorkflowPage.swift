@@ -662,7 +662,7 @@ struct WorkflowPage: View {
             sectionTitle("What it does")
             GlassEffectContainer(spacing: 12) {
                 VStack(alignment: .leading, spacing: 12) {
-                    fileAndRuntime(summary)
+                    fileRow(summary)
                     agentRow(summary)
                     block(workflow.prompt.isEmpty ? "(no prompt)" : workflow.prompt)
                     if workflow.settingsLocked {
@@ -812,9 +812,9 @@ struct WorkflowPage: View {
         }
     }
 
-    /// The file on the left, where the bar has the folder; the runtime on the right,
-    /// where the bar has its picker.
-    private func fileAndRuntime(_ summary: WorkflowSummary) -> some View {
+    /// The workflow file, without a runtime picker. The runtime follows the last agent
+    /// on this host unless the file names an override.
+    private func fileRow(_ summary: WorkflowSummary) -> some View {
         let workflow = summary.workflow
         let file = url(workflow)
         let here = model.isOnThisMac(place.host)
@@ -836,9 +836,6 @@ struct WorkflowPage: View {
                     .lineLimit(1)
                     .help("On \(model.hosts.label(place.host)). Open it there.")
             }
-            Spacer(minLength: 8)
-            runtimeControl(summary)
-                .disabled(workflow.mode == .triggering || workflow.settingsLocked)
         }
     }
 
@@ -847,28 +844,11 @@ struct WorkflowPage: View {
         var folder: URL
     }
 
-    /// The runtime the file names, or the one a workflow runs on when it names none.
+    /// The runtime the file names, or the most recently active runtime on this host.
     private func runtimeID(_ workflow: Workflow) -> String {
-        workflow.settings.runtimeID ?? RuntimeCatalog.defaultRuntime.id
-    }
-
-    /// The runtime, from the catalog rather than from anything remembered: which
-    /// runtimes exist is this app's to know. A value the catalog does not hold is shown
-    /// and marked, because that workflow is refusing every fire on it (FR-009).
-    private func runtimeControl(_ summary: WorkflowSummary) -> some View {
-        let named = summary.workflow.settings.runtimeID
-        let fallback = RuntimeCatalog.defaultRuntime
-        let choices = [ConfigChoice(value: .null, name: "Default (\(fallback.name))")]
-            + RuntimeCatalog.builtIn.map { ConfigChoice(value: .string($0.id), name: $0.name) }
-        let option = ConfigOption(id: WorkflowSettings.Setting.runtime, name: "Runtime",
-                                  kind: .select([ConfigChoiceGroup(name: nil, choices: choices)]),
-                                  currentValue: .null)
-        return VStack(alignment: .trailing, spacing: 4) {
-            OptionMenu(option: option, chosen: binding(summary, \.runtimeID) { $0.runtimeID = $1 })
-            if let named, RuntimeCatalog.runtime(id: named) == nil {
-                marked("\"\(named)\" is not a runtime this app knows")
-            }
-        }
+        workflow.settings.runtimeID
+            ?? model.work.agents.first(where: { $0.host == place.host })?.runtimeID
+            ?? RuntimeCatalog.defaultRuntime.id
     }
 
     /// One of the settings the runtime itself defines, in the four states the

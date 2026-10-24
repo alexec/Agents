@@ -47,14 +47,8 @@ try {
     throw new Error(`the file never ${gone ? "lost" : "got"} ${needle}:\n${front()}`);
   };
 
-  const steps = [
-    ["Runtime", process.env.RUNTIME_NAME ?? "Codex", `runtime: ${process.env.RUNTIME_ID ?? "codex"}`],
-    ["Runtime", "Default (Claude)", "runtime:", true],
-  ];
-  for (const [menu, name, needle, gone] of steps) {
-    await choose(menu, name);
-    await waitFile(needle, gone);
-    console.log(`${menu} → ${name}: ok`);
+  if (await page.eval(`document.querySelector('.workflow-page select[aria-label="Runtime"]') !== null`)) {
+    throw new Error("the workflow page must not show a runtime picker");
   }
   await page.waitFor(`document.querySelector(".workflow-page select[aria-label='Model']")`, 10_000);
   const pick = async (menu, index) => {

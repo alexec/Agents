@@ -34,6 +34,11 @@ func TestAWorkflowRuns(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
 	dir := project(t, c, 1)
+	lastUsed := now() + 1
+	seeded(t, d, dir, func(a *wire.Agent) {
+		a.RuntimeID = "grok"
+		a.LastActivityAt = lastUsed
+	})
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "review.md"), []byte("---\nname: Review\non: lease.granted\n---\nReview what changed.\n"), 0o644)
@@ -45,7 +50,7 @@ func TestAWorkflowRuns(t *testing.T) {
 	}
 	agent := s.LastOutcome.Ran.AgentID
 	a := d.Store.Agent(agent)
-	if a == nil || *a.Title != "Review" || a.StartedByWorkflow == nil || *a.StartedByWorkflow != "review" || *a.ChainDepth != 1 {
+	if a == nil || a.RuntimeID != "grok" || *a.Title != "Review" || a.StartedByWorkflow == nil || *a.StartedByWorkflow != "review" || *a.ChainDepth != 1 {
 		t.Fatalf("%+v", a)
 	}
 	waitFor(t, "the run over", func() bool {
@@ -76,6 +81,38 @@ func TestAWorkflowRuns(t *testing.T) {
 		defer d.workflowMu.Unlock()
 		return len(d.recordsLocked().Runs) == 0
 	})
+}
+
+func TestAllowanceFailureDoesNotAutoarchiveWorkflowRun(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := project(t, c, 1)
+	const id = "allowance"
+	if err := os.MkdirAll(workflowsFolder(dir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workflowsFolder(dir), id+".md"), []byte("---\nname: Allowance check\nwhen-done: archive\n---\nCheck usage.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	d.workflowMu.Lock()
+	d.scanLocked()
+	d.workflowMu.Unlock()
+	workflowID := id
+	a := seeded(t, d, dir, func(a *wire.Agent) {
+		a.State = wire.AgentStateStopped
+		a.EndedReason = reason(wire.EndedReasonAllowanceSpent)
+		a.StartedByWorkflow = &workflowID
+	})
+	d.workflowMu.Lock()
+	d.recordsLocked().Runs = append(d.recordsLocked().Runs, workflowRun{
+		ID: store.NewUUID(), WorkflowID: id, Folder: store.FolderURL(dir), AgentID: &a.ID, StartedAt: now(),
+	})
+	d.workflowMu.Unlock()
+
+	d.workflowRunFinished(a.ID)
+	if got := d.Store.Agent(a.ID); got == nil || got.State != wire.AgentStateStopped {
+		t.Fatalf("allowance failure was archived: %+v", got)
+	}
 }
 
 func TestAFireWhileARunGoesQueues(t *testing.T) {

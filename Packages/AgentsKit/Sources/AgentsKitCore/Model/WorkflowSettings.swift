@@ -7,8 +7,8 @@ import Foundation
 /// not define a vocabulary of modes and could not support the claim if it did — that
 /// `plan` on one runtime is the same promise as `plan` on another is not something
 /// anyone here has checked, and a translation layer would be asserting it on every
-/// fire. A workflow belongs to a project, and a project's runtime is something the
-/// person already chose.
+/// fire. A workflow belongs to a project, and its runtime follows the most recently
+/// active agent on the host unless the workflow file names an override.
 ///
 /// All of them are optional, and a workflow stating none of them starts exactly as every
 /// workflow started before this feature.

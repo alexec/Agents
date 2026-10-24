@@ -1254,7 +1254,6 @@ button.remove:hover { opacity: 1; }
 .workflow-page .agent-mode { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
 .workflow-page .agent-mode code { font: 0.71875rem var(--font-mono); }
 .workflow-page .workflow-settings { display: flex; flex-direction: column; gap: 8px; }
-.workflow-page .file-and-runtime .quiet { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .workflow-page .marked { margin: 0; color: var(--tint-attention); }
 .workflow-page .pill[disabled], .workflow-page .pill:has(select:disabled) { opacity: 0.55; }
 .workflow-page .labels:empty { display: none; }
