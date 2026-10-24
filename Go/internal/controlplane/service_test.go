@@ -723,7 +723,7 @@ func TestAKeptRequestIsDelivered(t *testing.T) {
 	}
 }
 
-// Workspace providers answer on a single copy with a home for their secrets, and say
+// Machine providers answer on a single copy with a home for their secrets, and say
 // why not anywhere else (#691).
 func TestProvidersAnswerWhereTheyCanRun(t *testing.T) {
 	t.Parallel()

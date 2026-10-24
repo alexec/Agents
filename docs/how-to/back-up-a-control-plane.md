@@ -13,7 +13,7 @@ store. A copy of the store alone does not restore it:
   `this store belongs to a control plane with another key`.
 - **Without the certificate,** it makes a new one. Every window, phone and host refuses the
   new certificate (`the certificate is not the pinned one`), and each one must pair again.
-- **Without the secrets key,** your secrets and the workspace providers' secrets do not
+- **Without the secrets key,** your secrets and the machine providers' secrets do not
   open.
 
 `agents-control backup` puts all of these into one folder. `agents-control restore` puts
@@ -122,7 +122,7 @@ With the same KMS key, start it.
 With a new KMS key, add `--new-kms` to `restore`, which leaves out the key the old KMS
 sealed. Then seal the exported key with the new one (`key seal --key-fd 0 < control-key`,
 as in the cloud how-to), and start it. Devices and hosts stay paired. The secrets that the
-old KMS sealed (people's and the workspace providers') do not open: give them again.
+old KMS sealed (people's and the machine providers') do not open: give them again.
 
 ## Check a restore
 
@@ -131,7 +131,7 @@ After a restore, check that:
 - the control plane starts, and its log says the same `pin` as before (a Mac's
   `control.log`);
 - **Settings ▸ Machines** lists every machine, and they come online;
-- a workspace provider lists its workspaces without asking for its secrets again.
+- a machine provider lists its workspaces without asking for its secrets again.
 
 ## Related
 

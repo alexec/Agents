@@ -1,5 +1,5 @@
 // Start a Machine from a Repository (#1809): the repository, a provider that makes machines, its
-// New Workspace form, and Start. What comes next is said in the sheet: joining on its first boot,
+// New Machine form, and Start. What comes next is said in the sheet: joining on its first boot,
 // or made but to add as a host in the Mac app. As New Machine (#2131), from Add a Machine… or a
 // provider's New Machine…, the repository is optional and the machine is named here.
 import { useEffect, useState } from "preact/hooks";

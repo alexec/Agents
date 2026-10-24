@@ -16,7 +16,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 )
 
-// Workspace providers on the control plane (#691): adding one, linking a host to its
+// Machine providers on the control plane (#691): adding one, linking a host to its
 // workspace, and Start and Stop, against a stand-in provider. A host comes online by the
 // router being told so, as its uplink would. Ports WorkspaceProvidersTests.swift.
 
@@ -85,9 +85,9 @@ func TestTheProviderRecordIsKeptAtTheSwiftKey(t *testing.T) {
 
 func TestAServerThatIsNotAProviderIsRefusedInItsWords(t *testing.T) {
 	h := newHarness(t)
-	h.provider.set("It isn’t a workspace provider: it has no workspace_stop tool.", "", 0)
+	h.provider.set("It isn’t a machine provider: it has no workspace_stop tool.", "", 0)
 	_, err := h.call(MethodProvidersAdd, map[string]any{"name": "DigitalOcean", "kind": "commands", "commands": map[string]any{"preset": "doctl"}})
-	if f := failureOf(err); f == nil || f.Code != CodeInvalidParams || f.Message != "It isn’t a workspace provider: it has no workspace_stop tool." {
+	if f := failureOf(err); f == nil || f.Code != CodeInvalidParams || f.Message != "It isn’t a machine provider: it has no workspace_stop tool." {
 		t.Fatalf("%v", err)
 	}
 	if listed := h.must(MethodProvidersList, nil).(map[string]any)["providers"].([]ProviderSummary); len(listed) != 0 {
@@ -244,7 +244,7 @@ func TestAFailedSSHStartEndsTheStartAtOnceInWords(t *testing.T) {
 func TestWithoutTheProvidersSSHItStartsOverTheInstallsDestination(t *testing.T) {
 	h := newHarness(t, func(o *harnessOptions) {
 		o.timing.SSHAfter, o.timing.GiveUp = 100*time.Millisecond, 2*time.Second
-		o.workspaces = []WorkspaceInfo{{ID: "cs-1", Name: "cs-1", State: "stopped"}}
+		o.workspaces = []MachineInfo{{ID: "cs-1", Name: "cs-1", State: "stopped"}}
 		o.installedOver = "cs.cs-1.main"
 	})
 	h.link(h.add(), devbox, "cs-1")
@@ -261,7 +261,7 @@ func TestTheSSHStartOfAWorkspaceThatRenewsItsKeyTakesTheNewOne(t *testing.T) {
 	renews := true
 	h := newHarness(t, func(o *harnessOptions) {
 		o.timing.SSHAfter, o.timing.GiveUp = 100*time.Millisecond, 2*time.Second
-		o.workspaces = []WorkspaceInfo{{ID: "ws-1", Name: "ws-1", State: "stopped", SSH: new("ws-1.alias"), HostKeyRenews: &renews}}
+		o.workspaces = []MachineInfo{{ID: "ws-1", Name: "ws-1", State: "stopped", SSH: new("ws-1.alias"), HostKeyRenews: &renews}}
 	})
 	h.link(h.add(), devbox, "ws-1")
 	h.must(MethodHostsStart, map[string]string{"host": devbox})
@@ -387,7 +387,7 @@ func TestAnIdleHostIsStoppedAndSaysSo(t *testing.T) {
 	id := h.add()
 	h.link(id, devbox, "scratch-1")
 	minutes := 2
-	h.must(MethodHostsSetOptions, HostWorkspaceOptions{Host: devbox, StopWhenIdleMinutes: int64Of(&minutes)})
+	h.must(MethodHostsSetOptions, HostMachineOptions{Host: devbox, StopWhenIdleMinutes: int64Of(&minutes)})
 	h.router.setOnline(devbox, true)
 	h.providers.Heard(devbox, HostStatus{Idle: true, Running: []string{}})
 	if !eventually(t, func() bool { _, stops := h.provider.count(); return stops == 1 }) {
@@ -404,7 +404,7 @@ func TestBusyAgainCancelsTheIdleCount(t *testing.T) {
 	h := newHarness(t, func(o *harnessOptions) { o.timing.IdleMinute = 30 * time.Millisecond })
 	h.link(h.add(), devbox, "scratch-1")
 	one := 1
-	h.must(MethodHostsSetOptions, HostWorkspaceOptions{Host: devbox, StopWhenIdleMinutes: int64Of(&one)})
+	h.must(MethodHostsSetOptions, HostMachineOptions{Host: devbox, StopWhenIdleMinutes: int64Of(&one)})
 	h.router.setOnline(devbox, true)
 	h.providers.Heard(devbox, HostStatus{Idle: true, Running: []string{}})
 	h.providers.Heard(devbox, HostStatus{Idle: false, Running: []string{"Claude (x)"}})
@@ -483,14 +483,14 @@ func TestAHostRecordWithALinkReadsAndWritesAsSwiftDoes(t *testing.T) {
 }
 
 func TestOverlayAndOfflineRefusal(t *testing.T) {
-	ws := &HostWorkspace{HostState: new("stopped")}
+	ws := &HostMachine{HostState: new("stopped")}
 	if Overlay(map[string]any{"state": "offline"}, false, ws)["state"] != "stopped" {
 		t.Error("not laid over")
 	}
 	if Overlay(map[string]any{"state": "online"}, true, ws)["state"] != "online" {
 		t.Error("laid over an online host")
 	}
-	if Overlay(map[string]any{"state": "online"}, true, &HostWorkspace{HostState: new("stopping")})["state"] != "stopping" {
+	if Overlay(map[string]any{"state": "online"}, true, &HostMachine{HostState: new("stopping")})["state"] != "stopping" {
 		t.Error("stopping not shown")
 	}
 	if OfflineRefusal(ws).Message != "That machine is stopped. Start it to reach it." || OfflineRefusal(nil).Message != "That machine is offline." {
@@ -512,7 +512,7 @@ func TestProviderIDsAndWords(t *testing.T) {
 	if andList([]string{"a", "b", "c"}) != "a, b and c" || orList([]string{"a", "b", "c"}) != "a, b or c" {
 		t.Error("lists")
 	}
-	if !MayBe(WorkspaceInfo{Name: "devstack-d7539e59"}, "cws.devstack-d7539e59") || MayBe(WorkspaceInfo{Name: "dev"}, "devstack") {
+	if !MayBe(MachineInfo{Name: "devstack-d7539e59"}, "cws.devstack-d7539e59") || MayBe(MachineInfo{Name: "dev"}, "devstack") {
 		t.Error("mayBe")
 	}
 }
@@ -734,7 +734,7 @@ func TestAnUnlinkedHostHasNoWorkspaceToDelete(t *testing.T) {
 // Agents' workspace tools (#691 US6). Ports AgentWorkspaceToolsTests.swift.
 
 func (h *harness) agentCall(method string, params any) (any, error) {
-	return h.providers.HostSaid(other, MethodHostWorkspaces, rawOf(HostWorkspaceCall{Agent: "Claude (fix-login)", Method: method,
+	return h.providers.HostSaid(other, MethodHostMachines, rawOf(HostMachineCall{Agent: "Claude (fix-login)", Method: method,
 		Params: rawOf(params)}))
 }
 
@@ -745,7 +745,7 @@ func TestAnAgentSeesWorkspacesAndTheirHostsAndNoSecret(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	listed := answer.(AgentWorkspaces)
+	listed := answer.(AgentMachines)
 	p := listed.Providers[0]
 	if p.Name != "DigitalOcean" || !p.CanMake || p.Options == nil {
 		t.Errorf("%+v", p)

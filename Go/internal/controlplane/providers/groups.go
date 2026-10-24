@@ -58,7 +58,7 @@ func (p *Providers) SummariesFor(person string) []ProviderSummary {
 		mayUse := p.MayUse(person, r)
 		s.MayUse = &mayUse
 		if !admin && p.hooks.OwnerOf != nil {
-			mine := []WorkspaceInfo{}
+			mine := []MachineInfo{}
 			for _, w := range s.Workspaces {
 				if w.Host == nil || *w.Host == "" || p.hooks.OwnerOf(string(*w.Host)) == person {
 					mine = append(mine, w)
@@ -81,7 +81,7 @@ var adminMethods = map[string]bool{
 func (p *Providers) refuse(method string, params []byte, caller Caller) error {
 	if adminMethods[method] {
 		if !p.isAdmin(caller.Person) {
-			return fail(CodeNotPermitted, "Only an admin can change a workspace provider.")
+			return fail(CodeNotPermitted, "Only an admin can change a machine provider.")
 		}
 		return nil
 	}

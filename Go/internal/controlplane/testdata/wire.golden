@@ -385,7 +385,7 @@ hosts/update refused
 providers/list refused
 {
   "code": -32064,
-  "message": "Workspace providers need a control plane with one copy, for now."
+  "message": "Machine providers need a control plane with one copy, for now."
 }
 
 nothing/here refused

@@ -220,7 +220,7 @@ rm -f /home/agents/first-boot.sh
 
 // digitalOceanAPI is DigitalOcean droplets with a tag, through DigitalOcean's API with a
 // token in DIGITALOCEAN_API_TOKEN: nothing to install. Each is reached by plain ssh to its
-// public address. New Workspace makes a droplet with the tag that installs Agents on its
+// public address. New Machine makes a droplet with the tag that installs Agents on its
 // first boot; Delete deletes it.
 func digitalOceanAPI(o map[string]any) (Config, error) {
 	tag, _ := o["tag"].(string)

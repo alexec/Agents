@@ -333,6 +333,29 @@ export type AgentGroup =
   | "stopped"
   | "archived";
 
+/** machines/forAgent: what list_machines shows an agent. */
+export interface AgentMachines {
+  providers: AgentMachinesProvider[];
+}
+
+export interface AgentMachinesMachine {
+  id: string;
+  name: string;
+  state: string;
+  host?: string;
+  hostState?: string;
+  cost?: string;
+}
+
+export interface AgentMachinesProvider {
+  id: ProviderID;
+  name: string;
+  canMake: boolean;
+  canDelete: boolean;
+  options?: JSONValue;
+  workspaces: AgentMachinesMachine[];
+}
+
 export type AgentPurpose =
   | { providerDraft: { id: UUID } };
 
@@ -365,29 +388,6 @@ export type AgentState =
 export interface AgentStopRequest {
   agentID: UUID;
   byAdmin?: boolean;
-}
-
-/** workspaces/forAgent: what list_workspaces shows an agent. */
-export interface AgentWorkspaces {
-  providers: AgentWorkspacesProvider[];
-}
-
-export interface AgentWorkspacesProvider {
-  id: ProviderID;
-  name: string;
-  canMake: boolean;
-  canDelete: boolean;
-  options?: JSONValue;
-  workspaces: AgentWorkspacesWorkspace[];
-}
-
-export interface AgentWorkspacesWorkspace {
-  id: string;
-  name: string;
-  state: string;
-  host?: string;
-  hostState?: string;
-  cost?: string;
 }
 
 export interface AgentWorktree {
@@ -2075,7 +2075,7 @@ export interface ControlHost {
   gitFrom?: Record<string, HostID>;
   gitAsks?: GitAsk[];
   tunnel?: HostTunnel;
-  workspace?: HostWorkspace;
+  workspace?: HostMachine;
   implementation?: string;
   /**
    * The capabilities this host said in its last host/hello (#1748). None from a host older than
@@ -2470,7 +2470,7 @@ export type DomainClaimState =
 
 export interface DraftCheck {
   passed: boolean;
-  workspaces?: WorkspaceInfo[];
+  workspaces?: MachineInfo[];
   problem?: string;
   ssh?: string;
   noSSH?: boolean;
@@ -2967,7 +2967,7 @@ export type GitView =
   | { unavailable: ChangesUnavailable };
 
 /**
- * A group (#1761, spec 736 FR-027): everyone, or named users. It owns workspace providers: only its
+ * A group (#1761, spec 736 FR-027): everyone, or named users. It owns machine providers: only its
  * users see them and start machines from them (FR-028).
  */
 export interface Group {
@@ -2987,7 +2987,7 @@ export interface GroupList {
   groups: Group[];
 }
 
-/** groups/remove (#1761): the group. Refused while a workspace provider or a bot has it. */
+/** groups/remove (#1761): the group. Refused while a machine provider or a bot has it. */
 export interface GroupRequest {
   id: string;
 }
@@ -3239,6 +3239,45 @@ export interface HostLink {
   stopWhenIdleMinutes?: number;
 }
 
+export interface HostMachine {
+  provider: ProviderID;
+  providerName: string;
+  workspace: string;
+  workspaceName: string;
+  workspaceState: string;
+  hostState?: string;
+  phase?: string;
+  since?: WireDate;
+  problem?: string;
+  stoppedBy?: string;
+  canStart: boolean;
+  canStop: boolean;
+  startWhenUsed: boolean;
+  stopWhenIdleMinutes?: number;
+  cost?: string;
+  current: boolean;
+  startForSchedules?: boolean;
+  tellsSchedule?: boolean;
+  nextWorkflow?: string;
+  nextWorkflowAt?: WireDate;
+  wakeAt?: WireDate;
+}
+
+/** host/machines, for an agent there: who asked, for the log, and its call. */
+export interface HostMachineCall {
+  agent: string;
+  method: string;
+  params: JSONValue;
+}
+
+/** hosts/setMachineOptions. stopWhenIdleMinutes 0 turns it off. */
+export interface HostMachineOptions {
+  host: HostID;
+  startWhenUsed?: boolean;
+  stopWhenIdleMinutes?: number;
+  startForSchedules?: boolean;
+}
+
 /**
  * host/policy (#998, FR-006): to a machine that says host.policy/1, on its channel 0, at each join
  * and within 5 seconds of each change. A signed policy, or none when no policy was ever set.
@@ -3345,45 +3384,6 @@ export interface HostUserSettings {
   user: string;
   settings: UserSettings;
   secrets: UserSecret[];
-}
-
-export interface HostWorkspace {
-  provider: ProviderID;
-  providerName: string;
-  workspace: string;
-  workspaceName: string;
-  workspaceState: string;
-  hostState?: string;
-  phase?: string;
-  since?: WireDate;
-  problem?: string;
-  stoppedBy?: string;
-  canStart: boolean;
-  canStop: boolean;
-  startWhenUsed: boolean;
-  stopWhenIdleMinutes?: number;
-  cost?: string;
-  current: boolean;
-  startForSchedules?: boolean;
-  tellsSchedule?: boolean;
-  nextWorkflow?: string;
-  nextWorkflowAt?: WireDate;
-  wakeAt?: WireDate;
-}
-
-/** host/workspaces, for an agent there: who asked, for the log, and its call. */
-export interface HostWorkspaceCall {
-  agent: string;
-  method: string;
-  params: JSONValue;
-}
-
-/** hosts/setWorkspaceOptions. stopWhenIdleMinutes 0 turns it off. */
-export interface HostWorkspaceOptions {
-  host: HostID;
-  startWhenUsed?: boolean;
-  stopWhenIdleMinutes?: number;
-  startForSchedules?: boolean;
 }
 
 export interface HostedMCPSnapshot {
@@ -3957,6 +3957,25 @@ export interface MacPathRequest {
 /** mac/terminal: Terminal, in path if given. */
 export interface MacTerminalRequest {
   path?: string;
+}
+
+/**
+ * One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or
+ * unknown.
+ */
+export interface MachineInfo {
+  id: string;
+  name: string;
+  state: string;
+  ssh?: string;
+  tunnel?: boolean;
+  /**
+   * Its ssh host key is made again at each start, as a Google Cloud workstation's is (#1701): after
+   * a Start the control plane made, the first ssh takes the key it is offered and pins it again.
+   */
+  hostKeyRenews?: boolean;
+  cost?: string;
+  host?: HostID;
 }
 
 export interface ManagedMCPServer {
@@ -5183,7 +5202,7 @@ export interface ProviderCreate {
   options?: JSONValue;
   clones?: string[];
   /**
-   * The repository to start it from (#1809), an https git address. A provider whose New Workspace
+   * The repository to start it from (#1809), an https git address. A provider whose New Machine
    * form has `repository`, such as Codespaces, makes the workspace from it; any other has the host
    * clone it once it joins, before `clones`.
    */
@@ -5192,7 +5211,7 @@ export interface ProviderCreate {
 
 /** What providers/create made. */
 export interface ProviderCreated {
-  workspace: WorkspaceInfo;
+  workspace: MachineInfo;
   joining: boolean;
 }
 
@@ -5255,7 +5274,7 @@ export interface ProviderList {
   providers: ProviderSummary[];
 }
 
-/** providers/options: the New Workspace form, a JSON Schema. */
+/** providers/options: the New Machine form, a JSON Schema. */
 export interface ProviderOptions {
   schema: JSONValue;
 }
@@ -5288,7 +5307,7 @@ export interface ProviderSummary {
   contract: number;
   mapped: boolean;
   preset?: string;
-  workspaces: WorkspaceInfo[];
+  workspaces: MachineInfo[];
   listedAt?: WireDate;
   current: boolean;
   problem?: string;
@@ -7957,25 +7976,6 @@ export interface WorkflowsListRequest {
   scope?: "project" | "user";
 }
 
-/**
- * One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or
- * unknown.
- */
-export interface WorkspaceInfo {
-  id: string;
-  name: string;
-  state: string;
-  ssh?: string;
-  tunnel?: boolean;
-  /**
-   * Its ssh host key is made again at each start, as a Google Cloud workstation's is (#1701): after
-   * a Start the control plane made, the first ssh takes the key it is offered and pins it again.
-   */
-  hostKeyRenews?: boolean;
-  cost?: string;
-  host?: HostID;
-}
-
 export type WorktreeChoice =
   | { new: Record<string, never> }
   | { existing: { _0: URLString } }
@@ -8167,7 +8167,7 @@ export interface Methods {
   "hosts/list": { params: Empty; result: ControlHost[] };
   "hosts/listKept": { params: Empty; result: KeptList };
   "hosts/retryKept": { params: KeptRequestID; result: Empty };
-  "hosts/setWorkspaceOptions": { params: HostWorkspaceOptions; result: ControlHost };
+  "hosts/setMachineOptions": { params: HostMachineOptions; result: ControlHost };
   "hosts/start": { params: HostRequest; result: ControlHost };
   "hosts/startEnroll": { params: HostEnroll; result: ControlCodeShown };
   "hosts/stop": { params: HostStop; result: ControlHost };
@@ -8439,7 +8439,7 @@ export const MethodTarget = {
   "hosts/list": "control",
   "hosts/listKept": "control",
   "hosts/retryKept": "control",
-  "hosts/setWorkspaceOptions": "control",
+  "hosts/setMachineOptions": "control",
   "hosts/start": "control",
   "hosts/startEnroll": "control",
   "hosts/stop": "control",
@@ -8663,12 +8663,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AgentConfigFile: { required: ["path", "time", "counter", "machine", "digest"], optional: ["contents", "deleted"] },
   AgentConfigFileRequest: { required: ["path", "time", "counter"], optional: ["contents", "deleted"] },
   AgentConfigFiles: { required: ["files"], optional: ["updated"] },
+  AgentMachines: { required: ["providers"], optional: [] },
+  AgentMachinesMachine: { required: ["id", "name", "state"], optional: ["host", "hostState", "cost"] },
+  AgentMachinesProvider: { required: ["id", "name", "canMake", "canDelete", "workspaces"], optional: ["options"] },
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },
   AgentStopRequest: { required: ["agentID"], optional: ["byAdmin"] },
-  AgentWorkspaces: { required: ["providers"], optional: [] },
-  AgentWorkspacesProvider: { required: ["id", "name", "canMake", "canDelete", "workspaces"], optional: ["options"] },
-  AgentWorkspacesWorkspace: { required: ["id", "name", "state"], optional: ["host", "hostState", "cost"] },
   AgentWorktree: { required: ["name", "root", "project", "madeByApp"], optional: ["branch", "base"] },
   AgentsExport: { required: ["file", "agents", "name"], optional: [] },
   AgentsExportRequest: { required: [], optional: ["agentID", "folder"] },
@@ -8937,6 +8937,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HostJoinTicket: { required: ["request", "code", "expires"], optional: [] },
   HostLastHeard: { required: ["host"], optional: ["projects", "agents", "heardAt"] },
   HostLink: { required: ["host", "provider", "workspace"], optional: ["startWhenUsed", "stopWhenIdleMinutes"] },
+  HostMachine: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },
+  HostMachineCall: { required: ["agent", "method", "params"], optional: [] },
+  HostMachineOptions: { required: ["host"], optional: ["startWhenUsed", "stopWhenIdleMinutes", "startForSchedules"] },
   HostPolicy: { required: [], optional: ["policy", "signature", "none"] },
   HostProviderDraftCall: { required: ["agentID", "draft", "tool"], optional: ["arguments"] },
   HostRelayRequest: { required: ["host", "relay"], optional: [] },
@@ -8950,9 +8953,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HostUpdate: { required: ["host", "destination"], optional: ["key", "trust"] },
   HostUser: { required: ["user", "kind", "name", "labels"], optional: ["capReachedUntil", "bots"] },
   HostUserSettings: { required: ["user", "settings", "secrets"], optional: [] },
-  HostWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },
-  HostWorkspaceCall: { required: ["agent", "method", "params"], optional: [] },
-  HostWorkspaceOptions: { required: ["host"], optional: ["startWhenUsed", "stopWhenIdleMinutes", "startForSchedules"] },
   HostedMCPSnapshot: { required: ["servers", "at"], optional: [] },
   HostedMCPStatus: { required: ["name", "state", "restarts", "users"], optional: ["project", "since", "retryAt", "lastError"] },
   JoinApproved: { required: ["host"], optional: [] },
@@ -9019,6 +9019,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MCPViewsForgetRequest: { required: ["destination", "name"], optional: [] },
   MacPathRequest: { required: ["path"], optional: ["app"] },
   MacTerminalRequest: { required: [], optional: ["path"] },
+  MachineInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host"] },
   ManagedMCPServer: { required: ["name", "registryName", "version", "run", "addedAt", "destination"], optional: ["byHand"] },
   ManagedSkill: { required: ["destination", "name", "source", "edited", "update"], optional: ["skillPath", "recordedHash", "commit", "committedAt", "catalogue"] },
   MarkRuntimeAvailable: { required: ["credentialKey"], optional: [] },
@@ -9419,7 +9420,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["scope", "content", "overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "hearsFor", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
   WorkflowWriteRequest: { required: ["workflowID", "content"], optional: [] },
   WorkflowsListRequest: { required: [], optional: ["folder", "scope"] },
-  WorkspaceInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host"] },
   WorktreeRemovalRequest: { required: ["project", "root", "confirmed"], optional: [] },
   WorktreeRemoved: { required: ["removedBranch"], optional: [] },
   WorktreeSize: { required: ["bytes", "partial"], optional: [] },

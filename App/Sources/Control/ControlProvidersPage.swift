@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Settings ▸ Workspace Providers (#691, layouts.md L3): each workspace provider as a
+/// Settings ▸ Machine Providers (#691, layouts.md L3): each machine provider as a
 /// card of its workspaces, which are hosts already or can be added as one. A provider runs on
 /// the control plane, so it can start a machine that is down.
 struct ControlProvidersPage: View {
@@ -9,7 +9,7 @@ struct ControlProvidersPage: View {
     @State private var adding = false
     @State private var removing: DaemonAPI.ProviderSummary?
     @State private var addingHost: ControlAddServerSheet.Prefill?
-    /// New Machine… (US5, L9; was New Workspace…).
+    /// New Machine… (US5, L9; was New Machine…).
     @State private var making: DaemonAPI.ProviderSummary?
     /// Write the Map Again… (#858 US4, L10f).
     @State private var rewriting: DaemonAPI.ProviderSummary?
@@ -21,7 +21,7 @@ struct ControlProvidersPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             if !control.providersHere {
-                Text("Workspace providers need a control plane with one copy, such as the one on your Mac. This one has several.")
+                Text("Machine providers need a control plane with one copy, such as the one on your Mac. This one has several.")
                     .appText(.supporting).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
@@ -44,7 +44,7 @@ struct ControlProvidersPage: View {
             }
         }
         // Lists every provider again when the page opens (FR-004).
-        .task { await control.listWorkspacesAgain() }
+        .task { await control.listMachinesAgain() }
         .sheet(isPresented: $adding) { AddProviderSheet(control: control).paperSheet() }
         .sheet(isPresented: $startingMachine) {
             MachineFromRepositorySheet(calls: control.machineCalls, close: { startingMachine = false },
@@ -90,7 +90,7 @@ struct ControlProvidersPage: View {
                     if control.isAdmin, provider.preset != nil {
                         Button("Edit…") { editing = provider }
                     }
-                    Button("List Again") { Task { await control.listWorkspacesAgain(provider.id) } }
+                    Button("List Again") { Task { await control.listMachinesAgain(provider.id) } }
                     // An agent writes its map or commands again, from the ones it has (#858 US4).
                     if control.isAdmin, provider.kind == "commands" ? provider.preset == nil : provider.mapped {
                         Button(provider.kind == "commands" ? "Write the Commands Again…" : "Write the Map Again…") {
@@ -144,7 +144,7 @@ struct ControlProvidersPage: View {
     /// Link to existing host (#976): a host added by hand under the workspace's ssh alias,
     /// such as `cws.devstack-d7539e59`, is linked to it rather than installed again.
     @ViewBuilder
-    private func linkToExistingHost(_ workspace: DaemonAPI.WorkspaceInfo, of provider: DaemonAPI.ProviderSummary) -> some View {
+    private func linkToExistingHost(_ workspace: DaemonAPI.MachineInfo, of provider: DaemonAPI.ProviderSummary) -> some View {
         let hosts = control.hostsThatMayBe(workspace)
         if hosts.count == 1, let host = hosts.first {
             Button("Link to \(host.name)") {
@@ -197,7 +197,7 @@ struct ControlProvidersPage: View {
         return parts.joined(separator: " · ")
     }
 
-    private func dot(_ workspace: DaemonAPI.WorkspaceInfo) -> ControlDot {
+    private func dot(_ workspace: DaemonAPI.MachineInfo) -> ControlDot {
         switch workspace.state {
         case "running": .online
         case "unknown": .attention
@@ -205,7 +205,7 @@ struct ControlProvidersPage: View {
         }
     }
 
-    private func workspaceLine(_ workspace: DaemonAPI.WorkspaceInfo, of provider: DaemonAPI.ProviderSummary) -> String {
+    private func workspaceLine(_ workspace: DaemonAPI.MachineInfo, of provider: DaemonAPI.ProviderSummary) -> String {
         var parts = [workspace.state.capitalized]
         if let host = workspace.host {
             parts.append("linked to \(control.hosts.first { $0.id == host }?.name ?? "a machine")")
@@ -850,9 +850,9 @@ struct AddProviderSheet: View {
         return (try? commandsJSON()) != written
     }
 
-    /// "It isn't a workspace provider: it has no …", or a map tool it lacks: a map would fix it.
+    /// "It isn't a machine provider: it has no …", or a map tool it lacks: a map would fix it.
     static func mapWouldFix(_ refusal: String) -> Bool {
-        refusal.hasPrefix("It isn’t a workspace provider") || refusal.hasPrefix("The tool map names")
+        refusal.hasPrefix("It isn’t a machine provider") || refusal.hasPrefix("The tool map names")
     }
 
     static func pretty(_ json: JSONValue) -> String {
@@ -1131,7 +1131,7 @@ struct EditProviderSheet: View {
     }
 }
 
-/// Link to Workspace… (#691, layouts.md L5): a provider's workspace for a host that is already
+/// Link to Machine… (#691, layouts.md L5): a provider's workspace for a host that is already
 /// one. A workspace another host has is shown, greyed, as that host's.
 struct LinkWorkspaceSheet: View {
     @Environment(\.dismiss) private var dismiss
@@ -1178,11 +1178,11 @@ struct LinkWorkspaceSheet: View {
         .frame(width: 460)
     }
 
-    private func key(_ provider: DaemonAPI.ProviderSummary, _ workspace: DaemonAPI.WorkspaceInfo) -> String {
+    private func key(_ provider: DaemonAPI.ProviderSummary, _ workspace: DaemonAPI.MachineInfo) -> String {
         "\(provider.id.rawValue)/\(workspace.id)"
     }
 
-    private func row(_ provider: DaemonAPI.ProviderSummary, _ workspace: DaemonAPI.WorkspaceInfo) -> some View {
+    private func row(_ provider: DaemonAPI.ProviderSummary, _ workspace: DaemonAPI.MachineInfo) -> some View {
         let other = workspace.host.flatMap { id in control.hosts.first { $0.id == id }?.name }
         let selected = chosen == key(provider, workspace)
         return Button {

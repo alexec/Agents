@@ -53,7 +53,7 @@ func notFound(method string) *RPCError {
 }
 
 // noSSHHere is a hosted copy's answer to a method that reaches a machine over ssh (#1807).
-var noSSHHere = fail(notSupported, "This control plane runs on our servers, which have no ssh of yours. Add a machine with its join command or a code, or from a workspace provider.")
+var noSSHHere = fail(notSupported, "This control plane runs on our servers, which have no ssh of yours. Add a machine with its join command or a code, or from a machine provider.")
 
 // overSSH are the methods that reach a machine over this machine's ssh.
 var overSSH = map[string]bool{"hosts/install": true, "hosts/detect": true, "hosts/sshHosts": true}

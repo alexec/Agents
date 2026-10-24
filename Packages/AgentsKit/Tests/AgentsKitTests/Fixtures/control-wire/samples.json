@@ -221,7 +221,7 @@
     "isBastion": true,
     "known": true
   },
-  "WorkspaceInfo": {
+  "MachineInfo": {
     "id": "id",
     "name": "name",
     "state": "state",
@@ -292,7 +292,7 @@
     "startWhenUsed": true,
     "stopWhenIdleMinutes": 7
   },
-  "HostWorkspaceOptions": {
+  "HostMachineOptions": {
     "host": "box",
     "startWhenUsed": true,
     "stopWhenIdleMinutes": 7,
@@ -325,14 +325,14 @@
     },
     "joining": true
   },
-  "HostWorkspaceCall": {
+  "HostMachineCall": {
     "agent": "agent",
     "method": "method",
     "params": {
       "k": "v"
     }
   },
-  "AgentWorkspaces": {
+  "AgentMachines": {
     "providers": [
       {
         "id": "digitalocean-x7k2",

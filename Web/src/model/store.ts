@@ -6,7 +6,7 @@ import { projectPath } from "./hostedMCP";
 import type { ExportImportBusy } from "./exports";
 import { batch, computed, signal, type ReadonlySignal, type Signal } from "@preact/signals";
 import type {
-  Agent, AgentRemovedNotification, ResumingNotification, ControlHost, HostID, HostWorkspace, ElicitationNotification, ElicitationRequest, EntryNotification,
+  Agent, AgentRemovedNotification, ResumingNotification, ControlHost, HostID, HostMachine, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, ProjectRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
@@ -1087,7 +1087,7 @@ export class Work {
 
 
   /** One host's row, or its state and workspace, as said now, in place of what was listed. */
-  protected takeHostRow(change: { id: string; state: string; workspace?: HostWorkspace | undefined }): void {
+  protected takeHostRow(change: { id: string; state: string; workspace?: HostMachine | undefined }): void {
     const hosts = this.hosts.value;
     const at = hosts.findIndex((h) => h.id === change.id);
     if (at < 0) return;
@@ -1162,7 +1162,7 @@ export function tellingWords(doing: string | null, recipient: string): string {
 export const sentBeforeEdit = "That prompt was sent before your change. Your words are in the prompt bar.";
 
 export class Store extends Work {
-  /** The control plane's workspace providers (#1808), for Settings ▸ Control plane. */
+  /** The control plane's machine providers (#1808), for Settings ▸ Control plane. */
   readonly providers: Providers;
 
   async loadUserWorkflows(host: string): Promise<void> {
@@ -1525,7 +1525,7 @@ export class Store extends Work {
    * it (the control plane says it twice per connect). A control plane naming no host loads all (#170).
    */
   private hostChanged(params: unknown): void {
-    const said = params as { host?: unknown; state?: unknown; workspace?: HostWorkspace } | null;
+    const said = params as { host?: unknown; state?: unknown; workspace?: HostMachine } | null;
     const host = said?.host;
     if (typeof host !== "string") {
       void this.load();

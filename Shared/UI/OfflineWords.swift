@@ -15,7 +15,7 @@ enum OfflineWords {
     /// A host linked to a provider's workspace (#691, layouts.md L1): what its strip says
     /// while the workspace is stopped, starting or failed to start, or nil when the
     /// ordinary offline line says it (its workspace is running, so agentsd is what went).
-    static func workspaceLine(name: String, state: String, workspace: DaemonAPI.HostWorkspace) -> String? {
+    static func workspaceLine(name: String, state: String, workspace: DaemonAPI.HostMachine) -> String? {
         if state == "starting" {
             return switch workspace.phase {
             case "connecting": "Waiting for \(name) to connect…"
@@ -34,14 +34,14 @@ enum OfflineWords {
 
     /// "Starts at 02:55 for Nightly review" (#1004 FR-007): when the control plane will start
     /// it for its next scheduled workflow, or nil when it won't.
-    static func wakeLine(_ workspace: DaemonAPI.HostWorkspace, now: Date = Date()) -> String? {
+    static func wakeLine(_ workspace: DaemonAPI.HostMachine, now: Date = Date()) -> String? {
         guard let at = workspace.wakeAt, let workflow = workspace.nextWorkflow else { return nil }
         return "Starts \(clock(at, now: now)) for \(workflow)"
     }
 
     /// "Stays up for Nightly review at 03:00": an idle host its next scheduled workflow keeps
     /// up, as it is due within its idle time (#1004 FR-005).
-    static func staysUpLine(_ workspace: DaemonAPI.HostWorkspace, now: Date = Date()) -> String? {
+    static func staysUpLine(_ workspace: DaemonAPI.HostMachine, now: Date = Date()) -> String? {
         guard let minutes = workspace.stopWhenIdleMinutes, let at = workspace.nextWorkflowAt,
               let workflow = workspace.nextWorkflow, at.timeIntervalSince(now) <= TimeInterval(minutes * 60) else { return nil }
         return "Stays up for \(workflow) \(clock(at, now: now))"
@@ -79,7 +79,7 @@ enum OfflineWords {
     }
 
     /// Whether the strip offers Start: a stopped or failed workspace, with nothing under way.
-    static func offersStart(state: String, workspace: DaemonAPI.HostWorkspace) -> Bool {
+    static func offersStart(state: String, workspace: DaemonAPI.HostMachine) -> Bool {
         workspace.canStart && state != "online" && state != "starting" && state != "stopping"
     }
 

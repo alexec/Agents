@@ -41,7 +41,7 @@ Each one sends only what it needs, to that service only:
   projects you connect, and nothing else.
 - **Email:** when you connect a mailbox, your host reads it over IMAP. It never sends mail.
 - **MCP servers (connectors):** each server you add gets what your agents send to its tools.
-- **Workspace providers:** Docker, AWS, Google Cloud, DigitalOcean, Codespaces and Coder get
+- **Machine providers:** Docker, AWS, Google Cloud, DigitalOcean, Codespaces and Coder get
   the calls that start, stop and make your machines, with the credentials you give.
 - **Downloads:** to install a runtime, the app downloads it from nodejs.org, npm, GitHub or
   the company that makes it.

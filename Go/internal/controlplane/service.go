@@ -92,7 +92,7 @@ type Config struct {
 	// How often a copy beats, looks for the others and renews its leases; shorter in
 	// tests. 0 is 10 s.
 	CopyBeat time.Duration
-	// The workspace providers' home (#691): their connections' files, and their secrets
+	// The machine providers' home (#691): their connections' files, and their secrets
 	// when there is no SecretKeeper; with one, the secrets are sealed in the store (#2138).
 	// "" for none, and no providers.
 	ProviderHome string
@@ -166,7 +166,7 @@ type Service struct {
 	// The reverse tunnels this copy holds for servers behind a bastion (#435): a single
 	// copy's, whose ssh is the person's on this machine.
 	tunnels *hosttunnels.Tunnels
-	// Workspace providers (#691): only on a single copy with a home for their secrets.
+	// Machine providers (#691): only on a single copy with a home for their secrets.
 	providers *providers.Providers
 	// The other copies over this store, and the leases (US3); nil for a single copy.
 	mesh *mesh

@@ -36,7 +36,7 @@ struct AddMachineSheet: View {
             choose
         case .provider(let id):
             if let provider = control.providers.first(where: { $0.id == id }) {
-                NewWorkspaceSheet(control: control, provider: provider) { prefill in step = .server(prefill) }
+                NewMachineSheet(control: control, provider: provider) { prefill in step = .server(prefill) }
             } else {
                 choose
             }
@@ -76,7 +76,7 @@ struct AddMachineSheet: View {
         }
         .padding(28)
         .frame(width: 560)
-        .task { await control.listWorkspacesAgain() }
+        .task { await control.listMachinesAgain() }
     }
 
     private func wayRow(_ each: AddMachine.Way) -> some View {

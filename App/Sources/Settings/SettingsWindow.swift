@@ -246,14 +246,14 @@ enum SettingsPane: String, Hashable, CaseIterable {
     case runtimes, spending, resources
     /// The control plane's Overview.
     case controlPlane
-    /// The control plane's workspace providers (#691) and its clients, pages of Control plane
+    /// The control plane's machine providers (#691) and its clients, pages of Control plane
     /// before #1759.
     case providers, clients
     /// Who uses the control plane, and the machines and clients that belong to them (#994).
     case people
     /// The bots that run the team's workflows (#1761), apart from the people (#2132).
     case bots
-    /// Groups own workspace providers (#1761).
+    /// Groups own machine providers (#1761).
     case groups
     /// Channel identities linked to people (#1762).
     case channels
@@ -300,7 +300,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .spending: "Cost"
         case .resources: "Resources"
         case .controlPlane: "Overview"
-        case .providers: "Workspace Providers"
+        case .providers: "Machine Providers"
         case .clients: "Clients"
         case .people: "People"
         case .bots: BotWords.title

@@ -723,7 +723,7 @@ of the same version:
 
 | Path | What it is |
 | --- | --- |
-| `/agents-control`, `/workspace-commands`, `/agents-hosted` | The control plane, the command workspace provider, and the hosted service |
+| `/agents-control`, `/workspace-commands`, `/agents-hosted` | The control plane, the command machine provider, and the hosted service |
 | `/web` | The web page |
 | `/servers` | The Linux host and the MCP servers beside it, for x86-64 and ARM64 servers |
 | `/toolsets` | The runtimes' toolsets, which a server that joins installs |

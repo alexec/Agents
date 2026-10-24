@@ -12,7 +12,7 @@ import Network
 final class ControlSettingsModel {
     private(set) var status: DaemonAPI.ControlStatus?
     private(set) var hosts: [DaemonAPI.ControlHost] = []
-    /// Workspace providers (#691), as the control plane last listed them.
+    /// Machine providers (#691), as the control plane last listed them.
     private(set) var providers: [DaemonAPI.ProviderSummary] = []
     /// False on a control plane that can't run providers (several copies, research R4).
     private(set) var providersHere = true
@@ -154,7 +154,7 @@ final class ControlSettingsModel {
         }
     }
 
-    // MARK: Workspace providers (#691)
+    // MARK: Machine providers (#691)
 
     private func refreshProviderList() async {
         do {
@@ -169,7 +169,7 @@ final class ControlSettingsModel {
     }
 
     /// Ask every provider for its workspaces now (FR-004: when a page that shows them opens).
-    func listWorkspacesAgain(_ provider: ProviderID? = nil) async {
+    func listMachinesAgain(_ provider: ProviderID? = nil) async {
         _ = try? await client.call(DaemonAPI.Method.providersRefresh, DaemonAPI.ProviderRequest(id: provider))
     }
 
@@ -253,8 +253,8 @@ final class ControlSettingsModel {
     /// `stopWhenIdleMinutes` 0 turns idle stopping off.
     func setWorkspaceOptions(_ host: HostID, startWhenUsed: Bool? = nil, stopWhenIdleMinutes: Int? = nil,
                              startForSchedules: Bool? = nil) async {
-        await perform(DaemonAPI.Method.hostsSetWorkspaceOptions,
-                      DaemonAPI.HostWorkspaceOptions(host: host, startWhenUsed: startWhenUsed,
+        await perform(DaemonAPI.Method.hostsSetMachineOptions,
+                      DaemonAPI.HostMachineOptions(host: host, startWhenUsed: startWhenUsed,
                                                      stopWhenIdleMinutes: stopWhenIdleMinutes,
                                                      startForSchedules: startForSchedules))
     }
@@ -288,7 +288,7 @@ final class ControlSettingsModel {
     /// as Joining… until their host joins and is linked.
     private(set) var joiningWorkspaces: Set<String> = []
 
-    /// The New Workspace form's schema, or why it couldn't be read.
+    /// The New Machine form's schema, or why it couldn't be read.
     func workspaceOptions(_ provider: ProviderID) async -> Result<JSONValue, WorkspaceRefusal> {
         do {
             let options = try await client.call(DaemonAPI.Method.providersOptions, DaemonAPI.ProviderRequest(id: provider),
@@ -302,7 +302,7 @@ final class ControlSettingsModel {
     }
 
     /// Makes a workspace: what was made, or why not in the provider's words.
-    func makeWorkspace(_ provider: ProviderID, name: String, options: JSONValue,
+    func makeMachine(_ provider: ProviderID, name: String, options: JSONValue,
                        clones: [String] = []) async -> Result<DaemonAPI.ProviderCreated, WorkspaceRefusal> {
         do {
             let made = try await client.call(DaemonAPI.Method.providersCreate,
@@ -327,13 +327,13 @@ final class ControlSettingsModel {
         (error as? JSONRPCError).map(HostProblem.controlRefusal) ?? "The control plane can’t be reached."
     }
 
-    func isJoining(_ provider: ProviderID, _ workspace: DaemonAPI.WorkspaceInfo) -> Bool {
+    func isJoining(_ provider: ProviderID, _ workspace: DaemonAPI.MachineInfo) -> Bool {
         workspace.host == nil && joiningWorkspaces.contains("\(provider.rawValue)/\(workspace.id)")
     }
 
-    /// Delete Workspace…: the provider deletes it, then the host goes as Remove does.
-    func deleteWorkspace(_ host: HostID) async {
-        await perform(DaemonAPI.Method.hostsDeleteWorkspace, DaemonAPI.HostRequest(host: host))
+    /// Delete Machine…: the provider deletes it, then the host goes as Remove does.
+    func deleteMachine(_ host: HostID) async {
+        await perform(DaemonAPI.Method.hostsDeleteMachine, DaemonAPI.HostRequest(host: host))
     }
 
     /// Whether the provider a host's workspace is at can delete it.
@@ -359,13 +359,13 @@ final class ControlSettingsModel {
 
     /// The unlinked hosts that may already be `workspace`, added by hand under its ssh alias
     /// (#976): Add as Host… offers to link one instead.
-    func hostsThatMayBe(_ workspace: DaemonAPI.WorkspaceInfo) -> [DaemonAPI.ControlHost] {
+    func hostsThatMayBe(_ workspace: DaemonAPI.MachineInfo) -> [DaemonAPI.ControlHost] {
         guard workspace.host == nil else { return [] }
         return hosts.filter { $0.workspace == nil && $0.runsAgents && workspace.mayBe(hostNamed: $0.name) }
     }
 
-    /// The workspaces no host is linked to yet, by provider, for Link to Workspace….
-    var linkableWorkspaces: [(provider: DaemonAPI.ProviderSummary, workspaces: [DaemonAPI.WorkspaceInfo])] {
+    /// The workspaces no host is linked to yet, by provider, for Link to Machine….
+    var linkableWorkspaces: [(provider: DaemonAPI.ProviderSummary, workspaces: [DaemonAPI.MachineInfo])] {
         providers.map { ($0, $0.workspaces) }.filter { !$0.1.isEmpty }
     }
 

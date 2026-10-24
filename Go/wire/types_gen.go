@@ -319,6 +319,39 @@ const AgentGroupFinished AgentGroup = "finished"
 const AgentGroupStopped AgentGroup = "stopped"
 const AgentGroupArchived AgentGroup = "archived"
 
+// machines/forAgent: what list_machines shows an agent.
+type AgentMachines struct {
+	Providers []AgentMachinesProvider `json:"providers"`
+}
+
+type AgentMachinesMachine struct {
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	State string `json:"state"`
+
+	Host *string `json:"host,omitzero"`
+
+	HostState *string `json:"hostState,omitzero"`
+
+	Cost *string `json:"cost,omitzero"`
+}
+
+type AgentMachinesProvider struct {
+	ID ProviderID `json:"id"`
+
+	Name string `json:"name"`
+
+	CanMake bool `json:"canMake"`
+
+	CanDelete bool `json:"canDelete"`
+
+	Options JSONValue `json:"options,omitzero"`
+
+	Workspaces []AgentMachinesMachine `json:"workspaces"`
+}
+
 type AgentPurpose struct {
 	ProviderDraft *AgentPurposeProviderDraft `json:"providerDraft,omitzero"`
 }
@@ -373,39 +406,6 @@ type AgentStopRequest struct {
 	AgentID UUID `json:"agentID"`
 
 	ByAdmin *bool `json:"byAdmin,omitzero"`
-}
-
-// workspaces/forAgent: what list_workspaces shows an agent.
-type AgentWorkspaces struct {
-	Providers []AgentWorkspacesProvider `json:"providers"`
-}
-
-type AgentWorkspacesProvider struct {
-	ID ProviderID `json:"id"`
-
-	Name string `json:"name"`
-
-	CanMake bool `json:"canMake"`
-
-	CanDelete bool `json:"canDelete"`
-
-	Options JSONValue `json:"options,omitzero"`
-
-	Workspaces []AgentWorkspacesWorkspace `json:"workspaces"`
-}
-
-type AgentWorkspacesWorkspace struct {
-	ID string `json:"id"`
-
-	Name string `json:"name"`
-
-	State string `json:"state"`
-
-	Host *string `json:"host,omitzero"`
-
-	HostState *string `json:"hostState,omitzero"`
-
-	Cost *string `json:"cost,omitzero"`
 }
 
 type AgentWorktree struct {
@@ -2497,7 +2497,7 @@ type ControlHost struct {
 
 	Tunnel *HostTunnel `json:"tunnel,omitzero"`
 
-	Workspace *HostWorkspace `json:"workspace,omitzero"`
+	Workspace *HostMachine `json:"workspace,omitzero"`
 
 	Implementation *string `json:"implementation,omitzero"`
 
@@ -2992,7 +2992,7 @@ const DomainClaimStateProved DomainClaimState = "proved"
 type DraftCheck struct {
 	Passed bool `json:"passed"`
 
-	Workspaces []WorkspaceInfo `json:"workspaces,omitzero"`
+	Workspaces []MachineInfo `json:"workspaces,omitzero"`
 
 	Problem *string `json:"problem,omitzero"`
 
@@ -3714,7 +3714,7 @@ type GitViewShared struct {
 	Since string `json:"since"`
 }
 
-// A group (#1761, spec 736 FR-027): everyone, or named users. It owns workspace providers: only its users see them and start machines from them (FR-028).
+// A group (#1761, spec 736 FR-027): everyone, or named users. It owns machine providers: only its users see them and start machines from them (FR-028).
 type Group struct {
 	ID string `json:"id"`
 
@@ -3738,7 +3738,7 @@ type GroupList struct {
 	Groups []Group `json:"groups"`
 }
 
-// groups/remove (#1761): the group. Refused while a workspace provider or a bot has it.
+// groups/remove (#1761): the group. Refused while a machine provider or a bot has it.
 type GroupRequest struct {
 	ID string `json:"id"`
 }
@@ -4036,6 +4036,70 @@ type HostLink struct {
 	StopWhenIdleMinutes *int64 `json:"stopWhenIdleMinutes,omitzero"`
 }
 
+type HostMachine struct {
+	Provider ProviderID `json:"provider"`
+
+	ProviderName string `json:"providerName"`
+
+	Workspace string `json:"workspace"`
+
+	WorkspaceName string `json:"workspaceName"`
+
+	WorkspaceState string `json:"workspaceState"`
+
+	HostState *string `json:"hostState,omitzero"`
+
+	Phase *string `json:"phase,omitzero"`
+
+	Since *Date `json:"since,omitzero"`
+
+	Problem *string `json:"problem,omitzero"`
+
+	StoppedBy *string `json:"stoppedBy,omitzero"`
+
+	CanStart bool `json:"canStart"`
+
+	CanStop bool `json:"canStop"`
+
+	StartWhenUsed bool `json:"startWhenUsed"`
+
+	StopWhenIdleMinutes *int64 `json:"stopWhenIdleMinutes,omitzero"`
+
+	Cost *string `json:"cost,omitzero"`
+
+	Current bool `json:"current"`
+
+	StartForSchedules *bool `json:"startForSchedules,omitzero"`
+
+	TellsSchedule *bool `json:"tellsSchedule,omitzero"`
+
+	NextWorkflow *string `json:"nextWorkflow,omitzero"`
+
+	NextWorkflowAt *Date `json:"nextWorkflowAt,omitzero"`
+
+	WakeAt *Date `json:"wakeAt,omitzero"`
+}
+
+// host/machines, for an agent there: who asked, for the log, and its call.
+type HostMachineCall struct {
+	Agent string `json:"agent"`
+
+	Method string `json:"method"`
+
+	Params JSONValue `json:"params"`
+}
+
+// hosts/setMachineOptions. stopWhenIdleMinutes 0 turns it off.
+type HostMachineOptions struct {
+	Host HostID `json:"host"`
+
+	StartWhenUsed *bool `json:"startWhenUsed,omitzero"`
+
+	StopWhenIdleMinutes *int64 `json:"stopWhenIdleMinutes,omitzero"`
+
+	StartForSchedules *bool `json:"startForSchedules,omitzero"`
+}
+
 // host/policy (#998, FR-006): to a machine that says host.policy/1, on its channel 0, at each join and within 5 seconds of each change. A signed policy, or none when no policy was ever set.
 type HostPolicy struct {
 	Policy *OrgPolicy `json:"policy,omitzero"`
@@ -4144,70 +4208,6 @@ type HostUserSettings struct {
 	Settings UserSettings `json:"settings"`
 
 	Secrets []UserSecret `json:"secrets"`
-}
-
-type HostWorkspace struct {
-	Provider ProviderID `json:"provider"`
-
-	ProviderName string `json:"providerName"`
-
-	Workspace string `json:"workspace"`
-
-	WorkspaceName string `json:"workspaceName"`
-
-	WorkspaceState string `json:"workspaceState"`
-
-	HostState *string `json:"hostState,omitzero"`
-
-	Phase *string `json:"phase,omitzero"`
-
-	Since *Date `json:"since,omitzero"`
-
-	Problem *string `json:"problem,omitzero"`
-
-	StoppedBy *string `json:"stoppedBy,omitzero"`
-
-	CanStart bool `json:"canStart"`
-
-	CanStop bool `json:"canStop"`
-
-	StartWhenUsed bool `json:"startWhenUsed"`
-
-	StopWhenIdleMinutes *int64 `json:"stopWhenIdleMinutes,omitzero"`
-
-	Cost *string `json:"cost,omitzero"`
-
-	Current bool `json:"current"`
-
-	StartForSchedules *bool `json:"startForSchedules,omitzero"`
-
-	TellsSchedule *bool `json:"tellsSchedule,omitzero"`
-
-	NextWorkflow *string `json:"nextWorkflow,omitzero"`
-
-	NextWorkflowAt *Date `json:"nextWorkflowAt,omitzero"`
-
-	WakeAt *Date `json:"wakeAt,omitzero"`
-}
-
-// host/workspaces, for an agent there: who asked, for the log, and its call.
-type HostWorkspaceCall struct {
-	Agent string `json:"agent"`
-
-	Method string `json:"method"`
-
-	Params JSONValue `json:"params"`
-}
-
-// hosts/setWorkspaceOptions. stopWhenIdleMinutes 0 turns it off.
-type HostWorkspaceOptions struct {
-	Host HostID `json:"host"`
-
-	StartWhenUsed *bool `json:"startWhenUsed,omitzero"`
-
-	StopWhenIdleMinutes *int64 `json:"stopWhenIdleMinutes,omitzero"`
-
-	StartForSchedules *bool `json:"startForSchedules,omitzero"`
 }
 
 type HostedMCPSnapshot struct {
@@ -5098,6 +5098,26 @@ type MacPathRequest struct {
 // mac/terminal: Terminal, in path if given.
 type MacTerminalRequest struct {
 	Path *string `json:"path,omitzero"`
+}
+
+// One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or unknown.
+type MachineInfo struct {
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	State string `json:"state"`
+
+	SSH *string `json:"ssh,omitzero"`
+
+	Tunnel *bool `json:"tunnel,omitzero"`
+
+	// Its ssh host key is made again at each start, as a Google Cloud workstation's is (#1701): after a Start the control plane made, the first ssh takes the key it is offered and pins it again.
+	HostKeyRenews *bool `json:"hostKeyRenews,omitzero"`
+
+	Cost *string `json:"cost,omitzero"`
+
+	Host *HostID `json:"host,omitzero"`
 }
 
 type ManagedMCPServer struct {
@@ -6598,13 +6618,13 @@ type ProviderCreate struct {
 
 	Clones []string `json:"clones,omitzero"`
 
-	// The repository to start it from (#1809), an https git address. A provider whose New Workspace form has `repository`, such as Codespaces, makes the workspace from it; any other has the host clone it once it joins, before `clones`.
+	// The repository to start it from (#1809), an https git address. A provider whose New Machine form has `repository`, such as Codespaces, makes the workspace from it; any other has the host clone it once it joins, before `clones`.
 	Repository *string `json:"repository,omitzero"`
 }
 
 // What providers/create made.
 type ProviderCreated struct {
-	Workspace WorkspaceInfo `json:"workspace"`
+	Workspace MachineInfo `json:"workspace"`
 
 	Joining bool `json:"joining"`
 }
@@ -6684,7 +6704,7 @@ type ProviderList struct {
 	Providers []ProviderSummary `json:"providers"`
 }
 
-// providers/options: the New Workspace form, a JSON Schema.
+// providers/options: the New Machine form, a JSON Schema.
 type ProviderOptions struct {
 	Schema JSONValue `json:"schema"`
 }
@@ -6729,7 +6749,7 @@ type ProviderSummary struct {
 
 	Preset *string `json:"preset,omitzero"`
 
-	Workspaces []WorkspaceInfo `json:"workspaces"`
+	Workspaces []MachineInfo `json:"workspaces"`
 
 	ListedAt *Date `json:"listedAt,omitzero"`
 
@@ -10272,26 +10292,6 @@ type WorkflowsListRequest struct {
 	Folder *URL `json:"folder,omitzero"`
 
 	Scope *string `json:"scope,omitzero"`
-}
-
-// One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or unknown.
-type WorkspaceInfo struct {
-	ID string `json:"id"`
-
-	Name string `json:"name"`
-
-	State string `json:"state"`
-
-	SSH *string `json:"ssh,omitzero"`
-
-	Tunnel *bool `json:"tunnel,omitzero"`
-
-	// Its ssh host key is made again at each start, as a Google Cloud workstation's is (#1701): after a Start the control plane made, the first ssh takes the key it is offered and pins it again.
-	HostKeyRenews *bool `json:"hostKeyRenews,omitzero"`
-
-	Cost *string `json:"cost,omitzero"`
-
-	Host *HostID `json:"host,omitzero"`
 }
 
 type WorktreeChoice struct {

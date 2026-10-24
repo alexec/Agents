@@ -608,7 +608,7 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "The machines this control plane's hosts run on, from every workspace provider:             each workspace's state, the host it is linked to and that host's state, and, for             a provider that can make workspaces, the choices a new one takes.",
+    "description": "The machines this control plane's hosts run on, from every machine provider:             each machine's state, the host it is linked to and that host's state, and, for             a provider that can make machines, the choices a new one takes.",
     "inputSchema": {
       "properties": {
         "description": {
@@ -618,11 +618,11 @@
       },
       "type": "object"
     },
-    "name": "list_workspaces",
+    "name": "list_machines",
     "title": "List workspaces"
   },
   {
-    "description": "Start the workspace a stopped host runs on. It answers at once; the host is up             when it connects, which you can wait for with wait_for_event on server.online.             Then you can start a session in a project there.",
+    "description": "Start the machine a stopped host runs on. It answers at once; the host is up             when it connects, which you can wait for with wait_for_event on server.online.             Then you can start a session in a project there.",
     "inputSchema": {
       "properties": {
         "description": {
@@ -630,7 +630,7 @@
           "type": "string"
         },
         "host": {
-          "description": "The host, by its name as list_workspaces gives it.",
+          "description": "The host, by its name as list_machines gives it.",
           "type": "string"
         }
       },
@@ -639,11 +639,11 @@
       ],
       "type": "object"
     },
-    "name": "start_workspace",
+    "name": "start_machine",
     "title": "Start a workspace"
   },
   {
-    "description": "Stop the workspace a host runs on. Every agent there stops with it. While agents             are working there it is refused, naming them, unless confirm_running is true.",
+    "description": "Stop the machine a host runs on. Every agent there stops with it. While agents             are working there it is refused, naming them, unless confirm_running is true.",
     "inputSchema": {
       "properties": {
         "confirm_running": {
@@ -655,7 +655,7 @@
           "type": "string"
         },
         "host": {
-          "description": "The host, by its name as list_workspaces gives it.",
+          "description": "The host, by its name as list_machines gives it.",
           "type": "string"
         }
       },
@@ -664,11 +664,11 @@
       ],
       "type": "object"
     },
-    "name": "stop_workspace",
+    "name": "stop_machine",
     "title": "Stop a workspace"
   },
   {
-    "description": "Make a new workspace at a provider that can (see list_workspaces), which joins as             a host of the same name. The person is asked first, on the question card, and             nothing is made without their yes. It may cost money while it runs.",
+    "description": "Make a new machine at a provider that can (see list_machines), which joins as             a host of the same name. The person is asked first, on the question card, and             nothing is made without their yes. It may cost money while it runs.",
     "inputSchema": {
       "properties": {
         "description": {
@@ -676,15 +676,15 @@
           "type": "string"
         },
         "name": {
-          "description": "The new workspace's and host's name: letters, digits and dashes.",
+          "description": "The new machine's and host's name: letters, digits and dashes.",
           "type": "string"
         },
         "options": {
-          "description": "Its choices, as the provider's options in list_workspaces describe them.",
+          "description": "Its choices, as the provider's options in list_machines describe them.",
           "type": "object"
         },
         "provider": {
-          "description": "The provider, by its name or id from list_workspaces.",
+          "description": "The provider, by its name or id from list_machines.",
           "type": "string"
         }
       },
@@ -694,14 +694,14 @@
       ],
       "type": "object"
     },
-    "name": "make_workspace",
+    "name": "make_machine",
     "title": "Make a workspace"
   },
   {
     "annotations": {
       "destructiveHint": true
     },
-    "description": "Delete the workspace a host runs on, with everything on its disk, and remove the             host and its agents. The person is asked first, on the question card, and nothing             is deleted without their yes.",
+    "description": "Delete the machine a host runs on, with everything on its disk, and remove the             host and its agents. The person is asked first, on the question card, and nothing             is deleted without their yes.",
     "inputSchema": {
       "properties": {
         "description": {
@@ -709,7 +709,7 @@
           "type": "string"
         },
         "host": {
-          "description": "The host, by its name as list_workspaces gives it.",
+          "description": "The host, by its name as list_machines gives it.",
           "type": "string"
         }
       },
@@ -718,7 +718,7 @@
       ],
       "type": "object"
     },
-    "name": "delete_workspace",
+    "name": "delete_machine",
     "title": "Delete a workspace"
   },
   {

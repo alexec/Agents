@@ -96,7 +96,7 @@ func TestACloudMachineStarted(t *testing.T) {
 	defer d.Shutdown()
 	listed := `{"providers":[{"id":"p","name":"DigitalOcean","canMake":false,"canDelete":false,"workspaces":[{"name":"box","state":"stopped"}]}]}`
 	d.SetControlAsk(func(_ context.Context, method string, params any) (json.RawMessage, error) {
-		call := params.(wire.HostWorkspaceCall)
+		call := params.(wire.HostMachineCall)
 		if call.Method == hostsStart {
 			return json.RawMessage(`{"state":"starting"}`), nil
 		}
@@ -117,11 +117,11 @@ func TestACloudMachineStarted(t *testing.T) {
 	d2.SetControlAsk(func(context.Context, string, any) (json.RawMessage, error) {
 		return json.RawMessage(`{"state":"starting"}`), nil
 	})
-	if _, err := d2.startWorkspace("", map[string]json.RawMessage{"host": json.RawMessage(`"box"`)}); err != nil {
+	if _, err := d2.startMachine("", map[string]json.RawMessage{"host": json.RawMessage(`"box"`)}); err != nil {
 		t.Fatal(err)
 	}
 	if !earned(d2, firstCloudHost) {
-		t.Fatal("start_workspace did not earn it")
+		t.Fatal("start_machine did not earn it")
 	}
 }
 

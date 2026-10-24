@@ -12,7 +12,7 @@ import (
 )
 
 // Groups (#1761, spec 736 FR-027, FR-028): an admin makes groups of everyone or named
-// users, and gives each workspace provider to one. Only a provider's group's users see it
+// users, and gives each machine provider to one. Only a provider's group's users see it
 // and start machines from it; a provider with no group is the admins' alone.
 
 // inGroup says a user is in a group: everyone, or named.
@@ -106,7 +106,7 @@ func (m *Methods) groupsMethod(ctx context.Context, method string, params json.R
 			return nil, err
 		}
 		if m.s.providers == nil {
-			return nil, fail(providersNeedOneCopy, "Workspace providers need a control plane with one copy, for now.")
+			return nil, fail(providersNeedOneCopy, "Machine providers need a control plane with one copy, for now.")
 		}
 		if g := deref(request.Group); g != "" && m.records.Group(g) == nil {
 			return nil, fail(invalidParams, "There is no such group.")

@@ -4,7 +4,7 @@ import SwiftUI
 /// New Machine… (#691 US5, layouts.md L9): a form drawn from the provider's
 /// `workspace_options`, then a confirmation that says what is made and, where the provider
 /// says, what it costs. Nothing is made until that is confirmed (US5 AS3).
-struct NewWorkspaceSheet: View {
+struct NewMachineSheet: View {
     @Environment(\.dismiss) private var dismiss
     let control: ControlSettingsModel
     let provider: DaemonAPI.ProviderSummary
@@ -151,7 +151,7 @@ struct NewWorkspaceSheet: View {
         problem = nil
         Task {
             let urls = clones.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-            let result = await control.makeWorkspace(provider.id, name: trimmedName, options: .object(chosen), clones: urls)
+            let result = await control.makeMachine(provider.id, name: trimmedName, options: .object(chosen), clones: urls)
             working = false
             switch result {
             case .success(let made):

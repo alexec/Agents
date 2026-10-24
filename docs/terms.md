@@ -24,7 +24,7 @@ YouTube. If you use them, you agree to these terms.
 
 ## Other services
 
-The runtimes, integrations and workspace providers that you use with Agents are other
+The runtimes, integrations and machine providers that you use with Agents are other
 companies' services. Their own terms apply, and you need your own account with each one.
 Agents does not change those terms and is not responsible for those services.
 

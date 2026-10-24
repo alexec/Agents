@@ -7,7 +7,7 @@ import SwiftUI
 enum NewProject: Identifiable, Hashable {
     case folder(HostID)
     case clone(HostID)
-    /// A machine of its own for a repository, made by a workspace provider (#1809).
+    /// A machine of its own for a repository, made by a machine provider (#1809).
     case machine
 
     var id: Self { self }

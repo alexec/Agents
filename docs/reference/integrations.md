@@ -99,9 +99,9 @@ Open issues: `is:open label:integration install`.
 | OpenCode from GitHub releases | Mac, server | built | — | `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/ArchiveToolset.swift` | |
 | Grok, Copilot and Cursor install scripts | Mac, server | built | — | `App/Sources/AppModel+GetStarted.swift`, `Go/internal/agentsd/install.go` | |
 
-## Workspace providers
+## Machine providers
 
-The machines hosts run on. The contract is in [Workspace providers](workspace-providers.md).
+The machines hosts run on. The contract is in [Machine providers](machine-providers.md).
 The presets are in `Go/internal/workspacecommands/presets.go` (Swift until #1364).
 Open issues: `is:open label:integration workspace`.
 

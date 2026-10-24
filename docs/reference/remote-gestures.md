@@ -55,7 +55,7 @@ A tap on a project's heading, or on its **Workflows** row, folds or unfolds it.
 
 Pull down on these lists to ask the control plane again: the sidebar (archived projects
 too), a workflow's page, **Runtimes**, the cost and token pages, worktrees, events,
-connectors, reports, **People** and the workspace providers. The app also catches up by
+connectors, reports, **People** and the machine providers. The app also catches up by
 itself when it connects and each time you go back to it, so a pull is for when you think
 it has missed something.
 
