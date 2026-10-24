@@ -380,7 +380,7 @@ jobs:
         run: |
           source scripts/ci-clean-retry.sh
           clean_retry "$RESTORED" Packages/AgentsKit/.build -- \
-            swift build --build-tests --package-path Packages/AgentsKit
+            swift build --build-tests --enable-code-coverage --package-path Packages/AgentsKit
 
       - name: Record the AgentsKit sources this build was made from
         if: ${{ always() && steps.agentskit-cache.outputs.cache-hit != 'true' && steps.build-agentskit.outcome == 'success' }}
@@ -416,7 +416,7 @@ jobs:
         run: |
           source scripts/ci-clean-retry.sh
           clean_retry "$RESTORED" Packages/CodeText/.build -- \
-            swift build --build-tests --package-path Packages/CodeText
+            swift build --build-tests --enable-code-coverage --package-path Packages/CodeText
 
       - name: Save SwiftPM build cache
         # Never on a failure, for the reason above.
@@ -439,10 +439,45 @@ jobs:
           TEST_MODE: ${{ steps.test-selection.outputs.codetext }}
         run: |
           if [ "$TEST_MODE" = filter ]; then
-            swift test --skip-build --package-path Packages/CodeText --filter "$TEST_FILTER"
+            swift test --skip-build --enable-code-coverage --package-path Packages/CodeText --filter "$TEST_FILTER"
           else
-            swift test --skip-build --package-path Packages/CodeText
+            swift test --skip-build --enable-code-coverage --package-path Packages/CodeText
           fi
+
+      # SwiftPM writes profiles for the tests above. Keep coverage out of the gate: this
+      # report describes the tests selected for this run, which can be a filtered suite.
+      - name: Report Swift package coverage
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          for package in AgentsKit CodeText; do
+            package_path="Packages/$package"
+            profile=""
+            binary=""
+            if [[ -d "$package_path/.build" ]]; then
+              profile=$(find "$package_path/.build" -path '*/codecov/default.profdata' -type f -print -quit)
+              binary=$(find "$package_path/.build" -path "*/debug/$package*Tests.xctest/Contents/MacOS/*Tests" -type f -print -quit)
+            fi
+            if [[ -f "$profile" && -n "$binary" ]]; then
+              echo "### $package coverage" >> "$GITHUB_STEP_SUMMARY"
+              if ! xcrun llvm-cov report -instr-profile="$profile" "$binary" | tee -a "$GITHUB_STEP_SUMMARY"; then
+                echo "::warning::Could not report coverage for $package."
+              fi
+            else
+              echo "Coverage profile not available for $package (tests may have been skipped or failed before producing one)." >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+
+      - name: Upload Swift coverage profiles
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v5
+        with:
+          name: swift-coverage
+          path: Packages/*/.build/**/codecov/default.profdata
+          if-no-files-found: ignore
+          retention-days: 14
 
       # A job that reaches its timeout-minutes ends Cancelled, not Failed (#897): no
       # checks.failed, no red mark, and a pull request with auto-merge on waits for a
@@ -482,10 +517,10 @@ jobs:
           # minutes. Capped at 3 locally it takes the same two minutes on a tenth of the CPU.
           run_agentskit_tests() {
             if [ "$TEST_MODE" = filter ]; then
-              swift test --skip-build --package-path Packages/AgentsKit \
+              swift test --skip-build --enable-code-coverage --package-path Packages/AgentsKit \
                 --experimental-maximum-parallelization-width 3 --filter "$TEST_FILTER"
             else
-              swift test --skip-build --package-path Packages/AgentsKit \
+              swift test --skip-build --enable-code-coverage --package-path Packages/AgentsKit \
                 --experimental-maximum-parallelization-width 3
             fi
           }
@@ -504,7 +539,7 @@ jobs:
             echo "::warning::AgentsKit tests failed on a restored build cache. Rebuilding and rerunning once from clean."
           fi
           rm -rf Packages/AgentsKit/.build
-          swift build --build-tests --package-path Packages/AgentsKit
+          swift build --build-tests --enable-code-coverage --package-path Packages/AgentsKit
           run_agentskit_tests
 
   # The check main requires. It used to be the whole macOS job; now it reads the two that
@@ -574,7 +609,35 @@ jobs:
       - name: Vet
         run: go vet ./...
       - name: Test
-        run: go test -race ./...
+        run: go test -race -coverprofile=coverage.out ./... | tee "$RUNNER_TEMP/go-coverage-tests.txt"
+      - name: Report Go coverage
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          {
+            echo '### Go coverage by package'
+            echo '| Package | Coverage |'
+            echo '|---|---:|'
+            awk '/coverage:/ { print "| " $2 " | " $(NF - 2) " |" }' \
+              "$RUNNER_TEMP/go-coverage-tests.txt"
+            if [[ -f coverage.out ]]; then
+              echo
+              echo '### Go coverage total'
+              go tool cover -func=coverage.out | tail -n 1
+            else
+              echo 'Coverage profile not available (tests may have been skipped or failed before producing one).'
+            fi
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload Go coverage profile
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v5
+        with:
+          name: go-coverage
+          path: Go/coverage.out
+          if-no-files-found: ignore
+          retention-days: 14
       # A failed test still leaves good compiled packages; a cancelled run may not finish
       # writing, so it saves nothing. Each ref keeps only its newest, as the Xcode caches do.
       - name: Save Go build cache
@@ -651,7 +714,32 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run build
       - run: npm run check
-      - run: npm test
+      - name: Test with coverage
+        run: |
+          mkdir -p coverage/v8
+          NODE_V8_COVERAGE=coverage/v8 node --experimental-test-coverage \
+            --test test/*.test.mjs 2>&1 | tee "$RUNNER_TEMP/web-coverage.txt"
+      - name: Report web coverage
+        if: always()
+        continue-on-error: true
+        run: |
+          {
+            echo '### Web coverage'
+            if [[ -f "$RUNNER_TEMP/web-coverage.txt" ]]; then
+              sed -n '/^ℹ file /,$p' "$RUNNER_TEMP/web-coverage.txt" || cat "$RUNNER_TEMP/web-coverage.txt"
+            else
+              echo 'Coverage report not available (tests did not start).'
+            fi
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload web coverage profiles
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v5
+        with:
+          name: web-coverage
+          path: Web/coverage/v8/*.json
+          if-no-files-found: ignore
+          retention-days: 14
 
   # The linters (#1224), through scripts/lint.sh, on every change: shellcheck, zsh -n and our
   # own text checks are required (a finding fails the job); ruff, Biome, SwiftLint, jscpd,
