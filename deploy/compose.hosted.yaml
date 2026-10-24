@@ -58,6 +58,15 @@ services:
       # The web page each control plane serves, built into the image.
       AGENTS_HOSTED_WEB: /web
       AGENTS_HOSTED_VIEWS_DOMAIN: ${AGENTS_HOSTED_VIEWS_DOMAIN:-}
+      # Who may sign up, and the limits (#2152, docs/how-to/run-the-hosted-service.md).
+      AGENTS_HOSTED_SIGNUP: ${AGENTS_HOSTED_SIGNUP:-invite}
+      AGENTS_HOSTED_MAX_ACCOUNTS: ${AGENTS_HOSTED_MAX_ACCOUNTS:-}
+      AGENTS_HOSTED_MIN_GITHUB_AGE: ${AGENTS_HOSTED_MIN_GITHUB_AGE:-}
+      AGENTS_HOSTED_SIGNUPS_PER_ADDRESS: ${AGENTS_HOSTED_SIGNUPS_PER_ADDRESS:-}
+      AGENTS_HOSTED_SIGNUPS_PER_HOUR: ${AGENTS_HOSTED_SIGNUPS_PER_HOUR:-}
+      AGENTS_HOSTED_MAX_COPIES: ${AGENTS_HOSTED_MAX_COPIES:-}
+      AGENTS_HOSTED_CERTS_PER_HOUR: ${AGENTS_HOSTED_CERTS_PER_HOUR:-}
+      AGENTS_HOSTED_CERTS_PER_WEEK: ${AGENTS_HOSTED_CERTS_PER_WEEK:-}
       # Caddy's address below: only its X-Forwarded-For says where a request came from.
       AGENTS_CONTROL_TRUSTED_PROXIES: 172.30.62.250
     secrets: [gcp-service-account]

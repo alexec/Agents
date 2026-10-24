@@ -13,8 +13,10 @@ import (
 	"net/http/httptest"
 	"net/netip"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
@@ -23,23 +25,34 @@ import (
 
 const domain = "hosted.test"
 
-// fakeGitHub signs in user 42, ana, for the code "good", and nobody for any other.
+// fakeGitHub signs in user 42, ana, made in 2015, for the code "good"; user <id>, <login>,
+// made <days> days ago, for the code "u.<id>.<login>.<days>"; and nobody for any other.
 func fakeGitHub(t *testing.T) *httptest.Server {
 	g := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/login/oauth/access_token":
 			r.ParseForm()
-			if r.PostForm.Get("client_secret") != "secret" || r.PostForm.Get("code") != "good" {
+			code := r.PostForm.Get("code")
+			if r.PostForm.Get("client_secret") != "secret" || code != "good" && !strings.HasPrefix(code, "u.") {
 				json.NewEncoder(w).Encode(map[string]string{"error": "bad_verification_code", "error_description": "The code is wrong."})
 				return
 			}
-			json.NewEncoder(w).Encode(map[string]string{"access_token": "gho_token"})
+			json.NewEncoder(w).Encode(map[string]string{"access_token": "gho_" + code})
 		case "/user":
-			if r.Header.Get("Authorization") != "Bearer gho_token" {
+			token, _ := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer gho_")
+			if token == "good" {
+				json.NewEncoder(w).Encode(map[string]any{"id": 42, "login": "ana", "created_at": "2015-01-01T00:00:00Z"})
+				return
+			}
+			parts := strings.Split(token, ".")
+			if len(parts) != 4 || parts[0] != "u" {
 				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}
-			json.NewEncoder(w).Encode(map[string]any{"id": 42, "login": "ana"})
+			id, _ := strconv.Atoi(parts[1])
+			days, _ := strconv.Atoi(parts[3])
+			json.NewEncoder(w).Encode(map[string]any{"id": id, "login": parts[2],
+				"created_at": time.Now().Add(-time.Duration(days) * 24 * time.Hour).UTC().Format(time.RFC3339)})
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -51,6 +64,8 @@ func fakeGitHub(t *testing.T) *httptest.Server {
 type browser struct {
 	t      *testing.T
 	client *http.Client
+	// The body of the last answer.
+	last string
 }
 
 // start serves the hosted service over TLS, and a browser that reaches it at every name.
@@ -59,28 +74,40 @@ func start(t *testing.T, st store.Store) (*Service, *browser) {
 	return startBehind(t, st, nil)
 }
 
-// startBehind is start with trusted as the proxies in front.
+// startBehind is start with trusted as the proxies in front. Sign-up is open, so these
+// tests sign up with no invite; signup_test.go tests the rest.
 func startBehind(t *testing.T, st store.Store, trusted []netip.Prefix) (*Service, *browser) {
 	t.Helper()
+	s, newBrowser := startWith(t, Config{Store: st, TrustedProxies: trusted, SignUp: SignUpOpen})
+	return s, newBrowser()
+}
+
+// startWith serves the hosted service of cfg, with the fake GitHub and a test keeper, and
+// makes browsers that reach it at every name, each with cookies of its own.
+func startWith(t *testing.T, cfg Config) (*Service, func() *browser) {
+	t.Helper()
 	g := fakeGitHub(t)
-	keeper := "base64key://" + base64.URLEncoding.EncodeToString(bytes.Repeat([]byte{3}, 32))
-	s, err := New(context.Background(), Config{Store: st, Keeper: keeper, Domain: domain, GitHubClientID: "Iv1.test",
-		GitHubSecret: "secret", GitHubWeb: g.URL, GitHubAPI: g.URL, TrustedProxies: trusted, Log: func(line string) { t.Log(line) }})
+	cfg.Keeper = "base64key://" + base64.URLEncoding.EncodeToString(bytes.Repeat([]byte{3}, 32))
+	cfg.Domain, cfg.GitHubClientID, cfg.GitHubSecret, cfg.GitHubWeb, cfg.GitHubAPI = domain, "Iv1.test", "secret", g.URL, g.URL
+	cfg.Log = func(line string) { t.Log(line) }
+	s, err := New(context.Background(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(s.Stop)
 	server := httptest.NewTLSServer(s)
 	t.Cleanup(server.Close)
-	jar, _ := cookiejar.New(nil)
 	address := server.Listener.Addr().String()
-	transport := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return (&net.Dialer{}).DialContext(ctx, network, address)
-		}}
-	client := &http.Client{Jar: jar, Transport: transport,
-		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	return s, &browser{t: t, client: client}
+	return s, func() *browser {
+		jar, _ := cookiejar.New(nil)
+		transport := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return (&net.Dialer{}).DialContext(ctx, network, address)
+			}}
+		client := &http.Client{Jar: jar, Transport: transport,
+			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+		return &browser{t: t, client: client}
+	}
 }
 
 func (b *browser) get(u string) (*http.Response, string) {
@@ -91,6 +118,7 @@ func (b *browser) get(u string) (*http.Response, string) {
 	}
 	body, _ := io.ReadAll(res.Body)
 	res.Body.Close()
+	b.last = string(body)
 	return res, string(body)
 }
 
@@ -102,13 +130,24 @@ func (b *browser) post(u string, form url.Values) (*http.Response, string) {
 	}
 	body, _ := io.ReadAll(res.Body)
 	res.Body.Close()
+	b.last = string(body)
 	return res, string(body)
 }
 
 // signIn goes to GitHub and back with code, and says where the service sent the browser.
 func (b *browser) signIn(code string) *http.Response {
 	b.t.Helper()
-	res, _ := b.get("https://" + domain + "/signin")
+	return b.signInWith(code, "")
+}
+
+// signInWith is signIn from an invite link's code, when not "".
+func (b *browser) signInWith(code, invite string) *http.Response {
+	b.t.Helper()
+	from := "https://" + domain + "/signin"
+	if invite != "" {
+		from += "?invite=" + invite
+	}
+	res, _ := b.get(from)
 	to, err := url.Parse(res.Header.Get("Location"))
 	if err != nil || res.StatusCode != http.StatusSeeOther || to.Path != "/login/oauth/authorize" {
 		b.t.Fatalf("%d %s", res.StatusCode, res.Header.Get("Location"))

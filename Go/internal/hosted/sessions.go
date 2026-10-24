@@ -18,8 +18,10 @@ import (
 const (
 	sessionCookie = "agents_session"
 	stateCookie   = "agents_signin"
-	sessionLife   = 30 * 24 * time.Hour
-	stateLife     = 10 * time.Minute
+	// An invite link's code, signed, from /signin to the callback (#2152).
+	inviteCookie = "agents_invite"
+	sessionLife  = 30 * 24 * time.Hour
+	stateLife    = 10 * time.Minute
 )
 
 type sessions struct {

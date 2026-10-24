@@ -50,6 +50,15 @@ func (s *Service) copyFor(ctx context.Context, id string) (*copyRunning, error) 
 		}
 		wait, busy := s.starting[id]
 		if !busy {
+			// At the most copies (#2152 FR-007): the one idle longest makes room, or none.
+			if len(s.copies)+len(s.starting) >= s.cfg.MaxCopies {
+				room := s.makeRoomLocked()
+				s.mu.Unlock()
+				if !room {
+					return nil, errFull
+				}
+				continue
+			}
 			done := make(chan struct{})
 			s.starting[id] = done
 			s.mu.Unlock()
@@ -146,6 +155,38 @@ func (s *Service) clientOf(r *http.Request) string {
 	return addr.String()
 }
 
+// makeRoomLocked stops the copy with no request open that has been idle longest, under
+// s.mu, which it gives up and takes again while the copy stops. It says whether it found
+// one.
+func (s *Service) makeRoomLocked() bool {
+	var oldest string
+	for id, c := range s.copies {
+		if c.open == 0 && (oldest == "" || c.last.Before(s.copies[oldest].last)) {
+			oldest = id
+		}
+	}
+	if oldest == "" {
+		return false
+	}
+	c := s.copies[oldest]
+	delete(s.copies, oldest)
+	done := make(chan struct{})
+	s.starting[oldest] = done
+	s.mu.Unlock()
+	c.service.Stop()
+	s.log(oldest + ": stopped, to make room")
+	s.mu.Lock()
+	delete(s.starting, oldest)
+	close(done)
+	return true
+}
+
+// suspended is what a suspended account's address answers (#2152 FR-009).
+func (s *Service) suspended(w http.ResponseWriter) {
+	w.Header().Set("Agents-Refusal", "suspended")
+	plain(w, http.StatusForbidden, "This hosted account is suspended. See https://"+s.cfg.Domain+"/account.\n")
+}
+
 // toAccount passes a request to an account's control plane.
 func (s *Service) toAccount(w http.ResponseWriter, r *http.Request, id string) {
 	if c := s.inUse(id); c != nil {
@@ -163,9 +204,18 @@ func (s *Service) toAccount(w http.ResponseWriter, r *http.Request, id string) {
 		plain(w, http.StatusNotFound, "There is no control plane here.\n")
 		return
 	}
+	if acc.Suspended != nil {
+		s.suspended(w)
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	c, err := s.copyFor(ctx, id)
 	cancel()
+	if errors.Is(err, errFull) {
+		s.log(id + ": could not start: every copy is in use")
+		plain(w, http.StatusServiceUnavailable, "The service is full just now. Try again in a few minutes.\n")
+		return
+	}
 	if err != nil {
 		s.log(id + ": could not start: " + err.Error())
 		plain(w, http.StatusServiceUnavailable, "Your control plane could not start. Try again in a moment.\n")
@@ -265,6 +315,28 @@ func (s *Service) sweepIdle() {
 	}
 }
 
+// sweepSuspended stops the running copies whose accounts are suspended or gone. A request
+// to a running copy reads no account (P20261020-24), so the operator's command, in another
+// process, reaches a running copy here, within a minute.
+func (s *Service) sweepSuspended(ctx context.Context) {
+	s.mu.Lock()
+	ids := make([]string, 0, len(s.copies))
+	for id := range s.copies {
+		ids = append(ids, id)
+	}
+	s.mu.Unlock()
+	for _, id := range ids {
+		acc, err := s.accounts.get(ctx, id)
+		if err != nil {
+			continue
+		}
+		if acc == nil || acc.Suspended != nil {
+			s.stopCopy(id)
+			s.log(id + ": stopped, suspended")
+		}
+	}
+}
+
 // sweepIdleEvery sweeps idle copies until the service stops.
 func (s *Service) sweepIdleEvery(every time.Duration) {
 	t := time.NewTicker(every)
@@ -275,6 +347,9 @@ func (s *Service) sweepIdleEvery(every time.Duration) {
 			return
 		case <-t.C:
 			s.sweepIdle()
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			s.sweepSuspended(ctx)
+			cancel()
 		}
 	}
 }
