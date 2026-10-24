@@ -304,7 +304,7 @@ public extension DaemonAPI {
                 // A linked host's workspace (#691): Start on the offline strip.
                 Row(Method.hostsStart, params: HostRequest.self, result: ControlHost.self, kind: .controlRequest),
                 Row(Method.hostsStop, params: HostStop.self, result: ControlHost.self, kind: .controlRequest),
-                // Settings ▸ Workspace providers (#1808): the API providers, and a workspace's host
+                // Settings ▸ Machine providers (#1808): the API providers, and a workspace's host
                 // linked and unlinked.
                 Row(Method.providersList, params: Empty.self, result: JSONValue.self, kind: .controlRequest),
                 Row(Method.providersAdd, params: ProviderAdd.self, result: ProviderSummary.self, kind: .controlRequest),
@@ -313,7 +313,7 @@ public extension DaemonAPI {
                 Row(Method.providersRefresh, params: ProviderRequest.self, result: Empty.self, kind: .controlRequest),
                 Row(Method.hostsLink, params: HostLink.self, result: ControlHost.self, kind: .controlRequest),
                 Row(Method.hostsUnlink, params: HostRequest.self, result: ControlHost.self, kind: .controlRequest),
-                Row(Method.hostsSetWorkspaceOptions, params: HostWorkspaceOptions.self, result: ControlHost.self,
+                Row(Method.hostsSetMachineOptions, params: HostMachineOptions.self, result: ControlHost.self,
                     kind: .controlRequest),
                 // Start a Machine from a Repository (#1809): the provider's form, then the machine.
                 Row(Method.providersOptions, params: ProviderRequest.self, result: ProviderOptions.self, kind: .controlRequest),
@@ -404,7 +404,7 @@ public extension DaemonAPI {
                 Row(Method.peopleRemove, params: PersonRequest.self, result: Empty.self, kind: .controlRequest),
                 Row(Method.peopleRemovePreview, params: PersonRequest.self, result: PersonRemovePreview.self,
                     kind: .controlRequest),
-                // Groups own workspace providers (#1761): Settings ▸ Groups.
+                // Groups own machine providers (#1761): Settings ▸ Groups.
                 Row(Method.groupsList, params: Empty.self, result: GroupList.self, kind: .controlRequest),
                 Row(Method.groupsSet, params: GroupSet.self, result: Group.self, kind: .controlRequest),
                 Row(Method.groupsRemove, params: GroupRequest.self, result: Empty.self, kind: .controlRequest),

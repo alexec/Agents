@@ -13,7 +13,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Workspace providers (#691), as ControlService.takeUp wires them: on a single copy with
+// Machine providers (#691), as ControlService.takeUp wires them: on a single copy with
 // a home for their secrets, beside the tunnels. They keep prompts and starts for a
 // stopped workspace (US3), and an agent on this machine's own host writes a map for a new
 // one (Write It for Me, #858).
@@ -135,7 +135,7 @@ func (a providerRouter) HostState(host string) string {
 	return state
 }
 
-func (a providerRouter) SetWorkspace(host string, ws *providers.HostWorkspace) {
+func (a providerRouter) SetWorkspace(host string, ws *providers.HostMachine) {
 	a.r.SetWorkspace(host, ws)
 }
 

@@ -1,6 +1,6 @@
-AgentWorkspaces full
+AgentMachines full
 {"providers":[{"id":"ID","name":"NAME","canMake":true,"canDelete":true,"options":{"k":"v"},"workspaces":[{"id":"ID","name":"NAME","state":"STATE","host":"HOST","hostState":"HOSTSTATE","cost":"COST"}]}]}
-AgentWorkspaces zero
+AgentMachines zero
 {"providers":null}
 DraftUpdate full
 {"draft":"DRAFT","state":"STATE","runtimeName":"RUNTIMENAME","steps":[{"at":813922215.25,"kind":"KIND","text":"TEXT"}],"cost":"COST","draftJSON":{"k":"v"},"check":{"passed":true,"workspaces":[{"id":"ID","name":"NAME","state":"STATE","ssh":"SSH","tunnel":true,"cost":"COST","host":"HOST"}],"problem":"PROBLEM","ssh":"SSH","noSSH":true},"question":{"id":"ID","kind":"KIND","workspace":"WORKSPACE","cost":"COST","text":"TEXT","yes":"YES"},"note":"NOTE"}
@@ -30,17 +30,17 @@ HostStop full
 {"host":"HOST","confirmRunning":true}
 HostStop zero
 {"host":""}
-HostWorkspace full
+HostMachine full
 {"provider":"PROVIDER","providerName":"PROVIDERNAME","workspace":"WORKSPACE","workspaceName":"WORKSPACENAME","workspaceState":"WORKSPACESTATE","hostState":"HOSTSTATE","phase":"PHASE","since":813922215.25,"problem":"PROBLEM","stoppedBy":"STOPPEDBY","canStart":true,"canStop":true,"startWhenUsed":true,"stopWhenIdleMinutes":7,"cost":"COST","current":true,"startForSchedules":true,"tellsSchedule":true,"nextWorkflow":"NEXTWORKFLOW","nextWorkflowAt":813922215.25,"wakeAt":813922215.25}
-HostWorkspace zero
+HostMachine zero
 {"provider":"","providerName":"","workspace":"","workspaceName":"","workspaceState":"","canStart":false,"canStop":false,"startWhenUsed":false,"current":false}
-HostWorkspaceCall full
+HostMachineCall full
 {"agent":"AGENT","method":"METHOD","params":{"k":"v"}}
-HostWorkspaceCall zero
+HostMachineCall zero
 {"agent":"","method":"","params":null}
-HostWorkspaceOptions full
+HostMachineOptions full
 {"host":"HOST","startWhenUsed":true,"stopWhenIdleMinutes":7,"startForSchedules":true}
-HostWorkspaceOptions zero
+HostMachineOptions zero
 {"host":""}
 KeepRequest full
 {"host":"HOST","method":"METHOD","params":{"k":"v"}}
@@ -106,7 +106,7 @@ ProviderSummary full
 {"id":"ID","name":"NAME","kind":"KIND","secrets":{"KEY":true},"capabilities":["CAPABILITIES"],"contract":7,"mapped":true,"preset":"PRESET","workspaces":[{"id":"ID","name":"NAME","state":"STATE","ssh":"SSH","tunnel":true,"cost":"COST","host":"HOST"}],"listedAt":813922215.25,"current":true,"problem":"PROBLEM"}
 ProviderSummary zero
 {"id":"","name":"","kind":"","secrets":null,"capabilities":null,"contract":0,"mapped":false,"workspaces":null,"current":false}
-WorkspaceInfo full
+MachineInfo full
 {"id":"ID","name":"NAME","state":"STATE","ssh":"SSH","tunnel":true,"cost":"COST","host":"HOST"}
-WorkspaceInfo zero
+MachineInfo zero
 {"id":"","name":"","state":""}

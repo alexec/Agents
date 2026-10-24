@@ -49,7 +49,7 @@ export function makers(providers: readonly ProviderSummary[]): ProviderSummary[]
   return providers.filter((p) => p.capabilities.includes("create") && p.mayUse !== false);
 }
 
-/** One field of a provider's New Workspace form, a flat JSON Schema object's property. */
+/** One field of a provider's New Machine form, a flat JSON Schema object's property. */
 export interface FormField {
   key: string;
   title: string;
@@ -91,10 +91,10 @@ export const machineWords = {
   repositoryPrompt: "The repository’s https address",
   repositoryNote: (r: Repository | null, typed: boolean) => r ? `The machine clones ${r.path} and adds it as a project.`
     : typed ? "Give an https address of a repository, such as on GitHub or GitLab." : "The repository to work in.",
-  noMakers: "No provider here can make a machine. Add DigitalOcean, Compute Engine or Codespaces in Settings ▸ Workspace providers.",
+  noMakers: "No provider here can make a machine. Add DigitalOcean, Compute Engine or Codespaces in Settings ▸ Machine providers.",
   start: "Start",
   starting: (name: string) => `Starting ${name}…`,
   joining: (name: string, r: Repository) => `${name} is starting. It installs Agents, joins and clones ${r.path} on its first boot. The project shows when it has.`,
-  notJoining: (name: string, provider: string) => `${provider} made ${name}, but can't install Agents on its first boot. Add it as a machine in the Mac app: Settings ▸ Workspace Providers, Add as Machine….`,
+  notJoining: (name: string, provider: string) => `${provider} made ${name}, but can't install Agents on its first boot. Add it as a machine in the Mac app: Settings ▸ Machine Providers, Add as Machine….`,
   privateNote: "A private repository needs git access on the new machine.",
 };

@@ -126,7 +126,7 @@ func TestATeamTriggerHeardByEveryMachineRunsOnce(t *testing.T) {
 	}
 }
 
-// starter is a fake of the workspace providers: which machines may be started, and the
+// starter is a fake of the machine providers: which machines may be started, and the
 // starts asked for.
 type starter struct {
 	mu      sync.Mutex
@@ -139,7 +139,7 @@ func (s *starter) MayStartFor(_, host string) bool {
 	defer s.mu.Unlock()
 	return s.may[host]
 }
-func (s *starter) Workspace(string) *wire.HostWorkspace { return nil }
+func (s *starter) Workspace(string) *wire.HostMachine { return nil }
 func (s *starter) StartForUse(host, _ string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

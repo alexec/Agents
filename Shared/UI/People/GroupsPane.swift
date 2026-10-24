@@ -2,7 +2,7 @@ import AgentsKitCore
 import SwiftUI
 
 /// Settings ▸ Groups (#1761, spec 736 FR-027, FR-028): each group, its people and the
-/// workspace providers it has. An admin makes, changes and removes groups; a member sees
+/// machine providers it has. An admin makes, changes and removes groups; a member sees
 /// the groups they are in, read only.
 ///
 /// One view for the Mac's Settings pane and the Remote's Settings page (the web page's is
@@ -56,7 +56,7 @@ struct GroupsPane: View {
                         GroupLine(title: "People", words: GroupWords.members(group, people: people))
                         // Its bots apart from its people (#2132).
                         GroupLine(title: BotWords.title, words: GroupWords.bots(group, people: people))
-                        GroupLine(title: "Workspace providers", words: GroupWords.providers(group, of: providers) ?? "None")
+                        GroupLine(title: "Machine providers", words: GroupWords.providers(group, of: providers) ?? "None")
                         // What its bots may spend together in a day (#2074).
                         GroupLine(title: "Daily cap", words: GroupWords.capLine(group, people: people))
                         if admin {

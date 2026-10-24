@@ -55,7 +55,7 @@ gateway that the organisation sets (#999) sends the data to that provider or gat
 | Linear | The linear server, Linear sign-in | The issues you read and change | Yes, if you do not connect Linear. |
 | Your mail provider | Email over IMAP | Reads one mailbox. Agents never sends mail. | Yes, if you do not connect a mailbox. |
 | Each MCP server's maker | Connectors | What your agents send to its tools | Yes. Add only the servers your organisation allows. |
-| Docker, AWS, Google Cloud, DigitalOcean, GitHub Codespaces, Coder | Workspace providers | The calls that start, stop and make machines, with the credentials you give | Yes. A control plane with no provider calls none. |
+| Docker, AWS, Google Cloud, DigitalOcean, GitHub Codespaces, Coder | Machine providers | The calls that start, stop and make machines, with the credentials you give | Yes. A control plane with no provider calls none. |
 | Google, Apple, GitHub | Sign-in of a person to the control plane | An ID token or a device-flow token, once per sign-in | Yes. The local owner signs in with codes and needs no outside account. |
 | nodejs.org, npm, GitHub releases, Google, each runtime's maker | Downloads of runtimes | The download requests | Partly. A host downloads only the runtimes you install. |
 | skills.sh, the MCP registries, GitHub | Marketplaces and catalogues | Search and download requests | Partly. An organisation's policy will allow only some marketplaces (T5, #998). |

@@ -1654,7 +1654,7 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .simulator-problem { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 8px; text-align: center; }
 .simulator-problem p { margin: 0; opacity: 0.55; }
 
-/* Settings ▸ Workspace providers (#1808): a card per provider, a row per workspace with its dot. */
+/* Settings ▸ Machine providers (#1808): a card per provider, a row per workspace with its dot. */
 .provider-card { margin-bottom: 10px; max-width: 640px; }
 .provider-add { margin: 4px 0 6px; }
 /* Add a Machine… (#2131): its three ways, a row each, the chosen one outlined in the accent. */

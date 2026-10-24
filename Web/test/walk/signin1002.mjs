@@ -1,4 +1,4 @@
-// The #1002 slice 4 walk: Console ▸ Sign-In on a scratch control plane. Adds a Google Workspace provider
+// The #1002 slice 4 walk: Console ▸ Sign-In on a scratch control plane. Adds a Google Machine provider
 // (Save reads Google's public discovery document), presses Check, claims a domain and reads its TXT record,
 // turns SCIM on and makes a token (shown once), then marks nothing else. Shoots each step at <out dir>.
 //

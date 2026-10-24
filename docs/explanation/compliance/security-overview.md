@@ -20,7 +20,7 @@ names its issue.
 - **Hosts never escalate.** Agents Host and `agentsd` run as the machine's user. On a Mac
   they are the user's own login items (`SMAppService.agent`). On Linux they are a
   `systemctl --user` service. Nothing asks for admin rights, and nothing installs a
-  privileged helper. A workspace provider's start script for Google Compute Engine runs as
+  privileged helper. A machine provider's start script for Google Compute Engine runs as
   root only to make an `agents` user, and the host runs as that user.
 
 ## People and roles
@@ -147,7 +147,7 @@ Keychain, on this device only.
 
 On the control plane, a person's secrets are sealed in the store (AES-256-GCM, with a data
 key wrapped by KMS or a local `secrets-key`). A control plane with neither refuses to keep
-them. Workspace providers' secrets stay in the control plane's own folder, mode 0600, and
+them. Machine providers' secrets stay in the control plane's own folder, mode 0600, and
 never go in the store.
 
 **Org keys** for runtimes, kept by the control plane and sealed to each machine, are

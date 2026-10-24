@@ -275,7 +275,7 @@ public extension DaemonAPI {
         /// that dials it directly.
         public var tunnel: HostTunnel?
         /// The provider's workspace it runs on, which can be started and stopped (#691).
-        public var workspace: HostWorkspace?
+        public var workspace: HostMachine?
         /// `swift` or `go`, as the host said in `host/hello` (#1134); nil when it never said.
         public var implementation: String?
         /// The capabilities the host said in its last `host/hello` (#1748); nil from a host
@@ -403,7 +403,7 @@ public extension DaemonAPI {
         /// As in `ControlHost.state`, or `removed`.
         public var state: String
         /// As in `ControlHost.workspace`.
-        public var workspace: HostWorkspace?
+        public var workspace: HostMachine?
     }
 
     /// `host/hello`, on every connect of an uplink.

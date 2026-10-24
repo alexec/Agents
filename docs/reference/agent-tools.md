@@ -41,11 +41,11 @@ There's no tool for ending a turn. The app works out how each one ended: **Compl
 | `wait_for_agents` | Waits for sessions in this project, by id or exact title. The agent's turn ends at once, it shows as **Waiting**, and it is started again, told how each one ended, once every one has finished, or the first with `wake_on: any`. `until_minutes` (1 minute to 24 hours) is required, so the wait cannot last for ever; `message` is what its row says meanwhile. | The runtime decides. |
 | `check_again` | Resumes the agent after `in_minutes` (1 minute to 24 hours). The turn ends at once. `message` is what its row says meanwhile. Use this to check on something the app cannot see, such as a CI run. | The runtime decides. |
 | `cancel_wait` | Stops the agent's wait, so nothing starts it again for it. | The runtime decides. |
-| `list_workspaces` | Lists the machines the control plane's hosts run on, from every workspace provider: each workspace's state, the host it is linked to and that host's state, and, for a provider that can make workspaces, the choices a new one takes. Never a provider's secrets. On a host that isn't on a control plane, it says there are none. See [Start workspaces from Agents](../how-to/start-workspaces-from-agents.md). | The runtime decides. |
-| `start_workspace` | Starts the workspace a host runs on, by the host's name. It answers at once; the host is up when it connects, which the agent can wait for with `wait_for_event` on `server.online`. | The runtime decides. |
-| `stop_workspace` | Stops the workspace a host runs on, and every agent there with it. While agents are working there it is refused, naming them, unless the agent says `confirm_running`. | The runtime decides. |
-| `make_workspace` | Makes a new workspace at a provider that can, with its choices; it joins as a host of the same name. It may cost money while it runs. | **Yes, always.** A question card on every client, and nothing is made without your **Make it**. |
-| `delete_workspace` | Deletes the workspace a host runs on, with everything on its disk, and removes the host with its agents. | **Yes, always.** A question card on every client, and nothing is deleted without your **Delete it**. |
+| `list_machines` | Lists the machines the control plane's hosts run on, from every machine provider: each machine's state, the host it is linked to and that host's state, and, for a provider that can make machines, the choices a new one takes. Never a provider's secrets. On a host that isn't on a control plane, it says there are none. See [Start machines from Agents](../how-to/start-machines-from-agents.md). | The runtime decides. |
+| `start_machine` | Starts the machine a host runs on, by the host's name. It answers at once; the host is up when it connects, which the agent can wait for with `wait_for_event` on `server.online`. | The runtime decides. |
+| `stop_machine` | Stops the machine a host runs on, and every agent there with it. While agents are working there it is refused, naming them, unless the agent says `confirm_running`. | The runtime decides. |
+| `make_machine` | Makes a new machine at a provider that can, with its choices; it joins as a host of the same name. It may cost money while it runs. | **Yes, always.** A question card on every client, and nothing is made without your **Make it**. |
+| `delete_machine` | Deletes the machine a host runs on, with everything on its disk, and removes the host with its agents. | **Yes, always.** A question card on every client, and nothing is deleted without your **Delete it**. |
 
 `set_session_labels` adds or removes labels owned by the agent. `start_session` can give
 the new session up to five labels, which it owns from its first moment. Labels are
@@ -80,7 +80,7 @@ change: the tools only read them. They are kept in the project's `.agents/projec
 a value written there by hand is held to the maximums. `list_sessions`, `read_session`, `message_session` and `cancel_message` are
 given to every agent, including one another agent started.
 
-The five workspace tools are given to every agent. The control plane does what they ask as
+The five machine tools are given to every agent. The control plane does what they ask as
 it would for you, and its log names the agent that asked. Agents reach providers only
 through the control plane, never directly.
 
@@ -95,7 +95,7 @@ each one, with every secret's value replaced by `${NAME}`.
 | `read_tools` | The MCP server's tools: names, descriptions, input schemas and annotations. | No. |
 | `read_help` | `‹cli› ‹words…› --help`, for at most three subcommands that the help printed. | No. |
 | `check_draft` | Checks a map or config as Add does, with one list. | Only when the list may change something: **Run Check**. |
-| `prove_start`, `prove_stop` | Starts or stops one workspace from the last list with the draft. | **Yes, always**, in the sheet. |
+| `prove_start`, `prove_stop` | Starts or stops one machine from the last list with the draft. | **Yes, always**, in the sheet. |
 | `send_draft` | The result, with a note of up to three lines. | No. |
 | `give_up` | Ends with a reason. | No. |
 

@@ -15,7 +15,7 @@ struct AddMachineSheet: View {
     @State private var picked: ProviderID?
     @State private var making = false
 
-    private var oneCopy: Bool { model.workspaceProvidersProblem == WorkspaceProviderWords.oneCopy }
+    private var oneCopy: Bool { model.machineProvidersProblem == MachineProviderWords.oneCopy }
 
     var body: some View {
         NavigationStack {
@@ -42,8 +42,8 @@ struct AddMachineSheet: View {
             }
             .navigationDestination(isPresented: $making) { NewMachinePage(picked: picked, close: { dismiss() }) }
         }
-        .task { await model.loadWorkspaceProviders() }
-        .sheet(isPresented: $addingProvider, onDismiss: providerAdded) { AddWorkspaceProviderSheet(editing: nil) }
+        .task { await model.loadMachineProviders() }
+        .sheet(isPresented: $addingProvider, onDismiss: providerAdded) { AddMachineProviderSheet(editing: nil) }
     }
 
     private func row(_ way: AddMachine.Way) -> some View {
@@ -55,15 +55,15 @@ struct AddMachineSheet: View {
     }
 
     private func addProvider() {
-        before = Set((model.workspaceProviders ?? []).map(\.id))
+        before = Set((model.machineProviders ?? []).map(\.id))
         addingProvider = true
     }
 
     /// A provider added here goes on to its New Machine (#2131), as the window's does.
     private func providerAdded() {
         Task {
-            await model.loadWorkspaceProviders()
-            guard let added = model.workspaceProviders?.first(where: { !before.contains($0.id) }) else { return }
+            await model.loadMachineProviders()
+            guard let added = model.machineProviders?.first(where: { !before.contains($0.id) }) else { return }
             picked = added.id
             making = true
         }

@@ -65,6 +65,7 @@ const CapHosts1 = "hosts/1"
 const CapLinks1 = "links/1"
 const CapLiveactivity1 = "liveactivity/1"
 const CapMac1 = "mac/1"
+const CapMachines1 = "machines/1"
 const CapMailbox1 = "mailbox/1"
 const CapMarketplaces1 = "marketplaces/1"
 const CapMcp1 = "mcp/1"
@@ -120,7 +121,6 @@ const CapViews1 = "views/1"
 const CapWake1 = "wake/1"
 const CapWorkflow1 = "workflow/1"
 const CapWorkflows1 = "workflows/1"
-const CapWorkspaces1 = "workspaces/1"
 const CapWorktrees1 = "worktrees/1"
 
 // HostCapabilities is the capability of each method and notification in daemon.openrpc.json.
@@ -537,16 +537,16 @@ var ControlCapabilities = pairs([][2]string{
 	{"groups/setRole", "org-identity/1"},
 	{"handover/status", "handover/1"},
 	{"host/hello", "host/1"},
+	{"host/machines", "host/1"},
 	{"host/orgRoutesAgain", "host.org-routes/1"},
 	{"host/orgRoutesApplied", "host.org-routes/1"},
 	{"host/policyApplied", "host.policy/1"},
 	{"host/providerDraft", "host/1"},
 	{"host/status", "host/1"},
-	{"host/workspaces", "host/1"},
 	{"hosts/announce", "hosts/1"},
 	{"hosts/approveJoin", "hosts.join/1"},
 	{"hosts/checkAgain", "hosts/1"},
-	{"hosts/deleteWorkspace", "hosts/1"},
+	{"hosts/deleteMachine", "hosts/1"},
 	{"hosts/denyJoin", "hosts.join/1"},
 	{"hosts/detect", "hosts/1"},
 	{"hosts/dropKept", "hosts/1"},
@@ -561,8 +561,8 @@ var ControlCapabilities = pairs([][2]string{
 	{"hosts/listKept", "hosts/1"},
 	{"hosts/remove", "hosts/1"},
 	{"hosts/retryKept", "hosts/1"},
+	{"hosts/setMachineOptions", "hosts/1"},
 	{"hosts/setRelay", "hosts/1"},
-	{"hosts/setWorkspaceOptions", "hosts/1"},
 	{"hosts/sshHosts", "hosts/1"},
 	{"hosts/start", "hosts/1"},
 	{"hosts/startEnroll", "hosts/1"},
@@ -575,6 +575,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"links/list", "links/1"},
 	{"links/remove", "links/1"},
 	{"links/requests", "links/1"},
+	{"machines/forAgent", "machines/1"},
 	{"orgRoutes/check", "org-routes/1"},
 	{"orgRoutes/list", "org-routes/1"},
 	{"orgRoutes/mine", "org-routes/1"},
@@ -654,7 +655,6 @@ var ControlCapabilities = pairs([][2]string{
 	{"workflows/claimRun", "bots/1"},
 	{"workflows/fire", "events.team/1"},
 	{"workflows/trigger", "events.team/1"},
-	{"workspaces/forAgent", "workspaces/1"},
 	{"control/capReached", "bots/1"},
 	{"control/clientChanged", "control/1"},
 	{"control/cutOff", "org-identity/1"},

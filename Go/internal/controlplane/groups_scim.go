@@ -196,7 +196,7 @@ func memberChanges(before, after []string) (added, removed int) {
 	return added, removed
 }
 
-// DeleteGroup takes a group away. One that owns shares (a workspace provider, a bot) is
+// DeleteGroup takes a group away. One that owns shares (a machine provider, a bot) is
 // kept as a tombstone with them, and admins are asked to give them to another group
 // (US5 AS5).
 func (d scimDirectory) DeleteGroup(ctx context.Context, c scim.Caller, id string) error {
@@ -235,7 +235,7 @@ func (d scimDirectory) DeleteGroup(ctx context.Context, c scim.Caller, id string
 	return nil
 }
 
-// groupShares names what a group owns: workspace providers and bots.
+// groupShares names what a group owns: machine providers and bots.
 func (s *Service) groupShares(id string) []string {
 	var out []string
 	if s.providers != nil {

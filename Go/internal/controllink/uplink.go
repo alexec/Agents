@@ -359,7 +359,7 @@ type askReply struct {
 // workspace, never this long.
 const askWait = 2 * time.Minute
 
-// Ask sends a request on channel 0 and waits for its answer (host/workspaces, #1444): the
+// Ask sends a request on channel 0 and waits for its answer (host/machines, #1444): the
 // result, an *AskError when the control plane refused it, or an error when it is not
 // connected or did not answer.
 func (u *Uplink) Ask(ctx context.Context, method string, params any) (json.RawMessage, error) {

@@ -326,16 +326,16 @@ func (r assessRecord) workspaces() (verdict, string) {
 		}
 	}
 	if len(listed) == 0 {
-		return failedStep, said(all, "list_workspaces")
+		return failedStep, said(all, "list_machines")
 	}
 	last := listed[len(listed)-1]
 	if last.Ok {
-		return passed, "`list_workspaces` answered"
+		return passed, "`list_machines` answered"
 	}
 	if strings.Contains(strings.ToLower(answerOfCall(last)), "has no workspaces") {
-		return passed, "`list_workspaces` answered that this machine has no workspaces"
+		return passed, "`list_machines` answered that this machine has no workspaces"
 	}
-	return failedStep, "`list_workspaces` refused: " + clip(answerOfCall(last), 160)
+	return failedStep, "`list_machines` refused: " + clip(answerOfCall(last), 160)
 }
 
 func (r assessRecord) workflows() (verdict, string) {

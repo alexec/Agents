@@ -22,7 +22,7 @@ something up, not for reading through.
   stays on each machine.
 - [Workflow triggers and actions](workflows.md): the workflow file format, every trigger
   and setting, and when a workflow does not run.
-- [Workspace providers](workspace-providers.md): the tools a workspace provider offers, and
+- [Machine providers](machine-providers.md): the tools a machine provider offers, and
   how the control plane checks and calls them.
 - [Integrations](integrations.md): every third-party service and tool the app talks to,
   starts, installs or signs in to, with its state and when it was last checked.
@@ -35,7 +35,7 @@ something up, not for reading through.
   Events page.
 - [Channels](channels.md): channel identities linked to people, so a chat or email message
   acts only as the person who approved it.
-- [Groups](groups.md): groups of people, and the workspace providers each group may start
+- [Groups](groups.md): groups of people, and the machine providers each group may start
 - [Policy](policy.md): the organisation's policy, its rules, its signature and its methods
   machines from.
 - [Secrets and what follows you](on-every-machine.md): the settings and secrets

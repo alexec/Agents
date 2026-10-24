@@ -1,12 +1,12 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Settings ▸ Workspace providers (#1819), as the web page's (#1808) and the window's
-/// Settings ▸ Workspace Providers: each provider as a section of its workspaces, Add
+/// Settings ▸ Machine providers (#1819), as the web page's (#1808) and the window's
+/// Settings ▸ Machine Providers: each provider as a section of its workspaces, Add
 /// Provider… (kind first, then its short form), Edit…, List Again and Remove…, and on a
 /// workspace Link to Host…, Start, Stop and Unlink. Only the API providers are added here;
 /// the rest are the Mac's. Tokens go to the control plane and are not kept on the device.
-struct WorkspaceProvidersView: View {
+struct MachineProvidersView: View {
     @Environment(RemoteModel.self) private var model
     @State private var adding = false
     @State private var editing: DaemonAPI.ProviderSummary?
@@ -17,65 +17,65 @@ struct WorkspaceProvidersView: View {
 
     struct Linking: Identifiable {
         let provider: DaemonAPI.ProviderSummary
-        let workspace: DaemonAPI.WorkspaceInfo
+        let workspace: DaemonAPI.MachineInfo
         var id: String { "\(provider.id)/\(workspace.id)" }
     }
 
-    private var oneCopy: Bool { model.workspaceProvidersProblem == WorkspaceProviderWords.oneCopy }
+    private var oneCopy: Bool { model.machineProvidersProblem == MachineProviderWords.oneCopy }
 
     var body: some View {
         Form {
-            if let problem = model.workspaceProvidersProblem {
+            if let problem = model.machineProvidersProblem {
                 Section { Text(problem).foregroundStyle(oneCopy ? AnyShapeStyle(.secondary) : StateTint.failure.style(or: .secondary)) }
             }
             if let said {
                 Section { Text(said).tinted(.failure) }
             }
             if !oneCopy {
-                ForEach(model.workspaceProviders ?? []) { provider in
+                ForEach(model.machineProviders ?? []) { provider in
                     providerSection(provider)
                 }
                 Section {
                     // Only an admin adds one (#1761).
                     if model.isAdmin {
-                        Button(WorkspaceProviderWords.add) { adding = true }
+                        Button(MachineProviderWords.add) { adding = true }
                     }
                 } footer: {
-                    Text(WorkspaceProviderWords.footer)
+                    Text(MachineProviderWords.footer)
                 }
             }
         }
         .scrollContentBackground(.hidden)
         .background(Paper.ground)
-        .navigationTitle(WorkspaceProviderWords.heading)
+        .navigationTitle(MachineProviderWords.heading)
         .navigationBarTitleDisplayMode(.inline)
         .overlay {
-            if model.workspaceProviders == nil { ProgressView() }
+            if model.machineProviders == nil { ProgressView() }
         }
         // Lists every provider again when the page opens (FR-004).
-        .task { await model.loadWorkspaceProviders() }
-        .refreshable { await model.loadWorkspaceProviders() }
-        .sheet(isPresented: $adding) { AddWorkspaceProviderSheet(editing: nil) }
-        .sheet(item: $editing) { AddWorkspaceProviderSheet(editing: $0) }
+        .task { await model.loadMachineProviders() }
+        .refreshable { await model.loadMachineProviders() }
+        .sheet(isPresented: $adding) { AddMachineProviderSheet(editing: nil) }
+        .sheet(item: $editing) { AddMachineProviderSheet(editing: $0) }
         .sheet(item: $making) { provider in
             NavigationStack { NewMachinePage(picked: provider.id, close: { making = nil }) }
         }
         .sheet(item: $linking) { LinkWorkspaceToHostSheet(provider: $0.provider, workspace: $0.workspace) }
-        .confirmationDialog(removing.map { WorkspaceProviderWords.removeTitle($0.name) } ?? "",
+        .confirmationDialog(removing.map { MachineProviderWords.removeTitle($0.name) } ?? "",
                             isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
                             titleVisibility: .visible, presenting: removing) { provider in
             Button("Remove", role: .destructive) {
                 Task { said = await model.removeWorkspaceProvider(provider.id) }
             }
         } message: { _ in
-            Text(WorkspaceProviderWords.removeNote)
+            Text(MachineProviderWords.removeNote)
         }
     }
 
     private func providerSection(_ provider: DaemonAPI.ProviderSummary) -> some View {
         Section {
             ForEach(provider.workspaces) { workspace in
-                WorkspaceProviderRow(provider: provider, workspace: workspace, say: { said = $0 }) {
+                MachineProviderRow(provider: provider, workspace: workspace, say: { said = $0 }) {
                     linking = Linking(provider: provider, workspace: workspace)
                 }
             }
@@ -89,7 +89,7 @@ struct WorkspaceProvidersView: View {
                         Button("New Machine…", systemImage: "plus") { making = provider }
                     }
                     Button("List Again", systemImage: "arrow.clockwise") {
-                        Task { await model.listWorkspacesAgain(provider.id) }
+                        Task { await model.listMachinesAgain(provider.id) }
                     }
                     // Who may start machines from it (#1761): an admin gives it to a group.
                     if model.isAdmin {
@@ -108,19 +108,19 @@ struct WorkspaceProvidersView: View {
                 }
             }
         } footer: {
-            let line = WorkspaceProviderWords.providerLine(provider) { $0.formatted(date: .omitted, time: .shortened) }
+            let line = MachineProviderWords.providerLine(provider) { $0.formatted(date: .omitted, time: .shortened) }
             let group = GroupWords.providerLine(provider, groups: model.providerGroups) ?? ""
-            Text([WorkspaceProviderWords.kindChip(provider), line, group].filter { !$0.isEmpty }.joined(separator: " · "))
+            Text([MachineProviderWords.kindChip(provider), line, group].filter { !$0.isEmpty }.joined(separator: " · "))
         }
         .paperListRow()
     }
 }
 
 /// A workspace of a provider: its state and host, and Start, Stop, Unlink or Link to Host….
-private struct WorkspaceProviderRow: View {
+private struct MachineProviderRow: View {
     @Environment(RemoteModel.self) private var model
     let provider: DaemonAPI.ProviderSummary
-    let workspace: DaemonAPI.WorkspaceInfo
+    let workspace: DaemonAPI.MachineInfo
     let say: (String?) -> Void
     let link: () -> Void
     @State private var stopAsk: String?
@@ -129,7 +129,7 @@ private struct WorkspaceProviderRow: View {
     var body: some View {
         let host = workspace.host.flatMap { id in model.controlHosts.first { $0.id == id } }
         let linked = host?.workspace
-        let free = WorkspaceProviderWords.linkableHosts(workspace, hosts: model.controlHosts)
+        let free = MachineProviderWords.linkableHosts(workspace, hosts: model.controlHosts)
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 // The window's ControlDot: running, unknown, or anything else.
@@ -144,10 +144,10 @@ private struct WorkspaceProviderRow: View {
                 .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(workspace.name)
-                    Text(linked?.phase ?? WorkspaceProviderWords.workspaceLine(workspace, hosts: model.controlHosts))
+                    Text(linked?.phase ?? MachineProviderWords.workspaceLine(workspace, hosts: model.controlHosts))
                         .appText(.supporting)
                         .foregroundStyle(.secondary)
-                    if let noHost = WorkspaceProviderWords.noHostLine(workspace, hosts: model.controlHosts) {
+                    if let noHost = MachineProviderWords.noHostLine(workspace, hosts: model.controlHosts) {
                         Text(noHost)
                             .appText(.supporting)
                             .foregroundStyle(.secondary)
@@ -168,7 +168,7 @@ private struct WorkspaceProviderRow: View {
                     Button("Unlink") { unlinking = true }
                 }
                 if workspace.host == nil, !free.isEmpty {
-                    Button(free.count == 1 && WorkspaceProviderWords.mayBe(workspace, hostName: free[0].name)
+                    Button(free.count == 1 && MachineProviderWords.mayBe(workspace, hostName: free[0].name)
                            ? "Link to \(free[0].name)…" : "Link to Machine…", action: link)
                 }
             }
@@ -192,14 +192,14 @@ private struct WorkspaceProviderRow: View {
     }
 
     private func stop(_ host: HostID, confirmed: Bool) async {
-        let answer = await model.stopWorkspace(host: host, confirmed: confirmed)
+        let answer = await model.stopMachine(host: host, confirmed: confirmed)
         if let ask = answer.ask { stopAsk = ask } else { say(answer.refused) }
     }
 }
 
 /// Add a Provider (kind first, then its form), or Edit… one: its name and its secrets again.
 /// What is typed lives in this sheet only, and goes when it closes.
-struct AddWorkspaceProviderSheet: View {
+struct AddMachineProviderSheet: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     let editing: DaemonAPI.ProviderSummary?
@@ -234,7 +234,7 @@ struct AddWorkspaceProviderSheet: View {
                 if let problem {
                     Section { Text(problem).tinted(.failure) }
                 }
-                Section {} footer: { Text(WorkspaceProviderWords.secretsFoot) }
+                Section {} footer: { Text(MachineProviderWords.secretsFoot) }
             }
             .disabled(working)
             .navigationTitle(editing.map { "Edit \($0.name)" } ?? "Add a Provider")
@@ -259,7 +259,7 @@ struct AddWorkspaceProviderSheet: View {
     private func fieldRow(_ field: APIProviderKind.Field) -> some View {
         let binding = Binding(get: { values[field.id] ?? "" }, set: { values[field.id] = $0 })
         let label = field.label + (field.isOptional ? " (optional)" : "")
-        let prompt = editing != nil && field.isSecret ? WorkspaceProviderWords.editSecret : field.prompt
+        let prompt = editing != nil && field.isSecret ? MachineProviderWords.editSecret : field.prompt
         if field.isLong {
             VStack(alignment: .leading) {
                 Text(label).appText(.supporting).foregroundStyle(.secondary)
@@ -307,26 +307,26 @@ private struct LinkWorkspaceToHostSheet: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     let provider: DaemonAPI.ProviderSummary
-    let workspace: DaemonAPI.WorkspaceInfo
+    let workspace: DaemonAPI.MachineInfo
     @State private var host: HostID?
     @State private var startWhenUsed = true
     @State private var idle = WorkspaceLink.defaultIdleMinutes
     @State private var problem: String?
 
     var body: some View {
-        let hosts = WorkspaceProviderWords.linkableHosts(workspace, hosts: model.controlHosts)
+        let hosts = MachineProviderWords.linkableHosts(workspace, hosts: model.controlHosts)
         NavigationStack {
             Form {
                 Section {
                     if hosts.isEmpty {
-                        Text(WorkspaceProviderWords.noHosts)
+                        Text(MachineProviderWords.noHosts)
                     } else {
                         Picker("Machine", selection: $host) {
                             ForEach(hosts) { Text($0.name).tag(HostID?.some($0.id)) }
                         }
                         Toggle("Start when used", isOn: $startWhenUsed)
                         Picker("Stop when idle", selection: $idle) {
-                            ForEach(WorkspaceProviderWords.idleChoices, id: \.minutes) { Text($0.label).tag($0.minutes) }
+                            ForEach(MachineProviderWords.idleChoices, id: \.minutes) { Text($0.label).tag($0.minutes) }
                         }
                     }
                 } footer: {

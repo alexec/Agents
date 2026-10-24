@@ -1,9 +1,9 @@
-// Settings ▸ Workspace Providers on the web (#1808), as the window's ControlProvidersPage:
-// each workspace provider as a card of its workspaces, Add Provider, Edit, List Again, Remove,
+// Settings ▸ Machine Providers on the web (#1808), as the window's ControlProvidersPage:
+// each machine provider as a card of its workspaces, Add Provider, Edit, List Again, Remove,
 // and a workspace's host linked, started and stopped. Only the providers that work through
 // their API with a token (#1119) are offered here: a CLI preset needs its CLI signed in where
 // the control plane runs, and a person who starts in a browser has no shell there.
-import type { ControlHost, ProviderAdd, ProviderSummary, WorkspaceInfo } from "../protocol/generated";
+import type { ControlHost, ProviderAdd, ProviderSummary, MachineInfo } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 
 export type ProviderKind = "digitalOcean" | "codespaces" | "coder" | "aws" | "compute";
@@ -85,18 +85,18 @@ const kinds: Record<ProviderKind, KindInfo> = {
 };
 
 export const providerWords = {
-  heading: "Workspace providers",
+  heading: "Machine providers",
   footer: "A provider starts and stops your machines: DigitalOcean Droplets, GitHub Codespaces, Coder workspaces, "
     + "Google Compute Engine VMs or AWS EC2 instances, through their API. It runs on the control plane, so it can start a machine that is down. "
     + "Docker, Cloud Workstations, your own commands and MCP servers are added in the Mac app.",
-  oneCopy: "Workspace providers need a control plane with one copy, such as the one on your Mac. This one has several.",
+  oneCopy: "Machine providers need a control plane with one copy, such as the one on your Mac. This one has several.",
   add: "Add Provider…",
   secretsFoot: "Tokens and keys go to the control plane and are never shown again. This page does not keep them.",
   editSecret: "Leave empty to keep the one it has.",
   removeTitle: (name: string) => `Remove ${name}?`,
   removeNote: "Its machines stay as they are, unlinked: nothing here can start or stop them any more.",
   noHosts: "No machine to link: add one in the Mac app, or start one from a repository.",
-  notAHostYet: "Not joined yet: add it as a machine in the Mac app, in Settings ▸ Workspace Providers.",
+  notAHostYet: "Not joined yet: add it as a machine in the Mac app, in Settings ▸ Machine Providers.",
 };
 
 export function kindTitle(kind: ProviderKind): string { return kinds[kind].title; }
@@ -189,7 +189,7 @@ export function providerLine(provider: ProviderSummary, time: (at: Date) => stri
 function capitalized(word: string): string { return word.slice(0, 1).toUpperCase() + word.slice(1); }
 
 /** The grey line under a workspace, as the window's workspaceLine. */
-export function workspaceLine(workspace: WorkspaceInfo, hosts: readonly ControlHost[]): string {
+export function workspaceLine(workspace: MachineInfo, hosts: readonly ControlHost[]): string {
   const parts = [capitalized(workspace.state)];
   parts.push(workspace.host ? `linked to ${hosts.find((h) => h.id === workspace.host)?.name ?? "a machine"}` : "not joined");
   if (workspace.cost) parts.push(workspace.cost);
@@ -200,12 +200,12 @@ export function workspaceLine(workspace: WorkspaceInfo, hosts: readonly ControlH
  * What a workspace with no host says when no host is free to link to it (#1931): this page can
  * not install Agents on it, so the person is told where to (the Mac's Add as Host…).
  */
-export function noHostLine(workspace: WorkspaceInfo, hosts: readonly ControlHost[]): string | undefined {
+export function noHostLine(workspace: MachineInfo, hosts: readonly ControlHost[]): string | undefined {
   return !workspace.host && linkableHosts(workspace, hosts).length === 0 ? providerWords.notAHostYet : undefined;
 }
 
-/** Whether a host named `hostName` may be this workspace (WorkspaceInfo.mayBe, #976). */
-export function mayBe(workspace: WorkspaceInfo, hostName: string): boolean {
+/** Whether a host named `hostName` may be this workspace (MachineInfo.mayBe, #976). */
+export function mayBe(workspace: MachineInfo, hostName: string): boolean {
   const host = hostName.toLowerCase();
   if (workspace.ssh && workspace.ssh.toLowerCase() === host) return true;
   const name = workspace.name.toLowerCase();
@@ -214,10 +214,10 @@ export function mayBe(workspace: WorkspaceInfo, hostName: string): boolean {
 }
 
 /**
- * The hosts Link to Workspace can offer for a workspace no host has: those that run agents and
+ * The hosts Link to Machine can offer for a workspace no host has: those that run agents and
  * are linked to none, the ones that may be it by name first.
  */
-export function linkableHosts(workspace: WorkspaceInfo, hosts: readonly ControlHost[]): ControlHost[] {
+export function linkableHosts(workspace: MachineInfo, hosts: readonly ControlHost[]): ControlHost[] {
   if (workspace.host) return [];
   const free = hosts.filter((h) => h.relay == null && !h.workspace);
   return [...free.filter((h) => mayBe(workspace, h.name)), ...free.filter((h) => !mayBe(workspace, h.name))];

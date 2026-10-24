@@ -238,17 +238,17 @@ private struct RemoteSlotView: View {
         .navigationTitle(ConnectorSetupWords.heading(kind))
         .task {
             if kind == .tasks { await readLinear() }
-            if kind == .workspace { await model.loadWorkspaceProviders() }
+            if kind == .workspace { await model.loadMachineProviders() }
         }
         .sheet(isPresented: $addingMachine) { AddMachineSheet() }
         .sheet(isPresented: $addingProvider, onDismiss: {
             Task {
-                await model.loadWorkspaceProviders()
-                making = model.workspaceProviders?.first { !before.contains($0.id) }
+                await model.loadMachineProviders()
+                making = model.machineProviders?.first { !before.contains($0.id) }
             }
         }) {
-            AddWorkspaceProviderSheet(editing: nil)
-                .onAppear { before = Set((model.workspaceProviders ?? []).map(\.id)) }
+            AddMachineProviderSheet(editing: nil)
+                .onAppear { before = Set((model.machineProviders ?? []).map(\.id)) }
         }
         .sheet(item: $making) { provider in
             NavigationStack { NewMachinePage(picked: provider.id, close: { making = nil }) }
@@ -762,7 +762,7 @@ extension RemoteModel {
     /// else is yours: the other machines and the providers.
     func whereAgentsRun(_ host: HostID) -> (title: String, line: String) {
         let others = projectHosts.filter { $0.id != host }.map(\.title)
-        let providers = (workspaceProviders ?? []).map(\.name)
+        let providers = (machineProviders ?? []).map(\.name)
         return (WhereAgentsRun.title(onThisMac: false, hostName: hostLabel(host)),
                 WhereAgentsRun.line(others: others, providers: providers))
     }

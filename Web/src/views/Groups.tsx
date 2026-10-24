@@ -1,5 +1,5 @@
 // Settings ▸ Groups (#1761, spec 736 FR-027, FR-028), as the window's and the Remote's Groups pane
-// (Shared/UI/People/GroupsPane.swift): each group, its people and the workspace providers it has.
+// (Shared/UI/People/GroupsPane.swift): each group, its people and the machine providers it has.
 // An admin makes, changes and removes groups; a member sees the groups they are in, read only. A
 // group from an org provider's SCIM says so (#1002, FR-028), and only SCIM changes its members.
 import { useSignal } from "@preact/signals";
@@ -144,7 +144,7 @@ export function GroupsSection({ store, down }: { store: Store; down: boolean }) 
                   {/* Its bots apart from its people (#2132). */}
                   <span class="faint small">{botWords.title}</span>
                   <span class="small">{groupBots(group, people)}</span>
-                  <span class="faint small">Workspace providers</span>
+                  <span class="faint small">Machine providers</span>
                   <span class="small">{providersOf(group, providers) ?? "None"}</span>
                   <span class="faint small">Daily cap</span>
                   <span class="small">{groupCapLine(group, people)}</span>

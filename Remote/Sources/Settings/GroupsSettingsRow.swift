@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Settings ▸ Control plane: groups, which own workspace providers (#1761): an admin's,
+/// Settings ▸ Control plane: groups, which own machine providers (#1761): an admin's,
 /// and a member's in a group, who sees the groups they are in (#2076).
 struct GroupsSettingsRow: View {
     @Environment(RemoteModel.self) private var model

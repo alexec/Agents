@@ -1689,6 +1689,27 @@
       }
     },
     {
+      "name": "host/machines",
+      "x-capability": "host/1",
+      "description": "A host, on its channel 0, for an agent there (#691 US6).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/HostMachineCall"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/JSONValue"
+        }
+      }
+    },
+    {
       "name": "host/orgRoutes",
       "x-capability": "host.org-routes/1",
       "description": "To a machine that says host.org-routes/1, on its channel 0, at each join and within 5 seconds of a change to what it may use (#999, FR-005): every route its person may use, each secret sealed to the machine's key. A machine without it is sent nothing.",
@@ -1874,27 +1895,6 @@
       ]
     },
     {
-      "name": "host/workspaces",
-      "x-capability": "host/1",
-      "description": "A host, on its channel 0, for an agent there (#691 US6).",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostWorkspaceCall"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/JSONValue"
-        }
-      }
-    },
-    {
       "name": "hosts/announce",
       "x-capability": "hosts/1",
       "description": "On an enrolment connection, before any other.",
@@ -1961,7 +1961,7 @@
       }
     },
     {
-      "name": "hosts/deleteWorkspace",
+      "name": "hosts/deleteMachine",
       "x-capability": "hosts/1",
       "paramStructure": "by-name",
       "params": [
@@ -2315,6 +2315,31 @@
       }
     },
     {
+      "name": "hosts/setMachineOptions",
+      "x-capability": "hosts/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/HostMachineOptions"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ControlHost"
+        }
+      }
+    },
+    {
       "name": "hosts/setRelay",
       "x-capability": "hosts/1",
       "paramStructure": "by-name",
@@ -2331,31 +2356,6 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "hosts/setWorkspaceOptions",
-      "x-capability": "hosts/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostWorkspaceOptions"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ControlHost"
         }
       }
     },
@@ -2652,6 +2652,27 @@
           "items": {
             "$ref": "daemon.schema.json#/definitions/ChannelLinkRequest"
           }
+        }
+      }
+    },
+    {
+      "name": "machines/forAgent",
+      "x-capability": "machines/1",
+      "description": "Through host/machines only.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/AgentMachines"
         }
       }
     },
@@ -4675,27 +4696,6 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/TeamTriggerSent"
-        }
-      }
-    },
-    {
-      "name": "workspaces/forAgent",
-      "x-capability": "workspaces/1",
-      "description": "Through host/workspaces only.",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/AgentWorkspaces"
         }
       }
     }
