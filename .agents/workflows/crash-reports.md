@@ -6,7 +6,6 @@ on:
       between: "07:00-07:00"
 agent: new
 runtime: claude
-model: sonnet
 effort: medium
 permission-mode: auto
 cooldown: 20h

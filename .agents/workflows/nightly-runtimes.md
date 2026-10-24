@@ -3,7 +3,6 @@ name: Runtime check
 on: manual
 agent: new
 runtime: claude
-model: sonnet
 permission-mode: auto
 runs-on: [8AB85821-9D24-59CE-9737-8FC556923733]
 labels: [release, runtimes]

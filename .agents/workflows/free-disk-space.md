@@ -4,7 +4,6 @@ on:
   - machine.disk_low
 agent: new
 runtime: claude
-model: sonnet
 effort: low
 permission-mode: auto
 cooldown: 1h
