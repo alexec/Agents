@@ -57,12 +57,11 @@ func endingBrief(runtimeID string) string {
 		"archive_session with no id."
 }
 
-// systemPromptDelivery is RuntimeCatalog's: how a runtime takes words of ours as its system
-// prompt. "append" is _meta.systemPrompt.append (Claude's adapter gives it to the Agent
-// SDK's preset prompt); "rules" is _meta.rules (Grok). Cursor and Gemini have no append
-// (Gemini's GEMINI_SYSTEM_MD replaces its own prompt), so they have it in the first prompt.
-// A runtime that gains an append comes here.
-var systemPromptDelivery = map[string]string{"claude": "append", "grok": "rules"}
+// systemPromptDelivery is how a runtime takes words of ours as its system prompt. "append"
+// is _meta.systemPrompt.append (Claude); "rules" is _meta.rules (Grok); "customInstructions"
+// is Codex ACP's JetBrains AIR session metadata. Cursor and Gemini have no append (Gemini's
+// GEMINI_SYSTEM_MD replaces its own prompt), so they have it in the first prompt.
+var systemPromptDelivery = map[string]string{"claude": "append", "grok": "rules", "codex": "customInstructions"}
 
 // brief is the whole of it for an agent, in the order it is said: who is who first, since
 // the paragraphs after it say "I" and "me" and that is the person it names; then the three
@@ -414,6 +413,23 @@ func withSystemPrompt(meta map[string]any, runtimeID, words string) map[string]a
 			words += "\n\n" + rules
 		}
 		out["rules"] = words
+	case "customInstructions":
+		jetbrains, _ := out["jetbrains"].(map[string]any)
+		jetbrains = cloneMeta(jetbrains)
+		air, _ := jetbrains["air"].(map[string]any)
+		air = cloneMeta(air)
+		air["version"] = 1
+		air["customInstructions"] = words
+		jetbrains["air"] = air
+		out["jetbrains"] = jetbrains
 	}
 	return out
+}
+
+func cloneMeta(meta map[string]any) map[string]any {
+	copy := make(map[string]any, len(meta)+1)
+	for key, value := range meta {
+		copy[key] = value
+	}
+	return copy
 }

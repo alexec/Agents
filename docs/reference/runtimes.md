@@ -209,6 +209,11 @@ way it can take them. See [Share skills, instructions and connectors with every 
 | **Antigravity** | a link in the folder the app gives it | none | sent at start | no way in |
 | **OpenCode** | reads `~/.agents/skills` | follows `~/.claude/CLAUDE.md`, the link above, unless you keep your own `~/.config/opencode/AGENTS.md` | sent at start | no way in: its plugins are its own npm packages |
 
+For Codex sessions that the app starts, the brief goes in Codex ACP's
+`_meta.jetbrains.air.customInstructions` session metadata. Codex ACP passes these words to
+Codex as developer instructions. This keeps the person's first prompt free of the brief,
+including when the app loads or resumes the session.
+
 For the conversations the app starts, each runtime's own tools for scheduling, starting
 other agents, sending notifications and saving documents elsewhere are taken away, so that
 the work stays where the app can see it. Reading, searching, editing, running commands,
