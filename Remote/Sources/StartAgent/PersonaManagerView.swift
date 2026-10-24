@@ -6,9 +6,9 @@ import SwiftUI
 struct PersonaManagerView: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    let project: URL
+    let folder: URL
 
-    @State private var origin: Persona.Origin = .project
+    @State private var origin: Persona.Origin = .folder
     @State private var files: [DaemonAPI.PersonaFile] = []
     @State private var selected: String?
     @State private var id = ""
@@ -22,7 +22,7 @@ struct PersonaManagerView: View {
             Form {
                 Section {
                     Picker("Scope", selection: $origin) {
-                        Text("This project").tag(Persona.Origin.project)
+                        Text("This folder").tag(Persona.Origin.folder)
                         Text("Personal").tag(Persona.Origin.personal)
                     }
                     .onChange(of: origin) { clear(); Task { await load() } }
@@ -80,7 +80,7 @@ struct PersonaManagerView: View {
     }
 
     private func load() async {
-        guard let listed = await model.personaFiles(in: project, origin: origin) else {
+        guard let listed = await model.personaFiles(in: folder, origin: origin) else {
             problem = "Personas could not be loaded."
             return
         }
@@ -89,7 +89,7 @@ struct PersonaManagerView: View {
 
     private func save(remove: Bool = false) async {
         busy = true
-        let ok = await model.savePersonaFile(in: project, origin: origin, id: id, content: content, delete: remove)
+        let ok = await model.savePersonaFile(in: folder, origin: origin, id: id, content: content, delete: remove)
         busy = false
         guard ok else { problem = "The persona could not be saved."; return }
         if remove { clear() } else { selected = id }

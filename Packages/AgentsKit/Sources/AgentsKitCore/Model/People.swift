@@ -259,16 +259,16 @@ public extension DaemonAPI {
     /// A worktree with work that is not pushed: commits ahead of its upstream, commits on a
     /// branch with no upstream (`unmerged`), or changes not committed.
     struct UnpushedWork: Codable, Sendable, Hashable {
-        public var project: URL
+        public var folder: URL
         public var worktree: URL
         public var branch: String?
         public var ahead: Int?
         public var unmerged: Int?
         public var uncommitted: Int?
 
-        public init(project: URL, worktree: URL, branch: String? = nil, ahead: Int? = nil, unmerged: Int? = nil,
+        public init(folder: URL, worktree: URL, branch: String? = nil, ahead: Int? = nil, unmerged: Int? = nil,
                     uncommitted: Int? = nil) {
-            self.project = project
+            self.folder = folder
             self.worktree = worktree
             self.branch = branch
             self.ahead = ahead

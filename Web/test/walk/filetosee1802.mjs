@@ -2,7 +2,7 @@
 //
 //   node Web/test/walk/filetosee1802.mjs <WEB_URL> <browser code> <ROOT> <out dir>
 //
-// The root is a run-app scratch root with a project `work` and a finished session whose
+// The root is a run-app scratch root with a folder `work` and a finished session whose
 // agent called show_file on a file nobody has looked at.
 
 import { readFileSync } from "node:fs";
@@ -17,8 +17,8 @@ try {
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  await page.waitFor(`document.querySelector(".sidebar .row.project")`, 20_000);
-  await page.eval(`document.querySelector(".row.project .disclosure")?.click()`);
+  await page.waitFor(`document.querySelector(".sidebar .row.folder")`, 20_000);
+  await page.eval(`document.querySelector(".row.folder .disclosure")?.click()`);
   await sleep(1500);
   console.log("rows", JSON.stringify(await page.eval(`[...document.querySelectorAll(".row.session")].filter((r) => r.offsetParent !== null).map((r) => r.innerText.replace(/\\s+/g, " ").slice(0, 80))`)));
   const marks = await page.eval(`[...document.querySelectorAll(".file-to-see")].map((m) => m.getAttribute("aria-label"))`);

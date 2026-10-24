@@ -21,7 +21,7 @@ struct ChatView: View {
     /// Set in a window of its own (#826): this session, not the selection.
     @Environment(\.poppedChat) private var popped
     /// Whether this window has an inspector: not a session's own window (#826), but a
-    /// project's does (#1089).
+    /// folder's does (#1089).
     @Environment(\.windowHasInspector) private var hasInspector
     @Environment(WindowRequests.self) private var requests
     /// Find in Chat is up over the chat (#1532).
@@ -73,7 +73,7 @@ struct ChatView: View {
                         }
                         // Stopped at the pane's top. A scroll view draws on up under the
                         // window's toolbar, which paints no ground of its own since #456,
-                        // so the chat showed through behind the title and project name.
+                        // so the chat showed through behind the title and folder name.
                         .clipped()
                     form
                 }
@@ -153,14 +153,14 @@ struct ChatView: View {
             send: { [model] text in await model.send(text, to: agent.id) },
             openLink: { [openURL] url in openURL(url) },
             pin: { [model] view in
-                await model.pinView(view, in: ProjectKey(host: agent.host, folder: agent.projectFolder))
+                await model.pinView(view, in: FolderKey(host: agent.host, folder: agent.folderPath))
             },
             startAgent: { [model] start in
-                model.offerStart(start, in: ProjectKey(host: agent.host, folder: agent.projectFolder))
+                model.offerStart(start, in: FolderKey(host: agent.host, folder: agent.folderPath))
             },
             // The session on a pull request's branch (#837), asked under the view first.
             recipient: { [model] message in
-                model.recipient(of: message, in: ProjectKey(host: agent.host, folder: agent.projectFolder))
+                model.recipient(of: message, in: FolderKey(host: agent.host, folder: agent.folderPath))
             },
             sendTo: { [model] id, text in await model.send(text, to: id) })
     }
@@ -347,10 +347,10 @@ struct ChatView: View {
                     .help(selectedHostOffline ? offlineHelp : "")
             })
         }
-        // A change its agent made to the project's own files waits the same way (#531).
+        // A change its agent made to the folder's own files waits the same way (#531).
         for change in model.work.guardedChanges(askedIn: agent.id) {
             cards.append(WaitingCard(id: "guarded:" + change.id) {
-                GuardedChangeQuestion(change: change, key: ProjectKey(host: agent.host, folder: agent.projectFolder))
+                GuardedChangeQuestion(change: change, key: FolderKey(host: agent.host, folder: agent.folderPath))
                     .chatColumn()
             })
         }

@@ -161,7 +161,7 @@ func TestAttachmentWritesReadNoTranscript(t *testing.T) {
 	}
 }
 
-// A project can commit .agents/attachments, or .agents, as a link to a folder outside
+// A folder can commit .agents/attachments, or .agents, as a link to a folder outside
 // it. The sweep deletes nothing there, and a write puts nothing there.
 func TestAttachmentsRefuseALinkedFolder(t *testing.T) {
 	clock := time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)
@@ -193,13 +193,13 @@ func TestAttachmentsRefuseALinkedFolder(t *testing.T) {
 
 			d.sweepAttachments()
 			if _, err := os.Stat(victim); err != nil {
-				t.Fatal("the sweep deleted a file outside the project")
+				t.Fatal("the sweep deleted a file outside the folder")
 			}
 			if path, err := d.writeAttachment(root, "a.png", []byte("x")); err == nil {
 				t.Fatalf("wrote %s through the link", path)
 			}
 			if entries, _ := os.ReadDir(filepath.Dir(victim)); len(entries) != 1 {
-				t.Fatalf("%d files outside the project", len(entries))
+				t.Fatalf("%d files outside the folder", len(entries))
 			}
 		})
 	}

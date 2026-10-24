@@ -49,8 +49,8 @@ the record began shows as **Earlier**.
 
 The chart shows money, in the currency that most was spent in. Under the chart:
 
-- **All time** is the total for all of the work. Under it, each project has its share,
-  largest first. Archived projects show **Archived** and stay in the list, so the total
+- **All time** is the total for all of the work. Under it, each folder has its share,
+  largest first. Archived folders show **Archived** and stay in the list, so the total
   always adds up.
 - **At least this much** means that some chats ran on a runtime that reports no price.
   The figure is then a floor, not the full cost.

@@ -74,7 +74,7 @@ var own = methodSet(
 	"clients/stopPairing",
 	"control/rotate",
 	"control/setAuditDays",
-	"control/setProjectDetection",
+	"control/setFolderDetection",
 	"control/status",
 	"daemon/ping",
 	"devices/forget",
@@ -202,7 +202,7 @@ var writes = methodSet(
 	"clients/startPairing",
 	"control/rotate",
 	"control/setAuditDays",
-	"control/setProjectDetection",
+	"control/setFolderDetection",
 	"devices/forget",
 	"devices/startPairing",
 	"governance/decide",
@@ -473,8 +473,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return m.readAPIMethod(ctx, method, params, from)
 	case "control/rotate":
 		return wire.Empty{}, m.s.rotate(ctx, from)
-	case "control/setProjectDetection":
-		request, err := require[wire.ProjectDetection](params, "ProjectDetection")
+	case "control/setFolderDetection":
+		request, err := require[wire.FolderDetection](params, "FolderDetection")
 		if err != nil {
 			return nil, err
 		}
@@ -486,7 +486,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		}
 		request.Paths = paths
 		raw, _ := json.Marshal(request)
-		if _, err := m.records.ChangeSettings(ctx, func(s *records.Settings) { s.ProjectDetection = raw }); err != nil {
+		if _, err := m.records.ChangeSettings(ctx, func(s *records.Settings) { s.FolderDetection = raw }); err != nil {
 			return nil, err
 		}
 		return request, nil
@@ -604,13 +604,13 @@ func (m *Methods) status(from Caller) wire.ControlStatus {
 	// As control.json has it, read as Swift's ControlStatus reads it; the standard where
 	// it has none.
 	detection := standardDetection
-	if len(settings.ProjectDetection) > 0 {
-		var kept wire.ProjectDetection
-		if json.Unmarshal(settings.ProjectDetection, &kept) == nil {
+	if len(settings.FolderDetection) > 0 {
+		var kept wire.FolderDetection
+		if json.Unmarshal(settings.FolderDetection, &kept) == nil {
 			detection = kept
 		}
 	}
-	status.ProjectDetection = &detection
+	status.FolderDetection = &detection
 	needed := requiredNow(m.router.Team())
 	status.Capabilities, status.Required = capabilities(), &needed
 	away := false
@@ -989,10 +989,10 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 			return nil, err
 		}
 		return map[string]any{}, m.hello(ctx, host, hello)
-	case "projects/detected":
-		// Once: from now on its projects are the person's to add and remove (#429).
-		if record := m.records.Host(host); record != nil && record.DetectProjects != nil && *record.DetectProjects {
-			record.DetectProjects = nil
+	case "folders/detected":
+		// Once: from now on its folders are the person's to add and remove (#429).
+		if record := m.records.Host(host); record != nil && record.DetectFolders != nil && *record.DetectFolders {
+			record.DetectFolders = nil
 			if err := m.records.SaveHost(ctx, *record); err != nil {
 				return nil, err
 			}
@@ -1228,12 +1228,12 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.HostHello) 
 			m.s.botMachineJoined(host)
 		}
 	}()
-	// A host marked before #656 to add the projects it found: the mark goes, unsaid.
+	// A host marked before #656 to add the folders it found: the mark goes, unsaid.
 	m.records.ChangeHost(ctx, host, func(r *records.HostRecord) bool {
-		if r.DetectProjects == nil || !*r.DetectProjects {
+		if r.DetectFolders == nil || !*r.DetectFolders {
 			return false
 		}
-		r.DetectProjects = nil
+		r.DetectFolders = nil
 		return true
 	})
 	return nil

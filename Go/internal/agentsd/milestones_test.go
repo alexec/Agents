@@ -25,7 +25,7 @@ func TestMilestonesEarned(t *testing.T) {
 	c.until(t, "the first agent earned", func(m string, p json.RawMessage) bool {
 		return m == "milestones/changed" && strings.Contains(string(p), `"firstAgent"`)
 	})
-	dir := project(t, c, 2)
+	dir := folder(t, c, 2)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "tidy.md"), []byte("---\non: agent.finished\n---\nTidy.\n"), 0o644)
 	c.call(t, 3, "workflows/list", map[string]any{"folder": store.FolderURL(dir)})
@@ -128,7 +128,7 @@ func TestACloudMachineStarted(t *testing.T) {
 func TestALandedPullRequestIsCounted(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	os.Mkdir(filepath.Join(dir, ".git"), 0o755)
 	day := time.Now().AddDate(0, 0, -2)
 	merged := day.UTC().Format(time.RFC3339)

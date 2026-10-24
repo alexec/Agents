@@ -134,7 +134,7 @@ struct WireSchemaTests {
             plugins: [.init(name: "tools", version: "1.0.0", description: nil, path: "/p",
                             contents: .init(skills: 1, commands: 2, agents: 0, hooks: 0, mcpServers: 1),
                             files: ["a.md"], serverNames: ["b"], reach: reach)],
-            otherFiles: [.init(path: "personas/critic.md", kind: .persona), .init(path: "project.json", kind: .app)],
+            otherFiles: [.init(path: "personas/critic.md", kind: .persona), .init(path: "folder.json", kind: .app)],
             needsALook: [.init(kind: .clash, page: .skills, item: "review", text: "Also in ~/.claude/skills/review.")])
         #expect(schema.errors(try JSONValue.encoding(snapshot), against: "SharedSnapshot") == [])
         #expect(schema.errors(try JSONValue.encoding(DaemonAPI.SharedRequest()), against: "SharedRequest") == [])

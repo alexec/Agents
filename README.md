@@ -9,11 +9,11 @@ A Mac app, rebuilt one feature at a time against a written spec.
 Using the app? The docs are at https://docs.agentloops.dev/ (source in `docs/`;
 preview with `scripts/docs.sh serve`). This README is for building and working on it.
 
-The window is a list of the projects you work in — a project is a folder, named by that
-folder, on this Mac or on a Linux server — with that project's agents beside it, grouped
-by what happens next: needs you, waiting, working, done, paused. Unread finished
-sessions need you until you open them. An agent can start helpers of its own (three running and five kept per project unless you change it),
-and a project's workflows (Markdown files under `.agents/workflows/`) start agents
+The window lists the directories you work in on this Mac or on a Linux server, with
+each directory's agents beside it, grouped by what happens next: needs you, waiting,
+working, done, paused. Unread finished
+sessions need you until you open them. An agent can start helpers of its own (three running and five kept per folder unless you change it),
+and a folder's workflows (Markdown files under `.agents/workflows/`) start agents
 by themselves on a schedule or when something happens.
 
 ## Setting it up
@@ -118,7 +118,7 @@ ls ~/Library/Application\ Support/Agents/
 #   daemon.lock   flock, held by the one daemon
 #   agents/<uuid>/agent.json        the record, written whole on every change
 #   agents/<uuid>/transcript.jsonl  appended as things happen, never rewritten
-#   projects.json                   only what a folder cannot tell us: archived, added
+#   folders.json                   only what a folder cannot tell us: archived, added
 
 # Its logs: daemon.log (what it has been doing), mcp-logs/, Agents Host's
 # control.log, relay.log and host.out, and the window's crashes/
@@ -287,7 +287,7 @@ Done or Archived and hold no lease. It also removes archived agents' worktrees t
 nothing uncommitted, keeping the branch, bounds the shared build cache (Swift and Go), ends
 headless walk Chromes left running over 6 hours, and removes older Xcode device support
 (`scripts/free-disk.sh`, #1796). It goes on until 20% of the disk is free or the steps run
-out. It never touches the project folder, a worktree no session names, or a busy agent's.
+out. It never touches the folder, a worktree no session names, or a busy agent's.
 It too arrives turned off.
 
 **Crash reports** (`.agents/workflows/crash-reports.md`, #392) runs once a day at 07:00. It
@@ -307,7 +307,7 @@ no code, and writes a note a day under `.agents/reviews/crashes/` on the local b
 Every runtime arrives holding its own version of nearly everything this app owns: a way to
 schedule something, a way to raise a question, a way to start another agent, somewhere to
 put what it wrote. Used, they put the work somewhere the app cannot see — a cron entry with
-no row in the project, a question in a queue that never reaches your phone, a report in a
+no row in the folder, a question in a queue that never reaches your phone, a report in a
 document nobody agreed on. So for the sessions the app starts, those tools are taken away,
 and the app's own are all that is left.
 

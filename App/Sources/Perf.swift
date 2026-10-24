@@ -3,7 +3,7 @@ import Foundation
 import os
 
 /// How long the window takes over what a person waits for (073): the first list after
-/// launch, a project switch, opening a chat.
+/// launch, a folder switch, opening a chat.
 ///
 /// Each is an `os_signpost` interval, for Instruments, and a `perf` log line with the
 /// milliseconds, for `scripts/perf-window.sh`. An interval ends when the main thread has

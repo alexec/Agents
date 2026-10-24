@@ -101,7 +101,7 @@ func (d *Daemon) registerLanguageServers() {
 		}
 		root := filepath.Dir(path)
 		if a := d.Store.Agent(r.AgentID); a != nil {
-			root = projectFolder(a)
+			root = folderPath(a)
 		}
 		return languageServerPool.diagnose(root, path, r.Text), nil
 	})
@@ -112,7 +112,7 @@ func (d *Daemon) registerLanguageServers() {
 		}
 		root := filepath.Dir(path)
 		if a := d.Store.Agent(r.AgentID); a != nil {
-			root = projectFolder(a)
+			root = folderPath(a)
 		}
 		return languageServerPool.complete(ctx, root, path, r), nil
 	})

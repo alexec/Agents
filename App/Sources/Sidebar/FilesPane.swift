@@ -190,35 +190,35 @@ struct FilesPane: View {
         .padding(.vertical, 6)
     }
 
-    /// The open file's path in the project, when it is a page that can be pinned (#159):
-    /// from a worktree, the same path in the project folder, where the pin opens it.
+    /// The open file's path in the folder, when it is a page that can be pinned (#159):
+    /// from a worktree, the same path in the folder, where the pin opens it.
     private func pinPath(_ url: URL) -> String? {
         let file = url.path(percentEncoded: false)
         let path = agent.worktree != nil
-            ? PinRules.relative(file, in: agent.cwd) : PinRules.relative(file, in: agent.projectFolder)
+            ? PinRules.relative(file, in: agent.cwd) : PinRules.relative(file, in: agent.folderPath)
         return path.flatMap { PinRules.kind($0) == nil ? nil : $0 }
     }
 
-    /// Pin to Project, or Unpin when it is pinned: under the project.
+    /// Pin to Folder, or Unpin when it is pinned: under the folder.
     @ViewBuilder
     private func pinButton(_ path: String) -> some View {
-        let project = ProjectKey(host: agent.host, folder: agent.projectFolder)
-        let pins = model.pins(in: project.folder)
+        let folder = FolderKey(host: agent.host, folder: agent.folderPath)
+        let pins = model.pins(in: folder.folder)
         if pins.contains(where: { $0.path == path }) {
-            Button { Task { await model.unpin(path, in: project) } } label: {
+            Button { Task { await model.unpin(path, in: folder) } } label: {
                 Label("Unpin", systemImage: "pin.fill").labelStyle(.iconOnly)
             }
             .buttonStyle(.borderless)
-            .help("Pinned under the project. Click to unpin it.")
+            .help("Pinned under the folder. Click to unpin it.")
         } else {
-            let full = pins.count >= PinLimits.perProject
-            Button { Task { await model.pin(path, in: project) } } label: {
-                Label("Pin to Project", systemImage: "pin").labelStyle(.iconOnly)
+            let full = pins.count >= PinLimits.perFolder
+            Button { Task { await model.pin(path, in: folder) } } label: {
+                Label("Pin to Folder", systemImage: "pin").labelStyle(.iconOnly)
             }
             .buttonStyle(.borderless)
             .disabled(full)
-            .help(full ? "This project already has \(PinLimits.perProject) pinned pages, the most it can have. Unpin one first."
-                       : "Pin to Project: under the project in the sidebar.")
+            .help(full ? "This folder already has \(PinLimits.perFolder) pinned pages, the most it can have. Unpin one first."
+                       : "Pin to Folder: under the folder in the sidebar.")
         }
     }
 

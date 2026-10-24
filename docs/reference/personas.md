@@ -14,11 +14,11 @@ of its own.
 
 A persona is one Markdown file in a `.agents/personas` folder:
 
-- in the project, for that project's sessions;
-- in `~/.agents`, for every project on that computer.
+- in the folder, for that folder's sessions;
+- in `~/.agents`, for every folder on that computer.
 
-The file name, without `.md`, is the persona's id. When the project and `~/.agents` both have
-one with the same id, the project's is used.
+The file name, without `.md`, is the persona's id. When the folder and `~/.agents` both have
+one with the same id, the folder's is used.
 
 No runtime reads these folders as skills, so an agent cannot pick a persona up half way
 through a session.
@@ -52,16 +52,16 @@ The body is the persona's prompt. It can name the skills the persona relies on.
 
 ## Manage them in Agents
 
-On the Mac, manage persona files in **Settings ▸ Agent Configuration ▸ Other files** for personal files, or **Project Settings ▸ Agent Configuration ▸ Other files** for project files. The iPhone, iPad and web keep persona management on the new-session form because they do not have agent-file configuration pages. You can still choose a persona on the new-session form on every client.
-Choose the project or personal scope, then open a file, create one, edit its Markdown or
+On the Mac, manage persona files in **Settings ▸ Agent Configuration ▸ Other files** for personal files, or **Folder Settings ▸ Agent Configuration ▸ Other files** for folder files. The iPhone, iPad and web keep persona management on the new-session form because they do not have agent-file configuration pages. You can still choose a persona on the new-session form on every client.
+Choose the folder or personal scope, then open a file, create one, edit its Markdown or
 delete it. The editor keeps the whole Markdown file, including front matter fields the app
 does not know, so a saved persona is available to future session starts in that scope.
 
 ## Picking one
 
-The choice is a menu under the project's name at the top of the new-session form, on the
+The choice is a menu under the folder's name at the top of the new-session form, on the
 Mac, the Remote and the web page (#918). It shows the persona picked, or **No persona**, and
-**No persona** is first in the menu. It is not shown when the project has no personas. A file that cannot be read is listed under it with what is wrong.
+**No persona** is first in the menu. It is not shown when the folder has no personas. A file that cannot be read is listed under it with what is wrong.
 
 Picking a persona:
 

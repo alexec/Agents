@@ -536,7 +536,7 @@ def real_turn(client, root, rid, model, timeout=300):
     os.makedirs(work, exist_ok=True)
     if not os.path.exists(os.path.join(work, ".git")):
         sh(["git", "-C", work, "init", "-q"])
-        client.call("projects/add", {"folder": "file://" + work})
+        client.call("folders/add", {"folder": "file://" + work})
     params = {"runtimeID": rid, "cwd": "file://" + work, "prompt": TURN_PROMPT}
     if model:
         params["startOptions"] = {"values": {"model": model}}

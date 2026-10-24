@@ -194,7 +194,7 @@ struct ChoiceRows: View {
     /// it as out is the whole of the change: a list of runtimes by name says nothing
     /// about which ones will turn a message down.
     ///
-    /// A server project's runtimes are left in one run, as the window leaves them (#240):
+    /// A server folder's runtimes are left in one run, as the window leaves them (#240):
     /// the allowances are the Mac's own, and would label a server's runtime with the
     /// Mac's state.
     private var splitsByAllowance: Bool { model.startHost == .mac }
@@ -225,17 +225,17 @@ struct ChoiceRows: View {
         model.runtimeAllowances?.availableNote(for: runtimeID)
     }
 
-    /// Project folder, a new worktree, or one already there (030), as the Mac's start
+    /// Folder, a new worktree, or one already there (030), as the Mac's start
     /// bar offers them. Only on a repository.
     private var worktreeRow: some View {
         let listed = model.startWorktrees
-        let others = listed.worktrees.filter { !$0.isProjectFolder }
+        let others = listed.worktrees.filter { !$0.isFolderPath }
         return Menu {
             Button {
                 Task { await model.chooseWorktree(nil) }
             } label: {
-                choiceLabel("Project folder", chosen: model.startWorktree == nil)
-                Text(listed.projectFolderDescription)
+                choiceLabel("Folder", chosen: model.startWorktree == nil)
+                Text(listed.folderPathDescription)
             }
             Button {
                 Task { await model.chooseWorktree(.new) }
@@ -343,7 +343,7 @@ struct ChoiceRows: View {
 
     private var worktreeTitle: String {
         switch model.startWorktree {
-        case nil: "Project folder"
+        case nil: "Folder"
         case .new: "New worktree"
         case .named(let name): name
         case .existing(let root): root.lastPathComponent

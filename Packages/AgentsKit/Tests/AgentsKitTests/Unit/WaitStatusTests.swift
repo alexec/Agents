@@ -5,7 +5,7 @@ import Testing
 /// Both kinds of waiting, said one way (042 FR-012, R4).
 @Suite("Wait status")
 struct WaitStatusTests {
-    private let dir = URL(fileURLWithPath: "/tmp/project")
+    private let dir = URL(fileURLWithPath: "/tmp/folder")
     private let since = Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 25, hour: 23, minute: 30))!
     private let until = Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 26, hour: 9, minute: 0))!
 

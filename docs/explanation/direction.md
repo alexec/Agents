@@ -23,7 +23,7 @@ The path a new person takes must be short, and must need only a browser. These a
 - Get a control plane of their own. They type no command and hold no key.
 - Connect a machine provider, such as DigitalOcean, Codespaces, Coder or Docker.
 - Pick a repository. A machine starts, clones it with a short-lived token and shows it as
-  a project.
+  a folder.
 - Work in the web page. Add the Mac app, the phone or a desktop machine later, by signing
   in on each.
 

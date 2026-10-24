@@ -3,8 +3,8 @@ import Foundation
 
 /// What the fake Mac has on it.
 ///
-/// Chosen to make the screens hard rather than easy: a project whose folder has gone,
-/// two projects that would share a name, an agent waiting on a question, one working
+/// Chosen to make the screens hard rather than easy: a folder whose folder has gone,
+/// two folders that would share a name, an agent waiting on a question, one working
 /// with a plan half done, one that crashed, one archived, and a conversation long
 /// enough that opening it has to page.
 ///
@@ -168,7 +168,7 @@ enum Canned {
                   endedReason: .endTurn, costToDate: ["USD": 0.05],
                   outcomeAsked: true),
             Agent(id: filed, runtimeID: "claude", cwd: agentsFolder,
-                  title: "The project lead that came back out", state: .archived,
+                  title: "The folder lead that came back out", state: .archived,
                   createdAt: ago(2_200), lastActivityAt: ago(2_000),
                   archivedReason: .byUser),
             // Waiting on an event (042): the wait card at the end of its chat, with Show in
@@ -192,7 +192,7 @@ enum Canned {
 
     /// The daemon works these out from the agents, so the fake does too rather than
     /// writing counts by hand that could disagree with the cards below them.
-    static func projects(for agents: [Agent]) -> [DaemonAPI.ProjectSummary] {
+    static func folders(for agents: [Agent]) -> [DaemonAPI.FolderSummary] {
         let folders: [(URL, String, Bool, Date?)] = [
             (agentsFolder, "Agents", true, nil),
             (apiFolder, "pricing/api", true, nil),
@@ -204,8 +204,8 @@ enum Canned {
             var counts: [AgentGroup: Int] = [:]
             // The preview says what the daemon says: without eyes.
             for agent in mine { counts[agent.group(), default: 0] += 1 }
-            return DaemonAPI.ProjectSummary(
-                project: Project(folder: folder, archivedAt: archivedAt, addedAt: ago(9_000)),
+            return DaemonAPI.FolderSummary(
+                folder: Folder(folder: folder, archivedAt: archivedAt, addedAt: ago(9_000)),
                 name: name,
                 exists: exists,
                 lastActivityAt: mine.map(\.lastActivityAt).max() ?? ago(9_000),
@@ -233,25 +233,25 @@ enum Canned {
                 text: "The Mac ships two columns and a push, which is already the shape a phone wants.")),
             TranscriptEntry(at: ago(39), kind: .agentMessage(
                 messageID: nil,
-                text: "Starting with the project list. I will copy what shipped rather than what the contract described.")),
+                text: "Starting with the folder list. I will copy what shipped rather than what the contract described.")),
             TranscriptEntry(at: ago(36), kind: .toolCall(ToolCall(
                 toolCallID: "t1",
-                title: "Read ProjectAgentsView.swift",
+                title: "Read FolderAgentsView.swift",
                 kind: "read",
                 content: [.content(.text("200 lines, the 144pt gutter and the grouped cards."))],
-                locations: [ToolCallLocation(path: "/App/Sources/Projects/ProjectAgentsView.swift",
+                locations: [ToolCallLocation(path: "/App/Sources/Folders/FolderAgentsView.swift",
                                              line: 1)]))),
             TranscriptEntry(at: ago(30), kind: .toolCall(ToolCall(
                 toolCallID: "t2",
-                title: "Write Remote/Sources/Projects/ProjectListView.swift",
+                title: "Write Remote/Sources/Folders/FolderListView.swift",
                 kind: "edit",
                 content: [.diff(ToolCallContent.Diff(
-                    path: "/Remote/Sources/Projects/ProjectListView.swift",
-                    oldText: "struct ProjectListView: View {\n    var body: some View {\n        List {}\n    }\n}\n",
-                    newText: "struct ProjectListView: View {\n    var body: some View {\n        List(model.liveProjects) { ProjectRow(summary: $0) }\n    }\n}\n"))]))),
+                    path: "/Remote/Sources/Folders/FolderListView.swift",
+                    oldText: "struct FolderListView: View {\n    var body: some View {\n        List {}\n    }\n}\n",
+                    newText: "struct FolderListView: View {\n    var body: some View {\n        List(model.liveFolders) { FolderRow(summary: $0) }\n    }\n}\n"))]))),
             TranscriptEntry(at: ago(24), kind: .planUpdated(Plan(planID: "p1", entries: [
-                PlanEntry(content: "The project list", status: .completed),
-                PlanEntry(content: "The project page", status: .inProgress),
+                PlanEntry(content: "The folder list", status: .completed),
+                PlanEntry(content: "The folder page", status: .inProgress),
                 PlanEntry(content: "The conversation", status: .pending),
             ]))),
             TranscriptEntry(at: ago(20), kind: .toolCall(ToolCall(

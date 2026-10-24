@@ -159,7 +159,7 @@ func (d *Daemon) adoptSession(ctx context.Context, r wire.AdoptRequest) (wire.UU
 		return "", err
 	}
 	d.tellChanged(a, nil)
-	d.projectChanged(projectFolder(&a))
+	d.folderChanged(folderPath(&a))
 	d.record(id, runtimeNote("Picked up a conversation "+rt.Name+" was already holding."))
 	err = s.LoadRecorded(ctx, sid, path, d.sessionMCP(path), sessionMeta(r.RuntimeID))
 	l.flushHeld()

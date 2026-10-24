@@ -25,7 +25,7 @@ try {
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  await page.waitFor(`document.querySelectorAll(".sidebar .row.project").length >= ${mode === "offline" ? 3 : 4}`, 20_000);
+  await page.waitFor(`document.querySelectorAll(".sidebar .row.folder").length >= ${mode === "offline" ? 3 : 4}`, 20_000);
   await sleep(800);
   if (mode === "offline") {
     await page.waitFor(`document.querySelector(".sidebar-foot .foot-line")`, 180_000);
@@ -36,10 +36,10 @@ try {
     process.exit(0);
   }
 
-  const projects = () => page.eval(`[...document.querySelectorAll(".sidebar .row.project")].map((r) => r.innerText.replace(/\\s+/g, " ").trim())`);
+  const folders = () => page.eval(`[...document.querySelectorAll(".sidebar .row.folder")].map((r) => r.innerText.replace(/\\s+/g, " ").trim())`);
   const rows = () => page.eval(`[...document.querySelectorAll(".sidebar .activity-row")].map((r) => r.innerText.replace(/\\s+/g, " ").trim())`);
   const unfold = (name, open = true) => page.eval(`(() => {
-    const b = [...document.querySelectorAll(".sidebar .row.project .disclosure")].find((d) => d.getAttribute("aria-label").endsWith(" " + ${js(name)}));
+    const b = [...document.querySelectorAll(".sidebar .row.folder .disclosure")].find((d) => d.getAttribute("aria-label").endsWith(" " + ${js(name)}));
     if (b && (b.getAttribute("aria-expanded") === "true") !== ${open}) b.click();
     return !!b;
   })()`);
@@ -52,19 +52,19 @@ try {
   const hash = () => page.eval(`location.hash`);
   const key = (k, extra = {}) => page.eval(`document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key: ${js(k)}, bubbles: true, cancelable: true, ...${js(extra)} }))`);
 
-  // 1: every project folded, nothing selected.
+  // 1: every folder folded, nothing selected.
   await page.eval(`localStorage.removeItem("agents.sidebar.folds")`);
   await page.eval(`location.hash = "#/"`);
   await sleep(300);
   say(`activity: ${js(await rows())}`);
-  say(`projects folded: ${js(await projects())}`);
+  say(`folders folded: ${js(await folders())}`);
   await page.shot(`${out}/1-folded-nothing-selected.png`);
 
   // 2: Agents and the server's api-server unfolded.
   await unfold("Agents");
   await unfold("build-box:api-server");
   await sleep(600);
-  say(`projects unfolded: ${js(await projects())}`);
+  say(`folders unfolded: ${js(await folders())}`);
   say(`subheads: ${js(await page.eval(`[...document.querySelectorAll(".sidebar .fold-body .subhead")].map((h) => h.innerText.replace(/\\s+/g, " ").trim())`))}`);
   await page.shot(`${out}/2-unfolded.png`);
 
@@ -75,18 +75,18 @@ try {
   say(`session: ${await hash()}`);
   await page.shot(`${out}/3-session-selected.png`);
 
-  // 4: a project's New session row (#375) opens its new session; only that row lights.
-  await page.eval(`[...document.querySelectorAll(".sidebar .project-fold")].find((f) => f.querySelector(".row.project .pick").innerText.startsWith("Agents")).querySelector(".row.new-session .pick").click()`);
+  // 4: a folder's New session row (#375) opens its new session; only that row lights.
+  await page.eval(`[...document.querySelectorAll(".sidebar .folder-fold")].find((f) => f.querySelector(".row.folder .pick").innerText.startsWith("Agents")).querySelector(".row.new-session .pick").click()`);
   await page.waitFor(`document.querySelector(".new-agent")`, 10_000);
   await sleep(500);
-  say(`project: ${await hash()}; lit: ${js(await page.eval(`[...document.querySelectorAll(".sidebar .chosen")].map((e) => e.innerText.split("\\n")[0])`))}`);
-  await page.shot(`${out}/4-project-new-session.png`);
+  say(`folder: ${await hash()}; lit: ${js(await page.eval(`[...document.querySelectorAll(".sidebar .chosen")].map((e) => e.innerText.split("\\n")[0])`))}`);
+  await page.shot(`${out}/4-folder-new-session.png`);
 
   // 5: reloaded, the folds are kept.
   await page.eval(`location.hash = "#/"; location.reload()`);
-  await page.waitFor(`document.querySelectorAll(".sidebar .row.project").length >= 4`, 20_000);
+  await page.waitFor(`document.querySelectorAll(".sidebar .row.folder").length >= 4`, 20_000);
   await sleep(800);
-  say(`after reload: ${js(await page.eval(`[...document.querySelectorAll(".sidebar .row.project .pick")].map((b) => b.innerText.split("\\n")[0] + (b.getAttribute("aria-expanded") === "true" ? " (open)" : ""))`))}`);
+  say(`after reload: ${js(await page.eval(`[...document.querySelectorAll(".sidebar .row.folder .pick")].map((b) => b.innerText.split("\\n")[0] + (b.getAttribute("aria-expanded") === "true" ? " (open)" : ""))`))}`);
   await page.shot(`${out}/5-reloaded-folds-kept.png`);
 
   // 6: Archived sessions opened under Agents.
@@ -110,7 +110,7 @@ try {
     if (name === "events" || name === "runtimes") await page.shot(`${out}/8-activity-${name}.png`);
   }
 
-  // 9: the keys. Focus on Events; ↓ to Resources; then down into the projects.
+  // 9: the keys. Focus on Events; ↓ to Resources; then down into the folders.
   await page.eval(`location.hash = "#/"`);
   await sleep(300);
   await page.eval(`document.querySelector(".sidebar .activity-row").focus()`);
@@ -118,14 +118,14 @@ try {
   for (let i = 0; i < 5; i++) { await key("ArrowDown"); await sleep(150); walk.push(`${await focused()} ${await hash()}`); }
   say(`↓×5: ${js(walk)}`);
   // On "Agents" (unfolded): ← folds it, → unfolds it.
-  await page.eval(`[...document.querySelectorAll(".sidebar .row.project .pick")].find((b) => b.innerText.startsWith("Agents")).focus()`);
+  await page.eval(`[...document.querySelectorAll(".sidebar .row.folder .pick")].find((b) => b.innerText.startsWith("Agents")).focus()`);
   await key("ArrowLeft");
   await sleep(200);
-  const folded = await page.eval(`[...document.querySelectorAll(".sidebar .row.project .pick")].find((b) => b.innerText.startsWith("Agents")).getAttribute("aria-expanded")`);
+  const folded = await page.eval(`[...document.querySelectorAll(".sidebar .row.folder .pick")].find((b) => b.innerText.startsWith("Agents")).getAttribute("aria-expanded")`);
   await page.shot(`${out}/9-keys-folded.png`);
   await key("ArrowRight");
   await sleep(200);
-  const unfolded = await page.eval(`[...document.querySelectorAll(".sidebar .row.project .pick")].find((b) => b.innerText.startsWith("Agents")).getAttribute("aria-expanded")`);
+  const unfolded = await page.eval(`[...document.querySelectorAll(".sidebar .row.folder .pick")].find((b) => b.innerText.startsWith("Agents")).getAttribute("aria-expanded")`);
   say(`← then →: expanded ${folded} then ${unfolded}`);
   await key("ArrowDown");
   await sleep(300);
@@ -134,7 +134,7 @@ try {
   await sleep(150);
   say(`← from a session: ${await focused()}`);
 
-  // 10: the menus. A session row's, by the menu key; a project row's, by a right click.
+  // 10: the menus. A session row's, by the menu key; a folder row's, by a right click.
   await page.eval(`[...document.querySelectorAll(".sidebar .row.session")].find((r) => r.innerText.includes("Dock badge counts")).focus()`);
   await key("ContextMenu");
   await sleep(200);
@@ -148,13 +148,13 @@ try {
   await sleep(800);
   say(`after ${marked}: ${js(await page.eval(`[...document.querySelectorAll(".sidebar .fold-body .subhead")].map((h) => h.innerText.replace(/\\s+/g, " ").trim()).filter((t) => t.startsWith("Done"))`))}`);
   await page.eval(`(() => {
-    const b = [...document.querySelectorAll(".sidebar .row.project .pick")].find((e) => e.innerText.startsWith("website"));
+    const b = [...document.querySelectorAll(".sidebar .row.folder .pick")].find((e) => e.innerText.startsWith("website"));
     const box = b.getBoundingClientRect();
     b.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: box.left + 40, clientY: box.top + 10 }));
   })()`);
   await sleep(200);
-  say(`project menu: ${js(await page.eval(`[...document.querySelectorAll(".context-menu [role=menuitem]")].map((b) => b.textContent)`))}`);
-  await page.shot(`${out}/11-project-menu.png`);
+  say(`folder menu: ${js(await page.eval(`[...document.querySelectorAll(".context-menu [role=menuitem]")].map((b) => b.textContent)`))}`);
+  await page.shot(`${out}/11-folder-menu.png`);
   await page.eval(`[...document.querySelectorAll(".context-menu [role=menuitem]")].find((b) => b.textContent === "New Session").click()`);
   await sleep(600);
   say(`New Session: ${await hash()}`);
@@ -165,7 +165,7 @@ try {
   for (const [w, h] of [[1600, 900], [1000, 800], [760, 800], [390, 844]]) {
     await page.viewport(w, h);
     await sleep(400);
-    const visible = await page.eval(`["sidebar","projects","sessions","chat"].filter((c) => { const el = document.querySelector("." + c); return el && el.offsetParent !== null; })`);
+    const visible = await page.eval(`["sidebar","folders","sessions","chat"].filter((c) => { const el = document.querySelector("." + c); return el && el.offsetParent !== null; })`);
     const sideways = await page.eval(`document.documentElement.scrollWidth > innerWidth + 1`);
     say(`${w}×${h}: ${js(visible)}${sideways ? " — scrolls sideways" : ""}`);
     await page.shot(`${out}/13-width-${w}.png`);

@@ -13,33 +13,33 @@ import { hostAnswers } from "./model/capabilities";
 const settle = 500;
 
 /**
- * Sessions that need the person across live projects (needsPersonCount): Needs you and Blocked, not unread (#1565).
- * Each project's count is worked out once per change to that project's agents (#170).
+ * Sessions that need the person across live folders (needsPersonCount): Needs you and Blocked, not unread (#1565).
+ * Each folder's count is worked out once per change to that folder's agents (#170).
  */
 export function needsPersonCount(store: Store): number {
   let total = 0;
-  for (const [host, projects] of Object.entries(store.projects.value)) {
-    for (const project of projects) {
-      if (project.project.archivedAt !== undefined) continue;
+  for (const [host, folders] of Object.entries(store.folders.value)) {
+    for (const folder of folders) {
+      if (folder.folder.archivedAt !== undefined) continue;
       // Needs you and Blocked, as the Dock badge counts (#1565).
-      total += store.projectView(host, project.project.folder).attention;
+      total += store.folderView(host, folder.folder.folder).attention;
     }
   }
   return total;
 }
 
-/** Each live project's view, for the favicon's mood (#1317). */
+/** Each live folder's view, for the favicon's mood (#1317). */
 function* liveViews(store: Store): Generator<MoodCounts> {
-  for (const [host, projects] of Object.entries(store.projects.value)) {
-    for (const project of projects) {
-      if (project.project.archivedAt === undefined) yield store.projectView(host, project.project.folder);
+  for (const [host, folders] of Object.entries(store.folders.value)) {
+    for (const folder of folders) {
+      if (folder.folder.archivedAt === undefined) yield store.folderView(host, folder.folder.folder);
     }
   }
 }
 
-/** The tab's title: Agents, or the project a tab holds alone (#1089), after how many need the person. */
-export function titleFor(count: number, project?: string): string {
-  const name = project ?? "Agents";
+/** The tab's title: Agents, or the folder a tab holds alone (#1089), after how many need the person. */
+export function titleFor(count: number, folder?: string): string {
+  const name = folder ?? "Agents";
   return count > 0 ? `(${count}) ${name}` : name;
 }
 

@@ -8,7 +8,7 @@ description: The coding agents the app can start, what it runs for each, and wha
 
 A runtime is the coding agent that does the work in a conversation. This page lists the
 ones the app knows how to start. Most you install and sign in to yourself, and the app
-finds them on your Mac, or on a server when the project is on a server. Codex, Gemini,
+finds them on your Mac, or on a server when the folder is on a server. Codex, Gemini,
 Antigravity and OpenCode are only ever the app's own copies: **Install** on their rows in **Settings ▸ Agent Runtimes** puts
 them in place.
 
@@ -22,7 +22,7 @@ newer version.
 | **Claude** | `npx -y @agentclientprotocol/claude-agent-acp` | Yes | Partly. Sign in with Claude Code itself, in Terminal: run `claude` and type `/login`. The sheet then shows the account, such as **Claude Max**, and offers **Sign out** and **Who answers**. | All | `claude` has no mode the app can talk to, so the app runs this adapter through your Node instead. Its questions reach you as a card you can answer on the Mac or phone. It asks your permission before using some of the app's tools. Its subagents and background commands are shown over the prompt as they run. |
 | **Grok** | `grok --permission-mode default agent stdio` | No | Yes, with **grok.com** | All | It cannot ask you a question mid-turn in a way the app can show, so it ends its turn with the question instead, and the agent shows **Waiting on your answer**. Its image and video generation is switched off for the conversations the app starts. Under the prompt, set **Default** or **Always-approve**. Agents the app starts follow this Mac-wide choice, even when Grok's own saved mode elsewhere would approve everything. |
 | **Copilot** | `copilot --acp` | Yes | Hands you the exact command to run in Terminal, with **Open Terminal** and **Copy** | All | It takes no MCP server it would have to start itself, so the app runs those and hands each to Copilot over a local http address only that agent can use. It uses its own follow-up suggestions instead of the app's. It asks permission before every tool call. |
-| **Gemini** | the app's own `gemini --acp --skip-trust`, installed from **Settings ▸ Agent Runtimes** | Yes | No. Paste a Gemini API key under Gemini in **Settings ▸ Agent Runtimes** (get one at aistudio.google.com/apikey). | All | A `gemini` you installed yourself is never used: the app runs the version it was built against. Google's own sign-in no longer works for individuals, so a key is the way in; the same key is used on servers. The app's tools reach Gemini only in a folder it trusts, so the app trusts the agent's folder for that conversation only, which also loads that project's own Gemini hooks and settings. It cannot ask you a question mid-turn, so it ends its turn with the question and the agent shows **Waiting on your answer**. Its own subagents and task tracker stay. It reports tokens but no cost. On Google's free tier a spent daily quota ends the turn with Google's own sentence, and **Auto** in the model menu may pick a Pro model, which has the smallest free quota: choose a Flash model to go further. Picking a conversation back up may make Gemini record, once, that it signs in with an API key, in its own `~/.gemini/settings.json`. |
+| **Gemini** | the app's own `gemini --acp --skip-trust`, installed from **Settings ▸ Agent Runtimes** | Yes | No. Paste a Gemini API key under Gemini in **Settings ▸ Agent Runtimes** (get one at aistudio.google.com/apikey). | All | A `gemini` you installed yourself is never used: the app runs the version it was built against. Google's own sign-in no longer works for individuals, so a key is the way in; the same key is used on servers. The app's tools reach Gemini only in a folder it trusts, so the app trusts the agent's folder for that conversation only, which also loads that folder's own Gemini hooks and settings. It cannot ask you a question mid-turn, so it ends its turn with the question and the agent shows **Waiting on your answer**. Its own subagents and task tracker stay. It reports tokens but no cost. On Google's free tier a spent daily quota ends the turn with Google's own sentence, and **Auto** in the model menu may pick a Pro model, which has the smallest free quota: choose a Flash model to go further. Picking a conversation back up may make Gemini record, once, that it signs in with an API key, in its own `~/.gemini/settings.json`. |
 | **Cursor** | `cursor-agent acp` | Yes | Yes | All | The command is `cursor-agent`, not `agent`, which is Grok's. It offers no options to pick from and no way to sign out, so the app shows neither. Three of its own tools, which overlap with the app's, cannot be turned off. It asks your permission before using some of the app's tools. Its Agent, Plan and Ask stay under the prompt beside a separate, Mac-wide permission capsule: **Default** or **Always-approve**. |
 | **Codex** | The app's own copy of `@agentclientprotocol/codex-acp`, installed from the set-up page or **Settings ▸ Agent Runtimes** | Yes | Yes: **ChatGPT** first, then a ChatGPT device code or an OpenAI API key | All | Never a `codex` or `npx` of yours: the app runs the exact version it carries, and offers **Update** when a newer app carries a newer one. Signing in with ChatGPT is shared with Codex in Terminal. Its questions reach you as a card. Its three modes are **Ask for approval**, **Approve for me** and **Full access**. It shows how much of its context is used, with no cost. Its own sub-agents and goals are on, and its sub-agents are shown over the prompt as they run. |
 | **Antigravity** | The app's own copy of Google's Antigravity ACP server (`agy_acp_server`, not the `agy` command), downloaded from Google by the set-up page or **Settings ▸ Agent Runtimes** | Yes | Yes, with a personal or business Google account, in your browser | All | The one Google runtime a Google account alone can sign in to; Gemini is for an API key, and the Gemini key is never lent to Antigravity. It keeps its settings, conversations and sign-in in a folder of the app's own, never in `~/.gemini`. It runs on this Mac only; servers are not supported yet. Its questions reach you as a card. Its own tool for starting subagents stays. |
@@ -38,7 +38,7 @@ In every column:
   runtime's sign-in. The sheet says one of **Signed in and ready**, **Installed, and
   needs signing in** or **Not asked yet**.
 - **App tools available**: the tools on [Tools the app gives agents](agent-tools.md).
-- **On a server**: an agent in a server project is offered only the runtimes on that
+- **On a server**: an agent in a server folder is offered only the runtimes on that
   server. Claude, Codex, Gemini and OpenCode are the exceptions: Agents installs them on the
   server itself. Claude and Codex sign in there through this Mac's own sign-ins, Gemini with
   the key in Settings, and OpenCode borrows the provider keys it is signed in with on this Mac,
@@ -205,7 +205,7 @@ way it can take them. See [Share skills, instructions and connectors with every 
 | **Grok** | reads `~/.agents/skills` | `~/.grok/AGENTS.md`, a link | sent at start | handed at start, with its servers sent as MCP servers |
 | **Cursor** | reads `~/.agents/skills` | none: User Rules are in Cursor's settings | sent at start; its own of the same name runs too | no way in |
 | **Copilot** | reads `~/.agents/skills` | `~/.copilot/copilot-instructions.md`, a link | through the app's local bridge for servers it would start; its own of the same name wins | no way in over the app |
-| **Gemini** | reads `~/.agents/skills` | `~/.gemini/AGENTS.md`, a link, beside its own `GEMINI.md` | sent at start | a link in `~/.gemini/extensions`; a project's plugins are switched on only in that project |
+| **Gemini** | reads `~/.agents/skills` | `~/.gemini/AGENTS.md`, a link, beside its own `GEMINI.md` | sent at start | a link in `~/.gemini/extensions`; a folder's plugins are switched on only in that folder |
 | **Antigravity** | a link in the folder the app gives it | none | sent at start | no way in |
 | **OpenCode** | reads `~/.agents/skills` | follows `~/.claude/CLAUDE.md`, the link above, unless you keep your own `~/.config/opencode/AGENTS.md` | sent at start | no way in: its plugins are its own npm packages |
 
@@ -270,7 +270,7 @@ on Linux).
 | | `AGENTS.md` read beside `GEMINI.md` | `GEMINI_CLI_SYSTEM_DEFAULTS_PATH` | Shared instructions reach Gemini. Your own `context.fileName` wins. |
 | | Your key from Settings | `GEMINI_API_KEY` | The only way in for individuals. |
 | **Antigravity** | A home of the app's own, never `~/.gemini` | `GEMINI_HOME` | Its settings, conversations and sign-in stay apart from Gemini's. |
-| | The agent's folder trusted | `AGY_ACP_DISABLE_WORKSPACE_TRUST` | As Gemini's. It also means a project's `.agents/hooks.json` runs without Antigravity asking first. |
+| | The agent's folder trusted | `AGY_ACP_DISABLE_WORKSPACE_TRUST` | As Gemini's. It also means a folder's `.agents/hooks.json` runs without Antigravity asking first. |
 | | Its sign-in in a file, not the Keychain | `AGY_ACP_FORCE_FILE_STORAGE` | So it can be copied to a server without a Keychain prompt. |
 | | No deny list sent | `_meta.agy.disabledTools`, while there is something in it | There is nothing to deny; the list is only ever for tools the app has a reason to take away. |
 | | Keys in the environment ignored | `GEMINI_API_KEY`, `GOOGLE_API_KEY` removed | It signs in with a Google account only. |
@@ -335,7 +335,7 @@ every turn, so those in your config file only choose the first value, or nothing
 | Memories | `features.memories` | off | Yes | Yes | Leave alone: Codex's own setting decides |
 | Browser, computer use, image generation | `features.browser_use`, `computer_use`, `image_generation` | on | Not yet measured | — | Measure: they may be tools that duplicate the app's |
 | Reasoning summaries | `model_reasoning_summary` | auto | No: the adapter chooses | — | Leave alone |
-| Folder trust | `projects.<path>.trust_level` | asks | The adapter trusts every agent's folder, so a project's own Codex config and hooks load | Yes | Leave alone |
+| Folder trust | `folders.<path>.trust_level` | asks | The adapter trusts every agent's folder, so a folder's own Codex config and hooks load | Yes | Leave alone |
 | Compaction | `model_auto_compact_token_limit`, `compact_prompt` | on, 90% of the window, no off switch | Yes: `compaction_update`, no summary; `/compact` offered | Through `CODEX_CONFIG` | Leave alone: on with nothing set; see [Compaction in each runtime](../explanation/compaction-by-runtime.md) |
 | Verbosity, subagent limits, profiles, instructions, MCP, hooks | config file | its defaults | Yes | Not read on a relayed server | Leave alone |
 | Sandbox and network | `sandbox_mode`, `sandbox_workspace_write.network_access` | from the mode: network off except **Full access** | The mode decides; measured | Yes; On needs user namespaces there | Show: **Command sandbox**, Off is **Full access** |
@@ -354,11 +354,11 @@ is the lowest of them, so yours always win over it.
 | Usage statistics | `privacy.usageStatisticsEnabled` | on | Yes | Through the app's defaults file | Show, planned: the usage data switch; your own file still wins |
 | Session retention | `general.sessionRetention` | 30 days, deleted at every start | Yes | Through the app's defaults file | Set, planned: long enough that an idle agent can still be picked back up |
 | Subagents, task tracker | `invoke_agent`, `tracker_*` | on | Yes | Yes | Leave alone |
-| Folder trust | `--skip-trust` | asks | Yes: loads the project's own hooks and settings | Yes | Set today |
+| Folder trust | `--skip-trust` | asks | Yes: loads the folder's own hooks and settings | Yes | Set today |
 | Compression | `model.compressionThreshold` | on, at 0.5 of the window | Yes, but nothing is sent over ACP and `/compress` is not offered | Through the app's defaults file | Leave alone: on with nothing set; see [Compaction in each runtime](../explanation/compaction-by-runtime.md) |
 | Turn limit, loop detection, tool output, shell | settings | its defaults | Yes | Server's own | Leave alone |
 | Checkpoints | `general.checkpointing.enabled` | off | No: only its terminal writes them | — | Leave alone |
-| MCP, hooks, extensions, skills, `.env` files | settings | loaded | Yes | Server's own | Leave alone. A project `.env` can set Gemini's variables. |
+| MCP, hooks, extensions, skills, `.env` files | settings | loaded | Yes | Server's own | Leave alone. A folder `.env` can set Gemini's variables. |
 | Telemetry to your own collector | `telemetry.*`, `GEMINI_TELEMETRY_*` | off | Yes | Yes | Leave alone |
 | Sandbox | `GEMINI_SANDBOX`, above `--sandbox` and `tools.sandbox` | off | Off works; with it on, Gemini never answers the app | On needs Docker or Podman there | Show: **Command sandbox**, Off only |
 | Updates, output format, theme and other terminal settings | settings, flags | — | No | — | Leave alone |
@@ -375,8 +375,8 @@ else is an option under the prompt, the tool list the app sends, or its environm
 | Image generation | tool `generate_image` | on | Yes | Mac only today | Leave alone |
 | Subagents | tool `start_subagent` | on | Yes | Mac only today | Leave alone |
 | Starting model | `AGY_ACP_DEFAULT_MODEL` | flash, high | Yes | — | Leave alone: the model is under the prompt |
-| Project hooks | `.agents/hooks.json` in the project | asks, unless the folder is trusted | Run without asking, because the app trusts the folder | — | Set, planned: stop trusting, so it asks, once its question is measured to reach you as a card |
-| MCP, skills, rules | its home, the project | — | Yes | — | Leave alone |
+| Folder hooks | `.agents/hooks.json` in the folder | asks, unless the folder is trusted | Run without asking, because the app trusts the folder | — | Set, planned: stop trusting, so it asks, once its question is measured to reach you as a card |
+| MCP, skills, rules | its home, the folder | — | Yes | — | Leave alone |
 | Compaction | none the ACP server reads | on, at its backend's threshold | Yes, but nothing is sent over ACP | Mac only today | Nothing to set; see [Compaction in each runtime](../explanation/compaction-by-runtime.md) |
 | Usage data, checkpoints, updates | none | — | — | — | Nothing to set |
 | Sandbox | the admin's **Sandbox mode**, business accounts only | off | No lever | — | Leave alone: **No sandbox** |
@@ -396,7 +396,7 @@ which reaches servers too. Settings your Mac's administrator manages win over bo
 | Language servers, formatters | `lsp`, `formatter` | off | Yes | Yes | Leave alone |
 | Compaction | `compaction.*`; `OPENCODE_DISABLE_AUTOCOMPACT` | on when the window is full; pruning off | Yes: the summary arrives as agent text; `/compact` works but is not offered | Through `OPENCODE_CONFIG_CONTENT` | Leave alone: on with nothing set; see [Compaction in each runtime](../explanation/compaction-by-runtime.md) |
 | Snapshots, instructions, skills, plugins, commands, providers, output limits | `opencode.json` | its defaults | Yes | Server's own, and the app's | Leave alone |
-| Leaving the project folder | `permission.external_directory` | asks | Yes | Yes | Leave alone: a permission, not a sandbox; OpenCode has none |
+| Leaving the folder | `permission.external_directory` | asks | Yes | Yes | Leave alone: a permission, not a sandbox; OpenCode has none |
 | Theme, keys and other terminal settings | `tui.json` | — | No | — | Leave alone |
 
 #### Grok
@@ -414,7 +414,7 @@ settings files there are the server's own.
 | Workflows and goals | `GROK_WORKFLOWS`, `GROK_GOAL` | on | Offered as commands | Yes | Set, planned: off, once measured; the `workflow` tool is already off by the app's deny list |
 | Usage data | `GROK_TELEMETRY_ENABLED`, `DISABLE_TELEMETRY` | on | Yes | Yes | Show, planned: the usage data switch |
 | Auto review | `_meta.autoMode` | off | Not measured with the app | Yes | Leave alone until measured |
-| Folder trust | `x.ai/folder_trust/request` | asks | The app does not answer it; a server's untrusted folder may skip the project's own settings | Yes | Measure on a server |
+| Folder trust | `x.ai/folder_trust/request` | asks | The app does not answer it; a server's untrusted folder may skip the folder's own settings | Yes | Measure on a server |
 | Compaction | `[session] auto_compact_threshold_percent`; `GROK_AUTO_COMPACT_THRESHOLD_PERCENT` | on, at 80–85% of the window, no off switch | Yes: its own `auto_compact_*` updates in `_x.ai/session_notification`, drawn as the compaction row; `/compact` offered | Yes, by the variable | Leave alone: on with nothing set; see [Compaction in each runtime](../explanation/compaction-by-runtime.md) |
 | Subagent limits, MCP, plugins, hooks, skills, tool timeouts | config file | its defaults | Yes | Server's own | Leave alone. It also reads Claude's and Cursor's MCP servers, hooks and rules. |
 | Permission rules | `permission.*`, and Claude's own settings files | — | Yes, before the app is asked | Server's own | Leave alone |
@@ -475,13 +475,13 @@ default for each runtime, and each agent has its own choice beside its mode; see
 [Settings](settings.md) and [Choose a runtime, model and mode](../how-to/choose-runtime-model-mode.md).
 
 Each choice the app offers was measured to take effect, on 2026-09-29, by
-`scripts/sandbox-probe.sh`: a real conversation, asked to write outside its project, on the
+`scripts/sandbox-probe.sh`: a real conversation, asked to write outside its folder, on the
 version below. A runtime the app cannot reach offers no choice, and says why.
 
 | Runtime | Measured on | **On** | **Off** | Without a choice | When the sandbox cannot start |
 | --- | --- | --- | --- | --- | --- |
-| **Claude** | Claude Code 2.1.284 | `sandbox.enabled` true, through `_meta`: writes only in the project, asks before a new website | false | your settings decide: **Runtime controlled** | On a server without bubblewrap and socat, it will not start the conversation. On a Mac already inside a sandbox, each command fails. |
-| **Codex** | Codex 0.156.1 | **Ask for approval** or **Approve for me**: writes only in the project, no network | **Full access**, which also stops approval prompts | the mode decides | Each command fails, on a server without user namespaces or a Mac already inside a sandbox; Codex says so in its reply. |
+| **Claude** | Claude Code 2.1.284 | `sandbox.enabled` true, through `_meta`: writes only in the folder, asks before a new website | false | your settings decide: **Runtime controlled** | On a server without bubblewrap and socat, it will not start the conversation. On a Mac already inside a sandbox, each command fails. |
+| **Codex** | Codex 0.156.1 | **Ask for approval** or **Approve for me**: writes only in the folder, no network | **Full access**, which also stops approval prompts | the mode decides | Each command fails, on a server without user namespaces or a Mac already inside a sandbox; Codex says so in its reply. |
 | **Grok** | Grok 1.0.67 | not offered: `grok agent stdio --help` has no `--sandbox` option | not offered | **Runtime controlled**: the app cannot change Grok’s sandbox | Grok 1.0.44 refused to start when the flag was passed. |
 | **Gemini** | Gemini CLI 0.61.0 | not offered: with its sandbox on, Gemini never answers the app | `GEMINI_SANDBOX=false`, above your own settings | your settings decide: **Runtime controlled** | On a server without Docker or Podman it will not start; on a Mac it never answers, and after 90 seconds the app says so. |
 | **Cursor** | 2026.09.26 | — | — | **Runtime controlled**: its own `sandbox.mode` | — |

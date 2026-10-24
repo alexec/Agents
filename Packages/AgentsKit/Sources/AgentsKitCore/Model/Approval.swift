@@ -1,7 +1,7 @@
 import Foundation
 
-/// One thing in a project waiting for the person's approval (#773), as its host lists it on
-/// the project's summary: a project MCP server, a workflow, a plugin, a guarded `.agents`
+/// One thing in a folder waiting for the person's approval (#773), as its host lists it on
+/// the folder's summary: a folder MCP server, a workflow, a plugin, a guarded `.agents`
 /// file, or a session asking to be archived; and a workflow that failed (#989), waiting for
 /// the person to fix it or dismiss it. Every client draws the one list in Needs You, the
 /// same way for every kind, rather than each gathering it from six places.
@@ -29,7 +29,7 @@ public struct Approval: Codable, Hashable, Sendable, Identifiable {
     }
 
     public var kind: Kind
-    /// What it is within its project and kind: the server's name, the workflow's id, the
+    /// What it is within its folder and kind: the server's name, the workflow's id, the
     /// plugin's folder name, the file's path, or the session's id.
     public var key: String
     /// Its name, as the row says it.
@@ -183,7 +183,7 @@ extension Approval {
     }
 }
 
-/// An item of a project's `approvals`, or nil when it is of a kind this build has not heard of.
+/// An item of a folder's `approvals`, or nil when it is of a kind this build has not heard of.
 struct LenientApproval: Decodable {
     let approval: Approval?
     init(from decoder: any Decoder) throws { approval = try? Approval(from: decoder) }

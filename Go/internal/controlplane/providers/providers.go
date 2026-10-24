@@ -1597,8 +1597,8 @@ func (p *Providers) linkWhenJoined(name string) {
 	}
 }
 
-// clone is WorkspaceProviders.clone (#1122): each project sent to the new host as File ▸
-// Clone Project sends it, one after another, as the client that made the workspace. The
+// clone is WorkspaceProviders.clone (#1122): each folder sent to the new host as File ▸
+// Clone Folder sends it, one after another, as the client that made the workspace. The
 // URLs are not logged: one may hold a token.
 func (p *Providers) clone(urls []string, host, name string, caller *Caller) {
 	client, kind := records.NewUUID(), "mac"
@@ -1606,7 +1606,7 @@ func (p *Providers) clone(urls []string, host, name string, caller *Caller) {
 		client, kind = caller.Client, caller.Kind
 	}
 	for i, url := range urls {
-		reply := p.router.DeliverKept(MethodProjectsClone, rawOf(map[string]string{"url": url}), client, kind, host, ClonePatience)
+		reply := p.router.DeliverKept(MethodFoldersClone, rawOf(map[string]string{"url": url}), client, kind, host, ClonePatience)
 		outcome := "not answered"
 		switch {
 		case reply != nil && reply.Error != nil:

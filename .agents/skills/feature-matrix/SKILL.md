@@ -12,7 +12,7 @@ run of the workflow.
 
 ## Rules for the whole run
 
-- **Never touch the project folder you start in.** It is the shared checkout of `main`.
+- **Never touch the folder you start in.** It is the shared checkout of `main`.
   Do any edits in a worktree of your own (step 3).
 - One pull request per release at most. If an earlier one from this workflow (branch
   `agents/feature-matrix-*`) is still open, do not open another: say so and call

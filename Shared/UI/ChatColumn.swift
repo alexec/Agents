@@ -4,7 +4,7 @@ import SwiftUI
 /// The chat's column: a measure that is a ceiling, not a gutter.
 ///
 /// Everything that sits in the conversation's column — the transcript, the floating
-/// prompt bar, a permission or elicitation card above it, and the project page that
+/// prompt bar, a permission or elicitation card above it, and the folder page that
 /// holds the same bar — draws its horizontal edges from this and from nothing else, so
 /// the edges cannot be changed independently and drift apart (FR-021). The arithmetic
 /// is `ChatMetrics`, in the kit where a test holds it; this only applies it.

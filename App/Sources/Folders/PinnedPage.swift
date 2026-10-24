@@ -1,0 +1,220 @@
+import AgentsKitCore
+import AppKit
+import SwiftUI
+
+/// A folder's pinned page (#159), open in the chat's place: the live page the files pane
+/// shows for `show_file`, read from the folder through its host rather than
+/// through an agent. Markdown follows the file and takes typing; HTML is drawn with
+/// scripts and the network off, with Page and Source.
+struct PinnedPage: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.openURL) private var openURL
+    let folder: FolderKey
+    let path: String
+
+    @State private var text: String?
+    @State private var stamp: FileStamp?
+    /// Which page `text` and `stamp` are of: another page's stamp would read as unchanged.
+    @State private var loadedPath: String?
+    @State private var problem: String?
+    @State private var showsSource = false
+    @State private var pictures: PagePictures?
+
+    private var pin: PinView? { model.pins(in: folder.folder).first { $0.path == path } }
+    private var kind: PinKind { PinRules.kind(path) ?? .markdown }
+    private var url: URL { folder.folder.appending(path: path) }
+    private var revision: Int { model.pageRevision(in: folder.folder) }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+            Divider()
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .task(id: "\(path)|\(revision)|\(pin?.missing == true)") { await load() }
+    }
+
+    private var header: some View {
+        HStack(spacing: 8) {
+            Image(systemName: kind == .html ? "globe" : "doc.text")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(pin?.title ?? PinRules.defaultTitle(path))
+                    .appText(.reading).fontWeight(.semibold)
+                    .lineLimit(1)
+                Text(path)
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer()
+            if kind == .html {
+                Picker("Show", selection: $showsSource) {
+                    Text("Page").tag(false)
+                    Text("Source").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+            }
+            if model.isOnThisMac(folder.host) {
+                Button("Show in Finder") { model.reveal(url, on: folder.host) }
+                    .buttonStyle(.paper)
+                    .disabled(problem != nil)
+            }
+            if pin != nil {
+                Button("Unpin") { Task { await model.unpin(path, in: folder) } }
+                    .buttonStyle(.paper)
+            } else {
+                // Unpinned while open: it can be pinned again.
+                Button("Pin to Folder") { Task { await model.pin(path, in: folder) } }
+                    .buttonStyle(.paper)
+                    .disabled(model.pins(in: folder.folder).count >= PinLimits.perFolder || problem != nil)
+                    .help(model.pins(in: folder.folder).count >= PinLimits.perFolder
+                          ? "This folder already has \(PinLimits.perFolder) pinned pages, the most it can have."
+                          : "Pin this page under the folder in the sidebar.")
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if let problem {
+            VStack(spacing: 10) {
+                Image(systemName: "doc.questionmark")
+                    .appText(.title)
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+                Text(problem)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                if pin != nil {
+                    Button("Unpin") { Task { await model.unpin(path, in: folder) } }
+                        .buttonStyle(.paper)
+                }
+            }
+            .padding(24)
+        } else if let text, loadedPath == path {
+            switch kind {
+            case .markdown, .view:
+                LivePage(text: text, url: url, line: nil, folderEvent: revision)
+                    .environment(\.pageActions, actions)
+            case .html where showsSource:
+                ScrollView {
+                    Text(text)
+                        .appText(.code)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                }
+            case .html:
+                HTMLPage(text: text, path: url.path(percentEncoded: false),
+                         scope: HTMLPageScope(root: folder.folder.path(percentEncoded: false)),
+                         allowsScripts: false, folderEvent: revision,
+                         read: { [model, folder] file in try await model.readPage(file, in: folder) },
+                         follow: follow)
+            }
+        } else {
+            ProgressView().controlSize(.small)
+        }
+    }
+
+    private var actions: PageActions {
+        let pictures = pictures ?? PagePictures(model: model, folder: folder)
+        return PageActions(
+            save: { [model, folder, path] _, document in await model.writePage(path, in: folder, text: document) },
+            image: { url in await pictures.image(url) },
+            stamp: { url in await pictures.stamp(url) },
+            canEdit: !model.hostUnreachable(folder.host))
+    }
+
+    private func load() async {
+        if pictures == nil { pictures = PagePictures(model: model, folder: folder) }
+        do {
+            let reading = path
+            switch try await model.readPage(reading, in: folder, known: loadedPath == reading ? stamp : nil) {
+            case .text(let read, _, _, let at):
+                text = read
+                stamp = at
+                loadedPath = reading
+                problem = nil
+            case .unchanged:
+                problem = nil
+            case .image, .other:
+                problem = "\(path) can't be shown as a page."
+            }
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.fileGone {
+            problem = "\(path) isn't in the folder. It may have been moved or deleted, "
+                + "or be on a branch that hasn't landed."
+            stamp = nil
+        } catch {
+            problem = "\(path) can't be read: \((error as? JSONRPCError)?.message ?? error.localizedDescription)"
+        }
+    }
+
+    private func follow(_ link: HTMLPageScope.LinkDecision) {
+        switch link {
+        case .openFile(let file):
+            // Another of the folder's pinned pages opens in its place; anything else is
+            // the folder's, not this page's, to show.
+            if let relative = PinRules.relative(file, in: folder.folder),
+               model.pins(in: folder.folder).contains(where: { $0.path == relative }) {
+                model.showPin(relative, in: folder)
+            }
+        case .openOutside(let url):
+            openURL(url)
+        case .stay, .ignore:
+            break
+        }
+    }
+}
+
+/// The pictures beside a pinned page, read through the folder's host and kept with the
+/// stamp they were read at, as `ServerPictures` keeps an agent's.
+@MainActor
+final class PagePictures {
+    private struct Held {
+        var stamp: FileStamp
+        var image: NSImage?
+    }
+
+    private let model: AppModel
+    private let folder: FolderKey
+    /// About a page or two of diagrams, as the phone keeps (#175, #213).
+    private var held = LRUCache<URL, Held>(limit: 24)
+
+    init(model: AppModel, folder: FolderKey) {
+        self.model = model
+        self.folder = folder
+    }
+
+    func stamp(_ url: URL) async -> FileStamp? { await refresh(url)?.stamp }
+
+    func image(_ url: URL) async -> NSImage? {
+        if let image = held.value(for: url)?.image { return image }
+        return await refresh(url)?.image
+    }
+
+    private func refresh(_ url: URL) async -> Held? {
+        let known = held.peek(url)
+        guard let reading = try? await model.readPage(url.path(percentEncoded: false), in: folder,
+                                                      known: known?.stamp) else { return known }
+        switch reading {
+        case .unchanged:
+            return known
+        case .image(let bytes, _, let stamp):
+            let fresh = Held(stamp: stamp, image: NSImage(data: bytes))
+            held.set(fresh, for: url)
+            return fresh
+        case .text(_, _, _, let stamp), .other(_, _, let stamp):
+            let fresh = Held(stamp: stamp, image: nil)
+            held.set(fresh, for: url)
+            return fresh
+        }
+    }
+}

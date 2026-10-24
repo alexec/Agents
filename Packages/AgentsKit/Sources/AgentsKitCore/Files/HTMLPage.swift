@@ -9,7 +9,7 @@ import Foundation
 /// picture or script it names beside it comes back to the app as a request on that
 /// scheme. This is the one place that says which of those requests are answered, and
 /// with what, so the Mac and the phone draw the same page from the same rules, for a
-/// project on this Mac and one on a server alike.
+/// folder on this Mac and one on a server alike.
 ///
 /// What the web view itself is allowed (no network, no scripts unless the person allows
 /// them, nothing kept, no bridge to native code) is in `Shared/UI/Page/HTMLPage.swift`.

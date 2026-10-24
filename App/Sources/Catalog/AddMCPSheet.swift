@@ -171,7 +171,7 @@ struct AddMCPSheet: View {
     private func addLabel(_ preview: DaemonAPI.MCPPreview) -> String {
         switch destination {
         case .personal: return "Add to ~/.agents"
-        case .project: return "Add to project"
+        case .folder: return "Add to folder"
         }
     }
 

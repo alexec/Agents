@@ -36,7 +36,7 @@ func (d *Daemon) startUserConfigSync() {
 		d.configWatchMu.Unlock()
 		return
 	}
-	watch, err := newProjectWatch(root, func(paths []string) { d.syncUserConfigPaths(paths) })
+	watch, err := newFilesWatch(root, func(paths []string) { d.syncUserConfigPaths(paths) })
 	if err == nil {
 		d.configWatch = watch
 	}

@@ -41,7 +41,7 @@ struct CostSettingsView: View {
 
             Section {
                 LimitField(title: "Per day",
-                           caption: "Everything, in every project, in one local day.",
+                           caption: "Everything, in every folder, in one local day.",
                            limit: model.costLimits.daily,
                            alreadyReachedBy: dayAlreadyOver) { limit in
                     await model.setCostLimits(daily: .some(limit))
@@ -98,13 +98,13 @@ struct CostSettingsView: View {
 
     // MARK: Workflows (#506)
 
-    /// How many workflows turned on may run in each project, as a menu of the
+    /// How many workflows turned on may run in each folder, as a menu of the
     /// numbers it may be, its default marked and choosing it putting it back.
     private var workflows: some View {
         let kept = model.workflowLimit ?? WorkflowLimitSettings()
         let current = kept.effectiveTotal
         return Section {
-            Picker("Turned on at once in each project", selection: Binding(get: { current }, set: { chosen in
+            Picker("Turned on at once in each folder", selection: Binding(get: { current }, set: { chosen in
                 Task { await model.setWorkflowLimit(WorkflowLimitSettings(total: chosen)) }
             })) {
                 ForEach(Array(WorkflowLimit.totalRange), id: \.self) { number in
@@ -113,13 +113,13 @@ struct CostSettingsView: View {
             }
             .disabled(model.workflowLimit == nil)
         } header: {
-            Text("The most workflows that may run in each project")
+            Text("The most workflows that may run in each folder")
         } footer: {
-            Text("Approved workflows turned on in each project. One turned off or archived "
+            Text("Approved workflows turned on in each folder. One turned off or archived "
                  + "takes no place. Past this, a workflow is listed but none of its triggers run it, "
-                 + "and turning another on in that project is refused until you turn one off or archive one. "
+                 + "and turning another on in that folder is refused until you turn one off or archive one. "
                  + "Agents can't change this."
-                 + (model.hosts.isEmpty ? "" : " Each server keeps to this number in each project."))
+                 + (model.hosts.isEmpty ? "" : " Each server keeps to this number in each folder."))
         }
         .paperListRow()
     }

@@ -5,7 +5,7 @@ import SwiftUI
 /// folders by name and path, as it is typed, and opens the one chosen.
 ///
 /// The search is the `@` search (`files/mention`), asked of the host the session is on,
-/// so a server's project is searched where it is. Up and Down move through what was
+/// so a server's folder is searched where it is. Up and Down move through what was
 /// found, Return opens it, Escape — or a click outside — closes the field and changes
 /// nothing.
 struct FileSearch: View {

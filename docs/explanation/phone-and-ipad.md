@@ -16,8 +16,8 @@ Your agents belong to hosts: your Mac with Agents Host, and any server you have 
 [The window and the host](window-and-daemon.md)). The phone and the iPad connect to your
 control plane, as the Mac window does, and reach every host through it (see
 [The control plane](control-plane.md)). They read the same conversations, and what you do
-on them happens on the host. An agent you start from your phone runs in the project's
-folder on that project's host, with that host's runtimes, and shows up in every window as
+on them happens on the host. An agent you start from your phone runs in the folder's
+folder on that folder's host, with that host's runtimes, and shows up in every window as
 if you had started it there.
 
 That is why the phone needs the control plane, and the host, to be up for it to be of use,
@@ -25,7 +25,7 @@ and why nothing is lost if your phone runs out of battery.
 
 ## Every host
 
-A paired iPhone or iPad sees the projects on every host, each under its host's heading, as
+A paired iPhone or iPad sees the folders on every host, each under its host's heading, as
 the Mac window does. A server you add once appears on your devices within a few seconds,
 with nothing to do on them.
 
@@ -52,12 +52,12 @@ hosts little, since a phone could already run commands in a terminal, and was re
 
 The iPhone and iPad have screens for these, on any host:
 
-- see every project and its agents, grouped the same way as on the Mac,
+- see every folder and its agents, grouped the same way as on the Mac,
 - read a conversation as it happens, and answer permission requests and questions,
 - send a prompt, attach a file or a picture, dictate, and change the agent's mode or model,
-- start a new agent, in the project folder or in a worktree, and remove a worktree,
+- start a new agent, in the folder or in a worktree, and remove a worktree,
 - stop or archive an agent,
-- see a project's workflows, run one now, and archive or restore one,
+- see a folder's workflows, run one now, and archive or restore one,
 - open the agent's files, follow a live page as the agent writes it and type on it, and
   use a terminal in the agent's folder,
 - see what an agent holds or waits for (see [Leases on shared resources](leases.md)), and
@@ -80,7 +80,7 @@ says how long ago it was updated. Tapping it opens the app, which catches up.
 Nothing is refused to a device any more, but some things have screens only in the Mac
 window so far:
 
-- adding, archiving and renaming projects, and browsing a host's folders,
+- adding, archiving and renaming folders, and browsing a host's folders,
 - signing a runtime in, lending a credential, and changing settings such as spending
   limits and helper limits,
 - adding and removing hosts, and pairing or forgetting clients.

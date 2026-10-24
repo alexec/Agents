@@ -10,15 +10,15 @@ An assessment checks that a runtime, such as Codex after an update, works with t
 app gives every agent. An agent on that runtime works through a fixed series of steps, one
 for each group of tools: ending a turn, asking you a question, opening a file, starting a
 helper, taking a lease, waiting for an event, workflows, moving into a worktree and back,
-reading its own session, and writing outside the project. It writes a report. The app then
+reading its own session, and writing outside the folder. It writes a report. The app then
 scores every step from its own record of what the agent called and what the app answered,
 so a pass never rests on the agent's word.
 
 ## Before you start
 
 - The runtime installed and signed in. See [Sign a runtime in](sign-a-runtime-in.md).
-- A project for it to work in, ideally a git repository so it can try a worktree. The
-  report goes in that project, in `.agents/reviews/runtimes/<runtime>-<date>.md`. The
+- A folder for it to work in, ideally a git repository so it can try a worktree. The
+  report goes in that folder, in `.agents/reviews/runtimes/<runtime>-<date>.md`. The
   workflow and the worktree it makes there are removed again before it ends.
 
 ## Steps
@@ -26,13 +26,13 @@ so a pass never rests on the agent's word.
 The app has no button for an assessment (#2133). The **Runtime check** workflow assesses a
 runtime when a release updates it, and you can start one by hand:
 
-1. In a chat in this project, ask an agent to assess the runtime, for example "Assess Codex".
-   It uses the `assess-runtime` skill. Or, in a terminal in the project folder, run
-   `.agents/skills/assess-runtime/scripts/assess.py <root> <runtime> --folder <project>`.
+1. In a chat in this folder, ask an agent to assess the runtime, for example "Assess Codex".
+   It uses the `assess-runtime` skill. Or, in a terminal in the folder, run
+   `.agents/skills/assess-runtime/scripts/assess.py <root> <runtime> --folder <folder>`.
 2. The assessing agent starts on the cheapest model the runtime offers, such as Haiku for
    Claude. The script answers its questions and permission cards as a person would: the
    form, the runtime's own question, and an allow for each card, except the write outside
-   the project, which it rejects.
+   the folder, which it rejects.
 3. Leave it. It waits for its helper, then for two one-minute timers, and moves into a
    worktree and back, and is started again by itself each time. It takes about six minutes.
 4. Read the result at the end of the assessing agent's conversation: a table from the app
@@ -46,9 +46,9 @@ setting.
 ## Things to know
 
 - **Not offered** is not a failure. A runtime with no question tool the app can carry, such
-  as Grok or Copilot, is not offered that step. Nor is a worktree in a project that is not a
+  as Grok or Copilot, is not offered that step. Nor is a worktree in a folder that is not a
   git repository, or a permission card where the runtime refuses the write outside the
-  project by itself.
+  folder by itself.
 - **The report names** the runtime's adapter and version, as it gave them when it started,
   and where it ran.
 - **A runtime that can't take an agent** (not installed, not signed in, or out of its

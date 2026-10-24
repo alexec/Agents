@@ -25,7 +25,7 @@ await page.waitFor(`document.querySelector("textarea")`);
 await page.focus("textarea");
 await page.type(deviceCode);
 await page.press("Connect");
-await page.waitFor(`document.querySelector(".projects .row")`);
+await page.waitFor(`document.querySelector(".folders .row")`);
 
 // A turn of several commands, each allowed on the host's socket as it is asked.
 const prompt = "Run each of these with your Bash tool, one call at a time, and after each say in one line what it printed: "
@@ -39,7 +39,7 @@ turn.stdout.on("data", (chunk) => {
 while (!agentID) await sleep(200);
 say(`started ${agentID} on the host's socket`);
 
-await page.eval(`(() => { const row = [...document.querySelectorAll(".projects .row")].find((r) => r.textContent.startsWith("work")); row?.click(); })()`);
+await page.eval(`(() => { const row = [...document.querySelectorAll(".folders .row")].find((r) => r.textContent.startsWith("work")); row?.click(); })()`);
 await page.waitFor(`document.querySelector(".group[aria-label=Working] .session")`, 60_000);
 await page.eval(`document.querySelector(".group[aria-label=Working] .session").click()`);
 await page.waitFor(`document.querySelector(".chat .transcript")?.textContent.length > 0`, 30_000);

@@ -1,4 +1,4 @@
-// A file into a project's drop box (#231), by the phone's size rule.
+// A file into a folder's drop box (#231), by the phone's size rule.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";

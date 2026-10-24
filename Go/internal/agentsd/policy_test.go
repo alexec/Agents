@@ -305,7 +305,7 @@ func TestEveryRuleAtEveryPath(t *testing.T) {
 		}},
 		{"Continue in New: a runtime not allowed", "runtimes", func() *Error {
 			return asError(func() error {
-				_, err := d.continueInProject(wire.ContinueInProjectRequest{AgentID: gemini.ID})
+				_, err := d.continueInFolder(wire.ContinueInFolderRequest{AgentID: gemini.ID})
 				return err
 			}())
 		}},
@@ -332,7 +332,7 @@ func TestEveryRuleAtEveryPath(t *testing.T) {
 		{"mcp/add-by-hand: custom servers refused", "marketplaces.customServers", func() *Error {
 			return call("mcp/add-by-hand", map[string]any{"verifyID": store.NewUUID(), "destination": map[string]any{"kind": "personal"}})
 		}},
-		{"projects/setHelperLimits: above the cap", "helpers.mostRunning", func() *Error {
+		{"folders/setHelperLimits: above the cap", "helpers.mostRunning", func() *Error {
 			return asError(d.helperLimitsRefusal(wire.HelperLimits{Running: new(int64(3))}))
 		}},
 	}
@@ -380,7 +380,7 @@ func TestEveryRuleAtEveryPath(t *testing.T) {
 		t.Fatal("a skill can be previewed from skills.sh, which is not allowed")
 	}
 
-	// Helpers: the project's limits are capped.
+	// Helpers: the folder's limits are capped.
 	if running, notArchived, _ := d.helperLimitsIn(dir); running != 1 || notArchived != 2 {
 		t.Fatalf("%d %d", running, notArchived)
 	}

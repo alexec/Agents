@@ -225,7 +225,7 @@ struct AddMCPByHandPane: View {
     private var addLabel: String {
         switch destination {
         case .personal: "Add to ~/.agents"
-        case .project: "Add to project"
+        case .folder: "Add to folder"
         }
     }
 

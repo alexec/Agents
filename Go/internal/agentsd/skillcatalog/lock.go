@@ -20,12 +20,12 @@ type LockKind int
 
 const (
 	Personal LockKind = iota
-	Project
+	FolderScope
 )
 
 const (
 	personalVersion = 3
-	projectVersion  = 1
+	folderVersion  = 1
 )
 
 // Entry is one lock entry, the fields the CLI writes for a GitHub skill.
@@ -58,7 +58,7 @@ func PersonalLockPath(home string, env func(string) string) string {
 	return filepath.Join(home, ".agents", ".skill-lock.json")
 }
 
-func ProjectLockPath(folder string) string { return filepath.Join(folder, "skills-lock.json") }
+func FolderLockPath(folder string) string { return filepath.Join(folder, "skills-lock.json") }
 
 // LoadLock reads a lock, or starts an empty one where there is no file. One that cannot be
 // read (after a second try), or is of an older version, is refused: the CLI would treat
@@ -75,8 +75,8 @@ func LoadLock(kind LockKind, path string) (*Lock, error) {
 		}
 	}
 	want := personalVersion
-	if kind == Project {
-		want = projectVersion
+	if kind == FolderScope {
+		want = folderVersion
 	}
 	root, err := Parse(b)
 	if err != nil || root.Kind != 'o' {
@@ -96,7 +96,7 @@ func emptyLock(kind LockKind) Value {
 		return Object(Pair{"version", Number(strconv.Itoa(personalVersion))}, Pair{"skills", Object()},
 			Pair{"dismissed", Object()})
 	}
-	return Object(Pair{"version", Number(strconv.Itoa(projectVersion))}, Pair{"skills", Object()})
+	return Object(Pair{"version", Number(strconv.Itoa(folderVersion))}, Pair{"skills", Object()})
 }
 
 func (l *Lock) skills() Value {
@@ -143,7 +143,7 @@ func (l *Lock) Upsert(name, source, skillPath, hash string, now time.Time) {
 		skills.Set(name, Object(Pair{"source", String(source)}, Pair{"sourceType", String("github")},
 			Pair{"sourceUrl", String("https://github.com/" + source + ".git")}, Pair{"skillPath", String(skillPath)},
 			Pair{"skillFolderHash", String(hash)}, Pair{"installedAt", String(installed)}, Pair{"updatedAt", String(stamp)}))
-	case Project:
+	case FolderScope:
 		skills.Set(name, Object(Pair{"source", String(source)}, Pair{"sourceType", String("github")},
 			Pair{"skillPath", String(skillPath)}, Pair{"computedHash", String(hash)}))
 	}
@@ -157,7 +157,7 @@ func (l *Lock) Remove(name string) {
 }
 
 // Text is the file as the CLI writes it: personal as JSON.stringify(lock, null, 2) with no
-// newline; project with only version and skills, skills sorted by name, and a newline.
+// newline; folder with only version and skills, skills sorted by name, and a newline.
 func (l *Lock) Text() string {
 	if l.Kind == Personal {
 		return l.root.Stringified()

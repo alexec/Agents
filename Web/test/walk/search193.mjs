@@ -4,8 +4,8 @@
 //
 //   node Web/test/walk/search193.mjs <WEB_URL> <browser code> <out dir> [words]
 //
-// Expects a root seeded with project alpha (hundreds of archived agents named "Seeded archived
-// agent N" and a few live) and project beta (a few dozen archived).
+// Expects a root seeded with folder alpha (hundreds of archived agents named "Seeded archived
+// agent N" and a few live) and folder beta (a few dozen archived).
 
 import { writeFileSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -23,14 +23,14 @@ try {
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  await page.waitFor(`document.querySelectorAll(".sidebar .row.project").length >= 2`, 20_000);
+  await page.waitFor(`document.querySelectorAll(".sidebar .row.folder").length >= 2`, 20_000);
   await sleep(800);
 
   const state = () => page.eval(`(() => {
-    const folds = [...document.querySelectorAll(".sidebar .project-fold")].map((f) => {
+    const folds = [...document.querySelectorAll(".sidebar .folder-fold")].map((f) => {
       const archived = f.querySelector("details.archived");
       return {
-        project: f.getAttribute("aria-label"),
+        folder: f.getAttribute("aria-label"),
         archivedCount: archived?.querySelector("summary .count")?.textContent ?? null,
         archivedRows: archived ? archived.querySelectorAll(".nav-item").length : 0,
         showAll: archived?.querySelector(".show-all")?.textContent ?? null,

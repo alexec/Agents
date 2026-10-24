@@ -1,5 +1,5 @@
-// The US5 walk (071 quickstart §7, second half; T068): a project's workflows listed in headless
-// Chrome, one run with Run Now, its session found under the project, in the page and in the
+// The US5 walk (071 quickstart §7, second half; T068): a folder's workflows listed in headless
+// Chrome, one run with Run Now, its session found under the folder, in the page and in the
 // scratch window.
 //
 //   node Web/test/walk/us5.mjs <WEB_URL> <ROOT> <device code> <out dir> <rpc.py> <window script>
@@ -25,8 +25,8 @@ await page.waitFor(`document.querySelector("textarea")`);
 await page.focus("textarea");
 await page.type(deviceCode);
 await page.press("Connect");
-await page.waitFor(`document.querySelector(".projects .row")`);
-await page.eval(`[...document.querySelectorAll(".projects .row")].find((r) => r.textContent.startsWith("work"))?.click()`);
+await page.waitFor(`document.querySelector(".folders .row")`);
+await page.eval(`[...document.querySelectorAll(".folders .row")].find((r) => r.textContent.startsWith("work"))?.click()`);
 
 // 1. Listed with their triggers, archived ones folded away.
 await page.waitFor(`document.querySelectorAll(".workflows .row.workflow").length >= 2`, 30_000);
@@ -54,7 +54,7 @@ for (let i = 0; i < 120 && !agent; i++) {
 }
 say(`Run Now: a new agent on the host after ${((Date.now() - ranAt) / 1000).toFixed(1)} s: ${agent?.id}, started by ${agent?.startedByWorkflow}, labels ${JSON.stringify((agent?.labels ?? []).map((l) => l.value))}`);
 await page.waitFor(`[...document.querySelectorAll(".sessions .session .title")].some((t) => t.textContent.includes(${JSON.stringify(agent.title ?? "")}) )`, 30_000);
-say(`its session under the project in the page: ${JSON.stringify(await page.eval(`[...document.querySelectorAll(".sessions .group")].map((g) => g.getAttribute("aria-label") + ": " + [...g.querySelectorAll(".session .title")].map((t) => t.textContent).join(", "))`))}`);
+say(`its session under the folder in the page: ${JSON.stringify(await page.eval(`[...document.querySelectorAll(".sessions .group")].map((g) => g.getAttribute("aria-label") + ": " + [...g.querySelectorAll(".session .title")].map((t) => t.textContent).join(", "))`))}`);
 await page.shot(`${out}/us5-2-ran.png`);
 window("open", agent.id);
 window("shot", `${out}/us5-window-1-ran.png`);

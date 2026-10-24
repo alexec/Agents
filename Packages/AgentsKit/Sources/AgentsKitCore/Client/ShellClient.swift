@@ -18,9 +18,9 @@ public final class ShellClient {
     public let agentID: UUID
     /// Which of the agent's shells. Zero is the one every agent has.
     public let shell: Int
-    /// The project folder, when this is a project's own shell rather than an agent's
-    /// (#418). `agentID` is then `ProjectShell.id(for:)` it.
-    public let project: URL?
+    /// The folder this shell belongs to, when it is a folder's own shell rather than an agent's
+    /// (#418). `agentID` is then `FolderShell.id(for:)` it.
+    public let folderContext: URL?
     public private(set) var state: ShellState = .live
     public private(set) var isAttached = false
     public private(set) var problem: String?
@@ -95,11 +95,11 @@ public final class ShellClient {
     /// alternate screen).
     static let reset = Data("\u{1B}c".utf8)
 
-    public init(agentID: UUID, shell: Int = 0, project: URL? = nil, client: DaemonClient,
+    public init(agentID: UUID, shell: Int = 0, folderContext: URL? = nil, client: DaemonClient,
                 describe: @escaping @MainActor (any Error) -> String) {
         self.agentID = agentID
         self.shell = shell
-        self.project = project
+        self.folderContext = folderContext
         self.client = client
         self.describe = describe
     }
@@ -117,7 +117,7 @@ public final class ShellClient {
                                              rows: rows > 0 ? rows : 24, cols: cols > 0 ? cols : 80,
                                              since: onOutput == nil ? nil : seen,
                                              startedAt: onOutput == nil || seen == nil ? nil : startedAt,
-                                             folder: project),
+                                             folder: folderContext),
                 returning: DaemonAPI.ShellAttachResponse.self)
             state = response.state
             dropped = response.dropped
@@ -191,12 +191,12 @@ public final class ShellClient {
         if isAttached { await resize(rows: rows, cols: cols) }
     }
 
-    /// A new shell for the agent, or for the project in `project`, numbered by the
-    /// daemon (#401). Nil from a host before #401, or for a project from one before its
+    /// A new shell for the agent, or for the folder in `folder`, numbered by the
+    /// daemon (#401). Nil from a host before #401, or for a folder from one before its
     /// shells had tabs, which has the caller number it.
-    public static func open(agentID: UUID, project: URL? = nil, on client: DaemonClient) async -> Int? {
+    public static func open(agentID: UUID, folder: URL? = nil, on client: DaemonClient) async -> Int? {
         let response = try? await client.call(DaemonAPI.Method.shellOpen,
-                                              DaemonAPI.ShellAttachRequest(agentID: agentID, folder: project),
+                                              DaemonAPI.ShellAttachRequest(agentID: agentID, folder: folder),
                                               returning: DaemonAPI.ShellOpenResponse.self)
         return response?.shell
     }
@@ -251,7 +251,7 @@ public final class ShellClient {
             let response = try await client.call(
                 DaemonAPI.Method.shellRestart,
                 DaemonAPI.ShellAttachRequest(agentID: agentID, shell: shell, rows: rows, cols: cols,
-                                             folder: project),
+                                             folder: folder),
                 returning: DaemonAPI.ShellAttachResponse.self)
             if startedAt != response.startedAt { beginAgain() }
             startedAt = response.startedAt

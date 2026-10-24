@@ -43,7 +43,7 @@ The Lock Screen shows these, from left to right:
   you, a tick when it is done, a grey stop when it is paused, and a red triangle
   for an unexpected stop.
 - **The title** of the session. A session with no title yet is **New session**.
-- **The phase**, then the runtime and the project, such as **Working · Claude · api**.
+- **The phase**, then the runtime and the folder, such as **Working · Claude · api**.
 - **A grey line**, of at most two lines, that says more.
 - **The time** the turn has worked, on the right. The system counts it, also when the
   app does not run. When the turn ends, the time stops.

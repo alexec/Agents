@@ -11,7 +11,7 @@ final class HostSet {
     private(set) var hosts = HostList()
     private(set) var states: [HostID: ServerConnection.State] = [:]
     private(set) var nextTry: [HostID: Date] = [:]
-    private(set) var goneProjects: [HostID: [String]] = [:]
+    private(set) var goneFolders: [HostID: [String]] = [:]
     var rebuiltAsk: HostID?
     private(set) var claude: [HostID: ServerConnection.Claude] = [:]
     @ObservationIgnored var claudeWanted: (HostID) -> Bool = { _ in false }
@@ -89,8 +89,8 @@ final class HostSet {
     func toolsetLine(_ id: HostID, runtimeID: String, hasCredential: Bool) -> String { "" }
     func agentsLive(_ id: HostID) async -> Int { 0 }
     func remove(_ id: HostID, purge: Bool = false) async {}
-    func noteProjects(_ id: HostID, listed: [DaemonAPI.ProjectSummary]) {}
-    func forgetGoneProject(_ id: HostID, path: String) {}
+    func noteFolders(_ id: HostID, listed: [DaemonAPI.FolderSummary]) {}
+    func forgetGoneFolder(_ id: HostID, path: String) {}
     func installClaude(_ id: HostID) async {}
 }
 

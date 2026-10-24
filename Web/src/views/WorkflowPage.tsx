@@ -24,8 +24,8 @@ import { BackToList } from "./BackToList";
 import { isWorkflowMuted, muteLabel, workflowMuteHelp } from "../model/mute";
 import { Capability } from "../protocol/capabilities.generated";
 
-export function WorkflowPage({ store, host, folder, projectName, workflowID, down }: {
-  store: Store; host: string; folder: string; projectName: string; workflowID: string; down: boolean;
+export function WorkflowPage({ store, host, folder, folderName, workflowID, down }: {
+  store: Store; host: string; folder: string; folderName: string; workflowID: string; down: boolean;
 }) {
   // Held while the page is open, shared with the sidebar's fold, and let go by the last of them (#291).
   useEffect(() => {
@@ -33,7 +33,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
     return () => store.releaseWorkflows(host, folder);
   }, [host, folder]);
   const known = store.workflowsKnown(host, folder);
-  const summary = store.projectWorkflows(host, folder).find((w) => w.workflow.workflowID === workflowID);
+  const summary = store.folderWorkflows(host, folder).find((w) => w.workflow.workflowID === workflowID);
   // Which half of the page is on show (#863), as the window and the Remote have it.
   const pane = useSignal<"activity" | "configuration">("activity");
   const runLimit = useSignal(3);
@@ -89,8 +89,8 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
   const change = (what: Parameters<Store["setWorkflowSettings"]>[2]) =>
     void store.setWorkflowSettings(host, summary, what).then((refusal) => { problem.value = refusal ? { workflowID, text: refusal } : null; });
   const deleteWorkflow = async () => {
-    if (confirm(`Delete "${workflow.name}"? Its file is removed from disk.\n\nThe file can be restored from the project's git history.`)) {
-      if (await store.deleteWorkflow(host, summary)) go({ host, project: folder });
+    if (confirm(`Delete "${workflow.name}"? Its file is removed from disk.\n\nThe file can be restored from the folder's git history.`)) {
+      if (await store.deleteWorkflow(host, summary)) go({ host, folder: folder });
     }
   };
   return (
@@ -136,17 +136,17 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
                   {muteLabel}
                 </label>
               )}
-              {/* Pinned to the top of its project in the sidebar (#432), as the window's page has it. */}
+              {/* Pinned to the top of its folder in the sidebar (#432), as the window's page has it. */}
               {(() => {
                 const pinned = store.workflowPinsIn(host, folder).includes(workflow.workflowID);
                 return (
                   <button class="archive" disabled={down}
-                    title={pinned ? "Take this workflow out of Pinned in the sidebar" : "Keep this workflow in Pinned, at the top of its project in the sidebar"}
+                    title={pinned ? "Take this workflow out of Pinned in the sidebar" : "Keep this workflow in Pinned, at the top of its folder in the sidebar"}
                     onClick={() => void store.setWorkflowPinned(host, folder, workflow.workflowID, !pinned)}>{pinned ? "Unpin" : "Pin"}</button>
                 );
               })()}
-              <button class="archive" disabled={down} title="Archive this workflow and go back to the project. Writes archived: true into its file"
-                onClick={async () => { await store.setWorkflowArchived(host, summary, true); go({ host, project: folder }); }}>Archive</button>
+              <button class="archive" disabled={down} title="Archive this workflow and go back to the folder. Writes archived: true into its file"
+                onClick={async () => { await store.setWorkflowArchived(host, summary, true); go({ host, folder: folder }); }}>Archive</button>
               <button class="archive" disabled={down} title="Delete this workflow file from disk" onClick={() => void deleteWorkflow()}>Delete…</button>
             </div>
           )}
@@ -172,7 +172,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
                     <span>{line.text}</span>
                     {line.detail && <span class="quiet small">{line.detail}</span>}
                   </span>
-                  {line.agentID && <button class="link" onClick={() => go({ host, project: folder, session: line.agentID })}>Open the agent →</button>}
+                  {line.agentID && <button class="link" onClick={() => go({ host, folder: folder, session: line.agentID })}>Open the agent →</button>}
                 </li>
               ))}
             </ul>
@@ -184,7 +184,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
 
             {!loadingRuns.value && runs.value.length === 0 && <p class="hint">Nothing has run yet.</p>}
             {runs.value.map((agent) => (
-              <SessionRow key={agent.id} agent={agent} chosen={false} onPick={() => go({ host, project: folder, session: agent.id })}
+              <SessionRow key={agent.id} agent={agent} chosen={false} onPick={() => go({ host, folder: folder, session: agent.id })}
                 extras={rowExtras(store, host, agent)} />
             ))}
             {runs.value.length === runLimit.value && <button class="link" disabled={loadingRuns.value}
@@ -197,7 +197,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
             <p class="agent-mode">
               <span>{agentModeWords(workflow.mode)}</span> <code class="quiet">agent: {workflow.mode}</code>
               {workflow.mode === "standing" && (standing
-                ? <button class="link" onClick={() => go({ host, project: folder, session: standing.id })}>{standing.title ?? "Untitled"} →</button>
+                ? <button class="link" onClick={() => go({ host, folder: folder, session: standing.id })}>{standing.title ?? "Untitled"} →</button>
                 : <span class="quiet"> · Started on the next run</span>)}
             </p>
             <pre class="prompt-text">{workflow.prompt || "(no prompt)"}</pre>
@@ -209,7 +209,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
               <ul class="triggers">
                 {workflow.triggers.map((trigger, index) => {
                   const filters = triggerFilters(trigger);
-                  const scope = scopeLine(trigger, projectName, hostName);
+                  const scope = scopeLine(trigger, folderName, hostName);
                   return (
                     <li key={index} class="trigger">
                       <span class="glyph" aria-hidden="true">{triggerGlyph(trigger)}</span>

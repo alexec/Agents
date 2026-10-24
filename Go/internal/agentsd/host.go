@@ -20,7 +20,7 @@ import (
 
 // The host's own plumbing, as the Swift host serves it on a server: the one answer a
 // client gets on connecting, status and quitting, the disk, the person's settings it
-// reads, and the files a client puts in (an agent's artifact, a project's drop box).
+// reads, and the files a client puts in (an agent's artifact, a folder's drop box).
 
 // Quit, when set, ends the host (daemon/quit): cmd/agentsd stops serving and lets go.
 type quitState struct {
@@ -116,15 +116,15 @@ func (d *Daemon) catchUp(r wire.CatchUpRequest) wire.CatchUpSnapshot {
 	disk := d.diskState()
 	notes := wire.StoreNotes{Notes: []string{}}
 	milestones := d.milestones()
-	s := wire.CatchUpSnapshot{Projects: d.projects(false), Agents: d.listAgents(list), Permissions: d.pendingPermissions(),
+	s := wire.CatchUpSnapshot{Folders: d.folders(false), Agents: d.listAgents(list), Permissions: d.pendingPermissions(),
 		Elicitations: d.pendingElicitations(),
 		Attention:    d.attentionPending(),
 		Resuming:     []wire.UUID{}, Disk: &disk, StoreNotes: &notes, Milestones: &milestones}
 	for _, part := range r.Parts {
 		if part == "pins" {
-			s.Pins = []wire.ProjectPins{}
-			for _, p := range d.projects(false) {
-				if pp := d.projectPins(store.FolderPath(p.Project.Folder)); len(pp.Pins)+len(pp.Sessions)+len(pp.Workflows) > 0 {
+			s.Pins = []wire.FolderPins{}
+			for _, p := range d.folders(false) {
+				if pp := d.folderPins(store.FolderPath(p.Folder.Folder)); len(pp.Pins)+len(pp.Sessions)+len(pp.Workflows) > 0 {
 					s.Pins = append(s.Pins, pp)
 				}
 			}
@@ -256,12 +256,12 @@ func (t diskThresholds) lowLine(total int64) int64 {
 }
 func (t diskThresholds) criticalLine() int64 { return int64(t.criticalGB * gigabyte) }
 
-// projectThresholds is a project's .agents/project.json "diskSpace", where it says one.
-func projectThresholds(folder string) (diskThresholds, bool) {
+// folderThresholds is a folder's .agents/folder.json "diskSpace", where it says one.
+func folderThresholds(folder string) (diskThresholds, bool) {
 	if !ownFolders(folder, ".agents") {
 		return diskThresholds{}, false
 	}
-	b, err := os.ReadFile(filepath.Join(folder, ".agents", "project.json"))
+	b, err := os.ReadFile(filepath.Join(folder, ".agents", "folder.json"))
 	if err != nil {
 		return diskThresholds{}, false
 	}
@@ -318,7 +318,7 @@ func nextDiskLevel(was wire.DiskLevel, free, low, critical int64) wire.DiskLevel
 	return level
 }
 
-// checkDisk looks at the root's and every project's disk, and says disk/changed when the
+// checkDisk looks at the root's and every folder's disk, and says disk/changed when the
 // alarms change.
 func (d *Daemon) checkDisk() {
 	// The first look after a restart: a crossing it finds happened in the gap (#1219).
@@ -343,7 +343,7 @@ func (d *Daemon) checkDisk() {
 			mounts[key] = m
 		}
 		if has {
-			// The strictest of the projects on the mount.
+			// The strictest of the folders on the mount.
 			if !m.set {
 				m.t, m.set = t, true
 			} else {
@@ -352,9 +352,9 @@ func (d *Daemon) checkDisk() {
 		}
 	}
 	look(d.Store.Loc.Root, diskThresholds{}, false)
-	for _, p := range d.projects(false) {
-		folder := store.FolderPath(p.Project.Folder)
-		t, has := projectThresholds(folder)
+	for _, p := range d.folders(false) {
+		folder := store.FolderPath(p.Folder.Folder)
+		t, has := folderThresholds(folder)
 		look(folder, t, has)
 	}
 	d.diskMu.Lock()
@@ -518,22 +518,22 @@ func inScope(path string, folders []string) bool {
 
 const dropboxLimit = 25 * 1024 * 1024
 
-// putInDropbox is dropbox/put: a file into a project's .agents/dropbox, whole or not at all.
+// putInDropbox is dropbox/put: a file into a folder's .agents/dropbox, whole or not at all.
 func (d *Daemon) putInDropbox(r wire.DropboxPutRequest) (wire.DropboxPutResponse, error) {
 	folder := store.FolderPath(r.Folder)
 	if real, err := store.Resolve(folder); err == nil {
 		folder = real
 	}
 	known := false
-	for _, p := range d.projects(true) {
-		f := store.FolderPath(p.Project.Folder)
+	for _, p := range d.folders(true) {
+		f := store.FolderPath(p.Folder.Folder)
 		if real, err := store.Resolve(f); err == nil {
 			f = real
 		}
 		known = known || f == folder
 	}
 	if !known {
-		return wire.DropboxPutResponse{}, Invalid("That is not a project here.")
+		return wire.DropboxPutResponse{}, Invalid("That is not a folder here.")
 	}
 	if len(r.Data) > dropboxLimit {
 		return wire.DropboxPutResponse{}, Invalid("That file is too big to send. Copy it into .agents/dropbox/ on its machine instead.")

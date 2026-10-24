@@ -1,7 +1,7 @@
 import Foundation
 
 /// The marketplaces Add server… and Add skill… search (#687): a list the app provides, the
-/// person's own in `~/.agents/marketplaces.json`, and a project's in its committed
+/// person's own in `~/.agents/marketplaces.json`, and a folder's in its committed
 /// `.agents/marketplaces.json`. Like the rest of the catalogue, none is in `agentMethods`.
 extension DaemonAPI.Method {
     public static let marketplacesList = "marketplaces/list"
@@ -21,7 +21,7 @@ extension DaemonAPI {
         /// A GitHub repository of skills: every folder with a `SKILL.md`.
         case gitHubSkills = "github-skills"
         /// A JSON file, or a folder of them, in the MCP Registry's shape (#2155): the Agents
-        /// marketplace inside the host, or a path in a person's or a project's list.
+        /// marketplace inside the host, or a path in a person's or a folder's list.
         case file
 
         public var kind: CatalogKind {
@@ -38,12 +38,12 @@ extension DaemonAPI {
         case provided
         /// `~/.agents/marketplaces.json`.
         case personal
-        /// A project's `.agents/marketplaces.json`, committed with it. Shown, edited in the file.
-        case project
+        /// A folder's `.agents/marketplaces.json`, committed with it. Shown, edited in the file.
+        case folder
     }
 
     public struct Marketplace: Codable, Hashable, Sendable, Identifiable {
-        /// `provided:<slug>`, `personal:<url>` or `project:<url>`.
+        /// `provided:<slug>`, `personal:<url>` or `folder:<url>`.
         public var id: String
         public var name: String
         public var format: MarketplaceFormat
@@ -77,7 +77,7 @@ extension DaemonAPI {
 
     public struct MarketplacesListRequest: Codable, Sendable {
         public var kind: CatalogKind?
-        /// A project's marketplaces are listed only when it is the destination.
+        /// A folder's marketplaces are listed only when it is the destination.
         public var destination: SkillDestination?
         public init(kind: CatalogKind? = nil, destination: SkillDestination? = nil) {
             self.kind = kind; self.destination = destination
@@ -86,7 +86,7 @@ extension DaemonAPI {
 
     public struct MarketplacesListAnswer: Codable, Sendable, Equatable {
         public var marketplaces: [Marketplace]
-        /// `marketplaces.json` (the person's or the project's) could not be read; what it
+        /// `marketplaces.json` (the person's or the folder's) could not be read; what it
         /// adds is missing, and the app will not write over it.
         public var problem: String?
         public init(marketplaces: [Marketplace], problem: String? = nil) {

@@ -86,6 +86,6 @@ extension EnvironmentValues {
     /// whose chat is the selection.
     @Entry var poppedChat: PoppedChat? = nil
     /// Whether the window has an inspector beside its chat: the main window and a
-    /// project's (#1089) do, a session's own window (#826) does not.
+    /// folder's (#1089) do, a session's own window (#826) does not.
     @Entry var windowHasInspector = true
 }

@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// A host's heading in the project list (037, wireframes/mac-projects.svg): its name,
+/// A host's heading in the folder list (037, wireframes/mac-folders.svg): its name,
 /// and how it is doing in a dot and at most two words.
 struct HostHeading: View {
     @Environment(AppModel.self) private var model

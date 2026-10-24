@@ -41,9 +41,9 @@ public struct ServerHost: Codable, Hashable, Sendable, Identifiable {
     /// "Use this server's own sign-in only" (043, FR-014): nothing from Settings is ever
     /// lent to it. For a box the person shares.
     public var ownSignInOnly: Bool = false
-    /// The project folders last seen on it, so that after a rebuild the ones it no longer
+    /// The folders last seen on it, so that after a rebuild the ones it no longer
     /// has can be shown as gone rather than offline (043, FR-019).
-    public var knownProjects: [String] = []
+    public var knownFolders: [String] = []
 
     public struct InvalidName: Error, Equatable, Sendable {
         public var name: String
@@ -68,7 +68,7 @@ public struct ServerHost: Codable, Hashable, Sendable, Identifiable {
         facts = (try? c.decodeIfPresent(ServerFacts.self, forKey: .facts)) ?? nil
         trustedFingerprint = try c.decodeIfPresent(String.self, forKey: .trustedFingerprint)
         ownSignInOnly = try c.decode(Bool.self, forKey: .ownSignInOnly)
-        knownProjects = try c.decode([String].self, forKey: .knownProjects)
+        knownFolders = try c.decode([String].self, forKey: .knownFolders)
     }
 
     /// Not empty, one word, and not something ssh would read as an option. The `--` in
@@ -332,8 +332,8 @@ public struct HostList: Codable, Hashable, Sendable {
     }
 }
 
-/// Which project, now that two machines can each have `/home/alex/src/api`.
-public struct ProjectKey: Hashable, Sendable, CustomStringConvertible {
+/// Which folder, now that two machines can each have `/home/alex/src/api`.
+public struct FolderKey: Hashable, Sendable, CustomStringConvertible {
     public var host: HostID
     public var folder: URL
 
@@ -356,11 +356,11 @@ public struct ProjectKey: Hashable, Sendable, CustomStringConvertible {
     public var description: String { stored }
 }
 
-/// As its `stored` form, one string: what a project's own window is restored with (#1089).
-extension ProjectKey: Codable {
+/// As its `stored` form, one string: what a folder's own window is restored with (#1089).
+extension FolderKey: Codable {
     public init(from decoder: Decoder) throws {
         let text = try decoder.singleValueContainer().decode(String.self)
-        guard let key = ProjectKey(stored: text) else {
+        guard let key = FolderKey(stored: text) else {
             throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
                                                     debugDescription: "Not host|path: \(text)"))
         }

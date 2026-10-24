@@ -16,13 +16,13 @@ import UserNotifications
 /// The banner's three lines come from `Need.headline` alone, built once in Core so the
 /// Mac and the phone say the same words about the same agent. Swiping a banner away
 /// marks nothing met: there is no "dismissed" in a need's life, the agent is still
-/// blocked, and the project row still says so.
+/// blocked, and the folder row still says so.
 @MainActor
 final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
     /// Open that agent's conversation, with the question in front of the person.
     var open: @MainActor (UUID) -> Void = { _ in }
-    /// A project's page, for a question asked of the project rather than a session (#531).
-    var openProject: @MainActor (URL) -> Void = { _ in }
+    /// A folder's page, for a question asked of the folder rather than a session (#531).
+    var openFolder: @MainActor (URL) -> Void = { _ in }
     /// One of the banner's own buttons (#1170): the need's token, the answer, and the line
     /// typed for a reply.
     var answer: @MainActor (String, QuickAnswer, String?) async -> Void = { _, _, _ in }
@@ -85,7 +85,7 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
 
     private func show(_ need: Need, token: String, alert: Bool) {
         let content = UNMutableNotificationContent()
-        // The agent first, because it is what the person will recognise; the project
+        // The agent first, because it is what the person will recognise; the folder
         // under it; what is wanted as the body. Never blank: the headline is truncated
         // rather than emptied, in Core, before it gets here.
         let headline = need.headline.truncating()
@@ -98,7 +98,7 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
             content.userInfo["agentID"] = agentID.uuidString
             content.threadIdentifier = agentID.uuidString
         } else {
-            // The project's own question (#531): its token names the project.
+            // The folder's own question (#531): its token names the folder.
             content.threadIdentifier = token
         }
         showing[token] = need.id
@@ -176,7 +176,7 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
         } else if let folder = NeedID.guardedFolder(fromToken: request.identifier) {
             await MainActor.run {
                 NSApp.activate()
-                openProject(folder)
+                openFolder(folder)
             }
         }
     }

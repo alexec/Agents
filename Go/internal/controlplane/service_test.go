@@ -203,14 +203,14 @@ func (p *plane) serveHost(root string, member *controllink.Membership, private [
 
 // fakeWorktrees is every fake host's worktrees/all: one ahead of its upstream, one with
 // no upstream and commits not on the base, one with a change not committed, one pushed.
-var fakeWorktrees = []map[string]any{{"project": "file:///work/app", "worktrees": []map[string]any{
-	{"name": "ahead", "root": "file:///work/app-ahead", "branch": "agents/ahead", "isProjectFolder": false, "exists": true,
+var fakeWorktrees = []map[string]any{{"folder": "file:///work/app", "worktrees": []map[string]any{
+	{"name": "ahead", "root": "file:///work/app-ahead", "branch": "agents/ahead", "isFolderPath": false, "exists": true,
 		"madeByApp": true, "agents": []string{}, "status": map[string]any{"uncommitted": 0, "ahead": 2, "behind": 0}},
-	{"name": "local", "root": "file:///work/app-local", "branch": "agents/local", "isProjectFolder": false, "exists": true,
+	{"name": "local", "root": "file:///work/app-local", "branch": "agents/local", "isFolderPath": false, "exists": true,
 		"madeByApp": true, "agents": []string{}, "status": map[string]any{"uncommitted": 0, "unmerged": 4}},
-	{"name": "dirty", "root": "file:///work/app-dirty", "branch": "agents/dirty", "isProjectFolder": false, "exists": true,
+	{"name": "dirty", "root": "file:///work/app-dirty", "branch": "agents/dirty", "isFolderPath": false, "exists": true,
 		"madeByApp": true, "agents": []string{}, "status": map[string]any{"uncommitted": 1, "ahead": 0, "behind": 0}},
-	{"name": "pushed", "root": "file:///work/app-pushed", "branch": "agents/pushed", "isProjectFolder": false, "exists": true,
+	{"name": "pushed", "root": "file:///work/app-pushed", "branch": "agents/pushed", "isFolderPath": false, "exists": true,
 		"madeByApp": true, "agents": []string{}, "status": map[string]any{"uncommitted": 0, "ahead": 0, "behind": 3}},
 }}}
 

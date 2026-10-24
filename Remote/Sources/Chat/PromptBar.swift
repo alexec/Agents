@@ -377,9 +377,9 @@ struct PromptBar: View {
 
     // MARK: Said instead of typed
 
-    /// The open projects, and this project's titles and issue numbers (#2515).
+    /// The open folders, and this folder's titles and issue numbers (#2515).
     private var speechSeeds: [String] {
-        DictationVocabulary.seeds(projects: model.work.projects, agents: model.work.agents, in: agent.projectFolder)
+        DictationVocabulary.seeds(folders: model.work.folders, agents: model.work.agents, in: agent.folderPath)
     }
 
     private func beginDictation() {
@@ -612,8 +612,8 @@ private struct SuggestionChip: View {
 private struct PromptHead: View {
     @Environment(RemoteModel.self) private var model
     let agent: Agent
-    /// The project folder's branch, for an agent working there rather than in a worktree.
-    @State private var projectBranch: String?
+    /// The folder's branch, for an agent working there rather than in a worktree.
+    @State private var folderBranch: String?
     @Environment(\.horizontalSizeClass) private var sizeClass
     /// At compact width the labels are one line, and a tap opens them in a popover (#2173).
     @State private var editingLabels = false
@@ -646,7 +646,7 @@ private struct PromptHead: View {
         }
         // Asked once a chat, as the window asks: the branch is not on the agent's record.
         .task(id: "\(agent.id)-\(agent.cwd.path)") {
-            projectBranch = agent.worktree == nil ? await model.projectFolderBranch(of: agent) : nil
+            folderBranch = agent.worktree == nil ? await model.folderPathBranch(of: agent) : nil
         }
     }
 
@@ -684,7 +684,7 @@ private struct PromptHead: View {
     private var labelEditor: some View {
         VStack(alignment: .trailing, spacing: 8) {
             LabelTagField(labels: agent.labels,
-                          suggestions: model.labelSuggestions(in: agent.projectFolder),
+                          suggestions: model.labelSuggestions(in: agent.folderPath),
                           add: { values in Task { _ = await model.setLabels(on: agent.id, add: values) } },
                           remove: { value in Task { _ = await model.setLabels(on: agent.id, remove: [value]) } },
                           focusFirst: true)
@@ -698,10 +698,10 @@ private struct PromptHead: View {
         .frame(width: 300)
     }
 
-    /// Its worktree, or the project folder's branch. None for an archived agent, whose
+    /// Its worktree, or the folder's branch. None for an archived agent, whose
     /// place may be gone, as on the window.
     private var place: String? {
         guard agent.state != .archived else { return nil }
-        return agent.worktree?.name ?? projectBranch
+        return agent.worktree?.name ?? folderBranch
     }
 }

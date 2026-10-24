@@ -18,8 +18,8 @@ import (
 const governanceItemsMost = 500
 
 // governanceItems is each MCP server and skill this machine has from a catalogue,
-// personal and in its projects, from the catalogue sidecars: a server's registry name
-// and version, a skill's catalogue and commit. A project's folder is not said. The files
+// personal and in its folders, from the catalogue sidecars: a server's registry name
+// and version, a skill's catalogue and commit. A folder is not said. The files
 // are only read here: one that does not decode says nothing.
 func (d *Daemon) governanceItems() []wire.CatalogItem {
 	seen := map[string]bool{}
@@ -69,7 +69,7 @@ func (d *Daemon) governanceItems() []wire.CatalogItem {
 func lastPart(key string) string { return key[strings.LastIndex(key, "/")+1:] }
 
 // mcpStillThere says whether a sidecar entry's server is still in the mcp.json its key
-// names, the personal one or the project folder's (#2505). The sidecar is not pruned when a
+// names, the personal one or the folder's (#2505). The sidecar is not pruned when a
 // server leaves mcp.json by hand, so the report would keep a server no agent can use. Each
 // mcp.json is read once a report. One that cannot be read, or that is not valid, settles
 // nothing: its entries stay, as the sidecar is all that is known of them.
@@ -91,7 +91,7 @@ func (d *Daemon) mcpStillThere() func(key string) bool {
 				path = mcpcatalog.PersonalFile(home)
 			}
 		} else {
-			path = mcpcatalog.ProjectFile(scope)
+			path = mcpcatalog.FolderFile(scope)
 		}
 		if path == "" {
 			return true

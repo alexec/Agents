@@ -310,7 +310,7 @@ func (l *RealLinear) commented(ctx context.Context, team, since string) ([]Activ
 	}
 	var items []Activity
 	for _, c := range out.Comments.Nodes {
-		if c.Issue == nil { // a comment on a project update, not an issue
+		if c.Issue == nil { // a comment on a folder update, not an issue
 			continue
 		}
 		items = append(items, Activity{ID: c.ID, At: c.CreatedAt, Issue: c.Issue.issue(), Kind: Commented,

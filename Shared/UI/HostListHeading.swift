@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// A host's name over its projects (058, frame H).
+/// A host's name over its folders (058, frame H).
 ///
 /// Upper case, at the fine step, which is what a section heading is. `note` sits at
 /// the trailing end in sentence case — frame H's "offline" — so a list style that

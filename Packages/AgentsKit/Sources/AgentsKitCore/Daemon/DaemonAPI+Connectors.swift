@@ -1,14 +1,14 @@
 import Foundation
 
-/// The person's connections to tools (#1335), and each project's Connectors set-up (#1336).
+/// The person's connections to tools (#1335), and each folder's Connectors set-up (#1336).
 ///
-/// A connection is the person's: one GitHub sign-in on a host covers every project there. The
+/// A connection is the person's: one GitHub sign-in on a host covers every folder there. The
 /// host does the device flow and keeps the tokens; a client shows the code and the links, and
 /// waits. Linear (#1343) is the authorization code with PKCE: the host keeps the verifier, the
 /// client opens the address in an authentication session, and gives back the code that the
 /// hand-back page sends to agents://oauth/callback. GitLab (#1630) is the device flow on
 /// gitlab.com, or a personal access token on any GitLab. Email (#1780) is one IMAP mailbox and
-/// its app password, which the host checks once and keeps. A project's set-up is the project's: its repository, four slots that each prove
+/// its app password, which the host checks once and keeps. A folder's set-up is the folder's: its repository, four slots that each prove
 /// themselves with one real read, and the github events it turned on.
 extension DaemonAPI.Method {
     public static let connectionsList = "connections/list"
@@ -179,7 +179,7 @@ extension DaemonAPI {
         public init(error: String? = nil) { self.error = error }
     }
 
-    /// One slot of a project's set-up, in the page's order.
+    /// One slot of a folder's set-up, in the page's order.
     public enum ConnectorSlotKind: String, Codable, Sendable, Hashable, CaseIterable {
         case tasks, codeReview, ci, workspace
     }
@@ -195,7 +195,7 @@ extension DaemonAPI {
         case failed
         /// The provider refused the read: the person grants it on the provider's site.
         case refused
-        /// The project has no GitHub or GitLab remote.
+        /// The folder has no GitHub or GitLab remote.
         case noRemote
         /// Skipped: it counts as done.
         case skipped
@@ -261,10 +261,10 @@ extension DaemonAPI {
         }
     }
 
-    /// A project's Connectors set-up (#1336), on GitHub or GitLab (#1632).
+    /// A folder's Connectors set-up (#1336), on GitHub or GitLab (#1632).
     public struct ConnectorSetup: Codable, Sendable, Hashable {
         public var folder: String
-        /// owner/name on GitHub, group/project on GitLab, from the project's git remote. Nil
+        /// owner/name on GitHub, group/folder on GitLab, from the folder's git remote. Nil
         /// with no GitHub or GitLab remote.
         public var repository: String?
         /// The forge that fills Tasks, Code review and CI; nil is GitHub.

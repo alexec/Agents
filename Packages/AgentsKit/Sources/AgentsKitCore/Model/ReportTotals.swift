@@ -1,12 +1,12 @@
 import Foundation
 
-/// The Reports pane (#1811): a report's rows added up by person, project, machine or
+/// The Reports pane (#1811): a report's rows added up by person, folder, machine or
 /// runtime, largest first. The window, the Remote and the web page (`Web/src/model/reports.ts`)
 /// add up the same way.
 public struct ReportTotals: Sendable, Hashable {
     public enum Dimension: String, CaseIterable, Identifiable, Sendable {
         case person = "Person"
-        case project = "Project"
+        case folder = "Folder"
         case machine = "Machine"
         case runtime = "Runtime"
         /// The workflow that started the agents: Reports ▸ Workflows' (#2019).
@@ -15,10 +15,10 @@ public struct ReportTotals: Sendable, Hashable {
         public var id: Self { self }
 
         /// The ways Spend adds up, and every page's after its own first.
-        public static let spend: [Dimension] = [.person, .project, .machine, .runtime]
+        public static let spend: [Dimension] = [.person, .folder, .machine, .runtime]
     }
 
-    /// One person's, project's, machine's or runtime's share.
+    /// One person's, folder's, machine's or runtime's share.
     public struct Group: Identifiable, Sendable, Hashable {
         public var id: String
         public var name: String
@@ -93,8 +93,8 @@ public struct ReportTotals: Sendable, Hashable {
         case .person:
             return (row.person, row.person.isEmpty ? ReportWords.removedOwner
                     : (row.personName.isEmpty ? row.person : row.personName))
-        case .project:
-            return (row.project, row.project.isEmpty ? ReportWords.noProject : row.project)
+        case .folder:
+            return (row.folder, row.folder.isEmpty ? ReportWords.noFolder : row.folder)
         case .machine:
             return (row.host, row.hostName.isEmpty ? row.host : row.hostName)
         case .runtime:
@@ -109,7 +109,7 @@ public struct ReportTotals: Sendable, Hashable {
 /// The Reports pane's words, on all three clients.
 public enum ReportWords {
     public static let removedOwner = "A removed machine"
-    public static let noProject = "No project"
+    public static let noFolder = "No folder"
     public static let noRuntime = "No runtime"
     public static let empty = "Nothing was used in this time. Each machine sends what it used once an hour."
     /// Whose spend the Cost page's Reports pane shows: the caller's own, an admin's too (#2071).

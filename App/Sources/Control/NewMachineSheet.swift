@@ -15,7 +15,7 @@ struct NewMachineSheet: View {
     @State private var loading = true
     @State private var name = ""
     @State private var values: [String: JSONValue] = [:]
-    /// Clone these projects (#1122): git URLs, one a line.
+    /// Clone these folders (#1122): git URLs, one a line.
     @State private var clones = ""
     @State private var confirming = false
     @State private var working = false
@@ -57,8 +57,8 @@ struct NewMachineSheet: View {
                 Form {
                     TextField("Name", text: $name, prompt: Text("build-2"))
                     ForEach(schema) { field in fieldView(field) }
-                    TextField("Clone these projects", text: $clones,
-                              prompt: Text("https://github.com/you/project.git"), axis: .vertical)
+                    TextField("Clone these folders", text: $clones,
+                              prompt: Text("https://github.com/you/folder.git"), axis: .vertical)
                         .lineLimit(1...5)
                 }
                 .formStyle(.grouped)
@@ -66,7 +66,7 @@ struct NewMachineSheet: View {
             if let problem {
                 Text(problem).appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
             }
-            Text("It joins as a machine by itself once it has started, and is linked to it. Then it clones the projects you list, one a line, with this Mac’s git access when you allow it.")
+            Text("It joins as a machine by itself once it has started, and is linked to it. Then it clones the folders you list, one a line, with this Mac’s git access when you allow it.")
                 .appText(.supporting).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             HStack {
                 Spacer()

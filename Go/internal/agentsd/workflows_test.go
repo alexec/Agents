@@ -13,11 +13,11 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-func TestWorkflowLimitsArePerProjectAndDoNotLimitApprovals(t *testing.T) {
+func TestWorkflowLimitsArePerFolderAndDoNotLimitApprovals(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	first := project(t, c, 1)
-	second := project(t, c, 2)
+	first := folder(t, c, 1)
+	second := folder(t, c, 2)
 	for _, dir := range []string{first, second} {
 		if err := os.MkdirAll(workflowsFolder(dir), 0o755); err != nil {
 			t.Fatal(err)
@@ -31,7 +31,7 @@ func TestWorkflowLimitsArePerProjectAndDoNotLimitApprovals(t *testing.T) {
 		}
 	}
 
-	// On first start, these existing files are approved as they stand. Each project
+	// On first start, these existing files are approved as they stand. Each folder
 	// gets its own default of twenty, so both twenty-first workflows are over limit.
 	approveAll(t, c, store.FolderURL(first))
 	approveAll(t, c, store.FolderURL(second))
@@ -47,14 +47,14 @@ func TestWorkflowLimitsArePerProjectAndDoNotLimitApprovals(t *testing.T) {
 		over := 0
 		for _, s := range summaries {
 			if s.OverLimit != nil {
-				if *s.OverLimit != wire.WorkflowLimitProject || s.TotalLimit == nil || *s.TotalLimit != 20 {
+				if *s.OverLimit != wire.WorkflowLimitFolder || s.TotalLimit == nil || *s.TotalLimit != 20 {
 					t.Fatalf("unexpected limit: %+v", s)
 				}
 				over++
 			}
 		}
 		if over != 1 {
-			t.Fatalf("project %s has %d workflows over limit", item.dir, over)
+			t.Fatalf("folder %s has %d workflows over limit", item.dir, over)
 		}
 	}
 
@@ -158,7 +158,7 @@ func TestOneKeyChangedAndNothingElse(t *testing.T) {
 func TestWorkflowsWaitForThePersonsOK(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "nightly.md"), []byte("---\non:\n  - schedule:\n      at: \":00\"\n---\nTidy up.\n"), 0o644)
@@ -222,7 +222,7 @@ func TestWorkflowsWaitForThePersonsOK(t *testing.T) {
 func TestClearingMissedEventsLeavesTheWorkflow(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "watch.md"), []byte("---\non: agent.finished\n---\nLook.\n"), 0o644)
@@ -242,7 +242,7 @@ func TestClearingMissedEventsLeavesTheWorkflow(t *testing.T) {
 func TestAWorkflowThatIsALinkNeverRuns(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	must := func(err error) {
 		t.Helper()
@@ -321,7 +321,7 @@ func TestAWorkflowThatIsALinkNeverRuns(t *testing.T) {
 func TestAWorkflowWaitsWhenTheSkillItFollowsChanges(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	must := func(err error) {
 		t.Helper()
@@ -363,8 +363,8 @@ func TestAWorkflowWaitsWhenTheSkillItFollowsChanges(t *testing.T) {
 	if o := ran.LastOutcome; o == nil || o.Refused == nil || o.Refused.Value.AwaitingApproval == nil {
 		t.Fatalf("ran: %+v", ran)
 	}
-	// The project's watch hears a skill's change as it hears a workflow's.
-	d.projectFilesChanged(dir, []string{skill})
+	// The folder's watch hears a skill's change as it hears a workflow's.
+	d.folderFilesChanged(dir, []string{skill})
 	s, _ := d.summaryFor(dir)
 	if len(s.Approvals) != 1 || s.Approvals[0].Key != "nightly" || s.Approvals[0].Line != "Changed since you approved it" {
 		t.Fatalf("%+v", s.Approvals)
@@ -378,7 +378,7 @@ func TestAWorkflowWaitsWhenTheSkillItFollowsChanges(t *testing.T) {
 		t.Fatalf("%+v", reading)
 	}
 	// Undo puts the approved skill back, and it runs again.
-	c.call(t, 4, "projects/undoGuardedChange", map[string]any{"folder": folder, "path": ".agents/workflows/nightly.md", "digest": *reading.Digest})
+	c.call(t, 4, "folders/undoGuardedChange", map[string]any{"folder": folder, "path": ".agents/workflows/nightly.md", "digest": *reading.Digest})
 	if !fileHas(t, skill, "Tidy the tree.\n") || !fileHas(t, path, workflow) {
 		t.Fatal("not undone")
 	}

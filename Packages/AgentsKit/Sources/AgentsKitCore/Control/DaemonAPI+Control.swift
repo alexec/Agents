@@ -25,9 +25,9 @@ public extension DaemonAPI.Method {
     /// resolves each, with no network. `{destination}` resolves just that, as typed.
     /// `[SSHHost]`.
     static let hostsSSHHosts = "hosts/sshHosts"
-    /// `ProjectDetection` (#429, #656): whether the window suggests projects on a host, and
+    /// `FolderDetection` (#429, #656): whether the window suggests folders on a host, and
     /// where it looks for them. Nothing is added unless the person picks it.
-    static let controlSetProjectDetection = "control/setProjectDetection"
+    static let controlSetFolderDetection = "control/setFolderDetection"
     /// `Empty` → `Empty`, an admin's only (#997): a new control key; members take it as
     /// they connect again, with no new pairing.
     static let controlRotate = "control/rotate"
@@ -67,12 +67,12 @@ public extension DaemonAPI.Method {
     static let hostHello = "host/hello"
     static let attentionNeed = "attention/need"
     static let controlPing = "control/ping"
-    /// To a host just added, on its channel 0 (#429), never answered: `ProjectDetection`.
-    /// Sent only by a control plane before #656; a host since says `projects/detected` with
+    /// To a host just added, on its channel 0 (#429), never answered: `FolderDetection`.
+    /// Sent only by a control plane before #656; a host since says `folders/detected` with
     /// nothing added.
-    static let projectsDetect = "projects/detect"
-    /// A host, on its channel 0 (#429): its answer to `projects/detect`. `{added}`.
-    static let projectsDetected = "projects/detected"
+    static let foldersDetect = "folders/detect"
+    /// A host, on its channel 0 (#429): its answer to `folders/detect`. `{added}`.
+    static let foldersDetected = "folders/detected"
 
     // To a relay host, on its channel 0 (058, T096–T097): notifications, never answered.
     /// `RelayDevices`: the devices it may carry for, with their keys.
@@ -173,9 +173,9 @@ public extension DaemonAPI {
         /// This Mac's host, as it says its join stands (#113), when the control plane runs
         /// beside it: "Couldn't join the control plane: …". Nil elsewhere.
         public var thisMacHost: HostJoinStatus?
-        /// Where a host added from now on has its projects found (#429). Nil from a control
+        /// Where a host added from now on has its folders found (#429). Nil from a control
         /// plane older than that.
-        public var projectDetection: ProjectDetection?
+        public var folderDetection: FolderDetection?
         /// Servers installed over an ssh tunnel that have not joined yet (#660), each with how
         /// its tunnel stands: they have no host row, so this is where ssh's reason shows.
         /// Nil from a control plane older than that, or one that holds no tunnels.

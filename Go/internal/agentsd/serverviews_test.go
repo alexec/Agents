@@ -25,11 +25,11 @@ func TestAServersListViewsShowWithoutAPinAndHide(t *testing.T) {
 		"local":{"command":"local-server"}}}`), 0o644)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 
 	// The first list reads the catalog in the background, then the rows are said.
-	var all []wire.ProjectPins
+	var all []wire.FolderPins
 	c.call(t, 20, "pins/list", nil)
 	c.until(t, "pins/changed with ci's view", func(method string, p json.RawMessage) bool {
 		var n wire.PinsChangedNotification
@@ -49,7 +49,7 @@ func TestAServersListViewsShowWithoutAPinAndHide(t *testing.T) {
 		t.Fatal("listing the views called a tool")
 	}
 	// Opened with no pin, its call names no agent: the server's own views say it is of ci.
-	if r := c.call(t, 8, "views/call", map[string]any{"agentID": store.NewUUID(), "project": folder, "viewID": store.NewUUID(),
+	if r := c.call(t, 8, "views/call", map[string]any{"agentID": store.NewUUID(), "folder": folder, "viewID": store.NewUUID(),
 		"name": "board", "server": "ci", "feed": true}); !strings.Contains(string(r), `"called":"board"`) {
 		t.Fatalf("%s", r)
 	}

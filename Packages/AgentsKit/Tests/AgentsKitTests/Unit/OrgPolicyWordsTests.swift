@@ -38,7 +38,7 @@ struct OrgPolicyWordsTests {
                                        "Antigravity’s terms", "Machines"])
         #expect(rules.map(\.words) == [
             "Up to Accept Edits", "Required", "Only Claude (claude-sonnet-*), Codex", "Only acme, github", "Not allowed",
-            "$40 a day, 50,000 tokens a day, $2.50 an agent", "Allowed: Cursor", "At most 3 running and 10 not archived in a project",
+            "$40 a day, 50,000 tokens a day, $2.50 an agent", "Allowed: Cursor", "At most 3 running and 10 not archived in a folder",
             "Only ANTHROPIC_*, OPENAI_*", "Antigravity is not allowed",
             "A machine that does not follow this policy starts no agent",
         ])
@@ -119,7 +119,7 @@ struct OrgPolicyWordsTests {
         status.setBy = .init(rule: "runtimes", words: "Your organisation does not allow Claude.")
         #expect(!status.canStart)
         #expect(status.unavailableReason == "Set by your organisation. Your organisation does not allow Claude.")
-        // The sandbox, cost and a project's helper limits.
+        // The sandbox, cost and a folder's helper limits.
         let sandbox = try JSONDecoder().decode(SandboxSettings.self, from: Data(#"{"defaults":{},"setBy":\#(mark)}"#.utf8))
         #expect(sandbox.setBy?.rule == "modeCeiling")
         let cost = try JSONDecoder().decode(DaemonAPI.CostState.self, from: Data(#"""

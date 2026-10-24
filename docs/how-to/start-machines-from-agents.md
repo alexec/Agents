@@ -92,7 +92,7 @@ All three are kept with the link.
 ### Start when used
 
 With **Start when used** on, you don't have to press **Start**. Send a prompt to an agent on
-the stopped server, or start a new agent in one of its projects, on the Mac, the iPhone or
+the stopped server, or start a new agent in one of its folders, on the Mac, the iPhone or
 the web page:
 
 - The control plane keeps what you sent and starts the machine.
@@ -120,7 +120,7 @@ means:
 
 - no turn running,
 - no agent waiting on your answer,
-- and no terminal or project shell open.
+- and no terminal or folder shell open.
 
 A turn starting in that time starts the count again. When Agents stops it, its row and the
 strip over its chats say **devbox was stopped by Agents after 30 minutes idle**. With **Start

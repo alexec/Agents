@@ -57,7 +57,7 @@ func (d *Daemon) machineFirstLookDone() {
 }
 
 // machineChanged is DaemonCore.machineChanged: one change, as its event, for every
-// project to hear.
+// folder to hear.
 func (d *Daemon) machineChanged(c machineChange) {
 	if c.kind == "wake" {
 		safe.Go("disk check", d.checkDisk)

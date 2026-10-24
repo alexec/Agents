@@ -21,7 +21,7 @@ test("an event trigger uses the catalogue meaning and includes its filters", () 
   const trigger = { unrecognised: { name: "branch.moved", keys: { branch: "main" } } };
   assert.equal(w.triggerSummary(trigger), "A branch an agent works on moved; never the default branch (branch main)");
   assert.equal(w.triggerSummary({ unrecognised: { name: "agent.finished", keys: {} } }),
-    "An agent in this project ended a turn having done its work");
+    "An agent in this folder ended a turn having done its work");
   assert.equal(w.canFire({ triggers: [trigger], mode: "new", settings: { options: {}, labels: [] } }), true);
 });
 
@@ -50,17 +50,17 @@ const event = (name, keys = {}) => ({ unrecognised: { name, keys } });
 const schedule = { schedule: { _0: { minutes: [0], hours: [3, 3], days: ["sun"], startMinute: 0, endMinute: 0 } } };
 
 test("each trigger listens where its events are", () => {
-  assert.equal(w.listensIn(event("agent.finished")), "project");
-  assert.equal(w.listensIn(event("branch.moved")), "project");
+  assert.equal(w.listensIn(event("agent.finished")), "folder");
+  assert.equal(w.listensIn(event("branch.moved")), "folder");
   assert.equal(w.listensIn(event("mac.wake")), "mac");
   assert.equal(w.listensIn(event("machine.disk_low", { level: "critical" })), "mac");
   assert.equal(w.listensIn(event("machine.disk_ok")), "mac");
   assert.equal(w.listensIn(event("cost.limit_reached")), "either");
   assert.equal(w.listensIn(event("cost.*")), "either");
-  assert.equal(w.listensIn(event("agent.*")), "project");
+  assert.equal(w.listensIn(event("agent.*")), "folder");
   assert.equal(w.listensIn(schedule), null);
   assert.equal(w.listensIn(event("x")), null);
-  assert.equal(w.scopeLine(event("mac.wake"), "work", "this Mac"), "Anywhere on this Mac, so it runs in every project");
+  assert.equal(w.scopeLine(event("mac.wake"), "work", "this Mac"), "Anywhere on this Mac, so it runs in every folder");
   assert.equal(w.scopeLine(schedule, "work", "this Mac"), "By the clock on this Mac");
 });
 
@@ -109,12 +109,12 @@ test("off says why when it started off, as the Mac and the Remote do (#124)", ()
     "New — approve it on its page to let it run · Off: written by an agent. Turn it on when you are ready");
 });
 
-test("an approved workflow past the project's running limit says why", () => {
+test("an approved workflow past the folder's running limit says why", () => {
   const summary = { workflow: { workflowID: "d", triggers: [schedule], mode: "new", prompt: "", settings: {}, unknownFields: {} },
     isArchived: false, isEnabled: true, isRunning: false, nextFireAtByTrigger: [],
-    overLimit: "project", totalLimit: 20 };
+    overLimit: "folder", totalLimit: 20 };
   assert.equal(w.happening(summary),
-    "This project already has 20 workflows running. Turn one off or archive one in this project to let it run");
+    "This folder already has 20 workflows running. Turn one off or archive one in this folder to let it run");
   assert.equal(w.workflowStatus(summary).words, "Over the limit");
 });
 
@@ -155,7 +155,7 @@ test("a list is a capsule joined by | and a cause joined by |", () => {
 
 test("the page says the switch is a line in the workflow's file, in the window's words (#125)", () => {
   assert.equal(w.switchesSentence({ workflow: { workflowID: "nightly" } }),
-    "Enabled and Archive are saved in .agents/workflows/nightly.md, a file in this project you may commit");
+    "Enabled and Archive are saved in .agents/workflows/nightly.md, a file in this folder you may commit");
 });
 
 const dates = await load("src/protocol/dates.ts");
@@ -181,6 +181,6 @@ test("a server's event trigger's lines say what the Mac's say (#383)", () => {
   assert.equal(w.mcpMissedWords({ name: "x.y", state: "active" }), null);
   const [{ input }] = cases("workflows/summaries.json");
   const lines = w.workflowStatusLines({ ...input, mcpTriggers: [{ name: "checks.failed", server: "b", state: "stopped",
-    failure: { code: "badArguments", message: "b's checks.failed takes project; not repo.", since: at("2026-10-06T12:01:00Z") } }] });
-  assert.ok(lines.some((line) => line.text === "b's checks.failed takes project; not repo." && line.tint === "failure"));
+    failure: { code: "badArguments", message: "b's checks.failed takes folder; not repo.", since: at("2026-10-06T12:01:00Z") } }] });
+  assert.ok(lines.some((line) => line.text === "b's checks.failed takes folder; not repo." && line.tint === "failure"));
 });

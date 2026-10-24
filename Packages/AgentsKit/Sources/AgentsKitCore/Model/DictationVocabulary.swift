@@ -4,7 +4,7 @@ import Foundation
 /// as that name (#2515).
 ///
 /// Apple asks for short strings, and for fewer than about a hundred of them. The
-/// product's own words come first, so a long project cannot push GitHub off the list.
+/// product's own words come first, so a long folder cannot push GitHub off the list.
 /// A title that is a sentence is left out: it is not a name.
 public enum DictationVocabulary {
     /// How many strings go to the transcriber.
@@ -33,19 +33,19 @@ public enum DictationVocabulary {
         combine(productTerms + extra)
     }
 
-    /// What voice mode and the dictate button seed: the open projects' names, the
-    /// selected project's session titles, and its issue numbers.
+    /// What voice mode and the dictate button seed: the open folders' names, the
+    /// selected folder's session titles, and its issue numbers.
     ///
     /// Issue numbers are the ones on those sessions. The app does not keep GitHub's
     /// own list. A label that is a number, or "#2515" inside a title, is one.
-    public static func seeds(projects: [DaemonAPI.ProjectSummary], agents: [Agent], in folder: URL?) -> [String] {
-        let names = projects.filter { $0.project.archivedAt == nil }.flatMap {
-            [$0.name, $0.folder.lastPathComponent]
+    public static func seeds(folders: [DaemonAPI.FolderSummary], agents: [Agent], in folder: URL?) -> [String] {
+        let names = folders.filter { $0.folder.archivedAt == nil }.flatMap {
+            [$0.name, $0.folder.folder.lastPathComponent]
         }
-        let wanted = folder.map(Project.standardize)
+        let wanted = folder.map(Folder.standardize)
         let live = agents.filter { agent in
             guard agent.state != .archived, let wanted else { return false }
-            return Project.standardize(agent.projectFolder) == wanted
+            return Folder.standardize(agent.folderPath) == wanted
         }
         var titles: [String] = []
         var issues: [String] = []

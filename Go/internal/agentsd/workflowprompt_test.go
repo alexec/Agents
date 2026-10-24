@@ -55,7 +55,7 @@ func TestAQueuedRunSaysWhyItStarted(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "slow.md"), []byte("---\nname: Slow\non: manual\n---\nwait for me\n"), 0o644)

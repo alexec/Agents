@@ -20,14 +20,14 @@ import (
 // stale. A hidden view is not polled.
 
 // viewCountEvery is the poll: no faster than a server's events (10 s to 5 min, 30 s by
-// default), and slow enough that 20 projects with two GitHub views each take a quarter of
+// default), and slow enough that 20 folders with two GitHub views each take a quarter of
 // GitHub's 5000 calls an hour.
 var viewCountEvery = 2 * time.Minute
 
 // viewCountFirst is how long after the start, or after a view first shows, its first poll is.
 var viewCountFirst = 10 * time.Second
 
-// viewCountsKept bounds the counts held: a project's views, across every project.
+// viewCountsKept bounds the counts held: a folder's views, across every folder.
 const viewCountsKept = 500
 
 type viewCount struct {
@@ -43,12 +43,12 @@ type viewCountBook struct {
 	viewCountKick chan struct{}
 }
 
-func viewCountKey(project, server, uri string) string { return project + "|" + server + "|" + uri }
+func viewCountKey(folder, server, uri string) string { return folder + "|" + server + "|" + uri }
 
 // withCount is v with the count held for it, if any.
-func (d *Daemon) withCount(project string, v wire.PinView) wire.PinView {
+func (d *Daemon) withCount(folder string, v wire.PinView) wire.PinView {
 	d.viewCountMu.Lock()
-	c, ok := d.viewCounts[viewCountKey(project, v.View.Server, v.Path)]
+	c, ok := d.viewCounts[viewCountKey(folder, v.View.Server, v.Path)]
 	d.viewCountMu.Unlock()
 	if !ok {
 		if v.Hidden == nil {
@@ -104,27 +104,27 @@ func (d *Daemon) countViewsEvery() {
 }
 
 // countViewsOnce calls each shown list view's feeding tool once, one after another, and
-// says a project's pins again when one of its counts changed.
+// says a folder's pins again when one of its counts changed.
 func (d *Daemon) countViewsOnce(ctx context.Context) {
 	seen := map[string]bool{}
-	for _, s := range d.projects(false) {
-		project := store.FolderPath(s.Project.Folder)
+	for _, s := range d.folders(false) {
+		folder := store.FolderPath(s.Folder.Folder)
 		changed := false
-		for _, v := range d.serverViews(project, d.readPins(project)) {
+		for _, v := range d.serverViews(folder, d.readPins(folder)) {
 			if v.Hidden != nil || ctx.Err() != nil {
 				continue
 			}
-			key := viewCountKey(project, v.View.Server, v.Path)
+			key := viewCountKey(folder, v.View.Server, v.Path)
 			seen[key] = true
-			if d.countView(ctx, project, key, *v.View) {
+			if d.countView(ctx, folder, key, *v.View) {
 				changed = true
 			}
 		}
 		if changed {
-			d.pinsChanged(project)
+			d.pinsChanged(folder)
 		}
 	}
-	// Bounded: what no project shows now goes.
+	// Bounded: what no folder shows now goes.
 	d.viewCountMu.Lock()
 	for key := range d.viewCounts {
 		if !seen[key] || len(d.viewCounts) > viewCountsKept {
@@ -135,8 +135,8 @@ func (d *Daemon) countViewsOnce(ctx context.Context) {
 }
 
 // countView polls one view, and says whether what is shown for it changed.
-func (d *Daemon) countView(ctx context.Context, project, key string, v wire.ViewPin) bool {
-	count, attention, err := d.readViewCount(ctx, project, v)
+func (d *Daemon) countView(ctx context.Context, folder, key string, v wire.ViewPin) bool {
+	count, attention, err := d.readViewCount(ctx, folder, v)
 	d.viewCountMu.Lock()
 	defer d.viewCountMu.Unlock()
 	if d.viewCounts == nil {
@@ -161,8 +161,8 @@ func sameInt(a, b *int64) bool { return (a == nil) == (b == nil) && (a == nil ||
 
 // readViewCount calls the view's feeding tool as a list view's page does, with no
 // arguments, and reads `count` and `attention` from its answer.
-func (d *Daemon) readViewCount(ctx context.Context, project string, v wire.ViewPin) (count, attention *int64, err error) {
-	s, problem := d.viewServerFor(v.Server, project)
+func (d *Daemon) readViewCount(ctx context.Context, folder string, v wire.ViewPin) (count, attention *int64, err error) {
+	s, problem := d.viewServerFor(v.Server, folder)
 	if problem != 0 {
 		return nil, nil, viewRefused(problem.words(v.Server))
 	}

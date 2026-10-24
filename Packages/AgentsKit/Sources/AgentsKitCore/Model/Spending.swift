@@ -33,7 +33,7 @@ public extension Agent {
 
 /// What all of the work has cost, and where it went.
 ///
-/// A pure fold over the project summaries a window already holds, so the grand total
+/// A pure fold over the folder summaries a window already holds, so the grand total
 /// and the shares beneath it cannot disagree: both come from the same array in the same
 /// render, and neither needs a fetch of its own.
 ///
@@ -41,7 +41,7 @@ public extension Agent {
 /// a number — two currencies cannot be ranked without a rate the app deliberately does
 /// not have, which is why the shares are ordered *within* a currency and never across.
 public struct Spending: Sendable {
-    /// Every project's spend, added per currency. Empty when nothing has ever been
+    /// Every folder's spend, added per currency. Empty when nothing has ever been
     /// spent anywhere.
     public let grandTotal: [String: Decimal]
     /// The currency codes anything has been spent in, in code order. Empty, one, or
@@ -51,9 +51,9 @@ public struct Spending: Sendable {
     /// means every figure here is a floor rather than the whole.
     public let unmeasuredAgents: Int
 
-    private let summaries: [DaemonAPI.ProjectSummary]
+    private let summaries: [DaemonAPI.FolderSummary]
 
-    public init(_ summaries: [DaemonAPI.ProjectSummary]) {
+    public init(_ summaries: [DaemonAPI.FolderSummary]) {
         self.summaries = summaries
         var total: [String: Decimal] = [:]
         var unmeasured = 0
@@ -72,19 +72,19 @@ public struct Spending: Sendable {
     /// rather than drawing a row of zeroes.
     public var isEmpty: Bool { grandTotal.isEmpty }
 
-    /// Every project with spend in this currency, largest first.
+    /// Every folder with spend in this currency, largest first.
     ///
-    /// Nothing filters: an archived project and a project whose folder has gone are
-    /// both listed with what they cost, because the money was still spent. A project
+    /// Nothing filters: an archived folder and a folder whose path has gone are
+    /// both listed with what they cost, because the money was still spent. A folder
     /// that has spent nothing in this currency is not listed and contributes nothing,
     /// which is what makes the listed shares sum exactly to `grandTotal`.
     public func shares(in currency: String) -> [Share] {
         summaries
             .compactMap { summary in
                 guard let amount = summary.costToDate[currency] else { return nil }
-                return Share(folder: summary.folder,
+                return Share(folder: summary.folder.folder,
                              name: summary.name,
-                             isArchived: summary.project.isArchived,
+                             isArchived: summary.folder.isArchived,
                              amount: amount)
             }
             .sorted { first, second in
@@ -95,7 +95,7 @@ public struct Spending: Sendable {
             }
     }
 
-    /// One project's line on the page, in the currency of the section it is in.
+    /// One folder's line on the page, in the currency of the section it is in.
     public struct Share: Sendable, Identifiable, Hashable {
         public let folder: URL
         public let name: String

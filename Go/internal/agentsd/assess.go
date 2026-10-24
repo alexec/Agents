@@ -182,7 +182,7 @@ const assessmentsKept = 50
 
 // dropOldAssessments deletes all but the newest assessmentsKept assessments, each its
 // <agentID>.start.json, its <agentID>.json score and its scope-<id>.txt (#2292). The
-// reports are in the projects, and stay.
+// reports are in the folders, and stay.
 func (d *Daemon) dropOldAssessments() {
 	dir := d.assessmentsPath()
 	starts, _ := filepath.Glob(filepath.Join(dir, "*.start.json"))
@@ -284,9 +284,9 @@ func assessModel(asked *string, options []wire.ConfigOption) *string {
 
 // freshReportPath is .agents/reviews/runtimes/<runtime>-<date>.md, or the first -2, -3 …
 // not taken: a second assessment the same day opens its report empty, as the first did.
-func freshReportPath(project, runtimeID string, at time.Time) string {
+func freshReportPath(folder, runtimeID string, at time.Time) string {
 	stem := runtimeID + "-" + at.Format("2006-01-02")
-	dir := filepath.Join(project, ".agents", "reviews", "runtimes")
+	dir := filepath.Join(folder, ".agents", "reviews", "runtimes")
 	path := filepath.Join(dir, stem+".md")
 	for n := 2; ; n++ {
 		if _, err := os.Stat(path); err != nil {
@@ -346,8 +346,8 @@ func (d *Daemon) assessRuntime(r wire.AssessRuntimeRequest) (wire.AssessRuntimeR
 	return wire.AssessRuntimeResult{AgentID: id, Model: model, ReportPath: report}, nil
 }
 
-func freshReportPathFirst(project, runtimeID string, at time.Time) string {
-	return filepath.Join(project, ".agents", "reviews", "runtimes", runtimeID+"-"+at.Format("2006-01-02")+".md")
+func freshReportPathFirst(folder, runtimeID string, at time.Time) string {
+	return filepath.Join(folder, ".agents", "reviews", "runtimes", runtimeID+"-"+at.Format("2006-01-02")+".md")
 }
 
 // MARK: Scoring
@@ -428,7 +428,7 @@ func (d *Daemon) assessment(id wire.UUID) (wire.RuntimeAssessmentScore, error) {
 	var start assessStart
 	if b, err := os.ReadFile(filepath.Join(d.assessmentsPath(), string(id)+".start.json")); err == nil && diskjson.Unmarshal(b, &start) == nil {
 		rec.start = &start
-		_, err := os.Stat(filepath.Join(projectFolder(a), ".agents", "workflows", "assess-"+start.ShortID+".md"))
+		_, err := os.Stat(filepath.Join(folderPath(a), ".agents", "workflows", "assess-"+start.ShortID+".md"))
 		rec.workflowLeft = err == nil
 		_, err = os.Stat(start.ScopePath)
 		rec.scopeWritten = err == nil

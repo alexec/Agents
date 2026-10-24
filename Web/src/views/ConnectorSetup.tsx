@@ -1,14 +1,14 @@
-// A project's Connectors set-up (#1336, frames A, C, F and G), the one Connect sheet for GitHub
+// A folder's Connectors set-up (#1336, frames A, C, F and G), the one Connect sheet for GitHub
 // (frame B) and Linear (#1343, frame H), and Connectors ▸ Connections (frame E), as the
 // window's ConnectorSetupView, ConnectGitHubSheet and YourConnectionsView. The state is the host's, so all three clients
 // show the same ticks. The page draws the Mac's grid; Where agents run says the machine the
-// project is on, and has Add a Machine… and Add Provider… in place (#2131).
+// folder is on, and has Add a Machine… and Add Provider… in place (#2131).
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { Store } from "../model/store";
 import type {
   Connection, ConnectionProvider, ConnectionSignIn, ConnectorSetup, ConnectorSetupReading, ConnectorSlot, ConnectorSlotKind, UUID,
 } from "../protocol/generated";
-import { projectPath } from "../model/hostedMCP";
+import { folderPath } from "../model/hostedMCP";
 import { Capability } from "../protocol/capabilities.generated";
 import * as words from "../model/connectorSetup";
 import { addMachineWords, whereAgentsRun } from "../model/addMachine";
@@ -24,10 +24,10 @@ function openOut(address: string) {
   window.open(address, "_blank", "noopener");
 }
 
-/** The set-up at the top of a project's Connectors page. */
-export function ConnectorSetupSection({ store, host, folder, projectName, go }: {
-  store: Store; host: string; folder: string; projectName: string;
-  /** Opens a workflow of this project. */
+/** The set-up at the top of a folder's Connectors page. */
+export function ConnectorSetupSection({ store, host, folder, folderName, go }: {
+  store: Store; host: string; folder: string; folderName: string;
+  /** Opens a workflow of this folder. */
   go: (workflowID: string) => void;
 }) {
   const [setup, setSetup] = useState<ConnectorSetup>();
@@ -36,11 +36,11 @@ export function ConnectorSetupSection({ store, host, folder, projectName, go }: 
   const [connecting, setConnecting] = useState<ConnectionProvider>();
   /** Whether the person's Linear connection is there, for the Tasks slot (#1682); unknown until read. */
   const [linearConnected, setLinearConnected] = useState<boolean>();
-  const path = projectPath(folder);
+  const path = folderPath(folder);
   /** Add a Machine… or Add Provider…, in place (#2131). */
   const [adding, setAdding] = useState<"machine" | "provider">();
   useEffect(() => { if (store.providers.list.peek() === null) void store.providers.load(); }, []);
-  // Where agents run (#2131): the machine the project's folder is on, and what else is yours.
+  // Where agents run (#2131): the machine the folder is on, and what else is yours.
   const hosts = store.hosts.value.filter((h) => h.relay == null);
   const place = {
     title: whereAgentsRun.title(false, hosts.find((h) => h.id === host)?.name),
@@ -87,7 +87,7 @@ export function ConnectorSetupSection({ store, host, folder, projectName, go }: 
 
   return (
     <div class="connector-setup">
-      <p class="hint">{words.intro(projectName, setup?.repository, setup?.site)}</p>
+      <p class="hint">{words.intro(folderName, setup?.repository, setup?.site)}</p>
       {problem && <p class="small failure">{problem}</p>}
       {setup && (
         <>
@@ -95,7 +95,7 @@ export function ConnectorSetupSection({ store, host, folder, projectName, go }: 
           <h2 class="setup-heading">{words.setUpHeading(setup)}</h2>
           <div class="slot-grid">
             {setup.slots.map((slot) => (
-              <SlotCard key={slot.slot} slot={slot} setup={setup} projectName={projectName} reading={reading}
+              <SlotCard key={slot.slot} slot={slot} setup={setup} folderName={folderName} reading={reading}
                 tryAgain={() => void load("fresh")} skip={(s) => void skip(slot.slot, s)}
                 linearConnected={linearConnected} connectLinear={() => setConnecting("linear")}
                 place={place} admin={store.person.value?.role !== "member"} add={setAdding} />
@@ -183,8 +183,8 @@ function SlotMark({ slot, reading }: { slot: ConnectorSlot; reading: boolean }) 
   return <span class={`slot-mark ${slot.state}`} role="img" aria-label={label}>{mark}</span>;
 }
 
-function SlotCard({ slot, setup, projectName, reading, tryAgain, skip, linearConnected, connectLinear, place, admin, add }: {
-  slot: ConnectorSlot; setup: ConnectorSetup; projectName: string; reading: boolean;
+function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConnected, connectLinear, place, admin, add }: {
+  slot: ConnectorSlot; setup: ConnectorSetup; folderName: string; reading: boolean;
   tryAgain: () => void; skip: (skipped: boolean) => void;
   /** Tasks only: whether Linear is connected, unknown until read (#1682). */
   linearConnected: boolean | undefined; connectLinear: () => void;
@@ -214,7 +214,7 @@ function SlotCard({ slot, setup, projectName, reading, tryAgain, skip, linearCon
         </p>
       ) : (
         <p class={`small ${["failed", "refused", "noRemote"].includes(slot.state) ? "attention" : "quiet"}`}>
-          {workspace ? place.line : words.line(slot, projectName, setup.repository, false, words.forgeOf(setup))}
+          {workspace ? place.line : words.line(slot, folderName, setup.repository, false, words.forgeOf(setup))}
         </p>
       )}
       <p class="slot-actions small">

@@ -17,7 +17,7 @@ struct PromptBar: View {
     @Environment(\.openURL) private var openURL
     /// Whether the folder is the caller's to decide rather than this bar's.
     ///
-    /// Set on a project page, where the folder is the project and changing it would
+    /// Set on a folder page, where the folder is the folder and changing it would
     /// start the agent under a different one.
     var folderIsFixed = false
     /// Told whether the field has focus and how many characters it holds, for the Blobs
@@ -68,11 +68,11 @@ struct PromptBar: View {
         model.promptCapabilities(for: agent?.runtimeID ?? model.draftRuntimeID)
     }
 
-    /// Which conversation the words in this bar belong to, and are kept against. A project
-    /// page's bar is that project's; the chat's is its agent's.
+    /// Which conversation the words in this bar belong to, and are kept against. A folder
+    /// page's bar is that folder's; the chat's is its agent's.
     private var draftKey: DraftKey {
         if let agent { return .agent(agent.id) }
-        return .newAgent(folder: folderIsFixed ? model.selectedProject : nil)
+        return .newAgent(folder: folderIsFixed ? model.selectedFolder : nil)
     }
 
     // MARK: What the agent thinks you might ask
@@ -100,7 +100,7 @@ struct PromptBar: View {
     }
 
     /// A new agent a view filled in (#834): the prompt in the field, its labels on the form
-    /// and its worktree chosen, on this project's page only. Taken after the page has
+    /// and its worktree chosen, on this folder's page only. Taken after the page has
     /// settled, since adopting the folder clears the worktree and a kept draft comes back
     /// on appear; starting it is still the person's move.
     private func takeOfferedStart() {
@@ -217,7 +217,7 @@ struct PromptBar: View {
             // and all — see `KeepsDrafts`. Words meant for one agent still never reach
             // the next: the bar only ever holds what belongs to where it is.
         }
-        // File ▸ New Session: the keyboard goes where the session starts, the project
+        // File ▸ New Session: the keyboard goes where the session starts, the folder
         // page's bar. The chat's own bar, on its way out, has no agent by then either,
         // so it is told apart by being the one whose folder is not fixed.
         .onChange(of: requests.wantsPromptFocus, initial: true) { takeFocusIfAsked() }
@@ -237,7 +237,7 @@ struct PromptBar: View {
         .onChange(of: model.draftPersona) { _, id in addLabels(ofPersona: id) }
         // And a quote from a reply (#1553). One modifier for both: the chain is at the
         // type checker's limit. From the start too (#1739): Clean up worktrees offers its
-        // words in the same update that makes the project page, and this bar with it.
+        // words in the same update that makes the folder page, and this bar with it.
         .onChange(of: [model.offeredPrompt, model.offeredQuote], initial: true) { takeOfferedWords() }
         // A new one is a new turn's worth, so it comes back from having been dismissed.
         .onChange(of: agent?.suggestedPrompts ?? []) {
@@ -249,10 +249,10 @@ struct PromptBar: View {
         // as Try again would, rather than kept until the form is closed and opened.
         .modifier(OnReachable(reachable: hostReachable) { prepare() })
         // Until a folder is chosen, the first agent to arrive names it. After that,
-        // another project's agent arriving is not a reason to list this one's
+        // another folder's agent arriving is not a reason to list this one's
         // worktrees again (#285).
-        .onChange(of: model.work.agentCount) { prepareWhenProjectChanges() }
-        .onChange(of: draftProjectAgentCount) { loadWorktreesWhenProjectChanges() }
+        .onChange(of: model.work.agentCount) { prepareWhenFolderChanges() }
+        .onChange(of: draftFolderAgentCount) { loadWorktreesWhenFolderChanges() }
         .modifier(KeepsDrafts(text: $text, attachments: $attachments,
                               lostSomething: $draftLostSomething, key: draftKey))
     }
@@ -347,8 +347,8 @@ struct PromptBar: View {
                 Spacer(minLength: 0)
                 runtimeLabel(agent)
             } else {
-                // On a project page the folder is the project, named in the middle of
-                // the page; only a session with no project yet chooses one.
+                // On a folder page the folder is the folder, named in the middle of
+                // the page; only a session with no folder yet chooses one.
                 if !folderIsFixed {
                     Button(action: chooseFolder) {
                         HStack(spacing: 5) {
@@ -483,7 +483,7 @@ struct PromptBar: View {
     /// A server with nothing to start agents with says so where the runtime is chosen
     /// (037, FR-012).
     private var noServerRuntime: String? {
-        let host = model.selectedProjectHost
+        let host = model.selectedFolderHost
         guard agent == nil, host != .mac, !model.hosts.isOffline(host), model.availableRuntimes.isEmpty else { return nil }
         let label = model.hosts.label(host)
         return "No agent runtime on \(label). Install one there and log in, then choose Check again."
@@ -699,10 +699,10 @@ struct PromptBar: View {
 
     // MARK: Said instead of typed
 
-    /// The open projects, and this project's titles and issue numbers (#2515).
+    /// The open folders, and this folder's titles and issue numbers (#2515).
     private var speechSeeds: [String] {
-        let folder = agent?.projectFolder ?? model.draftCwd ?? model.selectedProject
-        return DictationVocabulary.seeds(projects: model.work.projects, agents: model.work.agents, in: folder)
+        let folder = agent?.folderPath ?? model.draftCwd ?? model.selectedFolder
+        return DictationVocabulary.seeds(folders: model.work.folders, agents: model.work.agents, in: folder)
     }
 
     /// On-device dictation in this field (#427, #2515). The words go in at the cursor.
@@ -1074,7 +1074,7 @@ struct PromptBar: View {
     /// typed and sends it when the turn ends, which is what the queue below the
     /// prompt is showing.
     /// The machine this prompt would go to (037).
-    private var targetHost: HostID { agent?.host ?? model.selectedProjectHost }
+    private var targetHost: HostID { agent?.host ?? model.selectedFolderHost }
     /// Offline, and not a stopped workspace that keeps what is sent until it is up (#691 US3).
     private var targetOffline: Bool { model.hosts.isOffline(targetHost) && !model.startsWhenUsed(targetHost) }
 
@@ -1090,7 +1090,7 @@ struct PromptBar: View {
     /// Why nothing can be sent on this Mac's host now, in its organisation's words (#998): the
     /// kill switch, or no policy it can trust. A server says its own when it refuses.
     private var policyRefusal: String? {
-        guard (agent?.host ?? model.selectedProjectHost) == .mac else { return nil }
+        guard (agent?.host ?? model.selectedFolderHost) == .mac else { return nil }
         return model.policyState?.composerReason
     }
 
@@ -1139,14 +1139,14 @@ struct PromptBar: View {
 
     private var labelDraft: some View {
         LabelTagField(labels: draftLabels.map { SessionLabel(value: $0, owner: .person) },
-                      suggestions: model.draftCwd.map { model.labelSuggestions(in: $0, on: model.selectedProjectHost) } ?? [],
+                      suggestions: model.draftCwd.map { model.labelSuggestions(in: $0, on: model.selectedFolderHost) } ?? [],
                       add: { draftLabels += $0 },
                       remove: { value in draftLabels.removeAll { SessionLabelPolicy.key($0) == SessionLabelPolicy.key(value) } })
             // Held with the words while they start, so the caret the prompt field gives
             // up does not fall into it (#650).
             .disabled(model.isStarting)
-            .task(id: model.draftCwd.map { ProjectKey(host: model.selectedProjectHost, folder: $0) }) {
-                if let folder = model.draftCwd { await model.loadLabelVocabulary(in: folder, on: model.selectedProjectHost) }
+            .task(id: model.draftCwd.map { FolderKey(host: model.selectedFolderHost, folder: $0) }) {
+                if let folder = model.draftCwd { await model.loadLabelVocabulary(in: folder, on: model.selectedFolderHost) }
             }
     }
 
@@ -1224,12 +1224,12 @@ struct PromptBar: View {
         }
     }
 
-    /// What the folder chip says when you hover it. On a project page it says why it
+    /// What the folder chip says when you hover it. On a folder page it says why it
     /// cannot be pressed, rather than looking broken.
     private var folderHelp: String {
         guard let cwd = model.draftCwd else { return "Folder" }
         let path = cwd.path(percentEncoded: false)
-        return folderIsFixed ? "This project's folder: \(path)" : "Folder: \(path)"
+        return folderIsFixed ? "This folder: \(path)" : "Folder: \(path)"
     }
 
     /// What an agent can reach beyond its own folder, said in the control itself.
@@ -1259,7 +1259,7 @@ struct PromptBar: View {
     /// A server's runtimes are left in one run: the allowance below is the Mac's own, so
     /// splitting by it would label a server's runtime with the Mac's state. Runtimes is
     /// where the Mac's own standing is read.
-    private var splitsByAllowance: Bool { model.selectedProjectHost == .mac }
+    private var splitsByAllowance: Bool { model.selectedFolderHost == .mac }
 
     private var availableRuntimes: [RuntimeStatus] {
         guard splitsByAllowance else { return model.availableRuntimes }
@@ -1293,29 +1293,29 @@ struct PromptBar: View {
         PromptWords.runtimeName(id)
     }
 
-    /// How many agents the draft's project holds. Moves when that project does, and
+    /// How many agents the draft's folder holds. Moves when that folder does, and
     /// not when any other does (#285).
-    private var draftProjectAgentCount: Int {
+    private var draftFolderAgentCount: Int {
         guard isNew, let folder = model.draftCwd else { return 0 }
-        let counts = model.work.counts(in: ProjectKey(host: model.selectedProjectHost, folder: folder))
+        let counts = model.work.counts(in: FolderKey(host: model.selectedFolderHost, folder: folder))
         return counts.values.reduce(0, +)
     }
 
-    private func prepareWhenProjectChanges() {
+    private func prepareWhenFolderChanges() {
         guard isNew else { return }
         guard model.draftCwd == nil else { return }
         prepare()
     }
 
-    private func loadWorktreesWhenProjectChanges() {
+    private func loadWorktreesWhenFolderChanges() {
         guard isNew else { return }
         guard model.draftCwd != nil else { return }
         Task { await model.loadDraftWorktrees() }
     }
 
-    /// The new agent's host answers: this Mac's daemon, or the project's server.
+    /// The new agent's host answers: this Mac's daemon, or the folder's server.
     private var hostReachable: Bool {
-        let host = model.selectedProjectHost
+        let host = model.selectedFolderHost
         return host == .mac ? model.isConnected : !model.hosts.isOffline(host)
     }
 
@@ -1335,7 +1335,7 @@ struct PromptBar: View {
             // The one rule (#264): what was put back, else the catalog's default, else the first.
             model.draftRuntimeID = model.defaultRuntimeID
         }
-        if model.draftCwd == nil { model.draftCwd = model.agents.first?.projectFolder }
+        if model.draftCwd == nil { model.draftCwd = model.agents.first?.folderPath }
         if model.draftCwd != nil, model.draftRuntimeID != nil, model.draftOptions.isEmpty {
             Task { await model.loadDraftOptions() }
         }
@@ -1354,15 +1354,15 @@ struct PromptBar: View {
         }
     }
 
-    // MARK: Where in the project (030)
+    // MARK: Where in the folder (030)
 
-    /// Project folder, a new worktree, or one already there. Only on a repository;
+    /// Folder, a new worktree, or one already there. Only on a repository;
     /// only before the agent exists, since where an agent works is settled at its start.
     private var worktreeChooser: some View {
         let listed = model.draftWorktrees
         return SelectCapsule(name: "Worktree", title: worktreeTitle) { dismiss in
-            SelectChoice(title: "Project folder",
-                         description: listed.projectFolderDescription,
+            SelectChoice(title: "Folder",
+                         description: listed.folderPathDescription,
                          isChosen: model.draftWorktree == nil) {
                 model.chooseWorktree(nil)
                 dismiss()
@@ -1375,7 +1375,7 @@ struct PromptBar: View {
                 dismiss()
             }
             .disabled(!listed.canMakeNew)
-            let others = listed.worktrees.filter { !$0.isProjectFolder }
+            let others = listed.worktrees.filter { !$0.isFolderPath }
             if !others.isEmpty || !listed.branches.isEmpty {
                 Divider().padding(.vertical, 4)
                 ScrollingChoices {
@@ -1412,11 +1412,11 @@ struct PromptBar: View {
     // MARK: Moving an agent that is already working (053)
 
     /// The Worktree choice on an agent's page, where the header names its place: where it
-    /// works now, and every other place in the project it could move to. Only for an agent
+    /// works now, and every other place in the folder it could move to. Only for an agent
     /// on this Mac, in a repository; anywhere else the header keeps its label.
     private func agentPlace(_ agent: Agent) -> AnyView? {
         guard agent.host == .mac, agent.state != .archived,
-              let listed = model.agentWorktrees[agent.projectFolder], listed.isRepository else { return nil }
+              let listed = model.agentWorktrees[agent.folderPath], listed.isRepository else { return nil }
         // Shown but not opened on a runtime that would forget its conversation in another
         // folder (053), with the reason where the pointer finds it.
         guard RuntimeCatalog.canMoveFolders(runtimeID: agent.runtimeID) else {
@@ -1428,10 +1428,10 @@ struct PromptBar: View {
         let waiting = agent.pendingMove
         return AnyView(VStack(alignment: .leading, spacing: 4) {
             SelectCapsule(name: "Worktree", title: placeTitle(agent, listed)) { dismiss in
-                SelectChoice(title: "Project folder",
-                             description: listed.projectFolderDescription,
-                             isChosen: waiting == nil ? here == nil : waiting?.target == .projectFolder) {
-                    Task { await model.move(agent, to: .projectFolder) }
+                SelectChoice(title: "Folder",
+                             description: listed.folderPathDescription,
+                             isChosen: waiting == nil ? here == nil : waiting?.target == .folderPath) {
+                    Task { await model.move(agent, to: .folderPath) }
                     dismiss()
                 }
                 SelectChoice(title: "New worktree",
@@ -1442,7 +1442,7 @@ struct PromptBar: View {
                     dismiss()
                 }
                 .disabled(!listed.canMakeNew)
-                let others = listed.worktrees.filter { !$0.isProjectFolder }
+                let others = listed.worktrees.filter { !$0.isFolderPath }
                 if !others.isEmpty {
                     Divider().padding(.vertical, 4)
                     ScrollingChoices {
@@ -1485,13 +1485,13 @@ struct PromptBar: View {
     private func placeTitle(_ agent: Agent, _ listed: DaemonAPI.WorktreesListResponse) -> String {
         if let waiting = agent.pendingMove {
             switch waiting.target {
-            case .projectFolder: return "Moving to project folder…"
+            case .folderPath: return "Moving to folder…"
             case .newWorktree(let name): return "Moving to \(name ?? "a new worktree")…"
             case .existing(let root): return "Moving to \(root.lastPathComponent)…"
             }
         }
         if let worktree = agent.worktree { return worktree.name }
-        return listed.projectFolderBranch ?? "Project folder"
+        return listed.folderPathBranch ?? "Folder"
     }
 
     private var chosenBranch: String? {
@@ -1504,7 +1504,7 @@ struct PromptBar: View {
     private func worktreeDescription(_ worktree: DaemonAPI.WorktreeSummary) -> String {
         guard worktree.exists else { return "Missing" }
         let branch = worktree.branch ?? "detached"
-        let size = model.work.size(of: worktree, on: model.selectedProjectKey?.host ?? .mac)
+        let size = model.work.size(of: worktree, on: model.selectedFolderKey?.host ?? .mac)
             .map { " · \($0.words)" } ?? ""
         switch worktree.agents.count {
         case 0: return branch + size
@@ -1515,7 +1515,7 @@ struct PromptBar: View {
 
     private var worktreeTitle: String {
         switch model.draftWorktree {
-        case nil: "Project folder"
+        case nil: "Folder"
         case .new: "New worktree"
         case .named(let name): name
         case .existing(let root): root.lastPathComponent

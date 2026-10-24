@@ -8,7 +8,7 @@ extension AppModel {
     func getStartedFacts(pairedDevice: Bool = false) -> GetStarted.Facts {
         GetStarted.Facts(paired: !needsFirstRun,
                          runtimeReady: !macRuntimesAvailable.isEmpty,
-                         hasProject: !liveProjects.isEmpty,
+                         hasFolder: !liveFolders.isEmpty,
                          ranAgent: hasSeenAgentRun || agents.contains(where: GetStarted.hasRunATurn),
                          pairedDevice: pairedDevice)
     }
@@ -20,7 +20,7 @@ extension AppModel {
     func weighGetStarted() {
         let facts = getStartedFacts()
         noteAgentRun(facts)
-        guard getStartedCard == nil, !needsFirstRun, hasLoadedProjects, hasLoadedAgents, !runtimes.isEmpty else { return }
+        guard getStartedCard == nil, !needsFirstRun, hasLoadedFolders, hasLoadedAgents, !runtimes.isEmpty else { return }
         keepGetStarted(GetStarted.card(kept: nil, facts: facts))
         // Already set up: the install sheet offers what is missing, as before.
         if getStartedCard == .gone { weighInstallOffer() }

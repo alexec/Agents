@@ -16,7 +16,7 @@ import Foundation
 /// it connects — `nil` means it has not said, and a device that has not said is not
 /// chosen (FR-023). `wants` is deliberately not built: every paired device is eligible
 /// for everything. `unknownFields` is what keeps a record written by a future build that
-/// has it from being damaged by this one, as `Agent` and `Project` already do.
+/// has it from being damaged by this one, as `Agent` and `Folder` already do.
 public struct Device: Hashable, Sendable, Codable, Identifiable {
     public enum Kind: String, Hashable, Sendable, Codable {
         case iPhone, iPad, unknown

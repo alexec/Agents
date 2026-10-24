@@ -19,14 +19,14 @@ import (
 var viewLinger = 2 * time.Minute
 
 // hostedViewConnect is the way to server's hosted copy for a view, for viewServer.connect.
-func (d *Daemon) hostedViewConnect(server sdk.McpServerStdio, project *string, cwd string) func() (mcpConn, error) {
+func (d *Daemon) hostedViewConnect(server sdk.McpServerStdio, folder *string, cwd string) func() (mcpConn, error) {
 	return func() (mcpConn, error) {
 		scope := "~"
-		if project != nil {
-			scope = *project
+		if folder != nil {
+			scope = *folder
 		}
 		user := "views " + scope + " " + server.Name
-		path, err := d.hostedUse(server, project, cwd, user)
+		path, err := d.hostedUse(server, folder, cwd, user)
 		if err != nil {
 			return nil, &mcpCheckFailure{kind: "refused", message: server.Name + " can't start: " + err.Error() + "."}
 		}

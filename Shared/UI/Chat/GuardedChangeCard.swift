@@ -7,7 +7,7 @@ import SwiftUI
 /// quick answer. Until then the app goes on with the copy last approved.
 ///
 /// Asked in the session of the agent that made it, over the prompt as a form is, or on
-/// the project's page when no agent did; and in Project Settings on the Mac. The client
+/// the folder's page when no agent did; and in Folder Settings on the Mac. The client
 /// says how to read the change and how to answer it, so the card holds no model of its own.
 /// A workflow waiting for an OK is asked the same way, by its file's path (#569).
 struct GuardedChangeCard: View {

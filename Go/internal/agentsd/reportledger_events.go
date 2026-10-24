@@ -11,7 +11,7 @@ import (
 )
 
 // What the agents did, for Reports ▸ Outcomes, Time, Runtimes, Adoption and Workflows (#2019): counted into the same UTC
-// hours as their cost, by project and runtime, from this host's own event log and time
+// hours as their cost, by folder and runtime, from this host's own event log and time
 // ledger. Only numbers go to the control plane, never a conversation's words.
 //
 // A pull or merge request counts on the host whose agent made it: one from a branch that
@@ -66,12 +66,12 @@ type prPayload struct {
 	MergedAt string `json:"mergedAt"`
 }
 
-// eventProject is an event's project as the reports name it: its folder's name.
-func eventProject(e wire.Event) string {
-	if e.Scope.Project == nil {
+// eventFolder is an event's folder as the reports name it: its folder's name.
+func eventFolder(e wire.Event) string {
+	if e.Scope.Folder == nil {
 		return ""
 	}
-	f := store.FolderPath(e.Scope.Project.Value)
+	f := store.FolderPath(e.Scope.Folder.Value)
 	if f == "" || f == "/" {
 		return ""
 	}
@@ -99,7 +99,7 @@ func (d *Daemon) countReportEvents() {
 		return
 	}
 	type add struct {
-		project, runtime, workflow, hour string
+		folder, runtime, workflow, hour string
 		counts                           *wire.ReportCounts
 	}
 	var adds []add
@@ -120,7 +120,7 @@ func (d *Daemon) countReportEvents() {
 					c.WorkflowFailures = 1
 				}
 			}
-			adds = append(adds, add{eventProject(e), e.Details["runtime"], workflow, utcHour(e.At.Time()), c})
+			adds = append(adds, add{eventFolder(e), e.Details["runtime"], workflow, utcHour(e.At.Time()), c})
 		case "workflow.ran":
 			c := blankCounts()
 			c.WorkflowRuns = 1
@@ -128,7 +128,7 @@ func (d *Daemon) countReportEvents() {
 			if a := d.Store.Agent(wire.UUID(e.Details["agent"])); a != nil {
 				runtime = a.RuntimeID
 			}
-			adds = append(adds, add{eventProject(e), runtime, e.Details["workflow"], utcHour(e.At.Time()), c})
+			adds = append(adds, add{eventFolder(e), runtime, e.Details["workflow"], utcHour(e.At.Time()), c})
 		case "pr.opened", "pr.merged":
 			var p prPayload
 			if json.Unmarshal([]byte(e.Details["payload"]), &p) != nil || p.PR.Branch == "" {
@@ -161,7 +161,7 @@ func (d *Daemon) countReportEvents() {
 					c.MergeSeconds = took.Seconds()
 				}
 			}
-			adds = append(adds, add{reportProject(a), a.RuntimeID, reportWorkflow(a), utcHour(at), c})
+			adds = append(adds, add{reportFolder(a), a.RuntimeID, reportWorkflow(a), utcHour(at), c})
 		}
 	}
 	last := list[len(list)-1].Position
@@ -170,8 +170,8 @@ func (d *Daemon) countReportEvents() {
 	oldest := utcHour(time.Now().Add(-reportHoursKept * time.Hour))
 	for _, a := range adds {
 		if a.hour >= oldest {
-			// What the agents did is counted by project, not by route.
-			d.addReportLocked(a.project, a.runtime, a.workflow, "", a.hour, wire.UsageRollupRow{Counts: a.counts})
+			// What the agents did is counted by folder, not by route.
+			d.addReportLocked(a.folder, a.runtime, a.workflow, "", a.hour, wire.UsageRollupRow{Counts: a.counts})
 		}
 	}
 	d.reportLocked().EventsSeen = last

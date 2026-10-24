@@ -11,8 +11,8 @@ import (
 )
 
 // start_session and the helper queue (#362), as DaemonCore+Helpers and +HelperQueue answer
-// them on the Swift host: an agent starts a session in its own project, within the
-// project's helper limits; past them, or behind others already waiting, it queues, first
+// them on the Swift host: an agent starts a session in its own folder, within the
+// folder's helper limits; past them, or behind others already waiting, it queues, first
 // in first out, and starts by itself once a running place and a not-archived place are
 // both free.
 
@@ -166,7 +166,7 @@ func (d *Daemon) helperWorktree(written, folder string) (*wire.WorktreeChoice, e
 		return &wire.WorktreeChoice{New: &struct{}{}}, nil
 	}
 	if _, ok := repositoryOf(folder); !ok {
-		return nil, &Error{Code: wire.FailureNotAWorktree, Message: "this project is not a git repository, so it has no worktrees"}
+		return nil, &Error{Code: wire.FailureNotAWorktree, Message: "this folder is not a git repository, so it has no worktrees"}
 	}
 	list, _ := worktreeList(folder)
 	var names []string
@@ -205,7 +205,7 @@ func errMessage(err error) (int, string) {
 	return CodeInternal, err.Error()
 }
 
-// helperLimitRefusal is why the project has no place for another helper now, or "".
+// helperLimitRefusal is why the folder has no place for another helper now, or "".
 func (d *Daemon) helperLimitRefusal(folder string) string {
 	running, notArchived, _ := d.helperLimitsIn(folder)
 	d.queueMu.Lock()
@@ -232,12 +232,12 @@ func (d *Daemon) helperLimitRefusal(folder string) string {
 		if d.agentsMayArchive(folder) {
 			then = "Archive one of yours with archive_session once its work is merged or abandoned, or let the person approve archiving one, to free that place."
 		}
-		full = append(full, fmt.Sprintf("this project already has %d of %d sessions started by sessions not yet archived%s%s. %s",
+		full = append(full, fmt.Sprintf("this folder already has %d of %d sessions started by sessions not yet archived%s%s. %s",
 			len(kept)+reserved, notArchived, quotedList(kept), starting, then))
 	}
 	r := d.runningHelpers(folder)
 	if int64(len(r)+reserved) >= running {
-		full = append(full, fmt.Sprintf("this project already has %d of %d sessions started by sessions running%s%s. "+
+		full = append(full, fmt.Sprintf("this folder already has %d of %d sessions started by sessions running%s%s. "+
 			"Archive or stop one of yours with archive_session or stop_session when its part is done, or wait for one to finish.",
 			len(r)+reserved, running, quotedList(r), starting))
 	}
@@ -282,7 +282,7 @@ func (d *Daemon) startSession(caller wire.UUID, args map[string]json.RawMessage)
 	if why := d.unavailableRuntime(rt); why != "" {
 		return "", Invalid("Nothing was started: %s.", why)
 	}
-	folder := projectFolder(me)
+	folder := folderPath(me)
 	worktree, err := d.helperWorktree(argString(args, "worktree"), folder)
 	if err != nil {
 		code, msg := errMessage(err)
@@ -308,7 +308,7 @@ func (d *Daemon) startSession(caller wire.UUID, args map[string]json.RawMessage)
 		return "", &Error{Code: code, Message: "Nothing was started: " + msg}
 	}
 	a := d.Store.Agent(id)
-	note := fmt.Sprintf("Started %s (id %s). This project now has %s.", quotedTitle(a.Title), id, d.helperPlaces(folder))
+	note := fmt.Sprintf("Started %s (id %s). This folder now has %s.", quotedTitle(a.Title), id, d.helperPlaces(folder))
 	if w := a.Worktree; w != nil {
 		note += " It is working in worktree " + w.Name
 		if w.Branch != nil {
@@ -339,7 +339,7 @@ func helperRequest(runtimeID, folder, prompt, model string, mode *string, worktr
 // queueHelper is queueHelper: a queued record, started by itself when there is a place.
 func (d *Daemon) queueHelper(caller *wire.Agent, prompt, runtimeID, model string, mode *string, worktree *wire.WorktreeChoice,
 	labels []string, full string) (string, error) {
-	folder := projectFolder(caller)
+	folder := folderPath(caller)
 	queue := d.helperQueue(folder)
 	_, _, limit := d.helperLimitsIn(folder)
 	if int64(len(queue)) >= limit {
@@ -351,13 +351,13 @@ func (d *Daemon) queueHelper(caller *wire.Agent, prompt, runtimeID, model string
 			}
 			names = " — " + strings.Join(each, ", ")
 		}
-		behind := "This project's"
+		behind := "This folder's"
 		if full != "" {
 			behind = full + " And its"
 		}
 		return "", &Error{Code: wire.FailureNotYours, Message: fmt.Sprintf("Nothing was started: %s queue is full too: %d of %d sessions queued%s. "+
 			"Stop one of yours that is queued with stop_session if it is no longer wanted, or wait for the queue to move. "+
-			"The person sets these limits in Project Settings.", behind, len(queue), limit, names)}
+			"The person sets these limits in Folder Settings.", behind, len(queue), limit, names)}
 	}
 	given, err := changeLabelsAs(wire.SessionLabelOwnerAgent, nil, labels, nil, vocabulary(folder, d.Store.Agents()))
 	if err != nil {
@@ -386,8 +386,8 @@ func (d *Daemon) queueHelper(caller *wire.Agent, prompt, runtimeID, model string
 		return "", &Error{Code: wire.FailureCouldNotSave, Message: "Nothing was started: the queued agent could not be saved: " + err.Error()}
 	}
 	d.tellChanged(a, nil)
-	d.projectChanged(folder)
-	d.record(a.ID, runtimeNote("Queued by "+d.holderName(caller.ID)+". It starts by itself when this project has a place free."))
+	d.folderChanged(folder)
+	d.record(a.ID, runtimeNote("Queued by "+d.holderName(caller.ID)+". It starts by itself when this folder has a place free."))
 	position := len(queue) + 1
 	for i, q := range d.helperQueue(folder) {
 		if q.ID == a.ID {
@@ -398,25 +398,25 @@ func (d *Daemon) queueHelper(caller *wire.Agent, prompt, runtimeID, model string
 	if full != "" {
 		ahead = strings.ToUpper(full[:1]) + full[1:] + " "
 	}
-	note := fmt.Sprintf("Queued %s (id %s), %s in this project's queue: %sIt starts by itself, oldest first, once a running place and a "+
+	note := fmt.Sprintf("Queued %s (id %s), %s in this folder's queue: %sIt starts by itself, oldest first, once a running place and a "+
 		"not-archived place are both free. Wait for it with wait_for_agents as for any session, or take it off the queue with stop_session. "+
-		"This project now has %s.", quotedTitle(a.Title), a.ID, ordinal(position), ahead, d.helperPlaces(folder))
+		"This folder now has %s.", quotedTitle(a.Title), a.ID, ordinal(position), ahead, d.helperPlaces(folder))
 	d.checkQueueSoon(folder)
 	return note, nil
 }
 
-// checkEveryQueue looks at every project with a queue, as a restart does.
+// checkEveryQueue looks at every folder with a queue, as a restart does.
 func (d *Daemon) checkEveryQueue() {
 	seen := map[string]bool{}
 	for _, a := range d.Store.Agents() {
-		if f := projectFolder(&a); a.State == wire.AgentStateQueued && !seen[f] {
+		if f := folderPath(&a); a.State == wire.AgentStateQueued && !seen[f] {
 			seen[f] = true
 			d.checkQueueSoon(f)
 		}
 	}
 }
 
-// checkQueueSoon starts what the project's queue may start now, off this call.
+// checkQueueSoon starts what the folder's queue may start now, off this call.
 func (d *Daemon) checkQueueSoon(folder string) {
 	d.goAfterTurn("helper queue", func() { d.startFromQueue(folder) })
 }
@@ -501,8 +501,8 @@ func (d *Daemon) startQueued(q wire.Agent, folder string) {
 
 // listHelpers is list_sessions with started_by me: its own, and every one below them.
 func (d *Daemon) listHelpers(caller *wire.Agent) string {
-	folder := projectFolder(caller)
-	places := "This project has " + d.helperPlaces(folder) + "."
+	folder := folderPath(caller)
+	places := "This folder has " + d.helperPlaces(folder) + "."
 	var mine []wire.Agent
 	for _, a := range append(d.helpersIn(folder), d.helperQueue(folder)...) {
 		for _, s := range d.starters(&a) {

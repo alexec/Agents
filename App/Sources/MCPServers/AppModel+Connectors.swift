@@ -1,33 +1,33 @@
 import AgentsKitCore
 import Foundation
 
-/// The person's connections (#1335) and a project's Connectors set-up (#1336), on the host
-/// that has the project. The answer or the error in words.
+/// The person's connections (#1335) and a folder's Connectors set-up (#1336), on the host
+/// that has the folder. The answer or the error in words.
 extension AppModel {
-    func connectorSetup(_ project: ProjectKey, reading: DaemonAPI.ConnectorSetupReading = .cached) async
+    func connectorSetup(_ folder: FolderKey, reading: DaemonAPI.ConnectorSetupReading = .cached) async
         -> Result<DaemonAPI.ConnectorSetup, ConnectorProblem> {
-        await connectorCall(project.host) {
+        await connectorCall(folder.host) {
             try await $0.call(DaemonAPI.Method.connectorsSetup,
-                              DaemonAPI.ConnectorSetupRequest(folder: project.folder.path, reading: reading),
+                              DaemonAPI.ConnectorSetupRequest(folder: folder.folder.path, reading: reading),
                               returning: DaemonAPI.ConnectorSetup.self)
         }
     }
 
-    func skipConnectorSlot(_ project: ProjectKey, _ slot: DaemonAPI.ConnectorSlotKind, skipped: Bool) async
+    func skipConnectorSlot(_ folder: FolderKey, _ slot: DaemonAPI.ConnectorSlotKind, skipped: Bool) async
         -> Result<DaemonAPI.ConnectorSetup, ConnectorProblem> {
-        await connectorCall(project.host) {
+        await connectorCall(folder.host) {
             try await $0.call(DaemonAPI.Method.connectorsSetupSkip,
-                              DaemonAPI.ConnectorSkipRequest(folder: project.folder.path, slot: slot, skipped: skipped),
+                              DaemonAPI.ConnectorSkipRequest(folder: folder.folder.path, slot: slot, skipped: skipped),
                               returning: DaemonAPI.ConnectorSetup.self)
         }
     }
 
-    func codespaces(_ project: ProjectKey, action: DaemonAPI.ConnectorCodespacesRequest.Action,
+    func codespaces(_ folder: FolderKey, action: DaemonAPI.ConnectorCodespacesRequest.Action,
                     id: String? = nil, name: String? = nil) async
         -> Result<DaemonAPI.ConnectorCodespaces, ConnectorProblem> {
-        await connectorCall(project.host) {
+        await connectorCall(folder.host) {
             try await $0.call(DaemonAPI.Method.connectorsCodespaces,
-                              DaemonAPI.ConnectorCodespacesRequest(folder: project.folder.path, action: action, id: id, name: name),
+                              DaemonAPI.ConnectorCodespacesRequest(folder: folder.folder.path, action: action, id: id, name: name),
                               returning: DaemonAPI.ConnectorCodespaces.self)
         }
     }

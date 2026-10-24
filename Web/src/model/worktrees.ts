@@ -1,7 +1,7 @@
 // Activity ▸ Worktrees (#790), as AgentsKitCore's WorktreeTally and WorktreeSummary.cleanupOrder
 // say it, so the page says what the window's and the Remote's say: idle ones first, largest first.
 import type {
-  BuildOutputRemoved, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeStatus, WorktreeSummary,
+  BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeStatus, WorktreeSummary,
 } from "../protocol/generated";
 import { diskWords } from "./disk";
 import type { Draft } from "./drafts";
@@ -50,7 +50,7 @@ export function rowWords(t: WorktreeTally): string | null {
 }
 
 export const worktreesEmpty = "No worktrees. A session started in a new worktree makes one.";
-export const worktreesIntro = "Every project's worktrees and how much each holds on disk. Idle ones, with no session in them, come first, largest first.";
+export const worktreesIntro = "Every folder's worktrees and how much each holds on disk. Idle ones, with no session in them, come first, largest first.";
 export const measuring = "Measuring…";
 export const cleanUpPrompt = "Remove worktrees and delete branches for any work that has been merged to the default branch.";
 
@@ -106,10 +106,10 @@ export function worktreeDetail(worktree: WorktreeSummary, size?: WorktreeSize): 
   return parts.join(" · ");
 }
 
-/** Projects holding the most idle first, each project's worktrees in cleanupOrder, sizes heard since filled in. */
-export function forCleanup(groups: readonly ProjectWorktrees[], heard: Record<string, WorktreeSize> = {}): ProjectWorktrees[] {
+/** Folders holding the most idle first, each folder's worktrees in cleanupOrder, sizes heard since filled in. */
+export function forCleanup(groups: readonly FolderWorktrees[], heard: Record<string, WorktreeSize> = {}): FolderWorktrees[] {
   const sized = groups.map((g) => ({
-    project: g.project,
+    folder: g.folder,
     worktrees: g.worktrees.map((w): WorktreeSummary => {
       const size = heard[w.root];
       return size ? { ...w, size } : w;

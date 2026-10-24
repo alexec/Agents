@@ -80,11 +80,11 @@ type Daemon struct {
 	worktreeState
 	recoveryState
 	backupState
-	projectState
+	folderState
 	installBook
 	guardedStateHolder
 	macState
-	projectWatchState
+	folderWatchState
 	deviceBook
 	localBook
 	connectionBook
@@ -132,10 +132,10 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	d.checkEveryQueue()
 	d.restoreRuns()
 	safe.Go("workflow clock", d.workflowClock)
-	// Each project's one watch (#173), which the first workflow scan starts too.
-	d.kickProjectWatches()
+	// Each folder's one watch (#173), which the first workflow scan starts too.
+	d.kickFolderWatches()
 	if done := ctx.Done(); done != nil {
-		safe.Go("project watches end", func() { <-done; d.stopProjectWatches() })
+		safe.Go("folder watches end", func() { <-done; d.stopFolderWatches() })
 	}
 	d.checkMilestonesSoon()
 	d.countMergedPRsEveryHour()
@@ -226,7 +226,7 @@ func (d *Daemon) Shutdown() {
 	d.allowMu.Unlock()
 	d.stopEventWaits()
 	d.stopShells()
-	d.stopProjectWatches()
+	d.stopFolderWatches()
 	d.stopSignInRelays()
 	d.stopModelRelay()
 }

@@ -35,7 +35,7 @@ final class FakeDaemon: DaemonLink, @unchecked Sendable {
     }
 }
 
-/// The canned Mac: a handful of projects, the agents in them, and one question
+/// The canned Mac: a handful of folders, the agents in them, and one question
 /// waiting.
 private actor FakeState {
     private var connection: JSONRPCConnection?
@@ -61,8 +61,8 @@ private actor FakeState {
             case DaemonAPI.Method.agentsList:
                 return .success(try JSONValue.encoding(agents))
 
-            case DaemonAPI.Method.projectsList:
-                return .success(try JSONValue.encoding(Canned.projects(for: agents)))
+            case DaemonAPI.Method.foldersList:
+                return .success(try JSONValue.encoding(Canned.folders(for: agents)))
 
             case DaemonAPI.Method.permissionsPending:
                 return .success(try JSONValue.encoding(permissions))

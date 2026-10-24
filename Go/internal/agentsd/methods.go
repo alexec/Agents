@@ -34,7 +34,7 @@ func (d *Daemon) register() {
 	d.registerAttention()
 	d.registerWorktrees()
 	d.registerChanges()
-	d.registerProjects()
+	d.registerFolders()
 	d.registerGuarded()
 	d.registerEvents()
 	d.registerEventWaits()
@@ -109,11 +109,11 @@ func (d *Daemon) register() {
 		return wire.Empty{}, d.offerRelay(o)
 	})
 
-	On(d, wire.CallProjectsList, func(ctx context.Context, c *Client, r wire.ProjectsListRequest) ([]wire.ProjectSummary, error) {
-		return d.projects(r.IncludeArchived), nil
+	On(d, wire.CallFoldersList, func(ctx context.Context, c *Client, r wire.FoldersListRequest) ([]wire.FolderSummary, error) {
+		return d.folders(r.IncludeArchived), nil
 	})
-	On(d, wire.CallProjectsAdd, func(ctx context.Context, c *Client, r wire.ProjectRequest) (wire.ProjectSummary, error) {
-		return d.addProject(r.Folder)
+	On(d, wire.CallFoldersAdd, func(ctx context.Context, c *Client, r wire.FolderRequest) (wire.FolderSummary, error) {
+		return d.addFolder(r.Folder)
 	})
 
 	On(d, wire.CallAgentsList, func(ctx context.Context, c *Client, r wire.ListRequest) ([]wire.Agent, error) {
@@ -163,13 +163,13 @@ func (d *Daemon) register() {
 	})
 }
 
-// MARK: projects
+// MARK: folders
 
-// projects is the union of every folder an agent is in and every project kept in
-// projects.json (DaemonCore.allProjects), newest activity first.
-// projectFolders is every folder projects(false) lists, undressed: what a caller holding
+// folders is the union of every folder an agent is in and every folder kept in
+// folders.json (DaemonCore.allFolders), newest activity first.
+// folderPaths is every folders(false) lists, undressed: what a caller holding
 // workflowMu may ask for, since dressing a summary reads the workflows (#1322).
-func (d *Daemon) projectFolders() []string {
+func (d *Daemon) folderPaths() []string {
 	seen := map[string]bool{}
 	var out []string
 	add := func(f string) {
@@ -179,7 +179,7 @@ func (d *Daemon) projectFolders() []string {
 		}
 	}
 	archived := map[string]bool{}
-	for _, p := range d.Store.Projects() {
+	for _, p := range d.Store.Folders() {
 		f := store.FolderPath(p.Folder)
 		if p.ArchivedAt != nil {
 			archived[f] = true
@@ -188,7 +188,7 @@ func (d *Daemon) projectFolders() []string {
 		add(f)
 	}
 	for _, a := range d.Store.Agents() {
-		if f := projectFolder(&a); !archived[f] && !seen[f] {
+		if f := folderPath(&a); !archived[f] && !seen[f] {
 			// As summary names a folder with no record: its links resolved.
 			add(store.FolderPath(store.FolderURL(f)))
 		}
@@ -196,14 +196,14 @@ func (d *Daemon) projectFolders() []string {
 	return out
 }
 
-func (d *Daemon) projects(includeArchived bool) []wire.ProjectSummary {
-	records := map[string]wire.Project{}
-	for _, p := range d.Store.Projects() {
+func (d *Daemon) folders(includeArchived bool) []wire.FolderSummary {
+	records := map[string]wire.Folder{}
+	for _, p := range d.Store.Folders() {
 		records[store.FolderPath(p.Folder)] = p
 	}
 	agents := map[string][]wire.Agent{}
 	for _, a := range d.Store.Agents() {
-		f := projectFolder(&a)
+		f := folderPath(&a)
 		agents[f] = append(agents[f], a)
 	}
 	folders := map[string]bool{}
@@ -213,10 +213,10 @@ func (d *Daemon) projects(includeArchived bool) []wire.ProjectSummary {
 	for f := range agents {
 		folders[f] = true
 	}
-	var out []wire.ProjectSummary
+	var out []wire.FolderSummary
 	for f := range folders {
 		s := summary(f, records, agents[f])
-		if !includeArchived && s.Project.ArchivedAt != nil {
+		if !includeArchived && s.Folder.ArchivedAt != nil {
 			continue
 		}
 		d.dress(&s)
@@ -227,25 +227,25 @@ func (d *Daemon) projects(includeArchived bool) []wire.ProjectSummary {
 		if out[i].LastActivityAt != out[j].LastActivityAt {
 			return out[i].LastActivityAt > out[j].LastActivityAt
 		}
-		return out[i].Project.Folder < out[j].Project.Folder
+		return out[i].Folder.Folder < out[j].Folder.Folder
 	})
 	if out == nil {
-		out = []wire.ProjectSummary{}
+		out = []wire.FolderSummary{}
 	}
 	return out
 }
 
-func projectFolder(a *wire.Agent) string {
-	if a.Worktree != nil && a.Worktree.Project != "" {
-		return store.FolderPath(a.Worktree.Project)
+func folderPath(a *wire.Agent) string {
+	if a.Worktree != nil && a.Worktree.Folder != "" {
+		return store.FolderPath(a.Worktree.Folder)
 	}
 	return store.FolderPath(a.Cwd)
 }
 
-func summary(folder string, records map[string]wire.Project, agents []wire.Agent) wire.ProjectSummary {
+func summary(folder string, records map[string]wire.Folder, agents []wire.Agent) wire.FolderSummary {
 	p, ok := records[folder]
 	if !ok {
-		p = wire.Project{Folder: store.FolderURL(folder)}
+		p = wire.Folder{Folder: store.FolderURL(folder)}
 		for i, a := range agents {
 			if i == 0 || a.CreatedAt < p.AddedAt {
 				p.AddedAt = a.CreatedAt
@@ -265,8 +265,8 @@ func summary(folder string, records map[string]wire.Project, agents []wire.Agent
 		}
 	}
 	fi, err := os.Stat(folder)
-	return wire.ProjectSummary{
-		Project:        p,
+	return wire.FolderSummary{
+		Folder:        p,
 		Name:           filepath.Base(folder),
 		Exists:         err == nil && fi.IsDir(),
 		LastActivityAt: newest,
@@ -275,26 +275,26 @@ func summary(folder string, records map[string]wire.Project, agents []wire.Agent
 	}
 }
 
-func countsOf(m map[string]int64) wire.ProjectSummaryCounts {
+func countsOf(m map[string]int64) wire.FolderSummaryCounts {
 	n := func(k string) *int64 {
 		if v, ok := m[k]; ok {
 			return &v
 		}
 		return nil
 	}
-	return wire.ProjectSummaryCounts{NeedsAttention: n("needsAttention"), Waiting: n("waiting"), Running: n("running"),
+	return wire.FolderSummaryCounts{NeedsAttention: n("needsAttention"), Waiting: n("waiting"), Running: n("running"),
 		Finished: n("finished"), Stopped: n("stopped"), Archived: n("archived")}
 }
 
-func (d *Daemon) addProject(folder wire.URL) (wire.ProjectSummary, error) {
+func (d *Daemon) addFolder(folder wire.URL) (wire.FolderSummary, error) {
 	path := store.FolderPath(folder)
 	if r, err := store.Resolve(path); err == nil {
 		path = r
 	}
 	if fi, err := os.Stat(path); err != nil || !fi.IsDir() {
-		return wire.ProjectSummary{}, &Error{Code: CodeFolderGone, Message: path + " is not there any more."}
+		return wire.FolderSummary{}, &Error{Code: CodeFolderGone, Message: path + " is not there any more."}
 	}
-	ps := d.Store.Projects()
+	ps := d.Store.Folders()
 	found := false
 	for _, p := range ps {
 		if store.FolderPath(p.Folder) == path {
@@ -302,24 +302,24 @@ func (d *Daemon) addProject(folder wire.URL) (wire.ProjectSummary, error) {
 		}
 	}
 	if !found {
-		ps = append(ps, wire.Project{Folder: store.FolderURL(path), AddedAt: wire.DateOf(nowFunc())})
-		if err := d.saveProjects(ps); err != nil {
-			return wire.ProjectSummary{}, err
+		ps = append(ps, wire.Folder{Folder: store.FolderURL(path), AddedAt: wire.DateOf(nowFunc())})
+		if err := d.saveFolders(ps); err != nil {
+			return wire.FolderSummary{}, err
 		}
 	}
-	for _, s := range d.projects(true) {
-		if store.FolderPath(s.Project.Folder) == path {
-			Broadcast(d, wire.NotifyProjectChanged, s)
+	for _, s := range d.folders(true) {
+		if store.FolderPath(s.Folder.Folder) == path {
+			Broadcast(d, wire.NotifyFolderChanged, s)
 			// A pins.json already in the folder is said now (#1622): a client reads pins/list only
 			// when it connects, and the watcher says pins/changed only when the file changes.
-			if pp := d.projectPins(path); len(pp.Pins) > 0 || len(pp.Sessions) > 0 || len(pp.Workflows) > 0 {
+			if pp := d.folderPins(path); len(pp.Pins) > 0 || len(pp.Sessions) > 0 || len(pp.Workflows) > 0 {
 				Broadcast(d, wire.NotifyPinsChanged, wire.PinsChangedNotification{Folder: pp.Folder, Pins: pp.Pins,
 					Sessions: pp.Sessions, Workflows: pp.Workflows})
 			}
 			return s, nil
 		}
 	}
-	return wire.ProjectSummary{}, &Error{Code: CodeNoSuchProject, Message: path + " could not be added."}
+	return wire.FolderSummary{}, &Error{Code: CodeNoSuchFolder, Message: path + " could not be added."}
 }
 
 // MARK: agents
@@ -356,12 +356,12 @@ func (d *Daemon) archiveBy(id wire.UUID, by wire.AgentArchivedReason) error {
 	d.dropLeases(id, "holderArchived")
 	d.endWait(id, "archived", false)
 	if a := d.Store.Agent(id); a != nil {
-		d.checkQueueSoon(projectFolder(a))
+		d.checkQueueSoon(folderPath(a))
 	}
 	d.agentEnded(id)
 	// An archived session is not kept pinned (unpinArchived).
 	if a := d.Store.Agent(id); a != nil {
-		d.unpinSession(projectFolder(a), id)
+		d.unpinSession(folderPath(a), id)
 	}
 	return nil
 }
@@ -421,7 +421,7 @@ func (d *Daemon) listAgents(r wire.ListRequest) []wire.Agent {
 		if archived && !r.IncludeArchived && !r.ArchivedOnly || r.ArchivedOnly && !archived {
 			continue
 		}
-		if r.Folder != nil && projectFolder(&a) != store.FolderPath(*r.Folder) {
+		if r.Folder != nil && folderPath(&a) != store.FolderPath(*r.Folder) {
 			continue
 		}
 		if r.StartedByWorkflow != nil && (a.StartedByWorkflow == nil || *a.StartedByWorkflow != *r.StartedByWorkflow) {

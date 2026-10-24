@@ -13,7 +13,7 @@
 
   /* The page every column sits on. */
   --paper-ground: #f7f8f9;
-  /* The projects column, one shade deeper. */
+  /* The folders column, one shade deeper. */
   --paper-sidebar: #f0f1f3;
   /* What floats: the prompt bar, cards, menus. */
   --paper-raised: #ffffff;

@@ -1,6 +1,6 @@
 // One thing waiting for the person's OK in Needs You (#773): an MCP server, a workflow, a plugin or a
 // guarded file, as the window's and the Remote's ApprovalRowLabel (Shared/UI/ApprovalViews.swift).
-// The row is drawn as a session's is (#587): the mark, the title with its project, the time and one
+// The row is drawn as a session's is (#587): the mark, the title with its folder, the time and one
 // grey line, with the same orange shield for every kind. Opened, its Review page (Review.tsx, #1472)
 // says what it is, shows the lines being approved, and offers the answers its host does.
 import type { Approval as ApprovalItem, ApprovalAction } from "../protocol/generated";
@@ -25,7 +25,7 @@ export function ApprovalMark() {
   );
 }
 
-/** A failed workflow's mark (#989): the triangle its own row wears on its project's page, in the attention tint. */
+/** A failed workflow's mark (#989): the triangle its own row wears on its folder's page, in the attention tint. */
 export function FailedMark() {
   return (
     <span class="sidebar-mark approval" aria-hidden="true">
@@ -48,10 +48,10 @@ export function FailedWorkflowRow({ store, host, folder, approval, place, down, 
 }) {
   const since = approval.since === undefined ? undefined : fromWireDate(approval.since);
   const agentID = approval.agentID as string | undefined;
-  const open = () => go(agentID ? { host, project: folder, session: agentID } : { host, project: folder, workflow: approval.key });
+  const open = () => go(agentID ? { host, folder: folder, session: agentID } : { host, folder: folder, workflow: approval.key });
   const menu = (): MenuItem[] => [
     { label: "Open", run: open },
-    ...(agentID ? [{ label: "Open Workflow", run: () => go({ host, project: folder, workflow: approval.key }) }] : []),
+    ...(agentID ? [{ label: "Open Workflow", run: () => go({ host, folder: folder, workflow: approval.key }) }] : []),
     ...(approval.actions.includes("dismiss") ? [{
       label: actionWord(approval.kind, "dismiss"), disabled: down, help: "Out of Needs You until it fails again",
       run: () => void store.dismissWorkflowFailure(host, folder, approval),
@@ -77,7 +77,7 @@ export function FailedWorkflowRow({ store, host, folder, approval, place, down, 
 }
 
 /**
- * Its row under Needs You, with its project's name after the title, as the group's session rows
+ * Its row under Needs You, with its folder's name after the title, as the group's session rows
  * have theirs. A press, Enter or Space opens its Review page in the chat's place (#1472); its menu
  * answers at once, of the version the row was drawn from.
  */
@@ -85,7 +85,7 @@ export function ApprovalRow({ store, host, folder, approval, place, down, chosen
   store: Store; host: string; folder: string; approval: ApprovalItem; place: string; down: boolean; chosen: boolean;
 }) {
   const since = approval.since === undefined ? undefined : fromWireDate(approval.since);
-  const open = () => go({ host, project: folder, review: approvalID(approval) });
+  const open = () => go({ host, folder: folder, review: approvalID(approval) });
   const answer = (action: ApprovalAction) => () => void store.answerApproval(host, folder, approval, action, approval.digest)
     .catch((error) => store.say(describe(error)));
   const menu = (): MenuItem[] => [

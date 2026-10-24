@@ -3,8 +3,8 @@ import Foundation
 /// How full a volume is allowed to get before the app says so (#195): `machine.disk_low` and
 /// `machine.disk_ok`, and the strip in the window.
 ///
-/// Set in a project's `.agents/project.json` beside `helperLimits`, or in Project
-/// Settings. A nil field is its default. A volume holding several projects goes by the
+/// Set in a folder's `.agents/folder.json` beside `helperLimits`, or in Folder
+/// Settings. A nil field is its default. A volume holding several folders goes by the
 /// most careful of the settings those that set one chose: the highest line of each.
 /// When none sets one, the defaults.
 ///
@@ -19,7 +19,7 @@ public struct DiskThresholds: Codable, Hashable, Sendable {
     public static let defaultLowGB = 20
     public static let defaultLowPercent = 5
     public static let defaultCriticalGB = 2
-    /// The choices Project Settings offers.
+    /// The choices Folder Settings offers.
     public static let lowChoices = [5, 10, 20, 50, 100]
     public static let criticalChoices = [1, 2, 5, 10]
 

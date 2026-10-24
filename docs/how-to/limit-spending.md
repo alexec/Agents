@@ -31,8 +31,8 @@ work.
 
 1. Click **Cost** in the sidebar's **Usage** group, or press Option-Command-S.
 
-   The page shows **All time** at the top, then each project with what its agents cost,
-   in each currency the runtimes reported. Archived projects are shown greyed. A line
+   The page shows **All time** at the top, then each folder with what its agents cost,
+   in each currency the runtimes reported. Archived folders are shown greyed. A line
    saying **At least this much** means some chats ran on a runtime that reported no price.
 2. For one agent, look above its prompt: the figure beside its name is what it has cost so
    far.
@@ -50,7 +50,7 @@ work.
    it does not count what the model reads back from a cache.
 4. Under **Per day** and **Tokens per day** (*The most a day may spend*), do the same.
 
-   When a day reaches it, nothing new starts and no prompt is sent, in any project,
+   When a day reaches it, nothing new starts and no prompt is sent, in any folder,
    including scheduled workflows. What is working finishes its turn and holds. What you
    typed waits until the day rolls over. **Today** shows what is left, in money and in
    tokens.

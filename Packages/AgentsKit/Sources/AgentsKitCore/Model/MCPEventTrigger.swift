@@ -3,7 +3,7 @@ import Foundation
 /// A workflow trigger naming an MCP server's event (#383), such as `checks.failed`.
 ///
 /// Named as the server names it, with no prefix: every event is `noun.verbed`, whoever
-/// raises it. Without `server:` it hears every server this project can use that offers
+/// raises it. Without `server:` it hears every server this folder can use that offers
 /// the name; with it, only those. Every other key under it is an argument of the
 /// subscription, sent to the server as it is, rather than a detail matched here: only the
 /// server knows how to filter its own events.

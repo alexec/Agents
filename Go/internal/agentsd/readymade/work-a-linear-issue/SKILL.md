@@ -19,14 +19,14 @@ The issue's identifier is its team key and number, such as `ENG-12`.
    move it to the team's first started state (In Progress).
 3. **Make a branch.** Use the app's `move_worktree` tool to move into a new worktree on a
    branch called `agent/<identifier>` in lower case (`agent/eng-12`), from the default
-   branch. When you do not have that tool, use `git worktree add` beside the project's
+   branch. When you do not have that tool, use `git worktree add` beside the folder's
    folder. The identifier in the branch is how Linear's GitHub integration links them.
-4. **Do the work.** Change only what the issue asks for. Follow the project's own
+4. **Do the work.** Change only what the issue asks for. Follow the folder's own
    instructions (`AGENTS.md`, `CLAUDE.md` or `README.md`, when there is one). Run the
-   project's tests and linters for the files that you changed.
+   folder's tests and linters for the files that you changed.
 5. **Push.** Commit with a message that starts with the identifier (`ENG-12: …`), and push
    the branch with `git push -u origin agent/<identifier>`.
-6. **Open the pull request.** Use `create_pull_request` in this project's repository, with
+6. **Open the pull request.** Use `create_pull_request` in this folder's repository, with
    the default branch as `base`. The title starts with the identifier (`ENG-12: …`). The
    body says what you changed, how you tested it, and has the issue's url and
    `Fixes <identifier>`, so Linear closes the issue when the pull request merges.

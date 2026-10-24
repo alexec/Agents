@@ -100,7 +100,7 @@ public struct WorkflowSchedule: Codable, Hashable, Sendable {
         return nil
     }
 
-    /// The schedule in the words the project page and the confirmation both use.
+    /// The schedule in the words the folder page and the confirmation both use.
     public var summary: String {
         let when: String
         if minutes == Self.allowedMinutes {

@@ -21,7 +21,7 @@ import (
 // OTEL_EXPORTER_OTLP_ENDPOINT (or _METRICS_ENDPOINT) is set. Each interval it sends the
 // organisation's figures for today, UTC, by runtime, as OTLP/HTTP JSON: cumulative sums
 // that start at midnight. Spend, tokens, outcomes and time are the rows reports/usage adds
-// up; no person, project or machine is named, so a collector holds no one's work.
+// up; no person, folder or machine is named, so a collector holds no one's work.
 
 const (
 	otlpEveryLeast   = time.Minute

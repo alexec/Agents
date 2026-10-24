@@ -1,6 +1,6 @@
 // A tool's view, inline in the chat where its call began (#187). The row holds the view's place,
 // its name and what it asks of the person; the frame itself is the chat's ViewLayer's. Pin, when
-// the host says the call can feed one, puts the view under the chat's project (#189).
+// the host says the call can feed one, puts the view under the chat's folder (#189).
 import { createContext } from "preact";
 import { useContext, useLayoutEffect, useRef } from "preact/hooks";
 import type { AppViewCall } from "../../protocol/generated";
@@ -39,7 +39,7 @@ export function AppView({ call }: { call: AppViewCall }) {
         <span class="view-actions">
           {hosting.actions.pin && canPin(call) && (view.pinned.value
             ? <span class="faint">Pinned</span>
-            : <button class="plain" title="Pin this view under the project" onClick={() => void view.pin()}>Pin</button>)}
+            : <button class="plain" title="Pin this view under the folder" onClick={() => void view.pin()}>Pin</button>)}
           {view.phase.value === "ready" && !full && (
             <button class="plain" title="Show this view in the chat's place" onClick={() => hosting.layer.setFullscreen(call.id)}>
               Full screen

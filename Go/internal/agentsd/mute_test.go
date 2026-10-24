@@ -86,7 +86,7 @@ func TestAMutedSessionSendsTheMacNoNotification(t *testing.T) {
 func TestMutingAWorkflowMutesItsRuns(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	wfDir := filepath.Join(dir, ".agents", "workflows")
 	if err := os.MkdirAll(wfDir, 0o750); err != nil {
 		t.Fatal(err)

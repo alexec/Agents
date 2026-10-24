@@ -12,7 +12,7 @@ at the keyboard, that is true only of a run of the workflow.
 
 ## Rules for the whole run
 
-- **Never touch the project folder you start in.** It is the shared checkout of `main`.
+- **Never touch the folder you start in.** It is the shared checkout of `main`.
   Do everything in the review worktree below, and have helpers work in their own.
 - **Never** merge, push, rebase `main`, open pull requests, file GitHub issues, ship or
   restart the app, or call the live app's `daemon.sock`.
@@ -102,7 +102,7 @@ Only **critical** and **high** findings are fixed; medium and low stay recorded.
 
 - At most **1 helper per run**: its proof is twelve runs of a measurement, and builds
   take turns on the one "build" lease. Take the most severe finding. Call
-  `list_sessions` with `started_by: me` first and start it only if a running place is free (the project's
+  `list_sessions` with `started_by: me` first and start it only if a running place is free (the folder's
   helper limits are 3 running and 5 not archived unless Alex changed them). Every
   other critical or high finding is recorded as "needs a decision: no helper place this
   run" and is picked up next run.

@@ -93,10 +93,10 @@ func TestAViewRowsCountFollowsItsListAndGoesStale(t *testing.T) {
 	os.WriteFile(filepath.Join(home, ".agents", "mcp.json"), []byte(`{"mcpServers":{"gh":{"url":"`+server.URL+`"}}}`), 0o644)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 
 	views := func() []wire.PinView {
-		var all []wire.ProjectPins
+		var all []wire.FolderPins
 		json.Unmarshal(c.call(t, 2, "pins/list", nil), &all)
 		if len(all) != 1 {
 			return nil

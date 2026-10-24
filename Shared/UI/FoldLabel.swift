@@ -5,7 +5,7 @@ extension View {
     /// does (#440). On the Mac only the system chevron toggles; iOS already toggles on a
     /// tap of the label, so there this does nothing (a second toggle would undo it).
     ///
-    /// `simultaneousGesture` sits alongside the list's own handling, as the project row's
+    /// `simultaneousGesture` sits alongside the list's own handling, as the folder row's
     /// does (#375), so selection and the context menu keep working.
     @ViewBuilder
     func togglesFold(_ isOpen: Binding<Bool>) -> some View {

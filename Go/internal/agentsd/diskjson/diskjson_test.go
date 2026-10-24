@@ -113,15 +113,15 @@ func TestDatesAreTheStoresAndTheWires(t *testing.T) {
 	if got := FormatDate(wire.Date(float64(d) + 0.0006)); got != "2026-10-16T09:57:40.124Z" {
 		t.Fatalf("rounded = %s", got)
 	}
-	p := wire.Project{Folder: "file:///home/a/src/x/", AddedAt: d}
+	p := wire.Folder{Folder: "file:///home/a/src/x/", AddedAt: d}
 	b, err := Marshal(p)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if string(b) != `{"addedAt":"2026-10-16T09:57:40.123Z","folder":"file:///home/a/src/x/"}` {
-		t.Fatalf("project on disk %s", b)
+		t.Fatalf("folder %s", b)
 	}
-	var back wire.Project
+	var back wire.Folder
 	if err := Unmarshal(b, &back); err != nil || back.AddedAt != d || back.Folder != p.Folder {
 		t.Fatalf("back %+v %v", back, err)
 	}
@@ -143,7 +143,7 @@ func TestDatesInsideListsMapsAndCases(t *testing.T) {
 	if !strings.Contains(string(b), `"askedAt":"2001-01-01T00:00:02.000Z"`) || !strings.Contains(string(b), `"at":"2001-01-01T00:00:01.000Z"`) {
 		t.Fatalf("disk %s", b)
 	}
-	list := []wire.Project{{Folder: "file:///a/", AddedAt: 3}}
+	list := []wire.Folder{{Folder: "file:///a/", AddedAt: 3}}
 	b, _ = Marshal(list)
 	if !strings.Contains(string(b), `"addedAt":"2001-01-01T00:00:03.000Z"`) {
 		t.Fatalf("list %s", b)

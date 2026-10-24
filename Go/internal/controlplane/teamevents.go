@@ -13,7 +13,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Team events (#2011, spec 736 FR-035): a project or control-plane event (a server's, such
+// Team events (#2011, spec 736 FR-035): a folder or control-plane event (a server's, such
 // as github or a channel's) or a schedule that a bot's runs-on: workflow matches is sent
 // once, by the control plane. Each machine that hears it sends it here (workflows/trigger);
 // the first is claimed as workflows/claimRun claims it, and the control plane asks the

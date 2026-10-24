@@ -1,7 +1,7 @@
 // The shape and words beside a session's title: StatusShape (UI/StatusShape.swift) as the Mac's
 // sessions list draws it, ported by hand and held to Fixtures/web/status (research R7).
 import type { Agent, AgentState, EndedReason, WorkOutcome } from "../protocol/generated";
-import { endingIsUnaccountedFor, isWaiting, outcomeNeedsAPerson, projectFolder } from "./groups";
+import { endingIsUnaccountedFor, isWaiting, outcomeNeedsAPerson, folderPath } from "./groups";
 import { runningToolLabel } from "./sidebar";
 
 /** Working is a spinner; the rest are drawn. Only needsYou is ever in colour. */
@@ -114,13 +114,13 @@ export function queuedLabel(position: number | null): string {
 }
 
 /**
- * AgentsModel.queuedLine: a queued helper's place in its project's queue, first in first
+ * AgentsModel.queuedLine: a queued helper's place in its folder's queue, first in first
  * (HelperLimit.queue: oldest started, then by id), among the agents of its host. Null otherwise.
  */
 export function queuedLine(agent: Agent, among: readonly Agent[]): string | null {
   if (agent.state !== "queued") return null;
-  const folder = projectFolder(agent);
-  const queue = among.filter((a) => a.state === "queued" && projectFolder(a) === folder)
+  const folder = folderPath(agent);
+  const queue = among.filter((a) => a.state === "queued" && folderPath(a) === folder)
     .sort((a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const index = queue.findIndex((a) => a.id === agent.id);
   return queuedLabel(index < 0 ? null : index + 1);

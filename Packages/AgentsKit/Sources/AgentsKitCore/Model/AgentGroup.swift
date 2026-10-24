@@ -1,6 +1,6 @@
 import Foundation
 
-/// Where an agent sits in the panel beside its project.
+/// Where an agent sits in the panel beside its folder.
 ///
 /// Derived from the state and never stored, which is what makes it impossible for an
 /// agent to be in two groups or in none. The mapping is total over `AgentState`, and a
@@ -159,7 +159,7 @@ public extension Agent {
     }
 
     /// Needs you, or Blocked from an older daemon: one in the badge's count. Unread is a
-    /// mark on the row, not a need (#1565). The rule `ProjectShelf` counts by and the
+    /// mark on the row, not a need (#1565). The rule `FolderShelf` counts by and the
     /// daemon sends the phone (#1163), so the two cannot disagree.
     var wantsALook: Bool {
         let group = group()

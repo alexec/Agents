@@ -40,7 +40,7 @@ something up, not for reading through.
   machines from.
 - [Secrets and what follows you](on-every-machine.md): the settings and secrets
   the control plane keeps for you and sends to each machine of yours.
-- [Reports](reports.md): usage, cost and time by person, project and machine, added up on
+- [Reports](reports.md): usage, cost and time by person, folder and machine, added up on
   the control plane.
 - [The Console](console.md): the control plane's app for admins on the web page, and what
   each of its pages does.

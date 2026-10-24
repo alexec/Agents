@@ -1,20 +1,20 @@
 import Foundation
 
-/// One of the rows at the top of the sidebar that gather sessions across every project
+/// One of the rows at the top of the sidebar that gather sessions across every folder
 /// and host (#495): Pinned, then by what they want — Needs You, Working, Unread. Mail's
 /// Favorites and smart mailboxes, Things' Inbox and Today.
 ///
 /// Needs You holds everything waiting for the person (#773): sessions asking a question or
 /// blocked, sessions asking to be archived (#584, #649, once their own group), and each
-/// project's `approvals` — MCP servers, workflows, plugins and guarded files, and workflows
+/// folder's `approvals` — MCP servers, workflows, plugins and guarded files, and workflows
 /// that failed (#989) — as rows of their own. A failed run's agent is its workflow's row,
 /// not a session row as well.
 ///
-/// Read off each project's shelf (#165), so a folded smart row costs a sum of counts per
-/// project and not a pass over every agent held; only an open one lists its sessions.
+/// Read off each folder's shelf (#165), so a folded smart row costs a sum of counts per
+/// folder and not a pass over every agent held; only an open one lists its sessions.
 public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
-    /// The pinned sessions (#180) and workflows (#432) of every project, in the projects'
-    /// order and each project's pin order. Out of their projects' groups (Alex, #495).
+    /// The pinned sessions (#180) and workflows (#432) of every folder, in the folders'
+    /// order and each folder's pin order. Out of their folders' groups (Alex, #495).
     case pinned
     case needsYou, working, unread
 
@@ -53,17 +53,17 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
     /// the others start folded, their counts in sight.
     public var startsOpen: Bool { self == .pinned || self == .needsYou }
 
-    /// How many sessions it gathers across the projects named, and for Needs You the
+    /// How many sessions it gathers across the folders named, and for Needs You the
     /// approvals besides.
     @MainActor
-    public func count(in work: AgentsModel, projects: [ProjectKey], on: Set<SidebarSmartRow> = all) -> Int {
+    public func count(in work: AgentsModel, folders: [FolderKey], on: Set<SidebarSmartRow> = all) -> Int {
         if on != Self.all, self != .pinned {
             // With a group off, its sessions go to the next one they fit (#846): a pass
             // over the live sessions, not the shelf's sums, which are for all four.
-            return agents(in: work, projects: projects, on: on).count
-                + (self == .needsYou ? projects.reduce(0) { $0 + Self.ownApprovals(in: work, $1).count } : 0)
+            return agents(in: work, folders: folders, on: on).count
+                + (self == .needsYou ? folders.reduce(0) { $0 + Self.ownApprovals(in: work, $1).count } : 0)
         }
-        return projects.reduce(0) { total, key in
+        return folders.reduce(0) { total, key in
             let shelf = work.shelf(key)
             if self == .pinned {
                 return total + Self.pinnedSessions(in: work, key).count + Self.pinnedWorkflows(in: work, key).count
@@ -93,7 +93,7 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
 
     /// Where a live session is listed (#587): once, in the first of the smart groups it
     /// belongs to — Pinned, Needs You (asking, blocked, or asking to be archived, #773),
-    /// Working, Unread — or, in none of them, under its project. Nil for its project.
+    /// Working, Unread — or, in none of them, under its folder. Nil for its folder.
     /// A group turned off (#846) is passed over: its sessions go to the next one they
     /// fit, so one unread that asks to be archived goes to Unread with Needs You off.
     public static func home(of agent: Agent, in group: AgentGroup, isPinned: Bool,
@@ -108,14 +108,14 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
 
     /// The session Unread keeps (#495): opened from it, read now, and listed there until
     /// another is opened, so it does not leave under the pointer. Until then it is not under
-    /// its project too (#689). Nil while searching, or once it belongs elsewhere: archived,
+    /// its folder too (#689). Nil while searching, or once it belongs elsewhere: archived,
     /// pinned, waiting, working or asking to be archived.
     @MainActor
     public static func keptInUnread(_ id: UUID?, in work: AgentsModel, query: String = "",
                                     on: Set<SidebarSmartRow> = all) -> Agent? {
         guard on.contains(.unread), query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let id,
               let kept = work.agent(id), kept.state != .archived,
-              !(on.contains(.pinned) && work.pinnedSessions(in: kept.projectFolder).contains(id)) else { return nil }
+              !(on.contains(.pinned) && work.pinnedSessions(in: kept.folderPath).contains(id)) else { return nil }
         switch home(of: kept, in: work.group(of: kept), isPinned: false, on: on) {
         case nil, .unread: return kept
         default: return nil
@@ -129,7 +129,7 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
     /// archived: Unread's share. The busy groups are few, so this is the shelf's count
     /// less a short count of theirs.
     @MainActor
-    static func unreadAtRest(in shelf: ProjectShelf) -> Int {
+    static func unreadAtRest(in shelf: FolderShelf) -> Int {
         shelf.unread - busyGroups.reduce(0) { $0 + (shelf.groups[$1] ?? []).count(where: \.showsUnread) }
             - (shelf.groups[.archived] ?? []).count(where: \.showsUnread)
             - AgentGroup.live.filter { !busyGroups.contains($0) }
@@ -139,7 +139,7 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
     /// Those asking to be archived that are neither waiting on a person nor working: Needs
     /// You's share of them (#584, #773).
     @MainActor
-    static func askingAtRest(in shelf: ProjectShelf) -> Int {
+    static func askingAtRest(in shelf: FolderShelf) -> Int {
         shelf.asking - busyGroups.reduce(0) { $0 + (shelf.groups[$1] ?? []).count(where: \.asksToArchive) }
     }
 
@@ -147,27 +147,27 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
     /// searching only with a match. Its count is a sum of counts; a search, already
     /// filtering every list, filters this one too.
     @MainActor
-    public func isShown(in work: AgentsModel, projects: [ProjectKey], query: String = "",
+    public func isShown(in work: AgentsModel, folders: [FolderKey], query: String = "",
                         on: Set<SidebarSmartRow> = all) -> Bool {
         guard on.contains(self) else { return false }
         if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return count(in: work, projects: projects, on: on) > 0
+            return count(in: work, folders: folders, on: on) > 0
         }
-        return !agents(in: work, projects: projects, query: query, on: on).isEmpty
-            || !workflows(in: work, projects: projects, query: query).isEmpty
-            || !approvals(in: work, projects: projects, query: query).isEmpty
+        return !agents(in: work, folders: folders, query: query, on: on).isEmpty
+            || !workflows(in: work, folders: folders, query: query).isEmpty
+            || !approvals(in: work, folders: folders, query: query).isEmpty
     }
 
     /// The sessions it gathers, newest started first, as a search leaves them.
     @MainActor
-    public func agents(in work: AgentsModel, projects: [ProjectKey], query: String = "",
+    public func agents(in work: AgentsModel, folders: [FolderKey], query: String = "",
                        on: Set<SidebarSmartRow> = all) -> [Agent] {
         let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let matcher = words.isEmpty ? nil : SessionLabelQuery(words, said: work.saidLines)
         guard on.contains(self) else { return [] }
         if on != Self.all, self != .pinned {
             // A group off (#846): each live session goes where `home` puts it.
-            let gathered = projects.flatMap { key -> [Agent] in
+            let gathered = folders.flatMap { key -> [Agent] in
                 let shelf = work.shelf(key)
                 let pinned = Set(work.pinnedSessions(in: key.folder))
                 let failed = self == .needsYou ? Self.failedRuns(in: work, key) : []
@@ -183,10 +183,10 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
         }
         if self == .pinned {
             // In pin order, not by start: the order they were put in is the point.
-            let pinned = projects.flatMap { Self.pinnedSessions(in: work, $0) }
+            let pinned = folders.flatMap { Self.pinnedSessions(in: work, $0) }
             return matcher.map { pinned.filter($0.matches) } ?? pinned
         }
-        let gathered = projects.flatMap { key -> [Agent] in
+        let gathered = folders.flatMap { key -> [Agent] in
             let shelf = work.shelf(key)
             let held: [Agent] = switch self {
             case .pinned: []
@@ -207,61 +207,61 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
         return shown.sorted { $0.createdAt > $1.createdAt }
     }
 
-    /// The pinned workflows of the projects named, each with its project, in pin order:
+    /// The pinned workflows of the folders named, each with its folder, in pin order:
     /// only Pinned gathers workflows.
     @MainActor
-    public func workflows(in work: AgentsModel, projects: [ProjectKey], query: String = "")
-        -> [(project: ProjectKey, workflow: WorkflowSummary)] {
+    public func workflows(in work: AgentsModel, folders: [FolderKey], query: String = "")
+        -> [(folder: FolderKey, workflow: WorkflowSummary)] {
         guard self == .pinned else { return [] }
         let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let matcher = words.isEmpty ? nil : SessionLabelQuery(words, said: work.saidLines)
-        return projects.flatMap { key in
+        return folders.flatMap { key in
             Self.pinnedWorkflows(in: work, key)
                 .filter { matcher?.matches($0) ?? true }
-                .map { (project: key, workflow: $0) }
+                .map { (folder: key, workflow: $0) }
         }
     }
 
-    /// What waits for an OK in the projects named, each with its project (#773): only Needs
+    /// What waits for an OK in the folders named, each with its folder (#773): only Needs
     /// You lists them, oldest first, after its sessions. A search matches the title, the
     /// kind and the grey line.
     @MainActor
-    public func approvals(in work: AgentsModel, projects: [ProjectKey], query: String = "")
-        -> [(project: ProjectKey, approval: Approval)] {
+    public func approvals(in work: AgentsModel, folders: [FolderKey], query: String = "")
+        -> [(folder: FolderKey, approval: Approval)] {
         guard self == .needsYou else { return [] }
         let words = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return projects.flatMap { key in
+        return folders.flatMap { key in
             Self.ownApprovals(in: work, key)
                 .filter { words.isEmpty || "\($0.title) \($0.kindWord) \($0.line)".lowercased().contains(words) }
-                .map { (project: key, approval: $0) }
+                .map { (folder: key, approval: $0) }
         }
         .sorted { ($0.approval.since ?? .distantPast) < ($1.approval.since ?? .distantPast) }
     }
 
-    /// One project's approvals drawn as rows of their own: every kind but a session's
+    /// One folder's approvals drawn as rows of their own: every kind but a session's
     /// archive request, which is the session's row (`home`).
     @MainActor
-    public static func ownApprovals(in work: AgentsModel, _ key: ProjectKey) -> [Approval] {
-        (work.project(key)?.approvals ?? []).filter { !$0.isSession }
+    public static func ownApprovals(in work: AgentsModel, _ key: FolderKey) -> [Approval] {
+        (work.folder(key)?.approvals ?? []).filter { !$0.isSession }
     }
 
-    /// The agents of one project's failed workflow runs (#989): Needs You lists each as its
+    /// The agents of one folder's failed workflow runs (#989): Needs You lists each as its
     /// workflow's row, which opens it, and not as a session too.
     @MainActor
-    public static func failedRuns(in work: AgentsModel, _ key: ProjectKey) -> Set<UUID> {
-        Set((work.project(key)?.approvals ?? []).filter { $0.kind == .workflowFailed }.compactMap(\.agentID))
+    public static func failedRuns(in work: AgentsModel, _ key: FolderKey) -> Set<UUID> {
+        Set((work.folder(key)?.approvals ?? []).filter { $0.kind == .workflowFailed }.compactMap(\.agentID))
     }
 
-    /// One project's pinned sessions held and not archived, in the order they were put in.
+    /// One folder's pinned sessions held and not archived, in the order they were put in.
     @MainActor
-    public static func pinnedSessions(in work: AgentsModel, _ key: ProjectKey) -> [Agent] {
+    public static func pinnedSessions(in work: AgentsModel, _ key: FolderKey) -> [Agent] {
         work.pinnedSessions(in: key.folder).compactMap { work.agent($0) }
             .filter { $0.host == key.host && $0.state != .archived }
     }
 
-    /// One project's pinned workflows held and not archived, in their order.
+    /// One folder's pinned workflows held and not archived, in their order.
     @MainActor
-    public static func pinnedWorkflows(in work: AgentsModel, _ key: ProjectKey) -> [WorkflowSummary] {
+    public static func pinnedWorkflows(in work: AgentsModel, _ key: FolderKey) -> [WorkflowSummary] {
         let held = work.workflows(in: key.folder)
         return work.pinnedWorkflows(in: key.folder).compactMap { id in
             held.first { $0.workflowID == id && !$0.isArchived }

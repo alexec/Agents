@@ -2,8 +2,8 @@ import Foundation
 
 /// Which conversation a half-typed prompt belongs to (025 US5).
 ///
-/// An agent that exists, or the one about to be started — per project when the bar is a
-/// project's, since what you were about to ask of one folder is not what you were about
+/// An agent that exists, or the one about to be started — per folder when the bar is a
+/// folder's, since what you were about to ask of one folder is not what you were about
 /// to ask of the next.
 public enum DraftKey: Hashable, Sendable {
     case agent(UUID)
@@ -17,7 +17,7 @@ public enum DraftKey: Hashable, Sendable {
         case .agent(let id):
             return Self.agentPrefix + id.uuidString
         case .newAgent(let folder):
-            return Self.newAgentPrefix + (folder.map { Project.standardize($0).path } ?? "")
+            return Self.newAgentPrefix + (folder.map { Folder.standardize($0).path } ?? "")
         }
     }
 

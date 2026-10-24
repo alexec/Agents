@@ -5,11 +5,11 @@ import Testing
 /// A full disk and a refused folder, in words (#88).
 struct WriteFailureTests {
     @Test func aFullDiskSaysWhatWasNotKeptAndWhatToDo() throws {
-        let error = CocoaError(.fileWriteOutOfSpace, userInfo: [NSFilePathErrorKey: "/tmp/x/projects.json"])
-        let failure = try #require(WriteFailure(error, keeping: "the project list", machine: "Your Mac"))
+        let error = CocoaError(.fileWriteOutOfSpace, userInfo: [NSFilePathErrorKey: "/tmp/x/folders.json"])
+        let failure = try #require(WriteFailure(error, keeping: "the folder list", machine: "Your Mac"))
         #expect(failure.cause == .diskFull)
-        #expect(failure.path == "/tmp/x/projects.json")
-        #expect(failure.message == "Your Mac is out of disk space, so the project list could not be saved. Free some space, then try again.")
+        #expect(failure.path == "/tmp/x/folders.json")
+        #expect(failure.message == "Your Mac is out of disk space, so the folder list could not be saved. Free some space, then try again.")
     }
 
     @Test func anErrnoUnderACocoaErrorIsFound() throws {

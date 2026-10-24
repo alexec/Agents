@@ -9,7 +9,7 @@ struct ReportOutcomesTests {
                      workflow: String? = nil, usd: Decimal? = nil, turns: Int = 1, working: Double = 0,
                      waiting: Double = 0, counts: DaemonAPI.ReportCounts? = nil) -> DaemonAPI.ReportRow {
         DaemonAPI.ReportRow(at: at, person: person, personName: person.capitalized, host: "H1", hostName: "Mac",
-                            project: "shop", runtime: runtime, workflow: workflow, cost: usd.map { ["USD": $0] } ?? [:],
+                            folder: "shop", runtime: runtime, workflow: workflow, cost: usd.map { ["USD": $0] } ?? [:],
                             turns: turns, workingSeconds: working, waitingSeconds: waiting, counts: counts)
     }
 
@@ -79,7 +79,7 @@ struct ReportOutcomesTests {
 
     @Test func countsDecodeFromTheWire() throws {
         let json = """
-        {"at":"2026-10-21","person":"p","personName":"P","host":"h","hostName":"H","project":"","runtime":"claude",
+        {"at":"2026-10-21","person":"p","personName":"P","host":"h","hostName":"H","folder":"","runtime":"claude",
          "workflow":"nightly","cost":{},"inputTokens":0,"outputTokens":0,"thoughtTokens":0,"cachedReadTokens":0,
          "cachedWriteTokens":0,"turns":0,"unpricedTurns":0,"workingSeconds":0,"waitingSeconds":0,
          "counts":{"sessions":1,"failedSessions":0,"prsOpened":2,"prsMerged":1,"prsReverted":0,"mergeSeconds":60,

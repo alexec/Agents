@@ -102,7 +102,7 @@ func TestASuspendedPersonsWorkflowsPause(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "review.md"), []byte("---\nname: Review\non: lease.granted\n---\nReview what changed.\n"), 0o644)

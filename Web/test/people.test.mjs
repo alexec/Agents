@@ -50,8 +50,8 @@ test("Remove says which machines are deleted and the work on them that is not pu
   const preview = {
     startedMachines: [
       { host: "w", name: "sam-ws", state: "online", unpushed: [
-        { project: "file:///p", worktree: "file:///p-fix", branch: "agents/fix", ahead: 2, uncommitted: 3 },
-        { project: "file:///p", worktree: "file:///p-new/", unmerged: 1 },
+        { folder: "file:///p", worktree: "file:///p-fix", branch: "agents/fix", ahead: 2, uncommitted: 3 },
+        { folder: "file:///p", worktree: "file:///p-new/", unmerged: 1 },
       ] },
       { host: "x", name: "sam-old", state: "offline", unpushed: [], unknown: "sam-old is not online, so it could not be asked." },
     ],

@@ -75,7 +75,7 @@ func TestBackupAndRestoreOnAnotherMachine(t *testing.T) {
 	shared := t.TempDir()
 	rootA, rootB := t.TempDir(), t.TempDir()
 	a, ca := start(t, rootA)
-	dir := project(t, ca, 1)
+	dir := folder(t, ca, 1)
 	ca.call(t, 2, "backups/configure", map[string]any{"every": "off", "keep": 2, "folder": shared})
 
 	finished := seeded(t, a, dir, nil)
@@ -104,7 +104,7 @@ func TestBackupAndRestoreOnAnotherMachine(t *testing.T) {
 
 	// Machine B already has an agent of its own and its own usage.
 	b, cb := start(t, rootB)
-	ownDir := project(t, cb, 1)
+	ownDir := folder(t, cb, 1)
 	own := seeded(t, b, ownDir, nil)
 	writeFile(t, filepath.Join(rootB, "usage-history.json"), `{"usage":"B"}`)
 	cb.call(t, 2, "backups/configure", map[string]any{"every": "off", "keep": 3, "folder": shared})
@@ -166,7 +166,7 @@ func TestARestoreFromAnotherMachineNeverRunsHere(t *testing.T) {
 	shared := t.TempDir()
 	a, ca := start(t, t.TempDir())
 	b, cb := start(t, t.TempDir())
-	dir := project(t, ca, 1)
+	dir := folder(t, ca, 1)
 	ca.call(t, 2, "backups/configure", map[string]any{"every": "off", "keep": 2, "folder": shared})
 	bRoot := b.Store.RootID
 	agent := seeded(t, a, dir, func(x *wire.Agent) {
@@ -379,7 +379,7 @@ func TestBackupToTheControlPlaneAndRestoreOnANewServer(t *testing.T) {
 		t.Fatalf("a host on no control plane can use one: %+v", s)
 	}
 	a.SetControlAsk(fake.askFor("a"))
-	dir := project(t, ca, 2)
+	dir := folder(t, ca, 2)
 	ca.call(t, 3, "backups/configure", map[string]any{"every": "off", "keep": 2, "target": "control"})
 	agent := seeded(t, a, dir, nil)
 	writeFile(t, a.Store.Loc.Transcript(string(agent.ID)), strings.Repeat("{\"line\":\"a turn of the conversation\"}\n", 100))
@@ -469,7 +469,7 @@ func TestABackupFolderOnTheSameDiskIsSaid(t *testing.T) {
 	if s := backupsIn(t, ca, 5); s.SameDisk != nil {
 		t.Fatalf("a folder on another disk said to be on the same disk")
 	}
-	dir := project(t, ca, 6)
+	dir := folder(t, ca, 6)
 	agent := seeded(t, a, dir, nil)
 	made, err := a.makeBackup()
 	if err != nil {

@@ -4,7 +4,7 @@
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import { keyWords } from "../model/credentials";
-import { hostLabel } from "./NewProject";
+import { hostLabel } from "./NewFolder";
 import { Modal } from "./Modal";
 
 export function TokenAskDialog({ store }: { store: Store }) {

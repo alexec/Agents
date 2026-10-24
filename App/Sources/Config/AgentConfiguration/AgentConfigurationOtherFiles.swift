@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Frame G: everything else in `~/.agents` or a project's `.agents`, with what (if
+/// Frame G: everything else in `~/.agents` or a folder's `.agents`, with what (if
 /// anything) uses it. Nothing is hidden, so the pages are the whole folder.
 struct AgentConfigurationOtherFiles: View {
     @Environment(AppModel.self) private var model
@@ -47,8 +47,8 @@ struct AgentConfigurationOtherFiles: View {
         switch place {
         case .you:
             PersonaManagerSheet(host: .mac, folder: URL(filePath: snapshot.home), personalOnly: true)
-        case .project(let folder):
-            PersonaManagerSheet(host: model.selectedProjectHost, folder: folder)
+        case .folder(let folder):
+            PersonaManagerSheet(host: model.selectedFolderHost, folder: folder)
         }
     }
 
@@ -57,11 +57,11 @@ struct AgentConfigurationOtherFiles: View {
         case .persona: "A persona: picked when an agent starts"
         case .git: "\(place.folderName) is a git repository"
         case .managed: "Kept by the skills installer; the app leaves it alone"
-        case .app: "The app’s own: the project’s settings, pins and workflows, and what it keeps as it works"
+        case .app: "The app’s own: the folder’s settings, pins and workflows, and what it keeps as it works"
         case .unused:
             switch place {
             case .you: "Not read by any agent"
-            case .project: "Not read by the app; an agent here can still open it"
+            case .folder: "Not read by the app; an agent here can still open it"
             }
         }
     }

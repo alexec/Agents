@@ -10,8 +10,8 @@ import (
 )
 
 // Bring back from ‹host›… (#1473), the reverse of Send to ‹host›… (#1123): the host packs
-// its branches with projects/sendPack, less the commits this Mac has, the window carries the
-// parts here with projects/receiveUpload, and projects/bringBack moves this Mac's branches
+// its branches with folders/sendPack, less the commits this Mac has, the window carries the
+// parts here with folders/receiveUpload, and folders/bringBack moves this Mac's branches
 // forward to the host's. It never overwrites work done here: a branch with commits of its
 // own, or uncommitted changes where a branch that moves is checked out, stops it before
 // anything is changed. The host's uncommitted changes come back as a patch only when asked.
@@ -180,7 +180,7 @@ func patchApplies(dir, patchOn string, branches []wire.SentBranch, patch string)
 }
 
 func (d *Daemon) registerBringBack() {
-	On(d, wire.CallProjectsBringBack, func(ctx context.Context, c *Client, r wire.BringBackRequest) (wire.BringBack, error) {
+	On(d, wire.CallFoldersBringBack, func(ctx context.Context, c *Client, r wire.BringBackRequest) (wire.BringBack, error) {
 		return d.bringBack(r)
 	})
 }

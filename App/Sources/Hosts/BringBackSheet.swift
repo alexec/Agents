@@ -23,13 +23,13 @@ extension AppModel {
         let here = try await receiveState(at: folder.path, on: from)
         progress("Making the bundle on \(label)…")
         let pack = try await there.callWhileAnswering(
-            DaemonAPI.Method.projectsSendPack,
+            DaemonAPI.Method.foldersSendPack,
             DaemonAPI.SendPackRequest(folder: source, branches: branches, leavingOut: here.heads, includeChanges: includeChanges),
             checkingEvery: .seconds(10)).decode(DaemonAPI.SendPack.self)
         let (bundle, patch) = try await relay(pack, from: there, to: mac, verb: "Bringing back", progress: progress)
         progress("Bringing it into this Mac's repository…")
         return try await mac.callWhileAnswering(
-            DaemonAPI.Method.projectsBringBack,
+            DaemonAPI.Method.foldersBringBack,
             DaemonAPI.BringBackRequest(folder: folder, bundle: bundle, patch: patch, patchOn: patch == nil ? nil : patchOn,
                                        branches: pack.commits),
             checkingEvery: .seconds(10)).decode(DaemonAPI.BringBack.self)
@@ -37,7 +37,7 @@ extension AppModel {
 }
 
 extension View {
-    /// The Bring back from ‹host›… sheet a project's menu asks for in `requests`.
+    /// The Bring back from ‹host›… sheet a folder's menu asks for in `requests`.
     func bringBackSheet(_ requests: WindowRequests) -> some View {
         sheet(item: Binding(get: { requests.bringBackFromHost }, set: { requests.bringBackFromHost = $0 })) { request in
             BringBackSheet(request: request).paperSheet()

@@ -11,7 +11,7 @@ struct SidebarView: View {
     @Environment(AppModel.self) private var model
     @Environment(SidebarFrame.self) private var frame
     @Environment(SidebarStates.self) private var states
-    /// A project's window shows its own session here, not the main window's (#1089).
+    /// A folder's window shows its own session here, not the main window's (#1089).
     @Environment(\.poppedChat) private var popped
 
     private var agent: Agent? { popped.map { model.work.agent($0.id) } ?? model.selectedAgent }

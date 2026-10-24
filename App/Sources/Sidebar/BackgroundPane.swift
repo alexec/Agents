@@ -9,7 +9,7 @@ import SwiftUI
 /// finished subagent can still be read.
 struct BackgroundPane: View {
     @Environment(AppModel.self) private var model
-    /// In a project's window, its session's own page of the transcript (#1089).
+    /// In a folder's window, its session's own page of the transcript (#1089).
     @Environment(\.poppedChat) private var popped
     let agent: Agent
     let state: AgentPaneState

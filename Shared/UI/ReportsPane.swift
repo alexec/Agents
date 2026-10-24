@@ -2,7 +2,7 @@ import AgentsKitCore
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Cost ▸ Reports (#1811): usage, cost and time by person, project, machine and runtime,
+/// Cost ▸ Reports (#1811): usage, cost and time by person, folder, machine and runtime,
 /// added up on the control plane from what each machine sends each hour. It shows the
 /// caller's own machines, an admin's too (the Me scope, #2071); a group's and everyone's are
 /// Reports on the web page. Export saves the rows as CSV or JSON lines. Page picks Spend or
@@ -233,7 +233,7 @@ struct ReportsPane: View {
     }
 }
 
-/// One person's, project's, machine's or runtime's figures, with a bar for its share of
+/// One person's, folder's, machine's or runtime's figures, with a bar for its share of
 /// the largest.
 private struct ReportGroupRow: View {
     let name: String

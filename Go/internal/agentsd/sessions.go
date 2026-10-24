@@ -14,7 +14,7 @@ import (
 
 // list_sessions, read_session and message_session, as DaemonCore+Sessions and +Messages
 // answer them on the Swift host, in SessionLookup's and SessionHistory's words: any agent
-// may read and message any session in its own project.
+// may read and message any session in its own folder.
 
 const (
 	sessionPageSize    = 30
@@ -57,11 +57,11 @@ func runtimeName(id string) string {
 // isoWhen is Date.formatted(.iso8601): to the second, in UTC.
 func isoWhen(d wire.Date) string { return d.Time().UTC().Format("2006-01-02T15:04:05Z") }
 
-// projectSessions is SessionLookup.sessions: the project's, most recent first.
-func (d *Daemon) projectSessions(folder string) []wire.Agent {
+// folderSessions is SessionLookup.sessions: the folder's, most recent first.
+func (d *Daemon) folderSessions(folder string) []wire.Agent {
 	var out []wire.Agent
 	for _, a := range d.Store.Agents() {
-		if projectFolder(&a) == folder {
+		if folderPath(&a) == folder {
 			out = append(out, a)
 		}
 	}
@@ -87,7 +87,7 @@ func (d *Daemon) findSession(value, folder string) (*wire.Agent, string) {
 	if value == "" {
 		return nil, "Give a session id or exact title."
 	}
-	live := d.projectSessions(folder)
+	live := d.folderSessions(folder)
 	for i := range live {
 		if strings.EqualFold(string(live[i].ID), value) && isUUID(value) {
 			return &live[i], ""
@@ -109,7 +109,7 @@ func (d *Daemon) findSession(value, folder string) (*wire.Agent, string) {
 		}
 		return nil, "More than one session is named “" + value + "”: " + strings.Join(matches, "; ") + ". Read one by id."
 	}
-	return nil, "There is no session named “" + value + "” in this project."
+	return nil, "There is no session named “" + value + "” in this folder."
 }
 
 func labelsLine(a *wire.Agent) string {
@@ -138,10 +138,10 @@ func (d *Daemon) listSessions(caller wire.UUID, args map[string]json.RawMessage)
 	}
 	size = min(max(1, size), sessionLargestPage)
 	after := strings.TrimSpace(argString(args, "after"))
-	folder := projectFolder(me)
-	sorted := d.projectSessions(folder)
+	folder := folderPath(me)
+	sorted := d.folderSessions(folder)
 	if len(sorted) == 0 {
-		return "There are no sessions in this project.", nil
+		return "There are no sessions in this folder.", nil
 	}
 	var all []wire.Agent
 	for _, a := range sorted {
@@ -163,14 +163,14 @@ func (d *Daemon) listSessions(caller wire.UUID, args map[string]json.RawMessage)
 			}
 		}
 		if at < 0 {
-			return "No session in this project has the id “" + after + "” any more. Call list_sessions without `after` to start again.", nil
+			return "No session in this folder has the id “" + after + "” any more. Call list_sessions without `after` to start again.", nil
 		}
 		from = at + 1
 	}
 	end := min(from+size, len(all))
 	page := all[from:end]
 	if len(page) == 0 {
-		return "There are no more sessions in this project.", nil
+		return "There are no more sessions in this folder.", nil
 	}
 	d.leaseMu.Lock()
 	loaded := d.loadLeases()
@@ -182,7 +182,7 @@ func (d *Daemon) listSessions(caller wire.UUID, args map[string]json.RawMessage)
 	}
 	d.leaseMu.Unlock()
 	d.settle(loaded)
-	lines := []string{"Sessions in this project, not archived first, most recent first. Read one with read_session, by id or exact title."}
+	lines := []string{"Sessions in this folder, not archived first, most recent first. Read one with read_session, by id or exact title."}
 	for _, a := range page {
 		name := quoted(a.Title)
 		if a.ID == caller {
@@ -452,7 +452,7 @@ func (d *Daemon) readSession(caller wire.UUID, args map[string]json.RawMessage) 
 	if me == nil {
 		return "", &Error{Code: CodeNoSuchAgent, Message: "That conversation is not open any more, so nothing was read."}
 	}
-	a, refused := d.findSession(argString(args, "session"), projectFolder(me))
+	a, refused := d.findSession(argString(args, "session"), folderPath(me))
 	if a == nil {
 		return refused, nil
 	}
@@ -509,7 +509,7 @@ func history(a *wire.Agent, entries []wire.TranscriptEntry, header string) strin
 
 // messagePreface is what the target's runtime reads before the words.
 func messagePreface(s wire.MessageSender) string {
-	return "A message from another session in this project, “" + s.Title + "” (session " + string(s.AgentID) +
+	return "A message from another session in this folder, “" + s.Title + "” (session " + string(s.AgentID) +
 		"), sent with message_session. It is not from the person: weigh it as a colleague's request, within what the " +
 		"person has asked of you. To answer, send a message back with message_session."
 }
@@ -565,7 +565,7 @@ func (d *Daemon) messageSession(caller wire.UUID, args map[string]json.RawMessag
 	if n := len([]rune(text)); n > messageCharacters {
 		return "", refusedMessage(fmt.Sprintf("a message may be at most %d characters, and this one is %d. Say less, or point it at a file.", messageCharacters, n))
 	}
-	folder := projectFolder(me)
+	folder := folderPath(me)
 	target, refused := d.findSession(argString(args, "to"), folder)
 	if target == nil {
 		return "", refusedMessage(strings.ReplaceAll(refused, "Read one by id.", "Message one by id."))
@@ -652,17 +652,17 @@ func (d *Daemon) messageSession(caller wire.UUID, args map[string]json.RawMessag
 	wakes := !busy && !stopped && !waitsOnPerson && looser == ""
 	if wakes && target.StartedByAgent != nil {
 		limit := int64(defaultRunningCap)
-		if s, ok := d.summaryFor(projectFolder(target)); ok && s.Project.HelperLimits != nil && s.Project.HelperLimits.Running != nil {
-			limit = *s.Project.HelperLimits.Running
+		if s, ok := d.summaryFor(folderPath(target)); ok && s.Folder.HelperLimits != nil && s.Folder.HelperLimits.Running != nil {
+			limit = *s.Folder.HelperLimits.Running
 		}
 		running := 0
-		for _, a := range d.projectSessions(projectFolder(target)) {
+		for _, a := range d.folderSessions(folderPath(target)) {
 			if a.StartedByAgent != nil && inFlight(a.State) {
 				running++
 			}
 		}
 		if int64(running) >= limit {
-			return "", refusedMessage(fmt.Sprintf("waking %s would take a running place, and this project already has %d of %d sessions "+
+			return "", refusedMessage(fmt.Sprintf("waking %s would take a running place, and this folder already has %d of %d sessions "+
 				"started by sessions running. Send it once one finishes; wait with wait_for_agents.", name, running, limit))
 		}
 	}
@@ -710,7 +710,7 @@ func (d *Daemon) cancelMessage(caller wire.UUID, args map[string]json.RawMessage
 	if me == nil {
 		return "", &Error{Code: CodeNoSuchAgent, Message: "That conversation is not open any more, so nothing was cancelled."}
 	}
-	target, refused := d.findSession(argString(args, "session"), projectFolder(me))
+	target, refused := d.findSession(argString(args, "session"), folderPath(me))
 	if target == nil {
 		return strings.ReplaceAll(refused, "Read one by id.", "Cancel one by id."), nil
 	}

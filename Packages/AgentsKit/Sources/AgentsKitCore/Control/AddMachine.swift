@@ -44,7 +44,7 @@ public enum AddMachine {
         public static let noProvidersAskAdmin = "No provider here can make a machine. An admin adds one in Settings ▸ Machine Providers."
         public static let needsControlPlane = "Needs a control plane with one copy, such as the one on your Mac."
         /// Said where a provider is added outside Settings (#1787).
-        public static let providersYours = "Your providers are yours in every project."
+        public static let providersYours = "Your providers are yours in every folder."
         public static let existing = "Or add one it has already"
         public static let next = "Next"
         public static let machineTitle = "New Machine"
@@ -67,23 +67,23 @@ public enum AddMachine {
     }
 }
 
-/// Connectors set-up ▸ Where agents run (#2131): the machine the project is on, the others
+/// Connectors set-up ▸ Where agents run (#2131): the machine the folder is on, the others
 /// that are yours, and Add a Machine… and Add Provider… in place.
 public enum WhereAgentsRun {
-    /// The slot's title: the machine the project's folder is on.
+    /// The slot's title: the machine the folder is on.
     public static func title(onThisMac: Bool, hostName: String?) -> String {
         onThisMac ? "This Mac" : (hostName ?? "Its machine")
     }
 
     /// The slot's line: why it runs there, and what else is yours.
     public static func line(others: [String], providers: [String]) -> String {
-        var parts = ["Agents run where this project’s folder is."]
+        var parts = ["Agents run where this folder is."]
         if !others.isEmpty { parts.append("Your other machines: \(others.joined(separator: ", ")).") }
         if !providers.isEmpty { parts.append("Providers: \(providers.joined(separator: ", ")).") }
         return parts.joined(separator: " ")
     }
 
-    public static let hereNote = "This project’s folder is here."
+    public static let hereNote = "This folder is here."
     public static let addMachineNote = "From a provider, a server or another Mac."
     public static let addProviderNote = "Docker, DigitalOcean, Codespaces, Coder and the others. " + AddMachine.Words.providersYours
 }

@@ -216,21 +216,21 @@ func TestTheBriefSaysTheRestWhereItApplies(t *testing.T) {
 	}
 }
 
-// The persona's prompt follows the brief: the project's before the person's, its front
+// The persona's prompt follows the brief: the folder's before the person's, its front
 // matter left out, none for a persona that is not there or an id that is a path (#760).
 func TestThePersonasPromptFollowsTheBrief(t *testing.T) {
-	project, home := t.TempDir(), t.TempDir()
+	folder, home := t.TempDir(), t.TempDir()
 	t.Setenv("AGENTS_PERSONAL_HOME", home)
 	write := func(base, id, text string) {
 		os.MkdirAll(filepath.Join(base, ".agents", "personas"), 0o755)
 		os.WriteFile(filepath.Join(base, ".agents", "personas", id+".md"), []byte(text), 0o644)
 	}
-	write(project, "reviewer", "---\nname: Reviewer\nmodel: x\n---\n\nReview as a sceptic.\n")
+	write(folder, "reviewer", "---\nname: Reviewer\nmodel: x\n---\n\nReview as a sceptic.\n")
 	write(home, "reviewer", "The person's own.")
 	write(home, "writer", "Write plainly.")
-	write(project, "broken", "---\nname: Broken\n")
+	write(folder, "broken", "---\nname: Broken\n")
 	persona := func(id string) string {
-		return personaPrompt(&wire.Agent{Cwd: store.FolderURL(project), Persona: &id})
+		return personaPrompt(&wire.Agent{Cwd: store.FolderURL(folder), Persona: &id})
 	}
 	if persona("reviewer") != "Review as a sceptic." || persona("writer") != "Write plainly." ||
 		persona("broken") != "" || persona("nobody") != "" || persona("../reviewer") != "" {
@@ -239,7 +239,7 @@ func TestThePersonasPromptFollowsTheBrief(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
 	id := "reviewer"
-	if got := d.brief(&wire.Agent{RuntimeID: "claude", Cwd: store.FolderURL(project), Persona: &id}); !strings.HasSuffix(got, "\n\nReview as a sceptic.") {
+	if got := d.brief(&wire.Agent{RuntimeID: "claude", Cwd: store.FolderURL(folder), Persona: &id}); !strings.HasSuffix(got, "\n\nReview as a sceptic.") {
 		t.Fatal(got)
 	}
 }

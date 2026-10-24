@@ -34,7 +34,7 @@ public enum EventWords {
         "Replaced your earlier wait on \(previous.label). "
     }
 
-    public static let otherProject = "You can only wait on this project's events and this Mac's."
+    public static let otherFolder = "You can only wait on this folder's events and this Mac's."
 
     public static func badDeadline() -> String {
         "until_minutes has to be from \(EventWait.deadlineMinutes.lowerBound) to \(EventWait.deadlineMinutes.upperBound)."
@@ -77,7 +77,7 @@ public enum EventWords {
         for (server, names) in offers.sorted(by: { $0.key < $1.key }) {
             words += names.isEmpty ? " \(server) offers no events." : " \(server) offers \(names.joined(separator: ", "))."
         }
-        if offers.isEmpty { words += " This project has no MCP server that offers events." }
+        if offers.isEmpty { words += " This folder has no MCP server that offers events." }
         if let guess = EventPatternProblem.closest(to: name) { words += " Did you mean \(guess)?" }
         return words
     }
@@ -104,7 +104,7 @@ public enum EventWords {
         if let message = event.message { lines.append("message: \(message)") }
         if extraMatches > 0 {
             let more = extraMatches == 1 ? "1 more match arrived" : "\(extraMatches) more matches arrived"
-            lines += ["", "\(more) before you resumed; they are in this project's events."]
+            lines += ["", "\(more) before you resumed; they are in this folder's events."]
         }
         return lines.joined(separator: "\n")
     }

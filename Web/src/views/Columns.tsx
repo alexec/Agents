@@ -1,6 +1,6 @@
 // The Mac window's layout in a tab (071 US2, US6; #151, #235). As the window since #145: one
-// sidebar (New Session, Activity, the smart groups, a group per project, the hosts' state at its
-// foot; #499), then the chat, a project's new-session form, a workflow, its archive, an Activity
+// sidebar (New Session, Activity, the smart groups, a group per folder, the hosts' state at its
+// foot; #499), then the chat, a folder's new-session form, a workflow, its archive, an Activity
 // page, a change's Review page (#1472), this browser's Settings (#846), or help text with nothing chosen; the files pane a third column from 1440, over the chat below that. Below 760 the same
 // sidebar is the root list, as the iPhone Remote's is (#226), and what it picks takes its place,
 // with ‹ Agents back to it. Above it all, Workspace | Console | Reports (#1804): the Console and
@@ -14,7 +14,7 @@ import type { Session } from "../session";
 import { Banner } from "./Banner";
 import { Chat } from "./Chat";
 import { NewAgent } from "./NewAgent";
-import { NewProjectDialog } from "./NewProject";
+import { NewFolderDialog } from "./NewFolder";
 import { DropboxDialog } from "./DropboxDialog";
 import { TokenAskDialog } from "./TokenAsk";
 import { GitLendDialog } from "./GitLend";
@@ -39,8 +39,8 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
   const down = session.state.value.kind === "down";
   // What a narrow window shows: the list, or what the route opens in the chat's place.
   const depth = r.app || r.settings || r.activity || r.session || r.workflow || r.page || r.compose || r.archive || r.mcp || r.review ? "chat" : "list";
-  const project = r.host && r.project
-    ? (store.projects.value[r.host] ?? []).find((p) => folderKey(p.project.folder) === folderKey(r.project!))
+  const folder = r.host && r.folder
+    ? (store.folders.value[r.host] ?? []).find((p) => folderKey(p.folder.folder) === folderKey(r.folder!))
     : undefined;
   useEffect(() => {
     if (r.host && r.session) void store.openSession(r.host, r.session);
@@ -66,26 +66,26 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
         <Sidebar session={session} store={store} linkDown={down} />
         {r.settings ? <SettingsPage store={store} down={down} />
           : r.activity ? <ActivityPageView store={store} page={r.activity} />
-          : r.host && r.project && project && r.review ? (
-            <ReviewPage key={`${r.host}|${r.review}`} store={store} host={r.host} folder={project.project.folder} projectName={project.name}
+          : r.host && r.folder && folder && r.review ? (
+            <ReviewPage key={`${r.host}|${r.review}`} store={store} host={r.host} folder={folder.folder.folder} folderName={folder.name}
               id={r.review} down={down || !store.hostIsOnline(r.host)} />
           ) : r.host && r.session ? <Chat store={store} host={r.host} session={r.session} down={down} />
-          : r.host && r.project && project && r.workflow ? (
-            <WorkflowPage store={store} host={r.host} folder={project.project.folder} projectName={project.name}
+          : r.host && r.folder && folder && r.workflow ? (
+            <WorkflowPage store={store} host={r.host} folder={folder.folder.folder} folderName={folder.name}
               workflowID={r.workflow} down={down || !store.hostIsOnline(r.host)} />
-          ) : r.host && r.project && project && r.page ? (
-            <PinnedPage store={store} host={r.host} folder={project.project.folder} path={r.page} down={down || !store.hostIsOnline(r.host)} />
-          ) : r.host && r.project && project && r.archive ? (
-            <ArchivePage store={store} host={r.host} folder={project.project.folder} projectName={project.name} down={down} />
-          ) : r.host && r.project && project && r.mcp ? (
-            <MCPServersPage store={store} host={r.host} folder={project.project.folder} projectName={project.name} />
-          ) : r.host && r.project && project && r.compose ? (
+          ) : r.host && r.folder && folder && r.page ? (
+            <PinnedPage store={store} host={r.host} folder={folder.folder.folder} path={r.page} down={down || !store.hostIsOnline(r.host)} />
+          ) : r.host && r.folder && folder && r.archive ? (
+            <ArchivePage store={store} host={r.host} folder={folder.folder.folder} folderName={folder.name} down={down} />
+          ) : r.host && r.folder && folder && r.mcp ? (
+            <MCPServersPage store={store} host={r.host} folder={folder.folder.folder} folderName={folder.name} />
+          ) : r.host && r.folder && folder && r.compose ? (
             // Only when asked for: leaving a session shows nothing chosen, not New Session (#2090).
-            <NewAgent store={store} host={r.host} folder={project.project.folder} projectName={project.name} down={down} />
+            <NewAgent store={store} host={r.host} folder={folder.folder.folder} folderName={folder.name} down={down} />
           ) : <NothingChosen />}
         {r.host && r.session && r.files && <FilesPane store={store} host={r.host} session={r.session} />}
       </div>}
-      <NewProjectDialog store={store} />
+      <NewFolderDialog store={store} />
       <DropboxDialog store={store} />
       <TokenAskDialog store={store} />
       <GitLendDialog store={store} />
@@ -103,7 +103,7 @@ function NothingChosen() {
       <span class="glyph" aria-hidden="true">◧</span>
       <h2>Nothing selected</h2>
       <p>Pick a session on the left to read it, or New Session at the top to start one.</p>
-      <p>↑ and ↓ move through the list, → and ← unfold and fold a project.</p>
+      <p>↑ and ↓ move through the list, → and ← unfold and fold a folder.</p>
     </section>
   );
 }

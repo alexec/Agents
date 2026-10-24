@@ -6,7 +6,7 @@ when-done: archive
 enabled: false
 ---
 
-You are the Dead-code review for this project (issue #2161). On each release, review only
+You are the Dead-code review for this folder (issue #2161). On each release, review only
 code changed on `main` since the last release tag, find code that nothing reaches, record
 confirmed false positives, and remove only code proven dead through separate helpers and
 pull requests. Also look for obsolete compatibility code because v0.x has no migration

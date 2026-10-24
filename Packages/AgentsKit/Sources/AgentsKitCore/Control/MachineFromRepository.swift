@@ -2,7 +2,7 @@ import Foundation
 
 /// Start a Machine from a Repository (#1809): pick a repository, pick a provider that makes
 /// machines, start. The control plane gives the repository to the provider (Codespaces makes
-/// the codespace from it) or has the new host clone it once it joins, and the project shows
+/// the codespace from it) or has the new host clone it once it joins, and the folder shows
 /// then. The web page's `machineFromRepository.ts` is the same.
 public enum MachineFromRepository {
     /// An https repository address, as the control plane takes one (`repositoryPath`).
@@ -113,13 +113,13 @@ public enum MachineFromRepository {
         public static let menuItem = "Start a Machine from a Repository…"
         public static let repositoryPrompt = "The repository’s https address"
         public static func repositoryNote(_ repository: Repository?, typed: Bool) -> String {
-            if let repository { return "The machine clones \(repository.path) and adds it as a project." }
+            if let repository { return "The machine clones \(repository.path) and adds it as a folder." }
             return typed ? "Give an https address of a repository, such as on GitHub or GitLab." : "The repository to work in."
         }
         public static let noMakers = "No provider here can make a machine. Add DigitalOcean, Compute Engine or Codespaces in Settings ▸ Machine providers."
         public static func starting(_ name: String) -> String { "Starting \(name)…" }
         public static func joining(_ name: String, _ repository: Repository) -> String {
-            "\(name) is starting. It installs Agents, joins and clones \(repository.path) on its first boot. The project shows when it has."
+            "\(name) is starting. It installs Agents, joins and clones \(repository.path) on its first boot. The folder shows when it has."
         }
         public static func notJoining(_ name: String, provider: String) -> String {
             "\(provider) made \(name), but can't install Agents on its first boot. Add it as a machine in the Mac app: Settings ▸ Machine Providers, Add as Machine…."

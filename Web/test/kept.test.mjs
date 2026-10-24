@@ -53,7 +53,7 @@ test("a kept prompt counts as sent, and shows at once in its agent's chat", asyn
   assert.deepEqual(store.keptFor("box", "a2"), []);
 });
 
-test("a kept start answers what was kept, and is found by its project", async () => {
+test("a kept start answers what was kept, and is found by its folder", async () => {
   const start = kept({ id: "k2", kind: "start", agentID: undefined, folder: "file:///home/alex/app/", runtimeID: "claude" });
   const store = new Store(fakeLink((method) => {
     if (method === "agents/start") throw new CallFailed(-32067, "devbox is starting.", start);

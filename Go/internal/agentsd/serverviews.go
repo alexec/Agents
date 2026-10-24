@@ -15,15 +15,15 @@ import (
 )
 
 // A connected server's list views in the sidebar (#2032): for each server set up and
-// approved for a project, each view that a read-only tool with no required arguments feeds
+// approved for a folder, each view that a read-only tool with no required arguments feeds
 // is a row of its own, named by the service ("GitHub · Issues"), without a pin. A person
 // hides one with pins/hideView; the hidden ones are in pins.json's hidden_views. A view that
 // is pinned shows as its pin only. A server that can't show views here shows no row.
 
-// serverViews is project's list views, the hidden ones marked, in the servers' order. It
+// serverViews is folder's list views, the hidden ones marked, in the servers' order. It
 // reads only kept catalogs: a server whose views were not read yet is read in the
 // background, and pins/changed says the rows once it has been.
-func (d *Daemon) serverViews(project string, f pinsFile) []wire.PinView {
+func (d *Daemon) serverViews(folder string, f pinsFile) []wire.PinView {
 	pinned := map[string]bool{}
 	for _, e := range f.pins {
 		if e.view != nil {
@@ -37,15 +37,15 @@ func (d *Daemon) serverViews(project string, f pinsFile) []wire.PinView {
 	host := ""
 	hostRead := false
 	out := []wire.PinView{}
-	for _, name := range d.viewServerNames(project) {
-		s, problem := d.viewServerFor(name, project)
+	for _, name := range d.viewServerNames(folder) {
+		s, problem := d.viewServerFor(name, folder)
 		if problem != 0 {
 			continue
 		}
 		ours, isOurs := oursForServer(s)
 		if isOurs {
 			if !hostRead {
-				host, hostRead = originHost(project), true
+				host, hostRead = originHost(folder), true
 			}
 			if !oursFits(ours, host) {
 				continue
@@ -53,7 +53,7 @@ func (d *Daemon) serverViews(project string, f pinsFile) []wire.PinView {
 		}
 		catalog := d.cachedViewCatalog(s)
 		if catalog == nil {
-			d.readServerViews(s, project)
+			d.readServerViews(s, folder)
 			continue
 		}
 		title := serverTitle(s, catalog, ours, isOurs)
@@ -71,18 +71,18 @@ func (d *Daemon) serverViews(project string, f pinsFile) []wire.PinView {
 				yes := true
 				v.Hidden = &yes
 			}
-			out = append(out, d.withCount(project, v))
+			out = append(out, d.withCount(folder, v))
 		}
 	}
 	return out
 }
 
-// readServerViews reads s's views in the background, and says project's pins again once
+// readServerViews reads s's views in the background, and says folder's pins again once
 // they are read. A server that failed is not asked again for five minutes (loadViewCatalog).
-func (d *Daemon) readServerViews(s viewServer, project string) {
+func (d *Daemon) readServerViews(s viewServer, folder string) {
 	safe.Go("server views", func() {
 		if d.loadViewCatalog(context.Background(), s) != nil {
-			d.pinsChanged(project)
+			d.pinsChanged(folder)
 		}
 	})
 }
@@ -95,7 +95,7 @@ func oursForServer(s viewServer) (mcpcatalog.Ours, bool) {
 	return mcpcatalog.OursByCommand(s.filled.Stdio.Command)
 }
 
-// oursFits says ours's views belong in a project whose origin is on host: GitHub's on
+// oursFits says ours's views belong in a folder whose origin is on host: GitHub's on
 // github.com, GitLab's on any other host, the rest everywhere.
 func oursFits(o mcpcatalog.Ours, host string) bool {
 	switch o.ID {
@@ -136,10 +136,10 @@ func listViewTitle(c *viewCatalog, v wire.ViewPin, server string) string {
 	return title
 }
 
-// originHost is the host of the project's origin remote, lower case ("github.com"), or "".
+// originHost is the host of the folder's origin remote, lower case ("github.com"), or "".
 // Read from the git config file, without running git.
-func originHost(project string) string {
-	gitDir := filepath.Join(project, ".git")
+func originHost(folder string) string {
+	gitDir := filepath.Join(folder, ".git")
 	if b, err := os.ReadFile(gitDir); err == nil {
 		// A worktree: "gitdir: <dir>", whose commondir is the repo's.
 		dir, ok := strings.CutPrefix(strings.TrimSpace(string(b)), "gitdir: ")
@@ -147,7 +147,7 @@ func originHost(project string) string {
 			return ""
 		}
 		if !filepath.IsAbs(dir) {
-			dir = filepath.Join(project, dir)
+			dir = filepath.Join(folder, dir)
 		}
 		gitDir = dir
 		if c, err := os.ReadFile(filepath.Join(dir, "commondir")); err == nil {

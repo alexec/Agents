@@ -25,7 +25,7 @@ type hostStatusBook struct {
 }
 
 // hostStatus is idle as a workspace's stop when idle counts it: no turn in flight, no agent
-// waiting on a person, no permission asked and no terminal or project shell open.
+// waiting on a person, no permission asked and no terminal or folder shell open.
 func (d *Daemon) hostStatus() wire.HostStatus {
 	running := []string{}
 	for _, a := range d.Store.Agents() {

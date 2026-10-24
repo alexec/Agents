@@ -71,7 +71,7 @@ func TestAStalledSocketClientIsLetGo(t *testing.T) {
 			if err != nil {
 				return
 			}
-			if strings.Contains(line, wire.NotifyProjectChanged.Name) {
+			if strings.Contains(line, wire.NotifyFolderChanged.Name) {
 				heard.Add(1)
 			}
 		}
@@ -80,7 +80,7 @@ func TestAStalledSocketClientIsLetGo(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		for i := 0; i < n; i++ {
-			Broadcast(d, wire.NotifyProjectChanged, wire.ProjectSummary{Name: big})
+			Broadcast(d, wire.NotifyFolderChanged, wire.FolderSummary{Name: big})
 		}
 		close(done)
 	}()

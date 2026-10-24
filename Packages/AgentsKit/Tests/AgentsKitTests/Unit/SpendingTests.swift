@@ -4,7 +4,7 @@ import Testing
 @testable import AgentsKitCore
 
 /// The three cases that all look like "no money" from outside. Getting them wrong puts
-/// a warning on a project where nothing has happened yet, or hides one on a project
+/// a warning on a folder where nothing has happened yet, or hides one on a folder
 /// whose runtime never said a price.
 @Suite("What has been spent")
 struct SpendingTests {
@@ -53,11 +53,11 @@ struct SpendingTests {
                          _ costToDate: [String: Decimal],
                          archived: Bool = false,
                          exists: Bool = true,
-                         unmeasured: Int = 0) -> DaemonAPI.ProjectSummary {
-        let folder = URL(fileURLWithPath: "/tmp/\(name)")
-        var project = Project(folder: folder)
-        if archived { project.archivedAt = Date() }
-        return DaemonAPI.ProjectSummary(project: project,
+                         unmeasured: Int = 0) -> DaemonAPI.FolderSummary {
+        let folderURL = URL(fileURLWithPath: "/tmp/\(name)")
+        var folder = Folder(folder: folderURL)
+        if archived { folder.archivedAt = Date() }
+        return DaemonAPI.FolderSummary(folder: folder,
                                         name: name,
                                         exists: exists,
                                         lastActivityAt: Date(),
@@ -68,7 +68,7 @@ struct SpendingTests {
 
     /// FR-011, and the first test written. It holds by construction today — the shares
     /// and the grand total are folded from the same array — and it exists because a
-    /// later feature that starts filtering the project list before totalling would
+    /// later feature that starts filtering the folder list before totalling would
     /// break it silently, losing money from the grand total with nothing to see.
     @Test("for every currency, the shares sum exactly to the grand total")
     func sharesAddUp() {
@@ -113,7 +113,7 @@ struct SpendingTests {
         #expect(spending.currencies == ["GBP", "USD"], "code order, not an opinion")
     }
 
-    @Test("a project that has spent nothing is in no share list")
+    @Test("a folder that has spent nothing is in no share list")
     func nothingSpentIsNotListed() {
         let spending = Spending([
             summary("api", ["USD": 5]),
@@ -123,7 +123,7 @@ struct SpendingTests {
         #expect(spending.shares(in: "USD").map(\.name) == ["api"])
     }
 
-    @Test("archived projects and missing folders are listed with what they cost")
+    @Test("archived folders and missing folders are listed with what they cost")
     func nothingIsFilteredOut() {
         let spending = Spending([
             summary("old", ["USD": 9], archived: true),
@@ -137,7 +137,7 @@ struct SpendingTests {
         #expect(spending.grandTotal["USD"] == 12, "the money was still spent")
     }
 
-    @Test("the unmeasured count is the sum across projects")
+    @Test("the unmeasured count is the sum across folders")
     func unmeasuredIsSummed() {
         let spending = Spending([
             summary("api", ["USD": 1], unmeasured: 2),
@@ -158,8 +158,8 @@ struct SpendingTests {
         #expect(spending.unmeasuredAgents == 0)
     }
 
-    @Test("no projects at all is empty, not a crash")
-    func noProjects() {
+    @Test("no folders at all is empty, not a crash")
+    func noFolders() {
         #expect(Spending([]).isEmpty)
     }
 }

@@ -278,7 +278,7 @@ class Video:
             run("git", "-C", folder, "add", "-A")
             run("git", "-C", folder, "-c", "user.name=Demo", "-c", "user.email=demo@example.com",
                 "commit", "-qm", "First version", check=False)
-        self.rpc("projects/add", {"folder": f"file://{folder}"})
+        self.rpc("folders/add", {"folder": f"file://{folder}"})
         return folder
 
     def start(self, folder, prompt, runtime="claude", **extra):

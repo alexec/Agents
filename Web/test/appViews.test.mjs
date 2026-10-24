@@ -45,12 +45,12 @@ test("agents/message-agent is read as AppViewAgentMessage reads it (#837)", () =
     { kind: "startAgent", id: 1, start: { prompt: "Fix PR #9", labels: ["P#9"], branch: "agents/fix-9" } });
 });
 
-test("the message goes to the latest session on the branch, in the project (#837)", () => {
+test("the message goes to the latest session on the branch, in the folder (#837)", () => {
   const agent = (title, branch, lastActivityAt, more = {}) => ({ id: title, title, cwd: "/tmp/repo/.agents/worktrees/w", lastActivityAt,
-    worktree: { name: "fix-837", root: "/tmp/repo/.agents/worktrees/w", branch, project: "/tmp/repo" }, ...more });
+    worktree: { name: "fix-837", root: "/tmp/repo/.agents/worktrees/w", branch, folder: "/tmp/repo" }, ...more });
   const agents = [agent("Older", "agents/fix-837", 10), agent("Newer", "agents/fix-837", 20),
     agent("Archived", "agents/fix-837", 30, { archivedAt: 1 }), agent("Other branch", "agents/fix-838", 40),
-    agent("Other project", "agents/fix-837", 50, { worktree: { name: "x", root: "/tmp/other/x", branch: "agents/fix-837", project: "/tmp/other" } })];
+    agent("Other folder", "agents/fix-837", 50, { worktree: { name: "x", root: "/tmp/other/x", branch: "agents/fix-837", folder: "/tmp/other" } })];
   const message = { branch: "agents/fix-837", text: "Fix" };
   assert.deepEqual(bridge.recipient(agents, message, "/tmp/repo/"), { id: "Newer", name: "Newer" });
   assert.equal(bridge.recipient(agents.slice(2), message, "/tmp/repo"), null);
@@ -189,7 +189,7 @@ test("Pin is offered only for a pinnable call that has answered", () => {
 test("a pinned view is fed by the host's own call: input first, then its answer", () => {
   const view = { server: "agents", uri: "ui://agents/test-view", tool: "show_test_view", arguments: { note: "pinned" } };
   assert.deepEqual(bridge.feedParams("P", "file:///p", view),
-    { agentID: "P", viewID: "P", name: "show_test_view", project: "file:///p", feed: true, arguments: { note: "pinned" } });
+    { agentID: "P", viewID: "P", name: "show_test_view", folder: "file:///p", feed: true, arguments: { note: "pinned" } });
   const running = bridge.pinnedViewCall("P", view);
   assert.deepEqual(running, { id: "P", server: "agents", tool: "show_test_view", resourceUri: "ui://agents/test-view",
     arguments: { note: "pinned" }, state: "running" });

@@ -476,7 +476,7 @@ public extension DaemonAPI {
         public var id: ProviderID
         public var name: String
         public var options: JSONValue?
-        /// Git URLs the new host clones once it has joined (#1122), as File ▸ Clone Project
+        /// Git URLs the new host clones once it has joined (#1122), as File ▸ Clone Folder
         /// does, one after another. Nil or empty for none.
         public var clones: [String]?
         /// The repository to start it from (#1809), an https git address. A provider whose

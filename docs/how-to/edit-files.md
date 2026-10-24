@@ -82,7 +82,7 @@ wrong with the text as you have it, saved or not. The answer shows under the tex
   server said. Click or tap a row to move the caret to that line.
 - **No problems · ‹server›**: the server answered and found nothing.
 - **Starting ‹server›…**: the server has not answered yet. A server can take a minute to
-  start on a large project.
+  start on a large folder.
 - **Couldn't ask ‹server›: ‹why›**: the request failed.
 - **‹server› is not installed on this host, so this file is not checked.** Install it on
   the agent's host. See below.
@@ -128,7 +128,7 @@ the folders of the host's login shell:
 To add one, install it on the host so that your login shell finds it, then open the file
 again.
 
-The host starts a server the first time a file needs it, one for each project folder and
+The host starts a server the first time a file needs it, one for each folder and
 language. It keeps at most four running and stops one after ten minutes with no requests,
 so servers do not hold memory for files you closed. A host made before this feature says
 **This host needs an update to do this.** in place of the list. See

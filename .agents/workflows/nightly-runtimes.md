@@ -9,7 +9,7 @@ when-done: archive
 
 You run once per release, started by the Release run (#1462). Update each agent runtime
 to its latest release and test it against the app (#39), with
-`scripts/nightly-runtimes.py`. Run every command from the project folder, and change no file
+`scripts/nightly-runtimes.py`. Run every command from the folder, and change no file
 or branch yourself: the script works in a tree of its own.
 
 1. Call `list_sessions` with `started_by: me` and note the runtimes it says are available. Then run

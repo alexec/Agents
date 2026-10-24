@@ -1,19 +1,19 @@
 ---
 diataxis: how-to
 devices: [mac, ipad, iphone, web]
-description: Open a session or a project in a window of its own on the Mac, in a scene of its own on an iPad, or in a tab of its own on the web page.
+description: Open a session or a folder in a window of its own on the Mac, in a scene of its own on an iPad, or in a tab of its own on the web page.
 ---
 
-# Open a session or a project in its own window
+# Open a session or a folder in its own window
 
 Sometimes you want two things on screen at once: a chat beside the one you are in, or one
-project on a second display while the main window shows all of them. A session or a
-project can open in a window of its own. The main window does not change, so you do not
+folder on a second display while the main window shows all of them. A session or a
+folder can open in a window of its own. The main window does not change, so you do not
 lose your place in it.
 
 ## Before you start
 
-- A session or a project to open. See the [tutorials](../tutorials/index.md).
+- A session or a folder to open. See the [tutorials](../tutorials/index.md).
 
 ## A session in its own window
 
@@ -33,7 +33,7 @@ window is in front, its session counts as read.
 
 **iPad**
 
-1. Touch and hold the session's row in the sidebar or its card on the project's page, and
+1. Touch and hold the session's row in the sidebar or its card on the folder's page, and
    choose **Open in New Window**. Or, in the conversation, open the **Actions** menu and
    choose **Open in New Window**.
 2. Or drag the session's row out of the sidebar.
@@ -58,50 +58,50 @@ address, so you can also keep it as a bookmark.
 - A question answered in one window goes from the other, because both show the same
   session.
 
-## A project in its own window
+## A folder in its own window
 
 **Mac**
 
 Do one of these:
 
-- Double-click the project's heading in the sidebar.
+- Double-click the folder's heading in the sidebar.
 - Right-click the heading and choose **Open in New Window**.
-- Select the project and choose **Window ▸ Open Project in New Window** (Option-Command-O).
-- Choose **Window ▸ Open Project Window**, then the project.
-- Right-click the Agents icon in the Dock and choose the project.
+- Select the folder and choose **Window ▸ Open Folder in New Window** (Option-Command-O).
+- Choose **Window ▸ Open Folder Window**, then the folder.
+- Right-click the Agents icon in the Dock and choose the folder.
 
-The window has a sidebar of only that project: **New Session**, its **Pinned** and
-**Needs You**, its sessions, its workflows, **Archived**, and **Project Settings…** at the
+The window has a sidebar of only that folder: **New Session**, its **Pinned** and
+**Needs You**, its sessions, its workflows, **Archived**, and **Folder Settings…** at the
 foot. A session you start or select there opens in that window. The window has its own
-inspector, and it keeps the pane and the width for that project. Its toolbar also has the
-project's shell (Control-`).
+inspector, and it keeps the pane and the width for that folder. Its toolbar also has the
+folder's shell (Control-`).
 
-When a session in another project needs you, the toolbar shows **✋ N elsewhere**. Click it
+When a session in another folder needs you, the toolbar shows **✋ N elsewhere**. Click it
 to go to the first of them.
 
-To bring the main window back, choose **Window ▸ Agents (All Projects)** (Command-0).
-If you close the main window, the project windows stay open. A project window opens again
-when Agents starts. A notification for a session in that project opens in its window.
+To bring the main window back, choose **Window ▸ Agents (All Folders)** (Command-0).
+If you close the main window, the folder windows stay open. A folder window opens again
+when Agents starts. A notification for a session in that folder opens in its window.
 
 **iPad**
 
-Touch and hold the project's heading in the sidebar and choose **Open in New Window**. The
-project opens in a scene of its own, with the same sidebar of only that project.
+Touch and hold the folder's heading in the sidebar and choose **Open in New Window**. The
+folder opens in a scene of its own, with the same sidebar of only that folder.
 
 **iPhone**
 
-Touch and hold the project's heading and choose **Open Project Alone**. The screen shows
-only that project. Tap **‹ All** to go back to every project. **✋ N elsewhere** shows when
-a session in another project needs you.
+Touch and hold the folder's heading and choose **Open Folder Alone**. The screen shows
+only that folder. Tap **‹ All** to go back to every folder. **✋ N elsewhere** shows when
+a session in another folder needs you.
 
 **Web page**
 
-Open the project heading's menu and choose **Open in New Tab**. The tab holds that project
-alone and has its name as its title. Click **‹ All** to see every project again.
-**✋ N elsewhere** shows when a session in another project needs you.
+Open the folder heading's menu and choose **Open in New Tab**. The tab holds that folder
+alone and has its name as its title. Click **‹ All** to see every folder again.
+**✋ N elsewhere** shows when a session in another folder needs you.
 
-On the iPad, the iPhone and the web page, a project's workflows and archived sessions open
-from the sidebar of every project. Only the Mac's project window shows them in place.
+On the iPad, the iPhone and the web page, a folder's workflows and archived sessions open
+from the sidebar of every folder. Only the Mac's folder window shows them in place.
 
 ## See also
 

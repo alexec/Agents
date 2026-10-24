@@ -16,7 +16,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Reports (#1811): usage, cost and time by person, project, machine and runtime, added up
+// Reports (#1811): usage, cost and time by person, folder, machine and runtime, added up
 // here from what each machine sends each hour (usage/rollup). One object per machine and
 // UTC hour, under v1/usage/hours/<hour>/<host>.json, kept 7 days; and per machine and UTC
 // day, under v1/usage/days/<day>/<host>.json, kept 90. A machine sends the whole of a
@@ -31,7 +31,7 @@ const (
 	usageDaysKept    = 90 * 24 * time.Hour
 	usageHourLayout  = "2006-01-02T15"
 	usageDayLayout   = "2006-01-02"
-	// mostRollupRows bounds one period of one machine: projects × runtimes.
+	// mostRollupRows bounds one period of one machine: folders × runtimes.
 	mostRollupRows = 1000
 	// mostRollupPeriods bounds one send.
 	mostRollupPeriods = 200
@@ -71,7 +71,7 @@ func (s *Service) keepRollup(ctx context.Context, host string, rollup wire.Usage
 				continue
 			}
 			if len(at.Rows) > mostRollupRows {
-				return fail(invalidParams, "At most %d projects and runtimes in one period.", mostRollupRows)
+				return fail(invalidParams, "At most %d folders and runtimes in one period.", mostRollupRows)
 			}
 			data, err := records.Encode(storedUsage{Rows: at.Rows, At: records.At(now)})
 			if err != nil {
@@ -218,7 +218,7 @@ func (s *Service) reportFrom(ctx context.Context, prefix, first string, keep fun
 				cost = map[string]float64{}
 			}
 			out = append(out, wire.ReportRow{At: at, Person: person, PersonName: name, Host: wire.HostID(host.ID),
-				HostName: host.Name, Project: row.Project, Runtime: row.Runtime, Cost: cost,
+				HostName: host.Name, Folder: row.Folder, Runtime: row.Runtime, Cost: cost,
 				InputTokens: row.InputTokens, OutputTokens: row.OutputTokens, ThoughtTokens: row.ThoughtTokens,
 				CachedReadTokens: row.CachedReadTokens, CachedWriteTokens: row.CachedWriteTokens, Turns: row.Turns,
 				UnpricedTurns: row.UnpricedTurns, WorkingSeconds: row.WorkingSeconds, WaitingSeconds: row.WaitingSeconds,
@@ -233,8 +233,8 @@ func (s *Service) reportFrom(ctx context.Context, prefix, first string, keep fun
 		if a.HostName != b.HostName {
 			return a.HostName < b.HostName
 		}
-		if a.Project != b.Project {
-			return a.Project < b.Project
+		if a.Folder != b.Folder {
+			return a.Folder < b.Folder
 		}
 		return a.Runtime < b.Runtime
 	})
@@ -312,7 +312,7 @@ func reportCSV(rows []wire.ReportRow, groupNames map[string]string) string {
 		codes = append(codes, c)
 	}
 	sort.Strings(codes)
-	header := []string{"at", "person", "personName", "host", "hostName", "project", "runtime"}
+	header := []string{"at", "person", "personName", "host", "hostName", "folder", "runtime"}
 	for _, c := range codes {
 		header = append(header, "cost"+c)
 	}
@@ -326,7 +326,7 @@ func reportCSV(rows []wire.ReportRow, groupNames map[string]string) string {
 	i := func(n int64) string { return strconv.FormatInt(n, 10) }
 	f := func(n float64) string { return strconv.FormatFloat(n, 'f', -1, 64) }
 	for _, r := range rows {
-		line := []string{r.At, r.Person, r.PersonName, string(r.Host), r.HostName, r.Project, r.Runtime}
+		line := []string{r.At, r.Person, r.PersonName, string(r.Host), r.HostName, r.Folder, r.Runtime}
 		for _, c := range codes {
 			line = append(line, f(r.Cost[c]))
 		}

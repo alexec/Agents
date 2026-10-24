@@ -516,13 +516,13 @@ func (u *Uplink) receive(line string) {
 
 func (u *Uplink) message(n int, message string) {
 	if n == 0 {
-		// A reply to an Ask; projects/detect from an older control plane is said done.
+		// A reply to an Ask; folders/detect from an older control plane is said done.
 		// Replies to Tell are not waited on.
 		if u.answered(message) {
 			return
 		}
-		if strings.Contains(message, `"projects/detect"`) {
-			u.Tell("projects/detected", map[string]int{"added": 0})
+		if strings.Contains(message, `"folders/detect"`) {
+			u.Tell("folders/detected", map[string]int{"added": 0})
 			return
 		}
 		var told struct {

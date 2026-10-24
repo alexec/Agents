@@ -38,14 +38,14 @@ public extension DaemonAPI {
         public var uri: String
         /// The server whose view it is (#191). Nil is the app's own, `agents`.
         public var server: String?
-        /// A pinned view's project, which has no agent (#189, #191).
-        public var project: URL?
+        /// A pinned view's folder, which has no agent (#189, #191).
+        public var folder: URL?
 
-        public init(agentID: UUID, uri: String, server: String? = nil, project: URL? = nil) {
+        public init(agentID: UUID, uri: String, server: String? = nil, folder: URL? = nil) {
             self.agentID = agentID
             self.uri = uri
             self.server = server
-            self.project = project
+            self.folder = folder
         }
     }
 
@@ -69,15 +69,15 @@ public extension DaemonAPI {
     /// The person's answer to a `ViewAsk`.
     struct ViewShowRequest: Codable, Sendable, Hashable {
         public var agentID: UUID
-        public var project: URL?
+        public var folder: URL?
         public var server: String
         public var uri: String
         public var hash: String
         public var show: Bool
 
-        public init(agentID: UUID, project: URL? = nil, server: String, uri: String, hash: String, show: Bool) {
+        public init(agentID: UUID, folder: URL? = nil, server: String, uri: String, hash: String, show: Bool) {
             self.agentID = agentID
-            self.project = project
+            self.folder = folder
             self.server = server
             self.uri = uri
             self.hash = hash
@@ -113,8 +113,8 @@ public extension DaemonAPI {
     /// A view's `tools/call`.
     struct ViewCallRequest: Codable, Sendable, Hashable {
         public var agentID: UUID
-        /// A standalone project view has no agent. The host supplies its project.
-        public var project: URL?
+        /// A standalone folder view has no agent. The host supplies its folder.
+        public var folder: URL?
         /// The call whose view it is.
         public var viewID: UUID
         public var name: String
@@ -127,10 +127,10 @@ public extension DaemonAPI {
         public var server: String?
 
         public init(agentID: UUID, viewID: UUID, name: String, arguments: JSONValue? = nil,
-                    project: URL? = nil, feed: Bool? = nil, server: String? = nil) {
+                    folder: URL? = nil, feed: Bool? = nil, server: String? = nil) {
             self.server = server
             self.agentID = agentID
-            self.project = project
+            self.folder = folder
             self.viewID = viewID
             self.name = name
             self.arguments = arguments

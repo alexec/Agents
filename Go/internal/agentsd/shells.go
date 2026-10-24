@@ -126,19 +126,19 @@ func (s *shell) resize(rows, cols *int64) {
 	}
 }
 
-// shellFolder: an agent's folder, or a project's for the project shell (Control-`), whose
+// shellFolder: an agent's folder, or a folder's for the folder shell (Control-`), whose
 // id the window makes from the folder and this host takes as given.
 func (d *Daemon) shellFolder(r wire.ShellAttachRequest) (string, error) {
 	if a := d.Store.Agent(wire.UUID(strings.ToUpper(string(r.AgentID)))); a != nil {
 		return store.FolderPath(a.Cwd), nil
 	}
 	if r.Folder != nil && *r.Folder != "" {
-		for _, p := range d.Store.Projects() {
+		for _, p := range d.Store.Folders() {
 			if store.FolderPath(p.Folder) == store.FolderPath(*r.Folder) {
 				return store.FolderPath(p.Folder), nil
 			}
 		}
-		return "", &Error{Code: -32005, Message: "There is no such project here."}
+		return "", &Error{Code: -32005, Message: "There is no such folder here."}
 	}
 	return "", &Error{Code: -32005, Message: "There is no such agent."}
 }

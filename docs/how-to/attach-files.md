@@ -12,7 +12,7 @@ take them.
 
 ## Before you start
 
-- An agent open, or a project's page with the prompt ready for a new one.
+- An agent open, or a folder's page with the prompt ready for a new one.
 - Which runtimes take pictures and file contents differs; see
   [Runtimes](../reference/runtimes.md) for the table.
 
@@ -47,7 +47,7 @@ pictures, and as a file otherwise.
      picture to paste.
 
    On an iPad with a keyboard, **⌘V** in the prompt attaches a picture you copied, too.
-2. In a conversation, to attach a file that is already in the project on the Mac, type
+2. In a conversation, to attach a file that is already in the folder on the Mac, type
    **@** and the start of its name in the prompt, and choose it from the list.
 3. Type the prompt and send it.
 
@@ -75,5 +75,5 @@ A line in red under an attachment says why it will not go:
   attach the file from Finder or with **@** rather than pasting its contents.
 - **This runtime does not take file contents, so this can only be attached on the Mac.**
   The file is on the phone and the runtime can only open files on the Mac. Put it in the
-  project and attach it with **@**.
+  folder and attach it with **@**.
 - **From a phone, attachments can be 900 KB in all, and these are …** Remove one to send.

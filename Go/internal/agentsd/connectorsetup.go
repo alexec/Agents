@@ -19,14 +19,14 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// A project's Connectors set-up (#1336): its GitHub repository (from its git remote), the
+// A folder's Connectors set-up (#1336): its GitHub repository (from its git remote), the
 // person's GitHub connection (#1335), and four slots. Tasks, Code review and CI come with the
 // connection, and each proves itself with one real read: the newest issue, the newest pull
 // request, the last workflow run. Where agents run is This Mac. A tick is a read: once a slot
 // has read, a read that does not reach GitHub keeps the tick, and only GitHub's refusal takes
-// it away. Skips are the project's (.agents/project.json "connectors"); the reads are this
-// host's (<root>/connector-setup.json, one record per project, only projects kept). Once a slot
-// can read, the set-up turns on the github connector's events for the project, once: a person
+// it away. Skips are the folder's (.agents/folder.json "connectors"); the reads are this
+// host's (<root>/connector-setup.json, one record per folder, only folders kept). Once a slot
+// can read, the set-up turns on the github connector's events for the folder, once: a person
 // who takes the entry out again is not overruled.
 //
 // GitLab (#1632): with no GitHub remote, a GitLab remote (gitlab.com, the connected GitLab, or
@@ -69,8 +69,8 @@ var gitlabSlotThing = map[wire.ConnectorSlotKind]string{
 	wire.ConnectorSlotKindCi:         "pipelines",
 }
 
-// forge is what a project's remote picked: the provider, its root (GitLab's), the repository
-// or project, and its host as the page says it.
+// forge is what a folder's remote picked: the provider, its root (GitLab's), the repository
+// or folder, and its host as the page says it.
 type forge struct {
 	provider wire.ConnectionProvider
 	root     string
@@ -109,9 +109,9 @@ func (f forge) ours() string {
 
 // gitlabSetupReader is the reads a GitLab set-up makes; a test gives a fake GitLab.
 type gitlabSetupReader interface {
-	NewestIssue(ctx context.Context, project string) (*gitlabmcp.Newest, error)
-	NewestMergeRequest(ctx context.Context, project string) (*gitlabmcp.Newest, error)
-	LastPipeline(ctx context.Context, project string) (*gitlabmcp.Newest, error)
+	NewestIssue(ctx context.Context, folder string) (*gitlabmcp.Newest, error)
+	NewestMergeRequest(ctx context.Context, folder string) (*gitlabmcp.Newest, error)
+	LastPipeline(ctx context.Context, folder string) (*gitlabmcp.Newest, error)
 }
 
 // setupReader is the reads a set-up makes; a test gives a fake GitHub.
@@ -133,10 +133,10 @@ type setupBook struct {
 	newCodespacesClient func(token string) codespacesClient
 }
 
-// setupRecord is what this host last read for one project.
+// setupRecord is what this host last read for one folder.
 type setupRecord struct {
 	Repo string `json:"repo"`
-	// Forge is gitlab for a GitLab project; empty is GitHub.
+	// Forge is gitlab for a GitLab folder; empty is GitHub.
 	Forge        string                                 `json:"forge,omitempty"`
 	ReadAt       time.Time                              `json:"readAt"`
 	Installed    *bool                                  `json:"installed,omitempty"`
@@ -188,7 +188,7 @@ func (d *Daemon) setupRecordsLocked() map[string]*setupRecord {
 	return d.setupRecords
 }
 
-// saveSetupLocked writes the records of projects this host still has. setupMu is held.
+// saveSetupLocked writes the records of folders this host still has. setupMu is held.
 func (d *Daemon) saveSetupLocked() {
 	for folder := range d.setupRecords {
 		if _, ok := d.summaryFor(folder); !ok {
@@ -204,7 +204,7 @@ func (d *Daemon) saveSetupLocked() {
 	}
 }
 
-// skippedSlots is the project's skips, from .agents/project.json as last approved.
+// skippedSlots is the folder's skips, from .agents/folder.json as last approved.
 func (d *Daemon) skippedSlots(folder string) map[wire.ConnectorSlotKind]bool {
 	out := map[wire.ConnectorSlotKind]bool{}
 	m, err := d.approvedConfig(folder)
@@ -221,24 +221,24 @@ func (d *Daemon) skippedSlots(folder string) map[wire.ConnectorSlotKind]bool {
 	return out
 }
 
-func (d *Daemon) setupProject(folder string) (string, error) {
+func (d *Daemon) setupFolder(folder string) (string, error) {
 	folder = filepath.Clean(folder)
 	if _, ok := d.summaryFor(folder); !ok || !isDir(folder) {
-		return "", noSuchProject(folder + " is not a project, or is not there.")
+		return "", noSuchFolder(folder + " is not a folder, or is not there.")
 	}
 	return folder, nil
 }
 
 func (d *Daemon) skipConnectorSlot(ctx context.Context, r wire.ConnectorSkipRequest) (wire.ConnectorSetup, error) {
-	folder, err := d.setupProject(r.Folder)
+	folder, err := d.setupFolder(r.Folder)
 	if err != nil {
 		return wire.ConnectorSetup{}, err
 	}
 	if _, known := slotChoice[r.Slot]; !known || r.Slot == wire.ConnectorSlotKindWorkspace {
 		return wire.ConnectorSetup{}, invalid("That slot cannot be skipped.")
 	}
-	if !d.settled(folder, ".agents/project.json") {
-		return wire.ConnectorSetup{}, guardedRefusal(".agents/project.json", "The slot was not changed: ")
+	if !d.settled(folder, ".agents/folder.json") {
+		return wire.ConnectorSetup{}, guardedRefusal(".agents/folder.json", "The slot was not changed: ")
 	}
 	skipped := d.skippedSlots(folder)
 	skipped[r.Slot] = r.Skipped
@@ -253,8 +253,8 @@ func (d *Daemon) skipConnectorSlot(ctx context.Context, r wire.ConnectorSkipRequ
 		v = map[string]any{"skipped": list}
 	}
 	func() {
-		defer d.approveWrite(folder, ".agents/project.json")
-		err = setProjectConfig(folder, "connectors", v)
+		defer d.approveWrite(folder, ".agents/folder.json")
+		err = setFolderConfig(folder, "connectors", v)
 	}()
 	if err != nil {
 		return wire.ConnectorSetup{}, configWriteError(err)
@@ -297,8 +297,8 @@ func (d *Daemon) gitlabConnection() (connections.Connection, bool) {
 	return c, ok && err == nil
 }
 
-// forgeAt is what the project's git remote names: a GitHub repository first, else a GitLab
-// project on the connected GitLab, gitlab.com, or a host named gitlab. Its connection, and
+// forgeAt is what the folder's git remote names: a GitHub repository first, else a GitLab
+// folder on the connected GitLab, gitlab.com, or a host named gitlab. Its connection, and
 // whether there is one, come with it: a GitLab connection counts only on its own GitLab.
 func (d *Daemon) forgeAt(ctx context.Context, folder string) (forge, connections.Connection, bool) {
 	gitCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -331,7 +331,7 @@ func (d *Daemon) forgeAt(ctx context.Context, folder string) (forge, connections
 }
 
 func (d *Daemon) connectorSetup(ctx context.Context, folder string, reading wire.ConnectorSetupReading) (wire.ConnectorSetup, error) {
-	folder, err := d.setupProject(folder)
+	folder, err := d.setupFolder(folder)
 	if err != nil {
 		return wire.ConnectorSetup{}, err
 	}
@@ -476,8 +476,8 @@ func (d *Daemon) readSetup(ctx context.Context, f forge, rec *setupRecord, token
 
 // fromGitLab is a GitLab read as a slot's read.
 func fromGitLab(read func(context.Context, string) (*gitlabmcp.Newest, error)) slotRead {
-	return func(ctx context.Context, project string) (*githubmcp.Newest, error) {
-		n, err := read(ctx, project)
+	return func(ctx context.Context, folder string) (*githubmcp.Newest, error) {
+		n, err := read(ctx, folder)
 		if n == nil || err != nil {
 			return nil, err
 		}
@@ -565,9 +565,9 @@ func forgeSlot(f forge, kind wire.ConnectorSlotKind, connected, skipped bool, re
 	return s
 }
 
-// setupEvents is the forge's connector's events for the project (github's or gitlab's). With
+// setupEvents is the forge's connector's events for the folder (github's or gitlab's). With
 // turnOn, a set-up that can read turns them on: the made-by-Agents entry goes in the
-// project's .agents/mcp.json, approved, once.
+// folder's .agents/mcp.json, approved, once.
 func (d *Daemon) setupEvents(ctx context.Context, f forge, folder string, rec *setupRecord, slots []wire.ConnectorSlot, turnOn bool) wire.ConnectorEvents {
 	ours, _ := mcpcatalog.OursByID(f.ours())
 	ev := wire.ConnectorEvents{State: wire.ConnectorEventsStateOff, Names: ours.Declares.Events, Workflows: []wire.ConnectorWorkflow{}}
@@ -640,14 +640,14 @@ func hearsAny(w wire.Workflow, server string, names []string) bool {
 }
 
 // ourServerFor is the name of the made-by-Agents connector ours (github's, gitlab's) that
-// reaches the project (its own, then the person's), and whether its name is taken by another.
+// reaches the folder (its own, then the person's), and whether its name is taken by another.
 func (d *Daemon) ourServerFor(folder string, ours mcpcatalog.Ours) (server string, taken bool) {
-	project, _ := readMCPFile(filepath.Join(folder, ".agents", "mcp.json"))
+	entries, _ := readMCPFile(filepath.Join(folder, ".agents", "mcp.json"))
 	var personal []mcpEntry
 	if home := d.personalHome(); home != "" {
 		personal, _ = readMCPFile(filepath.Join(home, ".agents", "mcp.json"))
 	}
-	for _, list := range [][]mcpEntry{project, personal} {
+	for _, list := range [][]mcpEntry{entries, personal} {
 		for _, e := range list {
 			if e.server.Stdio == nil {
 				continue
@@ -657,16 +657,16 @@ func (d *Daemon) ourServerFor(folder string, ours mcpcatalog.Ours) (server strin
 			}
 		}
 	}
-	for _, e := range project {
+	for _, e := range entries {
 		taken = taken || e.name == ours.NameHere()
 	}
 	return "", taken
 }
 
-// addOurConnector adds the made-by-Agents connector ours to the project, as Add Connector…
+// addOurConnector adds the made-by-Agents connector ours to the folder, as Add Connector…
 // does: previewed, then added and approved as written.
 func (d *Daemon) addOurConnector(ctx context.Context, folder string, ours mcpcatalog.Ours) error {
-	dest := wire.SkillDestination{Kind: wire.SkillDestinationKindProject, Folder: &folder}
+	dest := wire.SkillDestination{Kind: wire.SkillDestinationKindFolder, Folder: &folder}
 	result := mcpcatalog.OursResult(ours, d.declaredBy(ours))
 	preview := d.mcpPreview(ctx, wire.MCPPreviewRequest{Result: result, Destination: dest})
 	if preview.Preview == nil {
@@ -675,6 +675,6 @@ func (d *Daemon) addOurConnector(ctx context.Context, folder string, ours mcpcat
 	if _, err := d.mcpAdd(wire.MCPAddRequest{PreviewID: preview.Preview.PreviewID, Destination: dest}); err != nil {
 		return err
 	}
-	log.Printf("connectors: the %s connector was added to a project for its events", ours.NameHere())
+	log.Printf("connectors: the %s connector was added to a folder for its events", ours.NameHere())
 	return nil
 }

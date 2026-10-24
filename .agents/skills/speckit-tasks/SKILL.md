@@ -2,7 +2,7 @@
 name: "speckit-tasks"
 description: "Generate an actionable, dependency-ordered tasks.md for the feature based on available design artifacts."
 argument-hint: "Optional task generation constraints"
-compatibility: "Requires spec-kit project structure with .specify/ directory"
+compatibility: "Requires spec-kit folder structure with .specify/ directory"
 metadata:
   author: "github-spec-kit"
   source: "templates/commands/tasks.md"
@@ -22,7 +22,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Pre-Execution Checks
 
 **Check for extension hooks (before tasks generation)**:
-- Check if `.specify/extensions.yml` exists in the project root.
+- Check if `.specify/extensions.yml` exists in the folder root.
 - If it exists, read it and look for entries under the `hooks.before_tasks` key
 - If the YAML cannot be parsed or is invalid, do not skip silently: tell the user that `.specify/extensions.yml` could not be read (include the parser error) and that no hooks were checked, including any mandatory (`optional: false`) hooks registered there, then continue normally
 - Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
@@ -62,11 +62,11 @@ You **MUST** consider the user input before proceeding (if not empty).
 2. **Load design documents**: Read from FEATURE_DIR:
    - **Required**: plan.md (tech stack, libraries, structure), spec.md (user stories with priorities)
    - **Optional**: data-model.md (entities), contracts/ (interface contracts), research.md (decisions), quickstart.md (test scenarios)
-   - **IF EXISTS**: Load `.specify/memory/constitution.md` for project principles and governance constraints
-   - Note: Not all projects have all documents. Generate tasks based on what's available.
+   - **IF EXISTS**: Load `.specify/memory/constitution.md` for folder principles and governance constraints
+   - Note: Not all folders have all documents. Generate tasks based on what's available.
 
 3. **Execute task generation workflow**:
-   - Load plan.md and extract tech stack, libraries, project structure
+   - Load plan.md and extract tech stack, libraries, folder structure
    - Load spec.md and extract user stories with their priorities (P1, P2, P3, etc.)
    - If data-model.md exists: Extract entities and map to user stories
    - If contracts/ exists: Map interface contracts to user stories
@@ -78,7 +78,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 4. **Generate tasks.md**: Use TASKS_TEMPLATE_CONTENT (from the JSON output above) as the structure. For compatibility with older setup scripts that omit TASKS_TEMPLATE_CONTENT, read TASKS_TEMPLATE instead. Fill with:
    - Correct feature name from plan.md
-   - Phase 1: Setup tasks (project initialization)
+   - Phase 1: Setup tasks (folder initialization)
    - Phase 2: Foundational tasks (blocking prerequisites for all user stories)
    - Phase 3+: One phase per user story (in priority order from spec.md)
    - Each phase includes: story goal, independent test criteria, tests (if requested), implementation tasks
@@ -93,7 +93,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 **You MUST complete this section before reporting completion to the user.**
 
-Check if `.specify/extensions.yml` exists in the project root.
+Check if `.specify/extensions.yml` exists in the folder root.
 - If it does not exist, or no hooks are registered under `hooks.after_tasks`, skip to the Completion Report.
 - If it exists, read it and look for entries under the `hooks.after_tasks` key.
 - If the YAML cannot be parsed or is invalid, do not skip silently: tell the user that `.specify/extensions.yml` could not be read (include the parser error) and that no hooks were checked, including any mandatory (`optional: false`) hooks registered there, then continue to the Completion Report.
@@ -167,7 +167,7 @@ Every task MUST strictly follow this format:
 
 **Examples**:
 
-- ✅ CORRECT: `- [ ] T001 Create project structure per implementation plan`
+- ✅ CORRECT: `- [ ] T001 Create folder structure per implementation plan`
 - ✅ CORRECT: `- [ ] T005 [P] Implement authentication middleware in src/middleware/auth.py`
 - ✅ CORRECT: `- [ ] T012 [P] [US1] Create User model in src/models/user.py`
 - ✅ CORRECT: `- [ ] T014 [US1] Implement UserService in src/services/user_service.py`
@@ -204,7 +204,7 @@ Every task MUST strictly follow this format:
 
 ### Phase Structure
 
-- **Phase 1**: Setup (project initialization)
+- **Phase 1**: Setup (folder initialization)
 - **Phase 2**: Foundational (blocking prerequisites - MUST complete before user stories)
 - **Phase 3+**: User Stories in priority order (P1, P2, P3...)
   - Within each story: Tests (if requested) → Models → Services → Endpoints → Integration

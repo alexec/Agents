@@ -11,7 +11,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Reports (#1811): a turn's cost, tokens and time go into its UTC hour by project and
+// Reports (#1811): a turn's cost, tokens and time go into its UTC hour by folder and
 // runtime, and the hours that changed go to the control plane with their days, once; a
 // send that fails is tried again.
 func TestUsageGoesToTheControlPlaneByTheHour(t *testing.T) {
@@ -19,8 +19,8 @@ func TestUsageGoesToTheControlPlaneByTheHour(t *testing.T) {
 	d, _ := start(t, root)
 	defer d.Shutdown()
 	d.SettingsDir = t.TempDir()
-	project := filepath.Join(t.TempDir(), "shop")
-	a := seeded(t, d, project, nil)
+	folder := filepath.Join(t.TempDir(), "shop")
+	a := seeded(t, d, folder, nil)
 
 	d.bankSessionCost(a.ID, wire.Cost{Amount: 0.5, Currency: "USD"})
 	d.bankTurnUsage(a.ID, wire.TurnUsage{TotalTokens: 1300, InputTokens: 1000, OutputTokens: 300})
@@ -58,7 +58,7 @@ func TestUsageGoesToTheControlPlaneByTheHour(t *testing.T) {
 	var tokens, turns int64
 	for _, h := range r.Hours {
 		for _, row := range h.Rows {
-			if row.Project != "shop" || row.Runtime != "claude" {
+			if row.Folder != "shop" || row.Runtime != "claude" {
 				t.Fatalf("%+v", row)
 			}
 			cost += row.Cost["USD"]

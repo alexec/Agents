@@ -7,7 +7,7 @@ import Testing
 @Suite("Milestones")
 struct MilestonesTests {
     private let start = Date(timeIntervalSince1970: 1_000_000)
-    private let cwd = URL(filePath: "/tmp/project")
+    private let cwd = URL(filePath: "/tmp/folder")
 
     @Test func aMilestoneIsEarnedOnceAndKeepsItsFirstDate() {
         var milestones = Milestones()

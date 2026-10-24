@@ -5,7 +5,7 @@ import Testing
 @Suite("Agent labels on the record")
 struct AgentTests {
     @Test func labelsRoundTripWithOwner() throws {
-        let agent = Agent(runtimeID: "claude", cwd: URL(filePath: "/tmp/project"),
+        let agent = Agent(runtimeID: "claude", cwd: URL(filePath: "/tmp/folder"),
                           labels: [SessionLabel(value: "perf", owner: .person),
                                    SessionLabel(value: "#42", owner: .agent)])
         let read = try JSONDecoder().decode(Agent.self, from: JSONEncoder().encode(agent))
@@ -14,7 +14,7 @@ struct AgentTests {
     }
 
     @Test func oldRecordWithoutLabelsStaysReadable() throws {
-        let agent = Agent(runtimeID: "claude", cwd: URL(filePath: "/tmp/project"))
+        let agent = Agent(runtimeID: "claude", cwd: URL(filePath: "/tmp/folder"))
         var record = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(agent))
             as? [String: Any])
         record.removeValue(forKey: "labels")

@@ -15,7 +15,7 @@ import (
 
 // A workflow trigger naming an MCP server's event (#383), such as `checks.failed`: Swift's
 // MCPEventTrigger. Named as the server names it; without `server:` it hears every server
-// this project can use that offers the name, with it only those. Every other key under it
+// this folder can use that offers the name, with it only those. Every other key under it
 // is an argument of the subscription, sent to the server as it is: only the server knows
 // how to filter its own events. On the wire and in the workflow's record it goes as an
 // unrecognised trigger does, and is read back as one by its name.

@@ -63,7 +63,7 @@ export function WorkflowSettingsForm({ store, host, summary, disabled, problem, 
   const others = known ? otherOptions(known) : [];
   const triggering = workflow.mode === "triggering";
   const off = disabled || triggering;
-  const notKnownYet = known !== null && <p class="quiet small">The choices are not known until {runtimeName} has been used in this project.</p>;
+  const notKnownYet = known !== null && <p class="quiet small">The choices are not known until {runtimeName} has been used in this folder.</p>;
   const marks = known ? refusals(settings, known, runtimeName) : [];
 
   return (

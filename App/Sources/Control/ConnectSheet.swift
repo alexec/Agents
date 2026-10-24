@@ -107,7 +107,7 @@ struct ConnectSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let joined {
-                Text("This Mac is one of the machines of \(joined) now. Its projects are listed wherever that control plane is used.")
+                Text("This Mac is one of the machines of \(joined) now. Its folders are listed wherever that control plane is used.")
                     .appText(.supporting).tinted(.vouched)
                     .fixedSize(horizontal: false, vertical: true)
             }

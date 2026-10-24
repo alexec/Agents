@@ -1,5 +1,5 @@
 // The layout walk (071 quickstart §3, T039): the three columns at every width of the look gate,
-// on a scratch root with real projects and sessions, screenshotted beside frames A–F.
+// on a scratch root with real folders and sessions, screenshotted beside frames A–F.
 //
 //   node Web/test/walk/layout.mjs <WEB_URL> <CONTROL_URL> <operator code> <session title> <out dir>
 //
@@ -22,7 +22,7 @@ await page.waitFor(`document.querySelector("textarea")`);
 await page.focus("textarea");
 await page.type((await op.call("clients/startPairing", { kind: "browser" })).text);
 await page.press("Connect");
-await page.waitFor(`document.querySelector(".projects .row")`);
+await page.waitFor(`document.querySelector(".folders .row")`);
 
 const clickRow = (text) => page.eval(`(() => {
   const row = [...document.querySelectorAll(".row")].find((r) => r.querySelector(".title")?.textContent === ${JSON.stringify(text)}
@@ -39,21 +39,21 @@ const problems = () => page.eval(`(() => {
     const box = prompt.getBoundingClientRect();
     if (box.bottom > innerHeight + 1 || box.top < 0) found.push("the prompt is off-screen");
   }
-  for (const column of document.querySelectorAll(".projects, .sessions, .chat, .files")) {
+  for (const column of document.querySelectorAll(".folders, .sessions, .chat, .files")) {
     if (column.offsetParent === null) continue;
     if (column.scrollWidth > column.clientWidth + 1) found.push(column.className + " scrolls sideways");
   }
   if (document.documentElement.scrollWidth > innerWidth + 1) found.push("the page scrolls sideways");
   // Every visible column starts at the top: none has wrapped onto a row of its own.
   const top = document.querySelector(".columns")?.getBoundingClientRect().top ?? 0;
-  for (const column of document.querySelectorAll(".projects, .sessions, .chat, .files")) {
+  for (const column of document.querySelectorAll(".folders, .sessions, .chat, .files")) {
     if (column.offsetParent === null) continue;
     if (Math.abs(column.getBoundingClientRect().top - top) > 1) found.push(column.className + " has wrapped below the others");
   }
   return found;
 })()`);
 
-const visible = () => page.eval(`["projects","sessions","chat","files"].filter((c) => {
+const visible = () => page.eval(`["folders","sessions","chat","files"].filter((c) => {
   const el = document.querySelector("." + c); return el && el.offsetParent !== null; })`);
 
 async function at(width, height, name, frame) {
@@ -63,7 +63,7 @@ async function at(width, height, name, frame) {
   say(`${name} (${width}×${height}, against frame ${frame}): columns ${JSON.stringify(await visible())}; problems ${JSON.stringify(await problems())}`);
 }
 
-if (!(await clickRow("web-remote"))) throw new Error("no web-remote project");
+if (!(await clickRow("web-remote"))) throw new Error("no web-remote folder");
 await page.waitFor(`document.querySelector(".sessions .row")`);
 if (!(await clickRow(title))) throw new Error(`no session called ${title}`);
 await page.waitFor(`document.querySelectorAll(".transcript p").length > 10`);
@@ -76,10 +76,10 @@ await at(1600, 900, "1600-files", "B");
 await at(1300, 900, "1300-files-over-chat", "B, below 1440");
 await page.press("Close Files");
 await at(1000, 800, "1000", "C");
-await page.eval(`document.querySelector(".project-menu").click()`);
+await page.eval(`document.querySelector(".folder-menu").click()`);
 await sleep(150);
 await at(1000, 800, "1000-menu", "C, menu open");
-await page.eval(`document.querySelector(".project-menu").click()`);
+await page.eval(`document.querySelector(".folder-menu").click()`);
 
 await at(390, 844, "390-chat", "D3");
 await page.eval(`history.back()`);
@@ -87,7 +87,7 @@ await sleep(250);
 await at(390, 844, "390-sessions", "D2 (after the browser's Back)");
 await page.eval(`history.back()`);
 await sleep(250);
-await at(390, 844, "390-projects", "D1 (after Back again)");
+await at(390, 844, "390-folders", "D1 (after Back again)");
 await clickRow("web-remote");
 await sleep(200);
 await page.eval(`document.querySelector(".sessions .back").click()`);

@@ -5,7 +5,7 @@ import Testing
 @Suite("How wide the chat reads")
 struct ChatMetricsTests {
     /// The widths the app can produce. The sidebar cannot be opened below a 520-point
-    /// window and the project list takes 200 at least, so nothing under 200 reaches a
+    /// window and the folder list takes 200 at least, so nothing under 200 reaches a
     /// chat; 2,000 is wider than any display this runs on.
     private let widths = stride(from: 200.0, through: 2_000.0, by: 1)
 

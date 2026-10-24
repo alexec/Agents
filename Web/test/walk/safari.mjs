@@ -50,17 +50,17 @@ try {
   const box = await find("textarea");
   await wd("POST", s(`/element/${box}/value`), { text: code });
   await clickText("button", "Connect");
-  await waitFor(`document.querySelector(".projects .row")`, 30_000);
+  await waitFor(`document.querySelector(".folders .row")`, 30_000);
   say(`§2 paired: ${JSON.stringify(await run(`return document.querySelector(".identity span")?.textContent`))}`);
   await shot("safari-1-paired.png");
   // Connecting again with the stored key: a reload, nothing pasted.
   await wd("POST", s("/refresh"), {});
-  await waitFor(`document.querySelector(".projects .row")`, 30_000);
+  await waitFor(`document.querySelector(".folders .row")`, 30_000);
   say("after a reload: connected again with the stored key, nothing pasted");
 
   // §4. Read and answer: a real Claude turn, started on the host's socket, answered in Safari.
-  // An empty project draws no session headings; the chat is reached by its address below.
-  await clickText(".projects .row", "work");
+  // An empty folder draws no session headings; the chat is reached by its address below.
+  await clickText(".folders .row", "work");
   const prompt = "This is a test of answering from Safari. Do exactly these steps, in order, and nothing else: "
     + "1. Use your AskUserQuestion tool to ask me which greeting to write, with the options Hello and Howdy. "
     + "2. Run this with your Bash tool: echo <the greeting I chose> > safari.txt "

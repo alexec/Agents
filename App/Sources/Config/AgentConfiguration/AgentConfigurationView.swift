@@ -3,8 +3,8 @@ import AppKit
 import SwiftUI
 
 /// Agent Configuration (054, #754): what is in a set of agent files and, for yours, which
-/// runtime gets each thing. The same pages in Settings, for `~/.agents`, and in Project
-/// Settings, for a project's `.agents`. Read-only but for what each section adds: Edit
+/// runtime gets each thing. The same pages in Settings, for `~/.agents`, and in Folder
+/// Settings, for a folder's `.agents`. Read-only but for what each section adds: Edit
 /// opens the file in the person's editor and Reveal in Finder opens the folder.
 ///
 /// Its pages are chosen in a list inside the pane, with their counts (#1076). The window
@@ -14,7 +14,7 @@ struct AgentConfigurationView: View {
     let place: AgentsPlace
     let snapshot: DaemonAPI.SharedSnapshot?
     @Binding var page: AgentConfigurationPage
-    /// Pages with something waiting for the person's OK, such as a project's new plugin.
+    /// Pages with something waiting for the person's OK, such as a folder's new plugin.
     var waiting: Set<AgentConfigurationPage> = []
     /// Read the snapshot again, after something was added from a catalogue (059).
     var refresh: () async -> Void = {}
@@ -71,7 +71,7 @@ struct AgentConfigurationView: View {
         case .instructions: AgentsSetupPage { AgentsInstructionsSection(place: place) }.task { await refresh() }
         case .skills: AgentsSetupPage { AgentsSkillsSection(place: place) }.task { await refresh() }
         case .workflows: if case .you = place { UserWorkflowsSettingsView() }
-        case .mcp: AgentsSetupPage { ProjectMCPSection(place: place) }.task { await refresh() }
+        case .mcp: AgentsSetupPage { FolderMCPSection(place: place) }.task { await refresh() }
         case .plugins: AgentsSetupPage { AgentsPluginsSection(place: place) }.task { await refresh() }
         case .other: AgentConfigurationOtherFiles(place: place, snapshot: snapshot)
         }
@@ -133,7 +133,7 @@ extension AgentsPlace {
     var folderName: String {
         switch self {
         case .you: "~/.agents"
-        case .project: ".agents"
+        case .folder: ".agents"
         }
     }
 }
@@ -184,8 +184,8 @@ private struct SharedEmptyState: View {
         switch place {
         case .you:
             "Put things in ~/.agents once and every agent gets them, on every runtime: AGENTS.md for instructions · skills/ · mcp.json for connectors · plugins/"
-        case .project:
-            "Put things in this project’s .agents and every agent here gets them, and everyone who clones it: skills/ · mcp.json for connectors · plugins/. Its instructions are AGENTS.md at the top of the project."
+        case .folder:
+            "Put things in this folder’s .agents and every agent here gets them, and everyone who clones it: skills/ · mcp.json for connectors · plugins/. Its instructions are AGENTS.md at the top of the folder."
         }
     }
 }
@@ -209,7 +209,7 @@ private struct SharedOffState: View {
 
 enum SharedFiles {
     /// In the App Store window, what this Mac's host does for these (058, US1): set by the
-    /// model when it starts. Your ~/.agents and a project's files are on this Mac.
+    /// model when it starts. Your ~/.agents and a folder's files are on this Mac.
     @MainActor static var onThisMacsHost: ((URL, _ reveal: Bool) -> Void)?
 
     @MainActor static func reveal(_ path: String) {
@@ -329,7 +329,7 @@ struct SharedFact: View {
     }
 }
 
-/// Agent Configuration's pages, as a list inside its pane in Settings and in Project
+/// Agent Configuration's pages, as a list inside its pane in Settings and in Folder
 /// Settings (#754, #1076). Overview only, until the folder is laid out.
 struct AgentConfigurationPageList: View {
     let snapshot: DaemonAPI.SharedSnapshot?

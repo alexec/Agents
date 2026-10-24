@@ -254,23 +254,23 @@ struct AgentsModelTests {
         #expect(model.entries.first?.text == "new")
     }
 
-    /// An agent's `cwd` is whatever it was started with and a project's folder is the
-    /// resolved form. Comparing them raw is how a project looks empty while its agents
+    /// An agent's `cwd` is whatever it was started with and a folder is the
+    /// resolved form. Comparing them raw is how a folder looks empty while its agents
     /// are plainly running.
-    @Test func anAgentIsFoundByItsProjectHoweverTheFolderWasWritten() throws {
+    @Test func anAgentIsFoundByItsFolderHoweverTheFolderWasWritten() throws {
         let model = AgentsModel()
         model.apply(DaemonAPI.Notification.agentChanged,
                     try notification(agent(cwd: URL(filePath: "/tmp/work/api/"))))
         #expect(model.agents(in: URL(filePath: "/tmp/work/./api"), group: .running).count == 1)
     }
 
-    /// Working in a worktree, filed under the project it was started from (030).
-    @Test func anAgentInAWorktreeIsFoundUnderItsProject() throws {
+    /// Working in a worktree, filed under the folder it was started from (030).
+    @Test func anAgentInAWorktreeIsFoundUnderItsFolder() throws {
         let model = AgentsModel()
         let root = folder.appending(path: ".agents/worktrees/fix-login")
         var working = agent(cwd: root)
         working.worktree = AgentWorktree(name: "fix-login", root: root, branch: "agents/fix-login",
-                                         project: folder, base: "main", madeByApp: true)
+                                         folder: folder, base: "main", madeByApp: true)
         model.apply(DaemonAPI.Notification.agentChanged, try notification(working))
         #expect(model.agents(in: folder, group: .running).map(\.id) == [working.id])
         #expect(model.agents(in: root, group: .running).isEmpty)
@@ -431,23 +431,23 @@ struct AgentsModelTests {
                 "while a method nobody knows is still passed on")
     }
 
-    @Test func archivedProjectsAreKeptApartFromLiveOnes() {
+    @Test func archivedFoldersAreKeptApartFromLiveOnes() {
         let model = AgentsModel()
-        let live = DaemonAPI.ProjectSummary(
-            project: Project(folder: URL(filePath: "/tmp/work/api")),
+        let live = DaemonAPI.FolderSummary(
+            folder: Folder(folder: URL(filePath: "/tmp/work/api")),
             name: "api", exists: true, lastActivityAt: Date(), counts: [:])
-        let filed = DaemonAPI.ProjectSummary(
-            project: Project(folder: URL(filePath: "/tmp/work/old"), archivedAt: Date()),
+        let filed = DaemonAPI.FolderSummary(
+            folder: Folder(folder: URL(filePath: "/tmp/work/old"), archivedAt: Date()),
             name: "old", exists: true, lastActivityAt: Date(), counts: [:])
-        model.replaceProjects([live, filed])
-        #expect(model.liveProjects.map(\.name) == ["api"])
-        #expect(model.archivedProjects.map(\.name) == ["old"])
+        model.replaceFolders([live, filed])
+        #expect(model.liveFolders.map(\.name) == ["api"])
+        #expect(model.archivedFolders.map(\.name) == ["old"])
     }
 
     // MARK: What is being spent
 
     @Test("cost state is seeded on connect and kept current by the notification")
-    func moneyArrivesTheWayProjectsDo() throws {
+    func moneyArrivesTheWayFoldersDo() throws {
         let model = AgentsModel()
         #expect(model.costState == nil,
                 "nothing until the daemon says, so a window shows nothing rather than a zero")
@@ -640,8 +640,8 @@ struct AgentsModelTests {
         #expect(!model.holds(index: 10))
     }
 
-    /// One project's workflows changing leaves another's list as it was (#285).
-    @Test func aWorkflowInOneProjectLeavesTheOther() {
+    /// One folder's workflows changing leaves another's list as it was (#285).
+    @Test func aWorkflowInOneFolderLeavesTheOther() {
         let model = AgentsModel()
         let api = URL(filePath: "/tmp/work/api")
         let web = URL(filePath: "/tmp/work/web")

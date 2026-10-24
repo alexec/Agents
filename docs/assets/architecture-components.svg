@@ -77,8 +77,8 @@
 <text x="200.0" y="683.5" fill="#0b2a4a" font-size="11.3" text-anchor="middle">MCPStdioProcess, OAuth sign-ins;</text>
 <text x="200.0" y="698.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">events/poll and server views</text>
 <rect x="370" y="610" width="260" height="112" rx="8" fill="#85bbf0" stroke="#5a95cf"/>
-<text x="500.0" y="634" fill="#0b2a4a" font-weight="700" font-size="14.5" text-anchor="middle">Projects, files and git</text>
-<text x="500.0" y="650" fill="#0b2a4a" font-size="10.5" text-anchor="middle" opacity=".85">[Component: Projects/, Files/]</text>
+<text x="500.0" y="634" fill="#0b2a4a" font-weight="700" font-size="14.5" text-anchor="middle">Folders, files and git</text>
+<text x="500.0" y="650" fill="#0b2a4a" font-size="10.5" text-anchor="middle" opacity=".85">[Component: Folders/, Files/]</text>
 <text x="500.0" y="669.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">.agents/ config and plugins,</text>
 <text x="500.0" y="683.5" fill="#0b2a4a" font-size="11.3" text-anchor="middle">worktrees, changes, clone,</text>
 <text x="500.0" y="698.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">folder watching, file read/write</text>
@@ -98,7 +98,7 @@
 <text x="200.0" y="814" fill="#0b2a4a" font-weight="700" font-size="14.5" text-anchor="middle">Shells</text>
 <text x="200.0" y="830" fill="#0b2a4a" font-size="10.5" text-anchor="middle" opacity=".85">[Component: Terminal/]</text>
 <text x="200.0" y="849.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">ShellSession, PTY, Scrollback ·</text>
-<text x="200.0" y="863.5" fill="#0b2a4a" font-size="11.3" text-anchor="middle">terminals and the project shell,</text>
+<text x="200.0" y="863.5" fill="#0b2a4a" font-size="11.3" text-anchor="middle">terminals and the folder shell,</text>
 <text x="200.0" y="878.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">kept with their scrollback</text>
 <rect x="370" y="790" width="260" height="112" rx="8" fill="#85bbf0" stroke="#5a95cf"/>
 <text x="500.0" y="814" fill="#0b2a4a" font-weight="700" font-size="14.5" text-anchor="middle">Stores</text>

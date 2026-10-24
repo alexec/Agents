@@ -66,8 +66,8 @@ How each client enforces it:
 | `resources/read` | Reads a `ui://` resource of the same server. |
 | `ui/open-link` | Opens an `http`, `https` or `mailto` link in your browser. Any other kind of link is refused. |
 | `ui/message` | **Asks you first.** Under the view: "The view asks to send this as your message", with **Send** and **Don't Send**. Send sends it as your own prompt, exactly as if you had typed it. A view never speaks for you without you. |
-| `agents/start-agent` | **Our extension (#834).** Opens the new-agent form in the view's project, filled in with the view's `prompt`, its `labels` and, when it names one, a new `worktree` of that name. You start the agent, or don't: a view never starts one. From a pinned view, it opens the form in the pin's project. A `branch` instead puts the agent in a new worktree on that branch (#837). |
-| `agents/message-agent` | **Our extension (#837). Asks you first.** Sends the view's `text` to the session whose worktree is on the view's `branch`, in the view's project (the latest active one not archived). Under the view: "The view asks to send this to "*session*" as your message", with **Send** and **Don't Send**. It works from a pinned view too. With no such session, the answer is error `-32001`, and the view can offer a new agent instead. |
+| `agents/start-agent` | **Our extension (#834).** Opens the new-agent form in the view's folder, filled in with the view's `prompt`, its `labels` and, when it names one, a new `worktree` of that name. You start the agent, or don't: a view never starts one. From a pinned view, it opens the form in the pin's folder. A `branch` instead puts the agent in a new worktree on that branch (#837). |
+| `agents/message-agent` | **Our extension (#837). Asks you first.** Sends the view's `text` to the session whose worktree is on the view's `branch`, in the view's folder (the latest active one not archived). Under the view: "The view asks to send this to "*session*" as your message", with **Send** and **Don't Send**. It works from a pinned view too. With no such session, the answer is error `-32001`, and the view can offer a new agent instead. |
 | `agents/open-diff` | **Our extension (#1341).** Draws the view's `files`, each as its hunks of context, added and removed lines, in the app's own diff (the Review page's, #1472): over the view, as a sheet on the Mac, the iPhone and the iPad, and over the chat or the pin on the web page. Unified, or Side by Side on a wide one. Each file's path and counts, a break between hunks, long unchanged runs folded, and **Open on GitHub** for the view's `url`. At most 3000 files and 20,000 lines. It works from a pinned view too. |
 | `ui/update-model-context` | Keeps what the view said, and tells the agent with **your next message**: before your words, not in your bubble, in the same way the app tells an agent that a wait ended. Only the last context from each view is kept, and it is used once. A line under the view says what the agent will be told, with **Don't Tell** to take it back. It is kept in memory only, so a daemon restart forgets it. |
 | `ui/request-display-mode` | `inline` or `fullscreen`. Full screen draws the same view in the chat's place, as a pinned page opens, with **Back to the chat**. You can also go full screen from the button beside the view's name. |
@@ -77,20 +77,20 @@ How each client enforces it:
 
 ## A server's list views in the sidebar
 
-A connected server's **list views** show under each project by themselves, with no pin
+A connected server's **list views** show under each folder by themselves, with no pin
 (#2032), on the Mac, the Remote and the web page. A list view is one that a read-only tool
 a view may call feeds with no required argument: the `github` server's
 `ui://github/pulls` and `ui://github/issues`, but not `ui://github/pr`, which needs a
 pull request's number. **This is our extension of MCP Apps (SEP-1865)**, as pins are.
 
-- **Where.** In the project's group, after its pinned pages and before its sessions.
+- **Where.** In the folder's group, after its pinned pages and before its sessions.
 - **Its name.** The service, then the view: **GitHub · Pull requests**, **GitHub · Issues**,
   **Linear · Issues**. The service is the catalogue's title for a connector Agents makes, else
   the server's own (`serverInfo.title`), else its name in `mcp.json`. A view title that
   starts with the service's ("Linear issues") loses it.
-- **Which servers.** Each server set up and approved for the project that can show views
+- **Which servers.** Each server set up and approved for the folder that can show views
   here, as for a pin. A server waiting for approval, missing a secret or run over stdio shows
-  no row. The GitHub connector's views show only in a project whose `origin` is on
+  no row. The GitHub connector's views show only in a folder whose `origin` is on
   github.com, and GitLab's only where it is on another host.
 - **Opening one.** As a pinned view opens: the host calls the feeding tool afresh.
 - **Its count.** The row ends in a grey count, such as **GitHub · Issues 23** (#2033). The
@@ -102,20 +102,20 @@ pull request's number. **This is our extension of MCP Apps (SEP-1865)**, as pins
   what the view lists: open pull requests, issues and merge requests.
 - **Hide.** The row's menu, or **Hide** at the top of the view, takes it out of the sidebar.
   The hidden addresses are kept in `.agents/pins.json` as `hidden_views` (at most 50).
-  **Show Hidden Views** in the project's menu puts them back.
+  **Show Hidden Views** in the folder's menu puts them back.
 - **Pinned.** A list view that is pinned shows as its pin only. List views do not count
   towards the 10 pins.
 
 ## Pinning a view
 
-A view can be pinned under a project, beside its pinned pages, on the Mac,
+A view can be pinned under a folder, beside its pinned pages, on the Mac,
 the Remote and the web page. **This is our extension of MCP Apps (SEP-1865).** The spec
 ties a view to a tool call the model made. A pin is the host making that call itself.
 
 - **What a pin names.** The server, the view's `ui://` address, the tool that feeds it,
   and that tool's arguments (at most 2 KB of JSON). It is kept in `.agents/pins.json`
   beside the Markdown and HTML pins, and shared through git, so the arguments never hold a
-  secret. A project has at most 10 pins, pages and views together.
+  secret. A folder has at most 10 pins, pages and views together.
 - **Its name.** The title the server gives the view, such as **Test view** for
   `ui://agents/test-view`, kept with the pin when it is pinned (#905). When the server gives none,
   the last part of the address.
@@ -130,16 +130,16 @@ ties a view to a tool call the model made. A pin is the host making that call it
   approval*, *a secret is missing*, *needs a sign-in*, *views from local servers aren't
   shown yet* or *no such view*. Each host says for itself, since each has its own servers. That is the way a pinned file shows as missing until its
   branch lands.
-- **No agent.** A pinned view is on a project's page with no
+- **No agent.** A pinned view is on a folder's page with no
   conversation. Its `ui/message` and `ui/update-model-context` are refused, and the refusal
   goes in the daemon's log.
-- **How to pin one.** **Pin to Project** in the view's menu, beside its name in the chat
+- **How to pin one.** **Pin to Folder** in the view's menu, beside its name in the chat
   or in full screen, when the server says the call can feed a pin. Only you pin one:
   agents have no pin tools.
 
 ## Views from your own servers
 
-A tool of one of your own connectors — in a project's `.agents/mcp.json`, your own
+A tool of one of your own connectors — in a folder's `.agents/mcp.json`, your own
 `~/.agents/mcp.json`, or a plugin — can have a view too (#191). The server is reached over
 http, or is one the app hosts (`"hosted": true`, #1341). The app draws it in the turn
 that called the tool and as a pin, on the Mac, the Remote and the web page, in the same
@@ -151,7 +151,7 @@ sandbox as the app's own views.
   that the server's own list of tools says the tool has a view. The app never calls a tool
   again to get its result: the view gets what the runtime passed on.
 - **Where the connection runs.** The daemon makes a connection of its own to the server, on
-  the host that runs the project, with the secrets filled from `secrets.env` as for a
+  the host that runs the folder, with the secrets filled from `secrets.env` as for a
   session. A hosted server's views go through the host's one copy of it, the copy that the
   sessions use; the views keep it running for 2 minutes after their last request. It reads the server's tools and `ui://` resources (kept in `<root>/mcp-views/`, a
   day at most), the view's HTML, and the tools the view calls. Clients never connect to your
@@ -167,7 +167,7 @@ sandbox as the app's own views.
   It asks again whenever the view changes (its address, type, HTML or `_meta.ui`), and it
   asks for your own servers too, since it is about drawing their HTML, not about running
   them. The answers are kept beside the approvals in `<root>/mcp-approvals.json`. **Ask
-  Again** on the server's row in the project's Connectors forgets them.
+  Again** on the server's row in the folder's Connectors forgets them.
 - **What it may reach.** Exactly what it declared in its `_meta.ui.csp`, as above. Its
   `tools/call` reaches only its own server, and only a tool whose `visibility` includes
   `app`. A view of one server asking for another's tool, or for the `agents` server's, is
@@ -190,9 +190,9 @@ sandbox as the app's own views.
 ## The github server's views
 
 The `github` server (`Go/internal/githubmcp`, #1341) has three views, each fed by a
-read-only tool, so each can be pinned. This project pins the first two in its
-`.agents/pins.json`; another project with the `github` server pins them with **Pin to
-Project**.
+read-only tool, so each can be pinned. This folder pins the first two in its
+`.agents/pins.json`; another folder with the `github` server pins them with **Pin to
+Folder**.
 
 - **Pull requests** (`ui://github/pulls`, from `show_pull_requests`): the open pull
   requests, each with its checks, review, conflict, auto-merge and CodeRabbit's status

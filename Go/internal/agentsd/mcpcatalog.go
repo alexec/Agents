@@ -23,7 +23,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// MCP servers from a registry, and the person's and a project's mcp.json as the pane shows
+// MCP servers from a registry, and the person's and a folder's mcp.json as the pane shows
 // them: listed with their approval and missing secrets, approved, added, taken out, a secret
 // set, and a server's view answers forgotten (DaemonCore+MCPCatalog).
 
@@ -69,12 +69,12 @@ func mcpWhy(err error) wire.MCPCatalogError {
 }
 
 // mcpChanged has the health checks look again, as a change to mcp.json or a secret can
-// make a server answer or stop, and says every project's pins again, whose server views
+// make a server answer or stop, and says every folder's pins again, whose server views
 // (#2032) may have come or gone.
 func (d *Daemon) mcpChanged() {
 	safe.Go("mcp health", d.reconcileMCPHealth)
-	for _, s := range d.projects(false) {
-		d.pinsChanged(store.FolderPath(s.Project.Folder))
+	for _, s := range d.folders(false) {
+		d.pinsChanged(store.FolderPath(s.Folder.Folder))
 	}
 }
 
@@ -82,8 +82,8 @@ func (d *Daemon) mcpSidecarPath() string { return filepath.Join(d.Store.Loc.Root
 
 // mcpFile is where a destination's mcp.json is.
 func (d *Daemon) mcpFile(dest wire.SkillDestination) (string, error) {
-	if dest.Kind == wire.SkillDestinationKindProject && dest.Folder != nil {
-		return mcpcatalog.ProjectFile(*dest.Folder), nil
+	if dest.Kind == wire.SkillDestinationKindFolder && dest.Folder != nil {
+		return mcpcatalog.FolderFile(*dest.Folder), nil
 	}
 	home := d.personalHome()
 	if home == "" {
@@ -92,17 +92,17 @@ func (d *Daemon) mcpFile(dest wire.SkillDestination) (string, error) {
 	return mcpcatalog.PersonalFile(home), nil
 }
 
-// requireMCPProject: a project destination has to be a project here. Personal is fine.
-func (d *Daemon) requireMCPProject(dest wire.SkillDestination) error {
-	if dest.Kind != wire.SkillDestinationKindProject {
+// requireMCPFolder: a folder destination has to be a folder here. Personal is fine.
+func (d *Daemon) requireMCPFolder(dest wire.SkillDestination) error {
+	if dest.Kind != wire.SkillDestinationKindFolder {
 		return nil
 	}
 	path := ""
 	if dest.Folder != nil {
 		path = *dest.Folder
 	}
-	if info, err := os.Stat(path); path == "" || err != nil || !info.IsDir() || !d.isProjectFolder(path) {
-		return mcpcatalog.NotAProject(path)
+	if info, err := os.Stat(path); path == "" || err != nil || !info.IsDir() || !d.isFolderPath(path) {
+		return mcpcatalog.NotAFolder(path)
 	}
 	return nil
 }
@@ -170,7 +170,7 @@ func (d *Daemon) mcpCatalogSearch(ctx context.Context, r wire.CatalogSearchReque
 }
 
 // fileMarketplace is a marketplace of the format file (#2155): the Agents one inside agentsd,
-// or a path, from ~/ or, when relative, from the home (a person's) or the project folder.
+// or a path, from ~/ or, when relative, from the home (a person's) or the folder.
 func (d *Daemon) fileMarketplace(m wire.Marketplace, dest *wire.SkillDestination) mcpcatalog.FileMarketplace {
 	if m.Origin == wire.MarketplaceOriginProvided && m.URL == skillcatalog.AgentsMarketplaceFile {
 		return mcpcatalog.FileMarketplace{Builtin: true}
@@ -180,7 +180,7 @@ func (d *Daemon) fileMarketplace(m wire.Marketplace, dest *wire.SkillDestination
 	case strings.HasPrefix(path, "~/") && home != "":
 		path = filepath.Join(home, path[2:])
 	case filepath.IsAbs(path):
-	case m.Origin == wire.MarketplaceOriginProject && dest != nil:
+	case m.Origin == wire.MarketplaceOriginFolder && dest != nil:
 		if place, err := d.skillPlace(*dest); err == nil {
 			path = filepath.Join(place.Folder, path)
 		}
@@ -334,7 +334,7 @@ func (d *Daemon) mcpDestinationState(nameHere, registryName string, dest wire.Sk
 }
 
 func (d *Daemon) mcpAdd(r wire.MCPAddRequest) (wire.MCPAddAnswer, error) {
-	if err := d.requireMCPProject(r.Destination); err != nil {
+	if err := d.requireMCPFolder(r.Destination); err != nil {
 		return wire.MCPAddAnswer{}, mcpRefusal(err)
 	}
 	mcpPreviews.Lock()
@@ -355,7 +355,7 @@ func (d *Daemon) mcpAdd(r wire.MCPAddRequest) (wire.MCPAddAnswer, error) {
 }
 
 // mcpInstall is MCPInstaller.add: its secrets into secrets.env, the entry into mcp.json, the
-// sidecar's record, and for a project, the entry approved as it was written.
+// sidecar's record, and for a folder, the entry approved as it was written.
 func (d *Daemon) mcpInstall(st mcpStaged, r wire.MCPAddRequest) (wire.ManagedMCPServer, error) {
 	home := d.personalHome()
 	if home == "" {
@@ -430,7 +430,7 @@ func (d *Daemon) mcpInstall(st mcpStaged, r wire.MCPAddRequest) (wire.ManagedMCP
 	if err := side.Save(d.mcpSidecarPath()); err != nil {
 		return wire.ManagedMCPServer{}, mcpcatalog.Failed("catalog-mcp.json could not be written")
 	}
-	if r.Destination.Kind == wire.SkillDestinationKindProject {
+	if r.Destination.Kind == wire.SkillDestinationKindFolder {
 		d.recordMCPApproval(*r.Destination.Folder, name, json.RawMessage(entry.Stringified()))
 	}
 	byHand := false
@@ -495,15 +495,15 @@ func (d *Daemon) recordMCPApproval(folder, name string, raw json.RawMessage) {
 // MARK: mcp/list and mcp/approve
 
 func (d *Daemon) mcpList(dest wire.SkillDestination) (wire.MCPListAnswer, error) {
-	if err := d.requireMCPProject(dest); err != nil {
+	if err := d.requireMCPFolder(dest); err != nil {
 		return wire.MCPListAnswer{}, mcpRefusal(err)
 	}
-	answer := wire.MCPListAnswer{Servers: []wire.ProjectMCPServer{}}
+	answer := wire.MCPListAnswer{Servers: []wire.FolderMCPServer{}}
 	path, err := d.mcpFile(dest)
 	if err != nil {
 		return answer, nil
 	}
-	project := dest.Kind == wire.SkillDestinationKindProject
+	folder := dest.Kind == wire.SkillDestinationKindFolder
 	d.mcpMu.Lock()
 	approved, _, unreadable := d.mcpApprovalsLocked()
 	views := map[string]string{}
@@ -511,7 +511,7 @@ func (d *Daemon) mcpList(dest wire.SkillDestination) (wire.MCPListAnswer, error)
 		json.Unmarshal(d.mcpApprovals["views"], &views)
 	}
 	d.mcpMu.Unlock()
-	if project && unreadable {
+	if folder && unreadable {
 		note := "mcp-approvals.json could not be read, so nothing is approved until you approve it again."
 		answer.ApprovalsProblem = &note
 	}
@@ -528,15 +528,15 @@ func (d *Daemon) mcpList(dest wire.SkillDestination) (wire.MCPListAnswer, error)
 	secrets := d.secrets()
 	side := mcpcatalog.LoadSidecar(d.mcpSidecarPath())
 	scope := "personal"
-	if project {
+	if folder {
 		scope = filepath.Clean(*dest.Folder)
 	}
-	var waiting, ready []wire.ProjectMCPServer
+	var waiting, ready []wire.FolderMCPServer
 	for _, e := range entries {
 		digest := entryDigest(e.raw)
-		row := wire.ProjectMCPServer{Name: e.name, Summary: mcpSummary(e), EntryDigest: digest,
+		row := wire.FolderMCPServer{Name: e.name, Summary: mcpSummary(e), EntryDigest: digest,
 			Approval: wire.MCPApprovalState{Approved: &struct{}{}}, MissingSecrets: []string{}, SecretNames: []string{}}
-		if project {
+		if folder {
 			stored, had := approved[mcpApprovalKey(*dest.Folder, e.name)]
 			if approved == nil || stored != digest {
 				row.Approval = wire.MCPApprovalState{Waiting: &wire.MCPApprovalStateWaiting{Digest: digest, IsNew: !had}}
@@ -641,14 +641,14 @@ func viewsWord(views map[string]string, scope, server string) *string {
 }
 
 func (d *Daemon) mcpApprove(r wire.MCPApproveRequest) (wire.MCPListAnswer, error) {
-	if r.Destination.Kind != wire.SkillDestinationKindProject || r.Destination.Folder == nil {
-		return wire.MCPListAnswer{}, mcpRefusal(mcpcatalog.Failed("Only a project's server waits for approval."))
+	if r.Destination.Kind != wire.SkillDestinationKindFolder || r.Destination.Folder == nil {
+		return wire.MCPListAnswer{}, mcpRefusal(mcpcatalog.Failed("Only a folder's server waits for approval."))
 	}
-	if err := d.requireMCPProject(r.Destination); err != nil {
+	if err := d.requireMCPFolder(r.Destination); err != nil {
 		return wire.MCPListAnswer{}, mcpRefusal(err)
 	}
 	folder := *r.Destination.Folder
-	path := mcpcatalog.ProjectFile(folder)
+	path := mcpcatalog.FolderFile(folder)
 	entries, problem := readMCPFile(path)
 	if problem != "" {
 		return wire.MCPListAnswer{}, mcpRefusal(mcpcatalog.Unreadable(path))
@@ -667,7 +667,7 @@ func (d *Daemon) mcpApprove(r wire.MCPApproveRequest) (wire.MCPListAnswer, error
 	}); err != nil {
 		return wire.MCPListAnswer{}, mcpRefusal(mcpcatalog.Failed("mcp-approvals.json could not be written"))
 	}
-	log.Printf("mcp: approve %s in project", r.Name)
+	log.Printf("mcp: approve %s in folder", r.Name)
 	d.mcpChanged()
 	// A pinned page of this server waited for the approval: its clients draw it now (#1780).
 	d.pinsChanged(folder)
@@ -677,7 +677,7 @@ func (d *Daemon) mcpApprove(r wire.MCPApproveRequest) (wire.MCPListAnswer, error
 // mcpForgetViews forgets every Show or Don't Show for one server, so its views ask again.
 func (d *Daemon) mcpForgetViews(r wire.MCPViewsForgetRequest) error {
 	scope := "personal"
-	if r.Destination.Kind == wire.SkillDestinationKindProject && r.Destination.Folder != nil {
+	if r.Destination.Kind == wire.SkillDestinationKindFolder && r.Destination.Folder != nil {
 		scope = filepath.Clean(*r.Destination.Folder)
 	}
 	prefix := scope + "|" + r.Name + "|"
@@ -719,9 +719,9 @@ func (d *Daemon) mcpSetSecret(r wire.MCPSetSecretRequest) (wire.MCPSetSecretAnsw
 // mcpRemove takes a server out of mcp.json, one the app added or one written by hand
 // (#2154): the person asked for it, so only add leaves a hand-written entry alone. The rest
 // of the file stays as it is; a personal entry is kept in mcp.removed.json (#2195). forgetSecret goes only when no other server, personal or a
-// project's, still names it.
+// folder's, still names it.
 func (d *Daemon) mcpRemove(r wire.MCPRemoveRequest) (wire.MCPRemoveAnswer, error) {
-	if err := d.requireMCPProject(r.Destination); err != nil {
+	if err := d.requireMCPFolder(r.Destination); err != nil {
 		return wire.MCPRemoveAnswer{}, mcpRefusal(err)
 	}
 	home := d.personalHome()
@@ -758,7 +758,7 @@ func (d *Daemon) mcpRemove(r wire.MCPRemoveRequest) (wire.MCPRemoveAnswer, error
 	if err := mcpcatalog.Remove(path, r.Name); err != nil {
 		return wire.MCPRemoveAnswer{}, mcpRefusal(mcpcatalog.Unreadable(path))
 	}
-	// The personal file is in no git: keep a copy of what went (#2195). A project's is committed.
+	// The personal file is in no git: keep a copy of what went (#2195). A folder's is committed.
 	if r.Destination.Kind == wire.SkillDestinationKindPersonal {
 		if err := mcpcatalog.KeepRemoved(home, r.Name, entry); err != nil {
 			log.Printf("mcp: remove %s: no copy kept in %s: %v", r.Name, mcpcatalog.RemovedFile(home), err)
@@ -766,7 +766,7 @@ func (d *Daemon) mcpRemove(r wire.MCPRemoveRequest) (wire.MCPRemoveAnswer, error
 	}
 	delete(side.Servers, key)
 	side.Save(d.mcpSidecarPath())
-	if r.Destination.Kind == wire.SkillDestinationKindProject {
+	if r.Destination.Kind == wire.SkillDestinationKindFolder {
 		folder := *r.Destination.Folder
 		d.changeMCPApprovals(true, func(approved, _ map[string]string) { delete(approved, mcpApprovalKey(folder, r.Name)) })
 	}
@@ -782,8 +782,8 @@ func (d *Daemon) mcpRemove(r wire.MCPRemoveRequest) (wire.MCPRemoveAnswer, error
 // secretNamedElsewhere is whether a server other than the one going still names ${secret}.
 func (d *Daemon) secretNamedElsewhere(secret, name, dropping, home string) bool {
 	paths := []string{}
-	for _, p := range d.projects(true) {
-		paths = append(paths, mcpcatalog.ProjectFile(store.FolderPath(p.Project.Folder)))
+	for _, p := range d.folders(true) {
+		paths = append(paths, mcpcatalog.FolderFile(store.FolderPath(p.Folder.Folder)))
 	}
 	paths = append(paths, mcpcatalog.PersonalFile(home), dropping)
 	seen := map[string]bool{}

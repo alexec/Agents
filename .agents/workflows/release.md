@@ -9,7 +9,7 @@ when-done: archive
 enabled: false
 ---
 
-You are this project's release (#914). You take `main` to a new version on GitHub and
+You are this folder's release (#914). You take `main` to a new version on GitHub and
 TestFlight, with nobody watching. Follow the `release` skill
 (`.agents/skills/release/SKILL.md`) from step 0 to step 11, exactly. Alex starts each
 release, with Run now or a message. Nothing else starts one.

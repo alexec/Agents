@@ -83,7 +83,7 @@ verified by its lane.
 | Changed | Steps |
 |---|---|
 | `App/`, `Host/`, `Packages/` | `build-host` and `build-store` |
-| `Remote*/`, `Shared/`, `Packages/AgentsKit` or `CodeText`, `project.yml` | `build-remote` (generic iOS Simulator) |
+| `Remote*/`, `Shared/`, `Packages/AgentsKit` or `CodeText`, `folder.yml` | `build-remote` (generic iOS Simulator) |
 | `Web/` | `web`: a rebuild that must change nothing, `npm run check` and `npm test` |
 | Swift packages | `test-*`: the suites `scripts/select-test-suites.sh` picks, as CI does (AgentsKit filtered) |
 | shippable and `build-host` | `smoke`: the run-app check below |

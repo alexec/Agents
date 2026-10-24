@@ -3,19 +3,19 @@
 // last report, labels and the worktree, what it holds or waits for, what runs in the background,
 // what it waits on, and whether an agent asks for it to be archived. Only Needs you is ever in
 // colour. In the sidebar it is the mark, the title, the time and one grey line (#587): the rest is
-// the project page's and the chat's.
+// the folder page's and the chat's.
 import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { leaseMark, lineResource, startedByAgentLabel, waitMark, worktreeHelp, type LeaseMark, type WaitMark } from "../model/rowLines";
 import { blockWaitNames, openBlock } from "../model/block";
 import { backgroundMark } from "../model/background";
-import { drawsUnread, projectFolder } from "../model/groups";
+import { drawsUnread, folderPath } from "../model/groups";
 import { archiveLine, archiveMark } from "../model/archiveWords";
 import { fileToSeeLine, reportLine } from "../model/fileToSeeWords";
 import { needsYouLine, queuedLine, rowStatus, type StatusShape } from "../model/status";
 import { fromWireDate } from "../protocol/dates";
 import { Telling } from "./Telling";
-import { folderIsMissing, folderPath, missingFolderLabel } from "../model/missingFolder";
+import { folderIsMissing, folderPath as missingFolderPath, missingFolderLabel } from "../model/missingFolder";
 import { shortAgo } from "../model/activity";
 import { runningTool, runningToolLabel, sessionMark, type SessionMark } from "../model/sidebar";
 import { isMuted, muteMark, mutedHelp, mutedWords } from "../model/mute";
@@ -109,7 +109,7 @@ export interface RowExtras {
   leases: LeaseMark | null;
   /** What it waits for, on one line (#582): its block, its wait on events, the resources it is in line for. */
   wait: WaitMark | null;
-  /** A queued helper's place in its project's queue (#362), "Queued, 2nd". */
+  /** A queued helper's place in its folder's queue (#362), "Queued, 2nd". */
   queued: string | null;
   /** While the sidebar searches: the line it said that matches (#1585). */
   said?: string | null;
@@ -133,14 +133,14 @@ export function rowExtras(store: Store, host: string, agent: Agent): RowExtras {
     comingBack: store.isComingBack(host, agent.id),
     // Its id when the file has since gone, so the mark never goes with it, as the window's.
     startedByWorkflow: workflowID === undefined ? null
-      : store.projectWorkflows(host, projectFolder(agent))
+      : store.folderWorkflows(host, folderPath(agent))
         .find((w) => w.workflow.workflowID === workflowID)?.workflow.name ?? workflowID,
     startedByAgent: startedByAgentLabel(agent, title),
     leases,
     wait: waitMark(agent, openBlock(agent)
       ? { names: blockWaitNames(agent, store.agents.value[host] ?? []), lines: store.waitsOf(host, agent) }
       : { names: [], lines: [] }, leases, title, snapshot),
-    queued: agent.state === "queued" ? queuedLine(agent, store.projectAgents(host, projectFolder(agent))) : null,
+    queued: agent.state === "queued" ? queuedLine(agent, store.folderAgents(host, folderPath(agent))) : null,
     said: store.saidLines.value[agent.id] ?? null,
     question: question ?? null,
   };
@@ -155,7 +155,7 @@ export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = f
    * the row is its title, time and one grey line (#587).
    */
   inSidebar?: boolean;
-  /** Which project it is in, after the title: under a smart group, which gathers every project's. */
+  /** Which folder it is in, after the title: under a smart group, which gathers every folder's. */
   place?: string | undefined;
   /** What the window's row says from beyond the agent's record (#251). */
   extras?: RowExtras | undefined;
@@ -178,7 +178,7 @@ export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = f
         {/* Unread is a mark, as in Mail (#70): a dot (two rings in the sidebar) and a heavier title, gone once opened. */}
         <span class={`title${drawsUnread(agent) ? " unread" : ""}${place ? " placed" : ""}`} aria-description={drawsUnread(agent) ? "unread" : undefined}>
           {drawsUnread(agent) && !inSidebar && <span class="unread-dot" aria-hidden="true" />}
-          {/* The title gives way before its project's name, which is whole (#587). */}
+          {/* The title gives way before its folder's name, which is whole (#587). */}
           {place ? <span class="name">{agent.title ?? "Untitled"}</span> : agent.title ?? "Untitled"}
           {place && <span class="place"> {place}</span>}
           {/* Started by a workflow or another agent, not typed for by the person (028). */}
@@ -202,8 +202,8 @@ export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = f
           : inSidebar && reason ? <span class="subtitle needs-you-reason">{reason}</span>
           : inSidebar && extras?.said && !folderIsMissing(agent) ? <span class="subtitle said" title={extras.said}>{extras.said}</span>
           : report && !(inSidebar && folderIsMissing(agent)) && <span class="subtitle report">{report}</span>}
-        {/* Its folder gone (#119), as a project's row says it. */}
-        {folderIsMissing(agent) && <span class="subtitle missing-folder" title={folderPath(agent)}>⚠ {missingFolderLabel}</span>}
+        {/* Its folder gone (#119), as a folder's row says it. */}
+        {folderIsMissing(agent) && <span class="subtitle missing-folder" title={missingFolderPath(agent)}>⚠ {missingFolderLabel}</span>}
         {/* In the sidebar, that one line is all (#587): what it holds, waits on, runs or is
             labelled with is the chat's to say. */}
         {!inSidebar && <>

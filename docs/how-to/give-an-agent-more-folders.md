@@ -6,22 +6,22 @@ description: Let a new agent work in more than one folder, and give it connector
 
 # Give an agent more folders and connectors
 
-An agent works in its project folder, or its worktree, and nothing outside it. When the
+An agent works in its folder, or its worktree, and nothing outside it. When the
 work spans two repositories, or needs a tool only a connector (an MCP server) offers, you can give a new
 agent more before it starts.
 
 ## Before you start
 
-- A project on this Mac. See [Add a project](add-a-project.md).
+- A folder on this Mac. See [Add a folder](add-a-folder.md).
 - For a connector, the command that starts it, as you would type it in Terminal.
 
 ## Steps
 
-1. Unfold the project in the sidebar and click **New session**, the first row under it (or press ⌘N).
+1. Unfold the folder in the sidebar and click **New session**, the first row under it (or press ⌘N).
 2. Above the prompt, click **Reach: this folder** (**Folders and connectors this agent
    may reach**).
 
-   A sheet opens, with **Folders** and **Connectors**. The project's folder is listed
+   A sheet opens, with **Folders** and **Connectors**. The folder is listed
    first and cannot be removed.
 3. To add a folder, click **Add a folder** and pick it. Click **×** beside one to take it
    off again.

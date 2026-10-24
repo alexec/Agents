@@ -31,7 +31,7 @@ test("an import is sent in parts at their offsets, then imported", async () => {
     if (method === "agents/importUpload") { sent.push(params); return {}; }
     assert.equal(method, "agents/import");
     assert.equal(params.upload, "U");
-    // Into the project whose menu was used (#2389).
+    // Into the folder whose menu was used (#2389).
     assert.equal(params.folder, "file:///tmp/B/");
     return { restored: 2, skipped: 1 };
   };

@@ -3,7 +3,7 @@
 // the new-agent form, Activity ▸ Runtimes and Spending, and, with the kill switch on, the red strip
 // and the composer. Leaves the policy set and the kill switch on, for the window's and the Remote's walk.
 //
-//   node Web/test/walk/policy998.mjs <WEB_URL> <browser code> <browser code> <project folder> <out dir>
+//   node Web/test/walk/policy998.mjs <WEB_URL> <browser code> <browser code> <folder> <out dir>
 
 import { setTimeout as sleep } from "node:timers/promises";
 import { load } from "../load.mjs";
@@ -102,9 +102,9 @@ try {
   await page.focus("textarea");
   await page.type(pageCode);
   await page.press("Connect");
-  await page.waitFor(`document.querySelector(".sidebar .row.project")`, 20_000);
-  const project = `#/h/${host}/p/${encodeURIComponent(`file://${folder}`)}/n/1`;
-  await page.eval(`location.hash = ${JSON.stringify(project)}`);
+  await page.waitFor(`document.querySelector(".sidebar .row.folder")`, 20_000);
+  const folder = `#/h/${host}/p/${encodeURIComponent(`file://${folder}`)}/n/1`;
+  await page.eval(`location.hash = ${JSON.stringify(folder)}`);
   await sleep(2500);
   await page.shot(`${out}/web-new-agent.png`);
   console.log("runtime options:", await page.eval(`[...document.querySelectorAll('select[aria-label="Runtime"] option')].map((o) => (o.disabled ? "×" : "") + o.textContent).join(" | ")`));
@@ -122,7 +122,7 @@ try {
   const stop = await admin.ask("policy/stopAll", { on: true });
   console.log("stopAll on:", stop.error?.message ?? "ok");
   await sleep(3000);
-  await page.eval(`location.hash = ${JSON.stringify(project)}`);
+  await page.eval(`location.hash = ${JSON.stringify(folder)}`);
   await sleep(2000);
   await page.shot(`${out}/web-stopped.png`);
   console.log("strip:", await page.eval(`document.querySelector(".policy-stopped")?.innerText ?? "none"`));

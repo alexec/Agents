@@ -11,7 +11,7 @@ const advertised = [
   { id: "fast", name: "Fast", type: "boolean", currentValue: false },
 ];
 const reviewer = {
-  id: "reviewer", name: "Reviewer", origin: "project",
+  id: "reviewer", name: "Reviewer", origin: "folder",
   settings: { permissionMode: "plan", model: "sonnet", options: { fast: "true" }, labels: ["review", "Bugs"] },
 };
 

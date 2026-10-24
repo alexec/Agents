@@ -74,10 +74,10 @@ struct ArchiveRequestRecordTests {
     }
 
     /// A group this build has never heard of is dropped, not fatal — a plain
-    /// `[AgentGroup: Int]` decode throws, and took every project with it (R7).
-    @Test func projectCountsWithAGroupFromANewerBuildStillOpen() throws {
-        let summary = DaemonAPI.ProjectSummary(
-            project: Project(folder: URL(filePath: "/tmp/api"), addedAt: Date()),
+    /// `[AgentGroup: Int]` decode throws, and took every folder with it (R7).
+    @Test func folderCountsWithAGroupFromANewerBuildStillOpen() throws {
+        let summary = DaemonAPI.FolderSummary(
+            folder: Folder(folder: URL(filePath: "/tmp/api"), addedAt: Date()),
             name: "api", exists: true, lastActivityAt: Date(),
             counts: [.finished: 2, .needsAttention: 1])
         var json = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(summary)) as? [String: Any])
@@ -86,7 +86,7 @@ struct ArchiveRequestRecordTests {
         // And one that went: an older Mac's Parked (#584).
         counts["parked"] = 3
         json["counts"] = counts
-        let read = try JSONDecoder().decode(DaemonAPI.ProjectSummary.self,
+        let read = try JSONDecoder().decode(DaemonAPI.FolderSummary.self,
                                             from: JSONSerialization.data(withJSONObject: json))
         #expect(read.counts == [.finished: 2, .needsAttention: 1])
         #expect(read.needsInput)

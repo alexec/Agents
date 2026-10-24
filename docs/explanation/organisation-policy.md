@@ -12,27 +12,27 @@ and sends it to each machine. This page tells how a machine follows it. The fiel
 
 ## A ceiling, not a setting
 
-The policy is a ceiling above the settings of the person and of the project. An agent gets
+The policy is a ceiling above the settings of the person and of the folder. An agent gets
 the tightest of the three:
 
 - The mode is the loosest mode that the policy allows, or the mode that the person chose
   when it is tighter.
 - With `sandbox: required`, the command sandbox is on. A person's default of off stays in
   `sandbox.json`, but it has no effect while the policy requires the sandbox.
-- A project's helper limits above the policy's are capped to the policy's numbers.
+- A folder's helper limits above the policy's are capped to the policy's numbers.
 - The person's own pass-through names (`runtime-environment.json`) are cut to the names that
   the policy allows.
 - The daily budget and the budget for each agent are the lower of the policy's and the
   person's own cost limits.
 
-The machine never changes or deletes what the person or the project wrote. When the
+The machine never changes or deletes what the person or the folder wrote. When the
 organisation makes the policy looser, each choice comes back as it was.
 
 A choice that the policy refuses is refused with the error `policyRefused`. Its data says
 why (`policy`, `budget`, `stopAll`, `noPolicy` or `update`), the rule, and the words that
 the clients show under **Set by your organisation**. The lists that the machine sends mark
 each refused choice with `setBy`: the runtimes, the modes and models of an agent, the
-sandbox, the cost state, the helper limits of a project and the pass-through names. A
+sandbox, the cost state, the helper limits of a folder and the pass-through names. A
 marketplace that the policy does not allow is not listed.
 
 ## Who asks matters

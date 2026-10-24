@@ -22,7 +22,7 @@ const KeptLimit = 20
 
 // KeptRequest is DaemonAPI.KeptRequest: a kept request, as clients draw it, never its
 // attachments or options. Kind is prompt (to an agent there, AgentID) or start (a new
-// agent in a project there: Folder and RuntimeID); Text is the prompt's words, or the new
+// agent in a folder there: Folder and RuntimeID); Text is the prompt's words, or the new
 // agent's first prompt; Failed, that it was not sent, and why (US3 AS4).
 type KeptRequest = wire.KeptRequest
 

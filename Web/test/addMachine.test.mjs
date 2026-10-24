@@ -17,9 +17,9 @@ test("a machine name is letters, digits and dashes, starting with a letter", () 
 });
 
 test("Where agents run says where the folder is, and what else is yours", () => {
-  assert.equal(a.whereAgentsRun.line([], []), "Agents run where this project’s folder is.");
+  assert.equal(a.whereAgentsRun.line([], []), "Agents run where this folder is.");
   assert.equal(a.whereAgentsRun.line(["devbox", "build-2"], ["Docker"]),
-    "Agents run where this project’s folder is. Your other machines: devbox, build-2. Providers: Docker.");
+    "Agents run where this folder is. Your other machines: devbox, build-2. Providers: Docker.");
   assert.equal(a.whereAgentsRun.title(true, "alex-mbp"), "This Mac");
   assert.equal(a.whereAgentsRun.title(false, "devbox"), "devbox");
 });

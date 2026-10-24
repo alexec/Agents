@@ -8,7 +8,7 @@ description: Answer an agent's permission request or question from the Mac, the 
 
 An agent stops and waits for you in three ways: it asks permission to do something, it
 asks a question with answers to pick from, or it ends its turn with a question in words.
-Whichever it is, the agent and its project say **Needs you** until you answer.
+Whichever it is, the agent and its folder say **Needs you** until you answer.
 
 ## Before you start
 
@@ -18,10 +18,10 @@ Whichever it is, the agent and its project say **Needs you** until you answer.
 ## Steps
 
 1. Find the agent that is waiting. Any of these takes you to it:
-   - On the Mac, a project with a dot beside it in the list; on its page, the agent under
+   - On the Mac, a folder with a dot beside it in the list; on its page, the agent under
      **Needs you**.
-   - On iPhone or iPad, the same, in the project list and on the project's page.
-   - A notification. It names the agent, the project and what is wanted; click or tap it
+   - On iPhone or iPad, the same, in the folder list and on the folder's page.
+   - A notification. It names the agent, the folder and what is wanted; click or tap it
      to open the conversation with the question in front of you. You get one
      notification, on the device you used last: the Mac if you are at it, otherwise the
      iPhone or iPad you touched most recently. None comes if you are already reading
@@ -71,7 +71,7 @@ text box.
 When Cursor, Grok or OpenCode is set to **Always-approve** under its prompt, every
 permission request from that runtime is answered for you: no card, no **Needs you**, and
 no notification. The value applies to every agent on that runtime, including workflow
-agents and agents in server projects. Questions that are not permission to act still wait
+agents and agents in server folders. Questions that are not permission to act still wait
 as above, including Grok's questions in words. Claude, Codex, Gemini, Antigravity and
 Copilot keep asking the way they always have.
 
@@ -92,7 +92,7 @@ start**, with **Show error details** for the runtime's own words.
 
 Where the app cannot turn a runtime's sandbox off, the card says so and has no **Continue**.
 The same card, and the same choice, are on iPhone and iPad. A command refused *inside* a
-working sandbox, such as a write outside the project, is an ordinary failed command and
+working sandbox, such as a write outside the folder, is an ordinary failed command and
 brings no card. Gemini that never answers when it starts gets the card too: its own
 sandbox, turned on in its settings, stops it answering the app.
 

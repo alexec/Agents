@@ -2,7 +2,7 @@
 name: "speckit-implement"
 description: "Execute the implementation plan by processing and executing all tasks defined in tasks.md"
 argument-hint: "Optional implementation guidance or task filter"
-compatibility: "Requires spec-kit project structure with .specify/ directory"
+compatibility: "Requires spec-kit folder structure with .specify/ directory"
 metadata:
   author: "github-spec-kit"
   source: "templates/commands/implement.md"
@@ -22,7 +22,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Pre-Execution Checks
 
 **Check for extension hooks (before implementation)**:
-- Check if `.specify/extensions.yml` exists in the project root.
+- Check if `.specify/extensions.yml` exists in the folder root.
 - If it exists, read it and look for entries under the `hooks.before_implement` key
 - If the YAML cannot be parsed or is invalid, do not skip silently: tell the user that `.specify/extensions.yml` could not be read (include the parser error) and that no hooks were checked, including any mandatory (`optional: false`) hooks registered there, then continue normally
 - Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
@@ -102,8 +102,8 @@ You **MUST** consider the user input before proceeding (if not empty).
    - **IF EXISTS**: Read .specify/memory/constitution.md for governance constraints
    - **IF EXISTS**: Read quickstart.md for integration scenarios
 
-4. **Project Setup Verification**:
-   - **REQUIRED**: Create/verify ignore files based on actual project setup:
+4. **Folder Setup Verification**:
+   - **REQUIRED**: Create/verify ignore files based on actual folder setup:
 
    **Detection & Creation Logic**:
    - Check if the following command succeeds to determine if the repository is a git repo (create/verify .gitignore if so):
@@ -160,7 +160,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - **Validation checkpoints**: Verify each phase completion before proceeding
 
 7. Implementation execution rules:
-   - **Setup first**: Initialize project structure, dependencies, configuration
+   - **Setup first**: Initialize folder structure, dependencies, configuration
    - **Tests before code**: If you need to write tests for contracts, entities, and integration scenarios
    - **Core development**: Implement models, services, CLI commands, endpoints
    - **Integration work**: Database connections, middleware, logging, external services
@@ -186,7 +186,7 @@ Note: This command assumes a complete task breakdown exists in tasks.md. If task
 
 **You MUST complete this section before reporting completion to the user.**
 
-Check if `.specify/extensions.yml` exists in the project root.
+Check if `.specify/extensions.yml` exists in the folder root.
 - If it does not exist, or no hooks are registered under `hooks.after_implement`, skip to the Completion Report.
 - If it exists, read it and look for entries under the `hooks.after_implement` key.
 - If the YAML cannot be parsed or is invalid, do not skip silently: tell the user that `.specify/extensions.yml` could not be read (include the parser error) and that no hooks were checked, including any mandatory (`optional: false`) hooks registered there, then continue to the Completion Report.

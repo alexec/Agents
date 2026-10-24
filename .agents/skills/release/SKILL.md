@@ -46,7 +46,7 @@ Alex decided (2026-10-13, #914):
   commit, the notes or a message to another session. Use its id (`S20261011-2`) only in
   the draft advisory.
 - Never write on the review branches (`agents/reviews-*`). They are the reviews' own.
-- Run every command from the project folder (step 8's deploy from its scratch worktree).
+- Run every command from the folder (step 8's deploy from its scratch worktree).
   Change no file in it: you only read, tag and push the tag. Write the notes in `$TMPDIR`.
 - Questions: nobody is watching, and every choice here is already made. Do not ask;
   put what stopped you in the report. If you must ever ask, use your question tool and
@@ -377,7 +377,7 @@ If step 8 failed, leave the milestone open and say so in the report.
 ## 10. Review the release
 
 Decided in #1659: every release reviews itself, briefly, while its times are still in
-this session. Write `~/.agents/reviews/releases/v<version>.md` (outside the project, so
+this session. Write `~/.agents/reviews/releases/v<version>.md` (outside the folder, so
 nothing is pushed): a timeline from T0 (reviews done, highs fixed, gate, tag, GitHub
 release, TestFlight, milestone closed), and a table of each step where a person did
 something, why, and the issue that would make it run without one. Search the issues

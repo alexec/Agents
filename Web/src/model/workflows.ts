@@ -53,27 +53,27 @@ function isEvent(trigger: WorkflowTriggerStored): boolean {
 
 // EventCatalogue's catalogue meaning, kept in sync with EventPattern.summary.
 const eventMeanings: Record<string, string> = {
-  "agent.started": "An agent in this project started working",
-  "agent.finished": "An agent in this project ended a turn having done its work",
-  "agent.asked_permission": "An agent in this project is asking for permission",
-  "agent.asked_form": "An agent in this project raised a form to fill in",
-  "agent.waiting": "An agent in this project ended its turn waiting on something",
-  "agent.stopped": "An agent in this project was stopped before finishing",
-  "agent.failed": "An agent in this project ended in an error",
-  "agent.archive_requested": "An agent in this project archived itself, and waits for the person to approve it",
-  "agent.messaged": "An agent in this project was sent a message by another, with message_session",
-  "agent.archived": "An agent in this project was archived",
+  "agent.started": "An agent in this folder started working",
+  "agent.finished": "An agent in this folder ended a turn having done its work",
+  "agent.asked_permission": "An agent in this folder is asking for permission",
+  "agent.asked_form": "An agent in this folder raised a form to fill in",
+  "agent.waiting": "An agent in this folder ended its turn waiting on something",
+  "agent.stopped": "An agent in this folder was stopped before finishing",
+  "agent.failed": "An agent in this folder ended in an error",
+  "agent.archive_requested": "An agent in this folder archived itself, and waits for the person to approve it",
+  "agent.messaged": "An agent in this folder was sent a message by another, with message_session",
+  "agent.archived": "An agent in this folder was archived",
   "agent.deleted": "An archived agent was deleted with its conversation",
-  "project.idle": "Every agent in this project has stopped working",
-  "workflow.ran": "A workflow in this project started an agent",
-  "workflow.completed": "A workflow's run in this project finished",
-  "workflow.refused": "A workflow in this project did not run, and why",
+  "folder.idle": "Every agent in this folder has stopped working",
+  "workflow.ran": "A workflow in this folder started an agent",
+  "workflow.completed": "A workflow's run in this folder finished",
+  "workflow.refused": "A workflow in this folder did not run, and why",
   "branch.moved": "A branch an agent works on moved; never the default branch",
   "lease.granted": "An agent was given a lease",
   "lease.released": "A lease was given back, ended or ran out",
   "mac.sleep": "This Mac is going to sleep",
   "mac.wake": "This Mac woke up",
-  "machine.disk_low": "Free space on a volume holding the Agents root, a project or a worktree fell below its low or critical threshold",
+  "machine.disk_low": "Free space on a volume holding the Agents root, a folder or a worktree fell below its low or critical threshold",
   "machine.disk_ok": "Free space on a volume that was low climbed back above its threshold",
   "person.away": "You locked the screen or stepped away for 5 minutes",
   "person.back": "You unlocked the screen or came back",
@@ -86,7 +86,7 @@ const eventMeanings: Record<string, string> = {
 };
 
 // EventCatalogue.reservedNouns: the app's own subjects, and `custom` (#639), which no server's event may use.
-const reservedNouns = new Set(["agent", "project", "workflow", "branch", "lease", "mac", "machine", "person", "cost", "server", "system", "custom"]);
+const reservedNouns = new Set(["agent", "folder", "workflow", "branch", "lease", "mac", "machine", "person", "cost", "server", "system", "custom"]);
 
 /** EventCatalogue.isServerEventName: `noun.verbed`, about none of the app's own subjects. */
 function isServerEventName(name: string): boolean {
@@ -300,26 +300,26 @@ export function workflowStatus(s: WorkflowSummary): { mark: string; words: strin
 /** What every agent event carries about its agent (073). */
 const context = ["labels", "runtime", "started_by"];
 
-const catalogue: Record<string, { scope: "mac" | "project" | "either"; details: string[] }> = {
-  "agent.started": { scope: "project", details: ["agent", ...context] },
-  "agent.finished": { scope: "project", details: ["agent", "outcome", "afterwards", ...context] },
-  "agent.asked_permission": { scope: "project", details: ["agent", ...context] },
-  "agent.asked_form": { scope: "project", details: ["agent", ...context] },
-  "agent.waiting": { scope: "project", details: ["agent", "waiting_on", ...context] },
-  "agent.stopped": { scope: "project", details: ["agent", "by", ...context] },
-  "agent.failed": { scope: "project", details: ["agent", "reason", ...context] },
-  "agent.archive_requested": { scope: "project", details: ["agent", "outcome", ...context] },
-  "agent.messaged": { scope: "project", details: ["agent", "from", "from_title", ...context] },
-  "agent.archived": { scope: "project", details: ["agent", "by", "outcome", ...context] },
-  "agent.deleted": { scope: "project", details: ["agent", "because", ...context] },
-  "project.idle": {
-    scope: "project",
+const catalogue: Record<string, { scope: "mac" | "folder" | "either"; details: string[] }> = {
+  "agent.started": { scope: "folder", details: ["agent", ...context] },
+  "agent.finished": { scope: "folder", details: ["agent", "outcome", "afterwards", ...context] },
+  "agent.asked_permission": { scope: "folder", details: ["agent", ...context] },
+  "agent.asked_form": { scope: "folder", details: ["agent", ...context] },
+  "agent.waiting": { scope: "folder", details: ["agent", "waiting_on", ...context] },
+  "agent.stopped": { scope: "folder", details: ["agent", "by", ...context] },
+  "agent.failed": { scope: "folder", details: ["agent", "reason", ...context] },
+  "agent.archive_requested": { scope: "folder", details: ["agent", "outcome", ...context] },
+  "agent.messaged": { scope: "folder", details: ["agent", "from", "from_title", ...context] },
+  "agent.archived": { scope: "folder", details: ["agent", "by", "outcome", ...context] },
+  "agent.deleted": { scope: "folder", details: ["agent", "because", ...context] },
+  "folder.idle": {
+    scope: "folder",
     details: ["agents", "finished", "waiting", "waiting_on_you", "stopped", "failed", "since", "ids"],
   },
-  "workflow.ran": { scope: "project", details: ["workflow", "agent"] },
-  "workflow.completed": { scope: "project", details: ["workflow", "agent", "outcome"] },
-  "workflow.refused": { scope: "project", details: ["workflow", "reason"] },
-  "branch.moved": { scope: "project", details: ["branch", "from", "to"] },
+  "workflow.ran": { scope: "folder", details: ["workflow", "agent"] },
+  "workflow.completed": { scope: "folder", details: ["workflow", "agent", "outcome"] },
+  "workflow.refused": { scope: "folder", details: ["workflow", "reason"] },
+  "branch.moved": { scope: "folder", details: ["branch", "from", "to"] },
   "lease.granted": { scope: "mac", details: ["resource", "agent"] },
   "lease.released": { scope: "mac", details: ["resource", "how"] },
   "mac.sleep": { scope: "mac", details: [] },
@@ -386,12 +386,12 @@ function filterWords(key: string, values: string[]): string {
 }
 
 /** WorkflowTrigger.listensIn. */
-export function listensIn(trigger: WorkflowTriggerStored): "mac" | "project" | "either" | null {
+export function listensIn(trigger: WorkflowTriggerStored): "mac" | "folder" | "either" | null {
   if ("schedule" in trigger) return null;
-  if (!("unrecognised" in trigger)) return "project";
+  if (!("unrecognised" in trigger)) return "folder";
   if (!isEvent(trigger)) return null;
-  // A server's events are the project's: its servers are found by its folder.
-  if (serverEvent(trigger)) return "project";
+  // A server's events are the folder's: its servers are found by its folder.
+  if (serverEvent(trigger)) return "folder";
   const name = trigger.unrecognised.name;
   const subject = wholeSubject(name);
   if (subject) {
@@ -402,12 +402,12 @@ export function listensIn(trigger: WorkflowTriggerStored): "mac" | "project" | "
 }
 
 /** "In work, on this Mac", as the window's scopeLine says it; null for nothing to say. */
-export function scopeLine(trigger: WorkflowTriggerStored, project: string, host: string): string | null {
+export function scopeLine(trigger: WorkflowTriggerStored, folder: string, host: string): string | null {
   if ("schedule" in trigger) return `By the clock on ${host}`;
   switch (listensIn(trigger)) {
-    case "project": return `In ${project}, on ${host}`;
-    case "mac": return `Anywhere on ${host}, so it runs in every project`;
-    case "either": return `In ${project}, or anywhere on ${host}`;
+    case "folder": return `In ${folder}, on ${host}`;
+    case "mac": return `Anywhere on ${host}, so it runs in every folder`;
+    case "either": return `In ${folder}, or anywhere on ${host}`;
     default: return null;
   }
 }
@@ -432,7 +432,7 @@ export function triggerGlyph(trigger: WorkflowTriggerStored): string {
   if (!("unrecognised" in trigger)) return "●";
   if (!isEvent(trigger)) return "?";
   const subject = trigger.unrecognised.name.split(".")[0];
-  return subject === "agent" || subject === "project" ? "●" : subject === "workflow" ? "⟳" : subject === "branch" ? "⎇" : "⌘";
+  return subject === "agent" || subject === "folder" ? "●" : subject === "workflow" ? "⟳" : subject === "branch" ? "⎇" : "⌘";
 }
 
 const named = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
@@ -485,10 +485,10 @@ export function lastRanLine(summary: WorkflowSummary, now = new Date()): string 
   return summary.lastFiredBy ? `${when}, ${causePhrase(summary.lastFiredBy)}` : when;
 }
 
-/** The person's workflow limit is applied separately in each project (#506). */
+/** The person's workflow limit is applied separately in each folder (#506). */
 const defaultTotal = 20;
 
-/** WorkflowSummary.limitTotal: the per-project limit in force on its host. */
+/** WorkflowSummary.limitTotal: the per-folder limit in force on its host. */
 export function limitTotal(s: WorkflowSummary): number {
   return s.totalLimit ?? defaultTotal;
 }
@@ -542,7 +542,7 @@ export function offReasonSentence(s: WorkflowSummary): string | null {
 
 /** WorkflowSummary.switchesSentence (#125): the switch is a line in the workflow's file. */
 export function switchesSentence(s: WorkflowSummary): string {
-  return `Enabled and Archive are saved in .agents/workflows/${s.workflow.workflowID}.md, a file in this project you may commit`;
+  return `Enabled and Archive are saved in .agents/workflows/${s.workflow.workflowID}.md, a file in this folder you may commit`;
 }
 
 /** The instance WorkflowSummary.turnedOffSentence: led by why, when there is a why. */
@@ -554,11 +554,11 @@ export function turnedOffSentenceFor(s: WorkflowSummary): string {
 }
 
 function limitSentence(_limit: WorkflowLimit, total: number): string {
-  return `This project already has ${total} workflows running`;
+  return `This folder already has ${total} workflows running`;
 }
 
 function limitRemedy(_limit: WorkflowLimit): string {
-  return "Turn one off or archive one in this project to let it run";
+  return "Turn one off or archive one in this folder to let it run";
 }
 
 /** WorkflowSummary.queued, read leniently: a host from before #422 sends none, and has none. */
@@ -581,14 +581,14 @@ export function refusalMessage(refusal: WorkflowRefusal): string {
   if ("disabled" in refusal) return "it is turned off";
   if ("overLimit" in refusal) {
     const over = refusal.overLimit;
-    return `this project already has ${over.allowed ?? defaultTotal} workflows running`;
+    return `this folder already has ${over.allowed ?? defaultTotal} workflows running`;
   }
   if ("unreadable" in refusal) return refusal.unreadable._0;
   if ("triggerNotSupported" in refusal) return `"${refusal.triggerNotSupported.name}" is not something this version can watch for`;
   if ("agentUnavailable" in refusal) return "the agent it would have resumed is gone";
   if ("noTriggeringAgent" in refusal) return "nothing triggered it, so there was no agent to resume";
   if ("missedWhileClosed" in refusal) return "the app was closed";
-  if ("folderGone" in refusal) return "the project folder is not there";
+  if ("folderGone" in refusal) return "the folder is not there";
   if ("dayLimitReached" in refusal) return "the day's spending limit has been reached";
   if ("settingRefused" in refusal) return refusal.settingRefused.detail;
   if ("deniedHere" in refusal) return "it is denied on this machine";
@@ -793,7 +793,7 @@ export function workflowRunsOn(runsOn: readonly string[] | undefined, machineID:
 
 /** What Runs on means, on every client (#2064). */
 export const workflowRunsOnSentence =
-  "Every machine with this project runs it, or each machine turned on here. The file stores each machine's id, so renaming one does not unpin it.";
+  "Every machine with this folder runs it, or each machine turned on here. The file stores each machine's id, so renaming one does not unpin it.";
 
 /**
  * A runs-on: list as the Runs on section shows it (#2064): the machines it names, any one of

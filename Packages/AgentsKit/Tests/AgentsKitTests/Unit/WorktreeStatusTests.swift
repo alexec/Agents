@@ -32,14 +32,14 @@ struct WorktreeStatusTests {
     }
 
     @Test func anOlderDaemonSendsNoStatus() throws {
-        let json = #"{"name":"x","root":"file:///tmp/x","branch":"b","isProjectFolder":false,"exists":true,"madeByApp":true,"agents":[]}"#
+        let json = #"{"name":"x","root":"file:///tmp/x","branch":"b","isFolderPath":false,"exists":true,"madeByApp":true,"agents":[]}"#
         let summary = try JSONDecoder().decode(DaemonAPI.WorktreeSummary.self, from: Data(json.utf8))
         #expect(summary.status == nil)
     }
 
     @Test func itRoundTrips() throws {
         let summary = DaemonAPI.WorktreeSummary(
-            name: "x", root: URL(filePath: "/tmp/x"), branch: "b", isProjectFolder: false,
+            name: "x", root: URL(filePath: "/tmp/x"), branch: "b", isFolderPath: false,
             exists: true, madeByApp: true, agents: [], status: .init(uncommitted: 1, unmerged: 2))
         let back = try JSONDecoder().decode(DaemonAPI.WorktreeSummary.self, from: JSONEncoder().encode(summary))
         #expect(back == summary)

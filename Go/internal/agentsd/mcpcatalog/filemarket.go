@@ -14,7 +14,7 @@ import (
 
 // A marketplace that is a file (#2155): the MCP Registry's list shape, {"servers": [{"server":
 // {…}, "_meta": {…}}]}, or one server.json, in a file or in each .json file of a folder. The
-// Agents marketplace is one, carried inside agentsd; a person's or a project's
+// Agents marketplace is one, carried inside agentsd; a person's or a folder's
 // marketplaces.json can name another with the format "file".
 
 // connectorMeta is the key in _meta that says how one of ours runs. It is read only in the

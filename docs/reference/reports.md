@@ -1,12 +1,12 @@
 ---
 diataxis: reference
 devices: [mac, iphone, ipad]
-description: Usage, cost and time by person, project, machine and runtime, added up on the control plane from what each machine sends.
+description: Usage, cost and time by person, folder, machine and runtime, added up on the control plane from what each machine sends.
 ---
 
 # Reports
 
-A report shows the usage, cost and time of each person, project, machine and runtime
+A report shows the usage, cost and time of each person, folder, machine and runtime
 (#1811). The control plane adds them up from what each machine sends.
 
 ## The Reports pane
@@ -16,8 +16,8 @@ page.
 
 - **The range:** D (the last 24 hours, by the hour), W, M or 3M (the last 7, 30 or 90
   days, by the day), as the Cost page's charts.
-- **By:** Person, Project, Machine or Runtime. The first line is the total. Under it is a
-  line for each person, project, machine or runtime, largest first, with a bar for its
+- **By:** Person, Folder, Machine or Runtime. The first line is the total. Under it is a
+  line for each person, folder, machine or runtime, largest first, with a bar for its
   share of the largest. Each line says the cost, the tokens, the turns and the working
   time.
 - **Export** saves the rows of the range as CSV or as JSON lines.
@@ -95,7 +95,7 @@ Three more pages of Reports (#2019), with the same scopes:
 
 ## What a machine sends
 
-- **Each machine keeps its usage by the UTC hour**, by project and runtime, in
+- **Each machine keeps its usage by the UTC hour**, by folder and runtime, in
   `<root>/report-hours.json`. It keeps 8 days.
 - **A row** has the cost (by currency), the tokens (input, output, thought, cache read and
   cache write), the turns, the turns with no price, the working seconds and the waiting
@@ -107,8 +107,8 @@ Three more pages of Reports (#2019), with the same scopes:
   with the workflow's id (`workflow`). The machine counts
   them from its own event log (`events.jsonl`) at each send, from the position it counted
   to last, and from its time ledger.
-- **The project** is the name of the project's folder. Thus the same repository on two
-  machines adds up into one project.
+- **The folder** is the name of the folder. Thus the same repository on two
+  machines adds up into one folder.
 - **Each hour**, and each time the machine connects again, it sends the hours that changed
   since the last send (`usage/rollup`, on its channel 0). It also sends each UTC day that
   those hours are in, added up from its own hours. One send has at most 48 hours. If a
@@ -190,7 +190,7 @@ Each metric is a cumulative sum that starts at midnight UTC, by runtime:
 `agents.cost` (by currency), `agents.tokens` (by kind), `agents.turns`,
 `agents.sessions` (ended or failed), `agents.pull_requests` (opened, merged, reverted),
 `agents.workflow.runs` (succeeded or failed) and `agents.time` (working or waiting, in
-seconds). No person, project or machine is named. Console ▸ Read API shows where the
+seconds). No person, folder or machine is named. Console ▸ Read API shows where the
 exporter sends and how its last send went. For the control plane's own health, use the
 Prometheus metrics (`AGENTS_CONTROL_METRICS`, #2176).
 

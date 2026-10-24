@@ -61,7 +61,7 @@ final class TurnActivities {
 
     /// A prompt went from here to this session: a new turn, or one more for the turn
     /// running, which the daemon queues.
-    func sent(to agent: Agent?, id agentID: UUID, project: String) {
+    func sent(to agent: Agent?, id agentID: UUID, folder: String) {
         guard mayStart else { return }
         let now = Date()
         if let running = activity(for: agentID), !running.content.state.isOver,
@@ -79,7 +79,7 @@ final class TurnActivities {
         }
         let attributes = TurnActivityAttributes(agentID: agentID,
                                                 runtime: PoolWords.runtimeName(agent?.runtimeID ?? ""),
-                                                project: project, title: agent?.title)
+                                                folder: folder, title: agent?.title)
         do {
             let activity = try TurnActivity.request(attributes: attributes, content: Self.content(content), pushType: .token)
             note("live activity: started for \(agentID)")
@@ -99,8 +99,8 @@ final class TurnActivities {
     func changed(_ agentID: UUID, in model: AgentsModel) {
         let agent = model.agent(agentID)
         if let agent, let request = agent.startRequestID, startsAsked.remove(request) != nil {
-            sent(to: agent, id: agentID, project: model.project(agent.projectFolder)?.name
-                 ?? agent.projectFolder.lastPathComponent)
+            sent(to: agent, id: agentID, folder: model.folder(agent.folderPath)?.name
+                 ?? agent.folderPath.lastPathComponent)
         }
         guard let activity = activity(for: agentID) else { return }
         update(activity, agent: agent, needs: model.needs.values)

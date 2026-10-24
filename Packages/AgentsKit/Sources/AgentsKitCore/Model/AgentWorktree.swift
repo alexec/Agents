@@ -3,39 +3,39 @@ import Foundation
 /// The git worktree an agent was started in (030).
 ///
 /// On the agent's record rather than looked up, because the worktree can go — removed by
-/// hand, pruned — and the agent still has to know where it was and which project it
-/// belongs to. Its project is `project`, not its `cwd`: a worktree is a second checkout
-/// of the same work, and filing it as a project of its own would scatter one project's
+/// hand, pruned — and the agent still has to know where it was and which folder it
+/// belongs to. Its folder is `folder`, not its `cwd`: a worktree is a second checkout
+/// of the same work, and filing it as a folder of its own would scatter one folder's
 /// agents across the sidebar.
 public struct AgentWorktree: Codable, Hashable, Sendable {
     /// The folder's name, and what the agent's row shows.
     public var name: String
     /// The worktree's top folder. The agent's `cwd` is this, or the same subfolder of
-    /// it that the project folder is of its repository.
+    /// it that the folder is of its repository.
     public var root: URL
     /// `agents/<name>` for one the app made; whatever it had for one chosen; nil when
     /// its HEAD is detached.
     public var branch: String?
-    /// The project folder it was started from.
-    public var project: URL
+    /// The folder it was started from.
+    public var folder: URL
     /// The branch, or the commit when detached, a new worktree was made from. What
     /// "merged" is measured against when it is cleaned up. Nil for one chosen.
     public var base: String?
     /// Made by this app's start, rather than chosen from what was already there.
     public var madeByApp: Bool
 
-    public init(name: String, root: URL, branch: String?, project: URL,
+    public init(name: String, root: URL, branch: String?, folder: URL,
                 base: String?, madeByApp: Bool) {
         self.name = name
         self.root = root
         self.branch = branch
-        self.project = project
+        self.folder = folder
         self.base = base
         self.madeByApp = madeByApp
     }
 }
 
-/// Where a new agent should work, when it is not simply the project folder.
+/// Where a new agent should work, when it is not simply the folder.
 public enum WorktreeChoice: Codable, Hashable, Sendable {
     /// Make a fresh worktree, named from the prompt.
     case new

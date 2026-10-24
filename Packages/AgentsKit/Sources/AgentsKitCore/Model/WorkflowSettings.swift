@@ -7,7 +7,7 @@ import Foundation
 /// not define a vocabulary of modes and could not support the claim if it did — that
 /// `plan` on one runtime is the same promise as `plan` on another is not something
 /// anyone here has checked, and a translation layer would be asserting it on every
-/// fire. A workflow belongs to a project, and its runtime follows the most recently
+/// fire. A workflow belongs to a folder, and its runtime follows the most recently
 /// active agent on the host unless the workflow file names an override.
 ///
 /// All of them are optional, and a workflow stating none of them starts exactly as every
@@ -74,7 +74,7 @@ public struct WorkflowSettings: Codable, Hashable, Sendable {
     /// `nil` when there is nothing to say.
     ///
     /// The runtime is left out when it is the default one. Naming it on every row
-    /// would put the same four words on every workflow in the project, and a row that
+    /// would put the same four words on every workflow in the folder, and a row that
     /// says something about all of them says nothing about any of them.
     public var summary: String? {
         guard !isEmpty else { return nil }

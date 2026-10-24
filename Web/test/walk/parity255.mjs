@@ -1,9 +1,9 @@
 // The page's prompt lists, cards and new-session bar (#255, #256, #257), walked against a scratch
-// root with one git project: its new-session bar (places, runtimes, sandbox, `/` commands), a
+// root with one git folder: its new-session bar (places, runtimes, sandbox, `/` commands), a
 // Claude session started from it in plan mode (its plan approval, answered by ⌥n), and `@` files
 // in that session's prompt. Reads back what each shows; shots beside the notes.
 //
-//   node Web/test/walk/parity255.mjs <WEB_URL> <browser code> <project name> <out dir>
+//   node Web/test/walk/parity255.mjs <WEB_URL> <browser code> <folder name> <out dir>
 //
 // The code is a browser's (`agents-control code --client --browser`).
 
@@ -11,7 +11,7 @@ import { writeFileSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 import { launch } from "./cdp.mjs";
 
-const [webURL, code, project, out] = process.argv.slice(2);
+const [webURL, code, folder, out] = process.argv.slice(2);
 const notes = [];
 const say = (line) => { notes.push(line); console.log(line); };
 
@@ -22,10 +22,10 @@ try {
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  await page.waitFor(`document.querySelector(".sidebar .row.project")`, 20_000);
-  // The project's row opens its new session, at /n/1, as New Session in its menu does.
+  await page.waitFor(`document.querySelector(".sidebar .row.folder")`, 20_000);
+  // The folder's row opens its new session, at /n/1, as New Session in its menu does.
   await page.eval(`(() => {
-    const row = [...document.querySelectorAll(".sidebar .row.project")].find((r) => r.querySelector(".title")?.textContent.includes(${JSON.stringify(project)}));
+    const row = [...document.querySelectorAll(".sidebar .row.folder")].find((r) => r.querySelector(".title")?.textContent.includes(${JSON.stringify(folder)}));
     row?.querySelector("button.pick")?.click();
   })()`);
   await page.waitFor(`location.hash.includes("/n/1")`, 10_000);

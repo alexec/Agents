@@ -34,14 +34,14 @@ help, so you can see that the feature exists and why it is not offered here:
 
 Where a whole section or pane needs the feature, the line is in its place:
 
-- A project's connector set-up, and your own connections on the connectors page.
+- A folder's connector set-up, and your own connections on the connectors page.
 - The **Simulator** pane. On the Mac and the Remote it says **Needs an Update** above the
   line.
 - **Language-server problems** in a file say it as their heading, and an asked completion
   says it as its note. No call goes to the host.
 
-Each host has its own list, so the same chat feature can be there for a project on one host
-and greyed for a project on another.
+Each host has its own list, so the same chat feature can be there for a folder on one host
+and greyed for a folder on another.
 
 ### A host too old for the control plane
 

@@ -43,7 +43,7 @@ public extension DaemonAPI {
         public static var rows: [Row] {
             [
                 // Reading
-                Row(Method.projectsList, params: ProjectsListRequest.self, result: [ProjectSummary].self, kind: .hostRequest),
+                Row(Method.foldersList, params: FoldersListRequest.self, result: [FolderSummary].self, kind: .hostRequest),
                 Row(Method.agentsList, params: ListRequest.self, result: [Agent].self, kind: .hostRequest),
                 Row(Method.agentsTranscript, params: TranscriptRequest.self, result: TranscriptPage.self, kind: .hostRequest),
                 Row(Method.agentsTouchedPaths, params: AgentRequest.self, result: [String].self, kind: .hostRequest),
@@ -79,8 +79,8 @@ public extension DaemonAPI {
                 Row(Method.agentsResuming, params: Empty.self, result: ResumingResponse.self, kind: .hostRequest),
                 Row(Method.worktreesList, params: WorktreesListRequest.self, result: WorktreesListResponse.self,
                     kind: .hostRequest),
-                // Activity ▸ Worktrees (#790): every project's, with sizes; Remove build output and Remove….
-                Row(Method.worktreesAll, params: Empty.self, result: [ProjectWorktrees].self, kind: .hostRequest),
+                // Activity ▸ Worktrees (#790): every folder's, with sizes; Remove build output and Remove….
+                Row(Method.worktreesAll, params: Empty.self, result: [FolderWorktrees].self, kind: .hostRequest),
                 Row(Method.worktreesRemoveBuildOutput, params: WorktreeRemovalRequest.self, result: BuildOutputRemoved.self,
                     kind: .hostRequest),
                 Row(Method.worktreesCheck, params: WorktreeRemovalRequest.self, result: RemovalCheck.self, kind: .hostRequest),
@@ -114,7 +114,7 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 // Remove… on a Connectors page (#2154).
                 Row(Method.mcpRemove, params: MCPRemoveRequest.self, result: MCPRemoveAnswer.self, kind: .hostRequest),
-                // The person's connections (#1335) and a project's Connectors set-up (#1336).
+                // The person's connections (#1335) and a folder's Connectors set-up (#1336).
                 Row(Method.connectionsList, params: Empty.self, result: ConnectionsList.self, kind: .hostRequest),
                 Row(Method.connectionsSignIn, params: ConnectionProviderRequest.self, result: ConnectionSignIn.self,
                     kind: .hostRequest),
@@ -143,7 +143,7 @@ public extension DaemonAPI {
                 Row(Method.backupsMake, params: BackupMakeRequest.self, result: BackupState.self, kind: .hostRequest),
                 Row(Method.backupsRestore, params: BackupRestoreRequest.self, result: BackupRestoreResult.self,
                     kind: .hostRequest),
-                // Export and import of an agent or a project (#1001).
+                // Export and import of an agent or a folder (#1001).
                 Row(Method.agentsExport, params: AgentsExportRequest.self, result: AgentsExport.self, kind: .hostRequest),
                 Row(Method.agentsExportRead, params: SendReadRequest.self, result: SendRead.self, kind: .hostRequest),
                 Row(Method.agentsImportUpload, params: ReceiveUploadRequest.self, result: Empty.self, kind: .hostRequest),
@@ -152,7 +152,7 @@ public extension DaemonAPI {
                 // The files the host could not read in this run (#205, #223), as the window's sidebar foot.
                 Row(Method.storeNotes, params: Empty.self, result: StoreNotes.self, kind: .hostRequest),
                 // Pinned pages (#159): the sidebar's rows and the pages themselves.
-                Row(Method.pinsList, params: Empty.self, result: [ProjectPins].self, kind: .hostRequest),
+                Row(Method.pinsList, params: Empty.self, result: [FolderPins].self, kind: .hostRequest),
                 Row(Method.pinsRead, params: PinReadRequest.self, result: FileReading.self, kind: .hostRequest),
                 // A view drawn in the chat (#187): its resource, and what it asks of its server.
                 Row(Method.viewsRead, params: ViewReadRequest.self, result: ViewResource.self, kind: .hostRequest),
@@ -199,7 +199,7 @@ public extension DaemonAPI {
                 Row(Method.agentsArchive, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsDelete, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
                 // The ways on from a missing folder (#119), as the window's header has them.
-                Row(Method.agentsContinueInProject, params: ContinueInProjectRequest.self, result: UUID.self,
+                Row(Method.agentsContinueInFolder, params: ContinueInFolderRequest.self, result: UUID.self,
                     kind: .hostRequest),
                 // Continue in New (#999): a session whose account the organisation removed or refuses.
                 Row(Method.agentsContinueInNew, params: ContinueInNewRequest.self, result: UUID.self, kind: .hostRequest),
@@ -224,7 +224,7 @@ public extension DaemonAPI {
                 Row(Method.elicitationsAnswer, params: AnswerElicitationRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsAnswerSandbox, params: AnswerSandboxRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.workflowsRun, params: WorkflowRequest.self, result: WorkflowSummary.self, kind: .hostRequest),
-                // A file put into a project's drop box (#231), as the window's drag and the Remote's pick.
+                // A file put into a folder's drop box (#231), as the window's drag and the Remote's pick.
                 Row(Method.dropboxPut, params: DropboxPutRequest.self, result: DropboxPutResponse.self,
                     kind: .hostRequest),
                 // Pin, Unpin, a drop, and typing on a pinned page (#159), from every client alike.
@@ -264,31 +264,31 @@ public extension DaemonAPI {
                 // Clear on a server's event trigger's missed-events line (#383).
                 Row(Method.workflowsClearMCPMissed, params: WorkflowMCPClearMissedRequest.self,
                     result: WorkflowSummary.self, kind: .hostRequest),
-                // New project (#115): Add Folder…, browsing the host's folders, and Clone Git URL…,
-                // as the window's projects column has them.
+                // New folder (#115): Add Folder…, browsing the host's folders, and Clone Git URL…,
+                // as the window's folders column has them.
                 Row(Method.filesBrowse, params: FilesBrowseRequest.self, result: DirectoryListing.self, kind: .hostRequest),
-                Row(Method.projectsAdd, params: ProjectRequest.self, result: ProjectSummary.self, kind: .hostRequest),
-                Row(Method.projectsClone, params: CloneRequest.self, result: ProjectSummary.self, kind: .hostRequest),
-                Row(Method.projectsClones, params: Empty.self, result: [CloneSummary].self, kind: .hostRequest),
-                // Archive… on a project's menu (#668), as the window's project menu has it.
-                Row(Method.projectsArchive, params: ProjectRequest.self, result: ProjectSummary.self, kind: .hostRequest),
-                // Unarchive in the Archived projects fold (#343), as the window's sidebar has it.
-                Row(Method.projectsUnarchive, params: ProjectRequest.self, result: ProjectSummary.self, kind: .hostRequest),
-                // Delete… on an archived project (#677).
-                Row(Method.projectsDelete, params: ProjectRequest.self, result: Empty.self, kind: .hostRequest),
-                // Pin and Unpin on a project's row, as the window's sidebar has them.
-                Row(Method.projectsSetPinned, params: SetPinnedRequest.self, result: ProjectSummary.self, kind: .hostRequest),
-                // A change to the project's own files made outside the app (#531): read, Keep, Undo.
-                Row(Method.projectsReadGuardedChange, params: GuardedChangeRequest.self, result: GuardedChangeReading.self,
+                Row(Method.foldersAdd, params: FolderRequest.self, result: FolderSummary.self, kind: .hostRequest),
+                Row(Method.foldersClone, params: CloneRequest.self, result: FolderSummary.self, kind: .hostRequest),
+                Row(Method.foldersClones, params: Empty.self, result: [CloneSummary].self, kind: .hostRequest),
+                // Archive… on a folder's menu (#668), as the window's folder menu has it.
+                Row(Method.foldersArchive, params: FolderRequest.self, result: FolderSummary.self, kind: .hostRequest),
+                // Unarchive in the Archived folders fold (#343), as the window's sidebar has it.
+                Row(Method.foldersUnarchive, params: FolderRequest.self, result: FolderSummary.self, kind: .hostRequest),
+                // Delete… on an archived folder (#677).
+                Row(Method.foldersDelete, params: FolderRequest.self, result: Empty.self, kind: .hostRequest),
+                // Pin and Unpin on a folder's row, as the window's sidebar has them.
+                Row(Method.foldersSetPinned, params: SetPinnedRequest.self, result: FolderSummary.self, kind: .hostRequest),
+                // A change to the folder's own files made outside the app (#531): read, Keep, Undo.
+                Row(Method.foldersReadGuardedChange, params: GuardedChangeRequest.self, result: GuardedChangeReading.self,
                     kind: .hostRequest),
-                Row(Method.projectsKeepGuardedChange, params: GuardedChangeRequest.self, result: ProjectSummary.self,
+                Row(Method.foldersKeepGuardedChange, params: GuardedChangeRequest.self, result: FolderSummary.self,
                     kind: .hostRequest),
-                Row(Method.projectsUndoGuardedChange, params: GuardedChangeRequest.self, result: ProjectSummary.self,
+                Row(Method.foldersUndoGuardedChange, params: GuardedChangeRequest.self, result: FolderSummary.self,
                     kind: .hostRequest),
                 // Everything in Needs You waiting for an OK (#773): read it, then Approve, Deny or Request changes.
                 Row(Method.approvalsRead, params: ApprovalReadRequest.self, result: GuardedChangeReading.self,
                     kind: .hostRequest),
-                Row(Method.approvalsAnswer, params: ApprovalAnswer.self, result: ProjectSummary.self, kind: .hostRequest),
+                Row(Method.approvalsAnswer, params: ApprovalAnswer.self, result: FolderSummary.self, kind: .hostRequest),
                 Row(Method.filesWatch, params: FilesWatchRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.filesUnwatch, params: FilesWatchRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.artifactWrite, params: ArtifactWriteRequest.self, result: Empty.self, kind: .hostRequest),
@@ -333,7 +333,7 @@ public extension DaemonAPI {
                 Row(Method.auditSetSinks, params: AuditSinks.self, result: AuditSinksState.self, kind: .controlRequest),
                 // Rotate Control Key… in Settings ▸ People (#997).
                 Row(Method.controlRotate, params: Empty.self, result: Empty.self, kind: .controlRequest),
-                // Reports (#1811): usage, cost and time by person, project and machine.
+                // Reports (#1811): usage, cost and time by person, folder and machine.
                 Row(Method.reportsUsage, params: ReportQuery.self, result: UsageReport.self, kind: .controlRequest),
                 Row(Method.reportsExport, params: ReportQuery.self, result: ReportExport.self, kind: .controlRequest),
                 Row(Method.reportsScopes, params: Empty.self, result: ReportScopes.self, kind: .controlRequest),
@@ -450,8 +450,8 @@ public extension DaemonAPI {
                     kind: .hostNotification),
                 Row(Notification.agentElicitation, params: ElicitationNotification.self, result: Empty.self,
                     kind: .hostNotification),
-                Row(Notification.projectChanged, params: ProjectSummary.self, result: Empty.self, kind: .hostNotification),
-                Row(Notification.projectRemoved, params: ProjectRemovedNotification.self, result: Empty.self,
+                Row(Notification.folderChanged, params: FolderSummary.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.folderRemoved, params: FolderRemovedNotification.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.cloneChanged, params: CloneNotification.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.draftOptions, params: DraftOptionsNotification.self, result: Empty.self,

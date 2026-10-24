@@ -17,7 +17,7 @@ signing in** beside it, and you can sign it in from there.
 
 ## Steps
 
-1. On a project's page, click the runtime above the prompt (it names the current one,
+1. On a folder's page, click the runtime above the prompt (it names the current one,
    such as **Claude**). A runtime that is not signed in says **Needs signing in** under
    its name. A runtime that says which account it is signed in with shows that instead,
    such as **Claude Max** or **Anthropic API key**.
@@ -113,7 +113,7 @@ a server, sign in on the server itself; see
   runtime's own sign-in in Terminal (for Claude Code, `claude`, then `/login`), then check
   again.
 - **The runtime is not in the menu at all.** It is not installed, or not where the app
-  looks. With no runtime at all, the project list says **No agent runtime found** and
+  looks. With no runtime at all, the folder list says **No agent runtime found** and
   what each one needs.
 
 ## See also

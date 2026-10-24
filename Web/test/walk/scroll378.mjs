@@ -1,6 +1,6 @@
 // The #378 walk: chat scrolling on the web page, each behaviour measured per frame rather than
 // looked at. Needs a scratch root (run-app) whose host offers the demo runtime
-// (`launch.sh --env AGENTS_TEST_RUNTIME=echo`), a project "work" with a long demo session whose
+// (`launch.sh --env AGENTS_TEST_RUNTIME=echo`), a folder "work" with a long demo session whose
 // first prompt starts "Turn 0" (a few hundred turns) and a short one whose first prompt starts
 // "A short second". New turns are sent to the long one over the host's socket.
 //
@@ -43,8 +43,8 @@ try {
 
   await page.waitFor(`document.querySelector("textarea")`);
   await page.focus("textarea"); await page.type(code); await page.press("Connect");
-  await page.waitFor(`document.querySelector(".row.project")`, 20_000);
-  await page.eval(`document.querySelector(".row.project .disclosure").click()`);
+  await page.waitFor(`document.querySelector(".row.folder")`, 20_000);
+  await page.eval(`document.querySelector(".row.folder .disclosure").click()`);
   await page.waitFor(`document.querySelectorAll(".row.session").length >= 2`, 20_000);
   const openSession = (needle) => page.eval(`[...document.querySelectorAll(".row.session .pick, .row.session")].find((e) => e.textContent.includes(${JSON.stringify(needle)}))?.click()`);
 

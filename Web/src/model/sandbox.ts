@@ -69,11 +69,11 @@ export function sandboxExplanation(choice: SandboxChoice, runtimeID: string, nam
     return codex ? "The mode decides: Full access has no sandbox, the other modes do." : `${name}’s own settings decide. The app adds nothing.`;
   }
   if (choice === "on") {
-    if (codex) return "Commands can write only in the project and cannot reach the network. The mode still decides when Codex asks.";
+    if (codex) return "Commands can write only in the folder and cannot reach the network. The mode still decides when Codex asks.";
     if (runtimeID === "claude") {
-      return "Commands can write only in the project, and Claude asks before they reach a new website. Its permission mode is a separate choice.";
+      return "Commands can write only in the folder, and Claude asks before they reach a new website. Its permission mode is a separate choice.";
     }
-    return `Commands can write only in the project, its temporary folders and ${name}’s own folder. Its permission mode is a separate choice.`;
+    return `Commands can write only in the folder, its temporary folders and ${name}’s own folder. Its permission mode is a separate choice.`;
   }
   return codex
     ? "Full access: commands run with your own access, and Codex stops asking for approval."

@@ -102,7 +102,7 @@ func TestABotsMachineSendsTeamEventsAndKeepsItsOwn(t *testing.T) {
 	failing = false
 
 	// workflows/fire: run here, unclaimed, when the workflow is here and its trigger matches.
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "review.md"), []byte("---\nname: Review\non: lease.granted\nruns-on: [review-bot]\n---\nLook.\n"), 0o644)
 	approveAll(t, c, store.FolderURL(dir))
@@ -114,7 +114,7 @@ func TestABotsMachineSendsTeamEventsAndKeepsItsOwn(t *testing.T) {
 	if _, ok := d.Asked("nothing/here", nil); ok {
 		t.Fatal("answered what it does not know")
 	}
-	other := wire.Event{Name: "lease.granted", Scope: projectScope("/elsewhere/" + filepath.Base(dir)), Details: map[string]string{"resource": "build"}}
+	other := wire.Event{Name: "lease.granted", Scope: folderScope("/elsewhere/" + filepath.Base(dir)), Details: map[string]string{"resource": "build"}}
 	if fire(filepath.Base(dir)+"/missing", other) || fire("nothing", other) || fire(filepath.Base(dir)+"/review", wire.Event{Name: "agent.finished"}) {
 		t.Fatal("ran what is not here")
 	}
@@ -145,7 +145,7 @@ func TestABotsMachineSendsTeamEventsAndKeepsItsOwn(t *testing.T) {
 func TestAPersonsMachineSendsABotsSchedule(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "nightly.md"), []byte("---\nname: Nightly\non:\n  - schedule:\n      at: \":00\"\nruns-on: [review-bot]\n---\nTidy up.\n"), 0o644)
 	var mu sync.Mutex
@@ -195,7 +195,7 @@ func TestAPersonsMachineHearsABotsServerEventsAndOnlySendsThem(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "merged.md"), []byte("---\nname: Merged\non:\n  - pr.merged:\n      server: ci\nruns-on: [review-bot]\n---\nTidy up.\n"), 0o644)
@@ -222,7 +222,7 @@ func TestAPersonsMachineHearsABotsServerEventsAndOnlySendsThem(t *testing.T) {
 	}
 	key := mcpTrigger{event: "pr.merged", arguments: map[string]json.RawMessage{}}.subscriptionKey("ci")
 	merged := func(id string) {
-		d.raise(wire.EventDraft{Name: "pr.merged", At: now(), Scope: projectScope(dir), Sentence: "ci reported pr.merged",
+		d.raise(wire.EventDraft{Name: "pr.merged", At: now(), Scope: folderScope(dir), Sentence: "ci reported pr.merged",
 			Details: map[string]string{"server": "ci", "event": "pr.merged", "subscription": key, "mcp_event_id": id, "payload": "{}"}})
 	}
 	// The first start approves every file as it stands, this one too; it is not listed.

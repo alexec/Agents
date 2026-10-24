@@ -51,9 +51,9 @@ A skills repository can be private: the app reads a private one through `gh`, so
 when `gh` is signed in on this Mac with access to the repository, and says the repository
 is unreachable otherwise. A public one is read over plain HTTPS and needs no `gh`.
 
-## A project's marketplaces
+## A folder's marketplaces
 
-A project can ship its own list in `.agents/marketplaces.json`, committed with it, in the
+A folder can ship its own list in `.agents/marketplaces.json`, committed with it, in the
 same shape:
 
 ```json
@@ -66,10 +66,10 @@ same shape:
 ```
 
 `format` is `mcp-registry`, `skills.sh`, `github-skills` or `file`. They are listed when the sheet
-adds to that project, marked **project**, and they start **off**. A committed file could
+adds to that folder, marked **folder**, and they start **off**. A committed file could
 otherwise send a token from your `secrets.env` to any address it names. Turn one on, and
-that choice is saved as `on` in your own `~/.agents/marketplaces.json`, not in the project.
-Edit the project's list in the file itself.
+that choice is saved as `on` in your own `~/.agents/marketplaces.json`, not in the folder.
+Edit the folder's list in the file itself.
 
 ## A marketplace that is a file
 
@@ -89,8 +89,8 @@ words you type narrow the list.
 ```
 
 A path is a full path, starts with `~/`, or is relative: to your home for your own list, and to
-the project folder for a project's. Each entry runs as its `packages` or `remotes` say, as from
-a registry. A file of your own or of a project cannot name a command to run: only the Agents
+the folder for a folder's. Each entry runs as its `packages` or `remotes` say, as from
+a registry. A file of your own or of a folder cannot name a command to run: only the Agents
 marketplace, carried by the host, does that.
 
 ## If something is wrong

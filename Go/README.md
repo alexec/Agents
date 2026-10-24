@@ -107,7 +107,7 @@ names. It has no account of its own and does not use `gh`.
 
 Agents Host carries it in `Contents/Helpers` (`scripts/go-github-mcp.sh`, a build phase,
 as `agents-control` is), and `scripts/build-linux-agentsd.sh` builds
-`github-mcp-linux-<arch>`, which every Linux host installs beside agentsd. A project names
+`github-mcp-linux-<arch>`, which every Linux host installs beside agentsd. A folder names
 it by bare name: `"github": { "command": "github-mcp", "hosted": true }`.
 
 ## The linear MCP server (`linear-mcp`, #839)

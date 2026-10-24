@@ -7,7 +7,7 @@ import { load } from "./load.mjs";
 
 const { Store } = await load("test/tokenAsk.ts");
 const { workflowHostChoices } = await load("src/model/workflows.ts");
-const { projectLabel, orderedProjects } = await load("src/views/Sidebar.tsx");
+const { folderLabel, orderedFolders } = await load("src/views/Sidebar.tsx");
 const { offlineStrip } = await load("src/views/OfflineStrip.tsx");
 
 const mac = { id: "wd2lxg5e", name: "Studio", platform: "macOS 26.1", version: "0.5.0", state: "online", reach: "uplink", machineID: "M1" };
@@ -59,11 +59,11 @@ test("a home host that is not a Mac is not called This Mac", async () => {
 });
 
 test("the sidebar, the workflow host menu and the offline strip name the person's Mac by its id", () => {
-  const project = { name: "Agents", project: { folder: "file:///u/Agents/", addedAt: 1 } };
-  assert.equal(projectLabel(mac, project, mac.id), "Agents");
-  assert.equal(projectLabel(server, project, mac.id), "box:Agents");
-  assert.equal(projectLabel(mac, project), "Studio:Agents", "without the id, only a host mac is this Mac");
-  assert.deepEqual(orderedProjects([server, mac], { box: [project], [mac.id]: [project] }, mac.id).map((r) => r.host.id), [mac.id, "box"]);
+  const folder = { name: "Agents", folder: { folder: "file:///u/Agents/", addedAt: 1 } };
+  assert.equal(folderLabel(mac, folder, mac.id), "Agents");
+  assert.equal(folderLabel(server, folder, mac.id), "box:Agents");
+  assert.equal(folderLabel(mac, folder), "Studio:Agents", "without the id, only a host mac is this Mac");
+  assert.deepEqual(orderedFolders([server, mac], { box: [folder], [mac.id]: [folder] }, mac.id).map((r) => r.host.id), [mac.id, "box"]);
   assert.deepEqual(workflowHostChoices([server, mac], mac.id).map((c) => c.name), ["This Mac", "box"]);
   assert.match(offlineStrip(mac.id, { ...mac, state: "offline" }, null, mac.id).line, /^This Mac hasn’t answered/);
   assert.match(offlineStrip("box", { ...server, state: "offline" }, null, mac.id).line, /^box is offline/);

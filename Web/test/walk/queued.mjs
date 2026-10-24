@@ -13,8 +13,8 @@ try {
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  await page.waitFor(`document.querySelector(".projects .row")`);
-  await page.eval(`[...document.querySelectorAll(".projects .row")].find((e) => e.textContent.includes("work"))?.click()`);
+  await page.waitFor(`document.querySelector(".folders .row")`);
+  await page.eval(`[...document.querySelectorAll(".folders .row")].find((e) => e.textContent.includes("work"))?.click()`);
   await page.waitFor(`document.querySelector(".sessions .session")`, 20_000);
   await page.eval(`document.querySelector(".sessions .session").click()`);
   await page.waitFor(`document.querySelectorAll(".queued").length >= 2`, 30_000);

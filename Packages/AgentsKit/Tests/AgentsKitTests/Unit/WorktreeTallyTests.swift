@@ -8,10 +8,10 @@ struct WorktreeTallyTests {
     private static let gb: Int64 = 1_000_000_000
 
     private func worktree(_ name: String, gb: Double?, agents: Int = 0, partial: Bool = false,
-                          in project: String = "/p") -> DaemonAPI.WorktreeSummary {
+                          in folder: String = "/p") -> DaemonAPI.WorktreeSummary {
         DaemonAPI.WorktreeSummary(
-            name: name, root: URL(filePath: "\(project)/.agents/worktrees/\(name)"), branch: "agents/\(name)",
-            isProjectFolder: false, exists: true, madeByApp: true, agents: (0..<agents).map { _ in UUID() },
+            name: name, root: URL(filePath: "\(folder)/.agents/worktrees/\(name)"), branch: "agents/\(name)",
+            isFolderPath: false, exists: true, madeByApp: true, agents: (0..<agents).map { _ in UUID() },
             size: gb.map { DaemonAPI.WorktreeSize(bytes: Int64($0 * Double(Self.gb)), partial: partial) })
     }
 
@@ -39,18 +39,18 @@ struct WorktreeTallyTests {
     }
 
     @MainActor
-    @Test func aSizeHeardAfterTheListFillsItInAndProjectsHoldingMostIdleComeFirst() {
+    @Test func aSizeHeardAfterTheListFillsItInAndFoldersHoldingMostIdleComeFirst() {
         let model = AgentsModel()
         let late = worktree("late", gb: nil, in: "/q")
         model.replaceWorktrees([
-            DaemonAPI.ProjectWorktrees(project: URL(filePath: "/p"), worktrees: [worktree("a", gb: 2)]),
-            DaemonAPI.ProjectWorktrees(project: URL(filePath: "/q"), worktrees: [late]),
+            DaemonAPI.FolderWorktrees(folder: URL(filePath: "/p"), worktrees: [worktree("a", gb: 2)]),
+            DaemonAPI.FolderWorktrees(folder: URL(filePath: "/q"), worktrees: [late]),
         ])
-        #expect(model.worktreesForCleanup().map(\.project.path) == ["/p", "/q"])
+        #expect(model.worktreesForCleanup().map(\.folder.path) == ["/p", "/q"])
 
         let note = DaemonAPI.WorktreesSized(sizes: [.init(root: late.root, size: .init(bytes: 7 * Self.gb))])
         #expect(model.apply(DaemonAPI.Notification.worktreesSized, try? JSONValue.encoding(note)))
         #expect(model.size(of: late)?.bytes == 7 * Self.gb)
-        #expect(model.worktreesForCleanup().map(\.project.path) == ["/q", "/p"])
+        #expect(model.worktreesForCleanup().map(\.folder.path) == ["/q", "/p"])
     }
 }

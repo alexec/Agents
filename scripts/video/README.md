@@ -41,10 +41,10 @@ and marketing videos; `--upload` uploads an integration video (below).
    it (`~/.cache/agents-video/work/<id>/video-sheet.png`) is made to look at before the
    video is kept.
 
-Real Claude agents run in the scenes, on scratch projects: a few cents a video. On camera
+Real Claude agents run in the scenes, on scratch folders: a few cents a video. On camera
 the person is called Sam (`launch.sh --person`), and the scratch root says it has 500 GB
 free, so the real disk is never shown. A scratch agent still reads the person's own
-`~/.claude/CLAUDE.md`: each project tells it never to name an instructions file, and a
+`~/.claude/CLAUDE.md`: each folder tells it never to name an instructions file, and a
 take whose window shows the person's name or their own instructions fails.
 
 ## Integration videos (#1793)
@@ -114,7 +114,7 @@ recording starts, and `run(v)` is the recording. `v` is the `Video` in `make.py`
 
 | Call | What it does |
 |---|---|
-| `v.project(name, files)` | a committed Git project under the root, added to the app |
+| `v.folder(name, files)` | a committed Git folder under the root, added to the app |
 | `v.start(folder, prompt)` | a real agent, as **New Session** would start it |
 | `v.select(text)`, `v.press(text)`, `v.unfold(text)` | the window's accessibility tree, read in its own process |
 | `v.type(field, text)`, `v.key("return")`, `v.menu(menu, item)` | keys and menu items, sent in the window's process |

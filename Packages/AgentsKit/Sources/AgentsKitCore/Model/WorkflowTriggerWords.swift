@@ -14,15 +14,15 @@ extension WorkflowTrigger {
         return [:]
     }
 
-    /// Whose agents and events it listens to: the project's, the host's as a whole
-    /// (an event about the machine runs matching workflows in every project), or
+    /// Whose agents and events it listens to: the folder's, the host's as a whole
+    /// (an event about the machine runs matching workflows in every folder), or
     /// either. `nil` for a schedule, which is a clock, and for a trigger this version
     /// does not know, which listens to nothing.
     public var listensIn: EventScopeKind? {
         switch self {
         case .schedule, .unrecognised: return nil
-        // A server's events are the project's: its servers are found by its folder.
-        case .serverEvent: return .project
+        // A server's events are the folder's: its servers are found by its folder.
+        case .serverEvent: return .folder
         case .event(let pattern):
             if let subject = pattern.wholeSubject {
                 let scopes = Set(EventCatalogue.kinds(in: subject).map(\.scope))

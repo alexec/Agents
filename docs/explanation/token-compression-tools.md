@@ -12,7 +12,7 @@ Token Killer) and **Headroom**. Both claim savings of 60–95%.
 
 This page records what each tool does and what independent measurements found. It also
 covers where either would plug into the app and what the app should do. It was researched
-on 2026-10-08 from each project's own pages, two independent benchmarks of rtk and three
+on 2026-10-08 from each folder's own pages, two independent benchmarks of rtk and three
 write-ups of Headroom in use. No tool was installed or run, and no code was changed.
 
 ## In short

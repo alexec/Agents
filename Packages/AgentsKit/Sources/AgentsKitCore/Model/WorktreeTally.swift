@@ -27,7 +27,7 @@ public struct WorktreeTally: Hashable, Sendable {
         }
     }
 
-    public init(_ groups: [DaemonAPI.ProjectWorktrees]) {
+    public init(_ groups: [DaemonAPI.FolderWorktrees]) {
         self.init(groups.flatMap(\.worktrees))
     }
 
@@ -47,7 +47,7 @@ public struct WorktreeTally: Hashable, Sendable {
 
     public static let empty = "No worktrees. A session started in a new worktree makes one."
     /// The page's intro, under its title.
-    public static let intro = "Every project's worktrees and how much each holds on disk. Idle ones, with no session in them, come first, largest first."
+    public static let intro = "Every folder's worktrees and how much each holds on disk. Idle ones, with no session in them, come first, largest first."
     /// A row's size before its walk is done.
     public static let measuring = "Measuring…"
 
@@ -57,7 +57,7 @@ public struct WorktreeTally: Hashable, Sendable {
         return "Freed \(removed.freed.words): \(removed.removed.joined(separator: ", "))."
     }
 
-    /// What Remove… asks before it loses work, as Project Settings asked it (030).
+    /// What Remove… asks before it loses work, as Folder Settings asked it (030).
     public static func removalMessage(_ check: DaemonAPI.RemovalCheck, branch: String?) -> String {
         var lost: [String] = []
         if check.uncommitted == 1 { lost.append("1 uncommitted change") }
@@ -66,6 +66,6 @@ public struct WorktreeTally: Hashable, Sendable {
         return "This loses \(lost.joined(separator: " and ")), and removes its branch \(branch ?? "")."
     }
 
-    /// The prompt Clean up worktrees offers a new session in the project.
+    /// The prompt Clean up worktrees offers a new session in the folder.
     public static let cleanUpPrompt = "Remove worktrees and delete branches for any work that has been merged to the default branch."
 }

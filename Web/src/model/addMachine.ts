@@ -1,6 +1,6 @@
 // Add a Machine… (#2131): one sheet with three ways in, a provider first; then a server, by one
 // command; then another Mac, by a code. Connectors set-up ▸ Where agents run says the machine the
-// project is on and what else is yours. The window's and the Remote's AddMachine.swift is the same.
+// folder is on and what else is yours. The window's and the Remote's AddMachine.swift is the same.
 
 export type AddMachineWay = "provider" | "server" | "code";
 export const addMachineWays: readonly AddMachineWay[] = ["provider", "server", "code"];
@@ -23,7 +23,7 @@ export const addMachineWords = {
   noProviders: "No provider here can make a machine yet.",
   noProvidersAskAdmin: "No provider here can make a machine. An admin adds one in Settings ▸ Machine Providers.",
   needsControlPlane: "Needs a control plane with one copy, such as the one on your Mac.",
-  providersYours: "Your providers are yours in every project.",
+  providersYours: "Your providers are yours in every folder.",
   next: "Next",
   machineTitle: "New Machine",
   namePrompt: "build-2",
@@ -40,16 +40,16 @@ export const addMachineWords = {
 };
 
 export const whereAgentsRun = {
-  /** The slot's title: the machine the project's folder is on. */
+  /** The slot's title: the machine the folder is on. */
   title: (onThisMac: boolean, hostName: string | null | undefined) => (onThisMac ? "This Mac" : hostName ?? "Its machine"),
   /** The slot's line: why it runs there, and what else is yours. */
   line(others: readonly string[], providers: readonly string[]): string {
-    const parts = ["Agents run where this project’s folder is."];
+    const parts = ["Agents run where this folder is."];
     if (others.length) parts.push(`Your other machines: ${others.join(", ")}.`);
     if (providers.length) parts.push(`Providers: ${providers.join(", ")}.`);
     return parts.join(" ");
   },
-  hereNote: "This project’s folder is here.",
+  hereNote: "This folder is here.",
   addMachineNote: "From a provider, a server or another Mac.",
   addProviderNote: `Docker, DigitalOcean, Codespaces, Coder and the others. ${addMachineWords.providersYours}`,
 };

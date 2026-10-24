@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// One agent on a project page: what it is, and what it is doing.
+/// One agent on a folder page: what it is, and what it is doing.
 ///
 /// An icon for the state, the name it was given, and a line saying what it is working
 /// on. The name is what it was asked; the line under it is what is happening now, which
@@ -14,8 +14,8 @@ struct AgentRow: View {
     /// A row of the Mac's sessions list rather than a card on a page: a list-sized
     /// title and one line of what it said, so a column of them reads at a glance.
     private let isCompact: Bool
-    /// Which project it is in, after the title: under a smart row of the sidebar (#495),
-    /// which gathers sessions from every project, and nowhere else.
+    /// Which folder it is in, after the title: under a smart row of the sidebar (#495),
+    /// which gathers sessions from every folder, and nowhere else.
     private let place: String?
     /// Where it sits in the sidebar's tree (#835): a parent with its count and fold, or a
     /// child one indent in. Nil off the sidebar.
@@ -108,7 +108,7 @@ struct AgentRow: View {
                         RenameField(agent: agent)
                             .appText(isCompact ? .supporting : .reading)
                     } else {
-                    // The project's name whole up to 40% of the line, then cut, so a long
+                    // The folder's name whole up to 40% of the line, then cut, so a long
                     // one never pushes the title out (#936).
                     TitleAndPlace {
                         Text(agent.title ?? "Untitled")
@@ -183,12 +183,12 @@ struct AgentRow: View {
                     Telling(host: model.answerRecipient(agent.id), doing: acting.doing)
                         .frame(height: isCompact ? 14 : nil)
                 } else if let queued = model.queuedLine(agent) {
-                    // Its place in its project's queue (#362), in the report's place: it
+                    // Its place in its folder's queue (#362), in the report's place: it
                     // has said nothing yet, and starts by itself when a place frees.
                     Text(queued)
                         .appText(isCompact ? .fine : .supporting)
                         .foregroundStyle(.secondary)
-                        .help("Starts by itself when this project has a place free for another helper")
+                        .help("Starts by itself when this folder has a place free for another helper")
                 } else if let reason = needsYouLine {
                     Text(reason)
                         .appText(isCompact ? .fine : .supporting)
@@ -196,7 +196,7 @@ struct AgentRow: View {
                         .lineLimit(isCompact ? 1 : 2)
                         .fixedSize(horizontal: false, vertical: true)
                 } else if agent.missingFolder != nil, agent.state != .archived {
-                    // Its folder gone (#119): said before anybody types, as a project's
+                    // Its folder gone (#119): said before anybody types, as a folder's
                     // row says it, in the report's place.
                     Text(MissingFolderWords.label)
                         .appText(isCompact ? .fine : .supporting)
@@ -226,7 +226,7 @@ struct AgentRow: View {
                 // the prompt bar and the wait lines carry it, and Carry on with it.
                 if !isCompact {
                     // Working in a worktree (030): named, because with two agents in one
-                    // project the worktree is how you tell whose changes are whose. On this
+                    // folder the worktree is how you tell whose changes are whose. On this
                     // line, not the title's, so a long branch never cuts the title short (#68).
                     // Labels are shown here and changed over the chat.
                     if agent.worktree != nil || !agent.labels.isEmpty {
@@ -350,7 +350,7 @@ struct AgentRow: View {
                 }
                 // The person's title, which the runtime's no longer replaces (#751).
                 Button("Rename…") { model.renaming = Renaming(id: agent.id) }
-                // At the top of its project whatever its state, or back among the rest (#180).
+                // At the top of its folder whatever its state, or back among the rest (#180).
                 PinSessionButton(agent: agent)
                 // Branching leaves the original alone and carries the history so far.
                 Button("Branch") { Task { await model.fork(agent.id) } }
@@ -402,7 +402,7 @@ struct AgentRow: View {
     /// the file has since gone, so the mark never disappears with it.
     private var startedByWorkflowName: String? {
         guard let id = agent.startedByWorkflow else { return nil }
-        return model.workflows(in: agent.projectFolder).first { $0.workflow.workflowID == id }?.workflow.name ?? id
+        return model.workflows(in: agent.folderPath).first { $0.workflow.workflowID == id }?.workflow.name ?? id
     }
 }
 
@@ -635,6 +635,6 @@ struct PinSessionButton: View {
             Task { await model.setPinned(agent, !pinned) }
         }
         .help(pinned ? "Put this session back among the others"
-                     : "Keep this session at the top of its project, whatever its state")
+                     : "Keep this session at the top of its folder, whatever its state")
     }
 }

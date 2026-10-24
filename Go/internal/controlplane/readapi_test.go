@@ -49,7 +49,7 @@ func TestTheReadAPIReadsTheReportsWithAToken(t *testing.T) {
 	owner := p.host("OWNERS-MAC")
 	_, admin := p.client("Owner's window")
 	bea := p.invite(admin, "Bea", wire.UserRoleMember)
-	sendUsage(t, p, owner.member.Host, wire.UsageRollupRow{Project: "agents", Runtime: "claude",
+	sendUsage(t, p, owner.member.Host, wire.UsageRollupRow{Folder: "agents", Runtime: "claude",
 		Cost: map[string]float64{"USD": 2.5}, InputTokens: 100, Turns: 1})
 
 	// Only an admin makes one; its value is shown once, and only its hash is kept.

@@ -72,7 +72,7 @@ Loops' source is visible at github.com/alexec/Agents (all rights reserved).
 
 ## Screenshots
 
-In `screenshots/`, taken as `promo/shots/README.md` says, with made-up projects and agents.
+In `screenshots/`, taken as `promo/shots/README.md` says, with made-up folders and agents.
 Upload them in the order of their numbers.
 
 | Display | Size | Files |

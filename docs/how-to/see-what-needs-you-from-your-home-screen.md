@@ -7,7 +7,7 @@ description: Put the number of agent sessions that need you on your Home screen,
 # See what needs you from your Home screen
 
 A widget on your Home screen shows how many agent sessions are waiting on you, and the
-newest few of them by name. Tap the number to go to the first project with something
+newest few of them by name. Tap the number to go to the first folder with something
 waiting, or a row to go straight to that conversation.
 
 The number is the one the Mac's Dock badge shows: every agent asking a question, waiting
@@ -34,7 +34,7 @@ cannot back.
 
 - **Small** is the number, and whether anybody is waiting. Orange means somebody is.
 - **Medium** adds up to four sessions, newest first: what the agent is called, which
-  project it is in, and what it is asking for. If more are waiting than fit, **+3 more**
+  folder it is in, and what it is asking for. If more are waiting than fit, **+3 more**
   counts the rest.
 - Once nothing is waiting, the widget says **Nothing waiting** rather than showing a zero
   with nothing under it.
@@ -42,8 +42,8 @@ cannot back.
 **Open one**
 
 - Tap a row to go to that conversation.
-- Tap the number, or the widget when there is no row to tap, to go to the first project
-  with something waiting. When nothing is waiting, it goes to the list of projects.
+- Tap the number, or the widget when there is no row to tap, to go to the first folder
+  with something waiting. When nothing is waiting, it goes to the list of folders.
 
 **Keep it honest**
 

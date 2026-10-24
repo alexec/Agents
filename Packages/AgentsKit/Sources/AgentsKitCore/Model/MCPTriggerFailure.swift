@@ -7,7 +7,7 @@ import Foundation
 /// times.
 public struct MCPTriggerFailure: Codable, Hashable, Sendable {
     public enum Code: String, Codable, Hashable, Sendable {
-        /// No server this project can use offers the event.
+        /// No server this folder can use offers the event.
         case serverNotFound
         /// The server names the event against the rules: not `noun.verbed`, or about
         /// one of the app's own subjects.

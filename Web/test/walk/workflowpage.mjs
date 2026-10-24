@@ -15,8 +15,8 @@ try {
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  await page.waitFor(`document.querySelector(".project-fold .row.project")`, 30_000);
-  const unfold = `document.querySelector(".project-fold .disclosure[aria-expanded=false]")?.click()`;
+  await page.waitFor(`document.querySelector(".folder-fold .row.folder")`, 30_000);
+  const unfold = `document.querySelector(".folder-fold .disclosure[aria-expanded=false]")?.click()`;
   await page.eval(unfold);
   await page.waitFor(`document.querySelector(".row.workflow")`, 30_000);
   const visible = (selector) => page.eval(`[...document.querySelectorAll(${JSON.stringify(selector)})]

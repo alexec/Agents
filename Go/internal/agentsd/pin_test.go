@@ -113,7 +113,7 @@ func TestAMachineThatMustJoinRunsNothingUntilItHas(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
 	d.SetPin(PinFromFlags("control.acme.dev", controllink.KeyID(k.public), true))
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	refused(t, c.callError(t, 2, "agents/start", startParams(dir, "claude", nil)), "mustJoin", "")
 	e := c.callError(t, 3, "agents/start", startParams(dir, "claude", nil))
 	if !strings.Contains(e.Message, "join control.acme.dev") {

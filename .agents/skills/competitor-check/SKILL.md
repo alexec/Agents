@@ -26,7 +26,7 @@ added it.
    report (the past 30 days when there is none).
 3. For each new feature, check whether Agents already has it: search `docs/`, `specs/`
    and the GitHub issues, open and closed (`gh issue list --state all --search …`).
-4. Drop gaps the project has set aside, such as new runtimes or App Store work.
+4. Drop gaps the folder has set aside, such as new runtimes or App Store work.
 5. Pick **at most three** gaps that users of those tools would expect from us. File each
    one with `gh issue create --label competitor --label enhancement`, after creating the
    `competitor` label if it does not exist yet. Each issue says which tool has the feature
@@ -38,7 +38,7 @@ added it.
 
 ## Rules
 
-- Never change the project folder you start in: it is the shared checkout of `main`.
+- Never change the folder you start in: it is the shared checkout of `main`.
   Make no branches and no commits, and start no other sessions.
 - When you mention Alex, name them. Write no bare "you".
 - End with one sentence naming the issues you filed (or saying there were none) and the

@@ -207,7 +207,7 @@ struct HostWindow: View {
         }
         var parts = ["Running your agents"]
         if let working = model.working { parts.append("\(working) working") }
-        if let projects = model.projects { parts.append("\(projects) project\(projects == 1 ? "" : "s")") }
+        if let folders = model.folders { parts.append("\(folders) folder\(folders == 1 ? "" : "s")") }
         parts.append("Agents Host \(model.version)")
         return parts.joined(separator: " · ")
     }

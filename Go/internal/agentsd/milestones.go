@@ -293,7 +293,7 @@ func anyRunning(listed wire.AgentMachines) bool {
 	return false
 }
 
-// hasWorkflowHere is whether a project has a workflow that runs on this host.
+// hasWorkflowHere is whether a folder has a workflow that runs on this host.
 func (d *Daemon) hasWorkflowHere() bool {
 	d.workflowMu.Lock()
 	defer d.workflowMu.Unlock()

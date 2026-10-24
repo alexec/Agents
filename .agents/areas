@@ -14,13 +14,13 @@
 
 # The broad lines come first, so that the feature lines below them win (#873).
 
-# build: building, testing and shipping: scripts, CI, project files, entitlements and
+# build: building, testing and shipping: scripts, CI, folder files, entitlements and
 # privacy manifests.
 .github/                                               build
 .agents/areas                                          build
 # The run-app skill (#2400): the scratch set-up every lane tests with.
 .agents/skills/run-app/                                build
-project.yml                                            build
+folder.yml                                            build
 **/Package.swift                                       build
 **/Package.resolved                                    build
 **/Info.plist                                          build
@@ -133,7 +133,7 @@ Packages/AgentsKit/Sources/AgentsKitCore/Files/        panes
 Packages/AgentsKit/Sources/AgentsKitCore/Model/ShownFile.swift  panes
 Packages/AgentsKit/Sources/AgentsKitCore/Model/ChartSpec.swift  panes
 Packages/AgentsKit/Sources/AgentsKitCore/Model/File*.swift  panes
-Packages/AgentsKit/Sources/AgentsKitCore/Model/ProjectShell.swift  panes
+Packages/AgentsKit/Sources/AgentsKitCore/Model/FolderShell.swift  panes
 Packages/AgentsKit/Sources/AgentsKitCore/Model/ShellState.swift  panes
 Packages/AgentsKit/Sources/AgentsKitCore/UI/PanePlacement.swift  panes
 Packages/AgentsKit/Sources/AgentsKitCore/UI/PageMetrics.swift  panes
@@ -167,42 +167,42 @@ docs/how-to/read-an-agents-changes.md                  panes
 docs/how-to/follow-a-live-document.md                  panes
 docs/how-to/look-at-an-html-page.md                    panes
 
-# projects: projects and their settings, pins, the drop box, worktrees, cloning and
+# folders: folders and their settings, pins, the drop box, worktrees, cloning and
 # the .agents files.
-App/Sources/Projects/                                  projects
-App/Sources/Worktrees/                                 projects
-Remote/Sources/Projects/                               projects
-Remote/Sources/Worktrees/                              projects
-Shared/UI/AppView/                                     projects
-Packages/AgentsKit/Sources/AgentsKitCore/Pins/         projects
-Packages/AgentsKit/Sources/AgentsKitCore/AppViews/     projects
-Packages/AgentsKit/Sources/AgentsKitCore/Model/Project*.swift  projects
-Packages/AgentsKit/Sources/AgentsKitCore/Model/*Worktree*.swift  projects
-Packages/AgentsKit/Sources/AgentsKitCore/Model/GuardedFile.swift  projects
-Packages/AgentsKit/Sources/AgentsKitCore/Model/MissingFolder.swift  projects
-Packages/AgentsKit/Sources/AgentsKitCore/Model/Persona.swift  projects
-Packages/AgentsKit/Tests/AgentsKitTests/**/*Project*   projects
-Packages/AgentsKit/Tests/AgentsKitTests/**/*Worktree*  projects
-Web/src/views/NewProject.tsx                           projects
-Web/src/views/Worktrees.tsx                            projects
-Web/src/views/Dropbox*.tsx                             projects
-Web/src/views/Pinned*.tsx                              projects
-Web/src/views/Archive*.tsx                             projects
-Web/src/views/GuardedChange.tsx                        projects
-Web/src/views/MissingFolder.tsx                        projects
-Web/src/model/worktrees.ts                             projects
-Web/src/model/dropbox.ts                               projects
-Web/src/model/personas.ts                              projects
-Web/src/model/missingFolder.ts                         projects
-docs/how-to/add-a-project.md                           projects
-docs/how-to/start-in-a-worktree.md                     projects
-docs/how-to/pin-a-page-to-a-project.md                 projects
-docs/how-to/archive-and-stop.md                        projects
-docs/explanation/projects-hosts-worktrees.md           projects
+App/Sources/Folders/                                  folders
+App/Sources/Worktrees/                                 folders
+Remote/Sources/Folders/                               folders
+Remote/Sources/Worktrees/                              folders
+Shared/UI/AppView/                                     folders
+Packages/AgentsKit/Sources/AgentsKitCore/Pins/         folders
+Packages/AgentsKit/Sources/AgentsKitCore/AppViews/     folders
+Packages/AgentsKit/Sources/AgentsKitCore/Model/Folder*.swift  folders
+Packages/AgentsKit/Sources/AgentsKitCore/Model/*Worktree*.swift  folders
+Packages/AgentsKit/Sources/AgentsKitCore/Model/GuardedFile.swift  folders
+Packages/AgentsKit/Sources/AgentsKitCore/Model/MissingFolder.swift  folders
+Packages/AgentsKit/Sources/AgentsKitCore/Model/Persona.swift  folders
+Packages/AgentsKit/Tests/AgentsKitTests/**/*Folder*   folders
+Packages/AgentsKit/Tests/AgentsKitTests/**/*Worktree*  folders
+Web/src/views/NewFolder.tsx                           folders
+Web/src/views/Worktrees.tsx                            folders
+Web/src/views/Dropbox*.tsx                             folders
+Web/src/views/Pinned*.tsx                              folders
+Web/src/views/Archive*.tsx                             folders
+Web/src/views/GuardedChange.tsx                        folders
+Web/src/views/MissingFolder.tsx                        folders
+Web/src/model/worktrees.ts                             folders
+Web/src/model/dropbox.ts                               folders
+Web/src/model/personas.ts                              folders
+Web/src/model/missingFolder.ts                         folders
+docs/how-to/add-a-folder.md                           folders
+docs/how-to/start-in-a-worktree.md                     folders
+docs/how-to/pin-a-page-to-a-folder.md                 folders
+docs/how-to/archive-and-stop.md                        folders
+docs/explanation/folders-hosts-worktrees.md           folders
 
 # workflows: workflows, their page, schedule and switches (triggers are events).
-App/Sources/Projects/WorkflowPage.swift                workflows
-Remote/Sources/Projects/WorkflowPage.swift             workflows
+App/Sources/Folders/WorkflowPage.swift                workflows
+Remote/Sources/Folders/WorkflowPage.swift             workflows
 Shared/UI/WorkflowStatus.swift                         workflows
 Shared/UI/WorkflowHostsSection.swift                   workflows
 Packages/AgentsKit/Sources/AgentsKitCore/Workflows/    workflows
@@ -238,7 +238,7 @@ App/Sources/Spending/                                  usage
 App/Sources/Time/                                      usage
 App/Sources/Settings/CostSettingsView.swift            usage
 Remote/Sources/Time/                                   usage
-Remote/Sources/Projects/TotalsView.swift               usage
+Remote/Sources/Folders/TotalsView.swift               usage
 Shared/UI/UsageCharts.swift                            usage
 Shared/UI/TimeCharts.swift                             usage
 Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/Allowance/  usage
@@ -259,7 +259,7 @@ docs/how-to/limit-spending.md                          usage
 App/Sources/Runtimes/                                  runtimes
 App/Sources/Config/                                    runtimes
 App/Sources/Settings/AgentRuntimesSettingsView.swift   runtimes
-Remote/Sources/Projects/RuntimesView.swift             runtimes
+Remote/Sources/Folders/RuntimesView.swift             runtimes
 Shared/UI/Chat/ModelPill.swift                         runtimes
 Shared/UI/Chat/Sandbox*.swift                          runtimes
 Packages/AgentsKit/Sources/AgentsKitCore/ACP/          runtimes
@@ -289,8 +289,8 @@ docs/how-to/keep-going-when-a-runtime-runs-out.md      runtimes
 # marketplace: MCP servers, skills, plugins and the marketplaces they come from.
 App/Sources/Catalog/                                   marketplace
 App/Sources/MCPServers/                                marketplace
-App/Sources/Projects/PluginsSection.swift              marketplace
-App/Sources/Projects/ProjectMCPSection.swift           marketplace
+App/Sources/Folders/PluginsSection.swift              marketplace
+App/Sources/Folders/FolderMCPSection.swift           marketplace
 Remote/Sources/MCPServers/                             marketplace
 Shared/UI/MCPHealthRow.swift                           marketplace
 Packages/AgentsKit/Sources/AgentsKitCore/Daemon/*MCP*.swift  marketplace
@@ -298,7 +298,7 @@ Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI+Catalog.swift  marketp
 Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI+Marketplaces.swift  marketplace
 Packages/AgentsKit/Sources/AgentsKitCore/Model/MCP*.swift  marketplace
 Packages/AgentsKit/Sources/AgentsKitCore/Model/HostedMCPWords.swift  marketplace
-Packages/AgentsKit/Sources/AgentsKitCore/Model/ProjectPlugin.swift  marketplace
+Packages/AgentsKit/Sources/AgentsKitCore/Model/FolderPlugin.swift  marketplace
 Packages/AgentsKit/Tests/AgentsKitTests/Catalog/       marketplace
 Web/src/views/MCPServers.tsx                           marketplace
 Web/src/model/hostedMCP.ts                             marketplace
@@ -372,7 +372,7 @@ App/Sources/Settings/WakeSettingsSection.swift         hosts
 App/Sources/Settings/ServerCredentials.swift           hosts
 App/Sources/Control/ControlAddServerSheet.swift        hosts
 App/Sources/Control/ThisMacHost.swift                  hosts
-App/Sources/Control/HostProjectsPicker.swift           hosts
+App/Sources/Control/HostFoldersPicker.swift           hosts
 Shared/UI/HostListHeading.swift                        hosts
 Shared/UI/OfflineWords.swift                           hosts
 Packages/AgentsKit/Sources/AgentsKit/Hosts/            hosts
@@ -441,16 +441,16 @@ Packages/AgentsKit/Sources/AgentsKitCore/Model/LeaseStatus.swift  agent-tools
 Web/src/views/Resources.tsx                            agent-tools
 docs/explanation/leases.md                             agent-tools
 
-# sidebar: the list of projects, sessions and workflows, and its row grammar (#587).
+# sidebar: the list of folders, sessions and workflows, and its row grammar (#587).
 App/Sources/AgentList/                                 sidebar
-App/Sources/Projects/ProjectListView.swift             sidebar
-App/Sources/Projects/ProjectRow.swift                  sidebar
-App/Sources/Projects/ProjectWorkRows.swift             sidebar
-App/Sources/Projects/PinnedPageRows.swift              sidebar
-App/Sources/Projects/SidebarSmartRows.swift            sidebar
-App/Sources/Projects/WorkflowRow.swift                 sidebar
-App/Sources/Projects/WindowFolds.swift                 sidebar
-App/Sources/Projects/SwipeAction.swift                 sidebar
+App/Sources/Folders/FolderListView.swift             sidebar
+App/Sources/Folders/FolderRow.swift                  sidebar
+App/Sources/Folders/FolderWorkRows.swift             sidebar
+App/Sources/Folders/PinnedPageRows.swift              sidebar
+App/Sources/Folders/SidebarSmartRows.swift            sidebar
+App/Sources/Folders/WorkflowRow.swift                 sidebar
+App/Sources/Folders/WindowFolds.swift                 sidebar
+App/Sources/Folders/SwipeAction.swift                 sidebar
 Packages/AgentsKit/Sources/AgentsKitCore/Sidebar/      sidebar
 Packages/AgentsKit/Tests/AgentsKitTests/Unit/Sidebar*  sidebar
 Remote/Sources/Sidebar/                                sidebar

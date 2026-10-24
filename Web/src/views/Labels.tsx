@@ -1,6 +1,6 @@
 // A session's labels (071 FR-027; LabelTagField.swift): chips, each removable, and a field where
 // a comma finishes a label and Delete on an empty field takes the last one off. What is typed is
-// held to SessionLabelPolicy before it is sent; the project's labels are offered as you type.
+// held to SessionLabelPolicy before it is sent; the folder's labels are offered as you type.
 // Above the prompt on the left, beside where it works, as in the window (#108); a new session
 // keeps its labels until it starts, and starts with them.
 import { signal, useSignal } from "@preact/signals";

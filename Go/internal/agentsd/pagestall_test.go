@@ -68,7 +68,7 @@ func TestAStalledPageDoesNotHoldAnAgentChange(t *testing.T) {
 			case <-gone:
 				return
 			default:
-				Broadcast(d, wire.NotifyProjectChanged, wire.ProjectSummary{Name: "x"})
+				Broadcast(d, wire.NotifyFolderChanged, wire.FolderSummary{Name: "x"})
 			}
 		}
 	}()

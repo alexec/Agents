@@ -3,7 +3,7 @@
 //
 //   node Web/test/walk/narrow235.mjs <WEB_URL> <browser code> <out dir>
 //
-// Expects a root with at least one project on this Mac holding a session.
+// Expects a root with at least one folder on this Mac holding a session.
 
 import { writeFileSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -21,7 +21,7 @@ try {
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  await page.waitFor(`document.querySelectorAll(".sidebar .row.project").length >= 1`, 20_000);
+  await page.waitFor(`document.querySelectorAll(".sidebar .row.folder").length >= 1`, 20_000);
   await sleep(800);
 
   const visible = () => page.eval(`["sidebar", "chat", "files"].filter((c) => { const el = document.querySelector("." + c); return el && el.offsetParent !== null; })`);
@@ -34,13 +34,13 @@ try {
     await page.shot(`${out}/${name}.png`);
   };
 
-  // 1: the root is the list, titled Agents, every project folded.
+  // 1: the root is the list, titled Agents, every folder folded.
   await page.eval(`localStorage.removeItem("agents.sidebar.folds"); location.hash = "#/"`);
   await at("1-root-list");
   say(`title: ${js(await page.eval(`document.querySelector(".sidebar-head h1")?.innerText`))}`);
 
-  // 2: a project unfolded in place, as the iPhone's row unfolds.
-  await page.eval(`document.querySelector(".sidebar .row.project .disclosure").click()`);
+  // 2: a folder unfolded in place, as the iPhone's row unfolds.
+  await page.eval(`document.querySelector(".sidebar .row.folder .disclosure").click()`);
   await at("2-unfolded");
 
   // 3: a session picked takes the list's place; ‹ Agents goes back to it, still unfolded.
@@ -49,9 +49,9 @@ try {
   await at("3-session");
   say(`back says: ${js(await back())}`);
   await at("4-back-to-list");
-  say(`still unfolded: ${await page.eval(`document.querySelector(".sidebar .row.project .pick").getAttribute("aria-expanded")`)}`);
+  say(`still unfolded: ${await page.eval(`document.querySelector(".sidebar .row.folder .pick").getAttribute("aria-expanded")`)}`);
 
-  // 5: the project's New session row (#375) opens its new session; the browser's Back comes back to the list.
+  // 5: the folder's New session row (#375) opens its new session; the browser's Back comes back to the list.
   await page.eval(`document.querySelector(".sidebar .row.new-session .pick").click()`);
   await page.waitFor(`document.querySelector(".new-agent")`, 10_000).catch(() => {});
   await at("5-new-session");

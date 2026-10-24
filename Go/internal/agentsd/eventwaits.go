@@ -63,7 +63,7 @@ func kindNamed(name string) *eventKind {
 	return nil
 }
 
-var eventSubjects = []string{"agent", "project", "workflow", "branch", "dropbox", "lease", "mac", "machine", "person", "cost", "server", "system"}
+var eventSubjects = []string{"agent", "folder", "workflow", "branch", "dropbox", "lease", "mac", "machine", "person", "cost", "server", "system"}
 
 func isSubject(s string) bool {
 	for _, x := range eventSubjects {
@@ -544,7 +544,7 @@ func wakeWords(e wire.Event, extra int) string {
 		if extra == 1 {
 			more = "1 more match arrived"
 		}
-		lines = append(lines, "", more+" before you resumed; they are in this project's events.")
+		lines = append(lines, "", more+" before you resumed; they are in this folder's events.")
 	}
 	return strings.Join(lines, "\n")
 }
@@ -630,7 +630,7 @@ func (d *Daemon) waitingAgents() []wire.WaitingAgent {
 		if a.EventWait != nil {
 			since = a.EventWait.Since
 		}
-		rows = append(rows, row{wire.WaitingAgent{AgentID: a.ID, Title: title, Folder: store.FolderURL(projectFolder(&a)), Status: *s}, since})
+		rows = append(rows, row{wire.WaitingAgent{AgentID: a.ID, Title: title, Folder: store.FolderURL(folderPath(&a)), Status: *s}, since})
 	}
 	sort.SliceStable(rows, func(i, j int) bool { return rows[i].since < rows[j].since })
 	out := []wire.WaitingAgent{}
@@ -656,7 +656,7 @@ type eventWaitState struct {
 }
 
 func (d *Daemon) inScope(e wire.Event, a *wire.Agent) bool {
-	return e.Scope.Mac != nil || e.Scope.Project != nil && store.FolderPath(e.Scope.Project.Value) == projectFolder(a)
+	return e.Scope.Mac != nil || e.Scope.Folder != nil && store.FolderPath(e.Scope.Folder.Value) == folderPath(a)
 }
 
 func (d *Daemon) takeOpenWait(agent wire.UUID) *openEventCall {
@@ -731,7 +731,7 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 	if branches, ok := filters["branch"]; ok {
 		for _, p := range patterns {
 			if p.name == "branch.moved" {
-				if main := defaultBranch(projectFolder(a)); contains(branches, main) {
+				if main := defaultBranch(folderPath(a)); contains(branches, main) {
 					return "", eventRefused("branch.moved is not raised for " + main + ", the default branch: this Mac's copy moves only when someone " +
 						"pulls. To wait for a pull request to land, wait for pr.merged (or pr.closed) with its pr. Nothing is waiting.")
 				}
@@ -753,8 +753,8 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 		warning = neverHereWords(neverHere) + " "
 	}
 	// A server's event is a subscription the wait holds, as a trigger's is (#577):
-	// checked against what the project's servers offer, `where` as its arguments.
-	servers, err := d.checkMCPWait(serverNames, filters, projectFolder(a))
+	// checked against what the folder's servers offer, `where` as its arguments.
+	servers, err := d.checkMCPWait(serverNames, filters, folderPath(a))
 	if err != nil {
 		return "", err
 	}

@@ -173,7 +173,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     public var startedByRun: UUID?
     /// The agent whose `start_session` call made this one, if one did (028). Set once,
     /// never changed. It is what lets that agent stop and archive this one, what keeps
-    /// the tools from this one, and what counts it against its project's three.
+    /// the tools from this one, and what counts it against its folder's three.
     public var startedByAgent: UUID?
     /// How deep a workflow fire caused by this agent is, when the agent that started it
     /// was part of a workflow chain (028). Taken when this agent is made, because the
@@ -184,7 +184,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// and kept here, not on the report, so whatever the turn then reports leaves it be.
     public var eventWait: EventWait?
     /// The worktree this agent works in, if it does: the one it was started in (030) or
-    /// moved into (053). Its project is the worktree's project, not its `cwd`.
+    /// moved into (053). Its folder is the worktree's folder, not its `cwd`.
     public var worktree: AgentWorktree?
     /// A move asked for and not yet made (053). Applied when the turn ends, or at once
     /// when none is running. Cleared when applied, cancelled, archived or deleted.
@@ -274,9 +274,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     public var unknownFields: [String: JSONValue]
 
     /// Everywhere this agent may read and write: its folder, and any it was given.
-    /// The project this agent belongs to, as projects compare folders. Its `cwd` is
+    /// The folder this agent belongs to, as folders compare folders. Its `cwd` is
     /// where it works; in a worktree those are two different folders (030).
-    public var projectFolder: URL { Project.standardize(worktree?.project ?? cwd) }
+    public var folderPath: URL { Folder.standardize(worktree?.folder ?? cwd) }
 
     public var folderScope: FolderScope { FolderScope(folders: [cwd] + additionalDirectories) }
 
@@ -375,7 +375,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         startedByAgent = try c.decodeIfPresent(UUID.self, forKey: .startedByAgent)
         chainDepth = try c.decodeIfPresent(Int.self, forKey: .chainDepth)
         eventWait = try c.decodeIfPresent(EventWait.self, forKey: .eventWait)
-        // Optional: an agent outside a worktree works in its project folder.
+        // Optional: an agent outside a worktree works in its folder.
         worktree = try c.decodeIfPresent(AgentWorktree.self, forKey: .worktree)
         pendingMove = (try? c.decodeIfPresent(PendingMove.self, forKey: .pendingMove)) ?? nil
         startingPoint = try c.decodeIfPresent(StartingPoint.self, forKey: .startingPoint)

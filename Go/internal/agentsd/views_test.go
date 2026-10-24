@@ -140,7 +140,7 @@ func TestAPersonsServersViewIsDrawnOnceShownAndCallsOnlyItsOwnServer(t *testing.
 		"local":{"command":"local-server"}}}`), 0o644)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	agent := wire.Agent{ID: store.NewUUID(), RuntimeID: "claude", Cwd: store.FolderURL(dir), State: wire.AgentStateFinished, EndedReason: ptr(wire.EndedReasonEndTurn),
 		Title: ptr("Board"), AdvertisedOptions: []wire.ConfigOption{}, AvailableCommands: []wire.SlashCommand{}}
 	if err := d.Store.Save(agent); err != nil {
@@ -236,7 +236,7 @@ func TestAPersonsServersViewIsDrawnOnceShownAndCallsOnlyItsOwnServer(t *testing.
 	}
 	c.call(t, 11, "views/log", map[string]any{"agentID": agent.ID, "viewID": v[0].ID, "level": "info", "data": "drawn"})
 
-	// Pinned, with the server's own title, and drawn on the project's page.
+	// Pinned, with the server's own title, and drawn on the folder's page.
 	var pins []wire.PinView
 	json.Unmarshal(c.call(t, 12, "pins/pin", map[string]any{"folder": store.FolderURL(dir), "path": "ui://ci/board",
 		"view": map[string]any{"server": "ci", "uri": "ui://ci/board", "tool": "board"}}), &pins)
@@ -247,8 +247,8 @@ func TestAPersonsServersViewIsDrawnOnceShownAndCallsOnlyItsOwnServer(t *testing.
 		"view": map[string]any{"server": "ci", "uri": "ui://ci/board", "tool": "refresh"}}); !strings.Contains(e.Message, "does not feed") {
 		t.Fatalf("%+v", e)
 	}
-	// A pin's call names no agent: its project's pins say which server it is of.
-	if r := c.call(t, 14, "views/call", map[string]any{"agentID": store.NewUUID(), "project": store.FolderURL(dir), "viewID": store.NewUUID(),
+	// A pin's call names no agent: its folder's pins say which server it is of.
+	if r := c.call(t, 14, "views/call", map[string]any{"agentID": store.NewUUID(), "folder": store.FolderURL(dir), "viewID": store.NewUUID(),
 		"name": "board", "server": "ci", "feed": true}); !strings.Contains(string(r), `"called":"board"`) {
 		t.Fatalf("%s", r)
 	}

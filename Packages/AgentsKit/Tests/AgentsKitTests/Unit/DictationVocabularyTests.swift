@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import AgentsKitCore
 
-/// #2515: the transcriber is seeded with the product's words, the open projects, and
-/// the selected project's titles and issue numbers. Long titles stay out.
+/// #2515: the transcriber is seeded with the product's words, the open folders, and
+/// the selected folder's titles and issue numbers. Long titles stay out.
 @Suite("Dictation vocabulary")
 struct DictationVocabularyTests {
     @Test func theProductsWordsComeFirst() {
@@ -36,21 +36,21 @@ struct DictationVocabularyTests {
         #expect(DictationVocabulary.issueNumbers(in: "Voice mode #2515 and #12") == ["2515"])
     }
 
-    @Test func seedsUseTheOpenProjectAndSkipAnArchivedSession() throws {
-        let folder = URL(fileURLWithPath: "/tmp/agents-dictation-vocab")
-        let project = DaemonAPI.ProjectSummary(
-            project: Project(folder: folder), name: "Agents", exists: true,
+    @Test func seedsUseTheOpenFolderAndSkipAnArchivedSession() throws {
+        let folderURL = URL(fileURLWithPath: "/tmp/agents-dictation-vocab")
+        let folder = DaemonAPI.FolderSummary(
+            folder: Folder(folder: folderURL), name: "Agents", exists: true,
             lastActivityAt: Date(), counts: [:])
-        let archivedProject = DaemonAPI.ProjectSummary(
-            project: Project(folder: URL(fileURLWithPath: "/tmp/agents-dictation-old"), archivedAt: Date()),
+        let archivedFolder = DaemonAPI.FolderSummary(
+            folder: Folder(folder: URL(fileURLWithPath: "/tmp/agents-dictation-old"), archivedAt: Date()),
             name: "Old", exists: true, lastActivityAt: Date(), counts: [:])
-        let live = Agent(runtimeID: "claude", cwd: folder, title: "Sidebar",
+        let live = Agent(runtimeID: "claude", cwd: folderURL, title: "Sidebar",
                          labels: [SessionLabel(value: "#2515", owner: .person)], state: .running)
-        let archived = Agent(runtimeID: "claude", cwd: folder, title: "Gone", state: .archived)
+        let archived = Agent(runtimeID: "claude", cwd: folderURL, title: "Gone", state: .archived)
         let elsewhere = Agent(runtimeID: "claude", cwd: URL(fileURLWithPath: "/tmp/agents-dictation-other"),
                               title: "Other", state: .running)
         let seeds = DictationVocabulary.seeds(
-            projects: [project, archivedProject], agents: [live, archived, elsewhere], in: folder)
+            folders: [folder, archivedFolder], agents: [live, archived, elsewhere], in: folderURL)
         #expect(seeds.contains("Agents"))
         #expect(seeds.contains("Sidebar"))
         #expect(seeds.contains("2515"))

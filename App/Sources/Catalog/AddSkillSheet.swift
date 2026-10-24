@@ -3,8 +3,8 @@ import SwiftUI
 
 /// Add a skill (059, look/ frames B, C and E): search a marketplace (skills.sh unless the
 /// person chose another, #687), look at one skill as its agent will read it, and add it
-/// where the sheet was opened (#688): Settings adds to the person's `~/.agents`, Project
-/// Settings to that project's `.agents`.
+/// where the sheet was opened (#688): Settings adds to the person's `~/.agents`, Folder
+/// Settings to that folder's `.agents`.
 ///
 /// Nothing is added from the list. Choosing a row fetches that skill at its repository's
 /// current commit and shows every file; Add then puts exactly those files in place.
@@ -46,7 +46,7 @@ struct AddSkillSheet: View {
                     Task { await loadMarketplaces() }
                 })
             } else if let preview {
-                SkillPreviewView(preview: preview, addTo: destination, projectName: projectName, runtimes: runtimes,
+                SkillPreviewView(preview: preview, addTo: destination, folderName: folderName, runtimes: runtimes,
                                  back: { self.preview = nil },
                                  added: { skill in
                                      self.added.insert(skill.name)
@@ -70,7 +70,7 @@ struct AddSkillSheet: View {
                 Text("Add a skill").appText(.title)
                 Spacer()
                 MarketplaceMenu(marketplaces: marketplaces, chosen: $chosen, manage: { managing = true })
-                Text(projectName.map { "Adds to \($0)" } ?? "Adds to ~/.agents").appText(.fine).foregroundStyle(.secondary)
+                Text(folderName.map { "Adds to \($0)" } ?? "Adds to ~/.agents").appText(.fine).foregroundStyle(.secondary)
             }
             TextField("Search \(marketplace?.name ?? "skills")", text: $query)
                 .textFieldStyle(.roundedBorder)
@@ -178,10 +178,10 @@ struct AddSkillSheet: View {
 
     // MARK: Words
 
-    /// The project's name when the sheet adds to a project.
-    private var projectName: String? {
-        guard case .project(let folder) = destination else { return nil }
-        return model.liveProjects.first { $0.project.folder.path == folder }?.name ?? URL(filePath: folder).lastPathComponent
+    /// The folder's name when the sheet adds to a folder.
+    private var folderName: String? {
+        guard case .folder(let folder) = destination else { return nil }
+        return model.liveFolders.first { $0.folder.folder.path == folder }?.name ?? URL(filePath: folder).lastPathComponent
     }
 
     /// 32978 → "33k", 9188 → "9.2k", 951 → "951", as frame B has them.
@@ -238,7 +238,7 @@ enum CatalogErrorWords {
         case .lockUnreadable(let path): "\((path as NSString).abbreviatingWithTildeInPath) could not be read, so nothing was changed."
         case .noPersonalHome: "This copy of the app has no ~/.agents of its own."
         case .previewExpired: "That preview has expired. Open the skill again."
-        case .notAProject(let path): "\((path as NSString).abbreviatingWithTildeInPath) is not a project on this Mac."
+        case .notAFolder(let path): "\((path as NSString).abbreviatingWithTildeInPath) is not a folder on this Mac."
         case .replaceMismatch: "The skill there has changed since this was opened. Open it again."
         case .cannotAdd: "This skill can't be added."
         case .notManaged(let name): "\(name) wasn't added by the app or the skills tool."

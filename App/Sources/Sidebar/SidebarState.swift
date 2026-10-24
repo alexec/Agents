@@ -58,7 +58,7 @@ final class SidebarFrame {
     static let minimumConversationWidth: Double = 520
 
     /// Where the width and the pane are kept: `sidebar.width`, `sidebar.pane` for the
-    /// main window, and a key of its own for each project's window (#1089).
+    /// main window, and a key of its own for each folder's window (#1089).
     private let widthKey: String
     private let paneKey: String
 
@@ -78,12 +78,12 @@ final class SidebarFrame {
         didSet { defaults.set(pane.rawValue, forKey: paneKey) }
     }
 
-    /// How wide the window and the pane beside the project list are. Measured by the
+    /// How wide the window and the pane beside the folder list are. Measured by the
     /// window as it lays out and never stored: they are facts about now.
     var windowWidth: Double = 0
     var paneWidth: Double = 0
 
-    /// `keyedBy` names a project's window, whose inspector is its own (#1089, Alex).
+    /// `keyedBy` names a folder's window, whose inspector is its own (#1089, Alex).
     init(defaults: UserDefaults = WindowDefaults.store, keyedBy window: String? = nil) {
         self.defaults = defaults
         let prefix = window.map { "sidebar.\($0)" } ?? "sidebar"

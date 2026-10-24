@@ -169,18 +169,18 @@ func TestAppendManyOpensTheTranscriptOnce(t *testing.T) {
 	}
 }
 
-func TestProjectsFile(t *testing.T) {
+func TestFoldersFile(t *testing.T) {
 	s, _ := Open(t.TempDir())
-	ps := []wire.Project{{Folder: FolderURL("/w/b"), AddedAt: 2}, {Folder: FolderURL("/w/a b"), AddedAt: 1}}
-	if err := s.SaveProjects(ps); err != nil {
+	ps := []wire.Folder{{Folder: FolderURL("/w/b"), AddedAt: 2}, {Folder: FolderURL("/w/a b"), AddedAt: 1}}
+	if err := s.SaveFolders(ps); err != nil {
 		t.Fatal(err)
 	}
-	b, _ := os.ReadFile(s.Loc.Projects())
+	b, _ := os.ReadFile(s.Loc.Folders())
 	if string(b) != `[{"addedAt":"2001-01-01T00:00:01.000Z","folder":"file:///w/a%20b"},{"addedAt":"2001-01-01T00:00:02.000Z","folder":"file:///w/b"}]` {
-		t.Fatalf("projects.json %s", b)
+		t.Fatalf("folders.json %s", b)
 	}
 	s2, _ := Open(s.Loc.Root)
-	if got := s2.Projects(); len(got) != 2 || FolderPath(got[0].Folder) != "/w/a b" {
+	if got := s2.Folders(); len(got) != 2 || FolderPath(got[0].Folder) != "/w/a b" {
 		t.Fatalf("%v", got)
 	}
 }

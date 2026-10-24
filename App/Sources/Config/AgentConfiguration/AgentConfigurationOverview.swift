@@ -2,7 +2,7 @@ import AgentsKitCore
 import SwiftUI
 
 /// Frame A: what every agent gets and under it every exception, each opening its own page.
-/// Yours is a grid of kinds by runtimes. A project's has no runtimes to draw (#754), so it
+/// Yours is a grid of kinds by runtimes. A folder's has no runtimes to draw (#754), so it
 /// is a line per kind with how many, each opening its page.
 struct AgentConfigurationOverview: View {
     let place: AgentsPlace
@@ -19,7 +19,7 @@ struct AgentConfigurationOverview: View {
                 case .you:
                     grid
                     legend
-                case .project:
+                case .folder:
                     Text(place.explainer)
                         .appText(.fine).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -39,11 +39,11 @@ struct AgentConfigurationOverview: View {
     private var title: String {
         switch place {
         case .you: "Shared by every agent"
-        case .project: "Shared by every agent in this project"
+        case .folder: "Shared by every agent in this folder"
         }
     }
 
-    // MARK: A project's kinds
+    // MARK: A folder's kinds
 
     private var kinds: some View {
         VStack(alignment: .leading, spacing: 6) {

@@ -194,7 +194,7 @@ const helpersBrief = "For work that can run alongside yours, use start_session w
 
 // sessionsBrief is Briefing.sessions (065): the person says "continue Login redirect" to
 // whichever chat they opened. Archiving this session is in endingBrief now.
-const sessionsBrief = "To continue another session in this project, read it with read_session " +
+const sessionsBrief = "To continue another session in this folder, read it with read_session " +
 	"(by id or exact title; reading changes nothing). list_sessions lists them."
 
 // worktreesBrief is Briefing.worktrees (#615): with move_worktree only described, agents
@@ -225,7 +225,7 @@ func appToolServed(name string) bool {
 	return false
 }
 
-// personaPrompt is the prompt of the persona the agent was started as (#760): the project's
+// personaPrompt is the prompt of the persona the agent was started as (#760): the folder's
 // .agents/personas/<id>.md, else the person's, read now so an edit reaches the next
 // conversation. None for a persona that is not there or will not parse.
 func personaPrompt(a *wire.Agent) string {
@@ -236,7 +236,7 @@ func personaPrompt(a *wire.Agent) string {
 	if id == "" || strings.Contains(id, "/") || strings.HasPrefix(id, ".") {
 		return ""
 	}
-	for _, from := range []struct{ base, origin string }{{projectFolder(a), "project"}, {personaHome(), "personal"}} {
+	for _, from := range []struct{ base, origin string }{{folderPath(a), "folder"}, {personaHome(), "personal"}} {
 		if from.base == "" {
 			continue
 		}

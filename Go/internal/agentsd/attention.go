@@ -306,7 +306,7 @@ func formAnswers(r wire.ElicitationRequest) []wire.QuickAnswer {
 func (d *Daemon) needs() []wire.Need {
 	at := now()
 	archived := map[string]bool{}
-	for _, p := range d.Store.Projects() {
+	for _, p := range d.Store.Folders() {
 		if p.ArchivedAt != nil {
 			archived[store.FolderPath(p.Folder)] = true
 		}
@@ -325,25 +325,25 @@ func (d *Daemon) needs() []wire.Need {
 		if a.Title != nil {
 			title = *a.Title
 		}
-		folder := projectFolder(a)
+		folder := folderPath(a)
 		agentID := a.ID
 		found = append(found, wire.Need{ID: id, AgentID: &agentID, Folder: fileURL(folder, true), Kind: kind, RaisedAt: raised,
 			Headline: truncating(wire.Headline{H1: filepath.Base(folder), H2: title, H3: wanted, Answers: answers})})
 	}
 	for _, p := range d.pendingPermissions() {
-		if a := d.Store.Agent(p.AgentID); a != nil && !archived[projectFolder(a)] {
+		if a := d.Store.Agent(p.AgentID); a != nil && !archived[folderPath(a)] {
 			id := p.ID
 			need(wire.NeedID{Permission: &id}, a, wire.NeedKindPermission, "Wants to "+line(p.ToolCall), permissionAnswers(p))
 		}
 	}
 	for _, e := range d.pendingElicitations() {
-		if a := d.Store.Agent(e.AgentID); a != nil && !archived[projectFolder(a)] {
+		if a := d.Store.Agent(e.AgentID); a != nil && !archived[folderPath(a)] {
 			id := e.ID
 			need(wire.NeedID{Elicitation: &id}, a, wire.NeedKindElicitation, "Asks: "+elicitationTitle(e), formAnswers(e))
 		}
 	}
 	for _, a := range d.Store.Agents() {
-		if a.State != wire.AgentStateFinished || a.Report == nil || !needsAPerson(a.Report.Outcome) || archived[projectFolder(&a)] {
+		if a.State != wire.AgentStateFinished || a.Report == nil || !needsAPerson(a.Report.Outcome) || archived[folderPath(&a)] {
 			continue
 		}
 		if a.ReportSeenAt != nil && *a.ReportSeenAt == a.Report.At {
@@ -353,8 +353,8 @@ func (d *Daemon) needs() []wire.Need {
 		need(wire.NeedID{Report: &wire.NeedIDReport{AgentID: a.ID, At: r.At}}, &a, wire.NeedKindReport, headings[r.Outcome]+": "+r.Message, nil)
 	}
 	// A change to the app's own files, made outside it (#531): asked in the session of the
-	// agent that made it, or of the project when none did.
-	for _, p := range d.Store.Projects() {
+	// agent that made it, or of the folder when none did.
+	for _, p := range d.Store.Folders() {
 		folder := store.FolderPath(p.Folder)
 		if p.ArchivedAt != nil {
 			continue
@@ -601,18 +601,18 @@ func (d *Daemon) reconsider() {
 }
 
 // waitingCount is DaemonCore.waitingCount: the agents that need the person (Needs you or
-// Blocked), the badge's count, outside archived projects. An unread finish is not
+// Blocked), the badge's count, outside archived folders. An unread finish is not
 // counted (#1565).
 func (d *Daemon) waitingCount() int64 {
 	archived := map[string]bool{}
-	for _, p := range d.Store.Projects() {
+	for _, p := range d.Store.Folders() {
 		if p.ArchivedAt != nil {
 			archived[store.FolderPath(p.Folder)] = true
 		}
 	}
 	var n int64
 	for _, a := range d.Store.Agents() {
-		if a.State == wire.AgentStateArchived || archived[projectFolder(&a)] {
+		if a.State == wire.AgentStateArchived || archived[folderPath(&a)] {
 			continue
 		}
 		if g := Group(&a); g == "needsAttention" || g == "blocked" {

@@ -4,7 +4,7 @@ import Testing
 
 @Suite("What an HTML page in the files pane may reach (#67)")
 struct HTMLPageScopeTests {
-    let scope = HTMLPageScope(root: "/work/project")
+    let scope = HTMLPageScope(root: "/work/folder")
     let stamp = FileStamp(size: 1, modifiedAt: Date(timeIntervalSince1970: 0))
 
     private func url(_ string: String) -> URL { URL(string: string)! }
@@ -12,37 +12,37 @@ struct HTMLPageScopeTests {
     // MARK: Scope
 
     @Test func theAgentsFolderIsTheScopeForAFileInIt() {
-        let scope = HTMLPageScope(file: URL(filePath: "/work/project/out/report.html"),
-                                  agentFolder: URL(filePath: "/work/project"))
-        #expect(scope.root == "/work/project")
+        let scope = HTMLPageScope(file: URL(filePath: "/work/folder/out/report.html"),
+                                  agentFolder: URL(filePath: "/work/folder"))
+        #expect(scope.root == "/work/folder")
     }
 
     @Test func aFileOutsideTheAgentsFolderReachesOnlyItsOwnFolder() {
         let scope = HTMLPageScope(file: URL(filePath: "/elsewhere/docs/index.html"),
-                                  agentFolder: URL(filePath: "/work/project"))
+                                  agentFolder: URL(filePath: "/work/folder"))
         #expect(scope.root == "/elsewhere/docs")
     }
 
     @Test func aSiblingFolderWithTheSamePrefixIsNotInside() {
-        let scope = HTMLPageScope(file: URL(filePath: "/work/project-old/report.html"),
-                                  agentFolder: URL(filePath: "/work/project"))
-        #expect(scope.root == "/work/project-old")
+        let scope = HTMLPageScope(file: URL(filePath: "/work/folder-old/report.html"),
+                                  agentFolder: URL(filePath: "/work/folder"))
+        #expect(scope.root == "/work/folder-old")
     }
 
     @Test func thePageIsPutAtItsPlaceUnderTheFolder() {
-        #expect(scope.address(of: "/work/project/out/report.html")?.absoluteString
+        #expect(scope.address(of: "/work/folder/out/report.html")?.absoluteString
                 == "agents-page://folder/out/report.html")
-        #expect(scope.address(of: "/work/project/a b.html")?.absoluteString
+        #expect(scope.address(of: "/work/folder/a b.html")?.absoluteString
                 == "agents-page://folder/a%20b.html")
         #expect(scope.address(of: "/work/other/report.html") == nil)
     }
 
     @Test func aRelativeAssetResolvesBesideThePage() throws {
-        let page = try #require(scope.address(of: "/work/project/out/report.html"))
+        let page = try #require(scope.address(of: "/work/folder/out/report.html"))
         let css = try #require(URL(string: "style.css", relativeTo: page)?.absoluteURL)
-        #expect(scope.path(for: css) == .success("/work/project/out/style.css"))
+        #expect(scope.path(for: css) == .success("/work/folder/out/style.css"))
         let image = try #require(URL(string: "img/chart%20one.png", relativeTo: page)?.absoluteURL)
-        #expect(scope.path(for: image) == .success("/work/project/out/img/chart one.png"))
+        #expect(scope.path(for: image) == .success("/work/folder/out/img/chart one.png"))
     }
 
     // MARK: Refusals
@@ -59,7 +59,7 @@ struct HTMLPageScopeTests {
     }
 
     @Test(arguments: [
-        "file:///work/project/style.css",
+        "file:///work/folder/style.css",
         "https://example.com/style.css",
         "agents-page://elsewhere/style.css",
         "agents://folder/style.css",
@@ -80,7 +80,7 @@ struct HTMLPageScopeTests {
                 Issue.record("refused \(address)")
                 continue
             }
-            #expect(path.hasPrefix("/work/project/"))
+            #expect(path.hasPrefix("/work/folder/"))
             #expect(!path.contains("/./") && !path.contains("//"))
         }
     }
@@ -94,7 +94,7 @@ struct HTMLPageScopeTests {
             return .text("h1 { color: red }", isTruncated: false, size: 17, stamp: stamp)
         }
         #expect(answer == .file(Data("h1 { color: red }".utf8), mimeType: "text/css", isText: true))
-        #expect(await asked.paths == ["/work/project/out/style.css"])
+        #expect(await asked.paths == ["/work/folder/out/style.css"])
     }
 
     @Test func aPictureIsServedWhole() async {
@@ -154,7 +154,7 @@ struct HTMLPageScopeTests {
         let page = url("agents-page://folder/out/report.html")
         #expect(scope.decide(link: url("agents-page://folder/out/report.html#results"), on: page) == .stay)
         #expect(scope.decide(link: url("agents-page://folder/out/other.html"), on: page)
-                == .openFile("/work/project/out/other.html"))
+                == .openFile("/work/folder/out/other.html"))
         #expect(scope.decide(link: url("https://example.com/docs"), on: page)
                 == .openOutside(url("https://example.com/docs")))
         #expect(scope.decide(link: url("mailto:a@b.com"), on: page) == .openOutside(url("mailto:a@b.com")))

@@ -2,7 +2,7 @@ import Foundation
 
 /// The three short strings a banner is allowed, and there is no fourth.
 ///
-/// `h1` the project's folder name, `h2` the agent's title, `h3` what is wanted in a few
+/// `h1` the folder name, `h2` the agent's title, `h3` what is wanted in a few
 /// words. Three because a push carries at most three keys of about a hundred characters
 /// each (research §11), and built here in Core, once, so the Mac banner and the phone
 /// banner say the same words about the same agent — the rule `AgentState.startingLabel`
@@ -35,7 +35,7 @@ public struct Headline: Hashable, Sendable, Codable {
     public static let placeholder = Headline(h1: "Agents", h2: "An agent", h3: "needs you")
 
     /// This headline with every field cut to `budget`, and an empty field given a word:
-    /// an agent with no title or a project with no name must still identify itself,
+    /// an agent with no title or a folder with no name must still identify itself,
     /// truncated rather than blank (spec edge case).
     public func truncating(to budget: Int = Headline.budget) -> Headline {
         func cut(_ text: String, or fallback: String) -> String {

@@ -220,7 +220,7 @@ struct ConsistencyTests {
         "App/Sources/Chat/PromptBar.swift",
         "App/Sources/Permission/PermissionView.swift",
         "App/Sources/Elicitation/ElicitationView.swift",
-        "App/Sources/Projects/ProjectAgentsView.swift",
+        "App/Sources/Folders/FolderAgentsView.swift",
         // The phone's, in the same column since 033.
         "Shared/UI/Chat/ChatTranscript.swift",
         "Remote/Sources/Chat/PromptBar.swift",
@@ -235,7 +235,7 @@ struct ConsistencyTests {
 
     @Test func noChatSurfaceKeepsAGutterOfItsOwn() async throws {
         // A numeric literal at or above the margin size, or anything that is not a
-        // literal at all — `Self.gutter` was how the project page kept its own copy.
+        // literal at all — `Self.gutter` was how the folder page kept its own copy.
         let padding = /\.padding\(\.horizontal,\s*([^)]+)\)/
         var violations: [String] = []
         var read = 0
@@ -399,10 +399,10 @@ struct ConsistencyTests {
     }
 
     /// "Agents may archive the chats I start" says, on every client, that a server does not
-    /// read it (#1872), in the docs' words, so a server project's chat that archives
+    /// read it (#1872), in the docs' words, so a server folder's chat that archives
     /// itself with the switch off is not a surprise.
     @Test func theArchiveSwitchSaysServersDoNotReadIt() async throws {
-        let sentence = "A server does not read this switch, so a chat in a server project may still archive itself."
+        let sentence = "A server does not read this switch, so a chat in a server folder may still archive itself."
         for path in ["Shared/UI/SidebarSettingsSection.swift", "Web/src/model/fileToSeeWords.ts"] {
             let text = try String(contentsOf: Self.root.appending(path: path), encoding: .utf8)
             #expect(text.contains(sentence), "\(path) does not say that a server ignores the switch")
@@ -525,7 +525,7 @@ struct ConsistencyTests {
         // XcodeGen writes each Info.plist from the properties in `project.yml`, so both
         // have to agree: a string in the plist and not in the yml is written straight
         // back out again on the next generate, and the app loses it where it matters.
-        let project = try String(contentsOf: Self.root.appending(path: "project.yml"), encoding: .utf8)
+        let folder = try String(contentsOf: Self.root.appending(path: "project.yml"), encoding: .utf8)
         var asked: [String: String] = [:]
         var violations: [String] = []
 
@@ -541,7 +541,7 @@ struct ConsistencyTests {
                                 \(Self.at(source, index)), and \(target.plist) has no \
                                 \(resource.key)
                                 """)
-                        } else if !project.contains("\(resource.key):") {
+                        } else if !folder.contains("\(resource.key):") {
                             violations.append("""
                                 \(resource.key) is in \(target.plist) but not in project.yml, \
                                 so XcodeGen would write it out again

@@ -12,7 +12,7 @@ change wait for your OK:
 
 - A **workflow** that is new, or that changed since you approved it. It does not run until
   you approve it.
-- A **file**: one of the app's own files in the project's `.agents` folder, changed outside
+- A **file**: one of the app's own files in the folder's `.agents` folder, changed outside
   the app (by an agent, a pull or an editor). The app goes on using the copy you approved
   last until you choose.
 
@@ -22,12 +22,12 @@ that shows the whole change. A chat that asks to be archived is in **Needs You**
 
 ## Before you start
 
-- A project with a change that waits for your OK. Its row under **Needs You** has an orange
+- A folder with a change that waits for your OK. Its row under **Needs You** has an orange
   shield.
 
 ## Open the Review page
 
-1. Under **Needs You**, find the row. It shows the title, the project, how long it has
+1. Under **Needs You**, find the row. It shows the title, the folder, how long it has
    waited, and one grey line that says what changed, for example **New**, **Changed by**
    an agent, **Changed with the last pull** or **Changed since you approved it**.
 2. Open the row:
@@ -39,14 +39,14 @@ that shows the whole change. A chat that asks to be archived is in **Needs You**
 You can also open the page from the short card in a chat. When an agent changes a file,
 the card shows above its prompt with who changed it, the lines added and removed
 (**+N −M**), **Review…**, **Undo** and **Keep**. Click **Review…** to read the whole change.
-When no agent made the change, the card is on the project's page. On the Mac it is also in
-Project Settings.
+When no agent made the change, the card is on the folder's page. On the Mac it is also in
+Folder Settings.
 
 ## Read the change
 
 The page shows, from the top:
 
-- The title, what kind of change it is (**Workflow** or **File**), the project, and when it
+- The title, what kind of change it is (**Workflow** or **File**), the folder, and when it
   began waiting.
 - Who changed it. If an agent did, click **Open Session** to go to that agent's chat.
 - What each answer does, in one short paragraph.
@@ -56,7 +56,7 @@ The page shows, from the top:
 When the page is wide, choose **Unified** or **Side by Side** to see the old file beside
 the new one. A narrow page always shows **Unified**.
 
-A change of more than 400 lines is cut. The page says so. Open the file in the project to
+A change of more than 400 lines is cut. The page says so. Open the file in the folder to
 read the rest.
 
 ## Answer it

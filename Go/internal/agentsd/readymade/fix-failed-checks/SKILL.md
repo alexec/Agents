@@ -23,7 +23,7 @@ On GitLab a merge request is `pr` in the event, and its number is its iid (`!12`
    comment to say why, and stop.
 3. **Get the branch.** Use the app's `move_worktree` tool to move into a worktree on the
    branch (the event's `pr.branch`). When you do not have that tool, use
-   `git worktree add` beside the project's folder. Pull it first, so that you have its
+   `git worktree add` beside the folder. Pull it first, so that you have its
    newest commit.
 4. **Fix it.** Change only what makes the check pass. Never turn off, skip or weaken a
    check or a test to make it pass. Run the check that failed, on your computer, when you

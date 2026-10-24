@@ -27,7 +27,7 @@ try {
   await page.type(code);
   await both("pairing");
   await page.press("Connect");
-  await page.waitFor(`document.querySelector(".sidebar .row.project")`, 20_000);
+  await page.waitFor(`document.querySelector(".sidebar .row.folder")`, 20_000);
   await sleep(800);
 
   const find = (text) => `[...document.querySelectorAll(".sidebar button, .sidebar summary")].find((b) => b.innerText.includes(${js(text)}))`;

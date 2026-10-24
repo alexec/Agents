@@ -18,7 +18,7 @@ import (
 const maxWatchedFolders = 4096
 
 // folderWatch is FolderWatch on Linux: inotify on every folder under root but the ones a
-// project's watch leaves out, changes gathered for a quarter of a second and said as the
+// folder's watch leaves out, changes gathered for a quarter of a second and said as the
 // folders they were in.
 type folderWatch struct {
 	fd      int
@@ -34,15 +34,15 @@ type folderWatch struct {
 	files bool
 }
 
-func newFolderWatch(root string, changed func([]string)) (*folderWatch, error) {
+func newFilesWatch(root string, changed func([]string)) (*folderWatch, error) {
 	return startFolderWatch(&folderWatch{root: root, changed: changed}, "files watch")
 }
 
-// newProjectWatch is a project's one watch (#173): every folder but the ones skipWatched
+// newFolderWatch is a folder's one watch (#173): every folder but the ones skipWatched
 // leaves out, said as the paths that changed.
-func newProjectWatch(root string, changed func([]string)) (*folderWatch, error) {
+func newFolderWatch(root string, changed func([]string)) (*folderWatch, error) {
 	return startFolderWatch(&folderWatch{root: root, changed: changed, files: true,
-		skip: func(p, name string) bool { return skipWatched(root, p, name) }}, "project watch")
+		skip: func(p, name string) bool { return skipWatched(root, p, name) }}, "folder watch")
 }
 
 func startFolderWatch(w *folderWatch, name string) (*folderWatch, error) {
@@ -137,7 +137,7 @@ func (w *folderWatch) read() {
 				if ev.Mask&unix.IN_ISDIR != 0 && ev.Mask&(unix.IN_CREATE|unix.IN_MOVED_TO) != 0 && name != "" {
 					w.addTree(filepath.Join(dir, name))
 				}
-				// The root itself gone (a project folder removed, a test's TempDir): nothing
+				// The root itself gone (a folder removed, a test's TempDir): nothing
 				// more can be heard, so the watch lets its descriptor go.
 				if ev.Mask&unix.IN_DELETE_SELF != 0 && dir == w.root {
 					go w.stop()

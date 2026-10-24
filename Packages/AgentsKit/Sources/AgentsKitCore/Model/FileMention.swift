@@ -78,7 +78,7 @@ extension FileMention {
                     .map { String(url.path.dropFirst($0.count + 1)) }
                     ?? url.path
                 let isDirectory = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
-                // Build output and what the project ignores are not files anyone means:
+                // Build output and what the folder ignores are not files anyone means:
                 // an index record under `build/DD` matched "PromptBar" before the source
                 // did. A skipped folder is not walked at all, which also keeps the cap
                 // for the files that are.
@@ -133,8 +133,8 @@ extension FileMention {
 /// start on iOS. Getting one of those wrong only means a file is offered that git would
 /// have hidden, which is how every search behaved before this.
 public struct MentionIgnore {
-    /// Folders that are build output in every project this app has met, whatever the
-    /// project's `.gitignore` says, or whether it has one.
+    /// Folders that are build output in every folder this app has met, whatever the
+    /// folder's `.gitignore` says, or whether it has one.
     public static let alwaysSkipped: Set<String> = [
         ".git", "node_modules", ".build", "build", "DerivedData", "Pods", ".swiftpm",
     ]

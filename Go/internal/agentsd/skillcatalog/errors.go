@@ -27,8 +27,8 @@ func LockUnreadable(path string) *Error {
 func NoPersonalHome() *Error  { return &Error{wire.CatalogError{NoPersonalHome: &struct{}{}}} }
 func PreviewExpired() *Error  { return &Error{wire.CatalogError{PreviewExpired: &struct{}{}}} }
 func ReplaceMismatch() *Error { return &Error{wire.CatalogError{ReplaceMismatch: &struct{}{}}} }
-func NotAProject(path string) *Error {
-	return &Error{wire.CatalogError{NotAProject: &wire.CatalogErrorNotAProject{Path: path}}}
+func NotAFolder(path string) *Error {
+	return &Error{wire.CatalogError{NotAFolder: &wire.CatalogErrorNotAFolder{Path: path}}}
 }
 func CannotAdd(problems []wire.PreviewProblem) *Error {
 	return &Error{wire.CatalogError{CannotAdd: &wire.CatalogErrorCannotAdd{Value: problems}}}
@@ -56,8 +56,8 @@ func Sentence(e wire.CatalogError) string {
 		return "This copy of the app has no personal ~/.agents."
 	case e.PreviewExpired != nil:
 		return "That preview has expired. Open the skill again."
-	case e.NotAProject != nil:
-		return e.NotAProject.Path + " is not a project on this Mac."
+	case e.NotAFolder != nil:
+		return e.NotAFolder.Path + " is not a folder on this Mac."
 	case e.ReplaceMismatch != nil:
 		return "The skill there has changed. Open it again."
 	case e.CannotAdd != nil:

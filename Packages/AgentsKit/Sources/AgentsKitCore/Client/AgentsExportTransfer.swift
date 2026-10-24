@@ -1,6 +1,6 @@
 import Foundation
 
-/// Export… and Import… of an agent or a project (#1001), as the window and the Remote do
+/// Export… and Import… of an agent or a folder (#1001), as the window and the Remote do
 /// them. The host makes the export; this reads it in parts into a file, and sends a file in
 /// parts for an import, so neither is held in memory whole.
 public enum AgentsExportTransfer {
@@ -39,7 +39,7 @@ public enum AgentsExportTransfer {
         }
     }
 
-    /// Sends `file` in parts and imports it, into the project at `folder` when one is given.
+    /// Sends `file` in parts and imports it, into the folder at `folder` when one is given.
     /// A cancelled task stops between parts, before anything is imported (#2437).
     public static func importFile(_ file: URL, into client: DaemonClient, folder: URL? = nil,
                                   progress: Progress? = nil) async throws -> DaemonAPI.BackupRestoreResult {
@@ -78,9 +78,9 @@ public enum AgentsExportTransfer {
     }
 
     /// What an import did, in a line: "Imported 2 agents into Web, archived." and what it
-    /// skipped. `project` is the project they went into, when the person chose one.
-    public static func imported(_ result: DaemonAPI.BackupRestoreResult, into project: String? = nil) -> String {
-        let into = project.map { " into \($0)" } ?? ""
+    /// skipped. `folder` is the folder they went into, when the person chose one.
+    public static func imported(_ result: DaemonAPI.BackupRestoreResult, into folder: String? = nil) -> String {
+        let into = folder.map { " into \($0)" } ?? ""
         let count = (result.restored == 1 ? "1 agent" : "\(result.restored) agents") + into
         let words = "Imported \(count), archived."
         guard result.skipped > 0 else { return result.restored == 0 ? "There were no agents to import." : words }

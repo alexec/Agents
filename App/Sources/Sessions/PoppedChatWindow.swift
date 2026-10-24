@@ -43,7 +43,7 @@ struct PoppedChatWindow: View {
         .frame(minWidth: 420, minHeight: 360)
         .toolbar { toolbar }
         .navigationTitle(AppCheckout.windowTitle(agent?.title))
-        .navigationSubtitle(agent.flatMap { model.work.project(ProjectKey(host: $0.host, folder: $0.projectFolder))?.name } ?? "")
+        .navigationSubtitle(agent.flatMap { model.work.folder(FolderKey(host: $0.host, folder: $0.folderPath))?.name } ?? "")
         .focusedSceneValue(\.poppedChat, chat)
         .environment(frame)
         .environment(states)
@@ -121,7 +121,7 @@ extension AppModel {
         bringMainWindowForward(opening: openWindow)
     }
 
-    /// The main window, in front: Window ▸ Agents (All Projects), ⌘0 (#1089). Minimised,
+    /// The main window, in front: Window ▸ Agents (All Folders), ⌘0 (#1089). Minimised,
     /// it comes back out of the Dock; closed, SwiftUI has let it go, so a new one opens
     /// (#1454).
     func bringMainWindowForward(opening openWindow: OpenWindowAction) {
@@ -134,7 +134,7 @@ extension AppModel {
 }
 
 /// Which of the app's windows is the main one: not Settings, not a session's own, and not
-/// a project's own (#1089).
+/// a folder's own (#1089).
 enum MainWindow {
     /// The main window's scene id (`AgentsApp`): what opens it again once closed (#1454).
     /// AppKit names its windows `main-AppWindow-<n>`, and saves and restores them by it.

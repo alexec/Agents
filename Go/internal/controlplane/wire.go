@@ -77,6 +77,6 @@ func clientOnWire(c records.ClientRecord) wire.ClientRecord {
 // HostJoinStatus is DaemonAPI.HostJoinStatus: how this Mac's host's join stands (#113).
 type HostJoinStatus = wire.HostJoinStatus
 
-// standardDetection is ProjectDetection.standard (#429): where a host added from now on
-// has its projects found, until a person says otherwise.
-var standardDetection = wire.ProjectDetection{Enabled: true, Paths: []string{"~", "~/src", "~/code", "~/projects", "~/Developer", "~/dev", "~/git"}}
+// standardDetection is FolderDetection.standard (#429): where a host added from now on
+// has its folders found, until a person says otherwise.
+var standardDetection = wire.FolderDetection{Enabled: true, Paths: []string{"~", "~/src", "~/code", "~/folders", "~/Developer", "~/dev", "~/git"}}

@@ -84,7 +84,7 @@ func runFailure(a *wire.Agent) (string, bool) {
 	return "", false
 }
 
-// workflowFailures is the project's workflows that have stopped working, less the failure
+// workflowFailures is the folder's workflows that have stopped working, less the failure
 // each the person dismissed, by id. Waiting for an OK or denied here is not a failure, nor
 // over the limit once it no longer is.
 func (d *Daemon) workflowFailures(folder string) []wire.Approval {
@@ -142,9 +142,9 @@ func (d *Daemon) workflowFailures(folder string) []wire.Approval {
 // dismissWorkflowFailure is Dismiss: out of Needs You until it fails again, kept on the
 // workflow's record for every client and a restart. Refused when it has failed anew since
 // it was shown, so a dismissal never hides a failure nobody saw.
-func (d *Daemon) dismissWorkflowFailure(folder, id string, digest *string) (wire.ProjectSummary, error) {
+func (d *Daemon) dismissWorkflowFailure(folder, id string, digest *string) (wire.FolderSummary, error) {
 	if digest == nil {
-		return wire.ProjectSummary{}, Invalid("Say which failure you were shown.")
+		return wire.FolderSummary{}, Invalid("Say which failure you were shown.")
 	}
 	shown := false
 	for _, a := range d.workflowFailures(folder) {
@@ -153,7 +153,7 @@ func (d *Daemon) dismissWorkflowFailure(folder, id string, digest *string) (wire
 		}
 	}
 	if !shown {
-		return wire.ProjectSummary{}, &Error{Code: wire.FailureNotChanged, Message: "That workflow has failed again since you looked, or it works now. Look again."}
+		return wire.FolderSummary{}, &Error{Code: wire.FailureNotChanged, Message: "That workflow has failed again since you looked, or it works now. Look again."}
 	}
 	d.workflowMu.Lock()
 	key := *digest
@@ -161,5 +161,5 @@ func (d *Daemon) dismissWorkflowFailure(folder, id string, digest *string) (wire
 	d.saveRecordsLocked(false)
 	d.workflowMu.Unlock()
 	log.Printf("workflows: failure of %s in %s dismissed", id, folder)
-	return d.sendProject(folder)
+	return d.sendFolder(folder)
 }

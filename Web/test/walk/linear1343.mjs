@@ -1,6 +1,6 @@
 // The #1343 walk: the linear server's Linear issues page on the web page. Pairs, opens the
-// project's pinned Linear issues, narrows it to a team and a state, and presses Start Agent,
-// which opens the new-agent form filled in. Starts no agent. Expects the project's
+// folder's pinned Linear issues, narrows it to a team and a state, and presses Start Agent,
+// which opens the new-agent form filled in. Starts no agent. Expects the folder's
 // .agents/pins.json to pin ui://linear/issues and its linear server approved, pointed at a
 // stand-in Linear (Web/test/walk/fake-linear.mjs).
 //
@@ -50,7 +50,7 @@ try {
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  // A new project starts folded: unfold it, as its chevron does.
+  // A new folder starts folded: unfold it, as its chevron does.
   await page.waitFor(`document.querySelector('.sidebar button.disclosure[aria-label="Unfold work"]')`, 15_000);
   await page.eval(`document.querySelector('.sidebar button.disclosure[aria-label="Unfold work"]').click()`);
   await page.waitFor(`document.querySelectorAll(".sidebar .row.pin").length >= 1`, 15_000);

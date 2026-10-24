@@ -1,6 +1,6 @@
 import Foundation
 
-/// One project-scoped name attached to a session. The owner is the person or the
+/// One folder-scoped name attached to a session. The owner is the person or the
 /// agent represented by the containing session.
 public struct SessionLabel: Codable, Hashable, Sendable {
     public enum Owner: String, Codable, Hashable, Sendable {
@@ -82,10 +82,10 @@ public enum SessionLabelPolicy {
         return result
     }
 
-    /// Existing labels elsewhere in the project carry its current canonical spelling.
+    /// Existing labels elsewhere in the folder carry its current canonical spelling.
     /// The caller supplies those from `vocabulary(in:agents:)`.
     public static func change(current: [SessionLabel], add: [String] = [], remove: [String] = [],
-                              actor: SessionLabel.Owner, projectLabels: [SessionLabel],
+                              actor: SessionLabel.Owner, folderLabels: [SessionLabel],
                               at date: Date = Date()) throws -> [SessionLabel] {
         let adding = try add.map(cleaned)
         let removing = try remove.map(cleaned)
@@ -111,7 +111,7 @@ public enum SessionLabelPolicy {
                 continue
             }
             guard result.count < maximumCount else { throw Refusal.tooMany }
-            let canonical = projectLabels.first(where: { $0.normalizedValue == key(value) })?.value ?? value
+            let canonical = folderLabels.first(where: { $0.normalizedValue == key(value) })?.value ?? value
             result.append(SessionLabel(value: canonical, owner: actor, addedAt: date))
         }
         return result
@@ -119,9 +119,9 @@ public enum SessionLabelPolicy {
 
     /// Only labels still attached to a session are suggested. The daemon serializes
     /// mutations, so every new copy can reuse the spelling already in this vocabulary.
-    public static func vocabulary(in project: URL, agents: some Sequence<Agent>) -> [SessionLabel] {
-        let folder = Project.standardize(project)
-        let all = agents.filter { $0.projectFolder == folder }.flatMap(\.labels)
+    public static func vocabulary(in folder: URL, agents: some Sequence<Agent>) -> [SessionLabel] {
+        let folder = Folder.standardize(folder)
+        let all = agents.filter { $0.folderPath == folder }.flatMap(\.labels)
             .sorted { left, right in
                 if left.addedAt != right.addedAt { return left.addedAt < right.addedAt }
                 return left.normalizedValue < right.normalizedValue

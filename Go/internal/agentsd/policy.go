@@ -21,7 +21,7 @@ import (
 // The organisation's policy on this machine (#998, spec 998 slice 2a). The control plane
 // sends it on channel 0 (host/policy) to a machine that says host.policy/1. The machine
 // keeps the newest copy whose signature its control key checks, in <root>/policy.json,
-// and applies it as a ceiling above the person's and the project's own settings: it caps
+// and applies it as a ceiling above the person's and the folder's own settings: it caps
 // their effect, and never changes what they wrote (FR-011). A copy with a lower version
 // is refused. The machine also keeps the highest version it applied, in
 // <root>/policy-seen.json, so that a machine that had a policy and lost it (the file
@@ -775,7 +775,7 @@ func requiredSandbox(runtimeID string) (wire.SandboxChoice, bool) {
 
 // marketplaceAllowed is whether the policy allows a marketplace: named by its id, or by
 // its address alone, so that an admin names a marketplace once for every person and
-// project that lists it. An id of "" is a marketplace not named, which an allowlist refuses.
+// folder that lists it. An id of "" is a marketplace not named, which an allowlist refuses.
 func (d *Daemon) marketplaceAllowed(id, url string) bool {
 	p := d.orgPolicy()
 	if p == nil || p.Marketplaces == nil {
@@ -807,7 +807,7 @@ func (d *Daemon) customServerRefusal() error {
 
 // MARK: helpers
 
-// helperCaps caps a project's helper limits by the policy's, and marks them when it does.
+// helperCaps caps a folder's helper limits by the policy's, and marks them when it does.
 func (d *Daemon) helperCaps(running, notArchived int64) (int64, int64, *wire.PolicySetBy) {
 	p := d.orgPolicy()
 	if p == nil || p.Helpers == nil {
@@ -833,14 +833,14 @@ func helperWords(h *wire.PolicyHelpers) string {
 	if h.MostNotArchived != nil {
 		parts = append(parts, fmt.Sprintf("%d not archived", *h.MostNotArchived))
 	}
-	return "Your organisation allows at most " + strings.Join(parts, " and ") + " helper sessions in a project."
+	return "Your organisation allows at most " + strings.Join(parts, " and ") + " helper sessions in a folder."
 }
 
-// markHelperLimits marks a project whose helper limits the policy caps.
-func (d *Daemon) markHelperLimits(s *wire.ProjectSummary) {
+// markHelperLimits marks a folder whose helper limits the policy caps.
+func (d *Daemon) markHelperLimits(s *wire.FolderSummary) {
 	s.HelperLimitsSetBy = nil
 	running, notArchived := int64(defaultHelpersRunning), int64(defaultHelpersNotArchived)
-	if l := s.Project.HelperLimits; l != nil {
+	if l := s.Folder.HelperLimits; l != nil {
 		if l.Running != nil {
 			running = *l.Running
 		}
@@ -851,7 +851,7 @@ func (d *Daemon) markHelperLimits(s *wire.ProjectSummary) {
 	_, _, s.HelperLimitsSetBy = d.helperCaps(running, notArchived)
 }
 
-// helperLimitsRefusal is why the project's own helper limits may not be set this high.
+// helperLimitsRefusal is why the folder's own helper limits may not be set this high.
 func (d *Daemon) helperLimitsRefusal(l wire.HelperLimits) error {
 	p := d.orgPolicy()
 	if p == nil || p.Helpers == nil {

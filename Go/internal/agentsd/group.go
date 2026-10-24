@@ -3,7 +3,7 @@ package agentsd
 import "github.com/alexec/agents/Go/wire"
 
 // Group is the sidebar heading an agent is under (AgentGroup.init(for:…)), for a
-// project's counts.
+// folder's counts.
 func Group(a *wire.Agent) string {
 	outcomeAsked := a.OutcomeAsked != nil && *a.OutcomeAsked
 	waitingOnEvents := a.EventWait != nil && a.EventWait.Ending == nil

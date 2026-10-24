@@ -10,12 +10,12 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// A workflow waiting for an OK is in the project's guarded changes, its approvals and
+// A workflow waiting for an OK is in the folder's guarded changes, its approvals and
 // Needs You, as on the Swift host (#1322); Approve, Deny and Undo settle it from there.
-func TestAWaitingWorkflowIsInTheProjectsApprovals(t *testing.T) {
+func TestAWaitingWorkflowIsInTheFoldersApprovals(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	write := func(id, text string) {
@@ -54,7 +54,7 @@ func TestAWaitingWorkflowIsInTheProjectsApprovals(t *testing.T) {
 	if len(s.Approvals) != 1 || s.Approvals[0].Line != "Changed since you approved it" {
 		t.Fatalf("%+v", s.Approvals)
 	}
-	c.call(t, 5, "projects/undoGuardedChange", map[string]any{"folder": folder, "path": ".agents/workflows/greet.md", "digest": *s.Approvals[0].Digest})
+	c.call(t, 5, "folders/undoGuardedChange", map[string]any{"folder": folder, "path": ".agents/workflows/greet.md", "digest": *s.Approvals[0].Digest})
 	if b, _ := os.ReadFile(filepath.Join(workflowsFolder(dir), "greet.md")); string(b) != "---\nname: Greet\non: agent.finished\n---\nSay hello.\n" {
 		t.Fatalf("%s", b)
 	}

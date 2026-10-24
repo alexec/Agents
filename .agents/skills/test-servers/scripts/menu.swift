@@ -1,9 +1,9 @@
 import ApplicationServices
 import Foundation
 // menu.swift <pid> <menu button label> <submenu> [<item>]: open a menu button (e.g. the
-// sidebar's "New project"), then press an item in it, or an item inside a submenu of it.
-//   swift menu.swift $APP_PID "New project" "127.0.0.1" "Choose Folder…"
-//   swift menu.swift $APP_PID "New project" "Add a server…"
+// sidebar's "New folder"), then press an item in it, or an item inside a submenu of it.
+//   swift menu.swift $APP_PID "New folder" "127.0.0.1" "Choose Folder…"
+//   swift menu.swift $APP_PID "New folder" "Add a server…"
 let a = CommandLine.arguments
 guard a.count >= 4 else { print("usage: menu.swift <pid> <menu button> <item or submenu> [item]"); exit(2) }
 let app = AXUIElementCreateApplication(pid_t(a[1])!)

@@ -14,30 +14,30 @@ struct TouchedPathsTests {
 
     @Test func locationsAndDiffPathsAreBothTaken() {
         let touched = TouchedPaths(entries: [
-            toolCall(locations: ["/tmp/project/read.swift"]),
-            toolCall(diffs: ["/tmp/project/written.swift"]),
+            toolCall(locations: ["/tmp/folder/read.swift"]),
+            toolCall(diffs: ["/tmp/folder/written.swift"]),
         ])
-        #expect(touched.contains(URL(filePath: "/tmp/project/read.swift")))
-        #expect(touched.contains(URL(filePath: "/tmp/project/written.swift")))
+        #expect(touched.contains(URL(filePath: "/tmp/folder/read.swift")))
+        #expect(touched.contains(URL(filePath: "/tmp/folder/written.swift")))
         #expect(touched.count == 2)
     }
 
     @Test func oneToolCallCanCarryBoth() {
         let touched = TouchedPaths(entries: [
-            toolCall(locations: ["/tmp/project/a.swift"], diffs: ["/tmp/project/b.swift"]),
+            toolCall(locations: ["/tmp/folder/a.swift"], diffs: ["/tmp/folder/b.swift"]),
         ])
         #expect(touched.count == 2)
     }
 
     @Test func aFileNobodyTouchedIsAbsent() {
-        let touched = TouchedPaths(entries: [toolCall(locations: ["/tmp/project/a.swift"])])
-        #expect(touched.contains(URL(filePath: "/tmp/project/untouched.swift")) == false)
+        let touched = TouchedPaths(entries: [toolCall(locations: ["/tmp/folder/a.swift"])])
+        #expect(touched.contains(URL(filePath: "/tmp/folder/untouched.swift")) == false)
     }
 
     @Test func theSameFileTwiceIsStillOneFile() {
         let touched = TouchedPaths(entries: [
-            toolCall(locations: ["/tmp/project/a.swift"]),
-            toolCall(diffs: ["/tmp/project/a.swift"]),
+            toolCall(locations: ["/tmp/folder/a.swift"]),
+            toolCall(diffs: ["/tmp/folder/a.swift"]),
         ])
         #expect(touched.count == 1)
     }
@@ -45,9 +45,9 @@ struct TouchedPathsTests {
     @Test func messagesAndThoughtsTouchNothing() {
         // The mark claims the agent changed a file. Talking about one is not that.
         let touched = TouchedPaths(entries: [
-            TranscriptEntry(kind: .agentMessage(messageID: nil, text: "I edited /tmp/project/a.swift")),
-            TranscriptEntry(kind: .agentThought(messageID: nil, text: "/tmp/project/b.swift next")),
-            TranscriptEntry(kind: .userMessage("please edit /tmp/project/c.swift")),
+            TranscriptEntry(kind: .agentMessage(messageID: nil, text: "I edited /tmp/folder/a.swift")),
+            TranscriptEntry(kind: .agentThought(messageID: nil, text: "/tmp/folder/b.swift next")),
+            TranscriptEntry(kind: .userMessage("please edit /tmp/folder/c.swift")),
         ])
         #expect(touched.isEmpty)
     }
@@ -56,11 +56,11 @@ struct TouchedPathsTests {
         let touched = TouchedPaths(entries: [
             TranscriptEntry(kind: .toolCallUpdate(ToolCall(
                 title: "Edit",
-                content: [.diff(ToolCallContent.Diff(path: "/tmp/project/late.swift",
+                content: [.diff(ToolCallContent.Diff(path: "/tmp/folder/late.swift",
                                                      oldText: nil, newText: "new"))],
                 locations: []))),
         ])
-        #expect(touched.contains(URL(filePath: "/tmp/project/late.swift")))
+        #expect(touched.contains(URL(filePath: "/tmp/folder/late.swift")))
     }
 
     @Test func aPathIsMatchedAfterItIsResolved() throws {
@@ -88,8 +88,8 @@ struct TouchedPathsTests {
         // The pane folds once per agent and keeps folding as entries arrive (FR-013).
         var touched = TouchedPaths()
         #expect(touched.isEmpty)
-        touched.absorb(toolCall(locations: ["/tmp/project/first.swift"]))
-        touched.absorb(toolCall(diffs: ["/tmp/project/second.swift"]))
+        touched.absorb(toolCall(locations: ["/tmp/folder/first.swift"]))
+        touched.absorb(toolCall(diffs: ["/tmp/folder/second.swift"]))
         #expect(touched.count == 2)
     }
 }

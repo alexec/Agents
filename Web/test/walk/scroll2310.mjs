@@ -1,5 +1,5 @@
 // The #2310 walk: the chat's place on the web page, measured per frame. Needs a scratch root
-// (run-app) seeded with a long chat in project "proj00" whose title holds "seeded live 0"
+// (run-app) seeded with a long chat in folder "proj00" whose title holds "seeded live 0"
 // (scripts/seed-markdown-chat.py, 97 turns).
 //
 //   node Web/test/walk/scroll2310.mjs <WEB_URL> <browser code> <ROOT> <out dir>
@@ -21,8 +21,8 @@ try {
   };
   await page.waitFor(`document.querySelector("textarea")`);
   await page.focus("textarea"); await page.type(code); await page.press("Connect");
-  await page.waitFor(`document.querySelector(".row.project")`, 20_000);
-  await page.eval(`document.querySelector(".row.project .disclosure")?.click()`);
+  await page.waitFor(`document.querySelector(".row.folder")`, 20_000);
+  await page.eval(`document.querySelector(".row.folder .disclosure")?.click()`);
   await page.waitFor(`[...document.querySelectorAll(".row.session")].some((e) => e.textContent.includes("seeded live 0"))`, 20_000);
   await page.eval(`[...document.querySelectorAll(".row.session .pick, .row.session")].find((e) => e.textContent.includes("seeded live 0"))?.click()`);
   await page.waitFor(`${T} && ${T}.scrollHeight > ${T}.clientHeight + 100`, 20_000);

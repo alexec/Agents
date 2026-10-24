@@ -352,7 +352,7 @@ struct AddProviderSheet: View {
     @State private var deployment = ""
     @State private var accessKey = ""
     @State private var secretKey = ""
-    @State private var project = ""
+    @State private var folder = ""
     @State private var sshKey = ""
     @State private var serviceKey = ""
     @State private var serviceAccount = ""
@@ -508,10 +508,10 @@ struct AddProviderSheet: View {
                 TextField("Cluster", text: $cluster)
                 TextField("Configuration", text: $config)
                 TextField("Region", text: $region)
-                TextField("Project", text: $project, prompt: Text("gcloud’s default"))
+                TextField("Project", text: $folder, prompt: Text("gcloud’s default"))
                 TextField("ssh", text: $ssh, prompt: Text("A host in your ssh config"))
             case .compute:
-                TextField("Project", text: $project)
+                TextField("Project", text: $folder)
                 TextField("Zone", text: $region, prompt: Text("us-west1-b"))
                 TextField("VMs labelled", text: $tag)
                 TextField("ssh as", text: $user)
@@ -577,7 +577,7 @@ struct AddProviderSheet: View {
                 .disabled(working || writing || name.trimmingCharacters(in: .whitespaces).isEmpty
                           || (editing != nil && written == nil) || (kind.hasAPI && !byCLI && token.isEmpty)
                           || (kind == .aws && (trimmed(accessKey).isEmpty || secretKey.isEmpty || trimmed(region).isEmpty))
-                          || (kind == .compute && (serviceKey.isEmpty || trimmed(project).isEmpty || trimmed(region).isEmpty)))
+                          || (kind == .compute && (serviceKey.isEmpty || trimmed(folder).isEmpty || trimmed(region).isEmpty)))
         }
     }
 
@@ -972,7 +972,7 @@ struct AddProviderSheet: View {
                                          secrets: ["AWS_ACCESS_KEY_ID": trimmed(accessKey), "AWS_SECRET_ACCESS_KEY": secretKey])
         case .compute:
             // The key goes in only as the provider's secret, never in its configuration.
-            commands = ["preset": "gcp-compute-api", "project": .string(trimmed(project)), "zone": .string(trimmed(region)),
+            commands = ["preset": "gcp-compute-api", "project": .string(trimmed(folder)), "zone": .string(trimmed(region)),
                         "label": .string(trimmed(tag).isEmpty ? "agents" : trimmed(tag)),
                         "user": .string(trimmed(user).isEmpty ? "agents" : trimmed(user))]
             if !trimmed(sshKey).isEmpty { commands["sshKeys"] = [.string(trimmed(sshKey))] }
@@ -981,7 +981,7 @@ struct AddProviderSheet: View {
         case .workstations:
             commands = ["preset": "gcloud-workstations", "cluster": .string(trimmed(cluster)),
                         "config": .string(trimmed(config)), "region": .string(trimmed(region))]
-            if !trimmed(project).isEmpty { commands["project"] = .string(trimmed(project)) }
+            if !trimmed(folder).isEmpty { commands["project"] = .string(trimmed(folder)) }
             if !trimmed(ssh).isEmpty { commands["ssh"] = .string(trimmed(ssh)) }
         case .commands:
             return DaemonAPI.ProviderAdd(name: name, kind: .commands, commands: try commandsJSON(), secrets: given)

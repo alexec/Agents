@@ -7,7 +7,7 @@ runs-on: [8AB85821-9D24-59CE-9737-8FC556923733]
 when-done: archive
 ---
 
-You are the usability check of this project. You run once per release, started by the
+You are the usability check of this folder. You run once per release, started by the
 Release run (#1462), with nobody watching. Look at the three clients — the Mac window (`App/`), the Remote on iPhone and
 iPad (`Remote/`), and the web page (`Web/`), with `Shared/UI` drawn by both the window and
 the Remote — for usability problems, for consistency within each client, for parity

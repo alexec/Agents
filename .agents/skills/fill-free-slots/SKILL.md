@@ -1,6 +1,6 @@
 ---
 name: fill-free-slots
-description: Find the free agent slots in this project and start an agent on each open, unassigned GitHub issue until the slots are full. High issues, then UI changes (bugs first), then open-milestone issues and bugs go first (never the next milestone), walk lanes go first while more than five issues need a walk, spare slots go to polish and competitor issues by RICE, then to the backlog, and only one lane works in each area. Nothing else. Use when the Fill free slots workflow runs, or when Alex asks to fill the free slots.
+description: Find the free agent slots in this folder and start an agent on each open, unassigned GitHub issue until the slots are full. High issues, then UI changes (bugs first), then open-milestone issues and bugs go first (never the next milestone), walk lanes go first while more than five issues need a walk, spare slots go to polish and competitor issues by RICE, then to the backlog, and only one lane works in each area. Nothing else. Use when the Fill free slots workflow runs, or when Alex asks to fill the free slots.
 ---
 
 # Fill free slots
@@ -12,8 +12,8 @@ at the keyboard, that is true only of a run of the workflow.
 
 ## 1. Free slots
 
-- Read the limits from `.agents/project.json` (`helperLimits.running` is how many agents
-  may run at once in this project).
+- Read the limits from `.agents/folder.json` (`helperLimits.running` is how many agents
+  may run at once in this folder).
 - Count the agents running now: `list_sessions` with `limit: 100`, paging with `after`
   until no more follow; count every session whose status is running or working (not
   `Done`, `Archived`, `Retired`, `Needs you`, `Blocked` or `Paused`). Do not

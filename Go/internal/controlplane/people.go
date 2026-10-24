@@ -431,17 +431,17 @@ func (m *Methods) unpushedOn(h records.HostRecord, from Caller) wire.StartedMach
 		return preview
 	}
 	answer := m.router.DeliverKept(wire.CallWorktreesAll.Name, wire.Empty{}, from.Client, from.Kind, h.ID, previewPatience)
-	var projects []wire.ProjectWorktrees
-	if answer == nil || len(answer.Error) > 0 || json.Unmarshal(answer.Result, &projects) != nil {
+	var folders []wire.FolderWorktrees
+	if answer == nil || len(answer.Error) > 0 || json.Unmarshal(answer.Result, &folders) != nil {
 		preview.Unknown = optional(h.Name + " did not say what work on it is not pushed.")
 		return preview
 	}
-	for _, p := range projects {
+	for _, p := range folders {
 		for _, w := range p.Worktrees {
 			if w.Status == nil || !unpushed(*w.Status) {
 				continue
 			}
-			work := wire.UnpushedWork{Project: p.Project, Worktree: w.Root, Branch: w.Branch, Ahead: w.Status.Ahead,
+			work := wire.UnpushedWork{Folder: p.Folder, Worktree: w.Root, Branch: w.Branch, Ahead: w.Status.Ahead,
 				Unmerged: w.Status.Unmerged}
 			if w.Status.Uncommitted > 0 {
 				work.Uncommitted = new(w.Status.Uncommitted)

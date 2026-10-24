@@ -2,15 +2,15 @@ import AgentsKitCore
 import AppKit
 import SwiftUI
 
-/// A project's Connectors set-up (#1336, frames A, C, D and G): one Connect GitHub…, then four
+/// A folder's Connectors set-up (#1336, frames A, C, D and G): one Connect GitHub…, then four
 /// slots (Tasks, Code review, CI, Where agents run), each proving itself with one real read,
 /// then the events it turned on. The page is the set-up: Change… opens a slot in place, and
 /// the only sheet is Connect. The state is the host's, so the Remote and the web page show
 /// the same ticks.
 struct ConnectorSetupView: View {
     @Environment(AppModel.self) private var model
-    var project: ProjectKey
-    var projectName: String
+    var folder: FolderKey
+    var folderName: String
     /// Opens the catalogue (Add Connector…), for Linear and the others.
     var addConnector: () -> Void
 
@@ -53,7 +53,7 @@ struct ConnectorSetupView: View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Connectors").appText(.title).fontWeight(.semibold)
-                Text(ConnectorSetupWords.intro(project: projectName, repository: setup?.repository,
+                Text(ConnectorSetupWords.intro(folder: folderName, repository: setup?.repository,
                                                site: setup?.siteOrGitHub ?? "github.com"))
                     .appText(.supporting).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -74,7 +74,7 @@ struct ConnectorSetupView: View {
                 ProgressView().controlSize(.small)
             }
         }
-        .task(id: project) { await load(.cached) }
+        .task(id: folder) { await load(.cached) }
         .task {
             control = ControlConfig.endpoint.flatMap { ControlSettingsModel(endpoint: $0) }
             await control?.refresh()
@@ -87,7 +87,7 @@ struct ConnectorSetupView: View {
         }) { flow in
             switch flow {
             case .choose:
-                CodespacesSheet(project: project, repository: setup?.repository ?? "", model: model, codespaces: codespaces,
+                CodespacesSheet(folder: folder, repository: setup?.repository ?? "", model: model, codespaces: codespaces,
                                 problem: codespacesProblem, onChange: { codespaces = $0 },
                                 onProblem: { codespacesProblem = $0 },
                                 onConnect: { codespacesFlow = .install($0) },
@@ -106,15 +106,15 @@ struct ConnectorSetupView: View {
         }
         .sheet(isPresented: $connecting) {
             if setup?.forgeOrGitHub == .gitlab {
-                ConnectGitLabSheet(host: project.host, onConnected: { Task { await load(.fresh) } })
+                ConnectGitLabSheet(host: folder.host, onConnected: { Task { await load(.fresh) } })
             } else {
-                ConnectGitHubSheet(host: project.host, project: project, onConnected: { Task { await load(.fresh) } })
+                ConnectGitHubSheet(host: folder.host, folder: folder, onConnected: { Task { await load(.fresh) } })
             }
         }
         .sheet(isPresented: $connectingLinear, onDismiss: {
             if linearConnected { linearConnected = false; addConnector() }
         }) {
-            ConnectLinearSheet(host: project.host, onConnected: { linearConnected = true })
+            ConnectLinearSheet(host: folder.host, onConnected: { linearConnected = true })
         }
     }
 
@@ -176,7 +176,7 @@ struct ConnectorSetupView: View {
     @ViewBuilder private func slots(_ setup: DaemonAPI.ConnectorSetup) -> some View {
         LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
             ForEach(setup.slots.filter { $0.slot != changing }) { slot in
-                SlotCard(slot: slot, setup: setup, projectName: projectName, place: place, reading: reading,
+                SlotCard(slot: slot, setup: setup, folderName: folderName, place: place, reading: reading,
                          change: { changing = slot.slot }, act: act)
             }
         }
@@ -187,12 +187,12 @@ struct ConnectorSetupView: View {
         }
     }
 
-    /// Where agents run (#2131): the machine the project's folder is on, and what else is yours.
+    /// Where agents run (#2131): the machine the folder is on, and what else is yours.
     private var place: Place {
         let hosts = control?.hosts ?? []
-        let here = model.isOnThisMac(project.host)
-        let title = WhereAgentsRun.title(onThisMac: here, hostName: hosts.first { $0.id == project.host }?.name)
-        let others = hosts.filter { $0.id != project.host && $0.runsAgents }
+        let here = model.isOnThisMac(folder.host)
+        let title = WhereAgentsRun.title(onThisMac: here, hostName: hosts.first { $0.id == folder.host }?.name)
+        let others = hosts.filter { $0.id != folder.host && $0.runsAgents }
             .map { $0.id == control?.thisMacHost?.id ? "This Mac" : $0.name }
         return Place(title: title, line: WhereAgentsRun.line(others: others, providers: control?.providers.map(\.name) ?? []))
     }
@@ -220,7 +220,7 @@ struct ConnectorSetupView: View {
                     Text(ConnectorSetupWords.workflowsLead(events)).appText(.fine).foregroundStyle(.secondary)
                     ForEach(Array(events.workflows.enumerated()), id: \.element.id) { index, workflow in
                         Button(workflow.name + (index < events.workflows.count - 1 ? "," : ".")) {
-                            model.sidebarItem = .workflow(project.folder.path + "/" + workflow.id, in: project)
+                            model.sidebarItem = .workflow(folder.folder.path + "/" + workflow.id, in: folder)
                         }
                         .buttonStyle(.link).appText(.fine)
                     }
@@ -259,7 +259,7 @@ struct ConnectorSetupView: View {
     /// The Linear connector reads the person's Linear connection (#1682): without one, it
     /// has nothing to read, so the connection comes first.
     private func useLinear() async {
-        if case .success(let list) = await model.connections(on: project.host),
+        if case .success(let list) = await model.connections(on: folder.host),
            list.contains(where: { $0.provider == .linear && $0.state == .connected }) {
             addConnector()
         } else {
@@ -270,7 +270,7 @@ struct ConnectorSetupView: View {
     private func load(_ how: DaemonAPI.ConnectorSetupReading) async {
         reading = true
         defer { reading = false }
-        switch await model.connectorSetup(project, reading: how) {
+        switch await model.connectorSetup(folder, reading: how) {
         case .success(let fresh):
             setup = fresh; problem = nil
             if fresh.forgeOrGitHub == .github, fresh.connection?.state == .connected, fresh.repository != nil {
@@ -284,14 +284,14 @@ struct ConnectorSetupView: View {
 
     private func loadCodespaces(_ action: DaemonAPI.ConnectorCodespacesRequest.Action) async {
         guard setup?.forgeOrGitHub == .github, setup?.repository != nil else { return }
-        switch await model.codespaces(project, action: action) {
+        switch await model.codespaces(folder, action: action) {
         case .success(let result): codespaces = result.codespaces; codespacesProblem = result.message
         case .failure(let failure): codespacesProblem = failure.words
         }
     }
 
     private func skip(_ slot: DaemonAPI.ConnectorSlotKind, _ skipped: Bool) async {
-        switch await model.skipConnectorSlot(project, slot, skipped: skipped) {
+        switch await model.skipConnectorSlot(folder, slot, skipped: skipped) {
         case .success(let fresh): setup = fresh; problem = nil; changing = nil
         case .failure(let failure): problem = failure.words
         }
@@ -308,7 +308,7 @@ struct ConnectorSetupView: View {
 private struct SlotCard: View {
     let slot: DaemonAPI.ConnectorSlot
     let setup: DaemonAPI.ConnectorSetup
-    let projectName: String
+    let folderName: String
     let place: ConnectorSetupView.Place
     let reading: Bool
     let change: () -> Void
@@ -357,7 +357,7 @@ private struct SlotCard: View {
             .accessibilityElement(children: .combine)
         } else {
             Text(slot.slot == .workspace ? place.line
-                 : ConnectorSetupWords.line(slot, project: projectName, repository: setup.repository, forge: setup.forgeOrGitHub))
+                 : ConnectorSetupWords.line(slot, folder: folderName, repository: setup.repository, forge: setup.forgeOrGitHub))
                 .appText(.fine)
                 .tinted([.failed, .refused, .noRemote].contains(slot.state) ? .attention : .none)
                 .foregroundStyle(.secondary)
@@ -562,9 +562,9 @@ private struct SlotChange: View {
     }
 }
 
-/// Codespaces from the GitHub connection, reached from the project's Where agents run slot.
+/// Codespaces from the GitHub connection, reached from the folder's Where agents run slot.
 private struct CodespacesSheet: View {
-    let project: ProjectKey
+    let folder: FolderKey
     let repository: String
     let model: AppModel
     let codespaces: [DaemonAPI.ConnectorCodespace]
@@ -583,7 +583,7 @@ private struct CodespacesSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("GitHub Codespaces").appText(.title).fontWeight(.semibold)
-            Text("Use a Codespace for this project, or create one from \(repository). Connect over SSH; Agents installs on the Codespace.")
+            Text("Use a Codespace for this folder, or create one from \(repository). Connect over SSH; Agents installs on the Codespace.")
                 .appText(.supporting).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Text("Connect prepares the Codespaces entries in ~/.ssh/config with GitHub CLI.")
                 .appText(.fine).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -614,7 +614,7 @@ private struct CodespacesSheet: View {
                 .paperRaised(in: RoundedRectangle(cornerRadius: 8))
             }
             HStack(spacing: 8) {
-                TextField("Codespace name", text: $displayName, prompt: Text("Project name"))
+                TextField("Codespace name", text: $displayName, prompt: Text("Folder name"))
                     .textFieldStyle(.roundedBorder)
                     .disabled(working)
                 Button("Create…") { confirmingCreate = true }
@@ -656,7 +656,7 @@ private struct CodespacesSheet: View {
     private func refresh() async {
         working = true
         defer { working = false }
-        switch await model.codespaces(project, action: .list) {
+        switch await model.codespaces(folder, action: .list) {
         case .success(let result): onChange(result.codespaces); onProblem(result.message)
         case .failure(let failure): onProblem(failure.words)
         }
@@ -665,7 +665,7 @@ private struct CodespacesSheet: View {
     private func change(_ codespace: DaemonAPI.ConnectorCodespace, action: DaemonAPI.ConnectorCodespacesRequest.Action) async {
         working = true
         defer { working = false }
-        switch await model.codespaces(project, action: action, id: codespace.id) {
+        switch await model.codespaces(folder, action: action, id: codespace.id) {
         case .success(let result): onChange(result.codespaces); onProblem(result.message)
         case .failure(let failure): onProblem(failure.words)
         }
@@ -674,7 +674,7 @@ private struct CodespacesSheet: View {
     private func create() async {
         working = true
         defer { working = false }
-        switch await model.codespaces(project, action: .create, name: displayName.trimmingCharacters(in: .whitespaces)) {
+        switch await model.codespaces(folder, action: .create, name: displayName.trimmingCharacters(in: .whitespaces)) {
         case .success(let result): onChange(result.codespaces); onProblem(result.message); displayName = ""
         case .failure(let failure): onProblem(failure.words)
         }
@@ -703,7 +703,7 @@ private struct CodespacesSheet: View {
         pendingStart = nil
         working = true
         defer { working = false }
-        switch await model.codespaces(project, action: .start, id: codespace.id) {
+        switch await model.codespaces(folder, action: .start, id: codespace.id) {
         case .success(let result):
             onChange(result.codespaces); onProblem(result.message)
         case .failure(let failure): onProblem(failure.words)
@@ -713,7 +713,7 @@ private struct CodespacesSheet: View {
     private func prepareSSH(_ codespace: DaemonAPI.ConnectorCodespace) async {
         working = true
         defer { working = false }
-        switch await model.codespaces(project, action: .prepareSSH) {
+        switch await model.codespaces(folder, action: .prepareSSH) {
         case .success(let result):
             onChange(result.codespaces)
             onConnect(result.codespaces.first(where: { $0.id == codespace.id }) ?? codespace)

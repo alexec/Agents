@@ -30,7 +30,7 @@ func (e event) json() map[string]any {
 
 var (
 	repoProperty = property{name: "repo", kind: "string",
-		description: "The GitHub repo, owner/name. Left out, the repo this project's folder pushes to.",
+		description: "The GitHub repo, owner/name. Left out, the repo this folder pushes to.",
 		pattern:     regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`), looksLike: "owner/name"}
 	prProperty = property{name: "pr", kind: "integer", description: "Only this pull request, by number."}
 	// anyoneProperty opts into anyone's issue, comment or PR (#728); left out, only the repo's own people.

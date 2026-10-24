@@ -86,7 +86,7 @@ func TestTheWireIsWhatItWas(t *testing.T) {
 	answer("devices/startPairing", nil)
 	answer("clients/stopPairing", nil)
 	answer("hosts/lastHeard", map[string]any{"host": box.member.Host})
-	answer("control/setProjectDetection", map[string]any{"enabled": true, "paths": []string{" ~/src ", "", "~/work"}})
+	answer("control/setFolderDetection", map[string]any{"enabled": true, "paths": []string{" ~/src ", "", "~/work"}})
 	answer("hosts/lendSignIn", map[string]any{"host": box.member.Host, "from": home.member.Host, "runtime": "claude", "allowed": true})
 	answer("hosts/lendGit", map[string]any{"host": box.member.Host, "from": home.member.Host, "server": "github.com", "allowed": true})
 	answer("hosts/setRelay", map[string]any{"host": relayID, "relay": true})

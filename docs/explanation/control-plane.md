@@ -65,7 +65,7 @@ plane, and nothing connects in to a host.
 │  ├ agents-control, if the │   │  ├ agentsd                │   │                            │
 │  │ control plane runs here│   │  └ agents-relay, optional │   │                            │
 │  └ agents-relay, optional │   │                           │   │                            │
-│ projects, agents,         │   │ projects, agents,         │   │ projects, agents,          │
+│ folders, agents,         │   │ folders, agents,         │   │ folders, agents,          │
 │ runtimes, files, terminals│   │ runtimes                  │   │ runtimes                   │
 └──────────────┬────────────┘   └───────────────────────────┘   └────────────────────────────┘
                │ agents-relay, when Relay for my devices is on
@@ -90,7 +90,7 @@ key, and an **admin**. With one person, everything below is as it was. See
 
 Each client is paired once, with a code the control plane shows, and may then do
 everything its person's other clients may: start and stop agents on their hosts, open terminals,
-sign runtimes in, add and remove hosts and projects, set helper limits, and pair or forget
+sign runtimes in, add and remove hosts and folders, set helper limits, and pair or forget
 other clients. A window, an iPhone, an iPad and a browser are all the same in this.
 
 There used to be two grants, **operator** and **device**, and a phone was a device. That
@@ -245,7 +245,7 @@ before. The iPhone, the iPad and a browser always go through the control plane f
 
 The control plane itself remembers little: the clients, the hosts, the
 codes it has handed out, and which of its copies is holding each host's connection. That
-is its **store**. It is either a folder on disk or an S3-compatible bucket. Nothing else,
+is its **store**. It is either a folder or an S3-compatible bucket. Nothing else,
 no database, is needed. Your agents and their conversations are not in it: they stay on
 their hosts.
 
@@ -378,7 +378,7 @@ try again. Neither is lost without a word.
 
 Before the control plane, the Mac window was special. It started the daemon on this Mac,
 reached each server itself over ssh, and was the only thing allowed to do everything. The
-phone reached only the Mac, through a separate bridge, and saw only the Mac's projects.
+phone reached only the Mac, through a separate bridge, and saw only the Mac's folders.
 What you could reach depended on which screen you held, and pairing, permissions and
 routing lived in three places.
 

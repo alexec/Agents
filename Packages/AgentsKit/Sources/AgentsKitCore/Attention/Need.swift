@@ -12,8 +12,8 @@ public enum NeedID: Hashable, Sendable, Codable {
     case permission(UUID)
     case elicitation(UUID)
     case report(UUID, Date)
-    /// A change to one of the app's own files in a project's `.agents`, waiting for Keep
-    /// or Undo (#531): the project and the file, since there is one question per file.
+    /// A change to one of the app's own files in a folder's `.agents`, waiting for Keep
+    /// or Undo (#531): the folder and the file, since there is one question per file.
     case guardedChange(URL, String)
 
     private enum CodingKeys: String, CodingKey { case permission, elicitation, report, guardedChange }
@@ -59,15 +59,15 @@ public enum NeedID: Hashable, Sendable, Codable {
         }
     }
 
-    /// The project a guarded change's token names (#531), for a banner opened with no
-    /// session behind it: its page is where the question is. Standardised as a project's
-    /// folder is, so `project(_:)` finds it (#1367): a folder with a trailing slash is not
-    /// equal to the project's, and the tap opened nothing.
+    /// The folder a guarded change's token names (#531), for a banner opened with no
+    /// session behind it: its page is where the question is. Standardised as a folder's
+    /// folder is, so `folder(_:)` finds it (#1367): a folder with a trailing slash is not
+    /// equal to the folder's, and the tap opened nothing.
     public static func guardedFolder(fromToken token: String) -> URL? {
         guard token.hasPrefix("guarded:"), let colon = token.lastIndex(of: ":") else { return nil }
         let start = token.index(token.startIndex, offsetBy: "guarded:".count)
         guard start < colon else { return nil }
-        return Project.standardize(URL(filePath: String(token[start..<colon]), directoryHint: .isDirectory))
+        return Folder.standardize(URL(filePath: String(token[start..<colon]), directoryHint: .isDirectory))
     }
 }
 
@@ -90,7 +90,7 @@ public struct Need: Hashable, Sendable, Codable, Identifiable {
 
     public var id: NeedID
     /// The session it is asked in. nil only for a guarded change no agent made (#531),
-    /// which is the project's: asked on its page.
+    /// which is the folder's: asked on its page.
     public var agentID: UUID?
     public var folder: URL
     public var kind: Kind

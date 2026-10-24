@@ -1,5 +1,5 @@
-// Export… and Import Agents… (#1001), as the window's and the Remote's: an agent or a project's
-// agents as a .tar.gz the browser downloads, and one brought back, archived, into a project
+// Export… and Import Agents… (#1001), as the window's and the Remote's: an agent or a folder's
+// agents as a .tar.gz the browser downloads, and one brought back, archived, into a folder
 // (#2389). The host makes and reads the file; the page carries it in parts, with a busy sheet
 // and Cancel while it does (#2437).
 import type { AgentsExport, AgentsExportRequest, AgentsImportRequest, BackupRestoreResult, ReceiveUploadRequest, SendReadRequest, UUID }
@@ -15,9 +15,9 @@ export const importPartSize = 1 << 20;
 /** What the page needs of the link: one call to a host. */
 export type Call = <R>(method: string, params: unknown, host: string) => Promise<R>;
 
-/** AgentsExportTransfer.imported: what an import did, in a line; `project` is where they went. */
-export function importedWords(r: BackupRestoreResult, project?: string): string {
-  const count = (r.restored === 1 ? "1 agent" : `${r.restored} agents`) + (project ? ` into ${project}` : "");
+/** AgentsExportTransfer.imported: what an import did, in a line; `folder` is where they went. */
+export function importedWords(r: BackupRestoreResult, folder?: string): string {
+  const count = (r.restored === 1 ? "1 agent" : `${r.restored} agents`) + (folder ? ` into ${folder}` : "");
   if (r.skipped === 0) return r.restored === 0 ? "There were no agents to import." : `Imported ${count}, archived.`;
   const skipped = r.skipped === 1 ? "1 was skipped" : `${r.skipped} were skipped`;
   const lead = r.restored === 0 ? "Imported no agents" : `Imported ${count}, archived`;
@@ -75,7 +75,7 @@ export async function readExport(call: Call, host: string, request: AgentsExport
   return { name: export_.name, agents: export_.agents, parts };
 }
 
-/** Sends `bytes` in parts, then imports them, into the project at `folder` when one is given. */
+/** Sends `bytes` in parts, then imports them, into the folder at `folder` when one is given. */
 export async function sendImport(call: Call, host: string, bytes: Uint8Array, upload: string,
   folder?: string, watch?: Watch): Promise<BackupRestoreResult> {
   for (let offset = 0; offset < bytes.length; offset += importPartSize) {
@@ -102,7 +102,7 @@ export async function downloadExport(call: Call, host: string, request: AgentsEx
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-/** Import Agents…: a file chosen, sent and imported into a project; `done` hears what it did. */
+/** Import Agents…: a file chosen, sent and imported into a folder; `done` hears what it did. */
 export function chooseImport(call: Call, host: string, into: { folder: string; name: string },
   done: (words: string) => void, failed: (error: unknown) => void, watch?: Watch, chosen?: () => void): void {
   const input = document.createElement("input");
@@ -155,7 +155,7 @@ export function exportFromMenu(store: Store, host: string, request: AgentsExport
     .finally(b.end);
 }
 
-/** Import Agents… from a project's menu: on its machine, into that project; what it did is said. */
+/** Import Agents… from a folder's menu: on its machine, into that folder; what it did is said. */
 export function importFromMenu(store: Store, host: string, into: { folder: string; name: string }): void {
   if (store.exportImport.value) return;
   let b: ReturnType<typeof busy> | null = null;

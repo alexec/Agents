@@ -99,7 +99,7 @@ You need a service account's JSON key. Give the service account the smallest rol
 1. Make the service account and a JSON key for it in the Google Cloud console.
 2. Give the key. On the Mac, choose **Choose Key File…** next to **Service account key**.
    On the Remote and the web page, paste the key's JSON in **Service account key (JSON)**.
-3. Give the **Project** and the **Zone**, such as `europe-west2-a`.
+3. Give the **Folder** and the **Zone**, such as `europe-west2-a`.
 4. Give the label key in **VMs labelled** (the Mac) or **Label**. The default is `agents`.
 5. Give the ssh user. The default is `agents`.
 6. To make VMs from Agents, give a public key in **ssh key for new VMs** (the Mac) or
@@ -119,7 +119,7 @@ This one is on the Mac only, through `gcloud`. It has no API preset.
 1. On the Mac that runs the control plane, install `gcloud` and sign it in.
 2. Add a host to your ssh config that reaches the workstation's port 22 through
    `gcloud workstations start-tcp-tunnel`.
-3. In the form, give the **Cluster**, the **Configuration** and the **Region**. **Project**
+3. In the form, give the **Cluster**, the **Configuration** and the **Region**. **Folder**
    is optional: without it, `gcloud`'s default is used.
 4. In **ssh**, give the host from your ssh config.
 

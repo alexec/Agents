@@ -15,9 +15,9 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// PersonalFile is <home>/.agents/mcp.json; ProjectFile is <project>/.agents/mcp.json.
+// PersonalFile is <home>/.agents/mcp.json; FolderFile is <folder>/.agents/mcp.json.
 func PersonalFile(home string) string  { return filepath.Join(home, ".agents", "mcp.json") }
-func ProjectFile(folder string) string { return filepath.Join(folder, ".agents", "mcp.json") }
+func FolderFile(folder string) string { return filepath.Join(folder, ".agents", "mcp.json") }
 
 // RemovedFile is <home>/.agents/mcp.removed.json: the entries last taken out of the personal
 // mcp.json (#2195). That file is not in git, so this is where one written by hand comes back from.
@@ -145,7 +145,7 @@ type Record struct {
 	ByHand       *bool     `json:"byHand,omitempty"`
 }
 
-// Key is personal/<name>, or <project folder>/<name>.
+// Key is personal/<name>, or <folder>/<name>.
 func Key(d wire.SkillDestination, name string) string { return skillcatalog.SidecarKey(d, name) }
 
 // LoadSidecar reads it; one that does not decode is set aside and this starts empty.

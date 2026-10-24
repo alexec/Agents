@@ -36,7 +36,7 @@ for why every client is trusted alike, and what that risks.
    **CODE**, and click **Connect**. To pair with no code, see [Sign in with Google, Apple or
    GitHub](sign-in-with-google-apple-or-github.md).
 
-   The window is paired, and lists the projects on every host.
+   The window is paired, and lists the folders on every host.
 
 On the Mac that runs Agents Host, you can also get a code from Agents Host itself: click
 **Pair a Window or Phone…**, choose **A window on a Mac**, and click **Copy**.
@@ -50,7 +50,7 @@ On the Mac that runs Agents Host, you can also get a code from Agents Host itsel
    first. Tap **Use a Code Instead…**, then **Scan the Code**, and point the camera at the
    code.
 
-   The device is paired, and lists the projects on every host, each under its host's
+   The device is paired, and lists the folders on every host, each under its host's
    heading.
 
 On the Mac that runs Agents Host, you can also get the code from Agents Host itself: click

@@ -1,5 +1,5 @@
 // Package store is the daemon's root as the Swift daemon lays it out (StoreLocations.swift,
-// AgentStore.swift, ProjectStore.swift): the same files, in the same encoding, so a host
+// AgentStore.swift, FolderStore.swift): the same files, in the same encoding, so a host
 // that changes language keeps its agents and its id (#1134).
 package store
 
@@ -94,7 +94,7 @@ func (l Locations) Record(id string) string { return filepath.Join(l.Agent(id), 
 func (l Locations) Transcript(id string) string {
 	return filepath.Join(l.Agent(id), "transcript.jsonl")
 }
-func (l Locations) Projects() string     { return filepath.Join(l.Root, "projects.json") }
+func (l Locations) Folders() string     { return filepath.Join(l.Root, "folders.json") }
 func (l Locations) RootIdentity() string { return filepath.Join(l.Root, "root-id.json") }
 func (l Locations) Socket() string       { return filepath.Join(l.Root, "daemon.sock") }
 func (l Locations) Lock() string         { return filepath.Join(l.Root, "daemon.lock") }

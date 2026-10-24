@@ -1,5 +1,5 @@
-// A project's drop box (#231): files put into `<project>/.agents/dropbox/`, where a workflow on
-// `dropbox.file_added` picks them up. The window drops files onto a project's row; the page does
+// A folder's drop box (#231): files put into `<folder>/.agents/dropbox/`, where a workflow on
+// `dropbox.file_added` picks them up. The window drops files onto a folder's row; the page does
 // the same, and has Put Files in Drop Box… in the row's menu for a folder inside it. From a
 // browser, as from a phone, a file crosses the relayed link in one record (PhoneAttachment).
 import type { DropboxPutRequest } from "../protocol/generated";

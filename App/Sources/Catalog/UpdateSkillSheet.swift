@@ -18,7 +18,7 @@ struct UpdateSkillSheet: View {
     var body: some View {
         Group {
             if let answer {
-                SkillPreviewView(preview: answer.preview, addTo: destination, projectName: nil, runtimes: runtimes,
+                SkillPreviewView(preview: answer.preview, addTo: destination, folderName: nil, runtimes: runtimes,
                                  back: { dismiss() },
                                  added: { _ in
                                      onUpdated()

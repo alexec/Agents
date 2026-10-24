@@ -51,7 +51,7 @@ struct WebFixturesTests {
     // MARK: Making things
 
     static let base = Date(timeIntervalSinceReferenceDate: 812_500_000)
-    static let folderURL = URL(filePath: "/fixture/project/")
+    static let folderURL = URL(filePath: "/fixture/folder/")
 
     static func at(_ minutes: Double) -> Date { base.addingTimeInterval(minutes * 60) }
 
@@ -127,8 +127,8 @@ struct WebFixturesTests {
 
     // MARK: queue/ (#362)
 
-    /// A queued helper's place in its project's queue, as its row says it: first in first,
-    /// ties by id, another project's queue apart.
+    /// A queued helper's place in its folder's queue, as its row says it: first in first,
+    /// ties by id, another folder's queue apart.
     @Test func queue() throws {
         func queued(_ n: Int, minutes: Double, cwd: URL = Self.folderURL) -> Agent {
             var agent = Self.agent(n, .queued, cwd: cwd)
@@ -160,7 +160,7 @@ struct WebFixturesTests {
     /// Who is asking at the head of a card: titled, untitled, a helper whose starter is
     /// here or gone, and a subagent.
     @Test func asker() throws {
-        let lead = Self.agent(50, .running, title: "Project lead")
+        let lead = Self.agent(50, .running, title: "Folder lead")
         var helper = Self.agent(51, .waitingOnUser, title: "#116 helper")
         helper.startedByAgent = lead.id
         helper.runtimeID = "grok"
@@ -291,8 +291,8 @@ struct WebFixturesTests {
         }
     }
 
-    /// A project's whole column: the headings in order, who is under each, archived apart,
-    /// and the counts the project row shows.
+    /// A folder's whole column: the headings in order, who is under each, archived apart,
+    /// and the counts the folder row shows.
     @Test func panels() throws {
         let everyone = Self.agents.enumerated().map { index, entry in
             var agent = entry.1
@@ -305,17 +305,17 @@ struct WebFixturesTests {
         let elsewhere = Self.agent(99, .running, cwd: URL(filePath: "/fixture/other/"))
         let inWorktree: Agent = {
             var agent = Self.agent(98, .running, minutes: 30)
-            agent.cwd = URL(filePath: "/fixture/project/.agents/worktrees/x/")
-            agent.worktree = AgentWorktree(name: "x", root: URL(filePath: "/fixture/project/.agents/worktrees/x/"),
-                                           branch: "agents/x", project: Self.folderURL, base: "main", madeByApp: true)
+            agent.cwd = URL(filePath: "/fixture/folder/.agents/worktrees/x/")
+            agent.worktree = AgentWorktree(name: "x", root: URL(filePath: "/fixture/folder/.agents/worktrees/x/"),
+                                           branch: "agents/x", folder: Self.folderURL, base: "main", madeByApp: true)
             return agent
         }()
         let cases = [
-            Case(name: "every kind of session in one project", input: .object([
+            Case(name: "every kind of session in one folder", input: .object([
                 "folder": .string(Self.folderURL.absoluteString),
                 "agents": .array(try (everyone + [elsewhere, inWorktree]).map(Self.encode)),
             ])),
-            Case(name: "an empty project", input: .object([
+            Case(name: "an empty folder", input: .object([
                 "folder": .string(Self.folderURL.absoluteString), "agents": .array([try Self.encode(elsewhere)]),
             ])),
             // Archived newest archived first (#2153): 71 was active a day ago and archived
@@ -725,7 +725,7 @@ struct WebFixturesTests {
             let command = SlashCommand.query(in: text)
             let mention = FileMention.query(in: text)
             let matching = command.map { SlashCommand.matching($0.term, in: offered) } ?? []
-            let file = FileMention(url: URL(filePath: "/fixture/project/Web/src/Prompt.tsx"), relativePath: "Web/src/Prompt.tsx")
+            let file = FileMention(url: URL(filePath: "/fixture/folder/Web/src/Prompt.tsx"), relativePath: "Web/src/Prompt.tsx")
             return .object([
                 "command": command.map { .string($0.term) } ?? .null,
                 "matching": .array(matching.map { .string($0.name) }),
@@ -1319,7 +1319,7 @@ struct WebFixturesTests {
             ("unreadable", WorkflowSummary(workflow: flow("broken", [], problem: .unreadable("Line 3: no closing ---")))),
             ("an unknown mode", WorkflowSummary(workflow: flow("odd", [.schedule(nightly)], problem: .unsupportedMode("swarm")))),
             ("archived and unreadable", WorkflowSummary(workflow: flow("old", [], problem: .unreadable("bad")), isArchived: true)),
-            ("over the limit", WorkflowSummary(workflow: flow("many", [.schedule(nightly)]), overLimit: .project)),
+            ("over the limit", WorkflowSummary(workflow: flow("many", [.schedule(nightly)]), overLimit: .folder)),
             ("waiting for approval", WorkflowSummary(workflow: flow("new", [.schedule(nightly)]),
                                                      awaitingApproval: WorkflowApproval(digest: "abc", isNew: true))),
             ("refused, sorting itself out", WorkflowSummary(workflow: flow("busy", [.schedule(nightly)]),

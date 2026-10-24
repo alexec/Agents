@@ -73,7 +73,7 @@ such as "Reaches Tools, Events, Views. Not yet Workflows, Tested."
 
 ## Where you see them
 
-- On every **Connectors** page, for a project and your own, on the Mac, the
+- On every **Connectors** page, for a folder and your own, on the Mac, the
   Remote and the web page.
 - In the Mac's catalogue (**Add Connector…**), on each row and on a connector's detail.
   The catalogue is on the Mac only.
