@@ -159,6 +159,20 @@ export function eventWaitLine(agent: Agent, title: (id: string) => string | unde
   return line;
 }
 
+/** The event wait card's readable lines, with its timeout and elapsed minutes (#2565). */
+export function eventWaitCardLines(agent: Agent, title: (id: string) => string | undefined,
+  now: Date): string[] | null {
+  const wait = agent.eventWait;
+  if (!wait || wait.ending !== undefined || wait.deadline === undefined || lineResource(agent) !== undefined) return null;
+  const mark = eventWaitMark(agent, title);
+  if (!mark) return null;
+  const since = fromWireDate(wait.since);
+  const deadline = fromWireDate(wait.deadline);
+  const duration = Math.max(1, Math.ceil((deadline.getTime() - since.getTime()) / 60_000));
+  const elapsed = Math.max(0, Math.floor((now.getTime() - since.getTime()) / 60_000));
+  return [`Waiting for ${duration} min for:`, mark.replace(/^◷ Waiting for /, ""), `${elapsed} min elapsed so far.`];
+}
+
 /** WaitStatus.of(…).mark for a wait on events: "◷ Waiting for “Fix login” to finish". A block's is blockLines'. */
 export function eventWaitMark(agent: Agent, title: (id: string) => string | undefined,
   snapshot?: LeaseSnapshot): string | null {

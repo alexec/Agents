@@ -58,6 +58,17 @@ test("a wait on agents finishing reads as a block does; any other wait by its pa
   assert.equal(lines.eventWaitMark({ state: "running" }, title), null);
 });
 
+test("an event wait card separates its timeout, event and elapsed minutes (#2565)", () => {
+  const since = new Date(2026, 9, 4, 14, 0);
+  const agent = { state: "finished", eventWait: { id: "w", since: wire(since),
+    deadline: wire(new Date(since.getTime() + 3 * 60_000)),
+    patterns: [{ name: "github:check.failed", filters: { pr: "1" } }] } };
+  assert.deepEqual(lines.eventWaitCardLines(agent, title, new Date(since.getTime() + 2 * 60_000)), [
+    "Waiting for 3 min for:", "github:check.failed pr 1", "2 min elapsed so far.",
+  ]);
+  assert.equal(lines.eventWaitCardLines({ ...agent, eventWait: { ...agent.eventWait, ending: { timedOut: {} } } }, title, since), null);
+});
+
 test("a waiting row is one line: the first thing it waits for and how many more (#582)", () => {
   assert.equal(lines.rowWaitLine([]), null);
   assert.equal(lines.rowWaitLine(["“Fix login”"]), "◷ Waiting for “Fix login”");
