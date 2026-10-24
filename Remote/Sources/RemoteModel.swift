@@ -1046,6 +1046,8 @@ final class RemoteModel {
     var startSandbox: SandboxChoice?
     /// Each runtime's sandbox default, read from the Mac, for "Use runtime default (Off)".
     private(set) var sandboxSettings = SandboxSettings()
+    /// The Mac-wide permission choice for Cursor, Grok and OpenCode (061).
+    private(set) var clientPermissions = ClientPermissionSettings()
     /// The organisation's policy as the Mac's host follows it (#998): the red strip on every
     /// page and the composer's reason while the kill switch is on. Nil from an older Mac.
     private(set) var policyState: DaemonAPI.PolicyState?
@@ -2808,6 +2810,10 @@ final class RemoteModel {
            let settings = try? notification.params?.decode(SandboxSettings.self) {
             self.sandboxSettings = settings
         }
+        if notification.method == DaemonAPI.Notification.clientPermissionsChanged,
+           let settings = try? notification.params?.decode(ClientPermissionSettings.self) {
+            self.clientPermissions = settings
+        }
         if notification.method == DaemonAPI.Notification.daemonPolicyStateChanged,
            let state = try? notification.params?.decode(DaemonAPI.PolicyState.self) {
             self.policyState = state
@@ -3053,7 +3059,9 @@ final class RemoteModel {
         case .runtimes: await refreshRuntimes()
         case .allowances: await refreshRuntimeAllowances()
         case .modes: await refreshModes()
-        case .sandbox: await refreshSandboxSettings()
+        case .sandbox:
+            await refreshSandboxSettings()
+            await refreshClientPermissions()
         case .costs: await refreshCostState()
         }
     }
@@ -4407,6 +4415,27 @@ final class RemoteModel {
         guard let settings = try? await client.call(DaemonAPI.Method.sandboxState, Optional<String>.none,
                                                     returning: SandboxSettings.self) else { return }
         sandboxSettings = settings
+    }
+
+    /// The permission choice is Mac-wide, even when the open project is on a server.
+    private func refreshClientPermissions() async {
+        guard let settings = try? await client.call(DaemonAPI.Method.clientPermissionsState,
+                                                    Optional<String>.none,
+                                                    returning: ClientPermissionSettings.self) else { return }
+        clientPermissions = settings
+    }
+
+    func setClientPermissions(_ settings: ClientPermissionSettings) async {
+        guard !isStale else {
+            problem = "Your Mac is not answering, so that could not be changed."
+            return
+        }
+        do {
+            clientPermissions = try await client.call(DaemonAPI.Method.clientPermissionsSet, settings,
+                                                       returning: ClientPermissionSettings.self)
+        } catch {
+            problem = (error as? JSONRPCError)?.message ?? "That did not reach your Mac."
+        }
     }
 
     /// One agent's own sandbox choice from the phone (064); nil follows the default.

@@ -512,7 +512,12 @@ struct PromptBar: View {
         if case .controls(let shown) = state {
             optionsRow(shown)
         } else {
-            OptionsNote(state: state)
+            VStack(alignment: .leading, spacing: 8) {
+                OptionsNote(state: state)
+                if ClientPermissionSettings.supports(agent.runtimeID) {
+                    optionsRow([])
+                }
+            }
         }
     }
 
@@ -524,6 +529,13 @@ struct PromptBar: View {
     private func optionsRow(_ shown: [ConfigOption]) -> some View {
         ScrollView(.horizontal) {
             HStack(spacing: 10) {
+                if ClientPermissionSettings.supports(agent.runtimeID) {
+                    ClientPermissionCapsule(runtimeID: agent.runtimeID,
+                                            mode: model.clientPermissions.mode(for: agent.runtimeID)) { mode in
+                        let settings = model.clientPermissions.setting(mode, for: agent.runtimeID)
+                        Task { await model.setClientPermissions(settings) }
+                    }
+                }
                 ForEach(shown.filter(\.isAboutPermission)) { option in
                     OptionMenu(option: option, chosen: binding(for: option))
                 }

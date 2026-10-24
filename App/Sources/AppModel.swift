@@ -2989,7 +2989,11 @@ final class AppModel {
 
         case DaemonAPI.Notification.clientPermissionsChanged:
             guard let settings = try? params?.decode(ClientPermissionSettings.self) else { return }
+            let changed = clientPermissions != settings
             clientPermissions = settings
+            // Remote and web clients set the Mac's host directly. Keep connected servers
+            // in step just as the Settings control did before the move under the prompt.
+            if changed { Task { await pushClientPermissionsToServers(settings) } }
 
         case DaemonAPI.Notification.personChanged:
             guard let settings = try? params?.decode(PersonSettings.self) else { return }

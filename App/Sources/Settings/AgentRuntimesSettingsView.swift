@@ -22,10 +22,6 @@ struct AgentRuntimesSettingsView: View {
                     if CredentialKind.kinds(for: status.id).contains(where: \.isLentOnTheMac) {
                         CredentialRow(runtimeID: status.id, name: status.runtime.name)
                     }
-                    // Cursor and Grok: permission mode lives here, not under the prompt (061).
-                    if ClientPermissionSettings.supports(status.id) {
-                        ClientPermissionModeRow(runtimeID: status.id, name: status.runtime.name)
-                    }
                 } footer: {
                     // Where its allowance stands is on the Runtimes page under Activity, not
                     // here (065). This is where a runtime is changed; that is where its state
@@ -73,44 +69,6 @@ struct AgentRuntimesSettingsView: View {
                 : "Runs through your own Node."
         }
         return "Installing puts it in the app’s own folder, with nothing added to your PATH."
-    }
-}
-
-/// One permission-mode picker for Cursor or Grok (061). Present even when that runtime
-/// is not installed; it takes effect the next time an agent on it asks.
-private struct ClientPermissionModeRow: View {
-    @Environment(AppModel.self) private var model
-    let runtimeID: String
-    let name: String
-
-    var body: some View {
-        Picker("\(name) permission mode", selection: binding) {
-            Text("Default").tag(ClientPermissionMode.default)
-            Text("Always-approve").tag(ClientPermissionMode.alwaysApprove)
-        }
-        Text(description)
-            .appText(.supporting)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private var binding: Binding<ClientPermissionMode> {
-        Binding(
-            get: { model.clientPermissions.mode(for: runtimeID) },
-            set: { mode in
-                guard ClientPermissionSettings.supports(runtimeID) else { return }
-                let settings = model.clientPermissions.setting(mode, for: runtimeID)
-                Task { await model.setClientPermissions(settings) }
-            })
-    }
-
-    private var description: String {
-        switch model.clientPermissions.mode(for: runtimeID) {
-        case .default:
-            return "Asks before \(name) does something that needs permission."
-        case .alwaysApprove:
-            return "Answers every permission request for you. Questions that are not permission still wait."
-        }
     }
 }
 

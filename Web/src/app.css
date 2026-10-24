@@ -855,6 +855,16 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 .model-effort > summary { list-style: none; cursor: pointer; }
 .model-effort > summary::-webkit-details-marker { display: none; }
 .model-effort-menu { position: absolute; z-index: 20; right: 0; bottom: calc(100% + 6px); display: flex; gap: 6px; padding: 8px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); box-shadow: 0 4px 18px #0002; }
+.client-permission-control { position: relative; flex: none; }
+.client-permission-control > summary { list-style: none; cursor: pointer; }
+.client-permission-control > summary::-webkit-details-marker { display: none; }
+.client-permission-menu { position: absolute; z-index: 20; left: 0; bottom: calc(100% + 6px); width: min(330px, calc(100vw - 36px)); padding: 6px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); box-shadow: 0 4px 18px #0002; }
+.client-permission-choice { display: grid; width: 100%; gap: 2px; padding: 7px 8px; border: 0; border-radius: 6px; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.client-permission-choice:hover, .client-permission-choice[aria-pressed=true] { background: var(--paper-selection); }
+.client-permission-choice:disabled { opacity: 0.55; cursor: default; }
+.client-permission-title { display: flex; gap: 7px; align-items: baseline; }
+.client-permission-title > span { width: 10px; }
+.client-permission-menu > p { margin: 5px 8px 3px; }
 .context-meter { display: inline-flex; align-items: center; gap: 5px; opacity: 0.72; font-size: 0.6875rem; font-variant-numeric: tabular-nums; }
 .context-ring { --used: 0%; width: 12px; height: 12px; box-sizing: border-box; border: 2px solid var(--paper-rule); border-radius: 50%; background: conic-gradient(var(--paper-ink) var(--used), transparent 0); }
 .context-ring.close { background: conic-gradient(var(--danger, #bd4238) var(--used), transparent 0); }
