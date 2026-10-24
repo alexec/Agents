@@ -547,8 +547,9 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
   const workflowsOpen = searching || folds.isWorkflowsOpen(host.id, folder);
   // Under a Sessions row, as the workflows are under theirs (#2312), the only layout (#2381); not in a
   // tab of the folder alone, whose group is headed Sessions already. A search holds it open.
-  const groupsSessions = !isAlone && (sessions.length > 0 || recentArchived.length > 0);
+  const groupsSessions = !isAlone && sessions.length > 0;
   const sessionsOpen = searching || folds.isSessionsOpen(host.id, folder);
+  const recentArchivedOpen = searching || folds.isRecentArchivedSessionsOpen(host.id, folder);
   const nameMatches = label.toLowerCase().includes(query.toLowerCase());
   if (searching && sessions.length === 0 && archived.length === 0 && workflows.length === 0
     && archivedWorkflows.length === 0 && !nameMatches) return null;
@@ -640,13 +641,24 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
                 const now = (e.currentTarget as HTMLDetailsElement).open;
                 if (!searching && now !== sessionsOpen) folds.setSessions(host.id, folder, now);
               }}>
-              <summary data-fold="sessions" aria-label={`Sessions, ${sessions.length + recentArchived.length}`}>
-                Sessions<span class="count">{sessions.length + recentArchived.length}</span>
+              <summary data-fold="sessions" aria-label={`Sessions, ${sessions.length}`}>
+                Sessions<span class="count">{sessions.length}</span>
               </summary>
               {sessionsOpen && sessionRows.map((tree) => row(tree.agent, tree))}
-              {sessionsOpen && recentArchived.map((agent) => row(agent))}
             </details>
-          ) : <>{sessionRows.map((tree) => row(tree.agent, tree))}{recentArchived.map((agent) => row(agent))}</>}
+          ) : sessionRows.map((tree) => row(tree.agent, tree))}
+          {recentArchived.length > 0 && (
+            <details class="recent-archived-sessions" open={recentArchivedOpen}
+              onToggle={(e) => {
+                const now = (e.currentTarget as HTMLDetailsElement).open;
+                if (!searching && now !== recentArchivedOpen) folds.setRecentArchivedSessions(host.id, folder, now);
+              }}>
+              <summary data-fold="recent-archived-sessions" aria-label={`Recently archived sessions, ${recentArchived.length}`}>
+                Recently archived sessions<span class="count">{recentArchived.length}</span>
+              </summary>
+              {recentArchivedOpen && recentArchived.map((agent) => row(agent))}
+            </details>
+          )}
           {/* Its workflows after the sessions (#495), in a Workflows fold of their own, one level in,
               as a mailbox's sub-mailboxes in Mail (#885): folded until opened, kept per folder, its
               grey count on the right. A search holds it open. */}
