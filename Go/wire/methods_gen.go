@@ -69,6 +69,7 @@ var CallConnectionsSignInComplete = Method[ConnectionSignInCompleteRequest, Conn
 var CallConnectionsSignInEmail = Method[ConnectionEmailRequest, ConnectionTokenAnswer]{"connections/sign-in/email"}
 var CallConnectionsSignInToken = Method[ConnectionTokenRequest, ConnectionTokenAnswer]{"connections/sign-in/token"}
 var CallConnectionsSignInWait = Method[ConnectionSignInFlowRequest, ConnectionSignIn]{"connections/sign-in/wait"}
+var CallConnectorsCodespaces = Method[ConnectorCodespacesRequest, ConnectorCodespaces]{"connectors/codespaces"}
 var CallConnectorsSetup = Method[ConnectorSetupRequest, ConnectorSetup]{"connectors/setup"}
 var CallConnectorsSetupSkip = Method[ConnectorSkipRequest, ConnectorSetup]{"connectors/setup/skip"}
 var CallCostSetLimits = Method[SetLimitsRequest, CostState]{"cost/setLimits"}

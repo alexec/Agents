@@ -223,6 +223,9 @@ private struct RemoteSlotView: View {
                         if model.isAdmin {
                             Button(AddMachine.Words.addProvider) { addingProvider = true }
                         }
+                        if setup.forgeOrGitHub == .github, setup.repository != nil, setup.connection?.state == .connected {
+                            Text("GitHub Codespaces: Set up on the Mac.").appText(.fine).foregroundStyle(.secondary)
+                        }
                         Text(WhereAgentsRun.addProviderNote).appText(.fine).foregroundStyle(.secondary)
                     }
                 }

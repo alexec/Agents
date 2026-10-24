@@ -129,6 +129,8 @@ type setupBook struct {
 	newSetupReader func(token string) setupReader
 	// newGitLabSetupReader is the GitLab at root as the token's owner; a test gives a fake.
 	newGitLabSetupReader func(root, token string) gitlabSetupReader
+	// newCodespacesClient reads and changes Codespaces as the GitHub connection owner.
+	newCodespacesClient func(token string) codespacesClient
 }
 
 // setupRecord is what this host last read for one project.
@@ -163,6 +165,9 @@ func (d *Daemon) registerConnectorSetup() {
 	})
 	On(d, wire.CallConnectorsSetupSkip, func(ctx context.Context, c *Client, r wire.ConnectorSkipRequest) (wire.ConnectorSetup, error) {
 		return d.skipConnectorSlot(ctx, r)
+	})
+	On(d, wire.CallConnectorsCodespaces, func(ctx context.Context, c *Client, r wire.ConnectorCodespacesRequest) (wire.ConnectorCodespaces, error) {
+		return d.connectorCodespaces(ctx, r)
 	})
 }
 

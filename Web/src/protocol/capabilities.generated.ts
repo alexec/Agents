@@ -194,6 +194,7 @@ export const HostCapabilities: Readonly<Record<string, Capability>> = {
   "connections/sign-in/email": "connections.email/1",
   "connections/sign-in/token": "connections/1",
   "connections/sign-in/wait": "connections/1",
+  "connectors/codespaces": "connectors.setup/1",
   "connectors/setup": "connectors.setup/1",
   "connectors/setup/skip": "connectors.setup/1",
   "cost/setLimits": "cost/1",

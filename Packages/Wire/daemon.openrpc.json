@@ -1893,6 +1893,25 @@
       }
     },
     {
+      "name": "connectors/codespaces",
+      "x-capability": "connectors.setup/1",
+      "tags": [
+        { "name": "web" }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": { "$ref": "daemon.schema.json#/definitions/ConnectorCodespacesRequest" }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": { "$ref": "daemon.schema.json#/definitions/ConnectorCodespaces" }
+      }
+    },
+    {
       "name": "connectors/setup",
       "x-capability": "connectors.setup/1",
       "tags": [

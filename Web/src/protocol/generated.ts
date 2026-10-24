@@ -1742,6 +1742,30 @@ export interface ConnectionsList {
   connections: Connection[];
 }
 
+/** A GitHub Codespace for a project's repository (#1591). */
+export interface ConnectorCodespace {
+  id: string;
+  name: string;
+  repository: string;
+  state: string;
+  ref?: string;
+  ssh: string;
+}
+
+export interface ConnectorCodespaces {
+  repository?: string;
+  codespaces: ConnectorCodespace[];
+  message?: string;
+}
+
+/** Lists or changes the project's GitHub Codespaces (#1591). */
+export interface ConnectorCodespacesRequest {
+  folder: URLString;
+  action: "list" | "create" | "start" | "stop" | "prepareSSH";
+  id?: string;
+  name?: string;
+}
+
 /**
  * The github events the set-up turned on, and the project's workflows that start on one of them.
  */
@@ -8068,6 +8092,7 @@ export interface Methods {
   "connections/sign-in/email": { params: ConnectionEmailRequest; result: ConnectionTokenAnswer };
   "connections/sign-in/token": { params: ConnectionTokenRequest; result: ConnectionTokenAnswer };
   "connections/sign-in/wait": { params: ConnectionSignInFlowRequest; result: ConnectionSignIn };
+  "connectors/codespaces": { params: ConnectorCodespacesRequest; result: ConnectorCodespaces };
   "connectors/setup": { params: ConnectorSetupRequest; result: ConnectorSetup };
   "connectors/setup/skip": { params: ConnectorSkipRequest; result: ConnectorSetup };
   "console/fleet": { params: Empty; result: FleetBoard };
@@ -8334,6 +8359,7 @@ export const MethodTarget = {
   "connections/sign-in/email": "host",
   "connections/sign-in/token": "host",
   "connections/sign-in/wait": "host",
+  "connectors/codespaces": "host",
   "connectors/setup": "host",
   "connectors/setup/skip": "host",
   "console/fleet": "control",
@@ -8729,6 +8755,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConnectionTokenAnswer: { required: [], optional: ["connection", "error"] },
   ConnectionTokenRequest: { required: ["provider", "token"], optional: ["url"] },
   ConnectionsList: { required: ["connections"], optional: [] },
+  ConnectorCodespace: { required: ["id", "name", "repository", "state", "ssh"], optional: ["ref"] },
+  ConnectorCodespaces: { required: ["codespaces"], optional: ["repository", "message"] },
+  ConnectorCodespacesRequest: { required: ["folder", "action"], optional: ["id", "name"] },
   ConnectorEvents: { required: ["state", "names", "workflows"], optional: ["server", "message"] },
   ConnectorProof: { required: ["title"], optional: ["number", "outcome", "url", "at"] },
   ConnectorSetup: { required: ["folder", "slots", "events", "done"], optional: ["repository", "forge", "site", "repositoryURL", "connection", "installed", "installURL", "repositories"] },

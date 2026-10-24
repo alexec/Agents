@@ -2117,6 +2117,40 @@ type ConnectionsList struct {
 	Connections []Connection `json:"connections"`
 }
 
+// A GitHub Codespace for a project's repository (#1591).
+type ConnectorCodespace struct {
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Repository string `json:"repository"`
+
+	State string `json:"state"`
+
+	Ref *string `json:"ref,omitzero"`
+
+	SSH string `json:"ssh"`
+}
+
+type ConnectorCodespaces struct {
+	Repository *string `json:"repository,omitzero"`
+
+	Codespaces []ConnectorCodespace `json:"codespaces"`
+
+	Message *string `json:"message,omitzero"`
+}
+
+// Lists or changes the project's GitHub Codespaces (#1591).
+type ConnectorCodespacesRequest struct {
+	Folder URL `json:"folder"`
+
+	Action string `json:"action"`
+
+	ID *string `json:"id,omitzero"`
+
+	Name *string `json:"name,omitzero"`
+}
+
 // The github events the set-up turned on, and the project's workflows that start on one of them.
 type ConnectorEvents struct {
 	State ConnectorEventsState `json:"state"`

@@ -22,6 +22,16 @@ extension AppModel {
         }
     }
 
+    func codespaces(_ project: ProjectKey, action: DaemonAPI.ConnectorCodespacesRequest.Action,
+                    id: String? = nil, name: String? = nil) async
+        -> Result<DaemonAPI.ConnectorCodespaces, ConnectorProblem> {
+        await connectorCall(project.host) {
+            try await $0.call(DaemonAPI.Method.connectorsCodespaces,
+                              DaemonAPI.ConnectorCodespacesRequest(folder: project.folder.path, action: action, id: id, name: name),
+                              returning: DaemonAPI.ConnectorCodespaces.self)
+        }
+    }
+
     func connections(on host: HostID = .mac) async -> Result<[DaemonAPI.Connection], ConnectorProblem> {
         await connectorCall(host) {
             try await $0.call(DaemonAPI.Method.connectionsList, DaemonAPI.Empty(),
