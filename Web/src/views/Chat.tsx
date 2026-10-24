@@ -817,7 +817,7 @@ function WaitCard({ agent, title, disabled, stop }: { agent: Agent; title: (id: 
   const busy = useSignal(false);
   const now = useSignal(Date.now());
   useEffect(() => {
-    const timer = window.setInterval(() => { now.value = Date.now(); }, 60_000);
+    const timer = window.setInterval(() => { now.value = Date.now(); }, 20_000);
     return () => window.clearInterval(timer);
   }, []);
   const wait = agent.eventWait;
