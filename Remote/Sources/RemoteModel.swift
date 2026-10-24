@@ -1900,9 +1900,8 @@ final class RemoteModel {
 
     /// Deny a session's ask to be archived (#773): the mark goes and the session stays.
     func keepSession(_ agent: Agent) async {
-        let ask = Approval(kind: .archive, key: agent.id.uuidString, title: agent.title ?? "", digest: nil,
-                           line: "", actions: [.deny], agentID: agent.id)
-        await settleApproval(ask, .deny, for: ProjectKey(host: agent.host, folder: agent.projectFolder))
+        let denial = ArchiveActions.denial(for: agent)
+        await settleApproval(denial.approval, .deny, for: denial.project)
     }
 
     /// A file being read, by path, or nothing.
@@ -3644,14 +3643,13 @@ final class RemoteModel {
     }
 
     private func search(_ request: DaemonAPI.ListRequest, on host: HostID) async {
-        guard let target = hostClient(host),
-              let found = try? await target.call(DaemonAPI.Method.agentsList, request, returning: [Agent].self),
-              // A search ended or changed while this was on its way: not what is asked now.
-              !Task.isCancelled else { return }
-        let archived = found.filter { $0.state == .archived }
-        searched.formUnion(archived.filter { work.agent($0.id) == nil }.map(\.id))
-        work.takeListed(archived.map { var agent = $0; agent.host = host; return agent })
-        searchNext[host] = request.next(after: found)
+        guard let page = await ArchiveActions.searchArchived(request, on: host, fetch: {
+            guard let target = self.hostClient(host) else { return nil }
+            return try? await target.call(DaemonAPI.Method.agentsList, request, returning: [Agent].self)
+        }) else { return }
+        searched.formUnion(page.agents.filter { work.agent($0.id) == nil }.map(\.id))
+        work.takeListed(page.agents)
+        searchNext[host] = page.next
     }
 
     /// A project's newest archived sessions, asked of the project's own host and stamped
@@ -5015,17 +5013,10 @@ final class RemoteModel {
     }
 
     func archive(_ agentID: UUID, andLeave: Bool = false) async {
-        // The sessions it started go with it (Alex, #835), named before it goes.
-        let children = work.liveDescendants(of: agentID).map(\.id)
-        let agent = work.agent(agentID)
-        let stops = ([agent] + children.map(work.agent)).contains { $0.map { ArchiveUndo.stops($0.state) } ?? false }
-        guard await archiveOne(agentID, andLeave: andLeave) else { return }
-        var put = [agentID]
-        for child in children where work.agent(child)?.state != .archived {
-            if await archiveOne(child, andLeave: andLeave) { put.append(child) }
-        }
+        guard let undo = await ArchiveActions.archiveWithChildren(agentID, in: work, andLeave: andLeave,
+                                                                   archiveOne: archiveOne) else { return }
         // Undo for a few seconds, at the foot of the screen (#1534).
-        archiveUndo = ArchiveUndo(agentIDs: put, title: agent?.title, stopped: stops)
+        archiveUndo = undo
     }
 
     /// The last Archive, while Undo is offered for it (#1534).

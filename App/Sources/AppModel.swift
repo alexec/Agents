@@ -1349,14 +1349,13 @@ final class AppModel {
     }
 
     private func search(_ request: DaemonAPI.ListRequest, on host: HostID) async {
-        guard let found = try? await client(for: host).call(DaemonAPI.Method.agentsList, request,
-                                                             returning: [Agent].self) else { return }
-        // A search ended or changed while this was on its way: not what is asked now.
-        guard !Task.isCancelled else { return }
-        let fresh = found.filter { $0.state == .archived && heldAgent($0.id) == nil }.map(\.id)
+        guard let page = await ArchiveActions.searchArchived(request, on: host, fetch: {
+            try? await self.client(for: host).call(DaemonAPI.Method.agentsList, request, returning: [Agent].self)
+        }) else { return }
+        let fresh = page.agents.filter { heldAgent($0.id) == nil }.map(\.id)
         searched.formUnion(fresh)
-        work.takeListed(found.filter { $0.state == .archived }.map { var agent = $0; agent.host = host; return agent })
-        searchNext[host] = request.next(after: found)
+        work.takeListed(page.agents)
+        searchNext[host] = page.next
     }
 
     /// Whether an archived session is on show in its project's open Archived fold.
@@ -2654,9 +2653,8 @@ final class AppModel {
 
     /// Deny a session's ask to be archived (#773): the mark goes and the session stays.
     func keepSession(_ agent: Agent) async {
-        let ask = Approval(kind: .archive, key: agent.id.uuidString, title: agent.title ?? "", digest: nil,
-                           line: "", actions: [.deny], agentID: agent.id)
-        await settleApproval(ask, .deny, for: ProjectKey(host: agent.host, folder: agent.projectFolder))
+        let denial = ArchiveActions.denial(for: agent)
+        await settleApproval(denial.approval, .deny, for: denial.project)
     }
 
     func setDiskSpace(_ lines: DiskThresholds, for key: ProjectKey) async {
@@ -5082,7 +5080,8 @@ final class AppModel {
     }
 
     func archive(_ id: UUID, andLeave: Bool = false) async {
-        guard let undo = await archiveWithChildren(id, andLeave: andLeave) else { return }
+        guard let undo = await ArchiveActions.archiveWithChildren(id, in: work, andLeave: andLeave,
+                                                                   archiveOne: archiveOne) else { return }
         // Undo for a few seconds, at the foot of the list (#1534).
         archiveUndo = undo
     }
@@ -5095,7 +5094,8 @@ final class AppModel {
         var stopped = false
         var count = 0
         for id in sessions where work.agent(id)?.state != .archived {
-            guard let one = await archiveWithChildren(id, andLeave: false) else { continue }
+            guard let one = await ArchiveActions.archiveWithChildren(id, in: work, andLeave: false,
+                                                                     archiveOne: archiveOne) else { continue }
             agentIDs += one.agentIDs.filter { !agentIDs.contains($0) }
             title = title ?? one.title
             stopped = stopped || one.stopped
@@ -5110,23 +5110,6 @@ final class AppModel {
         guard count + flows.count > 0 else { return }
         archiveUndo = ArchiveUndo(agentIDs: agentIDs, title: title, stopped: stopped,
                                   sessions: count, workflows: flows)
-    }
-
-    /// Archive one session and the ones it started (Alex, #835): what Undo brings back, or
-    /// nil when Archive failed.
-    private func archiveWithChildren(_ id: UUID, andLeave: Bool) async -> ArchiveUndo? {
-        // Named before it goes.
-        let children = work.liveDescendants(of: id).map(\.id)
-        let agent = work.agent(id)
-        let stops = ([agent] + children.map(work.agent)).contains { $0.map { ArchiveUndo.stops($0.state) } ?? false }
-        let archived = await archiveOne(id, andLeave: andLeave)
-        guard archived else { return nil }
-        var put = [id]
-        // One archived meanwhile (a ⌫ over parent and child together) is left as it is.
-        for child in children where work.agent(child)?.state != .archived {
-            if await archiveOne(child, andLeave: andLeave) { put.append(child) }
-        }
-        return ArchiveUndo(agentIDs: put, title: agent?.title, stopped: stops)
     }
 
     /// The last Archive, while Undo is offered for it (#1534).
