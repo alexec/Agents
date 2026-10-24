@@ -464,25 +464,6 @@ func (d *Daemon) writeCostLimits(raw wire.JSONValue) error {
 	return err
 }
 
-// writeResources declares the part's resources, and only those.
-func (d *Daemon) writeResources(raw wire.JSONValue) error {
-	var list []wire.DeclaredResource
-	if err := json.Unmarshal(raw, &list); err != nil {
-		return errors.New("not a list of resources")
-	}
-	var clean []wire.DeclaredResource
-	for _, r := range list {
-		name, ok := resourceName(string(r.Name))
-		if !ok || r.Holders < 1 {
-			continue
-		}
-		r.Name = name
-		clean = append(clean, r)
-	}
-	sort.Slice(clean, func(i, j int) bool { return clean[i].Name < clean[j].Name })
-	return d.declareAll(clean)
-}
-
 // writeSecrets sets each secret in secrets.env, and takes out the ones the control plane
 // set before and no longer sends. A secret the person set here by hand, under a name the
 // control plane never sent, is left alone. It gives the names now from the control plane.
@@ -522,23 +503,6 @@ func writeSecrets(home string, secrets []wire.UserSecret, before []string) ([]st
 }
 
 var secretNameHere = regexp.MustCompile(`^[A-Z_][A-Z0-9_]{0,63}$`)
-
-// declareAll is resources.json as list, and each one's rules, as resources/declare does.
-func (d *Daemon) declareAll(list []wire.DeclaredResource) error {
-	d.leaseMu.Lock()
-	loaded := d.loadLeases()
-	err := d.saveDeclared(list)
-	var events []leaseEvent
-	if err == nil {
-		for _, r := range list {
-			events = append(events, d.setRules(r.Name, rulesOf(r))...)
-		}
-	}
-	d.leasesChanged()
-	d.leaseMu.Unlock()
-	d.settle(append(loaded, events...))
-	return err
-}
 
 // registerUserScope is settings/userPart: a part as this machine has it, for Use This
 // Mac's under You.
