@@ -1,16 +1,14 @@
 #!/bin/zsh
-# Build main and install the Remote on Alex's paired iPhone/iPad.
+# Build main and install Agents Host, the Mac window and the Remote.
 #
-# The Mac copy is off unless --install-mac is passed, and only when Alex has asked to
-# install on this Mac. Without that flag this script does not copy Agents Host or the
-# window into ~/Applications, /Applications or ~/AgentsApps, and it does not restart the
-# login-item jobs. A development run and a merge wave never pass it.
+# The Mac install runs by default. Pass --no-mac to leave Agents Host, the window and the
+# login-item jobs alone. A development run and a merge wave do not run this script.
 #
-# With --install-mac, Agents Host is swapped in at ~/Applications/Agents Host.app, where
-# its Login Items point, and launchd restarts both jobs from it. The window runs from a
-# copy in ~/Applications/AgentsLive/<sha>-<time>/, never from build/DD-store: every build
-# in the main checkout writes over that. The relaunch is this file detached (`--restart`),
-# because the host it restarts is usually the one running the session that started it.
+# Agents Host is swapped in at ~/Applications/Agents Host.app, where its Login Items point,
+# and launchd restarts both jobs from it. The window runs from a copy in
+# ~/Applications/AgentsLive/<sha>-<time>/, never from build/DD-store: every build in the
+# main checkout writes over that. The relaunch is this file detached (`--restart`), because
+# the host it restarts is usually the one running the session that started it.
 #
 # Everything is built in the Live configuration (#220): optimised like Release, signed for
 # development like Debug. Release itself is the App Store archive's. Scratch walks
@@ -19,12 +17,12 @@
 # Run from a worktree, it builds and installs that worktree, if clean and at origin/main
 # (#797); run from the main checkout, the main checkout.
 #
-#   ship.sh                 the Remote only; the Mac app stays where it is
-#   ship.sh --install-mac   also copy the Mac app into place and restart its login items
+#   ship.sh                 install the Mac apps and Remote (the default)
+#   ship.sh --no-mac        skip the Mac install and restart
+#   ship.sh --install-mac   accepted as an alias for the default
 #   ship.sh --no-build      reuse build/DD-host, build/DD-store and build/DD-ios as they are
 #   ship.sh --no-linux      skip rebuilding the Linux hosts in App/Resources/servers
 #   ship.sh --no-devices    skip the iPhone/iPad
-#   ship.sh --no-mac        skip the Mac (the default)
 #   ship.sh --device UDID   only this device (repeatable)
 #   ship.sh --now           relaunch the Mac after 3s instead of 20s
 #   ship.sh --list-devices  say which devices it would install on, and why it skips any;
@@ -128,7 +126,7 @@ if [[ ${1:-} == --restart ]]; then
   exit
 fi
 
-BUILD=1 DEVICES=1 MAC=0 DELAY=20 LINUX=1 BUILD_ONLY=0 LIST_DEVICES=0
+BUILD=1 DEVICES=1 MAC=1 DELAY=20 LINUX=1 BUILD_ONLY=0 LIST_DEVICES=0
 typeset -a ONLY
 while (( $# )); do
   case $1 in
