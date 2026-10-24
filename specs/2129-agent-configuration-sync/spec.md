@@ -66,7 +66,7 @@ a new workspace and verify that its first agent sees the current configuration.
 
 The Mac, Remote and web pages show that agent configuration syncs to all the person's
 machines and show when the last sync completed. Agent configuration has no per-machine
-switch. Other settings keep their current scope controls.
+switch. Other settings follow their fixed scopes (#2410); they have no scope controls.
 
 **Why this priority**: People need clear feedback about the state and scope of their
 configuration.
@@ -80,7 +80,8 @@ scope and sync time are shown, with no switch to turn configuration sync off.
    sync is active, **Then** the page says "The same on all your machines" and shows the
    last successful sync.
 2. **Given** the person opens settings for runtimes, cost limits or resources, **When**
-   they view the existing scope controls, **Then** those controls remain available.
+   they view runtime choices, cost limits or resources, **Then** the fixed scope is clear
+   and there is no control to change it.
 3. **Given** the person makes an agent configuration change in a client, **When** it is
    saved, **Then** the other clients show the resulting sync state.
 
@@ -129,8 +130,8 @@ scope and sync time are shown, with no switch to turn configuration sync off.
 - **FR-012**: The Agent Configuration page MUST state that configuration syncs to all
   the person's machines and show the latest successful sync on Mac, Remote and web.
 - **FR-013**: The system MUST remove the Agent Configuration and MCP servers rows from
-  the per-part machine-scope settings. Runtimes, cost limits and resources keep their
-  existing switches.
+  the former per-part machine-scope settings. Runtime choices and cost limits have fixed
+  person scope; resources have fixed machine scope (#2410).
 - **FR-014**: The system MUST report sync progress and errors without displaying secret
   values or configuration contents.
 - **FR-015**: The system MUST reject a file over 1 MiB and MUST keep no more than 4,096

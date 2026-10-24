@@ -24,7 +24,7 @@ struct AgentConfigurationView: View {
             if showsSyncState {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(UserScopeWords.partsHeading).appText(.supporting).fontWeight(.semibold)
+                        Text(UserScopeWords.yoursOnEveryMachine).appText(.supporting).fontWeight(.semibold)
                         Text(UserScopeWords.agentConfigurationUpdated(model.userScope.settings?.agentConfigFiles?.updated))
                             .appText(.fine).foregroundStyle(.secondary)
                     }

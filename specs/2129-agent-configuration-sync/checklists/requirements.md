@@ -37,5 +37,5 @@
   plugin sync.
 - The sync keeps each file under 1 MiB, up to 4,096 paths and 64 MiB of active files per
   person, to bound storage and network use.
-- The issue limits this feature to agent configuration. Other settings keep their
-  existing scope switches.
+- The issue limits this feature to agent configuration. Other settings follow their fixed
+  scopes (#2410); they have no scope switches.

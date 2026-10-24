@@ -22397,7 +22397,7 @@
     },
     "UserSettings": {
       "type": "object",
-      "description": "user/settings (#1760, spec 736 FR-023, FR-024): what the control plane keeps for a person and sends to each of that person's machines. A part that is absent is not set at the user scope, and each machine keeps its own. The control plane does not read inside a part.",
+      "description": "user/settings (#1760, #2410): the person's settings that follow them to each of their machines. An omitted part has no value yet, but does not make that setting machine-local. The control plane does not read inside a part.",
       "properties": {
         "mcpServers": {
           "$ref": "#/definitions/JSONValue"
@@ -22413,9 +22413,6 @@
           "$ref": "#/definitions/JSONValue"
         },
         "costLimits": {
-          "$ref": "#/definitions/JSONValue"
-        },
-        "resources": {
           "$ref": "#/definitions/JSONValue"
         },
         "updated": {
@@ -22469,10 +22466,9 @@
         "mcpServers",
         "agentConfig",
         "runtimes",
-        "costLimits",
-        "resources"
+        "costLimits"
       ],
-      "description": "A part of a person's user settings (#1760, spec 736 FR-023). New agent configuration and MCP server edits use per-file state (#2129); runtimes, costLimits and resources retain their existing parts."
+      "description": "A part of a person's user settings (#1760, #2410). Each part has one fixed scope: MCP servers, agent configuration, runtimes and cost limits follow the person. Resources belong to each machine."
     },
     "UserSuspended": {
       "type": "object",

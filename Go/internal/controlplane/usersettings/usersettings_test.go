@@ -146,14 +146,14 @@ func TestPartsAreKeptWithoutBeingRead(t *testing.T) {
 	if changed, _ := b.SetPart(ctx, "sam", wire.UserSettingsPartNameMcpServers, servers); changed {
 		t.Fatal("the same part again is a change")
 	}
-	if _, err := b.SetPart(ctx, "sam", wire.UserSettingsPartNameResources, json.RawMessage(`{}`)); !errors.Is(err, ErrInvalid) {
+	if _, err := b.SetPart(ctx, "sam", wire.UserSettingsPartName("resources"), json.RawMessage(`[]`)); !errors.Is(err, ErrInvalid) {
 		t.Fatal(err)
 	}
 	if _, err := b.SetPart(ctx, "sam", "theme", json.RawMessage(`{}`)); !errors.Is(err, ErrInvalid) {
 		t.Fatal(err)
 	}
 	got, _ := b.Settings(ctx, "sam")
-	if got.McpServers == nil || got.Updated == nil || got.Resources != nil {
+	if got.McpServers == nil || got.Updated == nil {
 		t.Fatalf("%+v", got)
 	}
 	b.SetPart(ctx, "sam", wire.UserSettingsPartNameMcpServers, json.RawMessage(`null`))

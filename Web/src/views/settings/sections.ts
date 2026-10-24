@@ -8,7 +8,7 @@ import { GroupsSection } from "../Groups";
 import { BotsSection, PeopleSection } from "../People";
 import { ProvidersSection } from "../Providers";
 import { SignInSection, SignInsSection } from "../SignInSection";
-import { SecretsSection, UserPartsSection } from "../UserScope";
+import { SecretsSection } from "../UserScope";
 import { BackupsSection, ServerBackupsSection } from "./Backups";
 import { FinishedChatsSection } from "./FinishedChats";
 import { GitAccessSection } from "./GitAccess";
@@ -47,8 +47,6 @@ export const settingsSections: readonly SettingsSection[] = [
   // The organisation's rules, read only, and the kill switch for an admin (#998).
   { name: "policy", scope: "controlPlane", order: 45, Section: PolicySection },
   { name: "providers", scope: "controlPlane", order: 50, Section: ProvidersSection },
-  // Which settings are the same on every machine of yours (#1760); turned on on the Mac (#2157).
-  { name: "sameOnAll", scope: "machines", order: 50, Section: UserPartsSection },
   // The secrets the control plane keeps for you and sends to each machine of yours (#1760, #2157).
   { name: "secrets", scope: "machines", order: 60, Section: SecretsSection },
   { name: "serverBackups", scope: "machines", order: 40, Section: ServerBackupsSection },

@@ -203,7 +203,7 @@ func (d *Daemon) syncUserConfigFile(rel string) {
 	d.sendUserConfigFile(rel, contents, false, timeValue, counter)
 }
 
-func (d *Daemon) currentUserConfigMark() userScopeMark {
+func (d *Daemon) currentUserConfigMark() userSettingsSyncState {
 	d.userScopeMu.Lock()
 	defer d.userScopeMu.Unlock()
 	return d.userMarkLocked()
@@ -269,7 +269,7 @@ func (d *Daemon) noteUserConfigClock(request wire.AgentConfigFileRequest, digest
 	}
 	encoded, err := diskjson.Marshal(mark)
 	if err == nil {
-		err = store.WriteAtomically(d.userScopeFile(), encoded, 0o644)
+		err = store.WriteAtomically(d.userSettingsSyncPath(), encoded, 0o644)
 	}
 	if err != nil {
 		log.Printf("agent configuration sync: could not save the local clock for %s: %v", filepath.ToSlash(request.Path), err)

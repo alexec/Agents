@@ -70,9 +70,8 @@ func (d *Daemon) register() {
 	d.registerHostedMCP()
 	d.registerViews()
 	d.registerPolicy()
-	// What the control plane keeps under You is changed there, not here (#1760).
+	// Person settings sync across machines, but local edits remain allowed (#2410).
 	d.registerUserScope()
-	defer d.guardUserScope()
 	On(d, wire.CallPermissionsPending, func(ctx context.Context, c *Client, _ wire.Empty) ([]wire.PermissionRequest, error) {
 		return d.pendingPermissions(), nil
 	})
