@@ -374,8 +374,7 @@ struct RemoteChatView: View {
         if agent.eventWait?.isOpen == true, let status = model.work.waitStatus(of: agent) {
             let open: (() -> Void)? = popped == nil ? { [model] in model.sidebarItem = .events } : nil
             cards.append(WaitingCard(id: "wait:" + agent.id.uuidString) {
-                WaitCard(status: status, eventWaitSince: agent.eventWait?.since,
-                         eventWaitDeadline: agent.eventWait?.deadline,
+                WaitCard(status: status, eventWait: agent.eventWait,
                          isLineWait: agent.eventWait?.lineResource != nil,
                          open: open,
                          stop: { await model.cancelWait(of: agent.id) },
