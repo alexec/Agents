@@ -1,6 +1,6 @@
 ---
 name: release
-description: Take main to a new version with nobody watching (#914), started by Alex. Run the eight reviews and checks once each on what changed since the last tag, have the high findings fixed through the Scrum Master's lanes (the medium ones are filed, listed as known issues and left to the lanes after the release), check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, deploy the live control plane, close the milestone, unpark the next milestone, which is now the open one, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
+description: Take main to a new version with nobody watching (#914), started by Alex. Run the eight reviews and checks once each on what changed since the last tag, have the high findings fixed through the Scrum Master's lanes (medium security advisories get one release of grace, then go to the Scrum Master as priority work), check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, deploy the live control plane, close the milestone, unpark the next milestone, which is now the open one, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
 ---
 
 # Release
@@ -17,22 +17,24 @@ Alex decided (2026-10-13, #914):
   1.0 and major versions only when Alex says.
 - **Every release runs the seven reviews and checks once each** (#1462, #1557): security,
   performance, HADR, runtimes, usability, competitors and the feature matrix.
-- **Scope is what changed** (#1462): the reviews read only `main` since the last tag, and
-  only what this release found or filed counts (step 3). Older open issues are not
-  this release's.
+- **Scope is what changed** (#1462): the reviews read only `main` since the last tag.
+  Step 3 also carries forward open medium security advisories from earlier releases.
+  Older open issues are not this release's.
 - **Time is one day** (#1462), from the start of the run (T0): the reviews and the fixes
   fit in it.
 - **Priority is a label:** `priority:high` and `priority:medium`. Within each, security
   goes before performance, before HADR, before usability, before runtimes, before the rest.
 - **Only high blocks** (Alex, 2026-10-19, #1661). The release tags as soon as no high is
-  open; it never waits for a medium fix. Medium is filed with `priority:medium`, listed as
-  a known issue, and worked by the ordinary lanes after the release (a bug in the next
-  milestone, the rest as labelled). Low is recorded and not worked.
+  open; it never waits for a medium fix. Other medium findings are filed with
+  `priority:medium`, listed as known issues, and worked by the ordinary lanes after the
+  release (a bug in the next milestone, the rest as labelled). Low is recorded and not
+  worked.
 - **A version has a milestone** (#1348): `0.5.0` is the milestone whose title starts
   with `0.5 `. A patch version has none. The milestone is done when its release has
   shipped, and this skill closes it then (step 9).
 - **Security findings stay private** until they ship: a draft GitHub security advisory
-  per finding, fixed on its private fork. The notes say only "Security fixes".
+  per finding, fixed on its private fork. Medium advisories get one release of grace,
+  then go to the Scrum Master as priority work. The notes say only "Security fixes".
 
 ## Rules for the whole run
 
@@ -109,7 +111,8 @@ medium **that this release's runs recorded**: the ones in their run files (front
 
 - **Security:** lines in `.agents/reviews/security/findings.md` on
   `agents/reviews-security` whose status is not `fixed` on main, `won't fix` or
-  `recorded` as low. These are private: see "Security findings" below.
+  `recorded` as low. These are private: see "Security findings" below. Also collect
+  carried-over draft medium advisories as described there.
 - **Performance:** the same in
   `git show agents/reviews-performance:.agents/reviews/performance/findings.md`. A status
   `fixed on <branch>` is fixed only when that branch is merged; until then it is open,
@@ -138,23 +141,27 @@ For each finding that is not security:
 Then send the Scrum Master one message (`list_sessions`, then `message_session` to the
 session not archived whose title has "scrum master" in it, any case, and that is labelled
 `lead`): the high issues in priority order (security, performance, HADR, usability, runtimes,
-the rest), and that the release waits for them. Send no medium one: the release does not
-wait for it, and the lanes take it after the release as its label and milestone say.
+the rest), then carried-over medium security advisory URLs as priority work. Say that the
+release waits for high issues and never waits for a medium advisory. Other medium issues
+go to the ordinary lanes after the release as their label and milestone say.
 
-**No Scrum Master running, and high issues to hand over** (#1908; in v0.7.0 the highs sat
-40 minutes with no owner): start one. Call `start_session` with the persona in
+**No Scrum Master running, and work to hand over** (#1908; in v0.7.0 the highs sat
+40 minutes with no owner): start one when there are high issues or carried-over medium
+security advisories. Call `start_session` with the persona in
 `.agents/personas/scrum-master.md` (its prompt, `runtime:` and `labels:`), the title
 `<x.y> scrum master` for the version being released, and a prompt that names the milestone,
-the high issues in the order above, that the release waits for them, and that it reports to
-the release session (this one, by its id). The release still starts no fix lane itself:
-the Scrum Master does. With nothing high to hand over, start none, and say so in the report.
+the high issues in the order above, then the carried-over medium security advisory URLs as
+priority work, that the release waits for high issues but not medium advisories, and that
+it reports to the release session (this one, by its id). The release still starts no fix
+lane itself: the Scrum Master does. With nothing to hand over, start none, and say so in
+the report.
 
 ### Security findings
 
-For each open high or medium security finding (a medium one still gets its draft
-advisory, but does not block, and the Scrum Master is not sent it):
+For each open high or medium security finding recorded by this release, and each
+carried-over draft medium advisory from an earlier release:
 
-1. Look for its advisory: `gh api repos/alexec/Agents/security-advisories?state=draft`,
+1. Look for its advisory: `gh api --paginate 'repos/alexec/Agents/security-advisories?state=draft'`,
    matching the finding's id in `summary`.
 2. Look for its fix on main (#1727): when `findings.md` says `fixed on <branch>` and
    `git merge-base --is-ancestor <branch> origin/main` passes, or a merged pull request
@@ -182,8 +189,26 @@ advisory, but does not block, and the Scrum Master is not sent it):
    `Fixed by <merge commit> on main.` at the end of the advisory's description
    (`python3 .agents/skills/release/scripts/advisory.py fixed <ghsa_id> <merge commit>`).
 
+5. Collect older draft medium advisories with
+   `gh api --paginate 'repos/alexec/Agents/security-advisories?state=draft'`. Match each
+   summary to its finding id. An advisory with `created_at` before this release's T0 is
+   from an earlier release. Skip advisories created in this run; a medium advisory gets
+   one release of grace and is collected here in a later release if it remains open.
+   For each older advisory, check for `Fixed by <commit>` and verify that commit is on
+   `origin/main`. Also check a recorded `fixed on <branch>` fix as in step 2: the branch
+   is fixed when it is an ancestor of `origin/main` or a merged pull request came from
+   it. If fixed, run `advisory.py fixed` with the merge commit and do not hand it off.
+   Leave an unfixed advisory as a draft, then send its URL to the Scrum Master as
+   priority work. Its lane fixes it on the advisory's private fork as in step 4. Never
+   include the finding or title in the message or report.
+
+6. In the report, list each carried-over advisory by advisory id only, and say whether it
+   is fixed. Do not include a finding id, summary, title or attack details. Do not send a
+   medium advisory made in this release to the Scrum Master until the next release.
+
 An advisory is fixed when its description says `Fixed by <commit>` and that commit is on
-`origin/main`. Leave the advisory a draft: publishing it after the release is Alex's.
+`origin/main`, or its fix branch is merged to `origin/main`, directly or by a merged PR
+from that branch. Leave the advisory a draft: publishing it after the release is Alex's.
 
 ## 4. Wait for the fixes
 
