@@ -10,7 +10,13 @@
 .issue-details { grid-column: 1 / -1; min-width: 0; padding: 8px 10px; border-radius: var(--border-radius-sm);
   background: var(--color-background-secondary); }
 .issue-details[hidden] { display: none; }
-.issue-body { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.issue-body { margin-top: 6px; overflow-wrap: anywhere; }
+.issue-body > :first-child { margin-top: 0; }
+.issue-body > :last-child { margin-bottom: 0; }
+.issue-body pre { overflow-x: auto; padding: 8px; background: var(--color-background-tertiary); border-radius: var(--border-radius-sm); }
+.issue-row { cursor: pointer; }
+.issue-row:hover { background: var(--color-background-secondary); }
+.issue-row:focus-visible { outline: 2px solid var(--color-text-info); outline-offset: -2px; }
 .linked-prs { display: grid; gap: 4px; margin-top: 8px; }
 .linked-pr { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
 </style></head>
@@ -61,13 +67,9 @@
     const comments = issue.comments ? ` · ${issue.comments} comment${issue.comments === 1 ? "" : "s"}` : "";
     const start = button("Start Agent", () => startAgent(issue),
       { className: "start", title: `A new agent for #${issue.number}, in a worktree of its own` });
-    const expand = button("Show details", () => toggleDetails(issue, expand, details),
-      { className: "details-toggle", title: "Read the issue description and linked pull requests" });
-    expand.setAttribute("aria-expanded", "false");
     const details = el("div", { className: "issue-details", hidden: true });
     details.id = `issue-details-${issue.number}`;
-    expand.setAttribute("aria-controls", details.id);
-    return el("li", {}, [
+    const item = el("li", { className: "issue-row" }, [
       link(`#${issue.number}`, issue.url),
       el("span", { className: "title", textContent: issue.title, title: issue.title }),
       start,
@@ -76,23 +78,35 @@
         el("span", { textContent: `${issue.author || "someone"}${comments}${issue.updatedAt ? " · " + ui.ago(issue.updatedAt) : ""}` }),
         issue.milestone ? el("span", { className: "pill", textContent: issue.milestone, title: "Milestone" }) : null,
         ...labels,
-        expand,
       ]),
       details,
     ]);
+    item.tabIndex = 0;
+    item.setAttribute("aria-label", `Issue #${issue.number}: ${issue.title}`);
+    item.setAttribute("aria-expanded", "false");
+    item.setAttribute("aria-controls", details.id);
+    const toggle = () => toggleDetails(issue, item, details);
+    item.addEventListener("click", (event) => {
+      if (event.target.closest("a, button, select, .issue-details")) return;
+      toggle();
+    });
+    item.addEventListener("keydown", (event) => {
+      if (event.target !== item || (event.key !== "Enter" && event.key !== " ")) return;
+      event.preventDefault(); toggle();
+    });
+    return item;
   };
 
-  const toggleDetails = async (issue, control, target) => {
-    const expanded = control.getAttribute("aria-expanded") === "true";
-    control.setAttribute("aria-expanded", String(!expanded));
-    control.textContent = expanded ? "Show details" : "Hide details";
+  const toggleDetails = async (issue, item, target) => {
+    const expanded = item.getAttribute("aria-expanded") === "true";
+    item.setAttribute("aria-expanded", String(!expanded));
     target.hidden = expanded;
     if (expanded || target.dataset.loaded || target.dataset.loading) return;
     target.dataset.loading = "true";
     target.replaceChildren(el("span", { className: "muted", textContent: "Loading issue details…" }));
     try {
       const details = await ui.call("show_issue_details", { repo, number: issue.number });
-      drawDetails(target, details);
+      drawDetails(target, details, issue);
       target.dataset.loaded = "true";
     } catch (e) {
       target.replaceChildren(el("span", { className: "error", textContent: "Couldn't load issue details: " + e.message }));
@@ -101,7 +115,7 @@
     }
   };
 
-  const drawDetails = (target, details) => {
+  const drawDetails = (target, details, issue) => {
     const body = typeof details.body === "string" && details.body.trim() ? details.body : "No description.";
     const closing = details.closed_by_pull_requests;
     const refs = closing && Array.isArray(closing.references) ? closing.references : [];
@@ -121,11 +135,22 @@
       ]));
     }
     if (total > refs.length) linked.append(el("span", { className: "muted", textContent: `Showing ${refs.length} of ${total} linked pull requests.` }));
-    target.replaceChildren(
-      el("span", { className: "muted", textContent: "Description" }),
-      el("pre", { className: "issue-body", textContent: body }),
-      linked,
-    );
+    const description = el("div", { className: "issue-body" });
+    if (body === "No description.") description.textContent = body;
+    else renderMarkdown(description, details.bodyHTML || "", issue.url);
+    target.replaceChildren(el("span", { className: "muted", textContent: "Description" }), description, linked);
+  };
+
+  const renderMarkdown = (target, html, base) => {
+    target.innerHTML = html;
+    for (const anchor of target.querySelectorAll("a")) {
+      try {
+        const url = new URL(anchor.getAttribute("href"), base);
+        if (!["http:", "https:", "mailto:"].includes(url.protocol)) { anchor.removeAttribute("href"); continue; }
+        anchor.href = url.href;
+        anchor.onclick = (event) => { event.preventDefault(); ui.openLink(url.href); };
+      } catch { anchor.removeAttribute("href"); }
+    }
   };
 
   // The app's new-agent form, filled in for this issue (#834). The person starts it, or not;

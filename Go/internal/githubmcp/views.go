@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/alexec/agents/Go/internal/richtext"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -168,7 +169,7 @@ func AddViews(server *mcp.Server, gh Views, person bool) {
 
 	mcp.AddTool(server, &mcp.Tool{Name: "show_issues", Title: "Show issues",
 		Description: "The repo's open issues (not pull requests), newest created first, at most 100, each with its labels, " +
-			"assignees (logins), milestone and comment count. Its view is the Issues page, where a person can expand an issue to read its description and linked pull requests.",
+			"assignees (logins), milestone and comment count. Its view is the Issues page, where a person expands a row to read its rich-text description and linked pull requests.",
 		Annotations: readOnly, Meta: uiMeta(issuesURI, "model", "app")},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in issuesArgs) (*mcp.CallToolResult, any, error) {
 			repo, err := repoOf(ctx, in.Repo)
@@ -201,6 +202,8 @@ func AddViews(server *mcp.Server, gh Views, person bool) {
 			if err != nil {
 				return failed(err), nil, nil
 			}
+			body, _ := details["body"].(string)
+			details["bodyHTML"] = richtext.Markdown(body)
 			return structured(details), nil, nil
 		})
 
@@ -337,7 +340,7 @@ func AddViews(server *mcp.Server, gh Views, person bool) {
 		{pullsURI, "pulls", "Pull requests", "The repo's open pull requests, newest created first, with their checks, review, conflict and auto-merge; " +
 			"a pull request opens its page. Fed by show_pull_requests.", "pulls.html"},
 		{issuesURI, "issues", "Issues", "The repo's open issues, newest created first, with their labels and assignees, and Start Agent; a label narrows " +
-			"the list. Fed by show_issues.", "issues.html"},
+			"the list. A person expands a row to read its rich-text description and linked pull requests. Fed by show_issues.", "issues.html"},
 		{prURI, "pr", "Pull request", "One pull request's page: description, checks with a failed run's log, files, comments and " +
 			"review threads, CodeRabbit's summary and review, with Comment, Approve, Merge, Auto-merge, Start Agent and Ask CodeRabbit Again. Fed by show_pull_request.", "pr.html"},
 	} {

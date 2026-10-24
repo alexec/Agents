@@ -310,10 +310,13 @@ func TestEachViewHasAToolThatFeedsItAndAPage(t *testing.T) {
 			t.Errorf("%s has no pull request page in it", uri)
 		}
 		if uri == issuesURI {
-			for _, want := range []string{"show_issue_details", "closed_by_pull_requests", "milestone", "aria-expanded"} {
+			for _, want := range []string{"show_issue_details", "closed_by_pull_requests", "milestone", "aria-expanded", "issue-row"} {
 				if !strings.Contains(html, want) {
 					t.Errorf("issues page is missing %q", want)
 				}
+			}
+			if strings.Contains(html, "Show details") || strings.Contains(html, "Hide details") {
+				t.Error("issues page still has a details button")
 			}
 		}
 	}
@@ -362,7 +365,7 @@ func TestTheIssuesListLeavesOutPullRequests(t *testing.T) {
 func TestIssueDetailsUseIssueReadAndShowClosingPullRequests(t *testing.T) {
 	c, _ := viewsClient(t)
 	r, data := callTool(t, c, "show_issue_details", map[string]any{"repo": "o/r", "number": 3})
-	if r.IsError || data["body"] != "A description" {
+	if r.IsError || data["body"] != "A description" || !strings.Contains(data["bodyHTML"].(string), "A description") {
 		t.Fatalf("issue details: %v", data)
 	}
 	closing, ok := data["closed_by_pull_requests"].(map[string]any)

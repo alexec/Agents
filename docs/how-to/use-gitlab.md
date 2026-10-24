@@ -110,9 +110,9 @@ open merge requests".
   has **Retry**, which runs its failed jobs again. Click a title to open its page in the
   same view.
 - **Issues** (`show_issues`): each open issue with its labels, its assignees and its
-  comment count. Click a label to show only those issues. **Start Agent** opens the
-  new-agent form for the issue, with its number as the label and a new worktree. Nothing
-  starts until you press Start.
+  comment count. Click a row to expand its rich-text description. Click a label to show only
+  those issues. **Start Agent** opens the new-agent form for the issue, with its number as the
+  label and a new worktree. Nothing starts until you press Start.
 
 To keep a page, choose **Pin to Project** in the view's menu. See
 [Pin a page to a project](pin-a-page-to-a-project.md).

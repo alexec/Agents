@@ -9,6 +9,16 @@
 .start { grid-column: 3; grid-row: 1 / span 2; white-space: nowrap; }
 .meta { grid-column: 2; }
 select { font: inherit; }
+.issue-details { grid-column: 1 / -1; min-width: 0; padding: 8px 10px; border-radius: var(--border-radius-sm);
+  background: var(--color-background-secondary); }
+.issue-details[hidden] { display: none; }
+.issue-body { margin-top: 6px; overflow-wrap: anywhere; }
+.issue-body > :first-child { margin-top: 0; }
+.issue-body > :last-child { margin-bottom: 0; }
+.issue-body pre { overflow-x: auto; padding: 8px; background: var(--color-background-tertiary); border-radius: var(--border-radius-sm); }
+.issue-row { cursor: pointer; }
+.issue-row:hover { background: var(--color-background-secondary); }
+.issue-row:focus-visible { outline: 2px solid var(--color-text-info); outline-offset: -2px; }
 </style></head>
 <body><main>
   <header><h1>Linear issues</h1>
@@ -68,7 +78,9 @@ select { font: inherit; }
     const priority = issue.priority ? ` · ${issue.priority}` : "";
     const start = button("Start Agent", () => startAgent(issue),
       { className: "start", title: `A new agent for ${issue.identifier}, in a worktree of its own` });
-    return el("li", {}, [
+    const details = el("div", { className: "issue-details", hidden: true });
+    details.id = `issue-details-${issue.identifier}`;
+    const item = el("li", { className: "issue-row" }, [
       link(issue.identifier, issue.url),
       el("span", { className: "title", textContent: issue.title, title: issue.title }),
       start,
@@ -78,7 +90,54 @@ select { font: inherit; }
         el("span", { textContent: `${issue.author || "someone"}${priority}${comments}${issue.updatedAt ? " · " + ui.ago(issue.updatedAt) : ""}` }),
         ...labels,
       ]),
+      details,
     ]);
+    item.tabIndex = 0;
+    item.setAttribute("aria-label", `Issue ${issue.identifier}: ${issue.title}`);
+    item.setAttribute("aria-expanded", "false");
+    item.setAttribute("aria-controls", details.id);
+    item.addEventListener("click", (event) => {
+      if (event.target.closest("a, button, select, .issue-details")) return;
+      toggleDetails(issue, item, details);
+    });
+    item.addEventListener("keydown", (event) => {
+      if (event.target !== item || (event.key !== "Enter" && event.key !== " ")) return;
+      event.preventDefault(); toggleDetails(issue, item, details);
+    });
+    return item;
+  };
+
+  const toggleDetails = async (issue, item, target) => {
+    const expanded = item.getAttribute("aria-expanded") === "true";
+    item.setAttribute("aria-expanded", String(!expanded));
+    target.hidden = expanded;
+    if (expanded || target.dataset.loaded || target.dataset.loading) return;
+    target.dataset.loading = "true";
+    target.replaceChildren(el("span", { className: "muted", textContent: "Loading issue description…" }));
+    try {
+      const details = await ui.call("show_issue_details", { identifier: issue.identifier });
+      const description = el("div", { className: "issue-body" });
+      if (details.description) renderMarkdown(description, details.descriptionHTML || "", issue.url);
+      else description.textContent = "No description.";
+      target.replaceChildren(el("span", { className: "muted", textContent: "Description" }), description);
+      target.dataset.loaded = "true";
+    } catch (e) {
+      target.replaceChildren(el("span", { className: "error", textContent: "Couldn't load issue description: " + e.message }));
+    } finally {
+      delete target.dataset.loading;
+    }
+  };
+
+  const renderMarkdown = (target, html, base) => {
+    target.innerHTML = html;
+    for (const anchor of target.querySelectorAll("a")) {
+      try {
+        const url = new URL(anchor.getAttribute("href"), base);
+        if (!["http:", "https:", "mailto:"].includes(url.protocol)) { anchor.removeAttribute("href"); continue; }
+        anchor.href = url.href;
+        anchor.onclick = (event) => { event.preventDefault(); ui.openLink(url.href); };
+      } catch { anchor.removeAttribute("href"); }
+    }
   };
 
   // The app's new-agent form, filled in for this issue (#834). The person starts it, or not.
