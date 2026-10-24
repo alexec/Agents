@@ -26,7 +26,6 @@ struct ProjectAgentsView: View {
     @State private var promptFocused = false
     @State private var typed = 0
     @State private var pointer: CGPoint?
-    @State private var managingPersonas = false
 
     private var folder: URL? { windowProject?.folder ?? model.selectedProject }
     private var summary: DaemonAPI.ProjectSummary? {
@@ -45,9 +44,6 @@ struct ProjectAgentsView: View {
             } else {
                 page
             }
-        }
-        .sheet(isPresented: $managingPersonas) {
-            if let folder, let summary { PersonaManagerSheet(host: summary.host, folder: folder) }
         }
     }
 
@@ -230,8 +226,6 @@ struct ProjectAgentsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            Button("Manage personas…") { managingPersonas = true }
-                .buttonStyle(.paper)
         }
     }
 

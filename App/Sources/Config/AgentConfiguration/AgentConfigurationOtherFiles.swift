@@ -4,8 +4,10 @@ import SwiftUI
 /// Frame G: everything else in `~/.agents` or a project's `.agents`, with what (if
 /// anything) uses it. Nothing is hidden, so the pages are the whole folder.
 struct AgentConfigurationOtherFiles: View {
+    @Environment(AppModel.self) private var model
     let place: AgentsPlace
     let snapshot: DaemonAPI.SharedSnapshot
+    @State private var managingPersonas = false
 
     var body: some View {
         ScrollView {
@@ -13,6 +15,7 @@ struct AgentConfigurationOtherFiles: View {
                 SharedPageHeader(title: "Other files", path: snapshot.home) {
                     Button("Reveal in Finder") { SharedFiles.reveal(snapshot.home) }.buttonStyle(.paper)
                 }
+                Button("Manage personas…") { managingPersonas = true }.buttonStyle(.paper)
                 if snapshot.otherFiles.isEmpty {
                     Text("Nothing else in \(place.folderName).").appText(.fine).foregroundStyle(.secondary)
                 }
@@ -26,7 +29,7 @@ struct AgentConfigurationOtherFiles: View {
                         Spacer()
                         SharedChip(text: file.kind.rawValue)
                         Button("Reveal") { SharedFiles.reveal(path) }.buttonStyle(.paper)
-                        if file.kind == .persona || file.kind == .unused {
+                        if file.kind == .unused {
                             Button("Edit") { SharedFiles.open(path) }.buttonStyle(.paper)
                         }
                     }
@@ -36,6 +39,16 @@ struct AgentConfigurationOtherFiles: View {
                 }
             }
             .padding(20)
+        }
+        .sheet(isPresented: $managingPersonas) { personaManager }
+    }
+
+    @ViewBuilder private var personaManager: some View {
+        switch place {
+        case .you:
+            PersonaManagerSheet(host: .mac, folder: URL(filePath: snapshot.home), personalOnly: true)
+        case .project(let folder):
+            PersonaManagerSheet(host: model.selectedProjectHost, folder: folder)
         }
     }
 
