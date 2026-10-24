@@ -47,10 +47,18 @@ private final class BufferSink: @unchecked Sendable {
     }
 }
 
+/// The text and timing fields both transcribers expose to dictation.
+private protocol DictationResult: SpeechModuleResult {
+    var text: AttributedString { get }
+}
+
+extension DictationTranscriber.Result: DictationResult {}
+extension SpeechTranscriber.Result: DictationResult {}
+
 /// Talking into the prompt instead of typing it.
 ///
-/// Apple's `SpeechTranscriber`, on the device, as one continuous session for as long
-/// as the button is on: a pause is a pause, not the end of a request (#427, #2515).
+/// Apple's on-device transcriber, as one continuous session for as long as the button
+/// is on: a pause is a pause, not the end of a request (#427, #2515, #2575).
 /// What it hears goes in at the cursor, the words it is still unsure of are the only
 /// ones it replaces, and the person can go on editing and typing while it listens.
 /// `DictationText` keeps track of all that. No cloud transcription.
@@ -60,6 +68,11 @@ private final class BufferSink: @unchecked Sendable {
 @MainActor
 @Observable
 final class Dictation {
+    enum Model {
+        case speech
+        case systemDictation
+    }
+
     /// Something to tell the person, and where to send them about it.
     struct Problem {
         var message: String
@@ -104,6 +117,7 @@ final class Dictation {
     private(set) var problem: Problem?
 
     private let engine: AVAudioEngine
+    private let model: Model
     /// Voice mode's engine and audio route, when this is voice mode's dictation (#2375):
     /// they are opened and closed by voice mode, and this only adds its tap.
     private let shared: VoiceAudio?
@@ -139,9 +153,10 @@ final class Dictation {
 
     /// Whether the system has been asked yet. Used to put our own words in front of
     /// the system's alert the first time.
-    init(shared: VoiceAudio? = nil) {
+    init(shared: VoiceAudio? = nil, model: Model = .speech) {
         self.shared = shared
         engine = shared?.engine ?? AVAudioEngine()
+        self.model = model
     }
 
     var hasBeenAsked: Bool {
@@ -224,16 +239,36 @@ final class Dictation {
     }
 
     private func listen(for thisRun: Int, vocabulary: [String]) async {
-        guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale.current) else {
-            guard thisRun == run else { return }
-            problem = Problem(message: "Dictation is not available for \(Locale.current.identifier).")
-            return
+        switch model {
+        case .systemDictation:
+            guard let locale = await DictationTranscriber.supportedLocale(equivalentTo: Locale.current) else {
+                guard thisRun == run else { return }
+                problem = Problem(message: "Dictation is not available for \(Locale.current.identifier).")
+                return
+            }
+            let transcriber = DictationTranscriber(locale: locale, contentHints: [],
+                                                   transcriptionOptions: [.punctuation],
+                                                   reportingOptions: [.volatileResults, .frequentFinalization],
+                                                   attributeOptions: [])
+            await listen(with: transcriber, locale: locale, for: thisRun, vocabulary: vocabulary)
+        case .speech:
+            guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale.current) else {
+                guard thisRun == run else { return }
+                problem = Problem(message: "Dictation is not available for \(Locale.current.identifier).")
+                return
+            }
+            // The newer on-device model (#2515). Volatile results are the live words. It
+            // has no punctuation switch: the model writes the punctuation.
+            let transcriber = SpeechTranscriber(locale: locale, transcriptionOptions: [],
+                                                reportingOptions: [.volatileResults],
+                                                attributeOptions: [])
+            await listen(with: transcriber, locale: locale, for: thisRun, vocabulary: vocabulary)
         }
-        // The newer on-device model (#2515). Volatile results are the live words. It has
-        // no punctuation switch: the model writes the punctuation.
-        let transcriber = SpeechTranscriber(locale: locale, transcriptionOptions: [],
-                                            reportingOptions: [.volatileResults],
-                                            attributeOptions: [])
+    }
+
+    private func listen<T: LocaleDependentSpeechModule>(with transcriber: T, locale: Locale,
+                                                        for thisRun: Int, vocabulary: [String]) async
+    where T.Result: DictationResult {
         do {
             // The model for this language, the first time: a download the system shares
             // with every app, and a no-op once it is there.
