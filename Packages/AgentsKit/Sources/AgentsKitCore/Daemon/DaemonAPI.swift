@@ -325,6 +325,7 @@ public enum DaemonAPI {
         /// is the writer for the reason it writes every other workflow change: a second
         /// window — or a phone — must not become a second author of the same file.
         public static let workflowsSettings = "workflows/settings"
+        public static let workflowsWrite = "workflows/write"
         /// Clear a server's event trigger's "events may have been missed" (#383).
         public static let workflowsClearMCPMissed = "workflows/mcpTrigger/clearMissed"
         /// What the MCP helper relays for `lease_resource`, `release_resource` and
@@ -2737,9 +2738,20 @@ public enum DaemonAPI {
     // MARK: Workflows
 
     public struct WorkflowsListRequest: Codable, Sendable {
-        /// Nil lists every project's.
+        /// Nil lists every workflow the host can run.
         public var folder: URL?
-        public init(folder: URL? = nil) { self.folder = folder }
+        /// `user` lists the files in the person's workflow folder.
+        public var scope: String?
+        public init(folder: URL? = nil, scope: String? = nil) { self.folder = folder; self.scope = scope }
+    }
+
+    public struct WorkflowWriteRequest: Codable, Sendable {
+        public var workflowID: String
+        public var content: String
+        public init(workflowID: String, content: String) {
+            self.workflowID = workflowID
+            self.content = content
+        }
     }
 
     public struct WorkflowRequest: Codable, Sendable {

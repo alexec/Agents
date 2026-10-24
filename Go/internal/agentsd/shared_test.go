@@ -160,7 +160,7 @@ func TestSharedSnapshotAnsweredOverTheSocket(t *testing.T) {
 	if err := json.Unmarshal(c.call(t, 1, "personal/shared", nil), &s); err != nil {
 		t.Fatal(err)
 	}
-	if !s.LaidOut || s.Home != filepath.Join(home, ".agents") || len(s.Skills) != 4 || len(s.MCP.Servers) != 3 {
+	if !s.LaidOut || s.Home != filepath.Join(home, ".agents") || len(s.Skills) != 4+len(readyMadeIDs()) || len(s.MCP.Servers) != 3 {
 		t.Fatalf("%+v", s)
 	}
 

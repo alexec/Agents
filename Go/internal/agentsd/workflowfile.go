@@ -43,6 +43,13 @@ func workflowPath(project, id string) (string, bool) {
 	return p, true
 }
 
+func workflowSourcePath(folder, id string, f *workflowFile) (string, bool) {
+	if f != nil && f.sourceFolder != "" {
+		return workflowPath(f.sourceFolder, id)
+	}
+	return workflowPath(folder, id)
+}
+
 // workflowIDs is WorkflowFolder.ids: the .md files, not hidden, by name.
 func workflowIDs(project string) []string {
 	if !ownFolders(project, workflowsRel) {
@@ -186,7 +193,7 @@ func workflowFileOf(folder, id, text, digest, why string) *workflowFile {
 	if why != "" {
 		wf := parseWorkflow("", id, folder)
 		wf.Problem = &wire.WorkflowProblem{Unreadable: &wire.WorkflowProblemUnreadable{Value: why}}
-		return &workflowFile{wf: wf}
+		return &workflowFile{wf: wf, sourceFolder: folder, scope: "project"}
 	}
 	wf := parseWorkflow(text, id, folder)
 	skills, why := readWorkflowSkills(folder, text)
@@ -194,9 +201,10 @@ func workflowFileOf(folder, id, text, digest, why string) *workflowFile {
 		if wf.Problem == nil {
 			wf.Problem = &wire.WorkflowProblem{Unreadable: &wire.WorkflowProblemUnreadable{Value: why}}
 		}
-		return &workflowFile{wf: wf, text: text}
+		return &workflowFile{wf: wf, text: text, sourceFolder: folder, scope: "project"}
 	}
-	return &workflowFile{wf: wf, digest: workflowDigest(digest, text, skills), text: text, skills: skills}
+	return &workflowFile{wf: wf, digest: workflowDigest(digest, text, skills), text: text, skills: skills,
+		sourceFolder: folder, scope: "project"}
 }
 
 // stripFrontMatter is FrontMatter.strip: what is under the closing ---, blank lines at its

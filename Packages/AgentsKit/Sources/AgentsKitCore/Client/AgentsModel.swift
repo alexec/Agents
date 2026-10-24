@@ -41,6 +41,11 @@ public final class AgentsModel {
     /// not redraw every other project's (#285). The array stays, for a one-off read.
     @ObservationIgnored public private(set) var workflows: [WorkflowSummary] = []
 
+    /// User workflows shown in Settings, separate from project copies merged into forge projects.
+    public var userWorkflows: [WorkflowSummary] {
+        workflows.filter { $0.scope == "user" && $0.content != nil }
+    }
+
     /// Each project's pinned pages (#159), by its standardized folder: kept current by
     /// `pins/changed`, which carries them. A project with none is absent. Not observed:
     /// a project reads its own shelf (#285).
@@ -807,6 +812,11 @@ public final class AgentsModel {
         workflows = summaries.sorted(by: Self.workflowName)
         let folders = Set(workflowShelves.keys)
         for folder in folders { refillWorkflowShelf(folder) }
+    }
+
+    /// Replace the user's Settings list without dropping project workflows from other shelves.
+    public func replaceUserWorkflows(_ summaries: [WorkflowSummary]) {
+        replaceWorkflows(workflows.filter { !($0.scope == "user" && $0.content != nil) } + summaries)
     }
 
     private static func workflowName(_ a: WorkflowSummary, _ b: WorkflowSummary) -> Bool {
