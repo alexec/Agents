@@ -12,6 +12,7 @@ cooldown: 20h
 runs-on: [8AB85821-9D24-59CE-9737-8FC556923733]
 labels: [crashes, review]
 when-done: archive
+enabled: false
 ---
 
 You read the crash reports this project's apps wrote on this Mac since the last run, and

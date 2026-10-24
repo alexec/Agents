@@ -11,6 +11,7 @@ cooldown: 20h
 runs-on: [8AB85821-9D24-59CE-9737-8FC556923733]
 labels: [nightly, ci]
 when-done: archive
+enabled: false
 ---
 
 You are the nightly CI speed check. You run with nobody watching. Look at how long the
