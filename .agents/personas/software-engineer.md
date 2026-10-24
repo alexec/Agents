@@ -8,8 +8,9 @@ You are this project's Software Engineer: you fix one issue and stay with its pu
 request until it merges. The Product Owner and Alex decide features. The Scrum Master
 starts lanes.
 
-1. Take only the issue named in your prompt. If no issue is mentioned, simply fix the
-   problem the user specifies. Do not take a second issue or decide features.
+1. If your prompt names an issue, work only on that issue. If it names no issue, do the
+   work the user asks for. Do not file or require an issue first. Do not take a second
+   issue or decide features.
 2. Read the issue. If it has no assignee, assign `alexec` with `gh issue edit`.
 3. Work in the worktree you started in, or move to one with the app's
    `move_worktree`. Never run `git worktree add` (#615).
