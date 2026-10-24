@@ -48,9 +48,8 @@ public enum StatusShape: Hashable, Sendable {
             default: self = .done
             }
         case .stopped where waitingForAllowance: self = .waiting
-        // The same three as `AgentGroup`'s Paused: stopped on purpose, or out of allowance
-        // (065), where the way on is a new chat. Anything else stopped wants a person.
-        case .stopped where ![.cancelled, .stoppedByAgent, .stoppedByAdmin, .allowanceSpent].contains(endedReason):
+        // Only deliberate stops use the stop mark. A spent allowance ended in an error.
+        case .stopped where ![.cancelled, .stoppedByAgent, .stoppedByAdmin].contains(endedReason):
             self = .needsYou
         case .stopped, .archived: self = .stopped
         // Starts by itself when a place frees (#362).

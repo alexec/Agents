@@ -197,7 +197,7 @@ struct RemoteChatView: View {
                 if let agent, agent.missingFolder == nil, let reason = model.accountMoveReason(agent) {
                     RemoteAccountMoveStrip(agent: agent, reason: reason)
                 }
-                // Paused by a spent allowance (#1859): Continue when it is back, or Cancel.
+                // A session failed when its allowance ran out (#1859): Continue when it is back, or Cancel.
                 if let agent, ContinueWhenBackWords.offers(agent) || agent.continueWhenBack != nil,
                    model.host(agent.host, has: Capability.chatContinueWhenBack1) {
                     RemoteContinueWhenBackStrip(agent: agent)

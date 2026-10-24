@@ -867,9 +867,9 @@
   },
   {
     "expected" : {
-      "shape" : "stopped",
-      "symbol" : "stop.circle",
-      "tinted" : false,
+      "shape" : "needsYou",
+      "symbol" : "exclamationmark.circle.fill",
+      "tinted" : true,
       "words" : "Its allowance ran out"
     },
     "input" : {

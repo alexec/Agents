@@ -889,11 +889,11 @@
   {
     "expected" : {
       "asksToArchive" : false,
-      "group" : "stopped",
+      "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : false,
       "showsUnread" : false,
-      "title" : "Paused"
+      "title" : "Needs you"
     },
     "input" : {
       "agent" : {

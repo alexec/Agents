@@ -149,21 +149,17 @@ pick one for the next chat.
 
 ## R7. Where the chat sits in the list
 
-**Decision**: `endedReason == .allowanceSpent` is grouped with a deliberate stop
-(`AgentGroup.stopped`, the heading **Paused**) and drawn with the stop mark, not the
-needs-you mark. The status line stays `EndedReason.allowanceSpent.summary`, **Its allowance
-ran out**. It is not **Waiting**, and `waitingForAllowance` stops being a reason to group
-anything.
+**Decision**: `endedReason == .allowanceSpent` is a failed session. It appears under
+**Needs you** and uses the failure mark. A deliberate wait to continue when the allowance
+returns is **Waiting** until it tries again.
 
 `.rateLimited` stays under **Needs you**, as any other unexpected stop. The person can send
-on that same chat. A spent allowance will not resume, and the way on is a new chat, so it
-does not nag under Needs you.
+on that same chat. A spent allowance can also continue after a manual Continue action or a
+configured wait, while its stopped failure remains visible until it tries again.
 
-**Rationale**: The spec's "under Stopped" was written against the heading that group used to
-have. The panel's heading for `AgentGroup.stopped` is now **Paused** (the grouping change on
-`af434dba`). Adding a heading called Stopped would undo that. The words the row says are the
-ones the spec names. The acceptance check is: heading Paused, status line "Its allowance ran
-out", absent from Waiting and from Needs you.
+**Rationale**: The daemon emits `agent.failed` for an allowance ending. The session list,
+status mark and Live Activity now show that failure. A wait to continue remains separate and
+appears under **Waiting**.
 
 ## R8. What is deleted, and what is kept
 

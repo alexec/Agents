@@ -26,8 +26,7 @@ public struct TurnActivityContent: Codable, Hashable, Sendable {
         /// It ended cleanly, but wanting the person: a question (#1916), Outcome
         /// unknown, or a question in its report (#1861). The sidebars put it under Needs you.
         case needsYou = "needs_you"
-        /// Cut short on purpose, or its allowance ran out: Paused in the sidebars, so a
-        /// neutral mark and not the failure's (#1869).
+        /// Cut short on purpose, so the sidebars show a neutral mark (#1869).
         case paused
         /// It ended for a reason that is not a clean end of turn, and nobody chose it.
         case failed
@@ -92,8 +91,8 @@ public struct TurnActivityContent: Codable, Hashable, Sendable {
         return line
     }
 
-    /// The endings the sidebars show as Paused (StatusShape): nobody is surprised by them.
-    public static let pausingReasons: Set<EndedReason> = [.cancelled, .stoppedByAgent, .stoppedByAdmin, .allowanceSpent]
+    /// The endings the sidebars show as Paused (StatusShape): stops someone chose.
+    public static let pausingReasons: Set<EndedReason> = [.cancelled, .stoppedByAgent, .stoppedByAdmin]
 
     /// The line for a turn that ended without a report saying how the work went.
     public static let outcomeUnknown = "Outcome unknown"
@@ -136,7 +135,7 @@ public struct TurnActivityContent: Codable, Hashable, Sendable {
         case .finished, .stopped:
             let ended = max(agent.lastActivityAt, startedAt)
             // The docs' words for the reason (statuses.md), and the word says which kind:
-            // Paused for a stop someone chose or a spent allowance, else Unexpected stop.
+            // Paused for a stop someone chose, else Unexpected stop.
             if agent.state == .stopped || agent.endedReason?.summary != nil {
                 let paused = agent.endedReason.map(pausingReasons.contains) ?? false
                 return TurnActivityContent(phase: paused ? .paused : .failed, title: title, line: agent.endedReason?.summary,

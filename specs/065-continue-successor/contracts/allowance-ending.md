@@ -16,8 +16,9 @@ classifies the turn that just ended, and what is no longer on screen.
 `‹Runtime›` is `PoolWords.runtimeName`. `‹time›` is `PoolWords.time`. These sentences already
 exist; this feature stops appending anything after them about another runtime.
 
-The list heading for "Its allowance ran out" is **Paused**. It is not **Waiting** and not
-**Needs you**.
+The list heading for "Its allowance ran out" is **Needs you** because the session ended in
+error. It is not **Paused**. A deliberate wait to continue when the allowance is back stays
+under **Waiting** until it tries again.
 
 ## What the runtime records
 
