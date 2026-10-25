@@ -24,7 +24,7 @@ struct WaitCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             if let eventWait, eventWait.isOpen, !isLineWait {
-                TimelineView(.periodic(from: .now, by: 60)) { context in
+                TimelineView(.periodic(from: .now, by: 20)) { context in
                     eventContent(eventWait, now: context.date)
                 }
             } else {
