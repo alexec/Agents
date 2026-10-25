@@ -37,7 +37,6 @@ export function WorkflowRow({ store, host, summary, disabled, chosen, onPick, pi
           {/* The name gives way before its folder's, which is whole (#587). */}
           {place ? <span class="name">{summary.workflow.name}</span> : summary.workflow.name}
           {place && <span class="place"> {place}</span>}
-          {summary.scope === "user" && <span class="quiet small"> · From your workflows</span>}
         </span>
         {/* Its runs send no notifications (#2003), marked as a muted session is. */}
         {isWorkflowMuted(summary) && !summary.isArchived && (

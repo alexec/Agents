@@ -687,7 +687,26 @@ struct RemoteFolderFold: View {
             folds.set(key, .workflows, open: !isOpen)
         }
         // A closed fold has no rows at all (#237).
-        ForEach(isOpen ? fold.workflows : []) { summary in
+        if isOpen {
+            if !fold.folderWorkflows.isEmpty {
+                workflowGroup("Folder workflows", rows: fold.folderWorkflows)
+            }
+            if !fold.userWorkflows.isEmpty {
+                workflowGroup("User workflows", rows: fold.userWorkflows)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func workflowGroup(_ title: String, rows: [WorkflowSummary]) -> some View {
+        HStack(spacing: 6) {
+            Text(title)
+            Text("\(rows.count)").monospacedDigit()
+        }
+            .appText(.fine)
+            .foregroundStyle(.secondary)
+            .padding(.leading, 30)
+        ForEach(rows) { summary in
             SidebarWorkflowRow(summary: summary, folder: key, isNested: true)
         }
     }

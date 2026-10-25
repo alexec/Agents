@@ -30,9 +30,23 @@ struct FolderWorkflowRows: View {
             // word at their titles, and the workflows one level in, under the word.
             SidebarFoldRow(title: "Workflows", count: workflows.count, isOpen: workflowsFold)
             // A closed fold has no rows at all (#237).
-            ForEach(FoldedRow.rows(isOpen ? workflows : [], in: .workflows)) { row in
-                WorkflowListRow(summary: row.item, folder: folder, isNested: true)
+            if isOpen {
+                if !fold.folderWorkflows.isEmpty {
+                    workflowGroup("Folder workflows", rows: fold.folderWorkflows)
+                }
+                if !fold.userWorkflows.isEmpty {
+                    workflowGroup("User workflows", rows: fold.userWorkflows)
+                }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func workflowGroup(_ title: String, rows: [WorkflowSummary]) -> some View {
+        SidebarSubheading(title: title, count: rows.count)
+            .padding(.leading, 22)
+        ForEach(FoldedRow.rows(rows, in: .workflows)) { row in
+            WorkflowListRow(summary: row.item, folder: folder, isNested: true)
         }
     }
 }
@@ -166,12 +180,7 @@ struct WorkflowListRow: View {
             WorkflowStatusIcon(summary: summary, accented: true)
                 .appText(.fine)
         } detail: {
-            if summary.scope == "user" {
-                Text("From your workflows")
-            } else {
-                // The title only (Alex, #495): what it does is the tooltip and the page's.
-                EmptyView()
-            }
+            EmptyView()
         } trailing: {
             // When it last ran, as a session's row has its time (#755); nothing if it never
             // has. A running one counts from when this run started. Off is marked where it

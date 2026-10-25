@@ -154,11 +154,6 @@ struct WorkflowPage: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if summary.scope == "user" {
-                Text("From your workflows")
-                    .appText(.fine)
-                    .foregroundStyle(.tertiary)
-            }
         }
     }
 

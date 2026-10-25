@@ -98,7 +98,6 @@ export function WorkflowPage({ store, host, folder, folderName, workflowID, down
       <header class="column-head">{back}<h1>{workflow.name}</h1></header>
       <div class="scroll">
         <div class="workflow-body">
-          {summary.scope === "user" && <p class="quiet small">From your workflows</p>}
           <div class="heading">
             {!workflow.problem && <p class="quiet">{workflowSummary(workflow, runtimeName)}</p>}
           </div>
