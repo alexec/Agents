@@ -78,15 +78,19 @@ second issue. For each of the first (free slots) issues, in order:
 
 1. Assign it first, so no other run picks it up: `gh issue edit <n> --add-assignee alexec`.
 2. Start the lane with the prompt and labels from
-   `.agents/personas/software-engineer.md`, plus one line naming the issue number and
-   title. Do not set a runtime; the lane uses the available default. Use a new worktree
+   `.agents/personas/software-engineer.md`. Put `#<n>: <issue title>` on the first line
+   of the prompt, followed by a blank line and the persona's instructions. Do not put
+   code or a preamble before the issue number and title. Do not set a runtime; the lane
+   uses the available default. Use a new worktree
    named `fix-github-issue-<n>` (for a bug) or `work-github-issue-<n>` (otherwise), and
    title the session `#<n>: <issue title>`.
 
    For a walk lane, name the worktree `walk-github-issue-<n>`, title it
    `Walk #<n>: <issue title>`, and use this prompt instead:
 
-   > Issue #<n>'s UI change has merged but nobody has run it (`gh issue view <n>`; its
+   > #<n>: <issue title>
+   >
+   > This issue's UI change has merged but nobody has run it (`gh issue view <n>`; its
    > pull request says what changed). Walk it on main with the run-app skill (the web page
    > in headless Chrome; Remote screens only by building, never a simulator), on a scratch
    > root, never the real app. Follow AGENTS.md for the "build" lease. If the Mac is

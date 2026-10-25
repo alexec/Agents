@@ -138,7 +138,7 @@
   // it reads the issue with get_issue.
   const startAgent = async (issue) => {
     const n = issue.number;
-    const prompt = `Work on GitLab issue #${n} in ${project} (get_issue with project ${project} and number ${n}): ${issue.title}\n\n`
+    const prompt = `#${n}: ${issue.title}\n\nWork on this GitLab issue in ${project} (get_issue with project ${project} and number ${n}).\n\n`
       + `Its page: ${issue.url}`;
     try {
       await ui.request("agents/start-agent", { prompt, labels: ["#" + n], worktree: `${n} ${issue.title}` });
