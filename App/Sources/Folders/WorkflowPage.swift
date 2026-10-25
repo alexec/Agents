@@ -202,11 +202,6 @@ struct WorkflowPage: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                if summary.scope == "user" {
-                    Text("From your workflows")
-                        .appText(.fine)
-                        .foregroundStyle(.tertiary)
-                }
                 // The toolbar's switches write the workflow's file (#125), so say so.
                 Text(summary.switchesSentence)
                     .appText(.fine)

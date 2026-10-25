@@ -62,6 +62,9 @@
 .with-sidebar details:is(.workflows, .sessions, .recent-archived-sessions)[open] > summary::before { content: "⌄"; }
 .with-sidebar details:is(.workflows, .sessions, .recent-archived-sessions) > summary .count { margin-left: auto; font-variant-numeric: tabular-nums; }
 .with-sidebar details.workflows .row.workflow .pick { padding-left: calc(8px + 26px); }
+.with-sidebar details.workflows .workflow-group-heading { display: flex; padding: 5px 8px 3px 34px;
+  font-size: 0.6875rem; color: color-mix(in srgb, currentColor 60%, transparent); }
+.with-sidebar details.workflows .workflow-group-heading .count { margin-left: auto; font-variant-numeric: tabular-nums; }
 /* A folder's sessions under its Sessions row (#2312): one level in, as the workflows; a child one more. */
 .with-sidebar details.sessions .nav-item > .row.session { padding-left: calc(8px + 26px); }
 .with-sidebar details.sessions .nav-item.child > .row.session { padding-left: calc(8px + 52px); }

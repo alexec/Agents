@@ -334,11 +334,6 @@ struct SidebarWorkflowRow: View {
                     .appText(.supporting)
                     .fontWeight(summary.awaitingApproval != nil && !summary.isArchived ? .semibold : .regular)
                     .lineLimit(1)
-                if summary.scope == "user" {
-                    Text("From your workflows")
-                        .appText(.fine)
-                        .foregroundStyle(.tertiary)
-                }
             }
             Spacer(minLength: 4)
             // Its runs send no notifications (#2003), as on the Mac.

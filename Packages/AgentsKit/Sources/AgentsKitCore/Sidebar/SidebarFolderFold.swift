@@ -47,6 +47,9 @@ public struct SidebarFolderFold {
     /// Whether the folder has a session that is not archived, search or not.
     public private(set) var hasLive = false
     public private(set) var workflows: [WorkflowSummary] = []
+    /// The two sections within the Workflows fold, after pins and archived files leave it.
+    public var folderWorkflows: [WorkflowSummary] { workflows.filter { $0.scope != "user" } }
+    public var userWorkflows: [WorkflowSummary] { workflows.filter { $0.scope == "user" } }
     public private(set) var archivedWorkflows: [WorkflowSummary] = []
     /// The folder's own name matches the search.
     public private(set) var nameMatches = false

@@ -543,6 +543,8 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
   // With Pinned off (#846), the pinned workflows are in the folder's list with the rest.
   const flowPins = on.has("pinned") ? store.workflowPinsIn(host.id, folder) : [];
   const workflows = allWorkflows.filter((w) => !w.isArchived && !flowPins.includes(w.workflow.workflowID));
+  const folderWorkflows = workflows.filter((w) => w.scope !== "user");
+  const userWorkflows = workflows.filter((w) => w.scope === "user");
   const archivedWorkflows = allWorkflows.filter((w) => w.isArchived);
   const workflowsOpen = searching || folds.isWorkflowsOpen(host.id, folder);
   // Under a Sessions row, as the workflows are under theirs (#2312), the only layout (#2381); not in a
@@ -671,7 +673,16 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
               <summary data-fold="workflows" aria-label={`Workflows, ${workflows.length}`}>
                 Workflows<span class="count">{workflows.length}</span>
               </summary>
-              {workflowsOpen && workflows.map(workflowRow)}
+              {workflowsOpen && <>
+                {folderWorkflows.length > 0 && <>
+                  <div class="workflow-group-heading">Folder workflows<span class="count">{folderWorkflows.length}</span></div>
+                  {folderWorkflows.map(workflowRow)}
+                </>}
+                {userWorkflows.length > 0 && <>
+                  <div class="workflow-group-heading">User workflows<span class="count">{userWorkflows.length}</span></div>
+                  {userWorkflows.map(workflowRow)}
+                </>}
+              </>}
             </details>
           )}
           {searching ? <>
