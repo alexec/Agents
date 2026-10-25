@@ -153,7 +153,7 @@ select { font: inherit; }
   // The identifier in the branch and the pull request's title is how Linear links them.
   const startAgent = async (issue) => {
     const id = issue.identifier;
-    const prompt = `Work on Linear issue ${id}: ${issue.title}\n${issue.url}\n\n`
+    const prompt = `${id}: ${issue.title}\n\nWork on this Linear issue: ${issue.url}\n\n`
       + `Read it with Linear's MCP server (mcp.linear.app). First assign it to yourself and move it to In Progress. `
       + `Put ${id} in the branch name and in the pull request's title, so Linear links the pull request to the issue.`;
     try {

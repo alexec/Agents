@@ -242,7 +242,7 @@ try {
   await press(issues, "Start Agent");
   await sleep(500);
   const forIssue = await issues.eval("window.started");
-  check(forIssue && /GitLab issue #5 in group\/app/.test(forIssue.prompt) && forIssue.labels[0] === "#5", `Start Agent fills the form: ${js(forIssue)}`);
+  check(forIssue && forIssue.prompt.startsWith("#5: The mean is off\n") && /GitLab issue in group\/app/.test(forIssue.prompt) && forIssue.labels[0] === "#5", `Start Agent fills the form: ${js(forIssue)}`);
   await issues.shot(`${out}/web-6-issues.png`);
 
   for (const [name, page] of [["merge requests", list], ["merge request", one], ["issues", issues]]) {

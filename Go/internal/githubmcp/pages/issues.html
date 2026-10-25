@@ -165,7 +165,7 @@
   // the agent assigns the issue to the signed-in person once it does.
   const startAgent = async (issue) => {
     const n = issue.number, on = repo ? ` --repo ${repo}` : "";
-    const prompt = `Work on GitHub issue #${n} (\`gh issue view ${n}${on}\`): ${issue.title}\n\n`
+    const prompt = `#${n}: ${issue.title}\n\nWork on this GitHub issue (\`gh issue view ${n}${on}\`).\n\n`
       + `First assign it to yourself: \`gh issue edit ${n}${on} --add-assignee @me\`.`;
     try {
       await ui.request("agents/start-agent", { prompt, labels: ["#" + n], worktree: `${n} ${issue.title}` });
