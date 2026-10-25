@@ -194,8 +194,8 @@ private struct FolderWindowColumns: View {
         .environment(\.windowPick, window.pick)
         // A file a chat links to is on the folder's host, as in the main window.
         .environment(\.openURL, OpenURLAction { url in
-            guard url.isFileURL else { return .systemAction }
-            model.open(url, on: summary.host)
+            guard let fileURL = ChatLinkURL.fileURL(from: url) else { return .systemAction }
+            model.open(fileURL, on: summary.host)
             return .handled
         })
         // The folder's settings, over this window (066).

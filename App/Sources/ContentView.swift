@@ -335,8 +335,8 @@ struct ContentView: View {
         // A file a chat links to is on its host: that host opens it (058, US1). Links to
         // the web are the window's own.
         .environment(\.openURL, OpenURLAction { url in
-            guard url.isFileURL else { return .systemAction }
-            model.open(url, on: model.selectedFolderHost)
+            guard let fileURL = ChatLinkURL.fileURL(from: url) else { return .systemAction }
+            model.open(fileURL, on: model.selectedFolderHost)
             return .handled
         })
         .task { await model.stayConnected() }

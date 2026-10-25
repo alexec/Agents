@@ -51,8 +51,8 @@ struct PoppedChatWindow: View {
         .tint(Paper.accent)
         // A file a chat links to is on its host, as in the main window.
         .environment(\.openURL, OpenURLAction { url in
-            guard url.isFileURL else { return .systemAction }
-            model.open(url, on: agent?.host ?? .mac)
+            guard let fileURL = ChatLinkURL.fileURL(from: url) else { return .systemAction }
+            model.open(fileURL, on: agent?.host ?? .mac)
             return .handled
         })
         .task(id: id) {
