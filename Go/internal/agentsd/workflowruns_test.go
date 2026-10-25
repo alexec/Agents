@@ -115,6 +115,82 @@ func TestAllowanceFailureDoesNotAutoarchiveWorkflowRun(t *testing.T) {
 	}
 }
 
+func TestRunNowRetriesStoppedWorkflowOnCurrentRuntime(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := folder(t, c, 1)
+	folderURL := store.FolderURL(dir)
+	path := filepath.Join(workflowsFolder(dir), "retry.md")
+	if err := os.MkdirAll(workflowsFolder(dir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("---\nname: Retry\nruntime: grok\n---\nwait for me\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	approveAll(t, c, folderURL)
+	stopped := seeded(t, d, dir, func(a *wire.Agent) {
+		a.State = wire.AgentStateStopped
+		a.EndedReason = reason(wire.EndedReasonAllowanceSpent)
+	})
+	d.workflowMu.Lock()
+	d.recordsLocked().Runs = append(d.recordsLocked().Runs,
+		workflowRun{ID: store.NewUUID(), WorkflowID: "retry", Folder: folderURL, StartedAt: now()},
+		workflowRun{ID: store.NewUUID(), WorkflowID: "retry", Folder: folderURL, AgentID: &stopped.ID, StartedAt: now()})
+	d.workflowMu.Unlock()
+	if err := os.WriteFile(path, []byte("---\nname: Retry\nruntime: codex\n---\nwait for me\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	approveAll(t, c, folderURL)
+	var summary wire.WorkflowSummary
+	json.Unmarshal(c.call(t, 2, "workflows/run", map[string]any{"folder": folderURL, "workflowID": "retry"}), &summary)
+	if summary.LastOutcome == nil || summary.LastOutcome.Ran == nil {
+		t.Fatalf("retry did not run: %+v", summary.LastOutcome)
+	}
+	agent := summary.LastOutcome.Ran.AgentID
+	if a := d.Store.Agent(agent); a == nil || a.RuntimeID != "codex" {
+		t.Fatalf("retry did not use the current runtime: %+v", a)
+	}
+	// The new agent is still active, so another Run now remains refused.
+	json.Unmarshal(c.call(t, 3, "workflows/run", map[string]any{"folder": folderURL, "workflowID": "retry"}), &summary)
+	if summary.LastOutcome.Refused == nil || summary.LastOutcome.Refused.Value.RunInFlight == nil {
+		t.Fatalf("active run was not protected: %+v", summary.LastOutcome)
+	}
+	c.call(t, 4, "agents/stop", map[string]any{"agentID": agent})
+}
+
+func TestRunEndingBeforeAgentAttachmentReleasesRun(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := folder(t, c, 1)
+	if err := os.MkdirAll(workflowsFolder(dir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workflowsFolder(dir), "early.md"), []byte("---\nname: Early\n---\nFinish.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	d.workflowMu.Lock()
+	d.scanLocked()
+	w := d.fileLocked(dir, "early").wf
+	run := workflowRun{ID: store.NewUUID(), WorkflowID: "early", Folder: store.FolderURL(dir), StartedAt: now()}
+	d.recordsLocked().Runs = append(d.recordsLocked().Runs, run)
+	d.workflowStarting = map[wire.UUID]bool{run.ID: true}
+	d.workflowMu.Unlock()
+	agent := seeded(t, d, dir, func(a *wire.Agent) { a.State = wire.AgentStateStopped })
+	// This is what the turn ending does before fire has attached its agent ID.
+	d.workflowRunFinished(agent.ID)
+	if !d.runningOf(dir, "early") {
+		t.Fatal("the setup did not leave an unattached run")
+	}
+	d.attachRunAgent(fireRequest{folder: dir, id: "early", byHand: true}, run, w, agent.ID)
+	if d.runningOf(dir, "early") {
+		t.Fatal("the completed agent left its run in flight")
+	}
+	if !strings.Contains(strings.Join(names(d), " "), "workflow.completed") {
+		t.Fatal("the completed run was not reported")
+	}
+}
+
 func TestAFireWhileARunGoesQueues(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())

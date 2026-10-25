@@ -350,6 +350,12 @@ func (d *Daemon) fire(fr fireRequest) {
 			return
 		}
 	}
+	if fr.byHand && fr.byAgent == nil {
+		// An agent can end before fire attaches its ID to the run. Only a person's
+		// next Run now clears the orphan; an agent still starting or working keeps
+		// the usual duplicate-run protection.
+		d.clearStoppedRunLocked(fr.folder, fr.id)
+	}
 	if refused := d.refusalLocked(fr, f); refused != nil {
 		st := d.stateLocked(fr.folder, fr.id, true)
 		hf := heldFire{Trigger: fr.trigger, TriggeringAgentID: fr.triggeringAgent, Depth: fr.depth, CausingEvent: fr.causingEvent, HeldAt: now()}
@@ -373,6 +379,10 @@ func (d *Daemon) fire(fr fireRequest) {
 		TriggeringAgentID: fr.triggeringAgent, Depth: fr.depth, StartedAt: now()}
 	rec := d.recordsLocked()
 	rec.Runs = append(rec.Runs, run)
+	if d.workflowStarting == nil {
+		d.workflowStarting = make(map[wire.UUID]bool)
+	}
+	d.workflowStarting[run.ID] = true
 	d.saveRecordsLocked(false)
 	w := f.wf
 	d.workflowMu.Unlock()
@@ -384,7 +394,14 @@ func (d *Daemon) fire(fr fireRequest) {
 		d.recordOutcome(fr, w.Name, wire.WorkflowOutcome{Refused: &wire.WorkflowOutcomeRefused{Value: *refusedSetting, At: now()}}, nil)
 		return
 	}
+	d.attachRunAgent(fr, run, w, agent)
+}
+
+// attachRunAgent closes the gap between starting an agent and identifying its run.
+// If the turn ended in that gap, the ending could not find this record.
+func (d *Daemon) attachRunAgent(fr fireRequest, run workflowRun, w wire.Workflow, agent wire.UUID) {
 	d.workflowMu.Lock()
+	delete(d.workflowStarting, run.ID)
 	for i := range d.recordsLocked().Runs {
 		if d.workflowRecs.Runs[i].ID == run.ID {
 			d.workflowRecs.Runs[i].AgentID = &agent
@@ -396,6 +413,34 @@ func (d *Daemon) fire(fr fireRequest) {
 	d.saveRecordsLocked(false)
 	d.workflowMu.Unlock()
 	d.recordOutcome(fr, w.Name, wire.WorkflowOutcome{Ran: &wire.WorkflowOutcomeRan{AgentID: agent, At: now()}}, &agent)
+	// An agent removed in the gap is also finished for this run.
+	if a := d.Store.Agent(agent); a == nil || !inFlight(a.State) && a.RestartPickUps == nil {
+		d.workflowRunFinished(agent)
+	}
+}
+
+// clearStoppedRunLocked removes only orphaned records for an explicit retry.
+// workflowMu protects both the records and the short startFor window.
+func (d *Daemon) clearStoppedRunLocked(folder, id string) {
+	rec := d.recordsLocked()
+	kept := rec.Runs[:0]
+	for _, run := range rec.Runs {
+		stale := false
+		if store.FolderPath(run.Folder) == folder && run.WorkflowID == id && !d.workflowStarting[run.ID] {
+			if run.AgentID == nil {
+				stale = true
+			} else if a := d.Store.Agent(*run.AgentID); a == nil || !inFlight(a.State) && a.RestartPickUps == nil {
+				stale = true
+			}
+		}
+		if !stale {
+			kept = append(kept, run)
+		}
+	}
+	if len(kept) != len(rec.Runs) {
+		rec.Runs = kept
+		d.saveRecordsLocked(false)
+	}
 }
 
 // noteRanByLocked records that ran started agent with manage_workflows run, and forgets
@@ -631,6 +676,7 @@ func (d *Daemon) releaseRun(id wire.UUID) *workflowRun {
 	for i, r := range rec.Runs {
 		if r.ID == id {
 			rec.Runs = append(rec.Runs[:i], rec.Runs[i+1:]...)
+			delete(d.workflowStarting, id)
 			d.saveRecordsLocked(false)
 			return &r
 		}

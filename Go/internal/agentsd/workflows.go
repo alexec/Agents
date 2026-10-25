@@ -106,12 +106,13 @@ type workflowFile struct {
 }
 
 type workflowBook struct {
-	workflowMu      sync.Mutex
-	workflowRecs    *workflowRecords
-	workflowRecsBad bool
-	workflowFiles   map[string]map[string]*workflowFile // folder → id → file
-	machineIDOnce   sync.Once
-	machineValue    string
+	workflowMu       sync.Mutex
+	workflowRecs     *workflowRecords
+	workflowStarting map[wire.UUID]bool // runs whose agent has not returned from startFor
+	workflowRecsBad  bool
+	workflowFiles    map[string]map[string]*workflowFile // folder → id → file
+	machineIDOnce    sync.Once
+	machineValue     string
 }
 
 func (d *Daemon) workflowsPath() string  { return filepath.Join(d.Store.Loc.Root, "workflows.json") }
