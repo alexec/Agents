@@ -136,13 +136,6 @@ struct PromptBar: View {
                     whereAndWhat
                     atItsLimit
                     startingOnOut
-                    if !attachments.isEmpty {
-                        AttachmentStrip(attachments: attachments,
-                                        refusal: { $0.refusal(from: promptCapabilities) },
-                                        remove: { attachment in
-                                            attachments.removeAll { $0.id == attachment.id }
-                                        })
-                    }
                     if draftLostSomething {
                         Text(PromptWords.draftLostSomething)
                             .appText(.fine)
@@ -492,7 +485,12 @@ struct PromptBar: View {
     // MARK: What you want done
 
     private var field: some View {
-        HStack(alignment: .bottom, spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
+            if !attachments.isEmpty {
+                AttachmentStrip(attachments: attachments,
+                                refusal: { $0.refusal(from: promptCapabilities) },
+                                remove: { attachment in attachments.removeAll { $0.id == attachment.id } })
+            }
             TextField(placeholder, text: $text, selection: $selection, axis: .vertical)
                 .textFieldStyle(.plain)
                 .appText(.reading)
@@ -597,95 +595,100 @@ struct PromptBar: View {
                 .onChange(of: selection) {
                     if let range = DictationCursor.range(of: selection, in: text) { dictation.selected(range) }
                 }
+                .frame(minHeight: 44, alignment: .topLeading)
 
-            Button(action: chooseAttachment) {
-                Image(systemName: "paperclip")
-                    .appText(.reading).fontWeight(.semibold)
-                    .frame(width: 22, height: 22)
-            }
-            .buttonStyle(.paper)
-            .buttonBorderShape(.circle)
-            .help("Attach a file or a picture")
-            .accessibilityLabel("Attach")
-
-            PushToTalkButton(tap: toggleDictation, begin: beginDictation, end: finishPushToTalk) {
-                Image(systemName: dictation.isListening ? "waveform" : "microphone")
-                    .appText(.reading).fontWeight(.semibold)
-                    .frame(width: 22, height: 22)
-                    .symbolEffect(.variableColor, isActive: dictation.isListening)
-            }
-            .buttonStyle(.paper)
-            .buttonBorderShape(.circle)
-            .help(dictation.isListening ? "Stop dictating" : "Dictate")
-            .accessibilityLabel(dictation.isListening ? "Stop dictating" : "Dictate")
-            // Voice mode listens already, in this window or another (#2445).
-            .disabled(VoiceMode.shared.isOn && !dictation.isListening)
-            .alert("Dictation", isPresented: Binding(get: { dictation.problem != nil },
-                                                     set: { if !$0 { dictation.dismissProblem() } })) {
-                if let permission = dictation.problem?.permission {
-                    Button("Open Settings") { openURL(permission.settings) }
+            HStack(spacing: 8) {
+                Button(action: chooseAttachment) {
+                    Image(systemName: "paperclip")
+                        .appText(.reading).fontWeight(.semibold)
+                        .frame(width: 22, height: 22)
                 }
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(dictation.problem?.message ?? "")
-            }
-
-            // Voice mode (#2322), while Settings ▸ Appearance has it on: in this chat, or in a
-            // new session that its first words start (#2375).
-            // A session's own window does not take "Hey Agents" (#2420): the main window does.
-            VoiceModeButton(agentID: agent?.id, vocabulary: speechSeeds, takesWake: popped == nil, send: sendSpoken)
-
-            // While it works and nothing is typed, send is stop. Type and it is send
-            // again, queueing what is typed for when the turn ends.
-            if let agent, model.canStop(agent), text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-               sending == 0 {
-                let acting = model.acting(agent.id)
-                Button {
-                    Task { await model.stop(agent.id) }
-                } label: {
-                    Group {
-                        if acting == .stop {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Image(systemName: PromptWords.stopSymbol)
-                                .appText(.reading).fontWeight(.semibold)
-                        }
-                    }
-                    .frame(width: 22, height: 22)
-                }
-                .buttonStyle(.paperProminent)
+                .buttonStyle(.paper)
                 .buttonBorderShape(.circle)
-                // Held while something else is on its way to this agent. Not while it is Stop:.
-                // the one that went stays bright, as on the answer cards (#86), and the
-                // model refuses a second press.
-                .disabled(acting != nil && acting != .stop)
-                .help(acting == .stop ? Telling.words(doing: "Stopping", host: recipient) : PromptWords.stopHelp)
-                .accessibilityLabel("Stop")
-                .accessibilityValue(acting == .stop ? Telling.words(doing: "Stopping", host: recipient) : "")
-            } else {
-                Button(action: send) {
-                    Group {
-                        if isGoing {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Image(systemName: PromptWords.sendSymbol(willQueue: willQueue))
-                                .appText(.reading).fontWeight(.semibold)
-                        }
-                    }
-                    .frame(width: 22, height: 22)
+                .help("Attach a file or a picture")
+                .accessibilityLabel("Attach")
+
+                PushToTalkButton(tap: toggleDictation, begin: beginDictation, end: finishPushToTalk) {
+                    Image(systemName: dictation.isListening ? "waveform" : "microphone")
+                        .appText(.reading).fontWeight(.semibold)
+                        .frame(width: 22, height: 22)
+                        .symbolEffect(.variableColor, isActive: dictation.isListening)
                 }
-                .buttonStyle(.paperProminent)
+                .buttonStyle(.paper)
                 .buttonBorderShape(.circle)
-                // Bright while its own spinner turns, as the answer that went stays bright
-                // on the cards (#86); `send()` refuses the press meanwhile.
-                .disabled(!canSend && !isGoing)
-                .keyboardShortcut(.return, modifiers: .command)
-                .help(targetOffline ? model.offlineHelp(for: targetHost)
-                                    : PromptWords.sendHelp(willQueue: willQueue))
-                .accessibilityLabel(PromptWords.sendLabel(willQueue: willQueue))
+                .help(dictation.isListening ? "Stop dictating" : "Dictate")
+                .accessibilityLabel(dictation.isListening ? "Stop dictating" : "Dictate")
+                // Voice mode listens already, in this window or another (#2445).
+                .disabled(VoiceMode.shared.isOn && !dictation.isListening)
+                .alert("Dictation", isPresented: Binding(get: { dictation.problem != nil },
+                                                         set: { if !$0 { dictation.dismissProblem() } })) {
+                    if let permission = dictation.problem?.permission {
+                        Button("Open Settings") { openURL(permission.settings) }
+                    }
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text(dictation.problem?.message ?? "")
+                }
+
+                // Voice mode (#2322), while Settings ▸ Appearance has it on: in this chat, or in a
+                // new session that its first words start (#2375).
+                // A session's own window does not take "Hey Agents" (#2420): the main window does.
+                VoiceModeButton(agentID: agent?.id, vocabulary: speechSeeds, takesWake: popped == nil, send: sendSpoken)
+
+                Spacer(minLength: 0)
+                // While it works and nothing is typed, send is stop. Type and it is send
+                // again, queueing what is typed for when the turn ends.
+                if let agent, model.canStop(agent), text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                   sending == 0 {
+                    let acting = model.acting(agent.id)
+                    Button {
+                        Task { await model.stop(agent.id) }
+                    } label: {
+                        Group {
+                            if acting == .stop {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Image(systemName: PromptWords.stopSymbol)
+                                    .appText(.reading).fontWeight(.semibold)
+                            }
+                        }
+                        .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(.paperProminent)
+                    .buttonBorderShape(.circle)
+                    // Held while something else is on its way to this agent. Not while it is Stop:.
+                    // the one that went stays bright, as on the answer cards (#86), and the
+                    // model refuses a second press.
+                    .disabled(acting != nil && acting != .stop)
+                    .help(acting == .stop ? Telling.words(doing: "Stopping", host: recipient) : PromptWords.stopHelp)
+                    .accessibilityLabel("Stop")
+                    .accessibilityValue(acting == .stop ? Telling.words(doing: "Stopping", host: recipient) : "")
+                } else {
+                    Button(action: send) {
+                        Group {
+                            if isGoing {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Image(systemName: PromptWords.sendSymbol(willQueue: willQueue))
+                                    .appText(.reading).fontWeight(.semibold)
+                            }
+                        }
+                        .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(.paperProminent)
+                    .buttonBorderShape(.circle)
+                    // Bright while its own spinner turns, as the answer that went stays bright
+                    // on the cards (#86); `send()` refuses the press meanwhile.
+                    .disabled(!canSend && !isGoing)
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .help(targetOffline ? model.offlineHelp(for: targetHost)
+                                        : PromptWords.sendHelp(willQueue: willQueue))
+                    .accessibilityLabel(PromptWords.sendLabel(willQueue: willQueue))
+                }
             }
         }
-        .padding(14)
+        .padding(10)
+        .frame(minHeight: 94, alignment: .topLeading)
         .paperRaised(in: RoundedRectangle(cornerRadius: 18))
         // A file dragged onto the prompt is a file you are talking about.
         .dropDestination(for: URL.self) { urls, _ in
