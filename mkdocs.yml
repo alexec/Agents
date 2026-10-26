@@ -161,7 +161,7 @@ nav:
       - reference/on-every-machine.md
       - reference/reports.md
       - reference/console.md
-      - reference/workspace-providers.md
+      - reference/machine-providers.md
       - reference/integrations.md
       - reference/sign-in.md
       - reference/ssh-options.md
