@@ -274,7 +274,9 @@ not refused, and runs when that run ends:
 - The queue survives the app restarting. Turning the workflow off or archiving it drops
   the queue, and each event it held says why.
 - A trigger set off by a chain already three deep is refused, not queued.
-- **Run now** is not queued: it says **a run is still going**, so you can try again.
+- **Run now** is not queued: it says **a run is still going** while a run starts or
+  uses the workflow's selected runtime. If you explicitly select a different runtime,
+  **Run now** can start a run there while the earlier run is active.
 - A workflow with a `cooldown:` does not queue. It holds the latest trigger and runs once
   for it (see [Cooldown](#cooldown)): a cooldown is there to make a burst one run, and
   queueing each trigger would undo it.

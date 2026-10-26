@@ -191,6 +191,51 @@ func TestRunEndingBeforeAgentAttachmentReleasesRun(t *testing.T) {
 	}
 }
 
+func TestRunNowUsesExplicitlyChangedRuntimeWhileOldRunIsActive(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := folder(t, c, 1)
+	folderURL := store.FolderURL(dir)
+	if err := os.MkdirAll(workflowsFolder(dir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workflowsFolder(dir), "retry.md"), []byte("---\nname: Retry\nruntime: codex\n---\nwait for me\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	approveAll(t, c, folderURL)
+	old := seeded(t, d, dir, func(a *wire.Agent) {
+		a.RuntimeID = "grok"
+		a.State = wire.AgentStateRunning
+	})
+	pending := workflowRun{ID: store.NewUUID(), WorkflowID: "retry", Folder: folderURL, StartedAt: now()}
+	d.workflowMu.Lock()
+	d.recordsLocked().Runs = append(d.recordsLocked().Runs,
+		workflowRun{ID: store.NewUUID(), WorkflowID: "retry", Folder: folderURL, AgentID: &old.ID, StartedAt: now()}, pending)
+	d.workflowStarting = map[wire.UUID]bool{pending.ID: true}
+	d.workflowMu.Unlock()
+
+	var summary wire.WorkflowSummary
+	json.Unmarshal(c.call(t, 2, "workflows/run", map[string]any{"folder": folderURL, "workflowID": "retry"}), &summary)
+	if summary.LastOutcome == nil || summary.LastOutcome.Refused == nil || summary.LastOutcome.Refused.Value.RunInFlight == nil {
+		t.Fatalf("a start without an agent ID did not block Run now: %+v", summary.LastOutcome)
+	}
+	d.releaseRun(pending.ID)
+	json.Unmarshal(c.call(t, 3, "workflows/run", map[string]any{"folder": folderURL, "workflowID": "retry"}), &summary)
+	if summary.LastOutcome == nil || summary.LastOutcome.Ran == nil {
+		t.Fatalf("Run now did not retry on the selected runtime: %+v", summary.LastOutcome)
+	}
+	newAgent := summary.LastOutcome.Ran.AgentID
+	if a := d.Store.Agent(newAgent); a == nil || a.RuntimeID != "codex" {
+		t.Fatalf("retry used the wrong runtime: %+v", a)
+	}
+	json.Unmarshal(c.call(t, 4, "workflows/run", map[string]any{"folder": folderURL, "workflowID": "retry"}), &summary)
+	if summary.LastOutcome.Refused == nil || summary.LastOutcome.Refused.Value.RunInFlight == nil {
+		t.Fatalf("a run on the selected runtime did not block Run now: %+v", summary.LastOutcome)
+	}
+	c.call(t, 5, "agents/stop", map[string]any{"agentID": newAgent})
+}
+
 func TestAFireWhileARunGoesQueues(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())

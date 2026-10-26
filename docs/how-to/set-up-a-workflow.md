@@ -238,7 +238,9 @@ A workflow that did not run says why on its row and its page, for example:
   the last agent it started was working. It runs when that one finishes.
 - **Did not run — 10 triggers are already queued for it**: triggers are coming faster
   than its runs finish. Ten wait at most.
-- **Did not run — a run is still going**: you pressed **Run now** while it was running.
+- **Did not run — a run is still going**: you pressed **Run now** while a run was
+  starting or already using the workflow's selected runtime. If a run is active on
+  another runtime, select a runtime in the workflow and press **Run now** to retry there.
 - **Did not run — this chain is already 3 deep**: workflows set off by agents that
   workflows started stop after three steps, so a reviewer that finishes cannot set off
   reviews for ever. That is why the example's prompt tells a reviewer of a reviewer to

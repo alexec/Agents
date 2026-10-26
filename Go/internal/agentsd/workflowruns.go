@@ -225,6 +225,9 @@ func (d *Daemon) refusalLocked(fr fireRequest, f *workflowFile) *wire.WorkflowRe
 	w := f.wf
 	st := d.stateLocked(fr.folder, fr.id, false)
 	running := d.runningLocked(fr.folder, fr.id)
+	if fr.byHand && fr.byAgent == nil && w.Settings.RuntimeID != nil {
+		running = d.runOnRuntimeLocked(fr.folder, fr.id, *w.Settings.RuntimeID)
+	}
 	queued := 0
 	if st != nil {
 		queued = len(st.QueuedFires)
@@ -313,6 +316,23 @@ func (d *Daemon) refusalLocked(fr fireRequest, f *workflowFile) *wire.WorkflowRe
 		}
 	}
 	return nil
+}
+
+// runOnRuntimeLocked protects a Run now on the selected runtime. An unattached run
+// still blocks it: its agent may be starting, and its runtime is not known yet.
+func (d *Daemon) runOnRuntimeLocked(folder, id, runtimeID string) bool {
+	for _, run := range d.recordsLocked().Runs {
+		if store.FolderPath(run.Folder) != folder || run.WorkflowID != id {
+			continue
+		}
+		if run.AgentID == nil {
+			return true
+		}
+		if a := d.Store.Agent(*run.AgentID); a == nil || a.RuntimeID == runtimeID {
+			return true
+		}
+	}
+	return false
 }
 
 // fire is DaemonCore.fire: weighed, then a run or a refusal recorded.
