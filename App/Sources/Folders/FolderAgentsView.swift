@@ -191,29 +191,24 @@ struct FolderAgentsView: View {
         VStack(spacing: 4) {
             if !model.draftPersonas.isEmpty {
                 if !usable.isEmpty {
-                    Menu {
-                        personaButton(nil, picked: picked == nil)
-                        ForEach(usable) { personaButton($0, picked: $0.id == picked?.id) }
-                    } label: {
-                        HStack(spacing: 5) {
-                            Text(picked?.name ?? Self.noPersona)
-                                .appText(.reading).fontWeight(.semibold)
-                                .foregroundStyle(picked == nil ? .secondary : .primary)
-                                .lineLimit(1)
-                            Image(systemName: "chevron.up.chevron.down")
-                                .imageScale(.small)
-                                .foregroundStyle(.secondary)
-                                .accessibilityHidden(true)
+                    ScrollView(.horizontal) {
+                        Picker("Persona", selection: Binding<String?>(
+                            get: { model.draftPersona },
+                            set: { id in model.choosePersona(usable.first { $0.id == id }) }
+                        )) {
+                            Text(Self.noPersona).tag(String?.none)
+                            ForEach(usable) { persona in
+                                Text(persona.name).tag(Optional(persona.id))
+                            }
                         }
-                        .contentShape(Rectangle())
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .fixedSize(horizontal: true, vertical: false)
+                        .accessibilityLabel("Persona: \(picked?.name ?? Self.noPersona)")
                     }
-                    .menuStyle(.button)
-                    .buttonStyle(.plain)
-                    .menuIndicator(.hidden)
-                    .fixedSize()
+                    .scrollIndicators(.hidden)
                     .disabled(model.isStarting)
                     .help("Start a kind of session: a persona sets what it names")
-                    .accessibilityLabel("Persona: \(picked?.name ?? Self.noPersona)")
                 }
                 if let description = picked?.description {
                     Text(description)
@@ -230,18 +225,6 @@ struct FolderAgentsView: View {
     }
 
     static let noPersona = "No persona"
-
-    private func personaButton(_ persona: Persona?, picked: Bool) -> some View {
-        Button {
-            model.choosePersona(persona)
-        } label: {
-            if picked {
-                Label(persona?.name ?? Self.noPersona, systemImage: "checkmark")
-            } else {
-                Text(persona?.name ?? Self.noPersona)
-            }
-        }
-    }
 
     private func label(_ folder: DaemonAPI.FolderSummary) -> String {
         SidebarOrder.label(folder) { model.hosts.label($0) }

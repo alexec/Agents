@@ -630,14 +630,18 @@ function PersonaSwitch({ personas, picked, down, choose }: {
 }) {
   const name = personas.find((p) => p.id === picked)?.name;
   return (
-    <h2 class={`folder-switch persona-switch${name ? "" : " none"}`} title="Start a kind of session: a persona sets what it names">
-      <span aria-hidden="true">{name ?? "No persona"} <span class="caret">▾</span></span>
-      <select aria-label="Persona" disabled={down} value={picked ?? ""}
-        onChange={(e) => choose((e.currentTarget as HTMLSelectElement).value)}>
-        <option value="">No persona</option>
-        {personas.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-      </select>
-    </h2>
+    <div class={`persona-switch${name ? "" : " none"}`} title="Start a kind of session: a persona sets what it names">
+      <div class="segmented persona-segments" role="group" aria-label="Persona">
+        <button type="button" aria-pressed={picked === undefined} class={picked === undefined ? "on" : ""}
+          disabled={down} onClick={() => choose("")}>No persona</button>
+        {personas.map((persona) => (
+          <button key={persona.id} type="button" aria-pressed={picked === persona.id}
+            class={picked === persona.id ? "on" : ""} disabled={down} onClick={() => choose(persona.id)}>
+            {persona.name}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
