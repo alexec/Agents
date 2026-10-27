@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-27
 
-**Status**: Draft, for Alex's review. Nothing is built before Alex approves this spec.
+**Status**: Approved by Alex, 2026-10-27 (with **Plan** in place of **Read-only**).
 
 **Input**: GitHub issue #2658, "Auto runtime: the app picks the runtime, model and mode from
 three model levels (Fast / Balanced / Smart)". Wireframe:
@@ -304,7 +304,8 @@ tables.
 - **FR-016**: The person MUST be able to override any cell with any of the runtime's own
   settings. An override MUST be marked **yours** and MUST have **Reset**.
 - **FR-017**: The order, the Include switches and the overrides MUST be the person's, stored
-  with the person's other settings in `~/.agents`, and the same on every machine and client.
+  beside the sandbox defaults in the daemon's settings, and the Mac MUST send them to every
+  machine, as it does the sandbox defaults (research R2).
 - **FR-018**: The mappings MUST apply to every agent that uses the new values, on Auto or on a
   named runtime.
 - **FR-019**: **Permission requests** MUST become a choice per agent. The Mac-wide value per
@@ -357,12 +358,11 @@ table ships with the app and the nightly check keeps it true.
 | Claude | as configured | on | off |
 | Codex | as configured | on (Ask or Approve for me) | off (Full access) |
 | Gemini | as configured | Not possible | off |
-| Grok, Cursor, Copilot | as configured (fixed) | Not possible | Not possible |
+| Grok, Cursor, Copilot | as configured (fixed) | Not possible | as configured (nearest safer) |
 | OpenCode, Antigravity | none (fixed) | Not possible | none (fixed) |
 
-Note: a fixed "Default sandbox" cannot honour **No sandbox**, so Auto skips Grok, Cursor and
-Copilot for it. This gives the agent less access than asked, not more, so the plan step may
-choose to allow it instead, with a note on the cell.
+Note: a fixed **Default sandbox** gives less access than **No sandbox**, so it is the nearest
+safer value for it, with a note on the cell (research R5).
 
 **Model**: Claude Fast = Haiku, Balanced = Sonnet, Smart = Opus; for the other runtimes, their
 smallest, usual and largest models, chosen by the plan step from each runtime's list.
