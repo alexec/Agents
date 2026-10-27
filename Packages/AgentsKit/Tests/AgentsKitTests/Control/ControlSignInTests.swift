@@ -114,6 +114,12 @@ struct ControlSignInTests {
             == "f399352dbd13beb7c27b5061d7085781ee74d846b27756855bb0fc428a15e0dc")
     }
 
+    // One vector with the control plane's Go (controllink.TestApprovalCodeIsBoundToBothKeys).
+    @Test func theApprovalCodeIsTheControlPlanes() {
+        #expect(ControlSignIn.approvalCode(clientPublicKey: Data(repeating: 1, count: 65), controlKey: Data(repeating: 2, count: 65))
+            == "8UMUNH")
+    }
+
     @Test func aSigningInIdentityReadsBack() {
         let id = UUID()
         #expect(ControlAuth.Identity(text: ControlAuth.Identity.signingIn(id).text) == .signingIn(id))
@@ -141,7 +147,9 @@ struct ControlSignInTests {
         #expect(server.identity == .signingIn(id))
         #expect(saw.value == ControlSignIn.nonce(controlKey: server.control.publicKey, challenge: server.helloNonce))
         #expect(server.paired?.token == "ghu_token" && server.paired?.provider == "github" && server.paired?.kind == .iPhone)
-        #expect(shown.value == "K7M2QX")
+        // The code made here from its own key and the key it trusts, never the control plane's.
+        #expect(shown.value == ControlSignIn.approvalCode(clientPublicKey: client.publicKey, controlKey: server.control.publicKey))
+        #expect(shown.value != "K7M2QX")
         #expect(membership.client == id && membership.controlKey == server.control.publicKey && membership.name == "Team plane")
     }
 

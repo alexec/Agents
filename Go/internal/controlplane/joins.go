@@ -40,9 +40,6 @@ const (
 	joinKept = time.Hour
 )
 
-// joinCodeLetters leave out what reads as another letter: 0 O 1 I L.
-const joinCodeLetters = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
-
 // joinRecord is v1/joins/<request>.json (data-model.md "Join request").
 type joinRecord struct {
 	ID        string        `json:"id"`
@@ -76,20 +73,6 @@ func newJoinID() string {
 	b := make([]byte, 16)
 	rand.Read(b)
 	return hex.EncodeToString(b)
-}
-
-func newJoinCode() string {
-	b := make([]byte, 6)
-	rand.Read(b)
-	out := make([]byte, 6)
-	for i := range b {
-		// 248 is the largest multiple of 31 below 256: no letter is likelier.
-		for b[i] >= 248 {
-			rand.Read(b[i : i+1])
-		}
-		out[i] = joinCodeLetters[int(b[i])%len(joinCodeLetters)]
-	}
-	return string(out)
 }
 
 func isJoinID(s string) bool {
@@ -217,7 +200,7 @@ func (j *joins) ask(ctx context.Context, a wire.MachineJoinAsk, from string) (*w
 		j.s.refusals.note("join-dropped", "", "ended the oldest request to join from "+heavy+": every place was taken")
 	}
 	now := records.At(j.now())
-	r := joinRecord{ID: newJoinID(), Code: newJoinCode(), Name: name, Platform: a.Platform, Version: deref(a.Version),
+	r := joinRecord{ID: newJoinID(), Code: controllink.JoinCode(a.PublicKey), Name: name, Platform: a.Platform, Version: deref(a.Version),
 		PublicKey: a.PublicKey, MachineID: deref(a.MachineID), Person: person, From: from,
 		Created: now, Expires: records.At(now.Add(joinLifetime))}
 	data, err := records.Encode(r)

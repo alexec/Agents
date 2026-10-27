@@ -23,8 +23,8 @@ type JoinAsk struct {
 }
 
 // AskToJoin asks a control plane to let this host join as a person, with no code (#994,
-// spec 736 FR-017): it says its key, shows the short code the control plane gives it
-// (shown), and waits until the person approves or denies it, or 10 minutes pass. Once
+// spec 736 FR-017): it says its key, shows the short code made from that key (shown,
+// JoinCode), and waits until the person approves or denies it, or 10 minutes pass. Once
 // approved, it keeps the membership, and connects as h:<id> with its own key.
 func AskToJoin(ctx context.Context, root string, ask JoinAsk, private []byte, hello MachineHello, shown func(code string)) (*Membership, error) {
 	pin := ask.Pin
@@ -50,7 +50,9 @@ func AskToJoin(ctx context.Context, root string, ask JoinAsk, private []byte, he
 	if err := callJSON(ctx, client, http.MethodPost, base+"/v1/join", body, &ticket); err != nil {
 		return nil, err
 	}
-	shown(ticket.Code)
+	// The code made here, never the control plane's: one that passed the request on with
+	// another key could only pass on that key's code.
+	shown(JoinCode(pub))
 	for {
 		var d wire.MachineJoinDecision
 		if err := callJSON(ctx, client, http.MethodGet, base+"/v1/join/"+ticket.Request, nil, &d); err != nil {
