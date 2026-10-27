@@ -597,7 +597,7 @@ struct WorkflowPage: View {
     private func runtimeID(_ workflow: Workflow) -> String {
         let host = model.work.folder(workflow.folder)?.host ?? .mac
         return workflow.settings.runtimeID
-            ?? model.work.agents.first(where: { $0.host == host })?.runtimeID
+            ?? model.work.lastRuntimes[host]
             ?? RuntimeCatalog.defaultRuntime.id
     }
 

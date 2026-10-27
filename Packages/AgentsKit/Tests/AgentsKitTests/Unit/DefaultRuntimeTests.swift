@@ -28,6 +28,29 @@ struct DefaultRuntimeTests {
         #expect(model.defaultRuntimeID(available: ["claude", "codex"], kept: nil) == "codex")
     }
 
+    /// Each machine's last runtime follows its newest agent, as one changes, comes or goes,
+    /// so a page reads it rather than every agent (#2732).
+    @Test func eachMachineKeepsItsLastRuntime() {
+        let model = AgentsModel()
+        let box = MachineRef(rawValue: "box")
+        var far = agent("grok", minutesAgo: 5)
+        far.host = box
+        let older = agent("claude", minutesAgo: 20)
+        var newer = agent("codex", minutesAgo: 1)
+        model.replaceAgents([older, newer, far])
+        #expect(model.lastRuntimes == [.mac: "codex", box: "grok"])
+
+        model.forget([newer.id])
+        #expect(model.lastRuntimes == [.mac: "claude", box: "grok"])
+
+        newer.lastActivityAt = Date()
+        model.upsert(newer)
+        #expect(model.lastRuntimes[.mac] == "codex")
+
+        model.forget([far.id])
+        #expect(model.lastRuntimes == [.mac: "codex"])
+    }
+
     /// The mode is the daemon's memory, kept current by `modes/changed` (029).
     @Test func theRememberedModeFollowsTheMac() throws {
         let model = AgentsModel()

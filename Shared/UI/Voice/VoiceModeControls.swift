@@ -8,7 +8,8 @@ struct VoiceModeButton: View {
     /// Nil for a new session, not started yet.
     let agentID: UUID?
     /// Words for the recogniser that a dictionary would not have: agent, file and runtime names.
-    var vocabulary: [String] = []
+    /// Run when voice mode starts, not in `body`, which then does not read every agent (#2732).
+    var vocabulary: () -> [String] = { [] }
     /// Whether "Hey Agents" (#2420) turns voice mode on here, as a press does, with the words
     /// said after the phrase. One bar of a chat takes it: the main window's.
     var takesWake = false
@@ -30,7 +31,7 @@ struct VoiceModeButton: View {
                     return
                 }
                 #endif
-                voice.turnOn(in: agentID, vocabulary: vocabulary, send: send)
+                voice.turnOn(in: agentID, vocabulary: vocabulary(), send: send)
             } label: {
                 Image(systemName: "waveform.circle")
                     .appText(.reading).fontWeight(.semibold)
@@ -42,7 +43,7 @@ struct VoiceModeButton: View {
             .accessibilityLabel("Voice mode")
             .onChange(of: voice.wake, initial: true) {
                 guard takesWake, let wake = voice.takeWake(for: agentID) else { return }
-                voice.turnOn(in: agentID, vocabulary: vocabulary, words: wake.words, send: send)
+                voice.turnOn(in: agentID, vocabulary: vocabulary(), words: wake.words, send: send)
             }
             #if os(iOS)
             .sheet(isPresented: $isPriming) {
@@ -50,7 +51,7 @@ struct VoiceModeButton: View {
                                 notNow: { isPriming = false },
                                 continue: {
                                     isPriming = false
-                                    voice.turnOn(in: agentID, vocabulary: vocabulary, send: send)
+                                    voice.turnOn(in: agentID, vocabulary: vocabulary(), send: send)
                                 })
                 .paperSheet()
             }

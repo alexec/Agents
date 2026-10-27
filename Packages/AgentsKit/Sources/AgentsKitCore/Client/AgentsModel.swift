@@ -24,6 +24,10 @@ public final class AgentsModel {
     /// How many agents are held: moves only when one comes or goes, for a view that
     /// wants to know that and not every change to every one of them.
     public private(set) var agentCount = 0
+    /// The runtime of the most recently active agent on each machine: what a page that
+    /// offers a runtime reads, rather than `agents`, so it draws again only when this
+    /// moves (#2732). A machine with no agent held is absent.
+    public private(set) var lastRuntimes: [MachineRef: String] = [:]
     /// Moves each time an agent held here becomes archived: what lets the window let go
     /// of that agent's draft without looking at everything (#176).
     public private(set) var archivals = 0
@@ -1641,8 +1645,7 @@ public final class AgentsModel {
     ///   - kept: the runtime the client's start form was last left on.
     ///   - host: the machine that will start the new agent.
     public func defaultRuntimeID(available: [String], kept: String?, host: MachineRef = .mac) -> String? {
-        let lastUsed = agents.first { $0.host == host }?.runtimeID
-        return RuntimeCatalog.newSessionRuntime(lastUsed: lastUsed, kept: kept, available: available)
+        RuntimeCatalog.newSessionRuntime(lastUsed: lastRuntimes[host], kept: kept, available: available)
     }
 
     /// The folders worth showing, oldest added first (`SidebarOrder.byAdded`, #357).
@@ -1756,6 +1759,8 @@ public final class AgentsModel {
         // copy taken to change was every agent held copied for each change (#213).
         Self.move(agent, from: old, in: &agents)
         if old == nil { agentCount = byID.count }
+        noteLastRuntime(on: agent.host)
+        if let old, old.host != agent.host { noteLastRuntime(on: old.host) }
         if let old, old.state != .archived, agent.state == .archived { archivals &+= 1 }
         // Its shelves: in place when it stays where it was, moved when not.
         let was = filedAs[agent.id]
@@ -1796,6 +1801,20 @@ public final class AgentsModel {
         if at < all.count, all[at].id == old.id { all.remove(at: at) } else { all.removeAll { $0.id == old.id } }
     }
 
+    /// One machine's last runtime again, from the front of the list: it stops at that
+    /// machine's newest agent. Set only when it moves, so its readers draw only then.
+    private func noteLastRuntime(on host: MachineRef) {
+        let runtimeID = agents.first { $0.host == host }?.runtimeID
+        if lastRuntimes[host] != runtimeID { lastRuntimes[host] = runtimeID }
+    }
+
+    /// Every machine's last runtime again, in one pass of the list.
+    private func noteLastRuntimes() {
+        var latest: [MachineRef: String] = [:]
+        for agent in agents where latest[agent.host] == nil { latest[agent.host] = agent.runtimeID }
+        if latest != lastRuntimes { lastRuntimes = latest }
+    }
+
     /// Agents let go of without being gone: an Archived fold closed, a search ended
     /// (#165). The host still has them, and lists them again when asked.
     public func forget(_ ids: some Sequence<UUID>) {
@@ -1815,6 +1834,7 @@ public final class AgentsModel {
         guard !removed.isEmpty else { return }
         agents.removeAll { gone.contains($0.id) }
         agentCount = byID.count
+        noteLastRuntimes()
         var titlesChanged = false
         for old in removed { detach(old, titlesChanged: &titlesChanged) }
         if titlesChanged { noteTitlesChanged() }
@@ -1828,6 +1848,7 @@ public final class AgentsModel {
         }
         Self.remove(old, from: &agents)
         agentCount = byID.count
+        noteLastRuntime(on: old.host)
         var titlesChanged = false
         detach(old, titlesChanged: &titlesChanged)
         if titlesChanged { noteTitlesChanged() }
@@ -1869,6 +1890,7 @@ public final class AgentsModel {
         }
         agents = unique.values.sorted(by: FolderShelf.byActivity)
         agentCount = unique.count
+        noteLastRuntimes()
         filedAs = [:]
         var byKey: [ShelfKey: [AgentGroup: [Agent]]] = [:]
         var byFolder: [URL: [AgentGroup: [Agent]]] = [:]

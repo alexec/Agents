@@ -1175,7 +1175,7 @@ final class RemoteModel {
     /// recently active runtime on this folder's host, then the kept choice (#264).
     private var pickedStartRuntime: String? {
         RuntimeCatalog.startFormRuntime(current: startRuntimeID,
-                                        lastUsed: work.agents.first { $0.host == startHost }?.runtimeID,
+                                        lastUsed: work.lastRuntimes[startHost],
                                         kept: UserDefaults.standard.string(forKey: Self.keptStartRuntime),
                                         available: startAvailableRuntimeIDs)
     }
