@@ -492,6 +492,126 @@ func TestTheModelRelay(t *testing.T) {
 	resp.Body.Close()
 }
 
+// The relay sends on only what a turn may do (#999): a model's paths, in the route's own
+// project; nothing while the kill switch is on; a model the policy allows; and nothing for
+// a session that is gone or whose runtime has ended.
+func TestTheRelaySendsOnOnlyWhatATurnMay(t *testing.T) {
+	k := newControlKeys(t)
+	root := t.TempDir()
+	d, _, public := orgMachine(t, root, k)
+	p := newFakeProvider(t)
+	deliver(t, d, testRoute(t, public, "acme", 1, wire.OrgRouteKindKey, wire.OrgRouteVendorAnthropic, p.URL, map[string]string{"apiKey": "ak"}, "claude"),
+		testRoute(t, public, "acme-vertex", 1, wire.OrgRouteKindVertex, "", p.URL, map[string]string{"googleToken": "ya29.t"}, "claude"))
+	r, err := d.relay()
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := relayClient(t, d)
+	base := "https://127.0.0.1:" + strconv.Itoa(r.port)
+	send := func(method, route, token, path, body string) int {
+		t.Helper()
+		req, _ := http.NewRequest(method, base+"/"+route+path, strings.NewReader(body))
+		req.Header.Set("X-Api-Key", token)
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	a := seeded(t, d, t.TempDir(), func(a *wire.Agent) { a.AccountID = new("org:acme") })
+	token := r.standInFor(standIn{route: "acme", runtime: "claude", account: "org:acme", agent: a.ID})
+	vertex := r.standInFor(standIn{route: "acme-vertex", runtime: "claude", account: "org:acme-vertex"})
+
+	// A model's paths go on; any other path or method does not.
+	for _, ok := range []struct{ method, route, token, path string }{
+		{"POST", "acme", token, "/v1/messages"}, {"POST", "acme", token, "/v1/messages/count_tokens"}, {"GET", "acme", token, "/v1/models"},
+		{"POST", "acme-vertex", vertex, "/projects/acme-proj/locations/us-east5/publishers/anthropic/models/claude-sonnet-4-5:streamRawPredict"},
+	} {
+		if got := send(ok.method, ok.route, ok.token, ok.path, `{}`); got != 200 {
+			t.Fatalf("%+v: %d", ok, got)
+		}
+	}
+	n := p.count()
+	for _, no := range []struct{ method, route, token, path string }{
+		{"POST", "acme", token, "/v1/files"}, {"GET", "acme", token, "/v1/messages/batches"}, {"POST", "acme", token, "/v1/messages/batches"},
+		{"DELETE", "acme", token, "/v1/models/m"}, {"GET", "acme", token, "/v1/organizations/me"},
+		{"POST", "acme", token, "/v1/files/../messages"}, {"POST", "acme", token, "/v1/threads/t/messages"},
+		{"POST", "acme-vertex", vertex, "/projects/other-proj/locations/us-east5/publishers/anthropic/models/claude-sonnet-4-5:rawPredict"},
+		{"GET", "acme-vertex", vertex, "/projects/acme-proj/locations/us-east5/batchPredictionJobs"},
+	} {
+		if got := send(no.method, no.route, no.token, no.path, `{}`); got != 404 {
+			t.Fatalf("%+v: %d", no, got)
+		}
+	}
+	if p.count() != n {
+		t.Fatal("a request for another path was sent on")
+	}
+
+	// A model the policy does not allow is refused, by the body or the path; a cloud's id
+	// of an allowed model goes on.
+	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 1, map[string]any{"runtimes": map[string]any{"claude": map[string]any{"models": []string{"claude-sonnet-*"}}},
+		"requires": []string{wire.CapHostPolicy1, wire.CapHostOrgRoutes1}}))
+	if got := send("POST", "acme", token, "/v1/messages", `{"model":"claude-opus-4-1"}`); got != 403 {
+		t.Fatalf("a refused model: %d", got)
+	}
+	if got := send("POST", "acme-vertex", vertex, "/projects/acme-proj/locations/us-east5/publishers/anthropic/models/claude-opus-4-1@20250805:rawPredict", `{}`); got != 403 {
+		t.Fatalf("a refused model in the path: %d", got)
+	}
+	if p.count() != n {
+		t.Fatal("a refused model was sent on")
+	}
+	if got := send("POST", "acme", token, "/v1/messages", `{"model":"claude-sonnet-4-5"}`); got != 200 {
+		t.Fatalf("an allowed model: %d", got)
+	}
+	if got := send("POST", "acme-vertex", vertex, "/projects/acme-proj/locations/us-east5/publishers/anthropic/models/claude-sonnet-4-5@20250929:rawPredict", `{}`); got != 200 {
+		t.Fatalf("an allowed model's Vertex id: %d", got)
+	}
+	if m := plainModel("us.anthropic.claude-sonnet-4-5-20250929-v1:0"); m != "claude-sonnet-4-5-20250929" {
+		t.Fatal(m)
+	}
+
+	// The kill switch: nothing goes on, for a session or a handshake.
+	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 2, map[string]any{"stopAll": map[string]any{"on": true, "by": map[string]any{"user": "priya"}, "at": now()},
+		"requires": []string{wire.CapHostPolicy1, wire.CapHostOrgRoutes1}}))
+	n = p.count()
+	if got := send("POST", "acme", token, "/v1/messages", `{}`); got != 403 {
+		t.Fatalf("the kill switch: %d", got)
+	}
+	if got := send("POST", "acme-vertex", vertex, "/projects/acme-proj/locations/us-east5/publishers/anthropic/models/claude-sonnet-4-5:rawPredict", `{}`); got != 403 {
+		t.Fatalf("the kill switch, a handshake: %d", got)
+	}
+	if p.count() != n {
+		t.Fatal("a request was sent on with the kill switch on")
+	}
+	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 3, map[string]any{"requires": []string{wire.CapHostPolicy1, wire.CapHostOrgRoutes1}}))
+	if got := send("POST", "acme", token, "/v1/messages", `{}`); got != 200 {
+		t.Fatalf("the kill switch off: %d", got)
+	}
+
+	// The session's runtime ended: its stand-in goes, and its next runtime gets a new one.
+	d.dropStandIn(a.ID)
+	if got := send("POST", "acme", token, "/v1/messages", `{}`); got != 401 {
+		t.Fatalf("an ended runtime's stand-in: %d", got)
+	}
+	again := r.standInFor(standIn{route: "acme", runtime: "claude", account: "org:acme", agent: a.ID})
+	if again == token || send("POST", "acme", again, "/v1/messages", `{}`) != 200 {
+		t.Fatal("the next runtime's stand-in")
+	}
+	// The session gone: refused, and its stand-in with it.
+	gone := r.standInFor(standIn{route: "acme", runtime: "claude", account: "org:acme", agent: "no-such-agent"})
+	if got := send("POST", "acme", gone, "/v1/messages", `{}`); got != 401 {
+		t.Fatalf("a gone session: %d", got)
+	}
+	r.mu.Lock()
+	_, kept := r.standIns[gone]
+	r.mu.Unlock()
+	if kept {
+		t.Fatal("a gone session's stand-in was kept")
+	}
+}
+
 // tlsTrusting is a TLS config that trusts one CA.
 func tlsTrusting(t *testing.T, caPEM []byte) *tls.Config {
 	t.Helper()
@@ -1037,8 +1157,8 @@ func TestTheRelayCountsTheProvidersTokens(t *testing.T) {
 	deliver(t, d, testRoute(t, public, "acme", 1, wire.OrgRouteKindBaseURL, wire.OrgRouteVendorAnthropic, p.URL, map[string]string{"apiKey": "k"}, "claude"))
 	r, _ := d.relay()
 	client := relayClient(t, d)
-	for i, k := range cases {
-		agent := wire.UUID(strconv.Itoa(i))
+	for _, k := range cases {
+		agent := seeded(t, d, t.TempDir(), nil).ID
 		token := r.standInFor(standIn{route: "acme", runtime: "claude", account: "org:acme", agent: agent})
 		p.mu.Lock()
 		p.answer = k.answer

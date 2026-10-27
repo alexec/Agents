@@ -384,6 +384,9 @@ func (d *Daemon) releaseRuntime(id wire.UUID) {
 	l.mu.Lock()
 	s := l.session
 	l.session = nil
+	if s != nil {
+		d.dropStandIn(id)
+	}
 	l.mu.Unlock()
 	if s != nil {
 		s.Stop()
