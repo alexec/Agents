@@ -78,9 +78,6 @@ public enum ControlAgreement {
         throw CocoaError(.fileReadCorruptFile, userInfo: [NSFilePathErrorKey: file.path])
     }
 
-    /// A key file a write never finished: shorter than a key, and not being written now.
-    static func isTorn(_ file: URL, now: Date) -> Bool { tornFile(file, now: now) != nil }
-
     private static func tornFile(_ file: URL, now: Date) -> stat? {
         var found = stat()
         guard lstat(file.path, &found) == 0, found.st_size < 32 else { return nil }
