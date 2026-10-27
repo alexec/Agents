@@ -468,15 +468,15 @@ struct StatusIcon: View {
 
     var body: some View {
         Group {
-            if let symbol = shape.symbol {
+            if shape == .waiting {
+                // The beacon breathes in the accent, as the sidebar's (#2456, #2657).
+                WaitingBeacon(size: 18)
+            } else if let symbol = shape.symbol {
                 Image(systemName: symbol)
                     // Decorative: a glyph filling a 20-point well, not text (FR-015).
                     .glyph(size: 16)
                     .foregroundStyle((shape.wantsAPerson ? StateTint.attention : .none)
                         .style(or: .secondary))
-            } else if shape == .waiting {
-                // In the accent, as the sidebar's (#2456).
-                BreathingDot(size: 18)
             } else {
                 WorkingRing(size: 18, doing: tool != nil)
             }

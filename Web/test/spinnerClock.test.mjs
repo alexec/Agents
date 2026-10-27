@@ -44,14 +44,13 @@ test("six keyframes, one per dot and activity, that start on the line", () => {
   assert.match(css, /@keyframes ring-think-0\{0%\{transform:translate\(-141\.67%,0%\);opacity:0\.475\}/);
 });
 
-test("the waiting dot breathes (#2456): dim at the start, full halfway, dim again, the ring's dot", () => {
+test("the waiting beacon breathes (#2456, #2657): dim at the start, full halfway, dim again", () => {
   near(clock.breathOpacity(0), 0.3, "start");
   near(clock.breathOpacity(2), 1, "halfway");
   near(clock.breathOpacity(4), 0.3, "round");
   near(clock.breathOpacity(1), 0.65, "a quarter in");
   near(clock.breathOpacity(4, 8), 1, "a longer breath, stretched");
   assert.ok(clock.breathOpacity(0.1) - 0.3 < 0.01, "no corner at the bottom");
-  assert.equal(clock.breathDotDiameter, clock.ringDotDiameter);
   assert.equal(clock.breathPeriod, 4);
   assert.equal(clock.breathPeriodKey, "waitingMarkPeriod");
 });
@@ -70,7 +69,7 @@ test("one breathe keyframe, dim at both ends, and the period twice as long under
   assert.match(css, /@keyframes breathe\{0%\{opacity:0\.3\}/);
   assert.match(css, /50%\{opacity:1\}/);
   assert.match(css, /100%\{opacity:0\.3\}\}/);
-  assert.match(css, /\.breathing-dot\{--breath-period:4s\}/);
-  assert.match(css, /prefers-reduced-motion: reduce\)\{\.breathing-dot\{--breath-period:8s\}\}/);
+  assert.match(css, /\.waiting-beacon\{--breath-period:4s\}/);
+  assert.match(css, /prefers-reduced-motion: reduce\)\{\.waiting-beacon\{--breath-period:8s\}\}/);
   assert.match(clock.breathStyles(2.5, 4), /--breath-period:2\.5s\}/);
 });

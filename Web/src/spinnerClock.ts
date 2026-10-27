@@ -7,9 +7,9 @@
 // tool. Its keyframes come from the same maths as SpinnerClock.ringDots, made once at start with
 // the tilt from `workingMarkTilt` in localStorage, and drawn by the browser from then on.
 //
-// The waiting mark (#2456) is one dot that breathes: a slow fade between dim and full, as
+// The waiting mark (#2456, #2657) is the beacon, breathing: a slow fade between dim and full, as
 // SpinnerClock.breathOpacity, once in 4 s unless `waitingMarkPeriod` in localStorage says otherwise.
-// Its keyframes and period are made at start the same way, and every dot on the page breathes in step.
+// Its keyframes and period are made at start the same way, and every beacon on the page breathes in step.
 
 /** One turn of the ring, one pivot, and the cycle that holds both (SpinnerClock). */
 export const ringSpinPeriod = 1.8;
@@ -23,14 +23,12 @@ export const ringDotDiameter = 0.24;
 export const ringRadius = 0.34 / (Math.sqrt(3) / 2);
 const restingOpacity = 0.3;
 
-/** One breath of the waiting dot, in seconds (SpinnerClock.breathPeriod), unless localStorage says. */
+/** One breath of the waiting beacon, in seconds (SpinnerClock.breathPeriod), unless localStorage says. */
 export const breathPeriod = 4;
 export const breathPeriodKey = "waitingMarkPeriod";
 /** The shortest and longest breath the key can ask for, in seconds. */
 export const breathPeriodRange: [number, number] = [1, 30];
-/** The dot's diameter, in fractions of the well: the ring's dot. */
-export const breathDotDiameter = ringDotDiameter;
-/** How dim the dot is at the bottom of a breath: the ring's resting opacity. */
+/** How dim the beacon is at the bottom of a breath: the ring's resting opacity. */
 export const breathDimOpacity = restingOpacity;
 /** Under Reduce Motion the marks keep going, this many times slower (SpinnerClock.reducedMotionSlowing). */
 export const reducedMotionSlowing = 2;
@@ -83,22 +81,22 @@ export function readBreathPeriod(stored: string | null): number {
   return Number.isFinite(seconds) ? Math.min(Math.max(seconds, breathPeriodRange[0]), breathPeriodRange[1]) : breathPeriod;
 }
 
-/** How bright the waiting dot is `time` seconds into a breath of `period`: dim, full halfway, dim. */
+/** How bright the waiting beacon is `time` seconds into a breath of `period`: dim, full halfway, dim. */
 export function breathOpacity(time: number, period = breathPeriod): number {
   const depth = (1 - Math.cos((2 * Math.PI * time) / period)) / 2;
   return breathDimOpacity + (1 - breathDimOpacity) * depth;
 }
 
 /**
- * `breathe`, the waiting dot's keyframes through one breath, and `.breathing-dot`'s period: the one
+ * `breathe`, the waiting beacon's keyframes through one breath, and `.waiting-beacon`'s period: the one
  * asked for, and `reducedMotionSlowing` times longer under Reduce Motion.
  */
 export function breathStyles(period: number, samples = 48): string {
   const steps = Array.from({ length: samples + 1 }, (_, n) =>
     `${+((n / samples) * 100).toFixed(3)}%{opacity:${+breathOpacity((n / samples) * period, period).toFixed(3)}}`);
   return `@keyframes breathe{${steps.join("")}}\n` +
-    `.breathing-dot{--breath-period:${+period.toFixed(3)}s}\n` +
-    `@media (prefers-reduced-motion: reduce){.breathing-dot{--breath-period:${+(period * reducedMotionSlowing).toFixed(3)}s}}`;
+    `.waiting-beacon{--breath-period:${+period.toFixed(3)}s}\n` +
+    `@media (prefers-reduced-motion: reduce){.waiting-beacon{--breath-period:${+(period * reducedMotionSlowing).toFixed(3)}s}}`;
 }
 
 const clocked = /^(spin|ring-(think|do)-[0-2]|breathe)$/;

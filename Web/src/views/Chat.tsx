@@ -28,6 +28,7 @@ import { Prompt } from "./Prompt";
 import { PromptMenus } from "./PromptMenus";
 import { ContextMeter, CostLimitBanner, SandboxCapsule } from "./PromptStatus";
 import { branchFromPrompt, RenameInput, SessionButtons, SessionMenu } from "./SessionMenu";
+import { Beacon } from "./SessionRow";
 import { drawable } from "../model/options";
 import { quietLine } from "../model/activity";
 import { sentPrompts } from "../model/promptHistory";
@@ -832,7 +833,7 @@ function WaitCard({ agent, title, disabled, stop }: { agent: Agent; title: (id: 
       <div class="card wait-card">
         {lineResource(agent) !== undefined ? <p class="strong">{line}</p> : <>
           <div class="wait-card-heading">
-            <span class="wait-card-title"><span class="wait-card-broadcast" aria-hidden="true">◉</span>Waiting for event</span>
+            <span class="wait-card-title"><span class="wait-card-broadcast" aria-hidden="true"><Beacon /></span>Waiting for event</span>
             <span class="wait-card-time">{total === undefined ? `${elapsed} min` : `${elapsed} / ${total} min`}</span>
           </div>
           <div class="wait-card-events">

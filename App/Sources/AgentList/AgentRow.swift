@@ -444,7 +444,7 @@ private struct FoldCount: View {
 /// A session's mark in the sidebar (Alex, #495): what it wants, in four shapes — an
 /// orange hand when it needs the person, a spinner in the accent while it works (#1558),
 /// a tick once done, read or not (#1323, #2363); a numbered list while queued, a breathing
-/// dot while it waits (#2456) and a pause mark once stopped (#630).
+/// beacon while it waits (#2456, #2657) and a pause mark once stopped (#630).
 /// An orange archive box when it asks to be archived, as it is listed under Needs You
 /// (#817). Archived keeps its `StatusIcon`.
 private struct SessionMark: View {
@@ -491,8 +491,8 @@ private struct SessionMark: View {
             case .queued:
                 Image(systemName: "list.number").sidebarMark(Paper.accent)
             case .waiting:
-                // One dot that breathes, in step with every other (#2456): asleep, but alive.
-                BreathingDot(size: 12 * scale, color: onAccent ? Paper.ground : Paper.accent)
+                // The waiting card's beacon, breathing in step with every other (#2456, #2657).
+                WaitingBeacon(size: 12 * scale, color: onAccent ? Paper.ground : Paper.accent)
             case .paused:
                 Image(systemName: "pause.circle").sidebarMark(Paper.accent)
             case .done:
@@ -556,16 +556,17 @@ struct StatusIcon: View {
 
     var body: some View {
         Group {
-            if let symbol = shape.symbol {
+            if shape == .waiting {
+                // The beacon breathes in the accent, where the unread dot before the title is grey,
+                // round and still (#2456, #2657).
+                WaitingBeacon(size: 12 * scale, color: onAccent ? Paper.ground : Paper.accent)
+            } else if let symbol = shape.symbol {
                 Image(systemName: symbol)
                     // Decorative: a glyph filling an 18-point well, not text (FR-015).
                     .glyph(size: 15)
                     .sidebarMark((StatusShape.isTinted(shape, isWaitingForAllowance: isWaitingForAllowance)
                                   ? StateTint.attention : .none)
                         .style(or: .secondary))
-            } else if shape == .waiting {
-                // In the accent, where the unread dot before the title is grey and still (#2456).
-                BreathingDot(size: 12 * scale, color: onAccent ? Paper.ground : Paper.accent)
             } else {
                 WorkingRing(size: 12 * scale, doing: tool != nil)
             }

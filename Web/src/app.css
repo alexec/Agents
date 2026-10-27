@@ -296,7 +296,7 @@ input.rename {
 .status.needsYou { background: currentColor; }
 .status.needsYou .glyph { color: var(--paper-ground); }
 .status.needsYou.tinted { color: var(--tint-attention); opacity: 1; }
-/* Waiting (#2456): no ring round the breathing dot, and the dot in the accent at full strength, as the
+/* Waiting (#2456, #2657): no ring round the breathing beacon, and the beacon in the accent at full strength, as the
    working ring has no ring round it; the breath does the dimming. */
 .status.waiting { border: none; opacity: 1; color: var(--accent); }
 .status.stopped { font-size: 0.4375rem; }
@@ -492,7 +492,9 @@ button.link.reading:hover { text-decoration: underline; }
 .wait-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .wait-card-title { display: flex; align-items: center; gap: 7px; min-width: 0; }
 .wait-card-title { font-weight: 600; }
-.wait-card-broadcast { color: var(--accent); }
+/* The waiting mark's beacon (#2657), still, at the title's size, in the same colour. */
+.wait-card-broadcast { color: var(--accent); display: inline-flex; }
+.wait-card-broadcast .beacon { width: 1.15em; height: 1.15em; }
 .wait-card-time { color: var(--paper-ink); opacity: .68; font-size: .9em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .wait-card-events { display: flex; flex-direction: column; gap: 8px; }
 .wait-card-event { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 5px; }
@@ -607,15 +609,16 @@ button.link.reading:hover { text-decoration: underline; }
 .working-ring.doing i:nth-child(2) { animation-name: ring-do-1; }
 .working-ring.doing i:nth-child(3) { animation-name: ring-do-2; }
 @media (prefers-reduced-motion: reduce) { .working-ring { --ring-period: 7.2s; } }
-/* A waiting session's mark on all three clients (#2456), as BreathingDot: one dot, the ring's dot, that
-   breathes between 0.3 and full once in 4 s. The keyframes (breathe) and --breath-period come from
-   spinnerClock.ts, which keeps every dot on the page in step and reads `waitingMarkPeriod` from
+/* The beacon (#2657), as `dot.radiowaves.left.and.right`: a filled dot, and arcs stroked in the colour around it. */
+.beacon { display: block; width: 100%; height: 100%; overflow: visible; }
+.beacon circle { fill: currentColor; }
+.beacon path { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+/* A waiting session's mark on all three clients (#2456, #2657), as WaitingBeacon: the waiting card's beacon,
+   breathing between 0.3 and full once in 4 s. The keyframes (breathe) and --breath-period come from
+   spinnerClock.ts, which keeps every beacon on the page in step and reads `waitingMarkPeriod` from
    localStorage; Reduce Motion doubles the period there. In the colour around it. */
-.breathing-dot { --well: 12px; --breath-period: 4s; position: relative; display: inline-block; width: var(--well);
-  height: var(--well); vertical-align: middle; }
-.breathing-dot i { position: absolute; left: 50%; top: 50%; width: calc(var(--well) * 0.24);
-  height: calc(var(--well) * 0.24); margin: calc(var(--well) * -0.12); border-radius: 50%; background: currentColor;
-  opacity: 0.3; animation: breathe var(--breath-period) linear infinite; }
+.waiting-beacon { --well: 12px; --breath-period: 4s; display: inline-block; width: var(--well);
+  height: var(--well); vertical-align: middle; opacity: 0.3; animation: breathe var(--breath-period) linear infinite; }
 /* At the chat's foot only: .working is also the sidebar mark's and the status mark's class. */
 p.working .working-ring { --well: 16px; opacity: 0.6; }
 /* In front of a live call's words, the line's text height (#2338): the words truncate, not the mark. */

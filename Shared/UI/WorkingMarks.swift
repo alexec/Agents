@@ -46,25 +46,27 @@ struct WorkingRing: View {
     }()
 }
 
-/// A waiting session's mark (#2456), in the sidebar rows, the page rows and the phone's agent
-/// cards: one dot, the ring's dot, that breathes, a slow fade between dim and full like a
-/// sleep light. Asleep, but alive. The app will carry the session on by itself (an event
-/// wait, a lease, an allowance, a queued place), so the mark asks for no attention: it is
-/// small, slow and in the accent, where the grey unread dot before a title is still, larger
-/// and grey. Motion, not a fourth symbol after the hourglass, `moon.zzz` and `zzz` (#765).
+/// A waiting session's mark (#2456, #2657), in the sidebar rows, the page rows and the phone's
+/// agent cards: the waiting card's beacon (`StatusShape.waitingSymbol`), one icon for waiting
+/// on the card and on the mark, that breathes, a slow fade between dim and full like a sleep
+/// light. Asleep, but alive. The app will carry the session on by itself (an event wait, a
+/// lease, an allowance, a queued place), so the mark asks for no attention: it is small, slow
+/// and in the accent, where the grey unread dot before a title is still and round. Before the
+/// beacon, a breathing dot (#2456); before that the hourglass, `moon.zzz` and `zzz` (#765).
 ///
-/// As the ring, it is one Core Animation layer whose breath starts where `SpinnerClock`
-/// says it is now, so every waiting dot on a screen breathes in step, and the render server
-/// draws it. Under Reduce Motion it breathes slower; a still dot would read as a bullet.
-/// The web page draws the same in `SessionRow.tsx` and `spinnerClock.ts`.
-struct BreathingDot: View {
+/// As the ring, it is one Core Animation layer, masked to the symbol, whose breath starts
+/// where `SpinnerClock` says it is now, so every waiting beacon on a screen breathes in step,
+/// and the render server draws it. Under Reduce Motion it breathes slower; a still beacon
+/// would pull the eye as the needs-you mark does. The web page draws the same in
+/// `SessionRow.tsx` and `spinnerClock.ts`.
+struct WaitingBeacon: View {
     /// The well's width and height, in points.
     var size: CGFloat
     /// The accent, as the sidebar's marks; the ground on a row filled with the accent (#2382).
     var color: Color = Paper.accent
 
     var body: some View {
-        BreathingMark(color: color)
+        BeaconMark(color: color)
             .frame(width: size, height: size)
             // One element and no words of its own: the caller says what it means.
             .accessibilityElement()
@@ -91,11 +93,11 @@ private struct ClockedMark {
     }
 }
 
-/// The dot's layer, its colour resolved as the ring's.
-private struct BreathingMark {
+/// The beacon's layer, its colour resolved as the ring's.
+private struct BeaconMark {
     var color: Color
 
-    @MainActor func update(_ view: BreathingDotView, in environment: EnvironmentValues) {
+    @MainActor func update(_ view: BeaconView, in environment: EnvironmentValues) {
         view.color = color.resolve(in: environment).cgColor
         view.reduceMotion = environment.accessibilityReduceMotion
     }
@@ -110,10 +112,10 @@ extension ClockedMark: NSViewRepresentable {
     }
 }
 
-extension BreathingMark: NSViewRepresentable {
-    func makeNSView(context: Context) -> BreathingDotView { BreathingDotView() }
+extension BeaconMark: NSViewRepresentable {
+    func makeNSView(context: Context) -> BeaconView { BeaconView() }
 
-    func updateNSView(_ view: BreathingDotView, context: Context) {
+    func updateNSView(_ view: BeaconView, context: Context) {
         update(view, in: context.environment)
     }
 }
@@ -126,10 +128,10 @@ extension ClockedMark: UIViewRepresentable {
     }
 }
 
-extension BreathingMark: UIViewRepresentable {
-    func makeUIView(context: Context) -> BreathingDotView { BreathingDotView() }
+extension BeaconMark: UIViewRepresentable {
+    func makeUIView(context: Context) -> BeaconView { BeaconView() }
 
-    func updateUIView(_ view: BreathingDotView, context: Context) {
+    func updateUIView(_ view: BeaconView, context: Context) {
         update(view, in: context.environment)
     }
 }
@@ -143,7 +145,7 @@ private typealias PlatformView = UIView
 
 /// A mark of dots that Core Animation moves on a cycle kept in step with the clock: the
 /// layers, their colour and scale, and when to lay them out and start the cycle again
-/// (a window, a size, Reduce Motion). The ring and the breathing dot each say where their
+/// (a window, a size, Reduce Motion). The ring and the waiting beacon each say where their
 /// dots go and what their cycle is.
 private class ClockedLayersView: PlatformView {
     /// The dots, left to right at the start of the cycle.
@@ -222,7 +224,11 @@ private class ClockedLayersView: PlatformView {
 
     private func setScale(_ scale: CGFloat) {
         for dot in dots { dot.contentsScale = scale }
+        scaleChanged(scale)
     }
+
+    /// The window's scale changed: a mark drawn from an image draws it again.
+    func scaleChanged(_ scale: CGFloat) {}
 
     /// The well the keyframes were made for: a new size makes them again.
     private var placed = CGRect.null
@@ -317,22 +323,67 @@ private final class ClockedMarkView: ClockedLayersView {
     }
 }
 
-/// The one layer of a breathing dot (#2456), and its breath kept in step with the clock.
-private final class BreathingDotView: ClockedLayersView {
-    convenience init() { self.init(dots: 1) }
+/// The one layer of the waiting beacon (#2456, #2657), filled with the colour and masked to
+/// the symbol, and its breath kept in step with the clock. The mask is drawn once per size
+/// and scale; the colour and the breath never draw it again.
+private final class BeaconView: ClockedLayersView {
+    private let symbolMask = CALayer()
+    private var scale: CGFloat = 2
 
-    /// The dot at the well's centre, dim: the start of a breath.
+    convenience init() {
+        self.init(dots: 1)
+        symbolMask.contentsGravity = .resizeAspect
+        for dot in dots { dot.mask = symbolMask }
+    }
+
+    /// The beacon filling the well, dim: the start of a breath.
     override func place() {
         for dot in dots {
-            size(dot, fraction: SpinnerClock.breathDotDiameter)
+            dot.bounds = CGRect(x: 0, y: 0, width: side, height: side)
             dot.position = CGPoint(x: bounds.midX, y: bounds.midY)
             dot.opacity = Float(SpinnerClock.breathOpacity(at: 0))
         }
+        drawMask()
+    }
+
+    override func scaleChanged(_ scale: CGFloat) {
+        self.scale = scale
+        withoutActions { drawMask() }
+    }
+
+    /// The symbol, at the well's width, as the mask's image: only its alpha counts.
+    private func drawMask() {
+        guard side > 0 else { return }
+        symbolMask.frame = CGRect(x: 0, y: 0, width: side, height: side)
+        symbolMask.contentsScale = scale
+        symbolMask.contents = Self.symbolImage(side: side, scale: scale)
+    }
+
+    private static func symbolImage(side: CGFloat, scale: CGFloat) -> CGImage? {
+        #if os(macOS)
+        let config = NSImage.SymbolConfiguration(pointSize: side, weight: .medium)
+        guard let symbol = NSImage(systemSymbolName: StatusShape.waitingSymbol, accessibilityDescription: nil)?
+            .withSymbolConfiguration(config) else { return nil }
+        let fit = NSImage(size: symbol.size, flipped: false) { frame in
+            symbol.draw(in: frame)
+            return true
+        }
+        var pixels = CGRect(x: 0, y: 0, width: symbol.size.width * scale, height: symbol.size.height * scale)
+        return fit.cgImage(forProposedRect: &pixels, context: nil, hints: nil)
+        #else
+        let config = UIImage.SymbolConfiguration(pointSize: side, weight: .medium)
+        guard let symbol = UIImage(systemName: StatusShape.waitingSymbol, withConfiguration: config) else { return nil }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = scale
+        return UIGraphicsImageRenderer(size: symbol.size, format: format).image { _ in
+            symbol.draw(at: .zero)
+        }.cgImage
+        #endif
     }
 
     override func startCycle() {
         guard side > 0 else { return }
-        let breath = BreathingDot.period
+        let breath = WaitingBeacon.period
         let period = breath * (reduceMotion ? SpinnerClock.reducedMotionSlowing : 1)
         let fade = CAKeyframeAnimation(keyPath: "opacity")
         fade.values = (0...Self.samples).map {

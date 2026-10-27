@@ -60,7 +60,7 @@ struct SpinnerClockTests {
         #expect(abs(pivots - pivots.rounded()) < 1e-9)
     }
 
-    @Test("The waiting dot breathes: dim at the start, full halfway, back round, in step (#2456)")
+    @Test("The waiting beacon breathes: dim at the start, full halfway, back round, in step (#2456)")
     func breath() {
         let dim = SpinnerClock.breathDimOpacity
         #expect(abs(SpinnerClock.breathOpacity(at: 0) - dim) < 1e-9)
@@ -77,14 +77,13 @@ struct SpinnerClockTests {
         }
         // A longer breath from the key keeps the same shape, stretched.
         #expect(abs(SpinnerClock.breathOpacity(at: 4, period: 8) - 1) < 1e-9)
-        // Every dot reads the one clock, so two that never met agree.
+        // Every beacon reads the one clock, so two that never met agree.
         let date = SpinnerClock.epoch.addingTimeInterval(1234.5)
         let first = SpinnerClock.fraction(at: date, period: SpinnerClock.breathPeriod)
         let second = SpinnerClock.fraction(at: Date(timeIntervalSince1970: date.timeIntervalSince1970),
                                            period: SpinnerClock.breathPeriod)
         #expect(first == second)
-        // The dot is the ring's dot, and as dim as its back.
-        #expect(SpinnerClock.breathDotDiameter == SpinnerClock.ringDotDiameter)
+        // As dim as the ring's back.
         #expect(dim == SpinnerClock.ringRestingOpacity)
     }
 

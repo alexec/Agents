@@ -68,8 +68,8 @@ struct StatusShapeTests {
         let shape = StatusShape(state: .finished, outcome: .waiting, isWaiting: true, isComingBack: false)
         #expect(shape == .waiting)
         #expect(!shape.wantsAPerson)
-        // Drawn as the breathing dot, not a symbol (#2456).
-        #expect(shape.symbol == nil)
+        // Drawn as the waiting card's beacon, which breathes (#2456, #2657).
+        #expect(shape.symbol == "dot.radiowaves.left.and.right")
         #expect(StatusShape(state: .finished, outcome: .done, isWaiting: true, isComingBack: false) == .waiting)
         #expect(StatusShape(state: .finished, outcome: .needsAnswer, isWaiting: true, isComingBack: false) == .needsYou)
         #expect(StatusShape(state: .stopped, outcome: .waiting, isWaiting: true, isComingBack: false,
@@ -84,9 +84,9 @@ struct StatusShapeTests {
         })
         #expect(shapes.isSubset(of: [.working, .needsYou, .done, .stopped]))
         #expect(StatusShape(state: .queued, outcome: nil, isWaiting: false, isComingBack: false) == .waiting)
-        // Two are motion (the ring, the breathing dot); the other three are symbols, each its own.
-        #expect(Set([StatusShape.needsYou, .done, .stopped].compactMap(\.symbol)).count == 3)
-        #expect(StatusShape.waiting.symbol == nil)
+        // One is motion (the ring); the other four are symbols, each its own.
+        #expect(Set([StatusShape.needsYou, .waiting, .done, .stopped].compactMap(\.symbol)).count == 4)
+        #expect(StatusShape.waiting.symbol == StatusShape.waitingSymbol)
     }
 
     @Test("A Needs You row says its question or why it stopped")
