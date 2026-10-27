@@ -18,7 +18,7 @@ import { signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import { ProjectAgentConfigModal } from "./AgentConfigEditor";
 import { ProjectModal } from "./ProjectPicker";
-import { actDoing, type Store } from "../model/store";
+import { actDoing, recentArchivedShown, type Store } from "../model/store";
 import { byStart, folderKey, folderPath as agentFolderPath, showsUnread } from "../model/groups";
 import { folds } from "../model/folds";
 import { smartGroupsOn } from "../model/smartGroups";
@@ -519,12 +519,16 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
   useEffect(() => {
     if (!unfolded || !online) return;
     store.holdWorkflows(host.id, folder);
-    void store.loadArchived(host.id, folder);
-    return () => {
-      store.releaseWorkflows(host.id, folder);
-      store.unloadArchived(host.id, folder);
-    };
+    return () => store.releaseWorkflows(host.id, folder);
   }, [unfolded, online, host.id, folder]);
+  // Its Recently archived sessions, the few it shows, while it is open by hand (#2731): not because
+  // a search unfolded it, since the search brings its own matches.
+  const opened = isAlone || folds.isOpen(host.id, folder);
+  useEffect(() => {
+    if (!opened || !online) return;
+    void store.loadArchived(host.id, folder, recentArchivedShown);
+    return () => store.unloadArchived(host.id, folder, recentArchivedShown);
+  }, [opened, online, host.id, folder]);
 
   const view = store.folderView(host.id, folder);
   // The matcher is made once per fold, not per row.
@@ -539,7 +543,7 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
   const keptAgent = keptID ? live.find((a) => a.id === keptID) : undefined;
   const kept = keptAgent && keepsInUnread(keptAgent, pins, on) ? keptAgent.id : undefined;
   const sessions = !unfolded ? [] : folderSessions(live, pins, parsed, kept, on);
-  const recentArchived = !parsed ? view.archived.slice(0, 3) : [];
+  const recentArchived = !parsed ? view.archived.slice(0, recentArchivedShown) : [];
   const archived = !unfolded || !parsed ? [] : view.archived.filter((a) => queryMatches(parsed, a));
   const allWorkflows = (unfolded ? store.folderWorkflows(host.id, folder) : [])
     .filter(workflowMatches(store, host.id, parsed))

@@ -1271,14 +1271,14 @@ final class AppModel {
     /// rest are on the phone's archive and in Events.
     static let archivedShown = SidebarFolderFold.archivedShown
 
-    /// A folder's newest archived sessions, for its Archived fold when it opens (#164):
-    /// the window holds the live agents, and a page of archived ones per open fold.
-    /// Answers whether the host did, so the page can tell an empty archive from a silent
-    /// host (#664).
+    /// A folder's newest `limit` archived sessions, for its Archived page when it opens
+    /// (#164), or the few its Recently archived sessions show (#2731): the window holds the
+    /// live agents, and a page of archived ones per open folder. Answers whether the host
+    /// did, so the page can tell an empty archive from a silent host (#664).
     @discardableResult
-    func loadArchived(in key: FolderKey) async -> Bool {
+    func loadArchived(in key: FolderKey, limit: Int = archivedShown) async -> Bool {
         let request = DaemonAPI.ListRequest(archivedOnly: true, folder: key.folder,
-                                            limit: Self.archivedShown, lean: true)
+                                            limit: limit, lean: true)
         guard let listed = try? await client(for: key.host).call(DaemonAPI.Method.agentsList, request,
                                                                   returning: [Agent].self) else { return false }
         work.takeListed(listed.map { var agent = $0; agent.host = key.host; return agent })

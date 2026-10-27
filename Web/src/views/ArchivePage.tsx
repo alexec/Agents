@@ -4,14 +4,11 @@
 // sidebar is never more than two levels deep. The sidebar's own rows, each opening its chat or
 // page, with their menus: Unarchive among them.
 import { useEffect } from "preact/hooks";
-import type { Store } from "../model/store";
+import { archivedPage, type Store } from "../model/store";
 import { route, go } from "../route";
 import { BackToList } from "./BackToList";
 import { SidebarSession } from "./Sidebar";
 import { WorkflowRow } from "./WorkflowRow";
-
-/** A page of the newest, as the fold held (#165): the host is asked for no more. */
-const archivedShown = 50;
 
 export function ArchivePage({ store, host, folder, folderName, down }: {
   store: Store; host: string; folder: string; folderName: string; down: boolean;
@@ -20,17 +17,17 @@ export function ArchivePage({ store, host, folder, folderName, down }: {
   // Held while the page is open, and let go when it closes, as the fold's were.
   useEffect(() => {
     if (!online) return;
-    void store.loadArchived(host, folder);
+    void store.loadArchived(host, folder, archivedPage);
     store.holdWorkflows(host, folder);
     return () => {
       // A session opened from here is watched before the page lets the rest go, so it stays.
       const next = route.peek();
       if (next.host === host && next.session) store.watch(host, next.session);
-      store.unloadArchived(host, folder);
+      store.unloadArchived(host, folder, archivedPage);
       store.releaseWorkflows(host, folder);
     };
   }, [host, folder, online]);
-  const sessions = store.folderView(host, folder).archived.slice(0, archivedShown);
+  const sessions = store.folderView(host, folder).archived.slice(0, archivedPage);
   const workflows = store.folderWorkflows(host, folder).filter((w) => w.isArchived)
     .sort((a, b) => a.workflow.name.localeCompare(b.workflow.name));
   const counted = store.folders.value[host]?.find((p) => p.folder.folder === folder)?.counts.archived ?? 0;
@@ -44,8 +41,8 @@ export function ArchivePage({ store, host, folder, folderName, down }: {
             <SidebarSession key={agent.id} store={store} host={host} folder={folder} agent={agent} chosen={false}
               down={down || !online} />
           ))}
-          {counted > sessions.length && sessions.length === archivedShown && (
-            <p class="hint">The newest {archivedShown} of {counted}. Search to find an older one.</p>
+          {counted > sessions.length && sessions.length === archivedPage && (
+            <p class="hint">The newest {archivedPage} of {counted}. Search to find an older one.</p>
           )}
           {workflows.length > 0 && <h2 class="subhead">Workflows</h2>}
           {workflows.map((summary) => (

@@ -124,8 +124,10 @@ const filesNamedAtMost = 64;
 export const quietSettle = 250;
 const filesSettle = quietSettle;
 
-/** How many archived sessions an open Archived fold lists: as many as it shows (#170). */
+/** How many archived sessions the Archived page lists: as many as it shows (#170). */
 export const archivedPage = 50;
+/** How many an open folder's Recently archived sessions lists (#2587): no more is asked (#2731). */
+export const recentArchivedShown = 3;
 
 /** The most a search brings back from each host, a page at a time (#165, #193). */
 export const searchShown = 200;
@@ -1600,7 +1602,7 @@ export class Store extends Work {
       this.disk.value = without(this.disk.value);
       this.storeNotes.value = without(this.storeNotes.value);
     });
-    for (const key of [...this.archivedLoaded]) if (key.startsWith(prefix)) this.archivedLoaded.delete(key);
+    for (const key of [...this.archivedHolds.keys()]) if (key.startsWith(prefix)) this.archivedHolds.delete(key);
     this.searched.delete(host);
     if (this.searchNext.value[host]) this.searchNext.value = without(this.searchNext.value);
   }
@@ -1630,10 +1632,10 @@ export class Store extends Work {
     // The Archived folds that were open are listed again rather than left empty by the live list,
     // and the workflows on screen asked again: they may have changed meanwhile.
     const prefix = `${host}|`;
-    const reopened = [...this.archivedLoaded].filter((key) => key.startsWith(prefix));
-    for (const key of reopened) {
-      this.archivedLoaded.delete(key);
-      void this.loadArchived(host, key.slice(prefix.length));
+    for (const [key, hold] of this.archivedHolds) {
+      if (!key.startsWith(prefix)) continue;
+      hold.listed = 0;
+      void this.listArchived(host, key.slice(prefix.length), key, Math.max(...hold.limits));
     }
     // Only what is on screen: a list left behind is not asked for again (#291).
     for (const key of this.workflowHolds.keys()) if (key.startsWith(prefix)) void this.loadWorkflows(host, key.slice(prefix.length));
@@ -1731,8 +1733,10 @@ export class Store extends Work {
     return listed;
   }
 
-  /** The folders whose archived sessions have been listed since this connection opened. */
-  private archivedLoaded = new Set<string>();
+  /** The folders whose archived sessions are on screen: the limit each view asked for, and the
+   *  most listed since this connection opened. The sidebar's fold and the Archive page each hold
+   *  one, so the one closing first does not take the other's rows (#2731). */
+  private archivedHolds = new Map<string, { limits: number[]; listed: number }>();
 
 
   /** The folder's workflow list is on screen. The first holder asks for it. */
@@ -1764,15 +1768,25 @@ export class Store extends Work {
     if (listed) this.writeWorkflows(key, listed);
   }
 
-  /** One folder's newest archived sessions, a page of them, asked for when its fold opens (#170). */
-  async loadArchived(host: string, folder: string): Promise<void> {
+  /** One folder's newest `limit` archived sessions, asked for when a view of them opens (#170): the
+   *  sidebar's few (#2731) or the Archive page's page. Only more than is held is asked again. Each
+   *  call is matched by one `unloadArchived` with the same limit. */
+  async loadArchived(host: string, folder: string, limit = archivedPage): Promise<void> {
     const key = `${host}|${folderKey(folder)}`;
-    if (this.archivedLoaded.has(key)) return;
-    this.archivedLoaded.add(key);
+    const hold = this.archivedHolds.get(key) ?? { limits: [], listed: 0 };
+    this.archivedHolds.set(key, hold);
+    hold.limits.push(limit);
+    if (limit <= hold.listed) return;
+    await this.listArchived(host, folder, key, limit);
+  }
+
+  private async listArchived(host: string, folder: string, key: string, limit: number): Promise<void> {
+    const hold = this.archivedHolds.get(key);
+    if (hold) hold.listed = Math.max(hold.listed, limit);
     const listed = await this.link.call("agents/list", {
-      includeArchived: true, archivedCommands: false, archivedOnly: true, folder: folder as never, lean: true, limit: archivedPage,
+      includeArchived: true, archivedCommands: false, archivedOnly: true, folder: folder as never, lean: true, limit,
     }, host).catch(() => null);
-    if (!listed || !this.archivedLoaded.has(key)) return;
+    if (!listed || this.archivedHolds.get(key) !== hold) return;
     // On show in the fold now: no longer the search's to let go.
     for (const agent of listed) this.searched.get(host)?.delete(agent.id);
     this.addAgents(listed, host);
@@ -1863,9 +1877,17 @@ export class Store extends Work {
     this.searched.clear();
   }
 
-  /** Its fold closed: the folder's archived sessions are let go, and listed again when it opens. */
-  unloadArchived(host: string, folder: string): void {
-    this.archivedLoaded.delete(`${host}|${folderKey(folder)}`);
+  /** A view of them closed: once the last has, the folder's archived sessions are let go, and listed
+   *  again when one opens. */
+  unloadArchived(host: string, folder: string, limit = archivedPage): void {
+    const key = `${host}|${folderKey(folder)}`;
+    const hold = this.archivedHolds.get(key);
+    if (hold) {
+      const at = hold.limits.indexOf(limit);
+      if (at >= 0) hold.limits.splice(at, 1);
+      if (hold.limits.length > 0) return;
+    }
+    this.archivedHolds.delete(key);
     this.dropArchived(host, folder);
   }
 
