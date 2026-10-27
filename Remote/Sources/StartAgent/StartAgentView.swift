@@ -185,24 +185,22 @@ struct StartAgentView: View {
             Section {
                 VStack(spacing: 4) {
                     if !usable.isEmpty {
-                        Menu {
-                            personaButton(nil, picked: picked == nil)
-                            ForEach(usable) { personaButton($0, picked: $0.id == picked?.id) }
-                        } label: {
-                            HStack(spacing: 5) {
-                                Text(picked?.name ?? Self.noPersona)
-                                    .appText(.reading).fontWeight(.semibold)
-                                    .foregroundStyle(picked == nil ? .secondary : .primary)
-                                    .lineLimit(1)
-                                Image(systemName: "chevron.up.chevron.down")
-                                    .imageScale(.small)
-                                    .foregroundStyle(.secondary)
-                                    .accessibilityHidden(true)
+                        ScrollView(.horizontal) {
+                            Picker("Persona", selection: Binding<String?>(
+                                get: { model.startPersona },
+                                set: { id in pickPersona(usable.first { $0.id == id }) }
+                            )) {
+                                Text(Self.noPersona).tag(String?.none)
+                                ForEach(usable) { persona in
+                                    Text(persona.name).tag(Optional(persona.id))
+                                }
                             }
-                            .contentShape(Rectangle())
+                            .pickerStyle(.segmented)
+                            .labelsHidden()
+                            .fixedSize(horizontal: true, vertical: false)
+                            .accessibilityLabel("Persona: \(picked?.name ?? Self.noPersona)")
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Persona: \(picked?.name ?? Self.noPersona)")
+                        .scrollIndicators(.hidden)
                     }
                     if let description = picked?.description {
                         Text(description)
@@ -224,18 +222,6 @@ struct StartAgentView: View {
     }
 
     static let noPersona = "No persona"
-
-    private func personaButton(_ persona: Persona?, picked: Bool) -> some View {
-        Button {
-            pickPersona(persona)
-        } label: {
-            if picked {
-                Label(persona?.name ?? Self.noPersona, systemImage: "checkmark")
-            } else {
-                Text(persona?.name ?? Self.noPersona)
-            }
-        }
-    }
 
     /// Every setting the persona names, and its labels beside any already there.
     private func pickPersona(_ persona: Persona?) {
