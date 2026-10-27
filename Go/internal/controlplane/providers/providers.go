@@ -566,6 +566,9 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 		if err := requireParams(params, &request, "MachineLink", "host", "provider", "workspace"); err != nil {
 			return nil, err
 		}
+		if !p.mayLink(caller.Person, string(request.Provider), request.Workspace) {
+			return nil, invalid("There is no such workspace.")
+		}
 		return p.link(request)
 	case MethodHostsUnlink:
 		var request hostRequest
@@ -1125,6 +1128,31 @@ func (p *Providers) connection(id string) (Provider, error) {
 }
 
 // MARK: Links
+
+// mayLink says the person may link the workspace to a machine: an admin, any; a member,
+// only one they are shown, on none of the machines or on one of their own.
+func (p *Providers) mayLink(person, provider, workspace string) bool {
+	if p.isAdmin(person) || p.hooks.OwnerOf == nil {
+		return true
+	}
+	for _, h := range p.records.Hosts() {
+		if link := LinkOf(&h); link != nil && link.Provider == provider && link.Workspace == workspace &&
+			p.hooks.OwnerOf(h.ID) != person {
+			return false
+		}
+	}
+	for _, s := range p.SummariesFor(person) {
+		if string(s.ID) != provider {
+			continue
+		}
+		for _, w := range s.Workspaces {
+			if w.ID == workspace {
+				return true
+			}
+		}
+	}
+	return false
+}
 
 func (p *Providers) link(request MachineLink) (any, error) {
 	host, provider := string(request.Host), string(request.Provider)

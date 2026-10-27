@@ -877,3 +877,42 @@ func TestASuspendedPersonsMachinesAreStoppedNotDeleted(t *testing.T) {
 	suspended = false
 	h.must(MethodHostsStart, map[string]string{"host": devbox})
 }
+
+// A member links only a workspace they are shown: one on none of the machines or on
+// their own, never one on another person's machine, nor one not listed.
+func TestAMemberCannotLinkAnotherPersonsWorkspace(t *testing.T) {
+	h := newHarness(t)
+	h.providers.hooks.IsAdmin = func(person string) bool { return person == "admin" }
+	h.providers.hooks.InGroup = func(string, string) bool { return true }
+	h.providers.hooks.OwnerOf = func(host string) string {
+		if host == devbox {
+			return "lee"
+		}
+		return "kim"
+	}
+	h.caller.Person = "admin"
+	id := h.add()
+	group := "crew"
+	if err := h.providers.SetGroup(id, &group); err != nil {
+		t.Fatal(err)
+	}
+	h.link(id, devbox, "scratch-1")
+
+	h.caller.Person = "kim"
+	for _, workspace := range []string{"scratch-1", "not-listed"} {
+		_, err := h.call(MethodHostsLink, map[string]string{"host": other, "provider": id, "workspace": workspace})
+		if f := failureOf(err); f == nil || f.Code != CodeInvalidParams {
+			t.Fatalf("%s: %v", workspace, err)
+		}
+	}
+	if link := LinkOf(h.records.Host(devbox)); link == nil || link.Workspace != "scratch-1" {
+		t.Fatalf("lee's link moved: %+v", link)
+	}
+	if LinkOf(h.records.Host(other)) != nil {
+		t.Fatal("kim's machine was linked")
+	}
+	h.link(id, other, "agents-devbox")
+	if link := LinkOf(h.records.Host(other)); link == nil || link.Workspace != "agents-devbox" {
+		t.Fatalf("%+v", link)
+	}
+}
