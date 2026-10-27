@@ -8540,6 +8540,14 @@
             "$ref": "#/definitions/Approval"
           }
         },
+        "project": {
+          "type": "string",
+          "description": "The project id that .agents/folder.json names (#2317). Absent when it names none or one that is not valid."
+        },
+        "projectProblem": {
+          "type": "string",
+          "description": "Why the folder is in no project (#2317): .agents/folder.json is not an object, names an id that is not valid, or .agents is a link."
+        },
         "helperLimitsSetBy": {
           "$ref": "#/definitions/PolicySetBy",
           "description": "Set when the organisation's policy caps this folder's helper limits (#998, #64): the lower number is used."
@@ -9328,6 +9336,27 @@
       ],
       "additionalProperties": false
     },
+      "JoinedFolder": {
+        "type": "object",
+        "description": "One folder of projects/joined (#2317).",
+        "properties": {
+          "folder": {
+            "$ref": "#/definitions/URLString"
+          },
+          "name": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "folder",
+          "name",
+          "project"
+        ],
+        "additionalProperties": false
+      },
     "KeepRequest": {
       "type": "object",
       "description": "hosts/keep: a request for a stopped host, kept until it is up.",
@@ -15312,6 +15341,134 @@
         "typing"
       ]
     },
+      "Project": {
+        "type": "object",
+        "description": "A project (#2317): what people work on, the record that folders join. folders is what the machines last reported.",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "folders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/ProjectFolder"
+            }
+          },
+          "mayChange": {
+            "type": "boolean",
+            "description": "The caller is the owner or an admin, so may rename and remove it."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "owner",
+          "folders",
+          "mayChange"
+        ],
+        "additionalProperties": false
+      },
+      "ProjectFolder": {
+        "type": "object",
+        "description": "A folder in a project (#2317), as its machine last reported it.",
+        "properties": {
+          "machine": {
+            "$ref": "#/definitions/MachineRef"
+          },
+          "folder": {
+            "$ref": "#/definitions/URLString"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "machine",
+          "folder",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "ProjectList": {
+        "type": "object",
+        "description": "projects/list (#2317): the organisation's projects, by name.",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/Project"
+            }
+          }
+        },
+        "required": [
+          "projects"
+        ],
+        "additionalProperties": false
+      },
+      "ProjectRequest": {
+        "type": "object",
+        "description": "projects/remove (#2317): the project. Refused while a folder names it.",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "ProjectSet": {
+        "type": "object",
+        "description": "projects/set (#2317): makes a project, or with id renames one.",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "ProjectsChanged": {
+        "type": "object",
+        "description": "control/projectsChanged (#2317): a project was made, renamed, adopted or removed, or a folder joined one.",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "removed": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectsJoined": {
+        "type": "object",
+        "description": "projects/joined (#2317): a machine's folders and the project each names, all of them each time.",
+        "properties": {
+          "folders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/JoinedFolder"
+            }
+          }
+        },
+        "required": [
+          "folders"
+        ],
+        "additionalProperties": false
+      },
     "PromptOrigin": {
       "type": "string",
       "enum": [
@@ -18524,6 +18681,23 @@
       ],
       "additionalProperties": false
     },
+      "SetFolderProjectRequest": {
+        "type": "object",
+        "description": "folders/setProject (#2317): the project id to write into the folder's .agents/folder.json.",
+        "properties": {
+          "folder": {
+            "$ref": "#/definitions/URLString"
+          },
+          "project": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "folder",
+          "project"
+        ],
+        "additionalProperties": false
+      },
     "SetHelperLimitsRequest": {
       "type": "object",
       "properties": {

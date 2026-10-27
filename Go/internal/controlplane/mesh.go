@@ -728,6 +728,9 @@ func (s *Service) apply(e controlEvent) {
 	case "groupsChanged":
 		// A group made, changed or removed at another copy (#1761).
 		s.tellGroupsChanged(e.Subject, s.records.Group(e.Subject) == nil)
+	case "projectsChanged":
+		// A project made, renamed, adopted or removed at another copy (#2317).
+		s.tellProjectsChanged(e.Subject, e.Subject != "" && s.records.Project(e.Subject) == nil)
 	case "personSuspended":
 		// A person suspended, or no longer, at another copy (#1002, D13): within 5 seconds here.
 		s.suspendedHere(e.Subject)

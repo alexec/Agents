@@ -330,7 +330,7 @@ func (d *Daemon) receive(r wire.ReceiveRequest) (summary wire.FolderSummary, err
 			}
 		}
 	}
-	return d.addFolder(store.FolderURL(path))
+	return d.addFolderOf(store.FolderURL(path), false)
 }
 
 func (d *Daemon) registerReceive() {

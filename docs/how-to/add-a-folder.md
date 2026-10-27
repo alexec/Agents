@@ -48,6 +48,19 @@ as a folder.
    server; pick where the folder should live first. See
    [Add a machine](add-a-machine.md).
 
+**Put a folder in a project**
+
+Each folder you add is in a project of its own name. Nothing is asked. The project's id
+goes into the folder's `.agents/folder.json`. Commit that file, and a clone of the
+repository on another machine joins the same project.
+
+1. On the Mac, select the folder and choose **File ▸ Folder Settings…**. On the iPhone,
+   iPad or web page, open the folder's menu and choose **Project…**.
+2. Under **Project**, pick another project, or choose **New Project…** and type a name.
+
+   To rename the project, choose **Rename Project…**. Only the person who made it, or an
+   admin, can rename it.
+
 **Archive a folder you are done with**
 
 1. Stop any agent in the folder that is still working. See
@@ -68,6 +81,8 @@ if you no longer want it. **Show in Finder** on the same menu takes you there.
   Stop them, then archive again.
 - **That is not a Git URL this app can clone.** The address is not one Git understands.
   Paste the HTTPS or SSH address from the repository's **Clone** button.
+- **.agents/folder.json names a project id that is not valid** under **Project**: the file
+  was changed by hand. Pick a project, and a good id is written.
 - **Folder is missing** under a folder's name means the folder was moved or deleted
   outside the app. Put it back, or archive the folder.
 

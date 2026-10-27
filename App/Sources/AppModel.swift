@@ -2537,6 +2537,22 @@ final class AppModel {
         }
     }
 
+    /// The folder joins a project (#2317): its id written into `.agents/folder.json` by its
+    /// own machine. Nil, or why not.
+    func setProject(_ project: String, for key: FolderKey) async -> String? {
+        do {
+            var summary = try await client(for: key.host).call(
+                DaemonAPI.Method.foldersSetProject,
+                DaemonAPI.SetFolderProjectRequest(folder: key.folder, project: project),
+                returning: DaemonAPI.FolderSummary.self)
+            summary.host = key.host
+            upsert(summary)
+            return nil
+        } catch {
+            return describe(error)
+        }
+    }
+
     /// A folder pinned to the top of the sidebar, or not.
     func setPinned(_ pinned: Bool, for key: FolderKey) async {
         do {

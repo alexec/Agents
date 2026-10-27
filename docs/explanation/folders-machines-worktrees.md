@@ -137,6 +137,33 @@ work. Claude, Copilot, Cursor and Codex can. Grok cannot, and Gemini and Antigra
 been checked, so their agents are never moved: they would carry on having forgotten
 everything.
 
+## A folder is in a project
+
+A project is what people work on (#2317). It is a record on the control plane, and it joins
+folders on any number of machines. The same repository cloned on three machines is three
+folders in one project.
+
+A folder names its project in its own `.agents/folder.json`:
+
+```json
+{
+  "project": "p-1wzbuhd43kd9"
+}
+```
+
+When the folder is a Git repository, that line travels with Git. A clone on another machine
+joins the same project with nothing to set. The control plane makes a record for an id that
+it does not know yet, with the folder's name.
+
+You see no new step. A folder that names no project gets one of its own name when you add it,
+or when its machine next starts. You pick another project in Folder Settings ▸ General ▸
+Project on the Mac, or with **Project…** in the folder's menu on the iPhone, iPad and web
+page.
+
+A project is not a repository. The repository only carries `.agents/` between clones. Later,
+a project's tracker, code review and CI, and its reports, belong to the project, not to one
+clone (#2669, #2670).
+
 ## Worktrees are never removed by accident
 
 Archiving an agent never throws work away. When you archive the last agent in a worktree

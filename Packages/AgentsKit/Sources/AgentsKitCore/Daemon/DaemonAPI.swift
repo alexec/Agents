@@ -765,6 +765,12 @@ public enum DaemonAPI {
         /// Set when the organisation's policy caps this folder's helper limits (#998, #64):
         /// the lower number is used, and the rows say so. Absent with no cap.
         public var helperLimitsSetBy: PolicySetBy?
+        /// The project id that `.agents/folder.json` names (#2317). Nil when it names none
+        /// or one that is not valid, and from a machine before projects.
+        public var project: String?
+        /// Why the folder is in no project (#2317): the file is not an object, names an id
+        /// that is not valid, or `.agents` is a link.
+        public var projectProblem: String?
         /// Which machine the folder is on, stamped by the window that heard of it and
         /// never sent (037). Not in `CodingKeys`.
         public var host: MachineRef = .mac
@@ -784,7 +790,7 @@ public enum DaemonAPI {
 
         enum CodingKeys: String, CodingKey {
             case folder, name, exists, lastActivityAt, counts, costToDate, unmeasuredAgents
-            case retiredCount, guardedChanges, approvals, helperLimitsSetBy
+            case retiredCount, guardedChanges, approvals, helperLimitsSetBy, project, projectProblem
         }
 
         /// Whether anything in this folder wants the user.
@@ -828,6 +834,8 @@ public enum DaemonAPI {
             approvals = (try? c.decodeIfPresent([LenientApproval].self, forKey: .approvals))
                 .map { $0.compactMap(\.approval) }
             helperLimitsSetBy = try? c.decodeIfPresent(PolicySetBy.self, forKey: .helperLimitsSetBy)
+            project = try? c.decodeIfPresent(String.self, forKey: .project)
+            projectProblem = try? c.decodeIfPresent(String.self, forKey: .projectProblem)
         }
     }
 

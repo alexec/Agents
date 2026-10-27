@@ -657,6 +657,8 @@ func (d *Daemon) ControlUplinkChanged(up bool) {
 	d.startHostStatus()
 	// And the usage it has not sent yet (#1811).
 	d.startReports()
+	// And which folder is in which project (#2317).
+	d.sendJoinedSoon()
 	d.userConfigSyncUplinkRestored()
 	d.reconsider()
 }

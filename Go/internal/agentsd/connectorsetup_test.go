@@ -170,8 +170,9 @@ func TestAFoldersConnectorSetUp(t *testing.T) {
 	if s := slotsByKind(setup)[wire.ConnectorSlotKindCodeReview]; s.State != wire.ConnectorSlotStateRead {
 		t.Fatalf("set up again: %+v", s)
 	}
-	if _, err := os.Stat(filepath.Join(folder, ".agents", "folder.json")); !os.IsNotExist(err) {
-		t.Fatalf("folder.json is kept with nothing in it: %v", err)
+	// Only the project id that adding the folder wrote (#2317) is left.
+	if b, _ := os.ReadFile(filepath.Join(folder, ".agents", "folder.json")); strings.Contains(string(b), "connectors") || !strings.Contains(string(b), `"project"`) {
+		t.Fatalf("folder.json: %s", b)
 	}
 	if e := c.callError(t, 8, "connectors/setup/skip", map[string]any{"folder": folder, "slot": "workspace", "skipped": true}); e == nil {
 		t.Fatal("This Mac was skipped")

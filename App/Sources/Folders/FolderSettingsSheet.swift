@@ -258,6 +258,12 @@ private struct FolderGeneralPane: View {
                         }
                     }
                     row("Machine") { Text(model.hosts.label(summary.host)) }
+                    // What people work on, across machines (#2317).
+                    row(ProjectWords.title) {
+                        ProjectPicker(control: model.controlRequests, summary: summary) { id in
+                            await model.setProject(id, for: summary.key)
+                        }
+                    }
                     row("Spent") { spent(summary) }
                     row("Helpers running") {
                         VStack(alignment: .leading, spacing: 6) {
