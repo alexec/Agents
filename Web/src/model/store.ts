@@ -2268,6 +2268,12 @@ export class Store extends Work {
     if (summary) this.upsertFolder(summary, host);
   }
 
+  /** The folder joins a project (#2317), through its own machine. Throws a refusal. */
+  async setFolderProject(host: string, folder: string, project: string): Promise<void> {
+    const summary = await this.link.call("folders/setProject", { folder: folder as never, project }, host);
+    this.upsertFolder(summary, host);
+  }
+
   /** A folder pinned to the top of the sidebar, or not, as the window's Pin and Unpin. */
   async setFolderPinned(host: string, folder: string, pinned: boolean): Promise<void> {
     const summary = await this.act("folders/setPinned", { folder: folder as never, pinned }, host);

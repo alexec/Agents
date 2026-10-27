@@ -282,6 +282,9 @@ public extension DaemonAPI {
                 Row(Method.foldersDelete, params: FolderRequest.self, result: Empty.self, kind: .hostRequest),
                 // Pin and Unpin on a folder's row, as the window's sidebar has them.
                 Row(Method.foldersSetPinned, params: SetPinnedRequest.self, result: FolderSummary.self, kind: .hostRequest),
+                // A folder joins a project (#2317).
+                Row(Method.foldersSetProject, params: SetFolderProjectRequest.self, result: FolderSummary.self,
+                    kind: .hostRequest),
                 // A change to the folder's own files made outside the app (#531): read, Keep, Undo.
                 Row(Method.foldersReadGuardedChange, params: GuardedChangeRequest.self, result: GuardedChangeReading.self,
                     kind: .hostRequest),
@@ -413,6 +416,10 @@ public extension DaemonAPI {
                 Row(Method.groupsSet, params: GroupSet.self, result: Group.self, kind: .controlRequest),
                 Row(Method.groupsRemove, params: GroupRequest.self, result: Empty.self, kind: .controlRequest),
                 Row(Method.providersSetGroup, params: ProviderGroup.self, result: Empty.self, kind: .controlRequest),
+                // Projects, the record that folders join (#2317): a folder's Project.
+                Row(Method.projectsList, params: Empty.self, result: ProjectList.self, kind: .controlRequest),
+                Row(Method.projectsSet, params: ProjectSet.self, result: Project.self, kind: .controlRequest),
+                Row(Method.projectsRemove, params: ProjectRequest.self, result: Empty.self, kind: .controlRequest),
                 // Bots run the team's workflows (#1761): in Settings ▸ People.
                 Row(Method.botsMake, params: BotMake.self, result: BotMade.self, kind: .controlRequest),
                 Row(Method.botsSetCaps, params: BotCaps.self, result: Empty.self, kind: .controlRequest),
@@ -513,6 +520,8 @@ public extension DaemonAPI {
                 Row(Notification.controlSignInDecided, params: SignInDecided.self, result: Empty.self,
                     kind: .controlNotification),
                 Row(Notification.controlGroupsChanged, params: GroupsChanged.self, result: Empty.self,
+                    kind: .controlNotification),
+                Row(Notification.controlProjectsChanged, params: ProjectsChanged.self, result: Empty.self,
                     kind: .controlNotification),
                 Row(Notification.controlCapReached, params: CapReached.self, result: Empty.self,
                     kind: .controlNotification),

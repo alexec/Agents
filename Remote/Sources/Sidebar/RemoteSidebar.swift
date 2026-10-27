@@ -854,6 +854,7 @@ private struct ForgetThisDeviceRow: View {
 private struct FolderMenuItems: View {
     @Environment(RemoteModel.self) private var model
     @State private var showingAgentConfiguration = false
+    @State private var showingProject = false
     let summary: DaemonAPI.FolderSummary
     /// Files into the folder's drop box (#231), as a drag onto the Mac's row puts them.
     let putInDropbox: () -> Void
@@ -867,6 +868,14 @@ private struct FolderMenuItems: View {
         }
         .sheet(isPresented: $showingAgentConfiguration) {
             RemoteFolderAgentConfiguration(folder: summary.folder.folder)
+        }
+        // What people work on, across machines (#2317), as the window's Folder Settings ▸ Project.
+        Button("\(ProjectWords.title)…", systemImage: "square.stack.3d.up") {
+            showingProject = true
+        }
+        .disabled(model.isStale(on: summary.host))
+        .sheet(isPresented: $showingProject) {
+            RemoteFolderProject(key: summary.key)
         }
         Button(action: putInDropbox) {
             Label("Put Files in Drop Box…", systemImage: "tray.and.arrow.down")
@@ -964,5 +973,32 @@ private struct RuntimesRow: View {
         .accessibilityValue(tally.map { $0.noneWorking ? "None of \($0.total) working"
                                                        : "\($0.working) of \($0.total) working" } ?? "")
         .accessibilityHint("Opens Runtimes")
+    }
+}
+
+/// A folder's Project (#2317), in a sheet of its own: the shared picker, on the folder as
+/// the model has it now, so a pick shows at once.
+private struct RemoteFolderProject: View {
+    @Environment(RemoteModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    let key: FolderKey
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                if let summary = model.work.folders.first(where: { $0.key == key }) {
+                    Section(summary.name) {
+                        ProjectPicker(control: model.controlPlane, summary: summary) { id in
+                            await model.setProject(id, for: summary)
+                        }
+                    }
+                }
+            }
+            .navigationTitle(ProjectWords.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+            }
+        }
     }
 }

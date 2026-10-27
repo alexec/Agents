@@ -3768,6 +3768,24 @@ final class RemoteModel {
     }
 
     /// A folder pinned to the top of the sidebar, or not, through its own host.
+    /// The folder joins a project (#2317), through its own machine, as the window's Folder
+    /// Settings ▸ Project. Nil, or why not.
+    func setProject(_ project: String, for summary: DaemonAPI.FolderSummary) async -> String? {
+        let host = summary.host
+        guard let target = host == .mac ? client : otherHosts[host] else { return "The folder's machine is not connected." }
+        do {
+            var changed = try await target.call(DaemonAPI.Method.foldersSetProject,
+                                                DaemonAPI.SetFolderProjectRequest(folder: summary.folder.folder,
+                                                                                  project: project),
+                                                returning: DaemonAPI.FolderSummary.self)
+            changed.host = host
+            work.upsert(changed)
+            return nil
+        } catch {
+            return sentence(for: error)
+        }
+    }
+
     func setPinned(_ pinned: Bool, for summary: DaemonAPI.FolderSummary) async {
         let host = summary.host
         guard let target = host == .mac ? client : otherHosts[host] else { return }
