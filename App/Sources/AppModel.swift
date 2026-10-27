@@ -99,7 +99,6 @@ final class AppModel {
     var elicitations: [ElicitationRequest] { work.elicitations }
     var entries: [TranscriptEntry] { work.entries }
     var transcriptItems: [TranscriptItem] { work.transcriptItems }
-    var transcriptHasMore: Bool { work.hasMoreOfTheConversation }
     var filesToShow: [UUID: ShownFile] { work.filesToShow }
     var chartHints: [String: ChartHint] { work.chartHints }
     /// What the reader will allow and what today has cost. Nil until the daemon has
@@ -810,10 +809,6 @@ final class AppModel {
     /// The account the next session uses (#840, #999), as `AccountChoices` keeps a choice:
     /// nil for the runtime's account for new sessions. Back to that whenever the runtime changes.
     var draftAccountID: String?
-    /// The accounts the draft's runtime offers beyond its own sign-in, the organisation's
-    /// included: this Mac's, so none for a folder on a server. The picker shows only when
-    /// there is one.
-    var draftAccounts: [AccountProfile] { draftAccountChoices?.accounts ?? [] }
     var draftAccountChoices: AccountChoices? {
         guard draftHost == .mac, let runtimeID = draftRuntimeID else { return nil }
         return AccountChoices(runtimeID: runtimeID, profiles: accountProfiles, policy: policyState?.policy)
@@ -1165,12 +1160,6 @@ final class AppModel {
             await connect()
             if !isConnected { await reconnect() }
         }
-    }
-
-    /// An agent on `host` whose folders include `folder`, so `files/read` can be scoped.
-    func anAgent(in folder: URL, on host: MachineRef) -> UUID? {
-        let wanted = Folder.standardize(folder)
-        return agents.first { $0.host == host && Folder.standardize($0.folderPath) == wanted }?.id
     }
 
     /// The text of a file, from its host: `files/read`, or `files/readText` with no agent (R11).
@@ -2735,22 +2724,6 @@ final class AppModel {
     /// back for it, or it would start it again under the host launchd is starting.
     @ObservationIgnored private var holdingForMove = false
 
-    /// A window working the old way, with something to move, and no control plane yet:
-    /// the strip that offers the move (frame I).
-    var offersMoveAcross: Bool { ControlConfig.endpoint == nil && !needsFirstRun && !moved }
-    private var moved = false
-
-    /// Step two of the move: the window's own daemon quits, leaving its agents to be
-    /// picked up by the host that replaces it, and the window does not start another.
-    /// A turn in flight refuses the quit, and nothing has changed.
-
-    /// The move stopped before the window adopted the control plane: back to the old way.
-    func resumeTheOldWay() async {
-        holdingForMove = false
-        guard ControlConfig.endpoint == nil else { return }
-        await stayConnected()
-    }
-
     /// First run has a control plane (058): from here the window is its client, and
     /// this Mac's host is reached through it.
 
@@ -3505,17 +3478,6 @@ final class AppModel {
     /// Everything a server has, after it connects or comes back. Replaces only that
     /// server's own, so the Mac's list is never emptied by a server re-listing, and
     /// whatever happened while the Mac was away is simply what the server now says.
-    /// Remove a server, and everything the window held from it (037 US5).
-    func removeServer(_ host: MachineRef, purge: Bool) async {
-        await hosts.remove(host, purge: purge)
-        work.replaceAgents([], from: host)
-        work.replaceFolders([], from: host)
-        serverRuntimes[host] = nil
-        serverDisks[host] = nil
-        serverFilesByHost[host] = nil
-        if selectedFolderHost == host { select(liveFolders.first?.key) }
-    }
-
     func refreshServer(_ host: MachineRef) async {
         let server = client(for: host)
         // A new connection watches nothing; what the files pane was watching is asked
@@ -3790,12 +3752,6 @@ final class AppModel {
         } catch {
             return .failure(Self.catalogError(error))
         }
-    }
-
-    /// A folder's (or worktree's) own skills, for its page (frame D). Nil when they could
-    /// not be read, so the section keeps what it last had.
-    func folderSkills(_ folder: URL) async -> [DaemonAPI.ListedSkill]? {
-        await skills(at: .folder(folder: folder.path))
     }
 
     /// Skills in `~/.agents/skills` or a folder's `.agents/skills`.
@@ -4511,11 +4467,6 @@ final class AppModel {
         }
     }
 
-    func personaFiles(on host: MachineRef, folder: URL, origin: Persona.Origin) async -> [DaemonAPI.PersonaFile]? {
-        let request = DaemonAPI.PersonasFilesRequest(folder: origin == .folder ? folder : nil, origin: origin)
-        return try? await client(for: host).call(DaemonAPI.Method.personasFiles, request, returning: [DaemonAPI.PersonaFile].self)
-    }
-
     func agentConfigEditorFiles(on host: MachineRef, folder: URL?, kind: DaemonAPI.AgentConfigEditorKind)
         async -> [DaemonAPI.AgentConfigEditorFile]? {
         let request = DaemonAPI.AgentConfigEditorRequest(folder: folder, kind: kind)
@@ -4532,15 +4483,6 @@ final class AppModel {
             await refreshWorkflows()
             return nil
         } catch { return describe(error) }
-    }
-
-    func savePersonaFile(on host: MachineRef, folder: URL, origin: Persona.Origin, id: String, content: String,
-                         delete: Bool = false) async -> Bool {
-        let request = DaemonAPI.PersonaFileSaveRequest(folder: origin == .folder ? folder : nil, origin: origin,
-                                                       id: id, content: content, delete: delete ? true : nil)
-        guard (try? await client(for: host).call(DaemonAPI.Method.personasSave, request)) != nil else { return false }
-        if selectedFolderHost == host { await loadDraftPersonas() }
-        return true
     }
 
     /// Pick a kind of session (#760): every setting it names is set, and every one it

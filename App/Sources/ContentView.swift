@@ -17,7 +17,6 @@ struct ContentView: View {
     /// ordinary thing to do here, and a list that hides itself when used is a list you
     /// have to keep fetching back.
     @State private var columns = NavigationSplitViewVisibility.all
-    @State private var offeringMove = false
 
     /// Put the file the selected agent asked about in front of the user.
     ///

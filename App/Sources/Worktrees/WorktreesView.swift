@@ -97,7 +97,7 @@ struct WorktreeRow: View {
     private var canClean: Bool { worktree.madeByApp && worktree.exists && worktree.isIdle }
 
     var body: some View {
-        // Laid out the way `AgentRow` and `WorkflowRow` are, so the page has one kind of
+        // Laid out the way `AgentRow` is, so the page has one kind of
         // card: an icon at the reading size, a semibold name, a grey line under it.
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "arrow.triangle.branch")
