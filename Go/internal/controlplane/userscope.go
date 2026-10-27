@@ -19,7 +19,9 @@ import (
 // The user scope (#1760, spec 736 US4): each person's settings and secrets, kept here and
 // sent to each machine of theirs on its channel 0 when it joins and when they change. Only
 // a person's own clients change them; a machine only receives them, so a machine taken over
-// cannot put an MCP server (a command) on its person's other machines.
+// cannot put an MCP server (a command) on its person's other machines. For the same reason a
+// machine does not send its agent configuration files to the person's other machines:
+// user/setAgentConfigFile is refused.
 
 // CapHostUserSettings is what a machine says when it writes host/userSettings into its
 // ~/.agents and ~/.agents-secrets. A machine that does not say it is sent nothing: no
@@ -43,21 +45,7 @@ func (m *Methods) userMethod(ctx context.Context, method string, params json.Raw
 	case "user/settings":
 		return book.Settings(ctx, user)
 	case "user/setAgentConfigFile":
-		request, err := require[wire.AgentConfigFileRequest](params, "AgentConfigFileRequest")
-		if err != nil {
-			return nil, err
-		}
-		if from.Kind != "host" || !m.owns(from, from.Client) {
-			return nil, fail(notPermitted, "Only one of your own machines can sync its agent configuration files.")
-		}
-		changed, err := book.SetAgentConfigFile(ctx, user, from.Client, request)
-		if err != nil {
-			return nil, userFailure(err)
-		}
-		if changed {
-			m.s.userAgentConfigChanged(user, from.Client)
-		}
-		return wire.Empty{}, nil
+		return nil, agentConfigFileRefused()
 	case "user/secretNames":
 		rows, err := book.Names(ctx, user)
 		if err != nil {
@@ -108,16 +96,11 @@ func (m *Methods) userMethod(ctx context.Context, method string, params json.Raw
 	return nil, fail(methodNotFound, "No method %s.", method)
 }
 
-// userAgentConfigChanged fans one file edit out to every machine and client of the person.
-func (s *Service) userAgentConfigChanged(user, by string) {
-	s.announce("userSettingsChanged", user, by)
-	yes := true
-	s.router.TellPerson(user, wire.NotifyControlUserSettingsChanged.Name, wire.UserSettingsChanged{AgentConfigFiles: &yes})
-	for _, host := range s.router.HostsHeldHere() {
-		if s.ownerOf(host) == user {
-			go s.sendUserSettings(host, false)
-		}
-	}
+// agentConfigFileRefused is user/setAgentConfigFile. The instructions, skills, personas,
+// MCP servers and plugins follow the person only from the person's own clients
+// (user/setSettings), so one machine cannot change what runs on the others.
+func agentConfigFileRefused() error {
+	return fail(notPermitted, "A machine does not send its agent configuration files to your other machines. Change them in the app.")
 }
 
 // userFailure is a book's error as words for the client. None holds a secret's value.

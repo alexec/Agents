@@ -659,7 +659,6 @@ func (d *Daemon) ControlUplinkChanged(up bool) {
 	d.startReports()
 	// And which folder is in which project (#2317).
 	d.sendJoinedSoon()
-	d.userConfigSyncUplinkRestored()
 	d.reconsider()
 }
 

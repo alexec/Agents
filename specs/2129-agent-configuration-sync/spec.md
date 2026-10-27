@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-23
 
-**Status**: Draft
+**Status**: Draft (machine-to-machine sync withdrawn 2026-10-27, FR-001)
 
 **Input**: GitHub issue #2129: agent configuration syncs both ways across the user's machines and workspaces, with the newest file winning.
 
@@ -105,8 +105,14 @@ scope and sync time are shown, with no switch to turn configuration sync off.
 
 ### Functional requirements
 
-- **FR-001**: The system MUST sync `~/.agents/AGENTS.md`, personas, all files in each
-  skill folder, the MCP server list without plaintext secrets, and plugin files.
+- **FR-001**: A machine MUST NOT send its agent configuration files (`AGENTS.md`,
+  personas, skills, the MCP server list or plugins), or their removal, to the person's
+  other machines, and MUST NOT write or remove the ones a control plane sends. Only the
+  person's own clients (the Mac window, the Remote and the web page) change what follows
+  the person, with `user/setSettings`. The control plane refuses
+  `user/setAgentConfigFile`, so one machine cannot change what runs on the others.
+  FR-002 to FR-010 and FR-015, the machine-to-machine sync, are withdrawn by this rule
+  (2026-10-27).
 - **FR-002**: The system MUST detect edits made in Settings and edits made directly to
   files on disk.
 - **FR-003**: The system MUST sync each file independently between each machine and the

@@ -971,27 +971,7 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 	case "control/ping":
 		return map[string]any{}, nil
 	case "user/setAgentConfigFile":
-		request, err := require[wire.AgentConfigFileRequest](params, "AgentConfigFileRequest")
-		if err != nil {
-			return nil, err
-		}
-		record := m.records.Host(host)
-		user := m.s.ownerOf(host)
-		if user == "" || record == nil {
-			return nil, fail(notPermitted, "Only one of your own machines can sync its agent configuration files.")
-		}
-		machine := host
-		if record.MachineID != nil && *record.MachineID != "" {
-			machine = *record.MachineID
-		}
-		changed, err := m.s.users.SetAgentConfigFile(ctx, user, machine, request)
-		if err != nil {
-			return nil, userFailure(err)
-		}
-		if changed {
-			m.s.userAgentConfigChanged(user, host)
-		}
-		return wire.Empty{}, nil
+		return nil, agentConfigFileRefused()
 	case "host/hello":
 		hello, err := require[wire.MachineHello](params, "MachineHello")
 		if err != nil {
