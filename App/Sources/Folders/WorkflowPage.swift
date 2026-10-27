@@ -842,7 +842,7 @@ struct WorkflowPage: View {
     /// The runtime the file names, or the most recently active runtime on this host.
     private func runtimeID(_ workflow: Workflow) -> String {
         workflow.settings.runtimeID
-            ?? model.work.agents.first(where: { $0.host == place.host })?.runtimeID
+            ?? model.work.lastRuntimes[place.host]
             ?? RuntimeCatalog.defaultRuntime.id
     }
 

@@ -618,7 +618,7 @@ struct PromptBar: View {
                 // Voice mode (#2322), while Settings ▸ Appearance has it on: in this chat, or in a
                 // new session that its first words start (#2375).
                 // A session's own window does not take "Hey Agents" (#2420): the main window does.
-                VoiceModeButton(agentID: agent?.id, vocabulary: speechSeeds, takesWake: popped == nil, send: sendSpoken)
+                VoiceModeButton(agentID: agent?.id, vocabulary: { speechSeeds }, takesWake: popped == nil, send: sendSpoken)
 
                 // While it works and nothing is typed, send is stop. Type and it is send
                 // again, queueing what is typed for when the turn ends.
@@ -686,7 +686,8 @@ struct PromptBar: View {
 
     // MARK: Said instead of typed
 
-    /// The open folders, and this folder's titles and issue numbers (#2515).
+    /// The open folders, and this folder's titles and issue numbers (#2515). Read only when
+    /// dictation or voice mode starts, never in `body` (#2732).
     private var speechSeeds: [String] {
         let folder = agent?.folderPath ?? model.draftCwd ?? model.selectedFolder
         return DictationVocabulary.seeds(folders: model.work.folders, agents: model.work.agents, in: folder)

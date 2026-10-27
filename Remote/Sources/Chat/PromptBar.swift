@@ -272,7 +272,7 @@ struct PromptBar: View {
                 DictateButton(dictation: dictation, begin: beginDictation, send: send)
 
                 // Voice mode (#2322), while Settings ▸ Voice has it on.
-                VoiceModeButton(agentID: agent.id, vocabulary: speechSeeds) { words, stopping in
+                VoiceModeButton(agentID: agent.id, vocabulary: { speechSeeds }) { words, stopping in
                     if let stopping { await model.stop(stopping) }
                     return await model.send(words, to: agent.id, voice: true) ? agent.id : nil
                 }
@@ -383,7 +383,8 @@ struct PromptBar: View {
 
     // MARK: Said instead of typed
 
-    /// The open folders, and this folder's titles and issue numbers (#2515).
+    /// The open folders, and this folder's titles and issue numbers (#2515). Read only when
+    /// dictation or voice mode starts, never in `body` (#2732).
     private var speechSeeds: [String] {
         DictationVocabulary.seeds(folders: model.work.folders, agents: model.work.agents, in: agent.folderPath)
     }
