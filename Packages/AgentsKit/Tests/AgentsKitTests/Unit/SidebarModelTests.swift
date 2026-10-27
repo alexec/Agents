@@ -190,6 +190,14 @@ struct SidebarModelTests {
         #expect(empty.recentArchived.isEmpty)
     }
 
+    @Test func aSearchListsArchivedMatchesOnceNotInTheRecentFold() {
+        let model = AgentsModel()
+        model.replaceAgents((0..<5).map { agent(api, .archived, "login \($0)", at: Double($0)) })
+        let searched = SidebarFolderFold(key, label: "api", in: model, query: "login", isOpen: false)
+        #expect(searched.recentArchived.isEmpty)
+        #expect(searched.archivedShown(showingAll: false).count == 5)
+    }
+
     @Test func foldersAreThisMacsThenEachServersInHostOrder() {
         let gpu = MachineRef(rawValue: "gpu00001")
         let stray = MachineRef(rawValue: "stray001")

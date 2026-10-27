@@ -669,7 +669,7 @@ struct RemoteFolderFold: View {
             SidebarSessionRow(agent: row.agent, tree: row, folds: folds, isNested: grouped)
         }
         if !fold.recentArchived.isEmpty {
-            let recentOpen = fold.isSearching || folds.isOpen(key, .recentArchivedSessions)
+            let recentOpen = folds.isOpen(key, .recentArchivedSessions)
             SidebarFoldRow(title: "Recently archived sessions", count: fold.recentArchived.count, isOpen: recentOpen) {
                 folds.set(key, .recentArchivedSessions, open: !recentOpen)
             }
