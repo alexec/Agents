@@ -136,16 +136,6 @@ func (m *Membership) Save(root string) error {
 	return os.Rename(tmp, filepath.Join(root, "control-host.json"))
 }
 
-// HostPrivateKey is control-host-key: 32 raw bytes, made once.
-func HostPrivateKey(root string) ([]byte, error) {
-	file := filepath.Join(root, "control-host-key")
-	if b, err := os.ReadFile(file); err == nil && len(b) == 32 {
-		return b, nil
-	}
-	k := NewPrivateKey()
-	return k, os.WriteFile(file, k, 0o600)
-}
-
 // Enroll uses a host code once: proves the code's key, says hosts/announce, keeps the answer.
 func Enroll(ctx context.Context, root string, code *Code, private []byte, hello MachineHello) (*Membership, error) {
 	if !code.Host {

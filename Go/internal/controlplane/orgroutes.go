@@ -19,6 +19,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/audit"
 	"github.com/alexec/agents/Go/internal/controlplane/kms"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
@@ -43,7 +44,7 @@ const (
 	orgRoutesPrefix = "v1/org/routes/"
 	orgSecretSuffix = ".secret.json"
 	// OrgRoutePurpose is the HPKE info a route's secret is sealed under (research R4).
-	OrgRoutePurpose = "com.alexecollins.agents.orgroute.v1"
+	OrgRoutePurpose = controllink.OrgRoutePurpose
 	// The bounds of data-model.md.
 	mostOrgRoutes      = 50
 	mostRouteSecrets   = 10
@@ -130,16 +131,14 @@ type keptRoute struct {
 func orgRouteKey(id string) string  { return orgRoutesPrefix + id + ".json" }
 func orgSecretKey(id string) string { return orgRoutesPrefix + id + orgSecretSuffix }
 
-// orgRouteAD is the associated data a route's secret is sealed with for one machine: a
-// file copied to another machine, another route's or an older version's does not open.
-func orgRouteAD(route, host string, version int64) []byte {
-	return fmt.Appendf(nil, "%s|%s|%d", route, host, version)
-}
-
-// SealOrgRoute is a route's secret sealed to a machine's P-256 key: HPKE (P-256,
-// HKDF-SHA256, AES-256-GCM), info OrgRoutePurpose, with the route, the machine and the
-// version as associated data (FR-005).
-func SealOrgRoute(publicKey []byte, route, host string, version int64, value []byte) (wire.SealedEnvelope, error) {
+// SealOrgRoute is one of a delivered route's secrets sealed to a machine's P-256 key: HPKE
+// (P-256, HKDF-SHA256, AES-256-GCM), info OrgRoutePurpose, with the machine and the whole
+// route as it goes (all but its sealed values) as associated data (FR-005).
+func SealOrgRoute(publicKey []byte, r wire.DeliveredRoute, host string, value []byte) (wire.SealedEnvelope, error) {
+	ad, err := controllink.OrgRouteAD(r, host)
+	if err != nil {
+		return wire.SealedEnvelope{}, err
+	}
 	key, err := ecdh.P256().NewPublicKey(publicKey)
 	if err != nil {
 		return wire.SealedEnvelope{}, fmt.Errorf("the machine's key: %w", err)
@@ -152,7 +151,7 @@ func SealOrgRoute(publicKey []byte, route, host string, version int64, value []b
 	if err != nil {
 		return wire.SealedEnvelope{}, err
 	}
-	ciphertext, err := sender.Seal(orgRouteAD(route, host, version), value)
+	ciphertext, err := sender.Seal(ad, value)
 	if err != nil {
 		return wire.SealedEnvelope{}, err
 	}
@@ -161,7 +160,11 @@ func SealOrgRoute(publicKey []byte, route, host string, version int64, value []b
 
 // OpenOrgRoute is SealOrgRoute's other side, with the machine's own key: the machine's
 // (slice 2) and the tests'.
-func OpenOrgRoute(privateKey []byte, route, host string, version int64, sealed wire.SealedEnvelope) ([]byte, error) {
+func OpenOrgRoute(privateKey []byte, r wire.DeliveredRoute, host string, sealed wire.SealedEnvelope) ([]byte, error) {
+	ad, err := controllink.OrgRouteAD(r, host)
+	if err != nil {
+		return nil, err
+	}
 	private, err := ecdh.P256().NewPrivateKey(privateKey)
 	if err != nil {
 		return nil, err
@@ -174,7 +177,7 @@ func OpenOrgRoute(privateKey []byte, route, host string, version int64, sealed w
 	if err != nil {
 		return nil, err
 	}
-	return recipient.Open(orgRouteAD(route, host, version), sealed.Ciphertext)
+	return recipient.Open(ad, sealed.Ciphertext)
 }
 
 // MARK: The methods
@@ -819,16 +822,17 @@ func (s *Service) orgDelivery(ctx context.Context, host string) (wire.OrgRouteDe
 		d := wire.DeliveredRoute{ID: r.ID, Name: r.Name, Kind: r.Kind, Vendor: r.Vendor, Runtimes: r.Runtimes, Settings: r.Settings,
 			Models: r.Models, DefaultFor: nonNil(r.DefaultFor), SecretFields: slices.Sorted(maps.Keys(send)), Version: deref(r.Version),
 			Sealed: map[string]wire.SealedEnvelope{}}
+		if !expires.IsZero() {
+			at := wire.DateOf(expires)
+			d.Expires = &at
+		}
+		// Sealed last: what was delivered with them is in the secrets' associated data.
 		for field, value := range send {
-			sealed, err := SealOrgRoute(h.PublicKey, r.ID, host, deref(r.Version), []byte(value))
+			sealed, err := SealOrgRoute(h.PublicKey, d, host, []byte(value))
 			if err != nil {
 				return out, [sha256.Size]byte{}, err
 			}
 			d.Sealed[field] = sealed
-		}
-		if !expires.IsZero() {
-			at := wire.DateOf(expires)
-			d.Expires = &at
 		}
 		fmt.Fprintf(digest, "%s|%d|%d\n", r.ID, deref(r.Version), expires.Unix())
 		out.Routes = append(out.Routes, d)

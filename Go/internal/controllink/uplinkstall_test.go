@@ -11,7 +11,7 @@ import (
 func enrolled(t *testing.T, f *fakeControl, accept Accept) *Uplink {
 	t.Helper()
 	root := t.TempDir()
-	private, err := HostPrivateKey(root)
+	private, err := HostPrivateKey(HostKeyFile{Root: root})
 	if err != nil {
 		t.Fatal(err)
 	}

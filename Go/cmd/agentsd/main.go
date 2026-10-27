@@ -88,6 +88,9 @@ func main() {
 		log.Fatal(err)
 	}
 	d.Quit = stop // daemon/quit
+	// This machine's key: in a Keychain item only agentsd reads on a Mac (the root's own
+	// service, so a scratch root has its own), control-host-key on Linux.
+	d.HostKey = controllink.HostKeyFor(cl.root)
 	// events/raise, as a debug build on a scratch root has it: never on a root a person
 	// uses, nor in a release.
 	d.RaiseByHand = buildinfo.Version == "dev" && !ordinaryRoot(cl.root)
@@ -275,7 +278,7 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 			code = strings.TrimSpace(string(b))
 		}
 	}
-	private, err := controllink.HostPrivateKey(loc.Root)
+	private, err := controllink.HostPrivateKey(d.HostKey)
 	if err != nil {
 		log.Fatal(err)
 	}

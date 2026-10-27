@@ -54,7 +54,10 @@ names its issue.
 - **Pairing.** A code works once, for five minutes. An invite lasts 7 days. A machine that
   asks to join with no code waits at most 10 minutes for approval.
 - **Each connection proves its key.** A client or machine keeps a P-256 key of its own
-  (in the Secure Enclave on an iPhone or iPad that has one). At each connection, both
+  (in the Secure Enclave on an iPhone or iPad that has one). A Mac's machine key is in a
+  Keychain item that only agentsd's code signature can read. A Linux machine's key is the
+  file `control-host-key` in its root (0600): any process of that user can read it (spec 999,
+  "Limits"). At each connection, both
   sides prove their keys with HMAC-SHA256 over a nonce exchange, under a key from P-256
   ECDH and HKDF. The proof is bound to the address it was made for, and must arrive within
   15 seconds.
