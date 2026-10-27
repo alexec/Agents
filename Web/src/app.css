@@ -763,6 +763,8 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
   padding: 0;
 }
 .send { background: var(--accent); color: var(--paper-ground); }
+/* Send (or Stop) at the right of the action row, Attach at the left, as on the Mac and the Remote (#2751). */
+.prompt-actions .send { margin-left: auto; }
 
 .files .tabs { flex: 1; display: flex; gap: 4px; min-width: 0; overflow-x: auto; }
 .files .tab { padding: 3px 10px; border-radius: var(--radius-control); white-space: nowrap; }
