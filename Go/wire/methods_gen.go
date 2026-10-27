@@ -3,6 +3,8 @@
 package wire
 
 // What a host answers (daemon.openrpc.json).
+var CallAgentConfigEditorFiles = Method[AgentConfigEditorRequest, AgentConfigEditorFiles]{"agentConfig/editorFiles"}
+var CallAgentConfigEditorSave = Method[AgentConfigEditorSaveRequest, Empty]{"agentConfig/editorSave"}
 var CallAgentsAnswerSandbox = Method[AnswerSandboxRequest, Agent]{"agents/answerSandbox"}
 var CallAgentsArchive = Method[AgentRequest, Empty]{"agents/archive"}
 var CallAgentsBranchFrom = Method[BranchFromRequest, UUID]{"agents/branchFrom"}

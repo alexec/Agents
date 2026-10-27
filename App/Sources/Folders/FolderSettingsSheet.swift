@@ -6,7 +6,7 @@ import SwiftUI
 /// has too (#754), which the rail shows as one row with the pages listed in its pane (#1076). Worktrees moved to Activity
 /// (#790): they change on their own, and settings are what a person sets.
 enum FolderSettingsPane: String, Hashable, CaseIterable, Identifiable {
-    case general, overview, instructions, skills, mcp, plugins, other
+    case general, overview, instructions, skills, personas, workflows, mcp, plugins, other
 
     var id: String { rawValue }
 
@@ -15,7 +15,8 @@ enum FolderSettingsPane: String, Hashable, CaseIterable, Identifiable {
         case .overview: self = .overview
         case .instructions: self = .instructions
         case .skills: self = .skills
-        case .workflows: self = .other
+        case .personas: self = .personas
+        case .workflows: self = .workflows
         case .mcp: self = .mcp
         case .plugins: self = .plugins
         case .other: self = .other
@@ -29,6 +30,8 @@ enum FolderSettingsPane: String, Hashable, CaseIterable, Identifiable {
         case .overview: .overview
         case .instructions: .instructions
         case .skills: .skills
+        case .personas: .personas
+        case .workflows: .workflows
         case .mcp: .mcp
         case .plugins: .plugins
         case .other: .other

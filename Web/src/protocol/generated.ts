@@ -295,6 +295,27 @@ export type AgentArchivedReason =
   | "byUser"
   | "byAgent";
 
+/** A Markdown file under skills, personas or workflows in Agent Configuration. */
+export interface AgentConfigEditorFile {
+  path: string;
+  content: string;
+}
+
+export type AgentConfigEditorFiles = AgentConfigEditorFile[];
+
+export interface AgentConfigEditorRequest {
+  folder?: URLString;
+  kind: "skills" | "personas" | "workflows";
+}
+
+export interface AgentConfigEditorSaveRequest {
+  folder?: URLString;
+  kind: "skills" | "personas" | "workflows";
+  path: string;
+  content: string;
+  delete?: boolean;
+}
+
 /**
  * One agent configuration file (#2129), or a deletion tombstone. contents is base64 encoded.
  * Logical time and machine ID resolve concurrent offline edits.
@@ -8048,6 +8069,8 @@ export type WriteFailureCause =
 
 /** Every method the web remote may call: its params and its result. */
 export interface Methods {
+  "agentConfig/editorFiles": { params: AgentConfigEditorRequest; result: AgentConfigEditorFiles };
+  "agentConfig/editorSave": { params: AgentConfigEditorSaveRequest; result: Empty };
   "agents/answerSandbox": { params: AnswerSandboxRequest; result: Agent };
   "agents/archive": { params: AgentRequest; result: Empty };
   "agents/branchFrom": { params: BranchFromRequest; result: UUID };
@@ -8320,6 +8343,8 @@ export interface Methods {
 
 /** Whether a method goes to a host (with `h`) or to the control plane itself. */
 export const MethodTarget = {
+  "agentConfig/editorFiles": "host",
+  "agentConfig/editorSave": "host",
   "agents/answerSandbox": "host",
   "agents/archive": "host",
   "agents/branchFrom": "host",
@@ -8657,6 +8682,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Admitted: { required: [], optional: ["client", "host", "grant"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
   Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "voiceHungUpAt"] },
+  AgentConfigEditorFile: { required: ["path", "content"], optional: [] },
+  AgentConfigEditorRequest: { required: ["kind"], optional: ["folder"] },
+  AgentConfigEditorSaveRequest: { required: ["kind", "path", "content"], optional: ["folder", "delete"] },
   AgentConfigFile: { required: ["path", "time", "counter", "machine", "digest"], optional: ["contents", "deleted"] },
   AgentConfigFileRequest: { required: ["path", "time", "counter"], optional: ["contents", "deleted"] },
   AgentConfigFiles: { required: ["files"], optional: ["updated"] },

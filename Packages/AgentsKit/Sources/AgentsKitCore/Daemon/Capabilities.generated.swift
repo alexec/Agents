@@ -126,6 +126,8 @@ public enum Capability {
 
     /// The capability of each method and notification in daemon.openrpc.json.
     public static let host: [String: String] = [
+        "agentConfig/editorFiles": "personal/1",
+        "agentConfig/editorSave": "personal/1",
         "agents/answerSandbox": "agents/1",
         "agents/archive": "agents/1",
         "agents/branchFrom": "chat.branch/1",

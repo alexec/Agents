@@ -53,6 +53,7 @@ func (d *Daemon) register() {
 	d.registerWorkflows()
 	d.registerShells()
 	d.registerSkills()
+	d.registerAgentConfigEditor()
 	d.registerShared()
 	d.registerPlugins()
 	d.registerWake()

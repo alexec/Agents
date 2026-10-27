@@ -129,6 +129,8 @@ export type Capability = (typeof Capability)[keyof typeof Capability];
 
 /** The capability of each method and notification in daemon.openrpc.json. */
 export const HostCapabilities: Readonly<Record<string, Capability>> = {
+  "agentConfig/editorFiles": "personal/1",
+  "agentConfig/editorSave": "personal/1",
   "agents/answerSandbox": "agents/1",
   "agents/archive": "agents/1",
   "agents/branchFrom": "chat.branch/1",

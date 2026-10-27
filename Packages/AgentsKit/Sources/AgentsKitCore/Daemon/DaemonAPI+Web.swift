@@ -42,6 +42,10 @@ public extension DaemonAPI {
         /// an empty object is `Empty`.
         public static var rows: [Row] {
             [
+                Row(Method.agentConfigEditorFiles, params: AgentConfigEditorRequest.self,
+                    result: [AgentConfigEditorFile].self, kind: .hostRequest),
+                Row(Method.agentConfigEditorSave, params: AgentConfigEditorSaveRequest.self,
+                    result: Empty.self, kind: .hostRequest),
                 // Reading
                 Row(Method.foldersList, params: FoldersListRequest.self, result: [FolderSummary].self, kind: .hostRequest),
                 Row(Method.agentsList, params: ListRequest.self, result: [Agent].self, kind: .hostRequest),
