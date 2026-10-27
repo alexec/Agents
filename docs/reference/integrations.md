@@ -41,12 +41,12 @@ Open issues: `is:open label:integration runtime`.
 | Integration | Clients that show it | State | Last checked | Where | Gaps |
 | --- | --- | --- | --- | --- | --- |
 | Claude | Mac, Remote, web, server | broken (fails at handshake) | 2026-10-17, 0.93.0: failed at handshake, in `.agents/reviews/runtimes/claude-2026-10-17.md` | `RuntimeCatalog.swift`, `runtimes.go` | |
-| Grok | Mac, Remote, web, server | broken (terminal commands fail) | 2026-10-23, 1.0.67: `agent stdio --help` has no `--sandbox`; flag removed from launches | `RuntimeCatalog.swift`, `runtimes.go` | Sandbox control unavailable until Grok supports it over ACP |
-| Copilot | Mac, Remote, web, server | broken (fails at turn) | 2026-10-17, 1.0.93-1: failed at turn, in `.agents/reviews/runtimes/copilot-2026-10-17.md` (skipped 2026-10-22: Copilot its allowance is spent on this Mac) | `RuntimeCatalog.swift`, `runtimes.go` | |
+| Grok | Mac, Remote, web, server | tested on a real account | 2026-10-27, 1.0.67: a real turn passed, not assessed, in `.agents/reviews/runtimes/grok-2026-10-27.md` | `RuntimeCatalog.swift`, `runtimes.go` | Sandbox control unavailable until Grok supports it over ACP |
+| Copilot | Mac, Remote, web, server | broken (fails at turn) | 2026-10-17, 1.0.93-1: failed at turn, in `.agents/reviews/runtimes/copilot-2026-10-17.md` (skipped 2026-10-27: Copilot its allowance is spent on this Mac) | `RuntimeCatalog.swift`, `runtimes.go` | |
 | Cursor | Mac, Remote, web, server | broken (fails at turn) | 2026-10-17, 2026.10.01-e373342: failed at turn, in `.agents/reviews/runtimes/cursor-2026-10-17.md` | `RuntimeCatalog.swift`, `runtimes.go` | |
 | Codex | Mac, Remote, web, server | broken (`ending`, `own_ask`, `scope`, `sessions`, `wait`, `workspaces` failed) | 2026-10-17, 2.2.2: assessment: 7 of 15 passed, in `.agents/reviews/runtimes/codex-2026-10-17.md` | `RuntimeCatalog.swift`, `runtimes.go`, `App/Resources/toolsets/codex/manifest.json`, `Go/internal/agentsd/brief.go` | `scope` and `permissions` fail on a root in `/tmp` (the nightly's): Codex's own `agent` mode (workspace-write) may write `/tmp` without asking, so no card comes (#1432). #1444, #1445 |
 | Gemini | Mac, Remote, web, server | broken (fails at turn) | 2026-10-17, 0.64.0: failed at turn, in `.agents/reviews/runtimes/gemini-2026-10-17.md` | `RuntimeCatalog.swift`, `runtimes.go` | |
-| Antigravity | Mac, Remote, web (Mac host only) | broken (fails at turn) | 2026-10-17, 1.4.1: failed at turn, in `.agents/reviews/runtimes/antigravity-2026-10-17.md` | `RuntimeCatalog.swift` | |
+| Antigravity | Mac, Remote, web (Mac host only) | broken (fails at turn) | 2026-10-17, 1.4.1: failed at turn, in `.agents/reviews/runtimes/antigravity-2026-10-17.md` (skipped 2026-10-27: Antigravity not signed in on this Mac) | `RuntimeCatalog.swift` | |
 | OpenCode | Mac, Remote, web, server | tested on a real account | 2026-10-22, 1.19.4: a real turn passed, not assessed, in `.agents/reviews/runtimes/opencode-2026-10-22.md` | `RuntimeCatalog.swift`, `runtimes.go` | |
 <!-- runtimes:end -->
 
