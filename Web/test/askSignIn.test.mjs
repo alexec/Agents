@@ -1,5 +1,5 @@
 // A browser pairs by approval (#2097): signIn/ask on s:<a new client> with the account typed, the
-// code control/signInWaiting gives shown while it waits, and the key kept once it is approved.
+// code it makes from its key and the control key shown while control/signInWaiting says it waits, and the key kept once it is approved.
 // Cancel closes it and says nothing; running out says so.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -8,6 +8,7 @@ import { load } from "./load.mjs";
 
 delete globalThis.BroadcastChannel;
 const { Session } = await load("src/session.ts");
+const { approvalCode } = await load("src/wire/signIn.ts");
 const w = await load("test/wire.ts");
 const v = JSON.parse(readFileSync(new URL("./vectors.json", import.meta.url)));
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -70,7 +71,10 @@ test("the code shows while it waits, and approved, the new key is this browser's
   const ask = net.made[0].sent[1];
   assert.equal(ask.method, "signIn/ask");
   assert.deepEqual(ask.params, { account: "sam@example.com", name: "A browser" });
-  assert.equal(s.askCode.value, "K7Q2MX");
+  // Its own code, never the control plane's.
+  const publicRaw = new Uint8Array(Buffer.from(net.made[0].sent[0].auth.publicKey, "base64"));
+  assert.equal(s.askCode.value, await approvalCode(publicRaw, control));
+  assert.notEqual(s.askCode.value, "K7Q2MX");
   assert.equal(keys.record, null);
   approve();
   await going;
@@ -101,4 +105,9 @@ test("Cancel closes the wait and says nothing; running out says so", async () =>
   await other.session.askToPair("sam");
   assert.match(other.session.pairingError.value, /within 10 minutes/);
   assert.equal(other.keys.record, null);
+});
+
+// One vector with the control plane's Go (controllink.TestApprovalCodeIsBoundToBothKeys).
+test("the approval code is the control plane's", async () => {
+  assert.equal(await approvalCode(new Uint8Array(65).fill(1), new Uint8Array(65).fill(2)), "8UMUNH");
 });

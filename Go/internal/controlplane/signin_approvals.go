@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/signin"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
@@ -127,6 +128,13 @@ func (a *signInApprovals) row(r signInRequest) wire.SignInRequest {
 		Code: code, Expires: dateOf(r.Expires.Time)}
 }
 
+// code is the code a sign-in shows (controllink.ApprovalCode): bound to the new client's key
+// and this control plane's, so a control plane that passes a sign-in on cannot show the
+// person the code their card shows.
+func (a *signInApprovals) code(public []byte) string {
+	return controllink.ApprovalCode(public, a.s.currentKeys().public)
+}
+
 // sameCode says a typed code is the request's: case, spaces and dashes aside.
 func sameCode(typed, code string) bool {
 	clean := strings.Map(func(r rune) rune {
@@ -140,9 +148,9 @@ func sameCode(typed, code string) bool {
 
 // unanswered is a browser's wait that no person can approve (FR-014b): an account nobody
 // has, or one with every place taken. It looks the same as one that waits for a person.
-func (a *signInApprovals) unanswered(conn *Conn) (*wire.Admitted, error) {
+func (a *signInApprovals) unanswered(conn *Conn, ask signInAsk) (*wire.Admitted, error) {
 	expires := a.now().Add(joinLifetime)
-	conn.SendNow(notification("control/signInWaiting", wire.SignInWaiting{Code: newJoinCode(), Expires: dateOf(expires)}))
+	conn.SendNow(notification("control/signInWaiting", wire.SignInWaiting{Code: a.code(ask.public), Expires: dateOf(expires)}))
 	timer := time.NewTimer(time.Until(expires))
 	defer timer.Stop()
 	select {
@@ -173,14 +181,14 @@ func (a *signInApprovals) wait(ctx context.Context, conn *Conn, ask signInAsk) (
 	}
 	if ask.provider == browserProvider && waiting < signInRequestsOpen && (ask.person == "" || forPerson >= signInRequestsPerPerson) {
 		a.mu.Unlock()
-		return a.unanswered(conn)
+		return a.unanswered(conn, ask)
 	}
 	if waiting >= signInRequestsOpen || forPerson >= signInRequestsPerPerson {
 		a.mu.Unlock()
 		return nil, fail(notPermitted, "Too many sign-ins are waiting for approval. Try again in a few minutes.")
 	}
 	now := records.At(a.now())
-	r := signInRequest{ID: newJoinID(), Code: newJoinCode(), Client: ask.client, PublicKey: ask.public, Name: ask.name, Kind: ask.kind,
+	r := signInRequest{ID: newJoinID(), Code: a.code(ask.public), Client: ask.client, PublicKey: ask.public, Name: ask.name, Kind: ask.kind,
 		Person: ask.person, Provider: ask.provider, Login: ask.login, Created: now, Expires: records.At(now.Add(joinLifetime))}
 	err = a.write(ctx, r, store.Absent)
 	a.mu.Unlock()

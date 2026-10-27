@@ -259,6 +259,10 @@ func (s *SignInSession) Call(ctx context.Context, method string, params any) (js
 		if r.ID == nil && r.Method == "control/signInWaiting" {
 			var w wire.SignInWaiting
 			if json.Unmarshal(r.Params, &w) == nil && s.Waiting != nil {
+				// The code this client makes itself, never the control plane's: a control
+				// plane that passes the sign-in on could only pass on another key's code.
+				public, _ := PublicKey(s.private)
+				w.Code = ApprovalCode(public, s.controlKey)
 				s.Waiting(w)
 			}
 			continue
@@ -279,4 +283,39 @@ func (s *SignInSession) Membership(client wire.UUID) (*ClientMembership, error) 
 		return nil, fmt.Errorf("paired as %s, not %s", client, s.id)
 	}
 	return &ClientMembership{Client: s.id, Private: s.private, ControlKey: s.controlKey, URL: s.base, Pin: s.pin, Name: s.name}, nil
+}
+
+// approvalLetters are the letters an approval code is made of: no 0, O, 1, I or L.
+const approvalLetters = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+// ApprovalCode is the code a sign-in that waits for approval shows: made from the new
+// client's public key and the control key it trusts, by the client and the control plane
+// each, so the new client and the card on the person's other client show the same code only
+// when the key the control plane asks about is the new client's own, at the control plane
+// the client dialled.
+func ApprovalCode(clientPublic, controlKey []byte) string {
+	return shortCode("agents-signin-approve", clientPublic, controlKey)
+}
+
+// JoinCode is the code a host that asks to join shows (#994): made from its public key, by
+// the host and the control plane each, so a request that names another key shows another code.
+func JoinCode(hostPublic []byte) string {
+	return shortCode("agents-join-approve", hostPublic)
+}
+
+// shortCode is six letters of SHA-256(label ‖ parts), two bytes a letter: no letter is much
+// likelier.
+func shortCode(label string, parts ...[]byte) string {
+	h := sha256.New()
+	h.Write([]byte(label))
+	for _, p := range parts {
+		h.Write(p)
+	}
+	sum := h.Sum(nil)
+	out := make([]byte, 6)
+	for i := range out {
+		v := int(sum[2*i])<<8 | int(sum[2*i+1])
+		out[i] = approvalLetters[v%len(approvalLetters)]
+	}
+	return string(out)
 }

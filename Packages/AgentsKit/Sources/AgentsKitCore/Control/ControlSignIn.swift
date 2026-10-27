@@ -44,6 +44,16 @@ public enum ControlSignIn {
         ControlAuth.hex(ControlAgreement.sha256(controlKey).prefix(8))
     }
 
+    /// The code a sign-in that waits for approval shows, made here as the control plane makes
+    /// it: SHA-256("agents-signin-approve" ‖ the new key's public half ‖ the control key this
+    /// client trusts), two bytes a letter. Never the control plane's: one that passed the
+    /// sign-in on could only pass on another key's code.
+    public static func approvalCode(clientPublicKey: Data, controlKey: Data) -> String {
+        let letters = Array("ABCDEFGHJKMNPQRSTUVWXYZ23456789")
+        let sum = Array(ControlAgreement.sha256(Data("agents-signin-approve".utf8) + clientPublicKey + controlKey))
+        return String((0..<6).map { letters[(Int(sum[2 * $0]) << 8 | Int(sum[2 * $0 + 1])) % letters.count] })
+    }
+
     /// The nonce for a sign-in on one connection to one control plane:
     /// SHA-256("agents-signin-v1\0" ‖ key id ‖ "\0" ‖ challenge), in hex.
     public static func nonce(controlKey: Data, challenge: Data) -> String {
@@ -73,7 +83,7 @@ public enum ControlSignIn {
 
     /// Pairs as the person the sign-in names: what the client keeps to dial again. A GitHub
     /// sign-in waits for Approve on another of the person's clients; `waiting` is told the
-    /// code to show.
+    /// code to show, made here (`approvalCode`).
     public static func pair(url: URL, pin: String?, controlKey: Data?, privateKey: Data, id: UUID, name: String,
                             kind: ClientRecord.Kind, dial: ControlCodeUse.Dial, signIn: Provider,
                             waiting: (@Sendable (DaemonAPI.SignInWaiting) -> Void)? = nil) async throws -> ControlMembership {
@@ -99,9 +109,15 @@ public enum ControlSignIn {
         switch try await signIn(providers, nonce(controlKey: session.controlKey, challenge: session.helloNonce), asking) {
         case .token(let provider, let token):
             let request = DaemonAPI.SignInPair(provider: provider, token: token, name: name, kind: kind)
+            let code = approvalCode(clientPublicKey: try ControlAgreement.publicKey(privateKey: privateKey),
+                                    controlKey: session.controlKey)
+            var shown: (@Sendable (DaemonAPI.SignInWaiting) -> Void)?
+            if let waiting {
+                shown = { told in waiting(DaemonAPI.SignInWaiting(code: code, expires: told.expires)) }
+            }
             // Long enough for another client to approve a GitHub sign-in (10 minutes there).
             paired = try await line.call(DaemonAPI.Method.signInPair, try JSONValue.encoding(request), within: 11 * 60,
-                                         waiting: waiting).decode(DaemonAPI.Admitted.self).client
+                                         waiting: shown).decode(DaemonAPI.Admitted.self).client
         case .ticket(let ticket):
             let request = DaemonAPI.SignInTicket(ticket: ticket, name: name, kind: kind)
             paired = try await line.call(DaemonAPI.Method.signInTicket, try JSONValue.encoding(request), within: 30,

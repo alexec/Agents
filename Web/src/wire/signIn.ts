@@ -4,6 +4,7 @@
 // The org flow leaves the page: the key it started with waits in IndexedDB as a pending sign-in,
 // apart from the paired key's record, until the provider sends the browser back or 10 minutes pass.
 import { signInConnect, type LineSocket, type SignedIn } from "./auth";
+import { fromBase64url } from "./bytes";
 import { CallFailed, LinkDown } from "./link";
 
 /** A sign-in started and not yet finished: the key and the client id the ticket is bound to. */
@@ -122,4 +123,26 @@ export async function openSignIn(lines: LineSocket, client: string, privateKey: 
   const publicRaw = new Uint8Array(await crypto.subtle.exportKey("raw", publicKey));
   const signedIn = await signInConnect(lines, client, privateKey, publicRaw, origin);
   return new SignInConnection(lines, signedIn);
+}
+
+const approvalLetters = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+
+/**
+ * The code a sign-in that waits for approval shows, made here as the control plane makes it:
+ * SHA-256("agents-signin-approve" ‖ the new key's public half ‖ the control key), two bytes a letter.
+ * Never the control plane's: one that passed the sign-in on could only pass on another key's code.
+ */
+export async function approvalCode(clientPublic: Uint8Array, controlKey: Uint8Array): Promise<string> {
+  const message = new Uint8Array([...new TextEncoder().encode("agents-signin-approve"), ...clientPublic, ...controlKey]);
+  const sum = new Uint8Array(await crypto.subtle.digest("SHA-256", message));
+  let out = "";
+  for (let i = 0; i < 6; i++) out += approvalLetters[(((sum[2 * i] ?? 0) << 8) | (sum[2 * i + 1] ?? 0)) % approvalLetters.length];
+  return out;
+}
+
+/** The code `connection`, opened with `publicKey`, shows while it waits for approval. */
+export async function connectionApprovalCode(connection: SignInConnection, publicKey: CryptoKey): Promise<string> {
+  const control = fromBase64url(connection.signedIn.control);
+  if (!control) throw new Error("no control key");
+  return approvalCode(new Uint8Array(await crypto.subtle.exportKey("raw", publicKey)), control);
 }

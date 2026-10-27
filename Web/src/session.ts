@@ -5,15 +5,15 @@
 import { signal } from "@preact/signals";
 import { log } from "./log";
 import { onThisMac } from "./place";
-import type { Admitted, SignInDiscovered, SignInOrgProvider, SignInOrgStarted, SignInProviders, SignInTicketResult,
-  SignInWaiting } from "./protocol/generated";
+import type { Admitted, SignInDiscovered, SignInOrgProvider, SignInOrgStarted, SignInProviders, SignInTicketResult }
+  from "./protocol/generated";
 import { askExpired, byOrder, noOrgForEmail, type OIDCReturn, oidcErrorWords, pendingLive, personSuspended, requiredProvider, signInExpired } from "./model/signIn";
 import { AnnounceRefused, BadServerProof, pair, Refused, type RefusalReason, WrongControlPlane } from "./wire/auth";
 import { base64url } from "./wire/bytes";
 import { parseCode } from "./wire/code";
 import { IndexedKeyStore, type KeyStore, makeKeyPair, newClientID, UnsupportedBrowser } from "./wire/keys";
 import { CallFailed, Link, type LinkState, Lines, type SocketLike } from "./wire/link";
-import { IndexedPendingStore, openSignIn, type PendingStore, type SignInConnection } from "./wire/signIn";
+import { connectionApprovalCode, IndexedPendingStore, openSignIn, type PendingStore, type SignInConnection } from "./wire/signIn";
 
 
 /**
@@ -212,7 +212,7 @@ export class Session {
 
   /**
    * **Sign in with your account** (#2097): signIn/ask with the email or GitHub login typed, on `s:` with
-   * a new key. The page shows the code control/signInWaiting gives; once the person types it on one of
+   * a new key. Told control/signInWaiting, the page shows the code it makes from its key and the control key; once the person types it on one of
    * their clients and approves, the key becomes this browser's and the link starts. An account nobody
    * has waits the same, and runs out after 10 minutes.
    */
@@ -226,9 +226,11 @@ export class Session {
       const client = newClientID();
       connection = await this.signInWith(client, keyPair.privateKey, keyPair.publicKey);
       this.asking = connection;
+      // The code made here, never the control plane's (it shows the same one when honest).
+      const code = await connectionApprovalCode(connection, keyPair.publicKey);
       const admitted = await connection.call<Admitted>("signIn/ask", { account: account.trim(), name: browserName() }, 11 * 60_000,
-        (method, params) => {
-          if (method === "control/signInWaiting") this.askCode.value = (params as SignInWaiting).code;
+        (method) => {
+          if (method === "control/signInWaiting") this.askCode.value = code;
         });
       if (!admitted.client || admitted.client.toUpperCase() !== client) throw new Refused("bad-message");
       // As a code's pairing keeps it: read back before it counts, so a browser that can't keep it never pairs.
