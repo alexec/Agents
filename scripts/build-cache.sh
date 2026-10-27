@@ -97,11 +97,17 @@ xcode() {
 	# The worktree's own DerivedData, unless the command names one (#2684). It is under
 	# $PWD, so the prefix mappings below keep it out of the cache keys. An action that
 	# builds nothing gets no -derivedDataPath.
-	local dd=(-derivedDataPath "$PWD/build/DerivedData") a
+	local dd=(-derivedDataPath "$PWD/build/DerivedData") a prev= target=() rdd=()
 	for a in "$@"; do
 		case $a in
 		-derivedDataPath | -exportArchive | -exportLocalizations | -importLocalizations | -version | -showsdks | -list | -help | -usage | -license) dd=() ;;
 		esac
+		# What the cold-cache resolve below needs from the command (#2773).
+		case $prev in
+		-project | -workspace | -scheme) target+=("$prev" "$a") ;;
+		-derivedDataPath) rdd=(-derivedDataPath "$a") ;;
+		esac
+		prev=$a
 	done
 	local flags=(
 		-packageCachePath "$CACHE/packages"
@@ -131,7 +137,11 @@ xcode() {
 		lock "$co.lock"
 		trap 'rmdir "$co.lock" 2>/dev/null || true' EXIT
 		if [ ! -e "$co/Package.resolved" ]; then
-			xcodebuild -resolvePackageDependencies "${flags[@]:0:4}" -derivedDataPath "$PWD/build/DerivedData" >&2
+			# xcodebuild refuses -derivedDataPath without -scheme (#2773): the resolve takes
+			# the command's project and scheme, and a DerivedData only with a scheme.
+			[ ${#rdd[@]} -gt 0 ] || rdd=(-derivedDataPath "$PWD/build/DerivedData")
+			case " ${target[*]-} " in *" -scheme "*) ;; *) rdd=() ;; esac
+			xcodebuild -resolvePackageDependencies ${target[@]+"${target[@]}"} "${flags[@]:0:4}" ${rdd[@]+"${rdd[@]}"} >&2
 			cp "$pins" "$co/Package.resolved"
 		fi
 		rmdir "$co.lock" 2>/dev/null || true
