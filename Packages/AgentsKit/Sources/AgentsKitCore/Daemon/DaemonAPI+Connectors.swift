@@ -227,13 +227,19 @@ extension DaemonAPI {
         public var proof: ConnectorProof?
         public var readAt: Date?
         public var message: String?
+        /// The repository that fills it: the project's when `fromProject`, else the folder's
+        /// own (#2669).
+        public var repository: String?
+        /// The folder's project sets it, for every folder in the project (#2669).
+        public var fromProject: Bool?
 
         public var id: ConnectorSlotKind { slot }
+        public var isFromProject: Bool { fromProject == true }
 
         public init(slot: ConnectorSlotKind, choice: String, state: ConnectorSlotState, proof: ConnectorProof? = nil,
-                    readAt: Date? = nil, message: String? = nil) {
+                    readAt: Date? = nil, message: String? = nil, repository: String? = nil, fromProject: Bool? = nil) {
             self.slot = slot; self.choice = choice; self.state = state; self.proof = proof
-            self.readAt = readAt; self.message = message
+            self.readAt = readAt; self.message = message; self.repository = repository; self.fromProject = fromProject
         }
     }
 
@@ -283,16 +289,21 @@ extension DaemonAPI {
         public var events: ConnectorEvents
         /// Slots that read or were skipped, of the four.
         public var done: Int
+        /// The folder's project id (#2669), whose owner or an admin sets Tasks, Code review
+        /// and CI for every folder in it; nil when the folder is in no project.
+        public var project: String?
+        /// The project's name, as the machine last heard it.
+        public var projectName: String?
 
         public init(folder: String, repository: String? = nil, forge: ConnectionProvider? = nil, site: String? = nil,
                     repositoryURL: String? = nil, connection: Connection? = nil, installed: Bool? = nil,
                     installURL: String? = nil, repositories: Int? = nil, slots: [ConnectorSlot],
-                    events: ConnectorEvents, done: Int) {
+                    events: ConnectorEvents, done: Int, project: String? = nil, projectName: String? = nil) {
             self.folder = folder; self.repository = repository; self.forge = forge; self.site = site
             self.repositoryURL = repositoryURL
             self.connection = connection; self.installed = installed
             self.installURL = installURL; self.repositories = repositories; self.slots = slots; self.events = events
-            self.done = done
+            self.done = done; self.project = project; self.projectName = projectName
         }
 
         public func slot(_ kind: ConnectorSlotKind) -> ConnectorSlot? { slots.first { $0.slot == kind } }

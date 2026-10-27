@@ -66,6 +66,7 @@ struct ConnectorSetupView: View {
                 connection(setup)
                 heading(ConnectorSetupWords.setUpHeading(setup))
                 slots(setup)
+                ProjectSlotsCard(control: model.controlRequests, setup: setup) { await load(.cached) }
                 if setup.connection != nil || setup.events.state != .off {
                     heading("Events")
                     events(setup.events, forge: setup.forgeOrGitHub)
@@ -328,6 +329,11 @@ private struct SlotCard: View {
             Text(slot.slot == .workspace ? place.title : ConnectorSetupWords.title(slot))
                 .appText(.supporting).fontWeight(.semibold)
             proofOrLine
+            if slot.isFromProject {
+                // The project's (#2669): changed in the project's card, not here.
+                Text(ProjectWords.setByProject(setup.projectName ?? ProjectWords.title))
+                    .appText(.fine).foregroundStyle(.secondary)
+            }
             actions
         }
         .padding(14)
@@ -337,7 +343,7 @@ private struct SlotCard: View {
     }
 
     private var canChange: Bool {
-        slot.slot == .workspace || [.read, .refused, .failed].contains(slot.state)
+        slot.slot == .workspace || (!slot.isFromProject && [.read, .refused, .failed].contains(slot.state))
     }
 
     @ViewBuilder private var proofOrLine: some View {
@@ -373,21 +379,23 @@ private struct SlotCard: View {
                 if slot.slot == .tasks {
                     Button("Use Linear instead\u{2026}") { act(.linear) }.buttonStyle(.link)
                 }
-                skip
+                if !slot.isFromProject { skip }
             case .noRemote:
                 if slot.slot == .tasks {
                     Button("Linear\u{2026}") { act(.linear) }.buttonStyle(.paper)
                     Button("From a catalogue\u{2026}") { act(.catalogue) }.buttonStyle(.link)
                 }
-                skip
+                if !slot.isFromProject { skip }
             case .failed:
                 Button("Try Again") { act(.tryAgain) }.buttonStyle(.paper)
             case .refused:
                 Button(ConnectorSetupWords.grantButton(setup)) { act(.open(ConnectorSetupWords.grantURL(setup))) }
                     .buttonStyle(.paper)
                 Button("Try Again") { act(.tryAgain) }.buttonStyle(.paper)
-            case .skipped:
+            case .skipped where !slot.isFromProject:
                 Button("Set Up") { act(.setUp(slot.slot)) }.buttonStyle(.link)
+            case .skipped:
+                EmptyView()
             case .read, .notRead:
                 EmptyView()
             }

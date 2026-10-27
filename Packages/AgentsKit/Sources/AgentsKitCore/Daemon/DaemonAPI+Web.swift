@@ -419,6 +419,7 @@ public extension DaemonAPI {
                 // Projects, the record that folders join (#2317): a folder's Project.
                 Row(Method.projectsList, params: Empty.self, result: ProjectList.self, kind: .controlRequest),
                 Row(Method.projectsSet, params: ProjectSet.self, result: Project.self, kind: .controlRequest),
+                Row(Method.projectsSetSlot, params: ProjectSlotSet.self, result: Project.self, kind: .controlRequest),
                 Row(Method.projectsRemove, params: ProjectRequest.self, result: Empty.self, kind: .controlRequest),
                 // Bots run the team's workflows (#1761): in Settings ▸ People.
                 Row(Method.botsMake, params: BotMake.self, result: BotMade.self, kind: .controlRequest),

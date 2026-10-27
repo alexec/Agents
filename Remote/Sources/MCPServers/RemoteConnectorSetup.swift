@@ -9,6 +9,7 @@ import SwiftUI
 /// The page that shows it reads it (MCPServersListView): at first, when the app comes back
 /// to the front, and on a pull (#1684).
 struct RemoteConnectorSetup: View {
+    @Environment(RemoteModel.self) private var model
     let folder: FolderKey
     let folderName: String
     @Binding var setup: DaemonAPI.ConnectorSetup?
@@ -44,6 +45,13 @@ struct RemoteConnectorSetup: View {
                         RemoteSlotRow(folder: folder, slot: slot, setup: setup, folderName: folderName)
                     }
                     .paperListRow()
+                }
+            }
+            if setup.project != nil {
+                // The project's tools (#2669): the same card as the window's.
+                Section(ProjectWords.title) {
+                    ProjectSlotsCard(control: model.controlPlane, setup: setup) { await reload(.cached) }
+                        .paperListRow()
                 }
             }
             if setup.connection != nil || setup.events.state != .off {
@@ -107,6 +115,10 @@ private struct RemoteSlotRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(ConnectorSetupWords.heading(slot.slot)) \u{00B7} \(title)")
                 Text(subtitle).appText(.fine).foregroundStyle(.secondary).lineLimit(2)
+                if slot.isFromProject {
+                    Text(ProjectWords.setByProject(setup.projectName ?? ProjectWords.title))
+                        .appText(.fine).foregroundStyle(.secondary)
+                }
             }
         }
         .accessibilityElement(children: .combine)
@@ -204,7 +216,11 @@ private struct RemoteSlotView: View {
                         }
                         Button("Try Again") { Task { await reload() } }
                     }
-                    if kind != .workspace {
+                    if slot.isFromProject {
+                        // The project's (#2669): its owner or an admin changes it on the folder's page.
+                        Text(ProjectWords.setByProject(setup.projectName ?? ProjectWords.title))
+                            .appText(.fine).foregroundStyle(.secondary)
+                    } else if kind != .workspace {
                         if slot.state == .skipped {
                             Button("Set Up") { Task { await skip(false) } }
                         } else {
