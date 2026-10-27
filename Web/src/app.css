@@ -1685,3 +1685,11 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .read-token-made { margin: 8px 0; padding: 8px 10px; border: 1px solid var(--paper-rule); border-radius: 6px; }
 .read-token-value { display: block; word-break: break-all; user-select: all; margin: 4px 0; }
 .live-id { font-family: var(--mono, ui-monospace, monospace); }
+.agent-config-editor { display: grid; gap: 12px; min-width: 0; }
+.agent-config-editor label { display: grid; gap: 5px; min-width: 0; }
+.agent-config-editor textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, monospace; }
+.agent-config-controls { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+.agent-config-controls label { flex: 1 1 180px; }
+.agent-config-controls input, .agent-config-controls select { width: 100%; box-sizing: border-box; }
+.agent-config-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.agent-config-project { min-width: min(760px, 90vw); max-height: 85vh; overflow: auto; }

@@ -15,7 +15,7 @@ import { GitAccessSection } from "./GitAccess";
 import { VersionsSection } from "./Machines";
 import { PolicySection } from "./Policy";
 import { SidebarGroupsSection } from "./SidebarGroups";
-import { UserWorkflowsSection } from "./UserWorkflows";
+import { PersonasConfigSection, SkillsConfigSection, WorkflowsConfigSection } from "../AgentConfigEditor";
 
 /** Settings' groups by subject (#2157, was by scope #1759): this browser, the machines that run agents, and
  * what the control plane keeps (the person's sign-ins first). */
@@ -44,6 +44,7 @@ export const settingsSections: readonly SettingsSection[] = [
   { name: "machines", scope: "machines", order: 20, Section: VersionsSection },
   // Who belongs to the control plane, and their machines and clients (#994).
   { name: "people", scope: "controlPlane", order: 10, Section: PeopleSection },
+  { name: "personas", scope: "agentConfiguration", order: 20, Section: PersonasConfigSection },
   // The organisation's rules, read only, and the kill switch for an admin (#998).
   { name: "policy", scope: "controlPlane", order: 45, Section: PolicySection },
   { name: "providers", scope: "controlPlane", order: 50, Section: ProvidersSection },
@@ -56,7 +57,8 @@ export const settingsSections: readonly SettingsSection[] = [
   { name: "signInProviders", scope: "controlPlane", order: 40, Section: SignInSection, shows: (store) => store.person.value?.role === "admin" },
   // How you sign in on your Macs, iPhones and iPads (#995).
   { name: "signIns", scope: "controlPlane", order: 5, Section: SignInsSection },
-  { name: "workflows", scope: "agentConfiguration", order: 10, Section: UserWorkflowsSection },
+  { name: "skills", scope: "agentConfiguration", order: 10, Section: SkillsConfigSection },
+  { name: "workflows", scope: "agentConfiguration", order: 30, Section: WorkflowsConfigSection },
 ];
 
 /** One group's sections, in their order, less any not shown now. */

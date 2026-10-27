@@ -1308,6 +1308,24 @@ final class RemoteModel {
         return try? await client(for: request).call(DaemonAPI.Method.personasFiles, request, returning: [DaemonAPI.PersonaFile].self)
     }
 
+    func agentConfigEditorFiles(in folder: URL?, kind: DaemonAPI.AgentConfigEditorKind)
+        async -> [DaemonAPI.AgentConfigEditorFile]? {
+        let request = DaemonAPI.AgentConfigEditorRequest(folder: folder, kind: kind)
+        return try? await client(for: request).call(DaemonAPI.Method.agentConfigEditorFiles, request,
+                                                     returning: [DaemonAPI.AgentConfigEditorFile].self)
+    }
+
+    func saveAgentConfigEditorFile(in folder: URL?, kind: DaemonAPI.AgentConfigEditorKind,
+                                   path: String, content: String, delete: Bool) async -> String? {
+        let request = DaemonAPI.AgentConfigEditorSaveRequest(folder: folder, kind: kind, path: path,
+                                                               content: content, delete: delete)
+        do {
+            try await client(for: request).call(DaemonAPI.Method.agentConfigEditorSave, request)
+            await refreshWorkflows()
+            return nil
+        } catch { return String(describing: error) }
+    }
+
     func savePersonaFile(in folder: URL, origin: Persona.Origin, id: String, content: String, delete: Bool = false) async -> Bool {
         let request = DaemonAPI.PersonaFileSaveRequest(folder: origin == .folder ? folder : nil, origin: origin,
                                                        id: id, content: content, delete: delete ? true : nil)

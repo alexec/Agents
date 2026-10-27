@@ -169,6 +169,22 @@
       ]
     },
     {
+      "name": "agentConfig/editorFiles",
+      "x-capability": "personal/1",
+      "tags": [{ "name": "web" }],
+      "paramStructure": "by-name",
+      "params": [{ "name": "params", "required": true, "schema": { "$ref": "daemon.schema.json#/definitions/AgentConfigEditorRequest" } }],
+      "result": { "name": "result", "schema": { "$ref": "daemon.schema.json#/definitions/AgentConfigEditorFiles" } }
+    },
+    {
+      "name": "agentConfig/editorSave",
+      "x-capability": "personal/1",
+      "tags": [{ "name": "web" }],
+      "paramStructure": "by-name",
+      "params": [{ "name": "params", "required": true, "schema": { "$ref": "daemon.schema.json#/definitions/AgentConfigEditorSaveRequest" } }],
+      "result": { "name": "result", "schema": { "$ref": "daemon.schema.json#/definitions/Empty" } }
+    },
+    {
       "name": "agents/answerSandbox",
       "x-capability": "agents/1",
       "tags": [

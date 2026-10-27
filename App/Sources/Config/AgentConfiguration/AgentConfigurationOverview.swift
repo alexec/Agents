@@ -47,12 +47,7 @@ struct AgentConfigurationOverview: View {
 
     private var kinds: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ForEach(AgentConfigurationPage.allCases.filter { kind in
-                guard kind != .overview else { return false }
-                if kind != .workflows { return true }
-                if case .you = place { return true }
-                return false
-            }, id: \.self) { kind in
+            ForEach(AgentConfigurationPage.allCases.filter { $0 != .overview }, id: \.self) { kind in
                 let what = summary(kind)
                 SharedRow(chosen: false, label: "\(kind.title): \(what). Show.", action: { page = kind }) {
                     HStack(spacing: 10) {
@@ -78,6 +73,7 @@ struct AgentConfigurationOverview: View {
             if count == 0 { return "None" }
             let noun: (String, String) = switch kind {
             case .skills: ("skill", "skills")
+            case .personas: ("persona", "personas")
             case .workflows: ("workflow", "workflows")
             case .mcp: ("connector", "connectors")
             case .plugins: ("plugin", "plugins")

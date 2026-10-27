@@ -125,6 +125,8 @@ const CapWorktrees1 = "worktrees/1"
 
 // HostCapabilities is the capability of each method and notification in daemon.openrpc.json.
 var HostCapabilities = pairs([][2]string{
+	{"agentConfig/editorFiles", "personal/1"},
+	{"agentConfig/editorSave", "personal/1"},
 	{"agents/answerSandbox", "agents/1"},
 	{"agents/archive", "agents/1"},
 	{"agents/branchFrom", "chat.branch/1"},

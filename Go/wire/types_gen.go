@@ -272,6 +272,33 @@ type AgentArchivedReason string
 const AgentArchivedReasonByUser AgentArchivedReason = "byUser"
 const AgentArchivedReasonByAgent AgentArchivedReason = "byAgent"
 
+// A Markdown file under skills, personas or workflows in Agent Configuration.
+type AgentConfigEditorFile struct {
+	Path string `json:"path"`
+
+	Content string `json:"content"`
+}
+
+type AgentConfigEditorFiles []AgentConfigEditorFile
+
+type AgentConfigEditorRequest struct {
+	Folder *URL `json:"folder,omitzero"`
+
+	Kind string `json:"kind"`
+}
+
+type AgentConfigEditorSaveRequest struct {
+	Folder *URL `json:"folder,omitzero"`
+
+	Kind string `json:"kind"`
+
+	Path string `json:"path"`
+
+	Content string `json:"content"`
+
+	Delete *bool `json:"delete,omitzero"`
+}
+
 // One agent configuration file (#2129), or a deletion tombstone. contents is base64 encoded. Logical time and machine ID resolve concurrent offline edits.
 type AgentConfigFile struct {
 	Path string `json:"path"`

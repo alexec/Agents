@@ -4,10 +4,10 @@ import SwiftUI
 /// Frame G: everything else in `~/.agents` or a folder's `.agents`, with what (if
 /// anything) uses it. Nothing is hidden, so the pages are the whole folder.
 struct AgentConfigurationOtherFiles: View {
-    @Environment(AppModel.self) private var model
     let place: AgentsPlace
     let snapshot: DaemonAPI.SharedSnapshot
-    @State private var managingPersonas = false
+
+    private var files: [DaemonAPI.OtherFile] { snapshot.otherFiles.filter { $0.kind != .persona } }
 
     var body: some View {
         ScrollView {
@@ -15,11 +15,10 @@ struct AgentConfigurationOtherFiles: View {
                 SharedPageHeader(title: "Other files", path: snapshot.home) {
                     Button("Reveal in Finder") { SharedFiles.reveal(snapshot.home) }.buttonStyle(.paper)
                 }
-                Button("Manage personas…") { managingPersonas = true }.buttonStyle(.paper)
-                if snapshot.otherFiles.isEmpty {
+                if files.isEmpty {
                     Text("Nothing else in \(place.folderName).").appText(.fine).foregroundStyle(.secondary)
                 }
-                ForEach(snapshot.otherFiles) { file in
+                ForEach(files) { file in
                     let path = snapshot.home + "/" + file.path
                     HStack(spacing: 10) {
                         VStack(alignment: .leading, spacing: 2) {
@@ -39,16 +38,6 @@ struct AgentConfigurationOtherFiles: View {
                 }
             }
             .padding(20)
-        }
-        .sheet(isPresented: $managingPersonas) { personaManager }
-    }
-
-    @ViewBuilder private var personaManager: some View {
-        switch place {
-        case .you:
-            PersonaManagerSheet(host: .mac, folder: URL(filePath: snapshot.home), personalOnly: true)
-        case .folder(let folder):
-            PersonaManagerSheet(host: model.selectedFolderHost, folder: folder)
         }
     }
 

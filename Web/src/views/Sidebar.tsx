@@ -16,6 +16,7 @@ import { undoLabel, undoMillis } from "../model/archiveWords";
 import { healthTally, folderServers } from "../model/hostedMCP";
 import { signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
+import { ProjectAgentConfigModal } from "./AgentConfigEditor";
 import { actDoing, type Store } from "../model/store";
 import { byStart, folderKey, folderPath as agentFolderPath, showsUnread } from "../model/groups";
 import { folds } from "../model/folds";
@@ -506,6 +507,7 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
   const down = linkDown || !store.hostIsOnline(host.id);
   // Every match on show, past the first few; a new search shows the few again.
   const showsAllMatches = useSignal(false);
+  const configOpen = useSignal(false);
   useEffect(() => { showsAllMatches.value = false; }, [query]);
   const online = store.hostIsOnline(host.id);
   // A file dragged onto the row goes into the folder's drop box (#231). Before any early return:
@@ -570,6 +572,8 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
       run: () => void window.open(aloneURL(host.id, folder), "_blank", "noopener") },
     { label: "Put Files in Drop Box…", disabled: down, help: "Put files into this folder's .agents/dropbox/ (#231)",
       run: () => putFilesInDropbox(host.id, folder, label) },
+    { label: "Agent Configuration…", disabled: down,
+      run: () => { configOpen.value = true; } },
     ...showHiddenViewsItem(store, host.id, folder, down),
     // To the top of the sidebar, as the window's Pin.
     { label: folderPinned ? "Unpin" : "Pin", disabled: down,
@@ -607,6 +611,8 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
   return (
     <div class={`folder-fold${down && !linkDown ? " greyed" : ""}`} role="group" aria-label={label}
       data-host={host.id} data-folder={folder}>
+      {configOpen.value && <ProjectAgentConfigModal store={store} host={host.id} folder={folder} down={down}
+        close={() => { configOpen.value = false; }} />}
       {isAlone ? (
         // The tab is the folder, so its name is the tab's title and not a heading (#1089).
         <p class={`sidebar-head-label alone-sessions${drop.targeted ? " drop-target" : ""}`} {...drop.props}>Sessions</p>

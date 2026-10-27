@@ -69,8 +69,9 @@ struct AgentConfigurationView: View {
         switch page {
         case .overview: AgentConfigurationOverview(place: place, snapshot: snapshot, page: $page)
         case .instructions: AgentsSetupPage { AgentsInstructionsSection(place: place) }.task { await refresh() }
-        case .skills: AgentsSetupPage { AgentsSkillsSection(place: place) }.task { await refresh() }
-        case .workflows: if case .you = place { UserWorkflowsSettingsView() }
+        case .skills: AgentConfigurationFilesPage(place: place, kind: .skills)
+        case .personas: AgentConfigurationFilesPage(place: place, kind: .personas)
+        case .workflows: AgentConfigurationFilesPage(place: place, kind: .workflows)
         case .mcp: AgentsSetupPage { FolderMCPSection(place: place) }.task { await refresh() }
         case .plugins: AgentsSetupPage { AgentsPluginsSection(place: place) }.task { await refresh() }
         case .other: AgentConfigurationOtherFiles(place: place, snapshot: snapshot)
@@ -80,7 +81,7 @@ struct AgentConfigurationView: View {
 
 /// Every page, in the order the pane lists them.
 enum AgentConfigurationPage: String, Hashable, CaseIterable {
-    case overview, instructions, skills, workflows, mcp, plugins, other
+    case overview, instructions, skills, personas, workflows, mcp, plugins, other
 
     init(_ page: DaemonAPI.Look.Page) {
         switch page {
@@ -97,6 +98,7 @@ enum AgentConfigurationPage: String, Hashable, CaseIterable {
         case .overview: "Overview"
         case .instructions: "Instructions"
         case .skills: "Skills"
+        case .personas: "Personas"
         case .workflows: "Workflows"
         case .mcp: "Connectors"
         case .plugins: "Plugins"
@@ -110,16 +112,17 @@ enum AgentConfigurationPage: String, Hashable, CaseIterable {
         case .overview: nil
         case .instructions: snapshot.instructions?.exists == true ? 1 : 0
         case .skills: snapshot.skills.count
+        case .personas: snapshot.otherFiles.filter { $0.kind == .persona }.count
         case .workflows: nil
         case .mcp: snapshot.mcp.problem == nil ? snapshot.mcp.servers.count : nil
         case .plugins: snapshot.plugins.count
-        case .other: snapshot.otherFiles.count
+        case .other: snapshot.otherFiles.filter { $0.kind != .persona }.count
         }
     }
 
     func warns(in snapshot: DaemonAPI.SharedSnapshot) -> Bool {
         switch self {
-        case .overview, .other, .workflows: false
+        case .overview, .other, .personas, .workflows: false
         case .instructions: snapshot.warns(.instructions)
         case .skills: snapshot.warns(.skills)
         case .mcp: snapshot.warns(.mcp)
@@ -183,9 +186,9 @@ private struct SharedEmptyState: View {
     private var words: String {
         switch place {
         case .you:
-            "Put things in ~/.agents once and every agent gets them, on every runtime: AGENTS.md for instructions · skills/ · mcp.json for connectors · plugins/"
+            "Put things in ~/.agents once and every agent gets them, on every runtime: AGENTS.md for instructions · skills/ · personas/ · workflows/ · mcp.json for connectors · plugins/"
         case .folder:
-            "Put things in this folder’s .agents and every agent here gets them, and everyone who clones it: skills/ · mcp.json for connectors · plugins/. Its instructions are AGENTS.md at the top of the folder."
+            "Put things in this folder’s .agents and every agent here gets them, and everyone who clones it: skills/ · personas/ · workflows/ · mcp.json for connectors · plugins/. Its instructions are AGENTS.md at the top of the folder."
         }
     }
 }
@@ -338,13 +341,7 @@ struct AgentConfigurationPageList: View {
     let choose: (AgentConfigurationPage) -> Void
     var place: AgentsPlace = .you
 
-    private var pages: [AgentConfigurationPage] {
-        AgentConfigurationPage.allCases.filter { page in
-            guard page == .workflows else { return true }
-            if case .you = place { return true }
-            return false
-        }
-    }
+    private var pages: [AgentConfigurationPage] { AgentConfigurationPage.allCases }
 
     var body: some View {
         PageList {

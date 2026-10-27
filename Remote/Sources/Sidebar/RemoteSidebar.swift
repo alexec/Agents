@@ -853,6 +853,7 @@ private struct ForgetThisDeviceRow: View {
 /// (Folder Settings, Show in Finder).
 private struct FolderMenuItems: View {
     @Environment(RemoteModel.self) private var model
+    @State private var showingAgentConfiguration = false
     let summary: DaemonAPI.FolderSummary
     /// Files into the folder's drop box (#231), as a drag onto the Mac's row puts them.
     let putInDropbox: () -> Void
@@ -861,6 +862,12 @@ private struct FolderMenuItems: View {
         NewSessionButton(folder: summary.folder.folder)
         // The folder alone (#1089): a scene of its own on an iPad, a screen on an iPhone.
         OpenFolderButton(key: summary.key)
+        Button("Agent Configuration…", systemImage: "slider.horizontal.3") {
+            showingAgentConfiguration = true
+        }
+        .sheet(isPresented: $showingAgentConfiguration) {
+            RemoteFolderAgentConfiguration(folder: summary.folder.folder)
+        }
         Button(action: putInDropbox) {
             Label("Put Files in Drop Box…", systemImage: "tray.and.arrow.down")
         }

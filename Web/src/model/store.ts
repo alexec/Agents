@@ -1191,6 +1191,20 @@ export class Store extends Work {
     }
   }
 
+  async agentConfigEditorFiles(host: string, folder: string | undefined, kind: "skills" | "personas" | "workflows") {
+    return this.link.call("agentConfig/editorFiles", { folder: folder as never, kind }, host).catch(() => null);
+  }
+
+  async saveAgentConfigEditorFile(host: string, folder: string | undefined,
+    kind: "skills" | "personas" | "workflows", path: string, content: string, remove: boolean): Promise<string | null> {
+    try {
+      await this.link.call("agentConfig/editorSave", { folder: folder as never, kind, path, content, delete: remove }, host);
+      if (kind === "workflows" && folder === undefined) await this.loadUserWorkflows(host);
+      if (kind === "workflows" && folder !== undefined) await this.loadWorkflows(host, folder);
+      return null;
+    } catch (error) { return describe(error); }
+  }
+
   constructor(readonly link: Link) {
     super();
     // The person's display choices are kept on their Mac (#1033).
