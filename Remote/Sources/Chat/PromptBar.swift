@@ -267,6 +267,8 @@ struct PromptBar: View {
             HStack(spacing: 8) {
                 AttachButton(attachments: $attachments, refusal: $attachRefusal)
 
+                Spacer(minLength: 0)
+                // Dictate and voice mode sit with send, on the right (#2634).
                 DictateButton(dictation: dictation, begin: beginDictation, send: send)
 
                 // Voice mode (#2322), while Settings ▸ Voice has it on.
@@ -275,7 +277,6 @@ struct PromptBar: View {
                     return await model.send(words, to: agent.id, voice: true) ? agent.id : nil
                 }
 
-                Spacer(minLength: 0)
                 // While it works and nothing is typed, send is stop. Type and it is send
                 // again, queueing what is typed for when the turn ends.
                 if model.canStop(agent), !model.isStale(agent), text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
