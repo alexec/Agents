@@ -297,7 +297,7 @@
   {
     "expected" : {
       "shape" : "waiting",
-      "symbol" : null,
+      "symbol" : "dot.radiowaves.left.and.right",
       "tinted" : false,
       "words" : "Waiting"
     },
@@ -345,7 +345,7 @@
   {
     "expected" : {
       "shape" : "waiting",
-      "symbol" : null,
+      "symbol" : "dot.radiowaves.left.and.right",
       "tinted" : false,
       "words" : "Waiting"
     },
@@ -481,7 +481,7 @@
   {
     "expected" : {
       "shape" : "waiting",
-      "symbol" : null,
+      "symbol" : "dot.radiowaves.left.and.right",
       "tinted" : false,
       "words" : "Waiting"
     },
@@ -743,7 +743,7 @@
   {
     "expected" : {
       "shape" : "waiting",
-      "symbol" : null,
+      "symbol" : "dot.radiowaves.left.and.right",
       "tinted" : false,
       "words" : "Waiting"
     },
@@ -1299,7 +1299,7 @@
   {
     "expected" : {
       "shape" : "waiting",
-      "symbol" : null,
+      "symbol" : "dot.radiowaves.left.and.right",
       "tinted" : false,
       "words" : "Queued"
     },

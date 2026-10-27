@@ -57,17 +57,22 @@ public enum StatusShape: Hashable, Sendable {
         }
     }
 
-    /// The SF Symbol to draw. Nil for `working`, which is drawn as the working ring, and
-    /// for `waiting`, which is drawn as the breathing dot (#2456): motion, not a fourth
-    /// symbol after the hourglass, `moon.zzz` and `zzz` (#765).
+    /// The SF Symbol to draw. Nil for `working`, which is drawn as the working ring. For
+    /// `waiting`, the waiting card's beacon (#2582, #2657), which breathes as the dot of
+    /// #2456 did: one icon for waiting, on the card and on the session's mark. Before the
+    /// dot, the hourglass, `moon.zzz` and `zzz` (#765).
     public var symbol: String? {
         switch self {
-        case .working, .waiting: return nil
+        case .working: return nil
+        case .waiting: return Self.waitingSymbol
         case .needsYou: return "exclamationmark.circle.fill"
         case .done: return "checkmark"
         case .stopped: return "stop.circle"
         }
     }
+
+    /// The beacon: the waiting mark and the waiting card's icon (#2657).
+    public static let waitingSymbol = "dot.radiowaves.left.and.right"
 
     /// What the Mac's row and the phone's card say for `waiting`, in place of the
     /// outcome's heading: a waiting report the app will resume is Waiting to the

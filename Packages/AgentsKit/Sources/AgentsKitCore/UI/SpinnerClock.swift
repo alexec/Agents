@@ -10,7 +10,7 @@ import Foundation
 /// one, and a row that appears late joins in step.
 ///
 /// Here rather than in `Shared/UI` so the arithmetic is under test; the views that
-/// draw it are `SyncedSpinner`, `WorkingRing` and `BreathingDot`.
+/// draw it are `SyncedSpinner`, `WorkingRing` and `WaitingBeacon`.
 public enum SpinnerClock {
     /// One full turn, in seconds. The system spinner's own pace, near enough.
     public static let period: TimeInterval = 1
@@ -50,8 +50,8 @@ public enum SpinnerClock {
     /// many times slower.
     public static let reducedMotionSlowing: Double = 2
 
-    /// One breath of the waiting mark (#2456): one accent dot that fades between dim and
-    /// full and back, a slow sine like a sleep light, unless `waitingMarkPeriod` in the
+    /// One breath of the waiting mark (#2456, #2657): the accent beacon fades between dim
+    /// and full and back, a slow sine like a sleep light, unless `waitingMarkPeriod` in the
     /// defaults (localStorage on the web page) says otherwise. Asleep, but alive.
     public static let breathPeriod: TimeInterval = 4
 
@@ -61,10 +61,7 @@ public enum SpinnerClock {
     /// The shortest and longest breath the key can ask for, in seconds.
     public static let breathPeriodRange: ClosedRange<TimeInterval> = 1...30
 
-    /// The dot's diameter, as a fraction of the well's side: the ring's dot.
-    public static let breathDotDiameter: Double = ringDotDiameter
-
-    /// How dim the dot is at the bottom of a breath: the ring's resting opacity.
+    /// How dim the beacon is at the bottom of a breath: the ring's resting opacity.
     public static let breathDimOpacity: Double = ringRestingOpacity
 
     /// The breath the key asks for: `stored` within `breathPeriodRange`, else `breathPeriod`.
@@ -73,7 +70,7 @@ public enum SpinnerClock {
         return min(max(stored, breathPeriodRange.lowerBound), breathPeriodRange.upperBound)
     }
 
-    /// How bright the waiting dot is `time` seconds into a breath of `period`: dim at the
+    /// How bright the waiting beacon is `time` seconds into a breath of `period`: dim at the
     /// start, full halfway, dim again at the end, along a cosine so it has no corners.
     public static func breathOpacity(at time: TimeInterval, period: TimeInterval = breathPeriod) -> Double {
         let depth = (1 - cos(2 * .pi * time / period)) / 2

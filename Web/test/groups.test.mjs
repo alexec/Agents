@@ -33,7 +33,7 @@ for (const { name, input, expected } of cases("groups/panels.json")) {
   });
 }
 
-const symbols = { working: null, needsYou: "exclamationmark.circle.fill", waiting: null,
+const symbols = { working: null, needsYou: "exclamationmark.circle.fill", waiting: "dot.radiowaves.left.and.right",
                   done: "checkmark", stopped: "stop.circle" };
 
 for (const { name, input, expected } of cases("status/rows.json")) {

@@ -42,7 +42,7 @@ const markWords: Record<SessionMark, string> = { needsYou: "Needs you", working:
 
 /**
  * A session's mark in the sidebar (#495, #499), the window's and the Remote's: an orange hand when
- * it needs the person, the working ring while it thinks, tipping while it runs a tool (#2332), a numbered list while queued, a breathing dot while it waits (#2456), a pause mark once
+ * it needs the person, the working ring while it thinks, tipping while it runs a tool (#2332), a numbered list while queued, a breathing beacon while it waits (#2456, #2657), a pause mark once
  * stopped (#630), a tick once done, read or not (#1323, #2363). Archived keeps its
  * status mark.
  */
@@ -79,12 +79,26 @@ export function WorkingMark({ tool }: { tool: string | null }) {
 }
 
 /**
- * A waiting session's mark (#2456), the window's `BreathingDot`: one dot, the ring's dot, that
- * breathes between dim and full once in 4 s, in step on the page (spinnerClock.ts) and slower under
- * Reduce Motion. In the colour around it: the accent, where the unread dot is grey and still.
+ * The beacon (#2657), the SF Symbol `dot.radiowaves.left.and.right` the window and the Remote draw
+ * for waiting: a dot with two arcs on each side, in the colour around it. The waiting mark and the
+ * waiting card's icon (`Chat.tsx`), so one icon says waiting everywhere.
+ */
+export function Beacon() {
+  return (
+    <svg class="beacon" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="2.4" />
+      <path d="M15.5 7.8A5.5 5.5 0 0 1 15.5 16.2M8.5 16.2A5.5 5.5 0 0 1 8.5 7.8M18.1 4.7A9.5 9.5 0 0 1 18.1 19.3M5.9 19.3A9.5 9.5 0 0 1 5.9 4.7" />
+    </svg>
+  );
+}
+
+/**
+ * A waiting session's mark (#2456, #2657), the window's `WaitingBeacon`: the beacon, breathing
+ * between dim and full once in 4 s, in step on the page (spinnerClock.ts) and slower under Reduce
+ * Motion. In the colour around it: the accent, where the unread dot is grey, round and still.
  */
 export function WaitingMark() {
-  return <span class="breathing-dot" aria-hidden="true"><i /></span>;
+  return <span class="waiting-beacon" aria-hidden="true"><Beacon /></span>;
 }
 
 const relative = new Intl.RelativeTimeFormat("en", { numeric: "always" });

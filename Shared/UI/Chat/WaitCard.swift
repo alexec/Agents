@@ -64,7 +64,8 @@ struct WaitCard: View {
         let elapsed = max(0, Int(now.timeIntervalSince(wait.since) / 60))
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 7) {
-                Image(systemName: "dot.radiowaves.left.and.right").foregroundStyle(.blue)
+                // The waiting mark's beacon in the same colour: one icon for waiting (#2657).
+                Image(systemName: StatusShape.waitingSymbol).foregroundStyle(Paper.accent)
                 Text("Waiting for event").fontWeight(.semibold)
                 Spacer(minLength: 6)
                 Text(total.map { "\(elapsed) / \($0) min" } ?? "\(elapsed) min")

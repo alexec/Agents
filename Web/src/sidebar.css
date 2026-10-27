@@ -88,7 +88,7 @@
 .with-sidebar .sidebar .title.placed .place { max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
 
 /* A session's mark in the sidebar (#495): an orange hand, the working ring (#2044, #2332), a list when queued,
-   a breathing dot (#2456), a pause mark (#630), a tick once done, read or not (#1323, #2363); every icon in the
+   the breathing beacon (#2456, #2657), a pause mark (#630), a tick once done, read or not (#1323, #2363); every icon in the
    accent but what lists it under Needs You (#817). */
 .sidebar-mark { width: 1rem; height: 1rem; margin-top: 1px; box-sizing: border-box;
   display: inline-flex; align-items: center; justify-content: center; color: var(--accent); }
