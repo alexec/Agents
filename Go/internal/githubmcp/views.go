@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/alexec/agents/Go/internal/richtext"
@@ -60,6 +61,9 @@ type repoArgs struct {
 type issuesArgs struct {
 	Repo  string `json:"repo,omitempty" jsonschema:"owner/name; the repo this folder pushes to when left out"`
 	Label string `json:"label,omitempty" jsonschema:"only issues with this label"`
+	// Labels and Query are the Issues page's filters (#2686): one call for all of them.
+	Labels []string `json:"labels,omitempty" jsonschema:"only issues with all of these labels"`
+	Query  string   `json:"query,omitempty" jsonschema:"only issues whose title or description has these words (GitHub search); a number also finds that issue"`
 }
 
 type issueDetailsArgs struct {
@@ -169,22 +173,31 @@ func AddViews(server *mcp.Server, gh Views, person bool) {
 
 	mcp.AddTool(server, &mcp.Tool{Name: "show_issues", Title: "Show issues",
 		Description: "The repo's open issues (not pull requests), newest created first, at most 100, each with its labels, " +
-			"assignees (logins), milestone and comment count. Its view is the Issues page, where a person expands a row to read its rich-text description and linked pull requests.",
+			"assignees (logins), milestone and comment count; labelColors maps each label to its #rrggbb. " +
+			"A query searches titles and descriptions. Its view is the Issues page, where a person expands a row to read its rich-text description and linked pull requests.",
 		Annotations: readOnly, Meta: uiMeta(issuesURI, "model", "app")},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in issuesArgs) (*mcp.CallToolResult, any, error) {
 			repo, err := repoOf(ctx, in.Repo)
 			if err != nil {
 				return failed(err), nil, nil
 			}
-			list, err := gh.OpenIssues(ctx, repo, in.Label)
+			labels := in.Labels
+			if in.Label != "" && !slices.Contains(labels, in.Label) {
+				labels = append([]string{in.Label}, labels...)
+			}
+			list, err := gh.OpenIssues(ctx, repo, IssueFilter{Labels: labels, Query: strings.TrimSpace(in.Query)})
 			if err != nil {
 				return failed(err), nil, nil
 			}
 			issues := make([]any, len(list))
+			colors := map[string]string{}
 			for i, l := range list {
 				issues[i] = l.json()
+				for name, color := range l.LabelColors {
+					colors[name] = color
+				}
 			}
-			return structured(map[string]any{"repo": repo, "issues": issues, "count": len(issues)}), nil, nil
+			return structured(map[string]any{"repo": repo, "issues": issues, "count": len(issues), "labelColors": colors}), nil, nil
 		})
 
 	mcp.AddTool(server, &mcp.Tool{Name: "show_issue_details", Title: "Show issue details",

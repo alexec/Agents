@@ -1,7 +1,7 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Issues</title>
-<!-- The github server's Issues (ui://github/issues, #1341): show_issues's result; a label
-     narrows it. Start Agent opens the app's new-agent form filled in for the issue
+<!-- The github server's Issues (ui://github/issues, #1341): show_issues's result; labels
+     and a search narrow it, in one call (#2686). Start Agent opens the app's new-agent form filled in for the issue
      (agents/start-agent, #834). It has no network: it speaks only the MCP Apps bridge. -->
 <style>
 /*common.css*/
@@ -21,10 +21,16 @@
 .linked-pr { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
 .label-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0; }
 .label-filters input { min-width: 12em; }
+.search { display: flex; margin: 8px 0; }
+.search input { flex: 1; min-width: 0; }
+/* A label in its GitHub colour (#2686): a chosen one keeps it and gets a ring. */
+.pill.colored.chosen { outline: 2px solid var(--color-text-primary); outline-offset: 1px; }
+button.pill.colored:hover { filter: brightness(0.9); }
 </style></head>
 <body><main>
   <header><h1>Issues</h1><span id="repo" class="muted"></span><span class="grow"></span>
     <button id="refresh" type="button" disabled>Refresh</button></header>
+  <div class="search"><input id="search" type="search" aria-label="Search issues" placeholder="Search issues" autocomplete="off"></div>
   <div class="label-filters" role="group" aria-label="Filter issues by labels">
     <span class="muted">Labels</span><span id="label-tags"></span>
     <input id="label-input" type="text" aria-label="Add a label filter" placeholder="Add label filter" list="label-options" autocomplete="off">
@@ -36,9 +42,12 @@
 <script>
 /*bridge.js*/
 (() => {
-  let repo = "", activeLabels = [];
+  let repo = "", activeLabels = [], query = "", searchTimer = 0;
+  const labelColors = {};
   const ui = bridge("github-issues", {
-    input: (args) => { repo = args.repo || ""; activeLabels = args.label ? [args.label] : []; drawLabel(); ui.$("repo").textContent = repo; say("Listing…"); },
+    input: (args) => {
+      repo = args.repo || ""; query = typeof args.query === "string" ? args.query.trim() : ""; ui.$("search").value = query;
+      activeLabels = [...new Set([args.label, ...(Array.isArray(args.labels) ? args.labels : [])].filter(Boolean))]; drawLabel(); ui.$("repo").textContent = repo; say("Listing…"); },
     result: (result) => draw(result),
     cancelled: (why) => say("Cancelled: " + why, true),
     started: () => say("Waiting for the issues…"),
@@ -46,15 +55,29 @@
   const { $, el, link, button } = ui;
   const say = (text, isError) => { $("state").textContent = text; $("state").className = isError ? "error" : "muted"; ui.size(); };
 
+  // A label pill in its GitHub colour, its text black or white by the colour's luminance.
+  const labelPill = (text, name, onClick, chosen, title) => {
+    const color = labelColors[name];
+    const pill = button(text, onClick, { className: "pill" + (chosen ? " chosen" : "") + (color ? " colored" : ""), title });
+    if (color) {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16) / 255)
+        .map((c) => c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+      pill.style.background = color;
+      pill.style.color = 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.179 ? "#000" : "#fff";
+    }
+    return pill;
+  };
+
   const drawLabel = () => {
-    $("label-tags").replaceChildren(...activeLabels.map((name) => button(name + " ✕", () => removeLabel(name),
-      { className: "pill chosen", title: `Remove ${name} label filter` })));
+    $("label-tags").replaceChildren(...activeLabels.map((name) => labelPill(name + " ✕", name, () => removeLabel(name),
+      true, `Remove ${name} label filter`)));
   };
 
   const draw = (result) => {
     const found = ui.data(result);
     if (!found) { say("Couldn't list issues: " + ui.errorText(result), true); $("refresh").disabled = !repo; return; }
     if (found.repo) { repo = found.repo; $("repo").textContent = repo; }
+    if (found.labelColors && typeof found.labelColors === "object") Object.assign(labelColors, found.labelColors);
     const issues = Array.isArray(found.issues) ? found.issues : [];
     const options = [...new Set(issues.flatMap((issue) => issue.labels || []))].filter((name) => !activeLabels.includes(name));
     $("label-options").replaceChildren(...options.map((name) => el("option", { value: name })));
@@ -62,13 +85,14 @@
     drawLabel();
     const assigned = issues.filter((issue) => (issue.assignees || []).length).length;
     say(issues.length ? `${issues.length} open · ${assigned} assigned · as of ${new Date().toLocaleTimeString()}`
+      : query ? `No open issues match ${query}${activeLabels.length ? " labelled " + activeLabels.join(" and ") : ""}.`
       : activeLabels.length ? `No open issues labelled ${activeLabels.join(" and ")}.` : "No open issues.");
     $("refresh").disabled = !repo;
   };
 
   const row = (issue) => {
-    const issueLabels = (issue.labels || []).map((name) => button(name, () => addLabel(name),
-      { className: activeLabels.includes(name) ? "pill chosen" : "pill", title: "Filter by label " + name }));
+    const issueLabels = (issue.labels || []).map((name) => labelPill(name, name, () => addLabel(name),
+      activeLabels.includes(name), "Filter by label " + name));
     // Who works on it (#905): an issue is taken by assigning it.
     const assignees = (issue.assignees || []).map((login) =>
       el("span", { className: "pill assigned", textContent: "@" + login, title: "Assigned to " + login }));
@@ -173,20 +197,28 @@
     } catch (e) { say("Couldn't open a new agent: " + e.message, true); ui.log("start-agent refused: " + e.message, "warning"); }
   };
 
+  // One call for the labels and the search (#2686); a later call's answer wins.
+  let asked = 0;
   const list = async () => {
     $("refresh").disabled = true;
-    const base = { repo };
+    const args = { repo };
+    if (activeLabels.length) args.labels = activeLabels;
+    if (query) args.query = query;
+    const mine = ++asked;
     try {
-      const results = await Promise.all((activeLabels.length ? activeLabels : [""]).map((name) => ui.call("show_issues", name ? { ...base, label: name } : base)));
-      const first = results[0];
-      const common = activeLabels.length > 1 ? results.slice(1).reduce((items, result) => {
-        const ids = new Set((result.issues || []).map((issue) => issue.number));
-        return items.filter((issue) => ids.has(issue.number));
-      }, first.issues || []) : first.issues || [];
-      draw({ structuredContent: { ...first, issues: common } });
+      const found = await ui.call("show_issues", args);
+      if (mine === asked) draw({ structuredContent: found });
     }
-    catch (e) { say("Couldn't list issues: " + e.message, true); $("refresh").disabled = false; }
+    catch (e) { if (mine === asked) { say("Couldn't list issues: " + e.message, true); $("refresh").disabled = false; } }
   };
+  const search = () => {
+    clearTimeout(searchTimer);
+    const text = $("search").value.trim();
+    if (text === query) return;
+    query = text; say(query ? "Searching…" : "Listing…"); list();
+  };
+  $("search").onkeydown = (event) => { if (event.key === "Enter") { event.preventDefault(); search(); } };
+  $("search").oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(search, 400); };
   const addLabel = (name) => { if (name && !activeLabels.includes(name)) { activeLabels = [...activeLabels, name]; $("label-input").value = ""; drawLabel(); say("Listing…"); list(); } };
   const removeLabel = (name) => { activeLabels = activeLabels.filter((item) => item !== name); drawLabel(); say("Listing…"); list(); };
   const labelInput = $("label-input");

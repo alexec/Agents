@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -85,11 +86,20 @@ func (a *viewsAPI) serve(t *testing.T) *httptest.Server {
 			io.WriteString(w, pageAnswer)
 		case r.URL.Path == "/repos/o/r/issues":
 			io.WriteString(w, `[{"number":3,"title":"Mean is off by one","html_url":"https://github.com/o/r/issues/3","user":{"login":"kim"},
-			  "labels":[{"name":"bug"}],"assignees":[{"login":"sam"}],"comments":2,"updated_at":"2026-10-18T07:00:00Z",
+			  "labels":[{"name":"bug","color":"D73A4A"},{"name":"odd","color":"red"}],"assignees":[{"login":"sam"}],"comments":2,"updated_at":"2026-10-18T07:00:00Z",
 			  "milestone":{"title":"0.13 Lineage and value"}},
 			 {"number":4,"title":"No milestone yet","html_url":"https://github.com/o/r/issues/4","user":{"login":"kim"},
 			  "labels":[],"assignees":[],"comments":0,"updated_at":"2026-10-18T07:00:00Z"},
 			 {"number":7,"title":"a PR","pull_request":{"url":"x"}}]`)
+		case r.URL.Path == "/search/issues":
+			io.WriteString(w, `{"total_count":2,"items":[{"number":9,"title":"Old mean bug","html_url":"https://github.com/o/r/issues/9",
+			  "user":{"login":"kim"},"labels":[{"name":"bug","color":"d73a4a"}],"assignees":[]},
+			 {"number":3,"title":"Mean is off by one","html_url":"https://github.com/o/r/issues/3","user":{"login":"kim"},"labels":[]}]}`)
+		case r.URL.Path == "/repos/o/r/issues/3":
+			io.WriteString(w, `{"number":3,"title":"Mean is off by one","state":"open","html_url":"https://github.com/o/r/issues/3",
+			  "user":{"login":"kim"},"labels":[{"name":"bug","color":"d73a4a"}]}`)
+		case r.URL.Path == "/repos/o/r/issues/7":
+			io.WriteString(w, `{"number":7,"title":"a PR","state":"open","pull_request":{"url":"x"}}`)
 		case r.URL.Path == "/repos/o/r/pulls/7" && r.Method == http.MethodGet:
 			io.WriteString(w, `{"node_id":"PR_7","head":{"ref":"fix-mean","sha":"c0ffee","repo":{"full_name":"o/r"}}}`)
 		case r.URL.Path == "/repos/o/r/pulls/7/merge" && r.Method == http.MethodPut:
@@ -311,7 +321,7 @@ func TestEachViewHasAToolThatFeedsItAndAPage(t *testing.T) {
 		}
 		if uri == issuesURI {
 			for _, want := range []string{"show_issue_details", "closed_by_pull_requests", "milestone", "aria-expanded", "issue-row",
-				"Add a label filter", "label-tags", "removeLabel", "Promise.all"} {
+				"Add a label filter", "label-tags", "removeLabel", "Search issues", "labelColors", "query", "No open issues match"} {
 				if !strings.Contains(html, want) {
 					t.Errorf("issues page is missing %q", want)
 				}
@@ -360,6 +370,58 @@ func TestTheIssuesListLeavesOutPullRequests(t *testing.T) {
 	}
 	if r, _ := callTool(t, c, "show_issues", map[string]any{"repo": "not a repo"}); !r.IsError {
 		t.Error("a repo that is not owner/name was read")
+	}
+	// Each label's colour (#2686), and none for a colour that is not 6-digit hex.
+	if colors, _ := data["labelColors"].(map[string]any); colors["bug"] != "#d73a4a" || colors["odd"] != nil {
+		t.Errorf("labelColors: %v", data["labelColors"])
+	}
+}
+
+func TestTheIssuesListTakesAllItsLabelsInOneCall(t *testing.T) {
+	c, api := viewsClient(t)
+	callTool(t, c, "show_issues", map[string]any{"repo": "o/r", "label": "bug", "labels": []string{"ui", "bug"}})
+	api.mu.Lock()
+	defer api.mu.Unlock()
+	if len(api.queries) != 1 || !strings.Contains(api.queries[0], "labels="+url.QueryEscape("ui,bug")+"&") {
+		t.Errorf("queries: %v", api.queries)
+	}
+}
+
+func TestTheIssuesSearchIsOneGitHubSearch(t *testing.T) {
+	c, api := viewsClient(t)
+	_, data := callTool(t, c, "show_issues", map[string]any{"repo": "o/r", "query": " mean ", "labels": []string{"bug", "good first"}})
+	issues, _ := data["issues"].([]any)
+	if len(issues) != 2 || issues[0].(map[string]any)["number"] != 9.0 {
+		t.Fatalf("issues: %v", data)
+	}
+	if colors, _ := data["labelColors"].(map[string]any); colors["bug"] != "#d73a4a" {
+		t.Errorf("labelColors: %v", data["labelColors"])
+	}
+	api.mu.Lock()
+	q, _ := url.ParseQuery(api.queries[0])
+	api.mu.Unlock()
+	if q.Get("q") != `repo:o/r is:issue is:open mean label:"bug" label:"good first"` || q.Get("sort") != "created" || q.Get("order") != "desc" {
+		t.Errorf("search: %v", q)
+	}
+}
+
+func TestTheIssuesSearchFindsANumber(t *testing.T) {
+	c, _ := viewsClient(t)
+	_, data := callTool(t, c, "show_issues", map[string]any{"repo": "o/r", "query": "#3"})
+	issues, _ := data["issues"].([]any)
+	// #3 first, from its own read, and not twice; then the search's other one.
+	if len(issues) != 2 || issues[0].(map[string]any)["number"] != 3.0 || issues[1].(map[string]any)["number"] != 9.0 {
+		t.Fatalf("issues: %v", issues)
+	}
+	// A pull request's number is not an issue.
+	_, data = callTool(t, c, "show_issues", map[string]any{"repo": "o/r", "query": "7"})
+	if issues, _ := data["issues"].([]any); len(issues) != 2 || issues[0].(map[string]any)["number"] != 9.0 {
+		t.Fatalf("issues for 7: %v", issues)
+	}
+	// With a label it does not have, the number finds nothing of its own.
+	_, data = callTool(t, c, "show_issues", map[string]any{"repo": "o/r", "query": "3", "labels": []string{"ui"}})
+	if issues, _ := data["issues"].([]any); len(issues) != 2 || issues[0].(map[string]any)["number"] != 9.0 {
+		t.Fatalf("issues for 3 with ui: %v", issues)
 	}
 }
 
