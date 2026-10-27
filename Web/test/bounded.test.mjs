@@ -676,3 +676,19 @@ test("of two loads of one chat, an older answer landing last is dropped (#400)",
   await first;
   assert.deepEqual(store.entries.value.map((e) => e.id), ["page1"], "the older answer is not shown over the newer");
 });
+
+test("a session opened is looked for once its record and history have come (#2652)", async () => {
+  const link = heldLink((method) => (method === "agents/turns" ? { turns: [], firstTurn: 0, openStart: 0 }
+    : method === "agents/transcript" ? { firstIndex: 0, total: 0, entries: [] } : []));
+  const store = new Store(link);
+  const opening = store.openSession("mac", "gone");
+  await wait(0);
+  await link.answer("agents/turns");
+  await link.answer("agents/transcript");
+  await opening;
+  assert.equal(store.lookedFor.value, null, "not until its record has been asked for");
+  await link.answer("agents/list");
+  await wait(0);
+  assert.deepEqual(store.lookedFor.value, { host: "mac", session: "gone" });
+  assert.equal(store.agent("mac", "gone"), undefined);
+});

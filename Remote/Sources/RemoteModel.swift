@@ -94,6 +94,10 @@ final class RemoteModel {
         }
     }
 
+    /// The selection once it has been looked for, as `PoppedChat.looked`: from then a
+    /// selected session not in hand is one that has gone (#2652).
+    private(set) var lookedForSelection: UUID?
+
     /// The sessions open in scenes of their own on an iPad (#888), each with its own page
     /// of its transcript. See `PoppedChat`.
     var popouts: [UUID: PoppedChat] = [:]
@@ -4548,7 +4552,7 @@ final class RemoteModel {
     func loadTranscript() async {
         guard let selection else { work.clearTranscript(); return }
         // Beside the transcript rather than before it, and not cancelled by its returns.
-        Task { await loadWholeAgent(selection) }
+        let whole = Task { await loadWholeAgent(selection) }
         // The last few finished turns as summaries, as the window opens with (#242), then
         // the turn in progress. A Mac too old to keep turns gives the lot. Both from the
         // chat's own host (058).
@@ -4583,6 +4587,9 @@ final class RemoteModel {
             guard self.selection == selection else { return }
             work.failOpening(Self.describeLoadFailure(error), load: load)
         }
+        // Looked for once both have come: from here a session not in hand has gone (#2652).
+        await whole.value
+        if self.selection == selection { lookedForSelection = selection }
     }
 
     /// A chat's history that did not come, in words (#400).

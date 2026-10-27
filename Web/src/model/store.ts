@@ -211,6 +211,8 @@ export class Work {
 
   /** The conversation being read, and only that one. */
   readonly watching = signal<{ host: string; session: string } | null>(null);
+  /** The conversation last looked for: once it is, one not in hand has gone (#2652), as PoppedChat.looked. */
+  readonly lookedFor = signal<{ host: string; session: string } | null>(null);
   readonly entries = signal<TranscriptEntry[]>([]);
   /** The page as the chat draws it, folded once as each entry lands. */
   readonly items = signal<Item[]>([]);
@@ -1891,9 +1893,21 @@ export class Store extends Work {
     if (whole) this.addAgents([whole], host);
   }
 
-  /** The finished turns first, as summaries, then the transcript from where the open turn starts. */
+  /**
+   * The open session's record and its history, side by side. Looked for once both have come, so one not
+   * in hand then has gone (#2652); only the history is waited for.
+   */
   private async loadTranscript(host: string, session: string): Promise<void> {
-    void this.loadWhole(host, session);
+    const page = this.loadPage(host, session);
+    void Promise.all([this.loadWhole(host, session), page]).then(() => {
+      const now = this.watching.value;
+      if (now?.host === host && now.session === session) this.lookedFor.value = { host, session };
+    }, () => {});
+    await page;
+  }
+
+  /** The finished turns first, as summaries, then the transcript from where the open turn starts. */
+  private async loadPage(host: string, session: string): Promise<void> {
     this.heardSincePage ??= [];
     const load = ++this.transcriptLoads;
     const agentID = session as never;
