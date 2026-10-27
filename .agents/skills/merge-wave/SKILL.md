@@ -34,6 +34,10 @@ $W start agents/fix-github-issue-139@1a2b3c agents/work-github-issue-47@4d5e6f
 
 `plan` (or `--dry-run`) shows which branch fast-forwards, which merge cleanly, which
 conflicts the wave settles itself, which stop it, and the builds. A wave does not install.
+For a branch that fast-forwards, which is a lane's own rebased branch, `plan` also lists
+the commands its lane runs to verify it (#2685): an `App/` or `Host/` change builds only
+the Mac schemes, a `Remote/` change only the Remote, and a `Shared/`, `Packages/` or
+`project.yml` change both. Run `plan` from the lane's worktree to get its tests too.
 It simulates the merges with `git merge-tree`, so no ref, worktree or file changes.
 
 Then repeat until the step is `finish`:

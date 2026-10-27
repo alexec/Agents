@@ -3,7 +3,7 @@
 # shellcheck disable=SC2015,SC2329
 # merge-wave.sh's own test, in a throwaway clone of this repository: never the real main.
 #
-#   selftest.sh [scenario...]   clean, web, conflict, bisect, docs, reuse (all by default)
+#   selftest.sh [scenario...]   clean, web, conflict, bisect, docs, reuse, lane (all by default)
 #
 # Builds are a stub (MERGE_WAVE_STUB): it fails any step when the tree has a file
 # called WAVE_BREAK, and passes otherwise. The one real build is `scripts/web.sh build`
@@ -194,7 +194,23 @@ scenario_reuse() {
 	ok "a check that passed at the same tree is not run again ($ran checks reused)"
 }
 
-for s in "${@:-clean web conflict bisect docs reuse}"; do
+scenario_lane() {
+	reset
+	# What one lane builds for its own branch (#2685): only the platforms its paths need.
+	branch s7-app sh -c 'echo "// wave self-test" >>App/Sources/AgentsApp.swift && echo "// wave" >>Host/Sources/ControlKey.swift'
+	branch s7-remote sh -c 'echo "// wave self-test" >>Remote/Sources/RemoteApp.swift'
+	branch s7-shared sh -c 'echo "// wave self-test" >>Shared/UI/AllowanceBar.swift'
+	branch s7-docs sh -c 'echo "wave" >>docs/index.md'
+	lane() { "$MW" plan "$1" | sed -n 's/^      \(build-[a-z]*\):.*/\1/p' | tr '\n' ' '; }
+	[ "$(lane s7-app)" = "build-host build-store " ] || fail "an App/ and Host/ lane builds the Mac schemes only: $(lane s7-app)"
+	[ "$(lane s7-remote)" = "build-remote " ] || fail "a Remote/ lane builds the Remote only: $(lane s7-remote)"
+	[ "$(lane s7-shared)" = "build-host build-store build-remote " ] || fail "a Shared/ lane builds both: $(lane s7-shared)"
+	out=$("$MW" plan s7-docs)
+	echo "$out" | grep -q 'its lane builds nothing' || fail "a docs lane builds nothing"
+	ok "a lane builds only the platforms its paths need"
+}
+
+for s in "${@:-clean web conflict bisect docs reuse lane}"; do
 	for one in $s; do "scenario_$one"; done
 done
 echo "all passed"
