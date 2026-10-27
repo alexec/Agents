@@ -24,12 +24,23 @@ the keyboard, that is true only of a workflow run.
 - Periphery is pinned at 3.8.0. Download its release archive to a temporary folder and
   run that binary; do not install it. Verify its SHA-256 against the recorded value in
   `baseline.md` before use.
-  Scan `AgentsHost`, `Remote` and every `Packages/*` Swift package. Build each Xcode
-  scheme once with the repo's build-cache wrapper and direct Periphery at the resulting
-  index store where possible. For packages, use Periphery's SwiftPM scan. Record the
-  exact command and any target the scan could not index.
+  Scan `AgentsHost`, `AgentsStore` (the Mac window: `App/Sources`), `Remote` and every
+  `Packages/*` Swift package. Build the three schemes with plain `xcodebuild`
+  (`-derivedDataPath build/DD-periphery`, the build cache's package checkout through
+  `-clonedSourcePackagesDirPath`, `COMPILER_INDEX_STORE_ENABLE=YES`), not through
+  `scripts/build-cache.sh`: its prefix mapping writes `/^worktree` paths into the index,
+  and Periphery then finds nothing. Run one scan over all three schemes with
+  `--skip-build --index-store-path build/DD-periphery/Index.noindex/DataStore`. For a
+  package, `swift build --build-tests --build-system native -Xswiftc -index-store-path
+  -Xswiftc .build/periphery-index` (Swift 6.4's default build system writes no index),
+  then `periphery scan --skip-build --index-store-path .build/periphery-index
+  --retain-public`. The Xcode index can still be partial: a Swift finding counts only
+  when its name appears nowhere else in tracked Swift files. Record the exact command
+  and any target the scan could not index.
 - Run `deadcode` from `golang.org/x/tools/cmd/deadcode@v0.49.0` inside the same pinned Go
-  container used by `scripts/lint.sh`; scan `./...` from `Go/`.
+  container used by `scripts/lint.sh`; scan `./...` from `Go/`. Scan again with
+  `GOOS=darwin GOARCH=arm64` (install `deadcode` for linux first, then run it with those
+  set), or every function with only `_darwin.go` callers reads as dead.
 - Run Knip 6.42.1 from the pinned `node:$NODE` container used by `scripts/lint.sh`, with
   `KNIP_DISABLE_RAW_TRANSFER=1` (needed for container memory limits) and the npm cache
   under `~/Library/Caches/Agents-build/npm`; run it from `Web/`. Keep the
