@@ -252,6 +252,22 @@
       ],
       "additionalProperties": false
     },
+    "AddFolderRequest": {
+      "type": "object",
+      "description": "folders/add: the folder, and the project to put it in (#2671). With no project, a folder that names none gets one of its own.",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "project": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "folder"
+      ],
+      "additionalProperties": false
+    },
     "Admitted": {
       "type": "object",
       "description": "What either announce is answered with: who the new party now is.",

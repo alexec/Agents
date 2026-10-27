@@ -182,6 +182,15 @@ export interface AddAccountRequest {
   name: string;
 }
 
+/**
+ * folders/add: the folder, and the project to put it in (#2671). With no project, a folder that
+ * names none gets one of its own.
+ */
+export interface AddFolderRequest {
+  folder: URLString;
+  project?: string;
+}
+
 /** What either announce is answered with: who the new party now is. */
 export interface Admitted {
   client?: UUID;
@@ -8302,7 +8311,7 @@ export interface Methods {
   "files/read": { params: FilesReadRequest; result: FileReading };
   "files/unwatch": { params: FilesWatchRequest; result: Empty };
   "files/watch": { params: FilesWatchRequest; result: Empty };
-  "folders/add": { params: FolderRequest; result: FolderSummary };
+  "folders/add": { params: AddFolderRequest; result: FolderSummary };
   "folders/archive": { params: FolderRequest; result: FolderSummary };
   "folders/clone": { params: CloneRequest; result: FolderSummary };
   "folders/clones": { params: Empty; result: CloneSummary[] };
@@ -8825,6 +8834,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AccountRequest: { required: ["runtimeID", "accountID"], optional: [] },
   ActivityToken: { required: ["agentID", "environment", "startedAt"], optional: ["token"] },
   AddAccountRequest: { required: ["runtimeID", "name"], optional: [] },
+  AddFolderRequest: { required: ["folder"], optional: ["project"] },
   Admitted: { required: [], optional: ["client", "host", "grant"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
   Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "voiceHungUpAt"] },

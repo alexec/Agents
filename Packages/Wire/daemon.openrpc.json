@@ -2901,7 +2901,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/FolderRequest"
+            "$ref": "daemon.schema.json#/definitions/AddFolderRequest"
           }
         }
       ],
