@@ -28,6 +28,9 @@ import (
 const (
 	ClientsPrefix  = "v1/clients/"
 	MachinesPrefix = "v1/machines/"
+	// OldMachinesPrefix is where builds before #2316 kept machines: moved to
+	// MachinesPrefix when a store opens or is copied (#2662).
+	OldMachinesPrefix = "v1/hosts/"
 	SettingsKey    = "v1/control.json"
 )
 

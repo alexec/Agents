@@ -1,9 +1,13 @@
 package controlplane
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
+	"os"
+	"path/filepath"
 
+	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/s3store"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 )
@@ -26,6 +30,9 @@ func OpenStore(text string, env func(string) string, given *StoreCredentials) (s
 	}
 	switch u.Scheme {
 	case "file":
+		if err := moveOldMachines(u.Path); err != nil {
+			return nil, err
+		}
 		return store.NewFolder(u.Path), nil
 	case "s3":
 		location, ok := s3store.ParseLocation(text, env)
@@ -42,4 +49,22 @@ func OpenStore(text string, env func(string) string, given *StoreCredentials) (s
 		return s3store.New(location, credentials, nil), nil
 	}
 	return nil, fmt.Errorf("%s is not a store: say file:///path or s3://bucket/prefix", text)
+}
+
+// moveOldMachines renames a folder store's v1/hosts to v1/machines (#2662), when only
+// the old one is there: the store of a build before #2316. The records do not change.
+func moveOldMachines(root string) error {
+	old := filepath.Join(root, filepath.FromSlash(records.OldMachinesPrefix))
+	now := filepath.Join(root, filepath.FromSlash(records.MachinesPrefix))
+	if _, err := os.Stat(old); err != nil {
+		return nil
+	}
+	if _, err := os.Stat(now); !errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err := os.Rename(old, now); err != nil {
+		return fmt.Errorf("move %s to %s: %w", old, now, err)
+	}
+	fmt.Fprintf(os.Stderr, "agents-control: moved the machine records from %s to %s (#2316)\n", old, now)
+	return nil
 }
