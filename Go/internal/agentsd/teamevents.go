@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/alexec/agents/Go/wire"
 )
@@ -123,7 +124,7 @@ func (d *Daemon) fireFromControl(t wire.TeamTrigger) bool {
 		if !d.runsHere(w) || w.Problem != nil || isArchived(w) {
 			continue
 		}
-		if f, matched := matchTeamTrigger(folder, id, w, t); matched {
+		if f, matched := matchTeamTrigger(folder, id, w, t, time.Now()); matched {
 			fr = &f
 			break
 		}
@@ -138,14 +139,24 @@ func (d *Daemon) fireFromControl(t wire.TeamTrigger) bool {
 	return true
 }
 
-// matchTeamTrigger is the fire for a trigger sent by the control plane: a schedule's, or
-// the trigger the event matches, with the event's folder made this machine's own folder.
-func matchTeamTrigger(folder, id string, w wire.Workflow, t wire.TeamTrigger) (fireRequest, bool) {
+// matchTeamTrigger is the fire for a trigger sent by the control plane: a due time of one
+// of its schedules, or a server's event one of its server triggers matches, with the event's
+// folder made this machine's own folder. Only what a machine may send is run: no app event,
+// no time its schedules are not due here, and only the trigger id its event or due time
+// names.
+func matchTeamTrigger(folder, id string, w wire.Workflow, t wire.TeamTrigger, now time.Time) (fireRequest, bool) {
 	fr := fireRequest{folder: folder, id: id, fromControl: true}
 	if t.DueAt != nil {
+		due := t.DueAt.Time()
+		if t.Event != nil || t.Trigger != wire.ScheduleTriggerID(due) || due.After(now.Add(5*time.Minute)) || due.Before(now.Add(-24*time.Hour)) {
+			return fr, false
+		}
+		// Only a time one of its schedules falls due here.
 		for _, trig := range w.Triggers {
-			if trig.Schedule != nil {
-				due := t.DueAt.Time()
+			if trig.Schedule == nil {
+				continue
+			}
+			if next, ok := nextDue(trig.Schedule.Value, due.Add(-time.Second)); ok && next.Equal(due) {
 				fr.trigger, fr.dueAt = trig, &due
 				return fr, true
 			}
@@ -156,12 +167,13 @@ func matchTeamTrigger(folder, id string, w wire.Workflow, t wire.TeamTrigger) (f
 		return fr, false
 	}
 	e := *t.Event
-	e.Scope = folderScope(folder)
+	if e.Details["server"] == "" || e.Details["event"] != e.Name || !isServerEventName(e.Name) || t.Trigger != triggerID(fireRequest{}, &e) {
+		return fr, false
+	}
+	e.Scope, e.ChainDepth = folderScope(folder), 0
 	for _, trig := range w.Triggers {
-		p, isPattern := triggerPattern(trig)
-		mt, isServer := serverTrigger(trig)
-		if isPattern && p.matches(e) || isServer && mt.matches(e) {
-			fr.trigger, fr.event, fr.depth = trig, &e, e.ChainDepth
+		if mt, isServer := serverTrigger(trig); isServer && mt.matches(e) {
+			fr.trigger, fr.event = trig, &e
 			return fr, true
 		}
 	}
