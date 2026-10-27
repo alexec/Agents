@@ -165,15 +165,16 @@ func bare(address string) string {
 }
 
 // senderOf is who sent a message, for a channel link (#1762, FR-037): its one From
-// address, and the DKIM result the receiving server found for it. Nil for a message with
-// no From, or more than one.
+// address, and the DKIM result the receiving server found for it. A message with no From,
+// or more than one, names no one and passes no DKIM, so its link check refuses it: every
+// message has a sender.
 func senderOf(m Summary) map[string]any {
-	if len(m.From) != 1 {
-		return nil
+	address := ""
+	if len(m.From) == 1 {
+		address = strings.ToLower(bare(m.From[0]))
 	}
-	address := strings.ToLower(bare(m.From[0]))
 	dkim := map[string]any{"result": "none"}
-	if m.dkim != "" {
+	if m.dkim != "" && address != "" {
 		dkim = map[string]any{"result": "pass", "domain": m.dkim}
 	}
 	return map[string]any{"channel": "email", "identity": address, "email": address, "dkim": dkim}
@@ -190,7 +191,7 @@ func anyMatches(re *regexp.Regexp, addresses []string) bool {
 
 func (a args) match(s Summary) bool {
 	return (!a.authenticated || s.Authenticated) &&
-		(a.from == nil || anyMatches(a.from, s.From)) &&
+		(a.from == nil || len(s.From) == 1 && anyMatches(a.from, s.From)) &&
 		(a.to == nil || anyMatches(a.to, s.To)) &&
 		(a.subject == nil || a.subject.MatchString(s.Subject))
 }
@@ -330,9 +331,7 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 			"data": map[string]any{"id": m.ID, "folder": m.Folder, "from": m.From, "to": m.To,
 				"subject": m.Subject, "date": m.Date.Format(time.RFC3339), "authenticated": m.Authenticated},
 		}
-		if sender := senderOf(m); sender != nil {
-			event["sender"] = sender
-		}
+		event["sender"] = senderOf(m)
 		out = append(out, event)
 	}
 	return answer(out, next, more), nil

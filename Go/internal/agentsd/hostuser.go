@@ -270,9 +270,13 @@ func (c senderChecks) linked(d *Daemon, sender wire.ChannelSender) (wire.Channel
 }
 
 // senderLinked asks the control plane whether a channel message's sender is linked to a
-// person (#1762, FR-037). False, so nothing starts, when it is not, when it is refused (an
-// email that fails DKIM), and when there is no control plane to ask or it does not answer.
+// person (#1762, FR-037). False, so nothing starts, when it is not, when it names no one,
+// when it is refused (an email that fails DKIM), and when there is no control plane to ask or it does not answer.
 func (d *Daemon) senderLinked(sender wire.ChannelSender) (wire.ChannelLinkChecked, bool) {
+	if strings.TrimSpace(sender.Identity) == "" {
+		log.Printf("channel message from %s names no one: nothing started", sender.Channel)
+		return wire.ChannelLinkChecked{}, false
+	}
 	ask := d.askControl.Load()
 	if ask == nil {
 		log.Printf("channel message from %s: no control plane to say whom it is from", sender.Channel)
