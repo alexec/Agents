@@ -61,3 +61,35 @@ func TestTheAgentConfigEditorKeepsToItsSection(t *testing.T) {
 		t.Fatalf("deleted persona listed: %+v", files)
 	}
 }
+
+// A persona or skill whose front matter cannot be read is refused, as a workflow is
+// (#2762), and nothing is written; a skill's other files and a body with no front
+// matter save as they are.
+func TestTheAgentConfigEditorRefusesFrontMatterItCannotRead(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	folder := t.TempDir()
+	anAgentIn(t, d, folder)
+	url := store.FolderURL(folder)
+
+	for i, f := range []struct{ kind, path, content string }{
+		{"personas", "broken.md", "---\nname: broken\nlabels: [\n---\nBody.\n"},
+		{"personas", "open.md", "---\nname: open\nBody.\n"},
+		{"personas", "labels.md", "---\nlabels:\n  nested: map\n---\nBody.\n"},
+		{"skills", "lint/SKILL.md", "---\nname: lint\ndescription: [\n---\nRun it.\n"},
+	} {
+		msg := c.callErr(t, 1+i, "agentConfig/editorSave", map[string]any{"folder": url, "kind": f.kind, "path": f.path, "content": f.content})
+		if !strings.Contains(msg, "front matter could not be read") || !strings.Contains(msg, "Nothing was saved") {
+			t.Fatalf("%s: %q", f.path, msg)
+		}
+		if _, err := os.Stat(filepath.Join(folder, ".agents", f.kind, f.path)); err == nil {
+			t.Fatalf("%s was written", f.path)
+		}
+	}
+	msg := c.callErr(t, 10, "personas/save", map[string]any{"folder": url, "origin": "folder", "id": "broken", "content": "---\nname: broken\n"})
+	if !strings.Contains(msg, "front matter could not be read") {
+		t.Fatalf("personas/save: %q", msg)
+	}
+
+	c.call(t, 11, "agentConfig/editorSave", map[string]any{"folder": url, "kind": "personas", "path": "plain.md", "content": "Just a prompt.\n"})
+	c.call(t, 12, "agentConfig/editorSave", map[string]any{"folder": url, "kind": "skills", "path": "lint/notes.md", "content": "---\nnot: [\n"})
+}

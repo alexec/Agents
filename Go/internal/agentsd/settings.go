@@ -440,6 +440,9 @@ func savePersonaFile(base string, r wire.PersonaFileSaveRequest) error {
 		}
 		return nil
 	}
+	if err := unreadableFrontMatter("personas", r.ID+".md", r.Content); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(folder, 0o755); err != nil {
 		return fileError(CodeFileNotReadable, "The persona folder can't be created.")
 	}

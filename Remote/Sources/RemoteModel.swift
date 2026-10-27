@@ -1331,12 +1331,15 @@ final class RemoteModel {
         } catch { return String(describing: error) }
     }
 
-    func savePersonaFile(in folder: URL, origin: Persona.Origin, id: String, content: String, delete: Bool = false) async -> Bool {
+    /// Nil when it was saved; otherwise the host's reason, such as front matter it cannot read (#2762).
+    func savePersonaFile(in folder: URL, origin: Persona.Origin, id: String, content: String, delete: Bool = false) async -> String? {
         let request = DaemonAPI.PersonaFileSaveRequest(folder: origin == .folder ? folder : nil, origin: origin,
                                                        id: id, content: content, delete: delete ? true : nil)
-        guard (try? await client(for: request).call(DaemonAPI.Method.personasSave, request)) != nil else { return false }
+        do {
+            try await client(for: request).call(DaemonAPI.Method.personasSave, request)
+        } catch { return String(describing: error) }
         await loadStartPersonas(in: folder)
-        return true
+        return nil
     }
 
     /// Pick a kind of session (#760): every setting it names is set, every one it leaves

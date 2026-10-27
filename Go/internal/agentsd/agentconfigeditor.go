@@ -10,6 +10,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/agentsd/skillcatalog"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/agentsd/yamlnode"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -172,8 +173,53 @@ func (d *Daemon) saveAgentConfigEditorFile(r wire.AgentConfigEditorSaveRequest) 
 	if strings.TrimSpace(r.Content) == "" {
 		return Invalid("Enter the file content before saving.")
 	}
+	if err := unreadableFrontMatter(r.Kind, r.Path, r.Content); err != nil {
+		return err
+	}
 	if err := store.WriteAtomically(path, []byte(r.Content), 0o644); err != nil {
 		return fileError(CodeFileNotReadable, "The file could not be saved: "+err.Error())
 	}
 	return nil
+}
+
+// unreadableFrontMatter refuses a persona or a skill whose front matter cannot be read, as
+// writeWorkflow refuses a workflow (#2762): saved, it would show its problem only later,
+// on the new-session form or to the runtime. A skill's other Markdown files are its own.
+func unreadableFrontMatter(kind, path, content string) error {
+	var problem *string
+	switch {
+	case kind == "personas":
+		problem = parsePersona(content, strings.TrimSuffix(filepath.Base(path), ".md"), "folder").Problem
+	case kind == "skills" && filepath.Base(path) == "SKILL.md":
+		problem = frontMatterProblem(content)
+	}
+	if problem == nil {
+		return nil
+	}
+	return Invalid("That front matter could not be read: %s. Nothing was saved.", strings.TrimSuffix(*problem, "."))
+}
+
+// frontMatterProblem is why a file's front matter, the block between its first two ---
+// lines, is not a YAML mapping; nil when it is one, or when the file has none.
+func frontMatterProblem(text string) *string {
+	lines := strings.Split(text, "\n")
+	if strings.TrimSpace(lines[0]) != "---" {
+		return nil
+	}
+	for i := 1; i < len(lines); i++ {
+		if strings.TrimSpace(lines[i]) != "---" {
+			continue
+		}
+		_, err := yamlnode.MappingFrom(lines[1:i])
+		if err == nil {
+			return nil
+		}
+		problem := "The metadata could not be read"
+		if f, ok := err.(*yamlnode.Failure); ok {
+			problem = f.Message
+		}
+		return &problem
+	}
+	problem := "The metadata block is never closed"
+	return &problem
 }
