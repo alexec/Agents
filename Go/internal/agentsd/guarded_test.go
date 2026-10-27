@@ -113,3 +113,22 @@ func TestDiffLines(t *testing.T) {
 		t.Fatal(s)
 	}
 }
+
+// A change waiting on a file the app no longer keeps goes when the records are read (#2680).
+func TestAFileTheAppNoLongerKeepsWaitsForNothing(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := folder(t, c, 1)
+	recs := guardedRecords{States: []guardedState{
+		{Folder: store.FolderURL(dir), Path: ".agents/project.json", Pending: &guardedPending{ChangedByIDs: []wire.UUID{}, ChangedBy: []string{"Tidy"}}},
+		{Folder: store.FolderURL(dir), Path: ".agents/pins.json", Pending: &guardedPending{ChangedByIDs: []wire.UUID{}, ChangedBy: []string{"Tidy"}}},
+	}}
+	b, _ := json.Marshal(recs)
+	os.WriteFile(d.guardedFile(), b, 0o644)
+	d.guardedMu.Lock()
+	d.guarded = nil
+	d.guardedMu.Unlock()
+	if s, _ := d.summaryFor(dir); len(s.GuardedChanges) != 1 || s.GuardedChanges[0].Path != ".agents/pins.json" {
+		t.Fatalf("%+v", s.GuardedChanges)
+	}
+}
