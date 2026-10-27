@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,7 +25,7 @@ type IssueReader func(ctx context.Context, owner, repo string, number int) (map[
 type Views interface {
 	DefaultRepo(ctx context.Context) (string, error)
 	BoardPRs(ctx context.Context, repo string) (Board, error)
-	OpenIssues(ctx context.Context, repo, label string) ([]ListedIssue, error)
+	OpenIssues(ctx context.Context, repo string, filter IssueFilter) ([]ListedIssue, error)
 	IssueDetails(ctx context.Context, repo string, number int) (map[string]any, error)
 	PRPage(ctx context.Context, repo string, number int) (map[string]any, error)
 	PRDiff(ctx context.Context, repo string, number int, sha string) (map[string]any, error)
@@ -77,12 +78,21 @@ func (p BoardPR) json() map[string]any {
 	return j
 }
 
+// IssueFilter narrows the Issues page's list (#2686): issues with all of Labels and, when
+// Query is set, the words of Query in their title or description.
+type IssueFilter struct {
+	Labels []string
+	Query  string
+}
+
 // ListedIssue is an open issue as the issues view lists it.
 type ListedIssue struct {
 	Issue
 	Comments  int
 	UpdatedAt string
 	Milestone string
+	// LabelColors is each label's #rrggbb, for those GitHub gives a colour (#2686).
+	LabelColors map[string]string
 }
 
 func (i ListedIssue) json() map[string]any {
@@ -324,15 +334,20 @@ func (g *RealGitHub) BoardPRs(ctx context.Context, repo string) (Board, error) {
 
 // MARK: Issues
 
-// OpenIssues are the open issues, newest created first, at most 100.
-func (g *RealGitHub) OpenIssues(ctx context.Context, repo, label string) ([]ListedIssue, error) {
+// OpenIssues are the open issues, newest created first, at most 100. With a query it is
+// GitHub search (#2686), which also finds issues older than the newest 100.
+func (g *RealGitHub) OpenIssues(ctx context.Context, repo string, filter IssueFilter) ([]ListedIssue, error) {
 	if _, _, err := ownerName(repo); err != nil {
 		return nil, err
 	}
-	// The listing has pull requests in it too: up to three pages, for 100 issues.
+	if filter.Query != "" {
+		return g.searchIssues(ctx, repo, filter)
+	}
+	// The listing has pull requests in it too: up to three pages, for 100 issues. Labels
+	// joined by commas are issues with all of them.
 	q := fmt.Sprintf("state=open&sort=created&direction=desc&per_page=%d", perPage)
-	if label != "" {
-		q += "&labels=" + url.QueryEscape(label)
+	if len(filter.Labels) > 0 {
+		q += "&labels=" + url.QueryEscape(strings.Join(filter.Labels, ","))
 	}
 	out := []ListedIssue{}
 	for page := 1; page <= 3 && len(out) < perPage; page++ {
@@ -342,8 +357,7 @@ func (g *RealGitHub) OpenIssues(ctx context.Context, repo, label string) ([]List
 		}
 		for _, i := range list {
 			if !i.isPR() && len(out) < perPage {
-				out = append(out, ListedIssue{Issue: i.issue(), Comments: i.Comments, UpdatedAt: i.UpdatedAt,
-					Milestone: i.Milestone.title()})
+				out = append(out, i.listed())
 			}
 		}
 		if len(list) < perPage {
@@ -351,6 +365,58 @@ func (g *RealGitHub) OpenIssues(ctx context.Context, repo, label string) ([]List
 		}
 	}
 	return out, nil
+}
+
+// searchIssues is one GitHub search for the query and every label. A number (2453 or
+// #2453) also finds that issue, first, when it is open and has the labels.
+func (g *RealGitHub) searchIssues(ctx context.Context, repo string, filter IssueFilter) ([]ListedIssue, error) {
+	q := fmt.Sprintf("repo:%s is:issue is:open %s", repo, filter.Query)
+	for _, l := range filter.Labels {
+		q += fmt.Sprintf(" label:%q", l)
+	}
+	var found struct {
+		Items []issueJSON `json:"items"`
+	}
+	path := fmt.Sprintf("search/issues?q=%s&sort=created&order=desc&per_page=%d", url.QueryEscape(q), perPage)
+	if err := g.get(ctx, path, false, &found); err != nil {
+		return nil, err
+	}
+	out := []ListedIssue{}
+	if n, err := strconv.Atoi(strings.TrimPrefix(filter.Query, "#")); err == nil && n > 0 {
+		var one issueJSON
+		if g.get(ctx, fmt.Sprintf("repos/%s/issues/%d", repo, n), false, &one) == nil && one.Number == n &&
+			one.State == "open" && !one.isPR() && one.hasLabels(filter.Labels) {
+			out = append(out, one.listed())
+		}
+	}
+	for _, i := range found.Items {
+		if !i.isPR() && len(out) < perPage && (len(out) == 0 || out[0].Number != i.Number) {
+			out = append(out, i.listed())
+		}
+	}
+	return out, nil
+}
+
+var hexColor = regexp.MustCompile(`^[0-9a-fA-F]{6}$`)
+
+func (i issueJSON) listed() ListedIssue {
+	colors := map[string]string{}
+	for _, l := range i.Labels {
+		if hexColor.MatchString(l.Color) {
+			colors[l.Name] = "#" + strings.ToLower(l.Color)
+		}
+	}
+	return ListedIssue{Issue: i.issue(), Comments: i.Comments, UpdatedAt: i.UpdatedAt, Milestone: i.Milestone.title(),
+		LabelColors: colors}
+}
+
+func (i issueJSON) hasLabels(names []string) bool {
+	for _, name := range names {
+		if !slices.ContainsFunc(i.Labels, func(l label) bool { return strings.EqualFold(l.Name, name) }) {
+			return false
+		}
+	}
+	return true
 }
 
 // MARK: A pull request's page

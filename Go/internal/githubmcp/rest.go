@@ -349,6 +349,8 @@ func (p pull) trusted(repo string) bool {
 
 type label struct {
 	Name string `json:"name"`
+	// Color is GitHub's 6-digit hex, without the # (#2686).
+	Color string `json:"color"`
 }
 
 type issueJSON struct {
@@ -358,6 +360,7 @@ type issueJSON struct {
 	User        user            `json:"user"`
 	Association string          `json:"author_association"`
 	Labels      []label         `json:"labels"`
+	State       string          `json:"state"`
 	Assignees   []user          `json:"assignees"`
 	CreatedAt   string          `json:"created_at"`
 	StateReason string          `json:"state_reason"`
