@@ -23,6 +23,9 @@ struct AgentConfigurationView: View {
     var unsaved: Binding<Bool>?
     @State private var ownUnsaved = false
     @State private var leaving: UnsavedLeave?
+    /// How many files the Workflows page lists (#2760): the snapshot has no workflows, so the
+    /// pane reads them as that page does, again on each page change to see an added one.
+    @State private var workflows: Int?
 
     private var unsavedEdits: Binding<Bool> { unsaved ?? $ownUnsaved }
 
@@ -42,11 +45,13 @@ struct AgentConfigurationView: View {
                 Divider()
             }
             HStack(spacing: 0) {
-                AgentConfigurationPageList(snapshot: snapshot, chosen: page, waiting: waiting, choose: choose, place: place)
+                AgentConfigurationPageList(snapshot: snapshot, workflows: workflows, chosen: page, waiting: waiting,
+                                           choose: choose, place: place)
                 chosenPage
             }
         }
         .task { if showsSyncState { await model.userScope.load(model.controlRequests) } }
+        .task(id: page) { await countWorkflows() }
         .discardUnsavedQuestion($leaving)
     }
 
@@ -54,6 +59,13 @@ struct AgentConfigurationView: View {
     private func choose(_ next: AgentConfigurationPage) {
         guard next != page else { return }
         $leaving.leave(unsaved: unsavedEdits.wrappedValue) { page = next }
+    }
+
+    private func countWorkflows() async {
+        let folder: URL? = if case .folder(let folder) = place { folder } else { nil }
+        let host: MachineRef = folder == nil ? .mac : model.selectedFolderHost
+        guard let files = await model.agentConfigEditorFiles(on: host, folder: folder, kind: .workflows) else { return }
+        workflows = files.count
     }
 
     private var showsSyncState: Bool {
@@ -81,7 +93,7 @@ struct AgentConfigurationView: View {
     @ViewBuilder
     private func pageView(_ snapshot: DaemonAPI.SharedSnapshot) -> some View {
         switch page {
-        case .overview: AgentConfigurationOverview(place: place, snapshot: snapshot, page: $page)
+        case .overview: AgentConfigurationOverview(place: place, snapshot: snapshot, workflows: workflows, page: $page)
         case .instructions: AgentsSetupPage { AgentsInstructionsSection(place: place) }.task { await refresh() }
         case .skills: AgentConfigurationFilesPage(place: place, kind: .skills, unsaved: unsavedEdits)
         case .personas: AgentConfigurationFilesPage(place: place, kind: .personas, unsaved: unsavedEdits)
@@ -120,14 +132,15 @@ enum AgentConfigurationPage: String, Hashable, CaseIterable {
         }
     }
 
-    /// What its line counts, if anything; nil while the MCP file can't be read.
-    func count(in snapshot: DaemonAPI.SharedSnapshot) -> Int? {
+    /// What its line counts, if anything; nil while the MCP file can't be read, or before
+    /// the workflow files are counted.
+    func count(in snapshot: DaemonAPI.SharedSnapshot, workflows: Int?) -> Int? {
         switch self {
         case .overview: nil
         case .instructions: snapshot.instructions?.exists == true ? 1 : 0
         case .skills: snapshot.skills.count
         case .personas: snapshot.otherFiles.filter { $0.kind == .persona }.count
-        case .workflows: nil
+        case .workflows: workflows
         case .mcp: snapshot.mcp.problem == nil ? snapshot.mcp.servers.count : nil
         case .plugins: snapshot.plugins.count
         case .other: snapshot.otherFiles.filter { $0.kind != .persona }.count
@@ -350,6 +363,7 @@ struct SharedFact: View {
 /// Settings (#754, #1076). Overview only, until the folder is laid out.
 struct AgentConfigurationPageList: View {
     let snapshot: DaemonAPI.SharedSnapshot?
+    var workflows: Int? = nil
     let chosen: AgentConfigurationPage
     var waiting: Set<AgentConfigurationPage> = []
     let choose: (AgentConfigurationPage) -> Void
@@ -369,7 +383,7 @@ struct AgentConfigurationPageList: View {
 
     private func line(_ each: AgentConfigurationPage) -> some View {
         let lit = chosen == each
-        let count = snapshot.flatMap { each.count(in: $0) }
+        let count = snapshot.flatMap { each.count(in: $0, workflows: workflows) }
         let warns = snapshot.map { each.warns(in: $0) } ?? false
         return PageLine(title: each.title, lit: lit,
                         label: each.title + (count.map { ", \($0)" } ?? "") + (warns ? ", needs a look" : "")

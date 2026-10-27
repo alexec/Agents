@@ -7,6 +7,8 @@ import SwiftUI
 struct AgentConfigurationOverview: View {
     let place: AgentsPlace
     let snapshot: DaemonAPI.SharedSnapshot
+    /// Nil until counted: then the line says nothing rather than "None".
+    let workflows: Int?
     @Binding var page: AgentConfigurationPage
 
     var body: some View {
@@ -68,8 +70,9 @@ struct AgentConfigurationOverview: View {
         case .overview: return ""
         case .instructions: return snapshot.instructions?.exists == true ? "AGENTS.md" : "No AGENTS.md yet"
         case .mcp where snapshot.mcp.problem != nil: return "mcp.json can't be read"
+        case .workflows where workflows == nil: return ""
         default:
-            let count = kind.count(in: snapshot) ?? 0
+            let count = kind.count(in: snapshot, workflows: workflows) ?? 0
             if count == 0 { return "None" }
             let noun: (String, String) = switch kind {
             case .skills: ("skill", "skills")
