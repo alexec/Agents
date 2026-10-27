@@ -185,11 +185,11 @@ func TestEnrolThenUplink(t *testing.T) {
 	root := t.TempDir()
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	private, err := HostPrivateKey(root)
+	private, err := HostPrivateKey(HostKeyFile{Root: root})
 	if err != nil {
 		t.Fatal(err)
 	}
-	again, _ := HostPrivateKey(root)
+	again, _ := HostPrivateKey(HostKeyFile{Root: root})
 	if string(again) != string(private) {
 		t.Fatal("the host key changed between reads")
 	}

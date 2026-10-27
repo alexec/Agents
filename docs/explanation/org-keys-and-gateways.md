@@ -31,12 +31,14 @@ value.
 Each machine has its own P-256 key; the control plane has its public half. When a route
 changes, the control plane opens the envelope and seals each value again, with HPKE
 (P-256, HKDF-SHA256, AES-256-GCM), to the key of each machine that may use the route. The
-associated data is the route, the machine and the route's version. It sends the result on
+associated data is the machine and the whole route as sent (its version, kind, settings
+such as the address and header, models and expiry). It sends the result on
 the machine's channel 0 (`host/orgRoutes`) within 5 seconds, from every copy.
 
 - A relay, a log or another copy that sees the message cannot open it.
 - A file copied to another machine does not open there.
 - An older version cannot take the place of a newer one.
+- A route file changed on the machine (another address, header or kind) does not open.
 - Only the machines of the people the route is for get it: everyone, or the groups the
   admin names. A machine that does not say `host.org-routes/1` gets nothing.
 
@@ -57,6 +59,11 @@ gateway's key) goes to the machine as it is, sealed. It works offline.
   machine's memory with a debugger while a request is sent can find a key that is open
   there. Sealing keeps keys out of files, logs, messages and the runtime's environment. It
   does not keep them from the member's own account.
+- **On Linux, the member's other programs can read the machine's key.** On a Mac the key
+  is in a Keychain item that only agentsd can read. A Linux machine keeps it in the file
+  `control-host-key` in the root (0600), so any process of the same user, an agent's shell
+  included, can read it and open the routes the machine keeps. Run agentsd as a user of
+  its own on a Linux machine where that matters.
 - **A leaked key stays valid until the provider revokes it.** Revoke it at the provider
   first. Then replace it here, or turn on the policy's kill switch.
 - **The control plane opens every route.** Whoever can run the control plane with its

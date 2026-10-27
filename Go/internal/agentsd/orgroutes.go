@@ -38,7 +38,7 @@ import (
 const (
 	orgRoutesFolder = "org-routes"
 	// orgRoutePurpose is HPKE's info, as the control plane seals with (FR-005).
-	orgRoutePurpose = "com.alexecollins.agents.orgroute.v1"
+	orgRoutePurpose = controllink.OrgRoutePurpose
 	// orgAccountPrefix starts an org account's id: org:<route id>.
 	orgAccountPrefix = "org:"
 	// mostOrgRoutes bounds a delivery, as the control plane bounds routes.
@@ -102,24 +102,24 @@ func (d *Daemon) identityLocked() *machineIdentity {
 	if err != nil || member.Host == "" {
 		return nil
 	}
-	private, err := os.ReadFile(filepath.Join(root, "control-host-key"))
-	if err != nil || len(private) != 32 {
+	private, ok, err := d.HostKey.Load()
+	if err != nil || !ok {
 		return nil
 	}
 	d.orgIdentity = &machineIdentity{host: member.Host, private: private}
 	return d.orgIdentity
 }
 
-// orgRouteAD is the associated data of a route's secret for this machine: a file copied to
-// another machine, another route's or an older version's does not open (research R4).
-func orgRouteAD(route, host string, version int64) []byte {
-	return fmt.Appendf(nil, "%s|%s|%d", route, host, version)
-}
-
-// openSealed opens one of a route's secrets with this machine's key.
+// openSealed opens one of a route's secrets with this machine's key. The associated data
+// is the machine and the whole route as kept (controllink.OrgRouteAD): a file whose
+// address, header or kind differs from what was delivered does not open.
 func openSealed(id *machineIdentity, r wire.DeliveredRoute, sealed wire.SealedEnvelope) ([]byte, error) {
 	if id == nil {
 		return nil, errors.New("this machine has not joined a control plane")
+	}
+	ad, err := controllink.OrgRouteAD(r, id.host)
+	if err != nil {
+		return nil, err
 	}
 	private, err := ecdh.P256().NewPrivateKey(id.private)
 	if err != nil {
@@ -133,7 +133,7 @@ func openSealed(id *machineIdentity, r wire.DeliveredRoute, sealed wire.SealedEn
 	if err != nil {
 		return nil, err
 	}
-	return recipient.Open(orgRouteAD(r.ID, id.host, r.Version), sealed.Ciphertext)
+	return recipient.Open(ad, sealed.Ciphertext)
 }
 
 // opens says each of a route's secrets opens here; the values are dropped at once.

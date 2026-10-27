@@ -49,7 +49,7 @@ func TestAPageThroughThisHost(t *testing.T) {
 	// This host, joined to it, with its uplink up.
 	root := t.TempDir()
 	d, _ := start(t, root)
-	private, err := controllink.HostPrivateKey(root)
+	private, err := controllink.HostPrivateKey(controllink.HostKeyFile{Root: root})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -2792,7 +2792,7 @@ type DeleteSessionRequest struct {
 	Confirmed *bool `json:"confirmed,omitzero"`
 }
 
-// One org route as a machine gets it (#999, FR-005): the route without its groups, fingerprint and stamps, and each secret sealed with HPKE to the machine's key (SealedEnvelope), info com.alexecollins.agents.orgroute.v1, associated data <route id>|<host id>|<version>. A cloud credential is sent only as a token that ends at expires (Q1 A): awsSession, googleToken or entraToken.
+// One org route as a machine gets it (#999, FR-005): the route without its groups, fingerprint and stamps, and each secret sealed with HPKE to the machine's key (SealedEnvelope), info com.alexecollins.agents.orgroute.v2, associated data <route id>|<host id>|<version>|<hex SHA-256 of the route as JSON without sealed>, so a route whose settings changed after delivery does not open. A cloud credential is sent only as a token that ends at expires (Q1 A): awsSession, googleToken or entraToken.
 type DeliveredRoute struct {
 	ID string `json:"id"`
 

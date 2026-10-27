@@ -73,7 +73,7 @@ func (d *routesTold) route(host, id string) *wire.DeliveredRoute {
 // opened is what a delivered route's field opens to with the machine's own key.
 func opened(t *testing.T, box *fakeHost, r *wire.DeliveredRoute, field string) string {
 	t.Helper()
-	plain, err := OpenOrgRoute(box.private, r.ID, box.member.Host, r.Version, r.Sealed[field])
+	plain, err := OpenOrgRoute(box.private, *r, box.member.Host, r.Sealed[field])
 	if err != nil {
 		t.Fatalf("%s's %s does not open: %v", r.ID, field, err)
 	}
@@ -328,18 +328,34 @@ func TestARouteReachesOnlyTheMachinesAllowed(t *testing.T) {
 		t.Fatal("the key is in the clear")
 	}
 	// Another machine's key, another machine's id, another route's id or an older version
-	// does not open it.
-	if _, err := OpenOrgRoute(samAtA.private, r.ID, samAtB.member.Host, r.Version, sealed); err == nil {
+	// does not open it; nor does the route with its address, header or kind changed.
+	if _, err := OpenOrgRoute(samAtA.private, *r, samAtB.member.Host, sealed); err == nil {
 		t.Fatal("another machine's key opens it")
 	}
-	if _, err := OpenOrgRoute(samAtB.private, r.ID, samAtA.member.Host, r.Version, sealed); err == nil {
+	if _, err := OpenOrgRoute(samAtB.private, *r, samAtA.member.Host, sealed); err == nil {
 		t.Fatal("it opens as another machine's")
 	}
-	if _, err := OpenOrgRoute(samAtB.private, "another", samAtB.member.Host, r.Version, sealed); err == nil {
-		t.Fatal("it opens as another route")
-	}
-	if _, err := OpenOrgRoute(samAtB.private, r.ID, samAtB.member.Host, r.Version+1, sealed); err == nil {
-		t.Fatal("it opens as another version")
+	for what, edit := range map[string]func(r *wire.DeliveredRoute){
+		"another route":   func(r *wire.DeliveredRoute) { r.ID = "another" },
+		"another version": func(r *wire.DeliveredRoute) { r.Version++ },
+		"another address": func(r *wire.DeliveredRoute) {
+			r.Settings = &wire.OrgRouteSettings{Address: new("https://elsewhere.example")}
+		},
+		"another header": func(r *wire.DeliveredRoute) {
+			settings := wire.OrgRouteSettings{}
+			if r.Settings != nil {
+				settings = *r.Settings
+			}
+			settings.Header = new("X-Elsewhere")
+			r.Settings = &settings
+		},
+		"another kind": func(r *wire.DeliveredRoute) { r.Kind = wire.OrgRouteKindBaseURL },
+	} {
+		changed := *r
+		edit(&changed)
+		if _, err := OpenOrgRoute(samAtB.private, changed, samAtB.member.Host, sealed); err == nil {
+			t.Fatalf("it opens as %s", what)
+		}
 	}
 
 	// Each machine says it keeps it; the list counts them.

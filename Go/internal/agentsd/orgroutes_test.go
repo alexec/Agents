@@ -47,7 +47,7 @@ func orgMachine(t *testing.T, root string, k controlKeys) (*Daemon, *conn, []byt
 // machineKeys writes a joined machine's membership and key into root.
 func machineKeys(t *testing.T, root string) ([]byte, []byte) {
 	t.Helper()
-	keyFile := filepath.Join(root, "control-host-key")
+	keyFile := filepath.Join(root, controllink.HostKeyFileName)
 	private, err := os.ReadFile(keyFile)
 	if err != nil {
 		private = controllink.NewPrivateKey()
@@ -63,9 +63,14 @@ func machineKeys(t *testing.T, root string) ([]byte, []byte) {
 	return private, public
 }
 
-// sealTo is the control plane's seal of one value for a machine (FR-005).
-func sealTo(t *testing.T, public []byte, route, host string, version int64, value string) wire.SealedEnvelope {
+// sealTo is the control plane's seal of one of r's values for a machine (FR-005): r is
+// as delivered, all but its sealed values.
+func sealTo(t *testing.T, public []byte, r wire.DeliveredRoute, host string, value string) wire.SealedEnvelope {
 	t.Helper()
+	ad, err := controllink.OrgRouteAD(r, host)
+	if err != nil {
+		t.Fatal(err)
+	}
 	key, err := ecdh.P256().NewPublicKey(public)
 	if err != nil {
 		t.Fatal(err)
@@ -78,7 +83,7 @@ func sealTo(t *testing.T, public []byte, route, host string, version int64, valu
 	if err != nil {
 		t.Fatal(err)
 	}
-	ct, err := sender.Seal(orgRouteAD(route, host, version), []byte(value))
+	ct, err := sender.Seal(ad, []byte(value))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,9 +108,20 @@ func testRoute(t *testing.T, public []byte, id string, version int64, kind wire.
 	case wire.OrgRouteKindVertex:
 		r.Settings.Project, r.Settings.Location = new("acme-proj"), new("us-east5")
 	}
-	for field, v := range secrets {
+	for field := range secrets {
 		r.SecretFields = append(r.SecretFields, field)
-		r.Sealed[field] = sealTo(t, public, id, orgTestHost, version, v)
+	}
+	slices.Sort(r.SecretFields)
+	return sealed(t, public, r, secrets)
+}
+
+// sealed is r with secrets sealed to public, for r as it is now: a test that changes a
+// delivered route seals it again after.
+func sealed(t *testing.T, public []byte, r wire.DeliveredRoute, secrets map[string]string) wire.DeliveredRoute {
+	t.Helper()
+	r.Sealed = map[string]wire.SealedEnvelope{}
+	for field, v := range secrets {
+		r.Sealed[field] = sealTo(t, public, r, orgTestHost, v)
 	}
 	return r
 }
@@ -378,7 +394,7 @@ func TestTheModelRelay(t *testing.T) {
 	custom := testRoute(t, public, "custom-header", 1, wire.OrgRouteKindBaseURL, wire.OrgRouteVendorAnthropic, p.URL+"/litellm",
 		map[string]string{"apiKey": "ck"}, "claude")
 	custom.Settings.Header = new("X-Litellm-Key")
-	routes = append(routes, custom)
+	routes = append(routes, sealed(t, public, custom, map[string]string{"apiKey": "ck"}))
 	session := testRoute(t, public, "bedrock-session", 1, wire.OrgRouteKindBedrock, "", p.URL,
 		map[string]string{"awsSession": `{"accessKeyId":"ASIAEXAMPLE","secretAccessKey":"s3cr3t","sessionToken":"tok"}`}, "claude")
 	routes = append(routes, session)
@@ -884,7 +900,7 @@ func TestOrgRoutesOffline(t *testing.T) {
 		map[string]string{"awsSession": `{"accessKeyId":"A","secretAccessKey":"S","sessionToken":"T"}`}, "claude")
 	ends := wire.DateOf(time.Now().Add(-time.Minute))
 	tok.Expires = &ends
-	deliver(t, d2, tok)
+	deliver(t, d2, sealed(t, public, tok, map[string]string{"awsSession": `{"accessKeyId":"A","secretAccessKey":"S","sessionToken":"T"}`}))
 	r, _ := d2.relay()
 	token := r.standInFor(standIn{route: "acme-bedrock", runtime: "claude", account: "org:acme-bedrock"})
 	req, _ := http.NewRequest("POST", "https://127.0.0.1:"+strconv.Itoa(r.port)+"/acme-bedrock/~"+token+"/model/m/invoke", strings.NewReader(`{}`))
@@ -899,6 +915,46 @@ func TestOrgRoutesOffline(t *testing.T) {
 	}
 	if s := d2.allowancesLocked()["claude:account:org:acme-bedrock"]; s.Status.Out == nil {
 		t.Fatalf("%+v", s)
+	}
+}
+
+// A kept route whose settings differ from what was delivered does not open, and is deleted.
+func TestAnEditedOrgRouteDoesNotOpen(t *testing.T) {
+	root := t.TempDir()
+	k := newControlKeys(t)
+	d, _, public := orgMachine(t, root, k)
+	deliver(t, d, testRoute(t, public, "acme", 1, wire.OrgRouteKindBaseURL, wire.OrgRouteVendorAnthropic, "https://llm.acme.example",
+		map[string]string{"apiKey": "k"}, "claude"))
+	d.Shutdown()
+	file := filepath.Join(root, orgRoutesFolder, "acme.json")
+	for _, edit := range []func(r *wire.DeliveredRoute){
+		func(r *wire.DeliveredRoute) { r.Settings.Address = new("https://attacker.example") },
+		func(r *wire.DeliveredRoute) { r.Settings.Header = new("X-Leak") },
+		func(r *wire.DeliveredRoute) { r.Kind = wire.OrgRouteKindKey },
+	} {
+		b, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var r wire.DeliveredRoute
+		if err := json.Unmarshal(b, &r); err != nil {
+			t.Fatal(err)
+		}
+		edit(&r)
+		b, _ = json.Marshal(r)
+		kept := filepath.Join(t.TempDir(), "acme.json")
+		os.Rename(file, kept)
+		os.WriteFile(file, b, 0o600)
+
+		d2, _ := joined(t, root, k)
+		if d2.accountProfile("claude", "org:acme") != nil {
+			t.Fatalf("an edited route was taken: %s", b)
+		}
+		if _, err := os.Stat(file); err == nil {
+			t.Fatal("an edited route was not deleted")
+		}
+		d2.Shutdown()
+		os.Rename(kept, file)
 	}
 }
 

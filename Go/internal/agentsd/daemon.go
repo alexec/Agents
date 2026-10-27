@@ -104,6 +104,9 @@ type Daemon struct {
 	SettingsDir string
 	// RaiseByHand lets events/raise make an event: an unreleased build on a scratch root.
 	RaiseByHand bool
+	// HostKey keeps this machine's private key: control-host-key in the root unless the
+	// command sets the platform's store (controllink.HostKeyFor, the Keychain on a Mac).
+	HostKey controllink.HostKeyStore
 }
 
 // New opens the root and registers every method this host serves.
@@ -115,7 +118,7 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	d := &Daemon{ctx: ctx, Store: st, handlers: map[string]Handler{}, clients: map[int64]*Client{}, unknown: map[string]int{},
 		lives: map[wire.UUID]*live{}, relays: map[string]*relay{}, sent: map[wire.UUID]bool{},
 		watches: map[string]*folderWatch{}, interests: map[string][]interest{}, shells: map[shellKey]*shell{},
-		SettingsDir: filepath.Join(st.Loc.Root, "settings")}
+		SettingsDir: filepath.Join(st.Loc.Root, "settings"), HostKey: controllink.HostKeyFile{Root: st.Loc.Root}}
 	d.setToolsHome()
 	d.register()
 	d.loadAttention()
