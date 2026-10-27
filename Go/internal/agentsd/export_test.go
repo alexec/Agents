@@ -75,8 +75,10 @@ func TestExportAnAgentAndImportItOnAnotherMachine(t *testing.T) {
 	a, ca := start(t, t.TempDir())
 	dir := folder(t, ca, 1)
 	title := "Fix the: build/now"
+	session, account := "5b0f6a1e-1c2d-4e3f-8a9b-0c1d2e3f4a5b", "acct"
 	one := seeded(t, a, dir, func(x *wire.Agent) {
 		x.Title = &title
+		x.RuntimeSessionID, x.AccountID = &session, &account
 		x.McpServers = []wire.MCPServer{{Name: "tool", Transport: wire.MCPServerTransport{
 			Stdio: &wire.MCPServerTransportStdio{Command: "/bin/echo", Args: []string{}, Env: map[string]string{}}}}}
 	})
@@ -100,7 +102,7 @@ func TestExportAnAgentAndImportItOnAnotherMachine(t *testing.T) {
 	}
 	got := bd.Store.Agent(one.ID)
 	if got == nil || got.State != wire.AgentStateArchived || got.MadeInRoot == nil || *got.MadeInRoot != a.Store.RootID ||
-		len(got.McpServers) != 0 {
+		len(got.McpServers) != 0 || got.RuntimeSessionID != nil || got.AccountID != nil {
 		t.Fatalf("came back as %+v", got)
 	}
 	if err := bd.refuseToRun(got); err == nil {

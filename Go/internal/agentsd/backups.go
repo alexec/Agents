@@ -773,7 +773,8 @@ func (d *Daemon) restoreAgent(id wire.UUID, raw []byte, files map[string]string,
 		a.Cwd, a.Worktree = store.FolderURL(into), nil
 	}
 	// Made under the root that made the backup. This machine's own record keeps what it
-	// says; one from another machine never names this root, and brings no MCP servers.
+	// says; one from another machine never names this root, and brings no MCP servers and
+	// no runtime session or account: those belong to the set-up that made it.
 	if mine {
 		if a.MadeInRoot == nil && madeIn != "" {
 			a.MadeInRoot = &madeIn
@@ -784,7 +785,7 @@ func (d *Daemon) restoreAgent(id wire.UUID, raw []byte, files map[string]string,
 			from = restoredElsewhere
 		}
 		a.MadeInRoot = &from
-		a.McpServers = nil
+		a.McpServers, a.RuntimeSessionID, a.AccountID = nil, nil, nil
 	}
 	if a.State != wire.AgentStateArchived {
 		r := wire.AgentArchivedReasonByUser
