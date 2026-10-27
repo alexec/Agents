@@ -61,9 +61,12 @@ worktree's own `build/` and `.build` is still the clean-up, and leaves the cache
 `scripts/build-cache.sh du` shows its size and `prune` bounds it.
 
 Verify only what you touched: the schemes and tests for the paths your branch changes, as
-`merge-wave.sh plan` lists them (an `App/` change needs `AgentsHost` and `AgentsStore`,
-not the Remote or the web page; a `Packages/AgentsKit` change needs its tests filtered
-by `scripts/select-test-suites.sh`). The full suite and every scheme run once, in the wave.
+`.agents/skills/merge-wave/scripts/merge-wave.sh plan <your branch>`, run in your
+worktree, lists them with their commands (#2685): an `App/` or `Host/` change needs
+`AgentsHost` and `AgentsStore`, not the Remote or the web page, so no iOS simulator
+build; a `Remote/` change needs only the Remote; a `Shared/`, `Packages/` or `project.yml`
+change needs both; a `Packages/AgentsKit` change needs its tests filtered by
+`scripts/select-test-suites.sh`. The full suite and every scheme run once, in the wave.
 
 Then it:
 1. starts `agents-control serve --home $ROOT/control` on a free loopback port, with
