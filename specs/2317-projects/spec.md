@@ -117,7 +117,20 @@ Sam renames the project **Agents** to **Agents app**. Every folder in it, on eve
 
 ### User Story 4 - The project's tools (Priority: P2, Part 2)
 
-The Tasks, Code review and CI slots, and the pull-request and issue pages, move from a folder's Connectors page to the project. Each folder of the project gets them. Part 2, its own issue.
+The Tasks, Code review and CI slots, and the pull-request and issue pages, move from a folder's Connectors page to the project. Each folder of the project gets them. Part 2, #2669 (built).
+
+**As built (#2669):**
+
+- **Control plane.** A project record keeps `slots`: one per slot, either a forge (GitHub or GitLab), a repository and a site, or skipped. `projects/setSlot` sets a slot, or with no value gives it back to each folder. Only the owner or an admin may call it. The `projects/joined` answer is the machine's folders' projects with their slots (`MachineProjects`). After any change to a project, `host/projects` sends the same answer to each machine again.
+- **Machine.** The machine keeps the last `MachineProjects` it heard in `<root>/projects.json`. `connectors/setup` fills a slot that the project sets from the project's repository, with `fromProject` and `repository` on the slot and `project` / `projectName` on the set-up. The project's skip is the folder's skip. A slot that the project sets is not skipped by the folder's own skip. `connectors/setup/skip` is refused on such a slot. The sidebar's Issues page (Tasks) and Pull requests or Merge requests page (Code review) get the project's repository as their `repo` / `project` argument. They show even when the folder's own remote is on another forge.
+- **Clients.** All three draw the same card under the slots: "Tasks, Code review and CI are the project's (name)… Only its owner or an admin changes them." For the owner or an admin, each slot has **Use for the Whole Project** (the folder's own repository becomes the project's) or **Use Each Folder's Own**. A slot that the project sets says "Set by the project name." and has no Skip and no Change…. The Mac and the Remote use `Shared/UI/ProjectSlotsCard.swift`. The web page uses `ProjectSlots` in `Web/src/views/ConnectorSetup.tsx`.
+
+**Acceptance Scenarios**:
+
+1. **Given** a folder in a project, **When** its owner presses Use for the Whole Project on CI, **Then** every folder of the project reads CI from that repository, and its CI slot says "Set by the project …".
+2. **Given** a folder with no remote in a project whose Code review is set, **When** its Connectors page opens, **Then** Code review reads the project's repository, and its Pull requests page shows that repository.
+3. **Given** a member who is not the owner and not an admin, **When** they call `projects/setSlot`, **Then** it is refused: "Only the project's owner or an admin can change it."
+4. **Given** a project slot, **When** the owner presses Use Each Folder's Own, **Then** each folder's slot is its own again.
 
 ### User Story 5 - Reporting per project (Priority: P2, Part 3)
 
@@ -172,7 +185,7 @@ An admin sees every project in the organisation, its folders on each machine and
 | Part | What | Issue |
 |---|---|---|
 | 1 | The record, adoption, `.agents/folder.json`'s `project`, `folders/setProject`, the Project picker in folder settings on all three clients, the docs. | #2317 (this branch) |
-| 2 | The Tasks, Code review and CI slots and the pull-request and issue pages move to the project. | #2669 |
+| 2 | The Tasks, Code review and CI slots and the pull-request and issue pages move to the project. | #2669 (built) |
 | 3 | A Project dimension in Reports, Usage and Time. | #2670 |
 | 4 | Console ▸ Projects, and a Project picker in the Add Folder sheet on all three clients. | #2671 |
 

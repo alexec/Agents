@@ -30,6 +30,13 @@ const (
 	mrURI     = "ui://gitlab/mr"
 )
 
+// MergeRequestsURI and IssuesURI are the list views' addresses, which agentsd points at a
+// project's GitLab project (#2669).
+const (
+	MergeRequestsURI = mrsURI
+	IssuesURI        = issuesURI
+)
+
 // page is a view's HTML: its file, with the shared script and styles put in.
 func page(name string) string {
 	read := func(n string) string {

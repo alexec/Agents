@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"path/filepath"
 	"sync"
@@ -117,8 +118,16 @@ func (d *Daemon) sendJoined() {
 	}
 	ctx, cancel := context.WithTimeout(d.ctx, reportPatience)
 	defer cancel()
-	if _, err := (*ask)(ctx, wire.CallProjectsJoined.Name, d.joined()); err != nil {
+	answer, err := (*ask)(ctx, wire.CallProjectsJoined.Name, d.joined())
+	if err != nil {
 		log.Printf("projects/joined: not sent, tried again on the next change: %v", err)
+		return
+	}
+	// The answer is the folders' projects' slots (#2669); a control plane from before them
+	// answers {}, which says nothing.
+	var projects wire.MachineProjects
+	if json.Unmarshal(answer, &projects) == nil && projects.Projects != nil {
+		d.heardProjects(projects)
 	}
 }
 

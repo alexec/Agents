@@ -1862,6 +1862,22 @@
       }
     },
     {
+      "name": "host/projects",
+      "x-capability": "projects/1",
+      "description": "To a machine, on its channel 0, when a project its folders name changes its slots or name (#2669): the projects its folders name, with their slots.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineProjects"
+          }
+        }
+      ]
+    },
+    {
       "name": "host/providerDraft",
       "x-capability": "host/1",
       "description": "A host, on its channel 0, for a writing agent there (#858).",
@@ -3173,7 +3189,7 @@
     {
       "name": "projects/joined",
       "x-capability": "projects/1",
-      "description": "A host, on its channel 0 (#2317): every folder it has and the project id each names. The control plane adopts the ids it does not know.",
+      "description": "A host, on its channel 0 (#2317): every folder it has and the project id each names. The control plane adopts the ids it does not know, and answers with those projects' slots (#2669).",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3187,7 +3203,7 @@
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
+          "$ref": "daemon.schema.json#/definitions/MachineProjects"
         }
       }
     },
@@ -3256,6 +3272,31 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/ProjectSet"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Project"
+        }
+      }
+    },
+    {
+      "name": "projects/setSlot",
+      "x-capability": "projects/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ProjectSlotSet"
           }
         }
       ],

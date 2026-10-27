@@ -188,6 +188,10 @@ func (d *Daemon) Told(method string, params json.RawMessage) {
 		d.toldRelease(params)
 		return
 	}
+	if method == wire.NotifyHostProjects.Name {
+		d.toldProjects(params)
+		return
+	}
 	if method == wire.NotifyHostOrgRoutes.Name {
 		d.toldOrgRoutes(params)
 		return

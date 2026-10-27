@@ -4808,6 +4808,14 @@
         "done": {
           "type": "integer",
           "description": "Slots that read or were skipped, of the four."
+        },
+        "project": {
+          "type": "string",
+          "description": "The folder's project id (#2669), whose owner or an admin sets Tasks, Code review and CI for every folder in it. Absent when the folder is in no project."
+        },
+        "projectName": {
+          "type": "string",
+          "description": "The project's name, as this machine last heard it from the control plane."
         }
       },
       "required": [
@@ -4886,6 +4894,14 @@
         "message": {
           "type": "string",
           "description": "Why a read failed or was refused, in words. Never a token."
+        },
+        "repository": {
+          "type": "string",
+          "description": "The repository that fills this slot (#2669): the project's when fromProject, else the folder's own. Absent for workspace and with no remote."
+        },
+        "fromProject": {
+          "type": "boolean",
+          "description": "The folder's project sets this slot (#2669), so it is the same in every folder of the project."
         }
       },
       "required": [
@@ -11967,6 +11983,22 @@
       },
       "additionalProperties": false
     },
+      "MachineProjects": {
+        "type": "object",
+        "description": "projects/joined's answer and host/projects (#2669): the projects that this machine's folders name, with their slots, all of them each time.",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/ProjectTools"
+            }
+          }
+        },
+        "required": [
+          "projects"
+        ],
+        "additionalProperties": false
+      },
     "MachineProviderDraftCall": {
       "type": "object",
       "description": "host/providerDraft: a writing agent called one of the writer's tools (#858).",
@@ -15362,7 +15394,14 @@
           },
           "mayChange": {
             "type": "boolean",
-            "description": "The caller is the owner or an admin, so may rename and remove it."
+            "description": "The caller is the owner or an admin, so may rename and remove it, and set its slots."
+          },
+          "slots": {
+            "type": "array",
+            "description": "The project's Tasks, Code review and CI (#2669), one per slot: every folder in the project uses them. A slot that is not here is each folder's own.",
+            "items": {
+              "$ref": "#/definitions/ProjectSlot"
+            }
           }
         },
         "required": [
@@ -15437,6 +15476,77 @@
         },
         "required": [
           "name"
+        ],
+        "additionalProperties": false
+      },
+      "ProjectSlot": {
+        "type": "object",
+        "description": "A project's Tasks, Code review or CI slot (#2669): the forge and the repository (GitHub owner/name, GitLab group/project) that fill it for every folder in the project, or skipped.",
+        "properties": {
+          "slot": {
+            "$ref": "#/definitions/ConnectorSlotKind"
+          },
+          "forge": {
+            "$ref": "#/definitions/ConnectionProvider"
+          },
+          "repository": {
+            "type": "string"
+          },
+          "site": {
+            "type": "string",
+            "description": "The repository's host: github.com, gitlab.com, or a self-managed GitLab's host."
+          },
+          "skipped": {
+            "type": "boolean",
+            "description": "Skipped for every folder in the project. forge, repository and site are then absent."
+          }
+        },
+        "required": [
+          "slot"
+        ],
+        "additionalProperties": false
+      },
+      "ProjectSlotSet": {
+        "type": "object",
+        "description": "projects/setSlot (#2669): sets one of the project's slots, or with no value gives it back to each folder. Only the owner or an admin.",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "slot": {
+            "$ref": "#/definitions/ConnectorSlotKind"
+          },
+          "value": {
+            "$ref": "#/definitions/ProjectSlot"
+          }
+        },
+        "required": [
+          "id",
+          "slot"
+        ],
+        "additionalProperties": false
+      },
+      "ProjectTools": {
+        "type": "object",
+        "description": "One project's slots, as a machine gets them (#2669).",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/ProjectSlot"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slots"
         ],
         "additionalProperties": false
       },

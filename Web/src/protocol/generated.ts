@@ -1858,6 +1858,13 @@ export interface ConnectorSetup {
   events: ConnectorEvents;
   /** Slots that read or were skipped, of the four. */
   done: number;
+  /**
+   * The folder's project id (#2669), whose owner or an admin sets Tasks, Code review and CI for
+   * every folder in it. Absent when the folder is in no project.
+   */
+  project?: string;
+  /** The project's name, as this machine last heard it from the control plane. */
+  projectName?: string;
 }
 
 /**
@@ -1894,6 +1901,15 @@ export interface ConnectorSlot {
   readAt?: WireDate;
   /** Why a read failed or was refused, in words. Never a token. */
   message?: string;
+  /**
+   * The repository that fills this slot (#2669): the project's when fromProject, else the folder's
+   * own. Absent for workspace and with no remote.
+   */
+  repository?: string;
+  /**
+   * The folder's project sets this slot (#2669), so it is the same in every folder of the project.
+   */
+  fromProject?: boolean;
 }
 
 /**
@@ -3969,6 +3985,14 @@ export interface MachinePolicy {
   none?: boolean;
 }
 
+/**
+ * projects/joined's answer and host/projects (#2669): the projects that this machine's folders
+ * name, with their slots, all of them each time.
+ */
+export interface MachineProjects {
+  projects: ProjectTools[];
+}
+
 /** host/providerDraft: a writing agent called one of the writer's tools (#858). */
 export interface MachineProviderDraftCall {
   agentID: UUID;
@@ -5203,8 +5227,13 @@ export interface Project {
   name: string;
   owner: string;
   folders: ProjectFolder[];
-  /** The caller is the owner or an admin, so may rename and remove it. */
+  /** The caller is the owner or an admin, so may rename and remove it, and set its slots. */
   mayChange: boolean;
+  /**
+   * The project's Tasks, Code review and CI (#2669), one per slot: every folder in the project uses
+   * them. A slot that is not here is each folder's own.
+   */
+  slots?: ProjectSlot[];
 }
 
 /** A folder in a project (#2317), as its machine last reported it. */
@@ -5228,6 +5257,37 @@ export interface ProjectRequest {
 export interface ProjectSet {
   id?: string;
   name: string;
+}
+
+/**
+ * A project's Tasks, Code review or CI slot (#2669): the forge and the repository (GitHub
+ * owner/name, GitLab group/project) that fill it for every folder in the project, or skipped.
+ */
+export interface ProjectSlot {
+  slot: ConnectorSlotKind;
+  forge?: ConnectionProvider;
+  repository?: string;
+  /** The repository's host: github.com, gitlab.com, or a self-managed GitLab's host. */
+  site?: string;
+  /** Skipped for every folder in the project. forge, repository and site are then absent. */
+  skipped?: boolean;
+}
+
+/**
+ * projects/setSlot (#2669): sets one of the project's slots, or with no value gives it back to each
+ * folder. Only the owner or an admin.
+ */
+export interface ProjectSlotSet {
+  id: string;
+  slot: ConnectorSlotKind;
+  value?: ProjectSlot;
+}
+
+/** One project's slots, as a machine gets them (#2669). */
+export interface ProjectTools {
+  id: string;
+  name: string;
+  slots: ProjectSlot[];
 }
 
 /**
@@ -8332,6 +8392,7 @@ export interface Methods {
   "projects/list": { params: Empty; result: ProjectList };
   "projects/remove": { params: ProjectRequest; result: Empty };
   "projects/set": { params: ProjectSet; result: Project };
+  "projects/setSlot": { params: ProjectSlotSet; result: Project };
   "providers/add": { params: ProviderAdd; result: ProviderSummary };
   "providers/create": { params: ProviderCreate; result: ProviderCreated };
   "providers/list": { params: Empty; result: ProviderList };
@@ -8610,6 +8671,7 @@ export const MethodTarget = {
   "projects/list": "control",
   "projects/remove": "control",
   "projects/set": "control",
+  "projects/setSlot": "control",
   "providers/add": "control",
   "providers/create": "control",
   "providers/list": "control",
@@ -8905,10 +8967,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConnectorCodespacesRequest: { required: ["folder", "action"], optional: ["id", "name"] },
   ConnectorEvents: { required: ["state", "names", "workflows"], optional: ["server", "message"] },
   ConnectorProof: { required: ["title"], optional: ["number", "outcome", "url", "at"] },
-  ConnectorSetup: { required: ["folder", "slots", "events", "done"], optional: ["repository", "forge", "site", "repositoryURL", "connection", "installed", "installURL", "repositories"] },
+  ConnectorSetup: { required: ["folder", "slots", "events", "done"], optional: ["repository", "forge", "site", "repositoryURL", "connection", "installed", "installURL", "repositories", "project", "projectName"] },
   ConnectorSetupRequest: { required: ["folder"], optional: ["reading"] },
   ConnectorSkipRequest: { required: ["folder", "slot", "skipped"], optional: [] },
-  ConnectorSlot: { required: ["slot", "choice", "state"], optional: ["proof", "readAt", "message"] },
+  ConnectorSlot: { required: ["slot", "choice", "state"], optional: ["proof", "readAt", "message", "repository", "fromProject"] },
   ConnectorWorkflow: { required: ["id", "name"], optional: [] },
   ConsoleStopAgent: { required: ["host", "agent"], optional: [] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
@@ -9127,6 +9189,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineLink: { required: ["host", "provider", "workspace"], optional: ["startWhenUsed", "stopWhenIdleMinutes"] },
   MachineOptions: { required: ["host"], optional: ["startWhenUsed", "stopWhenIdleMinutes", "startForSchedules"] },
   MachinePolicy: { required: [], optional: ["policy", "signature", "none"] },
+  MachineProjects: { required: ["projects"], optional: [] },
   MachineProviderDraftCall: { required: ["agentID", "draft", "tool"], optional: ["arguments"] },
   MachineRelayRequest: { required: ["host", "relay"], optional: [] },
   MachineRelease: { required: ["version"], optional: [] },
@@ -9250,11 +9313,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PresenceReport: { required: ["active"], optional: ["watching", "mayNotify", "showing", "alsoShowing"] },
   PreviewFile: { required: ["path", "bytes", "runnable", "via"], optional: [] },
   PrewarmRequest: { required: ["agentID", "why"], optional: [] },
-  Project: { required: ["id", "name", "owner", "folders", "mayChange"], optional: [] },
+  Project: { required: ["id", "name", "owner", "folders", "mayChange"], optional: ["slots"] },
   ProjectFolder: { required: ["machine", "folder", "name"], optional: [] },
   ProjectList: { required: ["projects"], optional: [] },
   ProjectRequest: { required: ["id"], optional: [] },
   ProjectSet: { required: ["name"], optional: ["id"] },
+  ProjectSlot: { required: ["slot"], optional: ["forge", "repository", "site", "skipped"] },
+  ProjectSlotSet: { required: ["id", "slot"], optional: ["value"] },
+  ProjectTools: { required: ["id", "name", "slots"], optional: [] },
   ProjectsChanged: { required: [], optional: ["id", "removed"] },
   ProjectsJoined: { required: ["folders"], optional: [] },
   PromptRequest: { required: ["agentID", "text", "attachments", "from"], optional: ["sendID", "voice"] },

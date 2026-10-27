@@ -131,6 +131,7 @@ var own = methodSet(
 	"projects/list",
 	"projects/remove",
 	"projects/set",
+	"projects/setSlot",
 	"providers/setGroup",
 	"readApi/list",
 	"readApi/make",
@@ -238,6 +239,7 @@ var writes = methodSet(
 	"policy/stopAll",
 	"projects/remove",
 	"projects/set",
+	"projects/setSlot",
 	"providers/setGroup",
 	"readApi/make",
 	"readApi/revoke",
@@ -314,7 +316,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return m.peopleMethod(ctx, method, params, from)
 	case "groups/list", "groups/set", "groups/remove", "groups/setRole", "providers/setGroup":
 		return m.groupsMethod(ctx, method, params, from)
-	case "projects/list", "projects/set", "projects/remove":
+	case "projects/list", "projects/set", "projects/remove", "projects/setSlot":
 		return m.projectsMethod(ctx, method, params, from)
 	case "scim/set", "scim/tokens/list", "scim/tokens/make", "scim/tokens/revoke":
 		return m.scimMethod(ctx, method, params, from)
@@ -1052,7 +1054,10 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{}, m.s.keepJoined(ctx, host, joined)
+		if err := m.s.keepJoined(ctx, host, joined); err != nil {
+			return nil, err
+		}
+		return m.s.machineProjects(joined.Folders), nil
 	case "usage/rollup":
 		rollup, err := require[wire.UsageRollup](params, "UsageRollup")
 		if err != nil {

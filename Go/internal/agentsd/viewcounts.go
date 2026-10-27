@@ -159,7 +159,7 @@ func (d *Daemon) countView(ctx context.Context, folder, key string, v wire.ViewP
 
 func sameInt(a, b *int64) bool { return (a == nil) == (b == nil) && (a == nil || *a == *b) }
 
-// readViewCount calls the view's feeding tool as a list view's page does, with no
+// readViewCount calls the view's feeding tool as a list view's page does, with the pin's
 // arguments, and reads `count` and `attention` from its answer.
 func (d *Daemon) readViewCount(ctx context.Context, folder string, v wire.ViewPin) (count, attention *int64, err error) {
 	s, problem := d.viewServerFor(v.Server, folder)
@@ -169,7 +169,12 @@ func (d *Daemon) readViewCount(ctx context.Context, folder string, v wire.ViewPi
 	var result json.RawMessage
 	err = withViewSession(ctx, s, func(m *viewSession) error {
 		var err error
-		result, err = m.call("tools/call", map[string]any{"name": v.Tool, "arguments": map[string]any{}})
+		arguments := json.RawMessage("{}")
+		if len(v.Arguments) > 0 && string(v.Arguments) != "null" {
+			// A project's repository (#2669).
+			arguments = v.Arguments
+		}
+		result, err = m.call("tools/call", map[string]any{"name": v.Tool, "arguments": arguments})
 		return err
 	})
 	if err != nil {

@@ -31,6 +31,13 @@ const (
 	prURI     = "ui://github/pr"
 )
 
+// PullsURI and IssuesURI are the list views' addresses, which agentsd points at a
+// project's repository (#2669).
+const (
+	PullsURI  = pullsURI
+	IssuesURI = issuesURI
+)
+
 // page is a view's HTML: its file, with the PR page's script and styles put in.
 func page(name string) string {
 	read := func(n string) string {
