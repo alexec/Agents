@@ -3,11 +3,13 @@ package store
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -27,8 +29,8 @@ type Store struct {
 	// it, and one stamped with another root's is never run.
 	RootID string
 
-	mu       sync.Mutex
-	agents   map[wire.UUID]*wire.Agent
+	mu      sync.Mutex
+	agents  map[wire.UUID]*wire.Agent
 	folders []wire.Folder
 	// lines is each transcript's count of lines, once counted, for an entry's index.
 	lines map[wire.UUID]int
@@ -55,13 +57,13 @@ func Open(root string) (*Store, error) {
 		if !wireUUID(name) {
 			continue
 		}
-		a, err := s.load(name)
+		a, filled, err := s.load(name)
 		if err != nil {
 			// Left where it is, for a build that can read it, and said (AgentStore.load).
 			log.Printf("could not read agent %s, left on disk: %v", name, err)
 			continue
 		}
-		changed := mend(a)
+		changed := mend(a) || filled
 		if a.MadeInRoot == nil && adopts {
 			a.MadeInRoot = &id
 			changed = true
@@ -84,17 +86,64 @@ func wireUUID(s string) bool {
 	return len(s) == 36 && strings.Count(s, "-") == 4 && s == strings.ToUpper(s)
 }
 
-func (s *Store) load(id string) (*wire.Agent, error) {
+// load reads a record, and says whether it filled the worktree's folder (fillFolder).
+func (s *Store) load(id string) (*wire.Agent, bool, error) {
 	b, err := os.ReadFile(s.Loc.Record(id))
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	var a wire.Agent
 	if err := diskjson.Unmarshal(b, &a); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	a.ID = wire.UUID(strings.ToUpper(string(a.ID)))
-	return &a, nil
+	return &a, fillFolder(&a, b), nil
+}
+
+// fillFolder gives a worktree with no folder one (#2650). #2617 renamed the record's
+// "project" key to "folder" with no migration, and records written since have "folder": "",
+// which no client reads as a URL. The folder is the old "project" key when the record has
+// it, else the repository the worktree's root belongs to, else the folder its
+// .agents/worktrees is in, else the root itself: never empty.
+func fillFolder(a *wire.Agent, record []byte) bool {
+	w := a.Worktree
+	if w == nil || w.Folder != "" {
+		return false
+	}
+	var old struct {
+		Worktree *struct {
+			Project wire.URL `json:"project"`
+		} `json:"worktree"`
+	}
+	if json.Unmarshal(record, &old) == nil && old.Worktree != nil && old.Worktree.Project != "" {
+		w.Folder = old.Worktree.Project
+	} else {
+		w.Folder = repositoryFolder(FolderPath(w.Root))
+	}
+	log.Printf("agent %s: its worktree had no folder; it is %s now", a.ID, w.Folder)
+	return true
+}
+
+// repositoryFolder is the folder a worktree at root is of: the parent of git's common
+// dir, else what comes before .agents/worktrees in root, else root.
+func repositoryFolder(root string) wire.URL {
+	if root == "" {
+		return PathURL("/")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "-C", root, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0")
+	if out, err := cmd.Output(); err == nil {
+		if dir := strings.TrimSpace(string(out)); dir != "" {
+			return FolderURL(filepath.Dir(dir))
+		}
+	}
+	marker := string(filepath.Separator) + filepath.Join(".agents", "worktrees") + string(filepath.Separator)
+	if i := strings.Index(root, marker); i > 0 {
+		return FolderURL(root[:i])
+	}
+	return FolderURL(root)
 }
 
 // mend brings a record the rules forbid to one they allow (AgentStore.mended), and ends

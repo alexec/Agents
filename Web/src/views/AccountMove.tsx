@@ -15,7 +15,7 @@ export function AccountMoveStrip({ store, host, agent }: { store: Store; host: s
   if (!reason) return null;
   const move = async () => {
     const id = await store.continueInNew(host, agent.id);
-    if (id) go({ host, folder: agent.worktree?.folder ?? agent.cwd, session: id });
+    if (id) go({ host, folder: agent.worktree?.folder || agent.cwd, session: id });
   };
   return (
     <div class="missing-folder-strip" role="status">

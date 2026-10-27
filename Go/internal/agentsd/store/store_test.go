@@ -3,6 +3,7 @@ package store
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -266,5 +267,46 @@ func TestATokenInATranscriptLineIsStoredRedacted(t *testing.T) {
 	entries, _, _ := s.Transcript(id, 0)
 	if len(entries) != 3 || entries[1].Kind.ToolCall.Value.Title != "cat .env: GITHUB_TOKEN=[redacted:github]" {
 		t.Fatalf("read back: %+v", entries)
+	}
+}
+
+// A worktree record with no folder (#2650) gets one on load, written back: the old
+// "project" key when it has one, else the repository its root belongs to. None is left "".
+func TestAWorktreeWithNoFolderIsFilled(t *testing.T) {
+	root := t.TempDir()
+	repo := filepath.Join(t.TempDir(), "repo")
+	wt := filepath.Join(repo, ".agents", "worktrees", "lane")
+	os.MkdirAll(wt, 0o755)
+	if out, err := exec.Command("git", "init", "-q", repo).CombinedOutput(); err != nil {
+		t.Skipf("no git here: %v %s", err, out)
+	}
+	write := func(id, worktree string) {
+		dir := filepath.Join(root, "agents", id)
+		os.MkdirAll(dir, 0o755)
+		b := `{"id":"` + id + `","runtimeID":"claude","cwd":"file:///w/","state":"stopped","endedReason":"endTurn",` +
+			`"advertisedOptions":[],"availableCommands":[],"worktree":` + worktree + `}`
+		if err := os.WriteFile(filepath.Join(dir, "agent.json"), []byte(b), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	empty, old, gone := NewUUID(), NewUUID(), NewUUID()
+	write(string(empty), `{"name":"lane","root":"`+string(PathURL(wt))+`","madeByApp":true,"folder":""}`)
+	write(string(old), `{"name":"lane","root":"file:///x/.agents/worktrees/lane","madeByApp":true,"project":"file:///x"}`)
+	write(string(gone), `{"name":"lane","root":"file:///nowhere/src/.agents/worktrees/lane","madeByApp":true,"folder":""}`)
+	s, err := Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[wire.UUID]wire.URL{empty: FolderURL(repo), old: "file:///x", gone: "file:///nowhere/src"}
+	for id, folder := range want {
+		if a := s.Agent(id); a == nil || a.Worktree == nil || a.Worktree.Folder != folder {
+			t.Errorf("%s: folder %+v, want %s", id, a.Worktree, folder)
+		}
+		b, _ := os.ReadFile(s.Loc.Record(string(id)))
+		var rec struct{ Worktree struct{ Folder wire.URL } }
+		json.Unmarshal(b, &rec)
+		if rec.Worktree.Folder != folder {
+			t.Errorf("%s: written back as %q, want %s", id, rec.Worktree.Folder, folder)
+		}
 	}
 }

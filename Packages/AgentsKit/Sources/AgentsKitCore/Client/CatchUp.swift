@@ -35,8 +35,8 @@ public extension DaemonAPI {
     struct CatchUpSnapshot: Codable, Sendable {
         public var folders: [FolderSummary]
         /// The first page of live agents. A full page means there are more, which come
-        /// a folder at a time as each folder's page opens.
-        public var agents: [Agent]
+        /// a folder at a time as each folder's page opens. Read a row at a time (#2650).
+        @AgentRows public var agents: [Agent]
         public var permissions: [PermissionRequest]
         public var elicitations: [ElicitationRequest]
         public var attention: AttentionPending

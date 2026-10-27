@@ -110,9 +110,10 @@ export function folderKey(url: string): string {
   return url.replace(/\/+$/, "");
 }
 
-/** The folder an agent counts under: its worktree's folder, else where it runs (Agent.folderPath). */
+/** The folder an agent counts under: its worktree's folder, else where it runs (Agent.folderPath); an
+ *  empty folder, left by #2617 (#2650), counts as none. */
 export function folderPath(agent: Agent): string {
-  return folderKey(agent.worktree?.folder ?? agent.cwd);
+  return folderKey(agent.worktree?.folder || agent.cwd);
 }
 
 /**
