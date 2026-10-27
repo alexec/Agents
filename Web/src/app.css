@@ -1203,6 +1203,10 @@ button.remove:hover { opacity: 1; }
 .console-table th { text-align: left; font-weight: 600; font-size: 0.6875rem; opacity: 0.6; padding: 6px 8px; border-bottom: 1px solid var(--paper-rule); }
 .console-table td { padding: 7px 8px; border-bottom: 1px solid var(--paper-rule); vertical-align: top; }
 .console-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+/* Console ▸ Projects (#2671): each project's folders, and its Rename… and Remove. */
+.console-projects ul { list-style: none; margin: 0; padding: 0; }
+.console-projects td.actions { white-space: nowrap; text-align: right; }
+.console-projects td.actions button + button { margin-left: 6px; }
 /* The organisation's policy (#998): Settings ▸ Policy and Console ▸ Policy. */
 .policy-rules { margin: 0; display: flex; flex-direction: column; gap: 2px; }
 .policy-rules .setting { display: flex; gap: 12px; justify-content: space-between; }
@@ -1344,6 +1348,10 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / 0.25); }
 .sheet-note { margin: 10px 0 0; font-size: 0.75rem; opacity: 0.65; min-height: 2.6em; }
 .sheet-body .sheet-note { margin: 0; }
 .sheet-note.failure { color: var(--tint-failure); opacity: 1; }
+/* The Add Folder sheet's Project (#2671). */
+.new-folder-project { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+.new-folder-project label { display: flex; flex-direction: column; gap: 2px; font-size: 0.8125rem; }
+.new-folder-project p { margin: 0; }
 .sheet-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
 .persona-manager { width: min(760px, calc(100vw - 72px)); }
 .persona-manager select { font: inherit; color: inherit; padding: 5px 8px; border: 1px solid var(--paper-rule); border-radius: var(--radius-control); background: var(--paper-ground); }

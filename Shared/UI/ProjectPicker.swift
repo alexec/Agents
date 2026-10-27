@@ -138,3 +138,33 @@ struct ProjectPicker: View {
         await load()
     }
 }
+
+/// The Add Folder sheet's Project (#2671): Its Own Project first, so a solo person adds a
+/// folder as before (SC-001), then the organisation's projects. A sheet shows it only when
+/// `projects(on:)` lists some, so with no control plane, or one before projects, the sheet
+/// is as it was. The web page's is in `Web/src/views/NewFolder.tsx`.
+struct NewFolderProjectChoice: View {
+    let projects: [DaemonAPI.Project]
+    /// The project picked; nil is the folder's own.
+    @Binding var project: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Picker(ProjectWords.title, selection: $project) {
+                Text(ProjectWords.ownProject).tag(String?.none)
+                ForEach(projects) { Text($0.name).tag(Optional($0.id)) }
+            }
+            Text(ProjectWords.addNote)
+                .appText(.fine)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /// The organisation's projects; none with no control plane or one before projects.
+    static func projects(on control: DaemonClient?) async -> [DaemonAPI.Project] {
+        guard let control else { return [] }
+        return (try? await control.call(DaemonAPI.Method.projectsList, DaemonAPI.Empty(),
+                                        returning: DaemonAPI.ProjectList.self))?.projects ?? []
+    }
+}

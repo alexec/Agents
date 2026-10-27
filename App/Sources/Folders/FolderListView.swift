@@ -324,9 +324,14 @@ struct FolderListView: View {
             Task { for folder in folders { await model.addFolder(folder) } }
             return true
         }
-        .fileImporter(isPresented: $isChoosingFolder, allowedContentTypes: [.folder]) { result in
-            guard case .success(let folder) = result else { return }
-            Task { await model.addFolder(folder) }
+        // The system's folder panel, with the Project picker under it (#2671).
+        .onChange(of: isChoosingFolder) { _, choosing in
+            guard choosing else { return }
+            isChoosingFolder = false
+            Task {
+                guard let chosen = await AddFolderPanel.choose(control: model.controlRequests) else { return }
+                await model.addFolder(chosen.folder, project: chosen.project)
+            }
         }
         .sheet(isPresented: $isCloning) { CloneSheet(host: targetHost).paperSheet() }
         .sheet(isPresented: $isChoosingServerFolder) { RemoteFolderSheet(host: targetHost).paperSheet() }

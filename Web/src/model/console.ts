@@ -29,6 +29,7 @@ export const consoleSections: readonly Section[] = [
   { id: "overview", title: "Overview", about: "What the Console has, and what waits for you.", group: "Organisation", built: true },
   { id: "people", title: "People and Groups", about: "Who belongs, their roles, bots and groups.", group: "Organisation", built: true },
   { id: "machines", title: "Machines", about: "Every machine: its owner, state, version and agents.", group: "Organisation", built: true },
+  { id: "projects", title: "Projects", about: "Every project: its owner and its folders on each machine. Rename and remove.", group: "Organisation", built: true },
   { id: "signIn", title: "Sign-In", about: "Your organisation’s sign-in providers, their domains and SCIM.", group: "Organisation", built: true },
   { id: "live", title: "Live Now", about: "Every agent running now, its cost so far, and Stop.", group: "Organisation", built: true },
   { id: "policy", title: "Policy", about: "The rules every machine follows: modes, sandbox, runtimes, budgets, and the kill switch.", group: "Rules", built: true },
