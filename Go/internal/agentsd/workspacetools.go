@@ -37,7 +37,6 @@ func (d *Daemon) SetControlAsk(ask askControl) {
 		return
 	}
 	d.askControl.Store(&ask)
-	d.startUserConfigSync()
 }
 
 // askWorkspaces is one host/machines call for an agent, named for the control plane's log.

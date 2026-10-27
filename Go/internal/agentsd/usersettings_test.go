@@ -87,26 +87,73 @@ func TestUserSettingsGoIntoTheMachinesFiles(t *testing.T) {
 	c.call(t, 4, "cost/setLimits", map[string]any{"dailyTokens": 1})
 }
 
-func TestAgentConfigFilesAreAppliedAndMarkedWithoutContents(t *testing.T) {
+// The agent configuration files another machine sent are neither written nor removed here,
+// as an older control plane may still send them: one machine does not change what runs on
+// the person's others.
+func TestAgentConfigFilesFromAnotherMachineAreNotWritten(t *testing.T) {
 	root, home := t.TempDir(), t.TempDir()
 	t.Setenv("AGENTS_PERSONAL_HOME", home)
+	os.MkdirAll(filepath.Join(home, ".agents", "skills", "mine"), 0o755)
+	os.WriteFile(filepath.Join(home, ".agents", "skills", "mine", "SKILL.md"), []byte("mine"), 0o644)
+	os.WriteFile(filepath.Join(home, ".agents", "mcp.json"), []byte(`{"mcpServers":{"mine":{"command":"x"}}}`), 0o644)
 	d, _ := start(t, root)
 	defer d.Shutdown()
-	contents := base64.StdEncoding.EncodeToString([]byte("Follow the shared rules."))
+	server := base64.StdEncoding.EncodeToString([]byte(`{"x":{"command":"y"}}`))
+	rules := base64.StdEncoding.EncodeToString([]byte("Follow the shared rules."))
+	yes := true
 	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(wire.MachineUserSettings{
 		User: "sam",
-		Settings: wire.UserSettings{AgentConfigFiles: &wire.AgentConfigFiles{Files: []wire.AgentConfigFile{{
-			Path: "skills/review/SKILL.md", Contents: &contents, Time: 10, Machine: "other", Digest: "abc",
-		}}}},
+		Settings: wire.UserSettings{AgentConfigFiles: &wire.AgentConfigFiles{Files: []wire.AgentConfigFile{
+			{Path: "mcp.json", Contents: &server, Time: 10, Machine: "other", Digest: "a"},
+			{Path: "plugins/other/hooks/hooks.json", Contents: &server, Time: 10, Machine: "other", Digest: "b"},
+			{Path: "AGENTS.md", Contents: &rules, Time: 10, Machine: "other", Digest: "c"},
+			{Path: "skills/review/SKILL.md", Contents: &rules, Time: 10, Machine: "other", Digest: "d"},
+			{Path: "skills/mine/SKILL.md", Deleted: &yes, Time: 10, Machine: "other", Digest: "deleted"},
+		}}},
 	}))
-	written, err := os.ReadFile(filepath.Join(home, ".agents", "skills", "review", "SKILL.md"))
-	if err != nil || string(written) != "Follow the shared rules." {
-		t.Fatalf("%q %v", written, err)
+	for _, rel := range []string{"AGENTS.md", "skills/review", "plugins/other"} {
+		if _, err := os.Stat(filepath.Join(home, ".agents", rel)); err == nil {
+			t.Fatalf("wrote %s from another machine", rel)
+		}
 	}
-	var mark userSettingsSyncState
-	data, err := os.ReadFile(d.userSettingsSyncPath())
-	if err != nil || json.Unmarshal(data, &mark) != nil || len(mark.ConfigFiles) != 1 || mark.ConfigFiles[0].Contents != nil {
-		t.Fatalf("mark retained file contents: %+v %v", mark.ConfigFiles, err)
+	if b, _ := os.ReadFile(filepath.Join(home, ".agents", "mcp.json")); !strings.Contains(string(b), `"mine"`) || strings.Contains(string(b), `"y"`) {
+		t.Fatalf("mcp.json: %s", b)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".agents", "skills", "mine", "SKILL.md")); err != nil {
+		t.Fatal("another machine removed a skill here")
+	}
+}
+
+// A mark from before files from other machines were refused names them too. The first
+// agentConfig part after it takes away none of them, nor the mcp.json it just wrote.
+func TestAnOldMarkTakesAwayOnlyWhatAgentConfigWrote(t *testing.T) {
+	root, home := t.TempDir(), t.TempDir()
+	t.Setenv("AGENTS_PERSONAL_HOME", home)
+	agents := filepath.Join(home, ".agents")
+	for _, rel := range []string{"mcp.json", "plugins/one/plugin.json", "skills/tool/run.sh", "personas/old.md"} {
+		os.MkdirAll(filepath.Dir(filepath.Join(agents, rel)), 0o755)
+		os.WriteFile(filepath.Join(agents, rel), []byte("{}"), 0o644)
+	}
+	d, _ := start(t, root)
+	defer d.Shutdown()
+	old, _ := json.Marshal(userSettingsSyncState{User: "sam", Secrets: []string{},
+		Files: []string{"mcp.json", "plugins/one/plugin.json", "skills/tool/run.sh", "personas/old.md"}})
+	os.WriteFile(d.userSettingsSyncPath(), old, 0o644)
+	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(wire.MachineUserSettings{
+		User: "sam",
+		Settings: wire.UserSettings{McpServers: wire.JSONValue(`{"mine":{"command":"x"}}`),
+			AgentConfig: wire.JSONValue(`{"instructions":"Be brief."}`)},
+	}))
+	for _, rel := range []string{"plugins/one/plugin.json", "skills/tool/run.sh"} {
+		if _, err := os.Stat(filepath.Join(agents, rel)); err != nil {
+			t.Fatalf("took away %s", rel)
+		}
+	}
+	if b, _ := os.ReadFile(filepath.Join(agents, "mcp.json")); !strings.Contains(string(b), `"mine"`) {
+		t.Fatalf("mcp.json: %s", b)
+	}
+	if _, err := os.Stat(filepath.Join(agents, "personas", "old.md")); err == nil {
+		t.Fatal("kept a persona the agentConfig part no longer sends")
 	}
 }
 

@@ -162,67 +162,6 @@ func TestPartsAreKeptWithoutBeingRead(t *testing.T) {
 	}
 }
 
-func TestAgentConfigFilesMergeIndependentlyAndNewestWins(t *testing.T) {
-	ctx := context.Background()
-	b := New(store.NewMemory(), nil, "")
-	one := base64.StdEncoding.EncodeToString([]byte("new instructions"))
-	two := base64.StdEncoding.EncodeToString([]byte("skill file"))
-	set := func(path, machine, contents string, at, counter int64, deleted bool) bool {
-		changed, err := b.SetAgentConfigFile(ctx, "sam", machine, wire.AgentConfigFileRequest{
-			Path: path, Contents: &contents, Deleted: &deleted, Time: at, Counter: counter,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		return changed
-	}
-	if !set("AGENTS.md", "mac", one, 100, 0, false) || !set("skills/review/SKILL.md", "box", two, 101, 0, false) {
-		t.Fatal("independent files were not stored")
-	}
-	if set("AGENTS.md", "mac", two, 99, 9, false) {
-		t.Fatal("older contents replaced a newer file")
-	}
-	if !set("AGENTS.md", "mac", one, 102, 0, true) {
-		t.Fatal("newer deletion was not stored")
-	}
-	if !set("AGENTS.md", "z-machine", two, 103, 0, false) {
-		t.Fatal("newer recreation was not stored")
-	}
-	got, err := b.Settings(ctx, "sam")
-	if err != nil || got.AgentConfigFiles == nil || len(got.AgentConfigFiles.Files) != 2 {
-		t.Fatalf("%+v %v", got.AgentConfigFiles, err)
-	}
-	if got.AgentConfigFiles.Files[0].Contents != nil {
-		t.Fatal("a client read file contents")
-	}
-	if got.AgentConfigFiles.Files[0].Path != "AGENTS.md" || got.AgentConfigFiles.Files[0].Digest == "" {
-		t.Fatalf("%+v", got.AgentConfigFiles.Files[0])
-	}
-	delivery, _, err := b.Delivery(ctx, "sam")
-	if err != nil || delivery.Settings.AgentConfigFiles == nil || delivery.Settings.AgentConfigFiles.Files[0].Contents == nil {
-		t.Fatalf("machine did not get file contents: %+v, %v", delivery.Settings.AgentConfigFiles, err)
-	}
-}
-
-func TestAgentConfigPathsAndMCPSecretsAreChecked(t *testing.T) {
-	ctx := context.Background()
-	b := New(store.NewMemory(), nil, "")
-	value := base64.StdEncoding.EncodeToString([]byte("x"))
-	for _, path := range []string{"../AGENTS.md", "skills/../outside", "plugins/demo/node_modules/pkg/index.js", ".env"} {
-		if _, err := b.SetAgentConfigFile(ctx, "sam", "mac", wire.AgentConfigFileRequest{Path: path, Contents: &value}); !errors.Is(err, ErrInvalid) {
-			t.Fatalf("%q: %v", path, err)
-		}
-	}
-	secret := base64.StdEncoding.EncodeToString([]byte(`{"server":{"env":{"API_TOKEN":"clear-value"}}}`))
-	if _, err := b.SetAgentConfigFile(ctx, "sam", "mac", wire.AgentConfigFileRequest{Path: "mcp.json", Contents: &secret}); !errors.Is(err, ErrInvalid) {
-		t.Fatalf("clear MCP secret was accepted: %v", err)
-	}
-	large := base64.StdEncoding.EncodeToString(make([]byte, MaxAgentConfigFile+1))
-	if _, err := b.SetAgentConfigFile(ctx, "sam", "mac", wire.AgentConfigFileRequest{Path: "AGENTS.md", Contents: &large}); !errors.Is(err, ErrInvalid) {
-		t.Fatalf("oversized configuration file was accepted: %v", err)
-	}
-}
-
 func TestAMachineLeftIsNamedOnTheSecretsItHad(t *testing.T) {
 	ctx := context.Background()
 	b := localBook(t, store.NewMemory())

@@ -84,40 +84,6 @@ func TestSettingsAndSecretsGoOnlyToTheirPersonsMachines(t *testing.T) {
 	p.waitFor(func() bool { _, ok := told.last(samBox.member.Host); return ok }, "Sam's machine told at its join")
 
 	// Sam's server and token, under You.
-	contents := base64.StdEncoding.EncodeToString([]byte("Sam's shared instructions"))
-	if _, err := samBox.uplink.Ask(t.Context(), wire.CallUserSetAgentConfigFile.Name, wire.AgentConfigFileRequest{
-		Path: "AGENTS.md", Contents: &contents, Time: time.Now().UnixMilli(),
-	}); err != nil {
-		t.Fatalf("host could not sync its configuration: %v", err)
-	}
-	p.waitFor(func() bool {
-		u, _ := told.last(samBox.member.Host)
-		return u.Settings.AgentConfigFiles != nil && len(u.Settings.AgentConfigFiles.Files) == 1
-	}, "Sam's machine gets its synced configuration")
-	if got, _ := told.last(samBox.member.Host); got.Settings.AgentConfigFiles.Files[0].Machine != "MACHINE-21" {
-		t.Fatalf("clock uses host id instead of machine id: %+v", got.Settings.AgentConfigFiles.Files[0])
-	}
-	var stored wire.UserSettings
-	json.Unmarshal(call(t, sam.window, "", "user/settings", nil), &stored)
-	if stored.AgentConfigFiles == nil || stored.AgentConfigFiles.Files[0].Contents != nil {
-		t.Fatalf("client saw file contents: %+v", stored.AgentConfigFiles)
-	}
-	if _, err := samBox.uplink.Ask(t.Context(), wire.CallUserSetAgentConfigFile.Name, wire.AgentConfigFileRequest{
-		Path: "AGENTS.md", Contents: &contents, Time: time.Now().UnixMilli(),
-	}); err != nil {
-		t.Fatal(err)
-	}
-	alexContents := base64.StdEncoding.EncodeToString([]byte("Alex's own instructions"))
-	if _, err := alexBox.uplink.Ask(t.Context(), wire.CallUserSetAgentConfigFile.Name, wire.AgentConfigFileRequest{
-		Path: "AGENTS.md", Contents: &alexContents, Time: time.Now().UnixMilli(),
-	}); err != nil {
-		t.Fatalf("Alex's machine could not sync its own configuration: %v", err)
-	}
-	json.Unmarshal(call(t, sam.window, "", "user/settings", nil), &stored)
-	if stored.AgentConfigFiles.Files[0].Contents != nil || stored.AgentConfigFiles.Files[0].Digest == "" {
-		t.Fatalf("Sam's configuration was not kept independently: %+v", stored.AgentConfigFiles)
-	}
-	// Sam's server and token, under You.
 	call(t, sam.window, "", "user/setSettings", map[string]any{"part": "mcpServers",
 		"value": map[string]any{"github": map[string]any{"url": "https://api.githubcopilot.com/mcp/"}}})
 	call(t, sam.window, "", "user/setSecret", wire.UserSecret{Name: "GITHUB_TOKEN", Value: "ghp_sams-own-token"})
@@ -229,5 +195,44 @@ func TestNoKeeperKeepsNoSecrets(t *testing.T) {
 	json.Unmarshal(call(t, window, "", "user/settings", nil), &got)
 	if got.CostLimits == nil {
 		t.Fatalf("%+v", got)
+	}
+}
+
+// A machine does not send its agent configuration files to its person's other machines: the
+// person's own clients change them (user/setSettings), so one machine cannot change what
+// runs on the others.
+func TestAMachineCannotSendAgentConfigFilesToItsPersonsOtherMachines(t *testing.T) {
+	t.Parallel()
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	told := &deliveries{got: map[string][]wire.MachineUserSettings{}}
+	p.told = told.heard
+	_, window := p.client("Alex's Mac")
+	alex := &person{id: p.s.localOwner(), window: window}
+	workspace := p.machineSaying(alex, takingHello("MACHINE-30"))
+	mac := p.machineSaying(alex, takingHello("MACHINE-31"))
+	p.waitFor(func() bool { _, ok := told.last(mac.member.Host); return ok }, "the Mac told at its join")
+
+	contents := base64.StdEncoding.EncodeToString([]byte(`{"x":{"command":"y"}}`))
+	yes := true
+	for _, request := range []wire.AgentConfigFileRequest{
+		{Path: "mcp.json", Contents: &contents, Time: time.Now().UnixMilli()},
+		{Path: "plugins/one/hooks/hooks.json", Contents: &contents, Time: time.Now().UnixMilli()},
+		{Path: "AGENTS.md", Contents: &contents, Time: time.Now().UnixMilli()},
+		{Path: "skills/review/SKILL.md", Contents: &contents, Time: time.Now().UnixMilli()},
+		{Path: "personas/reviewer.md", Contents: &contents, Time: time.Now().UnixMilli()},
+		{Path: "skills/review/SKILL.md", Deleted: &yes, Time: time.Now().UnixMilli() + 1},
+	} {
+		_, err := workspace.uplink.Ask(t.Context(), wire.CallUserSetAgentConfigFile.Name, request)
+		if err == nil || !strings.Contains(err.Error(), "does not send its agent configuration files") {
+			t.Fatalf("%s from a machine: %v", request.Path, err)
+		}
+	}
+	if u, _ := told.last(mac.member.Host); u.Settings.AgentConfigFiles != nil {
+		t.Fatalf("the Mac was sent files from another machine: %+v", u.Settings.AgentConfigFiles)
+	}
+	var stored wire.UserSettings
+	json.Unmarshal(call(t, window, "", "user/settings", nil), &stored)
+	if stored.AgentConfigFiles != nil {
+		t.Fatalf("kept files from a machine: %+v", stored.AgentConfigFiles)
 	}
 }

@@ -5,7 +5,6 @@
 // does not read inside:
 //
 //	v1/users/<user>/settings.json          wire.UserSettings
-//	v1/users/<user>/agent-config/<path>.json one agent configuration file or tombstone
 //	v1/users/<user>/secrets/<NAME>.json    a secret, sealed (FR-025, SC-007)
 //
 // Each secret is sealed in an envelope (kms.SealFor): a data key of its own encrypts it,
@@ -17,12 +16,9 @@ package usersettings
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"path"
 	"regexp"
 	"slices"
 	"sort"
@@ -43,12 +39,9 @@ const Prefix = "v1/users/"
 
 // The bounds on what one person keeps, so no person fills the store or a machine's link.
 const (
-	MaxPart             = 256 << 10
-	MaxSecret           = 16 << 10
-	MaxSecrets          = 200
-	MaxAgentConfigFile  = 1 << 20
-	MaxAgentConfigFiles = 4096
-	MaxAgentConfigTotal = 64 << 20
+	MaxPart    = 256 << 10
+	MaxSecret  = 16 << 10
+	MaxSecrets = 200
 )
 
 var (
@@ -59,10 +52,7 @@ var (
 	ErrInvalid = errors.New("invalid")
 )
 
-var (
-	secretName          = regexp.MustCompile(`^[A-Z_][A-Z0-9_]{0,63}$`)
-	agentConfigFileName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
-)
+var secretName = regexp.MustCompile(`^[A-Z_][A-Z0-9_]{0,63}$`)
 
 // userID is a person's id as it may be in a store key.
 var userID = regexp.MustCompile(`^[A-Za-z0-9._-]{1,128}$`)
@@ -74,8 +64,7 @@ type Book struct {
 	keeperURL string
 	now       func() time.Time
 
-	mu       sync.Mutex
-	configMu sync.Mutex
+	mu sync.Mutex
 	// opened keeps each secret's value by its record's tag, so a machine's join does not
 	// ask the keeper again for what did not change.
 	opened map[string]openedSecret
@@ -111,11 +100,7 @@ func (b *Book) OpenFor(ctx context.Context, sealed *kms.Sealed, boundTo []byte) 
 	return kms.OpenFor(ctx, b.keeper, sealed, boundTo)
 }
 
-func settingsKey(user string) string       { return Prefix + user + "/settings.json" }
-func agentConfigPrefix(user string) string { return Prefix + user + "/agent-config/" }
-func agentConfigKey(user, name string) string {
-	return agentConfigPrefix(user) + base64.RawURLEncoding.EncodeToString([]byte(name)) + ".json"
-}
+func settingsKey(user string) string { return Prefix + user + "/settings.json" }
 func secretsPrefix(user string) string {
 	return Prefix + user + "/secrets/"
 }
@@ -155,255 +140,7 @@ func (b *Book) Settings(ctx context.Context, user string) (wire.UserSettings, er
 			return wire.UserSettings{}, fmt.Errorf("%s cannot be read: %w", settingsKey(user), err)
 		}
 	}
-	files, err := b.AgentConfigFiles(ctx, user)
-	if err != nil {
-		return wire.UserSettings{}, err
-	}
-	if len(files.Files) > 0 {
-		for i := range files.Files {
-			files.Files[i].Contents = nil
-		}
-		out.AgentConfigFiles = &files
-	}
 	return out, nil
-}
-
-// AgentConfigFiles is the current per-path state, including deletion tombstones.
-func (b *Book) AgentConfigFiles(ctx context.Context, user string) (wire.AgentConfigFiles, error) {
-	out := wire.AgentConfigFiles{Files: []wire.AgentConfigFile{}}
-	if err := checkUser(user); err != nil {
-		return out, err
-	}
-	keys, err := b.store.List(ctx, agentConfigPrefix(user))
-	if err != nil {
-		return out, err
-	}
-	for _, key := range keys {
-		o, err := b.store.Get(ctx, key.Key)
-		if err != nil || o == nil {
-			continue
-		}
-		var file wire.AgentConfigFile
-		if json.Unmarshal(o.Data, &file) == nil {
-			out.Files = append(out.Files, file)
-		}
-	}
-	sort.Slice(out.Files, func(i, j int) bool { return out.Files[i].Path < out.Files[j].Path })
-	if len(out.Files) > 0 {
-		latest := int64(0)
-		for _, f := range out.Files {
-			if f.Time > latest {
-				latest = f.Time
-			}
-		}
-		at := time.UnixMilli(latest).UTC().Format(time.RFC3339)
-		out.Updated = &at
-	}
-	return out, nil
-}
-
-// SetAgentConfigFile keeps one file or tombstone. The newest logical time wins per path;
-// the machine id gives equal clocks a stable order.
-func (b *Book) SetAgentConfigFile(ctx context.Context, user, machine string, request wire.AgentConfigFileRequest) (bool, error) {
-	if err := checkUser(user); err != nil {
-		return false, err
-	}
-	name := path.Clean(request.Path)
-	if name != request.Path || !validAgentConfigPath(name) || machine == "" || request.Time < 0 || request.Counter < 0 {
-		return false, fmt.Errorf("%w: invalid agent configuration path or clock", ErrInvalid)
-	}
-	deleted := request.Deleted != nil && *request.Deleted
-	if !deleted && request.Contents == nil {
-		return false, fmt.Errorf("%w: file contents are missing", ErrInvalid)
-	}
-	var content []byte
-	if !deleted {
-		if len(*request.Contents) > base64.StdEncoding.EncodedLen(MaxAgentConfigFile) {
-			return false, fmt.Errorf("%w: an agent configuration file is over %d MB", ErrInvalid, MaxAgentConfigFile>>20)
-		}
-		decoded, err := base64.StdEncoding.DecodeString(*request.Contents)
-		if err != nil {
-			return false, fmt.Errorf("%w: file contents are not base64", ErrInvalid)
-		}
-		content = decoded
-		if len(content) > MaxAgentConfigFile {
-			return false, fmt.Errorf("%w: an agent configuration file is over %d MB", ErrInvalid, MaxAgentConfigFile>>20)
-		}
-		if name == "mcp.json" && !validMCPServers(content) {
-			return false, fmt.Errorf("%w: mcp.json has invalid servers or a secret in clear", ErrInvalid)
-		}
-	}
-	contents := request.Contents
-	digest := "deleted"
-	if !deleted {
-		sum := sha256.Sum256(content)
-		digest = fmt.Sprintf("%x", sum)
-	}
-	b.configMu.Lock()
-	defer b.configMu.Unlock()
-	current, err := b.store.Get(ctx, agentConfigKey(user, name))
-	if err != nil {
-		return false, err
-	}
-	var previous wire.AgentConfigFile
-	if current != nil {
-		if err := json.Unmarshal(current.Data, &previous); err != nil {
-			return false, err
-		}
-		if compareAgentConfigClock(request.Time, request.Counter, machine, previous) <= 0 {
-			return false, nil
-		}
-	}
-	if err := b.checkAgentConfigBounds(ctx, user, name, previous, content, deleted); err != nil {
-		return false, err
-	}
-	changed := false
-	err = b.change(ctx, agentConfigKey(user, name), func(raw []byte) ([]byte, error) {
-		var before wire.AgentConfigFile
-		if raw != nil {
-			if err := json.Unmarshal(raw, &before); err != nil {
-				return nil, err
-			}
-			if compareAgentConfigClock(request.Time, request.Counter, machine, before) <= 0 {
-				return nil, nil
-			}
-		}
-		file := wire.AgentConfigFile{Path: name, Contents: contents, Deleted: optional(deleted), Time: request.Time,
-			Counter: request.Counter, Machine: machine, Digest: digest}
-		data, err := records.Encode(file)
-		if err == nil {
-			changed = true
-		}
-		return data, err
-	})
-	return changed, err
-}
-
-func (b *Book) checkAgentConfigBounds(ctx context.Context, user, name string, previous wire.AgentConfigFile, content []byte, deleted bool) error {
-	keys, err := b.store.List(ctx, agentConfigPrefix(user))
-	if err != nil {
-		return err
-	}
-	count, total := 0, 0
-	recordCount := len(keys)
-	for _, key := range keys {
-		o, err := b.store.Get(ctx, key.Key)
-		if err != nil {
-			return err
-		}
-		if o == nil {
-			continue
-		}
-		var file wire.AgentConfigFile
-		if json.Unmarshal(o.Data, &file) != nil {
-			return fmt.Errorf("%s cannot be read", key.Key)
-		}
-		if file.Path == name || file.Deleted != nil && *file.Deleted {
-			continue
-		}
-		if file.Contents != nil {
-			data, err := base64.StdEncoding.DecodeString(*file.Contents)
-			if err == nil {
-				count++
-				total += len(data)
-			}
-		}
-	}
-	if deleted {
-		if previous.Path != name && recordCount >= MaxAgentConfigFiles {
-			return fmt.Errorf("%w: a person can keep up to %d agent configuration files", ErrInvalid, MaxAgentConfigFiles)
-		}
-		return nil
-	}
-	if previous.Path != name || previous.Deleted != nil && *previous.Deleted {
-		count++
-		if previous.Path != name {
-			recordCount++
-		}
-	}
-	total += len(content)
-	if count > MaxAgentConfigFiles || recordCount > MaxAgentConfigFiles || total > MaxAgentConfigTotal {
-		return fmt.Errorf("%w: a person can keep up to %d agent configuration files and %d MB total", ErrInvalid, MaxAgentConfigFiles, MaxAgentConfigTotal>>20)
-	}
-	return nil
-}
-
-func optional[T any](value T) *T { return &value }
-
-func compareAgentConfigClock(timeValue, counter int64, machine string, old wire.AgentConfigFile) int {
-	if timeValue != old.Time {
-		if timeValue < old.Time {
-			return -1
-		}
-		return 1
-	}
-	if counter != old.Counter {
-		if counter < old.Counter {
-			return -1
-		}
-		return 1
-	}
-	return strings.Compare(machine, old.Machine)
-}
-
-func validAgentConfigPath(name string) bool {
-	if name == "AGENTS.md" || name == "mcp.json" {
-		return true
-	}
-	parts := strings.Split(name, "/")
-	if len(parts) < 2 || (parts[0] != "personas" && parts[0] != "skills" && parts[0] != "plugins") {
-		return false
-	}
-	for _, part := range parts {
-		switch strings.ToLower(part) {
-		case "", ".", "..", "node_modules", ".git", ".cache", "cache", "caches", "dist", "build", "target", "vendor", "__pycache__":
-			return false
-		}
-	}
-	if !agentConfigFileName.MatchString(parts[1]) || strings.Contains(parts[1], "..") {
-		return false
-	}
-	if parts[0] == "personas" {
-		return len(parts) == 2 && strings.HasSuffix(parts[1], ".md")
-	}
-	return len(parts) >= 3
-}
-
-// MCP server settings travel without any clear secret values.
-func validMCPServers(raw []byte) bool {
-	var servers map[string]struct {
-		Env     map[string]string `json:"env"`
-		Headers map[string]string `json:"headers"`
-	}
-	if json.Unmarshal(raw, &servers) != nil || servers == nil {
-		return false
-	}
-	for _, server := range servers {
-		for key, value := range server.Env {
-			if looksLikeSecret(key) && value != "" && !strings.Contains(value, "${") {
-				return false
-			}
-		}
-		for key, value := range server.Headers {
-			if looksLikeSecret(key) && value != "" && !strings.Contains(value, "${") {
-				return false
-			}
-			if strings.HasPrefix(strings.ToLower(value), "bearer ") && !strings.Contains(value, "${") {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-func looksLikeSecret(name string) bool {
-	name = strings.ToLower(name)
-	for _, part := range []string{"token", "secret", "key", "password", "passwd", "auth", "bearer", "cookie", "credential"} {
-		if strings.Contains(name, part) {
-			return true
-		}
-	}
-	return false
 }
 
 // Forget deletes everything kept for a person: their settings and every sealed secret
@@ -683,13 +420,6 @@ func (b *Book) Delivery(ctx context.Context, user string) (out wire.MachineUserS
 		return out, nil, err
 	}
 	out = wire.MachineUserSettings{User: user, Settings: settings, Secrets: []wire.UserSecret{}}
-	files, err := b.AgentConfigFiles(ctx, user)
-	if err != nil {
-		return out, nil, err
-	}
-	if len(files.Files) > 0 {
-		out.Settings.AgentConfigFiles = &files
-	}
 	all, tags, err := b.secretRecords(ctx, user)
 	if err != nil {
 		return out, nil, err
