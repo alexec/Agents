@@ -166,19 +166,6 @@ enum StoreFile {
         return aside
     }
 
-    /// Keep a copy of `url`, which read but only in part, under the daemon's `root`
-    /// before a write drops what did not read; once for the bytes it has, and not held.
-    @discardableResult
-    static func keepPartCopy(_ url: URL, under root: URL, what: String) -> URL? {
-        let folder = StoreCoding.asideFolder(for: url, under: root)
-        guard let bytes = try? reader(url) else { return nil }
-        if let last = StoreCoding.asides(of: url, in: folder).last, (try? Data(contentsOf: last)) == bytes { return last }
-        guard let aside = StoreCoding.setAside(url, in: folder, copy: true) else { return nil }
-        DaemonLog.shared.write("store: \(what) in \(url.path) could not be read; the whole file is kept as \(aside.path)")
-        SetAsideNotes.shared.add(url, aside: aside, partly: true)
-        return aside
-    }
-
     private static func hold(_ url: URL, forRun: Bool, because why: String, meaning: String) {
         guard StoreHolds.shared.hold(url, forRun: forRun) else { return }
         DaemonLog.shared.write("store: \(url.lastPathComponent) could not be read (\(why)); left where it is and held: nothing is written to it this run, \(meaning)")
@@ -189,11 +176,6 @@ enum StoreFile {
     static func write(_ data: Data, to url: URL, permissions: Int? = nil) throws {
         if let untilRestart = StoreHolds.shared.isHeld(url) { throw Held(url: url, untilRestart: untilRestart) }
         try StoreCoding.writeAtomically(data, to: url, permissions: permissions)
-    }
-
-    /// Refuse when `url` is held, for a store that writes some other way (a removal).
-    static func requireWritable(_ url: URL) throws {
-        if let untilRestart = StoreHolds.shared.isHeld(url) { throw Held(url: url, untilRestart: untilRestart) }
     }
 }
 
