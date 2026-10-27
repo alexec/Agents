@@ -15,7 +15,11 @@ func TestAnOldStoreOpensWithItsMachines(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	root := t.TempDir()
-	if _, err := store.NewFolder(root).Put(ctx, "v1/hosts/mac.json", []byte(`{"id":"mac","name":"Mac"}`), store.Absent); err != nil {
+	// A real record, where a build before #2316 kept it.
+	if err := records.New(store.NewFolder(root)).SaveHost(ctx, records.MachineRecord{ID: "mac", Name: "Mac"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(filepath.Join(root, "v1", "machines"), filepath.Join(root, "v1", "hosts")); err != nil {
 		t.Fatal(err)
 	}
 	st, err := OpenStore("file://"+root+"/", os.Getenv, nil)
