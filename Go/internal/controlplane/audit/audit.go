@@ -189,6 +189,16 @@ func Action(method string, toHost bool) (string, bool) {
 	return a, ok
 }
 
+// HostMethods are the calls passed to a host that the audit keeps, sorted.
+func HostMethods() []string {
+	out := make([]string, 0, len(hostActions))
+	for m := range hostActions {
+		out = append(out, m)
+	}
+	sort.Strings(out)
+	return out
+}
+
 // targetKeys are where a call names what it acts on, most telling first.
 var targetKeys = []string{"agentID", "id", "workflowID", "key", "server", "name", "host", "provider",
 	"permissionID", "requestID", "cwd", "folder", "path"}
