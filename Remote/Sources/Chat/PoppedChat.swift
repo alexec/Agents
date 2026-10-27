@@ -89,6 +89,9 @@ struct PoppedChatScene: View {
                         .environment(\.poppedChat, chat)
                 } else if chat?.looked == true {
                     SessionDeletedPage(next: .closeWindow)
+                } else if let chat, let failure = chat.work.transcriptLoadFailure {
+                    // Not looked for: its host did not answer, so it is not called deleted (#2743).
+                    SessionNotLoadedPage(failure: failure) { await model.loadTranscript(of: chat) }
                 } else if id == nil {
                     ContentUnavailableView("No session", systemImage: "bubble.left.and.bubble.right",
                                            description: Text("Drag a session out of the sidebar to open it here."))

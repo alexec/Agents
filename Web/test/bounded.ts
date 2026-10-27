@@ -4,3 +4,5 @@ export {
 } from "../src/model/store";
 export { keepingTurns } from "../src/model/turns";
 export { effect } from "@preact/signals";
+export { CallFailed } from "../src/wire/link";
+export { Failure } from "../src/protocol/generated";

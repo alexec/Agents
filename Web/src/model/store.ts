@@ -1878,31 +1878,36 @@ export class Store extends Work {
     this.unwatch();
   }
 
-  /** The open session's record whole, with the menus a lean list leaves out (#107). */
-  private async loadWhole(host: string, session: string): Promise<void> {
+  /** The open session's record whole, with the menus a lean list leaves out (#107). Whether its host answered. */
+  private async loadWhole(host: string, session: string): Promise<boolean> {
     const listed = await this.link.call("agents/list", {
       includeArchived: true, archivedCommands: true, archivedOnly: false, lean: false, agentID: session as never, limit: 1,
     }, host).catch(() => null);
     // A host from before #107 ignores agentID and answers with its newest, which isn't this one.
     const whole = listed?.find((a) => a.id === session);
     if (whole) this.addAgents([whole], host);
+    return listed !== null;
   }
 
   /**
-   * The open session's record and its history, side by side. Looked for once both have come, so one not
-   * in hand then has gone (#2652); only the history is waited for.
+   * The open session's record and its history, side by side. Looked for once its host has answered both,
+   * so one not in hand then has gone (#2652); a call that failed is not an answer, and the chat says it
+   * with Try Again instead of calling the session deleted (#2743). Only the history is waited for.
    */
   private async loadTranscript(host: string, session: string): Promise<void> {
     const page = this.loadPage(host, session);
-    void Promise.all([this.loadWhole(host, session), page]).then(() => {
+    void Promise.all([this.loadWhole(host, session), page]).then(([listed, paged]) => {
       const now = this.watching.value;
-      if (now?.host === host && now.session === session) this.lookedFor.value = { host, session };
+      if (listed && paged && now?.host === host && now.session === session) this.lookedFor.value = { host, session };
     }, () => {});
     await page;
   }
 
-  /** The finished turns first, as summaries, then the transcript from where the open turn starts. */
-  private async loadPage(host: string, session: string): Promise<void> {
+  /**
+   * The finished turns first, as summaries, then the transcript from where the open turn starts. Whether
+   * its host answered: with the page, or that it has no such session (#2743).
+   */
+  private async loadPage(host: string, session: string): Promise<boolean> {
     this.heardSincePage ??= [];
     const load = ++this.transcriptLoads;
     const agentID = session as never;
@@ -1914,24 +1919,27 @@ export class Store extends Work {
         if (!(error instanceof CallFailed && error.code === methodNotFound)) failed.turns = describe(error);
         return { turns: [], firstTurn: 0, openStart: 0 };
       });
+    let gone = false;
     const page = await this.link.call("agents/transcript", { agentID, limit: 200, from: turns.openStart }, host)
       .catch((error: unknown) => {
+        gone = error instanceof CallFailed && error.code === Failure.noSuchAgent;
         failed.page = describe(error);
         log("call.failed", error instanceof CallFailed ? error.code : undefined);
         return null;
       });
     // A chat opened since is not this one, and a newer load of this one has the say.
     const now = this.watching.value;
-    if (now?.host !== host || now.session !== session || load !== this.transcriptLoads) return;
+    if (now?.host !== host || now.session !== session || load !== this.transcriptLoads) return false;
     if (!page) {
       this.transcriptLoadFailure.value = { nothingLoaded: true, reason: failed.page ?? "no answer." };
-      return;
+      return gone;
     }
     batch(() => {
       this.replaceTurns(turns);
       this.replaceTranscript(page);
       if (failed.turns) this.transcriptLoadFailure.value = { nothingLoaded: false, reason: failed.turns };
     });
+    return true;
   }
 
   /** Ask again for the open chat's history, after it did not load (#400). */

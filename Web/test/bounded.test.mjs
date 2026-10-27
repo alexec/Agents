@@ -6,6 +6,7 @@ import { load } from "./load.mjs";
 const {
   Work, Store, archivedPage, searchShown, keepingTurns, effect,
   turnPage, openTurnsHeld, historyEntriesCap, historyTurnsCap, rememberOpen, quietSettle,
+  CallFailed, Failure,
 } = await load("test/bounded.ts");
 const w = await load("test/wire.ts");
 
@@ -691,4 +692,26 @@ test("a session opened is looked for once its record and history have come (#265
   await wait(0);
   assert.deepEqual(store.lookedFor.value, { host: "mac", session: "gone" });
   assert.equal(store.agent("mac", "gone"), undefined);
+});
+
+test("a session whose lookup failed is not looked for, and is once its host says it is gone (#2743)", async () => {
+  let answer = "fail";
+  const link = fakeLink((method) => {
+    if (method === "agents/turns") return { turns: [], firstTurn: 0, openStart: 0 };
+    if (method === "agents/transcript") {
+      if (answer === "gone") throw new CallFailed(Failure.noSuchAgent, "no agent gone");
+      return undefined;
+    }
+    if (method === "agents/list") return answer === "gone" ? [] : undefined;
+    return undefined;
+  });
+  const store = new Store(link);
+  await store.openSession("mac", "gone");
+  await wait(0);
+  assert.equal(store.lookedFor.value, null, "a call that failed is not an answer");
+  assert.equal(store.transcriptLoadFailure.value?.nothingLoaded, true, "said, with Try Again");
+  answer = "gone";
+  await store.reloadTranscript();
+  await wait(0);
+  assert.deepEqual(store.lookedFor.value, { host: "mac", session: "gone" });
 });

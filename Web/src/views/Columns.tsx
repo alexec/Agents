@@ -71,7 +71,8 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
               id={r.review} down={down || !store.hostIsOnline(r.host)} />
           ) : r.host && r.session ? (store.agent(r.host, r.session)
             ? <Chat store={store} host={r.host} session={r.session} down={down} />
-            : <MissingSession looked={!down && store.lookedFor.value?.host === r.host && store.lookedFor.value.session === r.session} />)
+            : <MissingSession store={store} looked={!down && store.hostIsOnline(r.host)
+              && store.lookedFor.value?.host === r.host && store.lookedFor.value.session === r.session} />)
           : r.host && r.folder && folder && r.workflow ? (
             <WorkflowPage store={store} host={r.host} folder={folder.folder.folder} folderName={folder.name}
               workflowID={r.workflow} down={down || !store.hostIsOnline(r.host)} />
@@ -102,7 +103,22 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
  * A session chosen that is not in hand (#2652), as the window's ChatView (#2651): a spinner until it has
  * been looked for, then that it was deleted. Never an empty chat to type into, which is New Session's.
  */
-function MissingSession({ looked }: { looked: boolean }) {
+/**
+ * A session not in hand: deleted only once its host has answered that it is not there (#2652). A lookup that
+ * failed says so, with Try Again, as the chat's history does (#400, #2743); until then, on its way.
+ */
+function MissingSession({ store, looked }: { store: Store; looked: boolean }) {
+  const failure = store.transcriptLoadFailure.value;
+  if (!looked && failure) {
+    return (
+      <section class="chat empty session-not-loaded" aria-label="Session did not load">
+        <span class="glyph" aria-hidden="true">⚠︎</span>
+        <h2>This session did not load</h2>
+        <p role="status">{failure.reason}</p>
+        <p><button class="link" onClick={() => { void store.reloadTranscript(); }}>Try Again</button></p>
+      </section>
+    );
+  }
   if (!looked) return <section class="chat empty" aria-label="Loading" aria-busy="true"><span class="spinner" aria-hidden="true" /></section>;
   return (
     <section class="chat empty session-deleted" aria-label="Session deleted">

@@ -4137,13 +4137,16 @@ final class AppModel {
 
     /// The open chat's record whole, with the menus and plan a lean list leaves out (#107).
     /// A host too old to know `agentID` lists its newest instead, which is not this one.
-    func loadWholeAgent(_ id: UUID) async {
+    /// Whether its host answered, with it or without it (#2743).
+    @discardableResult
+    func loadWholeAgent(_ id: UUID) async -> Bool {
         let host = host(ofAgent: id)
         guard let listed = try? await client(for: host).call(DaemonAPI.Method.agentsList, DaemonAPI.ListRequest.whole(id),
-                                                             returning: [Agent].self),
-              var whole = listed.first(where: { $0.id == id }) else { return }
+                                                             returning: [Agent].self) else { return false }
+        guard var whole = listed.first(where: { $0.id == id }) else { return true }
         whole.host = host
         work.takeListed([whole])
+        return true
     }
 
     func loadTranscript() async {
@@ -4159,7 +4162,7 @@ final class AppModel {
         // opening, on every reconnect and on its host's lists, and these overlap (#400).
         let load = work.beginTranscriptLoad()
         // Beside the transcript rather than before it: neither waits on the other.
-        async let whole: Void = loadWholeAgent(selection)
+        async let whole = loadWholeAgent(selection)
         // The chat's own host, both for the call and for the check that it is up: a
         // server's chat does not fail because this Mac's host is down (#400).
         let host = host(ofAgent: selection)
@@ -4206,7 +4209,7 @@ final class AppModel {
             Self.chatLog.notice("history of \(selection) did not load from \(host.rawValue, privacy: .public): \(why, privacy: .public)")
             work.failOpening(why, load: load)
         }
-        await whole
+        _ = await whole
     }
 
     /// A session's transcript in a window of its own (#826), loaded as the main window's
@@ -4214,9 +4217,11 @@ final class AppModel {
     func loadTranscript(of chat: PoppedChat) async {
         let id = chat.id
         let load = chat.work.beginTranscriptLoad()
-        async let whole: Void = loadWholeAgent(id)
+        async let whole = loadWholeAgent(id)
         let host = host(ofAgent: id)
         var reason: String?
+        // Its host answered that it has no such session: an answer, not a failure (#2743).
+        var gone = false
         let loaded = await attempt(on: host, quietWhenDown: true) {
             let client = self.client(for: host)
             do {
@@ -4237,6 +4242,7 @@ final class AppModel {
             } catch {
                 // A server that went: the strip says so, and this says what is shown (#963).
                 reason = host != .mac && OfflineWords.hostDown(error) ? OfflineWords.lastHeard : self.describe(error)
+                gone = ChatOpening.saysGone(error)
                 throw error
             }
         }
@@ -4245,8 +4251,10 @@ final class AppModel {
             Self.chatLog.notice("history of \(id) did not load in its own window from \(host.rawValue, privacy: .public): \(why, privacy: .public)")
             chat.work.failOpening(why, load: load)
         }
-        await whole
-        // Looked for: from here a session not in hand is one that has gone.
+        // Looked for once its host has answered both: from here a session not in hand is
+        // one that has gone. A call that failed is no answer, and the window says it with
+        // Try Again rather than calling the session deleted (#2743).
+        guard await whole, loaded || gone else { return }
         chat.looked = true
     }
 

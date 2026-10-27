@@ -47,6 +47,11 @@ struct RemoteChatView: View {
                 // A session that went while it was open: not an empty chat to type into,
                 // which is New Session's (#2652), as on the Mac (#2651).
                 SessionDeletedPage(next: sizeClass == .compact ? .goBack : .pickAnother)
+            } else if let failure = page.transcriptLoadFailure {
+                // Not looked for: its host did not answer, so it is not called deleted (#2743).
+                SessionNotLoadedPage(failure: failure) { [model, popped] in
+                    if let popped { await model.loadTranscript(of: popped) } else { await model.loadTranscript() }
+                }
             } else {
                 // Not looked for yet: on its way, not gone.
                 ProgressView()

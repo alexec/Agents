@@ -4541,13 +4541,16 @@ final class RemoteModel {
 
     /// The open chat's record whole, with the menus and plan a lean list leaves out (#107).
     /// A Mac too old to know `agentID` lists its newest instead, which is not this one.
-    func loadWholeAgent(_ id: UUID) async {
+    /// Whether its host answered, with it or without it (#2743).
+    @discardableResult
+    func loadWholeAgent(_ id: UUID) async -> Bool {
         let request = DaemonAPI.ListRequest.whole(id)
         guard let listed = try? await client(for: request).call(DaemonAPI.Method.agentsList, request,
-                                                                returning: [Agent].self),
-              var whole = listed.first(where: { $0.id == id }) else { return }
+                                                                returning: [Agent].self) else { return false }
+        guard var whole = listed.first(where: { $0.id == id }) else { return true }
         whole.host = work.agent(id)?.host ?? whole.host
         work.takeListed([whole])
+        return true
     }
 
     func loadTranscript() async {
@@ -4563,6 +4566,8 @@ final class RemoteModel {
         let load = work.beginTranscriptLoad()
         let turnsRequest = DaemonAPI.TurnsRequest.opening(selection)
         let pageSize = firstPageSize
+        // Whether its host answered: with the history, or that it has no such session.
+        var answered = true
         do {
             let opening = try await ChatOpening.load(
                 limit: pageSize,
@@ -4587,10 +4592,13 @@ final class RemoteModel {
             note("chat: history of \(selection) did not load: \(error)")
             guard self.selection == selection else { return }
             work.failOpening(Self.describeLoadFailure(error), load: load)
+            answered = ChatOpening.saysGone(error)
         }
-        // Looked for once both have come: from here a session not in hand has gone (#2652).
-        await whole.value
-        if self.selection == selection { lookedForSelection = selection }
+        // Looked for once its host has answered both: from here a session not in hand has
+        // gone (#2652). A call that failed is no answer, and the chat says it with Try
+        // Again rather than calling the session deleted (#2743).
+        guard await whole.value, answered, self.selection == selection else { return }
+        lookedForSelection = selection
     }
 
     /// A chat's history that did not come, in words (#400).
@@ -5489,10 +5497,11 @@ extension RemoteModel {
     /// that scene's own page of it.
     func loadTranscript(of chat: PoppedChat) async {
         let id = chat.id
-        Task { await loadWholeAgent(id) }
+        let whole = Task { await loadWholeAgent(id) }
         let load = chat.work.beginTranscriptLoad()
         let turnsRequest = DaemonAPI.TurnsRequest.opening(id)
         let pageSize = firstPageSize
+        var answered = true
         do {
             let opening = try await ChatOpening.load(
                 limit: pageSize,
@@ -5513,8 +5522,10 @@ extension RemoteModel {
             note("chat: history of \(id) did not load in its own scene: \(error)")
             guard popouts[id] === chat else { return }
             chat.work.failOpening(Self.describeLoadFailure(error), load: load)
+            answered = ChatOpening.saysGone(error)
         }
-        // Looked for: from here a session not in hand is one that has gone.
+        // Looked for once its host has answered both, as the main scene's (#2743).
+        guard await whole.value, answered else { return }
         chat.looked = true
     }
 
