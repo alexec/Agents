@@ -147,12 +147,12 @@
 /* Start beside a stopped workspace's line (#961), as on its strip. */
 .with-sidebar .foot-line .foot-start { margin-left: 6px; font-size: inherit; }
 
-/* Nothing chosen: what the sidebar is for, and its keys. */
-.with-sidebar .nothing-chosen { display: flex; flex-direction: column; text-align: center; padding: 0 24px; gap: 4px; }
-.with-sidebar .nothing-chosen p { max-width: 380px; }
-.with-sidebar .nothing-chosen .glyph { font-size: 2.125rem; opacity: 0.6; }
-.with-sidebar .nothing-chosen h2 { font-size: 0.875rem; margin: 4px 0 2px; }
-.with-sidebar .nothing-chosen p { margin: 4px 0; line-height: 1.45; }
+/* Nothing chosen: what the sidebar is for, and its keys. A chosen session that was deleted, the same (#2652). */
+.with-sidebar .nothing-chosen, .with-sidebar .session-deleted { display: flex; flex-direction: column; text-align: center; padding: 0 24px; gap: 4px; }
+.with-sidebar .nothing-chosen p, .with-sidebar .session-deleted p { max-width: 380px; }
+.with-sidebar .nothing-chosen .glyph, .with-sidebar .session-deleted .glyph { font-size: 2.125rem; opacity: 0.6; }
+.with-sidebar .nothing-chosen h2, .with-sidebar .session-deleted h2 { font-size: 0.875rem; margin: 4px 0 2px; }
+.with-sidebar .nothing-chosen p, .with-sidebar .session-deleted p { margin: 4px 0; line-height: 1.45; }
 
 /* An Activity page in the chat's place. */
 .with-sidebar .activity-body { max-width: 760px; padding: 8px 12px; }

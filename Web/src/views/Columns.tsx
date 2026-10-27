@@ -69,7 +69,9 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
           : r.host && r.folder && folder && r.review ? (
             <ReviewPage key={`${r.host}|${r.review}`} store={store} host={r.host} folder={folder.folder.folder} folderName={folder.name}
               id={r.review} down={down || !store.hostIsOnline(r.host)} />
-          ) : r.host && r.session ? <Chat store={store} host={r.host} session={r.session} down={down} />
+          ) : r.host && r.session ? (store.agent(r.host, r.session)
+            ? <Chat store={store} host={r.host} session={r.session} down={down} />
+            : <MissingSession looked={!down && store.lookedFor.value?.host === r.host && store.lookedFor.value.session === r.session} />)
           : r.host && r.folder && folder && r.workflow ? (
             <WorkflowPage store={store} host={r.host} folder={folder.folder.folder} folderName={folder.name}
               workflowID={r.workflow} down={down || !store.hostIsOnline(r.host)} />
@@ -93,6 +95,21 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
       <ContextMenu />
       <MilestoneCard store={store} />
     </div>
+  );
+}
+
+/**
+ * A session chosen that is not in hand (#2652), as the window's ChatView (#2651): a spinner until it has
+ * been looked for, then that it was deleted. Never an empty chat to type into, which is New Session's.
+ */
+function MissingSession({ looked }: { looked: boolean }) {
+  if (!looked) return <section class="chat empty" aria-label="Loading" aria-busy="true"><span class="spinner" aria-hidden="true" /></section>;
+  return (
+    <section class="chat empty session-deleted" aria-label="Session deleted">
+      <span class="glyph" aria-hidden="true">🗑</span>
+      <h2>This session was deleted</h2>
+      <p>There is nothing left of it to show. Pick another session on the left.</p>
+    </section>
   );
 }
 

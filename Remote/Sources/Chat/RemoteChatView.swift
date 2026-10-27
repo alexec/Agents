@@ -43,8 +43,14 @@ struct RemoteChatView: View {
             if let agent {
                 // The conversation with its panes beside it or over it (034).
                 PaneHost(agent: agent) { conversation }
+            } else if popped?.looked ?? (model.lookedForSelection == model.selection) {
+                // A session that went while it was open: not an empty chat to type into,
+                // which is New Session's (#2652), as on the Mac (#2651).
+                SessionDeletedPage(next: sizeClass == .compact ? .goBack : .pickAnother)
             } else {
-                conversation
+                // Not looked for yet: on its way, not gone.
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         // What its prompt bar reads: the runtime's capabilities, the cost limit, the

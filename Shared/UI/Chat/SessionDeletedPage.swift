@@ -10,6 +10,8 @@ struct SessionDeletedPage: View {
         case closeWindow
         /// A window with a sidebar of sessions.
         case pickAnother
+        /// A phone's stack of screens, with the list one Back away (#2652).
+        case goBack
     }
 
     let next: Next
@@ -23,6 +25,7 @@ struct SessionDeletedPage: View {
         switch next {
         case .closeWindow: "There is nothing left of it to show. Close this window."
         case .pickAnother: "There is nothing left of it to show. Pick another session on the left."
+        case .goBack: "There is nothing left of it to show. Go back to pick another session."
         }
     }
 }
