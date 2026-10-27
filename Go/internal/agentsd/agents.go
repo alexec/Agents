@@ -546,7 +546,7 @@ func (d *Daemon) deleteArchivedThen(a *wire.Agent, because string, erase func(*w
 	// The runtime's own copy goes next, and a backup never brings the agent back (#1001).
 	erase(a)
 	copyOf := "none"
-	if hasRuntimeCopy(a) {
+	if d.mayErase(a, nil) {
 		copyOf = "queued"
 	}
 	Broadcast(d, wire.NotifyAgentRemoved, wire.AgentRemovedNotification{AgentID: a.ID})

@@ -112,6 +112,27 @@ func TestCodexFilesGoWithoutTheRuntime(t *testing.T) {
 	}
 }
 
+// Only a runtime copy this set-up made, and that no kept agent still holds, is erased.
+func TestDeleteErasesOnlyItsOwnRuntimeCopy(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	dir := folder(t, c, 1)
+	other := "another-root"
+	copied := archivedWithSession(t, d, dir, "copied")
+	d.change(copied.ID, func(a *wire.Agent) { a.MadeInRoot = &other })
+	shared := archivedWithSession(t, d, dir, "shared")
+	archivedWithSession(t, d, dir, "shared")
+	own := archivedWithSession(t, d, dir, "own")
+	for i, a := range []wire.Agent{copied, shared, own} {
+		c.call(t, 2+i, "agents/delete", map[string]any{"agentID": a.ID})
+	}
+	if q := d.readErasures(); len(q) != 1 || q[0].SessionID != "own" {
+		t.Fatalf("queued %+v", q)
+	}
+	if got := lastEvent(d, "agent.deleted"); got == nil || got.Details["runtimeCopy"] != "queued" {
+		t.Errorf("agent.deleted is %+v", got)
+	}
+}
+
 // The queue is bounded, and kept across a restart only for erasureTries and erasureKeep.
 func TestTheErasureQueueIsBounded(t *testing.T) {
 	root := t.TempDir()

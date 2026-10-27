@@ -126,25 +126,49 @@ func hasRuntimeCopy(a *wire.Agent) bool {
 	return a.RuntimeSessionID != nil && *a.RuntimeSessionID != ""
 }
 
+// heldSessions is the runtime sessions of the agents this set-up still keeps, when any of
+// agents has a copy: those copies are never erased.
+func (d *Daemon) heldSessions(agents []*wire.Agent) map[string]bool {
+	if !slices.ContainsFunc(agents, hasRuntimeCopy) {
+		return nil
+	}
+	held := map[string]bool{}
+	for _, a := range d.Store.Agents() {
+		if hasRuntimeCopy(&a) {
+			held[a.RuntimeID+"\x00"+*a.RuntimeSessionID] = true
+		}
+	}
+	return held
+}
+
+// mayErase is whether a deleted agent's runtime copy is erased: one made under another
+// set-up, or that an agent still kept holds, belongs to someone else.
+func (d *Daemon) mayErase(a *wire.Agent, held map[string]bool) bool {
+	if !hasRuntimeCopy(a) || held[a.RuntimeID+"\x00"+*a.RuntimeSessionID] {
+		return false
+	}
+	return a.MadeInRoot == nil || *a.MadeInRoot == d.Store.RootID
+}
+
 // queueErasure adds the runtime's copy of a deleted agent, and puts it on the erased list.
-// It says whether there was a copy to queue.
-func (d *Daemon) queueErasure(a *wire.Agent) bool {
+func (d *Daemon) queueErasure(a *wire.Agent) {
 	d.queueErasures([]*wire.Agent{a})
-	return hasRuntimeCopy(a)
 }
 
 // queueErasures is queueErasure for many deleted agents, with one rewrite of each file.
+// Only a copy this set-up made, and that no agent it still keeps holds, is queued.
 func (d *Daemon) queueErasures(agents []*wire.Agent) {
 	if len(agents) == 0 {
 		return
 	}
+	held := d.heldSessions(agents)
 	d.erasures.mu.Lock()
 	defer d.erasures.mu.Unlock()
 	erased := map[wire.UUID]time.Time{}
 	var add []erasure
 	for _, a := range agents {
 		erased[a.ID] = nowFunc()
-		if hasRuntimeCopy(a) {
+		if d.mayErase(a, held) {
 			add = append(add, erasure{AgentID: a.ID, RuntimeID: a.RuntimeID, SessionID: *a.RuntimeSessionID,
 				AccountID: a.AccountID, QueuedAt: nowFunc()})
 		}
