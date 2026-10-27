@@ -436,7 +436,7 @@ export function NewAgent({ store, host, folder, folderName, down }: {
                       New worktree — {canMakeNew.value ? "A new branch from the last commit here" : whyNot.value ?? "Can't be made here"}</option>
                     {/* The one a view named (#834), offered while it is the place. */}
                     {where.value.kind === "named" && (
-                      <option value={whereValue(where.value)}>New worktree — {where.value.name}</option>
+                      <option value={whereValue(where.value)}>New worktree — {oneLine(where.value.name)}</option>
                     )}
                     {/* A pull request's branch a view named (#837), when the list has not got it. */}
                     {where.value.kind === "branch" && !branches.value.some((b) => where.value.kind === "branch" && b.name === where.value.name) && (
@@ -556,9 +556,15 @@ function isPrompt(target: EventTarget | null): target is HTMLTextAreaElement {
 /** What the Works in chip says: the window's words for the place. */
 function whereTitle(where: Where, worktrees: WorktreeSummary[]): string {
   if (where.kind === "folder") return "Folder";
-  if (where.kind === "new") return "New worktree";
-  if (where.kind === "branch" || where.kind === "named") return where.name;
+  // A named one's name is long and is not what the daemon calls it (#2659): the menu shows it.
+  if (where.kind === "new" || where.kind === "named") return "New worktree";
+  if (where.kind === "branch") return where.name;
   return worktrees.find((w) => w.root === where.root)?.name ?? "Worktree";
+}
+
+/** A name cut to one menu line with "…" (#2659). */
+function oneLine(name: string, max = 48): string {
+  return name.length > max ? `${name.slice(0, max - 1).trimEnd()}…` : name;
 }
 
 function whereValue(where: Where): string {

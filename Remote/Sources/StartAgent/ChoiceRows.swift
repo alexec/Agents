@@ -244,6 +244,13 @@ struct ChoiceRows: View {
                 Text(listed.canMakeNew ? "A new branch from the last commit here" : (listed.whyNot ?? ""))
             }
             .disabled(!listed.canMakeNew)
+            // The one a view named (#834), on one line: an issue's title is long (#2659).
+            if case .named(let name) = model.startWorktree {
+                Button {} label: {
+                    choiceLabel("New worktree", chosen: true)
+                    Text(name).lineLimit(1).truncationMode(.tail)
+                }
+            }
             if !others.isEmpty {
                 Divider()
                 ForEach(others) { worktree in
@@ -344,8 +351,8 @@ struct ChoiceRows: View {
     private var worktreeTitle: String {
         switch model.startWorktree {
         case nil: "Folder"
-        case .new: "New worktree"
-        case .named(let name): name
+        // A named one's name is long and is not what the daemon calls it (#2659): the menu shows it.
+        case .new, .named: "New worktree"
         case .existing(let root): root.lastPathComponent
         case .branch(let name): name
         }
