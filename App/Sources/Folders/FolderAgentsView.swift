@@ -191,22 +191,12 @@ struct FolderAgentsView: View {
         VStack(spacing: 4) {
             if !model.draftPersonas.isEmpty {
                 if !usable.isEmpty {
-                    ScrollView(.horizontal) {
-                        Picker("Persona", selection: Binding<String?>(
-                            get: { model.draftPersona },
-                            set: { id in model.choosePersona(usable.first { $0.id == id }) }
-                        )) {
-                            Text(Self.noPersona).tag(String?.none)
-                            ForEach(usable) { persona in
-                                Text(persona.name).tag(Optional(persona.id))
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                        .fixedSize(horizontal: true, vertical: false)
-                        .accessibilityLabel("Persona: \(picked?.name ?? Self.noPersona)")
+                    // Centred under the folder when it fits; it scrolls when it does not (#2649).
+                    ViewThatFits(in: .horizontal) {
+                        personaPicker(usable, picked: picked)
+                        ScrollView(.horizontal) { personaPicker(usable, picked: picked) }
+                            .scrollIndicators(.hidden)
                     }
-                    .scrollIndicators(.hidden)
                     .disabled(model.isStarting)
                     .help("Start a kind of session: a persona sets what it names")
                 }
@@ -225,6 +215,22 @@ struct FolderAgentsView: View {
     }
 
     static let noPersona = "No persona"
+
+    private func personaPicker(_ usable: [Persona], picked: Persona?) -> some View {
+        Picker("Persona", selection: Binding<String?>(
+            get: { model.draftPersona },
+            set: { id in model.choosePersona(usable.first { $0.id == id }) }
+        )) {
+            Text(Self.noPersona).tag(String?.none)
+            ForEach(usable) { persona in
+                Text(persona.name).tag(Optional(persona.id))
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize(horizontal: true, vertical: false)
+        .accessibilityLabel("Persona: \(picked?.name ?? Self.noPersona)")
+    }
 
     private func label(_ folder: DaemonAPI.FolderSummary) -> String {
         SidebarOrder.label(folder) { model.hosts.label($0) }

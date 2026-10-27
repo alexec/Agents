@@ -258,10 +258,11 @@ export function NewAgent({ store, host, folder, folderName, down }: {
   // Pick a kind of session (#760): what it names is set, what it leaves out stays as the form has it.
   const choosePersona = (id: string) => {
     const picked = personas.value.find((p) => p.id === id && p.problem === undefined);
+    const last = personas.value.find((p) => p.id === persona.value);
+    labels.value = withPersonaLabels(labels.value, last, picked);
     persona.value = picked?.id;
     pendingPersona.current = undefined;
     if (!picked) return;
-    labels.value = withPersonaLabels(labels.value, picked);
     const wanted = picked.settings.runtimeID;
     if (wanted !== undefined && wanted !== chosenRuntime && runs.available.some((r) => r.runtime.id === wanted)) {
       pendingPersona.current = picked;

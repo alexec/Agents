@@ -185,22 +185,12 @@ struct StartAgentView: View {
             Section {
                 VStack(spacing: 4) {
                     if !usable.isEmpty {
-                        ScrollView(.horizontal) {
-                            Picker("Persona", selection: Binding<String?>(
-                                get: { model.startPersona },
-                                set: { id in pickPersona(usable.first { $0.id == id }) }
-                            )) {
-                                Text(Self.noPersona).tag(String?.none)
-                                ForEach(usable) { persona in
-                                    Text(persona.name).tag(Optional(persona.id))
-                                }
-                            }
-                            .pickerStyle(.segmented)
-                            .labelsHidden()
-                            .fixedSize(horizontal: true, vertical: false)
-                            .accessibilityLabel("Persona: \(picked?.name ?? Self.noPersona)")
+                        // Centred under the folder when it fits; it scrolls when it does not (#2649).
+                        ViewThatFits(in: .horizontal) {
+                            personaPicker(usable, picked: picked)
+                            ScrollView(.horizontal) { personaPicker(usable, picked: picked) }
+                                .scrollIndicators(.hidden)
                         }
-                        .scrollIndicators(.hidden)
                     }
                     if let description = picked?.description {
                         Text(description)
@@ -223,12 +213,27 @@ struct StartAgentView: View {
 
     static let noPersona = "No persona"
 
-    /// Every setting the persona names, and its labels beside any already there.
-    private func pickPersona(_ persona: Persona?) {
-        for label in persona?.settings.labels ?? []
-        where !draftLabels.contains(where: { SessionLabelPolicy.key($0) == SessionLabelPolicy.key(label) }) {
-            draftLabels.append(label)
+    private func personaPicker(_ usable: [Persona], picked: Persona?) -> some View {
+        Picker("Persona", selection: Binding<String?>(
+            get: { model.startPersona },
+            set: { id in pickPersona(usable.first { $0.id == id }) }
+        )) {
+            Text(Self.noPersona).tag(String?.none)
+            ForEach(usable) { persona in
+                Text(persona.name).tag(Optional(persona.id))
+            }
         }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize(horizontal: true, vertical: false)
+        .accessibilityLabel("Persona: \(picked?.name ?? Self.noPersona)")
+    }
+
+    /// Every setting the persona names, and its labels beside any already there, in place
+    /// of the last one's (#2649).
+    private func pickPersona(_ persona: Persona?) {
+        let last = model.startPersonas.first { $0.id == model.startPersona }
+        draftLabels = Persona.labels(draftLabels, switchingFrom: last, to: persona)
         Task { await model.choosePersona(persona) }
     }
 
