@@ -165,7 +165,7 @@ export function FilesPane({ store, host, session }: { store: Store; host: string
  * From a worktree, the same path in the folder, where the pin opens it.
  */
 function PinButton({ store, host, agent, file }: { store: Store; host: string; agent: Agent; file: string }) {
-  const folder = agent.worktree?.folder ?? agent.cwd;
+  const folder = agent.worktree?.folder || agent.cwd;
   const base = pathOf(agent.worktree ? agent.cwd : folder) + "/";
   const absolute = file.startsWith("/") ? file : pathOf(file);
   if (!absolute.startsWith(base) || !/\.(md|markdown|mdown|mkd|html?)$/i.test(absolute)) return null;

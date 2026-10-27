@@ -48,3 +48,10 @@ test("a folder row says Needs you first, unread beside it (FolderRow.subtitle, #
   assert.equal(groups.folderSubtitle(input.agents, input.folder), "Needs you · 3 unread");
   assert.equal(groups.folderSubtitle([], input.folder), null);
 });
+
+// A worktree with "folder": "" (#2650), left by #2617, counts under where the agent runs.
+test("an empty worktree folder counts as none", () => {
+  const worktree = { name: "lane", root: "file:///r/.agents/worktrees/lane/", madeByApp: true, folder: "" };
+  assert.equal(groups.folderPath({ cwd: "file:///r/.agents/worktrees/lane/", worktree }), "file:///r/.agents/worktrees/lane");
+  assert.equal(groups.folderPath({ cwd: "file:///w/", worktree: { ...worktree, folder: "file:///r/" } }), "file:///r");
+});

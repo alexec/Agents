@@ -11,7 +11,7 @@ import {
 
 async function continueIn(store: Store, host: string, agent: Agent, text = "", attachments: Attachment[] = []) {
   const id = await store.continueInFolder(host, agent.id, text, attachments);
-  if (id) go({ host, folder: agent.worktree?.folder ?? agent.cwd, session: id });
+  if (id) go({ host, folder: agent.worktree?.folder || agent.cwd, session: id });
 }
 
 function WaysOn({ store, host, agent, text, attachments, then }: {

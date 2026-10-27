@@ -94,7 +94,7 @@ func (l Locations) Record(id string) string { return filepath.Join(l.Agent(id), 
 func (l Locations) Transcript(id string) string {
 	return filepath.Join(l.Agent(id), "transcript.jsonl")
 }
-func (l Locations) Folders() string     { return filepath.Join(l.Root, "folders.json") }
+func (l Locations) Folders() string      { return filepath.Join(l.Root, "folders.json") }
 func (l Locations) RootIdentity() string { return filepath.Join(l.Root, "root-id.json") }
 func (l Locations) Socket() string       { return filepath.Join(l.Root, "daemon.sock") }
 func (l Locations) Lock() string         { return filepath.Join(l.Root, "daemon.lock") }
