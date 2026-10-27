@@ -82,8 +82,7 @@ func TestATeamTriggerHeardByEveryMachineRunsOnce(t *testing.T) {
 
 	const triggers = 50
 	for i := range triggers {
-		trigger, _ := json.Marshal(wire.TeamTrigger{Workflow: "app/review", Trigger: "event:pr.opened:" + itoa(i),
-			RunsOn: []string{"Review-Bot", "linux"}, Event: &wire.Event{Name: "pr.opened", Details: map[string]string{"server": "github"}}})
+		trigger, _ := json.Marshal(serverTrigger("app/review", []string{"Review-Bot", "linux"}, itoa(i), nil))
 		var wg sync.WaitGroup
 		for _, host := range senders {
 			wg.Add(1)
@@ -185,7 +184,8 @@ func TestABotsMachineIsStartedOnceForItsTriggers(t *testing.T) {
 	samsMac := p.machine(sam, "MACHINE-S")
 	send := func(i int) {
 		t.Helper()
-		trigger, _ := json.Marshal(wire.TeamTrigger{Workflow: "app/nightly", Trigger: "schedule:" + itoa(i), RunsOn: []string{"review-bot"}})
+		due := wire.DateOf(time.Now().Truncate(time.Minute).Add(-time.Duration(i) * time.Minute))
+		trigger, _ := json.Marshal(wire.TeamTrigger{Workflow: "app/nightly", Trigger: wire.ScheduleTriggerID(due.Time()), RunsOn: []string{"review-bot"}, DueAt: &due})
 		out, err := p.s.methods.HostSaid(samsMac.member.Host, "workflows/trigger", trigger)
 		if err != nil || !out.(wire.TeamTriggerSent).Taken {
 			t.Fatalf("%v %v", out, err)
@@ -295,4 +295,130 @@ func TestAPersonsMachineIsToldTheBotsOfItsGroups(t *testing.T) {
 	p.waitFor(func() bool {
 		return botsOf(leesMac.member.Host) == "review-bot" && botsOf(samsMac.member.Host) == ""
 	}, "the group's change told")
+}
+
+// serverTrigger is a server's event as a machine sends it: its details as raiseMCPEvent
+// makes them, and more, and the trigger id they name.
+func serverTrigger(workflow string, runsOn []string, id string, more map[string]string) wire.TeamTrigger {
+	details := map[string]string{"server": "github", "event": "pr.opened", "subscription": "s1", "mcp_event_id": id,
+		"time": "2026-10-21T09:00:00Z", "payload": `{"n":1}`}
+	for k, v := range more {
+		details[k] = v
+	}
+	e := wire.Event{Name: "pr.opened", Details: details}
+	return wire.TeamTrigger{Workflow: workflow, Trigger: wire.EventTriggerID(e.Name, e.Details), RunsOn: runsOn, Event: &e}
+}
+
+// A trigger sent for a bot carries only what a machine hears: a server's event, cut to its
+// details, with the sender the control plane's own links name, or a schedule due about now,
+// and the trigger id they name. Anything else is refused, and a trigger no machine took is
+// unclaimed, so it may be sent again.
+func TestATeamTriggerCarriesOnlyAServerEventOrASchedule(t *testing.T) {
+	t.Parallel()
+	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), nil)
+	var mu sync.Mutex
+	var got []wire.TeamTrigger
+	takes := true
+	p.asked = func(host, method string, params json.RawMessage) (any, bool) {
+		if method != wire.CallWorkflowsFire.Name {
+			return nil, false
+		}
+		var tr wire.TeamTrigger
+		json.Unmarshal(params, &tr)
+		mu.Lock()
+		defer mu.Unlock()
+		got = append(got, tr)
+		return wire.TeamTriggerFired{Ran: takes}, true
+	}
+	sent := func() []wire.TeamTrigger {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]wire.TeamTrigger(nil), got...)
+	}
+	_, admin := p.client("Alex's Mac")
+	sam := p.invite(admin, "Sam", wire.UserRoleMember)
+	var platform wire.Group
+	json.Unmarshal(call(t, admin, "", "groups/set", wire.GroupSet{Name: "Platform", Members: []string{sam.id}}), &platform)
+	var made wire.BotMade
+	json.Unmarshal(call(t, admin, "", "bots/make", wire.BotMake{Name: "review-bot", Group: platform.ID}), &made)
+	p.botMachine(admin, made.User, "MACHINE-B1")
+	samsMac := p.machine(sam, "MACHINE-S")
+	runsOn := []string{"review-bot"}
+	send := func(tr wire.TeamTrigger) error {
+		params, _ := json.Marshal(tr)
+		_, err := p.s.methods.HostSaid(samsMac.member.Host, "workflows/trigger", params)
+		return err
+	}
+
+	appEvent := wire.Event{Name: "lease.granted", Details: map[string]string{"resource": "build"}}
+	wrongID := serverTrigger("app/review", runsOn, "e0", nil)
+	wrongID.Trigger = "schedule:2026-10-21T09:00:00Z"
+	old := wire.DateOf(time.Now().Add(-48 * time.Hour).Truncate(time.Minute))
+	both := serverTrigger("app/review", runsOn, "e0", nil)
+	both.DueAt = &old
+	unlinked := serverTrigger("app/review", runsOn, "e9", map[string]string{"sender_channel": "slack", "sender_identity": "T1/U9"})
+	for name, tr := range map[string]wire.TeamTrigger{
+		"an app event":       {Workflow: "app/review", Trigger: wire.EventTriggerID(appEvent.Name, appEvent.Details), RunsOn: runsOn, Event: &appEvent},
+		"a wrong id":         wrongID,
+		"an old schedule":    {Workflow: "app/nightly", Trigger: wire.ScheduleTriggerID(old.Time()), RunsOn: runsOn, DueAt: &old},
+		"event + schedule":   both,
+		"nothing":            {Workflow: "app/review", Trigger: "event:x", RunsOn: runsOn},
+		"an unlinked sender": unlinked,
+	} {
+		if err := send(tr); err == nil {
+			t.Errorf("%s: taken", name)
+		}
+	}
+	time.Sleep(100 * time.Millisecond)
+	if n := len(sent()); n != 0 {
+		t.Fatalf("sent on %d refused triggers", n)
+	}
+
+	// Details a server's event has not, and a sender named with no channel identity, are cut.
+	if err := send(serverTrigger("app/review", runsOn, "e1", map[string]string{"resource": "build", "sender_user": "someone-else"})); err != nil {
+		t.Fatal(err)
+	}
+	p.waitFor(func() bool { return len(sent()) == 1 }, "the event sent")
+	if d := sent()[0].Event.Details; d["resource"] != "" || d["sender_user"] != "" || d["payload"] != `{"n":1}` || d["mcp_event_id"] != "e1" {
+		t.Fatalf("%v", d)
+	}
+
+	// A linked sender is the person its link names, whoever the machine said.
+	giveEmail(t, p, sam.id, "sam@example.com")
+	slack := wire.ChannelSender{Channel: "slack", Identity: "T1/U42", Email: new("sam@example.com")}
+	checkLink(t, p, samsMac.member.Host, slack)
+	note := waitNote(t, sam.window, "control/linkRequested")
+	var asked wire.ChannelLinkRequest
+	json.Unmarshal(note.Params, &asked)
+	call(t, sam.window, "", "links/approve", wire.ChannelLinkDecide{Request: asked.Request})
+	if err := send(serverTrigger("app/review", runsOn, "e2", map[string]string{"sender_channel": "slack", "sender_identity": "T1/U42",
+		"sender_user": "someone-else", "sender_name": "Alex"})); err != nil {
+		t.Fatal(err)
+	}
+	p.waitFor(func() bool { return len(sent()) == 2 }, "the event sent")
+	if d := sent()[1].Event.Details; d["sender_user"] != sam.id || d["sender_name"] != "Sam" {
+		t.Fatalf("%v", d)
+	}
+
+	// A schedule due now is sent.
+	due := wire.DateOf(time.Now().Truncate(time.Minute))
+	if err := send(wire.TeamTrigger{Workflow: "app/nightly", Trigger: wire.ScheduleTriggerID(due.Time()), RunsOn: runsOn, DueAt: &due}); err != nil {
+		t.Fatal(err)
+	}
+	p.waitFor(func() bool { return len(sent()) == 3 }, "the schedule sent")
+
+	// Not taken, and none can be started: unclaimed, so the same trigger is sent again.
+	mu.Lock()
+	takes = false
+	mu.Unlock()
+	again := serverTrigger("app/review", runsOn, "e3", nil)
+	if err := send(again); err != nil {
+		t.Fatal(err)
+	}
+	p.waitFor(func() bool { return len(sent()) == 4 }, "asked once")
+	time.Sleep(100 * time.Millisecond)
+	if err := send(again); err != nil {
+		t.Fatal(err)
+	}
+	p.waitFor(func() bool { return len(sent()) == 5 }, "asked again")
 }

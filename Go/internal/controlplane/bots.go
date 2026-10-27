@@ -262,8 +262,7 @@ func (s *Service) claimAs(ctx context.Context, owner, host string, claim wire.Wo
 	if strings.TrimSpace(claim.Workflow) == "" || strings.TrimSpace(claim.Trigger) == "" {
 		return wire.WorkflowClaimed{}, fail(invalidParams, "Say the workflow and the trigger.")
 	}
-	sum := sha256.Sum256([]byte(owner + "\x00" + claim.Workflow + "\x00" + claim.Trigger))
-	name := hex.EncodeToString(sum[:16]) + ".json"
+	name := claimName(owner, claim)
 	today, yesterday := now.UTC().Format(usageDayLayout), now.UTC().Add(-24*time.Hour).Format(usageDayLayout)
 	if before, err := s.cfg.Store.Get(ctx, runsPrefix+yesterday+"/"+name); err != nil {
 		return wire.WorkflowClaimed{}, err
@@ -283,6 +282,24 @@ func (s *Service) claimAs(ctx context.Context, owner, host string, claim wire.Wo
 	}
 	s.log(fmt.Sprintf("%s runs %s for %s", host, claim.Workflow, claim.Trigger))
 	return wire.WorkflowClaimed{Won: true}, nil
+}
+
+// unclaimAs takes back a claim claimAs made: a trigger sent to the control plane that no
+// machine took and none waits for. Yesterday's is taken back too, for a claim made either
+// side of midnight.
+func (s *Service) unclaimAs(ctx context.Context, owner string, claim wire.WorkflowClaim, now time.Time) {
+	name := claimName(owner, claim)
+	for _, day := range []time.Time{now, now.Add(-24 * time.Hour)} {
+		if err := s.cfg.Store.Delete(ctx, runsPrefix+day.UTC().Format(usageDayLayout)+"/"+name); err != nil {
+			s.log(fmt.Sprintf("the claim of %s for %s could not be taken back: %v", claim.Workflow, claim.Trigger, err))
+		}
+	}
+}
+
+// claimName is a claim's file: the same for the same owner, workflow and trigger.
+func claimName(owner string, claim wire.WorkflowClaim) string {
+	sum := sha256.Sum256([]byte(owner + "\x00" + claim.Workflow + "\x00" + claim.Trigger))
+	return hex.EncodeToString(sum[:16]) + ".json"
 }
 
 // sweepRuns deletes claims of days older than a week, at most most.

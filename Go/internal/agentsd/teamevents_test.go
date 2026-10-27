@@ -101,24 +101,42 @@ func TestABotsMachineSendsTeamEventsAndKeepsItsOwn(t *testing.T) {
 	}
 	failing = false
 
-	// workflows/fire: run here, unclaimed, when the workflow is here and its trigger matches.
+	// workflows/fire: run here, unclaimed, when the workflow is here and a server trigger of
+	// it matches the server's event; an app event, or a trigger id the event does not name,
+	// is not run.
 	dir := folder(t, c, 1)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
-	os.WriteFile(filepath.Join(workflowsFolder(dir), "review.md"), []byte("---\nname: Review\non: lease.granted\nruns-on: [review-bot]\n---\nLook.\n"), 0o644)
+	os.WriteFile(filepath.Join(workflowsFolder(dir), "review.md"), []byte("---\nname: Review\non:\n  - pr.merged:\n      server: ci\nruns-on: [review-bot]\n---\nLook.\n"), 0o644)
+	os.WriteFile(filepath.Join(workflowsFolder(dir), "leases.md"), []byte("---\nname: Leases\non: lease.granted\nruns-on: [review-bot]\n---\nLook.\n"), 0o644)
 	approveAll(t, c, store.FolderURL(dir))
-	fire := func(workflow string, e wire.Event) bool {
-		params, _ := json.Marshal(wire.TeamTrigger{Workflow: workflow, Trigger: "event:x", RunsOn: w.RunsOn, Event: &e})
+	sendFire := func(workflow, trigger string, e wire.Event) bool {
+		params, _ := json.Marshal(wire.TeamTrigger{Workflow: workflow, Trigger: trigger, RunsOn: w.RunsOn, Event: &e})
 		out, ok := d.Asked(wire.CallWorkflowsFire.Name, params)
 		return ok && out.(wire.TeamTriggerFired).Ran
 	}
+	fire := func(workflow string, e wire.Event) bool { return sendFire(workflow, triggerID(fireRequest{}, &e), e) }
 	if _, ok := d.Asked("nothing/here", nil); ok {
 		t.Fatal("answered what it does not know")
 	}
-	other := wire.Event{Name: "lease.granted", Scope: folderScope("/elsewhere/" + filepath.Base(dir)), Details: map[string]string{"resource": "build"}}
-	if fire(filepath.Base(dir)+"/missing", other) || fire("nothing", other) || fire(filepath.Base(dir)+"/review", wire.Event{Name: "agent.finished"}) {
+	key := mcpTrigger{event: "pr.merged", arguments: map[string]json.RawMessage{}}.subscriptionKey("ci")
+	merged := wire.Event{Name: "pr.merged", Scope: folderScope("/elsewhere/" + filepath.Base(dir)), ChainDepth: 3,
+		Details: map[string]string{"server": "ci", "event": "pr.merged", "subscription": key, "mcp_event_id": "e7", "payload": "{}"}}
+	lease := wire.Event{Name: "lease.granted", Details: map[string]string{"resource": "build"}}
+	if fire(filepath.Base(dir)+"/missing", merged) || fire("nothing", merged) || fire(filepath.Base(dir)+"/review", wire.Event{Name: "agent.finished"}) {
 		t.Fatal("ran what is not here")
 	}
-	if !fire(filepath.Base(dir)+"/review", other) {
+	if fire(filepath.Base(dir)+"/leases", lease) {
+		t.Fatal("ran an app event the control plane sent")
+	}
+	if sendFire(filepath.Base(dir)+"/review", "event:x", merged) {
+		t.Fatal("ran a trigger its event does not name")
+	}
+	nowDue := wire.DateOf(time.Now().Truncate(15 * time.Minute))
+	params, _ := json.Marshal(wire.TeamTrigger{Workflow: filepath.Base(dir) + "/review", Trigger: wire.ScheduleTriggerID(nowDue.Time()), RunsOn: w.RunsOn, DueAt: &nowDue})
+	if out, _ := d.Asked(wire.CallWorkflowsFire.Name, params); out.(wire.TeamTriggerFired).Ran {
+		t.Fatal("ran a schedule the workflow does not have")
+	}
+	if !fire(filepath.Base(dir)+"/review", merged) {
 		t.Fatal("did not run it")
 	}
 	waitFor(t, "the run", func() bool {
@@ -299,5 +317,33 @@ func TestAPersonsMachineHearsABotsServerEventsAndOnlySendsThem(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 	if n := sentCount(); n != 1 {
 		t.Fatalf("sent %d", n)
+	}
+}
+
+// A schedule the control plane sends runs only at a time one of the workflow's schedules
+// falls due here, about now, under the trigger id its due time names.
+func TestATeamScheduleRunsOnlyWhenItIsDue(t *testing.T) {
+	hourly := wire.WorkflowTrigger{Schedule: &wire.WorkflowTriggerStoredSchedule{Value: wire.WorkflowSchedule{Minutes: []int64{0},
+		Hours: [2]int64{0, 23}, EndMinute: 59, Days: []wire.Weekday{wire.WeekdaySun, wire.WeekdayMon, wire.WeekdayTue,
+			wire.WeekdayWed, wire.WeekdayThu, wire.WeekdayFri, wire.WeekdaySat}}}}
+	w := wire.Workflow{RunsOn: []string{"review-bot"}, Triggers: []wire.WorkflowTrigger{hourly}}
+	now := time.Date(2026, 10, 21, 9, 10, 0, 0, time.Local)
+	at := func(due time.Time, trigger string) bool {
+		d := wire.DateOf(due)
+		_, ok := matchTeamTrigger("/w/app", "nightly", w, wire.TeamTrigger{Workflow: "app/nightly", Trigger: trigger, DueAt: &d}, now)
+		return ok
+	}
+	nine := time.Date(2026, 10, 21, 9, 0, 0, 0, time.Local)
+	if !at(nine, wire.ScheduleTriggerID(nine)) || !at(nine.Add(-5*time.Hour), wire.ScheduleTriggerID(nine.Add(-5*time.Hour))) {
+		t.Fatal("a due schedule did not run")
+	}
+	for name, due := range map[string]time.Time{"not due": nine.Add(-30 * time.Minute), "ahead": nine.Add(time.Hour),
+		"two days ago": nine.Add(-48 * time.Hour), "off the half hour": nine.Add(-15 * time.Minute)} {
+		if at(due, wire.ScheduleTriggerID(due)) {
+			t.Errorf("%s: ran", name)
+		}
+	}
+	if at(nine, "schedule:x") {
+		t.Fatal("ran under another id")
 	}
 }
