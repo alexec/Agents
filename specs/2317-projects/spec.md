@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-26
 
-**Status**: Part 1 in build (this branch). Parts 2–4 are issues of their own.
+**Status**: Part 1 built (this branch). Parts 2–4 are issues of their own.
 
 **Milestone**: 0.11.2 Tech debt
 

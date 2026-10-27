@@ -62,7 +62,9 @@ organisation           one control plane store prefix (hosted: one per account)
     └── project        the record that folders join
 ```
 
-A project can include folders on more than one machine.
+A project can include folders on more than one machine. A folder joins a project by naming
+the project's id in its `.agents/folder.json` (#2317). Each folder is in exactly one project.
+The control plane adopts an id that it does not know, so a clone joins with nothing to set.
 
 ### Glossary
 
