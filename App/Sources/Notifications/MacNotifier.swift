@@ -185,6 +185,23 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
 /// A line on stderr, unbuffered, for a walk that runs the app from a shell. `print`
 /// goes to stdout, which is block-buffered when it is a file, and says nothing until
 /// the app exits.
+///
+/// In the unified log too (#2700): the installed window's stderr is /dev/null, and voice
+/// mode's lines (#2679) were lost there. Read them with
+/// `log show --predicate 'subsystem == "com.alexecollins.agents.store" AND category == "voice"'`.
+/// The lines hold states, formats, counts and errors, never what the person wrote or said,
+/// so they are public.
 func note(_ line: String) {
     FileHandle.standardError.write(Data((line + "\n").utf8))
+    NoteLog.logger(for: line).log("\(line, privacy: .public)")
+}
+
+private enum NoteLog {
+    static let subsystem = Bundle.main.bundleIdentifier ?? "com.alexecollins.agents.store"
+    static let voice = Logger(subsystem: subsystem, category: "voice")
+    static let other = Logger(subsystem: subsystem, category: "note")
+
+    static func logger(for line: String) -> Logger {
+        line.hasPrefix("voice:") || line.hasPrefix("dictation:") ? voice : other
+    }
 }
