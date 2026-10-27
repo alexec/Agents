@@ -7,10 +7,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
 
+	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/kms"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/wire"
@@ -159,6 +161,35 @@ func TestPartsAreKeptWithoutBeingRead(t *testing.T) {
 	b.SetPart(ctx, "sam", wire.UserSettingsPartNameMcpServers, json.RawMessage(`null`))
 	if got, _ := b.Settings(ctx, "sam"); got.McpServers != nil {
 		t.Fatalf("%+v", got)
+	}
+}
+
+// The largest delivery the bounds on parts and secrets allow fits one frame on a machine's
+// link, with room to spare (#2730): each part and each secret as long as it may be, of
+// what JSON writes longest.
+func TestTheLargestDeliveryFitsAMachinesLink(t *testing.T) {
+	ctx := context.Background()
+	b := localBook(t, store.NewMemory())
+	long := func(n int) string { return strings.Repeat("<", n) }
+	for _, part := range []wire.UserSettingsPartName{wire.UserSettingsPartNameMcpServers, wire.UserSettingsPartNameAgentConfig,
+		wire.UserSettingsPartNameRuntimes, wire.UserSettingsPartNameCostLimits} {
+		value := json.RawMessage(`{"x":"` + long(MaxPart-8) + `"}`)
+		if _, err := b.SetPart(ctx, "sam", part, value); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := range MaxSecrets {
+		if err := b.SetSecret(ctx, "sam", fmt.Sprintf("SECRET_%d", i), long(MaxSecret)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	delivery, skipped, err := b.Delivery(ctx, "sam")
+	if err != nil || len(skipped) > 0 || len(delivery.Secrets) != MaxSecrets {
+		t.Fatal(len(delivery.Secrets), skipped, err)
+	}
+	encoded, _ := json.Marshal(delivery)
+	if len(encoded) > controllink.MaxMessage/2 {
+		t.Fatalf("the largest delivery is %d MB, too near the %d MB a machine's link takes", len(encoded)>>20, controllink.MaxMessage>>20)
 	}
 }
 

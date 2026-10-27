@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/kms"
 	"github.com/alexec/agents/Go/internal/controlplane/usersettings"
 	"github.com/alexec/agents/Go/wire"
@@ -30,6 +31,11 @@ const CapHostUserSettings = wire.CapHostUserSettings1
 
 // userDeliveryTimeout bounds opening a person's secrets for one machine.
 const userDeliveryTimeout = 30 * time.Second
+
+// userDeliveryMost is the largest host/userSettings sent, with room for the frame around it
+// under what a machine's link reads (#2730). A longer one would fail the machine's read,
+// close its link, and be sent again at the rejoin without end.
+const userDeliveryMost = controllink.MaxMessage - 1<<20
 
 // toldUsers is what each machine here was last sent, by a hash, so a change tells only the
 // machines whose delivery differs.
@@ -162,6 +168,11 @@ func (s *Service) sendUserSettings(host string, always bool) {
 			host, len(skipped), strings.Join(skipped, ", ")))
 	}
 	b, _ := json.Marshal(delivery)
+	if len(b) > userDeliveryMost {
+		s.log(fmt.Sprintf("user settings for %s are %d MB, over the %d MB a machine's link takes, and were not sent",
+			host, len(b)>>20, userDeliveryMost>>20))
+		return
+	}
 	sum := sha256.Sum256(b)
 	s.toldUsers.mu.Lock()
 	if s.toldUsers.last == nil {

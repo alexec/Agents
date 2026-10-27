@@ -41,6 +41,10 @@ func (l *Lines) Close() { l.ws.Close(websocket.StatusNormalClosure, "") }
 // the control plane's link to another copy.
 func (l *Lines) Socket() *websocket.Conn { return l.ws }
 
+// MaxMessage is the largest message a socket dialled here reads. A longer one fails the
+// read and closes the link, so the control plane keeps what it sends under it (#2730).
+const MaxMessage = 64 << 20
+
 // Dial opens wss://…/v1/connect. With a pin, only a certificate whose SPKI hashes to it is
 // taken and no trust store is read (R6); without one, TrustRoots decide. It goes through
 // the network's proxy, if there is one (network.go).
@@ -81,7 +85,7 @@ func dial(ctx context.Context, base, pin, origin string) (*Lines, error) {
 		}
 		return nil, err
 	}
-	ws.SetReadLimit(64 << 20)
+	ws.SetReadLimit(MaxMessage)
 	return &Lines{ws: ws}, nil
 }
 
