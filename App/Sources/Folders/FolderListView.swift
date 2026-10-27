@@ -518,7 +518,7 @@ struct FolderFold: View {
                     SessionSidebarRow(agent: row.item.agent, tree: row.item, folds: folds, isNested: grouped)
                 }
                 if !fold.recentArchived.isEmpty {
-                    let recentOpen = fold.isSearching || folds.isOpen(key, .recentArchivedSessions)
+                    let recentOpen = folds.isOpen(key, .recentArchivedSessions)
                     SidebarFoldRow(title: "Recently archived sessions", count: fold.recentArchived.count, isOpen: Binding(
                         get: { recentOpen },
                         set: { folds.set(key, .recentArchivedSessions, open: $0) }))
