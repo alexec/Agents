@@ -236,34 +236,3 @@ private struct ShareRow: View {
         .accessibilityElement(children: .combine)
     }
 }
-
-/// This folder's own total, on its page.
-///
-/// A fact about the work, which is what puts it in scope where setting a limit is not.
-/// Nothing when nothing has been spent: `costToDate` is empty until a runtime reports
-/// a price, and an empty figure is a different thing from a zero.
-struct FolderTotal: View {
-    let summary: DaemonAPI.FolderSummary
-
-    var body: some View {
-        if let total = Cost.total(of: summary.costToDate) {
-            HStack(spacing: 6) {
-                Text(total)
-                    .monospacedDigit()
-                if summary.unmeasuredAgents > 0 {
-                    // The same qualification the spending page makes, in one word,
-                    // so the figure is never read as the whole when it is a floor.
-                    Text("at least")
-                        .foregroundStyle(.tertiary)
-                }
-                Spacer(minLength: 0)
-            }
-            .appText(.fine)
-            .foregroundStyle(.secondary)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(summary.unmeasuredAgents > 0
-                                ? "Spent on this folder: at least \(total)"
-                                : "Spent on this folder: \(total)")
-        }
-    }
-}

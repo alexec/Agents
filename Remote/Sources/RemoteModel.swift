@@ -1802,10 +1802,6 @@ final class RemoteModel {
         }
     }
 
-    var availableRuntimeIDs: [String] {
-        runtimes.filter(\.canStart).map(\.runtime.id)
-    }
-
     /// What this runtime says it will take in a prompt, as the Mac reads it. Nothing
     /// is refused on a guess: unknown is the protocol's baseline.
     func promptCapabilities(for runtimeID: String?) -> ACP.PromptCapabilities {
@@ -1844,20 +1840,6 @@ final class RemoteModel {
     func isBlocked(_ agent: Agent) -> Bool { work.openBlock(agent) != nil }
     /// End a block by hand (039), as the person. See the Mac's `carryOn`.
     func carryOn(_ agentID: UUID) async { _ = await send(Block.carryOnPrompt, to: agentID) }
-
-    /// The question the open conversation is blocked on, if it still is.
-    var questionsForSelection: [PermissionRequest] { work.permissions(for: selection) }
-
-    /// The form it is blocked on, if it is one of those.
-    ///
-    /// Shown beside any permission rather than behind it, as on the Mac and the page
-    /// (#243, #539): each waits on its own, and a form hidden until a permission is
-    /// answered is a form that cannot be answered first.
-    var formForSelection: ElicitationRequest? { work.elicitation(for: selection) }
-
-    /// The changes to its folder's own files the open conversation's agent made (#531),
-    /// each a question over the prompt, as a form is.
-    var guardedChangesForSelection: [GuardedChange] { work.guardedChanges(askedIn: selection) }
 
     /// What a guarded file was and is (#502), for the person deciding.
     func readGuardedChange(_ change: GuardedChange, for key: FolderKey) async -> GuardedChangeReading? {
