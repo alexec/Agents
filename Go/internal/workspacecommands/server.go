@@ -178,9 +178,6 @@ func NewServer(config Config, timing Timing, run Runner, version string) *Server
 	return &Server{Provider: &Provider{Config: config, Timing: timing, Run: run}, Version: version, tools: tools}
 }
 
-// Tools are the tools it lists.
-func (s *Server) Tools() []Tool { return s.tools }
-
 // Handle answers one method with its params (decoded, numbers as json.Number).
 func (s *Server) Handle(method string, params map[string]any) (any, error) {
 	switch method {
