@@ -50,9 +50,16 @@ as a folder.
 
 **Put a folder in a project**
 
-Each folder you add is in a project of its own name. Nothing is asked. The project's id
-goes into the folder's `.agents/folder.json`. Commit that file, and a clone of the
+Each folder you add is in a project of its own name, unless you pick another. The project's
+id goes into the folder's `.agents/folder.json`. Commit that file, and a clone of the
 repository on another machine joins the same project.
+
+When you add a folder, the sheet has a **Project** menu. Keep **Its Own Project**, or pick
+a project to share its tools and reports. On the Mac, the menu is under the folder panel.
+A folder whose `.agents/folder.json` names a project already joins that project when you
+keep **Its Own Project**.
+
+To move a folder that you added before:
 
 1. On the Mac, select the folder and choose **File ▸ Folder Settings…**. On the iPhone,
    iPad or web page, open the folder's menu and choose **Project…**.
@@ -60,6 +67,13 @@ repository on another machine joins the same project.
 
    To rename the project, choose **Rename Project…**. Only the person who made it, or an
    admin, can rename it.
+
+**See every project in the organisation**
+
+An admin chooses **Console ▸ Projects** on the web page. It shows each project, its owner,
+and its folders on each machine. The owner of a project, or an admin, can **Rename…** it.
+They can **Remove** it when no folder is in it. A folder that names a removed project later
+brings it back.
 
 **Archive a folder you are done with**
 

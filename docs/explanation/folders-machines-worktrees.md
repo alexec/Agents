@@ -156,9 +156,11 @@ joins the same project with nothing to set. The control plane makes a record for
 it does not know yet, with the folder's name.
 
 You see no new step. A folder that names no project gets one of its own name when you add it,
-or when its machine next starts. You pick another project in Folder Settings ▸ General ▸
-Project on the Mac, or with **Project…** in the folder's menu on the iPhone, iPad and web
-page.
+or when its machine next starts. The Add Folder sheet has a **Project** menu that starts on
+**Its Own Project**; pick another there, and the machine writes that id as it adds the folder
+(#2671). Later, you pick another project in Folder Settings ▸ General ▸ Project on the Mac,
+or with **Project…** in the folder's menu on the iPhone, iPad and web page. An admin sees
+every project, its owner and its folders in Console ▸ Projects on the web page.
 
 A project is not a repository. The repository only carries `.agents/` between clones. Later,
 a project's reports belong to the project, not to one clone (#2670).
