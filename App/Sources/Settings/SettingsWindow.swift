@@ -17,6 +17,9 @@ struct SettingsWindow: View {
     /// back to the front, which is when an edit made elsewhere shows.
     @State private var sharedSnapshot: DaemonAPI.SharedSnapshot?
     @State private var machinesPage: MachinesPage = .list
+    /// A Skills, Personas or Workflows file has edits not saved: another pane asks first (#2745).
+    @State private var unsaved = false
+    @State private var leaving: UnsavedLeave?
     /// Settings ▸ Control plane's own view of the control plane, while the window has one
     /// (058). Without one, Devices and Servers are listed as they always were.
     @State private var control: ControlSettingsModel? = ControlConfig.endpoint.flatMap { ControlSettingsModel(endpoint: $0) }
@@ -50,7 +53,12 @@ struct SettingsWindow: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            SettingsRail(pane: pane, shows: shows)
+            SettingsRail(pane: Binding(get: { pane.wrappedValue },
+                                       set: { next in
+                                           guard next != pane.wrappedValue else { return }
+                                           $leaving.leave(unsaved: unsaved) { pane.wrappedValue = next }
+                                       }),
+                         shows: shows)
             Divider()
             VStack(alignment: .leading, spacing: 0) {
                 // A pane of this Mac's own things, with no host on this Mac (#1503): what is
@@ -72,6 +80,7 @@ struct SettingsWindow: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .discardUnsavedQuestion($leaving)
         .frame(minWidth: Self.size.width, idealWidth: Self.size.width,
                maxWidth: .infinity,
                minHeight: Self.size.height, idealHeight: Self.size.height,
@@ -187,7 +196,8 @@ struct SettingsWindow: View {
                 RuntimePageList(runtimeID: runtimeID)
                 FormColumn { AgentRuntimesSettingsView(runtimeID: runtimeID.wrappedValue) }
             }
-        case .agentConfiguration: AgentConfigurationView(place: .you, snapshot: sharedSnapshot, page: sharedPage, refresh: { await refreshShared() })
+        case .agentConfiguration: AgentConfigurationView(place: .you, snapshot: sharedSnapshot, page: sharedPage, refresh: { await refreshShared() },
+                                                         unsaved: $unsaved)
         case .spending: FormColumn { CostSettingsView() }
         case .resources: FormColumn { ResourcesSettingsView() }
         case .controlPlane:

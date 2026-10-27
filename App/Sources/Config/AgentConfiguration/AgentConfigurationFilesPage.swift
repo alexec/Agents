@@ -5,6 +5,7 @@ struct AgentConfigurationFilesPage: View {
     @Environment(AppModel.self) private var model
     let place: AgentsPlace
     let kind: DaemonAPI.AgentConfigEditorKind
+    var unsaved: Binding<Bool> = .constant(false)
     @State private var showingSkillCatalogue = false
 
     private var folder: URL? {
@@ -31,7 +32,8 @@ struct AgentConfigurationFilesPage: View {
                                   saveFile: { path, content, delete in
                                       await model.saveAgentConfigEditorFile(on: host, folder: folder, kind: kind,
                                                                            path: path, content: content, delete: delete)
-                                  })
+                                  },
+                                  unsaved: unsaved)
         }
         .sheet(isPresented: $showingSkillCatalogue) {
             AgentsSetupPage { AgentsSkillsSection(place: place) }
