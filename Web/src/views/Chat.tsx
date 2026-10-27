@@ -609,8 +609,9 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
             {cards.map((card) => <Fragment key={card.key}>{card.node}</Fragment>)}
           </div>
         )}
-        {/* Under them, and not in "Waiting for you": the agent waits, not the person (#2084). */}
-        {agent?.eventWait && <WaitCard agent={agent} title={(id) => store.agent(host, id)?.title}
+        {/* Under them, and not in "Waiting for you": the agent waits, not the person (#2084). Only
+            while the wait is open: an ended one stays on the record until the agent goes on (#2749). */}
+        {agent?.eventWait && agent.eventWait.ending === undefined && <WaitCard agent={agent} title={(id) => store.agent(host, id)?.title}
           disabled={down} stop={() => store.cancelWait(host, agent.id)} />}
         {agent && !store.isComingBack(host, agent.id) && agent.state !== "running" && agent.state !== "starting" && (
           <QuietLine since={lastEntryAt(store.entries.value, store.turns.value) ?? fromWireDate(agent.lastActivityAt)} />
@@ -823,7 +824,7 @@ function WaitCard({ agent, title, disabled, stop }: { agent: Agent; title: (id: 
   }, []);
   const wait = agent.eventWait;
   const line = eventWaitLine(agent, title);
-  if (!wait || (!line && wait.patterns.length === 0)) return null;
+  if (!wait || wait.ending !== undefined || (!line && wait.patterns.length === 0)) return null;
   const since = new Date(wait.since).getTime();
   const deadline = wait.deadline ? new Date(wait.deadline).getTime() : undefined;
   const total = deadline === undefined ? undefined : Math.max(1, Math.ceil((deadline - since) / 60_000));
