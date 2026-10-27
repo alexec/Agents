@@ -18,9 +18,18 @@ function whole(frontmatter: string, markdown: string, hasFrontmatter: boolean) {
   return hasFrontmatter || frontmatter !== "" ? `---\n${frontmatter}\n---\n${markdown}` : markdown;
 }
 
+/** What the editor and its dialog say when unsaved edits would be lost (#2745), as the Mac and the Remote. */
+export const discardQuestion = "Discard unsaved changes? Your changes to this file have not been saved.";
+
+/** Asks before unsaved edits are dropped; true when there are none or the person discards them. */
+export const mayLeave = (unsaved: boolean, ask: (question: string) => boolean = confirm) =>
+  !unsaved || ask(discardQuestion);
+
 /** The same file controls serve personal Settings and a project's Agent Configuration. */
-export function AgentConfigEditor({ store, host, folder, kind, down }: {
+export function AgentConfigEditor({ store, host, folder, kind, down, onUnsaved }: {
   store: Store; host: string; folder?: string; kind: AgentConfigKind; down: boolean;
+  /** Told when the open file gets or loses edits not saved, for a container that can leave the editor. */
+  onUnsaved?: (unsaved: boolean) => void;
 }) {
   const [files, setFiles] = useState<AgentConfigEditorFile[]>([]);
   const [selected, setSelected] = useState("");
@@ -33,6 +42,15 @@ export function AgentConfigEditor({ store, host, folder, kind, down }: {
   const [busy, setBusy] = useState(false);
   const content = whole(frontmatter, markdown, hasFrontmatter);
   const dirty = selected !== "" && content !== original;
+  useEffect(() => { onUnsaved?.(dirty); }, [dirty]);
+  useEffect(() => () => onUnsaved?.(false), []);
+  // Leaving or reloading the page drops the edits too: the browser asks first.
+  useEffect(() => {
+    if (!dirty) return;
+    const ask = (event: BeforeUnloadEvent) => { event.preventDefault(); };
+    addEventListener("beforeunload", ask);
+    return () => removeEventListener("beforeunload", ask);
+  }, [dirty]);
 
   function pick(path: string, listed: AgentConfigEditorFile[] = files) {
     const file = listed.find((item) => item.path === path);
@@ -87,7 +105,7 @@ export function AgentConfigEditor({ store, host, folder, kind, down }: {
       <label>New file name
         <input value={newName} disabled={down || busy} onInput={(event) => setNewName(event.currentTarget.value)} />
       </label>
-      <button type="button" disabled={down || busy || !newName.trim()} onClick={() => void add()}>Add</button>
+      <button type="button" disabled={down || busy || dirty || !newName.trim()} onClick={() => void add()}>Add</button>
     </div>
     {selected ? <>
       <label>Frontmatter (YAML)
@@ -128,15 +146,17 @@ export function ProjectAgentConfigModal({ store, host, folder, down, close }: {
   store: Store; host: string; folder: string; down: boolean; close: () => void;
 }) {
   const [kind, setKind] = useState<AgentConfigKind>("skills");
-  return <Modal label="Agent Configuration" close={close}>
+  const [unsaved, setUnsaved] = useState(false);
+  const leave = (then: () => void) => { if (mayLeave(unsaved)) { setUnsaved(false); then(); } };
+  return <Modal label="Agent Configuration" close={close} keep={() => !mayLeave(unsaved)}>
     <div class="sheet-body agent-config-project">
       <h2>Agent Configuration</h2>
       <div class="segmented" role="tablist" aria-label="Configuration files">
         {kinds.map((item) => <button type="button" key={item} role="tab" aria-selected={kind === item}
-          class={kind === item ? "on" : ""} onClick={() => setKind(item)}>{title(item)}</button>)}
+          class={kind === item ? "on" : ""} onClick={() => { if (item !== kind) leave(() => setKind(item)); }}>{title(item)}</button>)}
       </div>
-      <AgentConfigEditor store={store} host={host} folder={folder} kind={kind} down={down} />
-      <div class="sheet-actions"><button type="button" onClick={close}>Done</button></div>
+      <AgentConfigEditor store={store} host={host} folder={folder} kind={kind} down={down} onUnsaved={setUnsaved} />
+      <div class="sheet-actions"><button type="button" onClick={() => leave(close)}>Done</button></div>
     </div>
   </Modal>;
 }

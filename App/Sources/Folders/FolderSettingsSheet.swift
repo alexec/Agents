@@ -79,6 +79,9 @@ struct FolderSettingsSheet: View {
     /// pages (#754). Read when the sheet opens, when a page is chosen, and when the app
     /// comes back to the front.
     @State private var snapshot: DaemonAPI.SharedSnapshot?
+    /// A Skills, Personas or Workflows file has edits not saved: the rail and Done ask first (#2745).
+    @State private var unsaved = false
+    @State private var leaving: UnsavedLeave?
 
     private var panes: [FolderSettingsPane] {
         isOnMac ? FolderSettingsPane.allCases : [.general]
@@ -98,7 +101,7 @@ struct FolderSettingsSheet: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 HStack {
                     Spacer()
-                    Button("Done") { pane = nil }
+                    Button("Done") { $leaving.leave(unsaved: unsaved) { pane = nil } }
                         .buttonStyle(.paperProminent)
                         .keyboardShortcut(.defaultAction)
                 }
@@ -108,6 +111,10 @@ struct FolderSettingsSheet: View {
         // Resizable: a range rather than a fixed size, so the sheet can be dragged big
         // enough to show a whole pane, and the panes fill what it is given (#439).
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .discardUnsavedQuestion($leaving)
+        // Escape closes a sheet: with edits not saved, it asks as Done does.
+        .interactiveDismissDisabled(unsaved)
+        .onExitCommand { if unsaved { $leaving.leave(unsaved: unsaved) { pane = nil } } }
         .frame(minWidth: Self.size.width, idealWidth: max(width, Self.size.width),
                maxWidth: .infinity,
                minHeight: Self.size.height, idealHeight: max(height, Self.size.height),
@@ -166,7 +173,7 @@ struct FolderSettingsSheet: View {
     private func paneItem(_ each: FolderSettingsPane, title: String, symbol: String,
                           lit: Bool, waiting: Bool) -> some View {
         RailButton(lit: lit, label: title + (waiting ? ", waiting for your OK" : ""),
-                   selected: lit, action: { pane = each }) {
+                   selected: lit, action: { if !lit { $leaving.leave(unsaved: unsaved) { pane = each } } }) {
             HStack(spacing: 8) {
                 Image(systemName: symbol)
                     .frame(width: 20)
@@ -193,7 +200,7 @@ struct FolderSettingsSheet: View {
             AgentConfigurationView(place: .folder(folder), snapshot: snapshot,
                                    page: Binding(get: { page }, set: { pane = FolderSettingsPane($0) }),
                                    waiting: waitingPlugins > 0 ? [.plugins] : [],
-                                   refresh: { await refreshSnapshot() })
+                                   refresh: { await refreshSnapshot() }, unsaved: $unsaved)
         } else {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {

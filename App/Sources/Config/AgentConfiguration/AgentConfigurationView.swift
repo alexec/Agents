@@ -18,6 +18,13 @@ struct AgentConfigurationView: View {
     var waiting: Set<AgentConfigurationPage> = []
     /// Read the snapshot again, after something was added from a catalogue (059).
     var refresh: () async -> Void = {}
+    /// The Skills, Personas or Workflows page has edits not saved (#2745): the container's,
+    /// when it has ways out of its own to guard, such as Folder Settings' Done.
+    var unsaved: Binding<Bool>?
+    @State private var ownUnsaved = false
+    @State private var leaving: UnsavedLeave?
+
+    private var unsavedEdits: Binding<Bool> { unsaved ?? $ownUnsaved }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -35,11 +42,18 @@ struct AgentConfigurationView: View {
                 Divider()
             }
             HStack(spacing: 0) {
-                AgentConfigurationPageList(snapshot: snapshot, chosen: page, waiting: waiting, choose: { page = $0 }, place: place)
+                AgentConfigurationPageList(snapshot: snapshot, chosen: page, waiting: waiting, choose: choose, place: place)
                 chosenPage
             }
         }
         .task { if showsSyncState { await model.userScope.load(model.controlRequests) } }
+        .discardUnsavedQuestion($leaving)
+    }
+
+    /// Another page drops the open file's edits, so it asks first.
+    private func choose(_ next: AgentConfigurationPage) {
+        guard next != page else { return }
+        $leaving.leave(unsaved: unsavedEdits.wrappedValue) { page = next }
     }
 
     private var showsSyncState: Bool {
@@ -69,9 +83,9 @@ struct AgentConfigurationView: View {
         switch page {
         case .overview: AgentConfigurationOverview(place: place, snapshot: snapshot, page: $page)
         case .instructions: AgentsSetupPage { AgentsInstructionsSection(place: place) }.task { await refresh() }
-        case .skills: AgentConfigurationFilesPage(place: place, kind: .skills)
-        case .personas: AgentConfigurationFilesPage(place: place, kind: .personas)
-        case .workflows: AgentConfigurationFilesPage(place: place, kind: .workflows)
+        case .skills: AgentConfigurationFilesPage(place: place, kind: .skills, unsaved: unsavedEdits)
+        case .personas: AgentConfigurationFilesPage(place: place, kind: .personas, unsaved: unsavedEdits)
+        case .workflows: AgentConfigurationFilesPage(place: place, kind: .workflows, unsaved: unsavedEdits)
         case .mcp: AgentsSetupPage { FolderMCPSection(place: place) }.task { await refresh() }
         case .plugins: AgentsSetupPage { AgentsPluginsSection(place: place) }.task { await refresh() }
         case .other: AgentConfigurationOtherFiles(place: place, snapshot: snapshot)

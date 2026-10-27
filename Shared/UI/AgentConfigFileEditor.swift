@@ -32,11 +32,15 @@ struct AgentConfigMarkdown {
 }
 
 /// Skills, personas and workflows use the same file selector and editor on Mac and Remote.
+/// While there are unsaved edits, nothing in the editor replaces them, and every way out asks
+/// first (#2745): the Mac's page list through `unsaved`, the Remote's Back and sheet swipe here.
 struct AgentConfigFileEditor: View {
     let kind: DaemonAPI.AgentConfigEditorKind
     let location: String
     let load: @MainActor () async -> [DaemonAPI.AgentConfigEditorFile]?
     let saveFile: @MainActor (_ path: String, _ content: String, _ delete: Bool) async -> String?
+    /// True while the open file has edits not saved, for a container that can leave the editor.
+    var unsaved: Binding<Bool> = .constant(false)
 
     @State private var files: [DaemonAPI.AgentConfigEditorFile] = []
     @State private var selected: String?
@@ -48,6 +52,12 @@ struct AgentConfigFileEditor: View {
     @State private var problem: String?
     @State private var busy = false
     @State private var deleting = false
+    #if os(iOS)
+    @State private var leaving: UnsavedLeave?
+    @Environment(\.dismiss) private var dismiss
+    #endif
+
+    private var dirty: Bool { current != original }
 
     private var current: String {
         AgentConfigMarkdown(frontmatter: frontmatter, markdown: markdown,
@@ -63,10 +73,10 @@ struct AgentConfigFileEditor: View {
                     Text("Choose a file").tag(Optional<String>.none)
                     ForEach(files) { file in Text(file.path).tag(Optional(file.path)) }
                 }
-                .disabled(busy || current != original)
+                .disabled(busy || dirty)
                 TextField("New file name", text: $newName)
                 Button("Add") { Task { await add() } }
-                    .disabled(busy || newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(busy || dirty || newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
             if selected != nil {
                 AgentConfigEditorFields(frontmatter: $frontmatter, markdown: $markdown)
@@ -74,10 +84,10 @@ struct AgentConfigFileEditor: View {
                     if let problem { Text(problem).appText(.fine).tinted(.failure) }
                     Spacer()
                     Button("Discard changes") { pick(selected) }
-                        .disabled(busy || current == original)
+                        .disabled(busy || !dirty)
                     Button("Delete…", role: .destructive) { deleting = true }.disabled(busy)
                     Button("Save") { Task { await save() } }
-                        .disabled(busy || current == original)
+                        .disabled(busy || !dirty)
                 }
             } else {
                 Text("Add or choose a file to edit it.").appText(.supporting).foregroundStyle(.secondary)
@@ -88,6 +98,21 @@ struct AgentConfigFileEditor: View {
         .padding(20)
         .task(id: kind) { await reload() }
         .onChange(of: selected) { _, path in pick(path) }
+        .onChange(of: dirty, initial: true) { _, now in unsaved.wrappedValue = now }
+        .onDisappear { unsaved.wrappedValue = false }
+        #if os(iOS)
+        // Back and a swipe on the sheet would drop the edits: ask first, as Notes and Mail do.
+        .navigationBarBackButtonHidden(dirty)
+        .interactiveDismissDisabled(dirty)
+        .toolbar {
+            if dirty {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Back", systemImage: "chevron.backward") { leaving = UnsavedLeave { dismiss() } }
+                }
+            }
+        }
+        .discardUnsavedQuestion($leaving)
+        #endif
         .confirmationDialog("Delete this file?", isPresented: $deleting, titleVisibility: .visible) {
             Button("Delete File", role: .destructive) { Task { await remove() } }
         } message: {
@@ -136,6 +161,43 @@ struct AgentConfigFileEditor: View {
         problem = await saveFile(selected, "", true)
         busy = false
         if problem == nil { self.selected = nil; await reload() }
+    }
+}
+
+/// What the editor and its containers say when unsaved edits would be lost (#2745).
+enum AgentConfigEditorWords {
+    static let discardQuestion = "Discard unsaved changes?"
+    static let discardMessage = "Your changes to this file have not been saved."
+    static let discard = "Discard Changes"
+    static let keepEditing = "Keep Editing"
+}
+
+/// A way out of the editor that waits for the person's answer: taken on Discard Changes.
+struct UnsavedLeave: Identifiable {
+    let id = UUID()
+    let go: () -> Void
+}
+
+extension Binding where Value == UnsavedLeave? {
+    /// Takes `go` at once when nothing is unsaved, or asks first (#2745).
+    func leave(unsaved: Bool, _ go: @escaping () -> Void) {
+        if unsaved { wrappedValue = UnsavedLeave(go: go) } else { go() }
+    }
+}
+
+extension View {
+    /// "Discard unsaved changes?" while `leaving` holds a way out: Discard Changes takes it,
+    /// Keep Editing and Escape stay.
+    func discardUnsavedQuestion(_ leaving: Binding<UnsavedLeave?>) -> some View {
+        confirmationDialog(AgentConfigEditorWords.discardQuestion,
+                           isPresented: Binding(get: { leaving.wrappedValue != nil },
+                                                set: { if !$0 { leaving.wrappedValue = nil } }),
+                           titleVisibility: .visible, presenting: leaving.wrappedValue) { leave in
+            Button(AgentConfigEditorWords.discard, role: .destructive) { leave.go() }
+            Button(AgentConfigEditorWords.keepEditing, role: .cancel) {}
+        } message: { _ in
+            Text(AgentConfigEditorWords.discardMessage)
+        }
     }
 }
 
