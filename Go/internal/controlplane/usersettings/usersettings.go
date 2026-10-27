@@ -140,6 +140,9 @@ func (b *Book) Settings(ctx context.Context, user string) (wire.UserSettings, er
 			return wire.UserSettings{}, fmt.Errorf("%s cannot be read: %w", settingsKey(user), err)
 		}
 	}
+	// A record kept before #2703 can hold the machines' agent configuration files, which
+	// nothing reads now and which can be more than a machine's link takes (#2730).
+	out.AgentConfigFiles = nil
 	return out, nil
 }
 
@@ -203,6 +206,7 @@ func (b *Book) SetPart(ctx context.Context, user string, part wire.UserSettingsP
 				return nil, err
 			}
 		}
+		s.AgentConfigFiles = nil
 		slot := partOf(&s, part)
 		if string(canonical(*slot)) == string(parsed) {
 			return nil, nil
