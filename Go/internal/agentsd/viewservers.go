@@ -381,6 +381,16 @@ func (d *Daemon) readViewCatalog(ctx context.Context, s viewServer, refresh bool
 		return cached
 	}
 	d.viewMu.Lock()
+	// A read that ended after the look above is kept by now: read again only when it is
+	// too old, or two asking one after the other read twice (#2673).
+	enough := viewCatalogFresh
+	if refresh {
+		enough = viewCatalogMissRefreshCooldown
+	}
+	if held, ok := d.viewCatalogs[s.entry]; ok && held.Version == viewCatalogVersion && nowFunc().Sub(held.MadeAt) < enough {
+		d.viewMu.Unlock()
+		return &held
+	}
 	if failed, ok := d.viewFailures[s.entry]; ok && nowFunc().Sub(failed) < 5*time.Minute {
 		d.viewMu.Unlock()
 		return cached

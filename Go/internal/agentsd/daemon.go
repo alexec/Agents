@@ -228,6 +228,7 @@ func (d *Daemon) Shutdown() {
 	d.stopEventWaits()
 	d.stopShells()
 	d.stopFolderWatches()
+	d.stopPins()
 	d.stopSignInRelays()
 	d.stopModelRelay()
 }
