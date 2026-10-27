@@ -69,6 +69,13 @@ public enum ChatOpening {
         }
         return Loaded(turns: opening, page: page, turnsFailure: turnsFailure)
     }
+
+    /// Whether an opening that failed is its host saying it has no such session: an
+    /// answer, so the session has gone. Any other failure (offline, no answer in time) is
+    /// not one, and leaves the session not yet looked for, rather than called deleted (#2743).
+    public static func saysGone(_ error: any Error) -> Bool {
+        (error as? JSONRPCError)?.code == DaemonAPI.Failure.noSuchAgent
+    }
 }
 
 extension AgentsModel {

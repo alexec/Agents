@@ -32,6 +32,9 @@ struct PoppedChatWindow: View {
                 .environment(\.windowHasInspector, false)
             } else if chat?.looked == true || id == nil {
                 SessionDeletedPage(next: .closeWindow)
+            } else if let chat, let failure = chat.work.transcriptLoadFailure {
+                // Not looked for: its host did not answer, so it is not called deleted (#2743).
+                SessionNotLoadedPage(failure: failure) { await model.loadTranscript(of: chat) }
             } else {
                 ProgressView()
                     .controlSize(.small)
