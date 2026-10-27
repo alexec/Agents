@@ -47,7 +47,7 @@ struct LocalHostLinkTests {
         /// Serves one window that proves `windowKey` as `client`, as host `name`. Says whether
         /// the window sent its auth at all.
         @discardableResult
-        func serve(client: UUID, windowPublic: Data, as name: HostID) async throws -> Bool {
+        func serve(client: UUID, windowPublic: Data, as name: MachineRef) async throws -> Bool {
             let fd = accept(listening, nil, nil)
             let reader = PrefixReader(FDTransport(socket: fd))
             let nonce = ControlAuth.nonce()
@@ -112,7 +112,7 @@ struct LocalHostLinkTests {
         defer { host.stop() }
         let window = ControlAgreement.generate()
         let id = UUID()
-        async let served = host.serve(client: id, windowPublic: window.publicKey, as: HostID(rawValue: "box"))
+        async let served = host.serve(client: id, windowPublic: window.publicKey, as: MachineRef(rawValue: "box"))
         let link = LocalHostLink(socket: host.place, client: id, privateKey: window.privateKey, host: .mac)
         await #expect(throws: (any Error).self) { _ = try await link.transport() }
         // Gone at its hello, before any proof (#1497): the host never counts it as connected,

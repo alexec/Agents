@@ -9,7 +9,7 @@
     {
       "name": "host.wire/1",
       "by": "host",
-      "description": "A host says host/hello with its capabilities on each connect (#1748). The control plane requires it of hosts."
+      "description": "A host says machine/hello with its capabilities on each connect (#1748). The control plane requires it of hosts."
     },
     {
       "name": "agents.move-worktree/1",
@@ -5791,7 +5791,7 @@
     {
       "name": "settings/userPart",
       "x-capability": "host.user-settings/1",
-      "description": "A part of the user settings as this machine has it (#1760), for Use This Mac's under You. This machine also writes host/userSettings into its files.",
+      "description": "A part of the user settings as this machine has it (#1760), for Use This Mac's under You. This machine also writes machine/userSettings into its files.",
       "paramStructure": "by-name",
       "params": [
         {

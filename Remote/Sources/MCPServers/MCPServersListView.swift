@@ -31,7 +31,7 @@ struct MCPServersListView: View {
     private var problem: String? { snapshot?.problem(in: folder?.folder.path) }
 
     /// The machine whose mcp.json this is (#2266).
-    private var host: HostID { folder?.host ?? .mac }
+    private var host: MachineRef { folder?.host ?? .mac }
     /// Remove… waits for it to come back (#2266), as on the window and the page.
     private var offline: Bool { model.hostIsOffline(host) }
 

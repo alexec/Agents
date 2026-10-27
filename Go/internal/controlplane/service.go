@@ -66,7 +66,7 @@ type Config struct {
 	HostJoinFile string
 	// Where the Linux hosts it hands out are (ServerFiles.folder).
 	ServerFolder string
-	// Where the runtimes' toolsets hosts/install puts on a server are (#1136): "" puts none.
+	// Where the runtimes' toolsets machines/install puts on a server are (#1136): "" puts none.
 	ToolsetFolder string
 	// The web remote's loopback listener (071): Web/dist and the port, or nil for none,
 	// which is a container's default.
@@ -152,7 +152,7 @@ type Service struct {
 	auditChain *audit.Chain
 	// auditWriter keeps the entries, one goroutine for all (#2433).
 	auditWriter *audit.Writer
-	auditSinks *auditSinkState
+	auditSinks  *auditSinkState
 	// Servers' backups (#1815).
 	backups *backupStore
 	methods *Methods
@@ -161,7 +161,7 @@ type Service struct {
 	desk *notices.Desk
 	// This copy's own pushes, when no relay host is online (#1460); nil with no key.
 	pushes *pushes
-	// What each host last listed (#962), for hosts/lastHeard.
+	// What each host last listed (#962), for machines/lastHeard.
 	copies *hostCopies
 	// The reverse tunnels this copy holds for servers behind a bastion (#435): a single
 	// copy's, whose ssh is the person's on this machine.
@@ -174,7 +174,7 @@ type Service struct {
 	peerOrigin string
 	// Where this copy is in a handover (R16): serving, receiving, frozen or forwarding.
 	phase *phaseBox
-	// hosts/install, detect and sshHosts (T072, #429, #610): with the person's own ssh.
+	// machines/install, detect and sshHosts (T072, #429, #610): with the person's own ssh.
 	installer *hostinstall.Installer
 
 	// One read of the store's records at a time, at most one every readAgainEvery
@@ -187,7 +187,7 @@ type Service struct {
 	downloads   *addressRates
 	socketsMost int
 	refusals    *refusalLog
-	// The host/clients each host here was told last (#1528).
+	// The machine/clients each host here was told last (#1528).
 	told toldClients
 	// Machines asking to join with no code (#994).
 	joins *joins
@@ -195,11 +195,11 @@ type Service struct {
 	// Sign-in with Google, Apple and GitHub (#995), and the GitHub sign-ins waiting.
 	signIns *signIns
 	// SCIM at /scim/v2/ (#1002, slice 2a).
-	scimTokens      *scimTokens
-	scimServer      *scim.Server
+	scimTokens *scimTokens
+	scimServer *scim.Server
 	// The read API's tokens, and the OTLP exporter when one is set (#2019).
-	readAPI *readTokens
-	otlp    *otlpExporter
+	readAPI         *readTokens
+	otlp            *otlpExporter
 	signInApprovals *signInApprovals
 	// Each person's settings and secrets (#1760), and what each machine here was sent.
 	users     *usersettings.Book
@@ -299,7 +299,7 @@ func New(cfg Config) (*Service, error) {
 	// Tunnels belong to a single copy: its ssh is the person's on this machine.
 	if cfg.PeerURL == "" && !cfg.Hosted {
 		s.tunnels = hosttunnels.New(hosttunnels.Config{Store: cfg.Store, Port: cfg.Port, Log: s.log,
-			Hosts:   func(context.Context) []records.HostRecord { return s.records.Hosts() },
+			Hosts:   func(context.Context) []records.MachineRecord { return s.records.Hosts() },
 			Changed: func(change hosttunnels.Changed) { s.router.BroadcastControl("control/tunnelChanged", change) },
 			// Made after the tunnels: read when a tunnel asks.
 			Asleep: func(host string) bool { return s.providers != nil && s.providers.Asleep(host) },
@@ -626,7 +626,7 @@ func (s *Service) reconcile() {
 }
 
 // thisMacHost is how this Mac's host's join stands, or nil (#113).
-func (s *Service) thisMacHost() *HostJoinStatus {
+func (s *Service) thisMacHost() *MachineJoinStatus {
 	if s.cfg.HostJoinFile == "" {
 		return nil
 	}
@@ -666,28 +666,28 @@ func (s *Service) syncRelays() {
 	s.tellHostClients()
 }
 
-// hostClients is host/clients: every paired window of the host's owner and its key,
+// hostClients is machine/clients: every paired window of the host's owner and its key,
 // which a host checks its local socket against (#1118). Only a Mac's window is on the
 // same machine as a host, and only its own person's reaches it there (FR-020).
-func (s *Service) hostClients(host string) wire.HostClients {
+func (s *Service) hostClients(host string) wire.MachineClients {
 	return s.hostClientsFrom(host, s.macWindows())
 }
 
 // hostClientsFrom is hostClients from the windows macWindows read once for every host
 // told, not once per host (#2059).
-func (s *Service) hostClientsFrom(host string, windows map[string][]wire.HostClient) wire.HostClients {
+func (s *Service) hostClientsFrom(host string, windows map[string][]wire.MachineClient) wire.MachineClients {
 	owner := s.ownerOf(host)
-	out := wire.HostClients{Clients: windows[owner], User: &owner}
+	out := wire.MachineClients{Clients: windows[owner], User: &owner}
 	if out.Clients == nil {
-		out.Clients = []wire.HostClient{}
+		out.Clients = []wire.MachineClient{}
 	}
 	return out
 }
 
 // macWindows is every paired Mac window with a key, by its person, in the order paired.
-func (s *Service) macWindows() map[string][]wire.HostClient {
+func (s *Service) macWindows() map[string][]wire.MachineClient {
 	local := s.localOwner()
-	out := map[string][]wire.HostClient{}
+	out := map[string][]wire.MachineClient{}
 	for _, c := range s.records.Clients() {
 		if c.Kind != records.KindMac || len(c.PublicKey) == 0 {
 			continue
@@ -697,13 +697,13 @@ func (s *Service) macWindows() map[string][]wire.HostClient {
 		if c.Owner != nil && *c.Owner != "" {
 			person = *c.Owner
 		}
-		out[person] = append(out[person], wire.HostClient{ID: wire.UUID(c.ID), Kind: c.Kind, PublicKey: c.PublicKey,
+		out[person] = append(out[person], wire.MachineClient{ID: wire.UUID(c.ID), Kind: c.Kind, PublicKey: c.PublicKey,
 			Person: &person})
 	}
 	return out
 }
 
-// toldClients is a hash of the host/clients each host whose uplink ends here was told last.
+// toldClients is a hash of the machine/clients each host whose uplink ends here was told last.
 type toldClients struct {
 	mu   sync.Mutex
 	last map[string][sha256.Size]byte
@@ -712,7 +712,7 @@ type toldClients struct {
 // tellHostClients tells each host whose uplink ends here which windows it may let in on its
 // local socket, so a window forgotten here is cut off there too. A host hears the list only
 // when it differs from the one it heard last, not on every refresh (#1528). The hosts named
-// (a host that says host/hello, after a new uplink) hear it in any case.
+// (a host that says machine/hello, after a new uplink) hear it in any case.
 func (s *Service) tellHostClients(only ...string) {
 	s.told.mu.Lock()
 	defer s.told.mu.Unlock()
@@ -741,7 +741,7 @@ func (s *Service) tellHostClients(only ...string) {
 		if len(only) == 0 && s.told.last[host] == sum {
 			continue
 		}
-		if s.router.Tell(host, wire.NotifyHostClients.Name, clients) {
+		if s.router.Tell(host, wire.NotifyMachineClients.Name, clients) {
 			s.told.last[host] = sum
 		} else {
 			delete(s.told.last, host)
@@ -1290,7 +1290,7 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 	}
 	// Once a list has been announced, every member is given it (R16).
 	settings := s.records.Settings()
-	ok2 := controllink.OK{Mac: controllink.B64URL(mac), Host: optional(wire.HostID(host)), NewKey: offer}
+	ok2 := controllink.OK{Mac: controllink.B64URL(mac), Host: optional(wire.MachineRef(host)), NewKey: offer}
 	if client != nil {
 		ok2.Grant = new(records.LegacyGrant)
 	}
@@ -1576,7 +1576,7 @@ func (g *readGate) read(read func() error) (ran bool, err error) {
 	return true, r.err
 }
 
-// hostArrived takes a host's uplink: its first line is host/hello on channel 0 (kept
+// hostArrived takes a host's uplink: its first line is machine/hello on channel 0 (kept
 // from the first build), then the router reads it.
 func (s *Service) hostArrived(host string, conn *Conn) {
 	first, err := conn.ReadWithin(15 * time.Second)
@@ -1585,7 +1585,7 @@ func (s *Service) hostArrived(host string, conn *Conn) {
 	if err == nil && ok && f.channel == 0 && !f.close && !f.open && f.channels == nil {
 		m, ok = decode(f.msg)
 	}
-	if err != nil || !ok || m == nil || m.Method != "host/hello" || !m.isRequest() {
+	if err != nil || !ok || m == nil || m.Method != "machine/hello" || !m.isRequest() {
 		s.log("host " + host + " connected without saying hello; closing it")
 		conn.Close()
 		return
@@ -1600,7 +1600,7 @@ func (s *Service) hostArrived(host string, conn *Conn) {
 			s.log("the store would not give " + host + "'s lease to this copy; serving it anyway")
 		}
 	}
-	result, err := s.methods.HostSaid(host, "host/hello", m.Params)
+	result, err := s.methods.HostSaid(host, "machine/hello", m.Params)
 	if err != nil {
 		conn.Send(channelFrame(0, replyError(m.ID, err)))
 	} else {
@@ -1719,8 +1719,8 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin
 		// Known at every copy at once: the relay host may be held at another.
 		s.announce("clientPaired", client, "code")
 		return result, nil
-	case stored.Purpose == "host" && method == "hosts/announce":
-		var a wire.HostAnnounce
+	case stored.Purpose == "host" && method == "machines/announce":
+		var a wire.MachineAnnounce
 		if json.Unmarshal(params, &a) != nil {
 			return nil, fail(invalidParams, "Say which host you are.")
 		}
@@ -1740,7 +1740,7 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin
 			return nil, controllink.Refuse(controllink.Spent)
 		}
 		host := *sp.Host
-		result := &wire.Admitted{Host: new(wire.HostID(host))}
+		result := &wire.Admitted{Host: new(wire.MachineRef(host))}
 		// The same join again (#212): it enrolled, and could not keep it.
 		if old := s.records.Host(host); sp.replayed && old != nil && bytes.Equal(old.PublicKey, a.PublicKey) {
 			s.log("host " + a.Name + " enrolled again as " + host + " with the code it spent")
@@ -1748,7 +1748,7 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin
 		}
 		mid := a.MachineID
 		// The machine is the person's who made the code (FR-017).
-		record := records.HostRecord{ID: host, Name: a.Name, PublicKey: a.PublicKey, Platform: a.Platform,
+		record := records.MachineRecord{ID: host, Name: a.Name, PublicKey: a.PublicKey, Platform: a.Platform,
 			Version: a.Version, MachineID: &mid, Owner: stored.Owner, Expires: s.newExpiry()}
 		if relay {
 			record.Relay = &relay
@@ -1768,7 +1768,7 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin
 			}
 			s.log("host " + a.Name + " joined from this machine as another host enrolled as mac: it enrols as " + other)
 			host, record.ID = other, other
-			result.Host = new(wire.HostID(host))
+			result.Host = new(wire.MachineRef(host))
 			err = s.records.AddHost(ctx, record)
 		}
 		if errors.Is(err, records.ErrHostTaken) {

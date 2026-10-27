@@ -370,7 +370,7 @@ window can. To cut it off, click **Forget…** on its row. To serve no page, set
 ### Enrol a Linux server
 
 1. In the window, open **Settings ▸ Machines**, then
-   **Add a Server…**, and **Copy** the command.
+   **Add a Machine…**, and **Copy** the command.
 2. On the server, as the user your agents should run as, run it. It looks like this:
 
    ```sh
@@ -384,7 +384,7 @@ window can. To cut it off, click **Forget…** on its row. To serve no page, set
    The command says **devbox joined the control plane.** The server has a heading of its
    own in every window.
 
-See [Add a server](add-a-server.md) for the rest: installing over ssh, folders on the
+See [Add a machine](add-a-machine.md) for the rest: installing over ssh, folders on the
 server, and its Claude sign-in.
 
 ### Enrol your Mac

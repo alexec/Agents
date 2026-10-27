@@ -132,7 +132,7 @@ func costly(method string) bool {
 		return true
 	}
 	switch method {
-	case "usage/rollup", "hosts/install", "hosts/detect", "hosts/sshHosts", "hosts/update", "hosts/startEnroll",
+	case "usage/rollup", "machines/install", "machines/detect", "machines/sshHosts", "machines/update", "machines/startEnroll",
 		"clients/startPairing", "devices/startPairing", "bots/make", "control/rotate", "links/check":
 		return true
 	}

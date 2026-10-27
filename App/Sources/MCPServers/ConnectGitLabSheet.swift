@@ -11,12 +11,12 @@ struct ConnectGitLabSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
 
-    var host: HostID
+    var host: MachineRef
     var onConnected: () -> Void = {}
 
     /// again is the ended connection Connect Again\u{2026} is for: the sheet opens the way it
     /// was made, with its address (#1865).
-    init(host: HostID, again: DaemonAPI.Connection? = nil, onConnected: @escaping () -> Void = {}) {
+    init(host: MachineRef, again: DaemonAPI.Connection? = nil, onConnected: @escaping () -> Void = {}) {
         self.host = host
         self.onConnected = onConnected
         let start = again.map(ConnectorSetupWords.GitLab.again)

@@ -62,10 +62,10 @@ func (p *plane) machine(who *person, name string) *fakeHost {
 }
 
 // machineSaying is machine, with its own hello.
-func (p *plane) machineSaying(who *person, hello controllink.HostHello) *fakeHost {
+func (p *plane) machineSaying(who *person, hello controllink.MachineHello) *fakeHost {
 	p.t.Helper()
 	var shown wire.ControlCodeShown
-	json.Unmarshal(call(p.t, who.window, "", "hosts/startEnroll", nil), &shown)
+	json.Unmarshal(call(p.t, who.window, "", "machines/startEnroll", nil), &shown)
 	code, err := controllink.ParseCode(shown.Text)
 	if err != nil {
 		p.t.Fatal(err)
@@ -88,8 +88,8 @@ func (p *plane) machineSaying(who *person, hello controllink.HostHello) *fakeHos
 
 func listedHosts(t *testing.T, s *controllink.Session) []string {
 	t.Helper()
-	var list []wire.ControlHost
-	json.Unmarshal(call(t, s, "", "hosts/list", nil), &list)
+	var list []wire.ControlMachine
+	json.Unmarshal(call(t, s, "", "machines/list", nil), &list)
 	out := []string{}
 	for _, h := range list {
 		out = append(out, string(h.ID))
@@ -205,10 +205,10 @@ func TestEachPersonReachesOnlyTheirOwnMachines(t *testing.T) {
 // hostNamingMethods are the control-plane methods that name a machine by host (and
 // lendSignIn and lendGit by from too): each refuses another person's as not found.
 var hostNamingMethods = map[string]bool{
-	"hosts/update": true, "hosts/checkAgain": true, "hosts/remove": true, "hosts/setRelay": true,
-	"hosts/lendSignIn": true, "hosts/lendGit": true, "hosts/lastHeard": true,
-	"hosts/link": true, "hosts/unlink": true, "hosts/start": true, "hosts/stop": true, "hosts/keep": true,
-	"hosts/deleteMachine": true, "hosts/setMachineOptions": true,
+	"machines/update": true, "machines/checkAgain": true, "machines/remove": true, "machines/setRelay": true,
+	"machines/lendSignIn": true, "machines/lendGit": true, "machines/lastHeard": true,
+	"machines/link": true, "machines/unlink": true, "machines/start": true, "machines/stop": true, "machines/keep": true,
+	"machines/deleteMachine": true, "machines/setMachineOptions": true,
 }
 
 // hostNamingParams are params that would do something with host for each of them.
@@ -230,18 +230,18 @@ func TestEveryClientMethodChecksTheOwner(t *testing.T) {
 
 	// Methods that name no machine: answered for the caller alone.
 	namesNone := map[string]bool{
-		"daemon/ping": true, "control/status": true, "hosts/list": true, "hosts/startEnroll": true, "hosts/install": true,
-		"hosts/detect": true, "hosts/sshHosts": true, "control/setFolderDetection": true, "clients/list": true,
+		"daemon/ping": true, "control/status": true, "machines/list": true, "machines/startEnroll": true, "machines/install": true,
+		"machines/detect": true, "machines/sshHosts": true, "control/setFolderDetection": true, "clients/list": true,
 		"clients/startPairing": true, "clients/stopPairing": true, "clients/setGrant": true, "clients/forget": true,
 		"clients/connections": true, "clients/forgetSelf": true, "clients/setPushToken": true, "clients/setActivityToken": true, "devices/list": true,
 		"devices/startPairing": true, "devices/stopPairing": true, "devices/forget": true, "audit/list": true, "audit/sinks": true, "audit/setSinks": true,
 		"audit/export": true, "control/setAuditDays": true, "people/list": true, "people/invite": true,
-		"people/setRole": true, "people/remove": true, "people/removePreview": true, "hosts/joinRequests": true, "hosts/approveJoin": true,
-		"hosts/denyJoin": true, "control/rotate": true,
+		"people/setRole": true, "people/remove": true, "people/removePreview": true, "machines/joinRequests": true, "machines/approveJoin": true,
+		"machines/denyJoin": true, "control/rotate": true,
 		"providers/list": true, "providers/refresh": true, "providers/add": true, "providers/update": true,
 		"providers/remove": true, "providers/options": true, "providers/runtimes": true, "providers/draftStart": true,
-		"providers/draftAnswer": true, "providers/draftCancel": true, "providers/create": true, "hosts/listKept": true,
-		"hosts/retryKept": true, "hosts/dropKept": true, "reports/usage": true, "reports/export": true,
+		"providers/draftAnswer": true, "providers/draftCancel": true, "providers/create": true, "machines/listKept": true,
+		"machines/retryKept": true, "machines/dropKept": true, "reports/usage": true, "reports/export": true,
 		"user/settings": true, "user/setSettings": true, "user/setAgentConfigFile": true, "user/setSecret": true, "user/removeSecret": true,
 		"user/secretNames": true, "groups/list": true, "groups/set": true, "groups/remove": true,
 		"providers/setGroup": true, "bots/make": true, "bots/setCaps": true,
@@ -370,15 +370,15 @@ func TestAMachineJoinsByApproval(t *testing.T) {
 		t.Fatalf("%+v", asked)
 	}
 	var waiting []wire.JoinRequest
-	json.Unmarshal(call(t, alexWindow, "", "hosts/joinRequests", nil), &waiting)
+	json.Unmarshal(call(t, alexWindow, "", "machines/joinRequests", nil), &waiting)
 	if len(waiting) != 0 {
 		t.Fatalf("Alex sees Sam's request: %+v", waiting)
 	}
-	if e := callError(t, alexWindow, "", "hosts/approveJoin", wire.JoinRequestDecide{Request: asked.Request}); !strings.Contains(e, "no such request") {
+	if e := callError(t, alexWindow, "", "machines/approveJoin", wire.JoinRequestDecide{Request: asked.Request}); !strings.Contains(e, "no such request") {
 		t.Fatal(e)
 	}
 	var approved wire.JoinApproved
-	json.Unmarshal(call(t, sam.window, "", "hosts/approveJoin", wire.JoinRequestDecide{Request: asked.Request}), &approved)
+	json.Unmarshal(call(t, sam.window, "", "machines/approveJoin", wire.JoinRequestDecide{Request: asked.Request}), &approved)
 	var member *controllink.Membership
 	select {
 	case member = <-joined:
@@ -398,33 +398,33 @@ func TestAMachineJoinsByApproval(t *testing.T) {
 	if e := callError(t, alexWindow, member.Host, "agents/list", nil); !strings.Contains(e, "-32091") {
 		t.Fatal(e)
 	}
-	if e := callError(t, sam.window, "", "hosts/approveJoin", wire.JoinRequestDecide{Request: asked.Request}); !strings.Contains(e, "ended") {
+	if e := callError(t, sam.window, "", "machines/approveJoin", wire.JoinRequestDecide{Request: asked.Request}); !strings.Contains(e, "ended") {
 		t.Fatal(e)
 	}
 
 	// One that names nobody is an admin's to decide; denied, the machine hears so.
-	body, _ := json.Marshal(wire.HostJoinAsk{Name: "stray", Platform: "Linux", PublicKey: mustPublic(t)})
+	body, _ := json.Marshal(wire.MachineJoinAsk{Name: "stray", Platform: "Linux", PublicKey: mustPublic(t)})
 	resp, err := http.Post(p.url+"/v1/join", "application/json", bytes.NewReader(body))
 	if err != nil {
 		t.Fatal(err)
 	}
-	var ticket wire.HostJoinTicket
+	var ticket wire.MachineJoinTicket
 	json.NewDecoder(resp.Body).Decode(&ticket)
 	resp.Body.Close()
-	json.Unmarshal(call(t, sam.window, "", "hosts/joinRequests", nil), &waiting)
+	json.Unmarshal(call(t, sam.window, "", "machines/joinRequests", nil), &waiting)
 	if len(waiting) != 0 {
 		t.Fatalf("a member sees a request that names nobody: %+v", waiting)
 	}
-	json.Unmarshal(call(t, alexWindow, "", "hosts/joinRequests", nil), &waiting)
+	json.Unmarshal(call(t, alexWindow, "", "machines/joinRequests", nil), &waiting)
 	if len(waiting) != 1 || waiting[0].Request != ticket.Request {
 		t.Fatalf("%+v", waiting)
 	}
-	call(t, alexWindow, "", "hosts/denyJoin", wire.JoinRequestDecide{Request: ticket.Request})
+	call(t, alexWindow, "", "machines/denyJoin", wire.JoinRequestDecide{Request: ticket.Request})
 	resp, err = http.Get(p.url + "/v1/join/" + ticket.Request)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var decision wire.HostJoinDecision
+	var decision wire.MachineJoinDecision
 	json.NewDecoder(resp.Body).Decode(&decision)
 	resp.Body.Close()
 	if decision.Result != "denied" || decision.Host != nil {
@@ -495,7 +495,7 @@ func TestLendsAndWindowsStayWithinOneUser(t *testing.T) {
 		}
 	}
 
-	// host/clients names the host's user, and only that user's windows.
+	// machine/clients names the host's user, and only that user's windows.
 	clients := p.s.hostClients(samBox)
 	if clients.User == nil || *clients.User != sam.id {
 		t.Fatalf("user: %+v", clients.User)
@@ -507,11 +507,11 @@ func TestLendsAndWindowsStayWithinOneUser(t *testing.T) {
 	}
 
 	// Sam cannot name Alex's machine as a lender.
-	if e := callError(t, sam.window, "", "hosts/lendSignIn", wire.LendSignIn{Host: wire.HostID(samBox), From: wire.HostID(alexMac),
+	if e := callError(t, sam.window, "", "machines/lendSignIn", wire.LendSignIn{Host: wire.MachineRef(samBox), From: wire.MachineRef(alexMac),
 		Runtime: "claude", Allowed: true}); !strings.Contains(e, "-32091") {
 		t.Fatalf("a lend from another user's machine: %s", e)
 	}
-	call(t, sam.window, "", "hosts/lendSignIn", wire.LendSignIn{Host: wire.HostID(samBox), From: wire.HostID(samMac),
+	call(t, sam.window, "", "machines/lendSignIn", wire.LendSignIn{Host: wire.MachineRef(samBox), From: wire.MachineRef(samMac),
 		Runtime: "codex", Allowed: true})
 
 	// A lend from before the team tier, from Alex's Mac, is not shown and not used.
@@ -521,8 +521,8 @@ func TestLendsAndWindowsStayWithinOneUser(t *testing.T) {
 	if err := p.s.Records().SaveHost(ctx, record); err != nil {
 		t.Fatal(err)
 	}
-	var hosts []wire.ControlHost
-	json.Unmarshal(call(t, sam.window, "", "hosts/list", nil), &hosts)
+	var hosts []wire.ControlMachine
+	json.Unmarshal(call(t, sam.window, "", "machines/list", nil), &hosts)
 	for _, h := range hosts {
 		if string(h.ID) != samBox {
 			continue

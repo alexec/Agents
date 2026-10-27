@@ -179,7 +179,7 @@ extension MCPTriggerStatus {
     /// from what the host last said, so "Checked 20 s ago" moves without the host
     /// sending anything. The web page's `workflows.ts` says the same words.
     func words(now: Date) -> (text: String, tint: StateTint) {
-        let who = server ?? "its server"
+        let who = server ?? "its machine"
         let body: String
         var tint = StateTint.none
         switch state {

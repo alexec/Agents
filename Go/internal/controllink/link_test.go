@@ -27,24 +27,24 @@ type fakeControl struct {
 	secret  []byte // the host code's
 	host    string
 	srv     *httptest.Server
-	hellos  chan HostHello
+	hellos  chan MachineHello
 	channel chan string // what the host wrote on channel 1
 	refuse  bool
 	// stall, when set, is what the first uplink waits on after opening its channel, reading
 	// nothing more: a control plane gone quiet (#1403). Later uplinks are served as usual.
 	stall   chan struct{}
 	uplinks atomic.Int32
-	// letGo, when set, closes every uplink as soon as its host/hello is read: a copy that
+	// letGo, when set, closes every uplink as soon as its machine/hello is read: a copy that
 	// lets go at once (#1529).
 	letGo bool
 
 	mu         sync.Mutex
-	hostPublic []byte // from hosts/announce
+	hostPublic []byte // from machines/announce
 }
 
 func newFakeControl(t *testing.T) *fakeControl {
 	f := &fakeControl{t: t, private: NewPrivateKey(), secret: make([]byte, 32), host: "k3rs7zgm",
-		hellos: make(chan HostHello, 4), channel: make(chan string, 16)}
+		hellos: make(chan MachineHello, 4), channel: make(chan string, 16)}
 	rand.Read(f.secret)
 	f.srv = httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.srv.Close)
@@ -106,7 +106,7 @@ func (f *fakeControl) serve(w http.ResponseWriter, r *http.Request) {
 			} `json:"params"`
 		}
 		json.Unmarshal([]byte(req), &call)
-		if call.Method != "hosts/announce" {
+		if call.Method != "machines/announce" {
 			f.t.Errorf("enrol said %s", call.Method)
 		}
 		f.mu.Lock()
@@ -115,17 +115,17 @@ func (f *fakeControl) serve(w http.ResponseWriter, r *http.Request) {
 		l.Write(ctx, `{"jsonrpc":"2.0","id":1,"result":{"host":"`+f.host+`"}}`)
 		return
 	}
-	// The uplink: host/hello on channel 0, then a channel opened and a message on it.
+	// The uplink: machine/hello on channel 0, then a channel opened and a message on it.
 	first, _ := l.Read(ctx)
 	var frame struct {
 		C int `json:"c"`
 		M struct {
-			Method string    `json:"method"`
-			Params HostHello `json:"params"`
+			Method string       `json:"method"`
+			Params MachineHello `json:"params"`
 		} `json:"m"`
 	}
 	json.Unmarshal([]byte(first), &frame)
-	if frame.C != 0 || frame.M.Method != "host/hello" {
+	if frame.C != 0 || frame.M.Method != "machine/hello" {
 		f.t.Errorf("first uplink line %s", first)
 	}
 	f.hellos <- frame.M.Params
@@ -146,7 +146,7 @@ func (f *fakeControl) serve(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return
 		}
-		// host/machines is answered on channel 0, as the control plane does (#1444).
+		// machine/machines is answered on channel 0, as the control plane does (#1444).
 		var ask struct {
 			C int `json:"c"`
 			M struct {
@@ -155,7 +155,7 @@ func (f *fakeControl) serve(w http.ResponseWriter, r *http.Request) {
 				Params json.RawMessage `json:"params"`
 			} `json:"m"`
 		}
-		if json.Unmarshal([]byte(line), &ask) == nil && ask.C == 0 && ask.M.Method == "host/machines" {
+		if json.Unmarshal([]byte(line), &ask) == nil && ask.C == 0 && ask.M.Method == "machine/machines" {
 			id := strconv.FormatInt(ask.M.ID, 10)
 			if strings.Contains(string(ask.M.Params), "refuse") {
 				l.Write(ctx, `{"c":0,"m":{"jsonrpc":"2.0","id":`+id+`,"error":{"code":-32010,"message":"Agents can’t ask that of the control plane."}}}`)
@@ -178,7 +178,7 @@ func (f *fakeControl) hostKey() []byte {
 	return k
 }
 
-// A host enrols with its code, keeps control-host.json, dials as h:<host>, says host/hello
+// A host enrols with its code, keeps control-host.json, dials as h:<host>, says machine/hello
 // on channel 0 and serves a channel the control plane opens.
 func TestEnrolThenUplink(t *testing.T) {
 	f := newFakeControl(t)
@@ -193,7 +193,7 @@ func TestEnrolThenUplink(t *testing.T) {
 	if string(again) != string(private) {
 		t.Fatal("the host key changed between reads")
 	}
-	hello := HostHello{Version: "1.2.3", Platform: "Linux arm64", MachineID: "m1", Name: new("devbox"), Implementation: new("go")}
+	hello := MachineHello{Version: "1.2.3", Platform: "Linux arm64", MachineID: "m1", Name: new("devbox"), Implementation: new("go")}
 	m, err := Enroll(ctx, root, f.code(), private, hello)
 	if err != nil {
 		t.Fatal(err)
@@ -229,7 +229,7 @@ func TestEnrolThenUplink(t *testing.T) {
 			t.Fatalf("hello %+v", h)
 		}
 	case <-ctx.Done():
-		t.Fatal("no host/hello")
+		t.Fatal("no machine/hello")
 	}
 	if line := <-served; !strings.Contains(line, "daemon/ping") {
 		t.Fatalf("served %s", line)
@@ -238,11 +238,11 @@ func TestEnrolThenUplink(t *testing.T) {
 		t.Fatalf("reply frame %s", line)
 	}
 	// A request on channel 0 waits for its answer (#1444), or for the refusal.
-	if got, err := u.Ask(ctx, "host/machines", map[string]any{"agent": "Claude (x)", "method": "machines/forAgent", "params": map[string]any{}}); err != nil || string(got) != `{"providers":[]}` {
+	if got, err := u.Ask(ctx, "machine/machines", map[string]any{"agent": "Claude (x)", "method": "machines/forAgent", "params": map[string]any{}}); err != nil || string(got) != `{"providers":[]}` {
 		t.Fatalf("ask %s %v", got, err)
 	}
 	var refused *AskError
-	if _, err := u.Ask(ctx, "host/machines", map[string]any{"method": "refuse"}); !errors.As(err, &refused) || refused.Code != -32010 || refused.Message != "Agents can’t ask that of the control plane." {
+	if _, err := u.Ask(ctx, "machine/machines", map[string]any{"method": "refuse"}); !errors.As(err, &refused) || refused.Code != -32010 || refused.Message != "Agents can’t ask that of the control plane." {
 		t.Fatalf("refused %v", err)
 	}
 	u.WriteFanOut([]int{1, 3}, `{"jsonrpc":"2.0","method":"agent/changed","params":{}}`)
@@ -256,7 +256,7 @@ func TestEnrolRefused(t *testing.T) {
 	f.refuse = true
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	_, err := Enroll(ctx, t.TempDir(), f.code(), NewPrivateKey(), HostHello{})
+	_, err := Enroll(ctx, t.TempDir(), f.code(), NewPrivateKey(), MachineHello{})
 	var r *Refusal
 	if !errors.As(err, &r) || r.Reason != Unknown {
 		t.Fatalf("err %v", err)

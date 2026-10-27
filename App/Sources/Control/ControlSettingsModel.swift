@@ -11,7 +11,7 @@ import Network
 @Observable
 final class ControlSettingsModel {
     private(set) var status: DaemonAPI.ControlStatus?
-    private(set) var hosts: [DaemonAPI.ControlHost] = []
+    private(set) var hosts: [DaemonAPI.ControlMachine] = []
     /// Machine providers (#691), as the control plane last listed them.
     private(set) var providers: [DaemonAPI.ProviderSummary] = []
     /// False on a control plane that can't run providers (several copies, research R4).
@@ -70,9 +70,9 @@ final class ControlSettingsModel {
     var isOnThisMac: Bool { status?.machineID == MachineID.current }
 
     /// The host on this Mac: shown first and without buttons (the look gate's decision).
-    var thisMacHost: DaemonAPI.ControlHost? { hosts.first { $0.machineID == MachineID.current && $0.runsAgents } }
+    var thisMacHost: DaemonAPI.ControlMachine? { hosts.first { $0.machineID == MachineID.current && $0.runsAgents } }
     /// Every other host, and this Mac's relay: it shares the Mac's machine but is not its host.
-    var otherHosts: [DaemonAPI.ControlHost] { hosts.filter { $0.machineID != MachineID.current || $0.relay != nil } }
+    var otherHosts: [DaemonAPI.ControlMachine] { hosts.filter { $0.machineID != MachineID.current || $0.relay != nil } }
 
     var onlineCount: Int { hosts.filter(\.answers).count }
 
@@ -99,7 +99,7 @@ final class ControlSettingsModel {
                         continue
                     }
                     if note.method == DaemonAPI.Notification.controlTunnelChanged,
-                       let change = try? note.params?.decode(DaemonAPI.HostTunnelChanged.self) {
+                       let change = try? note.params?.decode(DaemonAPI.MachineTunnelChanged.self) {
                         self.tunnels[change.name] = change.tunnel
                     }
                     // What this page does not show asks for nothing (#2055).
@@ -138,7 +138,7 @@ final class ControlSettingsModel {
         do {
             try await client.connect(startIfNeeded: false, timeout: .seconds(2))
             status = try await client.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
-            hosts = try await client.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlHost].self)
+            hosts = try await client.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlMachine].self)
             clients = try await client.call(DaemonAPI.Method.clientsList, returning: [ClientRecord].self)
                 .sorted { ($0.id == status?.you ? 0 : 1, $0.paired) < ($1.id == status?.you ? 0 : 1, $1.paired) }
             let links = (try? await client.call(DaemonAPI.Method.clientsConnections,
@@ -234,40 +234,40 @@ final class ControlSettingsModel {
         await perform(DaemonAPI.Method.providersRemove, DaemonAPI.ProviderRequest(id: id))
     }
 
-    func link(_ host: HostID, to provider: ProviderID, workspace: String, startWhenUsed: Bool? = nil,
+    func link(_ host: MachineRef, to provider: ProviderID, workspace: String, startWhenUsed: Bool? = nil,
               stopWhenIdleMinutes: Int? = nil) async {
         await perform(DaemonAPI.Method.hostsLink,
-                      DaemonAPI.HostLink(host: host, provider: provider, workspace: workspace,
+                      DaemonAPI.MachineLink(host: host, provider: provider, workspace: workspace,
                                          startWhenUsed: startWhenUsed, stopWhenIdleMinutes: stopWhenIdleMinutes))
     }
 
     /// A host stops using a Mac's git access for one git server (#1122).
-    func revokeGit(_ host: HostID, from: HostID, server: String) async {
+    func revokeGit(_ host: MachineRef, from: MachineRef, server: String) async {
         await perform(DaemonAPI.Method.hostsLendGit, DaemonAPI.LendGit(host: host, from: from, server: server, allowed: false))
     }
 
-    func unlink(_ host: HostID) async {
-        await perform(DaemonAPI.Method.hostsUnlink, DaemonAPI.HostRequest(host: host))
+    func unlink(_ host: MachineRef) async {
+        await perform(DaemonAPI.Method.hostsUnlink, DaemonAPI.MachineRequest(host: host))
     }
 
     /// `stopWhenIdleMinutes` 0 turns idle stopping off.
-    func setWorkspaceOptions(_ host: HostID, startWhenUsed: Bool? = nil, stopWhenIdleMinutes: Int? = nil,
+    func setWorkspaceOptions(_ host: MachineRef, startWhenUsed: Bool? = nil, stopWhenIdleMinutes: Int? = nil,
                              startForSchedules: Bool? = nil) async {
         await perform(DaemonAPI.Method.hostsSetMachineOptions,
-                      DaemonAPI.HostMachineOptions(host: host, startWhenUsed: startWhenUsed,
+                      DaemonAPI.MachineOptions(host: host, startWhenUsed: startWhenUsed,
                                                      stopWhenIdleMinutes: stopWhenIdleMinutes,
                                                      startForSchedules: startForSchedules))
     }
 
-    func start(_ host: HostID) async {
-        await perform(DaemonAPI.Method.hostsStart, DaemonAPI.HostRequest(host: host))
+    func start(_ host: MachineRef) async {
+        await perform(DaemonAPI.Method.hostsStart, DaemonAPI.MachineRequest(host: host))
     }
 
     /// Stop. Unconfirmed while agents are working there, the control plane says who they are
     /// (US4 AS4), and that is answered for the question; nil once it is stopping or refused.
-    func stop(_ host: HostID, confirmed: Bool = false) async -> [String]? {
+    func stop(_ host: MachineRef, confirmed: Bool = false) async -> [String]? {
         do {
-            _ = try await client.call(DaemonAPI.Method.hostsStop, DaemonAPI.HostStop(host: host, confirmRunning: confirmed ? true : nil))
+            _ = try await client.call(DaemonAPI.Method.hostsStop, DaemonAPI.MachineStop(host: host, confirmRunning: confirmed ? true : nil))
             problem = nil
         } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.agentsWorking {
             let names = error.data?["running"]?.arrayValue?.compactMap(\.stringValue) ?? []
@@ -332,12 +332,12 @@ final class ControlSettingsModel {
     }
 
     /// Delete Machine…: the provider deletes it, then the host goes as Remove does.
-    func deleteMachine(_ host: HostID) async {
-        await perform(DaemonAPI.Method.hostsDeleteMachine, DaemonAPI.HostRequest(host: host))
+    func deleteMachine(_ host: MachineRef) async {
+        await perform(DaemonAPI.Method.hostsDeleteMachine, DaemonAPI.MachineRequest(host: host))
     }
 
     /// Whether the provider a host's workspace is at can delete it.
-    func canDeleteWorkspace(_ host: DaemonAPI.ControlHost) -> Bool {
+    func canDeleteWorkspace(_ host: DaemonAPI.ControlMachine) -> Bool {
         guard let workspace = host.workspace else { return false }
         return providers.first { $0.id == workspace.provider }?.capabilities.contains("delete") == true
     }
@@ -353,13 +353,13 @@ final class ControlSettingsModel {
             guard let host = hosts.first(where: { $0.name == name && $0.workspace == nil }) else { continue }
             linkOnJoin[name] = nil
             _ = try? await client.call(DaemonAPI.Method.hostsLink,
-                                       DaemonAPI.HostLink(host: host.id, provider: wanted.provider, workspace: wanted.workspace))
+                                       DaemonAPI.MachineLink(host: host.id, provider: wanted.provider, workspace: wanted.workspace))
         }
     }
 
     /// The unlinked hosts that may already be `workspace`, added by hand under its ssh alias
     /// (#976): Add as Host… offers to link one instead.
-    func hostsThatMayBe(_ workspace: DaemonAPI.MachineInfo) -> [DaemonAPI.ControlHost] {
+    func hostsThatMayBe(_ workspace: DaemonAPI.MachineInfo) -> [DaemonAPI.ControlMachine] {
         guard workspace.host == nil else { return [] }
         return hosts.filter { $0.workspace == nil && $0.runsAgents && workspace.mayBe(hostNamed: $0.name) }
     }
@@ -403,19 +403,19 @@ final class ControlSettingsModel {
         return true
     }
 
-    func checkAgain(_ host: HostID) async {
-        await perform(DaemonAPI.Method.hostsCheckAgain, DaemonAPI.HostRequest(host: host))
+    func checkAgain(_ host: MachineRef) async {
+        await perform(DaemonAPI.Method.hostsCheckAgain, DaemonAPI.MachineRequest(host: host))
     }
 
-    func remove(_ host: HostID) async {
-        await perform(DaemonAPI.Method.hostsRemove, DaemonAPI.HostRequest(host: host))
+    func remove(_ host: MachineRef) async {
+        await perform(DaemonAPI.Method.hostsRemove, DaemonAPI.MachineRequest(host: host))
     }
 
     /// The step the control plane says an install is at (`control/installProgress`).
     private(set) var installStep: String?
     /// How each server's reverse tunnel stands, by name, as the control plane said it
     /// (`control/tunnelChanged`, #435): before the server has joined, too.
-    private(set) var tunnels: [String: DaemonAPI.HostTunnel] = [:]
+    private(set) var tunnels: [String: DaemonAPI.MachineTunnel] = [:]
 
     enum InstallOutcome: Equatable {
         /// `tunnel`: the server dials the control plane through a reverse tunnel the
@@ -456,7 +456,7 @@ final class ControlSettingsModel {
     /// Update a host over ssh (#1766): its server and key given again, as at its install,
     /// because the control plane keeps neither. The control plane checks the server's root
     /// is this host's, copies its agentsd there, and starts the host again.
-    func update(host: HostID, destination: String, key: String? = nil, trust: String? = nil) async -> InstallOutcome {
+    func update(host: MachineRef, destination: String, key: String? = nil, trust: String? = nil) async -> InstallOutcome {
         installStep = nil
         var params: [String: JSONValue] = ["host": .string(host.rawValue), "destination": .string(destination)]
         if let key { params["key"] = .string(key) }
@@ -474,7 +474,7 @@ final class ControlSettingsModel {
     }
 
     /// The hosts in the control plane's ssh config, or just `destination` as typed, as
-    /// `ssh -G` resolves each (#610): what Add a Server's server box offers. Empty when the
+    /// `ssh -G` resolves each (#610): what Add a Machine's server box offers. Empty when the
     /// control plane cannot say.
     func sshHosts(_ destination: String? = nil) async -> [DaemonAPI.SSHHost] {
         var params: [String: JSONValue] = [:]

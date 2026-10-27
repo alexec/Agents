@@ -11,7 +11,7 @@ struct ConnectGitHubSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
 
-    var host: HostID
+    var host: MachineRef
     /// The folder whose page opened it, for the install step; nil from Connectors.
     var folder: FolderKey?
     var onConnected: () -> Void = {}

@@ -10,11 +10,11 @@ import Testing
 struct SidebarModelTests {
     private let api = URL(filePath: "/tmp/work/api")
     private let web = URL(filePath: "/tmp/work/web")
-    private let devbox = HostID(rawValue: "devbox01")
+    private let devbox = MachineRef(rawValue: "devbox01")
     private let t0 = Date(timeIntervalSince1970: 1_800_000_000)
 
     private func agent(_ folder: URL, _ state: AgentState, _ title: String, at offset: Double,
-                       host: HostID = .mac) -> Agent {
+                       host: MachineRef = .mac) -> Agent {
         var agent = Agent(runtimeID: "claude", cwd: folder, title: title, state: state,
                           lastActivityAt: t0.addingTimeInterval(offset))
         agent.host = host
@@ -22,7 +22,7 @@ struct SidebarModelTests {
         return agent
     }
 
-    private func summary(_ folder: URL, host: HostID = .mac, archived: Int = 0) -> DaemonAPI.FolderSummary {
+    private func summary(_ folder: URL, host: MachineRef = .mac, archived: Int = 0) -> DaemonAPI.FolderSummary {
         var summary = DaemonAPI.FolderSummary(folder: Folder(folder: folder), name: folder.lastPathComponent,
                                                exists: true, lastActivityAt: t0,
                                                counts: archived > 0 ? [.archived: archived] : [:])
@@ -191,8 +191,8 @@ struct SidebarModelTests {
     }
 
     @Test func foldersAreThisMacsThenEachServersInHostOrder() {
-        let gpu = HostID(rawValue: "gpu00001")
-        let stray = HostID(rawValue: "stray001")
+        let gpu = MachineRef(rawValue: "gpu00001")
+        let stray = MachineRef(rawValue: "stray001")
         let listed = [summary(api, host: gpu), summary(web), summary(api, host: devbox), summary(api),
                       summary(web, host: stray)]
         let ordered = SidebarOrder.folders(listed, servers: [devbox, gpu])
@@ -216,7 +216,7 @@ struct SidebarModelTests {
 
     @Test func foldersStayInTheOrderTheyWereAddedHoweverBusy() {
         let docs = URL(filePath: "/tmp/work/docs")
-        func added(_ folder: URL, at offset: Double, active: Double = 0, host: HostID = .mac) -> DaemonAPI.FolderSummary {
+        func added(_ folder: URL, at offset: Double, active: Double = 0, host: MachineRef = .mac) -> DaemonAPI.FolderSummary {
             var summary = DaemonAPI.FolderSummary(
                 folder: Folder(folder: folder, addedAt: t0.addingTimeInterval(offset)),
                 name: folder.lastPathComponent, exists: true, lastActivityAt: t0.addingTimeInterval(active), counts: [:])

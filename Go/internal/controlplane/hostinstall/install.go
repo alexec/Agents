@@ -17,7 +17,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// CodeIssuer is what HostInstall needs of ControlCodes: a one-time host code. url is
+// CodeIssuer is what MachineInstall needs of ControlCodes: a one-time host code. url is
 // the address the code names: "" for the control plane's own, or the server's end of a
 // reverse tunnel (#435). The code's text goes to the server. Its id goes in a
 // TunnelRecord: its spend says which host the tunnel carries.
@@ -41,7 +41,7 @@ type Tunnels interface {
 // TunnelRecord is HostTunnels.Record, stored as v1/tunnels/<id>.json: the tunnels' own.
 type TunnelRecord = hosttunnels.Record
 
-// Installer is HostInstall: hosts/install (058, US4, T072). The control plane installs
+// Installer is MachineInstall: machines/install (058, US4, T072). The control plane installs
 // the host on a server the person can ssh to, once, and lets go.
 //
 //   - A key in the request lives for this call only: written 0600 into a folder of its
@@ -78,17 +78,17 @@ type Installer struct {
 	Progress func(name, step string)
 	// Tunnels may be nil: then a server that wants a tunnel is refused.
 	Tunnels Tunnels
-	// KnownNames are the names of the control plane's hosts, for hosts/detect and
-	// hosts/sshHosts. Nil: none.
+	// KnownNames are the names of the control plane's hosts, for machines/detect and
+	// machines/sshHosts. Nil: none.
 	KnownNames func(ctx context.Context) []string
 }
 
-// Request is HostInstall.Request: the params of hosts/install. Destination is user@host,
+// Request is MachineInstall.Request: the params of machines/install. Destination is user@host,
 // user@host:port, or a name from the ssh config. Key is the private key's text, OpenSSH or
 // PEM (nil or empty: ssh's own choice). Trust is the fingerprint the person was shown and
 // trusts, on the second call. Tunnel says whether the server dials back through an ssh
 // tunnel (#610); nil: when ssh reaches it through a bastion.
-type Request = wire.HostInstall
+type Request = wire.MachineInstall
 
 func (i *Installer) sshExecutable() string {
 	if i.SSH != "" {
@@ -100,7 +100,7 @@ func (i *Installer) sshExecutable() string {
 	return DefaultSSH
 }
 
-// configFile is HostInstall.configFile: -F and a config file, or nothing for the
+// configFile is MachineInstall.configFile: -F and a config file, or nothing for the
 // person's own.
 func (i *Installer) configFile() []string {
 	file := i.ConfigFile
@@ -127,7 +127,7 @@ func (i *Installer) progress(name, step string) {
 	}
 }
 
-// Install is hosts/install: params is a Request. The reply is
+// Install is machines/install: params is a Request. The reply is
 // {"needsTrust": fingerprint, "name"} when the host key must be shown first, or
 // {"started": true, "name", "platform", "tunnel"} once the host has started.
 func (i *Installer) Install(ctx context.Context, params json.RawMessage) (any, error) {
@@ -142,19 +142,19 @@ func (i *Installer) Install(ctx context.Context, params json.RawMessage) (any, e
 	return i.install(ctx, request.Request, false)
 }
 
-// Update is hosts/update (#1766): a host this control plane installed over ssh, updated
+// Update is machines/update (#1766): a host this control plane installed over ssh, updated
 // the same way, with its server and key given again (the control plane keeps neither).
 // The host key is checked as at an install. The server's root must hold this host's own
 // membership, so no other server is touched; then its agentsd, MCP servers and toolsets
 // are copied, and the host starts again with its root, membership and agents as they were.
 // name is the host's, as the control plane knows it. The answer is an install's:
 // {needsTrust, name} for a key to trust first, then {updated: true, name}.
-func (i *Installer) Update(ctx context.Context, update wire.HostUpdate, name string) (any, error) {
+func (i *Installer) Update(ctx context.Context, update wire.MachineUpdate, name string) (any, error) {
 	request := Request{Destination: update.Destination, Key: update.Key, Trust: update.Trust, Name: &name}
 	return i.run(ctx, request, false, string(update.Host))
 }
 
-// CheckAgain is hosts/checkAgain. The Swift control plane does nothing for it
+// CheckAgain is machines/checkAgain. The Swift control plane does nothing for it
 // (ControlMethods' default hook), so neither does this.
 func (i *Installer) CheckAgain(ctx context.Context, host string) error { return nil }
 
@@ -163,7 +163,7 @@ func trimSpaces(s string) string {
 	return strings.TrimFunc(s, func(r rune) bool { return r != '\n' && r != '\r' && unicode.IsSpace(r) })
 }
 
-// install is HostInstall.run. The host key, in order (#610):
+// install is MachineInstall.run. The host key, in order (#610):
 //  1. With no fingerprint to trust, ssh logs in against the person's own known_hosts,
 //     with StrictHostKeyChecking=yes. A key there is the one they trust; a changed one
 //     is refused, as ssh refuses it.
@@ -382,7 +382,7 @@ func (i *Installer) installToolsets(ctx context.Context, server installer, found
 				text = Say(p, true)
 			}
 			if i.Log != nil {
-				i.Log("hosts/install: %s on %s: %s", runtimeName(t.manifest.RuntimeID), name, text)
+				i.Log("machines/install: %s on %s: %s", runtimeName(t.manifest.RuntimeID), name, text)
 			}
 			continue
 		}
@@ -401,7 +401,7 @@ func newID() string {
 	return h[0:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:]
 }
 
-// throughBastion is HostInstall.throughBastion: whether the person's ssh config reaches
+// throughBastion is MachineInstall.throughBastion: whether the person's ssh config reaches
 // this server through another machine. A config ssh cannot read is taken as no bastion.
 func throughBastion(ctx context.Context, ssh sshCommand) bool {
 	out, err := ssh.run(ctx, join(ssh.options, ssh.resolveArguments()), "")
@@ -411,7 +411,7 @@ func throughBastion(ctx context.Context, ssh sshCommand) bool {
 	return throughBastionResolved(out.stdout)
 }
 
-// label is HostInstall.label: agents@devbox.lan:2222 is devbox.lan.
+// label is MachineInstall.label: agents@devbox.lan:2222 is devbox.lan.
 func label(destination string) string {
 	host := destination
 	if at := strings.LastIndex(host, "@"); at >= 0 {
@@ -424,11 +424,11 @@ func label(destination string) string {
 	return host
 }
 
-// sayErrors is HostInstall.sayErrors: over a config's LogLevel quiet, which keeps even
+// sayErrors is MachineInstall.sayErrors: over a config's LogLevel quiet, which keeps even
 // "Host key verification failed" off standard error (#964).
 var sayErrors = []string{"-o", "LogLevel=error"}
 
-// options is HostInstall.options: what ssh is told besides the person's config. The
+// options is MachineInstall.options: what ssh is told besides the person's config. The
 // host key goes into the install's own known_hosts ("" is the person's). A key given
 // is the only one tried; with none, ssh offers what it would for `ssh user@host` (#413).
 func options(keyFile, knownHosts string) []string {
@@ -443,7 +443,7 @@ func options(keyFile, knownHosts string) []string {
 	return append(all, sayErrors...)
 }
 
-// personsKnownHostsOptions is HostInstall.personsKnownHosts: the person's own
+// personsKnownHostsOptions is MachineInstall.personsKnownHosts: the person's own
 // known_hosts, for a server whose ssh config checks against none (#514).
 func personsKnownHostsOptions(ctx context.Context, ssh sshCommand) []string {
 	out, err := ssh.run(ctx, join(ssh.options, ssh.resolveArguments()), "")
@@ -453,7 +453,7 @@ func personsKnownHostsOptions(ctx context.Context, ssh sshCommand) []string {
 	return knownHostsOverride(out.stdout)
 }
 
-// knownHostsOverride is HostInstall.knownHostsOverride: from `ssh -G` output, ssh's
+// knownHostsOverride is MachineInstall.knownHostsOverride: from `ssh -G` output, ssh's
 // default known_hosts files when every one it names is /dev/null, otherwise nothing.
 // Checking a key against /dev/null always fails.
 func knownHostsOverride(resolved string) []string {

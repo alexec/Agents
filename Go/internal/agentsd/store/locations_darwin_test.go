@@ -15,7 +15,7 @@ func TestMacFolders(t *testing.T) {
 		t.Fatalf("another root: %+v", l)
 	}
 	l = macFolders("/tmp/run-x/host", home)
-	if l.Cache != "/tmp/run-x/host/cache" || l.Logs != "/tmp/run-x/host/logs" {
+	if l.Cache != "/tmp/run-x/machine/cache" || l.Logs != "/tmp/run-x/machine/logs" {
 		t.Fatalf("a temporary root: %+v", l)
 	}
 }

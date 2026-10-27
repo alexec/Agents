@@ -122,7 +122,7 @@ nothing.
 3. On a Mac, quit Agents Host and open it again, or wait for its next start. Agents Host
    reads the profile at each start of the machine.
 4. Join as usual: paste a machine code of the pinned control plane in Agents Host, under
-   **Join one elsewhere**. See [Add a server](add-a-server.md) for codes.
+   **Join one elsewhere**. See [Add a machine](add-a-machine.md) for codes.
 
 ## Pin a Linux server
 

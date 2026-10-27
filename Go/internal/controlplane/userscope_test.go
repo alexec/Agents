@@ -15,17 +15,17 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// deliveries is every host/userSettings each machine was told, by machine.
+// deliveries is every machine/userSettings each machine was told, by machine.
 type deliveries struct {
 	mu  sync.Mutex
-	got map[string][]wire.HostUserSettings
+	got map[string][]wire.MachineUserSettings
 }
 
 func (d *deliveries) heard(host, method string, params json.RawMessage) {
-	if method != wire.NotifyHostUserSettings.Name {
+	if method != wire.NotifyMachineUserSettings.Name {
 		return
 	}
-	var u wire.HostUserSettings
+	var u wire.MachineUserSettings
 	json.Unmarshal(params, &u)
 	d.mu.Lock()
 	d.got[host] = append(d.got[host], u)
@@ -33,17 +33,17 @@ func (d *deliveries) heard(host, method string, params json.RawMessage) {
 }
 
 // last is what host was told last, and whether it was told anything.
-func (d *deliveries) last(host string) (wire.HostUserSettings, bool) {
+func (d *deliveries) last(host string) (wire.MachineUserSettings, bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	list := d.got[host]
 	if len(list) == 0 {
-		return wire.HostUserSettings{}, false
+		return wire.MachineUserSettings{}, false
 	}
 	return list[len(list)-1], true
 }
 
-func secretsOf(u wire.HostUserSettings) map[string]string {
+func secretsOf(u wire.MachineUserSettings) map[string]string {
 	out := map[string]string{}
 	for _, s := range u.Secrets {
 		out[string(s.Name)] = s.Value
@@ -51,15 +51,15 @@ func secretsOf(u wire.HostUserSettings) map[string]string {
 	return out
 }
 
-// takingHello is a machine that writes host/userSettings (it serves settings/userPart).
-func takingHello(name string) controllink.HostHello {
+// takingHello is a machine that writes machine/userSettings (it serves settings/userPart).
+func takingHello(name string) controllink.MachineHello {
 	hello := fakeHello(name)
 	hello.Capabilities = append(slices.Clone(hello.Capabilities), CapHostUserSettings)
 	return hello
 }
 
 // notTakingHello is a machine from before #1760.
-func notTakingHello(name string) controllink.HostHello {
+func notTakingHello(name string) controllink.MachineHello {
 	hello := fakeHello(name)
 	hello.Capabilities = slices.DeleteFunc(slices.Clone(hello.Capabilities), func(c string) bool { return c == CapHostUserSettings })
 	return hello
@@ -73,7 +73,7 @@ func TestSettingsAndSecretsGoOnlyToTheirPersonsMachines(t *testing.T) {
 	p := startPlaneWith(t, st, controllink.NewPrivateKey(), func(c *Config) {
 		c.SecretKeeper = "base64key://" + base64.URLEncoding.EncodeToString(key)
 	})
-	told := &deliveries{got: map[string][]wire.HostUserSettings{}}
+	told := &deliveries{got: map[string][]wire.MachineUserSettings{}}
 	p.told = told.heard
 	_, alexWindow := p.client("Alex's Mac")
 	alex := &person{id: p.s.localOwner(), window: alexWindow}
@@ -181,7 +181,7 @@ func TestSettingsAndSecretsGoOnlyToTheirPersonsMachines(t *testing.T) {
 	}
 
 	// Removed, a machine is sent nothing more, and Sam hears what was on it (FR-026).
-	call(t, sam.window, "", "hosts/remove", wire.HostRequest{Host: wire.HostID(next.member.Host)})
+	call(t, sam.window, "", "machines/remove", wire.MachineRequest{Host: wire.MachineRef(next.member.Host)})
 	note := waitNote(t, sam.window, wire.NotifyControlSecretsLeft.Name)
 	var left wire.SecretsLeft
 	json.Unmarshal(note.Params, &left)

@@ -42,7 +42,7 @@ Contract 1 keeps these tool names and the `workspace`/`workspaces` payload field
   `enum` property may have `x-costs`, its values' costs, such as
   `{"s-1vcpu-1gb": "$0.009/hour"}`, which the confirmation shows.
 - **`workspace_create`** takes the name, the chosen `options`, and `firstBoot`: one shell
-  line that installs Agents and joins it as a host, with a host code that works once. It
+  line that installs Agents and joins it as a host, with a join code that works once. It
   ends with the new host's name as its second argument. Run it as the machine's own user on
   its first boot, never with sudo. Answer `firstBootRuns: true` if you will. Otherwise the
   person adds it over its `ssh`, as **Add as Machine…** does.

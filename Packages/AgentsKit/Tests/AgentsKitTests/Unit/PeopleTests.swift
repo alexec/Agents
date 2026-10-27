@@ -32,7 +32,7 @@ struct PeopleTests {
         #expect(PeopleWords.canRemove(sam))
         #expect(PeopleWords.removeMessage(sam) == "Sam can no longer reach the control plane. They have no clients and no machines.")
         sam.clients = [.init(id: UUID(), name: "Sam’s iPhone", kind: .iPhone)]
-        sam.machines = [.init(id: HostID(rawValue: "h1"), name: "studio", state: "offline")]
+        sam.machines = [.init(id: MachineRef(rawValue: "h1"), name: "studio", state: "offline")]
         #expect(PeopleWords.removeMessage(sam)
             == "Sam can no longer reach the control plane. These clients are forgotten: Sam’s iPhone. These machines leave the control plane: studio.")
         #expect(PeopleWords.badges(sam) == "Member")
@@ -42,7 +42,7 @@ struct PeopleTests {
     /// not pushed, and the others leave. It reads as the control plane writes it.
     @Test func removingSaysWhatWorkIsNotPushed() throws {
         var sam = DaemonAPI.PersonRow(id: "sam", name: "Sam", role: .member)
-        sam.machines = [.init(id: HostID(rawValue: "h1"), name: "studio", state: "online")]
+        sam.machines = [.init(id: MachineRef(rawValue: "h1"), name: "studio", state: "online")]
         let line = #"{"startedMachines":[{"host":"w1","name":"sam-ws","state":"online","unpushed":["#
             + #"{"folder":"file:///p","worktree":"file:///p-fix","branch":"agents/fix","ahead":2,"uncommitted":3},"#
             + #"{"folder":"file:///p","worktree":"file:///p-new","unmerged":1}]},"#

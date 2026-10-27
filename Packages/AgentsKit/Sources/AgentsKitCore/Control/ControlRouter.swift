@@ -9,8 +9,8 @@ public protocol ControlHandling: Sendable {
     /// A request from a client for the control plane itself. Any paired client may ask
     /// any of them (#111); a method with a rule of its own keeps it in the handler.
     func handle(method: String, params: JSONValue?, from caller: ControlRouter.Caller) async throws -> JSONValue
-    /// A request on a host's channel 0: `host/hello`, `attention/need`.
-    func hostSaid(_ host: HostID, method: String, params: JSONValue?) async throws -> JSONValue
+    /// A request on a host's channel 0: `machine/hello`, `attention/need`.
+    func hostSaid(_ host: MachineRef, method: String, params: JSONValue?) async throws -> JSONValue
 }
 
 /// The middle of the control plane (058, R3): client sessions on one side, host
@@ -42,15 +42,15 @@ public actor ControlRouter {
     private struct ClientSession {
         var caller: Caller
         var transport: any LineTransport
-        var channels: [HostID: Int] = [:]
+        var channels: [MachineRef: Int] = [:]
         /// Set by the first wrapped line. Until then the client is today's Remote, which
         /// speaks bare JSON-RPC to one daemon: the home host (R7).
         var wrapped = false
         /// Requests sent to each host and not answered yet, so a host that goes answers
         /// them with `hostOffline` rather than leaving the client to wait for ever (#77).
-        var inFlight: [HostID: Set<JSONRPCID>] = [:]
+        var inFlight: [MachineRef: Set<JSONRPCID>] = [:]
         /// Of those, the whole lists whose answer is kept for when the host is offline (#962).
-        var copying: [HostID: [JSONRPCID: String]] = [:]
+        var copying: [MachineRef: [JSONRPCID: String]] = [:]
     }
 
     /// Who a channel on a host's uplink is for: a client session here, or a stream a
@@ -59,7 +59,7 @@ public actor ControlRouter {
         case session(UUID)
         case peer(String, Int)
         /// The other end of a tunnel between two hosts (T091): that host's channel.
-        case tunnel(HostID, Int)
+        case tunnel(MachineRef, Int)
         /// A kept request being delivered (#691 US3), waiting on its reply.
         case kept(UUID)
     }
@@ -79,27 +79,27 @@ public actor ControlRouter {
     }
 
     private let handler: any ControlHandling
-    private var homeHost: HostID?
+    private var homeHost: MachineRef?
     private var clients: [UUID: ClientSession] = [:]
-    private var hosts: [HostID: HostSession] = [:]
-    private var known: Set<HostID>
+    private var hosts: [MachineRef: HostSession] = [:]
+    private var known: Set<MachineRef>
     /// Hosts that only relay (T096), and whether each is relaying now: they carry
     /// devices through iCloud and are given no client channels, only channel 0.
-    private var relays: [HostID: Bool] = [:]
-    private var states: [HostID: HostState] = [:]
+    private var relays: [MachineRef: Bool] = [:]
+    private var states: [MachineRef: HostState] = [:]
     /// A linked host's workspace (#691), laid over its state: a host whose workspace is
     /// stopped is shown stopped, not offline.
-    private var workspaces: [HostID: DaemonAPI.HostMachine] = [:]
+    private var workspaces: [MachineRef: DaemonAPI.MachineWorkspace] = [:]
     /// Keeps a prompt or agent start for a stopped host (#691 US3); nil where nothing is kept.
     private var keeper: (any KeptHandling)?
-    /// Told each host's answer to a whole list (#962), for `hosts/lastHeard`; nil where none is kept.
-    private var copier: (@Sendable (HostID, String, String) -> Void)?
+    /// Told each host's answer to a whole list (#962), for `machines/lastHeard`; nil where none is kept.
+    private var copier: (@Sendable (MachineRef, String, String) -> Void)?
     /// The last keep asked for, so kept requests are stored in the order they came.
     private var keeping: Task<Void, Never>?
     /// Kept requests on their way to a host, by their delivery, until it answers.
     private var keptWaits: [UUID: CheckedContinuation<JSONRPCMessage?, Never>] = [:]
     /// Requests of a host on its channel 0 (#1122), by their id, until it answers.
-    private var hostAsks: [String: (host: HostID, waiting: CheckedContinuation<JSONRPCMessage?, Never>)] = [:]
+    private var hostAsks: [String: (host: MachineRef, waiting: CheckedContinuation<JSONRPCMessage?, Never>)] = [:]
     /// Where each session last said the person was, keyed by the session, or by the client for
     /// a report made at another copy. Folded per surface, so a client with two sockets (two tabs
     /// of one browser, 071 R11) is active while either is: one record per client let the last
@@ -125,7 +125,7 @@ public actor ControlRouter {
         var mayNotify: Bool?
     }
 
-    public init(handler: any ControlHandling, knownHosts: [HostID] = [], homeHost: HostID? = nil) {
+    public init(handler: any ControlHandling, knownHosts: [MachineRef] = [], homeHost: MachineRef? = nil) {
         self.handler = handler
         self.known = Set(knownHosts)
         self.homeHost = homeHost
@@ -134,16 +134,16 @@ public actor ControlRouter {
 
     // MARK: What it knows
 
-    public func setHomeHost(_ host: HostID?) { homeHost = host }
+    public func setHomeHost(_ host: MachineRef?) { homeHost = host }
 
-    public func state(of host: HostID) -> HostState? { states[host] }
+    public func state(of host: MachineRef) -> HostState? { states[host] }
 
-    public var hostStates: [HostID: HostState] { states }
+    public var hostStates: [MachineRef: HostState] { states }
 
     public var sessionCount: Int { clients.count }
 
     /// How many calls to `host` are waiting on an answer, across every session.
-    public func inFlight(of host: HostID) -> Int {
+    public func inFlight(of host: MachineRef) -> Int {
         clients.values.reduce(0) { $0 + ($1.inFlight[host]?.count ?? 0) }
     }
 
@@ -200,16 +200,16 @@ public actor ControlRouter {
     }
 
     /// The channels open on a host's uplink, for tests and for Settings.
-    public func channels(of host: HostID) -> [Int] {
+    public func channels(of host: MachineRef) -> [Int] {
         hosts[host].map { Array($0.channels.keys).sorted() } ?? []
     }
 
     /// Whether this copy holds the host's real uplink, as against a stream to the copy
     /// that does.
-    public func holds(_ host: HostID) -> Bool { hosts[host]?.local == true }
+    public func holds(_ host: MachineRef) -> Bool { hosts[host]?.local == true }
 
     /// Whether the host is reachable from here at all, directly or through a peer.
-    public func reaches(_ host: HostID) -> Bool { hosts[host] != nil }
+    public func reaches(_ host: MachineRef) -> Bool { hosts[host] != nil }
 
     /// Every client with a session here, for the backstop that catches a forget another
     /// copy made while its event was missed (T066).
@@ -221,14 +221,14 @@ public actor ControlRouter {
 
     /// A host enrolled with the control plane (online or not). Calls naming one that is
     /// not known are refused as `noSuchHost`, not `hostOffline`.
-    public func know(_ host: HostID) {
+    public func know(_ host: MachineRef) {
         guard known.insert(host).inserted else { return }
         states[host] = .offline(since: Date())
     }
 
     /// Removing a host (FR-014): its uplink closes and it is forgotten. Its agents are
     /// left as they are.
-    public func forgetHost(_ host: HostID) {
+    public func forgetHost(_ host: MachineRef) {
         dropHost(host, generation: nil, newState: nil)
         known.remove(host)
         states[host] = nil
@@ -241,7 +241,7 @@ public actor ControlRouter {
     /// holds it. Opens a channel to it for every client session, then reads it until it
     /// ends. A proxied stream that ends leaves the state alone: the host has usually moved,
     /// and is shown offline only if nobody holds it again soon (wire.md, `gone`).
-    public func attachHost(_ host: HostID, transport: any LineTransport, local: Bool = true) {
+    public func attachHost(_ host: MachineRef, transport: any LineTransport, local: Bool = true) {
         if hosts[host] != nil { dropHost(host, generation: nil, newState: nil) }
         known.insert(host)
         let generation = UUID()
@@ -265,26 +265,26 @@ public actor ControlRouter {
         }
     }
 
-    private func isCurrent(_ host: HostID, _ generation: UUID) -> Bool { hosts[host]?.generation == generation }
+    private func isCurrent(_ host: MachineRef, _ generation: UUID) -> Bool { hosts[host]?.generation == generation }
 
     /// Told when a host's real uplink here ends, so its lease is let go (T063).
-    private var localEnded: (@Sendable (HostID) async -> Void)?
-    public func onLocalHostEnded(_ ended: @escaping @Sendable (HostID) async -> Void) { localEnded = ended }
+    private var localEnded: (@Sendable (MachineRef) async -> Void)?
+    public func onLocalHostEnded(_ ended: @escaping @Sendable (MachineRef) async -> Void) { localEnded = ended }
 
     /// Closes a host's real uplink here: its lease went to another copy. The host redials.
-    public func closeLocal(_ host: HostID) {
+    public func closeLocal(_ host: MachineRef) {
         guard hosts[host]?.local == true else { return }
         dropHost(host, generation: nil, newState: nil)
     }
 
     /// Ends whatever this copy has for `host`, saying nothing yet: another copy is taking
     /// it over. Shown offline only if nothing is back within `grace`.
-    public func dropQuietly(_ host: HostID, grace: Duration = .seconds(5)) {
+    public func dropQuietly(_ host: MachineRef, grace: Duration = .seconds(5)) {
         dropHost(host, generation: nil, newState: nil)
         Task { [weak self] in await self?.offlineUnlessBack(host, after: grace) }
     }
 
-    private func offlineUnlessBack(_ host: HostID, after grace: Duration) async {
+    private func offlineUnlessBack(_ host: MachineRef, after grace: Duration) async {
         try? await Task.sleep(for: grace)
         if hosts[host] == nil, known.contains(host), states[host]?.isOnline == true {
             setState(.offline(since: Date()), of: host)
@@ -313,7 +313,7 @@ public actor ControlRouter {
     }
 
     /// A peer opens a stream to a host held here: a fresh channel on the real uplink.
-    public func openFromPeer(_ peer: String, host: HostID, channel: Int, _ open: ControlWire.ChannelOpen) {
+    public func openFromPeer(_ peer: String, host: MachineRef, channel: Int, _ open: ControlWire.ChannelOpen) {
         guard relays[host] == nil, var session = hosts[host], session.local else {
             peers[peer]?(PeerWire.frame(host, ControlWire.close(channel)))
             return
@@ -336,7 +336,7 @@ public actor ControlRouter {
     }
 
     /// A message on a peer's stream, for the host.
-    public func fromPeer(_ peer: String, host: HostID, channel: Int, message: String) {
+    public func fromPeer(_ peer: String, host: MachineRef, channel: Int, message: String) {
         guard let session = hosts[host], session.local, let mine = session.proxied[.peer(peer, channel)] else {
             peers[peer]?(PeerWire.frame(host, ControlWire.close(channel)))
             return
@@ -345,19 +345,19 @@ public actor ControlRouter {
     }
 
     /// The peer closed its stream.
-    public func closeFromPeer(_ peer: String, host: HostID, channel: Int) {
+    public func closeFromPeer(_ peer: String, host: MachineRef, channel: Int) {
         guard let mine = hosts[host]?.proxied[.peer(peer, channel)] else { return }
         closeHostChannel(mine, on: host)
     }
 
-    private func closeHostChannel(_ channel: Int, on host: HostID) {
+    private func closeHostChannel(_ channel: Int, on host: MachineRef) {
         guard var session = hosts[host], let target = session.channels.removeValue(forKey: channel) else { return }
         session.proxied[target] = nil
         hosts[host] = session
         try? session.transport.write(line: ControlWire.close(channel))
     }
 
-    public func setState(_ state: HostState, of host: HostID) {
+    public func setState(_ state: HostState, of host: MachineRef) {
         guard states[host] != state else { return }
         states[host] = state
         broadcastControl(DaemonAPI.Notification.controlHostChanged, described(host, state))
@@ -365,11 +365,11 @@ public actor ControlRouter {
 
     // MARK: Workspaces (#691)
 
-    public func workspace(of host: HostID) -> DaemonAPI.HostMachine? { workspaces[host] }
+    public func workspace(of host: MachineRef) -> DaemonAPI.MachineWorkspace? { workspaces[host] }
 
     /// A linked host's workspace changed (its state, a start's phase), or the link went: said
     /// to every client when it differs.
-    public func setWorkspace(_ workspace: DaemonAPI.HostMachine?, of host: HostID) {
+    public func setWorkspace(_ workspace: DaemonAPI.MachineWorkspace?, of host: MachineRef) {
         guard workspaces[host] != workspace else { return }
         workspaces[host] = workspace
         guard known.contains(host) else { return }
@@ -379,7 +379,7 @@ public actor ControlRouter {
 
     /// `describe`, with the host's workspace laid over it: its `hostState` names the state
     /// while the host isn't online (`stopping` whatever it is), and the workspace rides along.
-    public func described(_ host: HostID, _ state: HostState) -> JSONValue {
+    public func described(_ host: MachineRef, _ state: HostState) -> JSONValue {
         let plain = Self.describe(host, state)
         guard let workspace = workspaces[host], var params = plain.objectValue else { return plain }
         if let shown = workspace.hostState, shown == "stopping" || !state.isOnline {
@@ -389,7 +389,7 @@ public actor ControlRouter {
         return .object(params)
     }
 
-    private func dropHost(_ host: HostID, generation: UUID?, newState: HostState?) {
+    private func dropHost(_ host: MachineRef, generation: UUID?, newState: HostState?) {
         guard let session = hosts[host], generation == nil || session.generation == generation else { return }
         hosts[host] = nil
         session.transport.close()
@@ -532,7 +532,7 @@ public actor ControlRouter {
         return nil
     }
 
-    private func hostLine(_ line: String, from host: HostID) async {
+    private func hostLine(_ line: String, from host: MachineRef) async {
         guard let frame = try? ControlWire.readHost(line) else { return }
         switch frame {
         case .message(0, let message):
@@ -604,7 +604,7 @@ public actor ControlRouter {
     /// one's client, wrapped once for them all. Only notifications come this way, so there
     /// is no reply in it to look for. A client whose transport has given up on it (too far
     /// behind) is detached by `write`, and reconnects to read everything afresh.
-    private func fanOut(_ message: String, to channels: [Int], from host: HostID) {
+    private func fanOut(_ message: String, to channels: [Int], from host: MachineRef) {
         guard let session = hosts[host] else { return }
         var wrapped: String?
         for channel in channels {
@@ -626,7 +626,7 @@ public actor ControlRouter {
         }
     }
 
-    private func channelZero(_ message: String, from host: HostID) async {
+    private func channelZero(_ message: String, from host: MachineRef) async {
         guard let decoded = try? JSONRPCCodec.decode(line: message) else { return }
         switch decoded {
         case .success(.string(let id), _), .failure(.string(let id)?, _):
@@ -739,7 +739,7 @@ public actor ControlRouter {
         for id in sessions(of: client) { detachClient(id, closing: Self.forgottenCloseCode) }
     }
 
-    private func openChannel(for sessionID: UUID, to host: HostID) {
+    private func openChannel(for sessionID: UUID, to host: MachineRef) {
         guard relays[host] == nil, var hostSession = hosts[host], let caller = clients[sessionID]?.caller else { return }
         let channel = hostSession.nextChannel
         hostSession.nextChannel += 1
@@ -781,7 +781,7 @@ public actor ControlRouter {
         }
     }
 
-    private func toHost(_ host: HostID, _ message: String, from sessionID: UUID) {
+    private func toHost(_ host: MachineRef, _ message: String, from sessionID: UUID) {
         guard let session = clients[sessionID] else { return }
         let wrapped = session.wrapped
         let decoded = try? JSONRPCCodec.decode(line: message)
@@ -836,7 +836,7 @@ public actor ControlRouter {
         guard let caller = clients[sessionID]?.caller,
               case .request(let id, let method, let params)? = try? JSONRPCCodec.decode(line: message) else { return }
         let handler = self.handler
-        // Its own task: `hosts/install` takes minutes, and nothing else this client says
+        // Its own task: `machines/install` takes minutes, and nothing else this client says
         // may wait behind it.
         Task.detached { [weak self] in
             let reply: JSONRPCMessage
@@ -860,7 +860,7 @@ public actor ControlRouter {
         WireLog.write("control: unreadable line from client \(sessionID) (\(error)): \(WireLog.excerpt(line))")
         guard let session = clients[sessionID] else { return }
         let object = try? JSONValue.parse(Data(line.utf8)).objectValue
-        let host = object?["h"]?.stringValue.flatMap { ControlWire.isHostID($0) ? HostID(rawValue: $0) : nil }
+        let host = object?["h"]?.stringValue.flatMap { ControlWire.isHostID($0) ? MachineRef(rawValue: $0) : nil }
         let wrapped = session.wrapped || object?["m"] != nil || object?["h"] != nil
         let failure = JSONRPCError(code: JSONRPCError.parseError, message: "The control plane could not read that message.")
         guard let reply = try? JSONRPCCodec.encode(.failure(id: nil, error: failure)) else { return }
@@ -869,7 +869,7 @@ public actor ControlRouter {
 
     /// What a request for a host that isn't up is answered with: a host whose workspace is
     /// stopped says so, and that it can be started (FR-022).
-    private func offlineRefusal(_ host: HostID) -> JSONRPCError {
+    private func offlineRefusal(_ host: MachineRef) -> JSONRPCError {
         if workspaces[host]?.hostState == "stopped" {
             return JSONRPCError(code: DaemonAPI.Failure.hostOffline,
                                 message: "That machine is stopped. Start it to reach it.")
@@ -882,13 +882,13 @@ public actor ControlRouter {
     public func setKeeper(_ keeper: (any KeptHandling)?) { self.keeper = keeper }
 
     /// Where each host's answer to a whole list goes (#962): `(host, method, the reply line)`.
-    public func setCopier(_ copier: (@Sendable (HostID, String, String) -> Void)?) { self.copier = copier }
+    public func setCopier(_ copier: (@Sendable (MachineRef, String, String) -> Void)?) { self.copier = copier }
 
     /// Sends a kept request to a host on a channel of its own, bound to the client that
     /// asked, and waits for its reply. Nil when the host isn't here, goes before it answers,
     /// or takes longer than `patience`: the request stays kept.
     public func deliverKept(_ method: String, params: JSONValue?, as client: UUID, kind: ClientRecord.Kind,
-                            to host: HostID, patience: Duration = .seconds(60)) async -> JSONRPCMessage? {
+                            to host: MachineRef, patience: Duration = .seconds(60)) async -> JSONRPCMessage? {
         guard relays[host] == nil, var session = hosts[host] else { return nil }
         let delivery = UUID()
         let channel = session.nextChannel
@@ -912,7 +912,7 @@ public actor ControlRouter {
         return reply
     }
 
-    private func endKept(_ delivery: UUID, channel: Int, on host: HostID, reply: JSONRPCMessage?) {
+    private func endKept(_ delivery: UUID, channel: Int, on host: MachineRef, reply: JSONRPCMessage?) {
         guard let waiting = keptWaits.removeValue(forKey: delivery) else { return }
         if hosts[host]?.channels.removeValue(forKey: channel) != nil {
             try? hosts[host]?.transport.write(line: ControlWire.close(channel))
@@ -920,7 +920,7 @@ public actor ControlRouter {
         waiting.resume(returning: reply)
     }
 
-    private func reply(to sessionID: UUID, host: HostID?, id: JSONRPCID, wrapped: Bool, error: JSONRPCError) {
+    private func reply(to sessionID: UUID, host: MachineRef?, id: JSONRPCID, wrapped: Bool, error: JSONRPCError) {
         guard let line = try? JSONRPCCodec.encode(.failure(id: id, error: error)) else { return }
         write(wrapped ? ControlWire.wrap(host: host, message: line) : line, to: sessionID)
     }
@@ -935,7 +935,7 @@ public actor ControlRouter {
     /// A request of a host on its channel 0, which only the control plane writes, and its
     /// reply. Nil when the host isn't here, goes before it answers, or takes longer than
     /// `patience`.
-    public func ask(_ host: HostID, _ method: String, params: JSONValue?, patience: Duration = .seconds(30)) async -> JSONRPCMessage? {
+    public func ask(_ host: MachineRef, _ method: String, params: JSONValue?, patience: Duration = .seconds(30)) async -> JSONRPCMessage? {
         guard let session = hosts[host], session.local else { return nil }
         let id = "ask-" + UUID().uuidString
         guard let line = try? JSONRPCCodec.encode(.request(id: .string(id), method: method, params: params)) else { return nil }
@@ -960,7 +960,7 @@ public actor ControlRouter {
     /// untouched. For a sign-in `lender` relays to `borrower`, which asked with `ref`. Either
     /// end closing, or either host going, closes both. False when either host is not here.
     @discardableResult
-    public func openTunnel(borrower: HostID, lender: HostID, runtime: String, ref: String) -> Bool {
+    public func openTunnel(borrower: MachineRef, lender: MachineRef, runtime: String, ref: String) -> Bool {
         guard borrower != lender, var near = hosts[borrower], var far = hosts[lender] else { return false }
         let nearChannel = near.nextChannel
         near.nextChannel += 1
@@ -978,9 +978,9 @@ public actor ControlRouter {
     }
 
     /// The tunnels open now, as (borrower, lender) pairs: for tests.
-    public func tunnels() -> [(HostID, HostID)] {
+    public func tunnels() -> [(MachineRef, MachineRef)] {
         hosts.flatMap { host, session in
-            session.channels.values.compactMap { target -> (HostID, HostID)? in
+            session.channels.values.compactMap { target -> (MachineRef, MachineRef)? in
                 guard case .tunnel(let other, _) = target else { return nil }
                 return (host, other)
             }
@@ -989,10 +989,10 @@ public actor ControlRouter {
 
     // MARK: Relay hosts (T096–T097)
 
-    /// Whether a host only relays (`HostRecord.relay`): nil for a host that runs agents,
+    /// Whether a host only relays (`MachineRecord.relay`): nil for a host that runs agents,
     /// false for a relay switched off, true for one relaying. A host found to be a relay
     /// has its client channels closed.
-    public func setRelay(_ host: HostID, _ relay: Bool?) {
+    public func setRelay(_ host: MachineRef, _ relay: Bool?) {
         guard let relay else {
             guard relays.removeValue(forKey: host) != nil else { return }
             for sessionID in clients.keys { openChannel(for: sessionID, to: host) }
@@ -1009,16 +1009,16 @@ public actor ControlRouter {
     }
 
     /// A relaying host whose uplink ends at this copy, if there is one online.
-    public func relayHeldHere() -> HostID? { relaysHeldHere().first }
+    public func relayHeldHere() -> MachineRef? { relaysHeldHere().first }
 
     /// Relaying hosts whose uplinks end here.
-    public func relaysHeldHere() -> [HostID] {
+    public func relaysHeldHere() -> [MachineRef] {
         relays.filter { $0.value && hosts[$0.key]?.local == true }.keys.sorted { $0.rawValue < $1.rawValue }
     }
 
     /// A notification on a host's channel 0, when its uplink ends here.
     @discardableResult
-    public func tell(_ host: HostID, _ method: String, _ params: JSONValue) -> Bool {
+    public func tell(_ host: MachineRef, _ method: String, _ params: JSONValue) -> Bool {
         guard let session = hosts[host], session.local,
               let line = try? JSONRPCCodec.encode(.notification(method: method, params: params)) else { return false }
         do {
@@ -1052,7 +1052,7 @@ public actor ControlRouter {
     /// Whether a client session is still here.
     public func hasSession(_ sessionID: UUID) -> Bool { clients[sessionID] != nil }
 
-    public static func describe(_ host: HostID, _ state: HostState) -> JSONValue {
+    public static func describe(_ host: MachineRef, _ state: HostState) -> JSONValue {
         var params: [String: JSONValue] = ["host": .string(host.rawValue)]
         switch state {
         case .online: params["state"] = "online"

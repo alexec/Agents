@@ -35,7 +35,7 @@ Nothing here needs doing; it is for understanding.
   plane work together at different versions, and what a version number means.
 - [Connector levels](connector-levels.md): what Tools, Events, Views, Workflows and Tested
   mean, why they exist, and where the connectors that Agents makes come from.
-- [Folders, hosts and worktrees](folders-hosts-worktrees.md): a folder is a directory on
+- [Folders, hosts and worktrees](folders-machines-worktrees.md): a folder is a directory on
   one machine, and an agent can have a worktree of its own.
 - [Leases on shared resources](leases.md): how agents take turns with the screen, a
   browser or a simulator, and what you can end.

@@ -58,7 +58,7 @@ func TestAPageThroughThisHost(t *testing.T) {
 		t.Fatal(err)
 	}
 	hostCode, _ := controllink.ParseCode(shown.Text)
-	hello := controllink.HostHello{Version: "test", Platform: "Linux arm64", MachineID: "PAGE-TEST"}
+	hello := controllink.MachineHello{Version: "test", Platform: "Linux arm64", MachineID: "PAGE-TEST"}
 	member, err := controllink.Enroll(ctx, root, hostCode, private, hello)
 	if err != nil {
 		t.Fatal(err)

@@ -188,7 +188,7 @@ func TestTheSweepRemovesOrphans(t *testing.T) {
 	s := store.NewMemory()
 	rs := records.New(s)
 	now := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
-	if err := rs.SaveHost(ctx, records.HostRecord{ID: "KNOWN", Name: "known"}); err != nil {
+	if err := rs.SaveHost(ctx, records.MachineRecord{ID: "KNOWN", Name: "known"}); err != nil {
 		t.Fatal(err)
 	}
 	lease := func(host string, expires time.Time) {
@@ -275,7 +275,7 @@ func TestTheSweepListsOnlyTheExpiredDays(t *testing.T) {
 	}
 }
 
-// A window's whole lists of a host are kept, and said by hosts/lastHeard while the host
+// A window's whole lists of a host are kept, and said by machines/lastHeard while the host
 // is offline (#962); a narrowed list is not.
 func TestWhatAHostLastListedIsKept(t *testing.T) {
 	t.Parallel()
@@ -290,7 +290,7 @@ func TestWhatAHostLastListedIsKept(t *testing.T) {
 	}, "the copy kept")
 	box.stop()
 	var heard map[string]json.RawMessage
-	json.Unmarshal(call(t, window, "", "hosts/lastHeard", map[string]string{"host": box.member.Host}), &heard)
+	json.Unmarshal(call(t, window, "", "machines/lastHeard", map[string]string{"host": box.member.Host}), &heard)
 	if string(heard["agents"]) != "[]" || heard["heardAt"] == nil || heard["folders"] != nil {
 		t.Fatalf("%s", heard)
 	}
@@ -298,11 +298,11 @@ func TestWhatAHostLastListedIsKept(t *testing.T) {
 		t.Fatal("keeps the wrong lists")
 	}
 	// A removed host's copy goes.
-	call(t, window, "", "hosts/remove", map[string]string{"host": box.member.Host})
+	call(t, window, "", "machines/remove", map[string]string{"host": box.member.Host})
 	if o, _ := p.store.Get(context.Background(), copyKey(box.member.Host)); o != nil {
 		t.Fatal("the copy stayed")
 	}
-	if e := callError(t, window, "", "hosts/lastHeard", map[string]string{"host": box.member.Host}); !strings.Contains(e, "-32091") {
+	if e := callError(t, window, "", "machines/lastHeard", map[string]string{"host": box.member.Host}); !strings.Contains(e, "-32091") {
 		t.Fatal(e)
 	}
 }

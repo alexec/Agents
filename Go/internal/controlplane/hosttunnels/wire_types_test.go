@@ -13,7 +13,7 @@ var update = flag.Bool("update", false, "write testdata/wire-types.golden from t
 // unchanged (#1313).
 func TestWireTypesKeepTheirBytes(t *testing.T) {
 	wiretest.Check(t, "testdata/wire-types.golden", wiretest.Types{
-		"HostTunnel":        func() any { return new(Tunnel) },
-		"HostTunnelChanged": func() any { return new(Changed) },
+		"MachineTunnel":        func() any { return new(Tunnel) },
+		"MachineTunnelChanged": func() any { return new(Changed) },
 	}, *update)
 }

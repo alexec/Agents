@@ -140,7 +140,7 @@ func TestTheExchangeBothWays(t *testing.T) {
 	if err != nil || id != (Identity{'h', "box-1"}) {
 		t.Fatal(id, err)
 	}
-	okLine := Message{OK: &OK{Mac: B64URL(mac), Host: new(wire.HostID("box-1"))}}.Line()
+	okLine := Message{OK: &OK{Mac: B64URL(mac), Host: new(wire.MachineRef("box-1"))}}.Line()
 	if okLine != `{"ok":{"mac":"`+B64URL(mac)+`","host":"box-1"}}` {
 		t.Fatal(okLine)
 	}

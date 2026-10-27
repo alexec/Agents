@@ -36,7 +36,7 @@ struct VersionsSettingsSection: View {
         .paperListRow()
     }
 
-    private func versionWords(_ host: DaemonAPI.ControlHost) -> String {
+    private func versionWords(_ host: DaemonAPI.ControlMachine) -> String {
         let version = UpdateWords.version(host)
         return host.state == "online" ? version : "\(UpdateWords.state(host)) · \(version)"
     }

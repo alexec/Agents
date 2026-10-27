@@ -138,7 +138,7 @@ public struct ClientRecord: Codable, Hashable, Sendable, Identifiable {
 /// own (FR-010). Hosts the control plane reached over ssh are gone (058, T073); a record
 /// that still says so is read as a host that dials out, which it becomes when it next
 /// installs.
-public enum HostReach: Codable, Hashable, Sendable {
+public enum MachineReach: Codable, Hashable, Sendable {
     case dialOut
 
     private enum Keys: String, CodingKey { case dialOut }
@@ -152,30 +152,30 @@ public enum HostReach: Codable, Hashable, Sendable {
 }
 
 /// A machine that runs agents. `hosts.json` under the control root.
-public struct HostRecord: Codable, Hashable, Sendable, Identifiable {
+public struct MachineRecord: Codable, Hashable, Sendable, Identifiable {
     /// `mac` for the host a set-up was moved from (R7, R11), so what was saved against it
-    /// still finds it; otherwise made by `HostID.make`.
-    public var id: HostID
+    /// still finds it; otherwise made by `MachineRef.make`.
+    public var id: MachineRef
     public var name: String
     /// For a host that connects out; its PSK is derived from it with "agents-host-v1".
     public var publicKey: Data?
-    public var reach: HostReach
+    public var reach: MachineReach
     public var platform: String
     public var version: String
-    /// Whether `hosts/install` put it there, so removing it can offer to take it away.
+    /// Whether `machines/install` put it there, so removing it can offer to take it away.
     public var installed: Bool
     /// The machine it runs on, so a window can tell a host on its own Mac (R11).
     public var machineID: String?
     /// A macOS host that runs the iCloud relay and mailbox for its person's devices (R10):
     /// `agents-relay`, which runs no agents. Nil for any other host; false while switched
-    /// off with `hosts/setRelay`.
+    /// off with `machines/setRelay`.
     public var relay: Bool?
     /// The hosts whose sign-in this host may use, by runtime, relayed through the control
     /// plane (058, T091): an operator said yes to each.
-    public var signInFrom: [String: HostID]?
+    public var signInFrom: [String: MachineRef]?
     /// The hosts whose git access this host may use, by git server (`github.com`), lent
     /// through the control plane (#1122): an operator said yes to each.
-    public var gitFrom: [String: HostID]?
+    public var gitFrom: [String: MachineRef]?
     public var owner: PersonID?
     /// As `ClientRecord.rev`.
     public var rev: Int
@@ -191,10 +191,10 @@ public struct HostRecord: Codable, Hashable, Sendable, Identifiable {
     /// The provider's workspace this host runs on, which the control plane can start and stop
     /// (#691). Nil for a host nothing can start.
     public var workspace: WorkspaceLink?
-    /// `swift` or `go`, as the host last said in `host/hello` (#1134). Nil until it says.
+    /// `swift` or `go`, as the host last said in `machine/hello` (#1134). Nil until it says.
     public var implementation: String?
 
-    public init(id: HostID, name: String, publicKey: Data? = nil, reach: HostReach = .dialOut,
+    public init(id: MachineRef, name: String, publicKey: Data? = nil, reach: MachineReach = .dialOut,
                 platform: String = "", version: String = "", installed: Bool = false,
                 machineID: String? = nil, relay: Bool? = nil, owner: PersonID? = nil,
                 rev: Int = 0, forgotten: Bool? = nil) {
@@ -257,7 +257,7 @@ public struct ControlSettings: Codable, Hashable, Sendable {
     public var name: String
     public var port: Int
     /// The host on the same machine. A legacy client's bare lines go there.
-    public var homeHost: HostID?
+    public var homeHost: MachineRef?
     public var machineID: String
     /// The one address clients and hosts are given (R8), and the pin of its certificate
     /// when that is not publicly trusted (R6). Absent on the first build's control plane.
@@ -275,7 +275,7 @@ public struct ControlSettings: Codable, Hashable, Sendable {
     /// Where a host added from now on has its folders found (#429). Nil: the default.
     public var folderDetection: FolderDetection?
 
-    public init(name: String, port: Int = 8790, homeHost: HostID? = nil, machineID: String,
+    public init(name: String, port: Int = 8790, homeHost: MachineRef? = nil, machineID: String,
                 url: String? = nil, pin: String? = nil, controlKey: Data? = nil,
                 owner: PersonID? = nil, created: Date? = nil) {
         self.name = name
@@ -332,12 +332,12 @@ public struct Person: Codable, Hashable, Sendable {
 
 /// `leases/<host>.json`: which copy holds a host's uplink (R5, data-model.md "Lease").
 public struct HostLease: Codable, Hashable, Sendable {
-    public var host: HostID
+    public var host: MachineRef
     public var copy: String
     /// Bumped on every takeover, so a lease never repeats its bytes (rule 10).
     public var epoch: Int
     public var expires: Date
-    public init(host: HostID, copy: String, epoch: Int, expires: Date) {
+    public init(host: MachineRef, copy: String, epoch: Int, expires: Date) {
         self.host = host
         self.copy = copy
         self.epoch = epoch

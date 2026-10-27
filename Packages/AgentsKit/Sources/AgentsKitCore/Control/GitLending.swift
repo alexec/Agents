@@ -5,14 +5,14 @@ import Foundation
 /// person said yes for that host and git server. The credential is used for one git
 /// command and kept nowhere.
 public extension DaemonAPI {
-    /// `hosts/lendGit`.
+    /// `machines/lendGit`.
     struct LendGit: Codable, Sendable, Hashable {
-        public var host: HostID
-        public var from: HostID
+        public var host: MachineRef
+        public var from: MachineRef
         /// The git server, as git names it: `github.com`, or `git.example.com:8443`.
         public var server: String
         public var allowed: Bool
-        public init(host: HostID, from: HostID, server: String, allowed: Bool) {
+        public init(host: MachineRef, from: MachineRef, server: String, allowed: Bool) {
             self.host = host
             self.from = from
             self.server = server
@@ -20,11 +20,11 @@ public extension DaemonAPI {
         }
     }
 
-    /// One ask on a `hosts/list` row: the host's git wants `from`'s git access for `server`.
+    /// One ask on a `machines/list` row: the host's git wants `from`'s git access for `server`.
     struct GitAsk: Codable, Sendable, Hashable {
         public var server: String
-        public var from: HostID
-        public init(server: String, from: HostID) {
+        public var from: MachineRef
+        public init(server: String, from: MachineRef) {
             self.server = server
             self.from = from
         }
@@ -107,7 +107,7 @@ public enum GitLendWords {
     }
 
     /// "Uses this Mac’s git access for github.com", for a host's row; nil when it uses none.
-    public static func uses(_ row: DaemonAPI.ControlHost, name: (HostID) -> String?) -> String? {
+    public static func uses(_ row: DaemonAPI.ControlMachine, name: (MachineRef) -> String?) -> String? {
         guard let lent = row.gitFrom, !lent.isEmpty else { return nil }
         let byLender = Dictionary(grouping: lent.keys.sorted()) { lent[$0]! }
         return byLender.keys.sorted { $0.rawValue < $1.rawValue }.map { lender in
@@ -121,10 +121,10 @@ public enum GitLendWords {
 
 /// A host's git asking to use a Mac's git access (#1122), as a client shows it.
 public struct GitLendAsk: Identifiable, Equatable, Sendable {
-    public let host: HostID
+    public let host: MachineRef
     public let hostName: String
     public let server: String
-    public let from: HostID
+    public let from: MachineRef
     /// Nil when the lender is the Mac this client is on.
     public let lenderName: String?
     public var id: String { Self.id(host, server) }
@@ -132,10 +132,10 @@ public struct GitLendAsk: Identifiable, Equatable, Sendable {
     public var title: String { GitLendWords.title(host: hostName, lender: lenderName, server: server) }
     public var message: String { GitLendWords.message(host: hostName, lender: lenderName, server: server) }
 
-    public static func id(_ host: HostID, _ server: String) -> String { "\(host.rawValue) \(server)" }
+    public static func id(_ host: MachineRef, _ server: String) -> String { "\(host.rawValue) \(server)" }
 
     /// The first ask on `rows` not answered here yet.
-    public static func first(in rows: [DaemonAPI.ControlHost], thisMac: HostID?, answered: Set<String>) -> GitLendAsk? {
+    public static func first(in rows: [DaemonAPI.ControlMachine], thisMac: MachineRef?, answered: Set<String>) -> GitLendAsk? {
         for row in rows {
             for ask in row.gitAsks ?? [] where !answered.contains(id(row.id, ask.server)) {
                 let lender = ask.from == thisMac ? nil : (rows.first { $0.id == ask.from }?.name ?? ask.from.rawValue)
@@ -146,12 +146,12 @@ public struct GitLendAsk: Identifiable, Equatable, Sendable {
     }
 
     /// Every ask still waiting on `rows`: an answered one no longer here may be asked again.
-    public static func waiting(in rows: [DaemonAPI.ControlHost]) -> Set<String> {
+    public static func waiting(in rows: [DaemonAPI.ControlMachine]) -> Set<String> {
         Set(rows.flatMap { row in (row.gitAsks ?? []).map { id(row.id, $0.server) } })
     }
 
     /// Every lend on `rows`, for a list with Revoke.
-    public static func lends(in rows: [DaemonAPI.ControlHost]) -> [GitLend] {
+    public static func lends(in rows: [DaemonAPI.ControlMachine]) -> [GitLend] {
         rows.flatMap { row in
             (row.gitFrom ?? [:]).keys.sorted().map { server in
                 let from = row.gitFrom![server]!
@@ -164,10 +164,10 @@ public struct GitLendAsk: Identifiable, Equatable, Sendable {
 
 /// A host using a Mac's git access for one git server (#1122).
 public struct GitLend: Identifiable, Equatable, Sendable {
-    public let host: HostID
+    public let host: MachineRef
     public let hostName: String
     public let server: String
-    public let from: HostID
+    public let from: MachineRef
     public let lenderName: String
     public var id: String { GitLendAsk.id(host, server) }
 }

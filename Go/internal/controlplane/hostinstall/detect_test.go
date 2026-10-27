@@ -159,7 +159,7 @@ func TestOnlyWhatAnswersIsAddedAndBastionsNeverAre(t *testing.T) {
 	}
 }
 
-// #610: Add a Server's server box, from ssh -G alone: nothing is probed or installed.
+// #610: Add a Machine's server box, from ssh -G alone: nothing is probed or installed.
 func TestTheServerBoxIsOfferedTheConfigsHostsResolved(t *testing.T) {
 	d := detector{
 		aliases: func() []string { return []string{"devbox", "bastion", "gpu", "mine"} },
@@ -246,7 +246,7 @@ func TestAtMostSoManyAtOnceAndInOrder(t *testing.T) {
 	}
 }
 
-// hosts/detect and hosts/sshHosts on the fake ssh, with a config of their own.
+// machines/detect and machines/sshHosts on the fake ssh, with a config of their own.
 func TestDetectInstallsWhatTheConfigNames(t *testing.T) {
 	f := newFake(t)
 	f.env["FAKE_SSH_PERSON_KNOWS"] = "1"

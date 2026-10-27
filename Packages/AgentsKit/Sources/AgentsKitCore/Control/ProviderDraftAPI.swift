@@ -14,8 +14,8 @@ public extension DaemonAPI.Method {
     static let providersDraftAnswer = "providers/draftAnswer"
     /// `{}` → `ProviderRuntimes`: the runtimes that can write, on the control plane's host.
     static let providersRuntimes = "providers/runtimes"
-    /// `HostProviderDraftCall` → `{note}`: a host to its control plane on channel 0.
-    static let hostProviderDraft = "host/providerDraft"
+    /// `MachineProviderDraftCall` → `{note}`: a host to its control plane on channel 0.
+    static let hostProviderDraft = "machine/providerDraft"
 }
 
 public extension DaemonAPI.Notification {
@@ -219,9 +219,9 @@ public extension DaemonAPI {
         }
     }
 
-    /// `host/providerDraft`: a writer's tool call, relayed by its host. `agentID` is the
+    /// `machine/providerDraft`: a writer's tool call, relayed by its host. `agentID` is the
     /// caller, which the control plane checks against the draft's agent (FR-011).
-    struct HostProviderDraftCall: Codable, Sendable, Hashable {
+    struct MachineProviderDraftCall: Codable, Sendable, Hashable {
         public var agentID: UUID
         public var draft: UUID
         public var tool: String

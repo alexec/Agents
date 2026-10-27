@@ -9,7 +9,7 @@ import SwiftUI
 /// current then.
 struct HostDiskStrip: View {
     @Environment(RemoteModel.self) private var model
-    let host: HostID
+    let host: MachineRef
 
     var body: some View {
         ForEach(alarms) { alarm in

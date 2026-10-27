@@ -2,7 +2,7 @@
 // provider as a card of its workspaces, Add Provider… (kind first, then its short form), Edit…,
 // List Again and Remove…, and on a workspace Link to Host…, Start, Stop and Unlink.
 import { useEffect, useState } from "preact/hooks";
-import type { ControlHost, ProviderSummary, MachineInfo } from "../protocol/generated";
+import type { ControlMachine, ProviderSummary, MachineInfo } from "../protocol/generated";
 import type { Store } from "../model/store";
 import {
   defaultIdleMinutes, idleChoices, kindChip, kindFields, kindNeeds, kindOfPreset, kindTitle, linkableHosts, mayBe, noHostLine,
@@ -98,7 +98,7 @@ function ProviderCard({ store, provider, say, edit, link }: {
 }
 
 function WorkspaceRow({ store, provider, workspace, hosts, say, link }: {
-  store: Store; provider: ProviderSummary; workspace: MachineInfo; hosts: readonly ControlHost[];
+  store: Store; provider: ProviderSummary; workspace: MachineInfo; hosts: readonly ControlMachine[];
   say: (why: string | null) => void; link: () => void;
 }) {
   const host = workspace.host ? hosts.find((h) => h.id === workspace.host) : undefined;

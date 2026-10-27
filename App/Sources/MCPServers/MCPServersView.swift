@@ -20,7 +20,7 @@ struct MCPServersView: View {
     /// Why the last Remove… did not take it out.
     @State private var removeProblem: String?
 
-    private var host: HostID { folder?.host ?? .mac }
+    private var host: MachineRef { folder?.host ?? .mac }
     private var snapshot: DaemonAPI.MCPHealthSnapshot? { model.work.mcpHealthSnapshot(host) }
 
     private var servers: [DaemonAPI.MCPServerHealth] {

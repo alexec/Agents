@@ -65,7 +65,7 @@ public enum ControlAuth {
         /// who has heard of a move. Nil from a build that keeps none.
         public var epoch: Int?
         /// What a client has (#1748), so the control plane can tell one too old for it. Nil
-        /// from a host, which says its own in `host/hello`.
+        /// from a host, which says its own in `machine/hello`.
         public var capabilities: [String]?
         /// With an `s:` identity (#995): the key of the client that signs in, X9.63.
         public var publicKey: Data?
@@ -86,7 +86,7 @@ public enum ControlAuth {
         public var mac: String
         /// `operator` for a client, for an older web page that shows it (#111). Not read.
         public var grant: String?
-        public var host: HostID?
+        public var host: MachineRef?
         public var relayed: Bool?
         /// Where the control plane answers now, and from when (R16): a member with an older
         /// epoch keeps this list in place of its own. Sent once one has been announced.
@@ -95,7 +95,7 @@ public enum ControlAuth {
         /// The control plane's new key, to a member that proved itself with the previous
         /// one (#997).
         public var newKey: NewKey?
-        public init(mac: String, client: Bool = false, host: HostID? = nil, relayed: Bool? = nil,
+        public init(mac: String, client: Bool = false, host: MachineRef? = nil, relayed: Bool? = nil,
                     endpoints: [ControlEndpoint]? = nil, epoch: Int? = nil, newKey: NewKey? = nil) {
             self.mac = mac
             self.grant = client ? LegacyGrant.everything : nil
@@ -168,7 +168,7 @@ public enum ControlAuth {
         case client(UUID)
         /// A client signing in with no code (#995): the UUID it will pair as.
         case signingIn(UUID)
-        case host(HostID)
+        case host(MachineRef)
         /// A client code's id (hex), or a host code's.
         case pairing(String)
         case enrolling(String)
@@ -190,7 +190,7 @@ public enum ControlAuth {
             switch text.prefix(2) {
             case "c:": guard let id = UUID(uuidString: rest) else { return nil }; self = .client(id)
             case "s:": guard let id = UUID(uuidString: rest) else { return nil }; self = .signingIn(id)
-            case "h:": guard ControlWire.isHostID(rest) else { return nil }; self = .host(HostID(rawValue: rest))
+            case "h:": guard ControlWire.isHostID(rest) else { return nil }; self = .host(MachineRef(rawValue: rest))
             case "p:": guard ControlAuth.isCodeID(rest) else { return nil }; self = .pairing(rest)
             case "e:": guard ControlAuth.isCodeID(rest) else { return nil }; self = .enrolling(rest)
             case "x:": guard !rest.isEmpty, rest.count <= 64 else { return nil }; self = .copy(rest)
@@ -212,7 +212,7 @@ public enum ControlAuth {
                                            info: Data(client.uuidString.utf8), length: 32)
     }
 
-    public static func hostKey(privateKey: Data, peer: Data, host: HostID) throws -> Data {
+    public static func hostKey(privateKey: Data, peer: Data, host: MachineRef) throws -> Data {
         try ControlAgreement.hostKey(privateKey: privateKey, peer: peer, host: host)
     }
 

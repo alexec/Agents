@@ -19,11 +19,11 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// HostRecords is what Providers needs of ControlRecords; records.Records has it.
-type HostRecords interface {
-	Hosts() []records.HostRecord
-	Host(id string) *records.HostRecord
-	SaveHost(ctx context.Context, h records.HostRecord) error
+// MachineRecords is what Providers needs of ControlRecords; records.Records has it.
+type MachineRecords interface {
+	Hosts() []records.MachineRecord
+	Host(id string) *records.MachineRecord
+	SaveHost(ctx context.Context, h records.MachineRecord) error
 }
 
 // Router is what Providers, Kept and Drafts need of ControlRouter. The service's router
@@ -31,12 +31,12 @@ type HostRecords interface {
 type Router interface {
 	// Online says whether a host's uplink is up (HostState.isOnline).
 	Online(host string) bool
-	// HostState is the state hosts/list shows for a host, its workspace laid over it.
+	// HostState is the state machines/list shows for a host, its workspace laid over it.
 	HostState(host string) string
 	// SetWorkspace is ControlRouter.setWorkspace: a linked host's workspace changed, or the
 	// link went (nil). Said to every client in control/hostChanged when it differs, and laid
 	// over the host's state with Overlay.
-	SetWorkspace(host string, ws *HostMachine)
+	SetWorkspace(host string, ws *MachineWorkspace)
 	// BroadcastControl tells every client session a control notification.
 	BroadcastControl(method string, params any)
 	// DeliverKept is ControlRouter.deliverKept: a request sent to a host on a channel of
@@ -53,9 +53,9 @@ type Router interface {
 
 // Methods is what Providers needs of ControlMethods.
 type Methods interface {
-	// HostRow is one hosts/list row, as it stands now (DaemonAPI.ControlHost).
-	HostRow(h records.HostRecord) any
-	// RemoveHost is hosts/remove, as that client asked it.
+	// HostRow is one machines/list row, as it stands now (DaemonAPI.ControlMachine).
+	HostRow(h records.MachineRecord) any
+	// RemoveHost is machines/remove, as that client asked it.
 	RemoveHost(host string, from Caller) error
 }
 
@@ -86,7 +86,7 @@ type Hooks struct {
 	// SSHStart starts a host's agentsd over ssh, as an install leaves it, without installing.
 	// renewKey: its workspace's host key is made again at each start, and this start was
 	// the control plane's own, so the key it is offered is taken and pinned again (#1701).
-	SSHStart func(host records.HostRecord, destination string, renewKey bool) error
+	SSHStart func(host records.MachineRecord, destination string, renewKey bool) error
 	// OpenTunnel opens the host's reverse tunnel now, if it has one.
 	OpenTunnel func(host string)
 	// Stopped: the host's workspace was stopped. Its connection, if one is still here, is
@@ -121,7 +121,7 @@ type Hooks struct {
 // Config is what NewProviders is given.
 type Config struct {
 	Store   store.Store
-	Records HostRecords
+	Records MachineRecords
 	Router  Router
 	Methods Methods
 	Secrets *Secrets
@@ -182,7 +182,7 @@ const ClonePatience = time.Hour
 // (SetWorkspace). It runs only on a control plane with one copy (research R4).
 type Providers struct {
 	store   store.Store
-	records HostRecords
+	records MachineRecords
 	router  Router
 	methods Methods
 	secrets *Secrets
@@ -205,7 +205,7 @@ type Providers struct {
 	kept     *Kept
 	drafts   *Drafts
 	// What each host last said about whether it is idle (US4).
-	statuses map[string]HostStatus
+	statuses map[string]MachineStatus
 	// Each linked host's stop when idle, counting down while it stays idle.
 	idleTimers map[string]*time.Timer
 	// Stops under way because a host was idle, by how many minutes.
@@ -233,7 +233,7 @@ func NewProviders(cfg Config) *Providers {
 	}
 	h := &cfg.Hooks
 	if h.SSHStart == nil {
-		h.SSHStart = func(records.HostRecord, string, bool) error {
+		h.SSHStart = func(records.MachineRecord, string, bool) error {
 			return providerFailure("This control plane can’t start agentsd over ssh.")
 		}
 	}
@@ -244,7 +244,9 @@ func NewProviders(cfg Config) *Providers {
 		h.InstalledOver = func(string) string { return "" }
 	}
 	if h.HostCommand == nil {
-		h.HostCommand = func(string) (string, error) { return "", providerFailure("This control plane can’t give out host codes.") }
+		h.HostCommand = func(string) (string, error) {
+			return "", providerFailure("This control plane can’t give out host codes.")
+		}
 	}
 	if h.OwnerOf == nil {
 		h.OwnerOf = func(string) string { return "" }
@@ -252,7 +254,7 @@ func NewProviders(cfg Config) *Providers {
 	return &Providers{store: cfg.Store, records: cfg.Records, router: cfg.Router, methods: cfg.Methods,
 		secrets: cfg.Secrets, timing: cfg.Timing, hooks: cfg.Hooks, log: cfg.Log,
 		providers: map[string]heldProvider{}, connections: map[string]Provider{}, listed: map[string]*listed{},
-		activities: map[string]*activity{}, problems: map[string]string{}, statuses: map[string]HostStatus{},
+		activities: map[string]*activity{}, problems: map[string]string{}, statuses: map[string]MachineStatus{},
 		idleTimers: map[string]*time.Timer{}, idleStopping: map[string]int{}, stoppedBy: map[string]string{},
 		joining: map[string]*joining{}, done: make(chan struct{})}
 }
@@ -388,13 +390,13 @@ func (p *Providers) Answer(method string, params json.RawMessage, from Caller) (
 	return p.answer(method, params, from, "client "+shortID(from.Client))
 }
 
-// HostSaid answers host/machines, host/providerDraft and host/status, which a host says
+// HostSaid answers machine/machines, machine/providerDraft and machine/status, which a host says
 // on its channel 0, as ControlMethods.hostSaid does for them.
 func (p *Providers) HostSaid(host, method string, params json.RawMessage) (any, error) {
 	switch method {
 	case MethodHostMachines:
-		var call HostMachineCall
-		if err := requireParams(params, &call, "HostMachineCall", "agent", "method", "params"); err != nil {
+		var call MachineWorkspaceCall
+		if err := requireParams(params, &call, "MachineWorkspaceCall", "agent", "method", "params"); err != nil {
 			return nil, err
 		}
 		if !AgentWorkspaceMethods[call.Method] {
@@ -402,17 +404,17 @@ func (p *Providers) HostSaid(host, method string, params json.RawMessage) (any, 
 		}
 		return p.AgentCall(host, call.Agent, call.Method, call.Params)
 	case MethodHostProviderDraft:
-		var call HostProviderDraftCall
-		if err := requireParams(params, &call, "HostProviderDraftCall", "agentID", "draft", "tool"); err != nil {
+		var call MachineProviderDraftCall
+		if err := requireParams(params, &call, "MachineProviderDraftCall", "agentID", "draft", "tool"); err != nil {
 			return nil, err
 		}
 		if !isUUID(string(call.AgentID)) || !isUUID(string(call.Draft)) {
-			return nil, invalid("Those parameters are not a HostProviderDraftCall.")
+			return nil, invalid("Those parameters are not a MachineProviderDraftCall.")
 		}
 		return p.DraftCall(host, call)
 	case MethodHostStatus:
-		var status HostStatus
-		if requireParams(params, &status, "HostStatus", "idle", "running") == nil {
+		var status MachineStatus
+		if requireParams(params, &status, "MachineStatus", "idle", "running") == nil {
 			p.Heard(host, status)
 		}
 		return map[string]any{}, nil
@@ -422,7 +424,7 @@ func (p *Providers) HostSaid(host, method string, params json.RawMessage) (any, 
 
 // DraftCall is WorkspaceHandling.draftCall: a writing agent on host called one of the
 // writer's tools (#858).
-func (p *Providers) DraftCall(host string, call HostProviderDraftCall) (any, error) {
+func (p *Providers) DraftCall(host string, call MachineProviderDraftCall) (any, error) {
 	drafts := p.Drafts()
 	if drafts == nil {
 		return nil, fail(CodeNotPermitted, "%s", NotYoursWords)
@@ -560,23 +562,23 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 		}
 		return map[string]any{}, p.remove(string(*request.ID))
 	case MethodHostsLink:
-		var request HostLink
-		if err := requireParams(params, &request, "HostLink", "host", "provider", "workspace"); err != nil {
+		var request MachineLink
+		if err := requireParams(params, &request, "MachineLink", "host", "provider", "workspace"); err != nil {
 			return nil, err
 		}
 		return p.link(request)
 	case MethodHostsUnlink:
 		var request hostRequest
-		if err := requireParams(params, &request, "HostRequest", "host"); err != nil {
+		if err := requireParams(params, &request, "MachineRequest", "host"); err != nil {
 			return nil, err
 		}
-		return p.changeLink(string(request.Host), func(h *records.HostRecord) { setLink(h, nil) }, nil)
+		return p.changeLink(string(request.Host), func(h *records.MachineRecord) { setLink(h, nil) }, nil)
 	case MethodHostsSetOptions:
-		var options HostMachineOptions
-		if err := requireParams(params, &options, "HostMachineOptions", "host"); err != nil {
+		var options MachineOptions
+		if err := requireParams(params, &options, "MachineOptions", "host"); err != nil {
 			return nil, err
 		}
-		return p.changeLink(string(options.Host), func(h *records.HostRecord) {
+		return p.changeLink(string(options.Host), func(h *records.MachineRecord) {
 			link := LinkOf(h)
 			if link == nil {
 				return
@@ -598,13 +600,13 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 		}, func() { p.countIdle(string(options.Host)) })
 	case MethodHostsStart:
 		var request hostRequest
-		if err := requireParams(params, &request, "HostRequest", "host"); err != nil {
+		if err := requireParams(params, &request, "MachineRequest", "host"); err != nil {
 			return nil, err
 		}
 		return p.begin(starting, string(request.Host), who)
 	case MethodHostsStop:
-		var request HostStop
-		if err := requireParams(params, &request, "HostStop", "host"); err != nil {
+		var request MachineStop
+		if err := requireParams(params, &request, "MachineStop", "host"); err != nil {
 			return nil, err
 		}
 		// Asked first while agents are working there (US4 AS4).
@@ -647,7 +649,7 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 		return p.create(request, who, &caller)
 	case MethodHostsDelete:
 		var request hostRequest
-		if err := requireParams(params, &request, "HostRequest", "host"); err != nil {
+		if err := requireParams(params, &request, "MachineRequest", "host"); err != nil {
 			return nil, err
 		}
 		return map[string]any{}, p.deleteMachine(string(request.Host), who, caller)
@@ -780,7 +782,7 @@ func (p *Providers) Summaries() []ProviderSummary {
 		}
 		workspaces := []MachineInfo{}
 		for _, w := range l.workspaces {
-			w.Host = optional(wire.HostID(linked[r.ID+"/"+w.ID]))
+			w.Host = optional(wire.MachineRef(linked[r.ID+"/"+w.ID]))
 			workspaces = append(workspaces, w)
 		}
 		caps := r.Capabilities
@@ -1124,7 +1126,7 @@ func (p *Providers) connection(id string) (Provider, error) {
 
 // MARK: Links
 
-func (p *Providers) link(request HostLink) (any, error) {
+func (p *Providers) link(request MachineLink) (any, error) {
 	host, provider := string(request.Host), string(request.Provider)
 	p.mu.Lock()
 	_, ok := p.providers[provider]
@@ -1142,7 +1144,7 @@ func (p *Providers) link(request HostLink) (any, error) {
 			}
 		}
 	}
-	return p.changeLink(host, func(h *records.HostRecord) {
+	return p.changeLink(host, func(h *records.MachineRecord) {
 		had := LinkOf(h)
 		link := &WorkspaceLink{Provider: provider, Workspace: request.Workspace}
 		on := true
@@ -1178,7 +1180,7 @@ func (p *Providers) link(request HostLink) (any, error) {
 	})
 }
 
-func (p *Providers) changeLink(host string, change func(*records.HostRecord), after func()) (any, error) {
+func (p *Providers) changeLink(host string, change func(*records.MachineRecord), after func()) (any, error) {
 	record := p.records.Host(host)
 	if record == nil {
 		return nil, fail(CodeNoSuchHost, "No machine is called %s.", host)
@@ -1579,7 +1581,7 @@ func (p *Providers) linkWhenJoined(name string) {
 				p.mu.Lock()
 				delete(p.joining, name)
 				p.mu.Unlock()
-				p.link(HostLink{Host: wire.HostID(h.ID), Provider: wire.ProviderID(wanted.provider), Workspace: wanted.workspace})
+				p.link(MachineLink{Host: wire.MachineRef(h.ID), Provider: wire.ProviderID(wanted.provider), Workspace: wanted.workspace})
 				p.clone(wanted.clones, h.ID, name, wanted.caller)
 				return
 			}
@@ -1726,8 +1728,8 @@ func shellQuoted(value string) string { return "'" + strings.ReplaceAll(value, "
 
 // MARK: Stop when idle (US4)
 
-// Heard is WorkspaceHandling.heard: a host said whether it is idle (host/status).
-func (p *Providers) Heard(host string, status HostStatus) {
+// Heard is WorkspaceHandling.heard: a host said whether it is idle (machine/status).
+func (p *Providers) Heard(host string, status MachineStatus) {
 	p.mu.Lock()
 	was, hadStatus := p.statuses[host]
 	p.statuses[host] = status
@@ -2025,7 +2027,7 @@ func (p *Providers) changed() {
 }
 
 // Workspace is a host's workspace as it is laid over its state now, or nil.
-func (p *Providers) Workspace(host string) *HostMachine {
+func (p *Providers) Workspace(host string) *MachineWorkspace {
 	if h := p.records.Host(host); h != nil {
 		return p.overlay(*h)
 	}
@@ -2033,7 +2035,7 @@ func (p *Providers) Workspace(host string) *HostMachine {
 }
 
 // overlay is WorkspaceProviders.overlay.
-func (p *Providers) overlay(record records.HostRecord) *HostMachine {
+func (p *Providers) overlay(record records.MachineRecord) *MachineWorkspace {
 	link := LinkOf(&record)
 	if link == nil {
 		return nil
@@ -2062,7 +2064,7 @@ func (p *Providers) overlay(record records.HostRecord) *HostMachine {
 		hostState = state
 	}
 	problem := p.problems[record.ID]
-	ws := &HostMachine{Provider: wire.ProviderID(link.Provider), ProviderName: provider.record.Name, Workspace: link.Workspace,
+	ws := &MachineWorkspace{Provider: wire.ProviderID(link.Provider), ProviderName: provider.record.Name, Workspace: link.Workspace,
 		WorkspaceName: link.Workspace, WorkspaceState: state, HostState: optional(hostState), Problem: optional(problem),
 		// A running one whose start failed can be started again: its agentsd is what is down (#960).
 		CanStart:      a == nil && (state != "running" && state != "starting" || state == "running" && problem != ""),
@@ -2116,7 +2118,7 @@ func SSHDestination(given string) string {
 
 // SayHostKeyUnknown is WorkspaceProviders.say for HostProblem.hostKeyUnknown: a host key
 // to trust is trusted with ssh itself, as there is no install here to show it. Every other
-// problem is said as HostInstall.say says it.
+// problem is said as MachineInstall.say says it.
 func SayHostKeyUnknown(destination string) string {
 	return "Its host key isn’t in your known_hosts. Check and trust it with “ssh " + strings.Join(strings.Fields(destination), " ") +
 		"”, then start it again."

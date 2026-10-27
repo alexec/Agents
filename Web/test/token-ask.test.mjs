@@ -30,7 +30,7 @@ function serverLink({ refuseLend = false } = {}) {
         if (!lent) throw wanted();
         return "A";
       }
-      if (method === "hosts/list") return [];
+      if (method === "machines/list") return [];
       throw new Error("no");
     },
   };
@@ -62,7 +62,7 @@ test("a start on a server that wants a key asks, lends on this connection, and g
   assert.equal(await store.lendKey(" AIzaSyExample "), null);
   assert.equal(await started, "A");
   assert.equal(store.tokenAsk.value, null);
-  const calls = link.asked.filter((c) => c.method !== "hosts/list");
+  const calls = link.asked.filter((c) => c.method !== "machines/list");
   assert.deepEqual(calls.map((c) => `${c.host} ${c.method}`),
     ["box agents/start", "box credentials/offer", "box credentials/lend", "box agents/start"]);
   assert.deepEqual(calls[1].params, { runtimes: ["gemini"], ownSignInOnly: false });

@@ -12,7 +12,7 @@ import (
 )
 
 // Ports WorkspaceToolsTests (#1444): an agent's workspace tools go to the control plane as
-// host/machines, named for its log; off a control plane they say there are none; making
+// machine/machines, named for its log; off a control plane they say there are none; making
 // one asks the person first, and nothing is made without their yes.
 
 func TestAnAgentsWorkspaceTools(t *testing.T) {
@@ -33,20 +33,20 @@ func TestAnAgentsWorkspaceTools(t *testing.T) {
 	listed := wire.AgentMachines{Providers: []wire.AgentMachinesProvider{{ID: "do", Name: "DigitalOcean", CanMake: true, CanDelete: true,
 		Workspaces: []wire.AgentMachinesMachine{{ID: "w1", Name: "devbox", State: "running", Host: &host, HostState: new("online")}}}}}
 	var mu sync.Mutex
-	var asked []wire.HostMachineCall
+	var asked []wire.MachineWorkspaceCall
 	d.SetControlAsk(func(_ context.Context, method string, params any) (json.RawMessage, error) {
-		call := params.(wire.HostMachineCall)
+		call := params.(wire.MachineWorkspaceCall)
 		mu.Lock()
 		asked = append(asked, call)
 		mu.Unlock()
-		if method != "host/machines" {
+		if method != "machine/machines" {
 			t.Errorf("method %s", method)
 		}
 		switch call.Method {
 		case "machines/forAgent":
 			b, _ := json.Marshal(listed)
 			return b, nil
-		case "hosts/start":
+		case "machines/start":
 			return json.RawMessage(`{"state":"online"}`), nil
 		case "providers/create":
 			return json.RawMessage(`{"workspace":{"id":"w2","name":"second"},"joining":true}`), nil
@@ -110,7 +110,7 @@ func TestAnAgentsWorkspaceTools(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	for _, call := range asked {
-		if call.Method == "hosts/deleteMachine" {
+		if call.Method == "machines/deleteMachine" {
 			t.Fatal("deleted without a yes")
 		}
 	}

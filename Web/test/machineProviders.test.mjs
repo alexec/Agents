@@ -86,7 +86,7 @@ function plane({ oneCopy = true, working = false } = {}) {
       if (method === "providers/refresh") return {};
       if (method === "providers/add") return summary({ id: "new", name: params.name });
       if (method === "providers/remove") return {};
-      if (method === "hosts/stop") {
+      if (method === "machines/stop") {
         if (working && !params.confirmRunning) throw new w.CallFailed(w.Failure.agentsWorking, "Stop box? A is working there.");
         return { id: params.host };
       }

@@ -398,14 +398,14 @@ struct ConsistencyTests {
             """)
     }
 
-    /// "Agents may archive the chats I start" says, on every client, that a server does not
-    /// read it (#1872), in the docs' words, so a server folder's chat that archives
+    /// "Agents may archive the chats I start" says, on every client, that another machine does not
+    /// read it (#1872), in the docs' words, so a chat on another machine that archives
     /// itself with the switch off is not a surprise.
-    @Test func theArchiveSwitchSaysServersDoNotReadIt() async throws {
-        let sentence = "A server does not read this switch, so a chat in a server folder may still archive itself."
+    @Test func theArchiveSwitchSaysOtherMachinesDoNotReadIt() async throws {
+        let sentence = "Another machine does not read this switch, so a chat in a folder on another machine may still archive itself."
         for path in ["Shared/UI/SidebarSettingsSection.swift", "Web/src/model/fileToSeeWords.ts"] {
             let text = try String(contentsOf: Self.root.appending(path: path), encoding: .utf8)
-            #expect(text.contains(sentence), "\(path) does not say that a server ignores the switch")
+            #expect(text.contains(sentence), "\(path) does not say that another machine ignores the switch")
         }
     }
 

@@ -24,9 +24,9 @@ type Codes struct {
 	Public  []byte
 	// The control plane's keys now, after any rotation (#997); nil uses Private and Public.
 	Keys func() (private, public []byte)
-	URL     string
-	Pin     string
-	Name    string
+	URL  string
+	Pin  string
+	Name string
 }
 
 func (c *Codes) keys() (private, public []byte) {
@@ -41,7 +41,7 @@ type storedCode struct {
 	Purpose string `json:"purpose"`
 	// Made for a browser (071 R2): good only through a page, the loopback listener's or the
 	// page on the control plane's own domain (#1459).
-	Browser *bool         `json:"browser,omitempty"`
+	Browser *bool `json:"browser,omitempty"`
 	// The person whose client or machine uses it (#994); none is the local owner.
 	Owner *string `json:"owner,omitempty"`
 	// An invite (#994): the client that uses it is a new person's first.
@@ -70,7 +70,7 @@ func codeKey(id string) string  { return "v1/codes/" + id + ".json" }
 func spentKey(id string) string { return "v1/codes/" + id + ".spent" }
 
 // Issue makes a code and writes it to the store, for clients/startPairing,
-// hosts/startEnroll or agents-control code. What uses it is the person's that ctx names
+// machines/startEnroll or agents-control code. What uses it is the person's that ctx names
 // (withCodeOwner), else the local owner's.
 func (c *Codes) Issue(ctx context.Context, host, browser bool, lifetime time.Duration) (*wire.ControlCodeShown, error) {
 	shown, _, err := c.issue(ctx, host, browser, lifetime, c.URL)
@@ -117,7 +117,7 @@ func (c *Codes) issue(ctx context.Context, host, browser bool, lifetime time.Dur
 	return shown, id, nil
 }
 
-// HostCode is what hosts/install needs of the codes (hostinstall.CodeIssuer): a host
+// HostCode is what machines/install needs of the codes (hostinstall.CodeIssuer): a host
 // code naming url ("" for this control plane's own address), and its id.
 func (c *Codes) HostCode(ctx context.Context, url string) (string, string, error) {
 	if url == "" {
@@ -267,7 +267,7 @@ func ServerFolder() string {
 	return ""
 }
 
-// ToolsetFolder is where the runtimes' toolsets are read for hosts/install (#1136):
+// ToolsetFolder is where the runtimes' toolsets are read for machines/install (#1136):
 // AGENTS_CONTROL_TOOLSETS, the app bundle's Resources/toolsets beside
 // Helpers/agents-control, or a container's /toolsets; the first with a Claude manifest.
 func ToolsetFolder() string {
@@ -291,7 +291,7 @@ func ToolsetFolder() string {
 }
 
 // toolsetFileNames are the only files /v1/toolsets/ hands out (#1312): what a Linux host
-// needs to install a Node toolset itself, for the runtimes hosts/install installs that way.
+// needs to install a Node toolset itself, for the runtimes machines/install installs that way.
 var toolsetFileNames = func() map[string]bool {
 	names := map[string]bool{}
 	for _, runtime := range []string{"claude", "codex", "gemini"} {

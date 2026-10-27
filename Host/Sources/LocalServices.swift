@@ -150,7 +150,7 @@ struct LocalServices {
     }
 
     /// The relay host this Mac's relay joined as, once it has.
-    var relayHost: HostID? { ControlMembership.load(paths.relayFiles.membership)?.host }
+    var relayHost: MachineRef? { ControlMembership.load(paths.relayFiles.membership)?.host }
 
     /// The relay's enrolment, and any code left for it, gone: it joins again only with a
     /// new code (#824). Its key stays.

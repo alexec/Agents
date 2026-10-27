@@ -26,10 +26,10 @@ const KeptLimit = 20
 // agent's first prompt; Failed, that it was not sent, and why (US3 AS4).
 type KeptRequest = wire.KeptRequest
 
-// KeepRequest is DaemonAPI.KeepRequest: hosts/keep.
+// KeepRequest is DaemonAPI.KeepRequest: machines/keep.
 type KeepRequest = wire.KeepRequest
 
-// KeptRequestID is DaemonAPI.KeptRequestID: hosts/dropKept, hosts/retryKept.
+// KeptRequestID is DaemonAPI.KeptRequestID: machines/dropKept, machines/retryKept.
 type KeptRequestID = wire.KeptRequestID
 
 // KeptList is DaemonAPI.KeptList.
@@ -234,7 +234,7 @@ func (k *Kept) Attached(host string) {
 		}
 		k.remove(host, next.ID)
 		k.log(fmt.Sprintf("workspace: delivered kept %s to %s", next.kind(), host))
-		delivered := KeptDelivered{Host: wire.HostID(host), ID: wire.UUID(next.ID)}
+		delivered := KeptDelivered{Host: wire.MachineRef(host), ID: wire.UUID(next.ID)}
 		if next.Method == MethodAgentsStart {
 			var agent string
 			if json.Unmarshal(reply.Result, &agent) == nil {
@@ -269,7 +269,7 @@ func (k *Kept) allLocked() []KeptRequest {
 	return out
 }
 
-// Answer is hosts/listKept, hosts/dropKept and hosts/retryKept.
+// Answer is machines/listKept, machines/dropKept and machines/retryKept.
 func (k *Kept) Answer(method string, params json.RawMessage) (any, error) {
 	k.Load()
 	switch method {
@@ -409,7 +409,7 @@ func summary(r keptRecord) KeptRequest {
 	var object map[string]any
 	decodeJSON(r.Params, &object)
 	start := r.Method == MethodAgentsStart
-	out := KeptRequest{ID: wire.UUID(r.ID), Host: wire.HostID(r.Host), Kind: r.kind(), At: *dateOf(r.At.Time),
+	out := KeptRequest{ID: wire.UUID(r.ID), Host: wire.MachineRef(r.Host), Kind: r.kind(), At: *dateOf(r.At.Time),
 		Failed: optional(r.Failed)}
 	if start {
 		out.Text = strOr(object["prompt"])

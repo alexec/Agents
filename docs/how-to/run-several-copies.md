@@ -126,7 +126,7 @@ trying it out only.
 
    From then on, make codes from that window: see
    [Connect a window or phone](connect-a-window-or-phone.md) and
-   [Add a server](add-a-server.md).
+   [Add a machine](add-a-machine.md).
 
 ## What to know
 

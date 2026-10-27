@@ -170,7 +170,7 @@ public enum MachineProviderWords {
 
     /// What a workspace with no host says when no host is free to link to it (#1931): this
     /// device can't install Agents on it, so the person is told where to (the Mac's Add as Host…).
-    public static func noHostLine(_ workspace: DaemonAPI.MachineInfo, hosts: [DaemonAPI.ControlHost]) -> String? {
+    public static func noHostLine(_ workspace: DaemonAPI.MachineInfo, hosts: [DaemonAPI.ControlMachine]) -> String? {
         workspace.host == nil && linkableHosts(workspace, hosts: hosts).isEmpty ? notAHostYet : nil
     }
 
@@ -197,7 +197,7 @@ public enum MachineProviderWords {
     }
 
     /// The grey line under a workspace.
-    public static func workspaceLine(_ workspace: DaemonAPI.MachineInfo, hosts: [DaemonAPI.ControlHost]) -> String {
+    public static func workspaceLine(_ workspace: DaemonAPI.MachineInfo, hosts: [DaemonAPI.ControlMachine]) -> String {
         var parts = [workspace.state.prefix(1).uppercased() + workspace.state.dropFirst()]
         if let host = workspace.host {
             parts.append("linked to \(hosts.first { $0.id == host }?.name ?? "a machine")")
@@ -219,7 +219,7 @@ public enum MachineProviderWords {
 
     /// The hosts Link to Host can offer for a workspace no host has: those that run agents
     /// and are linked to none, the ones that may be it by name first.
-    public static func linkableHosts(_ workspace: DaemonAPI.MachineInfo, hosts: [DaemonAPI.ControlHost]) -> [DaemonAPI.ControlHost] {
+    public static func linkableHosts(_ workspace: DaemonAPI.MachineInfo, hosts: [DaemonAPI.ControlMachine]) -> [DaemonAPI.ControlMachine] {
         if workspace.host != nil { return [] }
         let free = hosts.filter { $0.relay == nil && $0.workspace == nil }
         return free.filter { mayBe(workspace, hostName: $0.name) } + free.filter { !mayBe(workspace, hostName: $0.name) }

@@ -7,8 +7,8 @@ import Testing
 @MainActor
 @Suite("The model across hosts")
 struct AgentsModelHostTests {
-    private let devbox = HostID(rawValue: "devbox01")
-    private let gpu = HostID(rawValue: "gpu00001")
+    private let devbox = MachineRef(rawValue: "devbox01")
+    private let gpu = MachineRef(rawValue: "gpu00001")
     private let path = URL(filePath: "/home/alex/src/api")
 
     private func agent(_ cwd: URL, title: String = "t") -> Agent {

@@ -36,11 +36,11 @@ public extension DaemonAPI {
         public var at: Date
         public var action: String
         public var method: String
-        public var host: HostID?
+        public var host: MachineRef?
         public var target: String?
         public var actor: AuditActor
 
-        public init(id: String, at: Date, action: String, method: String, host: HostID? = nil, target: String? = nil,
+        public init(id: String, at: Date, action: String, method: String, host: MachineRef? = nil, target: String? = nil,
                     actor: AuditActor) {
             self.id = id
             self.at = at
@@ -118,7 +118,7 @@ public enum AuditWords {
     }
 
     /// "on box-1", or "on the control plane" for its own methods.
-    public static func place(_ entry: DaemonAPI.AuditEntry, hostName: (HostID) -> String) -> String {
+    public static func place(_ entry: DaemonAPI.AuditEntry, hostName: (MachineRef) -> String) -> String {
         entry.host.map { "on \(hostName($0))" } ?? "on the control plane"
     }
 
@@ -192,7 +192,7 @@ public enum AuditWords {
 
     /// `audit/export`'s JSON lines as CSV, a row per entry, oldest first, for a spreadsheet;
     /// a line that is not an entry is left out. The web page's `auditCSV` makes the same.
-    public static func csv(_ lines: String, hostName: (HostID) -> String) -> String {
+    public static func csv(_ lines: String, hostName: (MachineRef) -> String) -> String {
         let header = ["at", "action", "method", "host", "hostName", "target", "user", "userName", "client", "clientName", "event"]
         var rows = [header.joined(separator: ",")]
         let iso = ISO8601DateFormatter()

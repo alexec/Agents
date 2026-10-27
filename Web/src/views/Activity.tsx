@@ -6,7 +6,7 @@ import { Fragment } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
-import type { AccountProfile, AllowanceReading, AllowanceState, Consequence, ControlHost, CostState, Event, FolderSummary, RuntimeAvailability, RuntimeStatus } from "../protocol/generated";
+import type { AccountProfile, AllowanceReading, AllowanceState, Consequence, ControlMachine, CostState, Event, FolderSummary, RuntimeAvailability, RuntimeStatus } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import { who } from "../model/audit";
 import type { ActivityPage } from "../route";
@@ -209,7 +209,7 @@ function lastEvent(store: Store): Date | null {
   return times.length ? fromWireDate(Math.max(...times) as never) : null;
 }
 
-const onlineHosts = (store: Store): ControlHost[] => store.hosts.value.filter((h) => hostAnswers(h.state));
+const onlineHosts = (store: Store): ControlMachine[] => store.hosts.value.filter((h) => hostAnswers(h.state));
 
 /** Asks each host for its events and its day again: on connecting, and every minute after. */
 function useActivity(store: Store): void {

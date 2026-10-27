@@ -3,7 +3,7 @@
 // and a workspace's host linked, started and stopped. Only the providers that work through
 // their API with a token (#1119) are offered here: a CLI preset needs its CLI signed in where
 // the control plane runs, and a person who starts in a browser has no shell there.
-import type { ControlHost, ProviderAdd, ProviderSummary, MachineInfo } from "../protocol/generated";
+import type { ControlMachine, ProviderAdd, ProviderSummary, MachineInfo } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 
 export type ProviderKind = "digitalOcean" | "codespaces" | "coder" | "aws" | "compute";
@@ -189,7 +189,7 @@ export function providerLine(provider: ProviderSummary, time: (at: Date) => stri
 function capitalized(word: string): string { return word.slice(0, 1).toUpperCase() + word.slice(1); }
 
 /** The grey line under a workspace, as the window's workspaceLine. */
-export function workspaceLine(workspace: MachineInfo, hosts: readonly ControlHost[]): string {
+export function workspaceLine(workspace: MachineInfo, hosts: readonly ControlMachine[]): string {
   const parts = [capitalized(workspace.state)];
   parts.push(workspace.host ? `linked to ${hosts.find((h) => h.id === workspace.host)?.name ?? "a machine"}` : "not joined");
   if (workspace.cost) parts.push(workspace.cost);
@@ -200,7 +200,7 @@ export function workspaceLine(workspace: MachineInfo, hosts: readonly ControlHos
  * What a workspace with no host says when no host is free to link to it (#1931): this page can
  * not install Agents on it, so the person is told where to (the Mac's Add as Host…).
  */
-export function noHostLine(workspace: MachineInfo, hosts: readonly ControlHost[]): string | undefined {
+export function noHostLine(workspace: MachineInfo, hosts: readonly ControlMachine[]): string | undefined {
   return !workspace.host && linkableHosts(workspace, hosts).length === 0 ? providerWords.notAHostYet : undefined;
 }
 
@@ -217,7 +217,7 @@ export function mayBe(workspace: MachineInfo, hostName: string): boolean {
  * The hosts Link to Machine can offer for a workspace no host has: those that run agents and
  * are linked to none, the ones that may be it by name first.
  */
-export function linkableHosts(workspace: MachineInfo, hosts: readonly ControlHost[]): ControlHost[] {
+export function linkableHosts(workspace: MachineInfo, hosts: readonly ControlMachine[]): ControlMachine[] {
   if (workspace.host) return [];
   const free = hosts.filter((h) => h.relay == null && !h.workspace);
   return [...free.filter((h) => mayBe(workspace, h.name)), ...free.filter((h) => !mayBe(workspace, h.name))];

@@ -6,13 +6,13 @@ import { folderPath as hostedFolderPath } from "./hostedMCP";
 import type { ExportImportBusy } from "./exports";
 import { batch, computed, signal, type ReadonlySignal, type Signal } from "@preact/signals";
 import type {
-  Agent, AgentRemovedNotification, ResumingNotification, ControlHost, HostID, HostMachine, ElicitationNotification, ElicitationRequest, EntryNotification,
+  Agent, AgentRemovedNotification, ResumingNotification, ControlMachine, MachineRef, MachineWorkspace, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, FolderSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, FolderRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
   CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
-  GuardedChange, GuardedChangeReading, HostJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
+  GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, RemoveRequest, ClientPermissionSettings } from "../protocol/generated";
@@ -199,7 +199,7 @@ export function hostStateWords(state: string): string {
 }
 
 export class Work {
-  readonly hosts = signal<ControlHost[]>([]);
+  readonly hosts = signal<ControlMachine[]>([]);
   readonly folders = signal<ByHost<FolderSummary>>({});
   /** The accounts added to each host's runtimes (#840), by host. */
   readonly accountProfiles = signal<Record<string, AccountProfile[]>>({});
@@ -401,7 +401,7 @@ export class Work {
    * The control plane's machine, its home host, and how this Mac's host says its join stands
    * (#666), from `control/status`.
    */
-  readonly plane = signal<{ machineID: string; homeHost?: string | undefined; thisMacHost?: HostJoinStatus | undefined;
+  readonly plane = signal<{ machineID: string; homeHost?: string | undefined; thisMacHost?: MachineJoinStatus | undefined;
     name?: string; version?: string; required?: RequiredCapabilities | undefined } | null>(null);
   /**
    * The person's Mac (#1501): the host that keeps their display choices (#1033) and that the page
@@ -1033,7 +1033,7 @@ export class Work {
   }
 
   /** The hosts as listed, with when each one went down noted. */
-  takeHosts(hosts: ControlHost[], now = Date.now()): void {
+  takeHosts(hosts: ControlMachine[], now = Date.now()): void {
     const since: Record<string, number> = {};
     for (const host of hosts) if (!hostAnswers(host.state)) since[host.id] = this.downSince.value[host.id] ?? now;
     const still = waiting(hosts);
@@ -1050,7 +1050,7 @@ export class Work {
   /** A host's git asking to use a Mac's git access (#1122), not answered here yet. */
   get gitLendAsk(): GitLendAsk | null { return firstAsk(this.hosts.value, this.gitAsksAnswered.value); }
 
-  /** The hosts whose `hosts/start` is out now, so the strip's Start waits for it (#691). */
+  /** The hosts whose `machines/start` is out now, so the strip's Start waits for it (#691). */
   readonly hostsBeingStarted = signal<readonly string[]>([]);
 
   /** Prompts and starts the control plane keeps for a stopped workspace (#691 US3), every host's. */
@@ -1087,11 +1087,11 @@ export class Work {
 
 
   /** One host's row, or its state and workspace, as said now, in place of what was listed. */
-  protected takeHostRow(change: { id: string; state: string; workspace?: HostMachine | undefined }): void {
+  protected takeHostRow(change: { id: string; state: string; workspace?: MachineWorkspace | undefined }): void {
     const hosts = this.hosts.value;
     const at = hosts.findIndex((h) => h.id === change.id);
     if (at < 0) return;
-    const row: ControlHost = { ...hosts[at]!, state: change.state };
+    const row: ControlMachine = { ...hosts[at]!, state: change.state };
     if (change.workspace) row.workspace = change.workspace;
     else delete row.workspace;
     this.takeHosts(hosts.map((h, i) => (i === at ? row : h)));
@@ -1308,7 +1308,7 @@ export class Store extends Work {
       }
       if (method === "control/thisMacHostChanged") {
         const plane = this.plane.value;
-        if (plane) this.plane.value = { ...plane, thisMacHost: (params as HostJoinStatus | null) ?? undefined };
+        if (plane) this.plane.value = { ...plane, thisMacHost: (params as MachineJoinStatus | null) ?? undefined };
         return;
       }
       if (method === "clientPermissions/changed") {
@@ -1347,7 +1347,7 @@ export class Store extends Work {
    */
   load(): Promise<void> {
     return this.once("*", async () => {
-      const [hosts] = await Promise.all([this.link.call("hosts/list", {}), this.loadPlane(), this.loadKept(), this.loadJoinRequests(),
+      const [hosts] = await Promise.all([this.link.call("machines/list", {}), this.loadPlane(), this.loadKept(), this.loadJoinRequests(),
         this.loadPeople().then(() => Promise.all([this.loadLinkRequests(), this.loadGovernanceRequests(), this.loadRemoveRequests()])),
         this.loadSignInRequests()]);
       this.takeHosts(hosts);
@@ -1366,7 +1366,7 @@ export class Store extends Work {
 
   /** What the control plane keeps for stopped workspaces; one without providers keeps nothing. */
   private async loadKept(): Promise<void> {
-    const listed = await this.link.call("hosts/listKept", {}).catch(() => null);
+    const listed = await this.link.call("machines/listKept", {}).catch(() => null);
     this.kept.value = listed?.kept ?? [];
   }
 
@@ -1383,7 +1383,7 @@ export class Store extends Work {
 
   /** Machines waiting to join (#994); a control plane before it has none to say. */
   private async loadJoinRequests(): Promise<void> {
-    const listed = await this.link.call("hosts/joinRequests", {}).catch(() => null);
+    const listed = await this.link.call("machines/joinRequests", {}).catch(() => null);
     this.joinRequests.value = listed ?? [];
   }
 
@@ -1486,7 +1486,7 @@ export class Store extends Work {
    */
   async decideJoin(request: string, approve: boolean): Promise<void> {
     try {
-      await this.link.call(approve ? "hosts/approveJoin" : "hosts/denyJoin", { request });
+      await this.link.call(approve ? "machines/approveJoin" : "machines/denyJoin", { request });
       this.joinRequests.value = withoutJoin(this.joinRequests.value, request);
     } catch (error) {
       this.say(describe(error));
@@ -1539,7 +1539,7 @@ export class Store extends Work {
    * it (the control plane says it twice per connect). A control plane naming no host loads all (#170).
    */
   private hostChanged(params: unknown): void {
-    const said = params as { host?: unknown; state?: unknown; workspace?: HostMachine } | null;
+    const said = params as { host?: unknown; state?: unknown; workspace?: MachineWorkspace } | null;
     const host = said?.host;
     if (typeof host !== "string") {
       void this.load();
@@ -1555,7 +1555,7 @@ export class Store extends Work {
   }
 
   private async reloadHost(host: string): Promise<void> {
-    const hosts = await this.link.call("hosts/list", {});
+    const hosts = await this.link.call("machines/list", {});
     this.takeHosts(hosts);
     await this.onHost(host, async () => {
       const now = this.hosts.value.find((h) => h.id === host);
@@ -1612,7 +1612,7 @@ export class Store extends Work {
    *  a page opened while it is stopped lists its folders and sessions as one open when it went. */
   private async loadLastHeard(host: string): Promise<void> {
     if (this.hostIsOnline(host) || this.folders.value[host] !== undefined) return;
-    const heard = await this.link.call("hosts/lastHeard", { host: host as HostID }).catch(() => null);
+    const heard = await this.link.call("machines/lastHeard", { host: host as MachineRef }).catch(() => null);
     if (!heard || this.hostIsOnline(host) || this.folders.value[host] !== undefined) return;
     batch(() => {
       if (heard.agents) this.replaceAgents(heard.agents, host);
@@ -2076,7 +2076,7 @@ export class Store extends Work {
   /** Said to the control plane; Settings ▸ Git access takes one back with `allowed` false. */
   async lendGit(host: string, from: string, server: string, allowed: boolean): Promise<void> {
     try {
-      await this.link.call("hosts/lendGit", { host: host as HostID, from: from as HostID, server, allowed });
+      await this.link.call("machines/lendGit", { host: host as MachineRef, from: from as MachineRef, server, allowed });
       if (!allowed) {
         this.hosts.value = this.hosts.value.map((row) => {
           if (row.id !== host || !row.gitFrom) return row;
@@ -2095,7 +2095,7 @@ export class Store extends Work {
     if (this.hostsBeingStarted.value.includes(host)) return;
     this.hostsBeingStarted.value = [...this.hostsBeingStarted.value, host];
     try {
-      const row = await this.link.call("hosts/start", { host: host as HostID });
+      const row = await this.link.call("machines/start", { host: host as MachineRef });
       this.takeHostRow(row);
     } catch (error) {
       log("call.failed", error instanceof CallFailed ? error.code : undefined);
@@ -2108,12 +2108,12 @@ export class Store extends Work {
   /** × on a kept prompt: it isn't sent, and the workspace keeps starting (US3 AS3). */
   async dropKept(kept: KeptRequest): Promise<void> {
     this.kept.value = this.kept.value.filter((k) => k.id !== kept.id);
-    await this.link.call("hosts/dropKept", { host: kept.host, id: kept.id }).catch((error: unknown) => this.say(describe(error)));
+    await this.link.call("machines/dropKept", { host: kept.host, id: kept.id }).catch((error: unknown) => this.say(describe(error)));
   }
 
   /** Try Again on one that wasn't sent: kept again, and the workspace started. */
   async retryKept(kept: KeptRequest): Promise<void> {
-    await this.link.call("hosts/retryKept", { host: kept.host, id: kept.id }).catch((error: unknown) => this.say(describe(error)));
+    await this.link.call("machines/retryKept", { host: kept.host, id: kept.id }).catch((error: unknown) => this.say(describe(error)));
   }
 
   /** Calls `method`, and on failure says why in `problem` and answers null. */

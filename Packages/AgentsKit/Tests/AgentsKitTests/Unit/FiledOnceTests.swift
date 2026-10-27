@@ -9,10 +9,10 @@ import Testing
 struct FiledOnceTests {
     private let api = URL(filePath: "/tmp/work/api")
     private let web = URL(filePath: "/tmp/work/web")
-    private let devbox = HostID(rawValue: "devbox01")
+    private let devbox = MachineRef(rawValue: "devbox01")
     private let t0 = Date(timeIntervalSince1970: 1_800_000_000)
 
-    private func agent(_ folder: URL, _ state: AgentState, at offset: Double, host: HostID = .mac) -> Agent {
+    private func agent(_ folder: URL, _ state: AgentState, at offset: Double, host: MachineRef = .mac) -> Agent {
         var agent = Agent(runtimeID: "claude", cwd: folder, title: "t", state: state,
                           lastActivityAt: t0.addingTimeInterval(offset))
         agent.host = host
@@ -20,7 +20,7 @@ struct FiledOnceTests {
     }
 
     /// `agents(in:group:)` as it was: a pass over everything held.
-    private func scanned(_ model: AgentsModel, _ folder: URL, _ group: AgentGroup, host: HostID? = nil) -> [UUID] {
+    private func scanned(_ model: AgentsModel, _ folder: URL, _ group: AgentGroup, host: MachineRef? = nil) -> [UUID] {
         let wanted = Folder.standardize(folder)
         let found = model.agents.filter {
             $0.folderPath == wanted && model.group(of: $0) == group && (host == nil || $0.host == host)
@@ -32,7 +32,7 @@ struct FiledOnceTests {
         for folder in [api, web] {
             for group in AgentGroup.allCases {
                 #expect(model.agents(in: folder, group: group).map(\.id) == scanned(model, folder, group), note)
-                for host in [HostID.mac, devbox] {
+                for host in [MachineRef.mac, devbox] {
                     #expect(model.agents(in: FolderKey(host: host, folder: folder), group: group).map(\.id)
                             == scanned(model, folder, group, host: host), note)
                 }

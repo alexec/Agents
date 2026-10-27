@@ -24,7 +24,7 @@ public enum WorkflowHosts {
     /// "This Mac" is the host whose machine id is `thisMachine` when this device is
     /// that computer. Otherwise it is the host with id `.mac` — the phone and the page
     /// are not that computer, and they still use the window's name for it.
-    public static func choices(from hosts: [DaemonAPI.ControlHost], thisMachine: String?) -> [WorkflowHostChoice] {
+    public static func choices(from hosts: [DaemonAPI.ControlMachine], thisMachine: String?) -> [WorkflowHostChoice] {
         let usable = hosts.filter { $0.runsAgents && !trimmed($0.machineID).isEmpty }
         let mac = thisMachine.flatMap { machine in
             let wanted = machine.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -64,7 +64,7 @@ public enum WorkflowHosts {
         id?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
-    private static func isThisMac(_ host: DaemonAPI.ControlHost, matched: DaemonAPI.ControlHost?) -> Bool {
+    private static func isThisMac(_ host: DaemonAPI.ControlMachine, matched: DaemonAPI.ControlMachine?) -> Bool {
         if let matched { return host.id == matched.id }
         return host.id == .mac
     }

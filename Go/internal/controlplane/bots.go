@@ -19,7 +19,7 @@ import (
 )
 
 // Bots (#1761, spec 736 US6, FR-030–FR-035): a user with no clients and no sign-in, in a
-// group, with machines an admin enrols for it (hosts/startEnroll with as). No client starts,
+// group, with machines an admin enrols for it (machines/startEnroll with as). No client starts,
 // messages or answers an agent on a bot's machine; an admin may stop a run (bots/stopRun).
 // A workflow whose runs-on: names the bot runs once per trigger across its machines
 // (workflows/claimRun). At its own or its group's daily spend cap it starts no work.
@@ -184,7 +184,7 @@ func (s *Service) BotMachineFor(person, host string) bool {
 	return owner != person && s.isBot(owner) && s.isAdmin(person)
 }
 
-// MARK: host/user
+// MARK: machine/user
 
 // sendHostUser tells a machine its user, their kind and labels, and a bot's cap.
 func (s *Service) sendHostUser(host string) {
@@ -193,7 +193,7 @@ func (s *Service) sendHostUser(host string) {
 		return
 	}
 	user := s.ownerOf(host)
-	u := wire.HostUser{User: user, Kind: records.KindPerson, Name: s.personName(user), Labels: []string{}}
+	u := wire.MachineUser{User: user, Kind: records.KindPerson, Name: s.personName(user), Labels: []string{}}
 	if u.Name == "" && user == s.localOwner() {
 		u.Name = localOwnerName
 	}
@@ -210,7 +210,7 @@ func (s *Service) sendHostUser(host string) {
 	if u.Kind == records.KindPerson {
 		u.Bots = s.botsOfGroups(user)
 	}
-	s.router.Tell(host, wire.NotifyHostUser.Name, u)
+	s.router.Tell(host, wire.NotifyMachineUser.Name, u)
 }
 
 // botsOfGroups is the names of the bots in a person's groups, sorted (#2027): a runs-on:
@@ -227,7 +227,7 @@ func (s *Service) botsOfGroups(user string) []string {
 	return names
 }
 
-// tellPeoplesMachines sends host/user again to each person's machine held here: a bot or a
+// tellPeoplesMachines sends machine/user again to each person's machine held here: a bot or a
 // group changed, and so which bots' workflows each hears (#2027).
 func (s *Service) tellPeoplesMachines() {
 	for _, host := range s.router.HostsHeldHere() {
@@ -237,7 +237,7 @@ func (s *Service) tellPeoplesMachines() {
 	}
 }
 
-// tellUsersMachines sends host/user again to each machine of a user held here.
+// tellUsersMachines sends machine/user again to each machine of a user held here.
 func (s *Service) tellUsersMachines(user string) {
 	for _, host := range s.router.HostsHeldHere() {
 		if s.ownerOf(host) == user {

@@ -82,7 +82,7 @@ enum ControlConfig {
     /// This Mac's host directly (#1118): agentsd's socket in the app group, named by the
     /// control plane's key, proved with this window's own key. Nil with no pairing, or no
     /// group container for this build.
-    static func localLink(_ endpoint: Endpoint, host: HostID) -> LocalHostLink? {
+    static func localLink(_ endpoint: Endpoint, host: MachineRef) -> LocalHostLink? {
         switch endpoint {
         case .remote(let membership):
             guard let client = membership.client,

@@ -13,7 +13,7 @@ folder.
 
 ## Before you start
 
-- A server that is a host of your control plane, and online. See [Add a server](add-a-server.md).
+- A server that is a host of your control plane, and online. See [Add a machine](add-a-machine.md).
 - Git on the server.
 - A folder, or a worktree, on this Mac that is a Git repository with at least one commit.
 

@@ -18,34 +18,34 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// The user this machine belongs to (#1761, spec 736 US6): host/user, which the control
+// The user this machine belongs to (#1761, spec 736 US6): machine/user, which the control
 // plane sends on channel 0 at each join and when the user changes. It says whether the
 // user is a person or a bot, and the labels runs-on: matches (FR-034). On a bot's machine
 // nobody answers: an agent has no ask tools, a permission is answered by its policy alone,
 // and at the bot's spend cap no workflow starts (FR-032, FR-033).
 
-// kindBot is host/user's kind for a bot.
+// kindBot is machine/user's kind for a bot.
 const kindBot = "bot"
 
-// hostUserFile keeps the last host/user, so a machine started with its control plane away
+// hostUserFile keeps the last machine/user, so a machine started with its control plane away
 // is still a bot's.
 const hostUserFile = "host-user.json"
 
 type hostUserState struct {
 	hostUserMu   sync.Mutex
 	hostUserRead bool
-	hostUser     *wire.HostUser
+	hostUser     *wire.MachineUser
 }
 
 func (d *Daemon) hostUserPath() string { return filepath.Join(d.Store.Loc.Root, hostUserFile) }
 
-// user is the last host/user, read from the root the first time; nil before any.
-func (d *Daemon) user() *wire.HostUser {
+// user is the last machine/user, read from the root the first time; nil before any.
+func (d *Daemon) user() *wire.MachineUser {
 	d.hostUserMu.Lock()
 	defer d.hostUserMu.Unlock()
 	if !d.hostUserRead {
 		d.hostUserRead = true
-		var kept wire.HostUser
+		var kept wire.MachineUser
 		if b, err := os.ReadFile(d.hostUserPath()); err == nil && json.Unmarshal(b, &kept) == nil && kept.User != "" {
 			d.hostUser = &kept
 		}
@@ -53,11 +53,11 @@ func (d *Daemon) user() *wire.HostUser {
 	return d.hostUser
 }
 
-// toldHostUser is host/user.
+// toldHostUser is machine/user.
 func (d *Daemon) toldHostUser(params json.RawMessage) {
-	var u wire.HostUser
+	var u wire.MachineUser
 	if err := json.Unmarshal(params, &u); err != nil || u.User == "" {
-		log.Printf("host/user: %v", err)
+		log.Printf("machine/user: %v", err)
 		return
 	}
 	d.user()
@@ -67,12 +67,12 @@ func (d *Daemon) toldHostUser(params json.RawMessage) {
 	d.hostUserMu.Unlock()
 	if b, err := json.Marshal(u); err == nil {
 		if err := os.WriteFile(d.hostUserPath(), b, 0o600); err != nil {
-			log.Printf("host/user: %v", err)
+			log.Printf("machine/user: %v", err)
 		}
 	}
 	if was == nil || was.Kind != u.Kind || strings.Join(was.Labels, ",") != strings.Join(u.Labels, ",") ||
 		strings.Join(was.Bots, ",") != strings.Join(u.Bots, ",") {
-		log.Printf("host/user: %s %s, labels %s", u.Kind, u.Name, strings.Join(u.Labels, ", "))
+		log.Printf("machine/user: %s %s, labels %s", u.Kind, u.Name, strings.Join(u.Labels, ", "))
 		// Which workflows run here may have changed.
 		d.tellEveryWorkflow()
 	}

@@ -16,14 +16,14 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// policyLine is host/policy as a machine reads it: the document's own bytes, to check.
+// policyLine is machine/policy as a machine reads it: the document's own bytes, to check.
 type policyLine struct {
 	Policy    json.RawMessage       `json:"policy"`
 	Signature *wire.PolicySignature `json:"signature"`
 	None      *bool                 `json:"none"`
 }
 
-// policiesTold is every host/policy each machine was told, by machine.
+// policiesTold is every machine/policy each machine was told, by machine.
 type policiesTold struct {
 	mu  sync.Mutex
 	got map[string][]policyLine
@@ -32,7 +32,7 @@ type policiesTold struct {
 func newPoliciesTold() *policiesTold { return &policiesTold{got: map[string][]policyLine{}} }
 
 func (d *policiesTold) heard(host, method string, params json.RawMessage) {
-	if method != wire.NotifyHostPolicy.Name {
+	if method != wire.NotifyMachinePolicy.Name {
 		return
 	}
 	var line policyLine
@@ -64,7 +64,7 @@ func (d *policiesTold) version(host string) int64 {
 }
 
 // policyHello is a machine that keeps and follows the policy.
-func policyHello(name string) controllink.HostHello {
+func policyHello(name string) controllink.MachineHello {
 	hello := fakeHello(name)
 	hello.Capabilities = append(slices.Clone(hello.Capabilities), CapHostPolicy)
 	return hello
@@ -392,7 +392,7 @@ func TestRequireFollowingRefusesAMachineBehind(t *testing.T) {
 	p.waitFor(func() bool { return told.version(host) == 1 }, "the machine told version 1")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if _, err := box.uplink.Ask(ctx, wire.CallHostPolicyApplied.Name, wire.PolicyApplied{Version: 1}); err != nil {
+	if _, err := box.uplink.Ask(ctx, wire.CallMachinePolicyApplied.Name, wire.PolicyApplied{Version: 1}); err != nil {
 		t.Fatal(err)
 	}
 	p.waitFor(func() bool {

@@ -10,7 +10,7 @@ import Testing
 @Suite("ssh command lines")
 struct SSHCommandTests {
     private let ssh = SSHCommand(executable: URL(filePath: "/usr/bin/ssh"), name: "devbox",
-                                 controlPath: URL(filePath: "/r/hosts/ab12cd34.ctl"))
+                                 controlPath: URL(filePath: "/r/machines/ab12cd34.ctl"))
 
     @Test func aPortAfterTheHostIsWrittenTheWaySSHReadsIt() {
         let withPort = SSHCommand(executable: URL(filePath: "/usr/bin/ssh"), name: "agents@127.0.0.1:2222",
@@ -30,16 +30,16 @@ struct SSHCommandTests {
     @Test func aMasterWithoutAForwardComesFirst() {
         #expect(ssh.masterArguments(forward: nil) == [
             "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
-            "-M", "-N", "-S", "/r/hosts/ab12cd34.ctl",
+            "-M", "-N", "-S", "/r/machines/ab12cd34.ctl",
             "-o", "ControlPersist=no", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3",
             "-o", "ExitOnForwardFailure=yes", "-o", "StreamLocalBindUnlink=yes",
             "--", "devbox"])
     }
 
     @Test func thenOneWithTheDaemonsSocketForwarded() {
-        let args = ssh.masterArguments(forward: (local: "/r/hosts/ab12cd34.sock",
+        let args = ssh.masterArguments(forward: (local: "/r/machines/ab12cd34.sock",
                                                  remote: "/home/alex/.agents-server/root/daemon.sock"))
-        #expect(args.suffix(4) == ["-L", "/r/hosts/ab12cd34.sock:/home/alex/.agents-server/root/daemon.sock",
+        #expect(args.suffix(4) == ["-L", "/r/machines/ab12cd34.sock:/home/alex/.agents-server/root/daemon.sock",
                                    "--", "devbox"])
     }
 
@@ -47,7 +47,7 @@ struct SSHCommandTests {
         #expect(ssh.runArguments("uname -sm") == [
             "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
             "-o", "RemoteCommand=none", "-o", "RequestTTY=no", "-o", "ClearAllForwardings=yes",
-            "-S", "/r/hosts/ab12cd34.ctl", "--", "devbox", "uname -sm"])
+            "-S", "/r/machines/ab12cd34.ctl", "--", "devbox", "uname -sm"])
     }
 
     /// #610: with no master of ours, a connection of its own: never the person's
@@ -78,8 +78,8 @@ struct SSHCommandTests {
     }
 
     @Test func checkAndExitAskTheMaster() {
-        #expect(ssh.controlArguments("check") == ["-S", "/r/hosts/ab12cd34.ctl", "-O", "check", "--", "devbox"])
-        #expect(ssh.controlArguments("exit") == ["-S", "/r/hosts/ab12cd34.ctl", "-O", "exit", "--", "devbox"])
+        #expect(ssh.controlArguments("check") == ["-S", "/r/machines/ab12cd34.ctl", "-O", "check", "--", "devbox"])
+        #expect(ssh.controlArguments("exit") == ["-S", "/r/machines/ab12cd34.ctl", "-O", "exit", "--", "devbox"])
     }
 
     @Test func fetchingAKeyOffersNoCredentials() {

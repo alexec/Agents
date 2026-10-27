@@ -946,8 +946,8 @@ func gitRemotes(ctx context.Context) []string {
 }
 
 // ProjectOfRemote is the project path (group/sub/name) of a remote of the GitLab at base:
-// https://host/group/name(.git), git@host:group/name(.git) or ssh://git@host(:port)/group/name(.git).
-// A GitLab under a path (https://host/gitlab/) keeps that path out of the project's.
+// https://machine/group/name(.git), git@host:group/name(.git) or ssh://git@host(:port)/group/name(.git).
+// A GitLab under a path (https://machine/gitlab/) keeps that path out of the project's.
 func ProjectOfRemote(base, remote string) (string, bool) {
 	u, err := url.Parse(BaseURL(base))
 	if err != nil || u.Host == "" {

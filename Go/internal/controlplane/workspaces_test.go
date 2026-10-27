@@ -26,7 +26,7 @@ func TestAStartOverSSHTakesAProvidersDestinationWithAPort(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := &Service{installer: &hostinstall.Installer{SSH: ssh}}
-	if err := s.sshStart(records.HostRecord{ID: "box", Name: "w857-box"}, "agents@127.0.0.1 -p 2224", false); err != nil {
+	if err := s.sshStart(records.MachineRecord{ID: "box", Name: "w857-box"}, "agents@127.0.0.1 -p 2224", false); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(said)
@@ -64,7 +64,7 @@ func keyedSSH(t *testing.T, key string) (ssh, said string) {
 // tunnelFor is the tunnels with one record, for host, installed over destination with key.
 func tunnelFor(t *testing.T, host, destination, key string) *hosttunnels.Tunnels {
 	tunnels := hosttunnels.New(hosttunnels.Config{Store: store.NewMemory(), SSH: "/usr/bin/false", Port: 1,
-		Hosts: func(context.Context) []records.HostRecord { return []records.HostRecord{{ID: host, Name: host}} }})
+		Hosts: func(context.Context) []records.MachineRecord { return []records.MachineRecord{{ID: host, Name: host}} }})
 	t.Cleanup(tunnels.Stop)
 	if err := tunnels.Add(context.Background(), hosttunnels.Record{ID: "t-" + host, Destination: destination, Name: host,
 		Port: 1, Code: "c", Host: &host, KnownHosts: destination + " ssh-ed25519 " + key + "\n", Made: records.Now()}); err != nil {
@@ -81,7 +81,7 @@ func TestAStartOverSSHPinsTheNewKeyOfAWorkspaceThatRenewsIt(t *testing.T) {
 	ssh, said := keyedSSH(t, "NEWKEY")
 	s := &Service{installer: &hostinstall.Installer{SSH: ssh}, tunnels: tunnelFor(t, "ws", "w1701-ws", "OLDKEY"),
 		cfg: Config{Log: func(string) {}}}
-	if err := s.sshStart(records.HostRecord{ID: "ws", Name: "w1701-ws"}, "w1701-ws", true); err != nil {
+	if err := s.sshStart(records.MachineRecord{ID: "ws", Name: "w1701-ws"}, "w1701-ws", true); err != nil {
 		t.Fatal(err)
 	}
 	if _, keys, _ := s.tunnels.Installed("ws"); keys != "agents-pinned-host ssh-ed25519 NEWKEY\n" {
@@ -99,7 +99,7 @@ func TestAStartOverSSHKeepsTheInstallsKeyOtherwise(t *testing.T) {
 	ssh, said := keyedSSH(t, "OLDKEY")
 	s := &Service{installer: &hostinstall.Installer{SSH: ssh}, tunnels: tunnelFor(t, "vm", "agents@10.0.0.1", "OLDKEY"),
 		cfg: Config{Log: func(string) {}}}
-	if err := s.sshStart(records.HostRecord{ID: "vm", Name: "w1691-vm"}, "agents@10.0.0.2", false); err != nil {
+	if err := s.sshStart(records.MachineRecord{ID: "vm", Name: "w1691-vm"}, "agents@10.0.0.2", false); err != nil {
 		t.Fatal(err)
 	}
 	if _, keys, _ := s.tunnels.Installed("vm"); keys != "agents@10.0.0.1 ssh-ed25519 OLDKEY\n" {

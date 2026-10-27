@@ -41,7 +41,7 @@ func TestAControlPlaneThatNeverAnswersIsGivenUp(t *testing.T) {
 		t.Fatalf("Join: %v", err)
 	}
 	code := &Code{Host: true, URL: base, Pin: "pin", Secret: make([]byte, 32)}
-	_, err = Enroll(context.Background(), t.TempDir(), code, NewPrivateKey(), HostHello{})
+	_, err = Enroll(context.Background(), t.TempDir(), code, NewPrivateKey(), MachineHello{})
 	if err == nil || !strings.Contains(err.Error(), "did not answer within") {
 		t.Fatalf("Enroll: %v", err)
 	}

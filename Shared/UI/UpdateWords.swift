@@ -9,13 +9,13 @@ enum UpdateWords {
 
     /// "Agents 0.9 (Go)" for a host written in Go (#1134), so the one being tried is never
     /// taken for the other; the Swift host says only its version.
-    static func version(_ host: DaemonAPI.ControlHost) -> String {
+    static func version(_ host: DaemonAPI.ControlMachine) -> String {
         host.implementation == "go" ? "Agents \(host.version) (Go)" : "Agents \(host.version)"
     }
 
     /// A host's state, as a host row says it: "Needs an update" for `needsUpdate`, which
     /// `capitalized` would make "Needsupdate".
-    static func state(_ host: DaemonAPI.ControlHost) -> String {
+    static func state(_ host: DaemonAPI.ControlMachine) -> String {
         if host.state == "needsUpdate" { return "Needs an update" }
         // A delete's backup, before its workspace goes (#1815).
         if host.state == "stopping", host.workspace?.phase == "backing up" { return "Backing up to delete" }
@@ -34,7 +34,7 @@ enum UpdateWords {
 
     /// The second line of a host that does not have the control plane's required
     /// capabilities: what to update it to, and the names it is missing. Nil for one that has them.
-    static func missing(_ host: DaemonAPI.ControlHost, controlVersion: String?) -> String? {
+    static func missing(_ host: DaemonAPI.ControlMachine, controlVersion: String?) -> String? {
         guard let missing = host.missing, !missing.isEmpty else { return nil }
         let to = controlVersion.map { " to Agents \($0)" } ?? ""
         return "Update this machine\(to). It does not have \(missing.joined(separator: ", "))."

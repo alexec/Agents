@@ -6,7 +6,7 @@ description: Why each client belongs to a person and each machine to one user, w
 # People and machines
 
 A control plane can hold a few people who work together (#994, spec 736). Each person
-has their own clients, and each machine (a host or a workspace) belongs to one user.
+has their own clients, and each machine (a machine or a workspace) belongs to one user.
 
 ## The local owner
 
@@ -20,7 +20,7 @@ outside is needed.
 
 A person reaches only their own machines. The control plane opens a client's channels
 only to its person's machines, and a call to another person's machine is answered "no such
-host", as for a machine that is not there. Each method of the control plane that names a
+machine", as for a machine that is not there. Each method of the control plane that names a
 machine checks the same.
 
 Machines are not shared, also not to see. A machine runs agents with its user's sign-ins,

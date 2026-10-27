@@ -295,7 +295,7 @@ public struct AppViewAgentMessage: Equatable, Sendable {
 
     /// The session it goes to: one on `host` in `folder` whose worktree is on the branch, not
     /// archived, the latest active first. Nil when there is none.
-    public func recipient(among agents: [Agent], host: HostID, folder: URL) -> Agent? {
+    public func recipient(among agents: [Agent], host: MachineRef, folder: URL) -> Agent? {
         let folder = Folder.standardize(folder)
         return agents
             .filter { $0.host == host && $0.archivedAt == nil && $0.worktree?.branch == branch && $0.folderPath == folder }

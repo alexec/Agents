@@ -10,7 +10,7 @@ struct ConnectLinearSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.webAuthenticationSession) private var session
 
-    var host: HostID
+    var host: MachineRef
     var onConnected: () -> Void = {}
 
     private enum Step: Equatable {

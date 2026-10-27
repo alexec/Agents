@@ -30,10 +30,10 @@ func (o *ownersStandIn) OwnerOf(host string) string {
 // a machine that changes hands moves only its own channels.
 func TestHoldingToOwnersReadsEachOwnerOnceOutsideTheLock(t *testing.T) {
 	t.Parallel()
-	const hosts, sessions, people = 400, 600, 10
+	const machines, sessions, people = 400, 600, 10
 	r := NewRouter(nil, nil)
 	o := &ownersStandIn{r: r, owner: map[string]string{}}
-	for i := range hosts {
+	for i := range machines {
 		host := "MACHINE-" + itoa(i)
 		o.owner[host] = "person-" + itoa(i%people)
 		up := &uplinkStandIn{closed: make(chan struct{})}
@@ -49,8 +49,8 @@ func TestHoldingToOwnersReadsEachOwnerOnceOutsideTheLock(t *testing.T) {
 	r.mu.Unlock()
 
 	r.SetOwnership(o)
-	if n := o.asked.Load(); n != hosts {
-		t.Fatalf("asked %d times for %d machines", n, hosts)
+	if n := o.asked.Load(); n != machines {
+		t.Fatalf("asked %d times for %d machines", n, machines)
 	}
 	if o.underLock.Load() {
 		t.Fatal("an owner was read under the router's lock")
@@ -65,15 +65,15 @@ func TestHoldingToOwnersReadsEachOwnerOnceOutsideTheLock(t *testing.T) {
 		r.mu.Lock()
 		n := len(r.clients["session-"+itoa(i)].channels)
 		r.mu.Unlock()
-		if n != hosts/people {
-			t.Fatalf("session %d holds %d channels, its person owns %d machines", i, n, hosts/people)
+		if n != machines/people {
+			t.Fatalf("session %d holds %d channels, its person owns %d machines", i, n, machines/people)
 		}
 	}
 
 	o.owner["MACHINE-0"] = "person-1"
 	o.asked.Store(0)
 	r.HoldToOwners()
-	if n := o.asked.Load(); n != hosts || o.underLock.Load() {
+	if n := o.asked.Load(); n != machines || o.underLock.Load() {
 		t.Fatalf("asked %d times, under the lock %v", n, o.underLock.Load())
 	}
 	if reaches("session-0", "MACHINE-0") || !reaches("session-1", "MACHINE-0") || !reaches("session-0", "MACHINE-10") {

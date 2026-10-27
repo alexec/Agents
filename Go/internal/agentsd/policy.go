@@ -19,7 +19,7 @@ import (
 )
 
 // The organisation's policy on this machine (#998, spec 998 slice 2a). The control plane
-// sends it on channel 0 (host/policy) to a machine that says host.policy/1. The machine
+// sends it on channel 0 (machine/policy) to a machine that says host.policy/1. The machine
 // keeps the newest copy whose signature its control key checks, in <root>/policy.json,
 // and applies it as a ceiling above the person's and the folder's own settings: it caps
 // their effect, and never changes what they wrote (FR-011). A copy with a lower version
@@ -174,7 +174,7 @@ func (d *Daemon) saveOrgSeenLocked() {
 	}
 }
 
-// toldPolicy is host/policy: a signed policy, or none when the control plane never had one.
+// toldPolicy is machine/policy: a signed policy, or none when the control plane never had one.
 func (d *Daemon) toldPolicy(params json.RawMessage) {
 	var line struct {
 		Policy    json.RawMessage       `json:"policy"`
@@ -182,7 +182,7 @@ func (d *Daemon) toldPolicy(params json.RawMessage) {
 		None      bool                  `json:"none"`
 	}
 	if err := json.Unmarshal(params, &line); err != nil {
-		log.Printf("host/policy: %v", err)
+		log.Printf("machine/policy: %v", err)
 		return
 	}
 	d.orgMu.Lock()
@@ -191,7 +191,7 @@ func (d *Daemon) toldPolicy(params json.RawMessage) {
 		// The control plane has no policy. One this machine holds is kept: only a newer
 		// signed policy changes it (a policy is never deleted, data-model.md).
 		if d.orgNow != nil {
-			log.Printf("host/policy: the control plane sends none; keeping version %d", d.orgNow.policy.Version)
+			log.Printf("machine/policy: the control plane sends none; keeping version %d", d.orgNow.policy.Version)
 			d.orgMu.Unlock()
 			return
 		}
@@ -202,20 +202,20 @@ func (d *Daemon) toldPolicy(params json.RawMessage) {
 		os.Remove(d.orgPath(orgPolicyFile))
 		d.orgMu.Unlock()
 		if was {
-			log.Printf("host/policy: the control plane has no policy")
+			log.Printf("machine/policy: the control plane has no policy")
 			d.tellPolicyState()
 		}
 		return
 	}
 	if line.Signature == nil {
 		d.orgMu.Unlock()
-		log.Printf("host/policy: no signature")
+		log.Printf("machine/policy: no signature")
 		return
 	}
 	kept := keptOrgPolicy{Policy: line.Policy, Signature: *line.Signature}
 	if !d.trustsLocked(&kept) {
 		d.orgMu.Unlock()
-		log.Printf("host/policy: the signature does not check; the policy is refused")
+		log.Printf("machine/policy: the signature does not check; the policy is refused")
 		return
 	}
 	held := d.orgWas.Version
@@ -224,14 +224,14 @@ func (d *Daemon) toldPolicy(params json.RawMessage) {
 	}
 	if kept.policy.Version < held {
 		d.orgMu.Unlock()
-		log.Printf("host/policy: version %d is older than the %d kept here; refused", kept.policy.Version, held)
+		log.Printf("machine/policy: version %d is older than the %d kept here; refused", kept.policy.Version, held)
 		d.tellControlPolicyApplied(held)
 		return
 	}
 	b, _ := json.Marshal(kept)
 	if err := store.WriteAtomically(d.orgPath(orgPolicyFile), b, 0o600); err != nil {
 		d.orgMu.Unlock()
-		log.Printf("host/policy: keep %s: %v", orgPolicyFile, err)
+		log.Printf("machine/policy: keep %s: %v", orgPolicyFile, err)
 		return
 	}
 	same := d.orgNow != nil && bytes.Equal(d.orgNow.Policy, kept.Policy)
@@ -243,7 +243,7 @@ func (d *Daemon) toldPolicy(params json.RawMessage) {
 	if same {
 		return
 	}
-	log.Printf("host/policy: applied version %d", kept.policy.Version)
+	log.Printf("machine/policy: applied version %d", kept.policy.Version)
 	d.policyChanged()
 }
 
@@ -252,7 +252,7 @@ func (d *Daemon) tellControlPolicyApplied(version int64) {
 		return
 	}
 	if tell := d.tellControl.Load(); tell != nil {
-		(*tell)(wire.CallHostPolicyApplied.Name, wire.PolicyApplied{Version: version})
+		(*tell)(wire.CallMachinePolicyApplied.Name, wire.PolicyApplied{Version: version})
 	}
 }
 

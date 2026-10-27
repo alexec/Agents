@@ -5,13 +5,13 @@
 // runs on a provider's workspace (#691, layouts.md L1): then a stopped or failed one offers Start,
 // and a starting one shows a spinner and how long so far. The words are OfflineWords.swift's.
 import { useEffect, useState } from "preact/hooks";
-import type { ControlHost, HostMachine } from "../protocol/generated";
+import type { ControlMachine, MachineWorkspace } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import type { Store } from "../model/store";
 
 /** What a workspace host's strip says while it is stopped, starting or failed to start, or null
  *  when the ordinary offline line says it (OfflineWords.workspaceLine). */
-export function workspaceLine(name: string, state: string, workspace: HostMachine): string | null {
+export function workspaceLine(name: string, state: string, workspace: MachineWorkspace): string | null {
   if (state === "starting") {
     switch (workspace.phase) {
       case "connecting": return `Waiting for ${name} to connect…`;
@@ -32,7 +32,7 @@ export function workspaceLine(name: string, state: string, workspace: HostMachin
 
 /** "Starts at 02:55 for Nightly review" (#1004; OfflineWords.wakeLine): when the control plane
  *  will start it for its next scheduled workflow, or null when it won't. */
-export function wakeLine(workspace: HostMachine, now: number = Date.now()): string | null {
+export function wakeLine(workspace: MachineWorkspace, now: number = Date.now()): string | null {
   if (workspace.wakeAt == null || !workspace.nextWorkflow) return null;
   return `Starts ${clock(fromWireDate(workspace.wakeAt).getTime(), now)} for ${workspace.nextWorkflow}`;
 }
@@ -47,13 +47,13 @@ export function clock(at: number, now: number): string {
 
 /** What the sidebar's foot says for a host that isn't online (#961; OfflineWords.footLine): a
  *  workspace's words, as its strip says them, or that it is connecting or offline. */
-export function footLine(host: ControlHost): string {
+export function footLine(host: ControlMachine): string {
   const said = host.workspace ? workspaceLine(host.name, host.state, host.workspace) : null;
   return said ?? `${host.name} is ${host.state === "connecting" ? "connecting…" : "offline"}`;
 }
 
 /** Whether the strip offers Start: a stopped or failed workspace, with nothing under way. */
-export function offersStart(state: string, workspace: HostMachine): boolean {
+export function offersStart(state: string, workspace: MachineWorkspace): boolean {
   return workspace.canStart && state !== "online" && state !== "starting" && state !== "stopping";
 }
 
@@ -64,7 +64,7 @@ export function elapsed(since: number, now: number): string {
 }
 
 /** What the strip draws for `host`: its words, a spinner or the dot, and Start or the timer. */
-export function offlineStrip(host: string, row: ControlHost | undefined, at: string | null, macID = "mac"):
+export function offlineStrip(host: string, row: ControlMachine | undefined, at: string | null, macID = "mac"):
   { line: string; starting: boolean; since: number | null; start: boolean } {
   const name = row?.name ?? "This machine";
   const state = row?.state ?? "offline";

@@ -2,9 +2,9 @@ DetectedServer full
 {"alias":"ALIAS","resolved":"RESOLVED","outcome":"OUTCOME","detail":"DETAIL"}
 DetectedServer zero
 {"alias":"","resolved":"","outcome":""}
-HostInstall full
+MachineInstall full
 {"destination":"DESTINATION","name":"NAME","key":"KEY","trust":"TRUST","tunnel":true}
-HostInstall zero
+MachineInstall zero
 {"destination":""}
 SSHHost full
 {"alias":"ALIAS","resolved":"RESOLVED","throughBastion":true,"isBastion":true,"known":true}

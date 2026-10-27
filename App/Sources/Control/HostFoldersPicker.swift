@@ -3,15 +3,15 @@ import SwiftUI
 
 /// The folders to add on a host (#656): the git repositories found under the auto-detect
 /// paths, each unticked, and any folder the person types. Nothing is added until Add, and
-/// only what is ticked. Shown as Add a Server's last step and by a host row's Choose
+/// only what is ticked. Shown as Add a Machine's last step and by a host row's Choose
 /// Folders….
 struct HostFoldersPicker: View {
     @Environment(AppModel.self) private var model
-    let host: HostID
+    let host: MachineRef
     let hostName: String
     /// Where to look; empty with auto-detect off, which leaves only the folder box.
     let paths: [String]
-    /// The button that adds nothing: Skip at the end of Add a Server, Cancel elsewhere.
+    /// The button that adds nothing: Skip at the end of Add a Machine, Cancel elsewhere.
     var leaveTitle = "Cancel"
     let done: () -> Void
 
@@ -170,7 +170,7 @@ struct HostFoldersPicker: View {
 /// Choose Folders… on a host row (#656): the picker in a sheet of its own.
 struct ChooseFoldersSheet: View {
     @Environment(\.dismiss) private var dismiss
-    let host: HostID
+    let host: MachineRef
     let hostName: String
     let paths: [String]
 

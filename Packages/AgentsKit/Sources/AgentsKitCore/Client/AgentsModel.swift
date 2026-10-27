@@ -198,7 +198,7 @@ public final class AgentsModel {
     @ObservationIgnored private var nextTrimAt = entriesTrimmedAt
     /// Each agent by id, and where it was filed: its folder and group as they were.
     @ObservationIgnored private var byID: [UUID: Agent] = [:]
-    @ObservationIgnored private var filedAs: [UUID: (folder: URL, host: HostID, group: AgentGroup)] = [:]
+    @ObservationIgnored private var filedAs: [UUID: (folder: URL, host: MachineRef, group: AgentGroup)] = [:]
     /// The held sessions each session started (#835), by the starter's id.
     @ObservationIgnored private var started: [UUID: Set<UUID>] = [:]
     /// Each folder's agents, by folder and host, and again by folder alone (#165).
@@ -308,16 +308,16 @@ public final class AgentsModel {
     public private(set) var hostedMCP: DaemonAPI.HostedMCPSnapshot?
     /// Every MCP server each host's `mcp.json` files name, and how each is doing (#753), by
     /// host. Replaced whole by each `mcp/healthChanged`. Empty for a daemon too old to say.
-    public private(set) var mcpHealth: [HostID: DaemonAPI.MCPHealthSnapshot] = [:]
+    public private(set) var mcpHealth: [MachineRef: DaemonAPI.MCPHealthSnapshot] = [:]
     /// Every volume that is low on space (#195), as the daemon last said. Replaced whole
     /// by each `disk/changed`. Empty from a daemon too old to say, which draws nothing.
     public private(set) var disk = DiskState()
     /// Every folder's worktrees on each host (#790), for Activity ▸ Worktrees, as last
     /// asked: a list, not kept up by the host, so asked again when the page is shown.
-    public private(set) var worktrees: [HostID: [DaemonAPI.FolderWorktrees]] = [:]
+    public private(set) var worktrees: [MachineRef: [DaemonAPI.FolderWorktrees]] = [:]
     /// Each worktree's size as `worktrees/sized` last said, by host and root, newer than
     /// any list: a chooser or a page already drawn fills in from here.
-    public private(set) var worktreeSizes: [HostID: [URL: DaemonAPI.WorktreeSize]] = [:]
+    public private(set) var worktreeSizes: [MachineRef: [URL: DaemonAPI.WorktreeSize]] = [:]
     /// The newest events (042), newest first, as far back as has been paged in. A new
     /// or changed event from `events/changed` is put in by its position. Empty until a
     /// page has been asked for, and on a daemon too old to have events.
@@ -444,10 +444,10 @@ public final class AgentsModel {
         case leasesChanged(DaemonAPI.LeaseSnapshot)
         case hostedMCPChanged(DaemonAPI.HostedMCPSnapshot)
         /// From the Mac until `stamp` says which host.
-        case mcpHealthChanged(DaemonAPI.MCPHealthSnapshot, host: HostID)
+        case mcpHealthChanged(DaemonAPI.MCPHealthSnapshot, host: MachineRef)
         case diskChanged(DiskState)
         /// From the Mac until `stamp` says which host.
-        case worktreesSized(DaemonAPI.WorktreesSized, host: HostID)
+        case worktreesSized(DaemonAPI.WorktreesSized, host: MachineRef)
         case eventsChanged(DaemonAPI.EventsChange)
         case modesChanged(DaemonAPI.RememberedModes)
         case wakeChanged(DaemonAPI.WakeState)
@@ -536,7 +536,7 @@ public final class AgentsModel {
     /// stamped with the host it came from before it is filed, so a window holding a
     /// server's folders beside the Mac's never mistakes one for the other.
     @discardableResult
-    public func apply(_ method: String, _ params: JSONValue?, from host: HostID) -> Bool {
+    public func apply(_ method: String, _ params: JSONValue?, from host: MachineRef) -> Bool {
         guard let update = Self.read(method, params) else { return false }
         apply(Self.stamp(update, host: host))
         return true
@@ -545,17 +545,17 @@ public final class AgentsModel {
     /// Whether this update brings a folder the model does not hold yet (#1798). A folder
     /// added comes with its ready-made workflows but no `workflow/changed` for them, so a
     /// client that listed the workflows at connect lists them again.
-    public func addsFolder(_ update: Update, from host: HostID? = nil) -> Bool {
+    public func addsFolder(_ update: Update, from host: MachineRef? = nil) -> Bool {
         guard case .folderChanged(let summary) = host.map({ Self.stamp(update, host: $0) }) ?? update else { return false }
         return !folders.contains { $0.folder.folder == summary.folder.folder && $0.host == summary.host }
     }
 
     /// Apply one notification from one of several daemons, already read off the main actor.
-    public func apply(_ update: Update, from host: HostID) {
+    public func apply(_ update: Update, from host: MachineRef) {
         apply(Self.stamp(update, host: host))
     }
 
-    public nonisolated static func stamp(_ update: Update, host: HostID) -> Update {
+    public nonisolated static func stamp(_ update: Update, host: MachineRef) -> Update {
         switch update {
         case .agentChanged(var agent):
             agent.host = host
@@ -1016,27 +1016,27 @@ public final class AgentsModel {
 
     /// One host's agents, as it just listed them. Every other host's are left alone:
     /// a server re-listing after a reconnect must not take the Mac's away (037).
-    public func replaceAgents(_ listed: [Agent], from host: HostID) {
+    public func replaceAgents(_ listed: [Agent], from host: MachineRef) {
         // A lean list (#107) keeps the lists already held for an agent: the open chat's menus.
         let held = byID.filter { $0.value.host == host }
         let stamped = listed.map { var agent = $0.keepingLists(of: held[$0.id]); agent.host = host; return agent }
         refile(byID.values.filter { $0.host != host } + stamped)
     }
 
-    public func replaceFolders(_ listed: [DaemonAPI.FolderSummary], from host: HostID) {
+    public func replaceFolders(_ listed: [DaemonAPI.FolderSummary], from host: MachineRef) {
         let stamped = listed.map { var summary = $0; summary.host = host; return summary }
         folders = (folders.filter { $0.host != host } + stamped).sorted(by: SidebarOrder.byAdded)
     }
 
     /// What an offline host last listed (#962), for a client that started while it was down:
     /// taken only when nothing of that host is held, so a live list always wins.
-    public func takeLastHeard(_ heard: DaemonAPI.HostLastHeard) {
+    public func takeLastHeard(_ heard: DaemonAPI.MachineLastHeard) {
         guard !holdsFolders(of: heard.host) else { return }
         if let agents = heard.agents { replaceAgents(agents, from: heard.host) }
         if let folders = heard.folders { replaceFolders(folders, from: heard.host) }
     }
 
-    public func holdsFolders(of host: HostID) -> Bool { folders.contains { $0.host == host } }
+    public func holdsFolders(of host: MachineRef) -> Bool { folders.contains { $0.host == host } }
 
     /// Down to the budget, never taking the terminal just written to.
     private func dropOldTerminalOutput() {
@@ -1055,13 +1055,13 @@ public final class AgentsModel {
     public func replaceBackupState(_ state: DaemonAPI.BackupState) { backupState = state }
     public func replaceRuntimeAllowances(_ allowances: RuntimeAllowances) { runtimeAllowances = allowances }
     public func replaceHostedMCP(_ snapshot: DaemonAPI.HostedMCPSnapshot) { hostedMCP = snapshot }
-    public func replaceMCPHealth(_ snapshot: DaemonAPI.MCPHealthSnapshot, from host: HostID = .mac) {
+    public func replaceMCPHealth(_ snapshot: DaemonAPI.MCPHealthSnapshot, from host: MachineRef = .mac) {
         mcpHealth[host] = snapshot
     }
 
     /// A host's MCP servers (#753); from a Mac too old to say, its hosted servers alone, as
     /// the page showed them before.
-    public func mcpHealthSnapshot(_ host: HostID = .mac) -> DaemonAPI.MCPHealthSnapshot? {
+    public func mcpHealthSnapshot(_ host: MachineRef = .mac) -> DaemonAPI.MCPHealthSnapshot? {
         if let snapshot = mcpHealth[host] { return snapshot }
         guard host == .mac, let hosted = hostedMCP else { return nil }
         return .init(servers: hosted.servers.map {
@@ -1071,20 +1071,20 @@ public final class AgentsModel {
 
     /// A host's worktrees as `worktrees/all` answered (#790). The sizes heard since are
     /// kept apart, and win: `size(of:on:)`.
-    public func replaceWorktrees(_ listed: [DaemonAPI.FolderWorktrees], from host: HostID = .mac) {
+    public func replaceWorktrees(_ listed: [DaemonAPI.FolderWorktrees], from host: MachineRef = .mac) {
         worktrees[host] = listed
         // What the list now says is as new as anything heard before it.
         worktreeSizes[host] = nil
     }
 
     /// A worktree's size, the newest heard: from `worktrees/sized`, else its list's.
-    public func size(of worktree: DaemonAPI.WorktreeSummary, on host: HostID = .mac) -> DaemonAPI.WorktreeSize? {
+    public func size(of worktree: DaemonAPI.WorktreeSummary, on host: MachineRef = .mac) -> DaemonAPI.WorktreeSize? {
         worktreeSizes[host]?[worktree.root] ?? worktree.size
     }
 
     /// A host's worktrees with the sizes heard since filled in, each folder's in
     /// `cleanupOrder`, the folders holding the most idle first.
-    public func worktreesForCleanup(on host: HostID = .mac) -> [DaemonAPI.FolderWorktrees] {
+    public func worktreesForCleanup(on host: MachineRef = .mac) -> [DaemonAPI.FolderWorktrees] {
         let sized = (worktrees[host] ?? []).map { group in
             DaemonAPI.FolderWorktrees(folder: group.folder, worktrees: group.worktrees.map { worktree in
                 var worktree = worktree
@@ -1640,7 +1640,7 @@ public final class AgentsModel {
     ///   - available: the runtimes that can be started now, in the host's order.
     ///   - kept: the runtime the client's start form was last left on.
     ///   - host: the machine that will start the new agent.
-    public func defaultRuntimeID(available: [String], kept: String?, host: HostID = .mac) -> String? {
+    public func defaultRuntimeID(available: [String], kept: String?, host: MachineRef = .mac) -> String? {
         let lastUsed = agents.first { $0.host == host }?.runtimeID
         return RuntimeCatalog.newSessionRuntime(lastUsed: lastUsed, kept: kept, available: available)
     }
@@ -1993,7 +1993,7 @@ public final class WorkflowRunShelf {
 /// Where a folder's shelf is kept: its folder, standardized, and its host.
 private struct ShelfKey: Hashable {
     var folder: URL
-    var host: HostID
+    var host: MachineRef
 }
 
 private extension Dictionary where Key == AgentGroup, Value == [Agent] {

@@ -6,11 +6,11 @@ import Foundation
 public enum PeerWire {
     public enum Frame: Sendable {
         /// A host frame, for a stream one copy carries to a host the other holds.
-        case stream(HostID, ControlWire.HostFrame)
+        case stream(MachineRef, ControlWire.HostFrame)
         /// The sender no longer holds the host.
-        case gone(HostID, epoch: Int)
+        case gone(MachineRef, epoch: Int)
         /// The sender holds the host now (or no longer, when offline).
-        case host(HostID, online: Bool, epoch: Int)
+        case host(MachineRef, online: Bool, epoch: Int)
         /// A change a person made, applied at every copy.
         case event(ControlEvent)
         /// A client here said where the person is, and whether it is a device's say. On
@@ -24,15 +24,15 @@ public enum PeerWire {
     }
 
     /// `{"p":"H","c":…}` from a host frame's line.
-    public static func frame(_ host: HostID, _ hostLine: String) -> String {
+    public static func frame(_ host: MachineRef, _ hostLine: String) -> String {
         #"{"p":""# + host.rawValue + #"","# + hostLine.dropFirst()
     }
 
-    public static func gone(_ host: HostID, epoch: Int) -> String {
+    public static func gone(_ host: MachineRef, epoch: Int) -> String {
         #"{"p":""# + host.rawValue + #"","gone":{"epoch":"# + String(epoch) + "}}"
     }
 
-    public static func host(_ host: HostID, online: Bool, epoch: Int) -> String {
+    public static func host(_ host: MachineRef, online: Bool, epoch: Int) -> String {
         encode(["host": .object(["id": .string(host.rawValue), "state": .string(online ? "online" : "offline"),
                                  "epoch": .int(epoch)])])
     }
@@ -61,7 +61,7 @@ public enum PeerWire {
         if line.hasPrefix(#"{"p":""#) {
             let rest = line.dropFirst(6)
             guard let quote = rest.firstIndex(of: "\"") else { return nil }
-            let host = HostID(rawValue: String(rest[..<quote]))
+            let host = MachineRef(rawValue: String(rest[..<quote]))
             let after = rest[rest.index(after: quote)...]
             guard after.hasPrefix(",") else { return nil }
             let hostLine = "{" + after.dropFirst()
@@ -73,7 +73,7 @@ public enum PeerWire {
         }
         guard let object = try? JSONValue.parse(Data(line.utf8)).objectValue else { return nil }
         if let host = object["host"], let id = host["id"]?.stringValue {
-            return .host(HostID(rawValue: id), online: host["state"]?.stringValue == "online",
+            return .host(MachineRef(rawValue: id), online: host["state"]?.stringValue == "online",
                          epoch: host["epoch"]?.intValue ?? 0)
         }
         if let event = object["event"], let decoded = try? event.decode(ControlEvent.self) {

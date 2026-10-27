@@ -16,7 +16,7 @@ extension AppModel {
 
     /// Made, saved where the person says, and read, with the busy sheet up while the host
     /// works (#2437); the save panel goes up between. One at a time.
-    private func export(_ request: DaemonAPI.AgentsExportRequest, on host: HostID) async {
+    private func export(_ request: DaemonAPI.AgentsExportRequest, on host: MachineRef) async {
         guard exportImport == nil else { return }
         let client = client(for: host)
         let progress = ExportImportProgress(.export)

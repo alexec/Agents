@@ -3,17 +3,17 @@ import Foundation
 /// The Console (#1804): the control plane's app for its admins, on the web page. The window
 /// and the Remote do not draw it; these types are here so `WebSignatures` names them.
 public extension DaemonAPI {
-    /// One machine on Console ▸ Machines: its `hosts/list` row, whose it is, and how many of
+    /// One machine on Console ▸ Machines: its `machines/list` row, whose it is, and how many of
     /// its agents were running when it last listed them. Numbers only.
     struct FleetMachine: Codable, Sendable, Hashable {
-        public var host: ControlHost
+        public var host: ControlMachine
         /// Its person's or bot's name; empty when nobody owns it.
         public var ownerName: String
         public var bot: Bool
         public var running: Int?
         public var heardAt: Date?
 
-        public init(host: ControlHost, ownerName: String, bot: Bool, running: Int? = nil, heardAt: Date? = nil) {
+        public init(host: ControlMachine, ownerName: String, bot: Bool, running: Int? = nil, heardAt: Date? = nil) {
             self.host = host
             self.ownerName = ownerName
             self.bot = bot
@@ -113,10 +113,10 @@ public extension DaemonAPI {
 
     /// `console/stopAgent` (#2019, M9): an admin stops one agent on any machine.
     struct ConsoleStopAgent: Codable, Sendable, Hashable {
-        public var host: HostID
+        public var host: MachineRef
         public var agent: UUID
 
-        public init(host: HostID, agent: UUID) {
+        public init(host: MachineRef, agent: UUID) {
             self.host = host
             self.agent = agent
         }

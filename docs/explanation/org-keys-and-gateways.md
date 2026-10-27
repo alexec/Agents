@@ -32,7 +32,7 @@ Each machine has its own P-256 key; the control plane has its public half. When 
 changes, the control plane opens the envelope and seals each value again, with HPKE
 (P-256, HKDF-SHA256, AES-256-GCM), to the key of each machine that may use the route. The
 associated data is the route, the machine and the route's version. It sends the result on
-the machine's channel 0 (`host/orgRoutes`) within 5 seconds, from every copy.
+the machine's channel 0 (`machine/orgRoutes`) within 5 seconds, from every copy.
 
 - A relay, a log or another copy that sees the message cannot open it.
 - A file copied to another machine does not open there.

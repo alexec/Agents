@@ -3,7 +3,7 @@
 //
 // A host joins by dialling the control plane. A server that this machine reaches only
 // through a ProxyJump or ProxyCommand can rarely dial back. For such a server,
-// hosts/install gives a code whose address is https://127.0.0.1:<port> and leaves a
+// machines/install gives a code whose address is https://127.0.0.1:<port> and leaves a
 // record here. This holds "ssh -N -R" to it, so that address on the server is this
 // control plane's listener. The certificate is checked by its pin, so the name does not
 // matter.
@@ -54,13 +54,13 @@ type Record struct {
 	Made       records.Stamp `json:"made"`
 }
 
-// Tunnel is DaemonAPI.HostTunnel: whether ssh has the server's end of the tunnel open
+// Tunnel is DaemonAPI.MachineTunnel: whether ssh has the server's end of the tunnel open
 // now, and why not, in ssh's words, when it said any.
-type Tunnel = wire.HostTunnel
+type Tunnel = wire.MachineTunnel
 
-// Changed is DaemonAPI.HostTunnelChanged, the params of control/tunnelChanged. It is
+// Changed is DaemonAPI.MachineTunnelChanged, the params of control/tunnelChanged. It is
 // by name, because a server's tunnel is up before it joins.
-type Changed = wire.HostTunnelChanged
+type Changed = wire.MachineTunnelChanged
 
 // Prefix is HostTunnels.prefix.
 const Prefix = "v1/tunnels/"
@@ -82,7 +82,7 @@ type Config struct {
 	// SSH is the ssh to run: "" is AGENTS_SSH, else DefaultSSH.
 	SSH string
 	// Env is the environment ssh runs with. Nil is this process's own, less what
-	// HostInstall.environment(keepAgent: true) takes out.
+	// MachineInstall.environment(keepAgent: true) takes out.
 	Env []string
 	// ConfigFile is an ssh config for tests, given with -F: "" is AGENTS_SSH_CONFIG,
 	// else the person's own ~/.ssh/config.
@@ -90,7 +90,7 @@ type Config struct {
 	// Port is the port on both ends: this machine's listener (configuration.port).
 	Port int
 	// Hosts are the control plane's hosts now (methods.allHosts).
-	Hosts func(ctx context.Context) []records.HostRecord
+	Hosts func(ctx context.Context) []records.MachineRecord
 	// Changed is told when a tunnel comes up or goes down. Nil: nobody.
 	Changed func(Changed)
 	// Log takes a line for the log. Nil: none.
@@ -113,7 +113,7 @@ type Tunnels struct {
 	store   store.Store
 	ssh     sshCommand
 	port    int
-	hosts   func(ctx context.Context) []records.HostRecord
+	hosts   func(ctx context.Context) []records.MachineRecord
 	changed func(Changed)
 	log     func(string)
 	asleep  func(host string) bool
@@ -153,7 +153,7 @@ func New(c Config) *Tunnels {
 	}
 	hosts := c.Hosts
 	if hosts == nil {
-		hosts = func(context.Context) []records.HostRecord { return nil }
+		hosts = func(context.Context) []records.MachineRecord { return nil }
 	}
 	log := c.Log
 	if log == nil {
@@ -483,7 +483,7 @@ func (t *Tunnels) Reconcile(ctx context.Context) {
 
 // joined is HostTunnels.joined: the host that spent this record's code. When the code
 // has been swept, it is a host of the record's name that no other tunnel carries.
-func (t *Tunnels) joined(ctx context.Context, record Record, known []records.HostRecord) *string {
+func (t *Tunnels) joined(ctx context.Context, record Record, known []records.MachineRecord) *string {
 	if object, err := t.store.Get(ctx, spentKey(record.Code)); err == nil && object != nil {
 		var spent struct {
 			Host *string `json:"host"`
@@ -602,7 +602,7 @@ func (t *Tunnels) sayState(ctx context.Context, id string, state Tunnel) {
 		}
 	}
 	t.log(line)
-	t.changed(Changed{Name: record.Name, Host: (*wire.HostID)(record.Host), Tunnel: state})
+	t.changed(Changed{Name: record.Name, Host: (*wire.MachineRef)(record.Host), Tunnel: state})
 }
 
 func sameTunnel(a, b Tunnel) bool {

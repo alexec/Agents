@@ -11,11 +11,11 @@ enum KeptThisMacHost {
 
     private struct Kept: Codable {
         var controlKey: Data
-        var host: DaemonAPI.ControlHost
+        var host: DaemonAPI.ControlMachine
     }
 
     /// The host kept for the control plane with `controlKey`, if it is on this machine.
-    static func read(controlKey: Data, machine: String = MachineID.current, from defaults: UserDefaults) -> DaemonAPI.ControlHost? {
+    static func read(controlKey: Data, machine: String = MachineID.current, from defaults: UserDefaults) -> DaemonAPI.ControlMachine? {
         guard let data = defaults.data(forKey: defaultsKey),
               let kept = try? JSONDecoder().decode(Kept.self, from: data),
               kept.controlKey == controlKey, kept.host.machineID == machine, kept.host.id != .mac else { return nil }
@@ -23,7 +23,7 @@ enum KeptThisMacHost {
     }
 
     /// The host on this machine in `listed`, kept; none there forgets the one kept.
-    static func keep(from listed: [DaemonAPI.ControlHost], controlKey: Data, machine: String = MachineID.current,
+    static func keep(from listed: [DaemonAPI.ControlMachine], controlKey: Data, machine: String = MachineID.current,
                      in defaults: UserDefaults) {
         guard let mine = listed.first(where: { $0.machineID == machine && $0.runsAgents && $0.id != .mac }) else {
             defaults.removeObject(forKey: defaultsKey)

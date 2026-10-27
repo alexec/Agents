@@ -191,7 +191,7 @@ private struct MachineProviderRow: View {
         }
     }
 
-    private func stop(_ host: HostID, confirmed: Bool) async {
+    private func stop(_ host: MachineRef, confirmed: Bool) async {
         let answer = await model.stopMachine(host: host, confirmed: confirmed)
         if let ask = answer.ask { stopAsk = ask } else { say(answer.refused) }
     }
@@ -308,7 +308,7 @@ private struct LinkWorkspaceToHostSheet: View {
     @Environment(\.dismiss) private var dismiss
     let provider: DaemonAPI.ProviderSummary
     let workspace: DaemonAPI.MachineInfo
-    @State private var host: HostID?
+    @State private var host: MachineRef?
     @State private var startWhenUsed = true
     @State private var idle = WorkspaceLink.defaultIdleMinutes
     @State private var problem: String?
@@ -322,7 +322,7 @@ private struct LinkWorkspaceToHostSheet: View {
                         Text(MachineProviderWords.noHosts)
                     } else {
                         Picker("Machine", selection: $host) {
-                            ForEach(hosts) { Text($0.name).tag(HostID?.some($0.id)) }
+                            ForEach(hosts) { Text($0.name).tag(MachineRef?.some($0.id)) }
                         }
                         Toggle("Start when used", isOn: $startWhenUsed)
                         Picker("Stop when idle", selection: $idle) {

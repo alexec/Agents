@@ -12,7 +12,7 @@ public actor HostCopies {
     /// The most sessions kept for one host: a page's worth, as the clients list them.
     public static let agentsKept = 500
     static let prefix = "v1/copies/"
-    static func key(_ host: HostID) -> String { prefix + host.rawValue + ".json" }
+    static func key(_ host: MachineRef) -> String { prefix + host.rawValue + ".json" }
 
     struct Copy: Codable, Equatable {
         var folders: JSONValue?
@@ -21,8 +21,8 @@ public actor HostCopies {
     }
 
     private let store: any ControlStore
-    private var copies: [HostID: Copy] = [:]
-    private var read: Set<HostID> = []
+    private var copies: [MachineRef: Copy] = [:]
+    private var read: Set<MachineRef> = []
 
     public init(store: any ControlStore) { self.store = store }
 
@@ -45,7 +45,7 @@ public actor HostCopies {
 
     /// A host's reply to a request `keeps` chose, as it came: a success is kept, anything
     /// else is not.
-    public func take(_ host: HostID, method: String, reply: String) async {
+    public func take(_ host: MachineRef, method: String, reply: String) async {
         guard case .success(_, let result)? = try? JSONRPCCodec.decode(line: reply),
               case .array(let items) = result else { return }
         var copy = await current(host) ?? Copy(heardAt: Date())
@@ -60,9 +60,9 @@ public actor HostCopies {
         _ = try? await store.put(Self.key(host), data, when: .always)
     }
 
-    /// What the host last said, for `hosts/lastHeard`: its folders and live sessions as it
+    /// What the host last said, for `machines/lastHeard`: its folders and live sessions as it
     /// listed them, and when; nothing when it never has.
-    public func lastHeard(_ host: HostID) async -> JSONValue {
+    public func lastHeard(_ host: MachineRef) async -> JSONValue {
         guard let copy = await current(host) else { return ["host": .string(host.rawValue)] }
         var said: [String: JSONValue] = ["host": .string(host.rawValue)]
         said["folders"] = copy.folders
@@ -72,13 +72,13 @@ public actor HostCopies {
     }
 
     /// A host removed: what was kept of it goes.
-    public func forget(_ host: HostID) async {
+    public func forget(_ host: MachineRef) async {
         copies[host] = nil
         read.insert(host)
         try? await store.delete(Self.key(host))
     }
 
-    private func current(_ host: HostID) async -> Copy? {
+    private func current(_ host: MachineRef) async -> Copy? {
         if !read.contains(host) {
             read.insert(host)
             if copies[host] == nil, let object = try? await store.get(Self.key(host)),
@@ -91,10 +91,10 @@ public actor HostCopies {
 }
 
 public extension DaemonAPI {
-    /// `hosts/lastHeard`'s answer (#962): what a host last listed, for a client that starts
+    /// `machines/lastHeard`'s answer (#962): what a host last listed, for a client that starts
     /// while it is offline. Each is missing when the host has never listed it here.
-    struct HostLastHeard: Codable, Sendable {
-        public var host: HostID
+    struct MachineLastHeard: Codable, Sendable {
+        public var host: MachineRef
         public var folders: [FolderSummary]?
         public var agents: [Agent]?
         public var heardAt: Date?
@@ -102,6 +102,6 @@ public extension DaemonAPI {
 }
 
 public extension DaemonAPI.Method {
-    /// `HostRequest` → `HostLastHeard`.
-    static let hostsLastHeard = "hosts/lastHeard"
+    /// `MachineRequest` → `MachineLastHeard`.
+    static let hostsLastHeard = "machines/lastHeard"
 }

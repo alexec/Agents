@@ -1,35 +1,39 @@
 Admitted full
-{"client":"CLIENT","host":"HOST","grant":"GRANT"}
+{"client":"6F9619FF-8B86-D011-B42D-00C04FC964FF","host":"HOST","grant":"GRANT"}
 Admitted zero
 {}
 ChannelOpen full
-{"grant":"GRANT","client":"CLIENT","device":"DEVICE","relayed":true,"tunnel":"TUNNEL","tunnelRef":"TUNNELREF","fanOut":true}
+{"grant":"GRANT","client":"CLIENT","device":"6F9619FF-8B86-D011-B42D-00C04FC964FF","relayed":true,"tunnel":"TUNNEL","tunnelRef":"TUNNELREF","fanOut":true,"actor":{"user":"USER","userName":"USERNAME","client":"6F9619FF-8B86-D011-B42D-00C04FC964FF","clientName":"CLIENTNAME","event":{"kind":"unknown","id":"ID"},"scim":{"provider":"PROVIDER","token":"TOKEN"},"refresh":{"provider":"PROVIDER"}}}
 ChannelOpen zero
 {"grant":"","client":""}
 ClientAnnounce full
-{"id":"ID","publicKey":"AQID","name":"NAME","kind":"iPhone"}
+{"id":"6F9619FF-8B86-D011-B42D-00C04FC964FF","publicKey":"AQID","name":"NAME","kind":"unknown"}
 ClientAnnounce zero
 {"id":"","publicKey":null,"name":"","kind":"unknown"}
 ClientConnection full
-{"client":"CLIENT","relayed":true,"through":"THROUGH"}
+{"client":"6F9619FF-8B86-D011-B42D-00C04FC964FF","relayed":true,"through":"THROUGH"}
 ClientConnection zero
 {"client":"","relayed":false}
 ClientRecord full
-{"id":"ID","name":"NAME","kind":"iPhone","publicKey":"AQID","grant":"GRANT","paired":813922215.25,"lastSeen":813922215.25,"mayNotify":true,"owner":"OWNER","rev":7,"forgotten":true,"forgottenAt":813922215.25,"knownEpoch":7}
+{"id":"6F9619FF-8B86-D011-B42D-00C04FC964FF","name":"NAME","kind":"unknown","publicKey":"AQID","grant":"GRANT","paired":813922215.25,"lastSeen":813922215.25,"mayNotify":true,"owner":"OWNER","rev":7,"forgotten":true,"forgottenAt":813922215.25,"knownEpoch":7}
 ClientRecord zero
 {"id":"","name":"","kind":"unknown","publicKey":null,"grant":"","paired":0,"rev":0}
 ControlCodeShown full
 {"text":"TEXT","expires":813922215.25,"command":"COMMAND"}
 ControlCodeShown zero
 {"text":"","expires":0}
-ControlHost full
-{"id":"ID","name":"NAME","platform":"PLATFORM","version":"VERSION","state":"STATE","reach":"REACH","machineID":"MACHINEID","relay":true,"signInFrom":{"KEY":"SIGNINFROM"},"gitFrom":{"KEY":"GITFROM"},"gitAsks":[{"server":"SERVER","from":"FROM"}],"tunnel":{"up":true,"problem":"PROBLEM"},"workspace":{"provider":"PROVIDER","providerName":"PROVIDERNAME","workspace":"WORKSPACE","workspaceName":"WORKSPACENAME","workspaceState":"WORKSPACESTATE","hostState":"HOSTSTATE","phase":"PHASE","since":813922215.25,"problem":"PROBLEM","stoppedBy":"STOPPEDBY","canStart":true,"canStop":true,"startWhenUsed":true,"stopWhenIdleMinutes":7,"cost":"COST","current":true,"startForSchedules":true,"tellsSchedule":true,"nextWorkflow":"NEXTWORKFLOW","nextWorkflowAt":813922215.25,"wakeAt":813922215.25},"implementation":"IMPLEMENTATION"}
-ControlHost zero
+ControlMachine full
+{"id":"ID","name":"NAME","platform":"PLATFORM","version":"VERSION","state":"STATE","reach":"REACH","machineID":"MACHINEID","relay":true,"signInFrom":{"KEY":"SIGNINFROM"},"gitFrom":{"KEY":"GITFROM"},"gitAsks":[{"server":"SERVER","from":"FROM"}],"tunnel":{"up":true,"problem":"PROBLEM"},"workspace":{"provider":"PROVIDER","providerName":"PROVIDERNAME","workspace":"WORKSPACE","workspaceName":"WORKSPACENAME","workspaceState":"WORKSPACESTATE","hostState":"HOSTSTATE","phase":"PHASE","since":813922215.25,"problem":"PROBLEM","stoppedBy":"STOPPEDBY","canStart":true,"canStop":true,"startWhenUsed":true,"stopWhenIdleMinutes":7,"cost":"COST","current":true,"startForSchedules":true,"tellsSchedule":true,"nextWorkflow":"NEXTWORKFLOW","nextWorkflowAt":813922215.25,"wakeAt":813922215.25},"implementation":"IMPLEMENTATION","capabilities":["CAPABILITIES"],"missing":["MISSING"],"owner":"OWNER"}
+ControlMachine zero
 {"id":"","name":"","platform":"","version":"","state":"","reach":""}
 ControlStatus full
-{"name":"NAME","version":"VERSION","homeHost":"HOMEHOST","machineID":"MACHINEID","startedAt":813922215.25,"port":7,"awayFromHome":true,"you":"YOU","relayKey":"AQID","web":{"port":7,"served":true,"reason":"REASON","detail":"DETAIL"},"thisMacHost":{"member":true,"connected":true,"problem":"PROBLEM","at":813922215.25},"folderDetection":{"enabled":true,"paths":["PATHS"]},"unjoinedTunnels":[{"name":"NAME","host":"HOST","tunnel":{"up":true,"problem":"PROBLEM"}}]}
+{"name":"NAME","version":"VERSION","homeHost":"HOMEHOST","machineID":"MACHINEID","startedAt":813922215.25,"port":7,"awayFromHome":true,"you":"6F9619FF-8B86-D011-B42D-00C04FC964FF","relayKey":"AQID","web":{"port":7,"served":true,"reason":"REASON","detail":"DETAIL"},"publicWeb":"PUBLICWEB","publicViews":"PUBLICVIEWS","thisMacHost":{"member":true,"connected":true,"problem":"PROBLEM","at":813922215.25},"folderDetection":{"enabled":true,"paths":["PATHS"]},"unjoinedTunnels":[{"name":"NAME","host":"HOST","tunnel":{"up":true,"problem":"PROBLEM"}}],"capabilities":["CAPABILITIES"],"required":{"host":["HOST"],"client":["CLIENT"]},"person":{"id":"ID","name":"NAME","role":"ROLE","localOwner":true},"joinCommand":"JOINCOMMAND"}
 ControlStatus zero
 {"name":"","version":"","machineID":""}
+FolderDetection full
+{"enabled":true,"paths":["PATHS"]}
+FolderDetection zero
+{"enabled":false,"paths":null}
 GitAsk full
 {"server":"SERVER","from":"FROM"}
 GitAsk zero
@@ -39,33 +43,13 @@ GitCredentialRequest full
 GitCredentialRequest zero
 {"protocol":"","host":""}
 HandoverMember full
-{"id":"ID","name":"NAME","kind":"KIND","knownEpoch":7,"version":"VERSION","online":true,"lastSeen":813922215.25}
+{"id":"ID","name":"NAME","kind":"unknown","knownEpoch":7,"version":"VERSION","online":true,"lastSeen":813922215.25}
 HandoverMember zero
-{"id":"","name":"","kind":""}
+{"id":"","name":"","kind":"unknown"}
 HandoverStatus full
-{"phase":"PHASE","controlKey":"AQID","hasRecords":true,"endpoints":[{"url":"URL","pin":"PIN"}],"epoch":7,"members":[{"id":"ID","name":"NAME","kind":"KIND","knownEpoch":7,"version":"VERSION","online":true,"lastSeen":813922215.25}],"forwardingUntil":813922215.25}
+{"phase":"PHASE","controlKey":"AQID","hasRecords":true,"endpoints":[{"url":"URL","pin":"PIN"}],"epoch":7,"members":[{"id":"ID","name":"NAME","kind":"unknown","knownEpoch":7,"version":"VERSION","online":true,"lastSeen":813922215.25}],"forwardingUntil":813922215.25}
 HandoverStatus zero
 {"phase":"","controlKey":null,"hasRecords":false,"endpoints":null,"members":null}
-HostAnnounce full
-{"publicKey":"AQID","name":"NAME","platform":"PLATFORM","version":"VERSION","machineID":"MACHINEID","relay":true,"implementation":"IMPLEMENTATION"}
-HostAnnounce zero
-{"publicKey":null,"name":"","platform":"","version":"","machineID":""}
-HostHello full
-{"host":"HOST","version":"VERSION","platform":"PLATFORM","machineID":"MACHINEID","name":"NAME","relay":true,"implementation":"IMPLEMENTATION"}
-HostHello zero
-{"version":"","platform":"","machineID":""}
-HostJoinStatus full
-{"member":true,"connected":true,"problem":"PROBLEM","at":813922215.25}
-HostJoinStatus zero
-{"member":false,"connected":false,"at":0}
-HostRelayRequest full
-{"host":"HOST","relay":true}
-HostRelayRequest zero
-{"host":"","relay":false}
-HostRequest full
-{"host":"HOST","purge":true}
-HostRequest zero
-{"host":""}
 LendGit full
 {"host":"HOST","from":"FROM","server":"SERVER","allowed":true}
 LendGit zero
@@ -74,12 +58,30 @@ LendSignIn full
 {"host":"HOST","from":"FROM","runtime":"RUNTIME","allowed":true}
 LendSignIn zero
 {"host":"","from":"","runtime":"","allowed":false}
+MachineAnnounce full
+{"publicKey":"AQID","name":"NAME","platform":"PLATFORM","version":"VERSION","machineID":"MACHINEID","relay":true,"implementation":"IMPLEMENTATION"}
+MachineAnnounce zero
+{"publicKey":null,"name":"","platform":"","version":"","machineID":""}
+MachineHello full
+{"host":"HOST","version":"VERSION","platform":"PLATFORM","machineID":"MACHINEID","name":"NAME","relay":true,"implementation":"IMPLEMENTATION","capabilities":["CAPABILITIES"]}
+MachineHello zero
+{"version":"","platform":"","machineID":""}
+MachineJoinStatus full
+{"member":true,"connected":true,"problem":"PROBLEM","at":813922215.25}
+MachineJoinStatus zero
+{"member":false,"connected":false,"at":0}
+MachineRelayRequest full
+{"host":"HOST","relay":true}
+MachineRelayRequest zero
+{"host":"","relay":false}
+MachineRequest full
+{"host":"HOST","purge":true}
+MachineRequest zero
+{"host":""}
 PresenceReport full
-{"watching":"WATCHING","active":true,"mayNotify":true}
-FolderDetection full
-{"enabled":true,"paths":["PATHS"]}
-FolderDetection zero
-{"enabled":false,"paths":null}
+{"watching":"6F9619FF-8B86-D011-B42D-00C04FC964FF","active":true,"mayNotify":true,"showing":"6F9619FF-8B86-D011-B42D-00C04FC964FF","alsoShowing":["6F9619FF-8B86-D011-B42D-00C04FC964FF"]}
+PresenceReport zero
+{"active":false}
 TunnelOpen full
 {"runtime":"RUNTIME","ref":"REF"}
 TunnelOpen zero

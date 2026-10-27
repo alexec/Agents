@@ -204,7 +204,7 @@ func (m *Methods) live(ctx context.Context) wire.LiveBoard {
 			if !liveStates[a.State] {
 				continue
 			}
-			row := wire.LiveAgent{Host: wire.HostID(h.ID), HostName: h.Name, Owner: owner, OwnerName: ownerName,
+			row := wire.LiveAgent{Host: wire.MachineRef(h.ID), HostName: h.Name, Owner: owner, OwnerName: ownerName,
 				Bot: m.s.isBot(owner), Agent: wire.UUID(a.ID), Runtime: a.RuntimeID, State: wire.AgentState(a.State),
 				Since: a.CreatedAt, CostToDate: a.CostToDate, HeardAt: &heard}
 			if a.StartedByWorkflow != "" {
@@ -293,7 +293,7 @@ func (m *Methods) teamWorkflows(ctx context.Context, now time.Time) (wire.TeamWo
 			if !liveStates[a.State] {
 				continue
 			}
-			run := wire.TeamBotRun{Host: wire.HostID(h.ID), HostName: h.Name, Agent: wire.UUID(a.ID), Since: a.CreatedAt}
+			run := wire.TeamBotRun{Host: wire.MachineRef(h.ID), HostName: h.Name, Agent: wire.UUID(a.ID), Since: a.CreatedAt}
 			if a.StartedByWorkflow != "" {
 				workflow := a.StartedByWorkflow
 				run.Workflow = &workflow

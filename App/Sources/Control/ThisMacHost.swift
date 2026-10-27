@@ -10,7 +10,7 @@ import Foundation
 enum ThisMacHost {
     /// `hosts` nil: no list yet, so this Mac is `.mac`. A list that names this machine:
     /// that host. Otherwise this Mac is not a host.
-    static func resolve(_ hosts: [DaemonAPI.ControlHost]?, machine: String = MachineID.current) -> HostID? {
+    static func resolve(_ hosts: [DaemonAPI.ControlMachine]?, machine: String = MachineID.current) -> MachineRef? {
         guard let hosts else { return .mac }
         return hosts.first(where: { $0.machineID == machine && $0.runsAgents })?.id
     }

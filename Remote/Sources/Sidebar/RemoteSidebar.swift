@@ -62,7 +62,7 @@ struct RemoteSidebar: View {
         MCPHealthWords.tally(model.work.mcpHealthSnapshot()?.personal ?? [])?.failing == true
     }
 
-    private var servers: [HostID] {
+    private var servers: [MachineRef] {
         model.hostSections.map(\.id).filter { $0 != .mac }
     }
 

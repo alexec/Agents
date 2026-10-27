@@ -1,10 +1,10 @@
 package hostinstall
 
 import (
-	"github.com/alexec/agents/Go/wire"
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/alexec/agents/Go/wire"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,7 +18,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 )
 
-// Ports HostInstallTests: how hosts/install runs ssh, with a key and without one (#413).
+// Ports HostInstallTests: how machines/install runs ssh, with a key and without one (#413).
 
 const knownHostsPath = "/tmp/agents-install-x/known_hosts"
 
@@ -213,7 +213,7 @@ func TestATunnelRecordIsStoredAsSwiftStoresIt(t *testing.T) {
 	}
 }
 
-// The whole of hosts/install, on the fake ssh.
+// The whole of machines/install, on the fake ssh.
 
 func reply(t *testing.T) func(any, error) map[string]any {
 	return func(got any, err error) map[string]any {
@@ -488,7 +488,7 @@ func TestCheckAgainDoesNothing(t *testing.T) {
 	}
 }
 
-// hosts/update (#1766): the server given again, its host key trusted as at an install, and
+// machines/update (#1766): the server given again, its host key trusted as at an install, and
 // its root this host's. Then the files are copied and the host starts again as itself: its
 // membership stays, and no code is left.
 func TestAnUpdateCopiesTheHostAndStartsItAgainAsItself(t *testing.T) {
@@ -499,7 +499,7 @@ func TestAnUpdateCopiesTheHostAndStartsItAgainAsItself(t *testing.T) {
 	var steps []string
 	codes := &fakeCodes{}
 	trust := hostKeyFingerprint
-	update := wire.HostUpdate{Host: "dev-box", Destination: "agents@devbox.lan", Trust: &trust}
+	update := wire.MachineUpdate{Host: "dev-box", Destination: "agents@devbox.lan", Trust: &trust}
 	got := reply(t)(f.installer(codes, &steps).Update(context.Background(), update, "Dev box"))
 	if !reflect.DeepEqual(got, map[string]any{"updated": true, "name": "Dev box"}) {
 		t.Fatalf("%v", got)
@@ -540,7 +540,7 @@ func TestAnUpdateToAnotherServerIsRefused(t *testing.T) {
 		var steps []string
 		trust := hostKeyFingerprint
 		_, err := f.installer(&fakeCodes{}, &steps).Update(context.Background(),
-			wire.HostUpdate{Host: "dev-box", Destination: "devbox", Trust: &trust}, "Dev box")
+			wire.MachineUpdate{Host: "dev-box", Destination: "devbox", Trust: &trust}, "Dev box")
 		if err == nil || !strings.Contains(err.Error(), c.want) {
 			t.Fatalf("%q: %v", c.member, err)
 		}

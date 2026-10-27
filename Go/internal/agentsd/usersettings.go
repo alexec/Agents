@@ -20,7 +20,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// The user scope on this machine (#1760, spec 736 US4): host/userSettings, which the
+// The user scope on this machine (#1760, spec 736 US4): machine/userSettings, which the
 // control plane sends on channel 0 when this machine joins and when its person's settings
 // or secrets change. Each part goes into the file this machine already reads:
 //
@@ -79,9 +79,9 @@ func (d *Daemon) userMarkLocked() userSettingsSyncState {
 	return *d.userMark
 }
 
-// toldUserSettings is host/userSettings.
+// toldUserSettings is machine/userSettings.
 func (d *Daemon) toldUserSettings(params json.RawMessage) {
-	var u wire.HostUserSettings
+	var u wire.MachineUserSettings
 	if err := json.Unmarshal(params, &u); err != nil {
 		log.Printf("user settings: %v", err)
 		return
@@ -92,7 +92,7 @@ func (d *Daemon) toldUserSettings(params json.RawMessage) {
 }
 
 // ApplyUserSettings writes what the control plane sent. Its errors never hold a secret.
-func (d *Daemon) ApplyUserSettings(u wire.HostUserSettings) error {
+func (d *Daemon) ApplyUserSettings(u wire.MachineUserSettings) error {
 	d.userScopeMu.Lock()
 	defer d.userScopeMu.Unlock()
 	before := d.userMarkLocked()

@@ -34,7 +34,7 @@ func newControlKeys(t *testing.T) controlKeys {
 	return controlKeys{private, public}
 }
 
-// signed is host/policy for a policy of this version with these rules, signed by k.
+// signed is machine/policy for a policy of this version with these rules, signed by k.
 func (k controlKeys) signed(t *testing.T, version int64, rules map[string]any) json.RawMessage {
 	t.Helper()
 	doc := map[string]any{"version": version, "issued": now(), "requires": []string{wire.CapHostPolicy1},
@@ -94,7 +94,7 @@ func TestNoPolicyChangesNothing(t *testing.T) {
 	k := newControlKeys(t)
 	root := t.TempDir()
 	d, c := joined(t, root, k)
-	d.Told(wire.NotifyHostPolicy.Name, json.RawMessage(`{"none":true}`))
+	d.Told(wire.NotifyMachinePolicy.Name, json.RawMessage(`{"none":true}`))
 	dir := t.TempDir()
 	c.call(t, 1, "agents/start", startParams(dir, "claude", map[string]any{"mode": "bypassPermissions", "model": "opus"}))
 	var st wire.PolicyState
@@ -104,7 +104,7 @@ func TestNoPolicyChangesNothing(t *testing.T) {
 	}
 	// A policy signed by another key is no policy: it is refused, and nothing changes.
 	other := newControlKeys(t)
-	d.Told(wire.NotifyHostPolicy.Name, other.signed(t, 1, map[string]any{"modeCeiling": "ask"}))
+	d.Told(wire.NotifyMachinePolicy.Name, other.signed(t, 1, map[string]any{"modeCeiling": "ask"}))
 	if d.orgPolicy() != nil {
 		t.Fatal("a policy of another key was taken")
 	}
@@ -128,11 +128,11 @@ func TestThePolicyFileIsKeptAndChecked(t *testing.T) {
 	d.SetControl(func(method string, params any) {
 		mu.Lock()
 		defer mu.Unlock()
-		if method == wire.CallHostPolicyApplied.Name {
+		if method == wire.CallMachinePolicyApplied.Name {
 			told = append(told, params)
 		}
 	})
-	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 2, map[string]any{"modeCeiling": "acceptEdits"}))
+	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 2, map[string]any{"modeCeiling": "acceptEdits"}))
 	st, err := os.Stat(filepath.Join(root, orgPolicyFile))
 	if err != nil || st.Mode().Perm() != 0o600 {
 		t.Fatalf("%v %v", st, err)
@@ -146,17 +146,17 @@ func TestThePolicyFileIsKeptAndChecked(t *testing.T) {
 	refused(t, c.callError(t, 1, "agents/start", startParams(dir, "claude", map[string]any{"mode": "bypassPermissions"})), "policy", "modeCeiling")
 
 	// An older version is refused, and the machine keeps its own.
-	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 1, map[string]any{}))
+	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 1, map[string]any{}))
 	if p := d.orgPolicy(); p == nil || p.Version != 2 {
 		t.Fatalf("%+v", p)
 	}
 	// A forged one: signed by another key.
-	d.Told(wire.NotifyHostPolicy.Name, newControlKeys(t).signed(t, 9, map[string]any{}))
+	d.Told(wire.NotifyMachinePolicy.Name, newControlKeys(t).signed(t, 9, map[string]any{}))
 	if p := d.orgPolicy(); p == nil || p.Version != 2 {
 		t.Fatalf("%+v", p)
 	}
 	// none, while the machine holds a policy: kept.
-	d.Told(wire.NotifyHostPolicy.Name, json.RawMessage(`{"none":true}`))
+	d.Told(wire.NotifyMachinePolicy.Name, json.RawMessage(`{"none":true}`))
 	if p := d.orgPolicy(); p == nil || p.Version != 2 {
 		t.Fatalf("%+v", p)
 	}
@@ -196,7 +196,7 @@ func TestThePolicyFileIsKeptAndChecked(t *testing.T) {
 	d4.orgMu.Unlock()
 	refused(t, c4.callError(t, 3, "agents/start", startParams(dir, "claude", nil)), "noPolicy", "")
 	// The control plane sends the policy: work starts again.
-	d4.Told(wire.NotifyHostPolicy.Name, k.signed(t, 3, map[string]any{}))
+	d4.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 3, map[string]any{}))
 	c4.call(t, 4, "agents/start", startParams(dir, "claude", map[string]any{"mode": "bypassPermissions"}))
 }
 
@@ -205,7 +205,7 @@ func TestAPolicyOfTheOldKeyIsTrusted30Days(t *testing.T) {
 	k := newControlKeys(t)
 	root := t.TempDir()
 	d, _ := joined(t, root, k)
-	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 1, map[string]any{"modeCeiling": "auto"}))
+	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 1, map[string]any{"modeCeiling": "auto"}))
 	next := newControlKeys(t)
 	d.ControlKeyRotated(next.public)
 	d.orgMu.Lock()
@@ -224,7 +224,7 @@ func TestAPolicyOfTheOldKeyIsTrusted30Days(t *testing.T) {
 		t.Fatal("the old key's policy is still trusted after 30 days")
 	}
 	// The control plane signs it again with the new key, at the same version: taken.
-	d.Told(wire.NotifyHostPolicy.Name, next.signed(t, 1, map[string]any{"modeCeiling": "auto"}))
+	d.Told(wire.NotifyMachinePolicy.Name, next.signed(t, 1, map[string]any{"modeCeiling": "auto"}))
 	if p := d.orgPolicy(); p == nil || d.workRefusal() != nil {
 		t.Fatal("the policy signed again is not taken")
 	}
@@ -251,7 +251,7 @@ func TestEveryRuleAtEveryPath(t *testing.T) {
 		"helpers":      map[string]any{"mostRunning": 1, "mostNotArchived": 2},
 		"environment":  map[string]any{"passThrough": []string{"AWS_*"}},
 	}
-	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 1, rules))
+	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 1, rules))
 
 	gemini := seeded(t, d, dir, func(a *wire.Agent) { a.RuntimeID = "gemini"; a.RuntimeSessionID = new("s") })
 	opts := []wire.ConfigOption{
@@ -417,7 +417,7 @@ func TestEveryRuleAtEveryPath(t *testing.T) {
 	}
 
 	// A looser policy gives every choice back, the person's own settings unchanged.
-	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 2, map[string]any{}))
+	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 2, map[string]any{}))
 	c.call(t, 100, "agents/setOption", map[string]any{"agentID": claude.ID, "optionID": "model", "value": "claude-opus-5-5"})
 	if choice, _ := d.resolveSandbox("claude", nil, nil); choice != wire.SandboxChoiceOff {
 		t.Fatalf("the person's sandbox default did not come back: %s", choice)
@@ -451,7 +451,7 @@ func TestARunningAgentMeetsANewPolicyAtItsNextTurn(t *testing.T) {
 			Options:      json.RawMessage(`[{"value":"default"},{"value":"acceptEdits"},{"value":"bypassPermissions"}]`)}}
 		a.StartOptions.Values = map[string]wire.JSONValue{"mode": json.RawMessage(`"bypassPermissions"`)}
 	})
-	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 1, map[string]any{"modeCeiling": "acceptEdits"}))
+	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 1, map[string]any{"modeCeiling": "acceptEdits"}))
 	c.call(t, 2, "agents/prompt", map[string]any{"agentID": id, "text": "go on", "from": "person"})
 	waitFor(t, "the second turn", func() bool { return len(userMessages(d, id)) == 2 })
 	if v := stringValue(d.Store.Agent(id).StartOptions.Values["mode"]); v != "acceptEdits" {
@@ -464,7 +464,7 @@ func TestARunningAgentMeetsANewPolicyAtItsNextTurn(t *testing.T) {
 	}
 	waitFor(t, "the end", func() bool { a := d.Store.Agent(id); return a.State == wire.AgentStateFinished })
 	// Its runtime is now refused: what is sent waits, and the chat says why.
-	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 2, map[string]any{"runtimes": map[string]any{"codex": map[string]any{}}}))
+	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 2, map[string]any{"runtimes": map[string]any{"codex": map[string]any{}}}))
 	d.change(id, func(a *wire.Agent) {
 		a.QueuedPrompts = append(a.QueuedPrompts, wire.QueuedPrompt{ID: store.NewUUID(), Text: "more", QueuedAt: now(), From: wire.PromptOriginPerson})
 	})
@@ -492,7 +492,7 @@ func TestApprovingEveryRequestIsUnderTheModeCeiling(t *testing.T) {
 		CurrentValue: json.RawMessage(`"on"`),
 		Options:      json.RawMessage(`[{"value":"off"},{"value":"on"}]`)}}
 	d.change(id, func(a *wire.Agent) { a.AdvertisedOptions = opts })
-	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 1, map[string]any{"modeCeiling": "acceptEdits"}))
+	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 1, map[string]any{"modeCeiling": "acceptEdits"}))
 
 	refused(t, c.callError(t, 2, "agents/start", startParams(dir, "claude", map[string]any{"allow_all": "on"})), "policy", "modeCeiling")
 	refused(t, c.callError(t, 3, "agents/setOption", map[string]any{"agentID": id, "optionID": "allow_all", "value": "on"}), "policy", "modeCeiling")
@@ -524,7 +524,7 @@ func TestApprovingEveryRequestIsUnderTheModeCeiling(t *testing.T) {
 	}
 
 	// The loosest ceiling allows it.
-	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 2, map[string]any{"modeCeiling": "bypassPermissions"}))
+	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 2, map[string]any{"modeCeiling": "bypassPermissions"}))
 	if err := d.optionRefusal(d.Store.Agent(id), "allow_all", "on"); err != nil {
 		t.Fatal(err)
 	}
@@ -540,7 +540,7 @@ func TestTheRuntimesOwnModelIsCheckedBeforeTheFirstTurn(t *testing.T) {
 	// The fake runtime's own model in a folder called offers is opus.
 	dir := filepath.Join(t.TempDir(), "offers")
 	os.Mkdir(dir, 0o755)
-	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 1, map[string]any{"runtimes": map[string]any{"claude": map[string]any{"models": []string{"sonnet"}}}}))
+	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 1, map[string]any{"runtimes": map[string]any{"claude": map[string]any{"models": []string{"sonnet"}}}}))
 	id := startAgent(t, c, 1, dir, "hi")
 	waitFor(t, "the hold said", func() bool {
 		return slices.ContainsFunc(notes(d, id), func(s string) bool { return strings.Contains(s, "does not allow the model opus") })
@@ -607,7 +607,7 @@ func TestMarkingTheModelsGrowsWithTheList(t *testing.T) {
 	fakeRuntimes(t)
 	k := newControlKeys(t)
 	d, _ := joined(t, t.TempDir(), k)
-	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 1, map[string]any{"runtimes": map[string]any{
+	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 1, map[string]any{"runtimes": map[string]any{
 		"claude":   map[string]any{"models": []string{"claude-sonnet-*"}},
 		"opencode": map[string]any{"models": []string{"anthropic/*"}},
 	}}))
@@ -652,7 +652,7 @@ func TestTheKillSwitch(t *testing.T) {
 	})
 	c.call(t, 3, "agents/prompt", map[string]any{"agentID": a, "text": "later", "from": "person"})
 	at := time.Now()
-	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 1, map[string]any{"stopAll": map[string]any{"on": true, "by": map[string]any{"user": "priya"}, "at": now()}}))
+	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 1, map[string]any{"stopAll": map[string]any{"on": true, "by": map[string]any{"user": "priya"}, "at": now()}}))
 	waitFor(t, "both stopped", func() bool { return !inFlight(d.Store.Agent(a).State) && !inFlight(d.Store.Agent(b).State) })
 	if s := time.Since(at); s > 5*time.Second {
 		t.Fatalf("stopped after %s", s)
@@ -671,7 +671,7 @@ func TestTheKillSwitch(t *testing.T) {
 		t.Fatalf("the queued prompt went: %+v", q)
 	}
 	// Off: nothing starts by itself; the queued prompt stays until its person sends again.
-	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 2, map[string]any{"stopAll": map[string]any{"on": false, "by": map[string]any{"user": "priya"}, "at": now()}}))
+	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 2, map[string]any{"stopAll": map[string]any{"on": false, "by": map[string]any{"user": "priya"}, "at": now()}}))
 	time.Sleep(300 * time.Millisecond)
 	if q := d.Store.Agent(a).QueuedPrompts; len(q) != 1 || inFlight(d.Store.Agent(a).State) {
 		t.Fatal("something started by itself")
@@ -686,8 +686,8 @@ func TestMachineBudgets(t *testing.T) {
 	root := t.TempDir()
 	d, c := joined(t, root, k)
 	dir := t.TempDir()
-	d.toldHostUser(mustJSON(wire.HostUser{User: "sam", Kind: "person", Name: "Sam", Labels: []string{}}))
-	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 1, map[string]any{"budgets": map[string]any{"daily": 1, "dailyTokens": 50000,
+	d.toldHostUser(mustJSON(wire.MachineUser{User: "sam", Kind: "person", Name: "Sam", Labels: []string{}}))
+	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 1, map[string]any{"budgets": map[string]any{"daily": 1, "dailyTokens": 50000,
 		"allowUnmetered": []string{"grok"}, "raises": []any{}}}))
 	// An unmetered runtime not allowed is refused; one allowed is not.
 	_, err := d.policyStart(&wire.StartRequest{RuntimeID: "cursor"}, startedBy{owner: wire.SessionLabelOwnerPerson})
@@ -706,7 +706,7 @@ func TestMachineBudgets(t *testing.T) {
 	refused(t, c.callError(t, 2, "agents/start", startParams(dir, "claude", nil)), "budget", "budgets.dailyTokens")
 	// A raise for today lets the work go on.
 	today := time.Now().UTC().Format(time.DateOnly)
-	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 2, map[string]any{"budgets": map[string]any{"daily": 1, "dailyTokens": 50000,
+	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 2, map[string]any{"budgets": map[string]any{"daily": 1, "dailyTokens": 50000,
 		"allowUnmetered": []string{}, "raises": []any{map[string]any{"user": "sam", "day": today, "dailyTokens": 100000, "by": map[string]any{"user": "priya"}}}}}))
 	c.call(t, 3, "agents/start", startParams(dir, "claude", nil))
 	// The dollars: the machine refuses at its own count.
@@ -724,10 +724,10 @@ func TestMachineBudgets(t *testing.T) {
 		t.Fatal("the turn was not held at the budget")
 	}
 	// The control plane's count across machines wins (capReachedUntil).
-	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 3, map[string]any{"budgets": map[string]any{"daily": 100, "allowUnmetered": []string{}, "raises": []any{}}}))
+	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 3, map[string]any{"budgets": map[string]any{"daily": 100, "allowUnmetered": []string{}, "raises": []any{}}}))
 	c.call(t, 5, "agents/start", startParams(dir, "claude", nil))
 	until := wire.DateOf(endOfUTCDay(time.Now()))
-	d.toldHostUser(mustJSON(wire.HostUser{User: "sam", Kind: "person", Name: "Sam", Labels: []string{}, CapReachedUntil: &until}))
+	d.toldHostUser(mustJSON(wire.MachineUser{User: "sam", Kind: "person", Name: "Sam", Labels: []string{}, CapReachedUntil: &until}))
 	refused(t, c.callError(t, 6, "agents/start", startParams(dir, "claude", nil)), "budget", "budgets")
 }
 
@@ -746,7 +746,7 @@ func TestAMissingCapabilityRefusesEveryStart(t *testing.T) {
 	sig, _ := controllink.SignPolicy(k.private, line.Policy)
 	b, _ := json.Marshal(map[string]any{"policy": line.Policy,
 		"signature": wire.PolicySignature{Version: 1, KeyID: controllink.KeyID(k.public), Alg: controllink.PolicyAlg, Sig: sig}})
-	d.Told(wire.NotifyHostPolicy.Name, b)
+	d.Told(wire.NotifyMachinePolicy.Name, b)
 	e := c.callError(t, 1, "agents/start", startParams(t.TempDir(), "claude", nil))
 	refused(t, e, "update", "requires")
 	if !strings.Contains(e.Message, "Update Agents Host") {

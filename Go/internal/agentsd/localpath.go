@@ -29,7 +29,7 @@ import (
 // control plane's key, so a scratch control plane's host never takes the person's.
 //
 // The control plane stays the authority for who may connect. The host lets in only a
-// window the control plane lists as paired (host/clients), and keeps that list in its root
+// window the control plane lists as paired (machine/clients), and keeps that list in its root
 // for when the control plane is away. The window proves its key with the control plane's
 // own exchange (hello, auth, ok), with this host's key in place of the control plane's.
 // What it does is then what it would do through the control plane: the host tells every
@@ -42,7 +42,7 @@ const LocalGroup = "6T4RVD5724.com.alexecollins.agents"
 // for the control plane cannot be replayed here, nor one made here there.
 const localOrigin = "local:agentsd"
 
-// localClientsFile is the last host/clients, in the root.
+// localClientsFile is the last machine/clients, in the root.
 const localClientsFile = "control-clients.json"
 
 // localExchangeWait bounds the exchange: a caller that says nothing is let go.
@@ -66,12 +66,12 @@ func LocalSocketDir(home string) string {
 
 type localBook struct {
 	localMu sync.Mutex
-	// localClients is the last host/clients, by upper-case id; nil until read.
-	localClients map[string]wire.HostClient
+	// localClients is the last machine/clients, by upper-case id; nil until read.
+	localClients map[string]wire.MachineClient
 	// localConns is each connection on the local socket, and the window it proved.
 	localConns map[*sockConn]string
 	// localKept is what localClientsFile holds, read the first time; it is written only
-	// when host/clients differs from it (#1528).
+	// when machine/clients differs from it (#1528).
 	localKept []byte
 	// localKey is the control plane's key the socket is named by, and localMove ends the
 	// socket at the old name when it changes (#997).
@@ -93,12 +93,12 @@ func (d *Daemon) MoveLocal(controlKey []byte) {
 	}
 }
 
-// SetLocalClients is host/clients: the windows the control plane lists as paired. It is
+// SetLocalClients is machine/clients: the windows the control plane lists as paired. It is
 // kept in the root, and a window no longer listed (forgotten) is cut off at once.
-func (d *Daemon) SetLocalClients(list wire.HostClients) {
+func (d *Daemon) SetLocalClients(list wire.MachineClients) {
 	clients := ownUsersWindows(list)
 	if list.Clients == nil {
-		list.Clients = []wire.HostClient{}
+		list.Clients = []wire.MachineClient{}
 	}
 	b, _ := json.Marshal(list)
 	file := filepath.Join(d.Store.Loc.Root, localClientsFile)
@@ -135,12 +135,12 @@ func (d *Daemon) SetLocalClients(list wire.HostClients) {
 	}
 }
 
-// ownUsersWindows is the windows of a host/clients by upper-case id: of the host's own user
+// ownUsersWindows is the windows of a machine/clients by upper-case id: of the host's own user
 // only, when the control plane says who that is (FR-020). A window of another person is
 // never let in here, even if a control plane lists it; an older control plane, which says
 // no user, is taken at its word.
-func ownUsersWindows(list wire.HostClients) map[string]wire.HostClient {
-	clients := map[string]wire.HostClient{}
+func ownUsersWindows(list wire.MachineClients) map[string]wire.MachineClient {
+	clients := map[string]wire.MachineClient{}
 	for _, c := range list.Clients {
 		if list.User != nil && (c.Person == nil || *c.Person != *list.User) {
 			continue
@@ -152,12 +152,12 @@ func ownUsersWindows(list wire.HostClients) map[string]wire.HostClient {
 
 // localClient is a window the control plane last listed, read from the root the first
 // time, as the host may start with the control plane away.
-func (d *Daemon) localClient(id string) (wire.HostClient, bool) {
+func (d *Daemon) localClient(id string) (wire.MachineClient, bool) {
 	d.localMu.Lock()
 	defer d.localMu.Unlock()
 	if d.localClients == nil {
-		d.localClients = map[string]wire.HostClient{}
-		var kept wire.HostClients
+		d.localClients = map[string]wire.MachineClient{}
+		var kept wire.MachineClients
 		if b, err := os.ReadFile(filepath.Join(d.Store.Loc.Root, localClientsFile)); err == nil && json.Unmarshal(b, &kept) == nil {
 			d.localClients = ownUsersWindows(kept)
 		}
@@ -168,15 +168,15 @@ func (d *Daemon) localClient(id string) (wire.HostClient, bool) {
 
 // Told is what the control plane tells this host on its uplink's channel 0.
 func (d *Daemon) Told(method string, params json.RawMessage) {
-	if method == wire.NotifyHostUserSettings.Name {
+	if method == wire.NotifyMachineUserSettings.Name {
 		d.toldUserSettings(params)
 		return
 	}
-	if method == wire.NotifyHostUser.Name {
+	if method == wire.NotifyMachineUser.Name {
 		d.toldHostUser(params)
 		return
 	}
-	if method == wire.NotifyHostPolicy.Name {
+	if method == wire.NotifyMachinePolicy.Name {
 		d.toldPolicy(params)
 		return
 	}
@@ -184,18 +184,18 @@ func (d *Daemon) Told(method string, params json.RawMessage) {
 		d.toldUserSuspended(params)
 		return
 	}
-	if method == wire.NotifyHostRelease.Name {
+	if method == wire.NotifyMachineRelease.Name {
 		d.toldRelease(params)
 		return
 	}
-	if method == wire.NotifyHostOrgRoutes.Name {
+	if method == wire.NotifyMachineOrgRoutes.Name {
 		d.toldOrgRoutes(params)
 		return
 	}
-	if method != wire.NotifyHostClients.Name {
+	if method != wire.NotifyMachineClients.Name {
 		return
 	}
-	var list wire.HostClients
+	var list wire.MachineClients
 	if err := json.Unmarshal(params, &list); err != nil {
 		log.Printf("local: %s: %v", method, err)
 		return
@@ -363,7 +363,7 @@ func (d *Daemon) localExchange(c net.Conn, r *bufio.Reader, host string, private
 		// The person is suspended (#1002, FR-018): their window is refused here too.
 		return "", controllink.Refuse(controllink.Suspended)
 	}
-	ok2 := controllink.Message{OK: &wire.ControlOK{Mac: controllink.B64URL(mac), Host: new(wire.HostID(host))}}
+	ok2 := controllink.Message{OK: &wire.ControlOK{Mac: controllink.B64URL(mac), Host: new(wire.MachineRef(host))}}
 	if _, err := c.Write([]byte(ok2.Line() + "\n")); err != nil {
 		return "", err
 	}

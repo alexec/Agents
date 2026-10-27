@@ -5,8 +5,8 @@ import SwiftUI
 /// home. The window's + menu and the page's, per host; the phone cannot see any host's
 /// disk, so every folder is chosen the way the window chooses a server's.
 enum NewFolder: Identifiable, Hashable {
-    case folder(HostID)
-    case clone(HostID)
+    case folder(MachineRef)
+    case clone(MachineRef)
     /// A machine of its own for a repository, made by a machine provider (#1809).
     case machine
 
@@ -79,7 +79,7 @@ private struct MachineSheet: View {
 private struct FolderPickerSheet: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    let host: HostID
+    let host: MachineRef
 
     @State private var path = "~"
     @State private var listing: DirectoryListing?
@@ -207,7 +207,7 @@ private struct FolderPickerSheet: View {
 private struct CloneFolderSheet: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    let host: HostID
+    let host: MachineRef
 
     @State private var text = ""
     @State private var cloning = false

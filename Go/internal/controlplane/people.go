@@ -250,7 +250,7 @@ func (m *Methods) peopleList(user string, admin bool) wire.PeopleList {
 	for _, h := range m.records.Hosts() {
 		owner := m.s.ownerOf(h.ID)
 		state, _ := m.router.Described(h.ID)["state"].(string)
-		machines[owner] = append(machines[owner], wire.PersonMachine{ID: wire.HostID(h.ID), Name: h.Name, State: state,
+		machines[owner] = append(machines[owner], wire.PersonMachine{ID: wire.MachineRef(h.ID), Name: h.Name, State: state,
 			Platform: optional(h.Platform)})
 	}
 	people := m.records.People()
@@ -394,7 +394,7 @@ var previewPatience = 10 * time.Second
 // asked at once for the work on it that is not pushed, and their registered machines.
 func (m *Methods) removePreview(user string, from Caller) wire.PersonRemovePreview {
 	out := wire.PersonRemovePreview{StartedMachines: []wire.StartedMachinePreview{}, RegisteredMachines: []wire.PersonMachine{}}
-	var started []records.HostRecord
+	var started []records.MachineRecord
 	for _, h := range m.records.Hosts() {
 		if m.s.ownerOf(h.ID) != user {
 			continue
@@ -404,7 +404,7 @@ func (m *Methods) removePreview(user string, from Caller) wire.PersonRemovePrevi
 			continue
 		}
 		state, _ := m.router.Described(h.ID)["state"].(string)
-		out.RegisteredMachines = append(out.RegisteredMachines, wire.PersonMachine{ID: wire.HostID(h.ID), Name: h.Name,
+		out.RegisteredMachines = append(out.RegisteredMachines, wire.PersonMachine{ID: wire.MachineRef(h.ID), Name: h.Name,
 			State: state, Platform: optional(h.Platform)})
 	}
 	previews := make([]wire.StartedMachinePreview, len(started))
@@ -423,9 +423,9 @@ func (m *Methods) removePreview(user string, from Caller) wire.PersonRemovePrevi
 
 // unpushedOn asks a started machine for its worktrees, on a channel bound to the admin
 // who asked, and keeps those with work that is not pushed.
-func (m *Methods) unpushedOn(h records.HostRecord, from Caller) wire.StartedMachinePreview {
+func (m *Methods) unpushedOn(h records.MachineRecord, from Caller) wire.StartedMachinePreview {
 	state, _ := m.router.Described(h.ID)["state"].(string)
-	preview := wire.StartedMachinePreview{Host: wire.HostID(h.ID), Name: h.Name, State: state, Unpushed: []wire.UnpushedWork{}}
+	preview := wire.StartedMachinePreview{Host: wire.MachineRef(h.ID), Name: h.Name, State: state, Unpushed: []wire.UnpushedWork{}}
 	if s, ok := m.router.State(h.ID); !ok || !s.online() {
 		preview.Unknown = optional(h.Name + " is not online, so it could not be asked.")
 		return preview

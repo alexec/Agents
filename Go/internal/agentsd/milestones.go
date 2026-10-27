@@ -272,7 +272,7 @@ func (d *Daemon) checkCloudHosts() {
 	if held || ask == nil {
 		return
 	}
-	out, err := (*ask)(d.ctx, "host/machines", wire.HostMachineCall{Agent: "Agents Host", Method: machinesForAgent, Params: json.RawMessage("{}")})
+	out, err := (*ask)(d.ctx, "machine/machines", wire.MachineWorkspaceCall{Agent: "Agents Host", Method: machinesForAgent, Params: json.RawMessage("{}")})
 	var listed wire.AgentMachines
 	if err != nil || json.Unmarshal(out, &listed) != nil {
 		return

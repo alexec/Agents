@@ -1,6 +1,6 @@
-// Package hostinstall is "Add a Server over ssh" (058, US4, T072; #429, #610): the
-// control plane's hosts/install, hosts/update, hosts/checkAgain, hosts/detect and
-// hosts/sshHosts. It ports ControlPlaneKit's HostInstall.swift, HostDetect.swift and
+// Package hostinstall is "Add a Machine over ssh" (058, US4, T072; #429, #610): the
+// control plane's machines/install, machines/update, machines/checkAgain, machines/detect and
+// machines/sshHosts. It ports ControlPlaneKit's MachineInstall.swift, HostDetect.swift and
 // SSHConfigHosts.swift, with the parts of AgentsKit's SSHCommand, HostKeyCheck and
 // ServerInstaller that they use. HostTunnels.swift (#435) is not here: the Tunnels
 // interface is where it goes.
@@ -83,7 +83,7 @@ func (p *Problem) Error() string {
 	return string(p.Kind)
 }
 
-// Say is HostInstall.say: the problem in words for the person. keyGiven says whether
+// Say is MachineInstall.say: the problem in words for the person. keyGiven says whether
 // the request gave a key, or ssh offered its own.
 func Say(p *Problem, keyGiven bool) string {
 	switch p.Kind {
@@ -112,7 +112,7 @@ func Say(p *Problem, keyGiven bool) string {
 	return p.Error()
 }
 
-// words is HostInstall.words: a Problem becomes a Failure a client sees, said for
+// words is MachineInstall.words: a Problem becomes a Failure a client sees, said for
 // whether a key was given. Any other error goes on as it is.
 func words(err error, keyGiven bool) error {
 	if p, ok := err.(*Problem); ok {

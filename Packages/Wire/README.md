@@ -65,7 +65,7 @@ A conflict in a generated file is settled by running `gen` again, never by hand.
   | `JSONValue` | `JSONValue` | `JSONValue` (`json.RawMessage`) | any JSON |
 
 - **`x-ts-type`** is a definition's TypeScript, written out: the meaning-types and the other
-  brands (`HostID`, `ProviderID`, `ResourceName`).
+  brands (`MachineRef`, `ProviderID`, `ResourceName`).
 - **`x-fallback`** says what a forgiving decoder does with what this build does not know:
   a value (`AgentState` reads as `stopped`, `EndedReason` as `unrecognised`), `keep`
   (`TranscriptEntryKind`: kept whole and written back), or `defaults` (`WorkflowSummary`: a

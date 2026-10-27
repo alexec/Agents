@@ -120,7 +120,7 @@ public struct ControlCode: Sendable, Hashable {
 }
 
 public extension DaemonAPI {
-    /// `clients/startPairing`, `hosts/startEnroll`: the code, and until when it works.
+    /// `clients/startPairing`, `machines/startEnroll`: the code, and until when it works.
     struct ControlCodeShown: Codable, Sendable, Hashable {
         public var text: String
         public var expires: Date
@@ -159,8 +159,8 @@ public extension DaemonAPI {
         }
     }
 
-    /// `hosts/announce`, on an enrolment connection.
-    struct HostAnnounce: Codable, Sendable, Hashable {
+    /// `machines/announce`, on an enrolment connection.
+    struct MachineAnnounce: Codable, Sendable, Hashable {
         public var publicKey: Data
         public var name: String
         public var platform: String
@@ -168,7 +168,7 @@ public extension DaemonAPI {
         public var machineID: String
         /// `agents-relay` enrolling (T096): never the home host, and relaying from the start.
         public var relay: Bool?
-        /// `swift` or `go` (#1134), as in `HostHello.implementation`, so the row says it from
+        /// `swift` or `go` (#1134), as in `MachineHello.implementation`, so the row says it from
         /// the first listing, before the host's first hello.
         public var implementation: String?
         public init(publicKey: Data, name: String, platform: String, version: String, machineID: String,
@@ -187,9 +187,9 @@ public extension DaemonAPI {
     /// `grant: operator` for an older web page, which shows it (#111).
     struct Admitted: Codable, Sendable, Hashable {
         public var client: UUID?
-        public var host: HostID?
+        public var host: MachineRef?
         public var grant: String?
-        public init(client: UUID? = nil, host: HostID? = nil) {
+        public init(client: UUID? = nil, host: MachineRef? = nil) {
             self.client = client
             self.host = host
             self.grant = client == nil ? nil : LegacyGrant.everything

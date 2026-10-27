@@ -13,7 +13,7 @@ struct EventAuditTests {
         let list = try JSONDecoder().decode(DaemonAPI.AuditList.self, from: Data(line.utf8))
         let entry = try #require(list.entries.first)
         #expect(list.admin && list.days == 90 && !list.more)
-        #expect(entry.host == HostID(rawValue: "box12345"))
+        #expect(entry.host == MachineRef(rawValue: "box12345"))
         #expect(AuditWords.who(entry.actor) == "Local owner · MacBook Pro")
         #expect(AuditWords.place(entry) { _ in "box" } == "on box")
         #expect(AuditWords.call(entry) == "agents/stop · A1")
@@ -76,7 +76,7 @@ struct EventAuditTests {
         let lines = [
             #"{"id":"1","at":0,"action":"Stopped an agent","method":"agents/stop","host":"H1","target":"A1","actor":{"user":"u","userName":"Bea, admin"}}"#,
             "not json",
-            #"{"id":"2","at":60,"action":"Approved","method":"hosts/approveJoin","actor":{"user":"b","event":{"kind":"schedule","id":"w"}}}"#,
+            #"{"id":"2","at":60,"action":"Approved","method":"machines/approveJoin","actor":{"user":"b","event":{"kind":"schedule","id":"w"}}}"#,
         ].joined(separator: "\n")
         let csv = AuditWords.csv(lines) { "\($0.rawValue)'s box" }.trimmingCharacters(in: .newlines).components(separatedBy: "\n")
         try #require(csv.count == 3)

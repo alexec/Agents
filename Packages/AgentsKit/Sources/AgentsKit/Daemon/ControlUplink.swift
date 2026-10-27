@@ -6,7 +6,7 @@ import Foundation
 /// The control plane opens a channel on it for each client, and each channel becomes a
 /// virtual connection to this daemon's `DaemonServer`, with everything a socket
 /// connection has. Channel 0 is the host's own conversation with the control plane:
-/// `host/hello` on every connect.
+/// `machine/hello` on every connect.
 ///
 /// Losing the uplink closes every channel and nothing else: agents carry on, and it
 /// dials again, waiting a second, then twice as long each time up to half a minute, each
@@ -15,7 +15,7 @@ public final class ControlUplink: @unchecked Sendable {
     public typealias Dial = @Sendable () async throws -> any LineTransport
 
     private let server: DaemonServer
-    private let hello: DaemonAPI.HostHello
+    private let hello: DaemonAPI.MachineHello
     private let dial: Dial
     private let lock = NSLock()
     private var channels: [Int: Channel] = [:]
@@ -41,7 +41,7 @@ public final class ControlUplink: @unchecked Sendable {
     /// The wait between dials, which `goBackNow()` cuts short (#82).
     private let backoff: Backoff
 
-    public init(server: DaemonServer, hello: DaemonAPI.HostHello,
+    public init(server: DaemonServer, hello: DaemonAPI.MachineHello,
                 onChange: @escaping @Sendable (Bool) -> Void = { _ in },
                 backoff: Backoff = Backoff(first: ControlUplink.firstWait, longest: ControlUplink.longestWait),
                 dial: @escaping Dial) {
@@ -291,7 +291,7 @@ public final class ControlUplink: @unchecked Sendable {
                 tell(DaemonAPI.Method.foldersDetected, ["added": .int(0)])
                 return
             }
-            // Replies to `host/hello` and `control/ping`, which nothing waits on; and to
+            // Replies to `machine/hello` and `control/ping`, which nothing waits on; and to
             // `tunnel/open`, whose refusal ends the wait for it.
             let decoded = try? JSONRPCCodec.decode(line: message)
             // The control plane's own request (#1122), answered on channel 0.

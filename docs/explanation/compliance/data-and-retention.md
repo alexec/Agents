@@ -33,7 +33,7 @@ command). Only its user can read it (mode 0700).
 | `<folder>/.agents/attachments` | Files attached to prompts | A file that no kept conversation names goes after 7 days. The folder stays under 500 MB, oldest first. |
 | `<folder>/.agents/dropbox` | Files handed to a workflow | 25 MB a file. Not swept. |
 | Terminal scrollback | What a terminal showed | In memory only, 4 MiB a terminal |
-| `daemon.log` | What the host did | 4 MB, and one older file |
+| `daemon.log` | What the machine did | 4 MB, and one older file |
 | `erasures.json`, `erased.json` | Runtime copies of deleted agents still to erase; every agent deleted here | 1,000 entries for 7 days; 10,000 IDs for 400 days |
 | `~/.agents-secrets` | Secrets (see [Security overview](security-overview.md#where-secrets-live)) | Until you remove them |
 
@@ -45,7 +45,7 @@ that machine starts.
 
 | Records | What they keep | How long |
 | --- | --- | --- |
-| Clients, hosts, people, groups | Who is paired, with their public keys, names and when last seen; which machines there are; a client's push tokens | Until forgotten or removed |
+| Clients, machines, people, groups | Who is paired, with their public keys, names and when last seen; which machines there are; a client's push tokens | Until forgotten or removed |
 | Codes | A code's purpose, owner and expiry, never its secret | Deleted 24 hours after it expires |
 | Audit events | Who did what (see [Security overview](security-overview.md#who-did-what)) | 90 days by default; an admin sets 1 to 3,650 days |
 | Usage reports | Usage, cost and time by person, folder, machine and runtime, sent by each machine | 7 days by the hour, 90 days by the day |

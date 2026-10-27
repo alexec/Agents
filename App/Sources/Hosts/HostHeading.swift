@@ -5,7 +5,7 @@ import SwiftUI
 /// and how it is doing in a dot and at most two words.
 struct HostHeading: View {
     @Environment(AppModel.self) private var model
-    let host: HostID
+    let host: MachineRef
 
     var body: some View {
         HStack(spacing: 6) {

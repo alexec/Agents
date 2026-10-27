@@ -40,7 +40,7 @@ struct FirstRunView: View {
     private var choice: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Where should your agents run?").appText(.title).fontWeight(.semibold)
-            Text("This window is where you work with your agents. They run on a \(Text("control plane").bold()) you own: on this Mac, on another Mac, or on a server. Your iPhone and iPad connect to it too.")
+            Text("This window is where you work with your agents. They run on a \(Text("control plane").bold()) you own: on this Mac, on another Mac, or on a Linux machine. Your iPhone and iPad connect to it too.")
                 .appText(.reading).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .top, spacing: 16) {
@@ -52,7 +52,7 @@ struct FirstRunView: View {
                         .keyboardShortcut(.defaultAction)
                 }
                 card(title: "Connect to a control plane",
-                     body: "You already run one, on another Mac or a server. You’ll need a pairing code from it.",
+                     body: "You already run one, on another Mac or a Linux machine. You’ll need a pairing code from it.",
                      usual: false) {
                     Button("Connect…") { connecting = true }
                 }
@@ -85,7 +85,7 @@ struct FirstRunView: View {
             .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(Color.secondary.opacity(0.25)) }
             .accessibilityElement(children: .contain)
             .accessibilityLabel(name)
-            Text("Pairing lets this window do everything: start agents, sign runtimes in, add servers and pair your phone. Agents Host shows the code to type.")
+            Text("Pairing lets this window do everything: start agents, sign runtimes in, add machines and pair your phone. Agents Host shows the code to type.")
                 .appText(.supporting).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Button("Connect to a different control plane…") { connecting = true }.buttonStyle(.link)

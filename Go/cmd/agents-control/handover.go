@@ -305,7 +305,7 @@ func handover() {
 		if host == "" || has("--on") == has("--off") {
 			fail("say --host ID and --on or --off")
 		}
-		request := wire.HostRelayRequest{Host: wire.HostID(host), Relay: has("--on")}
+		request := wire.MachineRelayRequest{Host: wire.MachineRef(host), Relay: has("--on")}
 		if _, err := link("--at", "--pin").call("relay/set", request); err != nil {
 			fail("%v", err)
 		}

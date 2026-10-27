@@ -34,7 +34,7 @@ func suspendedRefusal(t *testing.T, e *Error) {
 	}
 }
 
-// The machine says it can hear user/suspended (host.suspend/1) in host/hello.
+// The machine says it can hear user/suspended (host.suspend/1) in machine/hello.
 func TestAHostSaysItTakesASuspension(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	if !slices.Contains(d.Capabilities(), wire.CapHostSuspend1) {
@@ -134,7 +134,7 @@ func TestASuspendedPersonsWorkflowsPause(t *testing.T) {
 func TestASuspendedPersonsWindowIsRefusedDirectly(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	w, listed := newWindow(t)
-	d.SetLocalClients(wire.HostClients{Clients: []wire.HostClient{listed}})
+	d.SetLocalClients(wire.MachineClients{Clients: []wire.MachineClient{listed}})
 	path := serveLocal(t, d, RoleWindow)
 	c, r, reply := prove(t, path, w)
 	if reply.OK == nil {

@@ -19,7 +19,7 @@ func TestTheLogCutsCodesAndTokenShapes(t *testing.T) {
 	if !strings.Contains(line, "[redacted:github]") || !strings.Contains(line, "agents-control:<code>") || !strings.Contains(line, "for host box") {
 		t.Fatalf("%q", line)
 	}
-	if plain := "hosts/list from MacBook Pro in 12ms"; Redact(plain) != plain {
+	if plain := "machines/list from MacBook Pro in 12ms"; Redact(plain) != plain {
 		t.Fatalf("%q", Redact(plain))
 	}
 }

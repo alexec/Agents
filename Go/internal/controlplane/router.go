@@ -48,7 +48,7 @@ type Handler interface {
 	Handles(method string) bool
 	// Handle answers a request from a client for the control plane itself.
 	Handle(method string, params json.RawMessage, from Caller) (any, error)
-	// HostSaid answers a request on a host's channel 0: host/hello, attention/need.
+	// HostSaid answers a request on a host's channel 0: machine/hello, attention/need.
 	HostSaid(host, method string, params json.RawMessage) (any, error)
 }
 
@@ -100,12 +100,12 @@ type Router struct {
 	presenceHeard func(client string, device bool, report json.RawMessage)
 	// A linked host's workspace (#691), laid over its state: a host whose workspace is
 	// stopped is shown stopped, not offline.
-	workspaces map[string]*providers.HostMachine
+	workspaces map[string]*providers.MachineWorkspace
 	// Keeps a prompt or agent start for a stopped host (#691 US3); nil where nothing is.
 	keeper keeper
 	// Kept requests asked, in the order they came.
 	keeping chan func()
-	// Told each host's answer to a whole list (#962), for hosts/lastHeard: host, method,
+	// Told each host's answer to a whole list (#962), for machines/lastHeard: host, method,
 	// the reply line. Nil where none is kept.
 	copier func(host, method, reply string)
 	// The organisation's policy's check of a call to a machine (#998): it reads only memory.
@@ -211,7 +211,7 @@ func NewRouter(h Handler, log func(string)) *Router {
 		known: map[string]bool{}, relays: map[string]bool{}, states: map[string]hostState{},
 		toldLinks: map[string]bool{}, asks: map[string]*hostAsk{}, keptWaits: map[string]chan *message{}, presence: map[string]notedPresence{}, log: log,
 		peers: map[string]func(string){}, peerLinks: map[string]map[string]bool{},
-		workspaces: map[string]*providers.HostMachine{}, rates: newClientRates(), refusals: newRefusalLog(log)}
+		workspaces: map[string]*providers.MachineWorkspace{}, rates: newClientRates(), refusals: newRefusalLog(log)}
 }
 
 // MARK: What it knows
@@ -266,7 +266,7 @@ func describe(host string, s hostState) map[string]any {
 	return params
 }
 
-// Described is a host's state as hosts/list and control/hostChanged say it, with its
+// Described is a host's state as machines/list and control/hostChanged say it, with its
 // workspace laid over it (#691).
 func (r *Router) Described(host string) map[string]any {
 	r.mu.Lock()
@@ -305,7 +305,7 @@ func (r *Router) SetKeeper(k keeper) {
 }
 
 // Workspace is a linked host's workspace, or nil.
-func (r *Router) Workspace(host string) *providers.HostMachine {
+func (r *Router) Workspace(host string) *providers.MachineWorkspace {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.workspaces[host]
@@ -313,7 +313,7 @@ func (r *Router) Workspace(host string) *providers.HostMachine {
 
 // SetWorkspace is ControlRouter.setWorkspace: a linked host's workspace changed (its
 // state, a start's phase), or the link went; said to every client when it differs.
-func (r *Router) SetWorkspace(host string, ws *providers.HostMachine) {
+func (r *Router) SetWorkspace(host string, ws *providers.MachineWorkspace) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	old := r.workspaces[host]
@@ -425,7 +425,7 @@ func (r *Router) CloseMembers() {
 	}
 }
 
-// SetRelay says whether a host only relays (HostRecord.relay): nil for a host that runs
+// SetRelay says whether a host only relays (MachineRecord.relay): nil for a host that runs
 // agents, false for a relay switched off, true for one relaying. A host found to be a
 // relay has its client channels closed.
 func (r *Router) SetRelay(host string, relay *bool) {
@@ -769,7 +769,7 @@ func (r *Router) OnLocalEnded(f func(string)) {
 	r.mu.Unlock()
 }
 
-// ForgetHost is hosts/remove (FR-014): its uplink closes and it is forgotten. Its agents
+// ForgetHost is machines/remove (FR-014): its uplink closes and it is forgotten. Its agents
 // are left as they are.
 func (r *Router) ForgetHost(host string) {
 	r.mu.Lock()
@@ -1741,7 +1741,7 @@ func (r *Router) SetCopier(f func(host, method, reply string)) {
 	r.mu.Unlock()
 }
 
-// toControl answers on its own goroutine: hosts/install takes minutes, and nothing else
+// toControl answers on its own goroutine: machines/install takes minutes, and nothing else
 // this client says may wait behind it.
 func (r *Router) toControl(msg, sessionID string, wrapped bool) {
 	m, ok := decode(msg)

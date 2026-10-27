@@ -198,7 +198,7 @@ docs/how-to/add-a-folder.md                           folders
 docs/how-to/start-in-a-worktree.md                     folders
 docs/how-to/pin-a-page-to-a-folder.md                 folders
 docs/how-to/archive-and-stop.md                        folders
-docs/explanation/folders-hosts-worktrees.md           folders
+docs/explanation/folders-machines-worktrees.md        folders
 
 # workflows: workflows, their page, schedule and switches (triggers are events).
 App/Sources/Folders/WorkflowPage.swift                workflows
@@ -362,39 +362,39 @@ deploy/gcp/hosted*                                     hosted-ops
 # billing: plans bought through Stripe (#2224). After hosted, so that it wins.
 Go/internal/hosted/billing/                            billing
 
-# hosts: the machines agents run on: Agents Host, agentsd, servers over ssh, Linux
+# machines: the computers agents run on: Agents Host, agentsd, servers over ssh, Linux
 # hosts, wakefulness and lending.
-Host/                                                  hosts
-App/Sources/Hosts/                                     hosts
-App/Sources/AppModel+MacHost.swift                     hosts
-App/Sources/WakeAndNetwork.swift                       hosts
-App/Sources/Settings/WakeSettingsSection.swift         hosts
-App/Sources/Settings/ServerCredentials.swift           hosts
-App/Sources/Control/ControlAddServerSheet.swift        hosts
-App/Sources/Control/ThisMacHost.swift                  hosts
-App/Sources/Control/HostFoldersPicker.swift           hosts
-Shared/UI/HostListHeading.swift                        hosts
-Shared/UI/OfflineWords.swift                           hosts
-Packages/AgentsKit/Sources/AgentsKit/Hosts/            hosts
-Packages/AgentsKit/Sources/AgentsKitCore/Hosts/        hosts
-Packages/AgentsKit/Sources/AgentsKitCore/Machine/      hosts
-Packages/AgentsKit/Sources/AgentsKitCore/Model/Wake*.swift  hosts
-Packages/AgentsKit/Sources/AgentsKitCore/Control/Host*.swift  hosts
-Go/cmd/agentsd/                                        hosts
-Go/cmd/agentsctl/                                      hosts
-Go/internal/agentsd/                                   hosts
-scripts/host-install.sh                                hosts
-scripts/release-host.sh                                hosts
-.agents/skills/test-servers/                           hosts
-Go/cmd/agentsd/                                        hosts
-Go/internal/agentsd/                                   hosts
-docs/how-to/add-a-server.md                            hosts
-docs/how-to/fix-agents-host-not-starting.md            hosts
-docs/how-to/release-agents-host.md                     hosts
-docs/how-to/set-up-on-this-mac.md                      hosts
-docs/explanation/window-and-daemon.md                  hosts
-specs/037-*/                                           hosts
-specs/043-*/                                           hosts
+Host/                                                  machines
+App/Sources/Hosts/                                     machines
+App/Sources/AppModel+MacHost.swift                     machines
+App/Sources/WakeAndNetwork.swift                       machines
+App/Sources/Settings/WakeSettingsSection.swift         machines
+App/Sources/Settings/ServerCredentials.swift           machines
+App/Sources/Control/ControlAddServerSheet.swift        machines
+App/Sources/Control/ThisMacHost.swift                  machines
+App/Sources/Control/HostFoldersPicker.swift           machines
+Shared/UI/HostListHeading.swift                        machines
+Shared/UI/OfflineWords.swift                           machines
+Packages/AgentsKit/Sources/AgentsKit/Hosts/            machines
+Packages/AgentsKit/Sources/AgentsKitCore/Hosts/        machines
+Packages/AgentsKit/Sources/AgentsKitCore/Machine/      machines
+Packages/AgentsKit/Sources/AgentsKitCore/Model/Wake*.swift  machines
+Packages/AgentsKit/Sources/AgentsKitCore/Control/Host*.swift  machines
+Go/cmd/agentsd/                                        machines
+Go/cmd/agentsctl/                                      machines
+Go/internal/agentsd/                                   machines
+scripts/host-install.sh                                machines
+scripts/release-host.sh                                machines
+.agents/skills/test-servers/                           machines
+Go/cmd/agentsd/                                        machines
+Go/internal/agentsd/                                   machines
+docs/how-to/add-a-machine.md                           machines
+docs/how-to/fix-agents-host-not-starting.md            machines
+docs/how-to/release-agents-host.md                     machines
+docs/how-to/set-up-on-this-mac.md                      machines
+docs/explanation/window-and-daemon.md                  machines
+specs/037-*/                                           machines
+specs/043-*/                                           machines
 
 # devices: how phones, iPads and browsers reach the Mac: pairing, the relay, links,
 # notifications, the widget and the web page's wire.

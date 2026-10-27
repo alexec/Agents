@@ -99,7 +99,7 @@ the rule. On the iPhone, the iPad and the web page, the rule is on the line.
   organisation's budget under your own limits. The lower number applies.
 - **Folder Settings** on the Mac: a helper limit above the organisation's cap says so.
 - **Connectors** on the Mac: a marketplace that is not allowed is not listed.
-  **Add by Hand** does not add a server when servers added by hand are not allowed.
+  **Add by Hand** does not add a machine when servers added by hand are not allowed.
 
 When a machine refuses a turn or a start, the error says **Set by your organisation** and
 the rule.

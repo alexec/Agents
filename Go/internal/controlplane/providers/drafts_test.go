@@ -253,7 +253,7 @@ func (h *draftHarness) startMap(t *testing.T) string {
 }
 
 func (h *draftHarness) tool(draft, name string, arguments any) (string, error) {
-	out, err := h.drafts.Call(h.host, HostProviderDraftCall{AgentID: wire.UUID(h.w.agent), Draft: wire.UUID(draft), Tool: name, Arguments: jsonValue(arguments)})
+	out, err := h.drafts.Call(h.host, MachineProviderDraftCall{AgentID: wire.UUID(h.w.agent), Draft: wire.UUID(draft), Tool: name, Arguments: jsonValue(arguments)})
 	if err != nil {
 		return "", err
 	}
@@ -473,10 +473,10 @@ func TestAnotherAgentsCallIsRefused(t *testing.T) {
 	w := newWorld([]string{"droplet-list"}, nil)
 	h := newDraftHarness(w, quickDraftTiming(), true, "", nil)
 	id := h.startMap(t)
-	if _, err := h.drafts.Call(h.host, HostProviderDraftCall{AgentID: wire.UUID(records.NewUUID()), Draft: wire.UUID(id), Tool: ToolReadTools}); failureOf(err) == nil {
+	if _, err := h.drafts.Call(h.host, MachineProviderDraftCall{AgentID: wire.UUID(records.NewUUID()), Draft: wire.UUID(id), Tool: ToolReadTools}); failureOf(err) == nil {
 		t.Error("another agent")
 	}
-	if _, err := h.drafts.Call("otherhost", HostProviderDraftCall{AgentID: wire.UUID(w.agent), Draft: wire.UUID(id), Tool: ToolReadTools}); failureOf(err) == nil {
+	if _, err := h.drafts.Call("otherhost", MachineProviderDraftCall{AgentID: wire.UUID(w.agent), Draft: wire.UUID(id), Tool: ToolReadTools}); failureOf(err) == nil {
 		t.Error("another host")
 	}
 	if _, err := h.tool(records.NewUUID(), ToolReadTools, nil); failureOf(err) == nil || failureOf(err).Message != NotYoursWords {

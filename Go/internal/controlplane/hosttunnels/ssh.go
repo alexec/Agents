@@ -34,7 +34,7 @@ var batch = []string{"-o", "BatchMode=yes", "-o", "ConnectTimeout=10"}
 // connection of ours (#610).
 var quiet = []string{"-o", "RemoteCommand=none", "-o", "RequestTTY=no", "-o", "ClearAllForwardings=yes"}
 
-// sayErrors is HostInstall.sayErrors: over a config's "LogLevel quiet" (#964).
+// sayErrors is MachineInstall.sayErrors: over a config's "LogLevel quiet" (#964).
 var sayErrors = []string{"-o", "LogLevel=error"}
 
 // destination is SSHCommand.destination: user@host:port is written ssh://user@host:port,
@@ -128,7 +128,7 @@ func (s sshCommand) run(ctx context.Context, args []string) (output, error) {
 	return output{status: status, stdout: out.String(), stderr: errs.String()}, nil
 }
 
-// environment is HostInstall.environment(keepAgent: true): this process's environment,
+// environment is MachineInstall.environment(keepAgent: true): this process's environment,
 // less what could open a prompt nobody sees and less the app's own variables.
 func environment(inherited []string) []string {
 	var env []string
@@ -143,7 +143,7 @@ func environment(inherited []string) []string {
 	return env
 }
 
-// personsKnownHosts is HostInstall.personsKnownHosts: the person's own known_hosts, for
+// personsKnownHosts is MachineInstall.personsKnownHosts: the person's own known_hosts, for
 // a server whose ssh config checks against none (#514).
 func personsKnownHosts(ctx context.Context, s sshCommand) []string {
 	resolved, err := s.run(ctx, join(s.options, s.resolveArguments()))
@@ -153,7 +153,7 @@ func personsKnownHosts(ctx context.Context, s sshCommand) []string {
 	return knownHostsOverride(resolved.stdout)
 }
 
-// knownHostsOverride is HostInstall.knownHostsOverride: from "ssh -G" output, the
+// knownHostsOverride is MachineInstall.knownHostsOverride: from "ssh -G" output, the
 // default known_hosts files when every one it names is /dev/null, otherwise nothing.
 func knownHostsOverride(resolved string) []string {
 	var files []string
@@ -181,7 +181,7 @@ func lines(text string) []string {
 	return strings.FieldsFunc(text, func(r rune) bool { return r == '\n' || r == '\r' })
 }
 
-// sshExecutable is HostInstall.sshExecutable: AGENTS_SSH, else DefaultSSH.
+// sshExecutable is MachineInstall.sshExecutable: AGENTS_SSH, else DefaultSSH.
 func sshExecutable() string {
 	if s := os.Getenv("AGENTS_SSH"); s != "" {
 		return s
@@ -189,7 +189,7 @@ func sshExecutable() string {
 	return DefaultSSH
 }
 
-// configFile is HostInstall.configFile: -F and the file AGENTS_SSH_CONFIG names, for
+// configFile is MachineInstall.configFile: -F and the file AGENTS_SSH_CONFIG names, for
 // tests. Otherwise nothing, and ssh reads the person's own ~/.ssh/config.
 func configFile(file string) []string {
 	if file == "" {
@@ -201,7 +201,7 @@ func configFile(file string) []string {
 	return []string{"-F", file}
 }
 
-// The sentences of HostInstall.say that a tunnel's end can give, for a key ssh offered
+// The sentences of MachineInstall.say that a tunnel's end can give, for a key ssh offered
 // itself (keyGiven true, as HostTunnels.worded says them).
 const (
 	sayUnknownHost    = "ssh doesn’t know that server."
@@ -212,7 +212,7 @@ const (
 )
 
 // classified is SSHCommand.classify(status: 255, stderr:, agentHasKeys: true), then
-// HostInstall.say: ssh's words, as the person is told them. ok is false for
+// MachineInstall.say: ssh's words, as the person is told them. ok is false for
 // installFailed, whose words are ssh's own.
 func classified(stderr string) (said string, ok bool) {
 	has := func(s string) bool { return strings.Contains(stderr, s) }
@@ -228,7 +228,7 @@ func classified(stderr string) (said string, ok bool) {
 	case has("Connection timed out"), has("Operation timed out"), has("No route to host"), has("Connection refused"):
 		return sayTimedOut, true
 	case has("administratively prohibited"):
-		// HostInstall.say has no words for it: Swift prints the case.
+		// MachineInstall.say has no words for it: Swift prints the case.
 		return "noStreamLocalForwarding", true
 	case has("No space left on device"):
 		return "diskFull(freeBytes: 0)", true

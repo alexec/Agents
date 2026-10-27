@@ -133,7 +133,7 @@ func (d *Daemon) sendGovernanceReport() {
 	}
 	ctx, cancel := context.WithTimeout(d.ctx, reportPatience)
 	defer cancel()
-	if _, err := (*ask)(ctx, wire.CallGovernanceReport.Name, wire.HostCatalog{Items: items}); err != nil {
+	if _, err := (*ask)(ctx, wire.CallGovernanceReport.Name, wire.MachineCatalog{Items: items}); err != nil {
 		log.Printf("governance/report: not sent, tried again within the hour: %v", err)
 	}
 }

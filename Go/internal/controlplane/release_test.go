@@ -19,10 +19,10 @@ func TestAMachineIsToldTheRelease(t *testing.T) {
 	var mu sync.Mutex
 	told := map[string]string{}
 	p.told = func(host, method string, params json.RawMessage) {
-		if method != wire.NotifyHostRelease.Name {
+		if method != wire.NotifyMachineRelease.Name {
 			return
 		}
-		var r wire.HostRelease
+		var r wire.MachineRelease
 		json.Unmarshal(params, &r)
 		mu.Lock()
 		told[host] = r.Version

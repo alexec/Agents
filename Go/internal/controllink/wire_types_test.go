@@ -14,10 +14,10 @@ var update = flag.Bool("update", false, "write testdata/wire-types.golden from t
 // and write them again unchanged (#1313).
 func TestWireTypesKeepTheirBytes(t *testing.T) {
 	wiretest.Check(t, "testdata/wire-types.golden", wiretest.Types{
-		"ControlHello": func() any { return new(Hello) },
-		"ControlAuth":  func() any { return new(Auth) },
-		"ControlOK":    func() any { return new(OK) },
-		"HostHello":    func() any { return new(HostHello) },
-		"HostAnnounce": func() any { return new(wire.HostAnnounce) },
+		"ControlHello":    func() any { return new(Hello) },
+		"ControlAuth":     func() any { return new(Auth) },
+		"ControlOK":       func() any { return new(OK) },
+		"MachineHello":    func() any { return new(MachineHello) },
+		"MachineAnnounce": func() any { return new(wire.MachineAnnounce) },
 	}, *update)
 }

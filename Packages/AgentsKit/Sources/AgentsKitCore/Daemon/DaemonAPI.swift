@@ -767,7 +767,7 @@ public enum DaemonAPI {
         public var helperLimitsSetBy: PolicySetBy?
         /// Which machine the folder is on, stamped by the window that heard of it and
         /// never sent (037). Not in `CodingKeys`.
-        public var host: HostID = .mac
+        public var host: MachineRef = .mac
 
         /// Archived folders, newest archived first (#2153); one archived before
         /// `archivedAt` was kept goes by its last activity.

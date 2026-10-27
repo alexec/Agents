@@ -3,28 +3,28 @@ import Foundation
 /// What the control plane answers itself, and says (058, contracts/control-api.md).
 public extension DaemonAPI.Method {
     static let controlStatus = "control/status"
-    static let hostsList = "hosts/list"
-    static let hostsStartEnroll = "hosts/startEnroll"
-    static let hostsInstall = "hosts/install"
-    static let hostsCheckAgain = "hosts/checkAgain"
-    static let hostsUpdate = "hosts/update"
-    static let hostsRemove = "hosts/remove"
+    static let hostsList = "machines/list"
+    static let hostsStartEnroll = "machines/startEnroll"
+    static let hostsInstall = "machines/install"
+    static let hostsCheckAgain = "machines/checkAgain"
+    static let hostsUpdate = "machines/update"
+    static let hostsRemove = "machines/remove"
     /// `{host, relay}`: whether a host carries the person's devices through iCloud (T097).
-    static let hostsSetRelay = "hosts/setRelay"
+    static let hostsSetRelay = "machines/setRelay"
     /// `{host, from, runtime, allowed}`: whether `host` may use `from`'s sign-in for a
     /// runtime, relayed through the control plane (058, T091). An operator's, after the
     /// window asked the person.
-    static let hostsLendSignIn = "hosts/lendSignIn"
+    static let hostsLendSignIn = "machines/lendSignIn"
     /// `LendGit`: whether `host` may use `from`'s git access for one git server (#1122).
     /// Any client's, after it asked the person; a no ends a waiting ask.
-    static let hostsLendGit = "hosts/lendGit"
-    /// `hosts/detect` (#429): every server in the control plane's `~/.ssh/config` that
-    /// answers, added as `hosts/install` would with no key. `[DetectedServer]`.
-    static let hostsDetect = "hosts/detect"
-    /// `hosts/sshHosts` (#610): the hosts in the control plane's ssh config, as `ssh -G`
+    static let hostsLendGit = "machines/lendGit"
+    /// `machines/detect` (#429): every server in the control plane's `~/.ssh/config` that
+    /// answers, added as `machines/install` would with no key. `[DetectedServer]`.
+    static let hostsDetect = "machines/detect"
+    /// `machines/sshHosts` (#610): the hosts in the control plane's ssh config, as `ssh -G`
     /// resolves each, with no network. `{destination}` resolves just that, as typed.
     /// `[SSHHost]`.
-    static let hostsSSHHosts = "hosts/sshHosts"
+    static let hostsSSHHosts = "machines/sshHosts"
     /// `FolderDetection` (#429, #656): whether the window suggests folders on a host, and
     /// where it looks for them. Nothing is added unless the person picks it.
     static let controlSetFolderDetection = "control/setFolderDetection"
@@ -63,8 +63,8 @@ public extension DaemonAPI.Method {
     static let clientsSetActivityToken = "clients/setActivityToken"
 
     // A host, on its channel 0.
-    static let hostsAnnounce = "hosts/announce"
-    static let hostHello = "host/hello"
+    static let hostsAnnounce = "machines/announce"
+    static let hostHello = "machine/hello"
     static let attentionNeed = "attention/need"
     static let controlPing = "control/ping"
     /// To a host just added, on its channel 0 (#429), never answered: `FolderDetection`.
@@ -82,7 +82,7 @@ public extension DaemonAPI.Method {
     /// `RelayCount` (#1163): one device's Needs you count, to post as a silent push.
     static let relayCount = "relay/count"
     /// A relay host, on its channel 0 (#824): `RelaySwitch`, itself switched on or off,
-    /// as `hosts/setRelay` would. What Agents Host has it say where it has no control
+    /// as `machines/setRelay` would. What Agents Host has it say where it has no control
     /// plane's key (Join one elsewhere). Refused from a host that runs agents.
     static let relaySwitch = "relay/switch"
 }
@@ -93,10 +93,10 @@ public extension DaemonAPI.Notification {
     static let controlPairingChanged = "control/pairingChanged"
     /// `WebRemoteStatus`: the web remote's listener started, or could not (071 R3).
     static let controlWebChanged = "control/webChanged"
-    /// `HostJoinStatus`: this Mac's host's join changed, as it said it (#113).
+    /// `MachineJoinStatus`: this Mac's host's join changed, as it said it (#113).
     static let controlThisMacHostChanged = "control/thisMacHostChanged"
     static let controlInstallProgress = "control/installProgress"
-    /// `HostTunnelChanged`: a server's reverse tunnel over ssh came up or went down (#435).
+    /// `MachineTunnelChanged`: a server's reverse tunnel over ssh came up or went down (#435).
     static let controlTunnelChanged = "control/tunnelChanged"
     /// To a device on the old way, after the move (058, T085): `ControlMoved`.
     static let controlMoved = "control/moved"
@@ -148,7 +148,7 @@ public extension DaemonAPI {
     struct ControlStatus: Codable, Sendable, Hashable {
         public var name: String
         public var version: String
-        public var homeHost: HostID?
+        public var homeHost: MachineRef?
         public var machineID: String
         /// When this run of the control plane started (frame D).
         public var startedAt: Date?
@@ -172,14 +172,14 @@ public extension DaemonAPI {
         public var publicViews: String?
         /// This Mac's host, as it says its join stands (#113), when the control plane runs
         /// beside it: "Couldn't join the control plane: …". Nil elsewhere.
-        public var thisMacHost: HostJoinStatus?
+        public var thisMacHost: MachineJoinStatus?
         /// Where a host added from now on has its folders found (#429). Nil from a control
         /// plane older than that.
         public var folderDetection: FolderDetection?
         /// Servers installed over an ssh tunnel that have not joined yet (#660), each with how
         /// its tunnel stands: they have no host row, so this is where ssh's reason shows.
         /// Nil from a control plane older than that, or one that holds no tunnels.
-        public var unjoinedTunnels: [HostTunnelChanged]?
+        public var unjoinedTunnels: [MachineTunnelChanged]?
         /// The control plane's own capabilities, and what it requires of hosts and clients
         /// (#1748). Nil from a control plane older than that.
         public var capabilities: [String]?
@@ -190,7 +190,7 @@ public extension DaemonAPI {
         /// with no code (#994). Nil from a control plane that does not say.
         public var joinCommand: String?
 
-        public init(name: String, version: String, homeHost: HostID?, machineID: String,
+        public init(name: String, version: String, homeHost: MachineRef?, machineID: String,
                     startedAt: Date? = nil, port: Int? = nil, awayFromHome: Bool? = nil) {
             self.name = name
             self.version = version
@@ -247,9 +247,9 @@ public extension DaemonAPI {
         }
     }
 
-    /// One row of `hosts/list`.
-    struct ControlHost: Codable, Sendable, Hashable, Identifiable {
-        public var id: HostID
+    /// One row of `machines/list`.
+    struct ControlMachine: Codable, Sendable, Hashable, Identifiable {
+        public var id: MachineRef
         public var name: String
         public var platform: String
         public var version: String
@@ -265,20 +265,20 @@ public extension DaemonAPI {
         /// runs no agents (#1507).
         public var runsAgents: Bool { relay == nil }
         /// The hosts whose sign-in this one may use, by runtime (T091).
-        public var signInFrom: [String: HostID]?
+        public var signInFrom: [String: MachineRef]?
         /// The hosts whose git access this one may use, by git server (#1122).
-        public var gitFrom: [String: HostID]?
+        public var gitFrom: [String: MachineRef]?
         /// Its git asking to use a host's git access, waiting on a person's answer (#1122).
         public var gitAsks: [GitAsk]?
         /// A server behind a bastion dials the control plane through a reverse tunnel the
         /// control plane holds over ssh (#435): how that session stands. Nil for a host
         /// that dials it directly.
-        public var tunnel: HostTunnel?
+        public var tunnel: MachineTunnel?
         /// The provider's workspace it runs on, which can be started and stopped (#691).
-        public var workspace: HostMachine?
-        /// `swift` or `go`, as the host said in `host/hello` (#1134); nil when it never said.
+        public var workspace: MachineWorkspace?
+        /// `swift` or `go`, as the host said in `machine/hello` (#1134); nil when it never said.
         public var implementation: String?
-        /// The capabilities the host said in its last `host/hello` (#1748); nil from a host
+        /// The capabilities the host said in its last `machine/hello` (#1748); nil from a host
         /// older than that, which is taken to have them all.
         public var capabilities: [String]?
         /// Of the control plane's required capabilities, the ones it does not have: it is
@@ -300,7 +300,7 @@ public extension DaemonAPI {
         /// The user who owns the machine (#994).
         public var owner: String?
 
-        public init(id: HostID, name: String, platform: String, version: String, state: String,
+        public init(id: MachineRef, name: String, platform: String, version: String, state: String,
                     reach: String, machineID: String?, relay: Bool? = nil) {
             self.relay = relay
             self.id = id
@@ -313,7 +313,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// One host in the ssh config, and what `hosts/detect` did with it (#429).
+    /// One host in the ssh config, and what `machines/detect` did with it (#429).
     struct DetectedServer: Codable, Sendable, Hashable, Identifiable {
         public enum Outcome: String, Codable, Sendable {
             /// It answered, and was installed: it joins by itself.
@@ -346,7 +346,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// A server ssh knows by a name, for Add a Server's server box (#610).
+    /// A server ssh knows by a name, for Add a Machine's server box (#610).
     struct SSHHost: Codable, Sendable, Hashable, Identifiable {
         /// The `Host` name in the config, or the destination as typed.
         public var alias: String
@@ -372,7 +372,7 @@ public extension DaemonAPI {
     }
 
     /// A reverse tunnel over ssh to the control plane, held for one server (#435).
-    struct HostTunnel: Codable, Sendable, Hashable {
+    struct MachineTunnel: Codable, Sendable, Hashable {
         /// Whether ssh has the server's end of the tunnel open now.
         public var up: Bool
         /// Why it is down, in ssh's words, when it said any.
@@ -385,12 +385,12 @@ public extension DaemonAPI {
     }
 
     /// `control/tunnelChanged`: by name, since a server's tunnel is up before it joins.
-    struct HostTunnelChanged: Codable, Sendable, Hashable {
+    struct MachineTunnelChanged: Codable, Sendable, Hashable {
         public var name: String
-        public var host: HostID?
-        public var tunnel: HostTunnel
+        public var host: MachineRef?
+        public var tunnel: MachineTunnel
 
-        public init(name: String, host: HostID?, tunnel: HostTunnel) {
+        public init(name: String, host: MachineRef?, tunnel: MachineTunnel) {
             self.name = name
             self.host = host
             self.tunnel = tunnel
@@ -399,19 +399,19 @@ public extension DaemonAPI {
 
     /// `control/hostChanged`.
     struct ControlHostChanged: Codable, Sendable, Hashable {
-        public var host: HostID
-        /// As in `ControlHost.state`, or `removed`.
+        public var host: MachineRef
+        /// As in `ControlMachine.state`, or `removed`.
         public var state: String
-        /// As in `ControlHost.workspace`.
-        public var workspace: HostMachine?
+        /// As in `ControlMachine.workspace`.
+        public var workspace: MachineWorkspace?
     }
 
-    /// `host/hello`, on every connect of an uplink.
-    struct HostHello: Codable, Sendable, Hashable {
+    /// `machine/hello`, on every connect of an uplink.
+    struct MachineHello: Codable, Sendable, Hashable {
         /// Which host this is. Said only on the control plane's local socket, where the
         /// uid and the code signature are the door; over TLS the key says it, and this
         /// is ignored.
-        public var host: HostID?
+        public var host: MachineRef?
         public var version: String
         public var platform: String
         public var machineID: String
@@ -422,7 +422,7 @@ public extension DaemonAPI {
         /// version in Hosts. Nil from a host built before it was said.
         public var implementation: String?
 
-        public init(host: HostID? = nil, version: String, platform: String, machineID: String, name: String? = nil,
+        public init(host: MachineRef? = nil, version: String, platform: String, machineID: String, name: String? = nil,
                     relay: Bool? = nil, implementation: String? = nil) {
             self.relay = relay
             self.implementation = implementation
@@ -473,16 +473,16 @@ public extension DaemonAPI {
     }
 
 
-    /// `clients/forget`, `hosts/remove`.
+    /// `clients/forget`, `machines/remove`.
     struct ClientRequest: Codable, Sendable, Hashable {
         public var client: UUID
         public init(client: UUID) { self.client = client }
     }
 
-    struct HostRequest: Codable, Sendable, Hashable {
-        public var host: HostID
+    struct MachineRequest: Codable, Sendable, Hashable {
+        public var host: MachineRef
         public var purge: Bool?
-        public init(host: HostID, purge: Bool? = nil) {
+        public init(host: MachineRef, purge: Bool? = nil) {
             self.host = host
             self.purge = purge
         }
@@ -518,13 +518,13 @@ public extension DaemonAPI {
         }
     }
 
-    /// `hosts/lendSignIn`.
+    /// `machines/lendSignIn`.
     struct LendSignIn: Codable, Sendable, Hashable {
-        public var host: HostID
-        public var from: HostID
+        public var host: MachineRef
+        public var from: MachineRef
         public var runtime: String
         public var allowed: Bool
-        public init(host: HostID, from: HostID, runtime: String, allowed: Bool) {
+        public init(host: MachineRef, from: MachineRef, runtime: String, allowed: Bool) {
             self.host = host
             self.from = from
             self.runtime = runtime
@@ -566,11 +566,11 @@ public extension DaemonAPI {
         public init(relay: Bool) { self.relay = relay }
     }
 
-    /// `hosts/setRelay`.
-    struct HostRelayRequest: Codable, Sendable, Hashable {
-        public var host: HostID
+    /// `machines/setRelay`.
+    struct MachineRelayRequest: Codable, Sendable, Hashable {
+        public var host: MachineRef
         public var relay: Bool
-        public init(host: HostID, relay: Bool) {
+        public init(host: MachineRef, relay: Bool) {
             self.host = host
             self.relay = relay
         }

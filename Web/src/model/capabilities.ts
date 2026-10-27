@@ -1,7 +1,7 @@
 // Capabilities decide what a host can do (#1748, docs/explanation/versions.md): the page shows
 // a feature only when the host's list has its capability, and says what a host too old for the
 // control plane is missing. The words are the window's and the Remote's (UpdateWords.swift).
-import type { ControlHost, RequiredCapabilities } from "../protocol/generated";
+import type { ControlMachine, RequiredCapabilities } from "../protocol/generated";
 import { DeclaredCapabilities } from "../protocol/capabilities.generated";
 
 /** Beside a feature that the host does not have. */
@@ -16,18 +16,18 @@ export function hostAnswers(state: string | undefined): boolean {
 }
 
 /** Whether a host can do what `capability` names. True for a host that said no list, or one not listed. */
-export function hostHas(hosts: readonly ControlHost[], host: string, capability: string): boolean {
+export function hostHas(hosts: readonly ControlMachine[], host: string, capability: string): boolean {
   const row = hosts.find((h) => h.id === host);
   return row?.capabilities?.includes(capability) ?? true;
 }
 
 /** "Agents 0.9 (Go)" for a host written in Go (#1134). */
-export function versionWords(host: ControlHost): string {
+export function versionWords(host: ControlMachine): string {
   return host.implementation === "go" ? `Agents ${host.version} (Go)` : `Agents ${host.version}`;
 }
 
 /** A host's state as a row says it: "Needs an update" for `needsUpdate`. */
-export function stateWords(host: ControlHost): string {
+export function stateWords(host: ControlMachine): string {
   if (host.state === "needsUpdate") return "Needs an update";
   // A delete's backup, before its workspace goes (#1815).
   if (host.state === "stopping" && host.workspace?.phase === "backing up") return "Backing up to delete";
@@ -35,7 +35,7 @@ export function stateWords(host: ControlHost): string {
 }
 
 /** What to update a host to, and the names it is missing; null for one that has the control plane's required set. */
-export function missingWords(host: ControlHost, controlVersion: string | undefined): string | null {
+export function missingWords(host: ControlMachine, controlVersion: string | undefined): string | null {
   if (!host.missing || host.missing.length === 0) return null;
   const to = controlVersion ? ` to Agents ${controlVersion}` : "";
   return `Update this machine${to}. It does not have ${host.missing.join(", ")}.`;

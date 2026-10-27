@@ -14,7 +14,7 @@ final class WindowRequests {
     enum FolderSheet: Equatable {
         /// A folder, or a clone, on this Mac or on a server (#495: the File menu is the
         /// one way in now the sidebar's New folder menu has gone).
-        case chooseFolder(HostID = .mac), clone(HostID = .mac), addServer
+        case chooseFolder(MachineRef = .mac), clone(MachineRef = .mac), addServer
     }
 
     /// Set by a menu item, taken (and cleared) by `FolderListView`, which owns the sheets.
@@ -394,7 +394,7 @@ struct AgentsCommands: Commands {
 
     /// The open chat's folder, or else the selected folder's. Only on this Mac:
     /// a server's folder is not somewhere Finder can go.
-    private var folderForFinder: (URL, HostID)? {
+    private var folderForFinder: (URL, MachineRef)? {
         if let agent = model.selectedAgent {
             return model.isOnThisMac(agent.host) ? (agent.cwd, agent.host) : nil
         }

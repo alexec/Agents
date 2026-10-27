@@ -45,7 +45,7 @@ type botStarts struct {
 // machineStarter is what a start for a bot needs of the machine providers.
 type machineStarter interface {
 	MayStartFor(person, host string) bool
-	Workspace(host string) *wire.HostMachine
+	Workspace(host string) *wire.MachineWorkspace
 	StartForUse(host, by string)
 }
 

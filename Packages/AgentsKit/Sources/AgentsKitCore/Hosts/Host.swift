@@ -6,19 +6,19 @@ import Foundation
 /// this Mac's. A server's id is eight
 /// lowercase letters and digits, short on purpose because it names the socket files the
 /// window keeps for it, and those have a 104-byte ceiling.
-public struct HostID: RawRepresentable, Codable, Hashable, Sendable, CustomStringConvertible {
+public struct MachineRef: RawRepresentable, Codable, Hashable, Sendable, CustomStringConvertible {
     public var rawValue: String
     public init(rawValue: String) { self.rawValue = rawValue }
 
-    public static let mac = HostID(rawValue: "mac")
+    public static let mac = MachineRef(rawValue: "mac")
 
-    public static func make() -> HostID {
+    public static func make() -> MachineRef {
         let alphabet = Array("abcdefghijklmnopqrstuvwxyz0123456789")
         var id: String
         repeat {
             id = String((0..<8).map { _ in alphabet.randomElement()! })
         } while id == mac.rawValue
-        return HostID(rawValue: id)
+        return MachineRef(rawValue: id)
     }
 
     public var description: String { rawValue }
@@ -29,7 +29,7 @@ public struct HostID: RawRepresentable, Codable, Hashable, Sendable, CustomStrin
 /// Everything about reaching it — address, port, user, key, jump host — stays in their
 /// own ssh configuration. The window keeps the name and what it learned by asking.
 public struct ServerHost: Codable, Hashable, Sendable, Identifiable {
-    public var id: HostID
+    public var id: MachineRef
     /// Exactly what was typed. Handed to `ssh` as the destination, after `--`.
     public var sshName: String
     public var label: String
@@ -49,7 +49,7 @@ public struct ServerHost: Codable, Hashable, Sendable, Identifiable {
         public var name: String
     }
 
-    public init(sshName: String, id: HostID = .make(), addedAt: Date = Date()) throws {
+    public init(sshName: String, id: MachineRef = .make(), addedAt: Date = Date()) throws {
         guard Self.isValid(sshName) else { throw InvalidName(name: sshName) }
         self.id = id
         self.sshName = sshName
@@ -61,7 +61,7 @@ public struct ServerHost: Codable, Hashable, Sendable, Identifiable {
     /// every connect, so facts this build cannot read cost the facts and not the server.
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = try c.decode(HostID.self, forKey: .id)
+        id = try c.decode(MachineRef.self, forKey: .id)
         sshName = try c.decode(String.self, forKey: .sshName)
         label = try c.decode(String.self, forKey: .label)
         addedAt = try c.decode(Date.self, forKey: .addedAt)
@@ -314,11 +314,11 @@ public struct HostList: Codable, Hashable, Sendable {
         all[index] = host
     }
 
-    public mutating func remove(_ id: HostID) {
+    public mutating func remove(_ id: MachineRef) {
         all.removeAll { $0.id == id }
     }
 
-    public subscript(id: HostID) -> ServerHost? {
+    public subscript(id: MachineRef) -> ServerHost? {
         all.first { $0.id == id }
     }
 
@@ -334,10 +334,10 @@ public struct HostList: Codable, Hashable, Sendable {
 
 /// Which folder, now that two machines can each have `/home/alex/src/api`.
 public struct FolderKey: Hashable, Sendable, CustomStringConvertible {
-    public var host: HostID
+    public var host: MachineRef
     public var folder: URL
 
-    public init(host: HostID = .mac, folder: URL) {
+    public init(host: MachineRef = .mac, folder: URL) {
         self.host = host
         self.folder = folder.standardizedFileURL
     }
@@ -350,7 +350,7 @@ public struct FolderKey: Hashable, Sendable, CustomStringConvertible {
         let host = String(stored[..<bar])
         let path = String(stored[stored.index(after: bar)...])
         guard !host.isEmpty, !path.isEmpty else { return nil }
-        self.init(host: HostID(rawValue: host), folder: URL(filePath: path))
+        self.init(host: MachineRef(rawValue: host), folder: URL(filePath: path))
     }
 
     public var description: String { stored }

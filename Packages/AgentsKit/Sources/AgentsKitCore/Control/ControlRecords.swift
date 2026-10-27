@@ -10,10 +10,10 @@ import Foundation
 /// read as absent, because a store cannot be trusted to delete conditionally.
 public actor ControlRecords {
     public static let clientsPrefix = "v1/clients/"
-    public static let hostsPrefix = "v1/hosts/"
+    public static let hostsPrefix = "v1/machines/"
     public static let settingsKey = "v1/control.json"
     public static func clientKey(_ id: UUID) -> String { clientsPrefix + id.uuidString.lowercased() + ".json" }
-    public static func hostKey(_ id: HostID) -> String { hostsPrefix + id.rawValue + ".json" }
+    public static func hostKey(_ id: MachineRef) -> String { hostsPrefix + id.rawValue + ".json" }
     public static func personKey(_ id: PersonID) -> String { "v1/people/\(id.rawValue).json" }
 
     private struct Held<Record: Sendable>: Sendable {
@@ -23,7 +23,7 @@ public actor ControlRecords {
 
     public let store: any ControlStore
     private var clientsHeld: [UUID: Held<ClientRecord>] = [:]
-    private var hostsHeld: [HostID: Held<HostRecord>] = [:]
+    private var hostsHeld: [MachineRef: Held<MachineRecord>] = [:]
     private var settingsHeld: Held<ControlSettings>?
     /// Tags of tombstones, so a refresh does not read them again and again.
     private var tombstones: [String: String] = [:]
@@ -75,7 +75,7 @@ public actor ControlRecords {
         }
         let listedHosts = try await store.list(prefix: Self.hostsPrefix)
         let heldHosts = Dictionary(hostsHeld.values.map { (Self.hostKey($0.record.id), $0) }, uniquingKeysWith: { a, _ in a })
-        var hosts: [HostID: Held<HostRecord>] = [:]
+        var hosts: [MachineRef: Held<MachineRecord>] = [:]
         for entry in listedHosts {
             if let held = heldHosts[entry.key], held.etag == entry.etag {
                 hosts[held.record.id] = held
@@ -90,7 +90,7 @@ public actor ControlRecords {
                 continue
             case .read(let read): object = read
             }
-            guard let record = try? Self.decoder.decode(HostRecord.self, from: object.data) else {
+            guard let record = try? Self.decoder.decode(MachineRecord.self, from: object.data) else {
                 noteUnreadable(entry.key, etag: object.etag)
                 if let held = heldHosts[entry.key] {
                     hosts[held.record.id] = held
@@ -147,17 +147,17 @@ public actor ControlRecords {
 
     /// Listed, and its record could not be read: neither known nor forgotten (#171).
     public func isUnreadable(_ id: UUID) -> Bool { unreadable[Self.clientKey(id)] != nil }
-    public func isUnreadable(_ id: HostID) -> Bool { unreadable[Self.hostKey(id)] != nil }
+    public func isUnreadable(_ id: MachineRef) -> Bool { unreadable[Self.hostKey(id)] != nil }
 
     /// The keys of every tombstone read, for the sweep (#174).
     public var tombstoneKeys: [String] { tombstones.keys.sorted() }
 
     public var clients: [ClientRecord] { clientsHeld.values.map(\.record).sorted { $0.paired < $1.paired } }
-    public var hosts: [HostRecord] { hostsHeld.values.map(\.record).sorted { $0.id.rawValue < $1.id.rawValue } }
+    public var hosts: [MachineRecord] { hostsHeld.values.map(\.record).sorted { $0.id.rawValue < $1.id.rawValue } }
     public func client(_ id: UUID) -> ClientRecord? { clientsHeld[id]?.record }
     /// Forgotten, and its tombstone still kept (seven days): refused as `forgotten`, not `unknown`.
     public func wasForgotten(_ id: UUID) -> Bool { tombstones[Self.clientKey(id)] != nil }
-    public func host(_ id: HostID) -> HostRecord? { hostsHeld[id]?.record }
+    public func host(_ id: MachineRef) -> MachineRecord? { hostsHeld[id]?.record }
     public var settings: ControlSettings? { settingsHeld?.record }
 
     // MARK: Settings
@@ -266,7 +266,7 @@ public actor ControlRecords {
 
     // MARK: Hosts
 
-    public func save(_ host: HostRecord) async throws {
+    public func save(_ host: MachineRecord) async throws {
         var record = host
         record.owner = record.owner ?? settingsHeld?.record.owner
         let condition: StoreCondition
@@ -291,9 +291,9 @@ public actor ControlRecords {
         etag.map { .matching($0) } ?? .absent
     }
 
-    /// `hosts/remove`: a tombstone. Returns whether there was such a host.
+    /// `machines/remove`: a tombstone. Returns whether there was such a host.
     @discardableResult
-    public func remove(_ id: HostID) async throws -> Bool {
+    public func remove(_ id: MachineRef) async throws -> Bool {
         if hostsHeld[id] == nil { try await load() }
         guard let held = hostsHeld[id] else { return false }
         var tombstone = held.record
@@ -351,9 +351,9 @@ public actor ControlRecords {
     }()
 }
 
-private extension HostRecord {
+private extension MachineRecord {
     /// The record as it would compare if nothing but its revision differed.
-    var withoutRevision: HostRecord {
+    var withoutRevision: MachineRecord {
         var copy = self
         copy.rev = 0
         return copy

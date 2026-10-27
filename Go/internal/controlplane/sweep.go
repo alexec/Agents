@@ -284,7 +284,7 @@ func dateTombstone(ctx context.Context, s store.Store, key string, object *store
 		r.ForgottenAt, r.Rev = &at, r.Rev+1
 		data, err = records.Encode(r)
 	} else {
-		var r records.HostRecord
+		var r records.MachineRecord
 		if json.Unmarshal(object.Data, &r) != nil {
 			return false, nil
 		}

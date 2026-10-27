@@ -1136,7 +1136,7 @@ struct EditProviderSheet: View {
 struct LinkWorkspaceSheet: View {
     @Environment(\.dismiss) private var dismiss
     let control: ControlSettingsModel
-    let host: DaemonAPI.ControlHost
+    let host: DaemonAPI.ControlMachine
 
     @State private var chosen: String?
     @State private var startWhenUsed = true

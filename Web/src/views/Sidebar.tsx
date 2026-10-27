@@ -30,7 +30,7 @@ import { keepsInUnread, newSessionFolder, pinnedSessions, pinnedWorkflows, folde
 import { updatedLine } from "../model/updated";
 import { namedRelative, workflowSummary } from "../model/workflows";
 import { fromWireDate } from "../protocol/dates";
-import type { Agent, AgentsExportRequest, ControlHost, FolderSummary, WorkflowSummary } from "../protocol/generated";
+import type { Agent, AgentsExportRequest, ControlMachine, FolderSummary, WorkflowSummary } from "../protocol/generated";
 import { alone, aloneURL, go, route, showAll, type ActivityPage } from "../route";
 import { onThisMac } from "../place";
 import { browserName, type Session } from "../session";
@@ -62,7 +62,7 @@ const matchesShown = 10;
 export const searchPause = 150;
 
 /** A folder's name in the sidebar: `host:Folder` on a server, the name alone on this Mac (`macID`, #1501). */
-export function folderLabel(host: ControlHost | undefined, folder: FolderSummary, macID = "mac"): string {
+export function folderLabel(host: ControlMachine | undefined, folder: FolderSummary, macID = "mac"): string {
   return !host || host.id === macID ? folder.name : `${host.name}:${folder.name}`;
 }
 
@@ -81,8 +81,8 @@ export function byAdded(a: FolderSummary, b: FolderSummary): number {
  * oldest added first, as the window's and the Remote's (SidebarOrder.folders, #250, #357): no
  * heading for a host.
  */
-export function orderedFolders(hosts: ControlHost[], folders: Record<string, FolderSummary[]>, macID = "mac"):
-  { host: ControlHost; folder: FolderSummary }[] {
+export function orderedFolders(hosts: ControlMachine[], folders: Record<string, FolderSummary[]>, macID = "mac"):
+  { host: ControlMachine; folder: FolderSummary }[] {
   const ordered = [...hosts.filter((h) => h.id === macID), ...hosts.filter((h) => h.id !== macID)];
   const byHost = ordered.flatMap((host) => (folders[host.id] ?? [])
     .filter((folder) => folder.folder.archivedAt === undefined)
@@ -93,8 +93,8 @@ export function orderedFolders(hosts: ControlHost[], folders: Record<string, Fol
 }
 
 /** Every host's archived folders, the latest archived first (#2153), as the window's Archived folders (#343). */
-export function archivedFolders(hosts: ControlHost[], folders: Record<string, FolderSummary[]>):
-  { host: ControlHost; folder: FolderSummary }[] {
+export function archivedFolders(hosts: ControlMachine[], folders: Record<string, FolderSummary[]>):
+  { host: ControlMachine; folder: FolderSummary }[] {
   return hosts.flatMap((host) => (folders[host.id] ?? [])
     .filter((folder) => folder.folder.archivedAt !== undefined)
     .map((folder) => ({ host, folder })))
@@ -285,7 +285,7 @@ const storage = globalThis.window?.localStorage;
 /** The session opened while it was unread, which Unread keeps until another is opened (#495). */
 const keptInUnread = signal<{ host: string; id: string } | null>(null);
 
-type Placed = { host: ControlHost; folder: FolderSummary };
+type Placed = { host: ControlMachine; folder: FolderSummary };
 
 /** One folder's live sessions, every group's, as held. */
 /** Who started a session, on whichever host holds it: a smart group gathers every host's (#835). */
@@ -495,7 +495,7 @@ function SmartFold({ row, store, folders, query, linkDown, downSince }: {
  * nothing of its sessions (#170). `query` is the search's words, already trimmed.
  */
 const FolderFold = memo(function FolderFold({ store, host, folder: summary, query, linkDown, alone: isAlone = false }: {
-  store: Store; host: ControlHost; folder: FolderSummary; query: string; linkDown: boolean;
+  store: Store; host: ControlMachine; folder: FolderSummary; query: string; linkDown: boolean;
   /** In a tab holding this folder alone (#1089): its rows under a Sessions heading, always open. */
   alone?: boolean;
 }) {
@@ -736,7 +736,7 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
  * Unarchived, it is a folder again and its new-session form opens.
  */
 function ArchivedFolderRow({ store, host, folder: summary, down }: {
-  store: Store; host: ControlHost; folder: FolderSummary; down: boolean;
+  store: Store; host: ControlMachine; folder: FolderSummary; down: boolean;
 }) {
   const folder = summary.folder.folder;
   const archivedAt = summary.folder.archivedAt;

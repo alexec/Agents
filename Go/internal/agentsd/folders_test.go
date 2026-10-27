@@ -124,7 +124,7 @@ func TestGitAddresses(t *testing.T) {
 			t.Errorf("%s: %v %q", url, ok, r.identity())
 		}
 	}
-	for _, bad := range []string{"-x", "/local/path", "https://host/", "a b"} {
+	for _, bad := range []string{"-x", "/local/path", "https://machine/", "a b"} {
 		if _, ok := parseRemote(bad); ok {
 			t.Errorf("%q read as an address", bad)
 		}

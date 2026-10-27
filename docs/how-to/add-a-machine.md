@@ -4,7 +4,7 @@ devices: [mac, server]
 description: Add a Linux server, or another Mac, to your control plane as a host, so every window and phone sees its folders.
 ---
 
-# Add a server
+# Add a machine
 
 A server is a Linux machine that runs agents for you. Once it is a host of your control
 plane, a folder can live on it: its agents run there, on its files, and keep working when
@@ -12,7 +12,7 @@ your Mac is asleep or closed. Every paired window, iPhone and iPad sees it withi
 with nothing to do on each.
 
 A server joins by connecting out to the control plane over HTTPS, so nothing has to reach
-it and no port needs opening. See [Folders, hosts and worktrees](../explanation/folders-hosts-worktrees.md).
+it and no port needs opening. See [Folders, hosts and worktrees](../explanation/folders-machines-worktrees.md).
 
 ## Before you start
 
@@ -36,7 +36,7 @@ it and no port needs opening. See [Folders, hosts and worktrees](../explanation/
 ### Run a command on the server
 
 1. In the window, open **Settings ▸ Machines**.
-2. Click **Add a Server…**. With **Run a command** chosen, the sheet shows one command,
+2. Click **Add a Machine…**. With **Run a command** chosen, the sheet shows one command,
    which works once.
 3. Click **Copy**.
 4. On the server, as the user your agents should run as, paste the command into a shell
@@ -67,7 +67,7 @@ you**, with the same code: click **Approve**. See
 
 ### Or add it over ssh
 
-1. In **Settings ▸ Machines**, click **Add a Server…**, then choose
+1. In **Settings ▸ Machines**, click **Add a Machine…**, then choose
    **Over ssh**.
 2. In **Server**, type the server. The box offers the hosts in your `~/.ssh/config`, each with
    the `user@host` ssh resolves it to; choose one, or type any `user@host`,
@@ -119,7 +119,7 @@ What the control plane passes to ssh, and how each common `~/.ssh/config` option
 
 ### Choose its folders
 
-Nothing on the server becomes a folder by itself (#656). Once it joins, Add a Server lists each
+Nothing on the server becomes a folder by itself (#656). Once it joins, Add a Machine lists each
 git repository directly inside the paths under **Auto-detect** (`~`, `~/src` and the like, `~`
 being the server's home), each unticked, and the same list opens later from **Choose
 Folders…** on the server's row under **Machines**, or on **This Mac**'s.
@@ -192,7 +192,7 @@ A second Mac joins the same way, with Agents Host.
 
 If the server is a workspace of a provider you have added (a Docker container, a DigitalOcean
 droplet, a Codespace), open **Settings ▸ Machine Providers** and choose **Add as
-Host…** beside it. Add a Server opens over ssh, with the address the provider gives already
+Host…** beside it. Add a Machine opens over ssh, with the address the provider gives already
 filled in. Once the server joins, it is linked to its workspace, so it can be started and
 stopped from Agents. See [Start workspaces from Agents](start-machines-from-agents.md).
 
@@ -227,11 +227,11 @@ and starts the host again. Its agents, folders and membership stay. It stops the
 moment, so do it when no agent there is in the middle of a turn.
 
 A server you added with a command can be updated the same way when you can ssh to it.
-Otherwise, add it again: click **Add a Server…** and run the new command on the server.
+Otherwise, add it again: click **Add a Machine…** and run the new command on the server.
 
 ## If it doesn't work
 
-- **That is not a host code.** The command was changed on its way. Copy it again.
+- **That is not a join code.** The command was changed on its way. Copy it again.
 - **Hosts other than Macs run Linux.** The machine is not Linux.
 - **… is not a machine the host is built for.** Agents hosts need x86-64 or ARM64.
 - **This machine has no CA certificates to check the control plane with.** Install
@@ -244,6 +244,6 @@ Otherwise, add it again: click **Add a Server…** and run the new command on th
 
 ## Related
 
-- [Folders, hosts and worktrees](../explanation/folders-hosts-worktrees.md).
+- [Folders, hosts and worktrees](../explanation/folders-machines-worktrees.md).
 - [The control plane](../explanation/control-plane.md).
 - [Start workspaces from Agents](start-machines-from-agents.md).

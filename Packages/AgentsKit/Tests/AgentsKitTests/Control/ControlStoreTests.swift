@@ -30,13 +30,13 @@ struct ControlStoreTests {
 
     @Test func aStaleEntityTagConflictsAndChangesNothing() async throws {
         try await Self.each { store in
-            let first = try await store.put("v1/hosts/h.json", Data("a".utf8), when: .absent)
-            let second = try await store.put("v1/hosts/h.json", Data("b".utf8), when: .matching(first))
+            let first = try await store.put("v1/machines/h.json", Data("a".utf8), when: .absent)
+            let second = try await store.put("v1/machines/h.json", Data("b".utf8), when: .matching(first))
             #expect(first != second)
-            await #expect(throws: StoreError.conflict(key: "v1/hosts/h.json")) {
-                _ = try await store.put("v1/hosts/h.json", Data("c".utf8), when: .matching(first))
+            await #expect(throws: StoreError.conflict(key: "v1/machines/h.json")) {
+                _ = try await store.put("v1/machines/h.json", Data("c".utf8), when: .matching(first))
             }
-            #expect(try await store.get("v1/hosts/h.json") == StoredObject(data: Data("b".utf8), etag: second))
+            #expect(try await store.get("v1/machines/h.json") == StoredObject(data: Data("b".utf8), etag: second))
         }
     }
 
@@ -52,7 +52,7 @@ struct ControlStoreTests {
         try await Self.each { store in
             _ = try await store.put("v1/clients/a.json", Data("a".utf8), when: .absent)
             _ = try await store.put("v1/clients/b.json", Data("b".utf8), when: .absent)
-            _ = try await store.put("v1/hosts/h.json", Data("h".utf8), when: .absent)
+            _ = try await store.put("v1/machines/h.json", Data("h".utf8), when: .absent)
             let clients = try await store.list(prefix: "v1/clients/")
             #expect(clients.map(\.key) == ["v1/clients/a.json", "v1/clients/b.json"])
             try await store.delete("v1/clients/a.json")

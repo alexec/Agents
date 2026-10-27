@@ -96,7 +96,7 @@ func TestACloudMachineStarted(t *testing.T) {
 	defer d.Shutdown()
 	listed := `{"providers":[{"id":"p","name":"DigitalOcean","canMake":false,"canDelete":false,"workspaces":[{"name":"box","state":"stopped"}]}]}`
 	d.SetControlAsk(func(_ context.Context, method string, params any) (json.RawMessage, error) {
-		call := params.(wire.HostMachineCall)
+		call := params.(wire.MachineWorkspaceCall)
 		if call.Method == hostsStart {
 			return json.RawMessage(`{"state":"starting"}`), nil
 		}

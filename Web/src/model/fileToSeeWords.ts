@@ -35,4 +35,4 @@ export const mayArchiveMyChatsFooter = "On, a chat you started that asks to be a
   + "Complete or Nothing to do, unless it showed you a file. Off, it waits for you to approve it. "
   + "Archived chats come back with Unarchive. "
   // Each host reads its own preferences (#1872): the docs' sentence.
-  + "A server does not read this switch, so a chat in a server folder may still archive itself.";
+  + "Another machine does not read this switch, so a chat in a folder on another machine may still archive itself.";

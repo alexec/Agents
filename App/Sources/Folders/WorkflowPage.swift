@@ -130,7 +130,7 @@ struct WorkflowPage: View {
     private struct RunsHeld: Equatable {
         var workflowID: String
         var folder: URL
-        var host: HostID
+        var host: MachineRef
     }
 
     private struct RunsWanted: Hashable {
@@ -1092,7 +1092,7 @@ struct WindowPlace: DynamicProperty {
     @Environment(\.windowOpen) private var windowOpen
 
     var folder: URL? { windowFolder?.folder ?? model.selectedFolder }
-    var host: HostID { windowFolder?.host ?? model.selectedFolderHost }
+    var host: MachineRef { windowFolder?.host ?? model.selectedFolderHost }
 
     /// Back to the folder, from a page over it.
     func leave() {
