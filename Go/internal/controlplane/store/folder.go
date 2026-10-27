@@ -30,6 +30,9 @@ import (
 type Folder struct {
 	Root  string
 	index *folderIndex
+	// folders keeps a Delete's removal of empty folders apart from a Put making its folder
+	// and opening its lock (#2676): a Put holds it shared, a removal alone.
+	folders sync.RWMutex
 }
 
 func NewFolder(root string) *Folder { return &Folder{Root: root, index: newFolderIndex()} }
@@ -77,7 +80,9 @@ func (f *Folder) Put(_ context.Context, key string, data []byte, when Condition)
 		return "", err
 	}
 	dir := filepath.Dir(p)
+	f.folders.RLock()
 	lock, err := makeLock(dir, p)
+	f.folders.RUnlock()
 	if err != nil {
 		return "", Unavailable("cannot lock %s: %v", key, err)
 	}
@@ -128,16 +133,21 @@ func (f *Folder) Put(_ context.Context, key string, data []byte, when Condition)
 	return tag, nil
 }
 
-// makeLock makes the key's folder and opens its lock. A Delete of the folder's last other
-// key may remove the folder between the two (#2293): then it is made again. Once the lock
-// is there, the folder is not empty, and stays.
+// makeLock makes the key's folder and opens its lock. Another copy's Delete of the
+// folder's last other key may remove the folder, or one above it, while it is made or
+// before the lock is opened (#2293, #2676): then it is made again. That fails as not
+// there, as there already (MkdirAll's check after its mkdir) or, on macOS, as an invalid
+// argument (a file opened in a folder being removed). Once the lock is there, the folder
+// is not empty, and stays.
 func makeLock(dir, p string) (*os.File, error) {
 	for try := 0; ; try++ {
-		if err := os.MkdirAll(dir, 0o700); err != nil {
-			return nil, err
+		err := os.MkdirAll(dir, 0o700)
+		var lock *os.File
+		if err == nil {
+			lock, err = os.OpenFile(p+".lock", os.O_CREATE|os.O_RDWR, 0o600)
 		}
-		lock, err := os.OpenFile(p+".lock", os.O_CREATE|os.O_RDWR, 0o600)
-		if err == nil || !errors.Is(err, fs.ErrNotExist) || try == 4 {
+		gone := errors.Is(err, fs.ErrNotExist) || errors.Is(err, fs.ErrExist) || errors.Is(err, syscall.EINVAL)
+		if err == nil || !gone || try == 4 {
 			return lock, err
 		}
 	}
@@ -176,7 +186,9 @@ func (f *Folder) Delete(_ context.Context, key string) error {
 	os.Remove(p)
 	os.Remove(p + ".lock")
 	f.index.forget(key)
+	f.folders.Lock()
 	f.removeEmptyFolders(filepath.Dir(p))
+	f.folders.Unlock()
 	return nil
 }
 
