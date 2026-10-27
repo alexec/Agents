@@ -398,7 +398,6 @@ export const adoptionNote = "A person is active in a week when one of their mach
 // Saved views and digests (R8), #2019: a page with its scope, range and way to add up, kept on the
 // control plane for the person who saved it, and its numbers as a few lines to paste.
 
-export const reportPages: readonly ReportPage[] = ["spend", "outcomes", "time", "runtimes", "adoption", "workflows"];
 export const pageTitle: Record<ReportPage, string> = { spend: "Spend", outcomes: "Outcomes", time: "Time", runtimes: "Runtimes",
   adoption: "Adoption", workflows: "Workflows" };
 

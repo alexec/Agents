@@ -187,17 +187,6 @@ function storedTurnOf(summary: TurnSummary): ChatTurn {
  * The reducer: what each notification does to what is held. Kept apart from the link so the
  * fixtures can drive it, as `AgentsModel` is driven in Swift.
  */
-/** What a host's state says to the person (the window's HostHeading). */
-export function hostStateWords(state: string): string {
-  switch (state) {
-    case "online": return "Online";
-    case "connecting": return "Connecting…";
-    case "needsUpdate": return "Needs an update";
-    case "failed": return "Can't connect";
-    default: return "Offline";
-  }
-}
-
 export class Work {
   readonly hosts = signal<ControlMachine[]>([]);
   readonly folders = signal<ByHost<FolderSummary>>({});
@@ -2989,16 +2978,6 @@ export class Store extends Work {
   async personas(host: string, folder: string): Promise<Persona[] | null> {
     return this.link.call("personas/list", { folder: folder as never }, host)
       .catch((error: unknown) => (error instanceof CallFailed && error.code === methodNotFound ? [] : null));
-  }
-
-  async personaFiles(host: string, folder: string, origin: "folder" | "personal") {
-    return this.link.call("personas/files", { folder: folder as never, origin }, host).catch(() => null);
-  }
-
-  async savePersonaFile(host: string, folder: string, origin: "folder" | "personal", id: string, content: string,
-    remove = false): Promise<boolean> {
-    return this.link.call("personas/save", { folder: folder as never, origin, id, content, delete: remove }, host)
-      .then(() => true).catch(() => false);
   }
 
   async worktrees(host: string, folder: string): Promise<WorktreesListResponse | null> {

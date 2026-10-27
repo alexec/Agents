@@ -9,13 +9,6 @@ function clock(at: number): string {
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
-/** Whose file names it: the folder name, or the person's own. */
-export function hostedPlace(status: HostedMCPStatus): string {
-  if (status.folder == null) return "Your own (~/.agents/mcp.json)";
-  const name = status.folder.replace(/\/+$/, "").split("/").pop() ?? "";
-  return name || status.folder;
-}
-
 /** What it is doing, in a line. */
 export function hostedLine(status: HostedMCPStatus): string {
   const using = status.users === 1 ? "1 using it" : `${status.users} using it`;

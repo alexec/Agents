@@ -7,7 +7,6 @@ import { fromWireDate } from "../protocol/dates";
 
 export const connectTitle = "Connect GitHub once: issues, pull requests and Actions.";
 export const connectNote = "Your connection, for every folder. You choose on github.com which repositories Agents can see.";
-export const connectButton = "Connect GitHub…";
 export const abilities = [
   "Read and write issues",
   "Read and write pull requests and reviews",
@@ -254,12 +253,6 @@ export function disconnectNoteFor(p: ConnectionProvider): string {
   return "Disconnect deletes the machine's tokens. Linear's events stop until you connect again or set LINEAR_API_KEY. To revoke Agents too, go to linear.app ▸ Settings ▸ Security & access.";
 }
 
-export function folderLine(setup: ConnectorSetup): string {
-  if (!setup.repository) return noRemote;
-  const used = setup.slots.filter((s) => s.state === "read").map((s) => s.choice);
-  return used.length === 0 ? "Not set up" : used.join(", ");
-}
-
 /** Connect Linear (#1343, frame H): the same sheet, its own list. */
 export const linear = {
   abilities: [
@@ -414,8 +407,4 @@ export function authorizeState(verificationURL: string): string | undefined {
   } catch {
     return undefined;
   }
-}
-
-export function isDone(slot: ConnectorSlot): boolean {
-  return slot.state === "read" || slot.state === "skipped";
 }
