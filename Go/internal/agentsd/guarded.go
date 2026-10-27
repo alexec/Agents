@@ -59,6 +59,15 @@ func (d *Daemon) guardedRecs() *guardedRecords {
 		if b, err := os.ReadFile(d.guardedFile()); err == nil {
 			diskjson.Unmarshal(b, d.guarded)
 		}
+		// A file the app no longer keeps (.agents/project.json before #2617) cannot be
+		// kept or undone, so its record goes (#2680).
+		kept := d.guarded.States[:0]
+		for _, s := range d.guarded.States {
+			if _, ok := guardedFiles[s.Path]; ok {
+				kept = append(kept, s)
+			}
+		}
+		d.guarded.States = kept
 	}
 	return d.guarded
 }
