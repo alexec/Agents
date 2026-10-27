@@ -44,6 +44,10 @@
 # What is not shared: DerivedData and .build. Their contents name the worktree's own
 # paths, and SwiftPM locks .build for one process at a time, so a shared one would make
 # lanes rebuild each other's or wait.
+#
+# An xcodebuild that names no -derivedDataPath gets <worktree>/build/DerivedData (#2684),
+# not Xcode's ~/Library/Developer/Xcode/DerivedData/Agents-<hash>: deleting the worktree's
+# build/ then deletes its build output too. AGENTS_BUILD_CACHE=off keeps Xcode's default.
 set -euo pipefail
 
 CACHE=${AGENTS_BUILD_CACHE:-$HOME/Library/Caches/Agents-build}
@@ -90,6 +94,15 @@ xcode() {
 	mkdir -p "$CACHE/cas" "$CACHE/packages" "$co"
 	using "$co" "$CACHE/packages" "$CACHE/cas"
 	auto_prune
+	# The worktree's own DerivedData, unless the command names one (#2684). It is under
+	# $PWD, so the prefix mappings below keep it out of the cache keys. An action that
+	# builds nothing gets no -derivedDataPath.
+	local dd=(-derivedDataPath "$PWD/build/DerivedData") a
+	for a in "$@"; do
+		case $a in
+		-derivedDataPath | -exportArchive | -exportLocalizations | -importLocalizations | -version | -showsdks | -list | -help | -usage | -license) dd=() ;;
+		esac
+	done
 	local flags=(
 		-packageCachePath "$CACHE/packages"
 		-clonedSourcePackagesDirPath "$co"
@@ -104,6 +117,7 @@ xcode() {
 		SWIFT_ENABLE_PROJECT_PREFIX_MAPPING=YES
 		CLANG_ENABLE_PROJECT_PREFIX_MAPPING=YES
 		# The project mappings leave the explicit modules' folders in DerivedData unmapped.
+		# Each DerivedData here is under $PWD (build/DerivedData, or a caller's build/DD).
 		# The path as the build sees it, which under /tmp is not git's /private/tmp.
 		# Quoted as one item of the list: Xcode splits these settings on spaces (#1417).
 		SWIFT_OTHER_PREFIX_MAPPINGS="\"$PWD=/^worktree\""
@@ -117,7 +131,7 @@ xcode() {
 		lock "$co.lock"
 		trap 'rmdir "$co.lock" 2>/dev/null || true' EXIT
 		if [ ! -e "$co/Package.resolved" ]; then
-			xcodebuild -resolvePackageDependencies "${flags[@]:0:4}" >&2
+			xcodebuild -resolvePackageDependencies "${flags[@]:0:4}" -derivedDataPath "$PWD/build/DerivedData" >&2
 			cp "$pins" "$co/Package.resolved"
 		fi
 		rmdir "$co.lock" 2>/dev/null || true
@@ -125,7 +139,7 @@ xcode() {
 	fi
 	mkdir -p "$(dirname "$pins")"
 	cp "$co/Package.resolved" "$pins"
-	exec xcodebuild "$@" "${flags[@]}" -disableAutomaticPackageResolution
+	exec xcodebuild "$@" ${dd[@]+"${dd[@]}"} "${flags[@]}" -disableAutomaticPackageResolution
 }
 
 swiftpm() {
