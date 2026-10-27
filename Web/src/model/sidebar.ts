@@ -44,12 +44,6 @@ export function home(agent: Agent, isPinned: boolean, on: ReadonlySet<SmartRow> 
   return showsUnread(agent) && on.has("unread") ? "unread" : null;
 }
 
-/** Whether a live session, not pinned, is listed under Needs You, Working or Unread. */
-export function inSmartRow(row: Exclude<SmartRow, "pinned">, agent: Agent,
-  on: ReadonlySet<SmartRow> = allSmartRows): boolean {
-  return home(agent, false, on) === row;
-}
-
 /** The mark a session's row carries in the sidebar (#495): what it wants, or null for its own status mark. */
 export type SessionMark = "needsYou" | "working" | "tool" | "queued" | "waiting" | "paused" | "done" | "asksToArchive";
 
