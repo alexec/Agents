@@ -214,3 +214,44 @@ func TestAPartIsTakenFromThisMachine(t *testing.T) {
 		t.Fatal("resources were returned as a person-scoped setting")
 	}
 }
+
+// A delivery that is on disk already writes no file again (#2729).
+func TestAnUnchangedDeliveryWritesNoFile(t *testing.T) {
+	root, home := t.TempDir(), t.TempDir()
+	t.Setenv("AGENTS_PERSONAL_HOME", home)
+	d, _ := start(t, root)
+	defer d.Shutdown()
+	d.SettingsDir = t.TempDir()
+	skills := map[string]string{}
+	for _, name := range []string{"one", "two", "three"} {
+		skills[name] = "---\nname: " + name + "\n---\n"
+	}
+	instructions := "Use ASD-STE100."
+	sent := wire.MachineUserSettings{User: "sam", Settings: wire.UserSettings{
+		McpServers:  json.RawMessage(`{"docs":{"command":"docs-mcp","args":["--quiet"]}}`),
+		AgentConfig: mustJSON(wire.UserAgentConfig{Instructions: &instructions, Personas: map[string]string{"reviewer": "You review."}, Skills: skills}),
+	}}
+	if err := d.ApplyUserSettings(sent); err != nil {
+		t.Fatal(err)
+	}
+	files := []string{"mcp.json", "AGENTS.md", "personas/reviewer.md", "skills/one/SKILL.md", "skills/two/SKILL.md", "skills/three/SKILL.md"}
+	stat := func(rel string) os.FileInfo {
+		info, err := os.Stat(filepath.Join(home, ".agents", filepath.FromSlash(rel)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return info
+	}
+	before := map[string]os.FileInfo{}
+	for _, rel := range files {
+		before[rel] = stat(rel)
+	}
+	if err := d.ApplyUserSettings(sent); err != nil {
+		t.Fatal(err)
+	}
+	for _, rel := range files {
+		if !os.SameFile(before[rel], stat(rel)) {
+			t.Fatalf("%s was written again with the same contents", rel)
+		}
+	}
+}

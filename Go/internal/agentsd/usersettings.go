@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -165,7 +166,16 @@ func writeMCPServers(home string, servers wire.JSONValue) error {
 	if err != nil {
 		return err
 	}
-	return store.WriteAtomically(path, append(b, '\n'), 0o644)
+	return writeIfChanged(path, append(b, '\n'))
+}
+
+// writeIfChanged writes a file only when its bytes on disk differ, so a delivery that
+// changes one part does not write and fsync every file of the others again (#2729).
+func writeIfChanged(path string, b []byte) error {
+	if on, err := os.ReadFile(path); err == nil && bytes.Equal(on, b) {
+		return nil
+	}
+	return store.WriteAtomically(path, b, 0o644)
 }
 
 // writeAgentConfig writes the instructions, personas and skills, and takes away the files
@@ -201,7 +211,7 @@ func writeAgentConfig(home string, raw wire.JSONValue, wroteBefore []string) ([]
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return wroteBefore, err
 		}
-		if err := store.WriteAtomically(path, []byte(text), 0o644); err != nil {
+		if err := writeIfChanged(path, []byte(text)); err != nil {
 			return wroteBefore, err
 		}
 		wrote = append(wrote, rel)
