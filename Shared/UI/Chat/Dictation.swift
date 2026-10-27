@@ -21,6 +21,14 @@ private final class BufferSink: @unchecked Sendable {
     private var continuation: AsyncStream<AnalyzerInput>.Continuation?
     private var converter: AVAudioConverter?
     private var target: AVAudioFormat?
+    /// For the log: the tap's format, and buffers given and passed on, since `point`.
+    private var given: (format: String, count: Int, passed: Int) = ("none", 0, 0)
+
+    var counts: String {
+        lock.lock()
+        defer { lock.unlock() }
+        return "tap \(given.format), \(given.count) buffers, \(given.passed) passed on"
+    }
 
     func point(at continuation: AsyncStream<AnalyzerInput>.Continuation?, in target: AVAudioFormat? = nil) {
         lock.lock()
@@ -29,13 +37,21 @@ private final class BufferSink: @unchecked Sendable {
         self.continuation = continuation
         self.target = target
         converter = nil
+        given = ("none", 0, 0)
     }
 
     func append(_ buffer: AVAudioPCMBuffer) {
         lock.lock()
         defer { lock.unlock() }
         guard let continuation else { return }
+        if given.count == 0 {
+            let format = buffer.format
+            given.format = "\(format.sampleRate) Hz × \(format.channelCount) \(format.commonFormat.rawValue)"
+                + (format.isInterleaved ? " interleaved" : "")
+        }
+        given.count += 1
         guard let target, buffer.format != target else {
+            given.passed += 1
             continuation.yield(AnalyzerInput(buffer: buffer))
             return
         }
@@ -43,6 +59,7 @@ private final class BufferSink: @unchecked Sendable {
             converter = DictationAudio.converter(from: buffer.format, to: target)
         }
         guard let converter, let converted = DictationAudio.convert(buffer, with: converter) else { return }
+        given.passed += 1
         continuation.yield(AnalyzerInput(buffer: converted))
     }
 }
@@ -235,10 +252,10 @@ final class Dictation {
                               permission: .microphone)
             return
         }
-        await listen(for: thisRun, vocabulary: vocabulary)
+        await listen(as: model, for: thisRun, vocabulary: vocabulary)
     }
 
-    private func listen(for thisRun: Int, vocabulary: [String]) async {
+    private func listen(as model: Model, for thisRun: Int, vocabulary: [String]) async {
         switch model {
         case .systemDictation:
             guard let locale = await DictationTranscriber.supportedLocale(equivalentTo: Locale.current) else {
@@ -252,9 +269,13 @@ final class Dictation {
                                                    attributeOptions: [])
             await listen(with: transcriber, locale: locale, for: thisRun, vocabulary: vocabulary)
         case .speech:
-            guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale.current) else {
+            // Not on every device, nor in the simulator: the older model there, rather than
+            // no dictation at all (#2532).
+            guard SpeechTranscriber.isAvailable,
+                  let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale.current) else {
                 guard thisRun == run else { return }
-                problem = Problem(message: "Dictation is not available for \(Locale.current.identifier).")
+                note("dictation: SpeechTranscriber not available (\(SpeechTranscriber.isAvailable)), the older model")
+                await listen(as: .systemDictation, for: thisRun, vocabulary: vocabulary)
                 return
             }
             // The newer on-device model (#2515). Volatile results are the live words. It
@@ -283,7 +304,16 @@ final class Dictation {
         guard thisRun == run else { return }
 
         let analyzer = SpeechAnalyzer(modules: [transcriber])
-        let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber])
+        // Nil when the model is not on the device after all (the simulator's case). The
+        // microphone's own buffers would then reach the analyser, which traps on them on the
+        // audio thread, and the app is gone (#2532): a problem to show instead.
+        guard let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) else {
+            let status = await AssetInventory.status(forModules: [transcriber])
+            guard thisRun == run else { return }
+            note("dictation: no audio format for \(T.self), assets \(status)")
+            problem = Problem(message: "Dictation is not available on this device for \(locale.identifier).")
+            return
+        }
         let (input, feed) = AsyncStream<AnalyzerInput>.makeStream()
         do {
             let context = AnalysisContext()
@@ -320,6 +350,7 @@ final class Dictation {
         }
         self.analyzer = analyzer
         listeningSince = clock.now
+        note("dictation: listening, \(T.self), analyzer \(format.sampleRate) Hz × \(format.channelCount)")
         judgedVolatile = false
         volatileIsLate = false
         isListening = true
@@ -336,6 +367,7 @@ final class Dictation {
                     self.heard(words, final: final, from: start.isFinite ? start : 0)
                 }
             } catch {
+                note("dictation: results ended: \(error)")
                 guard let self, thisRun == self.run else { return }
                 self.problem = Problem(message: "Dictation stopped: \(error.localizedDescription)")
                 self.stop()
@@ -344,6 +376,7 @@ final class Dictation {
     }
 
     private func heard(_ words: String, final: Bool, from start: Double) {
+        if !judgedVolatile, listeningSince != nil { note("dictation: first result, final \(final), \(sink.counts)") }
         if !final, !judgedVolatile, let listeningSince {
             judgedVolatile = true
             let lag = clock.now - listeningSince - Duration.seconds(start)
@@ -444,6 +477,7 @@ final class Dictation {
     func stop() {
         // Retire pending permission and set-up work as well as results still on their
         // way. Results already queued carry the old run number.
+        if isListening { note("dictation: stop, \(sink.counts)") }
         run += 1
         onChange = nil
         isListening = false

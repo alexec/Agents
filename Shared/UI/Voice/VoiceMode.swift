@@ -150,6 +150,7 @@ final class VoiceMode {
                                                queue: .main) { _ in
             MainActor.assumeIsolated {
                 guard VoiceMode.shared.phase != .off else { return }
+                note("voice: the audio session went inactive in \(VoiceMode.shared.phase): off")
                 VoiceMode.shared.turnOff()
             }
         }
@@ -203,18 +204,22 @@ final class VoiceMode {
         talkedOver = nil
         clearJoin()
         phase = .loading
+        note("voice: on")
         Task {
             do {
                 try await voice.load()
             } catch {
                 guard self.agentID == agentID else { return }
+                note("voice: the voice would not load: \(error)")
                 fail("The voice would not load: \(error.localizedDescription)")
                 return
             }
             guard self.agentID == agentID, phase == .loading else { return }
             do {
                 try audio.open()
+                note("voice: audio open, \(audio.route)")
             } catch {
+                note("voice: audio would not open: \(error)")
                 fail("The microphone and speaker would not start: \(error.localizedDescription)")
                 return
             }
@@ -261,7 +266,10 @@ final class VoiceMode {
         tickTask?.cancel()
         tickTask = nil
         pauseTimer?.cancel()
-        if wasOn { sound(.ended) }
+        if wasOn {
+            note("voice: off")
+            sound(.ended)
+        }
         Task { await voice.unload() }
     }
 
@@ -666,6 +674,7 @@ final class VoiceMode {
     /// with what is said next.
     private func listen(chime: Bool = true, after words: String = "") {
         guard phase != .off else { return }
+        if phase == .loading { note("voice: listening, echo cancelled \(audio.cancelsEcho)") }
         heard = ""
         phase = .listening
         armStillWorking()
@@ -718,6 +727,7 @@ final class VoiceMode {
                 self.isWatchingDictation = false
                 guard self.phase != .off else { return }
                 if let problem = self.dictation.problem {
+                    note("voice: dictation: \(problem.message)")
                     self.dictation.dismissProblem()
                     self.fail(VoiceModeWords.problem(dictation: problem.message), permission: problem.permission)
                 } else {
@@ -920,6 +930,7 @@ final class VoiceMode {
                     }
                 } while !Task.isCancelled && phase == .speaking && !queue.isEmpty
             } catch {
+                if !Task.isCancelled { note("voice: could not speak: \(error)") }
                 if !Task.isCancelled { fail("The voice could not speak: \(error.localizedDescription)") }
                 return
             }
