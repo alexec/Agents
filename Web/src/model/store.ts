@@ -451,6 +451,8 @@ export class Work {
   readonly signInRequests = signal<SignInRequest[]>([]);
   /** Goes up on control/linksChanged, so Settings ▸ Channels loads again. */
   readonly linksChanges = signal(0);
+  /** Goes up on control/projectsChanged (#2317), so Console ▸ Projects loads again (#2671). */
+  readonly projectsChanges = signal(0);
   /** Counts each control/peopleChanged (#994): Settings ▸ People loads its list again when it moves. */
   readonly peopleChanges = signal(0);
   /**
@@ -1284,6 +1286,10 @@ export class Store extends Work {
         if (reached?.user) this.capped.value = addCap(reached, this.capped.value);
         // Only the bot's spend today changed.
         void this.loadPeople();
+        return;
+      }
+      if (method === "control/projectsChanged") {
+        this.projectsChanges.value += 1;
         return;
       }
       if (method === "control/groupsChanged") {
@@ -2143,10 +2149,12 @@ export class Store extends Work {
 
   /**
    * A folder on `host` as a folder (#115), as the window's Add Folder… does. Answers the
-   * folder, or null with `problem` saying why.
+   * folder, or null with `problem` saying why. With `project`, it joins the project picked in
+   * the Add Folder sheet (#2671); with none, a folder that names no project gets one of its own.
    */
-  async addFolder(host: string, folder: string): Promise<FolderSummary | null> {
-    const summary = await this.act("folders/add", { folder: folder as never }, host);
+  async addFolder(host: string, folder: string, project?: string): Promise<FolderSummary | null> {
+    const params = project === undefined ? { folder: folder as never } : { folder: folder as never, project };
+    const summary = await this.act("folders/add", params, host);
     if (summary) this.upsertFolder(summary, host);
     return summary;
   }

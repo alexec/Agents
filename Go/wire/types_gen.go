@@ -114,6 +114,13 @@ type AddAccountRequest struct {
 	Name string `json:"name"`
 }
 
+// folders/add: the folder, and the project to put it in (#2671). With no project, a folder that names none gets one of its own.
+type AddFolderRequest struct {
+	Folder URL `json:"folder"`
+
+	Project *string `json:"project,omitzero"`
+}
+
 // What either announce is answered with: who the new party now is.
 type Admitted struct {
 	Client *UUID `json:"client,omitzero"`

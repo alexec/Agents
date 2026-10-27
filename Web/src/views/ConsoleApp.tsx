@@ -26,6 +26,7 @@ import { followsWords } from "../model/orgPolicy";
 import { AuditPage, RequestsPage, requestCount } from "./ConsoleRecords";
 import { TeamWorkflowsPage } from "./ConsoleWorkflows";
 import { LiveNowPage } from "./ConsoleLive";
+import { ProjectsPage } from "./ConsoleProjects";
 import { SignInPage } from "./ConsoleSignIn";
 import { CataloguePage } from "./Governance";
 import { ReadAPIPage } from "./ReadAPI";
@@ -102,6 +103,7 @@ function ConsoleSection({ store, section, down }: { store: Store; section: Secti
   switch (section.id) {
     case "people": return <PeoplePage store={store} down={down} />;
     case "machines": return <MachinesPage store={store} down={down} />;
+    case "projects": return <ProjectsPage store={store} down={down} />;
     case "signIn": return <SignInPage store={store} down={down} />;
     case "live": return <LiveNowPage store={store} down={down} runtimeName={runtimeNameIn(store)} />;
     case "policy": return <OrgPolicyPage store={store} down={down} />;

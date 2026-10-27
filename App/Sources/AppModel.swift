@@ -2406,9 +2406,19 @@ final class AppModel {
         openPending()
     }
 
-    func addFolder(_ folder: URL, on host: MachineRef = .mac) async {
-        await callFolder(DaemonAPI.Method.foldersAdd, FolderKey(host: host, folder: folder)) { [weak self] summary in
-            self?.select(summary.key)
+    /// With `project`, the folder joins the project picked in the Add Folder sheet (#2671);
+    /// with none, a folder that names no project gets one of its own.
+    func addFolder(_ folder: URL, on host: MachineRef = .mac, project: String? = nil) async {
+        do {
+            var summary = try await client(for: host).call(DaemonAPI.Method.foldersAdd,
+                                                           DaemonAPI.AddFolderRequest(folder: folder, project: project),
+                                                           returning: DaemonAPI.FolderSummary.self)
+            summary.host = host
+            upsert(summary)
+            select(summary.key)
+            settleFolderSelection()
+        } catch {
+            problem = describe(error)
         }
     }
 

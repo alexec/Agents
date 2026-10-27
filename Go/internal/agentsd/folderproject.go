@@ -67,6 +67,27 @@ func (d *Daemon) ensureProject(folder string) bool {
 	return true
 }
 
+// putInProject writes the project picked when the folder was added (#2671), in place of any
+// it names. It leaves alone the folders ensureProject leaves alone, except one that names a
+// project: the pick replaces that id.
+func (d *Daemon) putInProject(folder, id string) bool {
+	if !isDir(folder) || !ownFolders(folder, ".agents") {
+		return false
+	}
+	if _, err := readFolderConfig(folder); err != nil {
+		return false
+	}
+	if !d.settled(folder, folderConfig) {
+		return false
+	}
+	if err := setFolderConfig(folder, "project", id); err != nil {
+		log.Printf("project: %s: %v", folder, err)
+		return false
+	}
+	d.approveWrite(folder, folderConfig)
+	return true
+}
+
 // StartProjects gives each folder with none a project id, at start-up, and then says
 // them to the control plane.
 func (d *Daemon) StartProjects() {

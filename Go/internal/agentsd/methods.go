@@ -113,8 +113,17 @@ func (d *Daemon) register() {
 	On(d, wire.CallFoldersList, func(ctx context.Context, c *Client, r wire.FoldersListRequest) ([]wire.FolderSummary, error) {
 		return d.folders(r.IncludeArchived), nil
 	})
-	On(d, wire.CallFoldersAdd, func(ctx context.Context, c *Client, r wire.FolderRequest) (wire.FolderSummary, error) {
-		return d.addFolder(r.Folder)
+	On(d, wire.CallFoldersAdd, func(ctx context.Context, c *Client, r wire.AddFolderRequest) (wire.FolderSummary, error) {
+		// The project picked in the Add Folder sheet (#2671), written as the folder is added,
+		// so the control plane never adopts a project of the folder's own name first.
+		pick := ""
+		if r.Project != nil {
+			if !wire.ValidProjectID(*r.Project) {
+				return wire.FolderSummary{}, Invalid("%q is not a project id.", *r.Project)
+			}
+			pick = *r.Project
+		}
+		return d.addFolderOf(r.Folder, true, pick)
 	})
 
 	On(d, wire.CallAgentsList, func(ctx context.Context, c *Client, r wire.ListRequest) ([]wire.Agent, error) {
@@ -288,12 +297,13 @@ func countsOf(m map[string]int64) wire.FolderSummaryCounts {
 }
 
 func (d *Daemon) addFolder(folder wire.URL) (wire.FolderSummary, error) {
-	return d.addFolderOf(folder, true)
+	return d.addFolderOf(folder, true, "")
 }
 
 // addFolderOf adds a folder; with project, one that names no project gets one of its own
-// (#2317). A folder sent from another machine does not: its project comes with it.
-func (d *Daemon) addFolderOf(folder wire.URL, project bool) (wire.FolderSummary, error) {
+// (#2317), or the one picked (#2671). A folder sent from another machine does not: its
+// project comes with it.
+func (d *Daemon) addFolderOf(folder wire.URL, project bool, pick string) (wire.FolderSummary, error) {
 	path := store.FolderPath(folder)
 	if r, err := store.Resolve(path); err == nil {
 		path = r
@@ -314,7 +324,9 @@ func (d *Daemon) addFolderOf(folder wire.URL, project bool) (wire.FolderSummary,
 			return wire.FolderSummary{}, err
 		}
 	}
-	if project {
+	if pick != "" {
+		d.putInProject(path, pick)
+	} else if project {
 		d.ensureProject(path)
 	}
 	d.sendJoinedSoon()

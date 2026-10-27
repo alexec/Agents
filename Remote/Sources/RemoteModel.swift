@@ -618,11 +618,12 @@ final class RemoteModel {
         let message: String
     }
 
-    /// Add a folder on `host` as a folder, and open it. Answers why not, or nil.
-    func addFolder(_ folder: URL, on host: MachineRef) async -> String? {
+    /// Add a folder on `host` as a folder, and open it: in `project` when one was picked
+    /// (#2671). Answers why not, or nil.
+    func addFolder(_ folder: URL, on host: MachineRef, project: String? = nil) async -> String? {
         do {
             let summary = try await client(on: host).call(DaemonAPI.Method.foldersAdd,
-                                                          DaemonAPI.FolderRequest(folder: folder),
+                                                          DaemonAPI.AddFolderRequest(folder: folder, project: project),
                                                           returning: DaemonAPI.FolderSummary.self)
             show(summary, on: host)
             return nil

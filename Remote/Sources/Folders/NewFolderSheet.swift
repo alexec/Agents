@@ -86,6 +86,9 @@ private struct FolderPickerSheet: View {
     @State private var chosen: URL?
     @State private var problem: String?
     @State private var adding = false
+    /// The Project picked (#2671); nil is the folder's own.
+    @State private var project: String?
+    @State private var projects: [DaemonAPI.Project] = []
 
     private var label: String { model.folderHosts.first { $0.id == host }?.title ?? model.hostLabel(host) }
 
@@ -103,6 +106,12 @@ private struct FolderPickerSheet: View {
                         Text(problem).tinted(.failure)
                     } else {
                         Text("Type a path or open a folder. Tap one to choose it; with none chosen, the folder shown is added.")
+                    }
+                }
+                // The project the folder joins (#2671): nothing to pick with no projects.
+                if !projects.isEmpty {
+                    Section {
+                        NewFolderProjectChoice(projects: projects, project: $project)
                     }
                 }
                 Section {
@@ -138,6 +147,7 @@ private struct FolderPickerSheet: View {
             }
         }
         .task { await load("~") }
+        .task { projects = await NewFolderProjectChoice.projects(on: model.controlPlane) }
     }
 
     /// A folder: tapped, it is chosen; its arrow opens it. A file is shown, never chosen.
@@ -193,7 +203,7 @@ private struct FolderPickerSheet: View {
         guard let folder = chosen ?? listing?.url else { return }
         adding = true
         defer { adding = false }
-        if let problem = await model.addFolder(folder, on: host) {
+        if let problem = await model.addFolder(folder, on: host, project: project) {
             self.problem = problem
         } else {
             dismiss()

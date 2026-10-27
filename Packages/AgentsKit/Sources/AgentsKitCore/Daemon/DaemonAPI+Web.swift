@@ -271,7 +271,7 @@ public extension DaemonAPI {
                 // New folder (#115): Add Folder…, browsing the host's folders, and Clone Git URL…,
                 // as the window's folders column has them.
                 Row(Method.filesBrowse, params: FilesBrowseRequest.self, result: DirectoryListing.self, kind: .hostRequest),
-                Row(Method.foldersAdd, params: FolderRequest.self, result: FolderSummary.self, kind: .hostRequest),
+                Row(Method.foldersAdd, params: AddFolderRequest.self, result: FolderSummary.self, kind: .hostRequest),
                 Row(Method.foldersClone, params: CloneRequest.self, result: FolderSummary.self, kind: .hostRequest),
                 Row(Method.foldersClones, params: Empty.self, result: [CloneSummary].self, kind: .hostRequest),
                 // Archive… on a folder's menu (#668), as the window's folder menu has it.

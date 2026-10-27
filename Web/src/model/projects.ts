@@ -1,6 +1,6 @@
 // A folder's Project (#2317): the words of ProjectWords in Packages/AgentsKit
 // (Model/Project.swift), the same on the Mac, the Remote and the web page.
-import type { ConnectorSetup, ConnectorSlot, Project, ProjectSlot } from "../protocol/generated";
+import type { ConnectorSetup, ConnectorSlot, PersonRow, Project, ProjectFolder, ProjectSlot } from "../protocol/generated";
 
 export const projectWords = {
   title: "Project",
@@ -12,6 +12,11 @@ export const projectWords = {
   noControlPlane: "Connect to a control plane to choose a project.",
   useForProject: "Use for the Whole Project",
   useFolderOwn: "Use Each Folder's Own",
+  // The Add Folder sheet's first choice (#2671), what a solo person keeps.
+  ownProject: "Its Own Project",
+  addNote: "Its own project is a new one of the folder's name, or the one its .agents/folder.json names. "
+    + "Pick another to share that project's tools and reports.",
+  remove: "Remove Project",
 } as const;
 
 /** On a Connectors page whose folder is in a project (#2669): whose the slots are, and who may change them. */
@@ -56,4 +61,36 @@ export function projectName(id: string | undefined, projects: readonly Project[]
 export function projectTaken(name: string, projects: readonly Project[], except?: string): boolean {
   const wanted = name.trim().toLowerCase();
   return projects.some((p) => p.id !== except && p.name.toLowerCase() === wanted);
+}
+
+// Console ▸ Projects (#2671): every project in the organisation, its owner and its folders on each machine.
+
+/** Under the Console's table. */
+export const projectsFoot = "A project is what people work on. Each folder names its project in .agents/folder.json, "
+  + "so its clones on other machines join the same one. The folders are as each machine last said them. "
+  + "A project with folders in it cannot be removed: move them to another project first.";
+
+/** The owner's name, from the people list; the id when the person is not on it. */
+export function projectOwner(owner: string, people: readonly PersonRow[]): string {
+  if (!owner) return "Nobody";
+  return people.find((p) => p.id === owner)?.name ?? owner;
+}
+
+/** A project's folders, by machine and then by name, each with the machine's name. */
+export function projectFolders(project: Project, machineName: (id: string) => string): { machine: string; folder: ProjectFolder }[] {
+  return project.folders
+    .map((folder) => ({ machine: machineName(folder.machine), folder }))
+    .sort((a, b) => a.machine.localeCompare(b.machine) || a.folder.name.localeCompare(b.folder.name));
+}
+
+/** Why Remove is off, or null when it may be done. */
+export function removeRefusal(project: Project): string | null {
+  if (!project.mayChange) return "Only its owner or an admin removes a project.";
+  if (project.folders.length > 0) return "A folder is still in it. Move its folders to another project first.";
+  return null;
+}
+
+/** What Remove asks. */
+export function removeQuestion(project: Project): string {
+  return `Remove the project ${project.name}? A folder that names it later brings it back.`;
 }

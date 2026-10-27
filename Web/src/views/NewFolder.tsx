@@ -4,7 +4,7 @@
 // folder is chosen the way the window chooses a server's.
 import { signal, useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import type { ControlMachine, DirectoryEntry, DirectoryListing, RuntimeStatus } from "../protocol/generated";
+import type { ControlMachine, DirectoryEntry, DirectoryListing, Project, RuntimeStatus } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { gitRemote } from "../model/gitRemote";
 import { hostAnswers } from "../model/capabilities";
@@ -15,6 +15,7 @@ import { go } from "../route";
 import { Modal } from "./Modal";
 import { MachineDialog } from "./MachineDialog";
 import { machineWords } from "../model/machineFromRepository";
+import { projectWords } from "../model/projects";
 
 type Adding = { kind: "folder" | "clone"; host: string } | { kind: "machine" };
 
@@ -220,6 +221,9 @@ function FolderDialog({ store, host, close }: { store: Store; host: string; clos
   const listing = useSignal<DirectoryListing | null>(null);
   const chosen = useSignal<string | null>(null);
   const problem = useSignal<string | null>(null);
+  // The project the folder joins (#2671): "" is its own; nothing to pick with no projects.
+  const projects = useSignal<Project[]>([]);
+  const project = useSignal("");
   const load = async (wanted: string) => {
     try {
       const listed = await store.browse(host, wanted);
@@ -231,13 +235,16 @@ function FolderDialog({ store, host, close }: { store: Store; host: string; clos
       problem.value = describe(error);
     }
   };
-  useEffect(() => { void load("~"); }, []);
+  useEffect(() => {
+    void load("~");
+    void store.link.call("projects/list", {}).then((list) => { projects.value = list.projects; }, () => undefined);
+  }, []);
   const parent = listing.value ? parentOf(pathOf(listing.value.url)) : null;
   const add = async () => {
     const folder = chosen.value ?? listing.value?.url;
     close();
     if (!folder) return;
-    const summary = await store.addFolder(host, folder);
+    const summary = await store.addFolder(host, folder, project.value || undefined);
     if (summary) go({ host, folder: summary.folder.folder, compose: true });
   };
   return (
@@ -263,6 +270,18 @@ function FolderDialog({ store, host, close }: { store: Store; host: string; clos
       {problem.value
         ? <p class="sheet-note failure" role="alert">{problem.value}</p>
         : <p class="sheet-note">Type a path or click into a folder. Files are shown but can’t be chosen.</p>}
+      {projects.value.length > 0 && (
+        <div class="new-folder-project">
+          <label>{projectWords.title}
+            <select value={project.value}
+              onChange={(e) => (project.value = (e.currentTarget as HTMLSelectElement).value)}>
+              <option value="">{projectWords.ownProject}</option>
+              {projects.value.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </label>
+          <p class="small quiet">{projectWords.addNote}</p>
+        </div>
+      )}
       <div class="sheet-actions">
         <button type="button" onClick={close}>Cancel</button>
         <button type="button" class="prominent" disabled={!listing.value} onClick={() => void add()}>Add as folder</button>

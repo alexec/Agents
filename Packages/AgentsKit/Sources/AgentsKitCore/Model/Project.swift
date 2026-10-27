@@ -127,6 +127,18 @@ public extension DaemonAPI {
         }
     }
 
+    /// `folders/add` (#2671): the folder, and the project picked in the Add Folder sheet. With
+    /// none, a folder that names no project gets one of its own.
+    struct AddFolderRequest: Codable, Sendable, Hashable {
+        public var folder: URL
+        public var project: String?
+
+        public init(folder: URL, project: String? = nil) {
+            self.folder = folder
+            self.project = project
+        }
+    }
+
     /// `folders/setProject`: the project id to write into the folder's `.agents/folder.json`.
     struct SetFolderProjectRequest: Codable, Sendable, Hashable {
         public var folder: URL
@@ -171,6 +183,11 @@ public enum ProjectWords {
     /// A folder whose id the control plane has not adopted yet, or with no control plane.
     public static func unknown(_ id: String) -> String { "Not on the control plane yet (\(id))" }
     public static let noControlPlane = "Connect to a control plane to choose a project."
+    /// The Add Folder sheet's first choice (#2671), what a solo person keeps.
+    public static let ownProject = "Its Own Project"
+    /// Under the Add Folder sheet's picker.
+    public static let addNote = "Its own project is a new one of the folder's name, or the one its .agents/folder.json names. "
+        + "Pick another to share that project's tools and reports."
 
     /// On a Connectors page whose folder is in a project (#2669): whose the slots are, and who
     /// may change them.

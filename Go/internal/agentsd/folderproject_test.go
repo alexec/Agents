@@ -69,6 +69,48 @@ func TestAddingAFolderGivesItAProject(t *testing.T) {
 	}
 }
 
+// #2671: the project picked in the Add Folder sheet is written as the folder is added, in
+// place of a new one and of one a clone names; an id that is not valid adds nothing.
+func TestAddingAFolderInAPickedProject(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+
+	dir := t.TempDir()
+	var s wire.FolderSummary
+	json.Unmarshal(c.call(t, 1, "folders/add", map[string]any{"folder": store.FolderURL(dir), "project": "p-picked"}), &s)
+	if s.Project == nil || *s.Project != "p-picked" {
+		t.Fatalf("%+v", s.Project)
+	}
+
+	clone := t.TempDir()
+	os.MkdirAll(filepath.Join(clone, ".agents"), 0o755)
+	os.WriteFile(filepath.Join(clone, ".agents", "folder.json"), []byte(`{"project": "p-agents", "keep": 1}`), 0o644)
+	s = wire.FolderSummary{}
+	json.Unmarshal(c.call(t, 2, "folders/add", map[string]any{"folder": store.FolderURL(clone), "project": "p-picked"}), &s)
+	if s.Project == nil || *s.Project != "p-picked" {
+		t.Fatalf("%+v", s.Project)
+	}
+	if b, _ := os.ReadFile(filepath.Join(clone, ".agents", "folder.json")); !strings.Contains(string(b), `"keep"`) {
+		t.Fatalf("%s", b)
+	}
+
+	other := t.TempDir()
+	c.in <- `{"jsonrpc":"2.0","id":3,"method":"folders/add","params":{"folder":"` + string(store.FolderURL(other)) + `","project":"not an id"}}`
+	for line := range c.out {
+		if strings.Contains(line, `"id":3`) {
+			if !strings.Contains(line, `"error"`) {
+				t.Fatalf("%s", line)
+			}
+			break
+		}
+	}
+	for _, p := range d.Store.Folders() {
+		if store.FolderPath(p.Folder) == mustResolve(other) {
+			t.Fatalf("added %s", other)
+		}
+	}
+}
+
 // US2 (#2317, FR-010): folders/setProject writes the id the person picked.
 func TestAFolderJoinsAnotherProject(t *testing.T) {
 	d, c := start(t, t.TempDir())
