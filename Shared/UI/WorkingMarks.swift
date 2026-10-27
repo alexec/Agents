@@ -327,13 +327,13 @@ private final class ClockedMarkView: ClockedLayersView {
 /// the symbol, and its breath kept in step with the clock. The mask is drawn once per size
 /// and scale; the colour and the breath never draw it again.
 private final class BeaconView: ClockedLayersView {
-    private let mask = CALayer()
+    private let symbolMask = CALayer()
     private var scale: CGFloat = 2
 
     convenience init() {
         self.init(dots: 1)
-        mask.contentsGravity = .resizeAspect
-        for dot in dots { dot.mask = mask }
+        symbolMask.contentsGravity = .resizeAspect
+        for dot in dots { dot.mask = symbolMask }
     }
 
     /// The beacon filling the well, dim: the start of a breath.
@@ -354,9 +354,9 @@ private final class BeaconView: ClockedLayersView {
     /// The symbol, at the well's width, as the mask's image: only its alpha counts.
     private func drawMask() {
         guard side > 0 else { return }
-        mask.frame = CGRect(x: 0, y: 0, width: side, height: side)
-        mask.contentsScale = scale
-        mask.contents = Self.symbolImage(side: side, scale: scale)
+        symbolMask.frame = CGRect(x: 0, y: 0, width: side, height: side)
+        symbolMask.contentsScale = scale
+        symbolMask.contents = Self.symbolImage(side: side, scale: scale)
     }
 
     private static func symbolImage(side: CGFloat, scale: CGFloat) -> CGImage? {
