@@ -147,6 +147,10 @@ func (a providerRouter) BroadcastControlEach(method string, params func(person s
 	a.r.BroadcastControlEach(method, params)
 }
 
+func (a providerRouter) TellPerson(person, method string, params any) {
+	a.r.TellPerson(person, method, params)
+}
+
 func (a providerRouter) DeliverKept(method string, params json.RawMessage, client, kind, host string, patience time.Duration) *providers.Reply {
 	m := a.r.DeliverKept(method, params, client, kind, host, patience)
 	if m == nil {

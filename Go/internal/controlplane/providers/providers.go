@@ -742,7 +742,7 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 		if kept == nil {
 			return map[string]any{"kept": []any{}}, nil
 		}
-		return kept.Answer(method, params)
+		return kept.Answer(method, params, caller.Person)
 	}
 	return nil, methodNotFound(method)
 }
