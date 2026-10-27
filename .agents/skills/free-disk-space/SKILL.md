@@ -1,6 +1,6 @@
 ---
 name: free-disk-space
-description: Free disk space on this Mac (#199, #1796) until 20% of the disk is free. Bound the shared build cache (Swift and Go), delete the build output that finished agents left in their worktrees, remove the worktrees of archived agents whose work is all on their branch, end leaked headless Chromes and their clones, and remove old Xcode device support and unavailable simulators. Nothing else. Use when the Free disk space workflow runs on machine.disk_low, or when Alex asks to free disk space.
+description: Free disk space on this Mac (#199, #1796) until 20% of the disk is free. Bound the shared build cache (Swift and Go), delete the build output that finished agents left in their worktrees, remove the worktrees of archived agents whose work is all on their branch, end leaked headless Chromes and their clones, remove old Xcode device support and unavailable simulators, and remove the Xcode DerivedData of removed worktrees. Nothing else. Use when the Free disk space workflow runs on machine.disk_low, or when Alex asks to free disk space.
 ---
 
 # Free disk space
@@ -135,8 +135,9 @@ a worktree with changes or untracked files, or one that is locked.
 ## 6. Leaked Chromes and Xcode leftovers
 
 ```sh
-scripts/free-disk.sh chromes   # ends leaked headless walk Chromes, then removes clones no process uses
-scripts/free-disk.sh xcode     # older iOS DeviceSupport builds per device, unavailable simulators
+scripts/free-disk.sh chromes       # ends leaked headless walk Chromes, then removes clones no process uses
+scripts/free-disk.sh xcode         # older iOS DeviceSupport builds per device, unavailable simulators
+scripts/free-disk.sh deriveddata   # Xcode DerivedData of worktrees that are gone (--dry-run to look first)
 ```
 
 A walk's headless Chrome that was left running keeps an APFS clone of the Chrome app (up
@@ -144,6 +145,14 @@ to 3 GB) until it ends. Walks end theirs now (`Web/test/walk/cdp.mjs`), but one 
 with `kill -9` still leaks. Xcode keeps a DeviceSupport folder (about 6.5 GB) for every
 OS build a device has run; only the newest per device model is kept, and Xcode makes it
 again when a device needs it.
+
+Xcode builds each worktree into `~/Library/Developer/Xcode/DerivedData/Agents-<hash>`
+(3 to 4 GB), not into the worktree, so step 4 does not find it and step 5 leaves it
+(#2683). `deriveddata` removes an `Agents-*` folder only when its `info.plist` names a
+`WorkspacePath` under `$P/.agents/worktrees/` that is gone, and no running `xcodebuild`
+names the folder or that worktree. It keeps a folder with no `info.plist`, a folder of
+any other project, and Xcode's shared caches (`ModuleCache.noindex`, `SDK*`). It prints
+each folder it removes and its size.
 
 ## 7. Report
 
@@ -163,6 +172,6 @@ du -sk "$P"/.agents/worktrees/* 2>/dev/null | sort -rn | head -5
 
 End with one line per worktree touched (`freed <GB> from <name>` or `removed <name>,
 branch <branch> kept`), then the build cache before and after, the Chromes ended and
-clones removed, the Xcode folders removed, then the free space before and after and how
+clones removed, the Xcode folders and DerivedData folders removed, then the free space before and after and how
 far from the target, then what was kept and why (busy, holding, not named by a session,
 not clean). Then call `archive_session` with no id.
