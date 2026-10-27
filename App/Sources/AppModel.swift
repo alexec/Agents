@@ -699,6 +699,10 @@ final class AppModel {
         }
     }
 
+    /// The selection once it has been looked for, as `PoppedChat.looked` and the Remote's:
+    /// from then a selected session not in hand is one that has gone (#2748).
+    private(set) var lookedForSelection: UUID?
+
     /// The session opened while it was unread, kept in the sidebar's Unread until another
     /// is opened (#495), so it does not leave the list under the pointer on the click.
     private(set) var keptInUnread: UUID?
@@ -4173,6 +4177,8 @@ final class AppModel {
         // server's chat does not fail because this Mac's host is down (#400).
         let host = host(ofAgent: selection)
         var reason: String?
+        // Its host answered that it has no such session: an answer, not a failure (#2743).
+        var gone = false
         let loaded = await attempt(on: host, quietWhenDown: true) {
             let client = self.client(for: host)
             do {
@@ -4205,6 +4211,7 @@ final class AppModel {
             } catch {
                 // A server that went: the strip says so, and this says what is shown (#963).
                 reason = host != .mac && OfflineWords.hostDown(error) ? OfflineWords.lastHeard : self.describe(error)
+                gone = ChatOpening.saysGone(error)
                 throw error
             }
         }
@@ -4215,7 +4222,17 @@ final class AppModel {
             Self.chatLog.notice("history of \(selection) did not load from \(host.rawValue, privacy: .public): \(why, privacy: .public)")
             work.failOpening(why, load: load)
         }
-        _ = await whole
+        // Looked for once its host has answered both and said it has no such session:
+        // only then has a session not in hand gone. A call that failed is no answer, and
+        // the chat says it with Try Again rather than calling the session deleted (#2748).
+        guard await whole, self.selection == selection else { return }
+        if gone {
+            lookedForSelection = selection
+        } else if loaded, work.agent(selection) == nil {
+            // Its host has its history, but no record this Mac could read (#2650): not gone.
+            Self.chatLog.notice("record of \(selection) did not load from \(host.rawValue, privacy: .public)")
+            work.failOpening("Its host has this session, but this Mac could not read its record.", load: load)
+        }
     }
 
     /// A session's transcript in a window of its own (#826), loaded as the main window's

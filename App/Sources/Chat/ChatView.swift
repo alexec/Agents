@@ -74,13 +74,17 @@ struct ChatView: View {
                         .clipped()
                     form
                 }
-            } else if model.hasLoadedAgents {
-                // A selection that names no session: it went while it was selected. Not a
-                // start form, which is the folder page's (#2651), as a session's own
-                // window says it (#826).
+            } else if model.lookedForSelection == model.selection {
+                // A selection that names no session its host knows: it went while it was
+                // selected. Not a start form, which is the folder page's (#2651), as a
+                // session's own window says it (#826).
                 SessionDeletedPage(next: .pickAnother)
+            } else if let failure = model.work.transcriptLoadFailure {
+                // Not looked for: its host did not answer, so it is not called deleted (#2748).
+                SessionNotLoadedPage(failure: failure) { await model.loadTranscript() }
             } else {
-                // The selection kept from the last launch, before the sessions arrive.
+                // Not looked for yet, as the selection kept from the last launch: on its
+                // way, not gone.
                 ProgressView()
                     .controlSize(.small)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
