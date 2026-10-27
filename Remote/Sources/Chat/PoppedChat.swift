@@ -88,8 +88,7 @@ struct PoppedChatScene: View {
                         .paperGround()
                         .environment(\.poppedChat, chat)
                 } else if chat?.looked == true {
-                    ContentUnavailableView("This session was deleted", systemImage: "trash",
-                                           description: Text("There is nothing left of it to show. Close this window."))
+                    SessionDeletedPage(next: .closeWindow)
                 } else if id == nil {
                     ContentUnavailableView("No session", systemImage: "bubble.left.and.bubble.right",
                                            description: Text("Drag a session out of the sidebar to open it here."))

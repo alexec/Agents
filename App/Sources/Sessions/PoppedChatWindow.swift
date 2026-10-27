@@ -31,8 +31,7 @@ struct PoppedChatWindow: View {
                 .environment(\.poppedChat, chat)
                 .environment(\.windowHasInspector, false)
             } else if chat?.looked == true || id == nil {
-                ContentUnavailableView("This session was deleted", systemImage: "trash",
-                                       description: Text("There is nothing left of it to show. Close this window."))
+                SessionDeletedPage(next: .closeWindow)
             } else {
                 ProgressView()
                     .controlSize(.small)
