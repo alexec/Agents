@@ -1378,6 +1378,13 @@ struct PromptBar: View {
                 dismiss()
             }
             .disabled(!listed.canMakeNew)
+            // The one a view named (#834), on one line: an issue's title is long (#2659).
+            if case .named(let name) = model.draftWorktree {
+                SelectChoice(title: "New worktree", description: name, isChosen: true,
+                             descriptionLines: 1) {
+                    dismiss()
+                }
+            }
             let others = listed.worktrees.filter { !$0.isFolderPath }
             if !others.isEmpty || !listed.branches.isEmpty {
                 Divider().padding(.vertical, 4)
@@ -1519,8 +1526,8 @@ struct PromptBar: View {
     private var worktreeTitle: String {
         switch model.draftWorktree {
         case nil: "Folder"
-        case .new: "New worktree"
-        case .named(let name): name
+        // A named one's name is long and is not what the daemon calls it (#2659): the menu shows it.
+        case .new, .named: "New worktree"
         case .existing(let root): root.lastPathComponent
         case .branch(let name): name
         }

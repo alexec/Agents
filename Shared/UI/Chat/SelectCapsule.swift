@@ -113,6 +113,8 @@ struct SelectChoice: View {
     let isChosen: Bool
     /// The organisation's mark on a choice its policy refuses (#998): shown, dimmed, not chosen.
     var setBy: DaemonAPI.PolicySetBy?
+    /// The description's lines, cut short with "…" past them; nil wraps it (#2659).
+    var descriptionLines: Int?
     let choose: () -> Void
 
     @State private var isHovered = false
@@ -132,6 +134,8 @@ struct SelectChoice: View {
                         Text(description)
                             .appText(.fine)
                             .foregroundStyle(.secondary)
+                            .lineLimit(descriptionLines)
+                            .truncationMode(.tail)
                     }
                 }
                 Spacer(minLength: 12)
