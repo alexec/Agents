@@ -5,11 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -158,7 +160,7 @@ func (s *Service) keepJoined(ctx context.Context, host string, joined wire.Proje
 	return nil
 }
 
-// projectsMethod answers projects/list, projects/set and projects/remove.
+// projectsMethod answers projects/list, projects/set, projects/setSlot and projects/remove.
 func (m *Methods) projectsMethod(ctx context.Context, method string, params json.RawMessage, from Caller) (any, error) {
 	user := m.callerPerson(from)
 	admin := m.s.isAdmin(user)
@@ -175,6 +177,12 @@ func (m *Methods) projectsMethod(ctx context.Context, method string, params json
 			return nil, err
 		}
 		return m.setProject(ctx, request, user, admin)
+	case "projects/setSlot":
+		request, err := require[wire.ProjectSlotSet](params, "ProjectSlotSet")
+		if err != nil {
+			return nil, err
+		}
+		return m.setProjectSlot(ctx, request, user, admin)
 	case "projects/remove":
 		request, err := require[wire.ProjectRequest](params, "ProjectRequest")
 		if err != nil {
@@ -209,7 +217,11 @@ func projectOnWire(p records.Project, folders []wire.ProjectFolder, mayChange bo
 	if folders == nil {
 		folders = []wire.ProjectFolder{}
 	}
-	return wire.Project{ID: p.ID, Name: p.Name, Owner: p.Owner, Folders: folders, MayChange: mayChange}
+	out := wire.Project{ID: p.ID, Name: p.Name, Owner: p.Owner, Folders: folders, MayChange: mayChange}
+	if len(p.Slots) > 0 {
+		out.Slots = p.Slots
+	}
+	return out
 }
 
 func (m *Methods) setProject(ctx context.Context, request wire.ProjectSet, user string, admin bool) (wire.Project, error) {
@@ -281,7 +293,8 @@ func (m *Methods) removeProject(ctx context.Context, id, user string, admin bool
 	return nil
 }
 
-// projectsChanged tells this copy's clients, and every other copy, that projects changed.
+// projectsChanged tells this copy's clients and machines, and every other copy, that
+// projects changed.
 func (s *Service) projectsChanged(id string, removed bool) {
 	s.tellProjectsChanged(id, removed)
 	s.announce("projectsChanged", id, "")
@@ -296,4 +309,126 @@ func (s *Service) tellProjectsChanged(id string, removed bool) {
 		change.Removed = &removed
 	}
 	s.router.BroadcastControl(wire.NotifyControlProjectsChanged.Name, change)
+	safe.Go("host/projects", s.tellMachinesProjects)
+}
+
+// The project's slots (#2669, specs/2317-projects User Story 4): Tasks, Code review and
+// CI, one per slot, set by the project's owner or an admin, for every folder in the
+// project. A machine gets them in projects/joined's answer, and again (host/projects) when
+// a project changes; a slot the project does not set is each folder's own.
+
+// projectSlots is the slots a project may set, in the page's order.
+var projectSlots = []wire.ConnectorSlotKind{wire.ConnectorSlotKindTasks, wire.ConnectorSlotKindCodeReview, wire.ConnectorSlotKindCi}
+
+const mostSlotText = 200
+
+// machineProjects is the projects that folders name, with their slots.
+func (s *Service) machineProjects(folders []wire.JoinedFolder) wire.MachineProjects {
+	out := wire.MachineProjects{Projects: []wire.ProjectTools{}}
+	seen := map[string]bool{}
+	for _, f := range folders {
+		if seen[f.Project] {
+			continue
+		}
+		seen[f.Project] = true
+		if p := s.records.Project(f.Project); p != nil {
+			slots := p.Slots
+			if slots == nil {
+				slots = []wire.ProjectSlot{}
+			}
+			out.Projects = append(out.Projects, wire.ProjectTools{ID: p.ID, Name: p.Name, Slots: slots})
+		}
+	}
+	return out
+}
+
+// tellMachinesProjects sends each machine on this copy its folders' projects, when they
+// are not what it was last sent.
+func (s *Service) tellMachinesProjects() {
+	joined, err := s.joinedFolders(context.Background())
+	if err != nil {
+		s.log("projects could not be sent to the machines: " + err.Error())
+		return
+	}
+	for host, folders := range joined {
+		s.router.Tell(host, wire.NotifyHostProjects.Name, s.machineProjects(folders))
+	}
+}
+
+// cleanProjectSlot is value as the project keeps it, or why it is not taken.
+func cleanProjectSlot(slot wire.ConnectorSlotKind, value *wire.ProjectSlot) (*wire.ProjectSlot, error) {
+	if !slices.Contains(projectSlots, slot) {
+		return nil, fail(invalidParams, "A project sets only Tasks, Code review and CI.")
+	}
+	if value == nil {
+		return nil, nil
+	}
+	if value.Slot != "" && value.Slot != slot {
+		return nil, fail(invalidParams, "The value is for another slot.")
+	}
+	if value.Skipped != nil && *value.Skipped {
+		yes := true
+		return &wire.ProjectSlot{Slot: slot, Skipped: &yes}, nil
+	}
+	forge := wire.ConnectionProviderGithub
+	if value.Forge != nil {
+		forge = *value.Forge
+	}
+	if forge != wire.ConnectionProviderGithub && forge != wire.ConnectionProviderGitlab {
+		return nil, fail(invalidParams, "A project's slot is on GitHub or GitLab.")
+	}
+	repo := strings.Trim(strings.TrimSpace(deref(value.Repository)), "/")
+	site := strings.ToLower(strings.TrimSpace(deref(value.Site)))
+	if site == "" {
+		site = map[wire.ConnectionProvider]string{wire.ConnectionProviderGithub: "github.com", wire.ConnectionProviderGitlab: "gitlab.com"}[forge]
+	}
+	if forge == wire.ConnectionProviderGithub {
+		site = "github.com"
+	}
+	parts := strings.Split(repo, "/")
+	if len(parts) < 2 || (forge == wire.ConnectionProviderGithub && len(parts) != 2) || slices.Contains(parts, "") ||
+		utf8.RuneCountInString(repo) > mostSlotText || strings.ContainsAny(repo, " \t\n?#") {
+		return nil, fail(invalidParams, "Give the repository as owner/name, or a GitLab group/project.")
+	}
+	if utf8.RuneCountInString(site) > mostSlotText || strings.ContainsAny(site, "/ \t\n?#@") {
+		return nil, fail(invalidParams, "Give the site as a host name, such as gitlab.com.")
+	}
+	return &wire.ProjectSlot{Slot: slot, Forge: &forge, Repository: &repo, Site: &site}, nil
+}
+
+// setProjectSlot is projects/setSlot: only the owner or an admin.
+func (m *Methods) setProjectSlot(ctx context.Context, request wire.ProjectSlotSet, user string, admin bool) (wire.Project, error) {
+	value, err := cleanProjectSlot(request.Slot, request.Value)
+	if err != nil {
+		return wire.Project{}, err
+	}
+	kept, err := m.records.ChangeProject(ctx, request.ID, func(p *records.Project) (*records.Project, error) {
+		if p == nil || p.IsRemoved() {
+			return nil, fail(invalidParams, "There is no such project.")
+		}
+		if !admin && p.Owner != user {
+			return nil, fail(notPermitted, "Only the project's owner or an admin can change it.")
+		}
+		next := *p
+		next.Slots = nil
+		for _, slot := range projectSlots {
+			if slot == request.Slot {
+				if value != nil {
+					next.Slots = append(next.Slots, *value)
+				}
+				continue
+			}
+			for _, had := range p.Slots {
+				if had.Slot == slot {
+					next.Slots = append(next.Slots, had)
+				}
+			}
+		}
+		return &next, nil
+	})
+	if err != nil {
+		return wire.Project{}, err
+	}
+	m.s.projectsChanged(request.ID, false)
+	return projectOnWire(*kept, nil, true), nil
 }

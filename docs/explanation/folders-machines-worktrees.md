@@ -161,8 +161,24 @@ Project on the Mac, or with **Project…** in the folder's menu on the iPhone, i
 page.
 
 A project is not a repository. The repository only carries `.agents/` between clones. Later,
-a project's tracker, code review and CI, and its reports, belong to the project, not to one
-clone (#2669, #2670).
+a project's reports belong to the project, not to one clone (#2670).
+
+### A project's tools
+
+The Tasks, Code review and CI slots on a folder's Connectors page can be the project's
+(#2669). The project's owner or an admin presses **Use for the Whole Project** on a slot. That
+slot then uses the same GitHub repository or GitLab project in every folder of the project,
+on every machine, even in a folder with no remote of its own. The folder's Issues and Pull
+requests pages show that repository too. **Use Each Folder's Own** gives the slot back. A slot
+that the project does not set is the folder's own, from its git remote, as before. A folder
+cannot skip a slot that the project sets.
+
+The control plane keeps the slots in the project's record, and sends them to each machine
+whose folders are in the project. The machine keeps the last copy in `<root>/projects.json`,
+so a folder keeps its project's slots while the control plane is away.
+
+`.agents/mcp.json`, the Where agents run slot, helper limits, disk space, skills, personas
+and workflows stay with each folder.
 
 ## Worktrees are never removed by accident
 

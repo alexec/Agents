@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // Projects (#2317, specs/2317-projects): what people work on, the record that folders
@@ -24,7 +25,10 @@ type Project struct {
 	Rev       int
 	Removed   *bool
 	RemovedAt *Stamp
-	Extra     Extra
+	// Slots is the project's Tasks, Code review and CI (#2669), one per slot; a slot not
+	// here is each folder's own.
+	Slots []wire.ProjectSlot
+	Extra Extra
 }
 
 type projectJSON struct {
@@ -34,11 +38,12 @@ type projectJSON struct {
 	MadeAt    Stamp  `json:"madeAt"`
 	Rev       int    `json:"rev,omitempty"`
 	Removed   *bool  `json:"removed,omitempty"`
-	RemovedAt *Stamp `json:"removedAt,omitempty"`
+	RemovedAt *Stamp             `json:"removedAt,omitempty"`
+	Slots     []wire.ProjectSlot `json:"slots,omitempty"`
 }
 
 func (p Project) MarshalJSON() ([]byte, error) {
-	return encodeKeeping(projectJSON{p.ID, p.Name, p.Owner, p.MadeAt, p.Rev, p.Removed, p.RemovedAt}, p.Extra)
+	return encodeKeeping(projectJSON{p.ID, p.Name, p.Owner, p.MadeAt, p.Rev, p.Removed, p.RemovedAt, p.Slots}, p.Extra)
 }
 
 func (p *Project) UnmarshalJSON(data []byte) error {
@@ -47,7 +52,7 @@ func (p *Project) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	*p = Project{j.ID, j.Name, j.Owner, j.MadeAt, j.Rev, j.Removed, j.RemovedAt, extra}
+	*p = Project{j.ID, j.Name, j.Owner, j.MadeAt, j.Rev, j.Removed, j.RemovedAt, j.Slots, extra}
 	return nil
 }
 

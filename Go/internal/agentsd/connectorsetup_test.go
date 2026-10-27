@@ -332,3 +332,94 @@ func TestAGitLabFoldersConnectorSetUp(t *testing.T) {
 		t.Fatalf("mcp.json: %s", b)
 	}
 }
+
+// US4 (#2669): a folder whose project sets Code review reads the project's repository, even
+// with no remote of its own; a slot the project skips is skipped; a slot the project does
+// not set is the folder's own; the folder cannot skip a slot the project sets; the Pull
+// requests page follows the project; the slots are kept across a restart.
+func TestAProjectsSlotsFillItsFolders(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("AGENTS_PERSONAL_HOME", home)
+	root := t.TempDir()
+	d, c := start(t, root)
+	defer d.Shutdown()
+	file := &connections.File{Path: filepath.Join(t.TempDir(), ".agents-secrets", connections.FileName)}
+	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+	file.Put(connections.Connection{Provider: connections.GitHub, Login: "alexec", Access: "ghu_secret",
+		AccessExpiresAt: time.Now().Add(time.Hour), ConnectedAt: time.Now()})
+	var mu sync.Mutex
+	readRepos := map[string]bool{}
+	d.newSetupReader = func(token string) setupReader { return &recordingGitHub{fakeSetupGitHub: &fakeSetupGitHub{}, mu: &mu, repos: readRepos} }
+	folder := gitFolder(t, "")
+	c.call(t, 1, "folders/add", map[string]any{"folder": "file://" + folder})
+	id, _, _ := d.folderProject(folder)
+	if id == "" {
+		t.Fatal("no project id")
+	}
+
+	forge, repo, yes := wire.ConnectionProviderGithub, "alexec/agents-walk", true
+	d.heardProjects(wire.MachineProjects{Projects: []wire.ProjectTools{{ID: id, Name: "Agents", Slots: []wire.ProjectSlot{
+		{Slot: wire.ConnectorSlotKindTasks, Skipped: &yes},
+		{Slot: wire.ConnectorSlotKindCodeReview, Forge: &forge, Repository: &repo},
+	}}}})
+
+	var setup wire.ConnectorSetup
+	json.Unmarshal(c.call(t, 2, "connectors/setup", map[string]any{"folder": folder, "reading": "fresh"}), &setup)
+	slots := slotsByKind(setup)
+	tasks, review, ci := slots[wire.ConnectorSlotKindTasks], slots[wire.ConnectorSlotKindCodeReview], slots[wire.ConnectorSlotKindCi]
+	if setup.Project == nil || *setup.Project != id || setup.ProjectName == nil || *setup.ProjectName != "Agents" {
+		t.Fatalf("project: %+v", setup)
+	}
+	if tasks.State != wire.ConnectorSlotStateSkipped || tasks.FromProject == nil {
+		t.Fatalf("tasks: %+v", tasks)
+	}
+	if review.State != wire.ConnectorSlotStateRead || review.FromProject == nil || review.Repository == nil || *review.Repository != repo {
+		t.Fatalf("review: %+v", review)
+	}
+	if ci.State != wire.ConnectorSlotStateNoRemote || ci.FromProject != nil {
+		t.Fatalf("ci: %+v", ci)
+	}
+	mu.Lock()
+	if !readRepos[repo] || len(readRepos) != 1 {
+		t.Fatalf("read %v", readRepos)
+	}
+	mu.Unlock()
+	if e := c.callError(t, 3, "connectors/setup/skip", map[string]any{"folder": folder, "slot": "codeReview", "skipped": true}); e == nil || !strings.Contains(e.Message, "owner or an admin") {
+		t.Fatalf("%+v", e)
+	}
+	if args, ok := d.projectViewArguments(folder, "agents/github", githubmcp.PullsURI); !ok || string(args) != `{"repo":"alexec/agents-walk"}` {
+		t.Fatalf("pulls page: %s %v", args, ok)
+	}
+	if _, ok := d.projectViewArguments(folder, "agents/github", githubmcp.IssuesURI); ok {
+		t.Fatal("the skipped Tasks slot pointed the Issues page")
+	}
+
+	// Kept on disk: a machine that starts again before the control plane answers has them.
+	d.projectToolsMu.Lock()
+	d.projectTools = nil
+	d.projectToolsMu.Unlock()
+	if _, set := d.projectSlot(folder, wire.ConnectorSlotKindCodeReview); !set {
+		t.Fatal("the slots were not kept")
+	}
+	// The project gives the slot back: the folder's own again.
+	d.heardProjects(wire.MachineProjects{Projects: []wire.ProjectTools{{ID: id, Name: "Agents", Slots: []wire.ProjectSlot{}}}})
+	var again wire.ConnectorSetup
+	json.Unmarshal(c.call(t, 4, "connectors/setup", map[string]any{"folder": folder}), &again)
+	if s := slotsByKind(again)[wire.ConnectorSlotKindCodeReview]; s.State != wire.ConnectorSlotStateNoRemote || s.FromProject != nil || s.Repository != nil {
+		t.Fatalf("given back: %+v", s)
+	}
+}
+
+// recordingGitHub is fakeSetupGitHub, noting each repository read.
+type recordingGitHub struct {
+	*fakeSetupGitHub
+	mu    *sync.Mutex
+	repos map[string]bool
+}
+
+func (r *recordingGitHub) NewestPull(ctx context.Context, repo string) (*githubmcp.Newest, error) {
+	r.mu.Lock()
+	r.repos[repo] = true
+	r.mu.Unlock()
+	return r.fakeSetupGitHub.NewestPull(ctx, repo)
+}

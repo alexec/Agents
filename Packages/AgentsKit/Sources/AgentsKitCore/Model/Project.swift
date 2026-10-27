@@ -11,16 +11,71 @@ public extension DaemonAPI {
         /// Its folders as their machines last said them: every machine's for an admin, the
         /// caller's own machines' for a member.
         public var folders: [ProjectFolder]
-        /// The caller is its owner or an admin, so may rename and remove it.
+        /// The caller is its owner or an admin, so may rename and remove it, and set its slots.
         public var mayChange: Bool
+        /// Its Tasks, Code review and CI (#2669), one per slot; a slot not here is each
+        /// folder's own.
+        public var slots: [ProjectSlot]?
 
-        public init(id: String, name: String, owner: String = "", folders: [ProjectFolder] = [], mayChange: Bool = true) {
+        public init(id: String, name: String, owner: String = "", folders: [ProjectFolder] = [], mayChange: Bool = true,
+                    slots: [ProjectSlot]? = nil) {
             self.id = id
             self.name = name
             self.owner = owner
             self.folders = folders
             self.mayChange = mayChange
+            self.slots = slots
         }
+    }
+
+    /// One of a project's Tasks, Code review and CI slots (#2669): the forge and repository
+    /// that fill it for every folder in the project, or skipped.
+    struct ProjectSlot: Codable, Sendable, Hashable {
+        public var slot: ConnectorSlotKind
+        public var forge: ConnectionProvider?
+        public var repository: String?
+        public var site: String?
+        public var skipped: Bool?
+
+        public init(slot: ConnectorSlotKind, forge: ConnectionProvider? = nil, repository: String? = nil,
+                    site: String? = nil, skipped: Bool? = nil) {
+            self.slot = slot; self.forge = forge; self.repository = repository; self.site = site; self.skipped = skipped
+        }
+
+        /// The folder's own slot, as the project's for every folder.
+        public static func from(_ setup: ConnectorSetup, _ slot: ConnectorSlot) -> ProjectSlot? {
+            if slot.state == .skipped { return ProjectSlot(slot: slot.slot, skipped: true) }
+            guard let repository = slot.repository ?? setup.repository else { return nil }
+            return ProjectSlot(slot: slot.slot, forge: setup.forgeOrGitHub, repository: repository, site: setup.siteOrGitHub)
+        }
+    }
+
+    /// `projects/setSlot` (#2669): sets one of the project's slots, or with no value gives it
+    /// back to each folder. Only the owner or an admin.
+    struct ProjectSlotSet: Codable, Sendable, Hashable {
+        public var id: String
+        public var slot: ConnectorSlotKind
+        public var value: ProjectSlot?
+
+        public init(id: String, slot: ConnectorSlotKind, value: ProjectSlot? = nil) {
+            self.id = id; self.slot = slot; self.value = value
+        }
+    }
+
+    /// One project's slots, as a machine gets them (#2669).
+    struct ProjectTools: Codable, Sendable, Hashable {
+        public var id: String
+        public var name: String
+        public var slots: [ProjectSlot]
+
+        public init(id: String, name: String, slots: [ProjectSlot] = []) { self.id = id; self.name = name; self.slots = slots }
+    }
+
+    /// `projects/joined`'s answer and `host/projects` (#2669).
+    struct MachineProjects: Codable, Sendable, Hashable {
+        public var projects: [ProjectTools]
+
+        public init(projects: [ProjectTools] = []) { self.projects = projects }
     }
 
     /// A folder in a project, as its machine last said it.
@@ -91,6 +146,8 @@ public extension DaemonAPI.Method {
     static let projectsSet = "projects/set"
     /// `ProjectRequest` → `{}`, the owner's or an admin's (#2317).
     static let projectsRemove = "projects/remove"
+    /// `ProjectSlotSet` → `Project`, the owner's or an admin's (#2669).
+    static let projectsSetSlot = "projects/setSlot"
     /// `SetFolderProjectRequest` → `FolderSummary`, on the folder's machine (#2317).
     static let foldersSetProject = "folders/setProject"
 }
@@ -114,6 +171,29 @@ public enum ProjectWords {
     /// A folder whose id the control plane has not adopted yet, or with no control plane.
     public static func unknown(_ id: String) -> String { "Not on the control plane yet (\(id))" }
     public static let noControlPlane = "Connect to a control plane to choose a project."
+
+    /// On a Connectors page whose folder is in a project (#2669): whose the slots are, and who
+    /// may change them.
+    public static func slotsOwner(_ name: String) -> String {
+        "Tasks, Code review and CI are the project's (\(name)), the same in every folder of it. Only its owner or an admin changes them."
+    }
+    /// A slot the project sets.
+    public static func setByProject(_ name: String) -> String { "Set by the project \(name)." }
+    /// One slot's row in the project's card: what fills it, and whose it is.
+    public static func slotLine(_ slot: DaemonAPI.ConnectorSlot, name: String) -> String {
+        let what = [slot.choice, slot.repository].compactMap { $0 }.joined(separator: " · ")
+        switch (slot.isFromProject, slot.state == .skipped) {
+        case (true, true): return "Skipped in every folder of \(name)."
+        case (true, false): return "\(what), for every folder of \(name)."
+        case (false, true): return "Skipped in this folder only."
+        case (false, false):
+            return slot.repository == nil ? "This folder has no GitHub or GitLab remote." : "\(what), this folder's own."
+        }
+    }
+    /// Make the folder's own slot the project's.
+    public static let useForProject = "Use for the Whole Project"
+    /// Give the slot back to each folder.
+    public static let useFolderOwn = "Use Each Folder's Own"
 
     /// The project a folder is in, by its id, from the list.
     public static func name(of id: String?, in projects: [DaemonAPI.Project]) -> String? {

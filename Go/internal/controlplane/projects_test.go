@@ -3,7 +3,9 @@ package controlplane
 import (
 	"encoding/json"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
@@ -139,5 +141,96 @@ func TestOnlyTheOwnerOrAnAdminChangesAProject(t *testing.T) {
 	call(t, owner, "", "projects/set", wire.ProjectSet{ID: &mine.ID, Name: "Renamed by admin"})
 	if got := listedProjects(t, owner); len(got) != 1 || !got[0].MayChange || len(got[0].Folders) != 1 || got[0].Name != "Renamed by admin" {
 		t.Fatalf("%+v", got)
+	}
+}
+
+// US4 (#2669): the owner or an admin sets a project's Tasks, Code review and CI; a machine
+// gets its folders' projects' slots in projects/joined's answer and again in host/projects
+// when one changes; a member who is neither may not set them.
+func TestAProjectsSlotsGoToItsMachines(t *testing.T) {
+	t.Parallel()
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	var mu sync.Mutex
+	heard := map[string][]wire.MachineProjects{}
+	p.told = func(host, method string, params json.RawMessage) {
+		if method != wire.NotifyHostProjects.Name {
+			return
+		}
+		var m wire.MachineProjects
+		json.Unmarshal(params, &m)
+		mu.Lock()
+		heard[host] = append(heard[host], m)
+		mu.Unlock()
+	}
+	_, owner := p.client("Alex's Mac")
+	sam := p.invite(owner, "Sam", wire.UserRoleMember)
+	mac := p.host("MAC")
+	other := p.host("OTHER")
+
+	var made wire.Project
+	json.Unmarshal(call(t, owner, "", "projects/set", wire.ProjectSet{Name: "Agents"}), &made)
+	params, _ := json.Marshal(wire.ProjectsJoined{Folders: []wire.JoinedFolder{{Folder: "file:///Users/a/Agents/", Name: "Agents", Project: made.ID}}})
+	answer, err := p.s.methods.HostSaid(mac.member.Host, "projects/joined", params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := json.Marshal(answer)
+	var first wire.MachineProjects
+	json.Unmarshal(b, &first)
+	if len(first.Projects) != 1 || first.Projects[0].ID != made.ID || len(first.Projects[0].Slots) != 0 {
+		t.Fatalf("%s", b)
+	}
+
+	forge, repo := wire.ConnectionProviderGithub, " alexec/Agents/ "
+	set := wire.ProjectSlotSet{ID: made.ID, Slot: wire.ConnectorSlotKindCodeReview, Value: &wire.ProjectSlot{Slot: wire.ConnectorSlotKindCodeReview, Forge: &forge, Repository: &repo}}
+	if e := callError(t, sam.window, "", "projects/setSlot", set); !strings.Contains(e, "owner or an admin") {
+		t.Fatal(e)
+	}
+	var got wire.Project
+	json.Unmarshal(call(t, owner, "", "projects/setSlot", set), &got)
+	if len(got.Slots) != 1 || *got.Slots[0].Repository != "alexec/Agents" || *got.Slots[0].Site != "github.com" {
+		t.Fatalf("%+v", got)
+	}
+	yes := true
+	call(t, owner, "", "projects/setSlot", wire.ProjectSlotSet{ID: made.ID, Slot: wire.ConnectorSlotKindTasks, Value: &wire.ProjectSlot{Slot: wire.ConnectorSlotKindTasks, Skipped: &yes}})
+	if listed := listedProjects(t, owner); len(listed[0].Slots) != 2 || listed[0].Slots[0].Slot != wire.ConnectorSlotKindTasks {
+		t.Fatalf("%+v", listed)
+	}
+	// Each machine hears its own folders' projects: the Mac this one, the other none.
+	waitFor(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		list := heard[mac.member.Host]
+		return len(list) > 0 && len(list[len(list)-1].Projects) == 1 && len(list[len(list)-1].Projects[0].Slots) == 2
+	})
+	mu.Lock()
+	for _, m := range heard[other.member.Host] {
+		if len(m.Projects) != 0 {
+			t.Fatalf("%+v", m)
+		}
+	}
+	mu.Unlock()
+
+	// No value gives the slot back to each folder; workspace and bad repositories are refused.
+	json.Unmarshal(call(t, owner, "", "projects/setSlot", wire.ProjectSlotSet{ID: made.ID, Slot: wire.ConnectorSlotKindCodeReview}), &got)
+	if len(got.Slots) != 1 || got.Slots[0].Slot != wire.ConnectorSlotKindTasks {
+		t.Fatalf("%+v", got)
+	}
+	if e := callError(t, owner, "", "projects/setSlot", wire.ProjectSlotSet{ID: made.ID, Slot: wire.ConnectorSlotKindWorkspace}); !strings.Contains(e, "only Tasks") {
+		t.Fatal(e)
+	}
+	bad := "just-a-name"
+	if e := callError(t, owner, "", "projects/setSlot", wire.ProjectSlotSet{ID: made.ID, Slot: wire.ConnectorSlotKindCi, Value: &wire.ProjectSlot{Slot: wire.ConnectorSlotKindCi, Repository: &bad}}); !strings.Contains(e, "owner/name") {
+		t.Fatal(e)
+	}
+}
+
+// waitFor waits up to five seconds for ok.
+func waitFor(t *testing.T, ok func() bool) {
+	t.Helper()
+	for deadline := time.Now().Add(5 * time.Second); !ok(); time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("not in time")
+		}
 	}
 }

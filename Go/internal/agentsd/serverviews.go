@@ -43,17 +43,18 @@ func (d *Daemon) serverViews(folder string, f pinsFile) []wire.PinView {
 			continue
 		}
 		ours, isOurs := oursForServer(s)
+		fits := true
 		if isOurs {
 			if !hostRead {
 				host, hostRead = originHost(folder), true
 			}
-			if !oursFits(ours, host) {
-				continue
-			}
+			fits = oursFits(ours, host)
 		}
 		catalog := d.cachedViewCatalog(s)
 		if catalog == nil {
-			d.readServerViews(s, folder)
+			if fits || d.projectFills(folder, ours.ID) {
+				d.readServerViews(s, folder)
+			}
 			continue
 		}
 		title := serverTitle(s, catalog, ours, isOurs)
@@ -62,8 +63,17 @@ func (d *Daemon) serverViews(folder string, f pinsFile) []wire.PinView {
 			if !t.feedsPins() || t.NeedsArguments || seen[t.ResourceURI] || pinned[name+" "+t.ResourceURI] {
 				continue
 			}
+			// The folder's project's repository, when its project sets the view's slot
+			// (#2669): the page follows the project, whatever the folder's own remote.
+			arguments, follows := wire.JSONValue(nil), false
+			if isOurs {
+				arguments, follows = d.projectViewArguments(folder, ours.ID, t.ResourceURI)
+			}
+			if !fits && !follows {
+				continue
+			}
 			seen[t.ResourceURI] = true
-			pin := wire.ViewPin{Server: name, URI: t.ResourceURI, Tool: t.Name}
+			pin := wire.ViewPin{Server: name, URI: t.ResourceURI, Tool: t.Name, Arguments: arguments}
 			v := wire.PinView{Path: t.ResourceURI, Kind: wire.PinKindView, View: &pin,
 				Title:    title + " · " + listViewTitle(catalog, pin, title),
 				PinnedBy: wire.PinnerView{Kind: wire.PinnerKindServer, ID: name, Name: title}}

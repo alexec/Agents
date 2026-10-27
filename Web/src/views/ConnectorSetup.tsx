@@ -11,6 +11,8 @@ import type {
 import { folderPath } from "../model/hostedMCP";
 import { Capability } from "../protocol/capabilities.generated";
 import * as words from "../model/connectorSetup";
+import { projectSlotFrom, projectWords, setByProject, slotLine, slotsOwner } from "../model/projects";
+import type { Project } from "../protocol/generated";
 import { addMachineWords, whereAgentsRun } from "../model/addMachine";
 import { Modal } from "./Modal";
 import { AddMachineDialog } from "./AddMachineDialog";
@@ -101,6 +103,7 @@ export function ConnectorSetupSection({ store, host, folder, folderName, go }: {
                 place={place} admin={store.person.value?.role !== "member"} add={setAdding} />
             ))}
           </div>
+          {setup.project && <ProjectSlots store={store} setup={setup} changed={() => void load("cached")} />}
           {(setup.connection || setup.events.state !== "off") && (
             <>
               <h2 class="setup-heading">Events</h2>
@@ -193,7 +196,8 @@ function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConn
 }) {
   const [changing, setChanging] = useState(false);
   const workspace = slot.slot === "workspace";
-  const canChange = workspace || ["read", "refused", "failed"].includes(slot.state);
+  const fromProject = slot.fromProject === true;
+  const canChange = workspace || (!fromProject && ["read", "refused", "failed"].includes(slot.state));
   const proof = slot.proof;
   const title = workspace ? place.title : words.title(slot);
   return (
@@ -217,6 +221,7 @@ function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConn
           {workspace ? place.line : words.line(slot, folderName, setup.repository, false, words.forgeOf(setup))}
         </p>
       )}
+      {fromProject && <p class="quiet small">{setByProject(setup.projectName ?? projectWords.title)}</p>}
       <p class="slot-actions small">
         {(slot.state === "notConnected" || slot.state === "noRemote") && slot.slot === "tasks" && (
           <>
@@ -224,7 +229,7 @@ function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConn
             <span class="quiet">{words.otherTrackers(linearConnected !== false)}</span>
           </>
         )}
-        {(slot.state === "notConnected" || slot.state === "noRemote") && <button class="link" onClick={() => skip(true)}>Skip</button>}
+        {!fromProject && (slot.state === "notConnected" || slot.state === "noRemote") && <button class="link" onClick={() => skip(true)}>Skip</button>}
         {slot.state === "failed" && <button onClick={tryAgain}>Try Again</button>}
         {slot.state === "refused" && (
           <>
@@ -232,7 +237,7 @@ function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConn
             <button onClick={tryAgain}>Try Again</button>
           </>
         )}
-        {slot.state === "skipped" && <button class="link" onClick={() => skip(false)}>Set Up</button>}
+        {!fromProject && slot.state === "skipped" && <button class="link" onClick={() => skip(false)}>Set Up</button>}
       </p>
       {changing && workspace && (
         <div class="slot-change">
@@ -258,6 +263,54 @@ function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConn
           <button class="link" onClick={() => setChanging(false)}>Cancel</button>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * The folder's project's tools (#2669), as the window's ProjectSlotsCard: Tasks, Code review and
+ * CI are the project's, and its owner or an admin makes a folder's own slot the project's, or
+ * gives one back to each folder.
+ */
+function ProjectSlots({ store, setup, changed }: { store: Store; setup: ConnectorSetup; changed: () => void }) {
+  const [project, setProject] = useState<Project>();
+  const [problem, setProblem] = useState<string>();
+  const [asking, setAsking] = useState(false);
+  useEffect(() => {
+    void store.link.call("projects/list", {}).then((l) => setProject(l.projects.find((p) => p.id === setup.project)))
+      .catch(() => setProject(undefined));
+  }, [setup.project]);
+  const name = project?.name ?? setup.projectName ?? projectWords.title;
+  const set = async (slot: ConnectorSlotKind, value: ReturnType<typeof projectSlotFrom>) => {
+    if (!setup.project) return;
+    setAsking(true);
+    try {
+      setProject(await store.link.call("projects/setSlot", { id: setup.project, slot, ...(value ? { value } : {}) }));
+      setProblem(undefined);
+      // The machine hears it from the control plane (host/projects): give it a moment.
+      setTimeout(changed, 400);
+    } catch (e) {
+      setProblem(why(e));
+    } finally {
+      setAsking(false);
+    }
+  };
+  return (
+    <div class="setup-card project-slots">
+      <p class="quiet small">{slotsOwner(name)}</p>
+      {project?.mayChange && setup.slots.filter((s) => s.slot !== "workspace").map((slot) => {
+        const value = projectSlotFrom(setup, slot);
+        return (
+          <p key={slot.slot} class="small project-slot">
+            <span class="slot-kind">{words.heading(slot.slot)}</span>{" "}
+            <span>{slotLine(slot, name)}</span>{" "}
+            {slot.fromProject
+              ? <button class="link" disabled={asking} onClick={() => void set(slot.slot, undefined)}>{projectWords.useFolderOwn}</button>
+              : value && <button class="link" disabled={asking} onClick={() => void set(slot.slot, value)}>{projectWords.useForProject}</button>}
+          </p>
+        );
+      })}
+      {problem && <p class="small failure">{problem}</p>}
     </div>
   );
 }

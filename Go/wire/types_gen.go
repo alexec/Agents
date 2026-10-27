@@ -2249,6 +2249,12 @@ type ConnectorSetup struct {
 
 	// Slots that read or were skipped, of the four.
 	Done int64 `json:"done"`
+
+	// The folder's project id (#2669), whose owner or an admin sets Tasks, Code review and CI for every folder in it. Absent when the folder is in no project.
+	Project *string `json:"project,omitzero"`
+
+	// The project's name, as this machine last heard it from the control plane.
+	ProjectName *string `json:"projectName,omitzero"`
 }
 
 // stored: no call to the provider, only what was read before (for a list of every folder). cached: a read at most five minutes old is used again. fresh: read now (Try Again).
@@ -2288,6 +2294,12 @@ type ConnectorSlot struct {
 
 	// Why a read failed or was refused, in words. Never a token.
 	Message *string `json:"message,omitzero"`
+
+	// The repository that fills this slot (#2669): the project's when fromProject, else the folder's own. Absent for workspace and with no remote.
+	Repository *string `json:"repository,omitzero"`
+
+	// The folder's project sets this slot (#2669), so it is the same in every folder of the project.
+	FromProject *bool `json:"fromProject,omitzero"`
 }
 
 // One slot of a folder's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci, and workspace (where agents run).
@@ -5139,6 +5151,11 @@ type MachinePolicy struct {
 	None *bool `json:"none,omitzero"`
 }
 
+// projects/joined's answer and host/projects (#2669): the projects that this machine's folders name, with their slots, all of them each time.
+type MachineProjects struct {
+	Projects []ProjectTools `json:"projects"`
+}
+
 // host/providerDraft: a writing agent called one of the writer's tools (#858).
 type MachineProviderDraftCall struct {
 	AgentID UUID `json:"agentID"`
@@ -6612,8 +6629,11 @@ type Project struct {
 
 	Folders []ProjectFolder `json:"folders"`
 
-	// The caller is the owner or an admin, so may rename and remove it.
+	// The caller is the owner or an admin, so may rename and remove it, and set its slots.
 	MayChange bool `json:"mayChange"`
+
+	// The project's Tasks, Code review and CI (#2669), one per slot: every folder in the project uses them. A slot that is not here is each folder's own.
+	Slots []ProjectSlot `json:"slots,omitzero"`
 }
 
 // A folder in a project (#2317), as its machine last reported it.
@@ -6640,6 +6660,39 @@ type ProjectSet struct {
 	ID *string `json:"id,omitzero"`
 
 	Name string `json:"name"`
+}
+
+// A project's Tasks, Code review or CI slot (#2669): the forge and the repository (GitHub owner/name, GitLab group/project) that fill it for every folder in the project, or skipped.
+type ProjectSlot struct {
+	Slot ConnectorSlotKind `json:"slot"`
+
+	Forge *ConnectionProvider `json:"forge,omitzero"`
+
+	Repository *string `json:"repository,omitzero"`
+
+	// The repository's host: github.com, gitlab.com, or a self-managed GitLab's host.
+	Site *string `json:"site,omitzero"`
+
+	// Skipped for every folder in the project. forge, repository and site are then absent.
+	Skipped *bool `json:"skipped,omitzero"`
+}
+
+// projects/setSlot (#2669): sets one of the project's slots, or with no value gives it back to each folder. Only the owner or an admin.
+type ProjectSlotSet struct {
+	ID string `json:"id"`
+
+	Slot ConnectorSlotKind `json:"slot"`
+
+	Value *ProjectSlot `json:"value,omitzero"`
+}
+
+// One project's slots, as a machine gets them (#2669).
+type ProjectTools struct {
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Slots []ProjectSlot `json:"slots"`
 }
 
 // control/projectsChanged (#2317): a project was made, renamed, adopted or removed, or a folder joined one.
