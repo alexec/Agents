@@ -18,6 +18,22 @@ final class VoiceAudio {
     /// Off in a walk: no microphone, so nothing to ask for and nothing to cancel.
     var listens = true
 
+    /// The route and the microphone's format, for the log: no words.
+    var route: String {
+        var parts = ["echo cancelled \(cancelsEcho)"]
+        if listens {
+            let format = engine.inputNode.outputFormat(forBus: 0)
+            parts.append("input \(format.sampleRate) Hz × \(format.channelCount)")
+        }
+        #if os(iOS)
+        let session = AVAudioSession.sharedInstance()
+        parts.append("category \(session.category.rawValue) mode \(session.mode.rawValue)")
+        parts.append("inputs \(session.currentRoute.inputs.map(\.portType.rawValue))")
+        parts.append("outputs \(session.currentRoute.outputs.map(\.portType.rawValue))")
+        #endif
+        return parts.joined(separator: ", ")
+    }
+
     /// Opens the audio route for talking and listening. Throws when there is none.
     func open() throws {
         guard !isOpen else { return }
