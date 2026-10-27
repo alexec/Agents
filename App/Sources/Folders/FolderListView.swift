@@ -557,9 +557,12 @@ struct FolderFold: View {
                     heading(fold, isOpen: isOpen)
                 }
             }
-            .task(id: isOpen) {
-                if isOpen { _ = await model.loadArchived(in: key) }
-                else { model.letGoOfArchived(in: key) }
+            // The few Recently archived sessions it shows, while it is open by hand (#2731):
+            // not because a search unfolded it, since the search brings its own matches.
+            .task(id: folds.isOpen(key)) {
+                if folds.isOpen(key) {
+                    _ = await model.loadArchived(in: key, limit: SidebarFolderFold.recentArchivedShown)
+                } else { model.letGoOfArchived(in: key) }
             }
         }
     }

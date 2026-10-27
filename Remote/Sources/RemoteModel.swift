@@ -3586,12 +3586,13 @@ final class RemoteModel {
         openArchivedFolds.union(folder.map { [Folder.standardize($0)] } ?? [])
     }
 
-    /// A folder's Archived fold has opened: a page of its newest archived sessions, from
-    /// the folder's own host (#533). Answers whether the host did (#664).
+    /// A folder's Archived page has opened: a page of its newest archived sessions, from
+    /// the folder's own host (#533), or the few its Recently archived sessions show (#2731).
+    /// Answers whether the host did (#664).
     @discardableResult
-    func loadArchived(in key: FolderKey) async -> Bool {
+    func loadArchived(in key: FolderKey, limit: Int = SidebarFolderFold.archivedShown) async -> Bool {
         openArchivedFolds.insert(Folder.standardize(key.folder))
-        return await loadArchivedAgents(in: key, limit: SidebarFolderFold.archivedShown)
+        return await loadArchivedAgents(in: key, limit: limit)
     }
 
     /// A folder's Archived fold has closed: what it held is let go, but for the chat open

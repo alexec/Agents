@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { load } from "./load.mjs";
 
 const {
-  Work, Store, archivedPage, searchShown, keepingTurns, effect,
+  Work, Store, archivedPage, recentArchivedShown, searchShown, keepingTurns, effect,
   turnPage, openTurnsHeld, historyEntriesCap, historyTurnsCap, rememberOpen, quietSettle,
   CallFailed, Failure,
 } = await load("test/bounded.ts");
@@ -249,6 +249,31 @@ test("an Archived fold asks for a page, and a reconnect lists it again rather th
   await store.load();
   await wait(10);
   assert.deepEqual(store.agents.value.mac.map((a) => a.id), ["live", "old"]);
+});
+
+test("the sidebar asks for its few archived, the Archive page for more, and each keeps its own (#2731)", async () => {
+  const params = [];
+  const link = fakeLink((method, p) => {
+    if (method === "agents/list") {
+      params.push(p);
+      return Array.from({ length: p.limit }, (_, i) => agent(`a${i}`, "p", 100 - i, { state: "archived" }));
+    }
+    return undefined;
+  });
+  const store = new Store(link);
+  await store.loadArchived("mac", "file:///w/p", recentArchivedShown);
+  assert.deepEqual(params.map((p) => p.limit), [recentArchivedShown]);
+  await store.loadArchived("mac", "file:///w/p", archivedPage);
+  assert.deepEqual(params.map((p) => p.limit), [recentArchivedShown, archivedPage]);
+  // A second sidebar fold over what is held asks for nothing.
+  await store.loadArchived("mac", "file:///w/p", recentArchivedShown);
+  assert.equal(params.length, 2);
+  // The Archive page closing leaves the sidebar's rows.
+  store.unloadArchived("mac", "file:///w/p", archivedPage);
+  store.unloadArchived("mac", "file:///w/p", recentArchivedShown);
+  assert.equal(store.agents.value.mac.length, archivedPage);
+  store.unloadArchived("mac", "file:///w/p", recentArchivedShown);
+  assert.equal(store.agents.value.mac.length, 0);
 });
 
 test("a call that is never answered is given up", async () => {

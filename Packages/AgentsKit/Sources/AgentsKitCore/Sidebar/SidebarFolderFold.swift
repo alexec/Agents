@@ -9,8 +9,11 @@ import Foundation
 /// under which heading, in what order, does not.
 @MainActor
 public struct SidebarFolderFold {
-    /// The most archived sessions a fold holds while open: a page from the host (#164).
+    /// The most archived sessions the Archived page holds while open: a page from the host (#164).
     nonisolated public static let archivedShown = 50
+    /// How many Recently archived sessions an open folder shows (#2587), and all it asks the
+    /// host for (#2731).
+    nonisolated public static let recentArchivedShown = 3
     /// The most archived matches a fold shows before Show all (#176).
     public static let matchesShown = 10
 
@@ -43,7 +46,7 @@ public struct SidebarFolderFold {
     /// The archived sessions held, newest first: a page while the fold is open (#165).
     public private(set) var archived: [Agent] = []
     /// The three most recently archived sessions, shown under Sessions (#2587).
-    public var recentArchived: [Agent] { Array(archived.prefix(3)) }
+    public var recentArchived: [Agent] { Array(archived.prefix(Self.recentArchivedShown)) }
     /// Whether the folder has a session that is not archived, search or not.
     public private(set) var hasLive = false
     public private(set) var workflows: [WorkflowSummary] = []
