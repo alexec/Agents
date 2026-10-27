@@ -24,8 +24,10 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -196,6 +198,34 @@ func (r *modelRelay) standInFor(s standIn) string {
 	return token
 }
 
+// dropStandIn takes away a session's stand-in: its runtime has ended, so nothing it left
+// running reaches the model with it. The session's next runtime is given a new one.
+func (d *Daemon) dropStandIn(agent wire.UUID) {
+	d.relayMu.Lock()
+	r := d.modelRelay
+	d.relayMu.Unlock()
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	if token, ok := r.byAgent[agent]; ok {
+		r.forgetLocked(token)
+	}
+	r.mu.Unlock()
+}
+
+// forgetLocked takes a stand-in away, from the order too, so a dropped one never pushes a
+// stand-in still in use out of it. r.mu is held.
+func (r *modelRelay) forgetLocked(token string) {
+	if a := r.standIns[token].agent; a != "" && r.byAgent[a] == token {
+		delete(r.byAgent, a)
+	}
+	delete(r.standIns, token)
+	if i := slices.Index(r.order, token); i >= 0 {
+		r.order = slices.Delete(r.order, i, i+1)
+	}
+}
+
 // dropStandInsOfGoneRoutes takes away the stand-ins of routes no longer here.
 func (d *Daemon) dropStandInsOfGoneRoutes() {
 	d.relayMu.Lock()
@@ -218,10 +248,7 @@ func (d *Daemon) dropStandInsOfGoneRoutes() {
 			continue
 		}
 		r.mu.Lock()
-		delete(r.standIns, token)
-		if r.byAgent[s.agent] == token {
-			delete(r.byAgent, s.agent)
-		}
+		r.forgetLocked(token)
 		r.mu.Unlock()
 	}
 }
@@ -294,6 +321,20 @@ func (d *Daemon) relayServe(r *modelRelay, w http.ResponseWriter, req *http.Requ
 		relayError(w, http.StatusUnauthorized, "authentication_error", "Your organisation removed this way to the model.")
 		return
 	}
+	if !relayAllows(route, req.Method, rest) {
+		relayError(w, http.StatusNotFound, "not_found_error", "The model relay sends on only requests for a model's answers.")
+		return
+	}
+	a, gone := d.relayAgent(r, s, token)
+	if gone {
+		relayError(w, http.StatusUnauthorized, "authentication_error", "This session has ended.")
+		return
+	}
+	p := d.orgPolicy()
+	if err := d.relayRefusal(p, s, a); err != nil {
+		relayError(w, http.StatusForbidden, "permission_error", policyWords(err))
+		return
+	}
 	key := accountKey(s.runtime, &s.account)
 	if route.Expires != nil && !relayNow().Before(route.Expires.Time()) {
 		words := fmt.Sprintf(orgExpiredWords, kindName(route.Kind))
@@ -313,6 +354,10 @@ func (d *Daemon) relayServe(r *modelRelay, w http.ResponseWriter, req *http.Requ
 	}
 	if len(body) > relayMostBody {
 		relayError(w, http.StatusRequestEntityTooLarge, "request_too_large", "The request is over 32 MiB.")
+		return
+	}
+	if err := d.relayModelRefusal(p, s.runtime, a, rest, body); err != nil {
+		relayError(w, http.StatusForbidden, "permission_error", policyWords(err))
 		return
 	}
 	target, err := upstreamURL(route, rest, req.URL.Query())
@@ -378,6 +423,141 @@ func (d *Daemon) relayServe(r *modelRelay, w http.ResponseWriter, req *http.Requ
 			d.relayCounted(r, s, *t)
 		}
 	}
+}
+
+// relayPostPaths and relayGetPaths are the requests the relay sends on: a model's answers
+// and token counts, and the list of models. Anything else the route's credential could
+// reach (files, batches, fine-tuning, a cloud's control plane) is refused.
+var (
+	relayPostPaths = regexp.MustCompile(`^(?:/v1)?/(?:messages|messages/count_tokens|chat/completions|completions|responses|responses/compact|embeddings)$|` +
+		`^/deployments/[^/]+/(?:chat/completions|completions|responses|embeddings)$|` +
+		`^/v1(?:beta1)?/projects/[^/]+/locations/[^/]+/endpoints/openapi/chat/completions$|` +
+		`^(?:/v1(?:beta|beta1|alpha)?)?/(?:projects/[^/]+/locations/[^/]+/)?(?:publishers/[^/]+/)?models/[^/]+:` +
+		`(?:generateContent|streamGenerateContent|countTokens|embedContent|batchEmbedContents|rawPredict|streamRawPredict|predict|serverStreamingPredict)$|` +
+		`^/model/.+/(?:invoke|invoke-with-response-stream|converse|converse-stream|count-tokens)$`)
+	relayGetPaths = regexp.MustCompile(`^(?:/v1(?:beta|beta1)?)?/models(?:/[^/]+)?$|^/(?:inference-profiles|foundation-models)(?:/[^/]+)?$`)
+)
+
+// relayAllows is whether a request is one the relay sends on: a model's path, with no
+// "." or ".." in it, and on Vertex in the route's own Google Cloud project.
+func relayAllows(r wire.DeliveredRoute, method, p string) bool {
+	if path.Clean(p) != p {
+		return false
+	}
+	if r.Kind == wire.OrgRouteKindVertex && r.Settings != nil && r.Settings.Project != nil {
+		if _, after, ok := strings.Cut(p, "/projects/"); ok {
+			if project, _, _ := strings.Cut(after, "/"); project != *r.Settings.Project {
+				return false
+			}
+		}
+	}
+	switch method {
+	case http.MethodPost:
+		return relayPostPaths.MatchString(p)
+	case http.MethodGet:
+		return relayGetPaths.MatchString(p)
+	}
+	return false
+}
+
+// relayAgent is a stand-in's session, and whether it is gone: deleted or archived, when
+// its stand-in is dropped too. A handshake's stand-in has no session.
+func (d *Daemon) relayAgent(r *modelRelay, s standIn, token string) (*wire.Agent, bool) {
+	if s.agent == "" {
+		return nil, false
+	}
+	a := d.Store.Agent(s.agent)
+	if a != nil && a.State != wire.AgentStateArchived {
+		return a, false
+	}
+	r.mu.Lock()
+	r.forgetLocked(token)
+	r.mu.Unlock()
+	return nil, true
+}
+
+// relayRefusal is why the relay sends no request on now, as a turn would not start: the
+// kill switch, a suspension or no policy (workRefusal), the runtime or the session's reach
+// no longer allowed, or a budget used. Nil otherwise.
+func (d *Daemon) relayRefusal(p *wire.OrgPolicy, s standIn, a *wire.Agent) error {
+	if err := d.workRefusal(); err != nil {
+		return err
+	}
+	if p == nil {
+		return nil
+	}
+	if err := d.runtimeRefusal(p, s.runtime); err != nil {
+		return err
+	}
+	if a != nil {
+		if err := d.sessionReachRefusal(a); err != nil {
+			return err
+		}
+		if err := d.agentBudgetRefusal(a); err != nil {
+			return err
+		}
+	}
+	return d.dayBudgetRefusal()
+}
+
+// relayModelRefusal is why the policy does not allow the model a request names, in its
+// path or its body, or nil.
+func (d *Daemon) relayModelRefusal(p *wire.OrgPolicy, runtimeID string, a *wire.Agent, reqPath string, body []byte) error {
+	if !hasModelRule(p, runtimeID) {
+		return nil
+	}
+	var options []wire.ConfigOption
+	if a != nil {
+		options = a.AdvertisedOptions
+	}
+	choices := runtimeModelChoices(runtimeID, options)
+	for _, model := range requestModels(reqPath, body) {
+		err := d.modelRefusalIn(p, runtimeID, model, choices)
+		if err == nil {
+			continue
+		}
+		if plain := plainModel(model); plain != model && d.modelRefusalIn(p, runtimeID, plain, choices) == nil {
+			continue
+		}
+		return err
+	}
+	return nil
+}
+
+// requestModels is the models a request names: in a Bedrock, Gemini or Vertex path, and
+// in the body's "model".
+func requestModels(p string, body []byte) []string {
+	var models []string
+	for _, re := range []*regexp.Regexp{bedrockModel, pathModel} {
+		if m := re.FindStringSubmatch(p); m != nil {
+			if model, err := url.PathUnescape(m[1]); err == nil {
+				models = append(models, model)
+			}
+		}
+	}
+	if bytes.Contains(body, []byte(`"model"`)) {
+		var obj struct {
+			Model string `json:"model"`
+		}
+		if json.Unmarshal(body, &obj) == nil && obj.Model != "" {
+			models = append(models, obj.Model)
+		}
+	}
+	return models
+}
+
+// bedrockVersion is the version at the end of a Bedrock model id, such as -v1:0.
+var bedrockVersion = regexp.MustCompile(`-v\d+(?::\d+)?$`)
+
+// plainModel is a cloud's model id as its vendor names it: claude-sonnet-4-5-20250929 for
+// Bedrock's us.anthropic.claude-sonnet-4-5-20250929-v1:0 and Vertex's
+// claude-sonnet-4-5@20250929.
+func plainModel(model string) string {
+	model, _, _ = strings.Cut(model, "@")
+	if _, after, ok := strings.Cut(model, "anthropic."); ok {
+		model = bedrockVersion.ReplaceAllString(after, "")
+	}
+	return model
 }
 
 func isHeaderIn(name string, list []string) bool {

@@ -540,6 +540,7 @@ func (d *Daemon) deleteArchivedThen(a *wire.Agent, because string, erase func(*w
 		l.halt()
 	}
 	d.dropAppTokens(a.ID)
+	d.dropStandIn(a.ID)
 	if err := d.Store.Delete(a.ID); err != nil {
 		return &Error{Code: wire.FailureCouldNotSave, Message: "The agent could not be deleted: " + err.Error()}
 	}
