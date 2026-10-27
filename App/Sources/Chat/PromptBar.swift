@@ -608,6 +608,8 @@ struct PromptBar: View {
                 .help("Attach a file or a picture")
                 .accessibilityLabel("Attach")
 
+                Spacer(minLength: 0)
+                // Dictate and voice mode sit with send, on the right (#2634).
                 PushToTalkButton(tap: toggleDictation, begin: beginDictation, end: finishPushToTalk) {
                     Image(systemName: dictation.isListening ? "waveform" : "microphone")
                         .appText(.reading).fontWeight(.semibold)
@@ -635,7 +637,6 @@ struct PromptBar: View {
                 // A session's own window does not take "Hey Agents" (#2420): the main window does.
                 VoiceModeButton(agentID: agent?.id, vocabulary: speechSeeds, takesWake: popped == nil, send: sendSpoken)
 
-                Spacer(minLength: 0)
                 // While it works and nothing is typed, send is stop. Type and it is send
                 // again, queueing what is typed for when the turn ends.
                 if let agent, model.canStop(agent), text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
