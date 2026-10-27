@@ -340,23 +340,6 @@ struct PromptBar: View {
                 Spacer(minLength: 0)
                 runtimeLabel(agent)
             } else {
-                // On a folder page the folder is the folder, named in the middle of
-                // the page; only a session with no folder yet chooses one.
-                if !folderIsFixed {
-                    Button(action: chooseFolder) {
-                        HStack(spacing: 5) {
-                            Image(systemName: "folder")
-                            // The folder's own name. The path it sits under is rarely the
-                            // thing you are checking, and it is in the tooltip when it is.
-                            Text(model.draftCwd?.lastPathComponent ?? "Choose a folder")
-                                .lineLimit(1)
-                        }
-                    }
-                    .buttonStyle(.paper)
-                    .appText(.fine)
-                    .help(folderHelp)
-                }
-
                 if model.draftWorktrees.isRepository {
                     worktreeChooser
                 }
@@ -1228,14 +1211,6 @@ struct PromptBar: View {
         }
     }
 
-    /// What the folder chip says when you hover it. On a folder page it says why it
-    /// cannot be pressed, rather than looking broken.
-    private var folderHelp: String {
-        guard let cwd = model.draftCwd else { return "Folder" }
-        let path = cwd.path(percentEncoded: false)
-        return folderIsFixed ? "This folder: \(path)" : "Folder: \(path)"
-    }
-
     /// What an agent can reach beyond its own folder, said in the control itself.
     private var reachTitle: String {
         let folders = model.draftFolders.count
@@ -1536,18 +1511,6 @@ struct PromptBar: View {
     private func chooseRuntime(_ id: String) {
         model.draftRuntimeID = id
         Task { await model.loadDraftOptions() }
-    }
-
-    private func chooseFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.prompt = "Work here"
-        if panel.runModal() == .OK {
-            model.draftCwd = panel.url
-            Task { await model.loadDraftOptions() }
-        }
     }
 }
 
