@@ -497,7 +497,7 @@ func (s *Drafts) Result(id string) (string, any, bool) {
 
 // MARK: The writer's tools
 
-// Call is ProviderDrafts.call: a writer's tool, from its host (machine/providerDraft).
+// Call is ProviderDrafts.call: a writer's tool, from its host (host/providerDraft).
 func (s *Drafts) Call(host string, call MachineProviderDraftCall) (any, error) {
 	s.mu.Lock()
 	d := s.drafts[strings.ToUpper(string(call.Draft))]

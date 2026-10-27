@@ -26,7 +26,7 @@ public extension DaemonAPI {
     }
 
     /// Per-file configuration state (#2129). Clients get metadata only; machines receive
-    /// the base64 file contents on machine/userSettings.
+    /// the base64 file contents on host/userSettings.
     struct AgentConfigFile: Codable, Sendable, Hashable {
         public var path: String
         public var contents: String?

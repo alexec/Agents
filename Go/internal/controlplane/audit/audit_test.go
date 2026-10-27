@@ -72,7 +72,7 @@ func TestEntriesAreListedNewestFirst(t *testing.T) {
 
 func TestWhatIsKeptAndWhatItActsOn(t *testing.T) {
 	for method, host := range map[string]bool{"agents/start": true, "elicitations/answer": true, "workflows/approve": true,
-		"preferences/set": true, "machines/remove": false, "control/setAuditDays": false} {
+		"preferences/set": true, "hosts/remove": false, "control/setAuditDays": false} {
 		if _, ok := Action(method, host); !ok {
 			t.Error(method)
 		}

@@ -18,7 +18,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 )
 
-// Ports HostInstallTests: how machines/install runs ssh, with a key and without one (#413).
+// Ports HostInstallTests: how hosts/install runs ssh, with a key and without one (#413).
 
 const knownHostsPath = "/tmp/agents-install-x/known_hosts"
 
@@ -213,7 +213,7 @@ func TestATunnelRecordIsStoredAsSwiftStoresIt(t *testing.T) {
 	}
 }
 
-// The whole of machines/install, on the fake ssh.
+// The whole of hosts/install, on the fake ssh.
 
 func reply(t *testing.T) func(any, error) map[string]any {
 	return func(got any, err error) map[string]any {
@@ -488,7 +488,7 @@ func TestCheckAgainDoesNothing(t *testing.T) {
 	}
 }
 
-// machines/update (#1766): the server given again, its host key trusted as at an install, and
+// hosts/update (#1766): the server given again, its host key trusted as at an install, and
 // its root this host's. Then the files are copied and the host starts again as itself: its
 // membership stays, and no code is left.
 func TestAnUpdateCopiesTheHostAndStartsItAgainAsItself(t *testing.T) {

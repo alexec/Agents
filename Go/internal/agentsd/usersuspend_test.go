@@ -34,7 +34,7 @@ func suspendedRefusal(t *testing.T, e *Error) {
 	}
 }
 
-// The machine says it can hear user/suspended (host.suspend/1) in machine/hello.
+// The machine says it can hear user/suspended (host.suspend/1) in host/hello.
 func TestAHostSaysItTakesASuspension(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	if !slices.Contains(d.Capabilities(), wire.CapHostSuspend1) {

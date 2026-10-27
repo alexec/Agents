@@ -5305,7 +5305,7 @@
         },
         "capabilities": {
           "type": "array",
-          "description": "The capabilities this client has (#1748). None from a client older than #1748, or from a host, which says its own in machine/hello.",
+          "description": "The capabilities this client has (#1748). None from a client older than #1748, or from a host, which says its own in host/hello.",
           "items": {
             "type": "string"
           }
@@ -5342,7 +5342,7 @@
     },
     "ControlCodeShown": {
       "type": "object",
-      "description": "clients/startPairing, machines/startEnroll: the code, until when it works, and for a host the one line to run on the server.",
+      "description": "clients/startPairing, hosts/startEnroll: the code, until when it works, and for a host the one line to run on the server.",
       "properties": {
         "text": {
           "type": "string"
@@ -5501,7 +5501,7 @@
         },
         "capabilities": {
           "type": "array",
-          "description": "The capabilities this host said in its last machine/hello (#1748). None from a host older than #1748.",
+          "description": "The capabilities this host said in its last host/hello (#1748). None from a host older than #1748.",
           "items": {
             "type": "string"
           }
@@ -6232,7 +6232,7 @@
     },
     "DetectedServer": {
       "type": "object",
-      "description": "One host in the ssh config, and what machines/detect did with it (#429).",
+      "description": "One host in the ssh config, and what hosts/detect did with it (#429).",
       "properties": {
         "alias": {
           "type": "string"
@@ -8229,7 +8229,7 @@
     },
     "FleetMachine": {
       "type": "object",
-      "description": "One machine on Console ▸ Machines (#1804): its machines/list row, whose it is, and how many of its agents were running when it last listed them. Numbers only, never what the agents said.",
+      "description": "One machine on Console ▸ Machines (#1804): its hosts/list row, whose it is, and how many of its agents were running when it last listed them. Numbers only, never what the agents said.",
       "properties": {
         "host": {
           "$ref": "#/definitions/ControlMachine"
@@ -9281,7 +9281,7 @@
     },
     "JoinRequest": {
       "type": "object",
-      "description": "machines/joinRequests, control/joinRequested (#994): a machine waiting for approval, with the code it shows.",
+      "description": "hosts/joinRequests, control/joinRequested (#994): a machine waiting for approval, with the code it shows.",
       "properties": {
         "request": {
           "type": "string"
@@ -9317,7 +9317,7 @@
     },
     "JoinRequestDecide": {
       "type": "object",
-      "description": "machines/approveJoin, machines/denyJoin (#994).",
+      "description": "hosts/approveJoin, hosts/denyJoin (#994).",
       "properties": {
         "request": {
           "type": "string"
@@ -9330,7 +9330,7 @@
     },
     "KeepRequest": {
       "type": "object",
-      "description": "machines/keep: a request for a stopped host, kept until it is up.",
+      "description": "hosts/keep: a request for a stopped host, kept until it is up.",
       "properties": {
         "host": {
           "$ref": "#/definitions/MachineRef"
@@ -9590,7 +9590,7 @@
     },
     "LendSignIn": {
       "type": "object",
-      "description": "machines/lendSignIn (T091).",
+      "description": "hosts/lendSignIn (T091).",
       "properties": {
         "host": {
           "$ref": "#/definitions/MachineRef"
@@ -11535,7 +11535,7 @@
     },
     "MachineAnnounce": {
       "type": "object",
-      "description": "machines/announce, on an enrolment connection.",
+      "description": "hosts/announce, on an enrolment connection.",
       "properties": {
         "publicKey": {
           "$ref": "#/definitions/Base64"
@@ -11611,7 +11611,7 @@
     },
     "MachineClients": {
       "type": "object",
-      "description": "machine/clients: every window paired with the control plane, which a host checks its local socket against (#1118).",
+      "description": "host/clients: every window paired with the control plane, which a host checks its local socket against (#1118).",
       "properties": {
         "clients": {
           "type": "array",
@@ -11631,7 +11631,7 @@
     },
     "MachineEnroll": {
       "type": "object",
-      "description": "machines/startEnroll (#1761): with as, a bot's machine code, an admin's only. Without, the caller's own, as before.",
+      "description": "hosts/startEnroll (#1761): with as, a bot's machine code, an admin's only. Without, the caller's own, as before.",
       "properties": {
         "as": {
           "type": "string"
@@ -11642,7 +11642,7 @@
     },
     "MachineHello": {
       "type": "object",
-      "description": "machine/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).",
+      "description": "host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).",
       "properties": {
         "host": {
           "$ref": "#/definitions/MachineRef"
@@ -11719,7 +11719,7 @@
     },
     "MachineInstall": {
       "type": "object",
-      "description": "machines/install (MachineInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel.",
+      "description": "hosts/install (MachineInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel.",
       "properties": {
         "destination": {
           "type": "string"
@@ -11875,7 +11875,7 @@
     },
     "MachineLink": {
       "type": "object",
-      "description": "machines/link.",
+      "description": "hosts/link.",
       "properties": {
         "host": {
           "$ref": "#/definitions/MachineRef"
@@ -11902,7 +11902,7 @@
     },
     "MachineOptions": {
       "type": "object",
-      "description": "machines/setMachineOptions. stopWhenIdleMinutes 0 turns it off.",
+      "description": "hosts/setMachineOptions. stopWhenIdleMinutes 0 turns it off.",
       "properties": {
         "host": {
           "$ref": "#/definitions/MachineRef"
@@ -11924,7 +11924,7 @@
     },
     "MachinePolicy": {
       "type": "object",
-      "description": "machine/policy (#998, FR-006): to a machine that says host.policy/1, on its channel 0, at each join and within 5 seconds of each change. A signed policy, or none when no policy was ever set.",
+      "description": "host/policy (#998, FR-006): to a machine that says host.policy/1, on its channel 0, at each join and within 5 seconds of each change. A signed policy, or none when no policy was ever set.",
       "properties": {
         "policy": {
           "$ref": "#/definitions/OrgPolicy"
@@ -11940,7 +11940,7 @@
     },
     "MachineProviderDraftCall": {
       "type": "object",
-      "description": "machine/providerDraft: a writing agent called one of the writer's tools (#858).",
+      "description": "host/providerDraft: a writing agent called one of the writer's tools (#858).",
       "properties": {
         "agentID": {
           "$ref": "#/definitions/UUID"
@@ -11968,7 +11968,7 @@
     },
     "MachineRelayRequest": {
       "type": "object",
-      "description": "machines/setRelay.",
+      "description": "hosts/setRelay.",
       "properties": {
         "host": {
           "$ref": "#/definitions/MachineRef"
@@ -11985,7 +11985,7 @@
     },
     "MachineRelease": {
       "type": "object",
-      "description": "machine/release (#2178): the release the control plane names, as X.Y.Z.",
+      "description": "host/release (#2178): the release the control plane names, as X.Y.Z.",
       "properties": {
         "version": {
           "type": "string"
@@ -12026,7 +12026,7 @@
     },
     "MachineStatus": {
       "type": "object",
-      "description": "machine/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next scheduled workflow.",
+      "description": "host/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next scheduled workflow.",
       "properties": {
         "idle": {
           "type": "boolean"
@@ -12098,7 +12098,7 @@
     },
     "MachineUpdate": {
       "type": "object",
-      "description": "machines/update (#1766): a host the control plane installed over ssh, updated the same way. The server and its key are given again, as at the install, because the control plane keeps neither; the host's own root and membership stay.",
+      "description": "hosts/update (#1766): a host the control plane installed over ssh, updated the same way. The server and its key are given again, as at the install, because the control plane keeps neither; the host's own root and membership stay.",
       "properties": {
         "host": {
           "$ref": "#/definitions/MachineRef"
@@ -12121,7 +12121,7 @@
     },
     "MachineUser": {
       "type": "object",
-      "description": "machine/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it starts no work (FR-033).",
+      "description": "host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it starts no work (FR-033).",
       "properties": {
         "user": {
           "type": "string"
@@ -12163,7 +12163,7 @@
     },
     "MachineUserSettings": {
       "type": "object",
-      "description": "machine/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and when its user's settings or secrets change. Sent only on the links of that user's own machines. secrets is every secret the user has: a name missing from it was removed.",
+      "description": "host/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and when its user's settings or secrets change. Sent only on the links of that user's own machines. secrets is every secret the user has: a name missing from it was removed.",
       "properties": {
         "user": {
           "type": "string"
@@ -12267,7 +12267,7 @@
     },
     "MachineWorkspaceCall": {
       "type": "object",
-      "description": "machine/machines, for an agent there: who asked, for the log, and its call.",
+      "description": "host/machines, for an agent there: who asked, for the log, and its call.",
       "properties": {
         "agent": {
           "type": "string"
@@ -13257,7 +13257,7 @@
         },
         "machines": {
           "type": "integer",
-          "description": "How many machines said they keep this version (machine/orgRoutesApplied). Only in orgRoutes/list."
+          "description": "How many machines said they keep this version (host/orgRoutesApplied). Only in orgRoutes/list."
         }
       },
       "required": [
@@ -13287,7 +13287,7 @@
     },
     "OrgRouteDelivery": {
       "type": "object",
-      "description": "machine/orgRoutes (#999): every route the machine's person (or bot) may use. An empty list removes every route.",
+      "description": "host/orgRoutes (#999): every route the machine's person (or bot) may use. An empty list removes every route.",
       "properties": {
         "routes": {
           "type": "array",
@@ -13530,7 +13530,7 @@
     },
     "OrgRoutesApplied": {
       "type": "object",
-      "description": "machine/orgRoutesApplied (#999): the routes a machine keeps, after a delivery.",
+      "description": "host/orgRoutesApplied (#999): the routes a machine keeps, after a delivery.",
       "properties": {
         "routes": {
           "type": "array",
@@ -14780,7 +14780,7 @@
     },
     "PolicyApplied": {
       "type": "object",
-      "description": "machine/policyApplied (#998): a machine kept this version of the policy.",
+      "description": "host/policyApplied (#998): a machine kept this version of the policy.",
       "properties": {
         "version": {
           "type": "integer"
@@ -17852,7 +17852,7 @@
     },
     "SSHHostsRequest": {
       "type": "object",
-      "description": "machines/sshHosts (#610): with a destination, just that, as typed.",
+      "description": "hosts/sshHosts (#610): with a destination, just that, as typed.",
       "properties": {
         "destination": {
           "type": "string"

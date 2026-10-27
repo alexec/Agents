@@ -246,7 +246,7 @@ func TestAtMostSoManyAtOnceAndInOrder(t *testing.T) {
 	}
 }
 
-// machines/detect and machines/sshHosts on the fake ssh, with a config of their own.
+// hosts/detect and hosts/sshHosts on the fake ssh, with a config of their own.
 func TestDetectInstallsWhatTheConfigNames(t *testing.T) {
 	f := newFake(t)
 	f.env["FAKE_SSH_PERSON_KNOWS"] = "1"

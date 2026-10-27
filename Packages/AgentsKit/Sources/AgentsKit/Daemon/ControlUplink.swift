@@ -6,7 +6,7 @@ import Foundation
 /// The control plane opens a channel on it for each client, and each channel becomes a
 /// virtual connection to this daemon's `DaemonServer`, with everything a socket
 /// connection has. Channel 0 is the host's own conversation with the control plane:
-/// `machine/hello` on every connect.
+/// `host/hello` on every connect.
 ///
 /// Losing the uplink closes every channel and nothing else: agents carry on, and it
 /// dials again, waiting a second, then twice as long each time up to half a minute, each
@@ -291,7 +291,7 @@ public final class ControlUplink: @unchecked Sendable {
                 tell(DaemonAPI.Method.foldersDetected, ["added": .int(0)])
                 return
             }
-            // Replies to `machine/hello` and `control/ping`, which nothing waits on; and to
+            // Replies to `host/hello` and `control/ping`, which nothing waits on; and to
             // `tunnel/open`, whose refusal ends the wait for it.
             let decoded = try? JSONRPCCodec.decode(line: message)
             // The control plane's own request (#1122), answered on channel 0.

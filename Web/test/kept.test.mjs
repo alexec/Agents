@@ -71,9 +71,9 @@ test("the control plane's list replaces what was kept; × drops one there", asyn
   assert.equal(store.kept.value.length, 2);
   await store.dropKept(store.kept.value[0]);
   assert.deepEqual(store.kept.value.map((k) => k.id), ["k3"]);
-  assert.deepEqual(link.asked.at(-1), { method: "machines/dropKept", params: { host: "box", id: "k1" }, host: undefined });
+  assert.deepEqual(link.asked.at(-1), { method: "hosts/dropKept", params: { host: "box", id: "k1" }, host: undefined });
   await store.retryKept(store.kept.value[0]);
-  assert.deepEqual(link.asked.at(-1), { method: "machines/retryKept", params: { host: "box", id: "k3" }, host: undefined });
+  assert.deepEqual(link.asked.at(-1), { method: "hosts/retryKept", params: { host: "box", id: "k3" }, host: undefined });
   link.notify("control/keptDelivered", { host: "box", id: "k3", agentID: "a9" });
   assert.equal(store.keptDelivered.value.agentID, "a9");
 });

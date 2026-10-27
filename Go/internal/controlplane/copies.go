@@ -23,7 +23,7 @@ const copyRestamp = 10 * time.Minute
 
 // hostCopies is HostCopies: what each host last listed (#962), its folders and its
 // agents, kept in the store, so a window that starts while the host is offline sees what
-// it had (machines/lastHeard).
+// it had (hosts/lastHeard).
 type hostCopies struct {
 	store store.Store
 	mu    sync.Mutex
@@ -117,7 +117,7 @@ func (c *hostCopies) take(host, method, reply string) {
 	}
 }
 
-// lastHeard is machines/lastHeard: what the host last listed, and when; only its id when
+// lastHeard is hosts/lastHeard: what the host last listed, and when; only its id when
 // nothing is kept.
 func (c *hostCopies) lastHeard(host string) map[string]any {
 	said := map[string]any{"host": host}

@@ -34,7 +34,7 @@ test("Console ▸ Audit (#1804): JSON lines as CSV, quoted where they must be", 
   const lines = [
     JSON.stringify({ id: "1", at: 0, action: "Stopped an agent", method: "agents/stop", host: "H1", target: "A1", actor: { user: "u", userName: "Bea, admin" } }),
     "not json",
-    JSON.stringify({ id: "2", at: 60, action: "Approved", method: "machines/approveJoin", actor: { user: "b", event: { kind: "schedule", id: "w" } } }),
+    JSON.stringify({ id: "2", at: 60, action: "Approved", method: "hosts/approveJoin", actor: { user: "b", event: { kind: "schedule", id: "w" } } }),
   ].join("\n");
   const csv = a.auditCSV(lines, (h) => `${h}'s box`).trim().split("\n");
   assert.equal(csv.length, 3);

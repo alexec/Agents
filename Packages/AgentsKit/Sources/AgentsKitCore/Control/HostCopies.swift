@@ -60,7 +60,7 @@ public actor HostCopies {
         _ = try? await store.put(Self.key(host), data, when: .always)
     }
 
-    /// What the host last said, for `machines/lastHeard`: its folders and live sessions as it
+    /// What the host last said, for `hosts/lastHeard`: its folders and live sessions as it
     /// listed them, and when; nothing when it never has.
     public func lastHeard(_ host: MachineRef) async -> JSONValue {
         guard let copy = await current(host) else { return ["host": .string(host.rawValue)] }
@@ -91,7 +91,7 @@ public actor HostCopies {
 }
 
 public extension DaemonAPI {
-    /// `machines/lastHeard`'s answer (#962): what a host last listed, for a client that starts
+    /// `hosts/lastHeard`'s answer (#962): what a host last listed, for a client that starts
     /// while it is offline. Each is missing when the host has never listed it here.
     struct MachineLastHeard: Codable, Sendable {
         public var host: MachineRef
@@ -103,5 +103,5 @@ public extension DaemonAPI {
 
 public extension DaemonAPI.Method {
     /// `MachineRequest` → `MachineLastHeard`.
-    static let hostsLastHeard = "machines/lastHeard"
+    static let hostsLastHeard = "hosts/lastHeard"
 }

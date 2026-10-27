@@ -14,7 +14,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// window is a paired window's key, as machine/clients lists it.
+// window is a paired window's key, as host/clients lists it.
 type window struct {
 	id      string
 	private []byte
@@ -169,7 +169,7 @@ func TestAForgottenWindowIsCutOff(t *testing.T) {
 	if reply.OK == nil {
 		t.Fatalf("%+v", reply)
 	}
-	d.Told(wire.NotifyMachineClients.Name, []byte(`{"clients":[]}`))
+	d.Told(wire.NotifyHostClients.Name, []byte(`{"clients":[]}`))
 	c.SetDeadline(time.Now().Add(5 * time.Second))
 	if _, err := r.ReadString('\n'); err == nil {
 		t.Fatal("a forgotten window is still connected")
@@ -182,7 +182,7 @@ func TestAForgottenWindowIsCutOff(t *testing.T) {
 	}
 }
 
-// control-clients.json is written only when machine/clients changes, not on every notice
+// control-clients.json is written only when host/clients changes, not on every notice
 // (#1528), and a host that starts with the same list kept does not write it again.
 func TestTheLocalClientsFileIsWrittenOnlyWhenItChanges(t *testing.T) {
 	root := t.TempDir()
@@ -207,7 +207,7 @@ func TestTheLocalClientsFileIsWrittenOnlyWhenItChanges(t *testing.T) {
 		d.SetLocalClients(list)
 	}
 	if written() {
-		t.Fatal("an unchanged machine/clients wrote the file again")
+		t.Fatal("an unchanged host/clients wrote the file again")
 	}
 	// Another daemon over the same root, as after a restart, finds the list kept.
 	again := &Daemon{Store: d.Store}
@@ -217,7 +217,7 @@ func TestTheLocalClientsFileIsWrittenOnlyWhenItChanges(t *testing.T) {
 	}
 	d.SetLocalClients(wire.MachineClients{})
 	if !written() {
-		t.Fatal("a changed machine/clients was not written")
+		t.Fatal("a changed host/clients was not written")
 	}
 	if b, _ := os.ReadFile(file); string(b) != `{"clients":[]}` {
 		t.Fatalf("the file holds %s", b)

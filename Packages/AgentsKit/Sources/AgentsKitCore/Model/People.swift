@@ -299,7 +299,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// A machine waiting for approval, with the code it shows: `machines/joinRequests` and
+    /// A machine waiting for approval, with the code it shows: `hosts/joinRequests` and
     /// `control/joinRequested`. `for` names whose it is to be; empty when it names no one.
     struct JoinRequest: Codable, Sendable, Hashable, Identifiable {
         public var request: String
@@ -351,14 +351,14 @@ public extension DaemonAPI {
         }
     }
 
-    /// `machines/approveJoin`, `machines/denyJoin`.
+    /// `hosts/approveJoin`, `hosts/denyJoin`.
     struct JoinRequestDecide: Codable, Sendable, Hashable {
         public var request: String
 
         public init(request: String) { self.request = request }
     }
 
-    /// `machines/approveJoin`'s answer: the machine's new host.
+    /// `hosts/approveJoin`'s answer: the machine's new host.
     struct JoinApproved: Codable, Sendable, Hashable {
         public var host: MachineRef
 
@@ -392,11 +392,11 @@ public extension DaemonAPI.Method {
     static let peopleRemovePreview = "people/removePreview"
     /// `Empty` → `[JoinRequest]`: the machines waiting for this person's approval; for an
     /// admin, also those that name no person (#994).
-    static let hostsJoinRequests = "machines/joinRequests"
+    static let hostsJoinRequests = "hosts/joinRequests"
     /// `JoinRequestDecide` → `JoinApproved` (#994).
-    static let hostsApproveJoin = "machines/approveJoin"
+    static let hostsApproveJoin = "hosts/approveJoin"
     /// `JoinRequestDecide` → `{}` (#994).
-    static let hostsDenyJoin = "machines/denyJoin"
+    static let hostsDenyJoin = "hosts/denyJoin"
 }
 
 public extension DaemonAPI.Notification {
@@ -417,7 +417,7 @@ public struct JoinRequestQueue: Sendable, Hashable {
         replace(with: requests)
     }
 
-    /// What `machines/joinRequests` said, in place of what was kept.
+    /// What `hosts/joinRequests` said, in place of what was kept.
     public mutating func replace(with listed: [DaemonAPI.JoinRequest]) {
         requests = []
         for request in listed { add(request) }

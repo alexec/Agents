@@ -299,7 +299,7 @@ func TestAHostAndAWindowThroughTheControlPlane(t *testing.T) {
 		t.Fatalf("%+v", status)
 	}
 	var hosts []wire.ControlMachine
-	json.Unmarshal(call(t, window, "", "machines/list", nil), &hosts)
+	json.Unmarshal(call(t, window, "", "hosts/list", nil), &hosts)
 	if len(hosts) != 2 || hosts[0].State != "online" || hosts[1].State != "online" || deref(hosts[0].Implementation) != "go" {
 		t.Fatalf("%+v", hosts)
 	}
@@ -397,7 +397,7 @@ func TestTheFolderAndKeyAreTheControlPlane(t *testing.T) {
 	}
 	defer window.Close()
 	var hosts []wire.ControlMachine
-	json.Unmarshal(call(t, window, "", "machines/list", nil), &hosts)
+	json.Unmarshal(call(t, window, "", "hosts/list", nil), &hosts)
 	if len(hosts) != 1 || string(hosts[0].ID) != h.member.Host {
 		t.Fatalf("%+v", hosts)
 	}
@@ -585,18 +585,18 @@ func answerHello(l *controllink.Lines, id controllink.Identity, key []byte, at, 
 	return auth, m.OK, controllink.Check(m.OK, expect)
 }
 
-// machines/install is answered by the installer, in its words, through the router.
+// hosts/install is answered by the installer, in its words, through the router.
 func TestHostsInstallAnswersInItsWords(t *testing.T) {
 	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, window := p.client("Window")
-	if e := callError(t, window, "", "machines/install", map[string]string{"destination": " "}); !strings.Contains(e, "Say which server.") {
+	if e := callError(t, window, "", "hosts/install", map[string]string{"destination": " "}); !strings.Contains(e, "Say which server.") {
 		t.Fatal(e)
 	}
-	if e := callError(t, window, "", "machines/update", map[string]string{"host": "x", "destination": "devbox"}); !strings.Contains(e, "There is no such host.") {
+	if e := callError(t, window, "", "hosts/update", map[string]string{"host": "x", "destination": "devbox"}); !strings.Contains(e, "There is no such host.") {
 		t.Fatal(e)
 	}
-	call(t, window, "", "machines/checkAgain", map[string]string{"host": "x"})
+	call(t, window, "", "hosts/checkAgain", map[string]string{"host": "x"})
 }
 
 // rawHost enrols and connects a host by hand, and returns its uplink's lines: for a
@@ -619,7 +619,7 @@ func (p *plane) rawHostKey(name string, relay bool) (string, *controllink.Lines,
 	}
 	params, _ := json.Marshal(wire.MachineAnnounce{PublicKey: public, Name: name, Platform: "macOS arm64", Version: "1",
 		MachineID: "RELAY-MAC", Relay: &relay})
-	l.Write(ctx, `{"jsonrpc":"2.0","id":1,"method":"machines/announce","params":`+string(params)+`}`)
+	l.Write(ctx, `{"jsonrpc":"2.0","id":1,"method":"hosts/announce","params":`+string(params)+`}`)
 	line, err := l.Read(ctx)
 	if err != nil {
 		p.t.Fatal(err)
@@ -637,7 +637,7 @@ func (p *plane) rawHostKey(name string, relay bool) (string, *controllink.Lines,
 		p.t.Fatal(err)
 	}
 	hello, _ := json.Marshal(wire.MachineHello{Version: "1", Platform: "macOS arm64", MachineID: "RELAY-MAC", Relay: &relay})
-	l.Write(ctx, channelFrame(0, `{"jsonrpc":"2.0","id":1,"method":"machine/hello","params":`+string(hello)+`}`))
+	l.Write(ctx, channelFrame(0, `{"jsonrpc":"2.0","id":1,"method":"host/hello","params":`+string(hello)+`}`))
 	p.t.Cleanup(l.Close)
 	return host, l, key
 }
@@ -762,7 +762,7 @@ func TestProvidersAnswerWhereTheyCanRun(t *testing.T) {
 		t.Fatalf("%v %+v", err, listed)
 	}
 	// A kept request's list is there, and empty.
-	call(t, w, "", "machines/listKept", map[string]any{})
+	call(t, w, "", "hosts/listKept", map[string]any{})
 }
 
 // A host says which language it is written in (#1134): kept from its announce and its hello,
@@ -783,7 +783,7 @@ func TestAHostsImplementationIsKeptFromItsHello(t *testing.T) {
 	hello := func(impl string) {
 		params, _ := json.Marshal(map[string]any{"version": "0.1", "platform": "linux aarch64", "machineID": "MACHINE-2",
 			"implementation": impl})
-		if _, err := p.s.methods.HostSaid(box.member.Host, "machine/hello", params); err != nil {
+		if _, err := p.s.methods.HostSaid(box.member.Host, "host/hello", params); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -826,7 +826,7 @@ func TestHostsHearThePairedWindows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for line := readUntil(t, host, "machine/clients"); !strings.Contains(line, m.Client); line = readUntil(t, host, "machine/clients") {
+	for line := readUntil(t, host, "host/clients"); !strings.Contains(line, m.Client); line = readUntil(t, host, "host/clients") {
 	}
 	if err := p.s.methods.forget(context.Background(), m.Client, 0); err != nil {
 		t.Fatal(err)
@@ -840,21 +840,21 @@ func TestHostsHearThePairedWindows(t *testing.T) {
 		if err != nil {
 			t.Fatal("a forgotten window is still listed:", err)
 		}
-		if strings.Contains(line, "machine/clients") && !strings.Contains(line, m.Client) {
+		if strings.Contains(line, "host/clients") && !strings.Contains(line, m.Client) {
 			return
 		}
 	}
 }
 
-// A host hears machine/clients when it says hello and when the paired windows change, not
+// A host hears host/clients when it says hello and when the paired windows change, not
 // on every refresh (#1528): forty refreshes (ten minutes of them) tell it nothing, so the
-// next machine/clients it reads is the one that lists a new window.
+// next host/clients it reads is the one that lists a new window.
 func TestAHostHearsThePairedWindowsOnlyWhenTheyChange(t *testing.T) {
 	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, host := p.rawHost("this mac", false)
-	if line := readUntil(t, host, "machine/clients"); !strings.Contains(line, `"clients":[]`) {
-		t.Fatal("the hello's machine/clients:", line)
+	if line := readUntil(t, host, "host/clients"); !strings.Contains(line, `"clients":[]`) {
+		t.Fatal("the hello's host/clients:", line)
 	}
 	for range 40 {
 		p.s.syncRelays()
@@ -863,7 +863,7 @@ func TestAHostHearsThePairedWindowsOnlyWhenTheyChange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if line := readUntil(t, host, "machine/clients"); !strings.Contains(line, m.Client) {
+	if line := readUntil(t, host, "host/clients"); !strings.Contains(line, m.Client) {
 		t.Fatal("the refreshes told the host an unchanged list:", line)
 	}
 }

@@ -259,7 +259,7 @@ func TestABotsMachineIsStartedOnceForItsTriggers(t *testing.T) {
 	}
 }
 
-// #2027: machine/user tells a person's machine the bots of their groups, so it hears a bot's
+// #2027: host/user tells a person's machine the bots of their groups, so it hears a bot's
 // workflow's server triggers for it, and again when a bot or a group changes; a bot's
 // machine and someone outside the group are told none.
 func TestAPersonsMachineIsToldTheBotsOfItsGroups(t *testing.T) {

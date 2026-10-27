@@ -2017,7 +2017,7 @@ export interface ControlAuth {
   epoch?: number;
   /**
    * The capabilities this client has (#1748). None from a client older than #1748, or from a host,
-   * which says its own in machine/hello.
+   * which says its own in host/hello.
    */
   capabilities?: string[];
   /**
@@ -2043,7 +2043,7 @@ export interface ControlClientChanged {
 }
 
 /**
- * clients/startPairing, machines/startEnroll: the code, until when it works, and for a host the one
+ * clients/startPairing, hosts/startEnroll: the code, until when it works, and for a host the one
  * line to run on the server.
  */
 export interface ControlCodeShown {
@@ -2103,7 +2103,7 @@ export interface ControlMachine {
   workspace?: MachineWorkspace;
   implementation?: string;
   /**
-   * The capabilities this host said in its last machine/hello (#1748). None from a host older than
+   * The capabilities this host said in its last host/hello (#1748). None from a host older than
    * #1748.
    */
   capabilities?: string[];
@@ -2350,7 +2350,7 @@ export interface DestinationStateRequest {
   destination: SkillDestination;
 }
 
-/** One host in the ssh config, and what machines/detect did with it (#429). */
+/** One host in the ssh config, and what hosts/detect did with it (#429). */
 export interface DetectedServer {
   alias: string;
   resolved: string;
@@ -2927,8 +2927,8 @@ export interface FleetBoard {
 }
 
 /**
- * One machine on Console ▸ Machines (#1804): its machines/list row, whose it is, and how many of
- * its agents were running when it last listed them. Numbers only, never what the agents said.
+ * One machine on Console ▸ Machines (#1804): its hosts/list row, whose it is, and how many of its
+ * agents were running when it last listed them. Numbers only, never what the agents said.
  */
 export interface FleetMachine {
   host: ControlMachine;
@@ -3236,8 +3236,8 @@ export interface JoinDecided {
 }
 
 /**
- * machines/joinRequests, control/joinRequested (#994): a machine waiting for approval, with the
- * code it shows.
+ * hosts/joinRequests, control/joinRequested (#994): a machine waiting for approval, with the code
+ * it shows.
  */
 export interface JoinRequest {
   request: string;
@@ -3249,12 +3249,12 @@ export interface JoinRequest {
   forName?: string;
 }
 
-/** machines/approveJoin, machines/denyJoin (#994). */
+/** hosts/approveJoin, hosts/denyJoin (#994). */
 export interface JoinRequestDecide {
   request: string;
 }
 
-/** machines/keep: a request for a stopped host, kept until it is up. */
+/** hosts/keep: a request for a stopped host, kept until it is up. */
 export interface KeepRequest {
   host: MachineRef;
   method: string;
@@ -3333,7 +3333,7 @@ export interface LendGit {
   allowed: boolean;
 }
 
-/** machines/lendSignIn (T091). */
+/** hosts/lendSignIn (T091). */
 export interface LendSignIn {
   host: MachineRef;
   from: MachineRef;
@@ -3776,7 +3776,7 @@ export interface MacTerminalRequest {
   path?: string;
 }
 
-/** machines/announce, on an enrolment connection. */
+/** hosts/announce, on an enrolment connection. */
 export interface MachineAnnounce {
   publicKey: Base64;
   name: string;
@@ -3811,7 +3811,7 @@ export interface MachineClient {
 }
 
 /**
- * machine/clients: every window paired with the control plane, which a host checks its local socket
+ * host/clients: every window paired with the control plane, which a host checks its local socket
  * against (#1118).
  */
 export interface MachineClients {
@@ -3824,14 +3824,14 @@ export interface MachineClients {
 }
 
 /**
- * machines/startEnroll (#1761): with as, a bot's machine code, an admin's only. Without, the
- * caller's own, as before.
+ * hosts/startEnroll (#1761): with as, a bot's machine code, an admin's only. Without, the caller's
+ * own, as before.
  */
 export interface MachineEnroll {
   as?: string;
 }
 
-/** machine/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134). */
+/** host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134). */
 export interface MachineHello {
   host?: MachineRef;
   version: string;
@@ -3867,8 +3867,8 @@ export interface MachineInfo {
 }
 
 /**
- * machines/install (MachineInstall.Request): a server over ssh, with its key, the fingerprint
- * trusted, a tunnel.
+ * hosts/install (MachineInstall.Request): a server over ssh, with its key, the fingerprint trusted,
+ * a tunnel.
  */
 export interface MachineInstall {
   destination: string;
@@ -3925,7 +3925,7 @@ export interface MachineLastHeard {
   heardAt?: WireDate;
 }
 
-/** machines/link. */
+/** hosts/link. */
 export interface MachineLink {
   host: MachineRef;
   provider: ProviderID;
@@ -3934,7 +3934,7 @@ export interface MachineLink {
   stopWhenIdleMinutes?: number;
 }
 
-/** machines/setMachineOptions. stopWhenIdleMinutes 0 turns it off. */
+/** hosts/setMachineOptions. stopWhenIdleMinutes 0 turns it off. */
 export interface MachineOptions {
   host: MachineRef;
   startWhenUsed?: boolean;
@@ -3943,8 +3943,8 @@ export interface MachineOptions {
 }
 
 /**
- * machine/policy (#998, FR-006): to a machine that says host.policy/1, on its channel 0, at each
- * join and within 5 seconds of each change. A signed policy, or none when no policy was ever set.
+ * host/policy (#998, FR-006): to a machine that says host.policy/1, on its channel 0, at each join
+ * and within 5 seconds of each change. A signed policy, or none when no policy was ever set.
  */
 export interface MachinePolicy {
   policy?: OrgPolicy;
@@ -3952,7 +3952,7 @@ export interface MachinePolicy {
   none?: boolean;
 }
 
-/** machine/providerDraft: a writing agent called one of the writer's tools (#858). */
+/** host/providerDraft: a writing agent called one of the writer's tools (#858). */
 export interface MachineProviderDraftCall {
   agentID: UUID;
   draft: UUID;
@@ -3960,13 +3960,13 @@ export interface MachineProviderDraftCall {
   arguments?: JSONValue;
 }
 
-/** machines/setRelay. */
+/** hosts/setRelay. */
 export interface MachineRelayRequest {
   host: MachineRef;
   relay: boolean;
 }
 
-/** machine/release (#2178): the release the control plane names, as X.Y.Z. */
+/** host/release (#2178): the release the control plane names, as X.Y.Z. */
 export interface MachineRelease {
   version: string;
 }
@@ -3983,7 +3983,7 @@ export interface MachineSchedule {
 }
 
 /**
- * machine/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next
+ * host/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next
  * scheduled workflow.
  */
 export interface MachineStatus {
@@ -4009,7 +4009,7 @@ export interface MachineTunnelChanged {
 }
 
 /**
- * machines/update (#1766): a host the control plane installed over ssh, updated the same way. The
+ * hosts/update (#1766): a host the control plane installed over ssh, updated the same way. The
  * server and its key are given again, as at the install, because the control plane keeps neither;
  * the host's own root and membership stay.
  */
@@ -4021,7 +4021,7 @@ export interface MachineUpdate {
 }
 
 /**
- * machine/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its
+ * host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its
  * user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it
  * starts no work (FR-033).
  */
@@ -4040,8 +4040,8 @@ export interface MachineUser {
 }
 
 /**
- * machine/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and
- * when its user's settings or secrets change. Sent only on the links of that user's own machines.
+ * host/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and when
+ * its user's settings or secrets change. Sent only on the links of that user's own machines.
  * secrets is every secret the user has: a name missing from it was removed.
  */
 export interface MachineUserSettings {
@@ -4074,7 +4074,7 @@ export interface MachineWorkspace {
   wakeAt?: WireDate;
 }
 
-/** machine/machines, for an agent there: who asked, for the log, and its call. */
+/** host/machines, for an agent there: who asked, for the log, and its call. */
 export interface MachineWorkspaceCall {
   agent: string;
   method: string;
@@ -4440,8 +4440,7 @@ export interface OrgRoute {
   created?: OrgRouteStamp;
   changed?: OrgRouteStamp;
   /**
-   * How many machines said they keep this version (machine/orgRoutesApplied). Only in
-   * orgRoutes/list.
+   * How many machines said they keep this version (host/orgRoutesApplied). Only in orgRoutes/list.
    */
   machines?: number;
 }
@@ -4453,8 +4452,8 @@ export interface OrgRouteCheck {
 }
 
 /**
- * machine/orgRoutes (#999): every route the machine's person (or bot) may use. An empty list
- * removes every route.
+ * host/orgRoutes (#999): every route the machine's person (or bot) may use. An empty list removes
+ * every route.
  */
 export interface OrgRouteDelivery {
   routes: DeliveredRoute[];
@@ -4557,7 +4556,7 @@ export interface OrgRouteVersion {
   version: number;
 }
 
-/** machine/orgRoutesApplied (#999): the routes a machine keeps, after a delivery. */
+/** host/orgRoutesApplied (#999): the routes a machine keeps, after a delivery. */
 export interface OrgRoutesApplied {
   routes: OrgRouteVersion[];
 }
@@ -4974,7 +4973,7 @@ export interface PluginsListRequest {
   folder: URLString;
 }
 
-/** machine/policyApplied (#998): a machine kept this version of the policy. */
+/** host/policyApplied (#998): a machine kept this version of the policy. */
 export interface PolicyApplied {
   version: number;
 }
@@ -6071,7 +6070,7 @@ export interface SSHHost {
   known: boolean;
 }
 
-/** machines/sshHosts (#610): with a destination, just that, as typed. */
+/** hosts/sshHosts (#610): with a destination, just that, as typed. */
 export interface SSHHostsRequest {
   destination?: string;
 }
@@ -8189,26 +8188,26 @@ export interface Methods {
   "groups/remove": { params: GroupRequest; result: Empty };
   "groups/set": { params: GroupSet; result: Group };
   "groups/setRole": { params: GroupRoleSet; result: Group };
+  "hosts/approveJoin": { params: JoinRequestDecide; result: JoinApproved };
+  "hosts/denyJoin": { params: JoinRequestDecide; result: Empty };
+  "hosts/dropKept": { params: KeptRequestID; result: Empty };
+  "hosts/joinRequests": { params: Empty; result: JoinRequest[] };
+  "hosts/lastHeard": { params: MachineRequest; result: MachineLastHeard };
+  "hosts/lendGit": { params: LendGit; result: Empty };
+  "hosts/link": { params: MachineLink; result: ControlMachine };
+  "hosts/list": { params: Empty; result: ControlMachine[] };
+  "hosts/listKept": { params: Empty; result: KeptList };
+  "hosts/retryKept": { params: KeptRequestID; result: Empty };
+  "hosts/setMachineOptions": { params: MachineOptions; result: ControlMachine };
+  "hosts/start": { params: MachineRequest; result: ControlMachine };
+  "hosts/startEnroll": { params: MachineEnroll; result: ControlCodeShown };
+  "hosts/stop": { params: MachineStop; result: ControlMachine };
+  "hosts/unlink": { params: MachineRequest; result: ControlMachine };
   "links/approve": { params: ChannelLinkDecide; result: Empty };
   "links/deny": { params: ChannelLinkDecide; result: Empty };
   "links/list": { params: Empty; result: ChannelLink[] };
   "links/remove": { params: ChannelLinkRemove; result: Empty };
   "links/requests": { params: Empty; result: ChannelLinkRequest[] };
-  "machines/approveJoin": { params: JoinRequestDecide; result: JoinApproved };
-  "machines/denyJoin": { params: JoinRequestDecide; result: Empty };
-  "machines/dropKept": { params: KeptRequestID; result: Empty };
-  "machines/joinRequests": { params: Empty; result: JoinRequest[] };
-  "machines/lastHeard": { params: MachineRequest; result: MachineLastHeard };
-  "machines/lendGit": { params: LendGit; result: Empty };
-  "machines/link": { params: MachineLink; result: ControlMachine };
-  "machines/list": { params: Empty; result: ControlMachine[] };
-  "machines/listKept": { params: Empty; result: KeptList };
-  "machines/retryKept": { params: KeptRequestID; result: Empty };
-  "machines/setMachineOptions": { params: MachineOptions; result: ControlMachine };
-  "machines/start": { params: MachineRequest; result: ControlMachine };
-  "machines/startEnroll": { params: MachineEnroll; result: ControlCodeShown };
-  "machines/stop": { params: MachineStop; result: ControlMachine };
-  "machines/unlink": { params: MachineRequest; result: ControlMachine };
   "mcp/health": { params: Empty; result: MCPHealthSnapshot };
   "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
   "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
@@ -8463,26 +8462,26 @@ export const MethodTarget = {
   "groups/remove": "control",
   "groups/set": "control",
   "groups/setRole": "control",
+  "hosts/approveJoin": "control",
+  "hosts/denyJoin": "control",
+  "hosts/dropKept": "control",
+  "hosts/joinRequests": "control",
+  "hosts/lastHeard": "control",
+  "hosts/lendGit": "control",
+  "hosts/link": "control",
+  "hosts/list": "control",
+  "hosts/listKept": "control",
+  "hosts/retryKept": "control",
+  "hosts/setMachineOptions": "control",
+  "hosts/start": "control",
+  "hosts/startEnroll": "control",
+  "hosts/stop": "control",
+  "hosts/unlink": "control",
   "links/approve": "control",
   "links/deny": "control",
   "links/list": "control",
   "links/remove": "control",
   "links/requests": "control",
-  "machines/approveJoin": "control",
-  "machines/denyJoin": "control",
-  "machines/dropKept": "control",
-  "machines/joinRequests": "control",
-  "machines/lastHeard": "control",
-  "machines/lendGit": "control",
-  "machines/link": "control",
-  "machines/list": "control",
-  "machines/listKept": "control",
-  "machines/retryKept": "control",
-  "machines/setMachineOptions": "control",
-  "machines/start": "control",
-  "machines/startEnroll": "control",
-  "machines/stop": "control",
-  "machines/unlink": "control",
   "mcp/health": "host",
   "mcp/health/check": "host",
   "mcp/hosted": "host",

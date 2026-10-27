@@ -26,7 +26,7 @@ import (
 )
 
 // Agents Host updates itself on a Mac (#2178, Enterprise T7). The control plane names its
-// release in machine/release at each join. When it is newer than this copy, and the person
+// release in host/release at each join. When it is newer than this copy, and the person
 // has not turned updating off (selfUpdate/set, self-update.json in the root), the host:
 //
 //  1. downloads the release's Agents-Host-<version>.zip and SHA256SUMS, and checks the sum;
@@ -158,7 +158,7 @@ func (u *selfUpdater) Set(r wire.SelfUpdateSet) (wire.SelfUpdate, error) {
 	return u.Status(), nil
 }
 
-// Named is machine/release: the release the control plane names. A newer one is taken up,
+// Named is host/release: the release the control plane names. A newer one is taken up,
 // unless updating is off or this copy cannot update itself.
 func (u *selfUpdater) Named(version string) {
 	u.mu.Lock()
@@ -417,11 +417,11 @@ func enclosingApp(executable string) string {
 	return ""
 }
 
-// toldRelease is machine/release.
+// toldRelease is host/release.
 func (d *Daemon) toldRelease(params json.RawMessage) {
 	var r wire.MachineRelease
 	if err := json.Unmarshal(params, &r); err != nil {
-		log.Printf("self-update: %s: %v", wire.NotifyMachineRelease.Name, err)
+		log.Printf("self-update: %s: %v", wire.NotifyHostRelease.Name, err)
 		return
 	}
 	if u := d.selfUpdateState.updater; u != nil {

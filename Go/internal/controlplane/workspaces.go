@@ -175,7 +175,7 @@ type providerMethods struct{ m *Methods }
 func (a providerMethods) HostRow(h records.MachineRecord) any { return a.m.hostRow(h) }
 
 func (a providerMethods) RemoveHost(host string, from providers.Caller) error {
-	_, err := a.m.Handle("machines/remove", rawOf(map[string]string{"host": host}),
+	_, err := a.m.Handle("hosts/remove", rawOf(map[string]string{"host": host}),
 		Caller{Session: from.Session, Client: from.Client, Kind: from.Kind, Person: from.Person})
 	return err
 }

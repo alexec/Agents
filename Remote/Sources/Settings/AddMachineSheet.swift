@@ -90,7 +90,7 @@ struct NewMachinePage: View {
     }
 }
 
-/// A server's one command, or another Mac's code: `machines/startEnroll`, to copy.
+/// A server's one command, or another Mac's code: `hosts/startEnroll`, to copy.
 private struct EnrollCodePage: View {
     typealias Words = AddMachine.Words
 

@@ -68,8 +68,8 @@ change. A person sees only their own raises.
 | `policy/raise` | An admin | Raises a person's budget for today. |
 | `control/policyChanged` | To every client | The policy changed. |
 | `control/stopAll` | To every client | The kill switch was turned on or off. |
-| `machine/policy` | To a machine | The signed policy, or `{none: true}`. |
-| `machine/policyApplied` | From a machine | The version it keeps. |
+| `host/policy` | To a machine | The signed policy, or `{none: true}`. |
+| `host/policyApplied` | From a machine | The version it keeps. |
 
 ## On a machine
 

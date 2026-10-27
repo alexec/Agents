@@ -13,13 +13,13 @@ func serverToolsetsFolder() string {
 }
 
 // registerInstall serves runtimes/install on a server (#1312): the Node toolsets in
-// ~/.agents-server/toolsets, into ~/.agents-server/tools, as machines/install does over ssh.
+// ~/.agents-server/toolsets, into ~/.agents-server/tools, as hosts/install does over ssh.
 func (d *Daemon) registerInstall() {
 	d.serveServerInstall(serverToolsetsFolder())
 }
 
 // defaultToolsets are the runtimes a server installs by itself when they are missing:
-// Claude, the default runtime, as machines/install's DefaultToolsets.
+// Claude, the default runtime, as hosts/install's DefaultToolsets.
 var defaultToolsets = []string{"claude"}
 
 // installDefaultToolsets installs Claude once the host is up, when the shown command left

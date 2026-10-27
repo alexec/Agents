@@ -291,7 +291,7 @@ public actor ControlRecords {
         etag.map { .matching($0) } ?? .absent
     }
 
-    /// `machines/remove`: a tombstone. Returns whether there was such a host.
+    /// `hosts/remove`: a tombstone. Returns whether there was such a host.
     @discardableResult
     public func remove(_ id: MachineRef) async throws -> Bool {
         if hostsHeld[id] == nil { try await load() }

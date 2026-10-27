@@ -41,7 +41,7 @@ type Tunnels interface {
 // TunnelRecord is HostTunnels.Record, stored as v1/tunnels/<id>.json: the tunnels' own.
 type TunnelRecord = hosttunnels.Record
 
-// Installer is MachineInstall: machines/install (058, US4, T072). The control plane installs
+// Installer is MachineInstall: hosts/install (058, US4, T072). The control plane installs
 // the host on a server the person can ssh to, once, and lets go.
 //
 //   - A key in the request lives for this call only: written 0600 into a folder of its
@@ -78,12 +78,12 @@ type Installer struct {
 	Progress func(name, step string)
 	// Tunnels may be nil: then a server that wants a tunnel is refused.
 	Tunnels Tunnels
-	// KnownNames are the names of the control plane's hosts, for machines/detect and
-	// machines/sshHosts. Nil: none.
+	// KnownNames are the names of the control plane's hosts, for hosts/detect and
+	// hosts/sshHosts. Nil: none.
 	KnownNames func(ctx context.Context) []string
 }
 
-// Request is MachineInstall.Request: the params of machines/install. Destination is user@host,
+// Request is MachineInstall.Request: the params of hosts/install. Destination is user@host,
 // user@host:port, or a name from the ssh config. Key is the private key's text, OpenSSH or
 // PEM (nil or empty: ssh's own choice). Trust is the fingerprint the person was shown and
 // trusts, on the second call. Tunnel says whether the server dials back through an ssh
@@ -127,7 +127,7 @@ func (i *Installer) progress(name, step string) {
 	}
 }
 
-// Install is machines/install: params is a Request. The reply is
+// Install is hosts/install: params is a Request. The reply is
 // {"needsTrust": fingerprint, "name"} when the host key must be shown first, or
 // {"started": true, "name", "platform", "tunnel"} once the host has started.
 func (i *Installer) Install(ctx context.Context, params json.RawMessage) (any, error) {
@@ -142,7 +142,7 @@ func (i *Installer) Install(ctx context.Context, params json.RawMessage) (any, e
 	return i.install(ctx, request.Request, false)
 }
 
-// Update is machines/update (#1766): a host this control plane installed over ssh, updated
+// Update is hosts/update (#1766): a host this control plane installed over ssh, updated
 // the same way, with its server and key given again (the control plane keeps neither).
 // The host key is checked as at an install. The server's root must hold this host's own
 // membership, so no other server is touched; then its agentsd, MCP servers and toolsets
@@ -154,7 +154,7 @@ func (i *Installer) Update(ctx context.Context, update wire.MachineUpdate, name 
 	return i.run(ctx, request, false, string(update.Host))
 }
 
-// CheckAgain is machines/checkAgain. The Swift control plane does nothing for it
+// CheckAgain is hosts/checkAgain. The Swift control plane does nothing for it
 // (ControlMethods' default hook), so neither does this.
 func (i *Installer) CheckAgain(ctx context.Context, host string) error { return nil }
 
@@ -382,7 +382,7 @@ func (i *Installer) installToolsets(ctx context.Context, server installer, found
 				text = Say(p, true)
 			}
 			if i.Log != nil {
-				i.Log("machines/install: %s on %s: %s", runtimeName(t.manifest.RuntimeID), name, text)
+				i.Log("hosts/install: %s on %s: %s", runtimeName(t.manifest.RuntimeID), name, text)
 			}
 			continue
 		}

@@ -3,7 +3,7 @@
 //
 // A host joins by dialling the control plane. A server that this machine reaches only
 // through a ProxyJump or ProxyCommand can rarely dial back. For such a server,
-// machines/install gives a code whose address is https://127.0.0.1:<port> and leaves a
+// hosts/install gives a code whose address is https://127.0.0.1:<port> and leaves a
 // record here. This holds "ssh -N -R" to it, so that address on the server is this
 // control plane's listener. The certificate is checked by its pin, so the name does not
 // matter.

@@ -11,7 +11,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// machine/status (#691 US4, #1387), as DaemonCore+MachineStatus: whether this host is idle, what
+// host/status (#691 US4, #1387), as DaemonCore+MachineStatus: whether this host is idle, what
 // runs, and its next scheduled workflow, said on channel 0 when it changes (on the
 // 15-second tick, and again when the uplink comes back), so a machine provider can stop
 // an idle host and wake it for its next schedule.
@@ -20,7 +20,7 @@ const hostStatusTick = 15 * time.Second
 
 type hostStatusBook struct {
 	statusMu   sync.Mutex
-	toldStatus []byte // what machine/status last said, as sent; nil to say it again
+	toldStatus []byte // what host/status last said, as sent; nil to say it again
 	statusTick sync.Once
 }
 
@@ -70,7 +70,7 @@ func (d *Daemon) nextScheduled() wire.MachineSchedule {
 	return wire.MachineSchedule{At: best.NextFireAt, Workflow: &name}
 }
 
-// reviseHostStatus says machine/status when it has changed, to a control plane this host has.
+// reviseHostStatus says host/status when it has changed, to a control plane this host has.
 func (d *Daemon) reviseHostStatus() {
 	tell := d.tellControl.Load()
 	if tell == nil {
@@ -88,7 +88,7 @@ func (d *Daemon) reviseHostStatus() {
 	}
 	d.statusMu.Unlock()
 	if !same {
-		(*tell)(wire.CallMachineStatus.Name, status)
+		(*tell)(wire.CallHostStatus.Name, status)
 	}
 }
 

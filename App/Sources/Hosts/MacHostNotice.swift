@@ -20,7 +20,7 @@ enum MacHostNotice: Equatable {
     /// the window's own connection, not the host. Try Again dials a fresh one.
     case windowLost
 
-    /// `macState` is this Mac's row in `machines/list` (`online`, `offline`, …), or nil when
+    /// `macState` is this Mac's row in `hosts/list` (`online`, `offline`, …), or nil when
     /// it has no row. `join` is `control/status.thisMacHost`. A plane that is not on this
     /// Mac does not read that file, so a missing join there is not "the process is down".
     /// `windowMissed` is a try of the window's own that failed, so a host that is up is

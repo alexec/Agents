@@ -299,7 +299,7 @@ final class RemoteModel {
     @ObservationIgnored private var otherHosts: [MachineRef: DaemonClient] = [:]
     @ObservationIgnored private var hostWatch: Task<Void, Never>?
     /// The watch's own client of the control plane while it is connected, for the control
-    /// plane's own requests (`machines/start`, #691). Nil against a bridge with no control plane.
+    /// plane's own requests (`hosts/start`, #691). Nil against a bridge with no control plane.
     @ObservationIgnored private(set) var controlPlane: DaemonClient?
     /// People (#994): the machines waiting for this person's approval, fed from the watch.
     let people = PeopleState()
@@ -307,7 +307,7 @@ final class RemoteModel {
     let signIn = SignInState()
     /// The settings and secrets that follow the person to their machines (#1760).
     let userScope = UserScopeState()
-    /// What `machines/list` last said, so the folder list can name each host (058, frame H).
+    /// What `hosts/list` last said, so the folder list can name each host (058, frame H).
     /// Empty when this phone is not a client of a control plane.
     private(set) var controlHosts: [DaemonAPI.ControlMachine] = []
     /// Git asks answered on this device, until the control plane's list drops them (#1122).
@@ -2241,12 +2241,12 @@ final class RemoteModel {
         host(work.agent(id)?.host ?? .mac, has: capability)
     }
 
-    /// A host's row as `machines/list` last said it: its state, and the workspace it runs on (#691).
+    /// A host's row as `hosts/list` last said it: its state, and the workspace it runs on (#691).
     func controlHost(_ host: MachineRef) -> DaemonAPI.ControlMachine? {
         controlHosts.first { $0.id == host }
     }
 
-    /// The hosts whose `machines/start` is out now, so the strip's Start waits for it (#691).
+    /// The hosts whose `hosts/start` is out now, so the strip's Start waits for it (#691).
     private(set) var hostsBeingStarted: Set<MachineRef> = []
     /// Prompts and starts the control plane keeps for stopped workspaces (#691 US3), every host's.
     private(set) var kept: [DaemonAPI.KeptRequest] = []

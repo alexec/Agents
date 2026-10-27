@@ -84,15 +84,15 @@ func TestEveryLineAndByteCounts(t *testing.T) {
 	now := time.Unix(1000, 0)
 	c.now = func() time.Time { return now }
 	for i := range clientLinesBurst {
-		if !c.allow("A", 10, "machines/list") {
+		if !c.allow("A", 10, "hosts/list") {
 			t.Fatalf("refused line %d", i)
 		}
 	}
-	if c.allow("A", 10, "machines/list") {
+	if c.allow("A", 10, "hosts/list") {
 		t.Fatal("a line past the burst went")
 	}
 	// A reply to a host takes no line, and another client has its own.
-	if !c.allow("A", 10, "") || !c.allow("B", 10, "machines/list") {
+	if !c.allow("A", 10, "") || !c.allow("B", 10, "hosts/list") {
 		t.Fatal("refused what is not over its rate")
 	}
 	if !c.allow("C", clientBytesBurst-1, "dropbox/put") || c.allow("C", 2<<20, "") {

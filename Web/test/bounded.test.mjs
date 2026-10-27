@@ -215,7 +215,7 @@ function fakeLink(replies) {
 
 test("hostChanged loads the host it names, once however often it is said, and no other", async () => {
   const hosts = [{ id: "mac", state: "online" }, { id: "box", state: "online" }];
-  const link = fakeLink((method) => (method === "machines/list" ? hosts : method === "agents/list" ? [] : method.endsWith("/pending") ? [] : undefined));
+  const link = fakeLink((method) => (method === "hosts/list" ? hosts : method === "agents/list" ? [] : method.endsWith("/pending") ? [] : undefined));
   const store = new Store(link);
   link.notify("control/hostChanged", { host: "box", state: "online" });
   link.notify("control/hostChanged", { host: "box", state: "online" });
@@ -229,7 +229,7 @@ test("hostChanged loads the host it names, once however often it is said, and no
   hosts.pop();
   link.notify("control/hostChanged", { host: "box", state: "removed" });
   await wait(300);
-  assert.deepEqual(link.asked, ["control machines/list"]);
+  assert.deepEqual(link.asked, ["control hosts/list"]);
   assert.equal(store.agents.value.box, undefined);
 });
 
@@ -237,7 +237,7 @@ test("an Archived fold asks for a page, and a reconnect lists it again rather th
   const hosts = [{ id: "mac", state: "online" }];
   const params = [];
   const link = fakeLink((method, p) => {
-    if (method === "machines/list") return hosts;
+    if (method === "hosts/list") return hosts;
     if (method === "agents/list") { params.push(p); return p.archivedOnly ? [agent("old", "p", 1, { state: "archived" })] : [agent("live", "p", 2)]; }
     if (method.endsWith("/pending")) return [];
     return undefined;
@@ -264,7 +264,7 @@ test("a call that is never answered is given up", async () => {
     authenticate: async () => ({ name: "test" }) });
   l.start();
   await wait(5);
-  await assert.rejects(l.call("machines/list", {}), (error) => error instanceof w.CallTimedOut);
+  await assert.rejects(l.call("hosts/list", {}), (error) => error instanceof w.CallTimedOut);
   l.stop();
 });
 
@@ -430,13 +430,13 @@ test("a heartbeat answered with an error keeps the link (#214)", async () => {
 });
 
 test("a slow call waits longer than an ordinary one, unless a test says otherwise (#291)", () => {
-  assert.equal(w.callTimeoutFor("machines/list"), 30_000);
+  assert.equal(w.callTimeoutFor("hosts/list"), 30_000);
   assert.equal(w.callTimeoutFor("agents/prompt"), 30_000);
   assert.ok(w.callTimeoutFor("folders/clone") > w.callTimeoutFor("agents/start"));
   assert.equal(w.callTimeoutFor("agents/start"), 2 * 60_000);
   assert.equal(w.callTimeoutFor("agents/options"), w.callTimeoutFor("agents/start"));
   assert.equal(w.callTimeoutFor("folders/clone", 20), 20);
-  assert.equal(w.callTimeoutFor("machines/list", 20), 20);
+  assert.equal(w.callTimeoutFor("hosts/list", 20), 20);
 });
 
 test("one start keeps its request until it succeeds (#291)", () => {
@@ -545,7 +545,7 @@ test("a workflow whose runs-on: names other computers leaves this host's list (#
 test("a reconnect lists the workflow folds still open, and no other (#291)", async () => {
   const listed = [];
   const link = fakeLink((method, params) => {
-    if (method === "machines/list") return [{ id: "mac", state: "online" }];
+    if (method === "hosts/list") return [{ id: "mac", state: "online" }];
     if (method === "agents/list") return [];
     if (method === "workflows/list") { listed.push(params.folder); return []; }
     if (method.endsWith("/pending")) return [];
@@ -564,7 +564,7 @@ test("a reconnect lists the workflow folds still open, and no other (#291)", asy
 
 test("a host removed takes its pages, runtimes and leases with it (#291)", async () => {
   const hosts = [{ id: "mac", state: "online" }, { id: "box", state: "online" }];
-  const link = fakeLink((method) => (method === "machines/list" ? hosts : undefined));
+  const link = fakeLink((method) => (method === "hosts/list" ? hosts : undefined));
   const store = new Store(link);
   store.pageRevisions.value = { "box|file:///w/p": 4, "mac|file:///w/p": 5 };
   store.runtimes.value = { box: [], mac: [] };
@@ -594,7 +594,7 @@ test("loading a host and reloading it do not list its agents at once (#291)", as
     onNotification(listener) { notify = listener; },
     onState() {},
     call(method) {
-      if (method === "machines/list") return Promise.resolve(hosts);
+      if (method === "hosts/list") return Promise.resolve(hosts);
       if (method === "agents/list") {
         inflight += 1;
         max = Math.max(max, inflight);

@@ -41,10 +41,11 @@ control/status
     "host.policy/1",
     "host.suspend/1",
     "host.update/1",
+    "host/1",
     "hosts.join/1",
+    "hosts/1",
     "links/1",
     "liveactivity/1",
-    "machine/1",
     "machines/1",
     "org-identity/1",
     "org-routes/1",
@@ -78,7 +79,7 @@ control/status
   "joinCommand": "curl -fsSL <url>/v1/install.sh | sh -s -- --join '<url>' '-' '<uuid>'"
 }
 
-machines/list
+hosts/list
 [
   {
     "id": "<host a>",
@@ -189,7 +190,7 @@ clients/connections
   }
 ]
 
-machines/startEnroll
+hosts/startEnroll
 {
   "text": "<secret>",
   "expires": <date>,
@@ -211,7 +212,7 @@ devices/startPairing
 clients/stopPairing
 {}
 
-machines/lastHeard
+hosts/lastHeard
 {
   "host": "<host a>"
 }
@@ -225,13 +226,13 @@ control/setFolderDetection
   ]
 }
 
-machines/lendSignIn
+hosts/lendSignIn
 {}
 
-machines/lendGit
+hosts/lendGit
 {}
 
-machines/setRelay
+hosts/setRelay
 {}
 
 control/status
@@ -272,10 +273,11 @@ control/status
     "host.policy/1",
     "host.suspend/1",
     "host.update/1",
+    "host/1",
     "hosts.join/1",
+    "hosts/1",
     "links/1",
     "liveactivity/1",
-    "machine/1",
     "machines/1",
     "org-identity/1",
     "org-routes/1",
@@ -309,7 +311,7 @@ control/status
   "joinCommand": "curl -fsSL <url>/v1/install.sh | sh -s -- --join '<url>' '-' '<uuid>'"
 }
 
-machines/list
+hosts/list
 [
   {
     "id": "<host a>",
@@ -368,13 +370,13 @@ clients/setGrant refused
   "message": "Every paired client may do everything now, so there is no grant to change. Update this window to lose the choice."
 }
 
-machines/remove refused
+hosts/remove refused
 {
   "code": -32091,
   "message": "No machine is called nobody."
 }
 
-machines/update refused
+hosts/update refused
 {
   "code": -32091,
   "message": "There is no such host."

@@ -56,11 +56,11 @@ func notFound(method string) *RPCError {
 var noSSHHere = fail(notSupported, "This control plane runs on our servers, which have no ssh of yours. Add a machine with its join command or a code, or from a machine provider.")
 
 // overSSH are the methods that reach a machine over this machine's ssh.
-var overSSH = map[string]bool{"machines/install": true, "machines/detect": true, "machines/sshHosts": true}
+var overSSH = map[string]bool{"hosts/install": true, "hosts/detect": true, "hosts/sshHosts": true}
 
 // ownersSSH are the methods that log in with this account's ssh: its config, agent and
 // known_hosts. That ssh is the local owner's, so no other person, admin or not, uses it.
-var ownersSSH = map[string]bool{"machines/install": true, "machines/detect": true, "machines/sshHosts": true, "machines/update": true}
+var ownersSSH = map[string]bool{"hosts/install": true, "hosts/detect": true, "hosts/sshHosts": true, "hosts/update": true}
 
 // notOwnersSSH is the answer to another person who calls one of ownersSSH.
 var notOwnersSSH = fail(notPermitted, "Only the control plane's owner can use its ssh. Add a machine with its join command or a code.")

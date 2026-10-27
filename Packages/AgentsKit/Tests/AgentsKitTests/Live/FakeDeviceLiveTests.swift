@@ -55,7 +55,7 @@ struct FakeDeviceLiveTests {
         let control = DaemonClient(link: wrapped.controlLink)
         try await control.connect(startIfNeeded: false)
         let hosts = try await control.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlMachine].self)
-        print("fake-device: machines/list → \(hosts.map { "\($0.name) (\($0.id), \($0.state))" })")
+        print("fake-device: hosts/list → \(hosts.map { "\($0.name) (\($0.id), \($0.state))" })")
         for host in hosts where host.state == "online" && host.relay != true {
             let there = DaemonClient(link: wrapped.link(for: host.id))
             try await there.connect(startIfNeeded: false)

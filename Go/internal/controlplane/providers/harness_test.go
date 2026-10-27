@@ -125,7 +125,7 @@ func (r *fakeRouter) HasSession(session string) bool {
 
 func (r *fakeRouter) Holds(host string) bool { return r.Online(host) }
 
-// row is a machines/list row, as far as the tests read it.
+// row is a hosts/list row, as far as the tests read it.
 type row struct {
 	ID        string
 	State     string

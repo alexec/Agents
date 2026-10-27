@@ -770,7 +770,7 @@ func (r *Records) AddHost(ctx context.Context, h MachineRecord) error {
 	return nil
 }
 
-// RemoveHost is machines/remove: a tombstone. It says whether there was such a host.
+// RemoveHost is hosts/remove: a tombstone. It says whether there was such a host.
 func (r *Records) RemoveHost(ctx context.Context, id string) (bool, error) {
 	r.writing.Lock()
 	defer r.writing.Unlock()

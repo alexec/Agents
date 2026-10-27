@@ -13,14 +13,14 @@ import (
 )
 
 // DetectedServer is DaemonAPI.DetectedServer: one host in the ssh config (its Host name,
-// and user@hostname:port as `ssh -G` resolved it), what machines/detect did with it, and why,
+// and user@hostname:port as `ssh -G` resolved it), what hosts/detect did with it, and why,
 // in words, when it was not added (#429).
 type DetectedServer = wire.DetectedServer
 
 // Outcome is DaemonAPI.DetectedServer.Outcome.
 type Outcome = string
 
-// The outcomes of machines/detect.
+// The outcomes of hosts/detect.
 const (
 	// Added: it answered and was installed. It joins by itself.
 	Added Outcome = "added"
@@ -121,13 +121,13 @@ func (i *Installer) detector() detector {
 	}
 }
 
-// Detect is machines/detect (#429): every server in the ssh config that answers, added
+// Detect is hosts/detect (#429): every server in the ssh config that answers, added
 // without being typed in. The reply is []DetectedServer.
 func (i *Installer) Detect(ctx context.Context) (any, error) {
 	return i.detector().run(ctx), nil
 }
 
-// SSHHosts is machines/sshHosts (#610). The reply is []SSHHost. destination "" is every
+// SSHHosts is hosts/sshHosts (#610). The reply is []SSHHost. destination "" is every
 // host in the config; otherwise just that, as typed.
 func (i *Installer) SSHHosts(ctx context.Context, destination string) (any, error) {
 	return i.detector().sshHosts(ctx, trimSpaces(destination)), nil
@@ -160,7 +160,7 @@ func isKnown(host Resolved, known map[string]bool) bool {
 //     Hosts behind one stay, and are probed through it.
 //  3. A host the control plane has by that name is left alone.
 //  4. The rest are probed, a few at once. One that does not answer is not added.
-//  5. What answered is installed as machines/install would with no key, trusting the host
+//  5. What answered is installed as hosts/install would with no key, trusting the host
 //     key the person's known_hosts already has. One with Agents installed already is
 //     joined the same way (#485).
 func (d detector) run(ctx context.Context) []DetectedServer {

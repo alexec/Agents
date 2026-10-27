@@ -116,7 +116,7 @@ func deliver(t *testing.T, d *Daemon, routes ...wire.DeliveredRoute) {
 		routes = []wire.DeliveredRoute{}
 	}
 	b, _ := json.Marshal(wire.OrgRouteDelivery{Routes: routes, At: now()})
-	d.Told(wire.NotifyMachineOrgRoutes.Name, b)
+	d.Told(wire.NotifyHostOrgRoutes.Name, b)
 }
 
 // fakeProvider is a model provider on loopback: it keeps each request's headers, path and
@@ -254,7 +254,7 @@ func TestNoOrgRouteChangesNothing(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if !slices.Contains(told, wire.CallMachineOrgRoutesApplied.Name) {
+	if !slices.Contains(told, wire.CallHostOrgRoutesApplied.Name) {
 		t.Fatalf("%v", told)
 	}
 	if !slices.Contains(d.Capabilities(), wire.CapHostOrgRoutes1) {
@@ -649,7 +649,7 @@ func TestTheOrgPathOnly(t *testing.T) {
 	root := t.TempDir()
 	d, c, public := orgMachine(t, root, k)
 	os.MkdirAll(d.SettingsDir, 0o755)
-	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 1, map[string]any{
+	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 1, map[string]any{
 		"runtimes": map[string]any{"claude": map[string]any{"reach": []string{"orgKey", "gateway"}}}, "requires": []string{wire.CapHostPolicy1, wire.CapHostOrgRoutes1}}))
 	dir := t.TempDir()
 	// No route here yet: refused with orgRouteMissing.
@@ -722,7 +722,7 @@ func TestTheOrgPathOnly(t *testing.T) {
 		t.Fatalf("%v", e)
 	}
 	// A looser policy: the own sign-in comes back.
-	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 2, map[string]any{}))
+	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 2, map[string]any{}))
 	p := startParams(dir, "claude", nil)
 	p["accountID"] = "default"
 	c.call(t, 30, "agents/start", p)
@@ -867,7 +867,7 @@ func TestOrgRoutesOffline(t *testing.T) {
 	deadline := time.Now().Add(5 * time.Second)
 	for {
 		mu.Lock()
-		ok := slices.Contains(asked, wire.CallMachineOrgRoutesAgain.Name)
+		ok := slices.Contains(asked, wire.CallHostOrgRoutesAgain.Name)
 		mu.Unlock()
 		if ok {
 			break
@@ -910,13 +910,13 @@ func TestAntigravityTermsByPolicy(t *testing.T) {
 	d, c, _ := orgMachine(t, root, k)
 	dir := t.TempDir()
 	for i, terms := range []string{"show", "accepted"} {
-		d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, int64(1+i), map[string]any{"notices": map[string]any{"antigravityTerms": terms},
+		d.Told(wire.NotifyHostPolicy.Name, k.signed(t, int64(1+i), map[string]any{"notices": map[string]any{"antigravityTerms": terms},
 			"requires": []string{wire.CapHostPolicy1, wire.CapHostOrgRoutes1}}))
 		if err := d.runtimeRefusal(d.orgPolicy(), "antigravity"); err != nil {
 			t.Fatalf("%s: %v", terms, err)
 		}
 	}
-	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 3, map[string]any{"notices": map[string]any{"antigravityTerms": "refuse"},
+	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 3, map[string]any{"notices": map[string]any{"antigravityTerms": "refuse"},
 		"requires": []string{wire.CapHostPolicy1, wire.CapHostOrgRoutes1}}))
 	e := c.callError(t, 1, "agents/start", startParams(dir, "antigravity", nil))
 	refused(t, e, "policy", "notices.antigravityTerms")

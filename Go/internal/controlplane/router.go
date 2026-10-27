@@ -48,7 +48,7 @@ type Handler interface {
 	Handles(method string) bool
 	// Handle answers a request from a client for the control plane itself.
 	Handle(method string, params json.RawMessage, from Caller) (any, error)
-	// HostSaid answers a request on a host's channel 0: machine/hello, attention/need.
+	// HostSaid answers a request on a host's channel 0: host/hello, attention/need.
 	HostSaid(host, method string, params json.RawMessage) (any, error)
 }
 
@@ -105,7 +105,7 @@ type Router struct {
 	keeper keeper
 	// Kept requests asked, in the order they came.
 	keeping chan func()
-	// Told each host's answer to a whole list (#962), for machines/lastHeard: host, method,
+	// Told each host's answer to a whole list (#962), for hosts/lastHeard: host, method,
 	// the reply line. Nil where none is kept.
 	copier func(host, method, reply string)
 	// The organisation's policy's check of a call to a machine (#998): it reads only memory.
@@ -266,7 +266,7 @@ func describe(host string, s hostState) map[string]any {
 	return params
 }
 
-// Described is a host's state as machines/list and control/hostChanged say it, with its
+// Described is a host's state as hosts/list and control/hostChanged say it, with its
 // workspace laid over it (#691).
 func (r *Router) Described(host string) map[string]any {
 	r.mu.Lock()
@@ -769,7 +769,7 @@ func (r *Router) OnLocalEnded(f func(string)) {
 	r.mu.Unlock()
 }
 
-// ForgetHost is machines/remove (FR-014): its uplink closes and it is forgotten. Its agents
+// ForgetHost is hosts/remove (FR-014): its uplink closes and it is forgotten. Its agents
 // are left as they are.
 func (r *Router) ForgetHost(host string) {
 	r.mu.Lock()
@@ -1741,7 +1741,7 @@ func (r *Router) SetCopier(f func(host, method, reply string)) {
 	r.mu.Unlock()
 }
 
-// toControl answers on its own goroutine: machines/install takes minutes, and nothing else
+// toControl answers on its own goroutine: hosts/install takes minutes, and nothing else
 // this client says may wait behind it.
 func (r *Router) toControl(msg, sessionID string, wrapped bool) {
 	m, ok := decode(msg)

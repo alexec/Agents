@@ -15,14 +15,14 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// deliveries is every machine/userSettings each machine was told, by machine.
+// deliveries is every host/userSettings each machine was told, by machine.
 type deliveries struct {
 	mu  sync.Mutex
 	got map[string][]wire.MachineUserSettings
 }
 
 func (d *deliveries) heard(host, method string, params json.RawMessage) {
-	if method != wire.NotifyMachineUserSettings.Name {
+	if method != wire.NotifyHostUserSettings.Name {
 		return
 	}
 	var u wire.MachineUserSettings
@@ -51,7 +51,7 @@ func secretsOf(u wire.MachineUserSettings) map[string]string {
 	return out
 }
 
-// takingHello is a machine that writes machine/userSettings (it serves settings/userPart).
+// takingHello is a machine that writes host/userSettings (it serves settings/userPart).
 func takingHello(name string) controllink.MachineHello {
 	hello := fakeHello(name)
 	hello.Capabilities = append(slices.Clone(hello.Capabilities), CapHostUserSettings)
@@ -181,7 +181,7 @@ func TestSettingsAndSecretsGoOnlyToTheirPersonsMachines(t *testing.T) {
 	}
 
 	// Removed, a machine is sent nothing more, and Sam hears what was on it (FR-026).
-	call(t, sam.window, "", "machines/remove", wire.MachineRequest{Host: wire.MachineRef(next.member.Host)})
+	call(t, sam.window, "", "hosts/remove", wire.MachineRequest{Host: wire.MachineRef(next.member.Host)})
 	note := waitNote(t, sam.window, wire.NotifyControlSecretsLeft.Name)
 	var left wire.SecretsLeft
 	json.Unmarshal(note.Params, &left)

@@ -30,7 +30,7 @@ func TestUserSettingsGoIntoTheMachinesFiles(t *testing.T) {
 		Runtimes:    json.RawMessage(`{"sandbox":{"defaults":{"claude":"on"}}}`),
 		CostLimits:  json.RawMessage(`{"dailyTokens":5000}`),
 	}, Secrets: []wire.UserSecret{{Name: "GITHUB_TOKEN", Value: "ghp_sams"}}}
-	d.Told(wire.NotifyMachineUserSettings.Name, mustJSON(sent))
+	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(sent))
 
 	read := func(parts ...string) string {
 		b, _ := os.ReadFile(filepath.Join(parts...))
@@ -74,7 +74,7 @@ func TestUserSettingsGoIntoTheMachinesFiles(t *testing.T) {
 	sent.Settings.AgentConfig = mustJSON(wire.UserAgentConfig{Instructions: &instructions})
 	sent.Settings.CostLimits = nil
 	sent.Secrets = nil
-	d.Told(wire.NotifyMachineUserSettings.Name, mustJSON(sent))
+	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(sent))
 	if _, err := os.Stat(filepath.Join(home, ".agents", "personas", "reviewer.md")); !os.IsNotExist(err) {
 		t.Fatal("the persona is still there")
 	}
@@ -93,7 +93,7 @@ func TestAgentConfigFilesAreAppliedAndMarkedWithoutContents(t *testing.T) {
 	d, _ := start(t, root)
 	defer d.Shutdown()
 	contents := base64.StdEncoding.EncodeToString([]byte("Follow the shared rules."))
-	d.Told(wire.NotifyMachineUserSettings.Name, mustJSON(wire.MachineUserSettings{
+	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(wire.MachineUserSettings{
 		User: "sam",
 		Settings: wire.UserSettings{AgentConfigFiles: &wire.AgentConfigFiles{Files: []wire.AgentConfigFile{{
 			Path: "skills/review/SKILL.md", Contents: &contents, Time: 10, Machine: "other", Digest: "abc",

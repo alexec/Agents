@@ -22,7 +22,7 @@ import (
 
 // The toolset installer on a control-plane host (#1136): what AgentsKit's
 // ToolsetInstaller puts on a server the window holds over ssh (043, 046), done by
-// machines/install instead, so a server added through the control plane can run a runtime
+// hosts/install instead, so a server added through the control plane can run a runtime
 // with nothing installed by the person.
 //
 // The server downloads it itself (D2): Node.js from nodejs.org, checked against the
@@ -45,7 +45,7 @@ const (
 // scripts, and nothing said about audits or funding.
 var npmCIArguments = []string{"ci", "--ignore-scripts", "--omit=dev", "--no-audit", "--no-fund"}
 
-// DefaultToolsets are the runtimes machines/install puts on a server when the Installer
+// DefaultToolsets are the runtimes hosts/install puts on a server when the Installer
 // names none: Claude, the default runtime. Each is about 500 MB and a minute of npm.
 var DefaultToolsets = []string{"claude"}
 

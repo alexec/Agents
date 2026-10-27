@@ -89,7 +89,7 @@ func main() {
 		fmt.Println("paired as", m.Client)
 	case "hosts":
 		s := session(ctx)
-		r, err := s.Call(ctx, "", "machines/list", nil)
+		r, err := s.Call(ctx, "", "hosts/list", nil)
 		out(r, err)
 	case "call":
 		if len(rest) < 1 {
@@ -151,8 +151,8 @@ func out(r json.RawMessage, err error) {
 // lend is what the window does on -32036 (Lending.swift): the control plane lets the
 // lender lend, the lender grants a stand-in and its CA, the borrower is offered them.
 func lend(ctx context.Context, s *controllink.Session, host, from, runtime string) {
-	if _, err := s.Call(ctx, "", "machines/lendSignIn", map[string]any{"host": host, "from": from, "runtime": runtime, "allowed": true}); err != nil {
-		die("machines/lendSignIn: %v", err)
+	if _, err := s.Call(ctx, "", "hosts/lendSignIn", map[string]any{"host": host, "from": from, "runtime": runtime, "allowed": true}); err != nil {
+		die("hosts/lendSignIn: %v", err)
 	}
 	g, err := s.Call(ctx, from, "relay/grant", map[string]any{"runtime": runtime})
 	if err != nil {

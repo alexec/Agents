@@ -277,7 +277,7 @@ struct ControlRouterTests {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
         let host = await connectHost(router, home)
         let remote = await connectClient(router, client(.iPhone))
-        try remote.send(#"{"jsonrpc":"2.0","id":4,"method":"machines/list"}"#)
+        try remote.send(#"{"jsonrpc":"2.0","id":4,"method":"hosts/list"}"#)
         await eventually { !remote.lines.isEmpty }
         try #require(!remote.lines.isEmpty)
         #expect(remote.lines[0].contains("control"))

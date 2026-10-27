@@ -9,7 +9,7 @@ public protocol ControlHandling: Sendable {
     /// A request from a client for the control plane itself. Any paired client may ask
     /// any of them (#111); a method with a rule of its own keeps it in the handler.
     func handle(method: String, params: JSONValue?, from caller: ControlRouter.Caller) async throws -> JSONValue
-    /// A request on a host's channel 0: `machine/hello`, `attention/need`.
+    /// A request on a host's channel 0: `host/hello`, `attention/need`.
     func hostSaid(_ host: MachineRef, method: String, params: JSONValue?) async throws -> JSONValue
 }
 
@@ -92,7 +92,7 @@ public actor ControlRouter {
     private var workspaces: [MachineRef: DaemonAPI.MachineWorkspace] = [:]
     /// Keeps a prompt or agent start for a stopped host (#691 US3); nil where nothing is kept.
     private var keeper: (any KeptHandling)?
-    /// Told each host's answer to a whole list (#962), for `machines/lastHeard`; nil where none is kept.
+    /// Told each host's answer to a whole list (#962), for `hosts/lastHeard`; nil where none is kept.
     private var copier: (@Sendable (MachineRef, String, String) -> Void)?
     /// The last keep asked for, so kept requests are stored in the order they came.
     private var keeping: Task<Void, Never>?
@@ -836,7 +836,7 @@ public actor ControlRouter {
         guard let caller = clients[sessionID]?.caller,
               case .request(let id, let method, let params)? = try? JSONRPCCodec.decode(line: message) else { return }
         let handler = self.handler
-        // Its own task: `machines/install` takes minutes, and nothing else this client says
+        // Its own task: `hosts/install` takes minutes, and nothing else this client says
         // may wait behind it.
         Task.detached { [weak self] in
             let reply: JSONRPCMessage

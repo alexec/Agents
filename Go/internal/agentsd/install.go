@@ -36,7 +36,7 @@ import (
 //
 // A Mac host installs into <cache>/tools (install_darwin.go). A Linux host (#1312) installs
 // the Node toolsets the shown command left in ~/.agents-server/toolsets into
-// ~/.agents-server/tools, where machines/install over ssh puts them (install_linux.go). The
+// ~/.agents-server/tools, where hosts/install over ssh puts them (install_linux.go). The
 // recipes are here so they test anywhere.
 
 // nodeDistURL is where Node is published; a test serves its own.

@@ -197,7 +197,7 @@ function BotMachineSheet({ store, bot, close }: { store: Store; bot: PersonRow; 
   const problem = useSignal<string | null>(null);
   const copied = useSignal(false);
   useEffect(() => {
-    store.link.call("machines/startEnroll", { as: bot.id })
+    store.link.call("hosts/startEnroll", { as: bot.id })
       .then((code) => { shown.value = code; })
       .catch((error) => { problem.value = sentence(error); });
   }, [bot.id]);

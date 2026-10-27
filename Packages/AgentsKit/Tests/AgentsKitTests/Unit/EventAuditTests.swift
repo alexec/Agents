@@ -76,7 +76,7 @@ struct EventAuditTests {
         let lines = [
             #"{"id":"1","at":0,"action":"Stopped an agent","method":"agents/stop","host":"H1","target":"A1","actor":{"user":"u","userName":"Bea, admin"}}"#,
             "not json",
-            #"{"id":"2","at":60,"action":"Approved","method":"machines/approveJoin","actor":{"user":"b","event":{"kind":"schedule","id":"w"}}}"#,
+            #"{"id":"2","at":60,"action":"Approved","method":"hosts/approveJoin","actor":{"user":"b","event":{"kind":"schedule","id":"w"}}}"#,
         ].joined(separator: "\n")
         let csv = AuditWords.csv(lines) { "\($0.rawValue)'s box" }.trimmingCharacters(in: .newlines).components(separatedBy: "\n")
         try #require(csv.count == 3)

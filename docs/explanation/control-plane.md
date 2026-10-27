@@ -154,9 +154,9 @@ nothing changes.
   signs it with its key (ECDSA P-256, the key that machines already trust). Any copy can send
   the signed policy without the key. At a key rotation, the control plane signs the policy
   again with the new key.
-- **Sent to every machine.** A machine that says the capability `machine.policy/1` gets the
+- **Sent to every machine.** A machine that says the capability `host.policy/1` gets the
   policy on its channel 0 when it connects, and within 5 seconds of each change, on every
-  copy. It tells the control plane which version it keeps (`machine/policyApplied`). A machine
+  copy. It tells the control plane which version it keeps (`host/policyApplied`). A machine
   that does not say the capability gets nothing.
 - **Only an admin changes it.** `policy/set` saves the rules, and fails when another admin
   saved first. `policy/stopAll` turns the kill switch on or off. `policy/raise` raises one
@@ -332,7 +332,7 @@ the machine to connect. See [Start machines from Agents](../how-to/start-machine
 Providers run on the control plane, not on a machine, because the machine is what is down. Their
 secrets stay in the control plane's own folder, never in its store. A machine linked to a
 workspace adds three states to the usual ones: **stopped**, **starting** and **stopping**.
-Every client draws them, from the same `machines/list` and `control/hostChanged` as the rest.
+Every client draws them, from the same `hosts/list` and `control/hostChanged` as the rest.
 
 A prompt or a new agent for a stopped workspace's machine is **kept** by the control plane, in
 its store, and the workspace is started. When the machine connects, the control plane sends each

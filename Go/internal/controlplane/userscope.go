@@ -21,7 +21,7 @@ import (
 // a person's own clients change them; a machine only receives them, so a machine taken over
 // cannot put an MCP server (a command) on its person's other machines.
 
-// CapHostUserSettings is what a machine says when it writes machine/userSettings into its
+// CapHostUserSettings is what a machine says when it writes host/userSettings into its
 // ~/.agents and ~/.agents-secrets. A machine that does not say it is sent nothing: no
 // secret goes where it would not be used.
 const CapHostUserSettings = wire.CapHostUserSettings1
@@ -154,7 +154,7 @@ func (s *Service) userChangedHere(user string, parts []wire.UserSettingsPartName
 	}
 }
 
-// takesUserSettings says a machine writes machine/userSettings.
+// takesUserSettings says a machine writes host/userSettings.
 func (s *Service) takesUserSettings(host string) bool {
 	h := s.records.Host(host)
 	return h != nil && slices.Contains(hostCapabilities(*h), CapHostUserSettings)
@@ -191,7 +191,7 @@ func (s *Service) sendUserSettings(host string, always bool) {
 	}
 	// The person may have changed while the secrets were opened: a machine that is no
 	// longer theirs is sent nothing.
-	if s.records.Host(host) == nil || s.ownerOf(host) != user || !s.router.Tell(host, wire.NotifyMachineUserSettings.Name, delivery) {
+	if s.records.Host(host) == nil || s.ownerOf(host) != user || !s.router.Tell(host, wire.NotifyHostUserSettings.Name, delivery) {
 		s.toldUsers.mu.Lock()
 		delete(s.toldUsers.last, host)
 		s.toldUsers.mu.Unlock()

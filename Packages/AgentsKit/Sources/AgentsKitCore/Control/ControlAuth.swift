@@ -65,7 +65,7 @@ public enum ControlAuth {
         /// who has heard of a move. Nil from a build that keeps none.
         public var epoch: Int?
         /// What a client has (#1748), so the control plane can tell one too old for it. Nil
-        /// from a host, which says its own in `machine/hello`.
+        /// from a host, which says its own in `host/hello`.
         public var capabilities: [String]?
         /// With an `s:` identity (#995): the key of the client that signs in, X9.63.
         public var publicKey: Data?

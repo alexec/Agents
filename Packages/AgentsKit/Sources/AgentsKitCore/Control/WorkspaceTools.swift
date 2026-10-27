@@ -5,10 +5,10 @@ import Foundation
 /// them as a client's would. Making and deleting ask the person first, on the daemon.
 public extension DaemonAPI.Method {
     /// `MachineWorkspaceCall`, a host to its control plane on channel 0.
-    static let hostMachines = "machine/machines"
+    static let hostMachines = "host/machines"
     /// `{}` → `AgentMachines`: what an agent is shown, never a secret's name.
     static let machinesForAgent = "machines/forAgent"
-    /// What an agent may ask of the control plane through `machine/machines`.
+    /// What an agent may ask of the control plane through `host/machines`.
     static let agentWorkspaceMethods: Set<String> = [
         machinesForAgent, hostsStart, hostsStop, providersOptions, providersCreate, hostsDeleteMachine,
     ]
@@ -41,7 +41,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// `machine/machines`: a control plane method, for an agent on this host.
+    /// `host/machines`: a control plane method, for an agent on this host.
     struct MachineWorkspaceCall: Codable, Sendable, Hashable {
         /// Who asked, for the control plane's log: "Claude (fix-login)".
         public var agent: String

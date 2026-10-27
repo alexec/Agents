@@ -5,7 +5,7 @@ import Foundation
 /// person said yes for that host and git server. The credential is used for one git
 /// command and kept nowhere.
 public extension DaemonAPI {
-    /// `machines/lendGit`.
+    /// `hosts/lendGit`.
     struct LendGit: Codable, Sendable, Hashable {
         public var host: MachineRef
         public var from: MachineRef
@@ -20,7 +20,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// One ask on a `machines/list` row: the host's git wants `from`'s git access for `server`.
+    /// One ask on a `hosts/list` row: the host's git wants `from`'s git access for `server`.
     struct GitAsk: Codable, Sendable, Hashable {
         public var server: String
         public var from: MachineRef

@@ -119,20 +119,20 @@ const (
 	MethodDraftStart        = "providers/draftStart"
 	MethodDraftCancel       = "providers/draftCancel"
 	MethodDraftAnswer       = "providers/draftAnswer"
-	MethodHostsLink         = "machines/link"
-	MethodHostsUnlink       = "machines/unlink"
-	MethodHostsSetOptions   = "machines/setMachineOptions"
-	MethodHostsStart        = "machines/start"
-	MethodHostsStop         = "machines/stop"
-	MethodHostsDelete       = "machines/deleteMachine"
-	MethodHostsKeep         = "machines/keep"
-	MethodHostsListKept     = "machines/listKept"
-	MethodHostsDropKept     = "machines/dropKept"
-	MethodHostsRetryKept    = "machines/retryKept"
+	MethodHostsLink         = "hosts/link"
+	MethodHostsUnlink       = "hosts/unlink"
+	MethodHostsSetOptions   = "hosts/setMachineOptions"
+	MethodHostsStart        = "hosts/start"
+	MethodHostsStop         = "hosts/stop"
+	MethodHostsDelete       = "hosts/deleteMachine"
+	MethodHostsKeep         = "hosts/keep"
+	MethodHostsListKept     = "hosts/listKept"
+	MethodHostsDropKept     = "hosts/dropKept"
+	MethodHostsRetryKept    = "hosts/retryKept"
 	MethodWorkspacesAgent   = "machines/forAgent"
-	MethodHostMachines      = "machine/machines"
-	MethodHostProviderDraft = "machine/providerDraft"
-	MethodHostStatus        = "machine/status"
+	MethodHostMachines      = "host/machines"
+	MethodHostProviderDraft = "host/providerDraft"
+	MethodHostStatus        = "host/status"
 	MethodAgentsPrompt      = "agents/prompt"
 	MethodAgentsStart       = "agents/start"
 	MethodAgentsStop        = "agents/stop"
@@ -158,7 +158,7 @@ var WorkspaceMethods = map[string]bool{
 }
 
 // AgentWorkspaceMethods is DaemonAPI.Method.agentWorkspaceMethods: what an agent may ask
-// through machine/machines.
+// through host/machines.
 var AgentWorkspaceMethods = map[string]bool{
 	MethodWorkspacesAgent: true, MethodHostsStart: true, MethodHostsStop: true, MethodProvidersOptions: true,
 	MethodProvidersCreate: true, MethodHostsDelete: true,
@@ -226,14 +226,14 @@ func MayBe(w MachineInfo, hostName string) bool {
 // its commands, headers or secrets' values.
 type ProviderSummary = wire.ProviderSummary
 
-// MachineWorkspace is DaemonAPI.MachineWorkspace: a linked host's workspace, on its machines/list
+// MachineWorkspace is DaemonAPI.MachineWorkspace: a linked host's workspace, on its hosts/list
 // row and in control/hostChanged. HostState is stopped, starting or stopping: shown over
 // the uplink's own state while it is not online, and stopping always. Phase, while
 // starting, is provider, connecting or sshStart.
 type MachineWorkspace = wire.MachineWorkspace
 
 // Overlay is ControlRouter.described's part for workspaces: a host's description as
-// machines/list and control/hostChanged say it, with its workspace laid over it. The
+// hosts/list and control/hostChanged say it, with its workspace laid over it. The
 // workspace's hostState names the state while the host is not online, and stopping
 // whatever it is.
 func Overlay(described map[string]any, online bool, ws *MachineWorkspace) map[string]any {
@@ -270,7 +270,7 @@ type providerRequest = wire.ProviderRequest
 
 type hostRequest = wire.MachineRequest
 
-// MachineLink is DaemonAPI.MachineLink: machines/link.
+// MachineLink is DaemonAPI.MachineLink: hosts/link.
 type MachineLink = wire.MachineLink
 
 // MachineOptions is DaemonAPI.MachineOptions. stopWhenIdleMinutes 0 turns it off.
@@ -285,10 +285,10 @@ type ProviderCreate = wire.ProviderCreate
 // ProviderCreated is DaemonAPI.ProviderCreated: what providers/create made.
 type ProviderCreated = wire.ProviderCreated
 
-// MachineStop is DaemonAPI.MachineStop: machines/stop.
+// MachineStop is DaemonAPI.MachineStop: hosts/stop.
 type MachineStop = wire.MachineStop
 
-// MachineWorkspaceCall is DaemonAPI.MachineWorkspaceCall: machine/machines, for an agent there.
+// MachineWorkspaceCall is DaemonAPI.MachineWorkspaceCall: host/machines, for an agent there.
 // Agent is who asked, for the log: "Claude (fix-login)".
 type MachineWorkspaceCall = wire.MachineWorkspaceCall
 
@@ -301,7 +301,7 @@ type AgentProvider = wire.AgentMachinesProvider
 // AgentWorkspace is DaemonAPI.AgentMachines.Workspace.
 type AgentWorkspace = wire.AgentMachinesMachine
 
-// MachineStatus is DaemonAPI.MachineStatus: machine/status on channel 0 (#691 US4). Running is
+// MachineStatus is DaemonAPI.MachineStatus: host/status on channel 0 (#691 US4). Running is
 // "Claude (fix-login)" for each agent working or waiting on a person; Schedule is nil from
 // a host from before #1004, and empty when nothing is scheduled.
 type MachineStatus = wire.MachineStatus

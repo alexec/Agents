@@ -157,7 +157,7 @@ public struct ProviderRecord: Codable, Hashable, Sendable, Identifiable {
 /// executable. Absent on a control plane with several copies (research R4).
 public protocol WorkspaceHandling: Sendable {
     func answer(method: String, params: JSONValue?, from caller: ControlRouter.Caller) async throws -> JSONValue
-    /// A host said whether it is idle (`machine/status`, #691 US4).
+    /// A host said whether it is idle (`host/status`, #691 US4).
     func heard(_ host: MachineRef, status: DaemonAPI.MachineStatus) async
     /// An agent on `host` asked through its workspace tools (US6): one of
     /// `agentWorkspaceMethods`, logged as that agent's.
@@ -185,21 +185,21 @@ public extension DaemonAPI.Method {
     /// `{id?}`: list again, said as `control/providersChanged`.
     static let providersRefresh = "providers/refresh"
     /// `MachineLink` → `ControlMachine`. A workspace linked to another host moves here.
-    static let hostsLink = "machines/link"
+    static let hostsLink = "hosts/link"
     /// `MachineRequest` → `ControlMachine`.
-    static let hostsUnlink = "machines/unlink"
+    static let hostsUnlink = "hosts/unlink"
     /// `MachineOptions` → `ControlMachine`.
-    static let hostsSetMachineOptions = "machines/setMachineOptions"
+    static let hostsSetMachineOptions = "hosts/setMachineOptions"
     /// `MachineRequest` → `ControlMachine`, at once; the start goes on, said as `control/hostChanged`.
-    static let hostsStart = "machines/start"
+    static let hostsStart = "hosts/start"
     /// `MachineStop` → `ControlMachine`, at once.
-    static let hostsStop = "machines/stop"
+    static let hostsStop = "hosts/stop"
     /// `ProviderRequest` → `ProviderOptions`: the New Machine form (US5).
     static let providersOptions = "providers/options"
     /// `ProviderCreate` → `ProviderCreated`, once the provider has made it (US5).
     static let providersCreate = "providers/create"
     /// `MachineRequest` → `{}`: its workspace deleted, then the host removed (US5).
-    static let hostsDeleteMachine = "machines/deleteMachine"
+    static let hostsDeleteMachine = "hosts/deleteMachine"
 
     /// Every method the control plane's workspace part answers.
     static let workspaceMethods: Set<String> = [
@@ -316,7 +316,7 @@ public extension DaemonAPI {
         public var usable: Bool { mayUse ?? true }
     }
 
-    /// A linked host's workspace, on its `machines/list` row and in `control/hostChanged`.
+    /// A linked host's workspace, on its `hosts/list` row and in `control/hostChanged`.
     struct MachineWorkspace: Codable, Sendable, Hashable {
         public var provider: ProviderID
         public var providerName: String
@@ -429,7 +429,7 @@ public extension DaemonAPI {
         public init(id: ProviderID?) { self.id = id }
     }
 
-    /// `machines/link`.
+    /// `hosts/link`.
     struct MachineLink: Codable, Sendable, Hashable {
         public var host: MachineRef
         public var provider: ProviderID
@@ -447,7 +447,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// `machines/setMachineOptions`. `stopWhenIdleMinutes` 0 turns it off.
+    /// `hosts/setMachineOptions`. `stopWhenIdleMinutes` 0 turns it off.
     struct MachineOptions: Codable, Sendable, Hashable {
         public var host: MachineRef
         public var startWhenUsed: Bool?
@@ -504,7 +504,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// `machines/stop`.
+    /// `hosts/stop`.
     struct MachineStop: Codable, Sendable, Hashable {
         public var host: MachineRef
         /// Stop even though turns are running there (US4).

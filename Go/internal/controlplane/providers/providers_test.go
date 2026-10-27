@@ -785,7 +785,7 @@ func TestAnAgentMakesAtAProviderByItsName(t *testing.T) {
 func TestAnAgentCantAskAnythingElse(t *testing.T) {
 	h := newHarness(t)
 	h.add()
-	for _, method := range []string{MethodProvidersAdd, MethodProvidersRemove, "machines/remove", MethodProvidersList} {
+	for _, method := range []string{MethodProvidersAdd, MethodProvidersRemove, "hosts/remove", MethodProvidersList} {
 		if _, err := h.agentCall(method, map[string]any{}); failureOf(err) == nil || failureOf(err).Code != CodeNotPermitted {
 			t.Errorf("%s: %v", method, err)
 		}

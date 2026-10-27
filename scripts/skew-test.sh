@@ -2,10 +2,10 @@
 # Mixed versions, as a person meets them while an update rolls out (#1767, after #1748):
 #
 #   1. the last release's agentsd joined to this tree's control plane: it is not
-#      needsUpdate (unless this tree moved the required set), and machines/list gives its
+#      needsUpdate (unless this tree moved the required set), and hosts/list gives its
 #      capabilities, so the clients' generated tables can gate what it lacks;
 #   2. the last release's control plane with this tree's client: control/status and
-#      machines/list answer, with no wrongProtocolVersion (-32008).
+#      hosts/list answer, with no wrongProtocolVersion (-32008).
 #
 # Needs Go on the PATH (CI's ubuntu runner). The last release is the newest tag reachable
 # from HEAD, or SKEW_TAG; its Go module is taken with git archive, or from SKEW_OLD_SRC (a
@@ -92,7 +92,7 @@ ctl() {
 	AGENTSCTL="$dir/ctl.json" "$work/new/agentsctl" "$@"
 }
 
-# machines/list's row for the skew host, waiting for it to join.
+# hosts/list's row for the skew host, waiting for it to join.
 host_row() {
 	dir=$1
 	i=0
@@ -131,7 +131,7 @@ case "$row" in
 	;;
 esac
 # What the clients' generated tables hide for it: this tree's capabilities it lacks.
-# HostCapabilities only: the control plane's own (machines/1, control/1) are never a host's.
+# HostCapabilities only: the control plane's own (hosts/1, control/1) are never a host's.
 lacks=$(sed -n '/^var HostCapabilities/,/^}/p' "$root/Go/wire/capabilities_gen.go" | grep -o ': *"[a-z.-]*/[0-9]*"' |
 	grep -o '"[^"]*"' | sort -u | while read -r cap; do
 	case "$row" in *"$cap"*) ;; *) printf '%s ' "$cap" ;; esac
@@ -140,7 +140,7 @@ echo "skew-test: what the clients hide for $tag's host: ${lacks:-nothing}"
 case "$row" in
 *'"capabilities"'*) ;;
 *)
-	echo "skew-test: FAIL: machines/list gives no capabilities for $tag's host" >&2
+	echo "skew-test: FAIL: hosts/list gives no capabilities for $tag's host" >&2
 	failed=1
 	;;
 esac

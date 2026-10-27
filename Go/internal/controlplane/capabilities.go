@@ -116,7 +116,7 @@ func (r *Router) SetNeedsUpdate(host, from, to string) {
 	r.setStateLocked(host, hostState{State: "needsUpdate", From: from, To: to})
 }
 
-// hostCapabilities is the list a host said in its last machine/hello, kept beside the record's
+// hostCapabilities is the list a host said in its last host/hello, kept beside the record's
 // own fields as its implementation is; nil for a host older than #1748.
 func hostCapabilities(h records.MachineRecord) []string {
 	raw, ok := h.Extra["capabilities"]

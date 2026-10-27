@@ -3,28 +3,28 @@ import Foundation
 /// What the control plane answers itself, and says (058, contracts/control-api.md).
 public extension DaemonAPI.Method {
     static let controlStatus = "control/status"
-    static let hostsList = "machines/list"
-    static let hostsStartEnroll = "machines/startEnroll"
-    static let hostsInstall = "machines/install"
-    static let hostsCheckAgain = "machines/checkAgain"
-    static let hostsUpdate = "machines/update"
-    static let hostsRemove = "machines/remove"
+    static let hostsList = "hosts/list"
+    static let hostsStartEnroll = "hosts/startEnroll"
+    static let hostsInstall = "hosts/install"
+    static let hostsCheckAgain = "hosts/checkAgain"
+    static let hostsUpdate = "hosts/update"
+    static let hostsRemove = "hosts/remove"
     /// `{host, relay}`: whether a host carries the person's devices through iCloud (T097).
-    static let hostsSetRelay = "machines/setRelay"
+    static let hostsSetRelay = "hosts/setRelay"
     /// `{host, from, runtime, allowed}`: whether `host` may use `from`'s sign-in for a
     /// runtime, relayed through the control plane (058, T091). An operator's, after the
     /// window asked the person.
-    static let hostsLendSignIn = "machines/lendSignIn"
+    static let hostsLendSignIn = "hosts/lendSignIn"
     /// `LendGit`: whether `host` may use `from`'s git access for one git server (#1122).
     /// Any client's, after it asked the person; a no ends a waiting ask.
-    static let hostsLendGit = "machines/lendGit"
-    /// `machines/detect` (#429): every server in the control plane's `~/.ssh/config` that
-    /// answers, added as `machines/install` would with no key. `[DetectedServer]`.
-    static let hostsDetect = "machines/detect"
-    /// `machines/sshHosts` (#610): the hosts in the control plane's ssh config, as `ssh -G`
+    static let hostsLendGit = "hosts/lendGit"
+    /// `hosts/detect` (#429): every server in the control plane's `~/.ssh/config` that
+    /// answers, added as `hosts/install` would with no key. `[DetectedServer]`.
+    static let hostsDetect = "hosts/detect"
+    /// `hosts/sshHosts` (#610): the hosts in the control plane's ssh config, as `ssh -G`
     /// resolves each, with no network. `{destination}` resolves just that, as typed.
     /// `[SSHHost]`.
-    static let hostsSSHHosts = "machines/sshHosts"
+    static let hostsSSHHosts = "hosts/sshHosts"
     /// `FolderDetection` (#429, #656): whether the window suggests folders on a host, and
     /// where it looks for them. Nothing is added unless the person picks it.
     static let controlSetFolderDetection = "control/setFolderDetection"
@@ -63,8 +63,8 @@ public extension DaemonAPI.Method {
     static let clientsSetActivityToken = "clients/setActivityToken"
 
     // A host, on its channel 0.
-    static let hostsAnnounce = "machines/announce"
-    static let hostHello = "machine/hello"
+    static let hostsAnnounce = "hosts/announce"
+    static let hostHello = "host/hello"
     static let attentionNeed = "attention/need"
     static let controlPing = "control/ping"
     /// To a host just added, on its channel 0 (#429), never answered: `FolderDetection`.
@@ -82,7 +82,7 @@ public extension DaemonAPI.Method {
     /// `RelayCount` (#1163): one device's Needs you count, to post as a silent push.
     static let relayCount = "relay/count"
     /// A relay host, on its channel 0 (#824): `RelaySwitch`, itself switched on or off,
-    /// as `machines/setRelay` would. What Agents Host has it say where it has no control
+    /// as `hosts/setRelay` would. What Agents Host has it say where it has no control
     /// plane's key (Join one elsewhere). Refused from a host that runs agents.
     static let relaySwitch = "relay/switch"
 }
@@ -247,7 +247,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// One row of `machines/list`.
+    /// One row of `hosts/list`.
     struct ControlMachine: Codable, Sendable, Hashable, Identifiable {
         public var id: MachineRef
         public var name: String
@@ -276,9 +276,9 @@ public extension DaemonAPI {
         public var tunnel: MachineTunnel?
         /// The provider's workspace it runs on, which can be started and stopped (#691).
         public var workspace: MachineWorkspace?
-        /// `swift` or `go`, as the host said in `machine/hello` (#1134); nil when it never said.
+        /// `swift` or `go`, as the host said in `host/hello` (#1134); nil when it never said.
         public var implementation: String?
-        /// The capabilities the host said in its last `machine/hello` (#1748); nil from a host
+        /// The capabilities the host said in its last `host/hello` (#1748); nil from a host
         /// older than that, which is taken to have them all.
         public var capabilities: [String]?
         /// Of the control plane's required capabilities, the ones it does not have: it is
@@ -313,7 +313,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// One host in the ssh config, and what `machines/detect` did with it (#429).
+    /// One host in the ssh config, and what `hosts/detect` did with it (#429).
     struct DetectedServer: Codable, Sendable, Hashable, Identifiable {
         public enum Outcome: String, Codable, Sendable {
             /// It answered, and was installed: it joins by itself.
@@ -406,7 +406,7 @@ public extension DaemonAPI {
         public var workspace: MachineWorkspace?
     }
 
-    /// `machine/hello`, on every connect of an uplink.
+    /// `host/hello`, on every connect of an uplink.
     struct MachineHello: Codable, Sendable, Hashable {
         /// Which host this is. Said only on the control plane's local socket, where the
         /// uid and the code signature are the door; over TLS the key says it, and this
@@ -473,7 +473,7 @@ public extension DaemonAPI {
     }
 
 
-    /// `clients/forget`, `machines/remove`.
+    /// `clients/forget`, `hosts/remove`.
     struct ClientRequest: Codable, Sendable, Hashable {
         public var client: UUID
         public init(client: UUID) { self.client = client }
@@ -518,7 +518,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// `machines/lendSignIn`.
+    /// `hosts/lendSignIn`.
     struct LendSignIn: Codable, Sendable, Hashable {
         public var host: MachineRef
         public var from: MachineRef
@@ -566,7 +566,7 @@ public extension DaemonAPI {
         public init(relay: Bool) { self.relay = relay }
     }
 
-    /// `machines/setRelay`.
+    /// `hosts/setRelay`.
     struct MachineRelayRequest: Codable, Sendable, Hashable {
         public var host: MachineRef
         public var relay: Bool

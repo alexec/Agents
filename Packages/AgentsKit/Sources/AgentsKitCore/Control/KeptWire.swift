@@ -20,17 +20,17 @@ public extension DaemonAPI.Method {
     /// which the control plane fills in when the client left it out.
     static let keptMethods: Set<String> = [agentsPrompt, agentsStart]
     /// `MachineStatus`, from a host on channel 0, whenever it changes (#691 US4).
-    static let hostStatus = "machine/status"
+    static let hostStatus = "host/status"
     /// `KeepRequest` → never a result: the `kept` error, or the host's refusal. For a client
     /// whose link to a host closes while the host is offline (the window's, the Remote's),
     /// so it can't send the request to the host itself.
-    static let hostsKeep = "machines/keep"
+    static let hostsKeep = "hosts/keep"
     /// `{}` → `{kept: [KeptRequest]}`.
-    static let hostsListKept = "machines/listKept"
+    static let hostsListKept = "hosts/listKept"
     /// `KeptRequestID` → `{}`. It isn't delivered; the workspace keeps starting (US3 AS3).
-    static let hostsDropKept = "machines/dropKept"
+    static let hostsDropKept = "hosts/dropKept"
     /// `KeptRequestID` → `{}`. A not-sent one is kept again and the workspace started.
-    static let hostsRetryKept = "machines/retryKept"
+    static let hostsRetryKept = "hosts/retryKept"
 }
 
 public extension DaemonAPI.Notification {
@@ -80,7 +80,7 @@ public extension DaemonAPI {
         public var isStart: Bool { kind == "start" }
     }
 
-    /// `machines/keep`: a prompt or a start, as it would have gone to the host.
+    /// `hosts/keep`: a prompt or a start, as it would have gone to the host.
     struct KeepRequest: Codable, Sendable {
         public var host: MachineRef
         public var method: String
@@ -92,7 +92,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// `machines/dropKept`, `machines/retryKept`.
+    /// `hosts/dropKept`, `hosts/retryKept`.
     struct KeptRequestID: Codable, Sendable, Hashable {
         public var host: MachineRef
         public var id: UUID
@@ -107,7 +107,7 @@ public extension DaemonAPI {
         public init(kept: [KeptRequest]) { self.kept = kept }
     }
 
-    /// `machine/status` on channel 0 (#691 US4): whether the host is idle, and what is working
+    /// `host/status` on channel 0 (#691 US4): whether the host is idle, and what is working
     /// there when it isn't, for the stop when idle and for Stop's confirmation.
     struct MachineStatus: Codable, Sendable, Hashable {
         public var idle: Bool

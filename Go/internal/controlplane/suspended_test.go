@@ -39,7 +39,7 @@ func TestASuspendedPersonsMachineGetsNoRouteAndStartsNothing(t *testing.T) {
 		t.Fatalf("%d routes, %v", len(delivery.Routes), err)
 	}
 	// The machine asking again gets nothing either.
-	if _, err := box.uplink.Ask(t.Context(), wire.CallMachineOrgRoutesAgain.Name, wire.Empty{}); err != nil {
+	if _, err := box.uplink.Ask(t.Context(), wire.CallHostOrgRoutesAgain.Name, wire.Empty{}); err != nil {
 		t.Fatal(err)
 	}
 	if delivery, _, _ := p.s.orgDelivery(ctx, host); len(delivery.Routes) != 0 {

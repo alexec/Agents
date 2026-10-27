@@ -10,7 +10,7 @@ export type MacHostNotice =
   | { kind: "notAnswering" };
 
 /**
- * `macState` is this Mac's row in `machines/list`; `join` is `control/status.thisMacHost`. Only a
+ * `macState` is this Mac's row in `hosts/list`; `join` is `control/status.thisMacHost`. Only a
  * control plane on this Mac reads the host's join file (`planeOnThisMac`: the plane's machine is
  * the Mac host's), so elsewhere a missing join is not "the process is down". Nil while it is online.
  */

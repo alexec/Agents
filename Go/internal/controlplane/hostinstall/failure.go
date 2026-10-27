@@ -1,6 +1,6 @@
 // Package hostinstall is "Add a Machine over ssh" (058, US4, T072; #429, #610): the
-// control plane's machines/install, machines/update, machines/checkAgain, machines/detect and
-// machines/sshHosts. It ports ControlPlaneKit's MachineInstall.swift, HostDetect.swift and
+// control plane's hosts/install, hosts/update, hosts/checkAgain, hosts/detect and
+// hosts/sshHosts. It ports ControlPlaneKit's MachineInstall.swift, HostDetect.swift and
 // SSHConfigHosts.swift, with the parts of AgentsKit's SSHCommand, HostKeyCheck and
 // ServerInstaller that they use. HostTunnels.swift (#435) is not here: the Tunnels
 // interface is where it goes.

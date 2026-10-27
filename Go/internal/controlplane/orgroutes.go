@@ -786,7 +786,7 @@ func (s *Service) takesOrgRoutes(host string) bool {
 	return h != nil && slices.Contains(hostCapabilities(*h), CapHostOrgRoutes)
 }
 
-// orgDelivery is machine/orgRoutes for one machine: each route its person may use, each
+// orgDelivery is host/orgRoutes for one machine: each route its person may use, each
 // secret (or a cloud credential's token) sealed to its key; and a digest of what went in.
 func (s *Service) orgDelivery(ctx context.Context, host string) (wire.OrgRouteDelivery, [sha256.Size]byte, error) {
 	out := wire.OrgRouteDelivery{Routes: []wire.DeliveredRoute{}, At: wire.DateOf(time.Now())}
@@ -862,7 +862,7 @@ func (s *Service) sendOrgRoutes(host string, always bool) {
 		return
 	}
 	// The machine may have changed hands while the secrets were opened.
-	if s.records.Host(host) == nil || s.ownerOf(host) != user || !s.router.Tell(host, wire.NotifyMachineOrgRoutes.Name, delivery) {
+	if s.records.Host(host) == nil || s.ownerOf(host) != user || !s.router.Tell(host, wire.NotifyHostOrgRoutes.Name, delivery) {
 		s.orgRoutes.mu.Lock()
 		delete(s.orgRoutes.told, host)
 		s.orgRoutes.mu.Unlock()
@@ -945,7 +945,7 @@ func (s *Service) sendOrgRoutesTo(hosts []string) {
 	wg.Wait()
 }
 
-// orgRoutesAgain is machine/orgRoutesAgain: a sealed route did not open on the machine.
+// orgRoutesAgain is host/orgRoutesAgain: a sealed route did not open on the machine.
 func (s *Service) orgRoutesAgain(host string) {
 	s.orgRoutes.mu.Lock()
 	delete(s.orgRoutes.told, host)
@@ -953,7 +953,7 @@ func (s *Service) orgRoutesAgain(host string) {
 	go s.sendOrgRoutes(host, true)
 }
 
-// orgRoutesApplied is machine/orgRoutesApplied: what the machine keeps, noted on its record
+// orgRoutesApplied is host/orgRoutesApplied: what the machine keeps, noted on its record
 // for orgRoutes/list and for when it is removed.
 func (s *Service) orgRoutesApplied(ctx context.Context, host string, applied wire.OrgRoutesApplied) error {
 	if len(applied.Routes) > mostOrgRoutes {

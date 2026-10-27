@@ -31,7 +31,7 @@ type MachineRecords interface {
 type Router interface {
 	// Online says whether a host's uplink is up (HostState.isOnline).
 	Online(host string) bool
-	// HostState is the state machines/list shows for a host, its workspace laid over it.
+	// HostState is the state hosts/list shows for a host, its workspace laid over it.
 	HostState(host string) string
 	// SetWorkspace is ControlRouter.setWorkspace: a linked host's workspace changed, or the
 	// link went (nil). Said to every client in control/hostChanged when it differs, and laid
@@ -53,9 +53,9 @@ type Router interface {
 
 // Methods is what Providers needs of ControlMethods.
 type Methods interface {
-	// HostRow is one machines/list row, as it stands now (DaemonAPI.ControlMachine).
+	// HostRow is one hosts/list row, as it stands now (DaemonAPI.ControlMachine).
 	HostRow(h records.MachineRecord) any
-	// RemoveHost is machines/remove, as that client asked it.
+	// RemoveHost is hosts/remove, as that client asked it.
 	RemoveHost(host string, from Caller) error
 }
 
@@ -390,7 +390,7 @@ func (p *Providers) Answer(method string, params json.RawMessage, from Caller) (
 	return p.answer(method, params, from, "client "+shortID(from.Client))
 }
 
-// HostSaid answers machine/machines, machine/providerDraft and machine/status, which a host says
+// HostSaid answers host/machines, host/providerDraft and host/status, which a host says
 // on its channel 0, as ControlMethods.hostSaid does for them.
 func (p *Providers) HostSaid(host, method string, params json.RawMessage) (any, error) {
 	switch method {
@@ -1728,7 +1728,7 @@ func shellQuoted(value string) string { return "'" + strings.ReplaceAll(value, "
 
 // MARK: Stop when idle (US4)
 
-// Heard is WorkspaceHandling.heard: a host said whether it is idle (machine/status).
+// Heard is WorkspaceHandling.heard: a host said whether it is idle (host/status).
 func (p *Providers) Heard(host string, status MachineStatus) {
 	p.mu.Lock()
 	was, hadStatus := p.statuses[host]

@@ -293,7 +293,7 @@ func (j *joins) tell(r joinRecord, method string, params any) {
 	}
 }
 
-// list is machines/joinRequests: the open requests the caller may decide.
+// list is hosts/joinRequests: the open requests the caller may decide.
 func (j *joins) list(ctx context.Context, user string) ([]wire.JoinRequest, error) {
 	all, err := j.all(ctx)
 	if err != nil {
@@ -308,7 +308,7 @@ func (j *joins) list(ctx context.Context, user string) ([]wire.JoinRequest, erro
 	return out, nil
 }
 
-// decide is machines/approveJoin and machines/denyJoin. An approved machine is the named
+// decide is hosts/approveJoin and hosts/denyJoin. An approved machine is the named
 // person's, or the approving admin's.
 func (j *joins) decide(ctx context.Context, id, user string, approve bool) (*wire.JoinApproved, error) {
 	j.mu.Lock()

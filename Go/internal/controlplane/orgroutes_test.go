@@ -24,7 +24,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// routesTold is every machine/orgRoutes each machine was told, by machine.
+// routesTold is every host/orgRoutes each machine was told, by machine.
 type routesTold struct {
 	mu  sync.Mutex
 	got map[string][]wire.OrgRouteDelivery
@@ -33,7 +33,7 @@ type routesTold struct {
 func newRoutesTold() *routesTold { return &routesTold{got: map[string][]wire.OrgRouteDelivery{}} }
 
 func (d *routesTold) heard(host, method string, params json.RawMessage) {
-	if method != wire.NotifyMachineOrgRoutes.Name {
+	if method != wire.NotifyHostOrgRoutes.Name {
 		return
 	}
 	var delivery wire.OrgRouteDelivery
@@ -344,7 +344,7 @@ func TestARouteReachesOnlyTheMachinesAllowed(t *testing.T) {
 
 	// Each machine says it keeps it; the list counts them.
 	for _, m := range []*fakeHost{samAtA, samAtB} {
-		if _, err := m.uplink.Ask(t.Context(), wire.CallMachineOrgRoutesApplied.Name,
+		if _, err := m.uplink.Ask(t.Context(), wire.CallHostOrgRoutesApplied.Name,
 			wire.OrgRoutesApplied{Routes: []wire.OrgRouteVersion{{ID: "platform-openai", Version: 1}}}); err != nil {
 			t.Fatal(err)
 		}
@@ -358,7 +358,7 @@ func TestARouteReachesOnlyTheMachinesAllowed(t *testing.T) {
 	later := b.machineSaying(sam, routesHello("MACHINE-5"))
 	a.waitFor(func() bool { return told.route(later.member.Host, "platform-openai") != nil }, "a later machine told the route")
 	n := told.count(later.member.Host)
-	if _, err := later.uplink.Ask(t.Context(), wire.CallMachineOrgRoutesAgain.Name, wire.Empty{}); err != nil {
+	if _, err := later.uplink.Ask(t.Context(), wire.CallHostOrgRoutesAgain.Name, wire.Empty{}); err != nil {
 		t.Fatal(err)
 	}
 	a.waitFor(func() bool { return told.count(later.member.Host) > n }, "the machine told again")
@@ -416,7 +416,7 @@ func TestReplaceAndRemoveARoute(t *testing.T) {
 	}, "the add and the replaced key in the audit")
 
 	// Sam's machine is removed: Alex, an admin, and Sam hear which routes it held.
-	if _, err := spare.uplink.Ask(t.Context(), wire.CallMachineOrgRoutesApplied.Name,
+	if _, err := spare.uplink.Ask(t.Context(), wire.CallHostOrgRoutesApplied.Name,
 		wire.OrgRoutesApplied{Routes: []wire.OrgRouteVersion{{ID: "acme", Version: 2}}}); err != nil {
 		t.Fatal(err)
 	}
@@ -424,7 +424,7 @@ func TestReplaceAndRemoveARoute(t *testing.T) {
 		h := p.s.records.Host(spare.member.Host)
 		return h != nil && len(appliedOrgRoutes(*h)) == 1
 	}, "the machine's routes noted")
-	call(t, sam.window, "", "machines/remove", map[string]string{"host": spare.member.Host})
+	call(t, sam.window, "", "hosts/remove", map[string]string{"host": spare.member.Host})
 	for _, s := range []*controllink.Session{window, sam.window} {
 		var left wire.OrgRoutesLeft
 		json.Unmarshal(waitNote(t, s, wire.NotifyControlOrgRoutesLeft.Name).Params, &left)

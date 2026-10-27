@@ -26,10 +26,10 @@ const KeptLimit = 20
 // agent's first prompt; Failed, that it was not sent, and why (US3 AS4).
 type KeptRequest = wire.KeptRequest
 
-// KeepRequest is DaemonAPI.KeepRequest: machines/keep.
+// KeepRequest is DaemonAPI.KeepRequest: hosts/keep.
 type KeepRequest = wire.KeepRequest
 
-// KeptRequestID is DaemonAPI.KeptRequestID: machines/dropKept, machines/retryKept.
+// KeptRequestID is DaemonAPI.KeptRequestID: hosts/dropKept, hosts/retryKept.
 type KeptRequestID = wire.KeptRequestID
 
 // KeptList is DaemonAPI.KeptList.
@@ -269,7 +269,7 @@ func (k *Kept) allLocked() []KeptRequest {
 	return out
 }
 
-// Answer is machines/listKept, machines/dropKept and machines/retryKept.
+// Answer is hosts/listKept, hosts/dropKept and hosts/retryKept.
 func (k *Kept) Answer(method string, params json.RawMessage) (any, error) {
 	k.Load()
 	switch method {

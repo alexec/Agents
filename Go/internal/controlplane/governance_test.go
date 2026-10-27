@@ -65,7 +65,7 @@ func TestGovernanceUsageIsWhatEachMachineReports(t *testing.T) {
 		t.Fatal(e)
 	}
 	// Bea's box leaves: its report goes.
-	call(t, bea.window, "", "machines/remove", wire.MachineRequest{Host: wire.MachineRef(beaBox)})
+	call(t, bea.window, "", "hosts/remove", wire.MachineRequest{Host: wire.MachineRef(beaBox)})
 	if o, _ := st.Get(context.Background(), governanceHostKey(beaBox)); o != nil {
 		t.Fatal("a removed machine's report stayed")
 	}

@@ -674,7 +674,7 @@ func (b *Book) Names(ctx context.Context, user string) ([]wire.UserSecretRow, er
 	return rows, nil
 }
 
-// Delivery is machine/userSettings for a machine of user's: the settings and every secret,
+// Delivery is host/userSettings for a machine of user's: the settings and every secret,
 // opened. Only for that user's own machine's link (FR-025). A secret that will not open
 // (sealed by another keeper, as after a move) is left out, and named in skipped.
 func (b *Book) Delivery(ctx context.Context, user string) (out wire.MachineUserSettings, skipped []string, err error) {

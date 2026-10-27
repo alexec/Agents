@@ -55,7 +55,7 @@ func TestAStalledControlPlaneIsDropped(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go u.Run(ctx)
-	hello(t, f, 10*time.Second, "no machine/hello")
+	hello(t, f, 10*time.Second, "no host/hello")
 	<-opened
 	// More than the queue and the socket's buffers hold, so the writer meets the stall.
 	line := `{"jsonrpc":"2.0","method":"agent/changed","params":{"x":"` + strings.Repeat("x", 16<<10) + `"}}`
@@ -99,7 +99,7 @@ func TestAQuietDeadLinkIsFoundByItsPing(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go u.Run(ctx)
-	hello(t, f, 10*time.Second, "no machine/hello")
+	hello(t, f, 10*time.Second, "no host/hello")
 	hello(t, f, 10*time.Second, "a link that answers no ping was kept")
 }
 

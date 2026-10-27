@@ -17,7 +17,7 @@ import (
 func (p *plane) botMachine(admin *controllink.Session, bot, name string) *fakeHost {
 	p.t.Helper()
 	var shown wire.ControlCodeShown
-	json.Unmarshal(call(p.t, admin, "", "machines/startEnroll", wire.MachineEnroll{As: &bot}), &shown)
+	json.Unmarshal(call(p.t, admin, "", "hosts/startEnroll", wire.MachineEnroll{As: &bot}), &shown)
 	code, err := controllink.ParseCode(shown.Text)
 	if err != nil {
 		p.t.Fatal(err)
@@ -30,14 +30,14 @@ func (p *plane) botMachine(admin *controllink.Session, bot, name string) *fakeHo
 	return p.serveHost(root, member, private, hello, nil)
 }
 
-// hostUsers keeps the last machine/user each machine was told.
+// hostUsers keeps the last host/user each machine was told.
 type hostUsers struct {
 	mu   sync.Mutex
 	last map[string]wire.MachineUser
 }
 
 func (h *hostUsers) heard(host, method string, params json.RawMessage) {
-	if method != wire.NotifyMachineUser.Name {
+	if method != wire.NotifyHostUser.Name {
 		return
 	}
 	var u wire.MachineUser
@@ -80,7 +80,7 @@ func TestABotRunsOncePerTriggerAndStopsAtItsCap(t *testing.T) {
 	var made wire.BotMade
 	json.Unmarshal(call(t, admin, "", "bots/make", wire.BotMake{Name: "review-bot", Group: platform.ID}), &made)
 	bot := made.User
-	if e := callError(t, sam.window, "", "machines/startEnroll", wire.MachineEnroll{As: &bot}); !strings.Contains(e, "Only an admin") {
+	if e := callError(t, sam.window, "", "hosts/startEnroll", wire.MachineEnroll{As: &bot}); !strings.Contains(e, "Only an admin") {
 		t.Fatal(e)
 	}
 	if e := callError(t, admin, "", "groups/remove", wire.GroupRequest{ID: platform.ID}); !strings.Contains(e, "review-bot") {

@@ -807,7 +807,7 @@ final class HostModel {
     /// at once. Paired devices stay paired either way.
     ///
     /// Where the control plane runs, it makes the code and is told over its key
-    /// (`machines/setRelay`). Elsewhere (#824) the code is one the person gives, from that
+    /// (`hosts/setRelay`). Elsewhere (#824) the code is one the person gives, from that
     /// control plane, and the relay tells it itself (`agents-relay --on`, `--off`).
     func setRelay(_ on: Bool, code given: String? = nil) async {
         guard busy == nil, settings.relaysForDevices != on else { return }
@@ -895,7 +895,7 @@ final class HostModel {
         return String(line[colon.upperBound...])
     }
 
-    /// `machines/setRelay`, over the session the control plane's key proves.
+    /// `hosts/setRelay`, over the session the control plane's key proves.
     private func tellRelay(_ host: MachineRef, on: Bool) async -> ControlTool.Result {
         await ControlTool.run(["handover", "relay", "--at", "self", "--host", host.rawValue, on ? "--on" : "--off",
                                "--home", paths.controlHome.path, "--port", String(paths.port)],
