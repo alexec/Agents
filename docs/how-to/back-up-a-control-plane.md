@@ -35,9 +35,12 @@ The backup holds keys in clear. Keep it as safe as the control plane's own folde
 encrypted disk, or in an encrypted archive. Never put it in a shared or public place.
 
 The 0.11.2 store uses `v1/machines/` for machine records. Older builds used
-`v1/hosts/`. You do not move it: when the control plane opens a folder store that has
-only `v1/hosts/`, it renames the folder to `v1/machines/` and logs one line. A restore
-of an older backup puts its `v1/hosts/` records in `v1/machines/` too (#2662).
+`v1/hosts/`. You do not move it: each time the control plane opens a store, a folder
+or a bucket, it moves each record in `v1/hosts/` to `v1/machines/` and logs one line. A
+machine that is in both keeps its `v1/machines/` record. It does this on each open, so it
+also moves a record that an older copy writes during a handover. A folder store that has
+only `v1/hosts/` gets the folder renamed. A restore of an older backup puts its
+`v1/hosts/` records in `v1/machines/` too (#2662).
 
 A change made while the backup runs can be missed. A change made after the backup is lost
 with the restore.
