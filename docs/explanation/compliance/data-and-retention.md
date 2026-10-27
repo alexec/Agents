@@ -48,7 +48,7 @@ that machine starts.
 | Clients, machines, people, groups | Who is paired, with their public keys, names and when last seen; which machines there are; a client's push tokens | Until forgotten or removed |
 | Codes | A code's purpose, owner and expiry, never its secret | Deleted 24 hours after it expires |
 | Audit events | Who did what (see [Security overview](security-overview.md#who-did-what)) | 90 days by default; an admin sets 1 to 3,650 days |
-| Usage reports | Usage, cost and time by person, folder, machine and runtime, sent by each machine | 7 days by the hour, 90 days by the day |
+| Usage reports | Usage, cost and time by person, project, folder, machine and runtime, sent by each machine | 7 days by the hour, 90 days by the day |
 | Kept requests | Prompts and agent starts for a stopped workspace | Until the machine starts and takes them; 20 a machine at most |
 | A person's settings and secrets | Settings that follow a person; secrets, sealed | Until changed |
 | Server backups | See below | The newest **Keep** of each server; a removed server's for 90 days after its newest |

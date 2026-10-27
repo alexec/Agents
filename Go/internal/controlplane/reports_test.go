@@ -69,7 +69,7 @@ func TestReportsAddUpWhatMachinesSend(t *testing.T) {
 	json.Unmarshal(call(t, admin, "", "reports/export", wire.ReportQuery{Range: wire.ReportRangeWeek}), &csv)
 	lines := strings.Split(strings.TrimSpace(csv.Text), "\n")
 	if csv.Format != wire.ReportFormatCsv || csv.Count != 3 || len(lines) != 4 ||
-		!strings.HasPrefix(lines[0], "at,person,personName,host,hostName,folder,runtime,costUSD,inputTokens") {
+		!strings.HasPrefix(lines[0], "at,person,personName,host,hostName,folder,project,projectName,runtime,costUSD,inputTokens") {
 		t.Fatalf("%+v", csv)
 	}
 	jsonl := wire.ReportFormatJsonl
@@ -152,5 +152,59 @@ func TestReportsKeepWhatTheAgentsDid(t *testing.T) {
 	if !strings.HasSuffix(lines[0], ",workflow,sessions,failedSessions,prsOpened,prsMerged,prsReverted,mergeSeconds,waits,workflowRuns,workflowFailures,groups") ||
 		!strings.HasSuffix(lines[1], ",nightly,2,1,1,1,0,3600,1,3,1,") || !strings.HasSuffix(lines[2], ",,,,,,,,,,,") {
 		t.Fatalf("%v", lines)
+	}
+}
+
+// #2670: each row names the project its folder is in, as its machine last reported it, so
+// the same project on two machines adds up as one. A folder in no project names none, and
+// so does a name two of one machine's folders in different projects share.
+func TestReportRowsNameTheirProject(t *testing.T) {
+	t.Parallel()
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	mac := p.host("MAC")
+	box := p.host("BOX")
+	_, admin := p.client("Owner's window")
+	joinFolders(t, p, mac.member.Host, wire.JoinedFolder{Folder: "file:///Users/a/Agents/", Name: "Agents", Project: "p-agents"},
+		wire.JoinedFolder{Folder: "file:///Users/a/one/site/", Name: "site", Project: "p-site"},
+		wire.JoinedFolder{Folder: "file:///Users/a/two/site/", Name: "site", Project: "p-other"})
+	joinFolders(t, p, box.member.Host, wire.JoinedFolder{Folder: "file:///home/a/agents/", Name: "agents", Project: "p-agents"})
+
+	hour := time.Now().UTC().Format(usageHourLayout)
+	send := func(host string, folders ...string) {
+		t.Helper()
+		var rows []wire.UsageRollupRow
+		for _, f := range folders {
+			rows = append(rows, wire.UsageRollupRow{Folder: f, Runtime: "claude", Cost: map[string]float64{"USD": 1}, Turns: 1})
+		}
+		params, _ := json.Marshal(wire.UsageRollup{Hours: []wire.UsageRollupPeriod{{At: hour, Rows: rows}}, Days: []wire.UsageRollupPeriod{}})
+		if _, err := p.s.methods.HostSaid(host, "usage/rollup", params); err != nil {
+			t.Fatal(err)
+		}
+	}
+	send(mac.member.Host, "Agents", "site", "scratch")
+	send(box.member.Host, "agents")
+
+	var report wire.UsageReport
+	json.Unmarshal(call(t, admin, "", "reports/usage", wire.ReportQuery{Range: wire.ReportRangeDay}), &report)
+	projects := map[string]string{}
+	for _, r := range report.Rows {
+		name := ""
+		if r.Project != nil {
+			if *r.Project != "p-agents" || r.ProjectName == nil || *r.ProjectName != "Agents" {
+				t.Fatalf("%+v", r)
+			}
+			name = *r.ProjectName
+		}
+		projects[r.Folder] = name
+	}
+	if len(projects) != 4 || projects["Agents"] != "Agents" || projects["agents"] != "Agents" ||
+		projects["site"] != "" || projects["scratch"] != "" {
+		t.Fatalf("%v", projects)
+	}
+
+	var csv wire.ReportExport
+	json.Unmarshal(call(t, admin, "", "reports/export", wire.ReportQuery{Range: wire.ReportRangeDay}), &csv)
+	if !strings.Contains(csv.Text, ",Agents,p-agents,Agents,claude,") {
+		t.Fatalf("%s", csv.Text)
 	}
 }

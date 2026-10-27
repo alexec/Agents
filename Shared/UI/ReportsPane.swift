@@ -2,7 +2,7 @@ import AgentsKitCore
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Cost ▸ Reports (#1811): usage, cost and time by person, folder, machine and runtime,
+/// Cost ▸ Reports (#1811): usage, cost and time by person, project, folder, machine and runtime,
 /// added up on the control plane from what each machine sends each hour. It shows the
 /// caller's own machines, an admin's too (the Me scope, #2071); a group's and everyone's are
 /// Reports on the web page. Export saves the rows as CSV or JSON lines. Page picks Spend or
@@ -183,7 +183,13 @@ struct ReportsPane: View {
                 Picker("By", selection: $dimension) {
                     ForEach(Self.ways(page)) { Text($0.rawValue).tag($0) }
                 }
+                // Up to six ways with Project (#2670): segments on the Mac, a menu on a phone.
+                #if os(macOS)
                 .pickerStyle(.segmented)
+                #else
+                .pickerStyle(.menu)
+                .fixedSize()
+                #endif
             }
             Text(ReportWords.span(range)).appText(.fine).foregroundStyle(.secondary)
         }

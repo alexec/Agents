@@ -197,6 +197,7 @@ func (s *Service) reportFrom(ctx context.Context, prefix, first string, keep fun
 	if err != nil {
 		return nil, fail(storeUnavailable, "The reports could not be read: %v", err)
 	}
+	projectOf := s.reportProjects(ctx)
 	out := []wire.ReportRow{}
 	for i, data := range objects {
 		at, person, host := meta[i].at, meta[i].person, meta[i].host
@@ -223,6 +224,9 @@ func (s *Service) reportFrom(ctx context.Context, prefix, first string, keep fun
 				CachedReadTokens: row.CachedReadTokens, CachedWriteTokens: row.CachedWriteTokens, Turns: row.Turns,
 				UnpricedTurns: row.UnpricedTurns, WorkingSeconds: row.WorkingSeconds, WaitingSeconds: row.WaitingSeconds,
 				Workflow: row.Workflow, Counts: row.Counts})
+			if p := projectOf[strings.ToLower(host.ID)][row.Folder]; p != nil {
+				out[len(out)-1].Project, out[len(out)-1].ProjectName = &p.ID, &p.Name
+			}
 		}
 	}
 	sort.SliceStable(out, func(i, j int) bool {
@@ -239,6 +243,36 @@ func (s *Service) reportFrom(ctx context.Context, prefix, first string, keep fun
 		return a.Runtime < b.Runtime
 	})
 	return out, nil
+}
+
+// reportProjects is each machine's folders' projects, by machine and folder name, as the
+// machines last reported them (projects/joined, #2670): a report row names its folder by
+// its name. Two folders of one name on one machine in different projects name neither.
+// Nothing when the store cannot say: the rows still add up, in no project.
+func (s *Service) reportProjects(ctx context.Context) map[string]map[string]*records.Project {
+	joined, err := s.joinedFolders(ctx)
+	if err != nil {
+		return nil
+	}
+	out := map[string]map[string]*records.Project{}
+	for host, folders := range joined {
+		ids := map[string]string{}
+		for _, f := range folders {
+			if id, seen := ids[f.Name]; !seen {
+				ids[f.Name] = f.Project
+			} else if id != f.Project {
+				ids[f.Name] = ""
+			}
+		}
+		names := map[string]*records.Project{}
+		for name, id := range ids {
+			if p := s.records.Project(id); id != "" && p != nil {
+				names[name] = p
+			}
+		}
+		out[strings.ToLower(host)] = names
+	}
+	return out
 }
 
 // reportMethod answers reports/usage and reports/export for a scope (#1804), and the
@@ -312,7 +346,7 @@ func reportCSV(rows []wire.ReportRow, groupNames map[string]string) string {
 		codes = append(codes, c)
 	}
 	sort.Strings(codes)
-	header := []string{"at", "person", "personName", "host", "hostName", "folder", "runtime"}
+	header := []string{"at", "person", "personName", "host", "hostName", "folder", "project", "projectName", "runtime"}
 	for _, c := range codes {
 		header = append(header, "cost"+c)
 	}
@@ -326,7 +360,11 @@ func reportCSV(rows []wire.ReportRow, groupNames map[string]string) string {
 	i := func(n int64) string { return strconv.FormatInt(n, 10) }
 	f := func(n float64) string { return strconv.FormatFloat(n, 'f', -1, 64) }
 	for _, r := range rows {
-		line := []string{r.At, r.Person, r.PersonName, string(r.Host), r.HostName, r.Folder, r.Runtime}
+		project, projectName := "", ""
+		if r.Project != nil && r.ProjectName != nil {
+			project, projectName = *r.Project, *r.ProjectName
+		}
+		line := []string{r.At, r.Person, r.PersonName, string(r.Host), r.HostName, r.Folder, project, projectName, r.Runtime}
 		for _, c := range codes {
 			line = append(line, f(r.Cost[c]))
 		}

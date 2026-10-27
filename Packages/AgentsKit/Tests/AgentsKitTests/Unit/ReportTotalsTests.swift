@@ -2,7 +2,7 @@
 import Foundation
 import Testing
 
-/// Cost ▸ Reports (#1811): rows added up by person, folder, machine or runtime, largest
+/// Cost ▸ Reports (#1811): rows added up by person, project, folder, machine or runtime, largest
 /// first, as the web page's `model/reports.ts` does.
 struct ReportTotalsTests {
     private func row(person: String = "bea", personName: String = "Bea", host: String = "H1",
@@ -32,6 +32,19 @@ struct ReportTotalsTests {
         #expect(runtimes.groups.map(\.name) == ["Claude", "Codex"])
         #expect(people.share(of: people.groups[0]) == 1)
         #expect(people.share(of: people.groups[2]) == 0.5)
+    }
+
+    /// #2670: the same project on two machines adds up as one; a folder in no project is
+    /// "No project".
+    @Test func rowsAddUpByProjectAcrossMachines() throws {
+        var mine = row(usd: 1), theirs = row(host: "H2", hostName: "Box", folder: "agents", usd: 2)
+        let loose = row(folder: "tmp", usd: 4)
+        (mine.project, mine.projectName) = ("p-agents", "Agents")
+        (theirs.project, theirs.projectName) = ("p-agents", "Agents")
+        let projects = ReportTotals([mine, theirs, loose], by: .project)
+        try #require(projects.groups.map(\.name) == [ReportWords.noProject, "Agents"])
+        #expect(projects.groups[1].cost["USD"] == 3)
+        #expect(ReportTotals.Dimension.spend.contains(.project))
     }
 
     @Test func nothingPricedIsSharedOutByTokens() throws {

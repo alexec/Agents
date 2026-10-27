@@ -1,5 +1,5 @@
 // Cost ▸ Reports (#1811), as the window's and the Remote's ReportsPane: usage, cost and time by
-// person, folder, machine and runtime, added up on the control plane from what each machine
+// person, project, folder, machine and runtime, added up on the control plane from what each machine
 // sends each hour. Cost ▸ Reports shows the caller's own machines (Me, #2071); Reports ▸ Spend
 // has a scope, Me, a group or the organisation, and names it.
 import { useEffect, useMemo, useRef } from "preact/hooks";

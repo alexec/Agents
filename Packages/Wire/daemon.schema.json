@@ -16942,6 +16942,14 @@
         },
         "folder": {
           "type": "string"
+        },
+        "project": {
+          "type": "string",
+          "description": "The project the folder is in (#2670), by id, as its machine last reported it (projects/joined); absent for a folder in no project."
+        },
+        "projectName": {
+          "type": "string",
+          "description": "The project's name, absent with project."
         }
       },
       "required": [
