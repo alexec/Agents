@@ -1,13 +1,13 @@
 // Cost ▸ Reports (#1811), as ReportTotals and ReportWords have it on the window and the
-// Remote: a report's rows added up by person, folder, machine or runtime, largest first.
+// Remote: a report's rows added up by person, project, folder, machine or runtime, largest first.
 import type { ReportFormat, ReportPage, ReportRange, ReportRow, ReportScope, ReportView, UsageReport } from "../protocol/generated";
 import { money } from "./limits";
 import { timeWords } from "./time";
 import { tokenWords } from "./usage";
 
-export type ReportDimension = "person" | "folder" | "machine" | "runtime" | "group" | "workflow";
-export const dimensions: readonly ReportDimension[] = ["person", "folder", "machine", "runtime"];
-export const dimensionTitle: Record<ReportDimension, string> = { person: "Person", folder: "Folder", machine: "Machine", runtime: "Runtime", group: "Group",
+export type ReportDimension = "person" | "project" | "folder" | "machine" | "runtime" | "group" | "workflow";
+export const dimensions: readonly ReportDimension[] = ["person", "project", "folder", "machine", "runtime"];
+export const dimensionTitle: Record<ReportDimension, string> = { person: "Person", project: "Project", folder: "Folder", machine: "Machine", runtime: "Runtime", group: "Group",
   workflow: "Workflow" };
 export const ranges: readonly ReportRange[] = ["day", "week", "month", "threeMonths"];
 export const rangeShort: Record<ReportRange, string> = { day: "D", week: "W", month: "M", threeMonths: "3M" };
@@ -19,6 +19,7 @@ export const rangeSpan: Record<ReportRange, string> = { day: "The last 24 hours"
 
 export const removedOwner = "A removed machine";
 export const noFolder = "No folder";
+export const noProject = "No project";
 export const noRuntime = "No runtime";
 export const noGroup = "No group";
 export const noWorkflow = "No workflow";
@@ -82,6 +83,8 @@ function key(r: ReportRow, by: Exclude<ReportDimension, "group">, runtimeName: (
   switch (by) {
     case "workflow": return [r.workflow ?? "", r.workflow || noWorkflow];
     case "person": return [r.person, r.person ? r.personName || r.person : removedOwner];
+    // The project the folder is in, across machines (#2670).
+    case "project": return [r.project ?? "", r.project ? r.projectName ?? r.project : noProject];
     case "folder": return [r.folder, r.folder || noFolder];
     case "machine": return [r.host, r.hostName || r.host];
     case "runtime": return [r.runtime, r.runtime ? runtimeName(r.runtime) : noRuntime];
@@ -400,7 +403,7 @@ export const pageTitle: Record<ReportPage, string> = { spend: "Spend", outcomes:
   adoption: "Adoption", workflows: "Workflows" };
 
 const isDimension = (by: string | undefined): by is ReportDimension =>
-  by !== undefined && ["person", "folder", "machine", "runtime", "group", "workflow"].includes(by);
+  by !== undefined && ["person", "project", "folder", "machine", "runtime", "group", "workflow"].includes(by);
 
 /** A view's way to add up, when it says one this build knows. */
 export function viewBy(view: Pick<ReportView, "by">): ReportDimension | undefined {

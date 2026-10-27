@@ -7331,6 +7331,12 @@ type ReportRow struct {
 	Counts *ReportCounts `json:"counts,omitzero"`
 
 	Folder string `json:"folder"`
+
+	// The project the folder is in (#2670), by id, as its machine last reported it (projects/joined); absent for a folder in no project.
+	Project *string `json:"project,omitzero"`
+
+	// The project's name, absent with project.
+	ProjectName *string `json:"projectName,omitzero"`
 }
 
 // Whose rows a report adds up (#1804).

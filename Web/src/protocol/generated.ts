@@ -5838,6 +5838,13 @@ export interface ReportRow {
   /** What the agents did (#2019): sessions, pull requests and waits. */
   counts?: ReportCounts;
   folder: string;
+  /**
+   * The project the folder is in (#2670), by id, as its machine last reported it (projects/joined);
+   * absent for a folder in no project.
+   */
+  project?: string;
+  /** The project's name, absent with project. */
+  projectName?: string;
 }
 
 /** Whose rows a report adds up (#1804). */
@@ -9375,7 +9382,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ReportExport: { required: ["text", "count", "format"], optional: [] },
   ReportPolicy: { required: ["totalsOnly", "leads", "budgetsUSD"], optional: [] },
   ReportQuery: { required: ["range"], optional: ["format", "scope"] },
-  ReportRow: { required: ["at", "person", "personName", "host", "hostName", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds", "folder"], optional: ["workflow", "groups", "counts"] },
+  ReportRow: { required: ["at", "person", "personName", "host", "hostName", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds", "folder"], optional: ["workflow", "groups", "counts", "project", "projectName"] },
   ReportScope: { required: ["kind"], optional: ["group"] },
   ReportScopeOption: { required: ["scope", "name"], optional: [] },
   ReportScopes: { required: ["scopes", "admin"], optional: [] },

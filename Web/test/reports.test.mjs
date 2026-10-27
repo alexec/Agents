@@ -11,6 +11,18 @@ const row = (over = {}) => ({
   unpricedTurns: 0, workingSeconds: 0, waitingSeconds: 0, ...over,
 });
 
+// #2670: the same project on two machines adds up as one; a folder in no project is "No project".
+test("rows add up by project across machines", () => {
+  const rows = [
+    row({ project: "p-agents", projectName: "Agents", cost: { USD: 1 } }),
+    row({ host: "H2", hostName: "Box", folder: "agents", project: "p-agents", projectName: "Agents", cost: { USD: 2 } }),
+    row({ folder: "tmp", cost: { USD: 4 } }),
+  ];
+  const t = r.reportTotals(rows, "project");
+  assert.deepEqual(t.groups.map((g) => g.name), [r.noProject, "Agents"]);
+  assert.equal(t.groups[1].cost.USD, 3);
+});
+
 test("rows add up by each dimension, largest first", () => {
   const rows = [
     row({ cost: { USD: 1 }, inputTokens: 100, turns: 1, workingSeconds: 60 }),
@@ -44,9 +56,9 @@ test("an export is named by its range and day", () => {
 });
 
 test("scopes (#1804): a group dimension past Me, none naming a person when hidden, a budget's words", () => {
-  assert.deepEqual(r.scopedDimensions({ scope: { kind: "me" } }), ["person", "folder", "machine", "runtime"]);
-  assert.deepEqual(r.scopedDimensions({ scope: { kind: "org" } }), ["person", "folder", "machine", "runtime", "group"]);
-  assert.deepEqual(r.scopedDimensions({ scope: { kind: "group", group: "g" }, personsHidden: true }), ["folder", "runtime", "group"]);
+  assert.deepEqual(r.scopedDimensions({ scope: { kind: "me" } }), ["person", "project", "folder", "machine", "runtime"]);
+  assert.deepEqual(r.scopedDimensions({ scope: { kind: "org" } }), ["person", "project", "folder", "machine", "runtime", "group"]);
+  assert.deepEqual(r.scopedDimensions({ scope: { kind: "group", group: "g" }, personsHidden: true }), ["project", "folder", "runtime", "group"]);
   assert.equal(r.scopeKey({ kind: "group", group: "g1" }), "group:g1");
   const rows = [row({ groups: ["g1", "g2"], cost: { USD: 2 } }), row({ person: "al", personName: "Al", groups: [], cost: { USD: 1 } })];
   const t = r.reportTotals(rows, "group", (id) => id, { g1: "Platform", g2: "Web" });

@@ -94,6 +94,11 @@ public extension DaemonAPI {
         public var host: String
         public var hostName: String
         public var folder: String
+        /// The project the folder is in (#2670), by id, as its machine last reported it; nil
+        /// for a folder in no project.
+        public var project: String?
+        /// The project's name, nil with project.
+        public var projectName: String?
         public var runtime: String
         /// The workflow that started the agents of this row (#2019), by its id; nil for agents
         /// a person or another agent started.
@@ -118,7 +123,8 @@ public extension DaemonAPI {
         public var counts: ReportCounts?
 
         public init(at: String, person: String, personName: String, host: String, hostName: String,
-                    folder: String, runtime: String, workflow: String? = nil, cost: [String: Decimal] = [:],
+                    folder: String, project: String? = nil, projectName: String? = nil, runtime: String,
+                    workflow: String? = nil, cost: [String: Decimal] = [:],
                     inputTokens: Int = 0, outputTokens: Int = 0, thoughtTokens: Int = 0, cachedReadTokens: Int = 0,
                     cachedWriteTokens: Int = 0, turns: Int = 0, unpricedTurns: Int = 0,
                     workingSeconds: Double = 0, waitingSeconds: Double = 0, groups: [String]? = nil,
@@ -129,6 +135,8 @@ public extension DaemonAPI {
             self.host = host
             self.hostName = hostName
             self.folder = folder
+            self.project = project
+            self.projectName = projectName
             self.runtime = runtime
             self.workflow = workflow
             self.cost = cost

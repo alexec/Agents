@@ -1,13 +1,13 @@
 ---
 diataxis: reference
 devices: [mac, iphone, ipad]
-description: Usage, cost and time by person, folder, machine and runtime, added up on the control plane from what each machine sends.
+description: Usage, cost and time by person, project, folder, machine and runtime, added up on the control plane from what each machine sends.
 ---
 
 # Reports
 
-A report shows the usage, cost and time of each person, folder, machine and runtime
-(#1811). The control plane adds them up from what each machine sends.
+A report shows the usage, cost and time of each person, project, folder, machine and
+runtime (#1811). The control plane adds them up from what each machine sends.
 
 ## The Reports pane
 
@@ -16,11 +16,17 @@ page.
 
 - **The range:** D (the last 24 hours, by the hour), W, M or 3M (the last 7, 30 or 90
   days, by the day), as the Cost page's charts.
-- **By:** Person, Folder, Machine or Runtime. The first line is the total. Under it is a
-  line for each person, folder, machine or runtime, largest first, with a bar for its
-  share of the largest. Each line says the cost, the tokens, the turns and the working
-  time.
-- **Export** saves the rows of the range as CSV or as JSON lines.
+- **By:** Person, Project, Folder, Machine or Runtime. The first line is the total. Under it
+  is a line for each person, project, folder, machine or runtime, largest first, with a bar
+  for its share of the largest. Each line says the cost, the tokens, the turns and the
+  working time. A segmented control on the Mac and the web page, and a menu on the Remote.
+- **Project** (#2670) adds up the folders of one [project](../explanation/folders-machines-worktrees.md)
+  on every machine. The control plane finds each row's project from the folders that its
+  machine last reported (`projects/joined`). A row's folder is in **No project** when its
+  machine reported no project for it, or when two of that machine's folders have the same
+  name and are in different projects.
+- **Export** saves the rows of the range as CSV or as JSON lines. Each row has its
+  project's id and name.
 - **Page** (the Mac and the Remote, #2183): Spend, or Outcomes, Time, Runtimes, Adoption or
   Workflows, which are the web page's Reports pages below at the Me scope. A segmented control
   on the Mac, and a menu on the Remote. On the web page these pages are in Reports.
