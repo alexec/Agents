@@ -14,7 +14,6 @@ final class HostSet {
     private(set) var goneFolders: [MachineRef: [String]] = [:]
     var rebuiltAsk: MachineRef?
     private(set) var claude: [MachineRef: ServerConnection.Claude] = [:]
-    @ObservationIgnored var claudeWanted: (MachineRef) -> Bool = { _ in false }
     private(set) var toolsets: [MachineRef: [String: ServerConnection.Claude]] = [:]
     @ObservationIgnored var toolsetWanted: (MachineRef, String) -> Bool = { _, _ in false }
     @ObservationIgnored var offerFor: (MachineRef) -> DaemonAPI.CredentialsOffer? = { _ in nil }
@@ -33,8 +32,6 @@ final class HostSet {
 
     init(locations: StoreLocations) {}
 
-    func stopForQuit() {}
-    func handOver() -> [MachineRef] { [] }
     var isEmpty: Bool { controlled.isEmpty }
 
     var servers: [MachineRef] {
@@ -84,9 +81,6 @@ final class HostSet {
     func connect(_ id: MachineRef) {}
     func retryNow() {}
     func update(_ host: ServerHost) {}
-    func setOwnSignInOnly(_ id: MachineRef, _ on: Bool) {}
-    func claudeLine(_ id: MachineRef, canRelay: Bool) -> String { "" }
-    func toolsetLine(_ id: MachineRef, runtimeID: String, hasCredential: Bool) -> String { "" }
     func agentsLive(_ id: MachineRef) async -> Int { 0 }
     func remove(_ id: MachineRef, purge: Bool = false) async {}
     func noteFolders(_ id: MachineRef, listed: [DaemonAPI.FolderSummary]) {}

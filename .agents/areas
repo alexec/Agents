@@ -373,7 +373,6 @@ App/Sources/Settings/ServerCredentials.swift           machines
 App/Sources/Control/ControlAddServerSheet.swift        machines
 App/Sources/Control/ThisMacHost.swift                  machines
 App/Sources/Control/HostFoldersPicker.swift           machines
-Shared/UI/HostListHeading.swift                        machines
 Shared/UI/OfflineWords.swift                           machines
 Packages/AgentsKit/Sources/AgentsKit/Hosts/            machines
 Packages/AgentsKit/Sources/AgentsKitCore/Hosts/        machines
@@ -448,7 +447,7 @@ App/Sources/Folders/FolderRow.swift                  sidebar
 App/Sources/Folders/FolderWorkRows.swift             sidebar
 App/Sources/Folders/PinnedPageRows.swift              sidebar
 App/Sources/Folders/SidebarSmartRows.swift            sidebar
-App/Sources/Folders/WorkflowRow.swift                 sidebar
+App/Sources/Folders/WorkflowStatusIcon.swift          sidebar
 App/Sources/Folders/WindowFolds.swift                 sidebar
 App/Sources/Folders/SwipeAction.swift                 sidebar
 Packages/AgentsKit/Sources/AgentsKitCore/Sidebar/      sidebar

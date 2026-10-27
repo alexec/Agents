@@ -1,6 +1,6 @@
 // A workflow's row under the sessions: Workflow.summary and canFire (Model/Workflow.swift and
 // its trigger, schedule and settings words), WorkflowSummary.needsAPerson, and the window's
-// status icon (WorkflowRow.swift), ported by hand and held to Fixtures/web/workflows.
+// status icon (WorkflowStatusIcon.swift), ported by hand and held to Fixtures/web/workflows.
 //
 // An event trigger (042) arrives as `unrecognised` with a dotted name, which Swift reads back as
 // an event and describes from its catalogue. The page has no catalogue, so it says the event's

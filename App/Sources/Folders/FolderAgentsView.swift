@@ -306,7 +306,7 @@ struct WaitingForOKBanner: View {
     }
 }
 
-/// A part of a page, a step above the `GroupHeading`s inside it.
+/// A part of a page.
 struct SectionHeading: View {
     let title: String
 
@@ -318,25 +318,5 @@ struct SectionHeading: View {
             .padding(.leading, 2)
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityAddTraits(.isHeader)
-    }
-}
-
-/// What the cards under it have in common, and how many there are.
-struct GroupHeading: View {
-    let title: String
-    let count: Int
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Text(title)
-            Text("\(count)")
-                .monospacedDigit()
-                .foregroundStyle(.tertiary)
-        }
-        .appText(.fine).fontWeight(.medium)
-        .foregroundStyle(.secondary)
-        .padding(.top, 14)
-        .padding(.leading, 2)
-        .accessibilityAddTraits(.isHeader)
     }
 }
