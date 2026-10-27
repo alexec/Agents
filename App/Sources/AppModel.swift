@@ -1297,10 +1297,16 @@ final class AppModel {
     }
 
     /// Let go of a folder's archived sessions when its Archived fold closes (#165),
-    /// keeping the one being read.
+    /// keeping the one being read and any with a window of its own (#2744).
     func letGoOfArchived(in key: FolderKey) {
-        let held = work.agents(in: key, group: .archived).map(\.id).filter { $0 != selection }
+        let held = work.agents(in: key, group: .archived).map(\.id).filter { !isBeingRead($0) }
         work.forget(held)
+    }
+
+    /// Whether a session is open, in the main window or a window of its own: a let-go
+    /// keeps it, or its window says it was deleted (#2744).
+    private func isBeingRead(_ id: UUID) -> Bool {
+        id == selection || popouts[id] != nil
     }
 
     /// The most a search brings back from each host, a page at a time.
@@ -1318,7 +1324,7 @@ final class AppModel {
         // Let the last page go before the next is asked, including a refinement.
         // Forgetting only when the field was cleared left every query's matches held (#285).
         let earlier = searched.filter { id in
-            id != selection && heldAgent(id)?.state == .archived && !isInOpenArchivedFold(id)
+            !isBeingRead(id) && heldAgent(id)?.state == .archived && !isInOpenArchivedFold(id)
         }
         searched = []
         searchNext = [:]
@@ -1391,7 +1397,7 @@ final class AppModel {
             }
         }
         let left = previous.subtracting(introduced).filter { id in
-            id != selection && heldAgent(id)?.state == .archived && !isInOpenArchivedFold(id)
+            !isBeingRead(id) && heldAgent(id)?.state == .archived && !isInOpenArchivedFold(id)
         }
         work.forget(left)
         work.takeListed(stamped)
@@ -1403,7 +1409,7 @@ final class AppModel {
         let key = RunsKey(host: host, folder: Folder.standardize(folder), workflowID: workflowID)
         guard let ids = runsIntroduced.removeValue(forKey: key) else { return }
         work.forget(ids.filter { id in
-            id != selection && heldAgent(id)?.state == .archived && !isInOpenArchivedFold(id)
+            !isBeingRead(id) && heldAgent(id)?.state == .archived && !isInOpenArchivedFold(id)
         })
     }
 
