@@ -12,6 +12,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/internal/controlplane/usersettings"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -234,5 +235,54 @@ func TestAMachineCannotSendAgentConfigFilesToItsPersonsOtherMachines(t *testing.
 	json.Unmarshal(call(t, window, "", "user/settings", nil), &stored)
 	if stored.AgentConfigFiles != nil {
 		t.Fatalf("kept files from a machine: %+v", stored.AgentConfigFiles)
+	}
+}
+
+// A person's settings kept before #2703 can hold their machines' agent configuration files,
+// far more than one frame on a machine's link takes (#2730). The delivery leaves them out,
+// so the machine is told its settings and its link stays up, not dropped and rejoined
+// without end.
+func TestADeliveryFitsTheMachinesLink(t *testing.T) {
+	t.Parallel()
+	st := store.NewMemory()
+	p := startPlane(t, st, controllink.NewPrivateKey())
+	told := &deliveries{got: map[string][]wire.MachineUserSettings{}}
+	p.told = told.heard
+	_, window := p.client("Alex's Mac")
+	alex := &person{id: p.s.localOwner(), window: window}
+
+	contents := strings.Repeat("A", 34<<20)
+	at := "2026-10-20T00:00:00Z"
+	kept := wire.UserSettings{
+		McpServers: wire.JSONValue(`{"github":{"url":"https://api.githubcopilot.com/mcp/"}}`),
+		AgentConfigFiles: &wire.AgentConfigFiles{Files: []wire.AgentConfigFile{
+			{Path: "plugins/one/big.bin", Contents: &contents, Time: 1, Machine: "MACHINE-40"},
+			{Path: "plugins/two/big.bin", Contents: &contents, Time: 1, Machine: "MACHINE-40"},
+		}},
+		Updated: &at,
+	}
+	data, _ := json.Marshal(kept)
+	if len(data) <= controllink.MaxMessage {
+		t.Fatalf("the kept settings are %d bytes, not over the frame", len(data))
+	}
+	if _, err := st.Put(t.Context(), usersettings.Prefix+alex.id+"/settings.json", data, store.Always); err != nil {
+		t.Fatal(err)
+	}
+
+	box := p.machineSaying(alex, takingHello("MACHINE-41"))
+	p.waitFor(func() bool { u, ok := told.last(box.member.Host); return ok && u.Settings.McpServers != nil }, "the machine told its settings")
+	if u, _ := told.last(box.member.Host); u.Settings.AgentConfigFiles != nil {
+		t.Fatalf("the machine was sent %d agent configuration files", len(u.Settings.AgentConfigFiles.Files))
+	}
+	// Still on the same link: one delivery, no rejoin.
+	time.Sleep(500 * time.Millisecond)
+	if s, ok := p.s.Router().State(box.member.Host); !ok || !s.online() {
+		t.Fatal("the machine is not online")
+	}
+	told.mu.Lock()
+	n := len(told.got[box.member.Host])
+	told.mu.Unlock()
+	if n != 1 {
+		t.Fatalf("the machine was told its settings %d times: it rejoined", n)
 	}
 }
