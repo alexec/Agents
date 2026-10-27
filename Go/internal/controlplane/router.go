@@ -149,6 +149,9 @@ type clientSession struct {
 	// The capabilities the client said in its auth line (#1748); nil from one older than
 	// that. Each request of a client too old for this control plane is refused.
 	capabilities []string
+	// The host that answers this page's calls itself (#1970), or "": the session ends when
+	// the host is no longer its person's.
+	carriedBy string
 }
 
 // target is who a channel on a host's uplink is for: a client session here, or the other
@@ -1601,6 +1604,30 @@ func (r *Router) mayReachLocked(from Caller, host string) bool {
 	return r.owners == nil || r.owners.OwnerOf(host) == from.Person
 }
 
+// ServesItself says whether a host may answer a person's page itself (#1970): one this
+// router knows, and the person's own (FR-018).
+func (r *Router) ServesItself(person, host string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.known[host] && r.mayReachLocked(Caller{Person: person}, host)
+}
+
+// NoteCarried says a host answers a session's calls itself (#1970), so the session ends
+// once the host is not its person's: at once, if it changed hands meanwhile.
+func (r *Router) NoteCarried(session, host string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	s := r.clients[session]
+	if s == nil {
+		return
+	}
+	if !r.mayReachLocked(s.caller, host) {
+		r.detachLocked(session, 0)
+		return
+	}
+	s.carriedBy = host
+}
+
 // HoldToOwners opens a channel to each machine a session's person owns now, and closes
 // the one to each it no longer owns: after a join is approved, or a machine changes hands.
 // Each machine's owner is read once, outside the lock, as each read takes the records'
@@ -1636,6 +1663,11 @@ func (r *Router) HoldToOwners() {
 		person := s.caller.Person
 		if owners == nil {
 			person = ""
+		}
+		// A page its host answers itself is that host's person's alone (#1970).
+		if owner, read := ownerOf[s.carriedBy]; s.carriedBy != "" && read && owner != person {
+			r.detachLocked(id, 0)
+			continue
 		}
 		for host, c := range s.channels {
 			owner, read := ownerOf[host]

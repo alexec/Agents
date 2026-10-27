@@ -1328,7 +1328,22 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 	}
 	switch id.Kind {
 	case 'c':
-		s.router.AttachClient(client, conn, relayed, auth.Capabilities)
+		// A page a host carries, of the host's own person: the host may answer its calls
+		// itself (#1970). It is told so on the line right after the ok, and never otherwise.
+		var carried *controllink.Carried
+		if via != "" {
+			carried = s.carriedBy(client, via)
+		}
+		if carried != nil {
+			if err := conn.SendNow(carried.Line()); err != nil {
+				conn.Close()
+				return
+			}
+		}
+		session := s.router.AttachClient(client, conn, relayed, auth.Capabilities)
+		if carried != nil {
+			s.router.NoteCarried(session, via)
+		}
 		// Forgotten while it joined (#1229): the forget's sweep of sessions may have come
 		// before this one was attached, and admitting it would write it back over its
 		// tombstone. It is closed as any forgotten client is.
@@ -1369,6 +1384,25 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 		}
 		s.mesh.accepted(id.ID, conn)
 	}
+}
+
+// carriedBy is what a host that carries a client's page is told (#1970), or nil when the
+// host must answer none of its calls itself: only a browser of the host's own person has
+// them answered there. Its calls that the audit keeps or the policy gates still come here.
+func (s *Service) carriedBy(client *records.ClientRecord, host string) *controllink.Carried {
+	if client.Kind != records.KindBrowser || !s.router.ServesItself(s.PersonOf(client.ID), host) {
+		return nil
+	}
+	up := audit.HostMethods()
+	for _, set := range []map[string]bool{policyGated, providers.KeptMethods} {
+		for method := range set {
+			if !slices.Contains(up, method) {
+				up = append(up, method)
+			}
+		}
+	}
+	slices.Sort(up)
+	return &controllink.Carried{Actor: s.actorFor(client.ID), Up: up}
 }
 
 // origins is every origin a member may have dialled: this copy's own, and each endpoint

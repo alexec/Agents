@@ -14,6 +14,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/web"
 	"github.com/alexec/agents/Go/internal/safe"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // The web page on this machine, served by this host when the control plane runs elsewhere
@@ -25,11 +26,14 @@ import (
 // The page's own exchange is with the control plane, which binds it to this listener's
 // origin; this host never checks a browser's proof, and holds no key to.
 //
-// Once the control plane has said ok to the page, the page's calls to this host are
-// answered here (#1970, FR-007): a frame {"h": <this host>, "m": …} goes to a channel of
-// this host's own, and its answers and notifications go back to the page in the same
-// frame, as the control plane would put them. Everything else still goes through the
-// control plane, which then never opens a channel to this host for that page.
+// When the control plane says so, the page's calls to this host are answered here (#1970,
+// FR-007): a frame {"h": <this host>, "m": …} goes to a channel of this host's own, and its
+// answers and notifications go back to the page in the same frame, as the control plane
+// would put them. The control plane says so only on the line right after the page's ok,
+// and only for a browser of this host's own person (controllink.Carried), with who it is
+// and the calls that still go through it (those the audit keeps or the policy gates). An
+// ok alone says nothing: a code's is no person's, and another person's is not this host's
+// owner's. Every other line goes through the control plane.
 
 // pageTimeout is how long the control plane has to say hello and ok to a carried page.
 const pageTimeout = 15 * time.Second
@@ -77,8 +81,8 @@ func (d *Daemon) carryPage(ctx context.Context, page *websocket.Conn, private []
 	out := newPageOut(ctx, page)
 	defer out.Close()
 	toPage := out.Write
-	// Set once the control plane's ok has gone to the page: only then is the page one the
-	// control plane has checked, and only then are its calls to this host answered here.
+	// Set once the control plane has said this page's calls to this host are answered here
+	// (controllink.Carried), and only then. local's actor and up are set before it.
 	var proved atomic.Bool
 	local := &pageChannel{host: host, toPage: toPage}
 	done := make(chan struct{}, 2)
@@ -93,7 +97,7 @@ func (d *Daemon) carryPage(ctx context.Context, page *websocket.Conn, private []
 				return
 			}
 			if proved.Load() {
-				if m, ok := forHost(b, host); ok {
+				if m, ok := forHost(b, host); ok && !local.goesUp(m) {
 					if local.take(m, d.Accept) {
 						continue
 					}
@@ -105,17 +109,28 @@ func (d *Daemon) carryPage(ctx context.Context, page *websocket.Conn, private []
 			}
 		}
 	})
-	// The control plane's lines to the page.
+	// The control plane's lines to the page; the one that says it is answered here is not.
 	safe.Go("page down", func() {
 		defer func() { done <- struct{}{} }()
+		// Where the exchange is: the page's ok not yet seen, the line after it next, or past.
+		const beforeOK, afterOK, past = 0, 1, 2
+		at := beforeOK
 		for {
 			line, err := up.Read(ctx)
 			if err != nil {
 				return
 			}
-			if !proved.Load() {
+			switch at {
+			case beforeOK:
 				if m, ok := controllink.ParseMessage(line); ok && m.OK != nil {
+					at = afterOK
+				}
+			case afterOK:
+				at = past
+				if c, ok := controllink.ParseCarried(line); ok {
+					local.carried(c)
 					proved.Store(true)
+					continue
 				}
 			}
 			if toPage(line) != nil {
@@ -250,9 +265,35 @@ func forHost(line []byte, host string) (json.RawMessage, bool) {
 type pageChannel struct {
 	host   string
 	toPage func(string) error
+	// Who the page is, and the methods that go through the control plane all the same, as
+	// the control plane said (controllink.Carried); set once, before the first take.
+	actor  *wire.AuditActor
+	up     map[string]bool
 	mu     sync.Mutex
 	in     chan string
 	closed bool
+}
+
+// carried takes what the control plane said of the page.
+func (c *pageChannel) carried(said controllink.Carried) {
+	actor := said.Actor
+	c.actor = &actor
+	c.up = make(map[string]bool, len(said.Up))
+	for _, method := range said.Up {
+		c.up[method] = true
+	}
+}
+
+// goesUp says a message goes through the control plane: a call it keeps in the audit or
+// holds its checks on. An answer, with no method, is this channel's.
+func (c *pageChannel) goesUp(m json.RawMessage) bool {
+	var call struct {
+		Method string `json:"method"`
+	}
+	if json.Unmarshal(m, &call) != nil {
+		return true
+	}
+	return c.up[call.Method]
 }
 
 // take hands one message to the channel, opening it with accept the first time. False
@@ -297,6 +338,9 @@ func (c *pageChannel) Close() {
 
 // Device is the device a channel carries: a browser is none.
 func (c *pageChannel) Device() string { return "" }
+
+// Actor is who the page is, as the control plane said (#996).
+func (c *pageChannel) Actor() *wire.AuditActor { return c.actor }
 
 // carryAs is controllink.Join for a carried page: the same exchange, as w:<host>, with the
 // page's port in the auth.

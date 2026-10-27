@@ -106,6 +106,33 @@ func TestAPageThroughThisHost(t *testing.T) {
 		t.Fatal(line, err)
 	}
 	l.Close()
+	host, _ := json.Marshal(member.Host)
+
+	// A code's ok is no person's: its calls to this host are never answered here.
+	shown, err = cp.Codes().Issue(ctx, false, true, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, _ = controllink.ParseCode(shown.Text)
+	if l, err = controllink.DialOrigin(ctx, origin, origin); err != nil {
+		t.Fatal(err)
+	}
+	if err := exchange(ctx, l, controllink.Identity{Kind: 'p', ID: code.ID()}, controllink.CodeKey(code.Secret), origin); err != nil {
+		t.Fatal(err)
+	}
+	l.Write(ctx, `{"h":`+string(host)+`,"m":{"jsonrpc":"2.0","id":3,"method":"daemon/status"}}`)
+	for {
+		rctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		line, err := l.Read(rctx)
+		cancel()
+		if err != nil {
+			break
+		}
+		if strings.Contains(line, `"id":3`) && strings.Contains(line, `"result"`) {
+			t.Fatalf("a code's call was answered by this host: %s", line)
+		}
+	}
+	l.Close()
 
 	// The browser connects there with its own key, and the control plane answers it.
 	controlPublic, _ := controllink.PublicKey(controlPrivate)
@@ -136,7 +163,6 @@ func TestAPageThroughThisHost(t *testing.T) {
 	// plane could not have, they are still answered, framed as the control plane frames them.
 	stopUplink()
 	time.Sleep(300 * time.Millisecond)
-	host, _ := json.Marshal(member.Host)
 	l.Write(ctx, `{"h":`+string(host)+`,"m":{"jsonrpc":"2.0","id":8,"method":"daemon/status"}}`)
 	for {
 		rctx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -147,6 +173,23 @@ func TestAPageThroughThisHost(t *testing.T) {
 		}
 		if strings.Contains(line, `"id":8`) {
 			if !strings.Contains(line, `"result"`) || !strings.HasPrefix(line, `{"h":`+string(host)+`,"m":`) {
+				t.Fatal(line)
+			}
+			break
+		}
+	}
+	// A call the audit keeps still goes through the control plane, which says the machine
+	// is offline: this host never answers it itself.
+	l.Write(ctx, `{"h":`+string(host)+`,"m":{"jsonrpc":"2.0","id":9,"method":"agents/stop","params":{"agentID":"`+records.NewUUID()+`"}}}`)
+	for {
+		rctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		line, err := l.Read(rctx)
+		cancel()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(line, `"id":9`) {
+			if !strings.Contains(line, "offline") {
 				t.Fatal(line)
 			}
 			break
@@ -165,6 +208,36 @@ func TestAPageThroughThisHost(t *testing.T) {
 	line, err := l.Read(rctx)
 	if err != nil || !strings.Contains(line, controllink.Unavailable) {
 		t.Fatalf("%q %v", line, err)
+	}
+}
+
+// The control plane's word that a page is answered here is taken only from the line right
+// after the page's ok, and says who the page is and which calls still go up.
+func TestCarriedLine(t *testing.T) {
+	said := controllink.Carried{Actor: wire.AuditActor{User: "P1"}, Up: []string{"agents/start"}}
+	got, ok := controllink.ParseCarried(said.Line())
+	if !ok || got.Actor.User != "P1" {
+		t.Fatal(said.Line())
+	}
+	for _, line := range []string{`{"ok":{}}`, `{"carried":{"up":[]}}`, `{"carried":{"actor":{"user":"P1"}},"jsonrpc":"2.0"}`, `[]`} {
+		if _, ok := controllink.ParseCarried(line); ok {
+			t.Fatal(line)
+		}
+	}
+	c := &pageChannel{}
+	c.carried(got)
+	if c.Actor() == nil || c.Actor().User != "P1" {
+		t.Fatal("no actor")
+	}
+	for m, up := range map[string]bool{
+		`{"jsonrpc":"2.0","id":1,"method":"agents/start"}`:  true,
+		`{"jsonrpc":"2.0","id":1,"method":"daemon/status"}`: false,
+		`{"jsonrpc":"2.0","id":1,"result":{}}`:              false,
+		`not json`:                                          true,
+	} {
+		if c.goesUp(json.RawMessage(m)) != up {
+			t.Fatal(m)
+		}
 	}
 }
 
