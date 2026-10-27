@@ -34,6 +34,10 @@ func TestAMachinesFolderIdsAreAdopted(t *testing.T) {
 	mac := p.host("MAC")
 	box := p.host("BOX")
 	_, owner := p.client("Alex's Mac")
+	// None yet; and the window, having asked, is told of changes.
+	if got := listedProjects(t, owner); len(got) != 0 {
+		t.Fatalf("%+v", got)
+	}
 
 	joinFolders(t, p, mac.member.Host, wire.JoinedFolder{Folder: "file:///Users/a/Agents/", Name: "Agents", Project: "p-agents"})
 	waitNote(t, owner, "control/projectsChanged")
