@@ -35,8 +35,9 @@ The backup holds keys in clear. Keep it as safe as the control plane's own folde
 encrypted disk, or in an encrypted archive. Never put it in a shared or public place.
 
 The 0.11.2 store uses `v1/machines/` for machine records. Older builds used
-`v1/hosts/`. There is no automatic migration. Restore an older backup with the build
-that made it before you update the control plane.
+`v1/hosts/`. There is no automatic migration. Before the new build starts, move the
+`v1/hosts/` folder in the store to `v1/machines/`; the records in it do not change. To
+restore an older backup, do the same with the backup's `store/`.
 
 A change made while the backup runs can be missed. A change made after the backup is lost
 with the restore.
