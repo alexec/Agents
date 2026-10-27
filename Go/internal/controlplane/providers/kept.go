@@ -69,6 +69,13 @@ type KeptHooks struct {
 	Keepable func(host string) string
 	// Start starts the host's workspace, or joins the start under way, for by.
 	Start func(host, by string)
+	// OwnerOf is the person a host belongs to: only they are shown what was kept for it.
+	OwnerOf func(host string) string
+}
+
+// eachSession is a router that tells one person's sessions alone.
+type eachSession interface {
+	TellPerson(person, method string, params any)
 }
 
 // Kept is KeptRequests (#691 US3, research R9): prompts and agent starts for a stopped
@@ -94,13 +101,16 @@ func NewKept(s store.Store, router Router, hooks KeptHooks, log func(string)) *K
 	if log == nil {
 		log = func(string) {}
 	}
+	if hooks.OwnerOf == nil {
+		hooks.OwnerOf = func(string) string { return "" }
+	}
 	return &Kept{store: s, router: router, hooks: hooks, log: log, kept: map[string][]keptEntry{}, delivering: map[string]bool{}}
 }
 
 // NewKeptFor is KeptRequests wired to providers as ControlService wires it, and handed to
 // them: the router's keeper is its Keep and Attached.
 func NewKeptFor(p *Providers, log func(string)) *Kept {
-	k := NewKept(p.store, p.router, KeptHooks{Keepable: p.Keepable, Start: p.StartForUse}, log)
+	k := NewKept(p.store, p.router, KeptHooks{Keepable: p.Keepable, Start: p.StartForUse, OwnerOf: p.hooks.OwnerOf}, log)
 	p.KeepWith(k)
 	return k
 }
@@ -241,7 +251,11 @@ func (k *Kept) Attached(host string) {
 				delivered.AgentID = optional(wire.UUID(uuidOf(agent)))
 			}
 		}
-		k.router.BroadcastControl(NoticeKeptDelivered, delivered)
+		if tell, ok := k.router.(eachSession); ok {
+			tell.TellPerson(k.hooks.OwnerOf(host), NoticeKeptDelivered, delivered)
+		} else {
+			k.router.BroadcastControl(NoticeKeptDelivered, delivered)
+		}
 	}
 	k.changed()
 }
@@ -254,10 +268,24 @@ func (k *Kept) All() []KeptRequest {
 	return k.allLocked()
 }
 
+// For is the kept requests of the person's own hosts: no one sees another's (FR-018).
+func (k *Kept) For(person string) []KeptRequest {
+	k.Load()
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	return k.listLocked(func(host string) bool { return k.hooks.OwnerOf(host) == person })
+}
+
 func (k *Kept) allLocked() []KeptRequest {
+	return k.listLocked(func(string) bool { return true })
+}
+
+func (k *Kept) listLocked(shown func(host string) bool) []KeptRequest {
 	hosts := make([]string, 0, len(k.kept))
 	for h := range k.kept {
-		hosts = append(hosts, h)
+		if shown(h) {
+			hosts = append(hosts, h)
+		}
 	}
 	sort.Strings(hosts)
 	out := []KeptRequest{}
@@ -269,16 +297,20 @@ func (k *Kept) allLocked() []KeptRequest {
 	return out
 }
 
-// Answer is hosts/listKept, hosts/dropKept and hosts/retryKept.
-func (k *Kept) Answer(method string, params json.RawMessage) (any, error) {
+// Answer is hosts/listKept, hosts/dropKept and hosts/retryKept, for the person who asked:
+// only of their own hosts.
+func (k *Kept) Answer(method string, params json.RawMessage, person string) (any, error) {
 	k.Load()
 	switch method {
 	case MethodHostsListKept:
-		return KeptList{Kept: k.All()}, nil
+		return KeptList{Kept: k.For(person)}, nil
 	case MethodHostsDropKept:
 		which, err := requireKeptID(params)
 		if err != nil {
 			return nil, err
+		}
+		if k.hooks.OwnerOf(string(which.Host)) != person {
+			return nil, invalid("That was sent or dropped already.")
 		}
 		k.remove(string(which.Host), string(which.ID))
 		k.log("workspace: dropped kept request for " + string(which.Host))
@@ -290,6 +322,9 @@ func (k *Kept) Answer(method string, params json.RawMessage) (any, error) {
 			return nil, err
 		}
 		host := string(which.Host)
+		if k.hooks.OwnerOf(host) != person {
+			return nil, invalid("That was sent or dropped already.")
+		}
 		k.mu.Lock()
 		index := -1
 		for i, e := range k.kept[host] {
@@ -380,7 +415,14 @@ func (k *Kept) remove(host, id string) {
 	}
 }
 
+// changed tells each person what is kept for their own hosts.
 func (k *Kept) changed() {
+	if each, ok := k.router.(eachPerson); ok {
+		each.BroadcastControlEach(NoticeKeptChanged, func(person string) any {
+			return KeptList{Kept: k.For(person)}
+		})
+		return
+	}
 	k.router.BroadcastControl(NoticeKeptChanged, KeptList{Kept: k.All()})
 }
 
