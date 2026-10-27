@@ -227,7 +227,7 @@ struct PromptBar: View {
         .onChange(of: model.offeredStart, initial: true) { takeOfferedStart() }
         .onChange(of: model.draftCwd) { takeOfferedStart() }
         // A persona is picked on the page's heading (#913); its labels go here.
-        .onChange(of: model.draftPersona) { _, id in addLabels(ofPersona: id) }
+        .onChange(of: model.draftPersona) { old, new in switchLabels(fromPersona: old, to: new) }
         // And a quote from a reply (#1553). One modifier for both: the chain is at the
         // type checker's limit. From the start too (#1739): Clean up worktrees offers its
         // words in the same update that makes the folder page, and this bar with it.
@@ -1348,13 +1348,12 @@ struct PromptBar: View {
 
     // MARK: A kind of session (#760)
 
-    /// The picked persona's labels, beside any already there.
-    private func addLabels(ofPersona id: String?) {
-        guard isNew, let persona = model.draftPersonas.first(where: { $0.id == id }) else { return }
-        for label in persona.settings.labels
-        where !draftLabels.contains(where: { SessionLabelPolicy.key($0) == SessionLabelPolicy.key(label) }) {
-            draftLabels.append(label)
-        }
+    /// The picked persona's labels, beside any already there, in place of the last one's (#2649).
+    private func switchLabels(fromPersona old: String?, to new: String?) {
+        guard isNew else { return }
+        draftLabels = Persona.labels(draftLabels,
+                                     switchingFrom: model.draftPersonas.first { $0.id == old },
+                                     to: model.draftPersonas.first { $0.id == new })
     }
 
     // MARK: Where in the folder (030)

@@ -62,6 +62,16 @@ public struct Persona: Codable, Hashable, Sendable, Identifiable {
         }
         return values
     }
+
+    /// The form's labels when the picked persona changes from `old` to `new` (#2649): the
+    /// old one's labels go, unless the new one names them too, and the new one's are added
+    /// beside the rest, each once.
+    public static func labels(_ labels: [String], switchingFrom old: Persona?, to new: Persona?) -> [String] {
+        let kept = Set((new?.settings.labels ?? []).map(SessionLabelPolicy.key))
+        let gone = Set((old?.settings.labels ?? []).map(SessionLabelPolicy.key)).subtracting(kept)
+        let left = labels.filter { !gone.contains(SessionLabelPolicy.key($0)) }
+        return left + SessionLabelPolicy.accepted(new?.settings.labels ?? [], existing: left)
+    }
 }
 
 extension DaemonAPI {

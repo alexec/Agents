@@ -35,8 +35,12 @@ export function personaChoices(persona: Persona, advertised: readonly ConfigOpti
   return values;
 }
 
-/** Its labels beside the ones already there, each once. */
-export function withPersonaLabels(labels: readonly string[], persona: Persona): string[] {
-  const have = new Set(labels.map((l) => l.toLowerCase()));
-  return [...labels, ...(persona.settings.labels ?? []).filter((l) => !have.has(l.toLowerCase()))];
+/** The form's labels when the picked persona changes (#2649): the last one's go, unless the new
+ *  one names them too, and the new one's go beside the rest, each once. */
+export function withPersonaLabels(labels: readonly string[], last: Persona | undefined, persona: Persona | undefined): string[] {
+  const kept = new Set((persona?.settings.labels ?? []).map((l) => l.toLowerCase()));
+  const gone = new Set((last?.settings.labels ?? []).map((l) => l.toLowerCase()).filter((l) => !kept.has(l)));
+  const left = labels.filter((l) => !gone.has(l.toLowerCase()));
+  const have = new Set(left.map((l) => l.toLowerCase()));
+  return [...left, ...(persona?.settings.labels ?? []).filter((l) => !have.has(l.toLowerCase()) && have.add(l.toLowerCase()))];
 }
