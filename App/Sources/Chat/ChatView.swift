@@ -1,13 +1,10 @@
 import AgentsKitCore
 import SwiftUI
 
-/// The right-hand side, whether or not there is an agent yet.
+/// The right-hand side for a selected session. A session the window does not have yet
+/// shows a spinner until the sessions load, then says it was deleted (#2651).
 ///
-/// One view rather than two, because a new chat has to turn into the chat. The prompt
-/// bar sits in the middle of an empty pane and moves to the foot of it when the
-/// conversation starts, and it is the same bar throughout.
-///
-/// Once there is a conversation the bar floats: the transcript runs the full height of
+/// The prompt bar floats: the transcript runs the full height of
 /// the pane and scrolls underneath it, the way controls sit over content everywhere
 /// else on the system. The transcript is told how tall the bar is so the last thing an
 /// agent said can still be scrolled clear of it. What waits on the person is the last
@@ -77,22 +74,19 @@ struct ChatView: View {
                         .clipped()
                     form
                 }
+            } else if model.hasLoadedAgents {
+                // The selection names a session this window does not have: it was
+                // deleted, or dropped from the list, while it was selected. Not a start
+                // form: a new session starts on the folder's page (#2651).
+                ContentUnavailableView("This session was deleted", systemImage: "trash",
+                                       description: Text("There is nothing left of it to show."))
             } else {
-                VStack(spacing: 0) {
-                    Spacer(minLength: 0)
-                    CrowdMark()
-                        .frame(width: 220)
-                        .padding(.bottom, 28)
-                    form
-                    Spacer(minLength: 0)
-                }
+                // At launch, before the live sessions arrive (#2651).
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        // The prompt bar moving between the middle of an empty pane and the foot of a
-        // chat. Not one chat changing for another: animating that faded the old rows out
-        // for a quarter of a second while the new ones were built, and every frame of it
-        // redrew the whole pane, which was most of the cost of opening a chat (#90).
-        .animation(.snappy(duration: 0.28), value: (popped?.id ?? model.selection) == nil)
         // Title stays on ContentView's detail: one owner for the window title.
         .environment(\.chatActions, chatActions)
         .environment(\.orgSandboxSetBy, model.sandboxSettings.setBy)
