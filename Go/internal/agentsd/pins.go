@@ -314,6 +314,9 @@ func (d *Daemon) writePins(f pinsFile, folder string) error {
 func (d *Daemon) pinsChanged(folder string) {
 	d.pinMu.Lock()
 	defer d.pinMu.Unlock()
+	if d.pinsStopped {
+		return
+	}
 	if d.pinTimers == nil {
 		d.pinTimers = map[string]*time.Timer{}
 	}
@@ -323,7 +326,11 @@ func (d *Daemon) pinsChanged(folder string) {
 	d.pinTimers[folder] = time.AfterFunc(time.Second, func() {
 		d.pinMu.Lock()
 		delete(d.pinTimers, folder)
+		stopped := d.pinsStopped
 		d.pinMu.Unlock()
+		if stopped {
+			return
+		}
 		pp := d.folderPins(folder)
 		Broadcast(d, wire.NotifyPinsChanged, wire.PinsChangedNotification{Folder: pp.Folder, Pins: pp.Pins,
 			Sessions: pp.Sessions, Workflows: pp.Workflows, Views: pp.Views})
@@ -698,8 +705,28 @@ func (d *Daemon) unpinSession(folder string, id wire.UUID) error {
 	return nil
 }
 
+// stopPins stops the pins/changed waiting to be said, and says none again: a stopped
+// host reading a folder's pins reads its servers' views too, and the person's servers are
+// found by the environment, so a host that stopped would read another one's (#2673).
+func (d *Daemon) stopPins() {
+	d.pinMu.Lock()
+	defer d.pinMu.Unlock()
+	d.pinsStopped = true
+	for folder, t := range d.pinTimers {
+		t.Stop()
+		delete(d.pinTimers, folder)
+	}
+}
+
+func (d *Daemon) pinsHaveStopped() bool {
+	d.pinMu.Lock()
+	defer d.pinMu.Unlock()
+	return d.pinsStopped
+}
+
 // pinState is the Daemon's: pins/changed waiting to be said, by folder.
 type pinState struct {
-	pinMu     sync.Mutex
-	pinTimers map[string]*time.Timer
+	pinMu       sync.Mutex
+	pinTimers   map[string]*time.Timer
+	pinsStopped bool
 }

@@ -209,7 +209,7 @@ func TestAPersonsServersViewIsDrawnOnceShownAndCallsOnlyItsOwnServer(t *testing.
 	d.keepViewCatalog(s.entry, viewCatalog{Version: viewCatalogVersion, Server: "ci", MadeAt: nowFunc().Add(-time.Hour), AppTools: []string{"refresh"}})
 	readsBeforeRefresh := catalogReads.Load()
 	if r, _ := call(5, "details", "ci"); !strings.Contains(string(r), `"called":"details"`) || calls.Load() != 1 || catalogReads.Load() != readsBeforeRefresh+1 {
-		t.Fatalf("%s", r)
+		t.Fatalf("%s: %d call(s), %d catalog read(s) after %d", r, calls.Load(), catalogReads.Load(), readsBeforeRefresh)
 	}
 	if _, e := call(6, "deploy", "ci"); e.Code != wire.FailureViewRefused || calls.Load() != 1 || catalogReads.Load() != readsBeforeRefresh+1 {
 		t.Fatalf("a view called a tool only the model may after the refresh: %+v", e)

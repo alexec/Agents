@@ -81,6 +81,9 @@ func (d *Daemon) serverViews(folder string, f pinsFile) []wire.PinView {
 // they are read. A server that failed is not asked again for five minutes (loadViewCatalog).
 func (d *Daemon) readServerViews(s viewServer, folder string) {
 	safe.Go("server views", func() {
+		if d.pinsHaveStopped() {
+			return
+		}
 		if d.loadViewCatalog(context.Background(), s) != nil {
 			d.pinsChanged(folder)
 		}
