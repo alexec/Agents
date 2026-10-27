@@ -35,8 +35,8 @@ type hostCopies struct {
 
 type hostCopy struct {
 	Folders json.RawMessage `json:"folders,omitempty"`
-	Agents   json.RawMessage `json:"agents,omitempty"`
-	HeardAt  records.Stamp   `json:"heardAt"`
+	Agents  json.RawMessage `json:"agents,omitempty"`
+	HeardAt records.Stamp   `json:"heardAt"`
 }
 
 func newHostCopies(s store.Store) *hostCopies {

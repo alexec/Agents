@@ -1276,7 +1276,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostJoinStatus"
+            "$ref": "daemon.schema.json#/definitions/MachineJoinStatus"
           }
         }
       ]
@@ -1291,7 +1291,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostTunnelChanged"
+            "$ref": "daemon.schema.json#/definitions/MachineTunnelChanged"
           }
         }
       ]
@@ -1451,7 +1451,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostCatalog"
+            "$ref": "daemon.schema.json#/definitions/MachineCatalog"
           }
         }
       ],
@@ -1699,7 +1699,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostClients"
+            "$ref": "daemon.schema.json#/definitions/MachineClients"
           }
         }
       ]
@@ -1714,7 +1714,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostHello"
+            "$ref": "daemon.schema.json#/definitions/MachineHello"
           }
         }
       ],
@@ -1735,7 +1735,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostMachineCall"
+            "$ref": "daemon.schema.json#/definitions/MachineWorkspaceCall"
           }
         }
       ],
@@ -1815,7 +1815,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostPolicy"
+            "$ref": "daemon.schema.json#/definitions/MachinePolicy"
           }
         }
       ]
@@ -1851,7 +1851,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostProviderDraftCall"
+            "$ref": "daemon.schema.json#/definitions/MachineProviderDraftCall"
           }
         }
       ],
@@ -1873,7 +1873,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostRelease"
+            "$ref": "daemon.schema.json#/definitions/MachineRelease"
           }
         }
       ]
@@ -1888,7 +1888,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostStatus"
+            "$ref": "daemon.schema.json#/definitions/MachineStatus"
           }
         }
       ],
@@ -1910,7 +1910,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostUser"
+            "$ref": "daemon.schema.json#/definitions/MachineUser"
           }
         }
       ]
@@ -1926,7 +1926,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostUserSettings"
+            "$ref": "daemon.schema.json#/definitions/MachineUserSettings"
           }
         }
       ]
@@ -1941,7 +1941,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostAnnounce"
+            "$ref": "daemon.schema.json#/definitions/MachineAnnounce"
           }
         }
       ],
@@ -1986,7 +1986,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostRequest"
+            "$ref": "daemon.schema.json#/definitions/MachineRequest"
           }
         }
       ],
@@ -2006,7 +2006,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostRequest"
+            "$ref": "daemon.schema.json#/definitions/MachineRequest"
           }
         }
       ],
@@ -2099,7 +2099,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostInstall"
+            "$ref": "daemon.schema.json#/definitions/MachineInstall"
           }
         }
       ],
@@ -2172,14 +2172,14 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostRequest"
+            "$ref": "daemon.schema.json#/definitions/MachineRequest"
           }
         }
       ],
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/HostLastHeard"
+          "$ref": "daemon.schema.json#/definitions/MachineLastHeard"
         }
       }
     },
@@ -2242,14 +2242,14 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostLink"
+            "$ref": "daemon.schema.json#/definitions/MachineLink"
           }
         }
       ],
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/ControlHost"
+          "$ref": "daemon.schema.json#/definitions/ControlMachine"
         }
       }
     },
@@ -2276,7 +2276,7 @@
         "schema": {
           "type": "array",
           "items": {
-            "$ref": "daemon.schema.json#/definitions/ControlHost"
+            "$ref": "daemon.schema.json#/definitions/ControlMachine"
           }
         }
       }
@@ -2315,7 +2315,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostRequest"
+            "$ref": "daemon.schema.json#/definitions/MachineRequest"
           }
         }
       ],
@@ -2365,14 +2365,14 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostMachineOptions"
+            "$ref": "daemon.schema.json#/definitions/MachineOptions"
           }
         }
       ],
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/ControlHost"
+          "$ref": "daemon.schema.json#/definitions/ControlMachine"
         }
       }
     },
@@ -2385,7 +2385,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostRelayRequest"
+            "$ref": "daemon.schema.json#/definitions/MachineRelayRequest"
           }
         }
       ],
@@ -2433,14 +2433,14 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostRequest"
+            "$ref": "daemon.schema.json#/definitions/MachineRequest"
           }
         }
       ],
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/ControlHost"
+          "$ref": "daemon.schema.json#/definitions/ControlMachine"
         }
       }
     },
@@ -2458,7 +2458,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostEnroll"
+            "$ref": "daemon.schema.json#/definitions/MachineEnroll"
           }
         }
       ],
@@ -2483,14 +2483,14 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostStop"
+            "$ref": "daemon.schema.json#/definitions/MachineStop"
           }
         }
       ],
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/ControlHost"
+          "$ref": "daemon.schema.json#/definitions/ControlMachine"
         }
       }
     },
@@ -2508,14 +2508,14 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostRequest"
+            "$ref": "daemon.schema.json#/definitions/MachineRequest"
           }
         }
       ],
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/ControlHost"
+          "$ref": "daemon.schema.json#/definitions/ControlMachine"
         }
       }
     },
@@ -2528,7 +2528,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostUpdate"
+            "$ref": "daemon.schema.json#/definitions/MachineUpdate"
           }
         }
       ],

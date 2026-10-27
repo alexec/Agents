@@ -22,7 +22,7 @@ func TestAMachineIsToldTheRelease(t *testing.T) {
 		if method != wire.NotifyHostRelease.Name {
 			return
 		}
-		var r wire.HostRelease
+		var r wire.MachineRelease
 		json.Unmarshal(params, &r)
 		mu.Lock()
 		told[host] = r.Version

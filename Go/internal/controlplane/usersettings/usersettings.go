@@ -664,9 +664,9 @@ func (b *Book) Names(ctx context.Context, user string) ([]wire.UserSecretRow, er
 		if r.Sealed == nil {
 			continue
 		}
-		row := wire.UserSecretRow{Name: wire.UserSecretName(r.Name), Updated: r.Updated, Machines: []wire.HostID{}, LeftOn: r.LeftOn}
+		row := wire.UserSecretRow{Name: wire.UserSecretName(r.Name), Updated: r.Updated, Machines: []wire.MachineRef{}, LeftOn: r.LeftOn}
 		for _, m := range r.Machines {
-			row.Machines = append(row.Machines, wire.HostID(m))
+			row.Machines = append(row.Machines, wire.MachineRef(m))
 		}
 		rows = append(rows, row)
 	}
@@ -677,12 +677,12 @@ func (b *Book) Names(ctx context.Context, user string) ([]wire.UserSecretRow, er
 // Delivery is host/userSettings for a machine of user's: the settings and every secret,
 // opened. Only for that user's own machine's link (FR-025). A secret that will not open
 // (sealed by another keeper, as after a move) is left out, and named in skipped.
-func (b *Book) Delivery(ctx context.Context, user string) (out wire.HostUserSettings, skipped []string, err error) {
+func (b *Book) Delivery(ctx context.Context, user string) (out wire.MachineUserSettings, skipped []string, err error) {
 	settings, err := b.Settings(ctx, user)
 	if err != nil {
 		return out, nil, err
 	}
-	out = wire.HostUserSettings{User: user, Settings: settings, Secrets: []wire.UserSecret{}}
+	out = wire.MachineUserSettings{User: user, Settings: settings, Secrets: []wire.UserSecret{}}
 	files, err := b.AgentConfigFiles(ctx, user)
 	if err != nil {
 		return out, nil, err
@@ -768,7 +768,7 @@ func (b *Book) Left(ctx context.Context, user, host, hostName string) ([]string,
 			}
 			r.Machines = slices.DeleteFunc(r.Machines, func(m string) bool { return m == host })
 			if r.Sealed != nil {
-				r.LeftOn = append(r.LeftOn, wire.SecretLeftOn{Host: wire.HostID(host), Name: hostName, At: b.stamp()})
+				r.LeftOn = append(r.LeftOn, wire.SecretLeftOn{Host: wire.MachineRef(host), Name: hostName, At: b.stamp()})
 			}
 			return records.Encode(r)
 		})

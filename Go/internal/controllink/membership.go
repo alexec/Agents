@@ -113,10 +113,10 @@ func AcceptableEndpoint(e wire.ControlEndpoint) bool {
 	return true
 }
 
-// HostHello is DaemonAPI.HostHello: what a host says on every connect. Implementation is
+// MachineHello is DaemonAPI.MachineHello: what a host says on every connect. Implementation is
 // "go" from this host (#1134), so the Hosts pane can say so; a control plane that does
 // not know the field ignores it, as Swift's Codable does.
-type HostHello = wire.HostHello
+type MachineHello = wire.MachineHello
 
 func LoadMembership(root string) (*Membership, error) {
 	b, err := os.ReadFile(filepath.Join(root, "control-host.json"))
@@ -147,7 +147,7 @@ func HostPrivateKey(root string) ([]byte, error) {
 }
 
 // Enroll uses a host code once: proves the code's key, says hosts/announce, keeps the answer.
-func Enroll(ctx context.Context, root string, code *Code, private []byte, hello HostHello) (*Membership, error) {
+func Enroll(ctx context.Context, root string, code *Code, private []byte, hello MachineHello) (*Membership, error) {
 	if !code.Host {
 		return nil, errors.New("that is not a host code")
 	}
@@ -166,7 +166,7 @@ func Enroll(ctx context.Context, root string, code *Code, private []byte, hello 
 	if hello.Name != nil {
 		name = *hello.Name
 	}
-	params, _ := json.Marshal(wire.HostAnnounce{PublicKey: pub, Name: name, Platform: hello.Platform, Version: hello.Version,
+	params, _ := json.Marshal(wire.MachineAnnounce{PublicKey: pub, Name: name, Platform: hello.Platform, Version: hello.Version,
 		MachineID: hello.MachineID, Implementation: hello.Implementation})
 	req, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "hosts/announce", "params": json.RawMessage(params)})
 	if err := l.Write(ctx, string(req)); err != nil {

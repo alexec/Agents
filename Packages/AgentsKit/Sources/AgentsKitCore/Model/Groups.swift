@@ -135,17 +135,17 @@ public extension DaemonAPI {
 
     /// `bots/stopRun` (FR-031): an admin stops an agent on a bot's machine.
     struct BotStopRun: Codable, Sendable, Hashable {
-        public var host: HostID
+        public var host: MachineRef
         public var agent: UUID
 
-        public init(host: HostID, agent: UUID) {
+        public init(host: MachineRef, agent: UUID) {
             self.host = host
             self.agent = agent
         }
     }
 
     /// `hosts/startEnroll` with `as`: a code for a bot's machine, an admin's only (#1761).
-    struct HostEnroll: Codable, Sendable, Hashable {
+    struct MachineEnroll: Codable, Sendable, Hashable {
         public var `as`: String?
 
         public init(as bot: String? = nil) { self.as = bot }

@@ -457,7 +457,7 @@ private struct FolderGeneralPane: View {
 /// A folder as a person writes it: `~/Agents` on this Mac, the full path on
 /// a server, where `~` would be somebody else's home.
 enum FolderPlace {
-    static func path(_ folder: URL, on host: HostID) -> String {
+    static func path(_ folder: URL, on host: MachineRef) -> String {
         let path = folder.path
         guard host == .mac else { return path }
         let home = RealHome.path

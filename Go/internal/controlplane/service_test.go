@@ -138,7 +138,7 @@ func (p *plane) olderHost(machine string) *fakeHost {
 	return p.hostSaying(hello, nil)
 }
 
-func (p *plane) hostSaying(hello controllink.HostHello, opened func(controllink.Conn)) *fakeHost {
+func (p *plane) hostSaying(hello controllink.MachineHello, opened func(controllink.Conn)) *fakeHost {
 	root := p.t.TempDir()
 	private := controllink.NewPrivateKey()
 	member, err := controllink.Enroll(context.Background(), root, p.code(true), private, hello)
@@ -149,13 +149,13 @@ func (p *plane) hostSaying(hello controllink.HostHello, opened func(controllink.
 }
 
 // fakeHello is a host of this build: it says the capabilities a host declares.
-func fakeHello(machine string) controllink.HostHello {
-	return controllink.HostHello{Version: "0.1", Platform: "linux aarch64", MachineID: machine, Name: new("box " + machine),
+func fakeHello(machine string) controllink.MachineHello {
+	return controllink.MachineHello{Version: "0.1", Platform: "linux aarch64", MachineID: machine, Name: new("box " + machine),
 		Implementation: new("go"), Capabilities: wire.DeclaredCapabilities["host"]}
 }
 
 // serveHost connects a host that has joined, and answers its channels as host does.
-func (p *plane) serveHost(root string, member *controllink.Membership, private []byte, hello controllink.HostHello, opened func(controllink.Conn)) *fakeHost {
+func (p *plane) serveHost(root string, member *controllink.Membership, private []byte, hello controllink.MachineHello, opened func(controllink.Conn)) *fakeHost {
 	ctx, cancel := context.WithCancel(context.Background())
 	h := &fakeHost{root: root, member: member, cancel: cancel, done: make(chan struct{}), private: private}
 	told, asked := p.told, p.asked
@@ -298,7 +298,7 @@ func TestAHostAndAWindowThroughTheControlPlane(t *testing.T) {
 	if status.Name != "Test plane" || status.HomeHost != "mac" || status.You != member.Client || status.StartedAt < 8e8 {
 		t.Fatalf("%+v", status)
 	}
-	var hosts []wire.ControlHost
+	var hosts []wire.ControlMachine
 	json.Unmarshal(call(t, window, "", "hosts/list", nil), &hosts)
 	if len(hosts) != 2 || hosts[0].State != "online" || hosts[1].State != "online" || deref(hosts[0].Implementation) != "go" {
 		t.Fatalf("%+v", hosts)
@@ -338,21 +338,21 @@ func TestACodeIsUsedOnce(t *testing.T) {
 	}
 	// A client code is no host code.
 	if _, err := controllink.Enroll(context.Background(), t.TempDir(), &controllink.Code{Host: true, ControlKey: c.ControlKey,
-		Secret: p.code(false).Secret, URL: c.URL, Name: c.Name}, controllink.NewPrivateKey(), controllink.HostHello{}); err == nil {
+		Secret: p.code(false).Secret, URL: c.URL, Name: c.Name}, controllink.NewPrivateKey(), controllink.MachineHello{}); err == nil {
 		t.Fatal("a client code enrolled a host")
 	}
 	// A spent code replayed by the key that spent it is given the same host.
 	hc := p.code(true)
 	priv := controllink.NewPrivateKey()
-	first, err := controllink.Enroll(context.Background(), t.TempDir(), hc, priv, controllink.HostHello{Name: new("a"), MachineID: "X"})
+	first, err := controllink.Enroll(context.Background(), t.TempDir(), hc, priv, controllink.MachineHello{Name: new("a"), MachineID: "X"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	again, err := controllink.Enroll(context.Background(), t.TempDir(), hc, priv, controllink.HostHello{Name: new("a"), MachineID: "X"})
+	again, err := controllink.Enroll(context.Background(), t.TempDir(), hc, priv, controllink.MachineHello{Name: new("a"), MachineID: "X"})
 	if err != nil || again.Host != first.Host {
 		t.Fatal(again, err)
 	}
-	if _, err := controllink.Enroll(context.Background(), t.TempDir(), hc, controllink.NewPrivateKey(), controllink.HostHello{}); err == nil {
+	if _, err := controllink.Enroll(context.Background(), t.TempDir(), hc, controllink.NewPrivateKey(), controllink.MachineHello{}); err == nil {
 		t.Fatal("another key used a spent code")
 	}
 }
@@ -396,7 +396,7 @@ func TestTheFolderAndKeyAreTheControlPlane(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer window.Close()
-	var hosts []wire.ControlHost
+	var hosts []wire.ControlMachine
 	json.Unmarshal(call(t, window, "", "hosts/list", nil), &hosts)
 	if len(hosts) != 1 || string(hosts[0].ID) != h.member.Host {
 		t.Fatalf("%+v", hosts)
@@ -421,7 +421,7 @@ func TestASwiftStoreIsTakenUp(t *testing.T) {
 	if _, err := r.SettingsOrMake(context.Background(), func() records.Settings { return settings }); err != nil {
 		t.Fatal(err)
 	}
-	r.SaveHost(context.Background(), records.HostRecord{ID: "mac", Name: "Mac", Platform: "macOS arm64"})
+	r.SaveHost(context.Background(), records.MachineRecord{ID: "mac", Name: "Mac", Platform: "macOS arm64"})
 	p := startPlane(t, store.NewFolder(root), key)
 	if p.s.Records().Host("mac") == nil {
 		t.Fatal("the host went")
@@ -617,7 +617,7 @@ func (p *plane) rawHostKey(name string, relay bool) (string, *controllink.Lines,
 	if err != nil {
 		p.t.Fatal(err)
 	}
-	params, _ := json.Marshal(wire.HostAnnounce{PublicKey: public, Name: name, Platform: "macOS arm64", Version: "1",
+	params, _ := json.Marshal(wire.MachineAnnounce{PublicKey: public, Name: name, Platform: "macOS arm64", Version: "1",
 		MachineID: "RELAY-MAC", Relay: &relay})
 	l.Write(ctx, `{"jsonrpc":"2.0","id":1,"method":"hosts/announce","params":`+string(params)+`}`)
 	line, err := l.Read(ctx)
@@ -636,7 +636,7 @@ func (p *plane) rawHostKey(name string, relay bool) (string, *controllink.Lines,
 	if err != nil {
 		p.t.Fatal(err)
 	}
-	hello, _ := json.Marshal(wire.HostHello{Version: "1", Platform: "macOS arm64", MachineID: "RELAY-MAC", Relay: &relay})
+	hello, _ := json.Marshal(wire.MachineHello{Version: "1", Platform: "macOS arm64", MachineID: "RELAY-MAC", Relay: &relay})
 	l.Write(ctx, channelFrame(0, `{"jsonrpc":"2.0","id":1,"method":"host/hello","params":`+string(hello)+`}`))
 	p.t.Cleanup(l.Close)
 	return host, l, key
@@ -889,7 +889,7 @@ func TestHostsJoiningAtOnceFromItsMachineAreOneMac(t *testing.T) {
 		wg.Go(func() {
 			<-start
 			members[i], errs[i] = controllink.Enroll(context.Background(), t.TempDir(), codes[i], keys[i],
-				controllink.HostHello{Name: new("host " + itoa(i)), MachineID: "MACHINE-1"})
+				controllink.MachineHello{Name: new("host " + itoa(i)), MachineID: "MACHINE-1"})
 		})
 	}
 	close(start)
@@ -926,7 +926,7 @@ func TestHostsJoiningAtOnceFromItsMachineAreOneMac(t *testing.T) {
 	// A replay of a join that could not be mac is given the id it was given.
 	for i := range n {
 		again, err := controllink.Enroll(context.Background(), t.TempDir(), codes[i], keys[i],
-			controllink.HostHello{Name: new("host " + itoa(i)), MachineID: "MACHINE-1"})
+			controllink.MachineHello{Name: new("host " + itoa(i)), MachineID: "MACHINE-1"})
 		if err != nil || again.Host != members[i].Host {
 			t.Fatalf("replay of %s: %v %v", members[i].Host, again, err)
 		}
@@ -940,7 +940,7 @@ func TestABadProofSaysWhichHostAndWhy(t *testing.T) {
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	code := p.code(true)
 	member, err := controllink.Enroll(context.Background(), t.TempDir(), code, controllink.NewPrivateKey(),
-		controllink.HostHello{Name: new("a"), MachineID: "X"})
+		controllink.MachineHello{Name: new("a"), MachineID: "X"})
 	if err != nil {
 		t.Fatal(err)
 	}

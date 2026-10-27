@@ -23,7 +23,7 @@ At least one runtime is needed to run agents.
 
 ## Runtime vendors
 
-Each runtime runs on your host and talks to its own company. Agents does not see that
+Each runtime runs on your machine and talks to its own company. Agents does not see that
 traffic and does not copy it ([Privacy](../../privacy.md)).
 
 | Runtime | Company | Notes |
@@ -31,7 +31,7 @@ traffic and does not copy it ([Privacy](../../privacy.md)).
 | Claude | Anthropic | Signs in with a Claude account, or uses a key or a gateway that you pass in its environment (Bedrock, Vertex, a base URL). On a server that borrows a Mac's sign-in, the gateway variables are cleared and its calls go out from that Mac ([Data flow](data-flow.md#a-borrowed-sign-in)). |
 | Codex | OpenAI | Refreshes its token at `auth.openai.com`. A server can borrow a Mac's sign-in, as for Claude. |
 | Gemini | Google | An API key from Google AI Studio. Agents checks the key at `generativelanguage.googleapis.com`. |
-| Antigravity | Google | A personal or business Google account. Mac hosts only. |
+| Antigravity | Google | A personal or business Google account. Mac machines only. |
 | Grok | xAI | Signs in with grok.com. |
 | Copilot | GitHub (Microsoft) | Signs in with GitHub. |
 | Cursor | Anysphere (Cursor) | Signs in with Cursor. |
@@ -57,7 +57,7 @@ gateway that the organisation sets (#999) sends the data to that provider or gat
 | Each MCP server's maker | Connectors | What your agents send to its tools | Yes. Add only the servers your organisation allows. |
 | Docker, AWS, Google Cloud, DigitalOcean, GitHub Codespaces, Coder | Machine providers | The calls that start, stop and make machines, with the credentials you give | Yes. A control plane with no provider calls none. |
 | Google, Apple, GitHub | Sign-in of a person to the control plane | An ID token or a device-flow token, once per sign-in | Yes. The local owner signs in with codes and needs no outside account. |
-| nodejs.org, npm, GitHub releases, Google, each runtime's maker | Downloads of runtimes | The download requests | Partly. A host downloads only the runtimes you install. |
+| nodejs.org, npm, GitHub releases, Google, each runtime's maker | Downloads of runtimes | The download requests | Partly. A machine downloads only the runtimes you install. |
 | skills.sh, the MCP registries, GitHub | Marketplaces and catalogues | Search and download requests | Partly. An organisation's policy will allow only some marketplaces (T5, #998). |
 
 ## A control plane that the makers of Agents run
@@ -72,7 +72,7 @@ A self-hosted control plane uses none of these.
 | Google | One Compute Engine VM in `us-west1`, and Cloud KMS | The control plane's store, on the VM's disk. KMS seals the control key. |
 | Cloudflare | DNS | The names only. Cloudflare does not carry the traffic. |
 | Let's Encrypt | TLS certificates | The names that the certificates are for. |
-| Apple | Apple Push Notification service | As above, for phones with no Mac host. |
+| Apple | Apple Push Notification service | As above, for phones with no Mac machine. |
 
 **The hosted service** ([Run the hosted service](../../how-to/run-the-hosted-service.md))
 gives each account a control plane of its own, with its records under `accounts/<id>/` in

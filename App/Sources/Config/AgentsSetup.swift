@@ -65,7 +65,7 @@ struct AgentsInstructionsSection: View {
     @State private var exists = false
 
     /// Whose disk the file is on: this Mac's host for yours, the folder's host for a folder's.
-    private var host: HostID {
+    private var host: MachineRef {
         if case .folder = place { return model.selectedFolderHost }
         return .mac
     }

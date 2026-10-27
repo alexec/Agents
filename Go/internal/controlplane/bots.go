@@ -193,7 +193,7 @@ func (s *Service) sendHostUser(host string) {
 		return
 	}
 	user := s.ownerOf(host)
-	u := wire.HostUser{User: user, Kind: records.KindPerson, Name: s.personName(user), Labels: []string{}}
+	u := wire.MachineUser{User: user, Kind: records.KindPerson, Name: s.personName(user), Labels: []string{}}
 	if u.Name == "" && user == s.localOwner() {
 		u.Name = localOwnerName
 	}

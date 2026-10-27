@@ -4,9 +4,9 @@ description: What a folder is, why each one lives on a single machine, and why a
 devices: [mac, server]
 ---
 
-# Folders, hosts and worktrees
+# Folders, machines and worktrees
 
-Every agent works in a folder, every folder lives on a host, and inside a folder an
+Every agent works in a folder, every folder lives on a machine, and inside a folder an
 agent can have a worktree of its own. This page explains what each of those is and why the
 app draws the lines where it does.
 
@@ -30,42 +30,42 @@ agent's changes need one, and are simply not offered in a folder that is not; ev
 else works the same.
 
 No folder is made for you (#2134). To ask an agent something that needs no repository,
-add any folder as a folder, such as an empty one, and start a session in it. A host that
+add any folder as a folder, such as an empty one, and start a session in it. A machine that
 still has the **chat** folder at `~/.agents/chat` from an earlier version keeps it as an
 ordinary folder: archive it, or keep using it, as any other.
 
-## A folder lives on one host
+## A folder lives on one machine
 
-A host is a machine where agents can do their work. Your Mac is one, once Agents Host runs
+A machine is a machine where agents can do their work. Your Mac is one, once Agents Host runs
 on it. A Linux server can be another, and so can a second Mac, once it joins your control
 plane (see [The control plane](control-plane.md)).
 
-Each folder belongs to exactly one host, and its folder is a path on that host. An agent
+Each folder belongs to exactly one machine, and its folder is a path on that machine. An agent
 in a folder on a server runs on the server: its commands run there, its edits land
 there, and the runtimes you can pick from are the ones installed and signed in on that
 server, not on your Mac. The files pane, the terminal and the worktrees all show the
-server's copy. The same is true of a folder on this Mac: the window asks this Mac's host
+server's copy. The same is true of a folder on this Mac: the window asks this Mac's machine
 for its files just as it asks a server's.
 
-Folders on every host sit in the same list, each under its host's heading, in every
+Folders on every machine sit in the same list, each under its machine's heading, in every
 window and on every phone and iPad. There is no switch that turns the whole window into a
-view of one host.
+view of one machine.
 
-The reason for one host per folder is that a folder is only ever in one place. Keeping
+The reason for one machine per folder is that a folder is only ever in one place. Keeping
 two copies of it on two machines in step would mean deciding, every time they differ,
 which one is right, and an agent's half-finished edit is exactly the kind of difference
 nobody can decide about. So the work happens where the folder is, and the window goes to
 it.
 
-## Hosts join by connecting out
+## Machines join by connecting out
 
-A host is never reached by anything. It connects out to your control plane over HTTPS,
-with a key of its own, and keeps that connection open. To add a server, you run one
-command on it, which a window shows you with a code that works once; it installs the host
-there in your home folder, and the host joins. A window can instead install it for you over
+A machine is never reached by anything. It connects out to your control plane over HTTPS,
+with a key of its own, and keeps that connection open. To add a machine, you run one
+command on it, which a window shows you with a code that works once; it installs the machine
+there in your home folder, and the machine joins. A window can instead install it for you over
 ssh with a key you give for that install only; afterwards the control plane keeps neither
 the key nor the session, and the server connects out like any other. See
-[Add a server](../how-to/add-a-server.md).
+[Add a machine](../how-to/add-a-machine.md).
 
 Connecting out means a server behind a firewall or a home router joins without a port
 being opened to it, and a server you add once is seen by every window and device, with
@@ -78,10 +78,10 @@ its network, or has the window closed, because nothing they need is on the Mac. 
 can happen on Linux, or on a machine with more room than a laptop. And the Mac stays quiet
 while four agents build at once somewhere else.
 
-When a host is offline, its folders show what the app last knew, marked as not current,
-and the app does not take a prompt or an answer for them that it cannot deliver. A host
+When a machine is offline, its folders show what the app last knew, marked as not current,
+and the app does not take a prompt or an answer for them that it cannot deliver. A machine
 that loses its connection keeps its agents working, and reconnects by itself when it can.
-When it does, you see everything that happened meanwhile. A host never stops for being
+When it does, you see everything that happened meanwhile. A machine never stops for being
 idle, so it is still there for the next connection.
 
 If your control plane runs on your Mac, a server's agents keep working while the Mac
@@ -193,7 +193,7 @@ the commit it took, and checks each file against GitHub's own record of it at th
 
 ## Related
 
-- [Add a folder](../how-to/add-a-folder.md), [Add a server](../how-to/add-a-server.md)
+- [Add a folder](../how-to/add-a-folder.md), [Add a machine](../how-to/add-a-machine.md)
   and [Start an agent in its own worktree](../how-to/start-in-a-worktree.md).
 - [The control plane](control-plane.md).
 - [Give an agent more folders and connectors](../how-to/give-an-agent-more-folders.md).

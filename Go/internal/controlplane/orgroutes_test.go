@@ -81,7 +81,7 @@ func opened(t *testing.T, box *fakeHost, r *wire.DeliveredRoute, field string) s
 }
 
 // routesHello is a machine that keeps org routes.
-func routesHello(name string) controllink.HostHello {
+func routesHello(name string) controllink.MachineHello {
 	hello := fakeHello(name)
 	hello.Capabilities = append(slices.Clone(hello.Capabilities), CapHostOrgRoutes)
 	return hello
@@ -420,7 +420,10 @@ func TestReplaceAndRemoveARoute(t *testing.T) {
 		wire.OrgRoutesApplied{Routes: []wire.OrgRouteVersion{{ID: "acme", Version: 2}}}); err != nil {
 		t.Fatal(err)
 	}
-	p.waitFor(func() bool { h := p.s.records.Host(spare.member.Host); return h != nil && len(appliedOrgRoutes(*h)) == 1 }, "the machine's routes noted")
+	p.waitFor(func() bool {
+		h := p.s.records.Host(spare.member.Host)
+		return h != nil && len(appliedOrgRoutes(*h)) == 1
+	}, "the machine's routes noted")
 	call(t, sam.window, "", "hosts/remove", map[string]string{"host": spare.member.Host})
 	for _, s := range []*controllink.Session{window, sam.window} {
 		var left wire.OrgRoutesLeft
@@ -593,7 +596,9 @@ func TestCloudCredentialsGoAsShortLivedTokens(t *testing.T) {
 		t.Fatal("no token is ending")
 	}
 	p.s.resendOrgRoutes()
-	p.waitFor(func() bool { return opened(t, box, told.route(box.member.Host, "vertex"), "googleToken") == "ya29.google-2" },
+	p.waitFor(func() bool {
+		return opened(t, box, told.route(box.member.Host, "vertex"), "googleToken") == "ya29.google-2"
+	},
 		"the machine told a new token")
 	p.waitFor(func() bool { return opened(t, box, told.route(box.member.Host, "azure"), "entraToken") == "entra-2" }, "a new Entra token")
 	if p.s.tokensEndingSoon() {

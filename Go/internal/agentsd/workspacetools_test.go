@@ -33,9 +33,9 @@ func TestAnAgentsWorkspaceTools(t *testing.T) {
 	listed := wire.AgentMachines{Providers: []wire.AgentMachinesProvider{{ID: "do", Name: "DigitalOcean", CanMake: true, CanDelete: true,
 		Workspaces: []wire.AgentMachinesMachine{{ID: "w1", Name: "devbox", State: "running", Host: &host, HostState: new("online")}}}}}
 	var mu sync.Mutex
-	var asked []wire.HostMachineCall
+	var asked []wire.MachineWorkspaceCall
 	d.SetControlAsk(func(_ context.Context, method string, params any) (json.RawMessage, error) {
-		call := params.(wire.HostMachineCall)
+		call := params.(wire.MachineWorkspaceCall)
 		mu.Lock()
 		asked = append(asked, call)
 		mu.Unlock()

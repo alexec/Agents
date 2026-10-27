@@ -147,4 +147,4 @@ file in your editor and **Reveal in Finder**.
 
 - [Settings](../reference/settings.md)
 - [Runtimes](../reference/runtimes.md)
-- [Folders, hosts and worktrees](../explanation/folders-hosts-worktrees.md)
+- [Folders, hosts and worktrees](../explanation/folders-machines-worktrees.md)

@@ -260,7 +260,7 @@
           "$ref": "#/definitions/UUID"
         },
         "host": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         },
         "grant": {
           "type": "string"
@@ -1776,7 +1776,7 @@
           "type": "string"
         },
         "host": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         },
         "target": {
           "type": "string"
@@ -2452,7 +2452,7 @@
       "description": "bots/stopRun (#1761, FR-031): an admin stops an agent on a bot's machine, the one way a client acts there.",
       "properties": {
         "host": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         },
         "agent": {
           "$ref": "#/definitions/UUID"
@@ -5054,7 +5054,7 @@
       "description": "console/stopAgent (#2019, M9): an admin stops one agent on any machine of the organisation, as Console ▸ Live Now does.",
       "properties": {
         "host": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         },
         "agent": {
           "$ref": "#/definitions/UUID"
@@ -5428,11 +5428,28 @@
       ],
       "additionalProperties": false
     },
-    "ControlHost": {
+    "ControlInstallProgress": {
+      "type": "object",
+      "description": "control/installProgress: a step of Add a Machine.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "step": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "step"
+      ],
+      "additionalProperties": false
+    },
+    "ControlMachine": {
       "type": "object",
       "properties": {
         "id": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         },
         "name": {
           "type": "string"
@@ -5458,13 +5475,13 @@
         "signInFrom": {
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/definitions/HostID"
+            "$ref": "#/definitions/MachineRef"
           }
         },
         "gitFrom": {
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/definitions/HostID"
+            "$ref": "#/definitions/MachineRef"
           }
         },
         "gitAsks": {
@@ -5474,10 +5491,10 @@
           }
         },
         "tunnel": {
-          "$ref": "#/definitions/HostTunnel"
+          "$ref": "#/definitions/MachineTunnel"
         },
         "workspace": {
-          "$ref": "#/definitions/HostMachine"
+          "$ref": "#/definitions/MachineWorkspace"
         },
         "implementation": {
           "type": "string"
@@ -5508,23 +5525,6 @@
         "version",
         "state",
         "reach"
-      ],
-      "additionalProperties": false
-    },
-    "ControlInstallProgress": {
-      "type": "object",
-      "description": "control/installProgress: a step of Add a Server.",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "step": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "name",
-        "step"
       ],
       "additionalProperties": false
     },
@@ -5608,7 +5608,7 @@
           "type": "string"
         },
         "host": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         },
         "relayed": {
           "type": "boolean"
@@ -5698,7 +5698,7 @@
           "type": "string"
         },
         "homeHost": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         },
         "machineID": {
           "type": "string"
@@ -5730,7 +5730,7 @@
           "description": "The origin of the sandbox proxy that draws MCP Apps views on the page at publicWeb (#1484): a second name in front of the same control plane. None when it draws no views there."
         },
         "thisMacHost": {
-          "$ref": "#/definitions/HostJoinStatus"
+          "$ref": "#/definitions/MachineJoinStatus"
         },
         "folderDetection": {
           "$ref": "#/definitions/FolderDetection"
@@ -5738,7 +5738,7 @@
         "unjoinedTunnels": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/HostTunnelChanged"
+            "$ref": "#/definitions/MachineTunnelChanged"
           }
         },
         "capabilities": {
@@ -8232,7 +8232,7 @@
       "description": "One machine on Console ▸ Machines (#1804): its hosts/list row, whose it is, and how many of its agents were running when it last listed them. Numbers only, never what the agents said.",
       "properties": {
         "host": {
-          "$ref": "#/definitions/ControlHost"
+          "$ref": "#/definitions/ControlMachine"
         },
         "ownerName": {
           "type": "string",
@@ -8644,7 +8644,7 @@
           "type": "string"
         },
         "from": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         }
       },
       "required": [
@@ -9154,722 +9154,6 @@
       },
       "additionalProperties": false
     },
-    "HostAnnounce": {
-      "type": "object",
-      "description": "hosts/announce, on an enrolment connection.",
-      "properties": {
-        "publicKey": {
-          "$ref": "#/definitions/Base64"
-        },
-        "name": {
-          "type": "string"
-        },
-        "platform": {
-          "type": "string"
-        },
-        "version": {
-          "type": "string"
-        },
-        "machineID": {
-          "type": "string"
-        },
-        "relay": {
-          "type": "boolean"
-        },
-        "implementation": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "publicKey",
-        "name",
-        "platform",
-        "version",
-        "machineID"
-      ],
-      "additionalProperties": false
-    },
-    "HostCatalog": {
-      "type": "object",
-      "description": "governance/report (#2019, M5): the MCP servers and skills a machine has from a catalogue, personal and in its folders, at most 500. Sent at start and each hour; each replaces the last.",
-      "properties": {
-        "items": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/CatalogItem"
-          }
-        }
-      },
-      "required": [
-        "items"
-      ],
-      "additionalProperties": false
-    },
-    "HostClient": {
-      "type": "object",
-      "description": "A paired window a host may let in on its local socket (#1118), with the key it proves itself with.",
-      "properties": {
-        "id": {
-          "$ref": "#/definitions/UUID"
-        },
-        "kind": {
-          "type": "string"
-        },
-        "publicKey": {
-          "$ref": "#/definitions/Base64"
-        },
-        "person": {
-          "type": "string",
-          "description": "The person the window belongs to (#994). The host lets it in only when it is the host's own user (FR-020)."
-        }
-      },
-      "required": [
-        "id",
-        "kind",
-        "publicKey"
-      ],
-      "additionalProperties": false
-    },
-    "HostClients": {
-      "type": "object",
-      "description": "host/clients: every window paired with the control plane, which a host checks its local socket against (#1118).",
-      "properties": {
-        "clients": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/HostClient"
-          }
-        },
-        "user": {
-          "type": "string",
-          "description": "The user the host belongs to (#994). With it, the host lets in only a window whose person is that user (FR-020); without it (an older control plane), every window listed."
-        }
-      },
-      "required": [
-        "clients"
-      ],
-      "additionalProperties": false
-    },
-    "HostEnroll": {
-      "type": "object",
-      "description": "hosts/startEnroll (#1761): with as, a bot's machine code, an admin's only. Without, the caller's own, as before.",
-      "properties": {
-        "as": {
-          "type": "string"
-        }
-      },
-      "required": [],
-      "additionalProperties": false
-    },
-    "HostHello": {
-      "type": "object",
-      "description": "host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).",
-      "properties": {
-        "host": {
-          "$ref": "#/definitions/HostID"
-        },
-        "version": {
-          "type": "string"
-        },
-        "platform": {
-          "type": "string"
-        },
-        "machineID": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "relay": {
-          "type": "boolean"
-        },
-        "implementation": {
-          "type": "string"
-        },
-        "capabilities": {
-          "type": "array",
-          "description": "The capabilities this host has (#1748): each one whose methods it all serves, and the ones it declares. None from a host older than #1748.",
-          "items": {
-            "type": "string"
-          }
-        }
-      },
-      "required": [
-        "version",
-        "platform",
-        "machineID"
-      ],
-      "additionalProperties": false
-    },
-    "HostID": {
-      "type": "string",
-      "x-ts-type": "string & { readonly __brand: \"HostID\" }"
-    },
-    "HostInstall": {
-      "type": "object",
-      "description": "hosts/install (HostInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel.",
-      "properties": {
-        "destination": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "key": {
-          "type": "string"
-        },
-        "trust": {
-          "type": "string"
-        },
-        "tunnel": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "destination"
-      ],
-      "additionalProperties": false
-    },
-    "HostJoinAsk": {
-      "type": "object",
-      "description": "POST /v1/join (#994, spec 736 FR-017): a machine with no code asks to join. `person` names whose it is to be, by name or id; with none, an admin approves it.",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "platform": {
-          "type": "string"
-        },
-        "version": {
-          "type": "string"
-        },
-        "publicKey": {
-          "$ref": "#/definitions/Base64"
-        },
-        "machineID": {
-          "type": "string"
-        },
-        "person": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "name",
-        "platform",
-        "publicKey"
-      ],
-      "additionalProperties": false
-    },
-    "HostJoinDecision": {
-      "type": "object",
-      "description": "GET /v1/join/<request> (#994): waiting, or how it ended; `host` once approved.",
-      "properties": {
-        "result": {
-          "type": "string",
-          "enum": [
-            "waiting",
-            "approved",
-            "denied",
-            "expired"
-          ]
-        },
-        "host": {
-          "$ref": "#/definitions/HostID"
-        },
-        "controlKey": {
-          "$ref": "#/definitions/Base64",
-          "description": "Once approved: the control plane's public key, which the machine keeps as a code's would give it."
-        },
-        "name": {
-          "type": "string",
-          "description": "Once approved: the control plane's name."
-        }
-      },
-      "required": [
-        "result"
-      ],
-      "additionalProperties": false
-    },
-    "HostJoinStatus": {
-      "type": "object",
-      "properties": {
-        "member": {
-          "type": "boolean"
-        },
-        "connected": {
-          "type": "boolean"
-        },
-        "problem": {
-          "type": "string"
-        },
-        "at": {
-          "$ref": "#/definitions/WireDate"
-        }
-      },
-      "required": [
-        "member",
-        "connected",
-        "at"
-      ],
-      "additionalProperties": false
-    },
-    "HostJoinTicket": {
-      "type": "object",
-      "description": "POST /v1/join: the request, the short code the machine shows, and when it ends (10 minutes).",
-      "properties": {
-        "request": {
-          "type": "string"
-        },
-        "code": {
-          "type": "string"
-        },
-        "expires": {
-          "$ref": "#/definitions/WireDate"
-        }
-      },
-      "required": [
-        "request",
-        "code",
-        "expires"
-      ],
-      "additionalProperties": false
-    },
-    "HostLastHeard": {
-      "type": "object",
-      "properties": {
-        "host": {
-          "$ref": "#/definitions/HostID"
-        },
-        "folders": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/FolderSummary"
-          }
-        },
-        "agents": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/Agent"
-          }
-        },
-        "heardAt": {
-          "$ref": "#/definitions/WireDate"
-        }
-      },
-      "required": [
-        "host"
-      ],
-      "additionalProperties": false
-    },
-    "HostLink": {
-      "type": "object",
-      "description": "hosts/link.",
-      "properties": {
-        "host": {
-          "$ref": "#/definitions/HostID"
-        },
-        "provider": {
-          "$ref": "#/definitions/ProviderID"
-        },
-        "workspace": {
-          "type": "string"
-        },
-        "startWhenUsed": {
-          "type": "boolean"
-        },
-        "stopWhenIdleMinutes": {
-          "type": "integer"
-        }
-      },
-      "required": [
-        "host",
-        "provider",
-        "workspace"
-      ],
-      "additionalProperties": false
-    },
-    "HostMachine": {
-      "type": "object",
-      "properties": {
-        "provider": {
-          "$ref": "#/definitions/ProviderID"
-        },
-        "providerName": {
-          "type": "string"
-        },
-        "workspace": {
-          "type": "string"
-        },
-        "workspaceName": {
-          "type": "string"
-        },
-        "workspaceState": {
-          "type": "string"
-        },
-        "hostState": {
-          "type": "string"
-        },
-        "phase": {
-          "type": "string"
-        },
-        "since": {
-          "$ref": "#/definitions/WireDate"
-        },
-        "problem": {
-          "type": "string"
-        },
-        "stoppedBy": {
-          "type": "string"
-        },
-        "canStart": {
-          "type": "boolean"
-        },
-        "canStop": {
-          "type": "boolean"
-        },
-        "startWhenUsed": {
-          "type": "boolean"
-        },
-        "stopWhenIdleMinutes": {
-          "type": "integer"
-        },
-        "cost": {
-          "type": "string"
-        },
-        "current": {
-          "type": "boolean"
-        },
-        "startForSchedules": {
-          "type": "boolean"
-        },
-        "tellsSchedule": {
-          "type": "boolean"
-        },
-        "nextWorkflow": {
-          "type": "string"
-        },
-        "nextWorkflowAt": {
-          "$ref": "#/definitions/WireDate"
-        },
-        "wakeAt": {
-          "$ref": "#/definitions/WireDate"
-        }
-      },
-      "required": [
-        "provider",
-        "providerName",
-        "workspace",
-        "workspaceName",
-        "workspaceState",
-        "canStart",
-        "canStop",
-        "startWhenUsed",
-        "current"
-      ],
-      "additionalProperties": false
-    },
-    "HostMachineCall": {
-      "type": "object",
-      "description": "host/machines, for an agent there: who asked, for the log, and its call.",
-      "properties": {
-        "agent": {
-          "type": "string"
-        },
-        "method": {
-          "type": "string"
-        },
-        "params": {
-          "$ref": "#/definitions/JSONValue"
-        }
-      },
-      "required": [
-        "agent",
-        "method",
-        "params"
-      ],
-      "additionalProperties": false
-    },
-    "HostMachineOptions": {
-      "type": "object",
-      "description": "hosts/setMachineOptions. stopWhenIdleMinutes 0 turns it off.",
-      "properties": {
-        "host": {
-          "$ref": "#/definitions/HostID"
-        },
-        "startWhenUsed": {
-          "type": "boolean"
-        },
-        "stopWhenIdleMinutes": {
-          "type": "integer"
-        },
-        "startForSchedules": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "host"
-      ],
-      "additionalProperties": false
-    },
-    "HostPolicy": {
-      "type": "object",
-      "description": "host/policy (#998, FR-006): to a machine that says host.policy/1, on its channel 0, at each join and within 5 seconds of each change. A signed policy, or none when no policy was ever set.",
-      "properties": {
-        "policy": {
-          "$ref": "#/definitions/OrgPolicy"
-        },
-        "signature": {
-          "$ref": "#/definitions/PolicySignature"
-        },
-        "none": {
-          "type": "boolean"
-        }
-      },
-      "additionalProperties": false
-    },
-    "HostProviderDraftCall": {
-      "type": "object",
-      "description": "host/providerDraft: a writing agent called one of the writer's tools (#858).",
-      "properties": {
-        "agentID": {
-          "$ref": "#/definitions/UUID"
-        },
-        "draft": {
-          "$ref": "#/definitions/UUID"
-        },
-        "tool": {
-          "type": "string"
-        },
-        "arguments": {
-          "$ref": "#/definitions/JSONValue"
-        }
-      },
-      "required": [
-        "agentID",
-        "draft",
-        "tool"
-      ],
-      "additionalProperties": false
-    },
-    "HostRelayRequest": {
-      "type": "object",
-      "description": "hosts/setRelay.",
-      "properties": {
-        "host": {
-          "$ref": "#/definitions/HostID"
-        },
-        "relay": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "host",
-        "relay"
-      ],
-      "additionalProperties": false
-    },
-    "HostRelease": {
-      "type": "object",
-      "description": "host/release (#2178): the release the control plane names, as X.Y.Z.",
-      "properties": {
-        "version": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "version"
-      ],
-      "additionalProperties": false
-    },
-    "HostRequest": {
-      "type": "object",
-      "properties": {
-        "host": {
-          "$ref": "#/definitions/HostID"
-        },
-        "purge": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "host"
-      ],
-      "additionalProperties": false
-    },
-    "HostSchedule": {
-      "type": "object",
-      "description": "A host's next scheduled workflow (#1004).",
-      "properties": {
-        "at": {
-          "$ref": "#/definitions/WireDate"
-        },
-        "workflow": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false
-    },
-    "HostStatus": {
-      "type": "object",
-      "description": "host/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next scheduled workflow.",
-      "properties": {
-        "idle": {
-          "type": "boolean"
-        },
-        "running": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "schedule": {
-          "$ref": "#/definitions/HostSchedule"
-        }
-      },
-      "required": [
-        "idle",
-        "running"
-      ],
-      "additionalProperties": false
-    },
-    "HostStop": {
-      "type": "object",
-      "properties": {
-        "host": {
-          "$ref": "#/definitions/HostID"
-        },
-        "confirmRunning": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "host"
-      ],
-      "additionalProperties": false
-    },
-    "HostTunnel": {
-      "type": "object",
-      "properties": {
-        "up": {
-          "type": "boolean"
-        },
-        "problem": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "up"
-      ],
-      "additionalProperties": false
-    },
-    "HostTunnelChanged": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "host": {
-          "$ref": "#/definitions/HostID"
-        },
-        "tunnel": {
-          "$ref": "#/definitions/HostTunnel"
-        }
-      },
-      "required": [
-        "name",
-        "tunnel"
-      ],
-      "additionalProperties": false
-    },
-    "HostUpdate": {
-      "type": "object",
-      "description": "hosts/update (#1766): a host the control plane installed over ssh, updated the same way. The server and its key are given again, as at the install, because the control plane keeps neither; the host's own root and membership stay.",
-      "properties": {
-        "host": {
-          "$ref": "#/definitions/HostID"
-        },
-        "destination": {
-          "type": "string"
-        },
-        "key": {
-          "type": "string"
-        },
-        "trust": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "host",
-        "destination"
-      ],
-      "additionalProperties": false
-    },
-    "HostUser": {
-      "type": "object",
-      "description": "host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it starts no work (FR-033).",
-      "properties": {
-        "user": {
-          "type": "string"
-        },
-        "kind": {
-          "type": "string",
-          "enum": [
-            "person",
-            "bot"
-          ]
-        },
-        "name": {
-          "type": "string"
-        },
-        "labels": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "capReachedUntil": {
-          "$ref": "#/definitions/WireDate"
-        },
-        "bots": {
-          "type": "array",
-          "description": "For a person: the names of the bots in their groups (#2027). A runs-on: workflow that names one is heard here, once approved here, and its matches are sent to the control plane, never run here.",
-          "items": {
-            "type": "string"
-          }
-        }
-      },
-      "required": [
-        "user",
-        "kind",
-        "name",
-        "labels"
-      ],
-      "additionalProperties": false
-    },
-    "HostUserSettings": {
-      "type": "object",
-      "description": "host/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and when its user's settings or secrets change. Sent only on the links of that user's own machines. secrets is every secret the user has: a name missing from it was removed.",
-      "properties": {
-        "user": {
-          "type": "string"
-        },
-        "settings": {
-          "$ref": "#/definitions/UserSettings"
-        },
-        "secrets": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/UserSecret"
-          }
-        }
-      },
-      "required": [
-        "user",
-        "settings",
-        "secrets"
-      ],
-      "additionalProperties": false
-    },
     "HostedMCPSnapshot": {
       "type": "object",
       "properties": {
@@ -9970,7 +9254,7 @@
       "type": "object",
       "properties": {
         "host": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         }
       },
       "required": [
@@ -10049,7 +9333,7 @@
       "description": "hosts/keep: a request for a stopped host, kept until it is up.",
       "properties": {
         "host": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         },
         "method": {
           "type": "string"
@@ -10069,7 +9353,7 @@
       "type": "object",
       "properties": {
         "host": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         },
         "id": {
           "$ref": "#/definitions/UUID"
@@ -10106,7 +9390,7 @@
           "$ref": "#/definitions/UUID"
         },
         "host": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         },
         "kind": {
           "type": "string"
@@ -10143,7 +9427,7 @@
       "type": "object",
       "properties": {
         "host": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         },
         "id": {
           "$ref": "#/definitions/UUID"
@@ -10284,10 +9568,10 @@
       "type": "object",
       "properties": {
         "host": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         },
         "from": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         },
         "server": {
           "type": "string"
@@ -10309,10 +9593,10 @@
       "description": "hosts/lendSignIn (T091).",
       "properties": {
         "host": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         },
         "from": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         },
         "runtime": {
           "type": "string"
@@ -10437,7 +9721,7 @@
       "description": "One agent on Console ▸ Live Now (#2019, M9): whose machine, which runtime, its state, since when and its cost so far. No title and nothing it said.",
       "properties": {
         "host": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         },
         "hostName": {
           "type": "string"
@@ -12249,6 +11533,153 @@
       },
       "additionalProperties": false
     },
+    "MachineAnnounce": {
+      "type": "object",
+      "description": "hosts/announce, on an enrolment connection.",
+      "properties": {
+        "publicKey": {
+          "$ref": "#/definitions/Base64"
+        },
+        "name": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "machineID": {
+          "type": "string"
+        },
+        "relay": {
+          "type": "boolean"
+        },
+        "implementation": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "publicKey",
+        "name",
+        "platform",
+        "version",
+        "machineID"
+      ],
+      "additionalProperties": false
+    },
+    "MachineCatalog": {
+      "type": "object",
+      "description": "governance/report (#2019, M5): the MCP servers and skills a machine has from a catalogue, personal and in its folders, at most 500. Sent at start and each hour; each replaces the last.",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CatalogItem"
+          }
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "MachineClient": {
+      "type": "object",
+      "description": "A paired window a host may let in on its local socket (#1118), with the key it proves itself with.",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "publicKey": {
+          "$ref": "#/definitions/Base64"
+        },
+        "person": {
+          "type": "string",
+          "description": "The person the window belongs to (#994). The host lets it in only when it is the host's own user (FR-020)."
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "publicKey"
+      ],
+      "additionalProperties": false
+    },
+    "MachineClients": {
+      "type": "object",
+      "description": "host/clients: every window paired with the control plane, which a host checks its local socket against (#1118).",
+      "properties": {
+        "clients": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MachineClient"
+          }
+        },
+        "user": {
+          "type": "string",
+          "description": "The user the host belongs to (#994). With it, the host lets in only a window whose person is that user (FR-020); without it (an older control plane), every window listed."
+        }
+      },
+      "required": [
+        "clients"
+      ],
+      "additionalProperties": false
+    },
+    "MachineEnroll": {
+      "type": "object",
+      "description": "hosts/startEnroll (#1761): with as, a bot's machine code, an admin's only. Without, the caller's own, as before.",
+      "properties": {
+        "as": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "MachineHello": {
+      "type": "object",
+      "description": "host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "version": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        },
+        "machineID": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "relay": {
+          "type": "boolean"
+        },
+        "implementation": {
+          "type": "string"
+        },
+        "capabilities": {
+          "type": "array",
+          "description": "The capabilities this host has (#1748): each one whose methods it all serves, and the ones it declares. None from a host older than #1748.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "version",
+        "platform",
+        "machineID"
+      ],
+      "additionalProperties": false
+    },
     "MachineInfo": {
       "type": "object",
       "description": "One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or unknown.",
@@ -12276,13 +11707,582 @@
           "type": "string"
         },
         "host": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         }
       },
       "required": [
         "id",
         "name",
         "state"
+      ],
+      "additionalProperties": false
+    },
+    "MachineInstall": {
+      "type": "object",
+      "description": "hosts/install (MachineInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel.",
+      "properties": {
+        "destination": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "trust": {
+          "type": "string"
+        },
+        "tunnel": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "destination"
+      ],
+      "additionalProperties": false
+    },
+    "MachineJoinAsk": {
+      "type": "object",
+      "description": "POST /v1/join (#994, spec 736 FR-017): a machine with no code asks to join. `person` names whose it is to be, by name or id; with none, an admin approves it.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "publicKey": {
+          "$ref": "#/definitions/Base64"
+        },
+        "machineID": {
+          "type": "string"
+        },
+        "person": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "platform",
+        "publicKey"
+      ],
+      "additionalProperties": false
+    },
+    "MachineJoinDecision": {
+      "type": "object",
+      "description": "GET /v1/join/<request> (#994): waiting, or how it ended; `host` once approved.",
+      "properties": {
+        "result": {
+          "type": "string",
+          "enum": [
+            "waiting",
+            "approved",
+            "denied",
+            "expired"
+          ]
+        },
+        "host": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "controlKey": {
+          "$ref": "#/definitions/Base64",
+          "description": "Once approved: the control plane's public key, which the machine keeps as a code's would give it."
+        },
+        "name": {
+          "type": "string",
+          "description": "Once approved: the control plane's name."
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "MachineJoinStatus": {
+      "type": "object",
+      "properties": {
+        "member": {
+          "type": "boolean"
+        },
+        "connected": {
+          "type": "boolean"
+        },
+        "problem": {
+          "type": "string"
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "member",
+        "connected",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "MachineJoinTicket": {
+      "type": "object",
+      "description": "POST /v1/join: the request, the short code the machine shows, and when it ends (10 minutes).",
+      "properties": {
+        "request": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "expires": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "request",
+        "code",
+        "expires"
+      ],
+      "additionalProperties": false
+    },
+    "MachineLastHeard": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "folders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FolderSummary"
+          }
+        },
+        "agents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Agent"
+          }
+        },
+        "heardAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "host"
+      ],
+      "additionalProperties": false
+    },
+    "MachineLink": {
+      "type": "object",
+      "description": "hosts/link.",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "provider": {
+          "$ref": "#/definitions/ProviderID"
+        },
+        "workspace": {
+          "type": "string"
+        },
+        "startWhenUsed": {
+          "type": "boolean"
+        },
+        "stopWhenIdleMinutes": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "host",
+        "provider",
+        "workspace"
+      ],
+      "additionalProperties": false
+    },
+    "MachineOptions": {
+      "type": "object",
+      "description": "hosts/setMachineOptions. stopWhenIdleMinutes 0 turns it off.",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "startWhenUsed": {
+          "type": "boolean"
+        },
+        "stopWhenIdleMinutes": {
+          "type": "integer"
+        },
+        "startForSchedules": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "host"
+      ],
+      "additionalProperties": false
+    },
+    "MachinePolicy": {
+      "type": "object",
+      "description": "host/policy (#998, FR-006): to a machine that says host.policy/1, on its channel 0, at each join and within 5 seconds of each change. A signed policy, or none when no policy was ever set.",
+      "properties": {
+        "policy": {
+          "$ref": "#/definitions/OrgPolicy"
+        },
+        "signature": {
+          "$ref": "#/definitions/PolicySignature"
+        },
+        "none": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MachineProviderDraftCall": {
+      "type": "object",
+      "description": "host/providerDraft: a writing agent called one of the writer's tools (#858).",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "draft": {
+          "$ref": "#/definitions/UUID"
+        },
+        "tool": {
+          "type": "string"
+        },
+        "arguments": {
+          "$ref": "#/definitions/JSONValue"
+        }
+      },
+      "required": [
+        "agentID",
+        "draft",
+        "tool"
+      ],
+      "additionalProperties": false
+    },
+    "MachineRef": {
+      "type": "string",
+      "x-ts-type": "string & { readonly __brand: \"MachineRef\" }"
+    },
+    "MachineRelayRequest": {
+      "type": "object",
+      "description": "hosts/setRelay.",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "relay": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "host",
+        "relay"
+      ],
+      "additionalProperties": false
+    },
+    "MachineRelease": {
+      "type": "object",
+      "description": "host/release (#2178): the release the control plane names, as X.Y.Z.",
+      "properties": {
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "additionalProperties": false
+    },
+    "MachineRequest": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "purge": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "host"
+      ],
+      "additionalProperties": false
+    },
+    "MachineSchedule": {
+      "type": "object",
+      "description": "A host's next scheduled workflow (#1004).",
+      "properties": {
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "workflow": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MachineStatus": {
+      "type": "object",
+      "description": "host/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next scheduled workflow.",
+      "properties": {
+        "idle": {
+          "type": "boolean"
+        },
+        "running": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "schedule": {
+          "$ref": "#/definitions/MachineSchedule"
+        }
+      },
+      "required": [
+        "idle",
+        "running"
+      ],
+      "additionalProperties": false
+    },
+    "MachineStop": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "confirmRunning": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "host"
+      ],
+      "additionalProperties": false
+    },
+    "MachineTunnel": {
+      "type": "object",
+      "properties": {
+        "up": {
+          "type": "boolean"
+        },
+        "problem": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "up"
+      ],
+      "additionalProperties": false
+    },
+    "MachineTunnelChanged": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "host": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "tunnel": {
+          "$ref": "#/definitions/MachineTunnel"
+        }
+      },
+      "required": [
+        "name",
+        "tunnel"
+      ],
+      "additionalProperties": false
+    },
+    "MachineUpdate": {
+      "type": "object",
+      "description": "hosts/update (#1766): a host the control plane installed over ssh, updated the same way. The server and its key are given again, as at the install, because the control plane keeps neither; the host's own root and membership stay.",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "destination": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "trust": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "host",
+        "destination"
+      ],
+      "additionalProperties": false
+    },
+    "MachineUser": {
+      "type": "object",
+      "description": "host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it starts no work (FR-033).",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "person",
+            "bot"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "capReachedUntil": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "bots": {
+          "type": "array",
+          "description": "For a person: the names of the bots in their groups (#2027). A runs-on: workflow that names one is heard here, once approved here, and its matches are sent to the control plane, never run here.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "user",
+        "kind",
+        "name",
+        "labels"
+      ],
+      "additionalProperties": false
+    },
+    "MachineUserSettings": {
+      "type": "object",
+      "description": "host/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and when its user's settings or secrets change. Sent only on the links of that user's own machines. secrets is every secret the user has: a name missing from it was removed.",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/definitions/UserSettings"
+        },
+        "secrets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/UserSecret"
+          }
+        }
+      },
+      "required": [
+        "user",
+        "settings",
+        "secrets"
+      ],
+      "additionalProperties": false
+    },
+    "MachineWorkspace": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "$ref": "#/definitions/ProviderID"
+        },
+        "providerName": {
+          "type": "string"
+        },
+        "workspace": {
+          "type": "string"
+        },
+        "workspaceName": {
+          "type": "string"
+        },
+        "workspaceState": {
+          "type": "string"
+        },
+        "hostState": {
+          "type": "string"
+        },
+        "phase": {
+          "type": "string"
+        },
+        "since": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "problem": {
+          "type": "string"
+        },
+        "stoppedBy": {
+          "type": "string"
+        },
+        "canStart": {
+          "type": "boolean"
+        },
+        "canStop": {
+          "type": "boolean"
+        },
+        "startWhenUsed": {
+          "type": "boolean"
+        },
+        "stopWhenIdleMinutes": {
+          "type": "integer"
+        },
+        "cost": {
+          "type": "string"
+        },
+        "current": {
+          "type": "boolean"
+        },
+        "startForSchedules": {
+          "type": "boolean"
+        },
+        "tellsSchedule": {
+          "type": "boolean"
+        },
+        "nextWorkflow": {
+          "type": "string"
+        },
+        "nextWorkflowAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "wakeAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "provider",
+        "providerName",
+        "workspace",
+        "workspaceName",
+        "workspaceState",
+        "canStart",
+        "canStop",
+        "startWhenUsed",
+        "current"
+      ],
+      "additionalProperties": false
+    },
+    "MachineWorkspaceCall": {
+      "type": "object",
+      "description": "host/machines, for an agent there: who asked, for the log, and its call.",
+      "properties": {
+        "agent": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/definitions/JSONValue"
+        }
+      },
+      "required": [
+        "agent",
+        "method",
+        "params"
       ],
       "additionalProperties": false
     },
@@ -13549,7 +13549,7 @@
       "description": "control/orgRoutesLeft (#999): a machine was removed with these routes on it. To its person and to every admin.",
       "properties": {
         "host": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         },
         "name": {
           "type": "string"
@@ -13993,7 +13993,7 @@
       "description": "A machine in People: its name, its state and nothing inside it (FR-019).",
       "properties": {
         "id": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         },
         "name": {
           "type": "string"
@@ -16614,7 +16614,7 @@
           "type": "string"
         },
         "host": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         },
         "hostName": {
           "type": "string"
@@ -17823,7 +17823,7 @@
     },
     "SSHHost": {
       "type": "object",
-      "description": "A server ssh knows by a name, for Add a Server's server box (#610).",
+      "description": "A server ssh knows by a name, for Add a Machine's server box (#610).",
       "properties": {
         "alias": {
           "type": "string"
@@ -17998,7 +17998,7 @@
       "description": "A machine that was removed with a secret on it (#1760, FR-026): change the secret where it was issued.",
       "properties": {
         "host": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         },
         "name": {
           "type": "string",
@@ -18021,7 +18021,7 @@
       "description": "control/secretsLeft (#1760, FR-026): to the person's own clients, when one of their machines was removed with secrets on it.",
       "properties": {
         "host": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         },
         "name": {
           "type": "string"
@@ -20579,7 +20579,7 @@
       "description": "A started machine in people/removePreview: the branches and worktrees on it with work that is not pushed. `unknown` says why it could not be asked (offline, or it did not answer), and then `unpushed` is empty.",
       "properties": {
         "host": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         },
         "name": {
           "type": "string"
@@ -20875,7 +20875,7 @@
       "description": "An agent running on a bot's machine (#1804, M6), as the machine last listed it, for bots/stopRun. No title, nothing it said.",
       "properties": {
         "host": {
-          "$ref": "#/definitions/HostID"
+          "$ref": "#/definitions/MachineRef"
         },
         "hostName": {
           "type": "string"
@@ -22571,7 +22571,7 @@
         "machines": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/HostID"
+            "$ref": "#/definitions/MachineRef"
           },
           "description": "The machines it was sent to."
         },

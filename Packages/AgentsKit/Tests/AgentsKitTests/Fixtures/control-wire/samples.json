@@ -28,7 +28,7 @@
     "name": "name",
     "kind": "iPhone"
   },
-  "HostAnnounce": {
+  "MachineAnnounce": {
     "publicKey": "AQID",
     "name": "name",
     "platform": "platform",
@@ -47,7 +47,7 @@
     "expires": 812345678.5,
     "command": "command"
   },
-  "HostHello": {
+  "MachineHello": {
     "host": "box",
     "version": "version",
     "platform": "platform",
@@ -62,7 +62,7 @@
     "runtime": "runtime",
     "allowed": true
   },
-  "HostRelayRequest": {
+  "MachineRelayRequest": {
     "host": "box",
     "relay": true
   },
@@ -285,14 +285,14 @@
   "ProviderRequest": {
     "id": "digitalocean-x7k2"
   },
-  "HostLink": {
+  "MachineLink": {
     "host": "box",
     "provider": "digitalocean-x7k2",
     "workspace": "workspace",
     "startWhenUsed": true,
     "stopWhenIdleMinutes": 7
   },
-  "HostMachineOptions": {
+  "MachineOptions": {
     "host": "box",
     "startWhenUsed": true,
     "stopWhenIdleMinutes": 7,
@@ -325,7 +325,7 @@
     },
     "joining": true
   },
-  "HostMachineCall": {
+  "MachineWorkspaceCall": {
     "agent": "agent",
     "method": "method",
     "params": {
@@ -355,11 +355,11 @@
       }
     ]
   },
-  "HostSchedule": {
+  "MachineSchedule": {
     "at": 812345678.5,
     "workflow": "workflow"
   },
-  "HostStatus": {
+  "MachineStatus": {
     "idle": true,
     "running": [
       "running"
@@ -508,7 +508,7 @@
     },
     "note": "note"
   },
-  "HostProviderDraftCall": {
+  "MachineProviderDraftCall": {
     "agentID": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
     "draft": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
     "tool": "tool",
@@ -757,7 +757,7 @@
     "request": "request",
     "result": "approved"
   },
-  "HostJoinDecision": {
+  "MachineJoinDecision": {
     "result": "approved",
     "host": "host",
     "controlKey": "AQID",

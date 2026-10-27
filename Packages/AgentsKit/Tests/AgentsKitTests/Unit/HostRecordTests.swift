@@ -6,7 +6,7 @@ import Testing
 /// What 043 adds to a server's record. A `hosts.json` from before it is past the cut-off
 /// (#58): it does not read, and is set aside rather than written over.
 @Suite("A server's record after 043")
-struct HostRecordTests {
+struct MachineRecordTests {
     /// A host as 037 wrote it: today's encoding with every key 043 added taken out.
     static func from037(keeping kept: Set<String> = []) throws -> Data {
         var host = try ServerHost(sshName: "devbox")
@@ -39,7 +39,7 @@ struct HostRecordTests {
 
     @Test func anUnreadableHostsFileIsSetAsideNotWrittenOver() throws {
         let folder = FileManager.default.temporaryDirectory
-            .appending(path: "HostRecordTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+            .appending(path: "MachineRecordTests-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         let file = folder.appending(path: "hosts.json")

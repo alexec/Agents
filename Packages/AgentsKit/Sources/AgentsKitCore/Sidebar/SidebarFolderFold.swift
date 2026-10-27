@@ -176,14 +176,14 @@ public enum SidebarOrder {
         return a.host.rawValue < b.host.rawValue
     }
 
-    public static func folders(_ live: [DaemonAPI.FolderSummary], servers: [HostID]) -> [DaemonAPI.FolderSummary] {
+    public static func folders(_ live: [DaemonAPI.FolderSummary], servers: [MachineRef]) -> [DaemonAPI.FolderSummary] {
         let byHost = live.filter { $0.host == .mac } + servers.flatMap { host in live.filter { $0.host == host } }
         return byHost.filter(\.folder.isPinned) + byHost.filter { !$0.folder.isPinned }
     }
 
     /// The name a folder's row shows: `server:Folder` on a server, so no heading is
     /// needed for each host (Alex, #145).
-    public static func label(_ summary: DaemonAPI.FolderSummary, hostLabel: (HostID) -> String) -> String {
+    public static func label(_ summary: DaemonAPI.FolderSummary, hostLabel: (MachineRef) -> String) -> String {
         summary.host == .mac ? summary.name : "\(hostLabel(summary.host)):\(summary.name)"
     }
 }

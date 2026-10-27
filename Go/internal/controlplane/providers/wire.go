@@ -130,13 +130,13 @@ const (
 	MethodHostsDropKept     = "hosts/dropKept"
 	MethodHostsRetryKept    = "hosts/retryKept"
 	MethodWorkspacesAgent   = "machines/forAgent"
-	MethodHostMachines    = "host/machines"
+	MethodHostMachines      = "host/machines"
 	MethodHostProviderDraft = "host/providerDraft"
 	MethodHostStatus        = "host/status"
 	MethodAgentsPrompt      = "agents/prompt"
 	MethodAgentsStart       = "agents/start"
 	MethodAgentsStop        = "agents/stop"
-	MethodFoldersClone     = "folders/clone"
+	MethodFoldersClone      = "folders/clone"
 )
 
 // Notification names (DaemonAPI.Notification).
@@ -226,17 +226,17 @@ func MayBe(w MachineInfo, hostName string) bool {
 // its commands, headers or secrets' values.
 type ProviderSummary = wire.ProviderSummary
 
-// HostMachine is DaemonAPI.HostMachine: a linked host's workspace, on its hosts/list
+// MachineWorkspace is DaemonAPI.MachineWorkspace: a linked host's workspace, on its hosts/list
 // row and in control/hostChanged. HostState is stopped, starting or stopping: shown over
 // the uplink's own state while it is not online, and stopping always. Phase, while
 // starting, is provider, connecting or sshStart.
-type HostMachine = wire.HostMachine
+type MachineWorkspace = wire.MachineWorkspace
 
 // Overlay is ControlRouter.described's part for workspaces: a host's description as
 // hosts/list and control/hostChanged say it, with its workspace laid over it. The
 // workspace's hostState names the state while the host is not online, and stopping
 // whatever it is.
-func Overlay(described map[string]any, online bool, ws *HostMachine) map[string]any {
+func Overlay(described map[string]any, online bool, ws *MachineWorkspace) map[string]any {
 	if ws == nil {
 		return described
 	}
@@ -253,7 +253,7 @@ func Overlay(described map[string]any, online bool, ws *HostMachine) map[string]
 
 // OfflineRefusal is ControlRouter.offlineRefusal: what a request for a host that is not
 // up is answered with. A host whose workspace is stopped says so (FR-022).
-func OfflineRefusal(ws *HostMachine) *Failure {
+func OfflineRefusal(ws *MachineWorkspace) *Failure {
 	if ws != nil && deref(ws.HostState) == "stopped" {
 		return fail(CodeHostOffline, "That machine is stopped. Start it to reach it.")
 	}
@@ -268,13 +268,13 @@ type ProviderAdd = wire.ProviderAdd
 
 type providerRequest = wire.ProviderRequest
 
-type hostRequest = wire.HostRequest
+type hostRequest = wire.MachineRequest
 
-// HostLink is DaemonAPI.HostLink: hosts/link.
-type HostLink = wire.HostLink
+// MachineLink is DaemonAPI.MachineLink: hosts/link.
+type MachineLink = wire.MachineLink
 
-// HostMachineOptions is DaemonAPI.HostMachineOptions. stopWhenIdleMinutes 0 turns it off.
-type HostMachineOptions = wire.HostMachineOptions
+// MachineOptions is DaemonAPI.MachineOptions. stopWhenIdleMinutes 0 turns it off.
+type MachineOptions = wire.MachineOptions
 
 // ProviderOptions is DaemonAPI.ProviderOptions: the New Machine form, a JSON Schema.
 type ProviderOptions = wire.ProviderOptions
@@ -285,12 +285,12 @@ type ProviderCreate = wire.ProviderCreate
 // ProviderCreated is DaemonAPI.ProviderCreated: what providers/create made.
 type ProviderCreated = wire.ProviderCreated
 
-// HostStop is DaemonAPI.HostStop: hosts/stop.
-type HostStop = wire.HostStop
+// MachineStop is DaemonAPI.MachineStop: hosts/stop.
+type MachineStop = wire.MachineStop
 
-// HostMachineCall is DaemonAPI.HostMachineCall: host/machines, for an agent there.
+// MachineWorkspaceCall is DaemonAPI.MachineWorkspaceCall: host/machines, for an agent there.
 // Agent is who asked, for the log: "Claude (fix-login)".
-type HostMachineCall = wire.HostMachineCall
+type MachineWorkspaceCall = wire.MachineWorkspaceCall
 
 // AgentMachines is DaemonAPI.AgentMachines: what list_machines shows an agent.
 type AgentMachines = wire.AgentMachines
@@ -301,15 +301,15 @@ type AgentProvider = wire.AgentMachinesProvider
 // AgentWorkspace is DaemonAPI.AgentMachines.Workspace.
 type AgentWorkspace = wire.AgentMachinesMachine
 
-// HostStatus is DaemonAPI.HostStatus: host/status on channel 0 (#691 US4). Running is
+// MachineStatus is DaemonAPI.MachineStatus: host/status on channel 0 (#691 US4). Running is
 // "Claude (fix-login)" for each agent working or waiting on a person; Schedule is nil from
 // a host from before #1004, and empty when nothing is scheduled.
-type HostStatus = wire.HostStatus
+type MachineStatus = wire.MachineStatus
 
-// HostSchedule is DaemonAPI.HostSchedule: a host's next scheduled workflow (#1004).
-type HostSchedule = wire.HostSchedule
+// MachineSchedule is DaemonAPI.MachineSchedule: a host's next scheduled workflow (#1004).
+type MachineSchedule = wire.MachineSchedule
 
-func schedule(s *HostSchedule) *Schedule {
+func schedule(s *MachineSchedule) *Schedule {
 	if s == nil {
 		return nil
 	}

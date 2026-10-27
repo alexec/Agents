@@ -36,7 +36,7 @@ are kept in the control plane's store at `v1/groups/<id>.json`.
 ## Bots
 
 A bot does the team's work on events (#1761). It is a user with no clients and no sign-in,
-in one group. Its machines are enrolled by an admin, with a host code made for the bot
+in one group. Its machines are enrolled by an admin, with a join code made for the bot
 (`hosts/startEnroll` with `as`).
 
 - **Nobody acts on a bot's machine.** A client cannot start, message or answer an agent

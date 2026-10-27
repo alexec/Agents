@@ -686,7 +686,7 @@ func TestMachineBudgets(t *testing.T) {
 	root := t.TempDir()
 	d, c := joined(t, root, k)
 	dir := t.TempDir()
-	d.toldHostUser(mustJSON(wire.HostUser{User: "sam", Kind: "person", Name: "Sam", Labels: []string{}}))
+	d.toldHostUser(mustJSON(wire.MachineUser{User: "sam", Kind: "person", Name: "Sam", Labels: []string{}}))
 	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 1, map[string]any{"budgets": map[string]any{"daily": 1, "dailyTokens": 50000,
 		"allowUnmetered": []string{"grok"}, "raises": []any{}}}))
 	// An unmetered runtime not allowed is refused; one allowed is not.
@@ -727,7 +727,7 @@ func TestMachineBudgets(t *testing.T) {
 	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 3, map[string]any{"budgets": map[string]any{"daily": 100, "allowUnmetered": []string{}, "raises": []any{}}}))
 	c.call(t, 5, "agents/start", startParams(dir, "claude", nil))
 	until := wire.DateOf(endOfUTCDay(time.Now()))
-	d.toldHostUser(mustJSON(wire.HostUser{User: "sam", Kind: "person", Name: "Sam", Labels: []string{}, CapReachedUntil: &until}))
+	d.toldHostUser(mustJSON(wire.MachineUser{User: "sam", Kind: "person", Name: "Sam", Labels: []string{}, CapReachedUntil: &until}))
 	refused(t, c.callError(t, 6, "agents/start", startParams(dir, "claude", nil)), "budget", "budgets")
 }
 

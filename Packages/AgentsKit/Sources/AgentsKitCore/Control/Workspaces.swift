@@ -35,7 +35,7 @@ public struct WorkspaceLink: Codable, Hashable, Sendable {
     /// FR-009). Nil reads as on.
     public var startForSchedules: Bool?
     /// The host's next scheduled workflow as it last said it (FR-003), kept while it is stopped.
-    public var schedule: DaemonAPI.HostSchedule?
+    public var schedule: DaemonAPI.MachineSchedule?
     /// How long its last start took, from asking the provider to the host connecting (FR-004).
     public var measuredStartSeconds: Int?
     /// The due time it was last started for, so each starts it once (FR-006).
@@ -158,16 +158,16 @@ public struct ProviderRecord: Codable, Hashable, Sendable, Identifiable {
 public protocol WorkspaceHandling: Sendable {
     func answer(method: String, params: JSONValue?, from caller: ControlRouter.Caller) async throws -> JSONValue
     /// A host said whether it is idle (`host/status`, #691 US4).
-    func heard(_ host: HostID, status: DaemonAPI.HostStatus) async
+    func heard(_ host: MachineRef, status: DaemonAPI.MachineStatus) async
     /// An agent on `host` asked through its workspace tools (US6): one of
     /// `agentWorkspaceMethods`, logged as that agent's.
-    func agentCall(from host: HostID, agent: String, method: String, params: JSONValue) async throws -> JSONValue
+    func agentCall(from host: MachineRef, agent: String, method: String, params: JSONValue) async throws -> JSONValue
     /// A writing agent on `host` called one of the writer's tools (#858).
-    func draftCall(from host: HostID, call: DaemonAPI.HostProviderDraftCall) async throws -> JSONValue
+    func draftCall(from host: MachineRef, call: DaemonAPI.MachineProviderDraftCall) async throws -> JSONValue
 }
 
 public extension WorkspaceHandling {
-    func draftCall(from host: HostID, call: DaemonAPI.HostProviderDraftCall) async throws -> JSONValue {
+    func draftCall(from host: MachineRef, call: DaemonAPI.MachineProviderDraftCall) async throws -> JSONValue {
         throw JSONRPCError(code: DaemonAPI.Failure.notSupported, message: "This control plane has no drafts.")
     }
 }
@@ -184,21 +184,21 @@ public extension DaemonAPI.Method {
     static let providersRemove = "providers/remove"
     /// `{id?}`: list again, said as `control/providersChanged`.
     static let providersRefresh = "providers/refresh"
-    /// `HostLink` → `ControlHost`. A workspace linked to another host moves here.
+    /// `MachineLink` → `ControlMachine`. A workspace linked to another host moves here.
     static let hostsLink = "hosts/link"
-    /// `HostRequest` → `ControlHost`.
+    /// `MachineRequest` → `ControlMachine`.
     static let hostsUnlink = "hosts/unlink"
-    /// `HostMachineOptions` → `ControlHost`.
+    /// `MachineOptions` → `ControlMachine`.
     static let hostsSetMachineOptions = "hosts/setMachineOptions"
-    /// `HostRequest` → `ControlHost`, at once; the start goes on, said as `control/hostChanged`.
+    /// `MachineRequest` → `ControlMachine`, at once; the start goes on, said as `control/hostChanged`.
     static let hostsStart = "hosts/start"
-    /// `HostStop` → `ControlHost`, at once.
+    /// `MachineStop` → `ControlMachine`, at once.
     static let hostsStop = "hosts/stop"
     /// `ProviderRequest` → `ProviderOptions`: the New Machine form (US5).
     static let providersOptions = "providers/options"
     /// `ProviderCreate` → `ProviderCreated`, once the provider has made it (US5).
     static let providersCreate = "providers/create"
-    /// `HostRequest` → `{}`: its workspace deleted, then the host removed (US5).
+    /// `MachineRequest` → `{}`: its workspace deleted, then the host removed (US5).
     static let hostsDeleteMachine = "hosts/deleteMachine"
 
     /// Every method the control plane's workspace part answers.
@@ -240,10 +240,10 @@ public extension DaemonAPI {
         public var hostKeyRenews: Bool?
         public var cost: String?
         /// The host it is linked to, in `providers/list`.
-        public var host: HostID?
+        public var host: MachineRef?
 
         public init(id: String, name: String, state: String, ssh: String? = nil, tunnel: Bool? = nil,
-                    hostKeyRenews: Bool? = nil, cost: String? = nil, host: HostID? = nil) {
+                    hostKeyRenews: Bool? = nil, cost: String? = nil, host: MachineRef? = nil) {
             self.id = id
             self.name = name
             self.state = state
@@ -317,7 +317,7 @@ public extension DaemonAPI {
     }
 
     /// A linked host's workspace, on its `hosts/list` row and in `control/hostChanged`.
-    struct HostMachine: Codable, Sendable, Hashable {
+    struct MachineWorkspace: Codable, Sendable, Hashable {
         public var provider: ProviderID
         public var providerName: String
         public var workspace: String
@@ -430,14 +430,14 @@ public extension DaemonAPI {
     }
 
     /// `hosts/link`.
-    struct HostLink: Codable, Sendable, Hashable {
-        public var host: HostID
+    struct MachineLink: Codable, Sendable, Hashable {
+        public var host: MachineRef
         public var provider: ProviderID
         public var workspace: String
         public var startWhenUsed: Bool?
         public var stopWhenIdleMinutes: Int?
 
-        public init(host: HostID, provider: ProviderID, workspace: String, startWhenUsed: Bool? = nil,
+        public init(host: MachineRef, provider: ProviderID, workspace: String, startWhenUsed: Bool? = nil,
                     stopWhenIdleMinutes: Int? = nil) {
             self.host = host
             self.provider = provider
@@ -448,14 +448,14 @@ public extension DaemonAPI {
     }
 
     /// `hosts/setMachineOptions`. `stopWhenIdleMinutes` 0 turns it off.
-    struct HostMachineOptions: Codable, Sendable, Hashable {
-        public var host: HostID
+    struct MachineOptions: Codable, Sendable, Hashable {
+        public var host: MachineRef
         public var startWhenUsed: Bool?
         public var stopWhenIdleMinutes: Int?
         /// Start for scheduled workflows (#1004 FR-009).
         public var startForSchedules: Bool?
 
-        public init(host: HostID, startWhenUsed: Bool? = nil, stopWhenIdleMinutes: Int? = nil,
+        public init(host: MachineRef, startWhenUsed: Bool? = nil, stopWhenIdleMinutes: Int? = nil,
                     startForSchedules: Bool? = nil) {
             self.startForSchedules = startForSchedules
             self.host = host
@@ -505,12 +505,12 @@ public extension DaemonAPI {
     }
 
     /// `hosts/stop`.
-    struct HostStop: Codable, Sendable, Hashable {
-        public var host: HostID
+    struct MachineStop: Codable, Sendable, Hashable {
+        public var host: MachineRef
         /// Stop even though turns are running there (US4).
         public var confirmRunning: Bool?
 
-        public init(host: HostID, confirmRunning: Bool? = nil) {
+        public init(host: MachineRef, confirmRunning: Bool? = nil) {
             self.host = host
             self.confirmRunning = confirmRunning
         }

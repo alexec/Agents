@@ -139,7 +139,7 @@ func (s *starter) MayStartFor(_, host string) bool {
 	defer s.mu.Unlock()
 	return s.may[host]
 }
-func (s *starter) Workspace(string) *wire.HostMachine { return nil }
+func (s *starter) Workspace(string) *wire.MachineWorkspace { return nil }
 func (s *starter) StartForUse(host, _ string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

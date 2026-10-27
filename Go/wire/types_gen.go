@@ -118,7 +118,7 @@ type AddAccountRequest struct {
 type Admitted struct {
 	Client *UUID `json:"client,omitzero"`
 
-	Host *HostID `json:"host,omitzero"`
+	Host *MachineRef `json:"host,omitzero"`
 
 	Grant *string `json:"grant,omitzero"`
 }
@@ -853,7 +853,7 @@ type AuditEntry struct {
 
 	Method string `json:"method"`
 
-	Host *HostID `json:"host,omitzero"`
+	Host *MachineRef `json:"host,omitzero"`
 
 	Target *string `json:"target,omitzero"`
 
@@ -1200,7 +1200,7 @@ type BotMake struct {
 
 // bots/stopRun (#1761, FR-031): an admin stops an agent on a bot's machine, the one way a client acts there.
 type BotStopRun struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
 	Agent UUID `json:"agent"`
 }
@@ -2357,7 +2357,7 @@ type ConsequenceCouldNotWake struct {
 
 // console/stopAgent (#2019, M9): an admin stops one agent on any machine of the organisation, as Console ▸ Live Now does.
 type ConsoleStopAgent struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
 	Agent UUID `json:"agent"`
 }
@@ -2499,8 +2499,15 @@ type ControlHello struct {
 	Previous *string `json:"previous,omitzero"`
 }
 
-type ControlHost struct {
-	ID HostID `json:"id"`
+// control/installProgress: a step of Add a Machine.
+type ControlInstallProgress struct {
+	Name string `json:"name"`
+
+	Step string `json:"step"`
+}
+
+type ControlMachine struct {
+	ID MachineRef `json:"id"`
 
 	Name string `json:"name"`
 
@@ -2516,15 +2523,15 @@ type ControlHost struct {
 
 	Relay *bool `json:"relay,omitzero"`
 
-	SignInFrom map[string]HostID `json:"signInFrom,omitzero"`
+	SignInFrom map[string]MachineRef `json:"signInFrom,omitzero"`
 
-	GitFrom map[string]HostID `json:"gitFrom,omitzero"`
+	GitFrom map[string]MachineRef `json:"gitFrom,omitzero"`
 
 	GitAsks []GitAsk `json:"gitAsks,omitzero"`
 
-	Tunnel *HostTunnel `json:"tunnel,omitzero"`
+	Tunnel *MachineTunnel `json:"tunnel,omitzero"`
 
-	Workspace *HostMachine `json:"workspace,omitzero"`
+	Workspace *MachineWorkspace `json:"workspace,omitzero"`
 
 	Implementation *string `json:"implementation,omitzero"`
 
@@ -2536,13 +2543,6 @@ type ControlHost struct {
 
 	// The user who owns the machine (#994).
 	Owner *string `json:"owner,omitzero"`
-}
-
-// control/installProgress: a step of Add a Server.
-type ControlInstallProgress struct {
-	Name string `json:"name"`
-
-	Step string `json:"step"`
 }
 
 // control/moved: where the control plane is now (T085).
@@ -2580,7 +2580,7 @@ type ControlOK struct {
 
 	Grant *string `json:"grant,omitzero"`
 
-	Host *HostID `json:"host,omitzero"`
+	Host *MachineRef `json:"host,omitzero"`
 
 	Relayed *bool `json:"relayed,omitzero"`
 
@@ -2621,7 +2621,7 @@ type ControlStatus struct {
 
 	Version string `json:"version"`
 
-	HomeHost *HostID `json:"homeHost,omitzero"`
+	HomeHost *MachineRef `json:"homeHost,omitzero"`
 
 	MachineID string `json:"machineID"`
 
@@ -2643,11 +2643,11 @@ type ControlStatus struct {
 	// The origin of the sandbox proxy that draws MCP Apps views on the page at publicWeb (#1484): a second name in front of the same control plane. None when it draws no views there.
 	PublicViews *string `json:"publicViews,omitzero"`
 
-	ThisMacHost *HostJoinStatus `json:"thisMacHost,omitzero"`
+	ThisMacHost *MachineJoinStatus `json:"thisMacHost,omitzero"`
 
 	FolderDetection *FolderDetection `json:"folderDetection,omitzero"`
 
-	UnjoinedTunnels []HostTunnelChanged `json:"unjoinedTunnels,omitzero"`
+	UnjoinedTunnels []MachineTunnelChanged `json:"unjoinedTunnels,omitzero"`
 
 	// The capabilities the control plane has (#1748).
 	Capabilities []string `json:"capabilities,omitzero"`
@@ -3663,7 +3663,7 @@ type FleetBoard struct {
 
 // One machine on Console ▸ Machines (#1804): its hosts/list row, whose it is, and how many of its agents were running when it last listed them. Numbers only, never what the agents said.
 type FleetMachine struct {
-	Host ControlHost `json:"host"`
+	Host ControlMachine `json:"host"`
 
 	// Its person's or bot's name; empty when nobody owns it.
 	OwnerName string `json:"ownerName"`
@@ -3836,7 +3836,7 @@ type FoundFolder struct {
 type GitAsk struct {
 	Server string `json:"server"`
 
-	From HostID `json:"from"`
+	From MachineRef `json:"from"`
 }
 
 // A credential for one git command. Never printed, logged or kept.
@@ -4044,332 +4044,6 @@ type HelperLimits struct {
 	ContinueWhenBack *bool `json:"continueWhenBack,omitzero"`
 }
 
-// hosts/announce, on an enrolment connection.
-type HostAnnounce struct {
-	PublicKey Data `json:"publicKey"`
-
-	Name string `json:"name"`
-
-	Platform string `json:"platform"`
-
-	Version string `json:"version"`
-
-	MachineID string `json:"machineID"`
-
-	Relay *bool `json:"relay,omitzero"`
-
-	Implementation *string `json:"implementation,omitzero"`
-}
-
-// governance/report (#2019, M5): the MCP servers and skills a machine has from a catalogue, personal and in its folders, at most 500. Sent at start and each hour; each replaces the last.
-type HostCatalog struct {
-	Items []CatalogItem `json:"items"`
-}
-
-// A paired window a host may let in on its local socket (#1118), with the key it proves itself with.
-type HostClient struct {
-	ID UUID `json:"id"`
-
-	Kind string `json:"kind"`
-
-	PublicKey Data `json:"publicKey"`
-
-	// The person the window belongs to (#994). The host lets it in only when it is the host's own user (FR-020).
-	Person *string `json:"person,omitzero"`
-}
-
-// host/clients: every window paired with the control plane, which a host checks its local socket against (#1118).
-type HostClients struct {
-	Clients []HostClient `json:"clients"`
-
-	// The user the host belongs to (#994). With it, the host lets in only a window whose person is that user (FR-020); without it (an older control plane), every window listed.
-	User *string `json:"user,omitzero"`
-}
-
-// hosts/startEnroll (#1761): with as, a bot's machine code, an admin's only. Without, the caller's own, as before.
-type HostEnroll struct {
-	As *string `json:"as,omitzero"`
-}
-
-// host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).
-type HostHello struct {
-	Host *HostID `json:"host,omitzero"`
-
-	Version string `json:"version"`
-
-	Platform string `json:"platform"`
-
-	MachineID string `json:"machineID"`
-
-	Name *string `json:"name,omitzero"`
-
-	Relay *bool `json:"relay,omitzero"`
-
-	Implementation *string `json:"implementation,omitzero"`
-
-	// The capabilities this host has (#1748): each one whose methods it all serves, and the ones it declares. None from a host older than #1748.
-	Capabilities []string `json:"capabilities,omitzero"`
-}
-
-type HostID string
-
-// hosts/install (HostInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel.
-type HostInstall struct {
-	Destination string `json:"destination"`
-
-	Name *string `json:"name,omitzero"`
-
-	Key *string `json:"key,omitzero"`
-
-	Trust *string `json:"trust,omitzero"`
-
-	Tunnel *bool `json:"tunnel,omitzero"`
-}
-
-// POST /v1/join (#994, spec 736 FR-017): a machine with no code asks to join. `person` names whose it is to be, by name or id; with none, an admin approves it.
-type HostJoinAsk struct {
-	Name string `json:"name"`
-
-	Platform string `json:"platform"`
-
-	Version *string `json:"version,omitzero"`
-
-	PublicKey Data `json:"publicKey"`
-
-	MachineID *string `json:"machineID,omitzero"`
-
-	Person *string `json:"person,omitzero"`
-}
-
-// GET /v1/join/<request> (#994): waiting, or how it ended; `host` once approved.
-type HostJoinDecision struct {
-	Result string `json:"result"`
-
-	Host *HostID `json:"host,omitzero"`
-
-	// Once approved: the control plane's public key, which the machine keeps as a code's would give it.
-	ControlKey Data `json:"controlKey,omitzero"`
-
-	// Once approved: the control plane's name.
-	Name *string `json:"name,omitzero"`
-}
-
-type HostJoinStatus struct {
-	Member bool `json:"member"`
-
-	Connected bool `json:"connected"`
-
-	Problem *string `json:"problem,omitzero"`
-
-	At Date `json:"at"`
-}
-
-// POST /v1/join: the request, the short code the machine shows, and when it ends (10 minutes).
-type HostJoinTicket struct {
-	Request string `json:"request"`
-
-	Code string `json:"code"`
-
-	Expires Date `json:"expires"`
-}
-
-type HostLastHeard struct {
-	Host HostID `json:"host"`
-
-	Folders []FolderSummary `json:"folders,omitzero"`
-
-	Agents []Agent `json:"agents,omitzero"`
-
-	HeardAt *Date `json:"heardAt,omitzero"`
-}
-
-// hosts/link.
-type HostLink struct {
-	Host HostID `json:"host"`
-
-	Provider ProviderID `json:"provider"`
-
-	Workspace string `json:"workspace"`
-
-	StartWhenUsed *bool `json:"startWhenUsed,omitzero"`
-
-	StopWhenIdleMinutes *int64 `json:"stopWhenIdleMinutes,omitzero"`
-}
-
-type HostMachine struct {
-	Provider ProviderID `json:"provider"`
-
-	ProviderName string `json:"providerName"`
-
-	Workspace string `json:"workspace"`
-
-	WorkspaceName string `json:"workspaceName"`
-
-	WorkspaceState string `json:"workspaceState"`
-
-	HostState *string `json:"hostState,omitzero"`
-
-	Phase *string `json:"phase,omitzero"`
-
-	Since *Date `json:"since,omitzero"`
-
-	Problem *string `json:"problem,omitzero"`
-
-	StoppedBy *string `json:"stoppedBy,omitzero"`
-
-	CanStart bool `json:"canStart"`
-
-	CanStop bool `json:"canStop"`
-
-	StartWhenUsed bool `json:"startWhenUsed"`
-
-	StopWhenIdleMinutes *int64 `json:"stopWhenIdleMinutes,omitzero"`
-
-	Cost *string `json:"cost,omitzero"`
-
-	Current bool `json:"current"`
-
-	StartForSchedules *bool `json:"startForSchedules,omitzero"`
-
-	TellsSchedule *bool `json:"tellsSchedule,omitzero"`
-
-	NextWorkflow *string `json:"nextWorkflow,omitzero"`
-
-	NextWorkflowAt *Date `json:"nextWorkflowAt,omitzero"`
-
-	WakeAt *Date `json:"wakeAt,omitzero"`
-}
-
-// host/machines, for an agent there: who asked, for the log, and its call.
-type HostMachineCall struct {
-	Agent string `json:"agent"`
-
-	Method string `json:"method"`
-
-	Params JSONValue `json:"params"`
-}
-
-// hosts/setMachineOptions. stopWhenIdleMinutes 0 turns it off.
-type HostMachineOptions struct {
-	Host HostID `json:"host"`
-
-	StartWhenUsed *bool `json:"startWhenUsed,omitzero"`
-
-	StopWhenIdleMinutes *int64 `json:"stopWhenIdleMinutes,omitzero"`
-
-	StartForSchedules *bool `json:"startForSchedules,omitzero"`
-}
-
-// host/policy (#998, FR-006): to a machine that says host.policy/1, on its channel 0, at each join and within 5 seconds of each change. A signed policy, or none when no policy was ever set.
-type HostPolicy struct {
-	Policy *OrgPolicy `json:"policy,omitzero"`
-
-	Signature *PolicySignature `json:"signature,omitzero"`
-
-	None *bool `json:"none,omitzero"`
-}
-
-// host/providerDraft: a writing agent called one of the writer's tools (#858).
-type HostProviderDraftCall struct {
-	AgentID UUID `json:"agentID"`
-
-	Draft UUID `json:"draft"`
-
-	Tool string `json:"tool"`
-
-	Arguments JSONValue `json:"arguments,omitzero"`
-}
-
-// hosts/setRelay.
-type HostRelayRequest struct {
-	Host HostID `json:"host"`
-
-	Relay bool `json:"relay"`
-}
-
-// host/release (#2178): the release the control plane names, as X.Y.Z.
-type HostRelease struct {
-	Version string `json:"version"`
-}
-
-type HostRequest struct {
-	Host HostID `json:"host"`
-
-	Purge *bool `json:"purge,omitzero"`
-}
-
-// A host's next scheduled workflow (#1004).
-type HostSchedule struct {
-	At *Date `json:"at,omitzero"`
-
-	Workflow *string `json:"workflow,omitzero"`
-}
-
-// host/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next scheduled workflow.
-type HostStatus struct {
-	Idle bool `json:"idle"`
-
-	Running []string `json:"running"`
-
-	Schedule *HostSchedule `json:"schedule,omitzero"`
-}
-
-type HostStop struct {
-	Host HostID `json:"host"`
-
-	ConfirmRunning *bool `json:"confirmRunning,omitzero"`
-}
-
-type HostTunnel struct {
-	Up bool `json:"up"`
-
-	Problem *string `json:"problem,omitzero"`
-}
-
-type HostTunnelChanged struct {
-	Name string `json:"name"`
-
-	Host *HostID `json:"host,omitzero"`
-
-	Tunnel HostTunnel `json:"tunnel"`
-}
-
-// hosts/update (#1766): a host the control plane installed over ssh, updated the same way. The server and its key are given again, as at the install, because the control plane keeps neither; the host's own root and membership stay.
-type HostUpdate struct {
-	Host HostID `json:"host"`
-
-	Destination string `json:"destination"`
-
-	Key *string `json:"key,omitzero"`
-
-	Trust *string `json:"trust,omitzero"`
-}
-
-// host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it starts no work (FR-033).
-type HostUser struct {
-	User string `json:"user"`
-
-	Kind string `json:"kind"`
-
-	Name string `json:"name"`
-
-	Labels []string `json:"labels"`
-
-	CapReachedUntil *Date `json:"capReachedUntil,omitzero"`
-
-	// For a person: the names of the bots in their groups (#2027). A runs-on: workflow that names one is heard here, once approved here, and its matches are sent to the control plane, never run here.
-	Bots []string `json:"bots,omitzero"`
-}
-
-// host/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and when its user's settings or secrets change. Sent only on the links of that user's own machines. secrets is every secret the user has: a name missing from it was removed.
-type HostUserSettings struct {
-	User string `json:"user"`
-
-	Settings UserSettings `json:"settings"`
-
-	Secrets []UserSecret `json:"secrets"`
-}
-
 type HostedMCPSnapshot struct {
 	Servers []HostedMCPStatus `json:"servers"`
 
@@ -4402,7 +4076,7 @@ type HostedMCPStatus struct {
 }
 
 type JoinApproved struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 }
 
 // control/joinDecided (#994): a request ended, approved or not, so every card for it goes.
@@ -4436,7 +4110,7 @@ type JoinRequestDecide struct {
 
 // hosts/keep: a request for a stopped host, kept until it is up.
 type KeepRequest struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
 	Method string `json:"method"`
 
@@ -4444,7 +4118,7 @@ type KeepRequest struct {
 }
 
 type KeptDelivered struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
 	ID UUID `json:"id"`
 
@@ -4458,7 +4132,7 @@ type KeptList struct {
 type KeptRequest struct {
 	ID UUID `json:"id"`
 
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
 	Kind string `json:"kind"`
 
@@ -4476,7 +4150,7 @@ type KeptRequest struct {
 }
 
 type KeptRequestID struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
 	ID UUID `json:"id"`
 }
@@ -4530,9 +4204,9 @@ type LeaseTokenRequest struct {
 }
 
 type LendGit struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
-	From HostID `json:"from"`
+	From MachineRef `json:"from"`
 
 	Server string `json:"server"`
 
@@ -4541,9 +4215,9 @@ type LendGit struct {
 
 // hosts/lendSignIn (T091).
 type LendSignIn struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
-	From HostID `json:"from"`
+	From MachineRef `json:"from"`
 
 	Runtime string `json:"runtime"`
 
@@ -4600,7 +4274,7 @@ type ListedSkill struct {
 
 // One agent on Console ▸ Live Now (#2019, M9): whose machine, which runtime, its state, since when and its cost so far. No title and nothing it said.
 type LiveAgent struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
 	HostName string `json:"hostName"`
 
@@ -5260,6 +4934,73 @@ type MacTerminalRequest struct {
 	Path *string `json:"path,omitzero"`
 }
 
+// hosts/announce, on an enrolment connection.
+type MachineAnnounce struct {
+	PublicKey Data `json:"publicKey"`
+
+	Name string `json:"name"`
+
+	Platform string `json:"platform"`
+
+	Version string `json:"version"`
+
+	MachineID string `json:"machineID"`
+
+	Relay *bool `json:"relay,omitzero"`
+
+	Implementation *string `json:"implementation,omitzero"`
+}
+
+// governance/report (#2019, M5): the MCP servers and skills a machine has from a catalogue, personal and in its folders, at most 500. Sent at start and each hour; each replaces the last.
+type MachineCatalog struct {
+	Items []CatalogItem `json:"items"`
+}
+
+// A paired window a host may let in on its local socket (#1118), with the key it proves itself with.
+type MachineClient struct {
+	ID UUID `json:"id"`
+
+	Kind string `json:"kind"`
+
+	PublicKey Data `json:"publicKey"`
+
+	// The person the window belongs to (#994). The host lets it in only when it is the host's own user (FR-020).
+	Person *string `json:"person,omitzero"`
+}
+
+// host/clients: every window paired with the control plane, which a host checks its local socket against (#1118).
+type MachineClients struct {
+	Clients []MachineClient `json:"clients"`
+
+	// The user the host belongs to (#994). With it, the host lets in only a window whose person is that user (FR-020); without it (an older control plane), every window listed.
+	User *string `json:"user,omitzero"`
+}
+
+// hosts/startEnroll (#1761): with as, a bot's machine code, an admin's only. Without, the caller's own, as before.
+type MachineEnroll struct {
+	As *string `json:"as,omitzero"`
+}
+
+// host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).
+type MachineHello struct {
+	Host *MachineRef `json:"host,omitzero"`
+
+	Version string `json:"version"`
+
+	Platform string `json:"platform"`
+
+	MachineID string `json:"machineID"`
+
+	Name *string `json:"name,omitzero"`
+
+	Relay *bool `json:"relay,omitzero"`
+
+	Implementation *string `json:"implementation,omitzero"`
+
+	// The capabilities this host has (#1748): each one whose methods it all serves, and the ones it declares. None from a host older than #1748.
+	Capabilities []string `json:"capabilities,omitzero"`
+}
+
 // One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or unknown.
 type MachineInfo struct {
 	ID string `json:"id"`
@@ -5277,7 +5018,266 @@ type MachineInfo struct {
 
 	Cost *string `json:"cost,omitzero"`
 
-	Host *HostID `json:"host,omitzero"`
+	Host *MachineRef `json:"host,omitzero"`
+}
+
+// hosts/install (MachineInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel.
+type MachineInstall struct {
+	Destination string `json:"destination"`
+
+	Name *string `json:"name,omitzero"`
+
+	Key *string `json:"key,omitzero"`
+
+	Trust *string `json:"trust,omitzero"`
+
+	Tunnel *bool `json:"tunnel,omitzero"`
+}
+
+// POST /v1/join (#994, spec 736 FR-017): a machine with no code asks to join. `person` names whose it is to be, by name or id; with none, an admin approves it.
+type MachineJoinAsk struct {
+	Name string `json:"name"`
+
+	Platform string `json:"platform"`
+
+	Version *string `json:"version,omitzero"`
+
+	PublicKey Data `json:"publicKey"`
+
+	MachineID *string `json:"machineID,omitzero"`
+
+	Person *string `json:"person,omitzero"`
+}
+
+// GET /v1/join/<request> (#994): waiting, or how it ended; `host` once approved.
+type MachineJoinDecision struct {
+	Result string `json:"result"`
+
+	Host *MachineRef `json:"host,omitzero"`
+
+	// Once approved: the control plane's public key, which the machine keeps as a code's would give it.
+	ControlKey Data `json:"controlKey,omitzero"`
+
+	// Once approved: the control plane's name.
+	Name *string `json:"name,omitzero"`
+}
+
+type MachineJoinStatus struct {
+	Member bool `json:"member"`
+
+	Connected bool `json:"connected"`
+
+	Problem *string `json:"problem,omitzero"`
+
+	At Date `json:"at"`
+}
+
+// POST /v1/join: the request, the short code the machine shows, and when it ends (10 minutes).
+type MachineJoinTicket struct {
+	Request string `json:"request"`
+
+	Code string `json:"code"`
+
+	Expires Date `json:"expires"`
+}
+
+type MachineLastHeard struct {
+	Host MachineRef `json:"host"`
+
+	Folders []FolderSummary `json:"folders,omitzero"`
+
+	Agents []Agent `json:"agents,omitzero"`
+
+	HeardAt *Date `json:"heardAt,omitzero"`
+}
+
+// hosts/link.
+type MachineLink struct {
+	Host MachineRef `json:"host"`
+
+	Provider ProviderID `json:"provider"`
+
+	Workspace string `json:"workspace"`
+
+	StartWhenUsed *bool `json:"startWhenUsed,omitzero"`
+
+	StopWhenIdleMinutes *int64 `json:"stopWhenIdleMinutes,omitzero"`
+}
+
+// hosts/setMachineOptions. stopWhenIdleMinutes 0 turns it off.
+type MachineOptions struct {
+	Host MachineRef `json:"host"`
+
+	StartWhenUsed *bool `json:"startWhenUsed,omitzero"`
+
+	StopWhenIdleMinutes *int64 `json:"stopWhenIdleMinutes,omitzero"`
+
+	StartForSchedules *bool `json:"startForSchedules,omitzero"`
+}
+
+// host/policy (#998, FR-006): to a machine that says host.policy/1, on its channel 0, at each join and within 5 seconds of each change. A signed policy, or none when no policy was ever set.
+type MachinePolicy struct {
+	Policy *OrgPolicy `json:"policy,omitzero"`
+
+	Signature *PolicySignature `json:"signature,omitzero"`
+
+	None *bool `json:"none,omitzero"`
+}
+
+// host/providerDraft: a writing agent called one of the writer's tools (#858).
+type MachineProviderDraftCall struct {
+	AgentID UUID `json:"agentID"`
+
+	Draft UUID `json:"draft"`
+
+	Tool string `json:"tool"`
+
+	Arguments JSONValue `json:"arguments,omitzero"`
+}
+
+type MachineRef string
+
+// hosts/setRelay.
+type MachineRelayRequest struct {
+	Host MachineRef `json:"host"`
+
+	Relay bool `json:"relay"`
+}
+
+// host/release (#2178): the release the control plane names, as X.Y.Z.
+type MachineRelease struct {
+	Version string `json:"version"`
+}
+
+type MachineRequest struct {
+	Host MachineRef `json:"host"`
+
+	Purge *bool `json:"purge,omitzero"`
+}
+
+// A host's next scheduled workflow (#1004).
+type MachineSchedule struct {
+	At *Date `json:"at,omitzero"`
+
+	Workflow *string `json:"workflow,omitzero"`
+}
+
+// host/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next scheduled workflow.
+type MachineStatus struct {
+	Idle bool `json:"idle"`
+
+	Running []string `json:"running"`
+
+	Schedule *MachineSchedule `json:"schedule,omitzero"`
+}
+
+type MachineStop struct {
+	Host MachineRef `json:"host"`
+
+	ConfirmRunning *bool `json:"confirmRunning,omitzero"`
+}
+
+type MachineTunnel struct {
+	Up bool `json:"up"`
+
+	Problem *string `json:"problem,omitzero"`
+}
+
+type MachineTunnelChanged struct {
+	Name string `json:"name"`
+
+	Host *MachineRef `json:"host,omitzero"`
+
+	Tunnel MachineTunnel `json:"tunnel"`
+}
+
+// hosts/update (#1766): a host the control plane installed over ssh, updated the same way. The server and its key are given again, as at the install, because the control plane keeps neither; the host's own root and membership stay.
+type MachineUpdate struct {
+	Host MachineRef `json:"host"`
+
+	Destination string `json:"destination"`
+
+	Key *string `json:"key,omitzero"`
+
+	Trust *string `json:"trust,omitzero"`
+}
+
+// host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it starts no work (FR-033).
+type MachineUser struct {
+	User string `json:"user"`
+
+	Kind string `json:"kind"`
+
+	Name string `json:"name"`
+
+	Labels []string `json:"labels"`
+
+	CapReachedUntil *Date `json:"capReachedUntil,omitzero"`
+
+	// For a person: the names of the bots in their groups (#2027). A runs-on: workflow that names one is heard here, once approved here, and its matches are sent to the control plane, never run here.
+	Bots []string `json:"bots,omitzero"`
+}
+
+// host/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and when its user's settings or secrets change. Sent only on the links of that user's own machines. secrets is every secret the user has: a name missing from it was removed.
+type MachineUserSettings struct {
+	User string `json:"user"`
+
+	Settings UserSettings `json:"settings"`
+
+	Secrets []UserSecret `json:"secrets"`
+}
+
+type MachineWorkspace struct {
+	Provider ProviderID `json:"provider"`
+
+	ProviderName string `json:"providerName"`
+
+	Workspace string `json:"workspace"`
+
+	WorkspaceName string `json:"workspaceName"`
+
+	WorkspaceState string `json:"workspaceState"`
+
+	HostState *string `json:"hostState,omitzero"`
+
+	Phase *string `json:"phase,omitzero"`
+
+	Since *Date `json:"since,omitzero"`
+
+	Problem *string `json:"problem,omitzero"`
+
+	StoppedBy *string `json:"stoppedBy,omitzero"`
+
+	CanStart bool `json:"canStart"`
+
+	CanStop bool `json:"canStop"`
+
+	StartWhenUsed bool `json:"startWhenUsed"`
+
+	StopWhenIdleMinutes *int64 `json:"stopWhenIdleMinutes,omitzero"`
+
+	Cost *string `json:"cost,omitzero"`
+
+	Current bool `json:"current"`
+
+	StartForSchedules *bool `json:"startForSchedules,omitzero"`
+
+	TellsSchedule *bool `json:"tellsSchedule,omitzero"`
+
+	NextWorkflow *string `json:"nextWorkflow,omitzero"`
+
+	NextWorkflowAt *Date `json:"nextWorkflowAt,omitzero"`
+
+	WakeAt *Date `json:"wakeAt,omitzero"`
+}
+
+// host/machines, for an agent there: who asked, for the log, and its call.
+type MachineWorkspaceCall struct {
+	Agent string `json:"agent"`
+
+	Method string `json:"method"`
+
+	Params JSONValue `json:"params"`
 }
 
 type ManagedMCPServer struct {
@@ -5846,7 +5846,7 @@ type OrgRoutesApplied struct {
 
 // control/orgRoutesLeft (#999): a machine was removed with these routes on it. To its person and to every admin.
 type OrgRoutesLeft struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
 	Name string `json:"name"`
 
@@ -6029,7 +6029,7 @@ type PersonInvited struct {
 
 // A machine in People: its name, its state and nothing inside it (FR-019).
 type PersonMachine struct {
-	ID HostID `json:"id"`
+	ID MachineRef `json:"id"`
 
 	Name string `json:"name"`
 
@@ -7172,7 +7172,7 @@ type ReportRow struct {
 
 	PersonName string `json:"personName"`
 
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
 	HostName string `json:"hostName"`
 
@@ -7702,7 +7702,7 @@ type SCIMTokensRequest struct {
 	Provider string `json:"provider"`
 }
 
-// A server ssh knows by a name, for Add a Server's server box (#610).
+// A server ssh knows by a name, for Add a Machine's server box (#610).
 type SSHHost struct {
 	Alias string `json:"alias"`
 
@@ -7782,7 +7782,7 @@ type SealedEnvelope struct {
 
 // A machine that was removed with a secret on it (#1760, FR-026): change the secret where it was issued.
 type SecretLeftOn struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
 	// The machine's name when it was removed.
 	Name string `json:"name"`
@@ -7792,7 +7792,7 @@ type SecretLeftOn struct {
 
 // control/secretsLeft (#1760, FR-026): to the person's own clients, when one of their machines was removed with secrets on it.
 type SecretsLeft struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
 	Name string `json:"name"`
 
@@ -8823,7 +8823,7 @@ type StartRequest struct {
 
 // A started machine in people/removePreview: the branches and worktrees on it with work that is not pushed. `unknown` says why it could not be asked (offline, or it did not answer), and then `unpushed` is empty.
 type StartedMachinePreview struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
 	Name string `json:"name"`
 
@@ -8945,7 +8945,7 @@ type TeamBot struct {
 
 // An agent running on a bot's machine (#1804, M6), as the machine last listed it, for bots/stopRun. No title, nothing it said.
 type TeamBotRun struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
 	HostName string `json:"hostName"`
 
@@ -9610,7 +9610,7 @@ type UserSecretRow struct {
 	Updated string `json:"updated"`
 
 	// The machines it was sent to.
-	Machines []HostID `json:"machines"`
+	Machines []MachineRef `json:"machines"`
 
 	// Machines removed with it on them, since it was last set.
 	LeftOn []SecretLeftOn `json:"leftOn,omitzero"`

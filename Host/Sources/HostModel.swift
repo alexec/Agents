@@ -22,7 +22,7 @@ final class HostModel {
     private(set) var daemonRunning = false
     private var daemonPID: Int32?
     /// How this Mac's host's join stands, as it wrote it (#113); nil until it has.
-    private(set) var hostJoin: DaemonAPI.HostJoinStatus?
+    private(set) var hostJoin: DaemonAPI.MachineJoinStatus?
     private(set) var runningSince: Date?
     private var controlPID: Int32?
     private(set) var clients: Int?
@@ -896,7 +896,7 @@ final class HostModel {
     }
 
     /// `hosts/setRelay`, over the session the control plane's key proves.
-    private func tellRelay(_ host: HostID, on: Bool) async -> ControlTool.Result {
+    private func tellRelay(_ host: MachineRef, on: Bool) async -> ControlTool.Result {
         await ControlTool.run(["handover", "relay", "--at", "self", "--host", host.rawValue, on ? "--on" : "--off",
                                "--home", paths.controlHome.path, "--port", String(paths.port)],
                               paths: paths, settings: settings)

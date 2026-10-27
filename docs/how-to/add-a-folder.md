@@ -46,7 +46,7 @@ as a folder.
 
    If you have added a server, the **+** menu has **This Mac** and one entry per
    server; pick where the folder should live first. See
-   [Add a server](add-a-server.md).
+   [Add a machine](add-a-machine.md).
 
 **Archive a folder you are done with**
 
@@ -73,7 +73,7 @@ if you no longer want it. **Show in Finder** on the same menu takes you there.
 
 ## See also
 
-- [Add a server](add-a-server.md)
+- [Add a machine](add-a-machine.md)
 - [Start an agent in its own worktree](start-in-a-worktree.md)
-- [Folders, hosts and worktrees](../explanation/folders-hosts-worktrees.md)
+- [Folders, hosts and worktrees](../explanation/folders-machines-worktrees.md)
 - [Runtimes](../reference/runtimes.md)

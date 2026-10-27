@@ -296,7 +296,7 @@ final class RemoteModel {
     /// Every host a control plane has besides the one this phone paired with, each with
     /// a client of its own over one more connection (058, US4). Empty against a bridge
     /// with no control plane.
-    @ObservationIgnored private var otherHosts: [HostID: DaemonClient] = [:]
+    @ObservationIgnored private var otherHosts: [MachineRef: DaemonClient] = [:]
     @ObservationIgnored private var hostWatch: Task<Void, Never>?
     /// The watch's own client of the control plane while it is connected, for the control
     /// plane's own requests (`hosts/start`, #691). Nil against a bridge with no control plane.
@@ -309,19 +309,19 @@ final class RemoteModel {
     let userScope = UserScopeState()
     /// What `hosts/list` last said, so the folder list can name each host (058, frame H).
     /// Empty when this phone is not a client of a control plane.
-    private(set) var controlHosts: [DaemonAPI.ControlHost] = []
+    private(set) var controlHosts: [DaemonAPI.ControlMachine] = []
     /// Git asks answered on this device, until the control plane's list drops them (#1122).
     private var gitAsksAnswered: Set<String> = []
     /// The host this phone's own connection reaches. Its folders are stamped `.mac`.
-    private(set) var controlHome: HostID?
+    private(set) var controlHome: MachineRef?
     /// What `control/status` last said: its version and capabilities, for Settings (#1748).
     private(set) var controlStatus: DaemonAPI.ControlStatus?
 
     /// Each connected server's local daily ledger, matching the window's combined
     /// Today figure. Limits remain local to the host that owns them.
-    private(set) var serverCosts: [HostID: DaemonAPI.CostState] = [:]
+    private(set) var serverCosts: [MachineRef: DaemonAPI.CostState] = [:]
     /// Each other host's disk alarms, kept separate from this Mac's strip (#263).
-    private(set) var serverDisks: [HostID: DiskState] = [:]
+    private(set) var serverDisks: [MachineRef: DiskState] = [:]
 
     var serversToday: [String: Decimal] {
         serverCosts.values.reduce(into: [:]) { sum, state in
@@ -481,7 +481,7 @@ final class RemoteModel {
     /// A server's daemon wants a key to start a runtime (043, R6): asked of the person, as the
     /// window asks. True when one was lent, and the refused call is then sent again, as
     /// it was. A second ask while one is showing is refused rather than left waiting.
-    private func answerCredentialWanted(_ wanted: DaemonAPI.CredentialWanted, on id: HostID) async -> Bool {
+    private func answerCredentialWanted(_ wanted: DaemonAPI.CredentialWanted, on id: MachineRef) async -> Bool {
         guard id != .mac, !CredentialKind.kinds(for: wanted.runtime).isEmpty, tokenAsk == nil else { return false }
         let label = hostName(id)
         return await withCheckedContinuation { answer in
@@ -590,7 +590,7 @@ final class RemoteModel {
     }
 
     /// The client for `host` itself, for a call that names no folder there yet.
-    private func client(on host: HostID) throws -> DaemonClient {
+    private func client(on host: MachineRef) throws -> DaemonClient {
         if host == .mac { return client }
         guard let other = otherHosts[host], reachableHosts.contains(host) else { throw HostAway(host: host) }
         return other
@@ -598,7 +598,7 @@ final class RemoteModel {
 
     /// One folder on `host`, for choosing a folder there (#537): `files/browse`, as the
     /// window's and the page's folder sheets read a server's. `~` is the host's home.
-    func browse(_ path: String, on host: HostID) async -> Result<DirectoryListing, BrowseProblem> {
+    func browse(_ path: String, on host: MachineRef) async -> Result<DirectoryListing, BrowseProblem> {
         do {
             return .success(try await client(on: host).call(DaemonAPI.Method.filesBrowse,
                                                              DaemonAPI.FilesBrowseRequest(path: path),
@@ -615,7 +615,7 @@ final class RemoteModel {
     }
 
     /// Add a folder on `host` as a folder, and open it. Answers why not, or nil.
-    func addFolder(_ folder: URL, on host: HostID) async -> String? {
+    func addFolder(_ folder: URL, on host: MachineRef) async -> String? {
         do {
             let summary = try await client(on: host).call(DaemonAPI.Method.foldersAdd,
                                                           DaemonAPI.FolderRequest(folder: folder),
@@ -629,7 +629,7 @@ final class RemoteModel {
 
     /// Clone a repository into `host`'s home folder as a folder, and open it. Answers
     /// why not, or nil.
-    func cloneFolder(url: String, on host: HostID) async -> String? {
+    func cloneFolder(url: String, on host: MachineRef) async -> String? {
         do {
             let summary = try await client(on: host).call(DaemonAPI.Method.foldersClone,
                                                           DaemonAPI.CloneRequest(url: url),
@@ -643,7 +643,7 @@ final class RemoteModel {
 
     /// A folder just added on `host`, listed and opened at once rather than when the
     /// host next says so.
-    private func show(_ summary: DaemonAPI.FolderSummary, on host: HostID) {
+    private func show(_ summary: DaemonAPI.FolderSummary, on host: MachineRef) {
         var added = summary
         added.host = host
         work.upsert(added)
@@ -655,7 +655,7 @@ final class RemoteModel {
     struct HostSection: Identifiable {
         /// The id folders from this host are stamped with. The phone's own Mac is
         /// `.mac`, whichever id the control plane gave that host.
-        var id: HostID
+        var id: MachineRef
         var title: String
         var offline: Bool
     }
@@ -674,11 +674,11 @@ final class RemoteModel {
 
     /// Whether `host`'s folders are last known rather than current (frame H greys them).
     /// A host's name as a server folder's row leads with it (#145): `devbox:api`.
-    func hostLabel(_ host: HostID) -> String {
+    func hostLabel(_ host: MachineRef) -> String {
         hostSections.first { $0.id == host }?.title ?? host.rawValue
     }
 
-    func hostIsOffline(_ host: HostID) -> Bool {
+    func hostIsOffline(_ host: MachineRef) -> Bool {
         hostSections.first { $0.id == host }?.offline ?? false
     }
     /// Archived ones too, for the spending page. A folder put away still cost what it
@@ -1072,7 +1072,7 @@ final class RemoteModel {
     private(set) var startWorktrees: DaemonAPI.WorktreesListResponse = .notARepository
     private var startDraftID: UUID?
     /// The host `startDraftID` was made on: the page's folder's (#240).
-    private var startDraftHost: HostID = .mac
+    private var startDraftHost: MachineRef = .mac
     /// Bumped by every fetch of a runtime's choices, so an answer for a runtime the
     /// person has since moved off is recognised as that and let go.
     private var startGeneration = 0
@@ -1155,7 +1155,7 @@ final class RemoteModel {
     /// Counts the page's opens, so only the last asks for its choices.
     @ObservationIgnored private var startOpens = 0
     /// The host the open page asked for runtimes, as it knew the folder then.
-    @ObservationIgnored private var startOpenedOn: HostID?
+    @ObservationIgnored private var startOpenedOn: MachineRef?
 
     /// The folder list came after the page opened (#2089): a page that took the Mac's
     /// runtimes for a server's folder opens again on its own host's.
@@ -1493,7 +1493,7 @@ final class RemoteModel {
 
     /// Not waited on: the page has moved on, and a Mac too old to know the method has
     /// nothing to be told. To the host the draft was made on (#240).
-    private func discard(draft: UUID, on host: HostID) {
+    private func discard(draft: UUID, on host: MachineRef) {
         let target = host == .mac ? client : otherHosts[host] ?? client
         Task { _ = try? await target.call(DaemonAPI.Method.agentsDiscardDraft,
                                           DaemonAPI.DiscardDraftRequest(draftID: draft)) }
@@ -1776,16 +1776,16 @@ final class RemoteModel {
 
     /// Each other host's runtimes, as it last listed them (#240): a server folder's
     /// start page offers its server's, as the window's does (037).
-    private(set) var serverRuntimes: [HostID: [RuntimeStatus]] = [:] { didSet { startRuntimesMoved() } }
+    private(set) var serverRuntimes: [MachineRef: [RuntimeStatus]] = [:] { didSet { startRuntimesMoved() } }
     /// Why a host's last `runtimes/list` failed, until one is answered (#977): the start
     /// page says that, rather than "None set up".
-    private var runtimesFailure: [HostID: String] = [:] { didSet { startRuntimesMoved() } }
+    private var runtimesFailure: [MachineRef: String] = [:] { didSet { startRuntimesMoved() } }
 
-    func runtimes(on host: HostID) -> [RuntimeStatus] {
+    func runtimes(on host: MachineRef) -> [RuntimeStatus] {
         host == .mac ? runtimes : serverRuntimes[host] ?? []
     }
 
-    private func refreshServerRuntimes(_ host: HostID) async {
+    private func refreshServerRuntimes(_ host: MachineRef) async {
         guard let other = otherHosts[host] else { return }
         do {
             let listed = try await other.call(DaemonAPI.Method.runtimesList, Optional<String>.none,
@@ -2170,7 +2170,7 @@ final class RemoteModel {
     }
 
     /// The host other than this phone's own that a call names, by its agent or its folder.
-    private func otherHost(named params: some Encodable) -> HostID? {
+    private func otherHost(named params: some Encodable) -> MachineRef? {
         guard !controlHosts.isEmpty, let value = try? JSONValue.encoding(params) else { return nil }
         if let id = (value["agentID"] ?? value["id"])?.stringValue.flatMap(UUID.init(uuidString:)),
            let host = work.agent(id)?.host, host != .mac {
@@ -2187,7 +2187,7 @@ final class RemoteModel {
 
     /// Another of the control plane's hosts, not reachable from here now (#208).
     struct HostAway: Error {
-        let host: HostID
+        let host: MachineRef
     }
 
     /// The home host did not come back within `sendPatience` (#208).
@@ -2195,7 +2195,7 @@ final class RemoteModel {
 
     /// The other hosts this phone has a live connection to now (058, #208): an agent on
     /// one that is not is stale on its own, whatever the home host is doing.
-    private(set) var reachableHosts: Set<HostID> = [] {
+    private(set) var reachableHosts: Set<MachineRef> = [] {
         didSet {
             for host in oldValue.subtracting(reachableHosts) where hostDownSince[host] == nil {
                 hostDownSince[host] = Date()
@@ -2206,7 +2206,7 @@ final class RemoteModel {
 
     /// Whether what is shown of `host`'s work can be trusted, and acted on: the home host's
     /// staleness for its own, that host's link for another's (#208).
-    func isStale(on host: HostID) -> Bool {
+    func isStale(on host: MachineRef) -> Bool {
         host == .mac ? isStale : !reachableHosts.contains(host)
     }
 
@@ -2214,7 +2214,7 @@ final class RemoteModel {
 
     /// Who something sent to `host` goes to, as the in-flight mark (`Telling`) names it:
     /// the Mac as "your Mac", a server by its name, as the window says it (#239).
-    func recipient(on host: HostID) -> String {
+    func recipient(on host: MachineRef) -> String {
         host == .mac ? "your Mac" : hostName(host)
     }
 
@@ -2224,14 +2224,14 @@ final class RemoteModel {
     }
 
     /// The host of the folder the start page is open on: where the new agent starts.
-    var startHost: HostID {
+    var startHost: MachineRef {
         startingIn.flatMap { work.folder($0)?.host } ?? .mac
     }
 
     /// Whether a host can do what `capability` names (#1748): its row's list, with `.mac`
     /// read as this phone's home host. True when the host said no list, or is not a
     /// control plane's.
-    func host(_ host: HostID, has capability: String) -> Bool {
+    func host(_ host: MachineRef, has capability: String) -> Bool {
         let id = host == .mac ? (controlHome ?? host) : host
         return controlHosts.first { $0.id == id }?.has(capability) ?? true
     }
@@ -2242,12 +2242,12 @@ final class RemoteModel {
     }
 
     /// A host's row as `hosts/list` last said it: its state, and the workspace it runs on (#691).
-    func controlHost(_ host: HostID) -> DaemonAPI.ControlHost? {
+    func controlHost(_ host: MachineRef) -> DaemonAPI.ControlMachine? {
         controlHosts.first { $0.id == host }
     }
 
     /// The hosts whose `hosts/start` is out now, so the strip's Start waits for it (#691).
-    private(set) var hostsBeingStarted: Set<HostID> = []
+    private(set) var hostsBeingStarted: Set<MachineRef> = []
     /// Prompts and starts the control plane keeps for stopped workspaces (#691 US3), every host's.
     private(set) var kept: [DaemonAPI.KeptRequest] = []
     /// The kept starts the start page has shown here: the one that reaches its host opens.
@@ -2255,7 +2255,7 @@ final class RemoteModel {
 
     /// Whether a prompt or a start for `host` now is kept rather than refused: it is linked
     /// to a workspace that is stopped or starting, and starts when used (FR-020).
-    func startsWhenUsed(_ host: HostID) -> Bool {
+    func startsWhenUsed(_ host: MachineRef) -> Bool {
         guard let row = controlHosts.first(where: { $0.id == host }), row.workspace?.startWhenUsed == true else { return false }
         return row.state == "stopped" || row.state == "starting"
     }
@@ -2271,7 +2271,7 @@ final class RemoteModel {
 
     /// A prompt or a start for a stopped workspace's host, whose link is closed while it is
     /// down, sent to the control plane to keep (#691 US3). What was kept, or nil with why not.
-    private func keepThroughControl(_ host: HostID, _ method: String, _ params: some Encodable) async -> DaemonAPI.KeptRequest? {
+    private func keepThroughControl(_ host: MachineRef, _ method: String, _ params: some Encodable) async -> DaemonAPI.KeptRequest? {
         guard let control = controlPlane, let params = try? JSONValue.encoding(params) else {
             problem = "The control plane isn’t answering, so that was not sent."
             return nil
@@ -2362,7 +2362,7 @@ final class RemoteModel {
     /// Start the workspace `host` runs on (#691, the strip's Start). The control plane answers
     /// at once; the start's progress comes as `control/hostChanged`, and a refusal is said
     /// in `problem`.
-    func startHost(_ host: HostID) async {
+    func startHost(_ host: MachineRef) async {
         guard let control = controlPlane else {
             problem = "The control plane isn’t answering, so \(hostName(host)) could not be started."
             return
@@ -2370,8 +2370,8 @@ final class RemoteModel {
         hostsBeingStarted.insert(host)
         defer { hostsBeingStarted.remove(host) }
         do {
-            let row = try await control.call(DaemonAPI.Method.hostsStart, DaemonAPI.HostRequest(host: host),
-                                             returning: DaemonAPI.ControlHost.self)
+            let row = try await control.call(DaemonAPI.Method.hostsStart, DaemonAPI.MachineRequest(host: host),
+                                             returning: DaemonAPI.ControlMachine.self)
             if let index = controlHosts.firstIndex(where: { $0.id == row.id }) { controlHosts[index] = row }
         } catch {
             problem = sentence(for: error)
@@ -2466,22 +2466,22 @@ final class RemoteModel {
         return refused
     }
 
-    func linkWorkspace(host: HostID, provider: ProviderID, workspace: String, startWhenUsed: Bool,
+    func linkWorkspace(host: MachineRef, provider: ProviderID, workspace: String, startWhenUsed: Bool,
                        stopWhenIdleMinutes: Int) async -> String? {
         await controlRequest(DaemonAPI.Method.hostsLink,
-                             DaemonAPI.HostLink(host: host, provider: provider, workspace: workspace,
+                             DaemonAPI.MachineLink(host: host, provider: provider, workspace: workspace,
                                                 startWhenUsed: startWhenUsed, stopWhenIdleMinutes: stopWhenIdleMinutes))
     }
 
-    func unlinkWorkspace(host: HostID) async -> String? {
-        await controlRequest(DaemonAPI.Method.hostsUnlink, DaemonAPI.HostRequest(host: host))
+    func unlinkWorkspace(host: MachineRef) async -> String? {
+        await controlRequest(DaemonAPI.Method.hostsUnlink, DaemonAPI.MachineRequest(host: host))
     }
 
     /// Stop. With agents at work there and not `confirmed`, answers the question to ask first.
-    func stopMachine(host: HostID, confirmed: Bool = false) async -> (refused: String?, ask: String?) {
+    func stopMachine(host: MachineRef, confirmed: Bool = false) async -> (refused: String?, ask: String?) {
         guard let control = controlPlane else { return ("The control plane isn’t answering.", nil) }
         do {
-            _ = try await control.call(DaemonAPI.Method.hostsStop, DaemonAPI.HostStop(host: host, confirmRunning: confirmed ? true : nil))
+            _ = try await control.call(DaemonAPI.Method.hostsStop, DaemonAPI.MachineStop(host: host, confirmRunning: confirmed ? true : nil))
             return (nil, nil)
         } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.agentsWorking && !confirmed {
             return (nil, error.message)
@@ -2513,7 +2513,7 @@ final class RemoteModel {
     }
 
     /// Said to the control plane; Settings ▸ Git access takes one back with `allowed` false.
-    func lendGit(host: HostID, from: HostID, server: String, allowed: Bool) async {
+    func lendGit(host: MachineRef, from: MachineRef, server: String, allowed: Bool) async {
         guard let control = controlPlane else {
             problem = "The control plane isn’t answering, so that was not changed."
             return
@@ -2531,7 +2531,7 @@ final class RemoteModel {
 
     /// When each other host was last seen to go, for the strip over its chats (#239):
     /// set as it leaves `reachableHosts`, cleared as it comes back.
-    private(set) var hostDownSince: [HostID: Date] = [:]
+    private(set) var hostDownSince: [MachineRef: Date] = [:]
 
     /// Ask whether a control plane is on the other end, and follow its other hosts if so.
     /// A bridge with no control plane answers `control/status` with methodNotFound, and
@@ -2590,7 +2590,7 @@ final class RemoteModel {
                         }
                         guard change.method == DaemonAPI.Notification.controlHostChanged else { continue }
                         // A host back while this phone waits out its backoff: go back now (#172).
-                        if !self.isConnected, DaemonAPI.ControlHost.answers(change.params?["state"]?.stringValue) { self.backoff.nudge() }
+                        if !self.isConnected, DaemonAPI.ControlMachine.answers(change.params?["state"]?.stringValue) { self.backoff.nudge() }
                         await self.syncOtherHosts(control, link: link)
                     }
                     note("hosts: the control plane's watch closed")
@@ -2629,7 +2629,7 @@ final class RemoteModel {
 
     private func syncOtherHosts(_ control: DaemonClient, link: ControlLink) async {
         guard let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self),
-              let listed = try? await control.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlHost].self)
+              let listed = try? await control.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlMachine].self)
         else { return }
         controlHosts = listed.filter(\.runsAgents)
         gitAsksAnswered.formIntersection(GitLendAsk.waiting(in: listed))
@@ -2709,8 +2709,8 @@ final class RemoteModel {
         // went while it ran (#962).
         for host in controlHosts where host.id != status.homeHost && !host.answers
             && !work.holdsFolders(of: host.id) {
-            if let heard = try? await control.call(DaemonAPI.Method.hostsLastHeard, DaemonAPI.HostRequest(host: host.id),
-                                                   returning: DaemonAPI.HostLastHeard.self) {
+            if let heard = try? await control.call(DaemonAPI.Method.hostsLastHeard, DaemonAPI.MachineRequest(host: host.id),
+                                                   returning: DaemonAPI.MachineLastHeard.self) {
                 work.takeLastHeard(heard)
             }
         }
@@ -2731,7 +2731,7 @@ final class RemoteModel {
 
     /// What another host says that the shared model does not claim, and the phone wants:
     /// its runtimes changing, and the start page's draft settling there (#240).
-    private func received(_ method: String, _ params: JSONValue?, fromOther host: HostID) async {
+    private func received(_ method: String, _ params: JSONValue?, fromOther host: MachineRef) async {
         switch method {
         case DaemonAPI.Notification.runtimeChanged:
             await refreshServerRuntimes(host)
@@ -3500,7 +3500,7 @@ final class RemoteModel {
             let owner = showing.map(hostOf)
             let watcher = watching.map(hostOf)
             let poppedHosts = popped.sorted { $0.uuidString < $1.uuidString }.map { ($0, hostOf($0)) }
-            func report(for host: HostID) -> DaemonAPI.PresenceReport {
+            func report(for host: MachineRef) -> DaemonAPI.PresenceReport {
                 DaemonAPI.PresenceReport(watching: watcher == host ? watching : nil, active: active,
                                          mayNotify: mayNotify, showing: owner == host ? showing : nil,
                                          alsoShowing: poppedHosts.filter { $0.1 == host }.map(\.0))
@@ -3622,7 +3622,7 @@ final class RemoteModel {
     /// Archived sessions a search brought in, let go when the search ends.
     private var searched: Set<UUID> = []
     /// The next page of matches, for each host whose last page was full (#176).
-    private var searchNext: [HostID: DaemonAPI.ListRequest] = [:]
+    private var searchNext: [MachineRef: DaemonAPI.ListRequest] = [:]
     /// Whether a host has more matches than it has sent: More matches… asks for them.
     var searchHasMore: Bool { !searchNext.isEmpty }
 
@@ -3639,7 +3639,7 @@ final class RemoteModel {
         work.saidLines = [:]
         guard !words.isEmpty else { return }
         let request = DaemonAPI.ListRequest(archivedCommands: false, limit: Self.searchShown, lean: true, query: words)
-        let hosts: [HostID] = [.mac] + reachableHosts.sorted { $0.rawValue < $1.rawValue }
+        let hosts: [MachineRef] = [.mac] + reachableHosts.sorted { $0.rawValue < $1.rawValue }
         for host in hosts {
             await search(request, on: host)
             // What was said (#1585): the sessions whose prompts or replies hold the words. Not
@@ -3660,7 +3660,7 @@ final class RemoteModel {
         for (host, request) in next { await search(request, on: host) }
     }
 
-    private func search(_ request: DaemonAPI.ListRequest, on host: HostID) async {
+    private func search(_ request: DaemonAPI.ListRequest, on host: MachineRef) async {
         guard let page = await ArchiveActions.searchArchived(request, on: host, fetch: {
             guard let target = self.hostClient(host) else { return nil }
             return try? await target.call(DaemonAPI.Method.agentsList, request, returning: [Agent].self)
@@ -3684,7 +3684,7 @@ final class RemoteModel {
     }
 
     /// The client for `host`: the Mac's own, or a server's while it answers.
-    func hostClient(_ host: HostID) -> DaemonClient? {
+    func hostClient(_ host: MachineRef) -> DaemonClient? {
         if host == .mac { return client }
         guard reachableHosts.contains(host) else { return nil }
         return otherHosts[host]
@@ -3885,7 +3885,7 @@ final class RemoteModel {
         [client] + reachableHosts.compactMap { otherHosts[$0] }
     }
 
-    private func refreshServerCost(_ host: HostID) async {
+    private func refreshServerCost(_ host: MachineRef) async {
         guard let other = otherHosts[host], reachableHosts.contains(host),
               let state = try? await other.call(DaemonAPI.Method.costState,
                                                 Optional<String>.none,
@@ -3893,7 +3893,7 @@ final class RemoteModel {
         serverCosts[host] = state
     }
 
-    private func refreshServerDisk(_ host: HostID) async {
+    private func refreshServerDisk(_ host: MachineRef) async {
         guard let other = otherHosts[host], reachableHosts.contains(host),
               let state = try? await other.call(DaemonAPI.Method.diskState,
                                                 Optional<String>.none, returning: DiskState.self) else { return }
@@ -5345,12 +5345,12 @@ final class RemoteModel {
 
     /// "… is not answering, so …", naming the host: the home host as the Mac, another
     /// by its name (#238).
-    private func notAnswering(_ host: HostID, _ outcome: String) -> String {
+    private func notAnswering(_ host: MachineRef, _ outcome: String) -> String {
         "\(host == .mac ? "Your Mac" : hostName(host)) is not answering, so \(outcome)"
     }
 
     /// Another of the control plane's hosts, by the name it was given.
-    func hostName(_ host: HostID) -> String {
+    func hostName(_ host: MachineRef) -> String {
         controlHosts.first { $0.id == host }.map { $0.name.isEmpty ? $0.id.rawValue : $0.name } ?? "That machine"
     }
 

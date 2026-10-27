@@ -20,9 +20,9 @@ import (
 // What an agent may ask of the control plane through host/machines.
 const (
 	machinesForAgent   = "machines/forAgent"
-	hostsStart           = "hosts/start"
-	hostsStop            = "hosts/stop"
-	providersCreate      = "providers/create"
+	hostsStart         = "hosts/start"
+	hostsStop          = "hosts/stop"
+	providersCreate    = "providers/create"
 	hostsDeleteMachine = "hosts/deleteMachine"
 )
 
@@ -47,7 +47,7 @@ func (d *Daemon) askWorkspaces(agent wire.UUID, method string, params any) (json
 		return nil, &Error{Code: wire.FailureNotSupported, Message: "This machine isn’t on a control plane, so it has no machines."}
 	}
 	p, _ := json.Marshal(params)
-	out, err := (*ask)(d.ctx, "host/machines", wire.HostMachineCall{Agent: d.agentWho(agent), Method: method, Params: json.RawMessage(p)})
+	out, err := (*ask)(d.ctx, "host/machines", wire.MachineWorkspaceCall{Agent: d.agentWho(agent), Method: method, Params: json.RawMessage(p)})
 	var refused *controllink.AskError
 	if errors.As(err, &refused) {
 		return nil, &Error{Code: refused.Code, Message: refused.Message}

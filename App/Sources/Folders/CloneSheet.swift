@@ -12,7 +12,7 @@ struct CloneSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     /// Where the clone goes: this Mac, or a server's home folder (037).
-    var host: HostID = .mac
+    var host: MachineRef = .mac
     @State private var text = ""
     @FocusState private var isFocused: Bool
 

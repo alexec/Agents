@@ -63,7 +63,7 @@ build added kept whole), the copies' own messages, and the JSON-RPC envelope.
 | `controlplane/records` | `ControlRecords`, in today's JSON |
 | `controlplane/kms` | The key sealed by a keeper (an option, `AGENTS_CONTROL_KMS`) |
 | `controlplane/web` | The web page's loopback listener |
-| `controlplane/hostinstall`, `hosttunnels` | Add a Server over ssh, Detect, the ssh config's hosts, bastion tunnels |
+| `controlplane/hostinstall`, `hosttunnels` | Add a Machine over ssh, Detect, the ssh config's hosts, bastion tunnels |
 | `controlplane/notices` | Where a need shows (`Routing`), and the relay host's deliveries |
 | `controlplane/providers` | Machine providers, kept requests, Write It for Me |
 

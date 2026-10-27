@@ -17,7 +17,7 @@ func enrolled(t *testing.T, f *fakeControl, accept Accept) *Uplink {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	m, err := Enroll(ctx, root, f.code(), private, HostHello{})
+	m, err := Enroll(ctx, root, f.code(), private, MachineHello{})
 	if err != nil {
 		t.Fatal(err)
 	}

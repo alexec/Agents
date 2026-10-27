@@ -29,7 +29,7 @@ public enum ArchiveActions {
     /// the results of the newer search that superseded it.
     public static func searchArchived(
         _ request: DaemonAPI.ListRequest,
-        on host: HostID,
+        on host: MachineRef,
         fetch: () async -> [Agent]?
     ) async -> ArchivedSearchPage? {
         guard let found = await fetch(), !Task.isCancelled else { return nil }

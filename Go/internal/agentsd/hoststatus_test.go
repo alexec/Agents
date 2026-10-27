@@ -12,7 +12,7 @@ import (
 
 type toldStatus struct {
 	mu   sync.Mutex
-	sent []wire.HostStatus
+	sent []wire.MachineStatus
 }
 
 func (c *toldStatus) tell(method string, params any) {
@@ -21,16 +21,16 @@ func (c *toldStatus) tell(method string, params any) {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.sent = append(c.sent, params.(wire.HostStatus))
+	c.sent = append(c.sent, params.(wire.MachineStatus))
 }
 
-func (c *toldStatus) all() []wire.HostStatus {
+func (c *toldStatus) all() []wire.MachineStatus {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return append([]wire.HostStatus(nil), c.sent...)
+	return append([]wire.MachineStatus(nil), c.sent...)
 }
 
-// host/status (#1387), as DaemonCore+HostStatus: said to the control plane when the uplink
+// host/status (#1387), as DaemonCore+MachineStatus: said to the control plane when the uplink
 // comes, again only when it changes, and again whole when the uplink comes back; busy while
 // an agent works, idle once none does, with the next scheduled workflow.
 func TestAHostTellsItsControlPlaneWhetherItIsIdle(t *testing.T) {

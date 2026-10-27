@@ -45,7 +45,7 @@ A server joins over your own ssh from this Mac, as the earlier app reached it. I
 not be reached, the sheet says **devbox couldn't be reached over ssh**, with the reason, and
 shows a command. Run that command on the server, as the user your agents run as, and it
 joins. If the command has run out, add the server afresh; see
-[Add a server](add-a-server.md).
+[Add a machine](add-a-machine.md).
 
 ### Pair the window
 

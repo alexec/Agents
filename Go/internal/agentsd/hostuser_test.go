@@ -21,7 +21,7 @@ func TestABotsMachineAsksNobodyAndClaimsItsRuns(t *testing.T) {
 	if d.isBot() || !d.runsOnHere(nil) || d.runsOnHere([]string{"review-bot"}) {
 		t.Fatal("a person's machine as it starts")
 	}
-	told, _ := json.Marshal(wire.HostUser{User: "b1", Kind: "bot", Name: "review-bot", Labels: []string{"do-1"}})
+	told, _ := json.Marshal(wire.MachineUser{User: "b1", Kind: "bot", Name: "review-bot", Labels: []string{"do-1"}})
 	d.toldHostUser(told)
 	if !d.isBot() || !d.runsOnHere([]string{"Review-Bot", osLabel(), "do-1"}) || d.runsOnHere([]string{"review-bot", "windows"}) {
 		t.Fatalf("labels %v", d.machineLabels())
@@ -83,7 +83,7 @@ func TestABotsMachineAsksNobodyAndClaimsItsRuns(t *testing.T) {
 
 	// At its cap, until the end of the day.
 	until := wire.DateOf(time.Now().Add(time.Hour))
-	told, _ = json.Marshal(wire.HostUser{User: "b1", Kind: "bot", Name: "review-bot", Labels: []string{}, CapReachedUntil: &until})
+	told, _ = json.Marshal(wire.MachineUser{User: "b1", Kind: "bot", Name: "review-bot", Labels: []string{}, CapReachedUntil: &until})
 	d.toldHostUser(told)
 	if _, capped := d.capped(time.Now()); !capped {
 		t.Fatal("not capped")

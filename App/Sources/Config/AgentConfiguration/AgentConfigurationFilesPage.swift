@@ -12,7 +12,7 @@ struct AgentConfigurationFilesPage: View {
         return nil
     }
 
-    private var host: HostID {
+    private var host: MachineRef {
         folder == nil ? .mac : model.selectedFolderHost
     }
 

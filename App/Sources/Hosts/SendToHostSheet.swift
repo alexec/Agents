@@ -7,29 +7,29 @@ import SwiftUI
 /// the window is sandboxed and reads no repository itself.
 struct SendToHostRequest: Identifiable, Hashable {
     let folder: URL
-    let from: HostID
-    let host: HostID
+    let from: MachineRef
+    let host: MachineRef
     var id: String { "\(host.rawValue) \(folder.path)" }
 }
 
 extension AppModel {
     /// The hosts a folder on this Mac can be sent to: the servers that are reachable now.
-    var sendTargets: [HostID] {
+    var sendTargets: [MachineRef] {
         hosts.servers.filter { $0 != .mac && !isOnThisMac($0) && !hostUnreachable($0) }
     }
 
     /// Whether a folder is this Mac's to send.
-    func canSend(from host: HostID) -> Bool { host == .mac || isOnThisMac(host) }
+    func canSend(from host: MachineRef) -> Bool { host == .mac || isOnThisMac(host) }
 
     /// What the host has at `destination`.
-    func receiveState(at destination: String, on host: HostID) async throws -> DaemonAPI.ReceiveState {
+    func receiveState(at destination: String, on host: MachineRef) async throws -> DaemonAPI.ReceiveState {
         try await client(for: host).call(DaemonAPI.Method.foldersReceiveState,
                                          DaemonAPI.ReceiveStateRequest(folder: destination),
                                          returning: DaemonAPI.ReceiveState.self)
     }
 
     /// What the sheet shows of the repository at `folder`, from this Mac's host.
-    func sendFacts(_ folder: URL, on from: HostID) async throws -> DaemonAPI.SendFacts {
+    func sendFacts(_ folder: URL, on from: MachineRef) async throws -> DaemonAPI.SendFacts {
         try await client(for: from).call(DaemonAPI.Method.foldersSendFacts, DaemonAPI.SendFactsRequest(folder: folder),
                                          returning: DaemonAPI.SendFacts.self)
     }
@@ -39,7 +39,7 @@ extension AppModel {
     /// `host` make or bring up to date its copy at `destination`. Each part goes through
     /// the window, from one host's link to the other's. The folder it becomes is listed
     /// and returned.
-    func sendRepository(_ folder: URL, from: HostID, to host: HostID, at destination: String, branches: [String],
+    func sendRepository(_ folder: URL, from: MachineRef, to host: MachineRef, at destination: String, branches: [String],
                         checkout: String, includeChanges: Bool, origin: String?,
                         progress: @escaping @MainActor (String) -> Void) async throws -> DaemonAPI.FolderSummary {
         let label = hosts.label(host)

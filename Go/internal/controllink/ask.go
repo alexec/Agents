@@ -26,7 +26,7 @@ type JoinAsk struct {
 // spec 736 FR-017): it says its key, shows the short code the control plane gives it
 // (shown), and waits until the person approves or denies it, or 10 minutes pass. Once
 // approved, it keeps the membership, and connects as h:<id> with its own key.
-func AskToJoin(ctx context.Context, root string, ask JoinAsk, private []byte, hello HostHello, shown func(code string)) (*Membership, error) {
+func AskToJoin(ctx context.Context, root string, ask JoinAsk, private []byte, hello MachineHello, shown func(code string)) (*Membership, error) {
 	pin := ask.Pin
 	if pin == "-" {
 		pin = ""
@@ -44,15 +44,15 @@ func AskToJoin(ctx context.Context, root string, ask JoinAsk, private []byte, he
 	if hello.Name != nil {
 		name = *hello.Name
 	}
-	body, _ := json.Marshal(wire.HostJoinAsk{Name: name, Platform: hello.Platform, Version: &hello.Version,
+	body, _ := json.Marshal(wire.MachineJoinAsk{Name: name, Platform: hello.Platform, Version: &hello.Version,
 		PublicKey: pub, MachineID: &hello.MachineID, Person: &ask.Person})
-	var ticket wire.HostJoinTicket
+	var ticket wire.MachineJoinTicket
 	if err := callJSON(ctx, client, http.MethodPost, base+"/v1/join", body, &ticket); err != nil {
 		return nil, err
 	}
 	shown(ticket.Code)
 	for {
-		var d wire.HostJoinDecision
+		var d wire.MachineJoinDecision
 		if err := callJSON(ctx, client, http.MethodGet, base+"/v1/join/"+ticket.Request, nil, &d); err != nil {
 			if ctx.Err() != nil {
 				return nil, ctx.Err()

@@ -64,7 +64,7 @@ func (d *policiesTold) version(host string) int64 {
 }
 
 // policyHello is a machine that keeps and follows the policy.
-func policyHello(name string) controllink.HostHello {
+func policyHello(name string) controllink.MachineHello {
 	hello := fakeHello(name)
 	hello.Capabilities = append(slices.Clone(hello.Capabilities), CapHostPolicy)
 	return hello

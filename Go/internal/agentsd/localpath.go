@@ -67,7 +67,7 @@ func LocalSocketDir(home string) string {
 type localBook struct {
 	localMu sync.Mutex
 	// localClients is the last host/clients, by upper-case id; nil until read.
-	localClients map[string]wire.HostClient
+	localClients map[string]wire.MachineClient
 	// localConns is each connection on the local socket, and the window it proved.
 	localConns map[*sockConn]string
 	// localKept is what localClientsFile holds, read the first time; it is written only
@@ -95,10 +95,10 @@ func (d *Daemon) MoveLocal(controlKey []byte) {
 
 // SetLocalClients is host/clients: the windows the control plane lists as paired. It is
 // kept in the root, and a window no longer listed (forgotten) is cut off at once.
-func (d *Daemon) SetLocalClients(list wire.HostClients) {
+func (d *Daemon) SetLocalClients(list wire.MachineClients) {
 	clients := ownUsersWindows(list)
 	if list.Clients == nil {
-		list.Clients = []wire.HostClient{}
+		list.Clients = []wire.MachineClient{}
 	}
 	b, _ := json.Marshal(list)
 	file := filepath.Join(d.Store.Loc.Root, localClientsFile)
@@ -139,8 +139,8 @@ func (d *Daemon) SetLocalClients(list wire.HostClients) {
 // only, when the control plane says who that is (FR-020). A window of another person is
 // never let in here, even if a control plane lists it; an older control plane, which says
 // no user, is taken at its word.
-func ownUsersWindows(list wire.HostClients) map[string]wire.HostClient {
-	clients := map[string]wire.HostClient{}
+func ownUsersWindows(list wire.MachineClients) map[string]wire.MachineClient {
+	clients := map[string]wire.MachineClient{}
 	for _, c := range list.Clients {
 		if list.User != nil && (c.Person == nil || *c.Person != *list.User) {
 			continue
@@ -152,12 +152,12 @@ func ownUsersWindows(list wire.HostClients) map[string]wire.HostClient {
 
 // localClient is a window the control plane last listed, read from the root the first
 // time, as the host may start with the control plane away.
-func (d *Daemon) localClient(id string) (wire.HostClient, bool) {
+func (d *Daemon) localClient(id string) (wire.MachineClient, bool) {
 	d.localMu.Lock()
 	defer d.localMu.Unlock()
 	if d.localClients == nil {
-		d.localClients = map[string]wire.HostClient{}
-		var kept wire.HostClients
+		d.localClients = map[string]wire.MachineClient{}
+		var kept wire.MachineClients
 		if b, err := os.ReadFile(filepath.Join(d.Store.Loc.Root, localClientsFile)); err == nil && json.Unmarshal(b, &kept) == nil {
 			d.localClients = ownUsersWindows(kept)
 		}
@@ -195,7 +195,7 @@ func (d *Daemon) Told(method string, params json.RawMessage) {
 	if method != wire.NotifyHostClients.Name {
 		return
 	}
-	var list wire.HostClients
+	var list wire.MachineClients
 	if err := json.Unmarshal(params, &list); err != nil {
 		log.Printf("local: %s: %v", method, err)
 		return
@@ -363,7 +363,7 @@ func (d *Daemon) localExchange(c net.Conn, r *bufio.Reader, host string, private
 		// The person is suspended (#1002, FR-018): their window is refused here too.
 		return "", controllink.Refuse(controllink.Suspended)
 	}
-	ok2 := controllink.Message{OK: &wire.ControlOK{Mac: controllink.B64URL(mac), Host: new(wire.HostID(host))}}
+	ok2 := controllink.Message{OK: &wire.ControlOK{Mac: controllink.B64URL(mac), Host: new(wire.MachineRef(host))}}
 	if _, err := c.Write([]byte(ok2.Line() + "\n")); err != nil {
 		return "", err
 	}

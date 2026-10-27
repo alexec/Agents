@@ -262,7 +262,7 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 	if name == "" {
 		name, _ = os.Hostname()
 	}
-	hello := controllink.HostHello{Version: buildinfo.Version, Platform: platform(), MachineID: machine.ID(),
+	hello := controllink.MachineHello{Version: buildinfo.Version, Platform: platform(), MachineID: machine.ID(),
 		Implementation: new(buildinfo.Implementation), Capabilities: d.Capabilities()}
 	if name != "" {
 		hello.Name = &name
@@ -356,7 +356,7 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 
 // askToJoin asks to join with no code (#994) until the person approves it, asking again
 // when a request is denied or runs out, or the control plane can't be reached.
-func askToJoin(ctx context.Context, root string, ask controllink.JoinAsk, private []byte, hello controllink.HostHello) *controllink.Membership {
+func askToJoin(ctx context.Context, root string, ask controllink.JoinAsk, private []byte, hello controllink.MachineHello) *controllink.Membership {
 	for {
 		member, err := controllink.AskToJoin(ctx, root, ask, private, hello, func(code string) {
 			os.WriteFile(filepath.Join(root, "control-join-shown"), []byte(code+"\n"), 0o600)

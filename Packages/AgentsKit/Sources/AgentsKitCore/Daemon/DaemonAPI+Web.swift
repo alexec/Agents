@@ -301,13 +301,13 @@ public extension DaemonAPI {
                 Row(Method.surfaceIdentify, params: SurfaceIdentification.self, result: Empty.self, kind: .hostRequest),
                 // The control plane's own
                 Row(Method.controlStatus, params: Empty.self, result: ControlStatus.self, kind: .controlRequest),
-                Row(Method.hostsList, params: Empty.self, result: [ControlHost].self, kind: .controlRequest),
+                Row(Method.hostsList, params: Empty.self, result: [ControlMachine].self, kind: .controlRequest),
                 Row(Method.clientsForgetSelf, params: Empty.self, result: Empty.self, kind: .controlRequest),
                 // A host using a Mac's git access (#1122): Allow, Don't Allow and Revoke.
                 Row(Method.hostsLendGit, params: LendGit.self, result: Empty.self, kind: .controlRequest),
                 // A linked host's workspace (#691): Start on the offline strip.
-                Row(Method.hostsStart, params: HostRequest.self, result: ControlHost.self, kind: .controlRequest),
-                Row(Method.hostsStop, params: HostStop.self, result: ControlHost.self, kind: .controlRequest),
+                Row(Method.hostsStart, params: MachineRequest.self, result: ControlMachine.self, kind: .controlRequest),
+                Row(Method.hostsStop, params: MachineStop.self, result: ControlMachine.self, kind: .controlRequest),
                 // Settings ▸ Machine providers (#1808): the API providers, and a workspace's host
                 // linked and unlinked.
                 Row(Method.providersList, params: Empty.self, result: JSONValue.self, kind: .controlRequest),
@@ -315,9 +315,9 @@ public extension DaemonAPI {
                 Row(Method.providersUpdate, params: ProviderAdd.self, result: ProviderSummary.self, kind: .controlRequest),
                 Row(Method.providersRemove, params: ProviderRequest.self, result: Empty.self, kind: .controlRequest),
                 Row(Method.providersRefresh, params: ProviderRequest.self, result: Empty.self, kind: .controlRequest),
-                Row(Method.hostsLink, params: HostLink.self, result: ControlHost.self, kind: .controlRequest),
-                Row(Method.hostsUnlink, params: HostRequest.self, result: ControlHost.self, kind: .controlRequest),
-                Row(Method.hostsSetMachineOptions, params: HostMachineOptions.self, result: ControlHost.self,
+                Row(Method.hostsLink, params: MachineLink.self, result: ControlMachine.self, kind: .controlRequest),
+                Row(Method.hostsUnlink, params: MachineRequest.self, result: ControlMachine.self, kind: .controlRequest),
+                Row(Method.hostsSetMachineOptions, params: MachineOptions.self, result: ControlMachine.self,
                     kind: .controlRequest),
                 // Start a Machine from a Repository (#1809): the provider's form, then the machine.
                 Row(Method.providersOptions, params: ProviderRequest.self, result: ProviderOptions.self, kind: .controlRequest),
@@ -327,7 +327,7 @@ public extension DaemonAPI {
                 Row(Method.hostsDropKept, params: KeptRequestID.self, result: Empty.self, kind: .controlRequest),
                 Row(Method.hostsRetryKept, params: KeptRequestID.self, result: Empty.self, kind: .controlRequest),
                 // What an offline host last listed (#962).
-                Row(Method.hostsLastHeard, params: HostRequest.self, result: HostLastHeard.self, kind: .controlRequest),
+                Row(Method.hostsLastHeard, params: MachineRequest.self, result: MachineLastHeard.self, kind: .controlRequest),
                 // Who did what (#996): Events ▸ Audit.
                 Row(Method.auditList, params: AuditQuery.self, result: AuditList.self, kind: .controlRequest),
                 Row(Method.auditExport, params: AuditQuery.self, result: AuditExport.self, kind: .controlRequest),
@@ -418,7 +418,7 @@ public extension DaemonAPI {
                 Row(Method.botsSetCaps, params: BotCaps.self, result: Empty.self, kind: .controlRequest),
                 Row(Method.botsStopRun, params: BotStopRun.self, result: Empty.self, kind: .controlRequest),
                 // A host code, the page's for a bot's machine (#1761).
-                Row(Method.hostsStartEnroll, params: HostEnroll.self, result: ControlCodeShown.self, kind: .controlRequest),
+                Row(Method.hostsStartEnroll, params: MachineEnroll.self, result: ControlCodeShown.self, kind: .controlRequest),
                 // A machine that asks to join, approved on a card (#994).
                 Row(Method.hostsJoinRequests, params: Empty.self, result: [JoinRequest].self, kind: .controlRequest),
                 Row(Method.hostsApproveJoin, params: JoinRequestDecide.self, result: JoinApproved.self,
@@ -490,7 +490,7 @@ public extension DaemonAPI {
                     kind: .hostNotification),
                 Row(Notification.pagesChanged, params: PagesChangedNotification.self, result: Empty.self,
                     kind: .hostNotification),
-                // An ad-hoc dictionary from ControlRouter.described: a `ControlHost`'s state, and
+                // An ad-hoc dictionary from ControlRouter.described: a `ControlMachine`'s state, and
                 // its `workspace` (#691) when it is linked.
                 Row(Notification.controlHostChanged, params: JSONValue.self, result: Empty.self, kind: .controlNotification),
                 Row(Notification.controlKeptChanged, params: KeptList.self, result: Empty.self, kind: .controlNotification),

@@ -54,7 +54,7 @@ struct FakeDeviceLiveTests {
         let wrapped = ControlLink(dial: dial)
         let control = DaemonClient(link: wrapped.controlLink)
         try await control.connect(startIfNeeded: false)
-        let hosts = try await control.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlHost].self)
+        let hosts = try await control.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlMachine].self)
         print("fake-device: hosts/list → \(hosts.map { "\($0.name) (\($0.id), \($0.state))" })")
         for host in hosts where host.state == "online" && host.relay != true {
             let there = DaemonClient(link: wrapped.link(for: host.id))
@@ -106,7 +106,7 @@ struct FakeDeviceLiveTests {
         // 6. A need from a host, sealed by the relay to this device, read back with its key.
         guard let hostCode, let code = ControlCode(text: hostCode) else { return await hold() }
         let hostKey = ControlAgreement.generate()
-        let hello = DaemonAPI.HostHello(version: "walk", platform: "fake", machineID: "fake-\(UUID().uuidString.prefix(8))",
+        let hello = DaemonAPI.MachineHello(version: "walk", platform: "fake", machineID: "fake-\(UUID().uuidString.prefix(8))",
                                         name: "fake host for a notice")
         let hostMembership = try await ControlJoin.enrollHost(code, privateKey: hostKey.privateKey, hello: hello)
         let uplink = try await ControlJoin.hostDial(hostMembership, privateKey: hostKey.privateKey)()

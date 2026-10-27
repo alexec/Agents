@@ -1,6 +1,6 @@
 ---
 name: test-servers
-description: Test agents on servers (037 cloud agents, 058 hosts) end to end — a real Linux box (the agents-devbox Docker container on 127.0.0.1:2222) joining a scratch control plane, or the fake ssh for install failures — by driving a scratch set-up through Add a Server, a server folder, a turn, offline and remove. Use whenever a change touches Hosts/, ServerInstaller, HostInstall, the Linux agentsd, files/browse or files/write, the offline strip, Settings ▸ Machines, or anything that says "server" or "host", or when asked to walk, test or prove servers or cloud agents.
+description: Test agents on servers (037 cloud agents, 058 hosts) end to end — a real Linux box (the agents-devbox Docker container on 127.0.0.1:2222) joining a scratch control plane, or the fake ssh for install failures — by driving a scratch set-up through Add a Machine, a server folder, a turn, offline and remove. Use whenever a change touches Hosts/, ServerInstaller, HostInstall, the Linux agentsd, files/browse or files/write, the offline strip, Settings ▸ Machines, or anything that says "server" or "host", or when asked to walk, test or prove servers or cloud agents.
 ---
 
 # Test agents on servers
@@ -106,7 +106,7 @@ the control plane at `App/Resources/servers` by itself.
 
 ## 3. The box joins
 
-The command, as Add a Server shows it (frame M), and run on the box:
+The command, as Add a Machine shows it (frame M), and run on the box:
 
 ```sh
 LINE="$("$CONTROL" code --host --command --home $ROOT/control | sed -n 's/^command\t//p')"
@@ -118,7 +118,7 @@ The devbox has no systemd, so the script starts the host detached; `devbox.sh st
 The window lists the box under its own heading. `devbox.sh logs` has the server's side (an
 `uplink:` line says it joined); `$ROOT/control/control.log` has the control plane's.
 
-Install over ssh instead (FR-018a), from the window's Add a Server ▸ Over ssh, or over
+Install over ssh instead (FR-018a), from the window's Add a Machine ▸ Over ssh, or over
 the control plane's socket: when the box's key is not in the known_hosts ssh reads, the first
 `hosts/install` answers `needsTrust` with its fingerprint, and the second, with the fingerprint,
 installs; a key already there goes straight on (#610). `Walk610LiveTests` drives the whole of

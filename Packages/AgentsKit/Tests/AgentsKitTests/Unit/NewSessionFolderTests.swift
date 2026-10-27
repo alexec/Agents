@@ -7,7 +7,7 @@ import Testing
 struct NewSessionFolderTests {
     let a = FolderKey(host: .mac, folder: URL(filePath: "/src/a"))
     let b = FolderKey(host: .mac, folder: URL(filePath: "/src/b"))
-    let server = FolderKey(host: HostID(rawValue: "devbox"), folder: URL(filePath: "/src/b"))
+    let server = FolderKey(host: MachineRef(rawValue: "devbox"), folder: URL(filePath: "/src/b"))
 
     @Test func theRememberedFolderWinsWhileItIsLive() {
         let chosen = NewSessionFolder.choose(live: [a, b], remembered: b, selected: a)
@@ -17,7 +17,7 @@ struct NewSessionFolderTests {
     /// The host is part of the folder: the same folder on a server is another one.
     @Test func aServersFolderIsKeptWithItsHost() {
         let chosen = NewSessionFolder.choose(live: [a, server], remembered: server, selected: a)
-        #expect(chosen?.key.host == HostID(rawValue: "devbox"))
+        #expect(chosen?.key.host == MachineRef(rawValue: "devbox"))
         #expect(chosen?.why == .remembered)
         // Kept in defaults and read back after a relaunch, it is still the server's.
         #expect(FolderKey(stored: server.stored) == server)

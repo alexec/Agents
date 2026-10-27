@@ -4,7 +4,7 @@ import SwiftUI
 /// Add a Machine… (#2131): one sheet with three ways in, a provider first. It is reached from
 /// Settings ▸ Machines, Connectors set-up ▸ Where agents run, and a provider's New Machine…
 /// (which opens it at that provider). Each way goes on in the same sheet, as the sheet it was
-/// before: New Machine, Add Provider, Add a Server, or the code.
+/// before: New Machine, Add Provider, Add a Machine, or the code.
 struct AddMachineSheet: View {
     typealias Words = AddMachine.Words
 

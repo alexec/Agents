@@ -12,7 +12,7 @@ struct AuditPane: View {
     /// The control plane, or nil while it cannot be reached.
     let control: DaemonClient?
     /// A host's name, as the client shows it.
-    let hostName: (HostID) -> String
+    let hostName: (MachineRef) -> String
 
     @State private var list: DaemonAPI.AuditList?
     @State private var problem: String?
@@ -207,7 +207,7 @@ struct AuditPane: View {
 /// One entry: the time, what was done, then who and where, then the call in monospace.
 struct AuditRow: View {
     let entry: DaemonAPI.AuditEntry
-    let hostName: (HostID) -> String
+    let hostName: (MachineRef) -> String
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {

@@ -53,18 +53,18 @@ struct ArchiveActionsTests {
         let archived = agent("old", state: .archived)
         let finished = agent("current", state: .finished)
 
-        let page = try #require(await ArchiveActions.searchArchived(request, on: HostID(rawValue: "devbox")) {
+        let page = try #require(await ArchiveActions.searchArchived(request, on: MachineRef(rawValue: "devbox")) {
             [archived, finished]
         })
 
         #expect(page.agents.map(\.id) == [archived.id])
-        #expect(page.agents.first?.host == HostID(rawValue: "devbox"))
+        #expect(page.agents.first?.host == MachineRef(rawValue: "devbox"))
         #expect(page.next == nil)
     }
 
     @Test func denialTargetsTheAgentFolder() {
         var archived = agent("old session", state: .archived)
-        archived.host = HostID(rawValue: "devbox")
+        archived.host = MachineRef(rawValue: "devbox")
 
         let denial = ArchiveActions.denial(for: archived)
 

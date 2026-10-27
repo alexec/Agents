@@ -32,14 +32,14 @@ extension AppModel {
         }
     }
 
-    func connections(on host: HostID = .mac) async -> Result<[DaemonAPI.Connection], ConnectorProblem> {
+    func connections(on host: MachineRef = .mac) async -> Result<[DaemonAPI.Connection], ConnectorProblem> {
         await connectorCall(host) {
             try await $0.call(DaemonAPI.Method.connectionsList, DaemonAPI.Empty(),
                               returning: DaemonAPI.ConnectionsList.self).connections
         }
     }
 
-    func startSignIn(_ provider: DaemonAPI.ConnectionProvider, on host: HostID) async
+    func startSignIn(_ provider: DaemonAPI.ConnectionProvider, on host: MachineRef) async
         -> Result<DaemonAPI.ConnectionSignIn, ConnectorProblem> {
         await connectorCall(host) {
             try await $0.call(DaemonAPI.Method.connectionsSignIn, DaemonAPI.ConnectionProviderRequest(provider: provider),
@@ -48,7 +48,7 @@ extension AppModel {
     }
 
     /// One long poll: the sign-in once it ended, or still waiting after 25 seconds.
-    func waitForSignIn(_ flow: UUID, on host: HostID) async -> Result<DaemonAPI.ConnectionSignIn, ConnectorProblem> {
+    func waitForSignIn(_ flow: UUID, on host: MachineRef) async -> Result<DaemonAPI.ConnectionSignIn, ConnectorProblem> {
         await connectorCall(host) {
             try await $0.call(DaemonAPI.Method.connectionsSignInWait, DaemonAPI.ConnectionSignInFlowRequest(flowID: flow),
                               returning: DaemonAPI.ConnectionSignIn.self)
@@ -56,7 +56,7 @@ extension AppModel {
     }
 
     /// Gives the host the code and the state that the hand-back page gave back (Linear).
-    func completeSignIn(_ request: DaemonAPI.ConnectionSignInCompleteRequest, on host: HostID) async
+    func completeSignIn(_ request: DaemonAPI.ConnectionSignInCompleteRequest, on host: MachineRef) async
         -> Result<DaemonAPI.ConnectionSignIn, ConnectorProblem> {
         await connectorCall(host) {
             try await $0.call(DaemonAPI.Method.connectionsSignInComplete, request, returning: DaemonAPI.ConnectionSignIn.self)
@@ -64,7 +64,7 @@ extension AppModel {
     }
 
     /// A personal access token (GitLab, #1630): the connection it made, or why it made none.
-    func signInWithToken(_ provider: DaemonAPI.ConnectionProvider, url: String?, token: String, on host: HostID) async
+    func signInWithToken(_ provider: DaemonAPI.ConnectionProvider, url: String?, token: String, on host: MachineRef) async
         -> Result<DaemonAPI.Connection, ConnectorProblem> {
         let answer = await connectorCall(host) {
             try await $0.call(DaemonAPI.Method.connectionsSignInToken,
@@ -81,7 +81,7 @@ extension AppModel {
 
     /// One IMAP mailbox and its app password (Email, #1780): the connection it made, or why it
     /// made none. The host signs in once to check it, and keeps the password.
-    func signInWithEmail(server: String, user: String, password: String, on host: HostID) async
+    func signInWithEmail(server: String, user: String, password: String, on host: MachineRef) async
         -> Result<DaemonAPI.Connection, ConnectorProblem> {
         let answer = await connectorCall(host) {
             try await $0.call(DaemonAPI.Method.connectionsSignInEmail,
@@ -96,7 +96,7 @@ extension AppModel {
         }
     }
 
-    func cancelSignIn(_ flow: UUID, on host: HostID) async {
+    func cancelSignIn(_ flow: UUID, on host: MachineRef) async {
         _ = await connectorCall(host) {
             try await $0.call(DaemonAPI.Method.connectionsSignInCancel, DaemonAPI.ConnectionSignInFlowRequest(flowID: flow),
                               returning: DaemonAPI.ConnectionSignIn.self)
@@ -104,7 +104,7 @@ extension AppModel {
     }
 
     /// Nil when it went; else why not.
-    func disconnect(_ provider: DaemonAPI.ConnectionProvider, on host: HostID = .mac) async -> String? {
+    func disconnect(_ provider: DaemonAPI.ConnectionProvider, on host: MachineRef = .mac) async -> String? {
         let answer = await connectorCall(host) {
             try await $0.call(DaemonAPI.Method.connectionsDisconnect, DaemonAPI.ConnectionProviderRequest(provider: provider),
                               returning: DaemonAPI.ConnectionDisconnectAnswer.self)
@@ -115,7 +115,7 @@ extension AppModel {
         }
     }
 
-    private func connectorCall<T: Sendable>(_ host: HostID, _ body: (DaemonClient) async throws -> T) async
+    private func connectorCall<T: Sendable>(_ host: MachineRef, _ body: (DaemonClient) async throws -> T) async
         -> Result<T, ConnectorProblem> {
         do {
             return .success(try await body(client(for: host)))

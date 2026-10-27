@@ -17,11 +17,11 @@ names its issue.
 - **The control plane routes and remembers little.** It knows who is paired and which
   machines there are. Agents, conversations, files and runtime sign-ins stay on the machine
   that runs them.
-- **Hosts never escalate.** Agents Host and `agentsd` run as the machine's user. On a Mac
+- **Machines never escalate.** Agents Host and `agentsd` run as the machine's user. On a Mac
   they are the user's own login items (`SMAppService.agent`). On Linux they are a
   `systemctl --user` service. Nothing asks for admin rights, and nothing installs a
   privileged helper. A machine provider's start script for Google Compute Engine runs as
-  root only to make an `agents` user, and the host runs as that user.
+  root only to make an `agents` user, and the machine runs as that user.
 
 ## People and roles
 
@@ -118,7 +118,7 @@ An organisation will be able to require a sandbox by policy (T5, below).
 
 ## Access on the machine
 
-- **`daemon.sock`**, the host's local socket, is mode 0600. On a Mac, the caller must be the
+- **`daemon.sock`**, the machine's local socket, is mode 0600. On a Mac, the caller must be the
   same macOS user, and its role comes from its code signature, which the `agents-peer`
   helper checks against the team. On Linux, only the user's own ssh session gets the full
   role.
@@ -157,9 +157,9 @@ planned (T6, #999).
 
 | Log | Where | What it holds | Size |
 | --- | --- | --- | --- |
-| `daemon.log` | `~/Library/Logs/Agents` on a Mac, `$XDG_STATE_HOME/agents/logs` on Linux | What the host did | Rolls at 4 MB, keeps one older file |
+| `daemon.log` | `~/Library/Logs/Agents` on a Mac, `$XDG_STATE_HOME/agents/logs` on Linux | What the machine did | Rolls at 4 MB, keeps one older file |
 | `control.log` | Agents Host's log folder, or the container's output in the cloud | Joins, people, keys, sign-in changes, refused connections with their address | Rolls at 4 MB, keeps one older file |
-| `relay.log`, `host-relay.log` | The Mac's log folder | The phone relay; the sign-in relay (what was asked and how it was answered) | 1 MB |
+| `relay.log`, `machine-relay.log` | The Mac's log folder | The phone relay; the sign-in relay (what was asked and how it was answered) | 1 MB |
 | `app-tools.jsonl` | Each agent's folder | Every call to the app's own tools, with a `token` argument left out and answers cut to 2,000 characters | Deleted with the agent |
 
 The code does not write tokens to these logs. **Redaction** (T8, #1001) also cuts known
@@ -207,7 +207,7 @@ A machine that cannot reach the control plane keeps the last policy it had. MDM 
 `/etc/agents/policy.json` on Linux only pin which control plane a machine must join.
 
 Policy stops mistakes and ordinary use. It is not a boundary against a machine's own user:
-the host runs as that user, who can change the program.
+the machine runs as that user, who can change the program.
 
 ## Report a vulnerability
 

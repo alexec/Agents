@@ -68,7 +68,7 @@ struct TokenAskCard: View {
 struct TokenAsk: Identifiable {
     let id = UUID()
     let runtimeID: String
-    let host: HostID
+    let host: MachineRef
     let label: String
     /// What becomes of a pasted key, said after "… has no … sign-in of its own."
     let keeping: String

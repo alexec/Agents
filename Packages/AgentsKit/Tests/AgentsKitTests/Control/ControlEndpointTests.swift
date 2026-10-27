@@ -10,7 +10,7 @@ struct ControlEndpointTests {
     let otherPin = ControlCode.base64url(Data(repeating: 9, count: 32))
 
     func membership() -> ControlMembership {
-        ControlMembership(host: HostID(rawValue: "abcd1234"), controlKey: Data([4] + Array(repeating: 1, count: 64)),
+        ControlMembership(host: MachineRef(rawValue: "abcd1234"), controlKey: Data([4] + Array(repeating: 1, count: 64)),
                           addresses: [], name: "home", url: "https://mac.local:8791", pin: pin)
     }
 
@@ -123,7 +123,7 @@ struct ControlEndpointTests {
         let key = Data(repeating: 3, count: 32)
         let serverNonce = ControlAuth.nonce()
         let hello = ControlAuth.Hello(name: "x", control: "", nonce: ControlCode.base64url(serverNonce), copy: "c")
-        let (auth, expect) = try ControlAuth.answer(hello, identity: .host(HostID(rawValue: "abcd1234")), key: key,
+        let (auth, expect) = try ControlAuth.answer(hello, identity: .host(MachineRef(rawValue: "abcd1234")), key: key,
                                                     origin: "https://agents.example.com:443", kind: "host",
                                                     expecting: nil, epoch: 2)
         #expect(auth.epoch == 2)

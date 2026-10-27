@@ -233,7 +233,7 @@ func (s *Service) machineLeft(host, user, name string) {
 		names[i] = wire.UserSecretName(n)
 	}
 	s.log(fmt.Sprintf("%s was removed with %d of %s's secrets on it", host, len(had), user))
-	s.router.TellPerson(user, wire.NotifyControlSecretsLeft.Name, wire.SecretsLeft{Host: wire.HostID(host), Name: name, Secrets: names})
+	s.router.TellPerson(user, wire.NotifyControlSecretsLeft.Name, wire.SecretsLeft{Host: wire.MachineRef(host), Name: name, Secrets: names})
 	s.announce("userSettingsChanged", user, host)
 	s.router.TellPerson(user, wire.NotifyControlUserSettingsChanged.Name, wire.UserSettingsChanged{Secrets: optional(true)})
 }

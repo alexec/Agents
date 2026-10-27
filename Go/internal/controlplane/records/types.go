@@ -131,8 +131,8 @@ func (c *ClientRecord) UnmarshalJSON(data []byte) error {
 // said; not the Mac's window, and not a browser, which has no mailbox (071).
 func (c *ClientRecord) IsDevice() bool { return c.Kind != KindMac && c.Kind != KindBrowser }
 
-// HostRecord is a machine that runs agents (v1/hosts/<id>.json).
-type HostRecord struct {
+// MachineRecord is a machine that runs agents (v1/machines/<id>.json).
+type MachineRecord struct {
 	ID   string
 	Name string
 	// For a host that connects out.
@@ -164,44 +164,44 @@ type HostRecord struct {
 }
 
 type hostJSON struct {
-	ID             string            `json:"id"`
-	Name           string            `json:"name"`
-	PublicKey      []byte            `json:"publicKey,omitempty"`
-	Reach          json.RawMessage   `json:"reach"`
-	Platform       string            `json:"platform"`
-	Version        string            `json:"version"`
-	Installed      bool              `json:"installed"`
-	MachineID      *string           `json:"machineID,omitempty"`
-	Relay          *bool             `json:"relay,omitempty"`
-	SignInFrom     map[string]string `json:"signInFrom,omitempty"`
-	GitFrom        map[string]string `json:"gitFrom,omitempty"`
-	Owner          *string           `json:"owner,omitempty"`
-	Rev            int               `json:"rev"`
-	Forgotten      *bool             `json:"forgotten,omitempty"`
-	ForgottenAt    *Stamp            `json:"forgottenAt,omitempty"`
-	KnownEpoch     *int              `json:"knownEpoch,omitempty"`
+	ID            string            `json:"id"`
+	Name          string            `json:"name"`
+	PublicKey     []byte            `json:"publicKey,omitempty"`
+	Reach         json.RawMessage   `json:"reach"`
+	Platform      string            `json:"platform"`
+	Version       string            `json:"version"`
+	Installed     bool              `json:"installed"`
+	MachineID     *string           `json:"machineID,omitempty"`
+	Relay         *bool             `json:"relay,omitempty"`
+	SignInFrom    map[string]string `json:"signInFrom,omitempty"`
+	GitFrom       map[string]string `json:"gitFrom,omitempty"`
+	Owner         *string           `json:"owner,omitempty"`
+	Rev           int               `json:"rev"`
+	Forgotten     *bool             `json:"forgotten,omitempty"`
+	ForgottenAt   *Stamp            `json:"forgottenAt,omitempty"`
+	KnownEpoch    *int              `json:"knownEpoch,omitempty"`
 	DetectFolders *bool             `json:"detectFolders,omitempty"`
-	Workspace      json.RawMessage   `json:"workspace,omitempty"`
-	Expires        *Stamp            `json:"expires,omitempty"`
+	Workspace     json.RawMessage   `json:"workspace,omitempty"`
+	Expires       *Stamp            `json:"expires,omitempty"`
 }
 
-// dialOut is HostReach.dialOut: every host connects out now (058, T073); a record that
+// dialOut is MachineReach.dialOut: every host connects out now (058, T073); a record that
 // says anything else is read as one that dials out.
 var dialOut = json.RawMessage(`{"dialOut":{}}`)
 
-func (h HostRecord) MarshalJSON() ([]byte, error) {
+func (h MachineRecord) MarshalJSON() ([]byte, error) {
 	return encodeKeeping(hostJSON{h.ID, h.Name, h.PublicKey, dialOut, h.Platform, h.Version, h.Installed, h.MachineID,
 		h.Relay, h.SignInFrom, h.GitFrom, h.Owner, h.Rev, h.Forgotten, h.ForgottenAt, h.KnownEpoch, h.DetectFolders,
 		h.Workspace, h.Expires}, h.Extra)
 }
 
-func (h *HostRecord) UnmarshalJSON(data []byte) error {
+func (h *MachineRecord) UnmarshalJSON(data []byte) error {
 	var j hostJSON
 	extra, err := decodeKeeping(data, &j, "id", "name", "reach", "platform", "version", "installed", "rev")
 	if err != nil {
 		return err
 	}
-	*h = HostRecord{j.ID, j.Name, j.PublicKey, j.Platform, j.Version, j.Installed, j.MachineID, j.Relay, j.SignInFrom,
+	*h = MachineRecord{j.ID, j.Name, j.PublicKey, j.Platform, j.Version, j.Installed, j.MachineID, j.Relay, j.SignInFrom,
 		j.GitFrom, j.Owner, j.Rev, j.Forgotten, j.ForgottenAt, j.KnownEpoch, j.DetectFolders, j.Workspace, j.Expires, extra}
 	return nil
 }
@@ -246,25 +246,25 @@ type Settings struct {
 }
 
 type settingsJSON struct {
-	Name             string          `json:"name"`
-	Port             int             `json:"port"`
-	HomeHost         *string         `json:"homeHost,omitempty"`
-	MachineID        string          `json:"machineID"`
-	URL              *string         `json:"url,omitempty"`
-	Pin              *string         `json:"pin,omitempty"`
-	Endpoints        []Endpoint      `json:"endpoints,omitempty"`
-	Epoch            *int            `json:"epoch,omitempty"`
-	ControlKey       []byte          `json:"controlKey,omitempty"`
-	Owner            *string         `json:"owner,omitempty"`
-	Created          *Stamp          `json:"created,omitempty"`
-	Rev              *int            `json:"rev,omitempty"`
+	Name            string          `json:"name"`
+	Port            int             `json:"port"`
+	HomeHost        *string         `json:"homeHost,omitempty"`
+	MachineID       string          `json:"machineID"`
+	URL             *string         `json:"url,omitempty"`
+	Pin             *string         `json:"pin,omitempty"`
+	Endpoints       []Endpoint      `json:"endpoints,omitempty"`
+	Epoch           *int            `json:"epoch,omitempty"`
+	ControlKey      []byte          `json:"controlKey,omitempty"`
+	Owner           *string         `json:"owner,omitempty"`
+	Created         *Stamp          `json:"created,omitempty"`
+	Rev             *int            `json:"rev,omitempty"`
 	FolderDetection json.RawMessage `json:"folderDetection,omitempty"`
-	Channels         json.RawMessage `json:"channels,omitempty"`
-	AuditDays        *int            `json:"auditDays,omitempty"`
-	AuditDaysBefore  *int            `json:"auditDaysBefore,omitempty"`
-	AuditShortened   *Stamp          `json:"auditShortened,omitempty"`
-	PreviousKey      []byte          `json:"previousKey,omitempty"`
-	RotatedAt        *Stamp          `json:"rotatedAt,omitempty"`
+	Channels        json.RawMessage `json:"channels,omitempty"`
+	AuditDays       *int            `json:"auditDays,omitempty"`
+	AuditDaysBefore *int            `json:"auditDaysBefore,omitempty"`
+	AuditShortened  *Stamp          `json:"auditShortened,omitempty"`
+	PreviousKey     []byte          `json:"previousKey,omitempty"`
+	RotatedAt       *Stamp          `json:"rotatedAt,omitempty"`
 }
 
 func (s Settings) MarshalJSON() ([]byte, error) {
@@ -295,7 +295,7 @@ func NewUUID() string {
 // NewPersonID is PersonID.make: a UUID in lower case.
 func NewPersonID() string { return strings.ToLower(NewUUID()) }
 
-// NewHostID is HostID.make: eight lower-case letters and digits, never "mac".
+// NewHostID is MachineRef.make: eight lower-case letters and digits, never "mac".
 func NewHostID() string {
 	const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
 	for {

@@ -25,7 +25,7 @@ func backupPlane(t *testing.T) (*backupStore, *store.Memory, string) {
 		t.Fatal(err)
 	}
 	for _, id := range []string{"a", "b"} {
-		if err := r.SaveHost(ctx, records.HostRecord{ID: id, Name: id}); err != nil {
+		if err := r.SaveHost(ctx, records.MachineRecord{ID: id, Name: id}); err != nil {
 			t.Fatal(err)
 		}
 	}

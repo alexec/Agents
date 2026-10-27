@@ -34,18 +34,18 @@ const hostUserFile = "host-user.json"
 type hostUserState struct {
 	hostUserMu   sync.Mutex
 	hostUserRead bool
-	hostUser     *wire.HostUser
+	hostUser     *wire.MachineUser
 }
 
 func (d *Daemon) hostUserPath() string { return filepath.Join(d.Store.Loc.Root, hostUserFile) }
 
 // user is the last host/user, read from the root the first time; nil before any.
-func (d *Daemon) user() *wire.HostUser {
+func (d *Daemon) user() *wire.MachineUser {
 	d.hostUserMu.Lock()
 	defer d.hostUserMu.Unlock()
 	if !d.hostUserRead {
 		d.hostUserRead = true
-		var kept wire.HostUser
+		var kept wire.MachineUser
 		if b, err := os.ReadFile(d.hostUserPath()); err == nil && json.Unmarshal(b, &kept) == nil && kept.User != "" {
 			d.hostUser = &kept
 		}
@@ -55,7 +55,7 @@ func (d *Daemon) user() *wire.HostUser {
 
 // toldHostUser is host/user.
 func (d *Daemon) toldHostUser(params json.RawMessage) {
-	var u wire.HostUser
+	var u wire.MachineUser
 	if err := json.Unmarshal(params, &u); err != nil || u.User == "" {
 		log.Printf("host/user: %v", err)
 		return

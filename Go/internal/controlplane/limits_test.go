@@ -220,8 +220,8 @@ func TestJoinPlacesAreFair(t *testing.T) {
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	ctx := context.Background()
 	public, _ := controllink.PublicKey(controllink.NewPrivateKey())
-	ask := func(from string, person *string) (*wire.HostJoinTicket, error) {
-		return p.s.joins.ask(ctx, wire.HostJoinAsk{Name: "Box", Platform: "linux", PublicKey: public, Person: person}, from)
+	ask := func(from string, person *string) (*wire.MachineJoinTicket, error) {
+		return p.s.joins.ask(ctx, wire.MachineJoinAsk{Name: "Box", Platform: "linux", PublicKey: public, Person: person}, from)
 	}
 	for i := range joinsOpen {
 		if _, err := ask(fmt.Sprintf("198.51.100.%d", i/joinsPerSource), nil); err != nil {

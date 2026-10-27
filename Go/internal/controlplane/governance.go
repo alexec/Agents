@@ -54,8 +54,8 @@ type governanceMachine struct {
 	Items []wire.CatalogItem `json:"items"`
 }
 
-func governanceMachineKey(host string) string { return governanceMachinesPrefix + host + ".json" }
-func governanceRequestKey(id string) string   { return governanceRequestsPrefix + id + ".json" }
+func governanceHostKey(host string) string  { return governanceMachinesPrefix + host + ".json" }
+func governanceRequestKey(id string) string { return governanceRequestsPrefix + id + ".json" }
 
 // governanceApprovalKey names one approval: of an item, for a group or a person.
 func governanceApprovalKey(kind wire.CatalogKind, name, group, user string) string {
@@ -81,7 +81,7 @@ func governedKind(kind wire.CatalogKind) bool {
 
 // keepGovernanceReport is governance/report: a machine's servers and skills, over its
 // last report. More than the bound are cut, and said in the log.
-func (s *Service) keepGovernanceReport(ctx context.Context, host string, report wire.HostCatalog, now time.Time) error {
+func (s *Service) keepGovernanceReport(ctx context.Context, host string, report wire.MachineCatalog, now time.Time) error {
 	items := make([]wire.CatalogItem, 0, min(len(report.Items), governanceItemsMost))
 	seen := map[string]bool{}
 	for _, item := range report.Items {
@@ -99,7 +99,7 @@ func (s *Service) keepGovernanceReport(ctx context.Context, host string, report 
 		items = append(items, item)
 	}
 	data, _ := json.Marshal(governanceMachine{Host: host, At: dateOf(now), Items: items})
-	if _, err := s.cfg.Store.Put(ctx, governanceMachineKey(host), data, store.Always); err != nil {
+	if _, err := s.cfg.Store.Put(ctx, governanceHostKey(host), data, store.Always); err != nil {
 		return fail(storeUnavailable, "The report could not be kept: %v", err)
 	}
 	return nil

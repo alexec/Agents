@@ -100,4 +100,4 @@ added, the app lists what `npx skills add` put in `~/.agents/skills`, and
 ## Related
 
 - [Share skills, instructions and connectors with every agent](share-skills-across-agents.md)
-- [Folders, hosts and worktrees](../explanation/folders-hosts-worktrees.md)
+- [Folders, hosts and worktrees](../explanation/folders-machines-worktrees.md)

@@ -20,11 +20,11 @@ something particular done.
   client with no code, and turn those sign-ins on for your control plane.
 - [Set up Google, Apple and GitHub sign-in for your own build](set-up-sign-in-for-your-own-build.md):
   make your own ids for a build from source, and check that sign-in works.
-- [Add a server](add-a-server.md): make a Linux server, or another Mac, a host of your
+- [Add a machine](add-a-machine.md): make a Linux server, or another Mac, a host of your
   control plane.
 - [Invite someone](invite-someone.md): add another person to your control plane, change
   their role, approve a machine that asks to join, and remove a person.
-- [Send a folder to a server](send-a-folder-to-a-server.md): a repository on this Mac,
+- [Send a folder to a server](send-a-folder-to-a-machine.md): a repository on this Mac,
   with its unpushed branches and uncommitted changes, made a folder on the server, and
   the server's work brought back.
 - [Start machines from Agents](start-machines-from-agents.md): let the control plane
@@ -130,8 +130,8 @@ something particular done.
 
 ### Servers
 
-- [Add a server](add-a-server.md): make a Linux server a host of your control plane.
-- [Send a folder to a server](send-a-folder-to-a-server.md): a repository on this Mac,
+- [Add a machine](add-a-machine.md): make a Linux server a host of your control plane.
+- [Send a folder to a server](send-a-folder-to-a-machine.md): a repository on this Mac,
   with its unpushed branches and uncommitted changes, made a folder on the server, and
   the server's work brought back.
 

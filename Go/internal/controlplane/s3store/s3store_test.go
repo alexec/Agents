@@ -228,7 +228,7 @@ func TestListSeesNewKeys(t *testing.T) {
 			t.Fatalf("got %v, %v", got, err)
 		}
 		tag, _ := s.Put(ctx, "v1/clients/one.json", []byte("1"), store.Absent)
-		s.Put(ctx, "v1/hosts/mac.json", []byte("2"), store.Absent)
+		s.Put(ctx, "v1/machines/mac.json", []byte("2"), store.Absent)
 		got, _ := s.List(ctx, "v1/clients/")
 		if want := []store.Key{{Key: "v1/clients/one.json", ETag: tag}}; !reflect.DeepEqual(got, want) {
 			t.Fatalf("got %v, want %v", got, want)

@@ -160,7 +160,7 @@ func (s *Service) reportFrom(ctx context.Context, prefix, first string, keep fun
 	if err != nil {
 		return nil, fail(storeUnavailable, "The reports could not be read: %v", err)
 	}
-	hosts := map[string]records.HostRecord{}
+	hosts := map[string]records.MachineRecord{}
 	for _, h := range s.records.Hosts() {
 		hosts[strings.ToLower(h.ID)] = h
 	}
@@ -168,7 +168,7 @@ func (s *Service) reportFrom(ctx context.Context, prefix, first string, keep fun
 	type wanted struct {
 		at     string
 		person string
-		host   records.HostRecord
+		host   records.MachineRecord
 	}
 	var read []store.Key
 	var meta []wanted
@@ -181,7 +181,7 @@ func (s *Service) reportFrom(ctx context.Context, prefix, first string, keep fun
 		host, known := hosts[hostKey]
 		if !known {
 			// A machine removed since: its person is not known, so only an admin sees it.
-			host = records.HostRecord{ID: strings.ToUpper(hostKey), Name: strings.ToUpper(hostKey)}
+			host = records.MachineRecord{ID: strings.ToUpper(hostKey), Name: strings.ToUpper(hostKey)}
 		}
 		person := ""
 		if known {
@@ -217,7 +217,7 @@ func (s *Service) reportFrom(ctx context.Context, prefix, first string, keep fun
 			if cost == nil {
 				cost = map[string]float64{}
 			}
-			out = append(out, wire.ReportRow{At: at, Person: person, PersonName: name, Host: wire.HostID(host.ID),
+			out = append(out, wire.ReportRow{At: at, Person: person, PersonName: name, Host: wire.MachineRef(host.ID),
 				HostName: host.Name, Folder: row.Folder, Runtime: row.Runtime, Cost: cost,
 				InputTokens: row.InputTokens, OutputTokens: row.OutputTokens, ThoughtTokens: row.ThoughtTokens,
 				CachedReadTokens: row.CachedReadTokens, CachedWriteTokens: row.CachedWriteTokens, Turns: row.Turns,

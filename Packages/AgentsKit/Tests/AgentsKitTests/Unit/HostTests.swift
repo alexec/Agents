@@ -28,7 +28,7 @@ struct HostTests {
 
     @Test func anIDIsEightLowercaseLettersOrDigits() throws {
         for _ in 0..<50 {
-            let id = HostID.make()
+            let id = MachineRef.make()
             #expect(id.rawValue.count == 8)
             #expect(id.rawValue.allSatisfy { $0.isLowercase || $0.isNumber })
             #expect(id.rawValue.allSatisfy { $0.isASCII })
@@ -63,14 +63,14 @@ struct HostTests {
     }
 
     @Test func aFolderKeyIsWrittenAsHostBarPath() {
-        let key = FolderKey(host: HostID(rawValue: "ab12cd34"), folder: URL(filePath: "/home/alex/src/api"))
+        let key = FolderKey(host: MachineRef(rawValue: "ab12cd34"), folder: URL(filePath: "/home/alex/src/api"))
         #expect(key.stored == "ab12cd34|/home/alex/src/api")
         #expect(FolderKey(stored: key.stored) == key)
     }
 
     /// A folder's own window is restored with its key (#1089): one string, as it is kept.
     @Test func aFolderKeyIsCodedAsItsStoredString() throws {
-        let key = FolderKey(host: HostID(rawValue: "ab12cd34"), folder: URL(filePath: "/home/alex/src/api"))
+        let key = FolderKey(host: MachineRef(rawValue: "ab12cd34"), folder: URL(filePath: "/home/alex/src/api"))
         let data = try JSONEncoder().encode(key)
         #expect(String(decoding: data, as: UTF8.self) == "\"ab12cd34|\\/home\\/alex\\/src\\/api\"")
         #expect(try JSONDecoder().decode(FolderKey.self, from: data) == key)
@@ -84,8 +84,8 @@ struct HostTests {
 
     @Test func theSamePathOnTwoHostsIsTwoFolders() {
         let path = URL(filePath: "/home/alex/src/api")
-        let one = FolderKey(host: HostID(rawValue: "aaaaaaaa"), folder: path)
-        let two = FolderKey(host: HostID(rawValue: "bbbbbbbb"), folder: path)
+        let one = FolderKey(host: MachineRef(rawValue: "aaaaaaaa"), folder: path)
+        let two = FolderKey(host: MachineRef(rawValue: "bbbbbbbb"), folder: path)
         #expect(one != two)
         #expect(Set([one, two]).count == 2)
     }

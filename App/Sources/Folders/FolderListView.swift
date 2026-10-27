@@ -45,7 +45,7 @@ struct FolderListView: View {
     @State private var isChoosingFolder = false
     @State private var isCloning = false
     /// Which machine the New folder menu was pointed at (037).
-    @State private var targetHost: HostID = .mac
+    @State private var targetHost: MachineRef = .mac
     @State private var isChoosingServerFolder = false
     /// File ▸ Add Server…'s own view of the control plane, while its sheet is open (#503).
     @State private var addingServer: ControlSettingsModel?
@@ -336,7 +336,7 @@ struct FolderListView: View {
         }
         .sendToHostSheet(requests)
         .bringBackSheet(requests)
-        // The sheet Settings ▸ Control plane ▸ Add a Server… shows (#503).
+        // The sheet Settings ▸ Control plane ▸ Add a Machine… shows (#503).
         .sheet(isPresented: Binding(get: { addingServer != nil }, set: { if !$0 { addingServer = nil } })) {
             if let control = addingServer {
                 ControlAddServerSheet(control: control)
@@ -1090,7 +1090,7 @@ private struct WakefulnessRow: View {
 /// offline, until the person removes them.
 private struct GoneFolderRows: View {
     @Environment(AppModel.self) private var model
-    let host: HostID
+    let host: MachineRef
 
     var body: some View {
         ForEach(model.hosts.goneFolders[host] ?? [], id: \.self) { path in

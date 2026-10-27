@@ -1077,7 +1077,7 @@ struct PromptBar: View {
     /// typed and sends it when the turn ends, which is what the queue below the
     /// prompt is showing.
     /// The machine this prompt would go to (037).
-    private var targetHost: HostID { agent?.host ?? model.selectedFolderHost }
+    private var targetHost: MachineRef { agent?.host ?? model.selectedFolderHost }
     /// Offline, and not a stopped workspace that keeps what is sent until it is up (#691 US3).
     private var targetOffline: Bool { model.hosts.isOffline(targetHost) && !model.startsWhenUsed(targetHost) }
 

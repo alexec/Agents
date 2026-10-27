@@ -21,7 +21,7 @@ import (
 type fakeRouter struct {
 	mu         sync.Mutex
 	online     map[string]bool
-	workspaces map[string]*HostMachine
+	workspaces map[string]*MachineWorkspace
 	broadcasts []string
 	told       []any
 	sessions   map[string]bool
@@ -38,7 +38,7 @@ type delivered struct {
 }
 
 func newFakeRouter() *fakeRouter {
-	return &fakeRouter{online: map[string]bool{}, workspaces: map[string]*HostMachine{}, sessions: map[string]bool{}}
+	return &fakeRouter{online: map[string]bool{}, workspaces: map[string]*MachineWorkspace{}, sessions: map[string]bool{}}
 }
 
 func (r *fakeRouter) setOnline(host string, on bool) {
@@ -64,13 +64,13 @@ func (r *fakeRouter) HostState(host string) string {
 	return shown
 }
 
-func (r *fakeRouter) SetWorkspace(host string, ws *HostMachine) {
+func (r *fakeRouter) SetWorkspace(host string, ws *MachineWorkspace) {
 	r.mu.Lock()
 	r.workspaces[host] = ws
 	r.mu.Unlock()
 }
 
-func (r *fakeRouter) workspace(host string) *HostMachine {
+func (r *fakeRouter) workspace(host string) *MachineWorkspace {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.workspaces[host]
@@ -129,7 +129,7 @@ func (r *fakeRouter) Holds(host string) bool { return r.Online(host) }
 type row struct {
 	ID        string
 	State     string
-	Workspace *HostMachine
+	Workspace *MachineWorkspace
 }
 
 type fakeMethods struct {
@@ -137,7 +137,7 @@ type fakeMethods struct {
 	records *records.Records
 }
 
-func (m *fakeMethods) HostRow(h records.HostRecord) any {
+func (m *fakeMethods) HostRow(h records.MachineRecord) any {
 	return row{ID: h.ID, State: m.router.HostState(h.ID), Workspace: m.router.workspace(h.ID)}
 }
 
@@ -343,7 +343,7 @@ func newHarness(t *testing.T, opts ...func(*harnessOptions)) *harness {
 	provider, ssh := h.provider, h.ssh
 	h.providers = NewProviders(Config{Store: h.store, Records: h.records, Router: h.router, Methods: h.methods,
 		Secrets: NewSecrets(h.home), Timing: o.timing, Hooks: Hooks{
-			SSHStart: func(_ records.HostRecord, destination string, renewKey bool) error {
+			SSHStart: func(_ records.MachineRecord, destination string, renewKey bool) error {
 				if renewKey {
 					destination += " (new key taken)"
 				}
@@ -375,7 +375,7 @@ func newHarness(t *testing.T, opts ...func(*harnessOptions)) *harness {
 
 func (h *harness) enroll(id, name string) {
 	h.t.Helper()
-	if err := h.records.SaveHost(context.Background(), records.HostRecord{ID: id, Name: name, Platform: "linux", Version: "1"}); err != nil {
+	if err := h.records.SaveHost(context.Background(), records.MachineRecord{ID: id, Name: name, Platform: "linux", Version: "1"}); err != nil {
 		h.t.Fatal(err)
 	}
 }
@@ -403,7 +403,7 @@ func (h *harness) add() string {
 
 func (h *harness) link(provider, host, workspace string) {
 	h.t.Helper()
-	h.must(MethodHostsLink, HostLink{Host: wire.HostID(host), Provider: wire.ProviderID(provider), Workspace: workspace})
+	h.must(MethodHostsLink, MachineLink{Host: wire.MachineRef(host), Provider: wire.ProviderID(provider), Workspace: workspace})
 }
 
 func (h *harness) row(host string) row {

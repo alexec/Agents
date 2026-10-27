@@ -24,7 +24,7 @@ func TestABotsMachineSendsTeamEventsAndKeepsItsOwn(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	told, _ := json.Marshal(wire.HostUser{User: "b1", Kind: "bot", Name: "review-bot", Labels: []string{}})
+	told, _ := json.Marshal(wire.MachineUser{User: "b1", Kind: "bot", Name: "review-bot", Labels: []string{}})
 	d.toldHostUser(told)
 
 	due := time.Date(2026, 10, 21, 9, 0, 0, 0, time.UTC)
@@ -175,7 +175,7 @@ func TestAPersonsMachineSendsABotsSchedule(t *testing.T) {
 	}
 
 	// A bot's machine, another bot's workflow: nothing sent.
-	told, _ := json.Marshal(wire.HostUser{User: "b2", Kind: "bot", Name: "other-bot", Labels: []string{}})
+	told, _ := json.Marshal(wire.MachineUser{User: "b2", Kind: "bot", Name: "other-bot", Labels: []string{}})
 	d.toldHostUser(told)
 	d.workflowTickOnce(hour.Add(59 * time.Minute))
 	d.workflowTickOnce(hour.Add(60*time.Minute + 30*time.Second))
@@ -231,7 +231,7 @@ func TestAPersonsMachineHearsABotsServerEventsAndOnlySendsThem(t *testing.T) {
 	}
 
 	// Told Sam's groups have review-bot: it is listed, heard for the bot, and waits.
-	told, _ := json.Marshal(wire.HostUser{User: "u1", Kind: "person", Name: "Sam", Labels: []string{}, Bots: []string{"Review-Bot"}})
+	told, _ := json.Marshal(wire.MachineUser{User: "u1", Kind: "person", Name: "Sam", Labels: []string{}, Bots: []string{"Review-Bot"}})
 	d.toldHostUser(told)
 	s := summary()
 	if s == nil || s.HearsFor == nil || *s.HearsFor != "Review-Bot" || s.AwaitingApproval == nil {
@@ -290,7 +290,7 @@ func TestAPersonsMachineHearsABotsServerEventsAndOnlySendsThem(t *testing.T) {
 	}
 
 	// Out of the bot's group: no longer listed or heard, and nothing sent.
-	told, _ = json.Marshal(wire.HostUser{User: "u1", Kind: "person", Name: "Sam", Labels: []string{}})
+	told, _ = json.Marshal(wire.MachineUser{User: "u1", Kind: "person", Name: "Sam", Labels: []string{}})
 	d.toldHostUser(told)
 	if summary() != nil || len(d.workflowsHearingServers()) != 0 {
 		t.Fatal("still heard out of the group")

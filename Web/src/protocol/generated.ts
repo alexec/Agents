@@ -14,7 +14,7 @@ export type Base64 = string & { readonly __brand: "Base64" };
 export type WireDate = number & { readonly __brand: "WireDate" };
 /** An absolute URL as text: URL in Swift. */
 export type URLString = string & { readonly __brand: "URLString" };
-export type HostID = string & { readonly __brand: "HostID" };
+export type MachineRef = string & { readonly __brand: "MachineRef" };
 export type ProviderID = string & { readonly __brand: "ProviderID" };
 /** ResourceName (Model/Lease.swift): the name, trimmed and lower-cased, as a single string. */
 export type ResourceName = string & { readonly __brand: "ResourceName" };
@@ -185,7 +185,7 @@ export interface AddAccountRequest {
 /** What either announce is answered with: who the new party now is. */
 export interface Admitted {
   client?: UUID;
-  host?: HostID;
+  host?: MachineRef;
   grant?: string;
 }
 
@@ -728,7 +728,7 @@ export interface AuditEntry {
   at: WireDate;
   action: string;
   method: string;
-  host?: HostID;
+  host?: MachineRef;
   target?: string;
   actor: AuditActor;
 }
@@ -1007,7 +1007,7 @@ export interface BotMake {
  * acts there.
  */
 export interface BotStopRun {
-  host: HostID;
+  host: MachineRef;
   agent: UUID;
 }
 
@@ -1938,7 +1938,7 @@ export type Consequence =
  * Console ▸ Live Now does.
  */
 export interface ConsoleStopAgent {
-  host: HostID;
+  host: MachineRef;
   agent: UUID;
 }
 
@@ -2081,8 +2081,14 @@ export interface ControlHello {
   previous?: string;
 }
 
-export interface ControlHost {
-  id: HostID;
+/** control/installProgress: a step of Add a Machine. */
+export interface ControlInstallProgress {
+  name: string;
+  step: string;
+}
+
+export interface ControlMachine {
+  id: MachineRef;
   name: string;
   platform: string;
   version: string;
@@ -2090,11 +2096,11 @@ export interface ControlHost {
   reach: string;
   machineID?: string;
   relay?: boolean;
-  signInFrom?: Record<string, HostID>;
-  gitFrom?: Record<string, HostID>;
+  signInFrom?: Record<string, MachineRef>;
+  gitFrom?: Record<string, MachineRef>;
   gitAsks?: GitAsk[];
-  tunnel?: HostTunnel;
-  workspace?: HostMachine;
+  tunnel?: MachineTunnel;
+  workspace?: MachineWorkspace;
   implementation?: string;
   /**
    * The capabilities this host said in its last host/hello (#1748). None from a host older than
@@ -2108,12 +2114,6 @@ export interface ControlHost {
   missing?: string[];
   /** The user who owns the machine (#994). */
   owner?: string;
-}
-
-/** control/installProgress: a step of Add a Server. */
-export interface ControlInstallProgress {
-  name: string;
-  step: string;
 }
 
 /** control/moved: where the control plane is now (T085). */
@@ -2150,7 +2150,7 @@ export interface ControlNotice {
 export interface ControlOK {
   mac: string;
   grant?: string;
-  host?: HostID;
+  host?: MachineRef;
   relayed?: boolean;
   endpoints?: ControlEndpoint[];
   epoch?: number;
@@ -2186,7 +2186,7 @@ export interface ControlPushItem {
 export interface ControlStatus {
   name: string;
   version: string;
-  homeHost?: HostID;
+  homeHost?: MachineRef;
   machineID: string;
   startedAt?: WireDate;
   port?: number;
@@ -2204,9 +2204,9 @@ export interface ControlStatus {
    * second name in front of the same control plane. None when it draws no views there.
    */
   publicViews?: string;
-  thisMacHost?: HostJoinStatus;
+  thisMacHost?: MachineJoinStatus;
   folderDetection?: FolderDetection;
-  unjoinedTunnels?: HostTunnelChanged[];
+  unjoinedTunnels?: MachineTunnelChanged[];
   /** The capabilities the control plane has (#1748). */
   capabilities?: string[];
   required?: RequiredCapabilities;
@@ -2931,7 +2931,7 @@ export interface FleetBoard {
  * agents were running when it last listed them. Numbers only, never what the agents said.
  */
 export interface FleetMachine {
-  host: ControlHost;
+  host: ControlMachine;
   /** Its person's or bot's name; empty when nobody owns it. */
   ownerName: string;
   /** Whether its owner is a bot (#1761). */
@@ -3043,7 +3043,7 @@ export interface FoundFolder {
 
 export interface GitAsk {
   server: string;
-  from: HostID;
+  from: MachineRef;
 }
 
 /** A credential for one git command. Never printed, logged or kept. */
@@ -3203,292 +3203,6 @@ export interface HelperLimits {
   continueWhenBack?: boolean;
 }
 
-/** hosts/announce, on an enrolment connection. */
-export interface HostAnnounce {
-  publicKey: Base64;
-  name: string;
-  platform: string;
-  version: string;
-  machineID: string;
-  relay?: boolean;
-  implementation?: string;
-}
-
-/**
- * governance/report (#2019, M5): the MCP servers and skills a machine has from a catalogue,
- * personal and in its folders, at most 500. Sent at start and each hour; each replaces the last.
- */
-export interface HostCatalog {
-  items: CatalogItem[];
-}
-
-/**
- * A paired window a host may let in on its local socket (#1118), with the key it proves itself
- * with.
- */
-export interface HostClient {
-  id: UUID;
-  kind: string;
-  publicKey: Base64;
-  /**
-   * The person the window belongs to (#994). The host lets it in only when it is the host's own
-   * user (FR-020).
-   */
-  person?: string;
-}
-
-/**
- * host/clients: every window paired with the control plane, which a host checks its local socket
- * against (#1118).
- */
-export interface HostClients {
-  clients: HostClient[];
-  /**
-   * The user the host belongs to (#994). With it, the host lets in only a window whose person is
-   * that user (FR-020); without it (an older control plane), every window listed.
-   */
-  user?: string;
-}
-
-/**
- * hosts/startEnroll (#1761): with as, a bot's machine code, an admin's only. Without, the caller's
- * own, as before.
- */
-export interface HostEnroll {
-  as?: string;
-}
-
-/** host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134). */
-export interface HostHello {
-  host?: HostID;
-  version: string;
-  platform: string;
-  machineID: string;
-  name?: string;
-  relay?: boolean;
-  implementation?: string;
-  /**
-   * The capabilities this host has (#1748): each one whose methods it all serves, and the ones it
-   * declares. None from a host older than #1748.
-   */
-  capabilities?: string[];
-}
-
-/**
- * hosts/install (HostInstall.Request): a server over ssh, with its key, the fingerprint trusted, a
- * tunnel.
- */
-export interface HostInstall {
-  destination: string;
-  name?: string;
-  key?: string;
-  trust?: string;
-  tunnel?: boolean;
-}
-
-/**
- * POST /v1/join (#994, spec 736 FR-017): a machine with no code asks to join. `person` names whose
- * it is to be, by name or id; with none, an admin approves it.
- */
-export interface HostJoinAsk {
-  name: string;
-  platform: string;
-  version?: string;
-  publicKey: Base64;
-  machineID?: string;
-  person?: string;
-}
-
-/** GET /v1/join/<request> (#994): waiting, or how it ended; `host` once approved. */
-export interface HostJoinDecision {
-  result: "waiting" | "approved" | "denied" | "expired";
-  host?: HostID;
-  /**
-   * Once approved: the control plane's public key, which the machine keeps as a code's would give
-   * it.
-   */
-  controlKey?: Base64;
-  /** Once approved: the control plane's name. */
-  name?: string;
-}
-
-export interface HostJoinStatus {
-  member: boolean;
-  connected: boolean;
-  problem?: string;
-  at: WireDate;
-}
-
-/** POST /v1/join: the request, the short code the machine shows, and when it ends (10 minutes). */
-export interface HostJoinTicket {
-  request: string;
-  code: string;
-  expires: WireDate;
-}
-
-export interface HostLastHeard {
-  host: HostID;
-  folders?: FolderSummary[];
-  agents?: Agent[];
-  heardAt?: WireDate;
-}
-
-/** hosts/link. */
-export interface HostLink {
-  host: HostID;
-  provider: ProviderID;
-  workspace: string;
-  startWhenUsed?: boolean;
-  stopWhenIdleMinutes?: number;
-}
-
-export interface HostMachine {
-  provider: ProviderID;
-  providerName: string;
-  workspace: string;
-  workspaceName: string;
-  workspaceState: string;
-  hostState?: string;
-  phase?: string;
-  since?: WireDate;
-  problem?: string;
-  stoppedBy?: string;
-  canStart: boolean;
-  canStop: boolean;
-  startWhenUsed: boolean;
-  stopWhenIdleMinutes?: number;
-  cost?: string;
-  current: boolean;
-  startForSchedules?: boolean;
-  tellsSchedule?: boolean;
-  nextWorkflow?: string;
-  nextWorkflowAt?: WireDate;
-  wakeAt?: WireDate;
-}
-
-/** host/machines, for an agent there: who asked, for the log, and its call. */
-export interface HostMachineCall {
-  agent: string;
-  method: string;
-  params: JSONValue;
-}
-
-/** hosts/setMachineOptions. stopWhenIdleMinutes 0 turns it off. */
-export interface HostMachineOptions {
-  host: HostID;
-  startWhenUsed?: boolean;
-  stopWhenIdleMinutes?: number;
-  startForSchedules?: boolean;
-}
-
-/**
- * host/policy (#998, FR-006): to a machine that says host.policy/1, on its channel 0, at each join
- * and within 5 seconds of each change. A signed policy, or none when no policy was ever set.
- */
-export interface HostPolicy {
-  policy?: OrgPolicy;
-  signature?: PolicySignature;
-  none?: boolean;
-}
-
-/** host/providerDraft: a writing agent called one of the writer's tools (#858). */
-export interface HostProviderDraftCall {
-  agentID: UUID;
-  draft: UUID;
-  tool: string;
-  arguments?: JSONValue;
-}
-
-/** hosts/setRelay. */
-export interface HostRelayRequest {
-  host: HostID;
-  relay: boolean;
-}
-
-/** host/release (#2178): the release the control plane names, as X.Y.Z. */
-export interface HostRelease {
-  version: string;
-}
-
-export interface HostRequest {
-  host: HostID;
-  purge?: boolean;
-}
-
-/** A host's next scheduled workflow (#1004). */
-export interface HostSchedule {
-  at?: WireDate;
-  workflow?: string;
-}
-
-/**
- * host/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next
- * scheduled workflow.
- */
-export interface HostStatus {
-  idle: boolean;
-  running: string[];
-  schedule?: HostSchedule;
-}
-
-export interface HostStop {
-  host: HostID;
-  confirmRunning?: boolean;
-}
-
-export interface HostTunnel {
-  up: boolean;
-  problem?: string;
-}
-
-export interface HostTunnelChanged {
-  name: string;
-  host?: HostID;
-  tunnel: HostTunnel;
-}
-
-/**
- * hosts/update (#1766): a host the control plane installed over ssh, updated the same way. The
- * server and its key are given again, as at the install, because the control plane keeps neither;
- * the host's own root and membership stay.
- */
-export interface HostUpdate {
-  host: HostID;
-  destination: string;
-  key?: string;
-  trust?: string;
-}
-
-/**
- * host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its
- * user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it
- * starts no work (FR-033).
- */
-export interface HostUser {
-  user: string;
-  kind: "person" | "bot";
-  name: string;
-  labels: string[];
-  capReachedUntil?: WireDate;
-  /**
-   * For a person: the names of the bots in their groups (#2027). A runs-on: workflow that names one
-   * is heard here, once approved here, and its matches are sent to the control plane, never run
-   * here.
-   */
-  bots?: string[];
-}
-
-/**
- * host/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and when
- * its user's settings or secrets change. Sent only on the links of that user's own machines.
- * secrets is every secret the user has: a name missing from it was removed.
- */
-export interface HostUserSettings {
-  user: string;
-  settings: UserSettings;
-  secrets: UserSecret[];
-}
-
 export interface HostedMCPSnapshot {
   servers: HostedMCPStatus[];
   at: WireDate;
@@ -3512,7 +3226,7 @@ export interface HostedMCPStatus {
 }
 
 export interface JoinApproved {
-  host: HostID;
+  host: MachineRef;
 }
 
 /** control/joinDecided (#994): a request ended, approved or not, so every card for it goes. */
@@ -3542,13 +3256,13 @@ export interface JoinRequestDecide {
 
 /** hosts/keep: a request for a stopped host, kept until it is up. */
 export interface KeepRequest {
-  host: HostID;
+  host: MachineRef;
   method: string;
   params: JSONValue;
 }
 
 export interface KeptDelivered {
-  host: HostID;
+  host: MachineRef;
   id: UUID;
   agentID?: UUID;
 }
@@ -3559,7 +3273,7 @@ export interface KeptList {
 
 export interface KeptRequest {
   id: UUID;
-  host: HostID;
+  host: MachineRef;
   kind: string;
   agentID?: UUID;
   text: string;
@@ -3570,7 +3284,7 @@ export interface KeptRequest {
 }
 
 export interface KeptRequestID {
-  host: HostID;
+  host: MachineRef;
   id: UUID;
 }
 
@@ -3613,16 +3327,16 @@ export interface LeaseTokenRequest {
 }
 
 export interface LendGit {
-  host: HostID;
-  from: HostID;
+  host: MachineRef;
+  from: MachineRef;
   server: string;
   allowed: boolean;
 }
 
 /** hosts/lendSignIn (T091). */
 export interface LendSignIn {
-  host: HostID;
-  from: HostID;
+  host: MachineRef;
+  from: MachineRef;
   runtime: string;
   allowed: boolean;
 }
@@ -3664,7 +3378,7 @@ export interface ListedSkill {
  * and its cost so far. No title and nothing it said.
  */
 export interface LiveAgent {
-  host: HostID;
+  host: MachineRef;
   hostName: string;
   /** The person or bot whose machine it is, by id. */
   owner: string;
@@ -4062,6 +3776,77 @@ export interface MacTerminalRequest {
   path?: string;
 }
 
+/** hosts/announce, on an enrolment connection. */
+export interface MachineAnnounce {
+  publicKey: Base64;
+  name: string;
+  platform: string;
+  version: string;
+  machineID: string;
+  relay?: boolean;
+  implementation?: string;
+}
+
+/**
+ * governance/report (#2019, M5): the MCP servers and skills a machine has from a catalogue,
+ * personal and in its folders, at most 500. Sent at start and each hour; each replaces the last.
+ */
+export interface MachineCatalog {
+  items: CatalogItem[];
+}
+
+/**
+ * A paired window a host may let in on its local socket (#1118), with the key it proves itself
+ * with.
+ */
+export interface MachineClient {
+  id: UUID;
+  kind: string;
+  publicKey: Base64;
+  /**
+   * The person the window belongs to (#994). The host lets it in only when it is the host's own
+   * user (FR-020).
+   */
+  person?: string;
+}
+
+/**
+ * host/clients: every window paired with the control plane, which a host checks its local socket
+ * against (#1118).
+ */
+export interface MachineClients {
+  clients: MachineClient[];
+  /**
+   * The user the host belongs to (#994). With it, the host lets in only a window whose person is
+   * that user (FR-020); without it (an older control plane), every window listed.
+   */
+  user?: string;
+}
+
+/**
+ * hosts/startEnroll (#1761): with as, a bot's machine code, an admin's only. Without, the caller's
+ * own, as before.
+ */
+export interface MachineEnroll {
+  as?: string;
+}
+
+/** host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134). */
+export interface MachineHello {
+  host?: MachineRef;
+  version: string;
+  platform: string;
+  machineID: string;
+  name?: string;
+  relay?: boolean;
+  implementation?: string;
+  /**
+   * The capabilities this host has (#1748): each one whose methods it all serves, and the ones it
+   * declares. None from a host older than #1748.
+   */
+  capabilities?: string[];
+}
+
 /**
  * One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or
  * unknown.
@@ -4078,7 +3863,222 @@ export interface MachineInfo {
    */
   hostKeyRenews?: boolean;
   cost?: string;
-  host?: HostID;
+  host?: MachineRef;
+}
+
+/**
+ * hosts/install (MachineInstall.Request): a server over ssh, with its key, the fingerprint trusted,
+ * a tunnel.
+ */
+export interface MachineInstall {
+  destination: string;
+  name?: string;
+  key?: string;
+  trust?: string;
+  tunnel?: boolean;
+}
+
+/**
+ * POST /v1/join (#994, spec 736 FR-017): a machine with no code asks to join. `person` names whose
+ * it is to be, by name or id; with none, an admin approves it.
+ */
+export interface MachineJoinAsk {
+  name: string;
+  platform: string;
+  version?: string;
+  publicKey: Base64;
+  machineID?: string;
+  person?: string;
+}
+
+/** GET /v1/join/<request> (#994): waiting, or how it ended; `host` once approved. */
+export interface MachineJoinDecision {
+  result: "waiting" | "approved" | "denied" | "expired";
+  host?: MachineRef;
+  /**
+   * Once approved: the control plane's public key, which the machine keeps as a code's would give
+   * it.
+   */
+  controlKey?: Base64;
+  /** Once approved: the control plane's name. */
+  name?: string;
+}
+
+export interface MachineJoinStatus {
+  member: boolean;
+  connected: boolean;
+  problem?: string;
+  at: WireDate;
+}
+
+/** POST /v1/join: the request, the short code the machine shows, and when it ends (10 minutes). */
+export interface MachineJoinTicket {
+  request: string;
+  code: string;
+  expires: WireDate;
+}
+
+export interface MachineLastHeard {
+  host: MachineRef;
+  folders?: FolderSummary[];
+  agents?: Agent[];
+  heardAt?: WireDate;
+}
+
+/** hosts/link. */
+export interface MachineLink {
+  host: MachineRef;
+  provider: ProviderID;
+  workspace: string;
+  startWhenUsed?: boolean;
+  stopWhenIdleMinutes?: number;
+}
+
+/** hosts/setMachineOptions. stopWhenIdleMinutes 0 turns it off. */
+export interface MachineOptions {
+  host: MachineRef;
+  startWhenUsed?: boolean;
+  stopWhenIdleMinutes?: number;
+  startForSchedules?: boolean;
+}
+
+/**
+ * host/policy (#998, FR-006): to a machine that says host.policy/1, on its channel 0, at each join
+ * and within 5 seconds of each change. A signed policy, or none when no policy was ever set.
+ */
+export interface MachinePolicy {
+  policy?: OrgPolicy;
+  signature?: PolicySignature;
+  none?: boolean;
+}
+
+/** host/providerDraft: a writing agent called one of the writer's tools (#858). */
+export interface MachineProviderDraftCall {
+  agentID: UUID;
+  draft: UUID;
+  tool: string;
+  arguments?: JSONValue;
+}
+
+/** hosts/setRelay. */
+export interface MachineRelayRequest {
+  host: MachineRef;
+  relay: boolean;
+}
+
+/** host/release (#2178): the release the control plane names, as X.Y.Z. */
+export interface MachineRelease {
+  version: string;
+}
+
+export interface MachineRequest {
+  host: MachineRef;
+  purge?: boolean;
+}
+
+/** A host's next scheduled workflow (#1004). */
+export interface MachineSchedule {
+  at?: WireDate;
+  workflow?: string;
+}
+
+/**
+ * host/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next
+ * scheduled workflow.
+ */
+export interface MachineStatus {
+  idle: boolean;
+  running: string[];
+  schedule?: MachineSchedule;
+}
+
+export interface MachineStop {
+  host: MachineRef;
+  confirmRunning?: boolean;
+}
+
+export interface MachineTunnel {
+  up: boolean;
+  problem?: string;
+}
+
+export interface MachineTunnelChanged {
+  name: string;
+  host?: MachineRef;
+  tunnel: MachineTunnel;
+}
+
+/**
+ * hosts/update (#1766): a host the control plane installed over ssh, updated the same way. The
+ * server and its key are given again, as at the install, because the control plane keeps neither;
+ * the host's own root and membership stay.
+ */
+export interface MachineUpdate {
+  host: MachineRef;
+  destination: string;
+  key?: string;
+  trust?: string;
+}
+
+/**
+ * host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its
+ * user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it
+ * starts no work (FR-033).
+ */
+export interface MachineUser {
+  user: string;
+  kind: "person" | "bot";
+  name: string;
+  labels: string[];
+  capReachedUntil?: WireDate;
+  /**
+   * For a person: the names of the bots in their groups (#2027). A runs-on: workflow that names one
+   * is heard here, once approved here, and its matches are sent to the control plane, never run
+   * here.
+   */
+  bots?: string[];
+}
+
+/**
+ * host/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and when
+ * its user's settings or secrets change. Sent only on the links of that user's own machines.
+ * secrets is every secret the user has: a name missing from it was removed.
+ */
+export interface MachineUserSettings {
+  user: string;
+  settings: UserSettings;
+  secrets: UserSecret[];
+}
+
+export interface MachineWorkspace {
+  provider: ProviderID;
+  providerName: string;
+  workspace: string;
+  workspaceName: string;
+  workspaceState: string;
+  hostState?: string;
+  phase?: string;
+  since?: WireDate;
+  problem?: string;
+  stoppedBy?: string;
+  canStart: boolean;
+  canStop: boolean;
+  startWhenUsed: boolean;
+  stopWhenIdleMinutes?: number;
+  cost?: string;
+  current: boolean;
+  startForSchedules?: boolean;
+  tellsSchedule?: boolean;
+  nextWorkflow?: string;
+  nextWorkflowAt?: WireDate;
+  wakeAt?: WireDate;
+}
+
+/** host/machines, for an agent there: who asked, for the log, and its call. */
+export interface MachineWorkspaceCall {
+  agent: string;
+  method: string;
+  params: JSONValue;
 }
 
 export interface ManagedMCPServer {
@@ -4566,7 +4566,7 @@ export interface OrgRoutesApplied {
  * every admin.
  */
 export interface OrgRoutesLeft {
-  host: HostID;
+  host: MachineRef;
   name: string;
   user: string;
   routes: string[];
@@ -4704,7 +4704,7 @@ export interface PersonInvited {
 
 /** A machine in People: its name, its state and nothing inside it (FR-019). */
 export interface PersonMachine {
-  id: HostID;
+  id: MachineRef;
   name: string;
   state: string;
   platform?: string;
@@ -5680,7 +5680,7 @@ export interface ReportRow {
   at: string;
   person: string;
   personName: string;
-  host: HostID;
+  host: MachineRef;
   hostName: string;
   runtime: string;
   /**
@@ -6061,7 +6061,7 @@ export interface SCIMTokensRequest {
   provider: string;
 }
 
-/** A server ssh knows by a name, for Add a Server's server box (#610). */
+/** A server ssh knows by a name, for Add a Machine's server box (#610). */
 export interface SSHHost {
   alias: string;
   resolved: string;
@@ -6138,7 +6138,7 @@ export interface SealedEnvelope {
  * issued.
  */
 export interface SecretLeftOn {
-  host: HostID;
+  host: MachineRef;
   /** The machine's name when it was removed. */
   name: string;
   at: string;
@@ -6149,7 +6149,7 @@ export interface SecretLeftOn {
  * removed with secrets on it.
  */
 export interface SecretsLeft {
-  host: HostID;
+  host: MachineRef;
   name: string;
   secrets: UserSecretName[];
 }
@@ -7014,7 +7014,7 @@ export interface StartRequest {
  * `unpushed` is empty.
  */
 export interface StartedMachinePreview {
-  host: HostID;
+  host: MachineRef;
   name: string;
   state: string;
   unpushed: UnpushedWork[];
@@ -7106,7 +7106,7 @@ export interface TeamBot {
  * No title, nothing it said.
  */
 export interface TeamBotRun {
-  host: HostID;
+  host: MachineRef;
   hostName: string;
   agent: UUID;
   /** The workflow that started it. */
@@ -7532,7 +7532,7 @@ export interface UserSecretRow {
   name: UserSecretName;
   updated: string;
   /** The machines it was sent to. */
-  machines: HostID[];
+  machines: MachineRef[];
   /** Machines removed with it on them, since it was last set. */
   leftOn?: SecretLeftOn[];
 }
@@ -8192,17 +8192,17 @@ export interface Methods {
   "hosts/denyJoin": { params: JoinRequestDecide; result: Empty };
   "hosts/dropKept": { params: KeptRequestID; result: Empty };
   "hosts/joinRequests": { params: Empty; result: JoinRequest[] };
-  "hosts/lastHeard": { params: HostRequest; result: HostLastHeard };
+  "hosts/lastHeard": { params: MachineRequest; result: MachineLastHeard };
   "hosts/lendGit": { params: LendGit; result: Empty };
-  "hosts/link": { params: HostLink; result: ControlHost };
-  "hosts/list": { params: Empty; result: ControlHost[] };
+  "hosts/link": { params: MachineLink; result: ControlMachine };
+  "hosts/list": { params: Empty; result: ControlMachine[] };
   "hosts/listKept": { params: Empty; result: KeptList };
   "hosts/retryKept": { params: KeptRequestID; result: Empty };
-  "hosts/setMachineOptions": { params: HostMachineOptions; result: ControlHost };
-  "hosts/start": { params: HostRequest; result: ControlHost };
-  "hosts/startEnroll": { params: HostEnroll; result: ControlCodeShown };
-  "hosts/stop": { params: HostStop; result: ControlHost };
-  "hosts/unlink": { params: HostRequest; result: ControlHost };
+  "hosts/setMachineOptions": { params: MachineOptions; result: ControlMachine };
+  "hosts/start": { params: MachineRequest; result: ControlMachine };
+  "hosts/startEnroll": { params: MachineEnroll; result: ControlCodeShown };
+  "hosts/stop": { params: MachineStop; result: ControlMachine };
+  "hosts/unlink": { params: MachineRequest; result: ControlMachine };
   "links/approve": { params: ChannelLinkDecide; result: Empty };
   "links/deny": { params: ChannelLinkDecide; result: Empty };
   "links/list": { params: Empty; result: ChannelLink[] };
@@ -8837,8 +8837,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ControlCutOff: { required: ["why"], optional: ["provider"] },
   ControlEndpoint: { required: ["url"], optional: ["pin"] },
   ControlHello: { required: ["v", "name", "control", "nonce", "copy"], optional: ["previous"] },
-  ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "gitFrom", "gitAsks", "tunnel", "workspace", "implementation", "capabilities", "missing", "owner"] },
   ControlInstallProgress: { required: ["name", "step"], optional: [] },
+  ControlMachine: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "gitFrom", "gitAsks", "tunnel", "workspace", "implementation", "capabilities", "missing", "owner"] },
   ControlMoved: { required: ["url", "controlKey", "name"], optional: ["pin"] },
   ControlNewKey: { required: ["key", "proof"], optional: [] },
   ControlNotice: { required: ["kind", "words"], optional: ["user", "group"] },
@@ -8960,35 +8960,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HandoverStatus: { required: ["phase", "controlKey", "hasRecords", "endpoints", "members"], optional: ["epoch", "forwardingUntil"] },
   Headline: { required: ["h1", "h2", "h3"], optional: ["answers"] },
   HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive", "continueWhenBack"] },
-  HostAnnounce: { required: ["publicKey", "name", "platform", "version", "machineID"], optional: ["relay", "implementation"] },
-  HostCatalog: { required: ["items"], optional: [] },
-  HostClient: { required: ["id", "kind", "publicKey"], optional: ["person"] },
-  HostClients: { required: ["clients"], optional: ["user"] },
-  HostEnroll: { required: [], optional: ["as"] },
-  HostHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "relay", "implementation", "capabilities"] },
-  HostInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel"] },
-  HostJoinAsk: { required: ["name", "platform", "publicKey"], optional: ["version", "machineID", "person"] },
-  HostJoinDecision: { required: ["result"], optional: ["host", "controlKey", "name"] },
-  HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
-  HostJoinTicket: { required: ["request", "code", "expires"], optional: [] },
-  HostLastHeard: { required: ["host"], optional: ["folders", "agents", "heardAt"] },
-  HostLink: { required: ["host", "provider", "workspace"], optional: ["startWhenUsed", "stopWhenIdleMinutes"] },
-  HostMachine: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },
-  HostMachineCall: { required: ["agent", "method", "params"], optional: [] },
-  HostMachineOptions: { required: ["host"], optional: ["startWhenUsed", "stopWhenIdleMinutes", "startForSchedules"] },
-  HostPolicy: { required: [], optional: ["policy", "signature", "none"] },
-  HostProviderDraftCall: { required: ["agentID", "draft", "tool"], optional: ["arguments"] },
-  HostRelayRequest: { required: ["host", "relay"], optional: [] },
-  HostRelease: { required: ["version"], optional: [] },
-  HostRequest: { required: ["host"], optional: ["purge"] },
-  HostSchedule: { required: [], optional: ["at", "workflow"] },
-  HostStatus: { required: ["idle", "running"], optional: ["schedule"] },
-  HostStop: { required: ["host"], optional: ["confirmRunning"] },
-  HostTunnel: { required: ["up"], optional: ["problem"] },
-  HostTunnelChanged: { required: ["name", "tunnel"], optional: ["host"] },
-  HostUpdate: { required: ["host", "destination"], optional: ["key", "trust"] },
-  HostUser: { required: ["user", "kind", "name", "labels"], optional: ["capReachedUntil", "bots"] },
-  HostUserSettings: { required: ["user", "settings", "secrets"], optional: [] },
   HostedMCPSnapshot: { required: ["servers", "at"], optional: [] },
   HostedMCPStatus: { required: ["name", "state", "restarts", "users"], optional: ["since", "retryAt", "lastError", "folder"] },
   JoinApproved: { required: ["host"], optional: [] },
@@ -9055,7 +9026,36 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MCPViewsForgetRequest: { required: ["destination", "name"], optional: [] },
   MacPathRequest: { required: ["path"], optional: ["app"] },
   MacTerminalRequest: { required: [], optional: ["path"] },
+  MachineAnnounce: { required: ["publicKey", "name", "platform", "version", "machineID"], optional: ["relay", "implementation"] },
+  MachineCatalog: { required: ["items"], optional: [] },
+  MachineClient: { required: ["id", "kind", "publicKey"], optional: ["person"] },
+  MachineClients: { required: ["clients"], optional: ["user"] },
+  MachineEnroll: { required: [], optional: ["as"] },
+  MachineHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "relay", "implementation", "capabilities"] },
   MachineInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host"] },
+  MachineInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel"] },
+  MachineJoinAsk: { required: ["name", "platform", "publicKey"], optional: ["version", "machineID", "person"] },
+  MachineJoinDecision: { required: ["result"], optional: ["host", "controlKey", "name"] },
+  MachineJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
+  MachineJoinTicket: { required: ["request", "code", "expires"], optional: [] },
+  MachineLastHeard: { required: ["host"], optional: ["folders", "agents", "heardAt"] },
+  MachineLink: { required: ["host", "provider", "workspace"], optional: ["startWhenUsed", "stopWhenIdleMinutes"] },
+  MachineOptions: { required: ["host"], optional: ["startWhenUsed", "stopWhenIdleMinutes", "startForSchedules"] },
+  MachinePolicy: { required: [], optional: ["policy", "signature", "none"] },
+  MachineProviderDraftCall: { required: ["agentID", "draft", "tool"], optional: ["arguments"] },
+  MachineRelayRequest: { required: ["host", "relay"], optional: [] },
+  MachineRelease: { required: ["version"], optional: [] },
+  MachineRequest: { required: ["host"], optional: ["purge"] },
+  MachineSchedule: { required: [], optional: ["at", "workflow"] },
+  MachineStatus: { required: ["idle", "running"], optional: ["schedule"] },
+  MachineStop: { required: ["host"], optional: ["confirmRunning"] },
+  MachineTunnel: { required: ["up"], optional: ["problem"] },
+  MachineTunnelChanged: { required: ["name", "tunnel"], optional: ["host"] },
+  MachineUpdate: { required: ["host", "destination"], optional: ["key", "trust"] },
+  MachineUser: { required: ["user", "kind", "name", "labels"], optional: ["capReachedUntil", "bots"] },
+  MachineUserSettings: { required: ["user", "settings", "secrets"], optional: [] },
+  MachineWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },
+  MachineWorkspaceCall: { required: ["agent", "method", "params"], optional: [] },
   ManagedMCPServer: { required: ["name", "registryName", "version", "run", "addedAt", "destination"], optional: ["byHand"] },
   ManagedSkill: { required: ["destination", "name", "source", "edited", "update"], optional: ["skillPath", "recordedHash", "commit", "committedAt", "catalogue"] },
   MarkRuntimeAvailable: { required: ["credentialKey"], optional: [] },

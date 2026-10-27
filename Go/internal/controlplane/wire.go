@@ -54,13 +54,13 @@ func int64Of(n *int) *int64 {
 }
 
 // hostIDs is a record's map of host ids on the wire; nil when it holds none.
-func hostIDs(m map[string]string) map[string]wire.HostID {
+func hostIDs(m map[string]string) map[string]wire.MachineRef {
 	if len(m) == 0 {
 		return nil
 	}
-	out := make(map[string]wire.HostID, len(m))
+	out := make(map[string]wire.MachineRef, len(m))
 	for k, v := range m {
-		out[k] = wire.HostID(v)
+		out[k] = wire.MachineRef(v)
 	}
 	return out
 }
@@ -74,8 +74,8 @@ func clientOnWire(c records.ClientRecord) wire.ClientRecord {
 		KnownEpoch: int64Of(c.KnownEpoch)}
 }
 
-// HostJoinStatus is DaemonAPI.HostJoinStatus: how this Mac's host's join stands (#113).
-type HostJoinStatus = wire.HostJoinStatus
+// MachineJoinStatus is DaemonAPI.MachineJoinStatus: how this Mac's host's join stands (#113).
+type MachineJoinStatus = wire.MachineJoinStatus
 
 // standardDetection is FolderDetection.standard (#429): where a host added from now on
 // has its folders found, until a person says otherwise.

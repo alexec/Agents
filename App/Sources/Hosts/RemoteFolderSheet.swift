@@ -8,7 +8,7 @@ import SwiftUI
 struct RemoteFolderSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    let host: HostID
+    let host: MachineRef
 
     @State private var path = "~"
     @State private var listing: DirectoryListing?

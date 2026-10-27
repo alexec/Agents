@@ -134,7 +134,7 @@ func TestASuspendedPersonsWorkflowsPause(t *testing.T) {
 func TestASuspendedPersonsWindowIsRefusedDirectly(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	w, listed := newWindow(t)
-	d.SetLocalClients(wire.HostClients{Clients: []wire.HostClient{listed}})
+	d.SetLocalClients(wire.MachineClients{Clients: []wire.MachineClient{listed}})
 	path := serveLocal(t, d, RoleWindow)
 	c, r, reply := prove(t, path, w)
 	if reply.OK == nil {

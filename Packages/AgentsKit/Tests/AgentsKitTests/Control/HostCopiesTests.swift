@@ -7,7 +7,7 @@ import Testing
 /// client that starts while it is offline.
 @Suite("What an offline host last listed")
 struct HostCopiesTests {
-    let host = HostID(rawValue: "k3v9x0qa")
+    let host = MachineRef(rawValue: "k3v9x0qa")
 
     static func reply(_ result: JSONValue) throws -> String {
         try JSONRPCCodec.encode(.success(id: .number(1), result: result))

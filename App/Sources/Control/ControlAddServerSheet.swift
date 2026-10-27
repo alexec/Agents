@@ -2,10 +2,10 @@ import AgentsKitCore
 import AppKit
 import SwiftUI
 
-/// Add a Server (058, US4, T074; frames M and M2).
+/// Add a Machine (058, US4, T074; frames M and M2).
 ///
 /// - **Run a command**, the usual way: the server installs itself and connects out, so
-///   nothing has to reach it. The command carries a one-time host code, and the sheet
+///   nothing has to reach it. The command carries a one-time join code, and the sheet
 ///   closes by itself when the server joins.
 /// - **Over ssh**, for a server the person can already ssh to (#610): the control plane
 ///   installs the host once and keeps neither a key nor the session. The server box offers
@@ -26,7 +26,7 @@ struct ControlAddServerSheet: View {
     var prefill: Prefill?
     /// A host that needs an update, updated over ssh as it was installed (#1766): the
     /// server and key asked again, and no code, name or tunnel.
-    var updating: DaemonAPI.ControlHost?
+    var updating: DaemonAPI.ControlMachine?
 
     struct Prefill: Identifiable {
         var destination: String
@@ -49,10 +49,10 @@ struct ControlAddServerSheet: View {
 
     // Run a command
     @State private var shown: DaemonAPI.ControlCodeShown?
-    @State private var before: Set<HostID> = []
+    @State private var before: Set<MachineRef> = []
     @State private var joined: String?
     /// The host that joined, once it has: the sheet's last step picks its folders (#656).
-    @State private var joinedHost: HostID?
+    @State private var joinedHost: MachineRef?
 
     // Over ssh
     @State private var destination = ""
@@ -72,7 +72,7 @@ struct ControlAddServerSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(updating.map { "Update \($0.name)" } ?? "Add a Server").appText(.title).fontWeight(.semibold)
+            Text(updating.map { "Update \($0.name)" } ?? "Add a Machine").appText(.title).fontWeight(.semibold)
             if updating != nil {
                 sshPage
             } else if let joinedHost, let joined {
@@ -93,7 +93,7 @@ struct ControlAddServerSheet: View {
         }
         .padding(28)
         .frame(width: 620)
-        // An update makes no host code: the host keeps its membership.
+        // An update makes no join code: the host keeps its membership.
         .task { if updating == nil { await watchForJoin() } }
         .onAppear {
             if let updating {
@@ -114,7 +114,7 @@ struct ControlAddServerSheet: View {
 
     @ViewBuilder
     private var commandPage: some View {
-        Text("On the server, as the user your agents should run as:")
+        Text("On the machine, as the user your agents should run as:")
             .appText(.reading).foregroundStyle(.secondary)
         if let command = shown?.command ?? shown.map({ "agentsd --control-code '\($0.text)'" }) {
             Text(command)
@@ -150,7 +150,7 @@ struct ControlAddServerSheet: View {
         } else if shown != nil {
             HStack(spacing: 8) {
                 ProgressView().controlSize(.mini)
-                Text("Waiting for the server to connect…").appText(.reading)
+                Text("Waiting for the machine to connect…").appText(.reading)
             }
         }
         if let problem = control.problem {
@@ -192,7 +192,7 @@ struct ControlAddServerSheet: View {
     private var sshPage: some View {
         Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
             GridRow {
-                Text("Server").foregroundStyle(.secondary).gridColumnAlignment(.trailing)
+                Text("Machine").foregroundStyle(.secondary).gridColumnAlignment(.trailing)
                 TextField(configHosts.isEmpty ? "agents@devbox.lan" : "A host from ~/.ssh/config, or user@host:port",
                           text: $destination)
                     .textFieldStyle(.roundedBorder).appText(.code)
@@ -208,7 +208,7 @@ struct ControlAddServerSheet: View {
                             .textInputCompletion(host.alias)
                         }
                     }
-                    .accessibilityLabel("Server").disabled(working || fingerprint != nil)
+                    .accessibilityLabel("Machine").disabled(working || fingerprint != nil)
             }
             if let resolvedLine {
                 GridRow {
@@ -238,28 +238,28 @@ struct ControlAddServerSheet: View {
                     Color.clear.frame(width: 1, height: 1)
                     Toggle("Use an ssh tunnel", isOn: Binding(get: { tunnel }, set: { tunnel = $0; tunnelChosen = true }))
                         .disabled(working || isDone)
-                        .help("For a server that can’t reach this Mac: it connects through ssh instead.")
+                        .help("For a machine that can’t reach this Mac: it connects through ssh instead.")
                 }
             }
         }
         .task { configHosts = control.isOnThisMac ? await control.sshHosts() : [] }
         .task(id: destination) { await resolveTyped() }
         if let updating {
-            Text("The server \(updating.name) runs on, as you reach it over ssh. The control plane checks it is \(updating.name), copies its version of Agents there and starts it again. Its agents and folders stay. The key is used for this update only and not kept.")
+            Text("The machine \(updating.name) runs on, as you reach it over ssh. The control plane checks it is \(updating.name), copies its version of Agents there and starts it again. Its agents and folders stay. The key is used for this update only and not kept.")
                 .appText(.supporting).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         } else {
         Text(keyOptional
-             ? "With no key, ssh logs in as it does from Terminal: your agent, ~/.ssh/config or default key. A key chosen here is used instead, for this install only. Afterwards the server connects to the control plane by itself, or, with a tunnel, through ssh the control plane keeps open."
-             : "The control plane runs on another machine, so it needs the key: it is used for this install only and not kept. Afterwards the server connects to the control plane by itself.")
+             ? "With no key, ssh logs in as it does from Terminal: your agent, ~/.ssh/config or default key. A key chosen here is used instead, for this install only. Afterwards the machine connects to the control plane by itself, or, with a tunnel, through ssh the control plane keeps open."
+             : "The control plane runs on another machine, so it needs the key: it is used for this install only and not kept. Afterwards the machine connects to the control plane by itself.")
             .appText(.supporting).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }
         if let fingerprint {
             VStack(alignment: .leading, spacing: 6) {
-                Text("This server’s key isn’t in your known_hosts. Its key is:").appText(.supporting)
+                Text("This machine’s key isn’t in your known_hosts. Its key is:").appText(.supporting)
                 Text(fingerprint).appText(.code).textSelection(.enabled)
-                Text("Install only if this is the key the server shows (ssh-keygen -lf on its host key).")
+                Text("Install only if this is the key the machine shows (ssh-keygen -lf on its host key).")
                     .appText(.supporting).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

@@ -968,7 +968,7 @@ func (s *Service) orgRoutesApplied(ctx context.Context, host string, applied wir
 	slices.SortFunc(list, func(a, b wire.OrgRouteVersion) int { return strings.Compare(a.ID, b.ID) })
 	value, _ := json.Marshal(list)
 	changed := false
-	if err := s.records.ChangeHost(ctx, host, func(r *records.HostRecord) bool {
+	if err := s.records.ChangeHost(ctx, host, func(r *records.MachineRecord) bool {
 		if bytes.Equal(r.Extra[orgRoutesApplied], value) {
 			return false
 		}
@@ -988,7 +988,7 @@ func (s *Service) orgRoutesApplied(ctx context.Context, host string, applied wir
 }
 
 // appliedOrgRoutes is what a machine said it keeps.
-func appliedOrgRoutes(h records.HostRecord) []wire.OrgRouteVersion {
+func appliedOrgRoutes(h records.MachineRecord) []wire.OrgRouteVersion {
 	var list []wire.OrgRouteVersion
 	json.Unmarshal(h.Extra[orgRoutesApplied], &list)
 	return list
@@ -1024,7 +1024,7 @@ func (s *Service) orgRoutesLeft(host, user, name string, held []wire.OrgRouteVer
 		}
 		names = append(names, label)
 	}
-	left := wire.OrgRoutesLeft{Host: wire.HostID(host), Name: name, User: user, Routes: names}
+	left := wire.OrgRoutesLeft{Host: wire.MachineRef(host), Name: name, User: user, Routes: names}
 	s.log(fmt.Sprintf("%s was removed with %d org routes on it", host, len(names)))
 	told := map[string]bool{}
 	for _, p := range s.records.People() {

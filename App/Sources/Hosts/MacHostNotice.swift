@@ -25,7 +25,7 @@ enum MacHostNotice: Equatable {
     /// Mac does not read that file, so a missing join there is not "the process is down".
     /// `windowMissed` is a try of the window's own that failed, so a host that is up is
     /// the window's connection, not "still connecting".
-    static func decide(planeOnThisMac: Bool, macState: String?, join: DaemonAPI.HostJoinStatus?,
+    static func decide(planeOnThisMac: Bool, macState: String?, join: DaemonAPI.MachineJoinStatus?,
                        windowMissed: Bool = false) -> MacHostNotice? {
         let up: MacHostNotice? = windowMissed ? .windowLost : nil
         if let join {
@@ -35,13 +35,13 @@ enum MacHostNotice: Equatable {
                 return .notAnswering
             }
             // The join says connected and the control plane's list says otherwise.
-            if let macState, !DaemonAPI.ControlHost.answers(macState) { return .notAnswering }
+            if let macState, !DaemonAPI.ControlMachine.answers(macState) { return .notAnswering }
             return up
         }
-        guard planeOnThisMac else { return macState == nil ? nil : (DaemonAPI.ControlHost.answers(macState) ? up : .notAnswering) }
+        guard planeOnThisMac else { return macState == nil ? nil : (DaemonAPI.ControlMachine.answers(macState) ? up : .notAnswering) }
         // Beside this Mac, a live host writes its join. No report, and not online, means
         // the process is down. Online with no report yet is the window still connecting.
-        return DaemonAPI.ControlHost.answers(macState) ? up : .notRunning
+        return DaemonAPI.ControlMachine.answers(macState) ? up : .notRunning
     }
 
     var title: String {

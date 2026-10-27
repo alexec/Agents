@@ -67,8 +67,8 @@ func (s *Service) makeProviders(home string) *providers.Providers {
 				over, _, _ := s.tunnels.Installed(host)
 				return over
 			},
-			Connect: connect,
-			OwnerOf: s.ownerOf,
+			Connect:   connect,
+			OwnerOf:   s.ownerOf,
 			IsAdmin:   s.isAdmin,
 			InGroup:   s.inGroup,
 			GroupName: s.groupName,
@@ -135,7 +135,7 @@ func (a providerRouter) HostState(host string) string {
 	return state
 }
 
-func (a providerRouter) SetWorkspace(host string, ws *providers.HostMachine) {
+func (a providerRouter) SetWorkspace(host string, ws *providers.MachineWorkspace) {
 	a.r.SetWorkspace(host, ws)
 }
 
@@ -172,7 +172,7 @@ func (a providerRouter) Holds(host string) bool { return a.r.Holds(host) }
 // providerMethods is the methods as the providers see them (their Methods).
 type providerMethods struct{ m *Methods }
 
-func (a providerMethods) HostRow(h records.HostRecord) any { return a.m.hostRow(h) }
+func (a providerMethods) HostRow(h records.MachineRecord) any { return a.m.hostRow(h) }
 
 func (a providerMethods) RemoveHost(host string, from providers.Caller) error {
 	_, err := a.m.Handle("hosts/remove", rawOf(map[string]string{"host": host}),
@@ -194,7 +194,7 @@ func providersCaller(c Caller) providers.Caller {
 // trusted at the install, whatever address the host has now (#1691); else the person's own
 // known_hosts (#965). With renewKey, the key it is offered is taken and pinned again for
 // its tunnel (#1701).
-func (s *Service) sshStart(host records.HostRecord, destination string, renewKey bool) error {
+func (s *Service) sshStart(host records.MachineRecord, destination string, renewKey bool) error {
 	known := ""
 	if s.tunnels != nil {
 		if _, keys, ok := s.tunnels.Installed(host.ID); ok {

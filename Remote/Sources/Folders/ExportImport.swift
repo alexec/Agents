@@ -10,7 +10,7 @@ import UniformTypeIdentifiers
 @MainActor
 enum RemoteExportImport {
     /// Made and read with the busy sheet up (#2437), then saved with the picker. One at a time.
-    static func export(_ request: DaemonAPI.AgentsExportRequest, on host: HostID, model: RemoteModel) {
+    static func export(_ request: DaemonAPI.AgentsExportRequest, on host: MachineRef, model: RemoteModel) {
         guard model.exportImport == nil else { return }
         guard let client = model.hostClient(host) else {
             say("The export did not start", "That machine is not connected.")

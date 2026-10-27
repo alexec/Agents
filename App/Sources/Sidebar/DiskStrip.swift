@@ -8,7 +8,7 @@ import SwiftUI
 /// itself once it climbs back.
 struct DiskStrip: View {
     @Environment(AppModel.self) private var model
-    let host: HostID
+    let host: MachineRef
 
     var body: some View {
         ForEach(alarms) { alarm in

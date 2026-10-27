@@ -15,7 +15,7 @@ public final class ControlUplink: @unchecked Sendable {
     public typealias Dial = @Sendable () async throws -> any LineTransport
 
     private let server: DaemonServer
-    private let hello: DaemonAPI.HostHello
+    private let hello: DaemonAPI.MachineHello
     private let dial: Dial
     private let lock = NSLock()
     private var channels: [Int: Channel] = [:]
@@ -41,7 +41,7 @@ public final class ControlUplink: @unchecked Sendable {
     /// The wait between dials, which `goBackNow()` cuts short (#82).
     private let backoff: Backoff
 
-    public init(server: DaemonServer, hello: DaemonAPI.HostHello,
+    public init(server: DaemonServer, hello: DaemonAPI.MachineHello,
                 onChange: @escaping @Sendable (Bool) -> Void = { _ in },
                 backoff: Backoff = Backoff(first: ControlUplink.firstWait, longest: ControlUplink.longestWait),
                 dial: @escaping Dial) {

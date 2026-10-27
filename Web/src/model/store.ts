@@ -6,13 +6,13 @@ import { folderPath as hostedFolderPath } from "./hostedMCP";
 import type { ExportImportBusy } from "./exports";
 import { batch, computed, signal, type ReadonlySignal, type Signal } from "@preact/signals";
 import type {
-  Agent, AgentRemovedNotification, ResumingNotification, ControlHost, HostID, HostMachine, ElicitationNotification, ElicitationRequest, EntryNotification,
+  Agent, AgentRemovedNotification, ResumingNotification, ControlMachine, MachineRef, MachineWorkspace, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, FolderSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, FolderRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
   CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
-  GuardedChange, GuardedChangeReading, HostJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
+  GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, RemoveRequest, ClientPermissionSettings } from "../protocol/generated";
@@ -199,7 +199,7 @@ export function hostStateWords(state: string): string {
 }
 
 export class Work {
-  readonly hosts = signal<ControlHost[]>([]);
+  readonly hosts = signal<ControlMachine[]>([]);
   readonly folders = signal<ByHost<FolderSummary>>({});
   /** The accounts added to each host's runtimes (#840), by host. */
   readonly accountProfiles = signal<Record<string, AccountProfile[]>>({});
@@ -401,7 +401,7 @@ export class Work {
    * The control plane's machine, its home host, and how this Mac's host says its join stands
    * (#666), from `control/status`.
    */
-  readonly plane = signal<{ machineID: string; homeHost?: string | undefined; thisMacHost?: HostJoinStatus | undefined;
+  readonly plane = signal<{ machineID: string; homeHost?: string | undefined; thisMacHost?: MachineJoinStatus | undefined;
     name?: string; version?: string; required?: RequiredCapabilities | undefined } | null>(null);
   /**
    * The person's Mac (#1501): the host that keeps their display choices (#1033) and that the page
@@ -1033,7 +1033,7 @@ export class Work {
   }
 
   /** The hosts as listed, with when each one went down noted. */
-  takeHosts(hosts: ControlHost[], now = Date.now()): void {
+  takeHosts(hosts: ControlMachine[], now = Date.now()): void {
     const since: Record<string, number> = {};
     for (const host of hosts) if (!hostAnswers(host.state)) since[host.id] = this.downSince.value[host.id] ?? now;
     const still = waiting(hosts);
@@ -1087,11 +1087,11 @@ export class Work {
 
 
   /** One host's row, or its state and workspace, as said now, in place of what was listed. */
-  protected takeHostRow(change: { id: string; state: string; workspace?: HostMachine | undefined }): void {
+  protected takeHostRow(change: { id: string; state: string; workspace?: MachineWorkspace | undefined }): void {
     const hosts = this.hosts.value;
     const at = hosts.findIndex((h) => h.id === change.id);
     if (at < 0) return;
-    const row: ControlHost = { ...hosts[at]!, state: change.state };
+    const row: ControlMachine = { ...hosts[at]!, state: change.state };
     if (change.workspace) row.workspace = change.workspace;
     else delete row.workspace;
     this.takeHosts(hosts.map((h, i) => (i === at ? row : h)));
@@ -1308,7 +1308,7 @@ export class Store extends Work {
       }
       if (method === "control/thisMacHostChanged") {
         const plane = this.plane.value;
-        if (plane) this.plane.value = { ...plane, thisMacHost: (params as HostJoinStatus | null) ?? undefined };
+        if (plane) this.plane.value = { ...plane, thisMacHost: (params as MachineJoinStatus | null) ?? undefined };
         return;
       }
       if (method === "clientPermissions/changed") {
@@ -1539,7 +1539,7 @@ export class Store extends Work {
    * it (the control plane says it twice per connect). A control plane naming no host loads all (#170).
    */
   private hostChanged(params: unknown): void {
-    const said = params as { host?: unknown; state?: unknown; workspace?: HostMachine } | null;
+    const said = params as { host?: unknown; state?: unknown; workspace?: MachineWorkspace } | null;
     const host = said?.host;
     if (typeof host !== "string") {
       void this.load();
@@ -1612,7 +1612,7 @@ export class Store extends Work {
    *  a page opened while it is stopped lists its folders and sessions as one open when it went. */
   private async loadLastHeard(host: string): Promise<void> {
     if (this.hostIsOnline(host) || this.folders.value[host] !== undefined) return;
-    const heard = await this.link.call("hosts/lastHeard", { host: host as HostID }).catch(() => null);
+    const heard = await this.link.call("hosts/lastHeard", { host: host as MachineRef }).catch(() => null);
     if (!heard || this.hostIsOnline(host) || this.folders.value[host] !== undefined) return;
     batch(() => {
       if (heard.agents) this.replaceAgents(heard.agents, host);
@@ -2076,7 +2076,7 @@ export class Store extends Work {
   /** Said to the control plane; Settings ▸ Git access takes one back with `allowed` false. */
   async lendGit(host: string, from: string, server: string, allowed: boolean): Promise<void> {
     try {
-      await this.link.call("hosts/lendGit", { host: host as HostID, from: from as HostID, server, allowed });
+      await this.link.call("hosts/lendGit", { host: host as MachineRef, from: from as MachineRef, server, allowed });
       if (!allowed) {
         this.hosts.value = this.hosts.value.map((row) => {
           if (row.id !== host || !row.gitFrom) return row;
@@ -2095,7 +2095,7 @@ export class Store extends Work {
     if (this.hostsBeingStarted.value.includes(host)) return;
     this.hostsBeingStarted.value = [...this.hostsBeingStarted.value, host];
     try {
-      const row = await this.link.call("hosts/start", { host: host as HostID });
+      const row = await this.link.call("hosts/start", { host: host as MachineRef });
       this.takeHostRow(row);
     } catch (error) {
       log("call.failed", error instanceof CallFailed ? error.code : undefined);

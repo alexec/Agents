@@ -7,8 +7,8 @@ import SwiftUI
 /// repository itself.
 struct BringBackFromHostRequest: Identifiable, Hashable {
     let folder: URL
-    let from: HostID
-    let host: HostID
+    let from: MachineRef
+    let host: MachineRef
     var id: String { "\(host.rawValue) \(folder.path)" }
 }
 
@@ -16,7 +16,7 @@ extension AppModel {
     /// Has `host` pack `branches` of its copy at `source`, less the commits this Mac has,
     /// with its uncommitted changes when `includeChanges`, and has this Mac's host `from`
     /// take them into the repository at `folder`. Each part goes through the window.
-    func bringBack(_ folder: URL, from: HostID, host: HostID, source: URL, branches: [String], includeChanges: Bool,
+    func bringBack(_ folder: URL, from: MachineRef, host: MachineRef, source: URL, branches: [String], includeChanges: Bool,
                    patchOn: String?, progress: @escaping @MainActor (String) -> Void) async throws -> DaemonAPI.BringBack {
         let label = hosts.label(host)
         let mac = client(for: from), there = client(for: host)

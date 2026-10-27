@@ -5,7 +5,7 @@ import SwiftUI
 struct PersonaManagerSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    let host: HostID
+    let host: MachineRef
     let folder: URL
     var personalOnly = false
 

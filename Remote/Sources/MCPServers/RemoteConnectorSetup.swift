@@ -289,13 +289,13 @@ struct RemoteConnectSheet: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.webAuthenticationSession) private var webAuthenticationSession
     var provider: DaemonAPI.ConnectionProvider = .github
-    let host: HostID
+    let host: MachineRef
     var folder: FolderKey?
     var onConnected: () -> Void = {}
 
     /// again is the ended GitLab connection Connect Again\u{2026} is for: the sheet opens the way
     /// it was made, with its address (#1865).
-    init(provider: DaemonAPI.ConnectionProvider = .github, host: HostID, folder: FolderKey? = nil,
+    init(provider: DaemonAPI.ConnectionProvider = .github, host: MachineRef, folder: FolderKey? = nil,
          again: DaemonAPI.Connection? = nil, onConnected: @escaping () -> Void = {}) {
         self.provider = provider
         self.host = host
@@ -558,7 +558,7 @@ struct RemoteConnectSheet: View {
 struct RemoteConnectEmailSheet: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    let host: HostID
+    let host: MachineRef
     var onConnected: () -> Void = {}
 
     private enum Step: Equatable {
@@ -760,7 +760,7 @@ private extension View {
 extension RemoteModel {
     /// Where agents run (#2131): the machine the folder is on, and its line of what
     /// else is yours: the other machines and the providers.
-    func whereAgentsRun(_ host: HostID) -> (title: String, line: String) {
+    func whereAgentsRun(_ host: MachineRef) -> (title: String, line: String) {
         let others = folderHosts.filter { $0.id != host }.map(\.title)
         let providers = (machineProviders ?? []).map(\.name)
         return (WhereAgentsRun.title(onThisMac: false, hostName: hostLabel(host)),

@@ -8,7 +8,7 @@ import SwiftUI
 /// not enrolled, or quiet after it had joined (#303).
 struct OfflineStrip: View {
     @Environment(AppModel.self) private var model
-    let host: HostID
+    let host: MachineRef
 
     var body: some View {
         // The control plane being away is the window's own strip, above everything.
@@ -76,8 +76,8 @@ struct OfflineStrip: View {
                                  since: since.formatted(date: .omitted, time: .shortened))
     }
 
-    private var row: DaemonAPI.ControlHost? { host == .mac ? nil : model.hosts.controlRows[host] }
-    private var workspace: DaemonAPI.HostMachine? { row?.workspace }
+    private var row: DaemonAPI.ControlMachine? { host == .mac ? nil : model.hosts.controlRows[host] }
+    private var workspace: DaemonAPI.MachineWorkspace? { row?.workspace }
     private var starting: Bool { workspace != nil && row?.state == "starting" }
 
     private var offlineSince: String? {

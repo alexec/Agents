@@ -13,7 +13,7 @@ struct EventAuditTests {
         let list = try JSONDecoder().decode(DaemonAPI.AuditList.self, from: Data(line.utf8))
         let entry = try #require(list.entries.first)
         #expect(list.admin && list.days == 90 && !list.more)
-        #expect(entry.host == HostID(rawValue: "box12345"))
+        #expect(entry.host == MachineRef(rawValue: "box12345"))
         #expect(AuditWords.who(entry.actor) == "Local owner · MacBook Pro")
         #expect(AuditWords.place(entry) { _ in "box" } == "on box")
         #expect(AuditWords.call(entry) == "agents/stop · A1")

@@ -75,12 +75,12 @@ public extension DaemonAPI {
 
     /// A machine in People: its name, its state and nothing inside it (FR-019).
     struct PersonMachine: Codable, Sendable, Hashable, Identifiable {
-        public var id: HostID
+        public var id: MachineRef
         public var name: String
         public var state: String
         public var platform: String?
 
-        public init(id: HostID, name: String, state: String, platform: String? = nil) {
+        public init(id: MachineRef, name: String, state: String, platform: String? = nil) {
             self.id = id
             self.name = name
             self.state = state
@@ -241,13 +241,13 @@ public extension DaemonAPI {
 
     /// A started machine in `people/removePreview`. `unknown` says why it could not be asked.
     struct StartedMachinePreview: Codable, Sendable, Hashable {
-        public var host: HostID
+        public var host: MachineRef
         public var name: String
         public var state: String
         public var unpushed: [UnpushedWork]
         public var unknown: String?
 
-        public init(host: HostID, name: String, state: String, unpushed: [UnpushedWork] = [], unknown: String? = nil) {
+        public init(host: MachineRef, name: String, state: String, unpushed: [UnpushedWork] = [], unknown: String? = nil) {
             self.host = host
             self.name = name
             self.state = state
@@ -333,17 +333,17 @@ public extension DaemonAPI {
     /// `GET /v1/join/<request>`, as a machine with no code reads it while it waits: still
     /// waiting, or how it ended. Once approved, its host, and the control plane's key and
     /// name, which the machine keeps as a code's would give it.
-    struct HostJoinDecision: Codable, Sendable, Hashable {
+    struct MachineJoinDecision: Codable, Sendable, Hashable {
         public enum Result: String, Codable, Sendable, Hashable {
             case waiting, approved, denied, expired
         }
 
         public var result: Result
-        public var host: HostID?
+        public var host: MachineRef?
         public var controlKey: Data?
         public var name: String?
 
-        public init(result: Result, host: HostID? = nil, controlKey: Data? = nil, name: String? = nil) {
+        public init(result: Result, host: MachineRef? = nil, controlKey: Data? = nil, name: String? = nil) {
             self.result = result
             self.host = host
             self.controlKey = controlKey
@@ -360,9 +360,9 @@ public extension DaemonAPI {
 
     /// `hosts/approveJoin`'s answer: the machine's new host.
     struct JoinApproved: Codable, Sendable, Hashable {
-        public var host: HostID
+        public var host: MachineRef
 
-        public init(host: HostID) { self.host = host }
+        public init(host: MachineRef) { self.host = host }
     }
 
     /// `control/joinDecided`: a request ended, approved or not, so every card for it goes.

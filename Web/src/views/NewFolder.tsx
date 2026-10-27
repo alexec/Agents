@@ -4,7 +4,7 @@
 // folder is chosen the way the window chooses a server's.
 import { signal, useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import type { ControlHost, DirectoryEntry, DirectoryListing, RuntimeStatus } from "../protocol/generated";
+import type { ControlMachine, DirectoryEntry, DirectoryListing, RuntimeStatus } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { gitRemote } from "../model/gitRemote";
 import { hostAnswers } from "../model/capabilities";
@@ -27,7 +27,7 @@ export function hostLabel(store: Store, host: string): string {
 }
 
 /** The window's menu item for a host that can't be asked: "This Mac — Not answering", a server's "— Offline". */
-function hostItem(host: ControlHost, macID: string): string {
+function hostItem(host: ControlMachine, macID: string): string {
   if (hostAnswers(host.state)) return host.id === macID ? "This Mac" : host.name;
   return host.id === macID ? "This Mac — Not answering" : `${host.name} — Offline`;
 }

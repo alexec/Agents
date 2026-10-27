@@ -163,7 +163,7 @@ public enum ControlAgreement {
         hkdfSHA256(ikm: secret, salt: Data("agents-control-code-v1".utf8), info: Data(), length: 32)
     }
 
-    public static func hostKey(privateKey: Data, peer: Data, host: HostID) throws -> Data {
+    public static func hostKey(privateKey: Data, peer: Data, host: MachineRef) throws -> Data {
         let shared = try sharedSecret(privateKey: privateKey, peerPublic: peer)
         return hkdfSHA256(ikm: shared, salt: Data("agents-control-host-v1".utf8),
                           info: Data(host.rawValue.utf8), length: 32)

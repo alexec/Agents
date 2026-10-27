@@ -8,8 +8,8 @@ import Testing
 /// falls behind is closed rather than queued for without end.
 @Suite("Backpressure on the control plane", .timeLimit(.minutes(1)))
 struct BackpressureTests {
-    let home = HostID(rawValue: "mac")
-    let server = HostID(rawValue: "k3v9x0qa")
+    let home = MachineRef(rawValue: "mac")
+    let server = MachineRef(rawValue: "k3v9x0qa")
 
     // MARK: The wire
 
@@ -67,7 +67,7 @@ struct BackpressureTests {
 
     // MARK: The router
 
-    func connectHost(_ router: ControlRouter, _ id: HostID) async -> FakeUplinkHost {
+    func connectHost(_ router: ControlRouter, _ id: MachineRef) async -> FakeUplinkHost {
         let (ours, theirs) = PairedTransport.pair()
         await router.attachHost(id, transport: ours)
         return FakeUplinkHost(transport: theirs)

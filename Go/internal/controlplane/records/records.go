@@ -26,16 +26,16 @@ import (
 )
 
 const (
-	ClientsPrefix = "v1/clients/"
-	HostsPrefix   = "v1/hosts/"
-	SettingsKey   = "v1/control.json"
+	ClientsPrefix  = "v1/clients/"
+	MachinesPrefix = "v1/machines/"
+	SettingsKey    = "v1/control.json"
 )
 
 // ClientKey is where a client is kept: its UUID in lower case.
 func ClientKey(id string) string { return ClientsPrefix + strings.ToLower(id) + ".json" }
 
 // HostKey is where a host is kept.
-func HostKey(id string) string { return HostsPrefix + id + ".json" }
+func HostKey(id string) string { return MachinesPrefix + id + ".json" }
 
 // PersonKey is where a person is kept.
 func PersonKey(id string) string { return "v1/people/" + id + ".json" }
@@ -55,7 +55,7 @@ type Records struct {
 
 	mu       sync.Mutex
 	clients  map[string]held[ClientRecord]
-	hosts    map[string]held[HostRecord]
+	hosts    map[string]held[MachineRecord]
 	settings *held[Settings]
 	// Every user, removed ones too (#994).
 	people map[string]held[Person]
@@ -72,7 +72,7 @@ type Records struct {
 }
 
 func New(s store.Store) *Records {
-	return &Records{Store: s, clients: map[string]held[ClientRecord]{}, hosts: map[string]held[HostRecord]{},
+	return &Records{Store: s, clients: map[string]held[ClientRecord]{}, hosts: map[string]held[MachineRecord]{},
 		people: map[string]held[Person]{}, groups: map[string]held[Group]{}, tombstones: map[string]string{}, unreadable: map[string]string{}}
 }
 
@@ -96,7 +96,7 @@ func (r *Records) load(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	listedHosts, err := r.Store.List(ctx, HostsPrefix)
+	listedHosts, err := r.Store.List(ctx, MachinesPrefix)
 	if err != nil {
 		return err
 	}
@@ -105,7 +105,7 @@ func (r *Records) load(ctx context.Context) error {
 	for _, h := range r.clients {
 		heldClients[ClientKey(h.record.ID)] = h
 	}
-	heldHosts := map[string]held[HostRecord]{}
+	heldHosts := map[string]held[MachineRecord]{}
 	for _, h := range r.hosts {
 		heldHosts[HostKey(h.record.ID)] = h
 	}
@@ -126,9 +126,9 @@ func (r *Records) load(ctx context.Context) error {
 		}
 		clients[record.ID] = held[ClientRecord]{record, etag}
 	}
-	hosts := map[string]held[HostRecord]{}
+	hosts := map[string]held[MachineRecord]{}
 	for _, entry := range listedHosts {
-		var record HostRecord
+		var record MachineRecord
 		etag, ok := r.readChanged(ctx, entry, heldHosts[entry.Key].etag, &record)
 		if !ok {
 			if h, there := heldHosts[entry.Key]; there {
@@ -139,7 +139,7 @@ func (r *Records) load(ctx context.Context) error {
 		if etag == "" {
 			continue
 		}
-		hosts[record.ID] = held[HostRecord]{record, etag}
+		hosts[record.ID] = held[MachineRecord]{record, etag}
 	}
 
 	present := map[string]bool{}
@@ -223,7 +223,7 @@ func forgotten(record any) bool {
 	switch r := record.(type) {
 	case *ClientRecord:
 		return r.Forgotten != nil && *r.Forgotten
-	case *HostRecord:
+	case *MachineRecord:
 		return r.Forgotten != nil && *r.Forgotten
 	}
 	return false
@@ -300,10 +300,10 @@ func (r *Records) Clients() []ClientRecord {
 }
 
 // Hosts is every host, by id.
-func (r *Records) Hosts() []HostRecord {
+func (r *Records) Hosts() []MachineRecord {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	out := make([]HostRecord, 0, len(r.hosts))
+	out := make([]MachineRecord, 0, len(r.hosts))
 	for _, h := range r.hosts {
 		out = append(out, h.record)
 	}
@@ -332,7 +332,7 @@ func (r *Records) WasForgotten(id string) bool {
 }
 
 // Host is the host of that id, or nil.
-func (r *Records) Host(id string) *HostRecord {
+func (r *Records) Host(id string) *MachineRecord {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if h, ok := r.hosts[id]; ok {
@@ -665,7 +665,7 @@ func (r *Records) ForgetClient(ctx context.Context, id string) error {
 
 // SaveHost saves a host: created if new, else updated against the version read, and
 // not written at all if nothing but its revision would change.
-func (r *Records) SaveHost(ctx context.Context, h HostRecord) error {
+func (r *Records) SaveHost(ctx context.Context, h MachineRecord) error {
 	r.writing.Lock()
 	defer r.writing.Unlock()
 	r.mu.Lock()
@@ -694,7 +694,7 @@ func (r *Records) SaveHost(ctx context.Context, h HostRecord) error {
 		return err
 	}
 	r.mu.Lock()
-	r.hosts[h.ID] = held[HostRecord]{kept, etag}
+	r.hosts[h.ID] = held[MachineRecord]{kept, etag}
 	delete(r.tombstones, key)
 	r.mu.Unlock()
 	return nil
@@ -704,7 +704,7 @@ func (r *Records) SaveHost(ctx context.Context, h HostRecord) error {
 // the write lock, as ChangeClient does: a change made since the caller looked (a hello
 // and a connect noting its epoch at once) is kept. change says whether there is anything
 // to write. Nothing happens for a host not known.
-func (r *Records) ChangeHost(ctx context.Context, id string, change func(*HostRecord) bool) error {
+func (r *Records) ChangeHost(ctx context.Context, id string, change func(*MachineRecord) bool) error {
 	r.writing.Lock()
 	defer r.writing.Unlock()
 	r.mu.Lock()
@@ -729,7 +729,7 @@ func (r *Records) ChangeHost(ctx context.Context, id string, change func(*HostRe
 		return err
 	}
 	r.mu.Lock()
-	r.hosts[id] = held[HostRecord]{kept, etag}
+	r.hosts[id] = held[MachineRecord]{kept, etag}
 	r.mu.Unlock()
 	return nil
 }
@@ -741,7 +741,7 @@ var ErrHostTaken = errors.New("a host of that id is already enrolled")
 // AddHost saves a host that has just enrolled, only if no host has its id: one write
 // that never replaces another machine's record or key, at this copy or another (#1996).
 // It is ErrHostTaken otherwise.
-func (r *Records) AddHost(ctx context.Context, h HostRecord) error {
+func (r *Records) AddHost(ctx context.Context, h MachineRecord) error {
 	r.writing.Lock()
 	defer r.writing.Unlock()
 	r.mu.Lock()
@@ -764,7 +764,7 @@ func (r *Records) AddHost(ctx context.Context, h HostRecord) error {
 		return err
 	}
 	r.mu.Lock()
-	r.hosts[h.ID] = held[HostRecord]{kept, etag}
+	r.hosts[h.ID] = held[MachineRecord]{kept, etag}
 	delete(r.tombstones, key)
 	r.mu.Unlock()
 	return nil

@@ -419,7 +419,7 @@ func enclosingApp(executable string) string {
 
 // toldRelease is host/release.
 func (d *Daemon) toldRelease(params json.RawMessage) {
-	var r wire.HostRelease
+	var r wire.MachineRelease
 	if err := json.Unmarshal(params, &r); err != nil {
 		log.Printf("self-update: %s: %v", wire.NotifyHostRelease.Name, err)
 		return

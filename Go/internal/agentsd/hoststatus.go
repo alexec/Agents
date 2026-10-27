@@ -11,7 +11,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// host/status (#691 US4, #1387), as DaemonCore+HostStatus: whether this host is idle, what
+// host/status (#691 US4, #1387), as DaemonCore+MachineStatus: whether this host is idle, what
 // runs, and its next scheduled workflow, said on channel 0 when it changes (on the
 // 15-second tick, and again when the uplink comes back), so a machine provider can stop
 // an idle host and wake it for its next schedule.
@@ -26,7 +26,7 @@ type hostStatusBook struct {
 
 // hostStatus is idle as a workspace's stop when idle counts it: no turn in flight, no agent
 // waiting on a person, no permission asked and no terminal or folder shell open.
-func (d *Daemon) hostStatus() wire.HostStatus {
+func (d *Daemon) hostStatus() wire.MachineStatus {
 	running := []string{}
 	for _, a := range d.Store.Agents() {
 		if a.State != wire.AgentStateStarting && a.State != wire.AgentStateRunning && a.State != wire.AgentStateWaitingOnUser {
@@ -47,12 +47,12 @@ func (d *Daemon) hostStatus() wire.HostStatus {
 	d.mu.Unlock()
 	idle := len(running) == 0 && len(d.pendingPermissions()) == 0 && shells == 0
 	schedule := d.nextScheduled()
-	return wire.HostStatus{Idle: idle, Running: running, Schedule: &schedule}
+	return wire.MachineStatus{Idle: idle, Running: running, Schedule: &schedule}
 }
 
 // nextScheduled is this host's next scheduled workflow, for the control plane's wake-up
 // call (#1004): the soonest due of the ones that run here and could fire, as their pages say.
-func (d *Daemon) nextScheduled() wire.HostSchedule {
+func (d *Daemon) nextScheduled() wire.MachineSchedule {
 	var best *wire.WorkflowSummary
 	for _, s := range d.workflowSummaries("") {
 		if s.NextFireAt == nil || s.IsArchived || !s.IsEnabled || s.AwaitingApproval != nil || s.DeniedHere != nil || s.OverLimit != nil {
@@ -64,10 +64,10 @@ func (d *Daemon) nextScheduled() wire.HostSchedule {
 		}
 	}
 	if best == nil {
-		return wire.HostSchedule{}
+		return wire.MachineSchedule{}
 	}
 	name := best.Workflow.Name
-	return wire.HostSchedule{At: best.NextFireAt, Workflow: &name}
+	return wire.MachineSchedule{At: best.NextFireAt, Workflow: &name}
 }
 
 // reviseHostStatus says host/status when it has changed, to a control plane this host has.

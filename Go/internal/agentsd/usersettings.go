@@ -81,7 +81,7 @@ func (d *Daemon) userMarkLocked() userSettingsSyncState {
 
 // toldUserSettings is host/userSettings.
 func (d *Daemon) toldUserSettings(params json.RawMessage) {
-	var u wire.HostUserSettings
+	var u wire.MachineUserSettings
 	if err := json.Unmarshal(params, &u); err != nil {
 		log.Printf("user settings: %v", err)
 		return
@@ -92,7 +92,7 @@ func (d *Daemon) toldUserSettings(params json.RawMessage) {
 }
 
 // ApplyUserSettings writes what the control plane sent. Its errors never hold a secret.
-func (d *Daemon) ApplyUserSettings(u wire.HostUserSettings) error {
+func (d *Daemon) ApplyUserSettings(u wire.MachineUserSettings) error {
 	d.userScopeMu.Lock()
 	defer d.userScopeMu.Unlock()
 	before := d.userMarkLocked()

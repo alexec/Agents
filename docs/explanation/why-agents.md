@@ -100,7 +100,7 @@ last gets a notification. See [How the phone and iPad reach your agents](phone-a
 ## Your machines, one figure
 
 The work happens on your Mac, or on a Linux server of your own. There is no service of
-ours in between. See [Add a server](../how-to/add-a-server.md).
+ours in between. See [Add a machine](../how-to/add-a-machine.md).
 
 What every agent spends, on every runtime and server, adds up to one figure for today.
 You can set a limit per agent and per day. See [Settings](../reference/settings.md).

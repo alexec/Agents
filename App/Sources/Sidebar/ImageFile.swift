@@ -22,7 +22,7 @@ struct ImageFile: View {
     let description: String
     /// For the way out when it cannot be drawn: see `OpenElsewhere`.
     var elsewhere: String? = nil
-    var host: HostID = .mac
+    var host: MachineRef = .mac
 
     @State private var image: NSImage?
     @State private var failed = false

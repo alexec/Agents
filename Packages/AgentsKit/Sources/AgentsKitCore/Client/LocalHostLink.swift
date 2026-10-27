@@ -27,9 +27,9 @@ public struct LocalHostLink: DaemonLink {
     public let client: UUID
     let privateKey: Data
     /// The host this link is for; a socket that names another is not used.
-    public let host: HostID
+    public let host: MachineRef
 
-    public init(socket: URL, client: UUID, privateKey: Data, host: HostID) {
+    public init(socket: URL, client: UUID, privateKey: Data, host: MachineRef) {
         self.socket = socket
         self.client = client
         self.privateKey = privateKey

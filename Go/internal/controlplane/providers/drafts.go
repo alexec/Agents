@@ -89,9 +89,9 @@ func Ended(u DraftUpdate) bool {
 	return u.State == "done" || u.State == "failed" || u.State == "cancelled"
 }
 
-// HostProviderDraftCall is DaemonAPI.HostProviderDraftCall: a writer's tool call, relayed
+// MachineProviderDraftCall is DaemonAPI.MachineProviderDraftCall: a writer's tool call, relayed
 // by its host. AgentID is the caller, which is checked against the draft's agent (FR-011).
-type HostProviderDraftCall = wire.HostProviderDraftCall
+type MachineProviderDraftCall = wire.MachineProviderDraftCall
 
 // StartRequest is DaemonAPI.StartRequest, as a writing agent's start sends it.
 type StartRequest = wire.StartRequest
@@ -498,7 +498,7 @@ func (s *Drafts) Result(id string) (string, any, bool) {
 // MARK: The writer's tools
 
 // Call is ProviderDrafts.call: a writer's tool, from its host (host/providerDraft).
-func (s *Drafts) Call(host string, call HostProviderDraftCall) (any, error) {
+func (s *Drafts) Call(host string, call MachineProviderDraftCall) (any, error) {
 	s.mu.Lock()
 	d := s.drafts[strings.ToUpper(string(call.Draft))]
 	s.mu.Unlock()
@@ -1410,7 +1410,7 @@ Or many from one list:
 // DraftWiring is what NewDraftsFor needs to wire drafts as ControlService does.
 type DraftWiring struct {
 	Router  Router
-	Records HostRecords
+	Records MachineRecords
 	// MachineID is this control plane's machine, for the host on it.
 	MachineID func() string
 	// Home is the control plane's home: where help and ssh -G run.

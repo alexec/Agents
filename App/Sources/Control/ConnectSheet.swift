@@ -6,7 +6,7 @@ import SwiftUI
 /// code says where to reach it and what this window may do there; Connect pairs with it
 /// and the window becomes that control plane's client.
 ///
-/// A host code instead (Hosts ▸ Add by Code…) makes this Mac one of its hosts, and only
+/// A join code instead (Hosts ▸ Add by Code…) makes this Mac one of its hosts, and only
 /// that (US7): its agents run for the control plane, and this window stays unpaired.
 struct ConnectSheet: View {
     @Environment(\.dismiss) private var dismiss
@@ -29,7 +29,7 @@ struct ConnectSheet: View {
     private var isHostCode: Bool { if case .host = parsed?.purpose { true } else { false } }
 
     private var hostCodeWords: String {
-        "This is a code for a machine. Give it to Agents Host on the Mac or server that should run the agents. To connect this window, use a code from Pair a Mac."
+        "This is a code for a machine. Give it to Agents Host on the Mac or Linux machine that should run the agents. To connect this window, use a code from Pair a Mac."
     }
 
     var body: some View {

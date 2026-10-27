@@ -19,7 +19,7 @@ waits for its agentsd to connect, and the server comes online by itself.
 - **A control plane on one machine.** The one on your Mac works. Several copies sharing a
   bucket can't run providers yet.
 - **A server already added**, or a machine you can reach over ssh. See
-  [Add a server](add-a-server.md).
+  [Add a machine](add-a-machine.md).
 - **The provider's command-line tool** on the Mac that runs the control plane, signed in:
   `docker`, `doctl`, `gh`, `coder` or `gcloud`. The provider runs there, not on the server.
   That is how it can start a server that is down.
@@ -47,7 +47,7 @@ waits for its agentsd to connect, and the server comes online by itself.
 - **For a server you already have:** in **Settings ▸ Machines**, open its `···`
   menu, choose **Link to Provider…**, pick the machine and choose **Link**.
 - **For a machine that isn't a server yet:** start it, then choose **Add as Machine…** beside
-  it on the Providers page. Add a Server opens over ssh, with the provider's address filled
+  it on the Providers page. Add a Machine opens over ssh, with the provider's address filled
   in. The new server is linked to the machine once it joins.
 
 A machine belongs to one server at a time: linking it to another moves the link.
@@ -165,7 +165,7 @@ Providers** has **New Machine…**.
 3. Choose **Make**.
 
 The new machine shows **Joining…** until it has installed Agents and joined. Then it is
-linked to its host. A provider that can't install on first boot opens **Add a Server** with
+linked to its host. A provider that can't install on first boot opens **Add a Machine** with
 the new machine filled in, as **Add as Machine…** does.
 
 To delete one, choose **Delete Machine…** in its server's `···` menu on Settings ▸ Machines.

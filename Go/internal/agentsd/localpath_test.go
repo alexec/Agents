@@ -20,14 +20,14 @@ type window struct {
 	private []byte
 }
 
-func newWindow(t *testing.T) (window, wire.HostClient) {
+func newWindow(t *testing.T) (window, wire.MachineClient) {
 	t.Helper()
 	w := window{id: "C0000000-0000-4000-8000-000000001118", private: controllink.NewPrivateKey()}
 	public, err := controllink.PublicKey(w.private)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return w, wire.HostClient{ID: wire.UUID(w.id), Kind: "mac", PublicKey: public}
+	return w, wire.MachineClient{ID: wire.UUID(w.id), Kind: "mac", PublicKey: public}
 }
 
 // serveLocal serves d's local socket as host "mac" with a test's door, and says where.
@@ -105,7 +105,7 @@ func prove(t *testing.T, path string, w window) (net.Conn, *bufio.Reader, contro
 func TestAPairedWindowReachesTheHostDirectly(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	w, listed := newWindow(t)
-	d.SetLocalClients(wire.HostClients{Clients: []wire.HostClient{listed}})
+	d.SetLocalClients(wire.MachineClients{Clients: []wire.MachineClient{listed}})
 	path := serveLocal(t, d, RoleWindow)
 	c, r, reply := prove(t, path, w)
 	if reply.OK == nil || reply.OK.Host == nil || *reply.OK.Host != "mac" {
@@ -135,7 +135,7 @@ func TestAnUnknownWindowIsRefused(t *testing.T) {
 	if _, _, reply := prove(t, path, w); reply.Refused != controllink.Unknown {
 		t.Fatalf("%+v", reply)
 	}
-	d.SetLocalClients(wire.HostClients{Clients: []wire.HostClient{listed}})
+	d.SetLocalClients(wire.MachineClients{Clients: []wire.MachineClient{listed}})
 	impostor := window{id: w.id, private: controllink.NewPrivateKey()}
 	if _, _, reply := prove(t, path, impostor); reply.Refused != controllink.BadProof {
 		t.Fatalf("%+v", reply)
@@ -163,7 +163,7 @@ func TestAForgottenWindowIsCutOff(t *testing.T) {
 	root := t.TempDir()
 	d, _ := start(t, root)
 	w, listed := newWindow(t)
-	d.SetLocalClients(wire.HostClients{Clients: []wire.HostClient{listed}})
+	d.SetLocalClients(wire.MachineClients{Clients: []wire.MachineClient{listed}})
 	path := serveLocal(t, d, RoleWindow)
 	c, r, reply := prove(t, path, w)
 	if reply.OK == nil {
@@ -175,7 +175,7 @@ func TestAForgottenWindowIsCutOff(t *testing.T) {
 		t.Fatal("a forgotten window is still connected")
 	}
 
-	d.SetLocalClients(wire.HostClients{Clients: []wire.HostClient{listed}})
+	d.SetLocalClients(wire.MachineClients{Clients: []wire.MachineClient{listed}})
 	again := &Daemon{Store: d.Store}
 	if _, ok := again.localClient(strings.ToLower(w.id)); !ok {
 		t.Fatal("the list was not kept in the root")
@@ -188,7 +188,7 @@ func TestTheLocalClientsFileIsWrittenOnlyWhenItChanges(t *testing.T) {
 	root := t.TempDir()
 	d, _ := start(t, root)
 	_, listed := newWindow(t)
-	list := wire.HostClients{Clients: []wire.HostClient{listed}}
+	list := wire.MachineClients{Clients: []wire.MachineClient{listed}}
 	file := filepath.Join(d.Store.Loc.Root, localClientsFile)
 	d.SetLocalClients(list)
 	old := time.Now().Add(-time.Hour).Truncate(time.Second)
@@ -215,7 +215,7 @@ func TestTheLocalClientsFileIsWrittenOnlyWhenItChanges(t *testing.T) {
 	if written() {
 		t.Fatal("a host that started with the same list kept wrote it again")
 	}
-	d.SetLocalClients(wire.HostClients{})
+	d.SetLocalClients(wire.MachineClients{})
 	if !written() {
 		t.Fatal("a changed host/clients was not written")
 	}
@@ -257,7 +257,7 @@ func TestOnlyTheHostsOwnUsersWindowIsLetIn(t *testing.T) {
 	theirs, listedTheirs := newWindow(t)
 	alex, sam := "alex", "sam"
 	listedMine.Person, listedTheirs.Person = &alex, &sam
-	d.SetLocalClients(wire.HostClients{User: &alex, Clients: []wire.HostClient{listedMine, listedTheirs}})
+	d.SetLocalClients(wire.MachineClients{User: &alex, Clients: []wire.MachineClient{listedMine, listedTheirs}})
 	path := serveLocal(t, d, RoleWindow)
 	if _, _, reply := prove(t, path, mine); reply.OK == nil {
 		t.Fatalf("the host's own user's window: %+v", reply)
@@ -266,7 +266,7 @@ func TestOnlyTheHostsOwnUsersWindowIsLetIn(t *testing.T) {
 		t.Fatal("another person's window was let in")
 	}
 	// An older control plane says no user: every window listed, as before.
-	d.SetLocalClients(wire.HostClients{Clients: []wire.HostClient{listedTheirs}})
+	d.SetLocalClients(wire.MachineClients{Clients: []wire.MachineClient{listedTheirs}})
 	if _, ok := d.localClient(theirs.id); !ok {
 		t.Fatal("a window an older control plane listed was not kept")
 	}

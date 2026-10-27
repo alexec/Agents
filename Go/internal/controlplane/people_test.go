@@ -62,7 +62,7 @@ func (p *plane) machine(who *person, name string) *fakeHost {
 }
 
 // machineSaying is machine, with its own hello.
-func (p *plane) machineSaying(who *person, hello controllink.HostHello) *fakeHost {
+func (p *plane) machineSaying(who *person, hello controllink.MachineHello) *fakeHost {
 	p.t.Helper()
 	var shown wire.ControlCodeShown
 	json.Unmarshal(call(p.t, who.window, "", "hosts/startEnroll", nil), &shown)
@@ -88,7 +88,7 @@ func (p *plane) machineSaying(who *person, hello controllink.HostHello) *fakeHos
 
 func listedHosts(t *testing.T, s *controllink.Session) []string {
 	t.Helper()
-	var list []wire.ControlHost
+	var list []wire.ControlMachine
 	json.Unmarshal(call(t, s, "", "hosts/list", nil), &list)
 	out := []string{}
 	for _, h := range list {
@@ -403,12 +403,12 @@ func TestAMachineJoinsByApproval(t *testing.T) {
 	}
 
 	// One that names nobody is an admin's to decide; denied, the machine hears so.
-	body, _ := json.Marshal(wire.HostJoinAsk{Name: "stray", Platform: "Linux", PublicKey: mustPublic(t)})
+	body, _ := json.Marshal(wire.MachineJoinAsk{Name: "stray", Platform: "Linux", PublicKey: mustPublic(t)})
 	resp, err := http.Post(p.url+"/v1/join", "application/json", bytes.NewReader(body))
 	if err != nil {
 		t.Fatal(err)
 	}
-	var ticket wire.HostJoinTicket
+	var ticket wire.MachineJoinTicket
 	json.NewDecoder(resp.Body).Decode(&ticket)
 	resp.Body.Close()
 	json.Unmarshal(call(t, sam.window, "", "hosts/joinRequests", nil), &waiting)
@@ -424,7 +424,7 @@ func TestAMachineJoinsByApproval(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var decision wire.HostJoinDecision
+	var decision wire.MachineJoinDecision
 	json.NewDecoder(resp.Body).Decode(&decision)
 	resp.Body.Close()
 	if decision.Result != "denied" || decision.Host != nil {
@@ -507,11 +507,11 @@ func TestLendsAndWindowsStayWithinOneUser(t *testing.T) {
 	}
 
 	// Sam cannot name Alex's machine as a lender.
-	if e := callError(t, sam.window, "", "hosts/lendSignIn", wire.LendSignIn{Host: wire.HostID(samBox), From: wire.HostID(alexMac),
+	if e := callError(t, sam.window, "", "hosts/lendSignIn", wire.LendSignIn{Host: wire.MachineRef(samBox), From: wire.MachineRef(alexMac),
 		Runtime: "claude", Allowed: true}); !strings.Contains(e, "-32091") {
 		t.Fatalf("a lend from another user's machine: %s", e)
 	}
-	call(t, sam.window, "", "hosts/lendSignIn", wire.LendSignIn{Host: wire.HostID(samBox), From: wire.HostID(samMac),
+	call(t, sam.window, "", "hosts/lendSignIn", wire.LendSignIn{Host: wire.MachineRef(samBox), From: wire.MachineRef(samMac),
 		Runtime: "codex", Allowed: true})
 
 	// A lend from before the team tier, from Alex's Mac, is not shown and not used.
@@ -521,7 +521,7 @@ func TestLendsAndWindowsStayWithinOneUser(t *testing.T) {
 	if err := p.s.Records().SaveHost(ctx, record); err != nil {
 		t.Fatal(err)
 	}
-	var hosts []wire.ControlHost
+	var hosts []wire.ControlMachine
 	json.Unmarshal(call(t, sam.window, "", "hosts/list", nil), &hosts)
 	for _, h := range hosts {
 		if string(h.ID) != samBox {

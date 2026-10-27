@@ -97,7 +97,7 @@ To go back, set **Keeps its store** to **On this Mac** and click **Switch Storeâ
   Again** to try now. The window shows the same line in **Settings â–¸ Control plane**.
 - If you already run a control plane elsewhere, choose **Join one elsewhere** in Agents
   Host instead, and paste a machine code from it. See
-  [Add a server](add-a-server.md#add-another-mac).
+  [Add a machine](add-a-machine.md#add-another-mac).
 - If you used the earlier Agents app on this Mac, Agents Host offers to move your agents,
   devices and servers across. See [Move an existing set-up across](move-an-existing-set-up.md).
 - To reach your agents from your iPhone and iPad away from home, and to be notified on

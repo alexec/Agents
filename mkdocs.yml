@@ -80,12 +80,12 @@ nav:
       - how-to/sign-in-with-your-organisation.md
       - how-to/set-up-sign-in-for-your-own-build.md
       - how-to/use-agents-in-a-browser.md
-      - how-to/add-a-server.md
+      - how-to/add-a-machine.md
       - how-to/invite-someone.md
       - how-to/set-an-organisation-policy.md
       - how-to/pin-machines-with-mdm.md
       - how-to/add-an-org-key-or-gateway.md
-      - how-to/send-a-folder-to-a-server.md
+      - how-to/send-a-folder-to-a-machine.md
       - how-to/start-machines-from-agents.md
       - how-to/add-a-machine-provider.md
       - how-to/set-up-a-cloud-machine-provider.md
@@ -191,7 +191,7 @@ nav:
       - explanation/scoped-tools.md
       - explanation/views.md
       - explanation/connector-levels.md
-      - explanation/folders-hosts-worktrees.md
+      - explanation/folders-machines-worktrees.md
       - explanation/leases.md
       - explanation/phone-and-ipad.md
       - explanation/live-activities.md

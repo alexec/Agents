@@ -188,7 +188,7 @@ func TestTheSweepRemovesOrphans(t *testing.T) {
 	s := store.NewMemory()
 	rs := records.New(s)
 	now := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
-	if err := rs.SaveHost(ctx, records.HostRecord{ID: "KNOWN", Name: "known"}); err != nil {
+	if err := rs.SaveHost(ctx, records.MachineRecord{ID: "KNOWN", Name: "known"}); err != nil {
 		t.Fatal(err)
 	}
 	lease := func(host string, expires time.Time) {

@@ -597,7 +597,7 @@ func (s *Service) sendPolicy(host string, always bool) {
 			return
 		}
 		if kept.policy == nil {
-			line = wire.HostPolicy{None: optional(true)}
+			line = wire.MachinePolicy{None: optional(true)}
 			break
 		}
 		if kept.signature != nil && kept.signature.Version == kept.policy.Version {
@@ -644,7 +644,7 @@ func (s *Service) policyApplied(ctx context.Context, host string, applied wire.P
 	}
 	value, _ := json.Marshal(applied.Version)
 	changed := false
-	if err := s.records.ChangeHost(ctx, host, func(r *records.HostRecord) bool {
+	if err := s.records.ChangeHost(ctx, host, func(r *records.MachineRecord) bool {
 		if bytes.Equal(r.Extra[policyAppliedField], value) {
 			return false
 		}
@@ -665,7 +665,7 @@ func (s *Service) policyApplied(ctx context.Context, host string, applied wire.P
 }
 
 // appliedPolicy is the version a machine said it kept.
-func appliedPolicy(h records.HostRecord) (int64, bool) {
+func appliedPolicy(h records.MachineRecord) (int64, bool) {
 	var v int64
 	if json.Unmarshal(h.Extra[policyAppliedField], &v) != nil || v < 1 {
 		return 0, false

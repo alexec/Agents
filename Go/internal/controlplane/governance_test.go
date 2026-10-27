@@ -18,7 +18,7 @@ import (
 
 func governanceReport(t *testing.T, p *plane, host string, items ...wire.CatalogItem) {
 	t.Helper()
-	params, _ := json.Marshal(wire.HostCatalog{Items: items})
+	params, _ := json.Marshal(wire.MachineCatalog{Items: items})
 	if _, err := p.s.methods.HostSaid(host, "governance/report", params); err != nil {
 		t.Fatal(err)
 	}
@@ -65,8 +65,8 @@ func TestGovernanceUsageIsWhatEachMachineReports(t *testing.T) {
 		t.Fatal(e)
 	}
 	// Bea's box leaves: its report goes.
-	call(t, bea.window, "", "hosts/remove", wire.HostRequest{Host: wire.HostID(beaBox)})
-	if o, _ := st.Get(context.Background(), governanceMachineKey(beaBox)); o != nil {
+	call(t, bea.window, "", "hosts/remove", wire.MachineRequest{Host: wire.MachineRef(beaBox)})
+	if o, _ := st.Get(context.Background(), governanceHostKey(beaBox)); o != nil {
 		t.Fatal("a removed machine's report stayed")
 	}
 	if got := usage(t, admin); got.Machines != 1 || len(got.Rows) != 2 {

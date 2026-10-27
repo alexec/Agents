@@ -195,7 +195,7 @@ final class MachineReturn {
         // This Mac's own host comes back by itself, told by the forwarding copy.
         for _ in 0..<60 {
             if let mine = await HandoverTool.status(["--at", "self"], model: model),
-               mine.members.contains(where: { $0.id == HostID.mac.rawValue && $0.online == true }) { break }
+               mine.members.contains(where: { $0.id == MachineRef.mac.rawValue && $0.online == true }) { break }
             try? await Task.sleep(for: .milliseconds(500))
         }
         stages[3] = .done

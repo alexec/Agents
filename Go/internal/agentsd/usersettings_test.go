@@ -24,7 +24,7 @@ func TestUserSettingsGoIntoTheMachinesFiles(t *testing.T) {
 	os.WriteFile(filepath.Join(home, ".agents", "mcp.json"), []byte(`{"mcpServers":{"old":{"command":"x"}},"note":"kept"}`), 0o644)
 
 	instructions := "Use ASD-STE100."
-	sent := wire.HostUserSettings{User: "sam", Settings: wire.UserSettings{
+	sent := wire.MachineUserSettings{User: "sam", Settings: wire.UserSettings{
 		McpServers:  json.RawMessage(`{"github":{"url":"https://api.githubcopilot.com/mcp/","headers":{"Authorization":"Bearer ${GITHUB_TOKEN}"}}}`),
 		AgentConfig: mustJSON(wire.UserAgentConfig{Instructions: &instructions, Personas: map[string]string{"reviewer": "You review."}, Skills: map[string]string{"release": "---\nname: release\n---\n"}}),
 		Runtimes:    json.RawMessage(`{"sandbox":{"defaults":{"claude":"on"}}}`),
@@ -93,7 +93,7 @@ func TestAgentConfigFilesAreAppliedAndMarkedWithoutContents(t *testing.T) {
 	d, _ := start(t, root)
 	defer d.Shutdown()
 	contents := base64.StdEncoding.EncodeToString([]byte("Follow the shared rules."))
-	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(wire.HostUserSettings{
+	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(wire.MachineUserSettings{
 		User: "sam",
 		Settings: wire.UserSettings{AgentConfigFiles: &wire.AgentConfigFiles{Files: []wire.AgentConfigFile{{
 			Path: "skills/review/SKILL.md", Contents: &contents, Time: 10, Machine: "other", Digest: "abc",

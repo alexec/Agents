@@ -27,14 +27,14 @@ func TestConsoleFleetIsEveryMachineForAnAdmin(t *testing.T) {
 	if len(board.Machines) != 2 {
 		t.Fatalf("%+v", board)
 	}
-	owners := map[wire.HostID]string{}
+	owners := map[wire.MachineRef]string{}
 	for _, m := range board.Machines {
 		owners[m.Host.ID] = m.OwnerName
 		if m.Bot || m.Host.State == "" {
 			t.Fatalf("%+v", m)
 		}
 	}
-	if owners[wire.HostID(owner.member.Host)] != "Local owner" || owners[wire.HostID(beas.member.Host)] != "Bea" {
+	if owners[wire.MachineRef(owner.member.Host)] != "Local owner" || owners[wire.MachineRef(beas.member.Host)] != "Bea" {
 		t.Fatalf("%v", owners)
 	}
 
@@ -141,7 +141,7 @@ func TestConsoleLiveIsEveryRunningAgent(t *testing.T) {
 		t.Fatal("a title left the machine's list")
 	}
 
-	stop := wire.ConsoleStopAgent{Host: wire.HostID(beas.member.Host), Agent: "B1"}
+	stop := wire.ConsoleStopAgent{Host: wire.MachineRef(beas.member.Host), Agent: "B1"}
 	if e := callError(t, bea.window, "", "console/stopAgent", stop); !strings.Contains(e, "Only an admin") {
 		t.Fatal(e)
 	}

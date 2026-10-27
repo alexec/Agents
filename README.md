@@ -131,7 +131,7 @@ ls ~/Library/Logs/Agents/
 ls ~/Library/Caches/com.alexecollins.agents/
 
 # By hand, as a host of a control plane, on a root of its own
-AGENTS_ROOT=/tmp/agents-branch "./build/DD-host/Build/Products/Debug/Agents Host.app/Contents/Helpers/agentsd" \
+AGENTS_ROOT=/tmp/agents-branch "./build/DD-machine/Build/Products/Debug/Agents Host.app/Contents/Helpers/agentsd" \
   --control-code '<host code>'
 ```
 

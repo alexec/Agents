@@ -26,7 +26,7 @@ providers/update refused
 {"code":-32602,"message":"Those parameters are not a ProviderAdd."}
 
 hosts/unlink refused
-{"code":-32602,"message":"Those parameters are not a HostRequest."}
+{"code":-32602,"message":"Those parameters are not a MachineRequest."}
 
 host/status (host)
 {}

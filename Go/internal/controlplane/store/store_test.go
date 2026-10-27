@@ -85,7 +85,7 @@ func TestListSeesNewKeys(t *testing.T) {
 			t.Fatalf("not empty: %v", l)
 		}
 		tag, _ := s.Put(ctx, "v1/clients/one.json", []byte("1"), Absent)
-		s.Put(ctx, "v1/hosts/mac.json", []byte("2"), Absent)
+		s.Put(ctx, "v1/machines/mac.json", []byte("2"), Absent)
 		l, err := s.List(ctx, "v1/clients/")
 		if err != nil || len(l) != 1 || l[0] != (Key{"v1/clients/one.json", tag}) {
 			t.Fatalf("listed %v %v", l, err)
@@ -211,9 +211,9 @@ func TestTheFolderIsTheSwiftLayout(t *testing.T) {
 		t.Fatal(string(data), err)
 	}
 	// A file another writer put there is read with its hash as its tag.
-	os.MkdirAll(filepath.Join(root, "v1", "hosts"), 0o700)
-	os.WriteFile(filepath.Join(root, "v1", "hosts", "mac.json"), []byte("hello"), 0o600)
-	o, _ := f.Get(ctx, "v1/hosts/mac.json")
+	os.MkdirAll(filepath.Join(root, "v1", "machines"), 0o700)
+	os.WriteFile(filepath.Join(root, "v1", "machines", "mac.json"), []byte("hello"), 0o600)
+	o, _ := f.Get(ctx, "v1/machines/mac.json")
 	if o == nil || o.ETag != tag {
 		t.Fatal(o)
 	}

@@ -47,7 +47,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// Kept in memory only and out of `CodingKeys` for the same reason as `rawState`:
     /// the daemon that owns the record does not know it has a name elsewhere, and the
     /// window stamps it on arrival. A record read without it is this Mac's.
-    public var host: HostID = .mac
+    public var host: MachineRef = .mac
     public var runtimeSessionID: String?
     public var startOptions: StartOptions
 

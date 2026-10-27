@@ -27,7 +27,7 @@ type fakeControl struct {
 	secret  []byte // the host code's
 	host    string
 	srv     *httptest.Server
-	hellos  chan HostHello
+	hellos  chan MachineHello
 	channel chan string // what the host wrote on channel 1
 	refuse  bool
 	// stall, when set, is what the first uplink waits on after opening its channel, reading
@@ -44,7 +44,7 @@ type fakeControl struct {
 
 func newFakeControl(t *testing.T) *fakeControl {
 	f := &fakeControl{t: t, private: NewPrivateKey(), secret: make([]byte, 32), host: "k3rs7zgm",
-		hellos: make(chan HostHello, 4), channel: make(chan string, 16)}
+		hellos: make(chan MachineHello, 4), channel: make(chan string, 16)}
 	rand.Read(f.secret)
 	f.srv = httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.srv.Close)
@@ -120,8 +120,8 @@ func (f *fakeControl) serve(w http.ResponseWriter, r *http.Request) {
 	var frame struct {
 		C int `json:"c"`
 		M struct {
-			Method string    `json:"method"`
-			Params HostHello `json:"params"`
+			Method string       `json:"method"`
+			Params MachineHello `json:"params"`
 		} `json:"m"`
 	}
 	json.Unmarshal([]byte(first), &frame)
@@ -193,7 +193,7 @@ func TestEnrolThenUplink(t *testing.T) {
 	if string(again) != string(private) {
 		t.Fatal("the host key changed between reads")
 	}
-	hello := HostHello{Version: "1.2.3", Platform: "Linux arm64", MachineID: "m1", Name: new("devbox"), Implementation: new("go")}
+	hello := MachineHello{Version: "1.2.3", Platform: "Linux arm64", MachineID: "m1", Name: new("devbox"), Implementation: new("go")}
 	m, err := Enroll(ctx, root, f.code(), private, hello)
 	if err != nil {
 		t.Fatal(err)
@@ -256,7 +256,7 @@ func TestEnrolRefused(t *testing.T) {
 	f.refuse = true
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	_, err := Enroll(ctx, t.TempDir(), f.code(), NewPrivateKey(), HostHello{})
+	_, err := Enroll(ctx, t.TempDir(), f.code(), NewPrivateKey(), MachineHello{})
 	var r *Refusal
 	if !errors.As(err, &r) || r.Reason != Unknown {
 		t.Fatalf("err %v", err)

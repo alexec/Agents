@@ -46,7 +46,7 @@ struct MachinePinTests {
         let byID = MachinePin(address: nil, key: MachinePin.keyID(key), mustJoin: false)
         #expect(byID.admits(code(key, url: "https://anywhere.dev")))
         #expect(!byID.admits(code(otherKey, url: "https://anywhere.dev")))
-        let member = ControlMembership(host: HostID(rawValue: "abcd1234"), controlKey: key, addresses: [], name: "acme",
+        let member = ControlMembership(host: MachineRef(rawValue: "abcd1234"), controlKey: key, addresses: [], name: "acme",
                                        url: "https://10.0.0.1:443", pin: nil)
         #expect(!pin.admits(member))
         var moved = member

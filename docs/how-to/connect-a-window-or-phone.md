@@ -91,7 +91,7 @@ Host on the Mac that runs the control plane.
 - **That isn't a control plane's code. It starts with agents-control:.** The window was
   given something else. Copy the code again.
 - **This is a code for a host.** It adds a machine that runs agents, not a window. Ask for
-  a code from **Pair a Mac…** instead, or see [Add a server](add-a-server.md).
+  a code from **Pair a Mac…** instead, or see [Add a machine](add-a-machine.md).
 - **That code is for adding a host, not a phone.** On the device: the same mistake. Use a
   code from **Pair a Device…**.
 - **The control plane didn't take that code. It may have run out: show a new one and try

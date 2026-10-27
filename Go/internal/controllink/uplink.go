@@ -35,7 +35,7 @@ type Uplink struct {
 	Root    string
 	Member  *Membership
 	Private []byte
-	Hello   HostHello
+	Hello   MachineHello
 	Accept  Accept
 
 	mu       sync.Mutex
@@ -224,7 +224,7 @@ func (u *Uplink) Run(ctx context.Context) {
 		u.channels = map[int]*channel{}
 		u.mu.Unlock()
 		hello := u.Hello
-		hello.Host = new(wire.HostID(u.Member.Host))
+		hello.Host = new(wire.MachineRef(u.Member.Host))
 		u.Tell("host/hello", hello)
 		log.Printf("uplink: connected to the control plane as %s", u.Member.Host)
 		if u.OnChange != nil {

@@ -215,7 +215,7 @@ func TestWithStartWhenUsedOffAPromptIsRefusedAsToday(t *testing.T) {
 	h := newHarness(t)
 	h.link(h.add(), devbox, "agents-devbox")
 	off := false
-	h.must(MethodHostsSetOptions, HostMachineOptions{Host: devbox, StartWhenUsed: &off})
+	h.must(MethodHostsSetOptions, MachineOptions{Host: devbox, StartWhenUsed: &off})
 	kept := h.keeper()
 	if f := kept.Keep(devbox, MethodAgentsPrompt, promptParams("hello"), h.caller); f != nil {
 		t.Errorf("%v", f)
