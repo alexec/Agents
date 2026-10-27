@@ -5,7 +5,7 @@ import { Modal } from "./Modal";
 
 export type AgentConfigKind = "skills" | "personas" | "workflows";
 const kinds: AgentConfigKind[] = ["skills", "personas", "workflows"];
-const title = (kind: AgentConfigKind) => kind[0].toUpperCase() + kind.slice(1);
+const title = (kind: AgentConfigKind) => kind.charAt(0).toUpperCase() + kind.slice(1);
 
 function parts(content: string) {
   const end = content.startsWith("---\n") ? content.indexOf("\n---\n", 4) : -1;
