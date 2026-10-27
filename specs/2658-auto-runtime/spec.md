@@ -14,7 +14,7 @@ three model levels (Fast / Balanced / Smart)". Wireframe:
 
 Each runtime has its own names for the model, the permission mode and the sandbox. When a
 person changes the runtime, they must set all of these again, with new words. A workflow or a
-persona that says `model: opus` or `permission-mode: plan` works on one runtime only.
+persona that says `model: opus` or `permission-mode: acceptEdits` works on one runtime only.
 
 This feature adds two things:
 
@@ -29,7 +29,7 @@ This feature adds two things:
 | --- | --- | --- |
 | **Runtime** | **Auto**, or the name of a runtime | the name of a runtime |
 | **Model** | **Fast**, **Balanced**, **Smart** | each runtime's model names |
-| **Permission mode** | **Read-only**, **Ask**, **Approve for me** | each runtime's mode names |
+| **Permission mode** | **Plan**, **Ask**, **Approve for me** | each runtime's mode names |
 | **Permission requests** (Cursor, Grok, OpenCode only) | **Request cards**, **Yes to all** | **Default**, **Always-approve** |
 | **Sandbox** | **Default sandbox**, **Runtime sandbox**, **No sandbox** | **As configured by runtime** / **Runtime controlled**, **On**, **Off** |
 
@@ -37,7 +37,7 @@ What each value means, on every runtime:
 
 - **Fast**: the runtime's smallest and quickest model that can do the work. **Balanced**: its
   usual model. **Smart**: its most capable model.
-- **Read-only**: the agent can read and plan, but cannot change files or run commands that
+- **Plan**: the agent can read and plan, but cannot change files or run commands that
   change things. **Ask**: the agent asks before it changes things. **Approve for me**: the agent
   does not ask for normal changes in its folder.
 - **Request cards**: each permission request is a card for the person. **Yes to all**: the app
@@ -46,7 +46,7 @@ What each value means, on every runtime:
   runtime's sandbox on. **No sandbox**: commands run with the person's access.
 
 The names in workflow, persona and `start_session` files are the same words in lower case with
-hyphens: `auto`; `fast`, `balanced`, `smart`; `read-only`, `ask`, `approve-for-me`;
+hyphens: `auto`; `fast`, `balanced`, `smart`; `plan`, `ask`, `approve-for-me`;
 `request-cards`, `yes-to-all`; `default`, `runtime`, `none`.
 
 ## User Scenarios & Testing *(mandatory)*
@@ -98,8 +98,8 @@ them.
 **Why this priority**: The issue decides that the new words replace the old ones on every
 runtime (two sets of words for one field would confuse). Auto depends on the same words.
 
-**Independent Test**: Start a session on Claude with **Smart** and **Read-only**. Change the
-runtime to Codex before sending. The pills still say **Smart** and **Read-only**, and the menus
+**Independent Test**: Start a session on Claude with **Smart** and **Plan**. Change the
+runtime to Codex before sending. The pills still say **Smart** and **Plan**, and the menus
 say what they are on Codex.
 
 **Acceptance Scenarios**:
@@ -167,7 +167,7 @@ Claude session with **Approve for me** starts in Bypass permissions. **Reset** r
    value marked **auto-mapped**.
 2. **Given** a runtime has no exact match for a value, **When** the app maps it, **Then** it
    takes the nearest value that gives the agent **less** access, never more, and the cell says
-   so ("nearest safer: no read-only mode").
+   so ("nearest safer: no plan mode").
 3. **Given** no safer value exists (for example **Runtime sandbox** on OpenCode), **When** the
    person looks at the cell, **Then** it says **Not possible**, and Auto skips that runtime when
    the session asks for that value.
@@ -185,22 +185,22 @@ Claude session with **Approve for me** starts in Bypass permissions. **Reset** r
 
 ### User Story 5 - Workflows, personas and helpers on Auto (Priority: P2)
 
-A workflow says `runtime: auto`, `model: smart`, `permission-mode: read-only`. It runs on the
-first runtime Auto can use, with that runtime's smart model and read-only mode. A helper started
+A workflow says `runtime: auto`, `model: smart`, `permission-mode: plan`. It runs on the
+first runtime Auto can use, with that runtime's smart model and plan mode. A helper started
 with `start_session` from an Auto agent is also on Auto.
 
 **Why this priority**: The issue counts workflows and personas in the reach. A workflow on Auto
 keeps working when one account is out.
 
 **Independent Test**: A workflow with the front matter above runs on Claude; with Claude out, it
-runs on Codex, with Codex's read-only mode.
+runs on Codex, with Codex's plan mode (Read only).
 
 **Acceptance Scenarios**:
 
 1. **Given** a workflow, persona or `start_session` call with `runtime: auto` and the new
    values, **When** it starts, **Then** the daemon resolves the runtime and native settings as
    the prompt does.
-2. **Given** a workflow with a runtime's own value (`permission-mode: plan`, `model: opus`),
+2. **Given** a workflow with a runtime's own value (`permission-mode: acceptEdits`, `model: opus`),
    **When** it starts on that runtime, **Then** it works as today.
 3. **Given** a workflow with `runtime: auto` and a runtime's own value, **When** the daemon reads
    it, **Then** it refuses the file with a line that says to use one of the new values.
@@ -339,16 +339,16 @@ table ships with the app and the nightly check keeps it true.
 
 **Permission mode**
 
-| Runtime | Read-only | Ask | Approve for me |
+| Runtime | Plan | Ask | Approve for me |
 | --- | --- | --- | --- |
 | Claude | Plan | Default | Accept edits |
 | Codex | Read only | Ask for approval | Approve for me |
 | Gemini | Plan | Default | Auto-edit |
-| Grok | Default (nearest safer: no read-only mode) | Default | Default + Yes to all |
-| Cursor | Ask | Agent + Request cards | Agent + Yes to all |
+| Grok | Default (nearest safer: no plan mode) | Default | Default + Yes to all |
+| Cursor | Plan | Agent + Request cards | Agent + Yes to all |
 | OpenCode | Plan | Build + Request cards | Build + Yes to all |
-| Copilot | the runtime's read-only mode, or nearest safer | its ask mode | its auto-approve mode, if any |
-| Antigravity | the runtime's read-only mode, or nearest safer | its ask mode | its auto-approve mode, if any |
+| Copilot | the runtime's plan or read-only mode, or nearest safer | its ask mode | its auto-approve mode, if any |
+| Antigravity | the runtime's plan or read-only mode, or nearest safer | its ask mode | its auto-approve mode, if any |
 
 **Sandbox**
 
