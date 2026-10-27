@@ -3783,6 +3783,12 @@ type FolderSummary struct {
 
 	Approvals []Approval `json:"approvals,omitzero"`
 
+	// The project id that .agents/folder.json names (#2317). Absent when it names none or one that is not valid.
+	Project *string `json:"project,omitzero"`
+
+	// Why the folder is in no project (#2317): .agents/folder.json is not an object, names an id that is not valid, or .agents is a link.
+	ProjectProblem *string `json:"projectProblem,omitzero"`
+
 	// Set when the organisation's policy caps this folder's helper limits (#998, #64): the lower number is used.
 	HelperLimitsSetBy *PolicySetBy `json:"helperLimitsSetBy,omitzero"`
 
@@ -4106,6 +4112,15 @@ type JoinRequest struct {
 // hosts/approveJoin, hosts/denyJoin (#994).
 type JoinRequestDecide struct {
 	Request string `json:"request"`
+}
+
+// One folder of projects/joined (#2317).
+type JoinedFolder struct {
+	Folder URL `json:"folder"`
+
+	Name string `json:"name"`
+
+	Project string `json:"project"`
 }
 
 // hosts/keep: a request for a stopped host, kept until it is up.
@@ -6587,6 +6602,58 @@ type PrewarmRequestWhy string
 const PrewarmRequestWhyOpened PrewarmRequestWhy = "opened"
 const PrewarmRequestWhyTyping PrewarmRequestWhy = "typing"
 
+// A project (#2317): what people work on, the record that folders join. folders is what the machines last reported.
+type Project struct {
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Owner string `json:"owner"`
+
+	Folders []ProjectFolder `json:"folders"`
+
+	// The caller is the owner or an admin, so may rename and remove it.
+	MayChange bool `json:"mayChange"`
+}
+
+// A folder in a project (#2317), as its machine last reported it.
+type ProjectFolder struct {
+	Machine MachineRef `json:"machine"`
+
+	Folder URL `json:"folder"`
+
+	Name string `json:"name"`
+}
+
+// projects/list (#2317): the organisation's projects, by name.
+type ProjectList struct {
+	Projects []Project `json:"projects"`
+}
+
+// projects/remove (#2317): the project. Refused while a folder names it.
+type ProjectRequest struct {
+	ID string `json:"id"`
+}
+
+// projects/set (#2317): makes a project, or with id renames one.
+type ProjectSet struct {
+	ID *string `json:"id,omitzero"`
+
+	Name string `json:"name"`
+}
+
+// control/projectsChanged (#2317): a project was made, renamed, adopted or removed, or a folder joined one.
+type ProjectsChanged struct {
+	ID *string `json:"id,omitzero"`
+
+	Removed *bool `json:"removed,omitzero"`
+}
+
+// projects/joined (#2317): a machine's folders and the project each names, all of them each time.
+type ProjectsJoined struct {
+	Folders []JoinedFolder `json:"folders"`
+}
+
 type PromptOrigin string
 
 const PromptOriginPerson PromptOrigin = "person"
@@ -8008,6 +8075,13 @@ type SetDiskSpaceRequest struct {
 	Folder URL `json:"folder"`
 
 	DiskSpace DiskThresholds `json:"diskSpace"`
+}
+
+// folders/setProject (#2317): the project id to write into the folder's .agents/folder.json.
+type SetFolderProjectRequest struct {
+	Folder URL `json:"folder"`
+
+	Project string `json:"project"`
 }
 
 type SetHelperLimitsRequest struct {

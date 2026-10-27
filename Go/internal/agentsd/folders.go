@@ -76,6 +76,8 @@ func (d *Daemon) sendFolder(folder string) (wire.FolderSummary, error) {
 	}
 	Broadcast(d, wire.NotifyFolderChanged, s)
 	d.reconsider()
+	// Its project may have changed (#2317).
+	d.sendJoinedSoon()
 	return s, nil
 }
 
@@ -165,6 +167,7 @@ func (d *Daemon) deleteFolder(folder string) error {
 	}
 	Broadcast(d, wire.NotifyFolderRemoved, wire.FolderRemovedNotification{Folder: store.FolderURL(folder)})
 	d.reconsider()
+	d.sendJoinedSoon()
 	return nil
 }
 
@@ -638,7 +641,16 @@ func (d *Daemon) dress(s *wire.FolderSummary) {
 	}
 	s.Approvals = append(s.Approvals, d.archiveApprovals(folder)...)
 	s.Approvals = append(s.Approvals, d.workflowFailures(folder)...)
-	if m, err := d.approvedConfig(folder); err == nil {
+	m, err := d.approvedConfig(folder)
+	if !isDir(folder) {
+		err = nil
+	}
+	if id, problem := projectIn(m, err); id != "" {
+		s.Project = &id
+	} else if problem != "" {
+		s.ProjectProblem = &problem
+	}
+	if err == nil {
 		if v, ok := m["helperLimits"]; ok {
 			var l wire.HelperLimits
 			if b, _ := json.Marshal(v); json.Unmarshal(b, &l) == nil {
@@ -683,6 +695,10 @@ func (d *Daemon) registerFolders() {
 	On(d, wire.CallFoldersSetDiskSpace, func(ctx context.Context, c *Client, r wire.SetDiskSpaceRequest) (wire.FolderSummary, error) {
 		r.Folder = store.FolderURL(folderOf(r.Folder))
 		return d.setDiskSpace(r)
+	})
+	On(d, wire.CallFoldersSetProject, func(ctx context.Context, c *Client, r wire.SetFolderProjectRequest) (wire.FolderSummary, error) {
+		r.Folder = store.FolderURL(folderOf(r.Folder))
+		return d.setProject(r)
 	})
 	On(d, wire.CallFoldersFind, func(ctx context.Context, c *Client, r wire.FoldersFindRequest) ([]wire.FoundFolder, error) {
 		return d.findFolders(r), nil

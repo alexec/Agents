@@ -288,6 +288,12 @@ func countsOf(m map[string]int64) wire.FolderSummaryCounts {
 }
 
 func (d *Daemon) addFolder(folder wire.URL) (wire.FolderSummary, error) {
+	return d.addFolderOf(folder, true)
+}
+
+// addFolderOf adds a folder; with project, one that names no project gets one of its own
+// (#2317). A folder sent from another machine does not: its project comes with it.
+func (d *Daemon) addFolderOf(folder wire.URL, project bool) (wire.FolderSummary, error) {
 	path := store.FolderPath(folder)
 	if r, err := store.Resolve(path); err == nil {
 		path = r
@@ -308,6 +314,10 @@ func (d *Daemon) addFolder(folder wire.URL) (wire.FolderSummary, error) {
 			return wire.FolderSummary{}, err
 		}
 	}
+	if project {
+		d.ensureProject(path)
+	}
+	d.sendJoinedSoon()
 	for _, s := range d.folders(true) {
 		if store.FolderPath(s.Folder.Folder) == path {
 			Broadcast(d, wire.NotifyFolderChanged, s)

@@ -3012,6 +3012,16 @@ export interface FolderSummary {
   guardedChanges?: GuardedChange[];
   approvals?: Approval[];
   /**
+   * The project id that .agents/folder.json names (#2317). Absent when it names none or one that is
+   * not valid.
+   */
+  project?: string;
+  /**
+   * Why the folder is in no project (#2317): .agents/folder.json is not an object, names an id that
+   * is not valid, or .agents is a link.
+   */
+  projectProblem?: string;
+  /**
    * Set when the organisation's policy caps this folder's helper limits (#998, #64): the lower
    * number is used.
    */
@@ -3252,6 +3262,13 @@ export interface JoinRequest {
 /** hosts/approveJoin, hosts/denyJoin (#994). */
 export interface JoinRequestDecide {
   request: string;
+}
+
+/** One folder of projects/joined (#2317). */
+export interface JoinedFolder {
+  folder: URLString;
+  name: string;
+  project: string;
 }
 
 /** hosts/keep: a request for a stopped host, kept until it is up. */
@@ -5177,6 +5194,58 @@ export type PrewarmRequestWhy =
   | "opened"
   | "typing";
 
+/**
+ * A project (#2317): what people work on, the record that folders join. folders is what the
+ * machines last reported.
+ */
+export interface Project {
+  id: string;
+  name: string;
+  owner: string;
+  folders: ProjectFolder[];
+  /** The caller is the owner or an admin, so may rename and remove it. */
+  mayChange: boolean;
+}
+
+/** A folder in a project (#2317), as its machine last reported it. */
+export interface ProjectFolder {
+  machine: MachineRef;
+  folder: URLString;
+  name: string;
+}
+
+/** projects/list (#2317): the organisation's projects, by name. */
+export interface ProjectList {
+  projects: Project[];
+}
+
+/** projects/remove (#2317): the project. Refused while a folder names it. */
+export interface ProjectRequest {
+  id: string;
+}
+
+/** projects/set (#2317): makes a project, or with id renames one. */
+export interface ProjectSet {
+  id?: string;
+  name: string;
+}
+
+/**
+ * control/projectsChanged (#2317): a project was made, renamed, adopted or removed, or a folder
+ * joined one.
+ */
+export interface ProjectsChanged {
+  id?: string;
+  removed?: boolean;
+}
+
+/**
+ * projects/joined (#2317): a machine's folders and the project each names, all of them each time.
+ */
+export interface ProjectsJoined {
+  folders: JoinedFolder[];
+}
+
 export type PromptOrigin =
   | "person"
   | "app"
@@ -6303,6 +6372,12 @@ export interface SetCeilingRequest {
 export interface SetDiskSpaceRequest {
   folder: URLString;
   diskSpace: DiskThresholds;
+}
+
+/** folders/setProject (#2317): the project id to write into the folder's .agents/folder.json. */
+export interface SetFolderProjectRequest {
+  folder: URLString;
+  project: string;
 }
 
 export interface SetHelperLimitsRequest {
@@ -8176,6 +8251,7 @@ export interface Methods {
   "folders/list": { params: FoldersListRequest; result: FolderSummary[] };
   "folders/readGuardedChange": { params: GuardedChangeRequest; result: GuardedChangeReading };
   "folders/setPinned": { params: SetPinnedRequest; result: FolderSummary };
+  "folders/setProject": { params: SetFolderProjectRequest; result: FolderSummary };
   "folders/unarchive": { params: FolderRequest; result: FolderSummary };
   "folders/undoGuardedChange": { params: GuardedChangeRequest; result: FolderSummary };
   "governance/approvals": { params: Empty; result: CatalogApprovalList };
@@ -8253,6 +8329,9 @@ export interface Methods {
   "preferences/get": { params: Empty; result: Record<string, JSONValue> };
   "preferences/set": { params: Record<string, JSONValue>; result: Record<string, JSONValue> };
   "presence/report": { params: PresenceReport; result: Empty };
+  "projects/list": { params: Empty; result: ProjectList };
+  "projects/remove": { params: ProjectRequest; result: Empty };
+  "projects/set": { params: ProjectSet; result: Project };
   "providers/add": { params: ProviderAdd; result: ProviderSummary };
   "providers/create": { params: ProviderCreate; result: ProviderCreated };
   "providers/list": { params: Empty; result: ProviderList };
@@ -8450,6 +8529,7 @@ export const MethodTarget = {
   "folders/list": "host",
   "folders/readGuardedChange": "host",
   "folders/setPinned": "host",
+  "folders/setProject": "host",
   "folders/unarchive": "host",
   "folders/undoGuardedChange": "host",
   "governance/approvals": "control",
@@ -8527,6 +8607,9 @@ export const MethodTarget = {
   "preferences/get": "host",
   "preferences/set": "host",
   "presence/report": "host",
+  "projects/list": "control",
+  "projects/remove": "control",
+  "projects/set": "control",
   "providers/add": "control",
   "providers/create": "control",
   "providers/list": "control",
@@ -8643,6 +8726,7 @@ export interface Notifications {
   "control/orgRoutesChanged": Empty;
   "control/peopleChanged": PeopleChanged;
   "control/policyChanged": PolicyView;
+  "control/projectsChanged": ProjectsChanged;
   "control/providersChanged": ProviderList;
   "control/secretsLeft": SecretsLeft;
   "control/signInDecided": SignInDecided;
@@ -8937,7 +9021,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FolderPlugin: { required: ["folder", "name", "carries", "folderPath"], optional: ["awaitingApproval"] },
   FolderRemovedNotification: { required: ["folder"], optional: [] },
   FolderRequest: { required: ["folder"], optional: [] },
-  FolderSummary: { required: ["name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount", "folder"], optional: ["guardedChanges", "approvals", "helperLimitsSetBy"] },
+  FolderSummary: { required: ["name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount", "folder"], optional: ["guardedChanges", "approvals", "project", "projectProblem", "helperLimitsSetBy"] },
   FolderWorktrees: { required: ["worktrees", "folder"], optional: [] },
   FoldersFindRequest: { required: [], optional: ["paths", "folders"] },
   FoldersListRequest: { required: ["includeArchived"], optional: [] },
@@ -8966,6 +9050,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   JoinDecided: { required: ["request", "result"], optional: [] },
   JoinRequest: { required: ["request", "name", "platform", "code", "expires", "for"], optional: ["forName"] },
   JoinRequestDecide: { required: ["request"], optional: [] },
+  JoinedFolder: { required: ["folder", "name", "project"], optional: [] },
   KeepRequest: { required: ["host", "method", "params"], optional: [] },
   KeptDelivered: { required: ["host", "id"], optional: ["agentID"] },
   KeptList: { required: ["kept"], optional: [] },
@@ -9165,6 +9250,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PresenceReport: { required: ["active"], optional: ["watching", "mayNotify", "showing", "alsoShowing"] },
   PreviewFile: { required: ["path", "bytes", "runnable", "via"], optional: [] },
   PrewarmRequest: { required: ["agentID", "why"], optional: [] },
+  Project: { required: ["id", "name", "owner", "folders", "mayChange"], optional: [] },
+  ProjectFolder: { required: ["machine", "folder", "name"], optional: [] },
+  ProjectList: { required: ["projects"], optional: [] },
+  ProjectRequest: { required: ["id"], optional: [] },
+  ProjectSet: { required: ["name"], optional: ["id"] },
+  ProjectsChanged: { required: [], optional: ["id", "removed"] },
+  ProjectsJoined: { required: ["folders"], optional: [] },
   PromptRequest: { required: ["agentID", "text", "attachments", "from"], optional: ["sendID", "voice"] },
   ProviderAdd: { required: ["name", "kind"], optional: ["id", "command", "args", "url", "headers", "commands", "map", "secrets", "cli", "draft"] },
   ProviderCreate: { required: ["id", "name"], optional: ["options", "clones", "repository"] },
@@ -9279,6 +9371,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SessionsListRequest: { required: ["runtimeID", "cwd"], optional: [] },
   SetCeilingRequest: { required: ["agentID"], optional: ["ceiling", "tokenCeiling"] },
   SetDiskSpaceRequest: { required: ["folder", "diskSpace"], optional: [] },
+  SetFolderProjectRequest: { required: ["folder", "project"], optional: [] },
   SetHelperLimitsRequest: { required: ["folder", "limits"], optional: [] },
   SetLabelsRequest: { required: ["agentID", "add", "remove"], optional: [] },
   SetLimitsRequest: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },

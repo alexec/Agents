@@ -125,6 +125,7 @@ func main() {
 	d.StartConnections()
 	d.StartRetention()
 	d.StartBackups()
+	d.StartProjects()
 	d.StartMCPHealth()
 	d.StartMCPEvents()
 	d.StartMachineWatch()

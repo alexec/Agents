@@ -92,6 +92,7 @@ public enum Capability {
     public static let pool1 = "pool/1"
     public static let preferences1 = "preferences/1"
     public static let presence1 = "presence/1"
+    public static let projects1 = "projects/1"
     public static let providers1 = "providers/1"
     public static let readapi1 = "readapi/1"
     public static let relay1 = "relay/1"
@@ -248,6 +249,7 @@ public enum Capability {
         "folders/setDiskSpace": "folders/1",
         "folders/setHelperLimits": "folders/1",
         "folders/setPinned": "folders/1",
+        "folders/setProject": "projects/1",
         "folders/unarchive": "folders/1",
         "folders/undoGuardedChange": "folders/1",
         "git/fill": "git/1",
@@ -547,6 +549,10 @@ public enum Capability {
         "policy/raise": "policy/1",
         "policy/set": "policy/1",
         "policy/stopAll": "policy/1",
+        "projects/joined": "projects/1",
+        "projects/list": "projects/1",
+        "projects/remove": "projects/1",
+        "projects/set": "projects/1",
         "providers/add": "providers/1",
         "providers/create": "providers/1",
         "providers/draftAnswer": "providers/1",
@@ -628,6 +634,7 @@ public enum Capability {
         "control/orgRoutesLeft": "org-routes/1",
         "control/peopleChanged": "people/1",
         "control/policyChanged": "policy/1",
+        "control/projectsChanged": "projects/1",
         "control/providerDraft": "control/1",
         "control/providersChanged": "control/1",
         "control/secretsLeft": "user/1",

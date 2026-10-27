@@ -74,6 +74,7 @@ type Daemon struct {
 	optionBook
 	timeBook
 	reportBook
+	projectBook
 	milestoneBook
 	afterTurnState
 	attentionState

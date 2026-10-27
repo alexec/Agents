@@ -68,7 +68,8 @@ func TestAFoldersSettingsAreItsFile(t *testing.T) {
 	}
 	c.call(t, 5, "folders/setDiskSpace", map[string]any{"folder": folder, "diskSpace": map[string]any{"lowGB": 50, "criticalGB": 2}})
 	b, _ := os.ReadFile(filepath.Join(dir, ".agents", "folder.json"))
-	if string(b) != "{\n  \"diskSpace\" : {\n    \"lowGB\" : 50\n  },\n  \"helperLimits\" : {\n    \"running\" : 4\n  }\n}\n" {
+	// The project id that adding the folder wrote (#2317) stays beside them.
+	if s.Project == nil || string(b) != "{\n  \"diskSpace\" : {\n    \"lowGB\" : 50\n  },\n  \"helperLimits\" : {\n    \"running\" : 4\n  },\n  \"project\" : \""+*s.Project+"\"\n}\n" {
 		t.Fatalf("%s", b)
 	}
 	os.WriteFile(filepath.Join(dir, ".agents", "folder.json"), []byte("[1]"), 0o644)
