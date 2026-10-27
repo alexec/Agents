@@ -656,6 +656,18 @@ func TestAChannelMessageStartsWorkOnlyFromALinkedSender(t *testing.T) {
 		t.Fatalf("asked %d times", n)
 	}
 
+	// A sender that names no one starts nothing, and the control plane is not asked.
+	if got := d.raiseMCPEvent(mcpPolled{EventID: new("no-one"), Name: new("pr.merged"), Sender: &wire.ChannelSender{Channel: "email"}},
+		&mcpSubscription{server: "ci", event: "pr.merged"}, nil); got.Name != "" {
+		t.Fatalf("raised from no one: %+v", got)
+	}
+	mu.Lock()
+	n = len(asked)
+	mu.Unlock()
+	if n != 2 {
+		t.Fatalf("asked %d times", n)
+	}
+
 	// No control plane: nothing starts.
 	d.askControl.Store(nil)
 	if got := d.raiseMCPEvent(mcpPolled{EventID: new("lone"), Name: new("pr.merged"), Sender: &wire.ChannelSender{Channel: "slack", Identity: "U-SAM"}},
