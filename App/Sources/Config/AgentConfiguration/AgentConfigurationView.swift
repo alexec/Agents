@@ -31,12 +31,14 @@ struct AgentConfigurationView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if showsSyncState {
+            // `~/.agents` is this Mac's; some parts go to the other machines (#2704).
+            if showsScope {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(UserScopeWords.yoursOnEveryMachine).appText(.supporting).fontWeight(.semibold)
-                        Text(UserScopeWords.agentConfigurationUpdated(model.userScope.settings?.agentConfigFiles?.updated))
+                        Text(UserScopeWords.thisMacOnly).appText(.supporting).fontWeight(.semibold)
+                        Text(UserScopeWords.agentConfigurationFollows)
                             .appText(.fine).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer()
                 }
@@ -50,7 +52,6 @@ struct AgentConfigurationView: View {
                 chosenPage
             }
         }
-        .task { if showsSyncState { await model.userScope.load(model.controlRequests) } }
         .task(id: page) { await countWorkflows() }
         .discardUnsavedQuestion($leaving)
     }
@@ -68,7 +69,7 @@ struct AgentConfigurationView: View {
         workflows = files.count
     }
 
-    private var showsSyncState: Bool {
+    private var showsScope: Bool {
         if case .you = place { return true }
         return false
     }

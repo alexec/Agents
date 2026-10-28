@@ -2,7 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import type { AgentConfigEditorFile } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { Modal } from "./Modal";
-import { agentConfigurationUpdated, yoursOnEveryMachine } from "../model/userScope";
+import { agentConfigurationFollows, thisMacOnly } from "../model/userScope";
 
 export type AgentConfigKind = "skills" | "personas" | "workflows";
 const kinds: AgentConfigKind[] = ["skills", "personas", "workflows"];
@@ -127,20 +127,12 @@ export function AgentConfigEditor({ store, host, folder, kind, down, onUnsaved }
   </div>;
 }
 
-/** `~/.agents` is the person's on every machine (#2766): said at the top, with when it last synced, as the Mac
- * and the Remote. Read again on each control/userSettingsChanged. */
-function SyncState({ store, down }: { store: Store; down: boolean }) {
-  const [updated, setUpdated] = useState<string | undefined>();
-  const changes = store.userScopeChanges.value;
-  useEffect(() => {
-    if (down) return;
-    store.link.call("user/settings", {})
-      .then((settings) => setUpdated(settings.agentConfigFiles?.updated))
-      .catch(() => setUpdated(undefined));
-  }, [changes, down]);
+/** `~/.agents` is the Mac's (#2766, #2704): said at the top, with what goes to the other machines, as the Mac and
+ * the Remote. */
+function UserScopeLines() {
   return <div class="agent-config-sync">
-    <p><strong>{yoursOnEveryMachine}</strong></p>
-    <p class="hint">{agentConfigurationUpdated(updated)}</p>
+    <p><strong>{thisMacOnly}</strong></p>
+    <p class="hint">{agentConfigurationFollows}</p>
   </div>;
 }
 
@@ -149,7 +141,7 @@ export function AgentConfigSettingsSection({ store, down, kind }: {
 }) {
   return <section aria-label={title(kind)}>
     <h3 class="section-head">{title(kind)}</h3>
-    <SyncState store={store} down={down} />
+    <UserScopeLines />
     <AgentConfigEditor store={store} host={store.macHostID.value} kind={kind} down={down} />
   </section>;
 }
