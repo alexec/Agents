@@ -29,6 +29,9 @@ const projectFoldersPrefix = "v1/projectFolders/"
 const (
 	mostJoinedFolders = 1000
 	mostProjectName   = 80
+	// mostOwnedProjects is how many project records one person may have, removed ones
+	// too until the sweep deletes them (#2711).
+	mostOwnedProjects = 500
 )
 
 func projectFoldersKey(host string) string { return projectFoldersPrefix + host + ".json" }
@@ -167,6 +170,7 @@ func (s *Service) keepJoined(ctx context.Context, host string, joined wire.Proje
 			owner = s.localOwner()
 		}
 		var taken map[string]string
+		refused := 0
 		err := s.records.ChangeProjects(ctx, unknown, func(id string, p *records.Project) (*records.Project, error) {
 			if p != nil && !p.IsRemoved() {
 				return nil, nil
@@ -183,8 +187,16 @@ func (s *Service) keepJoined(ctx context.Context, host string, joined wire.Proje
 				next.Name = freeProjectName(taken, p.Name, p.ID)
 				return &next, nil
 			}
+			if s.records.ProjectsOwnedBy(owner) >= mostOwnedProjects {
+				// Not adopted: the folder has no project until its owner has fewer.
+				refused++
+				return nil, nil
+			}
 			return &records.Project{ID: id, Name: freeProjectName(taken, names[id], id), Owner: owner, MadeAt: records.Now()}, nil
 		})
+		if refused > 0 {
+			s.log(fmt.Sprintf("projects/joined from %s: %d project ids not adopted, as %s has %d projects already", host, refused, owner, mostOwnedProjects))
+		}
 		if err != nil {
 			return wire.MachineProjects{}, err
 		}
@@ -276,6 +288,9 @@ func (m *Methods) setProject(ctx context.Context, request wire.ProjectSet, user 
 	}
 	kept, err := m.records.ChangeProject(ctx, id, func(p *records.Project) (*records.Project, error) {
 		if making {
+			if m.records.ProjectsOwnedBy(user) >= mostOwnedProjects {
+				return nil, fail(notPermitted, "You have %d projects, counting those removed in the last week. Remove one first.", mostOwnedProjects)
+			}
 			return &records.Project{ID: id, Name: name, Owner: user, MadeAt: records.Now()}, nil
 		}
 		if p == nil || p.IsRemoved() {

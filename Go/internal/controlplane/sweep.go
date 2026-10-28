@@ -142,8 +142,20 @@ func sweep(ctx context.Context, rs *records.Records, now time.Time, most int, ev
 		var mark struct {
 			Forgotten   *bool          `json:"forgotten"`
 			ForgottenAt *records.Stamp `json:"forgottenAt"`
+			Removed     *bool          `json:"removed"`
+			RemovedAt   *records.Stamp `json:"removedAt"`
 		}
-		if object == nil || json.Unmarshal(object.Data, &mark) != nil || mark.Forgotten == nil || !*mark.Forgotten {
+		if object == nil || json.Unmarshal(object.Data, &mark) != nil {
+			continue
+		}
+		if strings.HasPrefix(key, records.ProjectsPrefix) {
+			// A removed project (#2711): projects/remove always gives it removedAt.
+			if mark.Removed == nil || !*mark.Removed || mark.RemovedAt == nil {
+				continue
+			}
+			mark.Forgotten, mark.ForgottenAt = mark.Removed, mark.RemovedAt
+		}
+		if mark.Forgotten == nil || !*mark.Forgotten {
 			continue
 		}
 		if mark.ForgottenAt == nil {
