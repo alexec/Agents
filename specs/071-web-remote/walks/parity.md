@@ -99,7 +99,7 @@ The record of the walks that brought the page level with the window, from 2026-1
 | Sessions column as one list; Archived folds named | sessions column | partly (workflows could not be chosen) | **has** | `before-sessions.png`, `after-workflow-triggering.png` | `window/sessions.png` | "Archived sessions" and "Archived workflows" were already named, and search covered both. A workflow row is now chosen like a session row and opens its page. |
 | Queued prompts look | #95 | n/a | n/a | — | — | #95 has not landed. Queued rows read "Waiting its turn" with Send now and ×. |
 | Prompt bar layout | #108 | has | has | `walks/108/` | `walks/108/window-*.png` | `bar.mjs` re-run on this branch: every control where #108 put it, no problems at 1440 or 390. |
-| Prompt composer keeps attachments, text, and actions in one growing box | #2621 | same | same | same | same | All three clients use the same order and keep their existing actions; the Remote keeps a compact phone row. |
+| Prompt composer keeps attachments, text, and actions in one growing box | #2621 | same | same | same | same | All three clients use the same order and keep their existing actions; the Remote keeps a compact phone row, in its New Session bar too (#2752). |
 
 ### Also merged since 2026-09-29
 

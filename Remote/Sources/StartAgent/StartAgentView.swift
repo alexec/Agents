@@ -249,10 +249,6 @@ struct StartAgentView: View {
 
     private var promptBar: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if !attachments.isEmpty {
-                AttachmentStrip(attachments: $attachments,
-                                capabilities: model.promptCapabilities(for: model.startRuntimeID))
-            }
             if let attachNote {
                 Text(attachNote).appText(.supporting).tinted(.failure)
                     .fixedSize(horizontal: false, vertical: true)
@@ -268,12 +264,17 @@ struct StartAgentView: View {
             if model.isStarting {
                 Telling(host: model.recipient(on: model.startHost), doing: AgentState.startingLabel)
             }
-            // The chat's prompt bar: one raised card holding the words, attach, dictate and send
-            // in ink, so starting an agent and talking to one look like the same act.
-            HStack(alignment: .bottom, spacing: 8) {
+            // The chat's prompt bar (#2621, #2752): one raised card holding the attachments and
+            // the words, with attach on the left and dictate and send on the right under them,
+            // so starting an agent and talking to one look like the same act.
+            VStack(alignment: .leading, spacing: 8) {
+                if !attachments.isEmpty {
+                    AttachmentStrip(attachments: $attachments,
+                                    capabilities: model.promptCapabilities(for: model.startRuntimeID))
+                }
                 TextField(policyRefusal ?? "What should it do?", text: $text, selection: $selection, axis: .vertical)
                     .textFieldStyle(.plain)
-                    .lineLimit(2...6)
+                    .lineLimit(2...8)
                     .focused($focused)
                     .appText(.reading)
                     .overlay(alignment: .topLeading) { HeardUnderline(dictation: dictation, text: text) }
@@ -282,34 +283,39 @@ struct StartAgentView: View {
                     .modifier(PastesPictures(attachments: $attachments, refusal: $attachNote))
                     // Held, words and all, while they start an agent (#87).
                     .disabled(model.isStarting)
+                    .frame(minHeight: 44, alignment: .topLeading)
 
-                AttachButton(attachments: $attachments, refusal: $attachNote)
+                HStack(spacing: 8) {
+                    AttachButton(attachments: $attachments, refusal: $attachNote)
 
-                DictateButton(dictation: dictation, begin: beginDictation, send: send)
-                    .disabled(model.isStarting)
+                    Spacer(minLength: 0)
+                    DictateButton(dictation: dictation, begin: beginDictation, send: send)
+                        .disabled(model.isStarting)
 
-                Button {
-                    send()
-                } label: {
-                    Group {
-                        if model.isStarting {
-                            ProgressView()
-                        } else {
-                            Image(systemName: "arrow.up")
-                                .appText(.reading).fontWeight(.semibold)
+                    Button {
+                        send()
+                    } label: {
+                        Group {
+                            if model.isStarting {
+                                ProgressView()
+                            } else {
+                                Image(systemName: "arrow.up")
+                                    .appText(.reading).fontWeight(.semibold)
+                            }
                         }
+                        .frame(width: 22, height: 22)
                     }
-                    .frame(width: 22, height: 22)
+                    .buttonStyle(.paperProminent)
+                    .buttonBorderShape(.circle)
+                    // Bright while its own spinner turns, as the answer that went stays bright
+                    // on the cards (#86); `send()` refuses the press meanwhile.
+                    .disabled(!canSend && !model.isStarting)
+                    .accessibilityLabel("Start agent")
+                    .accessibilityValue(model.isStarting ? AgentState.startingLabel : "")
                 }
-                .buttonStyle(.paperProminent)
-                .buttonBorderShape(.circle)
-                // Bright while its own spinner turns, as the answer that went stays bright
-                // on the cards (#86); `send()` refuses the press meanwhile.
-                .disabled(!canSend && !model.isStarting)
-                .accessibilityLabel("Start agent")
-                .accessibilityValue(model.isStarting ? AgentState.startingLabel : "")
             }
-            .padding(14)
+            .padding(10)
+            .frame(minHeight: 94, alignment: .topLeading)
             .paperRaised(in: RoundedRectangle(cornerRadius: 18))
         }
         .padding(.horizontal, 12)
