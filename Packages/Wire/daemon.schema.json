@@ -530,6 +530,18 @@
           "description": "The added account its runtime runs with (#840); absent for the runtime's own sign-in.",
           "type": "string"
         },
+        "auto": {
+          "$ref": "#/definitions/AutoPick",
+          "description": "Set when the agent started on Auto (#2658, FR-007)."
+        },
+        "clientPermission": {
+          "$ref": "#/definitions/ClientPermissionMode",
+          "description": "The agent's own answer to permission requests (#2658, FR-019); absent follows Settings."
+        },
+        "levels": {
+          "$ref": "#/definitions/Levels",
+          "description": "The shared values the agent runs with now (#2658), where its own settings match one; a field that is absent shows Custom."
+        },
         "voiceHungUpAt": {
           "$ref": "#/definitions/WireDate",
           "description": "When the agent last ended voice mode with hang_up (#2375): the person said they were done talking. A client in voice mode on this chat says the reply, then turns voice mode off."
@@ -2029,6 +2041,257 @@
       "required": [
         "runtimeID",
         "methodID"
+      ],
+      "additionalProperties": false
+    },
+    "AutoField": {
+      "type": "string",
+      "description": "A field Auto maps (#2658): the model level, the permission mode, the permission requests and the sandbox.",
+      "enum": [
+        "model",
+        "permission",
+        "permissionRequests",
+        "sandbox"
+      ]
+    },
+    "AutoMapping": {
+      "type": "object",
+      "description": "One cell of Settings ▸ Agent Runtimes ▸ Auto ▸ Mappings (#2658): what a level is on one runtime. native is absent when the runtime cannot honour the level.",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "field": {
+          "$ref": "#/definitions/AutoField"
+        },
+        "level": {
+          "type": "string",
+          "description": "A ModelLevel, PermissionLevel, ClientPermissionMode or SandboxChoice, by field."
+        },
+        "native": {
+          "$ref": "#/definitions/NativeSetting"
+        },
+        "words": {
+          "type": "string",
+          "description": "The runtime's own words for native, such as Sonnet 5 or Accept edits."
+        },
+        "mark": {
+          "$ref": "#/definitions/AutoMark"
+        },
+        "note": {
+          "type": "string",
+          "description": "One line, such as nearest safer: no plan mode."
+        }
+      },
+      "required": [
+        "runtimeID",
+        "field",
+        "level",
+        "words",
+        "mark"
+      ],
+      "additionalProperties": false
+    },
+    "AutoMappings": {
+      "type": "object",
+      "description": "auto/mappings: every cell, and each runtime's own choices a cell can be set to.",
+      "properties": {
+        "cells": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AutoMapping"
+          }
+        },
+        "choices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AutoNativeChoice"
+          }
+        }
+      },
+      "required": [
+        "cells",
+        "choices"
+      ],
+      "additionalProperties": false
+    },
+    "AutoMark": {
+      "type": "string",
+      "description": "How a cell got its value: the shipped map, the nearest value with less access, the person's own, none possible, or a value the runtime no longer offers.",
+      "enum": [
+        "autoMapped",
+        "nearestSafer",
+        "yours",
+        "notPossible",
+        "dropped"
+      ],
+      "x-fallback": "autoMapped"
+    },
+    "AutoNativeChoice": {
+      "type": "object",
+      "description": "One of a runtime's own settings that a cell of a field can be set to.",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "field": {
+          "$ref": "#/definitions/AutoField"
+        },
+        "native": {
+          "$ref": "#/definitions/NativeSetting"
+        },
+        "words": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "field",
+        "native",
+        "words"
+      ],
+      "additionalProperties": false
+    },
+    "AutoOverride": {
+      "type": "object",
+      "description": "The person's own value for one cell (#2658, FR-016).",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "field": {
+          "$ref": "#/definitions/AutoField"
+        },
+        "level": {
+          "type": "string"
+        },
+        "native": {
+          "$ref": "#/definitions/NativeSetting"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "field",
+        "level",
+        "native"
+      ],
+      "additionalProperties": false
+    },
+    "AutoPick": {
+      "type": "object",
+      "description": "On an Auto agent (#2658, FR-007): the runtime Auto picked, the levels asked for, the native settings given, and why each runtime before it was not used. The runtime never changes in the session.",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "levels": {
+          "$ref": "#/definitions/Levels"
+        },
+        "native": {
+          "$ref": "#/definitions/NativeSetting"
+        },
+        "skipped": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AutoSkip"
+          }
+        }
+      },
+      "required": [
+        "runtimeID",
+        "levels",
+        "native",
+        "skipped"
+      ],
+      "additionalProperties": false
+    },
+    "AutoPreview": {
+      "type": "object",
+      "description": "auto/preview: the runtime Auto would pick now and what it would give, or why none can.",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "native": {
+          "$ref": "#/definitions/NativeSetting"
+        },
+        "skipped": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AutoSkip"
+          }
+        }
+      },
+      "required": [
+        "skipped"
+      ],
+      "additionalProperties": false
+    },
+    "AutoPreviewRequest": {
+      "type": "object",
+      "properties": {
+        "cwd": {
+          "$ref": "#/definitions/URLString"
+        },
+        "levels": {
+          "$ref": "#/definitions/Levels"
+        },
+        "sandbox": {
+          "$ref": "#/definitions/SandboxChoice"
+        }
+      },
+      "required": [
+        "cwd"
+      ],
+      "additionalProperties": false
+    },
+    "AutoSettings": {
+      "type": "object",
+      "description": "The person's Auto settings (#2658, FR-017), in <settings>/auto.json: the order Auto tries the runtimes in (one not named goes last, in the shipped order), the runtimes it never uses, and their own values for cells.",
+      "properties": {
+        "order": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excluded": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "overrides": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AutoOverride"
+          }
+        },
+        "setBy": {
+          "$ref": "#/definitions/PolicySetBy"
+        }
+      },
+      "required": [
+        "order",
+        "excluded",
+        "overrides"
+      ],
+      "additionalProperties": false
+    },
+    "AutoSkip": {
+      "type": "object",
+      "description": "Why Auto did not use a runtime, in short: out, not signed in, not installed, excluded, no Runtime sandbox.",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "reason"
       ],
       "additionalProperties": false
     },
@@ -9674,6 +9937,22 @@
       ],
       "additionalProperties": false
     },
+    "Levels": {
+      "type": "object",
+      "description": "The values a session asks for in the words every runtime shares (#2658). Each is mapped to the runtime's own setting; a native value in startOptions for the same option wins.",
+      "properties": {
+        "model": {
+          "$ref": "#/definitions/ModelLevel"
+        },
+        "permission": {
+          "$ref": "#/definitions/PermissionLevel"
+        },
+        "permissionRequests": {
+          "$ref": "#/definitions/ClientPermissionMode"
+        }
+      },
+      "additionalProperties": false
+    },
     "LineMember": {
       "type": "object",
       "properties": {
@@ -12639,6 +12918,16 @@
       ],
       "additionalProperties": false
     },
+    "ModelLevel": {
+      "type": "string",
+      "description": "Fast: the runtime's smallest quick model; Balanced: its usual model; Smart: its most capable model (#2658).",
+      "enum": [
+        "fast",
+        "balanced",
+        "smart"
+      ],
+      "x-fallback": "balanced"
+    },
     "MoveAnswer": {
       "type": "object",
       "description": "What a person's move came to. The message is what the window may show.",
@@ -12755,6 +13044,25 @@
         "afterTurn",
         "nothing"
       ]
+    },
+    "NativeSetting": {
+      "type": "object",
+      "description": "A runtime's own setting for one level: config option values (mode, model, effort), a sandbox choice, or the answer to permission requests.",
+      "properties": {
+        "options": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/JSONValue"
+          }
+        },
+        "sandbox": {
+          "$ref": "#/definitions/SandboxChoice"
+        },
+        "clientPermission": {
+          "$ref": "#/definitions/ClientPermissionMode"
+        }
+      },
+      "additionalProperties": false
     },
     "Need": {
       "type": "object",
@@ -13905,6 +14213,16 @@
         "admin"
       ],
       "additionalProperties": false
+    },
+    "PermissionLevel": {
+      "type": "string",
+      "description": "Plan: reads and plans, changes nothing; Ask: asks before it changes things; Approve for me: does not ask for normal changes in its folder (#2658).",
+      "enum": [
+        "plan",
+        "ask",
+        "approveForMe"
+      ],
+      "x-fallback": "ask"
     },
     "PermissionNotification": {
       "type": "object",
@@ -18799,6 +19117,22 @@
       ],
       "additionalProperties": false
     },
+    "SetClientPermissionRequest": {
+      "type": "object",
+      "description": "An agent's own answer to permission requests (#2658, FR-019); no mode follows Settings.",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "mode": {
+          "$ref": "#/definitions/ClientPermissionMode"
+        }
+      },
+      "required": [
+        "agentID"
+      ],
+      "additionalProperties": false
+    },
     "SetDiskSpaceRequest": {
       "type": "object",
       "properties": {
@@ -18871,6 +19205,23 @@
         "agentID",
         "add",
         "remove"
+      ],
+      "additionalProperties": false
+    },
+    "SetLevelsRequest": {
+      "type": "object",
+      "description": "Change a running agent's model level or permission mode on its own runtime (#2658): each is mapped as at its start. An Auto agent keeps its runtime.",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "levels": {
+          "$ref": "#/definitions/Levels"
+        }
+      },
+      "required": [
+        "agentID",
+        "levels"
       ],
       "additionalProperties": false
     },
@@ -20857,6 +21208,10 @@
         },
         "persona": {
           "type": "string"
+        },
+        "levels": {
+          "$ref": "#/definitions/Levels",
+          "description": "The values in the shared words (#2658). With runtimeID auto, the daemon picks the runtime (FR-006)."
         },
         "purpose": {
           "$ref": "#/definitions/AgentPurpose"
@@ -24372,6 +24727,14 @@
         },
         "effort": {
           "type": "string"
+        },
+        "permissionRequests": {
+          "type": "string",
+          "description": "permission-requests: request-cards or yes-to-all (#2658)."
+        },
+        "sandbox": {
+          "type": "string",
+          "description": "sandbox: default, runtime or none (#2658)."
         },
         "options": {
           "type": "object",

@@ -3,6 +3,7 @@
 // ported by hand and held to Fixtures/web/sandbox. A runtime the catalog has no route for has no
 // choice: its state is said, with why.
 import type { SandboxChoice, SandboxState } from "../protocol/generated";
+import { levelWords } from "./levels";
 
 type Route = "choices" | "offOnly" | "codexMode" | { fixed: SandboxState };
 
@@ -42,16 +43,20 @@ export function sandboxState(runtimeID: string, choice: SandboxChoice, codexMode
   return choice === "on" ? "on" : choice === "off" ? "off" : "runtimeControlled";
 }
 
-export function sandboxChoiceWords(choice: SandboxChoice, runtimeID: string): string {
-  const codex = runtimeID === "codex";
-  if (choice === "runtime") return "As configured by runtime";
-  if (choice === "on") return codex ? "On (Ask or Approve for me)" : "On";
-  return codex ? "Off (Full access)" : "Off";
+/** A choice, in the words every runtime shares (#2658). */
+export function sandboxChoiceWords(choice: SandboxChoice, _runtimeID: string): string {
+  return levelWords("sandbox", choice);
 }
 
-/** One agent's menu, where no choice follows the runtime's default. */
+/** One agent's pill: its own choice, else the one Settings gives, which its menu marks
+ *  **follows Settings**. */
 export function sandboxOverrideWords(choice: SandboxChoice | undefined, runtimeDefault: SandboxChoice, runtimeID: string): string {
-  return choice ? sandboxChoiceWords(choice, runtimeID) : `Use runtime default (${sandboxChoiceWords(runtimeDefault, runtimeID)})`;
+  return sandboxChoiceWords(choice ?? runtimeDefault, runtimeID);
+}
+
+/** A runtime that cannot change its sandbox: its fixed value. */
+export function fixedSandbox(runtimeID: string): SandboxChoice {
+  return sandboxState(runtimeID, "runtime", undefined) === "none" ? "off" : "runtime";
 }
 
 export function sandboxStateWords(state: SandboxState): string {

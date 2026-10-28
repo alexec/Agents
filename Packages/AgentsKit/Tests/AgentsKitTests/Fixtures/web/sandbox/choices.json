@@ -7,9 +7,9 @@
         "off"
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off)",
-        "on" : "Use runtime default (On)",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Commands run with your own access. Claude still asks as its permission mode says.",
@@ -23,9 +23,9 @@
       },
       "why" : null,
       "words" : {
-        "off" : "Off",
-        "on" : "On",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -42,9 +42,9 @@
         "off"
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off)",
-        "on" : "Use runtime default (On)",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Commands run with your own access. Claude still asks as its permission mode says.",
@@ -58,9 +58,9 @@
       },
       "why" : null,
       "words" : {
-        "off" : "Off",
-        "on" : "On",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -77,9 +77,9 @@
         "off"
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off)",
-        "on" : "Use runtime default (On)",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Commands run with your own access. Claude still asks as its permission mode says.",
@@ -93,9 +93,9 @@
       },
       "why" : null,
       "words" : {
-        "off" : "Off",
-        "on" : "On",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -112,9 +112,9 @@
         "off"
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off (Full access))",
-        "on" : "Use runtime default (On (Ask or Approve for me))",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Full access: commands run with your own access, and Codex stops asking for approval.",
@@ -128,9 +128,9 @@
       },
       "why" : null,
       "words" : {
-        "off" : "Off (Full access)",
-        "on" : "On (Ask or Approve for me)",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -147,9 +147,9 @@
         "off"
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off (Full access))",
-        "on" : "Use runtime default (On (Ask or Approve for me))",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Full access: commands run with your own access, and Codex stops asking for approval.",
@@ -163,9 +163,9 @@
       },
       "why" : null,
       "words" : {
-        "off" : "Off (Full access)",
-        "on" : "On (Ask or Approve for me)",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -182,9 +182,9 @@
         "off"
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off (Full access))",
-        "on" : "Use runtime default (On (Ask or Approve for me))",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Full access: commands run with your own access, and Codex stops asking for approval.",
@@ -198,9 +198,9 @@
       },
       "why" : null,
       "words" : {
-        "off" : "Off (Full access)",
-        "on" : "On (Ask or Approve for me)",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -215,9 +215,9 @@
 
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off)",
-        "on" : "Use runtime default (On)",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Commands run with your own access. Grok still asks as its permission mode says.",
@@ -231,9 +231,9 @@
       },
       "why" : "Grok 1.0.67 does not accept --sandbox with agent stdio. The app cannot change Grok’s sandbox.",
       "words" : {
-        "off" : "Off",
-        "on" : "On",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -248,9 +248,9 @@
 
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off)",
-        "on" : "Use runtime default (On)",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Commands run with your own access. Grok still asks as its permission mode says.",
@@ -264,9 +264,9 @@
       },
       "why" : "Grok 1.0.67 does not accept --sandbox with agent stdio. The app cannot change Grok’s sandbox.",
       "words" : {
-        "off" : "Off",
-        "on" : "On",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -281,9 +281,9 @@
 
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off)",
-        "on" : "Use runtime default (On)",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Commands run with your own access. Grok still asks as its permission mode says.",
@@ -297,9 +297,9 @@
       },
       "why" : "Grok 1.0.67 does not accept --sandbox with agent stdio. The app cannot change Grok’s sandbox.",
       "words" : {
-        "off" : "Off",
-        "on" : "On",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -315,9 +315,9 @@
         "off"
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off)",
-        "on" : "Use runtime default (On)",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Commands run with your own access. Gemini still asks as its permission mode says.",
@@ -331,9 +331,9 @@
       },
       "why" : "Gemini’s own sandbox cannot start when the app runs it, so On is not offered.",
       "words" : {
-        "off" : "Off",
-        "on" : "On",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -349,9 +349,9 @@
         "off"
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off)",
-        "on" : "Use runtime default (On)",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Commands run with your own access. Gemini still asks as its permission mode says.",
@@ -365,9 +365,9 @@
       },
       "why" : "Gemini’s own sandbox cannot start when the app runs it, so On is not offered.",
       "words" : {
-        "off" : "Off",
-        "on" : "On",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -383,9 +383,9 @@
         "off"
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off)",
-        "on" : "Use runtime default (On)",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Commands run with your own access. Gemini still asks as its permission mode says.",
@@ -399,9 +399,9 @@
       },
       "why" : "Gemini’s own sandbox cannot start when the app runs it, so On is not offered.",
       "words" : {
-        "off" : "Off",
-        "on" : "On",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -416,9 +416,9 @@
 
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off)",
-        "on" : "Use runtime default (On)",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Commands run with your own access. Cursor still asks as its permission mode says.",
@@ -432,9 +432,9 @@
       },
       "why" : "Cursor’s own sandbox setting decides. The app cannot change it.",
       "words" : {
-        "off" : "Off",
-        "on" : "On",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -449,9 +449,9 @@
 
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off)",
-        "on" : "Use runtime default (On)",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Commands run with your own access. Cursor still asks as its permission mode says.",
@@ -465,9 +465,9 @@
       },
       "why" : "Cursor’s own sandbox setting decides. The app cannot change it.",
       "words" : {
-        "off" : "Off",
-        "on" : "On",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -482,9 +482,9 @@
 
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off)",
-        "on" : "Use runtime default (On)",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Commands run with your own access. Cursor still asks as its permission mode says.",
@@ -498,9 +498,9 @@
       },
       "why" : "Cursor’s own sandbox setting decides. The app cannot change it.",
       "words" : {
-        "off" : "Off",
-        "on" : "On",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -515,9 +515,9 @@
 
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off)",
-        "on" : "Use runtime default (On)",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Commands run with your own access. Copilot still asks as its permission mode says.",
@@ -531,9 +531,9 @@
       },
       "why" : "Copilot’s own sandbox setting decides. The app cannot change it yet.",
       "words" : {
-        "off" : "Off",
-        "on" : "On",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -548,9 +548,9 @@
 
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off)",
-        "on" : "Use runtime default (On)",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Commands run with your own access. Copilot still asks as its permission mode says.",
@@ -564,9 +564,9 @@
       },
       "why" : "Copilot’s own sandbox setting decides. The app cannot change it yet.",
       "words" : {
-        "off" : "Off",
-        "on" : "On",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -581,9 +581,9 @@
 
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off)",
-        "on" : "Use runtime default (On)",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Commands run with your own access. Copilot still asks as its permission mode says.",
@@ -597,9 +597,9 @@
       },
       "why" : "Copilot’s own sandbox setting decides. The app cannot change it yet.",
       "words" : {
-        "off" : "Off",
-        "on" : "On",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -614,9 +614,9 @@
 
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off)",
-        "on" : "Use runtime default (On)",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Commands run with your own access. Antigravity still asks as its permission mode says.",
@@ -630,9 +630,9 @@
       },
       "why" : "Antigravity sandboxes commands only when a business account’s admin turns Sandbox mode on.",
       "words" : {
-        "off" : "Off",
-        "on" : "On",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -647,9 +647,9 @@
 
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off)",
-        "on" : "Use runtime default (On)",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Commands run with your own access. Antigravity still asks as its permission mode says.",
@@ -663,9 +663,9 @@
       },
       "why" : "Antigravity sandboxes commands only when a business account’s admin turns Sandbox mode on.",
       "words" : {
-        "off" : "Off",
-        "on" : "On",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -680,9 +680,9 @@
 
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off)",
-        "on" : "Use runtime default (On)",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Commands run with your own access. Antigravity still asks as its permission mode says.",
@@ -696,9 +696,9 @@
       },
       "why" : "Antigravity sandboxes commands only when a business account’s admin turns Sandbox mode on.",
       "words" : {
-        "off" : "Off",
-        "on" : "On",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -713,9 +713,9 @@
 
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off)",
-        "on" : "Use runtime default (On)",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Commands run with your own access. OpenCode still asks as its permission mode says.",
@@ -729,9 +729,9 @@
       },
       "why" : "OpenCode has no command sandbox. It asks before running commands unless set to Always-approve.",
       "words" : {
-        "off" : "Off",
-        "on" : "On",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -746,9 +746,9 @@
 
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off)",
-        "on" : "Use runtime default (On)",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Commands run with your own access. OpenCode still asks as its permission mode says.",
@@ -762,9 +762,9 @@
       },
       "why" : "OpenCode has no command sandbox. It asks before running commands unless set to Always-approve.",
       "words" : {
-        "off" : "Off",
-        "on" : "On",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -779,9 +779,9 @@
 
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off)",
-        "on" : "Use runtime default (On)",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Commands run with your own access. OpenCode still asks as its permission mode says.",
@@ -795,9 +795,9 @@
       },
       "why" : "OpenCode has no command sandbox. It asks before running commands unless set to Always-approve.",
       "words" : {
-        "off" : "Off",
-        "on" : "On",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -812,9 +812,9 @@
 
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off)",
-        "on" : "Use runtime default (On)",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Commands run with your own access. unknown still asks as its permission mode says.",
@@ -828,9 +828,9 @@
       },
       "why" : null,
       "words" : {
-        "off" : "Off",
-        "on" : "On",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -845,9 +845,9 @@
 
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off)",
-        "on" : "Use runtime default (On)",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Commands run with your own access. unknown still asks as its permission mode says.",
@@ -861,9 +861,9 @@
       },
       "why" : null,
       "words" : {
-        "off" : "Off",
-        "on" : "On",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {
@@ -878,9 +878,9 @@
 
       ],
       "defaults" : {
-        "off" : "Use runtime default (Off)",
-        "on" : "Use runtime default (On)",
-        "runtime" : "Use runtime default (As configured by runtime)"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       },
       "explanations" : {
         "off" : "Commands run with your own access. unknown still asks as its permission mode says.",
@@ -894,9 +894,9 @@
       },
       "why" : null,
       "words" : {
-        "off" : "Off",
-        "on" : "On",
-        "runtime" : "As configured by runtime"
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
       }
     },
     "input" : {

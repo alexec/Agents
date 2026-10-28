@@ -15,6 +15,7 @@ public enum Capability {
     public static let artifact1 = "artifact/1"
     public static let attention1 = "attention/1"
     public static let auditSinks1 = "audit.sinks/1"
+    public static let auto1 = "auto/1"
     public static let backupsStore1 = "backups.store/1"
     public static let backups1 = "backups/1"
     public static let bots1 = "bots/1"
@@ -157,7 +158,9 @@ public enum Capability {
         "agents/said": "agents.said/1",
         "agents/sendNow": "agents/1",
         "agents/setCeiling": "agents/1",
+        "agents/setClientPermission": "auto/1",
         "agents/setLabels": "agents/1",
+        "agents/setLevels": "auto/1",
         "agents/setMuted": "mute/1",
         "agents/setOption": "agents/1",
         "agents/setSandbox": "agents/1",
@@ -174,6 +177,10 @@ public enum Capability {
         "approvals/read": "approvals/1",
         "artifact/write": "artifact/1",
         "attention/pending": "attention/1",
+        "auto/mappings": "auto/1",
+        "auto/preview": "auto/1",
+        "auto/set": "auto/1",
+        "auto/state": "auto/1",
         "backups/configure": "backups/1",
         "backups/make": "backups/1",
         "backups/restore": "backups/1",
@@ -405,6 +412,7 @@ public enum Capability {
         "agent/showFile": "agent/1",
         "agents/draftOptions": "agents/1",
         "attention/changed": "attention/1",
+        "auto/changed": "auto/1",
         "backups/changed": "backups/1",
         "clientPermissions/changed": "client-permissions/1",
         "clone/changed": "clone/1",

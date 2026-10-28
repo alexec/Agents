@@ -441,6 +441,15 @@ public enum DaemonAPI {
         /// One agent's override (nil clears it), and the card's recovery (064).
         public static let agentsSetSandbox = "agents/setSandbox"
         public static let agentsAnswerSandbox = "agents/answerSandbox"
+        /// Auto and the shared words (#2658): the person's order, Include switches and own
+        /// cells; every cell, marked; what Auto would pick now; a running agent's level, and
+        /// its own answer to permission requests.
+        public static let autoState = "auto/state"
+        public static let autoSet = "auto/set"
+        public static let autoMappings = "auto/mappings"
+        public static let autoPreview = "auto/preview"
+        public static let agentsSetLevels = "agents/setLevels"
+        public static let agentsSetClientPermission = "agents/setClientPermission"
         /// Every runtime's state (065, US4), and the person saying one is back.
         public static let runtimesAllowances = "runtimes/allowances"
         public static let runtimesMarkAvailable = "runtimes/markAvailable"
@@ -555,6 +564,8 @@ public enum DaemonAPI {
         public static let personChanged = "person/changed"
         /// A runtime's sandbox default changed (064).
         public static let sandboxChanged = "sandbox/changed"
+        /// The person's Auto settings changed (#2658).
+        public static let autoChanged = "auto/changed"
         /// `RuntimeAllowances`, whenever a runtime's state changes (065). Debounced to
         /// one a second.
         public static let runtimesAllowancesChanged = "runtimes/allowancesChanged"
@@ -947,6 +958,9 @@ public enum DaemonAPI {
         public var accountID: String?
         /// Started from voice mode (#2375): the first reply is heard, as a voice prompt's is.
         public var voice: Bool?
+        /// The values in the shared words (#2658). With `runtimeID` "auto" the daemon picks
+        /// the runtime.
+        public var levels: Levels?
 
         public init(runtimeID: String, cwd: URL, prompt: String,
                     attachments: [Attachment] = [],
@@ -954,7 +968,9 @@ public enum DaemonAPI {
                     additionalDirectories: [URL] = [], mcpServers: [MCPServer] = [],
                     worktree: WorktreeChoice? = nil, requestID: UUID? = nil,
                     sandbox: SandboxChoice? = nil, labels: [String] = [], persona: String? = nil,
-                    purpose: AgentPurpose? = nil, accountID: String? = nil, voice: Bool? = nil) {
+                    purpose: AgentPurpose? = nil, accountID: String? = nil, voice: Bool? = nil,
+                    levels: Levels? = nil) {
+            self.levels = levels
             self.accountID = accountID
             self.voice = voice
             self.persona = persona
@@ -994,6 +1010,7 @@ public enum DaemonAPI {
             purpose = try c.decodeIfPresent(AgentPurpose.self, forKey: .purpose)
             accountID = try c.decodeIfPresent(String.self, forKey: .accountID)
             voice = try c.decodeIfPresent(Bool.self, forKey: .voice)
+            levels = try c.decodeIfPresent(Levels.self, forKey: .levels)
         }
 
         /// What goes to the runtime: the words, then whatever was attached.
@@ -2597,6 +2614,9 @@ public enum DaemonAPI {
         /// (064). Its data is `SandboxWillNotStart`: the form keeps the prompt and offers
         /// **Start without sandbox** when `offOffered`.
         public static let sandboxWillNotStart = -32061
+        /// No runtime Auto may use can take the session (#2658): the form keeps the prompt,
+        /// and the message names each runtime and why.
+        public static let autoNoRuntime = -32083
         public static let sessionGone = -32003
         public static let folderGone = -32004
         public static let noSuchAgent = -32005

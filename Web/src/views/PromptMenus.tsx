@@ -8,6 +8,7 @@ import { choiceGroups, closedTitle, isAboutPermission, same } from "../model/opt
 import { nothingToAdjust } from "../model/promptWords";
 import { line } from "../model/orgPolicy";
 import { optionLabel } from "./OrgPolicyLine";
+import { fieldWords, levelMeaning, levelWords } from "../model/levels";
 
 export function OptionControl({ option, value, onChange, disabled }: {
   option: ConfigOption; value: JSONValue | undefined; onChange: (value: JSONValue) => void; disabled?: boolean | undefined;
@@ -90,12 +91,11 @@ function ClientPermissionControl({ runtime, mode, onChange, disabled }: {
 }) {
   // Always-approve answers every request for every agent of the runtime: one more click (#2746).
   const [confirming, setConfirming] = useState(false);
-  const title = (choice: ClientPermissionSettings["cursor"]) => choice === "alwaysApprove" ? "Always-approve" : "Default";
+  // In the words every runtime shares (#2658): Request cards or Yes to all.
+  const title = (choice: ClientPermissionSettings["cursor"]) => levelWords("permissionRequests", choice);
   const choices: ClientPermissionSettings["cursor"][] = ["default", "alwaysApprove"];
   const scope = `Applies to every ${runtime} agent, including workflows and server folders.`;
-  const description = (choice: ClientPermissionSettings["cursor"]) => choice === "default"
-    ? `Asks before ${runtime} does something that needs permission.`
-    : "Answers every permission request for you. Questions that are not permission still wait.";
+  const description = (choice: ClientPermissionSettings["cursor"]) => levelMeaning("permissionRequests", choice);
   const close = () => {
     setConfirming(false);
     const details = document.activeElement?.closest("details");
@@ -105,23 +105,23 @@ function ClientPermissionControl({ runtime, mode, onChange, disabled }: {
     <details class="client-permission-control" onToggle={(e) => {
       if (!(e.currentTarget as HTMLDetailsElement).open) setConfirming(false);
     }}>
-      {/* What it sets, then its value: beside the sandbox pill, "Default" alone says nothing. */}
-      <summary class="pill" title={`${runtime} permissions. ${scope}`}
-        aria-label={`${runtime} permissions: ${title(mode)}`} aria-disabled={disabled}>
-        Permissions: {title(mode)} <span aria-hidden="true">▾</span>
+      {/* The value alone, as every pill says (#2658); the menu's header names the field. */}
+      <summary class="pill" title={`${fieldWords.permissionRequests}. ${scope}`}
+        aria-label={`${runtime} permission requests: ${title(mode)}`} aria-disabled={disabled}>
+        {title(mode)} <span aria-hidden="true">▾</span>
       </summary>
-      <div class="client-permission-menu" role="group" aria-label={`${runtime} permissions`}>
+      <div class="client-permission-menu" role="group" aria-label={`${runtime} permission requests`}>
         {confirming ? (
           <div class="client-permission-confirm" role="alertdialog"
-            aria-label={`Always approve every ${runtime} permission request?`}>
-            <p>Always approve every {runtime} permission request?</p>
-            <p class="quiet small">No {runtime} agent, workflow or server folder will ask before it edits files or runs commands. Set Default to make them ask again.</p>
+            aria-label={`Say yes to every ${runtime} permission request?`}>
+            <p>Say yes to every {runtime} permission request?</p>
+            <p class="quiet small">No {runtime} agent, workflow or server folder will ask before it edits files or runs commands. Choose Request cards to make them ask again.</p>
             <div class="client-permission-actions">
               <button type="button" onClick={close}>Cancel</button>
               <button type="button" class="destructive" disabled={disabled} onClick={() => {
                 onChange("alwaysApprove");
                 close();
-              }}>Always Approve</button>
+              }}>Yes to All</button>
             </div>
           </div>
         ) : (<>

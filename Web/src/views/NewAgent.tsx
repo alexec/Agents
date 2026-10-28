@@ -24,7 +24,8 @@ import { accountChoices, accountRows, choiceNote, defaultAccountName, formRuntim
 import { formFor, keepForm, keptForm } from "../model/startForm";
 import { personaChoices, withPersonaLabels } from "../model/personas";
 import { sandboxCardTitle, sandboxChoiceWords, sandboxChoices, sandboxExplanation, sandboxOverrideWords, sandboxState,
-  sandboxStateWords, sandboxWhy, startWithout } from "../model/sandbox";
+  sandboxStateWords, sandboxWhy, startWithout, fixedSandbox } from "../model/sandbox";
+import { fieldWords, followsSettings } from "../model/levels";
 import { accepted } from "../model/labels";
 import type { Start } from "./chat/appViewBridge";
 import { go } from "../route";
@@ -594,22 +595,26 @@ function SandboxPill({ runtimeID, name, override, runtimeDefault, codexMode, dis
   setBy?: PolicySetBy | undefined;
 }) {
   const choices = sandboxChoices(runtimeID);
-  const words = sandboxStateWords(sandboxState(runtimeID, override ?? runtimeDefault, codexMode));
-  if (!choices.length) return <span class="pill quiet" title={setBy ? line(setBy) : sandboxWhy(runtimeID) ?? words}>{words}</span>;
+  const state = sandboxStateWords(sandboxState(runtimeID, override ?? runtimeDefault, codexMode));
+  // A runtime that cannot change its sandbox: its fixed value, and why (#2658).
+  if (!choices.length) {
+    return <span class="pill quiet" title={setBy ? line(setBy) : sandboxWhy(runtimeID) ?? state}>{sandboxChoiceWords(fixedSandbox(runtimeID), runtimeID)}</span>;
+  }
   const refused = (choice: SandboxChoice) => setBy !== undefined && choice !== "on";
+  const asked = override ?? runtimeDefault;
   return (
-    <label class="pill select" title="Command sandbox">
-      <span aria-hidden="true">{words} ▾</span>
-      <select aria-label="Command sandbox" disabled={disabled} value={override ?? ""}
+    <label class="pill select" title={`${fieldWords.sandbox}: ${state}`}>
+      <span aria-hidden="true">{sandboxOverrideWords(override, runtimeDefault, runtimeID)} ▾</span>
+      <select aria-label="Sandbox" disabled={disabled} value={asked}
         onChange={(e) => {
-          const v = (e.currentTarget as HTMLSelectElement).value;
-          choose(v === "" ? undefined : v as SandboxChoice);
+          const v = (e.currentTarget as HTMLSelectElement).value as SandboxChoice;
+          // The value Settings gives, chosen again, follows Settings still.
+          choose(override === undefined && v === runtimeDefault ? undefined : v);
         }}>
-        <option value="" disabled={refused(runtimeDefault)}>
-          {optionLabel(sandboxOverrideWords(undefined, runtimeDefault, runtimeID), refused(runtimeDefault) ? setBy : undefined)}</option>
         {choices.map((c) => (
           <option key={c} value={c} disabled={refused(c)} title={refused(c) ? line(setBy!) : sandboxExplanation(c, runtimeID, name)}>
-            {optionLabel(sandboxChoiceWords(c, runtimeID), refused(c) ? setBy : undefined)}</option>
+            {optionLabel(override === undefined && c === runtimeDefault ? `${sandboxChoiceWords(c, runtimeID)} (${followsSettings})` : sandboxChoiceWords(c, runtimeID),
+              refused(c) ? setBy : undefined)}</option>
         ))}
       </select>
     </label>

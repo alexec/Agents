@@ -31,20 +31,20 @@ running, and reads the meter that says how full its context is.
    Click one and choose. A runtime that offers no runtime-native choices, such as Cursor,
    shows none of those. Its permission capsule is separate.
 
-   Cursor, Grok and OpenCode also have a permission capsule under the prompt. Set **Default**
-   to be asked before an action that needs permission, or **Always-approve** to answer every
-   permission request for that runtime. Questions that are not permission still wait. This
-   is one Mac-wide value for every agent on that runtime, including workflow agents and
-   agents in server folders. It follows the Mac across the Remote and web page. Cursor's
-   **Agent**, **Plan** and **Ask**, and OpenCode's own modes, stay separate.
+   Cursor, Grok and OpenCode also have a **Permission requests** pill under the prompt.
+   Choose **Request cards** to be asked, with a card, before an action that needs permission,
+   or **Yes to all** for the app to say yes to each permission request. Questions that are
+   not permission still wait. Cursor's **Agent**, **Plan** and **Ask**, and OpenCode's own
+   modes, stay separate.
 
-   Beside the mode is the command sandbox, such as **Sandbox: runtime controlled** or
-   **Sandbox off**. It is the app's, not the runtime's list, and it is separate from the
-   mode: the mode says when the agent asks you, the sandbox says what its commands can
-   reach. Choose **Use runtime default** to follow **Settings ▸ Agent Runtimes**, or **On**
-   or **Off** for this agent only. For Codex, **Off** is **Full access** and turns its
-   approval prompts off too; the mode capsule changes with it. A runtime the app cannot
-   change shows its state only; hover over it for why.
+   Beside the mode is the **Sandbox** pill: **Default sandbox** (the runtime's own settings
+   decide), **Runtime sandbox** (the app turns the runtime's sandbox on) or **No sandbox**
+   (commands run with your own access). It is the app's, not the runtime's list, and it is
+   separate from the mode: the mode says when the agent asks you, the sandbox says what its
+   commands can reach. The value from **Settings ▸ Agent Runtimes** is marked **follows
+   Settings**; choose another for this agent only. For Codex, **No sandbox** is **Full
+   access** and turns its approval prompts off too; the mode capsule changes with it. A
+   runtime the app cannot change shows its fixed value; hover over it for why.
 4. Type the prompt and send it. The agent starts with what you chose.
 
    On iPhone and iPad, the start form has **Runtime**, **Permission** for Cursor, Grok or

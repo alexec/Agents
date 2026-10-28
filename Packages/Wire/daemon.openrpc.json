@@ -910,6 +910,32 @@
       }
     },
     {
+      "name": "agents/setClientPermission",
+      "x-capability": "auto/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "An agent's own answer to permission requests on Cursor, Grok and OpenCode (#2658, FR-019); no mode follows Settings. Applied from its next request.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SetClientPermissionRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Agent"
+        }
+      }
+    },
+    {
       "name": "agents/setLabels",
       "x-capability": "agents/1",
       "tags": [
@@ -924,6 +950,32 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/SetLabelsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Agent"
+        }
+      }
+    },
+    {
+      "name": "agents/setLevels",
+      "x-capability": "auto/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Change a running agent's model level or permission mode (#2658, Story 2): mapped on its own runtime, applied from its next step.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SetLevelsRequest"
           }
         }
       ],
@@ -1358,6 +1410,130 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/AttentionPending"
+        }
+      }
+    },
+    {
+      "name": "auto/changed",
+      "x-capability": "auto/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "description": "The saved Auto settings (#2658).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AutoSettings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "auto/mappings",
+      "x-capability": "auto/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Every cell of the Auto mappings, marked, with each runtime's own choices (#2658).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/AutoMappings"
+        }
+      }
+    },
+    {
+      "name": "auto/preview",
+      "x-capability": "auto/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "The runtime Auto would pick now for these levels and folder, or why none can (#2658).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AutoPreviewRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/AutoPreview"
+        }
+      }
+    },
+    {
+      "name": "auto/set",
+      "x-capability": "auto/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Save the Auto order, the runtimes left out and the person's own cells (#2658, FR-017).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AutoSettings"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/AutoSettings"
+        }
+      }
+    },
+    {
+      "name": "auto/state",
+      "x-capability": "auto/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/AutoSettings"
         }
       }
     },
@@ -7173,6 +7349,10 @@
       "agentsWorking": {
         "code": -32068,
         "message": "agentsWorking"
+      },
+      "autoNoRuntime": {
+        "code": -32083,
+        "message": "autoNoRuntime"
       },
       "botMachine": {
         "code": -32073,

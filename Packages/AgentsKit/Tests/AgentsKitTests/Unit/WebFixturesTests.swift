@@ -1024,6 +1024,49 @@ struct WebFixturesTests {
         }
     }
 
+    // MARK: levels/
+
+    /// The words every runtime shares (#2658), field by field.
+    @Test func levelWords() throws {
+        let cases = AutoField.allCases.map { field in
+            Case(name: field.rawValue, input: .object(["field": .string(field.rawValue)]))
+        }
+        try pin("levels/words.json", cases) { input in
+            let field = AutoField(rawValue: input["field"]!.stringValue!)!
+            let levels = LevelWords.levels(field)
+            return .object([
+                "field": .string(LevelWords.field(field)),
+                "levels": .array(levels.map(JSONValue.string)),
+                "words": .object(Dictionary(uniqueKeysWithValues: levels.map { ($0, JSONValue.string(LevelWords.level(field, $0))) })),
+                "files": .object(Dictionary(uniqueKeysWithValues: levels.map { ($0, JSONValue.string(LevelWords.fileWord(field, $0))) })),
+                "meanings": .object(Dictionary(uniqueKeysWithValues: levels.map { level in
+                    let meaning: String = switch field {
+                    case .model: LevelWords.meaning(model: ModelLevel(rawValue: level)!)
+                    case .permission: LevelWords.meaning(permission: PermissionLevel(rawValue: level)!)
+                    case .permissionRequests: LevelWords.meaning(requests: ClientPermissionMode(rawValue: level)!)
+                    case .sandbox: LevelWords.meaning(sandbox: SandboxChoice(rawValue: level)!)
+                    }
+                    return (level, JSONValue.string(meaning))
+                })),
+                "marks": .object(Dictionary(uniqueKeysWithValues: [AutoMark.autoMapped, .nearestSafer, .yours, .notPossible, .dropped].map {
+                    ($0.rawValue, JSONValue.string(LevelWords.mark($0)))
+                })),
+                "custom": .string(LevelWords.custom),
+                "followsSettings": .string(LevelWords.followsSettings),
+                "own": .string(LevelWords.own("Claude")),
+                "on": .string(LevelWords.on("Balanced", native: "Sonnet 5", runtimeName: "Claude")),
+                "picks": .string(LevelWords.picks("Claude")),
+                "picksNone": .string(LevelWords.picks(nil)),
+                "header": .string(LevelWords.header("Claude")),
+                "noRuntime": .string(LevelWords.noRuntime([AutoSkip(runtimeID: "claude", reason: "out"),
+                                                            AutoSkip(runtimeID: "codex", reason: "not signed in")]) {
+                    RuntimeCatalog.runtime(id: $0)?.name ?? $0
+                }),
+                "continueOn": .string(LevelWords.continueOn("Codex")),
+            ])
+        }
+    }
+
     // MARK: runtimes/
 
     @Test func runtimeReasons() throws {

@@ -110,7 +110,7 @@ struct ChoiceRows: View {
                     Text(ClientPermissionWords.scope(runtimeName: name))
                 }
             } label: {
-                LabeledContent("Permissions") {
+                LabeledContent(LevelWords.requestsField) {
                     Text(ClientPermissionWords.title(mode)).foregroundStyle(.secondary)
                 }
                 .appText(.reading)
@@ -312,8 +312,10 @@ struct ChoiceRows: View {
             let runtimeDefault = model.sandboxSettings.choice(for: runtimeID)
             let title = SandboxWords.override(model.startSandbox, runtimeDefault: runtimeDefault, runtimeID: runtimeID)
             if choices.isEmpty {
-                LabeledContent("Sandbox") {
-                    Text(SandboxWords.state(SandboxCatalog.state(runtimeID: runtimeID, choice: .runtime)))
+                LabeledContent(LevelWords.sandboxField) {
+                    // Its fixed value, in the shared words (#2658).
+                    let none = SandboxCatalog.state(runtimeID: runtimeID, choice: .runtime) == SandboxState.none
+                    Text(LevelWords.sandbox(none ? .off : .runtime))
                         .foregroundStyle(.secondary)
                 }
                 .appText(.reading)
@@ -324,38 +326,31 @@ struct ChoiceRows: View {
                 // While the organisation requires the sandbox, only On is in force (#998).
                 let setBy = model.sandboxSettings.setBy
                 Menu {
-                    if let setBy, runtimeDefault != .on {
-                        OrgPolicyMenuItem(name: SandboxWords.override(nil, runtimeDefault: runtimeDefault, runtimeID: runtimeID),
-                                          mark: setBy)
-                    } else {
-                        Button {
-                            model.startSandbox = nil
-                        } label: {
-                            choiceLabel(SandboxWords.override(nil, runtimeDefault: runtimeDefault, runtimeID: runtimeID),
-                                        chosen: model.startSandbox == nil)
-                        }
-                    }
                     ForEach(choices, id: \.self) { choice in
                         if let setBy, choice != .on {
                             OrgPolicyMenuItem(name: choice == .off ? SandboxWords.startWithout
                                                   : SandboxWords.choice(choice, runtimeID: runtimeID), mark: setBy)
                         } else {
                             Button {
-                                model.startSandbox = choice
+                                // The value Settings gives, chosen again, follows Settings still.
+                                model.startSandbox = model.startSandbox == nil && choice == runtimeDefault ? nil : choice
                                 // Codex's sandbox is its mode (FR-005a).
                                 if runtimeID == RuntimeCatalog.codex.id, choice == .off {
                                     model.choose("agent-full-access", for: "mode")
                                 }
                             } label: {
-                                choiceLabel(choice == .off ? SandboxWords.startWithout : SandboxWords.choice(choice, runtimeID: runtimeID),
-                                            chosen: model.startSandbox == choice)
+                                choiceLabel(SandboxWords.choice(choice, runtimeID: runtimeID),
+                                            chosen: (model.startSandbox ?? runtimeDefault) == choice)
+                                if model.startSandbox == nil, choice == runtimeDefault {
+                                    Text(LevelWords.followsSettings)
+                                }
                                 Text(SandboxWords.explanation(choice, runtimeID: runtimeID,
                                                               name: model.startRuntime?.runtime.name ?? runtimeID))
                             }
                         }
                     }
                 } label: {
-                    LabeledContent("Sandbox") {
+                    LabeledContent(LevelWords.sandboxField) {
                         Text(title).foregroundStyle(.secondary)
                     }
                     .appText(.reading)
