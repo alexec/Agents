@@ -31,7 +31,14 @@ struct RemoteAgentConfigEditor: View {
                               saveFile: { path, content, delete in
                                   await model.saveAgentConfigEditorFile(in: folder, kind: kind,
                                                                         path: path, content: content, delete: delete)
-                              })
+                              },
+                              synced: folder == nil ? synced : nil)
+            // `~/.agents` is the person's on every machine: say so, and when it last synced (#2766).
+            .task(id: folder == nil) { if folder == nil { await model.userScope.load(model.controlPlane) } }
+    }
+
+    private var synced: String {
+        UserScopeWords.agentConfigurationUpdated(model.userScope.settings?.agentConfigFiles?.updated)
     }
 }
 

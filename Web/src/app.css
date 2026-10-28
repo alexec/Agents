@@ -1696,4 +1696,6 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .agent-config-controls label { flex: 1 1 180px; }
 .agent-config-controls input, .agent-config-controls select { width: 100%; box-sizing: border-box; }
 .agent-config-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.agent-config-sync { display: grid; gap: 3px; margin-bottom: 12px; }
+.agent-config-sync p { margin: 0; }
 .agent-config-project { min-width: min(760px, 90vw); max-height: 85vh; overflow: auto; }
