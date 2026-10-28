@@ -47,8 +47,8 @@ struct FolderListView: View {
     /// Which machine the New folder menu was pointed at (037).
     @State private var targetHost: MachineRef = .mac
     @State private var isChoosingServerFolder = false
-    /// File ▸ Add Server…'s own view of the control plane, while its sheet is open (#503).
-    @State private var addingServer: ControlSettingsModel?
+    /// File ▸ Add a Machine…'s own view of the control plane, while its sheet is open (#503).
+    @State private var addingMachine: ControlSettingsModel?
 
     /// This Mac's folders, then each server's: no headings for hosts (Alex, #145), the
     /// host is in a server folder's own name.
@@ -341,17 +341,17 @@ struct FolderListView: View {
         }
         .sendToHostSheet(requests)
         .bringBackSheet(requests)
-        // The sheet Settings ▸ Control plane ▸ Add a Machine… shows (#503).
-        .sheet(isPresented: Binding(get: { addingServer != nil }, set: { if !$0 { addingServer = nil } })) {
-            if let control = addingServer {
-                ControlAddServerSheet(control: control)
+        // The sheet Settings ▸ Machines ▸ Add a Machine… shows (#503, #2755).
+        .sheet(isPresented: Binding(get: { addingMachine != nil }, set: { if !$0 { addingMachine = nil } })) {
+            if let control = addingMachine {
+                AddMachineSheet(control: control)
                     .task { await control.start() }
                     .onDisappear { control.stop() }
                     .paperSheet()
             }
         }
         // File ▸ Add Folder…, Clone Folder from Git URL…, their On menus for a server,
-        // and Add Server….
+        // and Add a Machine….
         .onChange(of: requests.folderSheet) { _, sheet in
             guard let sheet else { return }
             requests.folderSheet = nil
@@ -362,8 +362,8 @@ struct FolderListView: View {
             case .clone(let host):
                 targetHost = host
                 isCloning = true
-            case .addServer:
-                addingServer = ControlConfig.endpoint.flatMap { ControlSettingsModel(endpoint: $0) }
+            case .addMachine:
+                addingMachine = ControlConfig.endpoint.flatMap { ControlSettingsModel(endpoint: $0) }
             }
         }
     }

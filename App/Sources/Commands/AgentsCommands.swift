@@ -14,7 +14,7 @@ final class WindowRequests {
     enum FolderSheet: Equatable {
         /// A folder, or a clone, on this Mac or on a server (#495: the File menu is the
         /// one way in now the sidebar's New folder menu has gone).
-        case chooseFolder(MachineRef = .mac), clone(MachineRef = .mac), addServer
+        case chooseFolder(MachineRef = .mac), clone(MachineRef = .mac), addMachine
     }
 
     /// Set by a menu item, taken (and cleared) by `FolderListView`, which owns the sheets.
@@ -134,8 +134,11 @@ struct AgentsCommands: Commands {
                     }
                 }
             }
-            Button("Add Server…") { requests.folderSheet = .addServer }
+            // As Settings ▸ Machines has it (#2755); a machine joins a control plane, so
+            // with none (the window is at first run) there is nothing to add it to.
+            Button(AddMachine.Words.menuItem) { requests.folderSheet = .addMachine }
                 .keyboardShortcut("o", modifiers: [.command, .control])
+                .disabled(model.needsFirstRun)
             Divider()
             Button("Show in Finder") { showInFinder() }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
