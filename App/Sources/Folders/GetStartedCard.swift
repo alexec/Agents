@@ -12,7 +12,7 @@ struct GetStartedCard: View {
     @Environment(WindowRequests.self) private var requests
     @Binding var isChoosingFolder: Bool
     /// Its own view of the control plane, for its list of clients: held only while the
-    /// card shows, as File ▸ Add Server… holds one only while its sheet is open.
+    /// card shows, as File ▸ Add a Machine… holds one only while its sheet is open.
     @State private var control: ControlSettingsModel?
     @State private var pairingDevice = false
 

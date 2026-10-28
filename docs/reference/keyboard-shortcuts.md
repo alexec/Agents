@@ -25,7 +25,7 @@ ones every Mac app has.
 | Option-Command-N | **File ▸ New Session in a Worktree** | Starts a new session in the selected folder, in a new worktree. |
 | Command-O | **File ▸ Add Folder…** | Adds a folder as a folder. |
 | Shift-Command-O | **File ▸ Clone Folder from Git URL…** | Clones a Git URL as a folder. |
-| Control-Command-O | **File ▸ Add Server…** | Adds a Linux server. |
+| Control-Command-O | **File ▸ Add a Machine…** | Adds a machine, as Settings ▸ Machines does. Off with no control plane. |
 | Shift-Command-R | **File ▸ Show in Finder** | Shows the agent's or folder in Finder. |
 | Option-Command-, | **File ▸ Folder Settings…** | Opens the selected folder's settings: its instructions, skills, plugins, connectors and worktrees. |
 | Command-. | **Session ▸ Stop** | Stops the agent and stays on the conversation. |
