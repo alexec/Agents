@@ -41,6 +41,9 @@ struct AgentConfigFileEditor: View {
     let saveFile: @MainActor (_ path: String, _ content: String, _ delete: Bool) async -> String?
     /// True while the open file has edits not saved, for a container that can leave the editor.
     var unsaved: Binding<Bool> = .constant(false)
+    /// A file to open, such as a Needs a look row's skill (#2761); set back to nil once it is
+    /// open, or when there is no such file. Edits not saved keep the open file.
+    var open: Binding<String?> = .constant(nil)
 
     @State private var files: [DaemonAPI.AgentConfigEditorFile] = []
     @State private var selected: String?
@@ -98,6 +101,7 @@ struct AgentConfigFileEditor: View {
         .padding(20)
         .task(id: kind) { await reload() }
         .onChange(of: selected) { _, path in pick(path) }
+        .onChange(of: open.wrappedValue) { openAsked() }
         .onChange(of: dirty, initial: true) { _, now in unsaved.wrappedValue = now }
         .onDisappear { unsaved.wrappedValue = false }
         #if os(iOS)
@@ -134,6 +138,13 @@ struct AgentConfigFileEditor: View {
         files = listed
         if selected == nil || !listed.contains(where: { $0.path == selected }) { selected = listed.first?.path }
         pick(selected)
+        openAsked()
+    }
+
+    private func openAsked() {
+        guard let path = open.wrappedValue, !files.isEmpty else { return }
+        if !dirty, files.contains(where: { $0.path == path }) { selected = path }
+        open.wrappedValue = nil
     }
 
     private func add() async {
