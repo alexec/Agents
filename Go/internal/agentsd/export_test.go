@@ -70,8 +70,7 @@ func tarNamesOf(t *testing.T, b []byte) []string {
 // US3: an agent exported on one machine comes back archived on another, never run there,
 // and a second import skips it.
 func TestExportAnAgentAndImportItOnAnotherMachine(t *testing.T) {
-	clock := time.Date(2026, 10, 22, 9, 0, 0, 0, time.UTC)
-	atTime(t, &clock)
+	atTime(t, time.Date(2026, 10, 22, 9, 0, 0, 0, time.UTC))
 	a, ca := start(t, t.TempDir())
 	dir := folder(t, ca, 1)
 	title := "Fix the: build/now"
@@ -222,8 +221,7 @@ func TestImportSkipsAnErasedAgentAndNeverRunsOwnAgents(t *testing.T) {
 // A file that is not an export is refused, and a backup imported brings its agents but
 // none of its root files: not the history, not the erased list.
 func TestImportRefusesWhatIsNotAnExport(t *testing.T) {
-	clock := time.Date(2026, 10, 22, 9, 0, 0, 0, time.UTC)
-	atTime(t, &clock)
+	atTime(t, time.Date(2026, 10, 22, 9, 0, 0, 0, time.UTC))
 	a, ca := start(t, t.TempDir())
 	upload := store.NewUUID()
 	ca.call(t, 1, "agents/importUpload", map[string]any{"upload": upload, "offset": 0, "data": []byte("not a tar.gz")})
