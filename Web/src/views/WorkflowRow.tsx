@@ -9,7 +9,7 @@
 import { useSignal } from "@preact/signals";
 import type { WorkflowSummary } from "../protocol/generated";
 import type { Store } from "../model/store";
-import { canBeApproved, canBeDenied, isOn, isUnapproved, runsHere, workflowStatus } from "../model/workflows";
+import { canBeApproved, canBeDenied, isOn, isUnapproved, runsHere, scopeSentence, workflowStatus } from "../model/workflows";
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
 import { fromWireDate } from "../protocol/dates";
 import { shortAgo } from "../model/activity";
@@ -26,11 +26,14 @@ export function WorkflowRow({ store, host, summary, disabled, chosen, onPick, pi
   const status = workflowStatus(summary);
   const ran = lastRan(summary);
   const menu = () => workflowMenu(store, host, summary, disabled, onPick, pinnedAt);
+  // A user workflow says it is in every folder (#2759), pinned or under Needs You too.
+  const pickWords = !isOn(summary) && !summary.isArchived ? `Turned off. Open ${summary.workflow.name}` : `Open ${summary.workflow.name}`;
+  const scope = scopeSentence(summary);
   return (
     <div class={`row workflow${chosen ? " chosen" : ""}`} onContextMenu={(e) => openContextMenu(e, menu())}
       onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }} {...holdForMenu(menu)}>
       <button class="pick" aria-current={chosen} onClick={onPick}
-        title={!isOn(summary) && !summary.isArchived ? `Turned off. Open ${summary.workflow.name}` : `Open ${summary.workflow.name}`}>
+        title={scope ? `${pickWords}. ${scope}` : pickWords}>
         <span class={`workflow-mark${status.tinted ? " tinted" : ""}`} role="img" aria-label={status.words} title={status.words}>{status.mark}</span>
         {/* Heavier only while it waits for an OK (#520), as a session's title is while unread. */}
         <span class={`title${summary.awaitingApproval && !summary.isArchived ? " needs-ok" : ""}${place ? " placed" : ""}`}>

@@ -446,6 +446,20 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
             + "a file in this folder you may commit"
     }
 
+    /// What a user workflow's page says, and its row's help and VoiceOver value (#2759): it
+    /// is in every folder, not only this one. Nil for a folder's own. The Remote and the web
+    /// page say the same words.
+    public static let userScopeSentence = "Your workflow: in every folder"
+    public var scopeSentence: String? { scope == "user" ? Self.userScopeSentence : nil }
+
+    /// A row's tooltip: what it does, led by Turned off when it is, and then where it is
+    /// (#2759). The Remote's row says where it is to VoiceOver.
+    public var rowHelp: String {
+        let what = !isEnabled && !isArchived ? "Turned off. \(workflow.summary)" : workflow.summary
+        guard let scopeSentence else { return what }
+        return "\(what)\n\(scopeSentence)"
+    }
+
     /// Read leniently: a daemon from before #100 sends no `isEnabled`, and an outcome
     /// this version does not know (a refusal added later) costs the outcome rather than
     /// the whole folder's list.

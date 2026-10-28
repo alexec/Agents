@@ -350,7 +350,9 @@ struct SidebarWorkflowRow: View {
         }
         .padding(.leading, isNested ? 20 * scale + 10 : 0)
         .accessibilityElement(children: .combine)
-        .accessibilityValue(!summary.isEnabled && !summary.isArchived ? "turned off" : "")
+        // A user workflow says it is in every folder (#2759), pinned or under Needs You too.
+        .accessibilityValue([!summary.isEnabled && !summary.isArchived ? "turned off" : nil, summary.scopeSentence]
+            .compactMap { $0 }.joined(separator: ", "))
         .tag(SidebarItem.workflow(summary.id, in: folder))
         // Pin or Unpin (#432), from the leading edge, as a session's row has it.
         .swipeActions(edge: .leading) {
