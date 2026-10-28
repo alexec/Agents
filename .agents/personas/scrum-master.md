@@ -97,6 +97,14 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
 - **The release unparks the next milestone** (#1729, #2309): when it ships, the next
   milestone becomes the open one and the release takes `parked` off its issues. Check its
   report; land anything it could not release.
+- **While a patch milestone is open** (x.y.z, z > 0; AGENTS.md, "A minor release is
+  followed by a patch", #2801): take its bugs first, high, then medium, then low, and
+  start nothing for the next minor milestone. Only bug fixes merge: when a `polish`,
+  `competitor` or backlog enhancement PR is ready, turn its auto-merge off
+  (`gh pr merge N --disable-auto`) and label it `hold:v<x.y.z>`; the release lifts the hold
+  when the patch ships. When no `priority:high` or `priority:medium` bug is open in the
+  patch milestone, or two days after the last tag, tell Alex in your report that the patch
+  is ready to release.
 - **Open questions get an agent.** An issue with open questions is not held back: start
   an agent that settles them: it decides the easy-to-undo ones and tells Alex
   (AGENTS.md, "Decide and tell"), and asks Alex the rest.
