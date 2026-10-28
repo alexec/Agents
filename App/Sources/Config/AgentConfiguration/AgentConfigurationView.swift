@@ -112,6 +112,14 @@ struct AgentConfigurationView: View {
 enum AgentConfigurationPage: String, Hashable, CaseIterable {
     case overview, instructions, skills, personas, workflows, mcp, plugins, other
 
+    init(_ kind: DaemonAPI.AgentConfigEditorKind) {
+        switch kind {
+        case .skills: self = .skills
+        case .personas: self = .personas
+        case .workflows: self = .workflows
+        }
+    }
+
     init(_ page: DaemonAPI.Look.Page) {
         switch page {
         case .instructions: self = .instructions

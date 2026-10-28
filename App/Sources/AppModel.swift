@@ -2082,6 +2082,10 @@ final class AppModel {
     /// by the Settings window.
     var settingsPaneAsked: SettingsPane?
 
+    /// A file for Agent Configuration's editor to open, asked for by a workflow page's Edit
+    /// File… (#2803): read and cleared by the editor's page for that kind and folder.
+    var agentConfigFileAsked: AgentConfigFileAsk?
+
     /// Every runtime's state on this Mac (065, US4). Asking also asks Grok what is left.
     func refreshRuntimeAllowances() async {
         guard let allowances = try? await macClient.call(DaemonAPI.Method.runtimesAllowances, Optional<String>.none,

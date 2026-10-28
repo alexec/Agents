@@ -31,6 +31,8 @@ struct WorkflowPage: View {
     /// phone's list until this page asks for them, so it cannot count them itself.
     @State private var moreRuns = false
     @State private var confirmsDelete = false
+    /// Its file, up in the Workflows editor (#2803).
+    @State private var editsFile = false
     /// Which half of the page is on show (#863), as on the Mac.
     @State private var pane = WorkflowPane.activity
 
@@ -65,12 +67,25 @@ struct WorkflowPage: View {
                     ToolbarItem(placement: .topBarTrailing) { PinWorkflowButton(summary: summary) }
                 }
                 ToolbarItem(placement: .topBarTrailing) { archiveButton(summary) }
+                // Its file in Agent Configuration's Workflows editor (#2803): yours, or the folder's.
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { editsFile = true } label: {
+                        Label("Edit File…", systemImage: "square.and.pencil")
+                    }
+                    .disabled(model.isStale)
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(role: .destructive) { confirmsDelete = true } label: {
                         Label("Delete…", systemImage: "trash")
                     }
                     .disabled(model.isStale)
                 }
+            }
+        }
+        .sheet(isPresented: $editsFile) {
+            if let summary {
+                RemoteWorkflowFileEditor(folder: summary.scope == "user" ? nil : summary.workflow.folder,
+                                         opening: "\(summary.workflowID).\(WorkflowPaths.fileExtension)")
             }
         }
         .confirmationDialog("Delete \"\(summary?.workflow.name ?? "workflow")\"? Its file is removed from disk.",

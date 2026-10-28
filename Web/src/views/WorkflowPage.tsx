@@ -23,6 +23,7 @@ import { workflowContinueSentence, workflowContinueSwitch } from "../model/conti
 import { BackToList } from "./BackToList";
 import { isWorkflowMuted, muteLabel, workflowMuteHelp } from "../model/mute";
 import { Capability } from "../protocol/capabilities.generated";
+import { WorkflowFileModal } from "./AgentConfigEditor";
 
 export function WorkflowPage({ store, host, folder, folderName, workflowID, down }: {
   store: Store; host: string; folder: string; folderName: string; workflowID: string; down: boolean;
@@ -36,6 +37,8 @@ export function WorkflowPage({ store, host, folder, folderName, workflowID, down
   const summary = store.folderWorkflows(host, folder).find((w) => w.workflow.workflowID === workflowID);
   // Which half of the page is on show (#863), as the window and the Remote have it.
   const pane = useSignal<"activity" | "configuration">("activity");
+  // Its file, up in the Workflows editor (#2803).
+  const editsFile = useSignal(false);
   const runLimit = useSignal(3);
   const runs = useSignal<Agent[]>([]);
   const loadingRuns = useSignal(false);
@@ -93,9 +96,18 @@ export function WorkflowPage({ store, host, folder, folderName, workflowID, down
       if (await store.deleteWorkflow(host, summary)) go({ host, folder: folder });
     }
   };
+  // Yours are in ~/.agents on the Mac, as Settings ▸ Agent Configuration edits them; the folder's on its host.
+  const yours = summary.scope === "user";
+  const editFile = <button class="archive" disabled={down}
+    title={yours ? "Open this workflow's file in Settings ▸ Agent Configuration ▸ Workflows"
+      : "Open this workflow's file in the folder's Agent Configuration ▸ Workflows"}
+    onClick={() => { editsFile.value = true; }}>Edit File…</button>;
   return (
     <section class="chat workflow-page" aria-label="Workflow">
       <header class="column-head">{back}<h1>{workflow.name}</h1></header>
+      {editsFile.value && <WorkflowFileModal store={store} host={yours ? store.macHostID.value : host}
+        folder={yours ? undefined : folder} path={`${workflow.workflowID}.md`} down={down}
+        close={() => { editsFile.value = false; }} />}
       <div class="scroll">
         <div class="workflow-body">
           <div class="heading">
@@ -106,6 +118,7 @@ export function WorkflowPage({ store, host, folder, folderName, workflowID, down
           {summary.isArchived ? (
             <div class="controls">
               <button class="run-now prominent" disabled={down} onClick={() => void store.setWorkflowArchived(host, summary, false)}>Unarchive</button>
+              {editFile}
               <button class="archive" disabled={down} title="Delete this workflow file from disk" onClick={() => void deleteWorkflow()}>Delete…</button>
             </div>
           ) : (
@@ -148,6 +161,7 @@ export function WorkflowPage({ store, host, folder, folderName, workflowID, down
               })()}
               <button class="archive" disabled={down} title="Archive this workflow and go back to the folder. Writes archived: true into its file"
                 onClick={async () => { await store.setWorkflowArchived(host, summary, true); go({ host, folder: folder }); }}>Archive</button>
+              {editFile}
               <button class="archive" disabled={down} title="Delete this workflow file from disk" onClick={() => void deleteWorkflow()}>Delete…</button>
             </div>
           )}

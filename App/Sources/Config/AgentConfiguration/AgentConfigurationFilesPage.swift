@@ -46,9 +46,24 @@ struct AgentConfigurationFilesPage: View {
                                   },
                                   unsaved: unsaved, open: $opening)
         }
+        // A file asked for from elsewhere, such as a workflow page's Edit File… (#2803).
+        .onChange(of: model.agentConfigFileAsked, initial: true) { _, asked in
+            guard let asked, asked.kind == kind,
+                  asked.folder?.standardizedFileURL == folder?.standardizedFileURL else { return }
+            opening = asked.path
+            model.agentConfigFileAsked = nil
+        }
         .sheet(isPresented: $showingSkillCatalogue) {
             AgentsSetupPage { AgentsSkillsSection(place: place) }
                 .frame(minWidth: 650, minHeight: 500)
         }
     }
+}
+
+/// A file to open in Agent Configuration's editor (#2803): its kind, its path inside that
+/// kind's folder, and the folder whose `.agents` it is in, or nil for `~/.agents`.
+struct AgentConfigFileAsk: Equatable {
+    var folder: URL?
+    var kind: DaemonAPI.AgentConfigEditorKind
+    var path: String
 }
