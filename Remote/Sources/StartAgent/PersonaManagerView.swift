@@ -89,9 +89,9 @@ struct PersonaManagerView: View {
 
     private func save(remove: Bool = false) async {
         busy = true
-        let ok = await model.savePersonaFile(in: folder, origin: origin, id: id, content: content, delete: remove)
+        let failure = await model.savePersonaFile(in: folder, origin: origin, id: id, content: content, delete: remove)
         busy = false
-        guard ok else { problem = "The persona could not be saved."; return }
+        if let failure { problem = failure; return }
         if remove { clear() } else { selected = id }
         await load()
     }
