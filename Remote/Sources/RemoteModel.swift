@@ -1308,11 +1308,6 @@ final class RemoteModel {
         startPersonas = listed
     }
 
-    func personaFiles(in folder: URL, origin: Persona.Origin) async -> [DaemonAPI.PersonaFile]? {
-        let request = DaemonAPI.PersonasFilesRequest(folder: origin == .folder ? folder : nil, origin: origin)
-        return try? await client(for: request).call(DaemonAPI.Method.personasFiles, request, returning: [DaemonAPI.PersonaFile].self)
-    }
-
     func agentConfigEditorFiles(in folder: URL?, kind: DaemonAPI.AgentConfigEditorKind)
         async -> [DaemonAPI.AgentConfigEditorFile]? {
         let request = DaemonAPI.AgentConfigEditorRequest(folder: folder, kind: kind)
@@ -1329,17 +1324,6 @@ final class RemoteModel {
             await refreshWorkflows()
             return nil
         } catch { return String(describing: error) }
-    }
-
-    /// Nil when it was saved; otherwise the host's reason, such as front matter it cannot read (#2762).
-    func savePersonaFile(in folder: URL, origin: Persona.Origin, id: String, content: String, delete: Bool = false) async -> String? {
-        let request = DaemonAPI.PersonaFileSaveRequest(folder: origin == .folder ? folder : nil, origin: origin,
-                                                       id: id, content: content, delete: delete ? true : nil)
-        do {
-            try await client(for: request).call(DaemonAPI.Method.personasSave, request)
-        } catch { return String(describing: error) }
-        await loadStartPersonas(in: folder)
-        return nil
     }
 
     /// Pick a kind of session (#760): every setting it names is set, every one it leaves
