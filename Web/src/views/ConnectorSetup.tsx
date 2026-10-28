@@ -11,7 +11,7 @@ import type {
 import { folderPath } from "../model/hostedMCP";
 import { Capability } from "../protocol/capabilities.generated";
 import * as words from "../model/connectorSetup";
-import { projectSlotFrom, projectWords, setByProject, slotLine, slotsOwner } from "../model/projects";
+import { projectSlotFrom, projectsNotRead, projectWords, setByProject, slotLine, slotsOwner } from "../model/projects";
 import type { Project } from "../protocol/generated";
 import { addMachineWords, whereAgentsRun } from "../model/addMachine";
 import { Modal } from "./Modal";
@@ -275,11 +275,20 @@ function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConn
 function ProjectSlots({ store, setup, changed }: { store: Store; setup: ConnectorSetup; changed: () => void }) {
   const [project, setProject] = useState<Project>();
   const [problem, setProblem] = useState<string>();
+  // Why the project could not be read (#2756): its rows wait on it, so say so.
+  const [notRead, setNotRead] = useState<string>();
   const [asking, setAsking] = useState(false);
-  useEffect(() => {
-    void store.link.call("projects/list", {}).then((l) => setProject(l.projects.find((p) => p.id === setup.project)))
-      .catch(() => setProject(undefined));
-  }, [setup.project]);
+  const load = () => {
+    void store.link.call("projects/list", {}).then((l) => {
+      setProject(l.projects.find((p) => p.id === setup.project));
+      setNotRead(undefined);
+    }).catch((e) => {
+      const said = projectsNotRead(e);
+      setNotRead(said);
+      if (said === undefined) setProject(undefined);
+    });
+  };
+  useEffect(load, [setup.project]);
   const name = project?.name ?? setup.projectName ?? projectWords.title;
   const set = async (slot: ConnectorSlotKind, value: ReturnType<typeof projectSlotFrom>) => {
     if (!setup.project) return;
@@ -310,6 +319,12 @@ function ProjectSlots({ store, setup, changed }: { store: Store; setup: Connecto
           </p>
         );
       })}
+      {notRead && (
+        <p class="small failure">
+          {notRead}{" "}
+          <button class="link" onClick={load}>{projectWords.tryAgain}</button>
+        </p>
+      )}
       {problem && <p class="small failure">{problem}</p>}
     </div>
   );

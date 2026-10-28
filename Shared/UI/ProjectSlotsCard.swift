@@ -15,6 +15,8 @@ struct ProjectSlotsCard: View {
 
     @State private var project: DaemonAPI.Project?
     @State private var problem: String?
+    /// Why the project could not be read (#2756): its rows wait on it, so say so.
+    @State private var notRead: String?
     @State private var isAsking = false
 
     private var name: String { project?.name ?? setup.projectName ?? ProjectWords.title }
@@ -29,6 +31,13 @@ struct ProjectSlotsCard: View {
                 if project?.mayChange == true {
                     ForEach(setup.slots.filter { $0.slot != .workspace }) { slot in
                         row(slot)
+                    }
+                }
+                if let notRead {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(notRead).appText(.fine).tinted(.failure).fixedSize(horizontal: false, vertical: true)
+                        Button(ProjectWords.tryAgain) { Task { await load() } }
+                            .projectLinkStyle()
                     }
                 }
                 if let problem {
@@ -65,12 +74,18 @@ struct ProjectSlotsCard: View {
     }
 
     /// The folder's project, for whether this person may change it. A control plane before
-    /// projects has none.
+    /// projects has none; any other failure says why, with Try Again (#2756).
     private func load() async {
         guard let control, let id = setup.project else { return }
-        let list = try? await control.call(DaemonAPI.Method.projectsList, DaemonAPI.Empty(),
-                                           returning: DaemonAPI.ProjectList.self)
-        project = list?.projects.first { $0.id == id }
+        do {
+            let list = try await control.call(DaemonAPI.Method.projectsList, DaemonAPI.Empty(),
+                                              returning: DaemonAPI.ProjectList.self)
+            project = list.projects.first { $0.id == id }
+            notRead = nil
+        } catch {
+            notRead = ProjectWords.notRead(error)
+            if notRead == nil { project = nil }
+        }
     }
 
     private func set(_ slot: DaemonAPI.ConnectorSlotKind, _ value: DaemonAPI.ProjectSlot?) async {

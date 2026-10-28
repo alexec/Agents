@@ -15,6 +15,8 @@ struct ProjectPicker: View {
     @State private var naming: Naming?
     @State private var name = ""
     @State private var problem: String?
+    /// Why the projects could not be read (#2756), so a failed read is not an empty list.
+    @State private var notRead: String?
     @State private var isAsking = false
 
     private enum Naming: Identifiable {
@@ -43,7 +45,8 @@ struct ProjectPicker: View {
                         if summary.project == nil {
                             Text("None").tag("")
                         } else if let id = summary.project, current == nil {
-                            Text(ProjectWords.unknown(id)).tag(id)
+                            // Not listed yet: most often its own project, being made (#2756).
+                            Text(summary.name).tag(id)
                         }
                         ForEach(projects) { Text($0.name).tag($0.id) }
                     }
@@ -61,6 +64,17 @@ struct ProjectPicker: View {
                     }
                     .fixedSize()
                     .disabled(isAsking)
+                }
+            }
+            if let notRead {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(notRead)
+                        .appText(.fine)
+                        .tinted(.failure)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button(ProjectWords.tryAgain) { Task { await load() } }
+                        .appText(.fine)
+                        .disabled(isAsking)
                 }
             }
             if let why = summary.projectProblem {
@@ -99,11 +113,18 @@ struct ProjectPicker: View {
         naming = asked
     }
 
-    /// The projects, again. A control plane before projects has none.
+    /// The projects, again. A control plane before projects has none; any other failure
+    /// keeps the last list and says why, with Try Again (#2756).
     private func load() async {
         guard let control else { return }
-        projects = (try? await control.call(DaemonAPI.Method.projectsList, DaemonAPI.Empty(),
-                                            returning: DaemonAPI.ProjectList.self))?.projects ?? []
+        do {
+            projects = try await control.call(DaemonAPI.Method.projectsList, DaemonAPI.Empty(),
+                                              returning: DaemonAPI.ProjectList.self).projects
+            notRead = nil
+        } catch {
+            notRead = ProjectWords.notRead(error)
+            if notRead == nil { projects = [] }
+        }
     }
 
     private func pick(_ id: String) async {

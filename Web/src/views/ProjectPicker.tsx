@@ -6,7 +6,7 @@ import { useEffect } from "preact/hooks";
 import type { Store } from "../model/store";
 import type { FolderSummary, Project } from "../protocol/generated";
 import { describe } from "../model/errors";
-import { projectTaken, projectWords, unknownProject } from "../model/projects";
+import { projectsNotRead, projectTaken, projectWords } from "../model/projects";
 import { Modal } from "./Modal";
 
 export function ProjectModal({ store, host, folder, summary, close }: {
@@ -16,9 +16,17 @@ export function ProjectModal({ store, host, folder, summary, close }: {
   const naming = useSignal<"new" | Project | null>(null);
   const name = useSignal("");
   const problem = useSignal<string | null>(null);
+  // Why the projects could not be read (#2756), so a failed read is not an empty list.
+  const notRead = useSignal<string | undefined>(undefined);
   const busy = useSignal(false);
   const load = async () => {
-    projects.value = (await store.link.call("projects/list", {}).catch(() => null))?.projects ?? [];
+    try {
+      projects.value = (await store.link.call("projects/list", {})).projects;
+      notRead.value = undefined;
+    } catch (error) {
+      notRead.value = projectsNotRead(error);
+      if (notRead.value === undefined) projects.value = [];
+    }
   };
   useEffect(() => { void load(); }, [summary.project]);
   const join = async (id: string) => {
@@ -69,7 +77,7 @@ export function ProjectModal({ store, host, folder, summary, close }: {
         <select aria-label={projectWords.title} disabled={busy.value} value={summary.project ?? ""}
           onChange={(e) => void join((e.currentTarget as HTMLSelectElement).value)}>
           {summary.project === undefined && <option value="">None</option>}
-          {summary.project !== undefined && !current && <option value={summary.project}>{unknownProject(summary.project)}</option>}
+          {summary.project !== undefined && !current && <option value={summary.project}>{summary.name}</option>}
           {projects.value.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
         {naming.value === null ? (
@@ -88,6 +96,12 @@ export function ProjectModal({ store, host, folder, summary, close }: {
               <p class="sheet-note">There is already a project called {name.value.trim()}.</p>
             )}
           </>
+        )}
+        {notRead.value && (
+          <p class="sheet-note failure" role="alert">
+            {notRead.value}{" "}
+            <button type="button" class="link" disabled={busy.value} onClick={() => void load()}>{projectWords.tryAgain}</button>
+          </p>
         )}
         {summary.projectProblem && <p class="sheet-note failure" role="alert">{summary.projectProblem}</p>}
         {problem.value && <p class="sheet-note failure" role="alert">{problem.value}</p>}

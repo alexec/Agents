@@ -1,5 +1,6 @@
 // A folder's Project (#2317): the words of ProjectWords in Packages/AgentsKit
 // (Model/Project.swift), the same on the Mac, the Remote and the web page.
+import { CallFailed, describe, methodNotFound } from "./errors";
 import type { ConnectorSetup, ConnectorSlot, PersonRow, Project, ProjectFolder, ProjectSlot } from "../protocol/generated";
 
 export const projectWords = {
@@ -17,6 +18,7 @@ export const projectWords = {
   addNote: "Its own project is a new one of the folder's name, or the one its .agents/folder.json names. "
     + "Pick another to share that project's tools and reports.",
   remove: "Remove Project",
+  tryAgain: "Try Again",
 } as const;
 
 /** On a Connectors page whose folder is in a project (#2669): whose the slots are, and who may change them. */
@@ -46,9 +48,13 @@ export function projectSlotFrom(setup: ConnectorSetup, slot: ConnectorSlot): Pro
   return { slot: slot.slot, forge: setup.forge ?? "github", repository, site: setup.site ?? "github.com" };
 }
 
-/** A folder whose id the control plane has not adopted yet. */
-export function unknownProject(id: string): string {
-  return `Not on the control plane yet (${id})`;
+/**
+ * The projects could not be read (#2756), kept apart from a list with none: what went wrong,
+ * said next to Try Again. Undefined for an older control plane, which has no projects.
+ */
+export function projectsNotRead(error: unknown): string | undefined {
+  if (error instanceof CallFailed && error.code === methodNotFound) return undefined;
+  return `Couldn't read the projects. ${describe(error)}`;
 }
 
 /** The project a folder is in, by its id, from the list. */

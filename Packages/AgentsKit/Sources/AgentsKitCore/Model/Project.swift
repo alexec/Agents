@@ -180,8 +180,15 @@ public enum ProjectWords {
     /// Under the picker: what a project is, and where the choice is kept.
     public static let explanation = "Folders in one project share its tools and its reports, on every machine. "
         + "The project is saved in .agents/folder.json, so a clone you commit it in joins the same project."
-    /// A folder whose id the control plane has not adopted yet, or with no control plane.
-    public static func unknown(_ id: String) -> String { "Not on the control plane yet (\(id))" }
+    /// The projects could not be read (#2756), kept apart from a list with none: what went
+    /// wrong, said next to Try Again. Nil for an older control plane, which has no projects.
+    public static func notRead(_ error: any Error) -> String? {
+        if let error = error as? JSONRPCError {
+            return error.isMethodNotFound ? nil : "Couldn’t read the projects. \(error.message)"
+        }
+        return "Couldn’t read the projects. The control plane can’t be reached."
+    }
+    public static let tryAgain = "Try Again"
     public static let noControlPlane = "Connect to a control plane to choose a project."
     /// The Add Folder sheet's first choice (#2671), what a solo person keeps.
     public static let ownProject = "Its Own Project"
