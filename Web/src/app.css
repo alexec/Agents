@@ -884,6 +884,9 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 .client-permission-title { display: flex; gap: 7px; align-items: baseline; }
 .client-permission-title > span { width: 10px; }
 .client-permission-menu > p { margin: 5px 8px 3px; }
+.client-permission-confirm { padding: 4px 8px; }
+.client-permission-confirm > p { margin: 0 0 6px; }
+.client-permission-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; }
 .context-meter { display: inline-flex; align-items: center; gap: 5px; opacity: 0.72; font-size: 0.6875rem; font-variant-numeric: tabular-nums; }
 .context-ring { --used: 0%; width: 12px; height: 12px; box-sizing: border-box; border: 2px solid var(--paper-rule); border-radius: 50%; background: conic-gradient(var(--paper-ink) var(--used), transparent 0); }
 .context-ring.close { background: conic-gradient(var(--danger, #bd4238) var(--used), transparent 0); }

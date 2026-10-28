@@ -9,6 +9,7 @@ import SwiftUI
 /// as one the phone forgot.
 struct ChoiceRows: View {
     @Environment(RemoteModel.self) private var model
+    @State private var confirmingAlwaysApprove = false
 
     var body: some View {
         Section {
@@ -91,8 +92,12 @@ struct ChoiceRows: View {
             Menu {
                 ForEach([ClientPermissionMode.default, .alwaysApprove], id: \.self) { choice in
                     Button {
-                        let settings = model.clientPermissions.setting(choice, for: runtimeID)
-                        Task { await model.setClientPermissions(settings) }
+                        if choice == .alwaysApprove, mode != .alwaysApprove {
+                            confirmingAlwaysApprove = true
+                        } else {
+                            let settings = model.clientPermissions.setting(choice, for: runtimeID)
+                            Task { await model.setClientPermissions(settings) }
+                        }
                     } label: {
                         VStack(alignment: .leading, spacing: 2) {
                             choiceLabel(ClientPermissionWords.title(choice), chosen: choice == mode)
@@ -105,13 +110,25 @@ struct ChoiceRows: View {
                     Text(ClientPermissionWords.scope(runtimeName: name))
                 }
             } label: {
-                LabeledContent("Permission") {
+                LabeledContent("Permissions") {
                     Text(ClientPermissionWords.title(mode)).foregroundStyle(.secondary)
                 }
                 .appText(.reading)
             }
-            .accessibilityLabel("Permission, \(ClientPermissionWords.title(mode))")
+            .accessibilityLabel("\(ClientPermissionWords.name(runtimeName: name)), \(ClientPermissionWords.title(mode))")
             .accessibilityHint(ClientPermissionWords.scope(runtimeName: name))
+            // Always-approve answers every request for every agent of the runtime: one more
+            // tap, as the capsule asks (#2746).
+            .confirmationDialog(ClientPermissionWords.confirmTitle(runtimeName: name),
+                                isPresented: $confirmingAlwaysApprove, titleVisibility: .visible) {
+                Button(ClientPermissionWords.confirmButton, role: .destructive) {
+                    let settings = model.clientPermissions.setting(.alwaysApprove, for: runtimeID)
+                    Task { await model.setClientPermissions(settings) }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(ClientPermissionWords.confirmMessage(runtimeName: name))
+            }
         }
     }
 
