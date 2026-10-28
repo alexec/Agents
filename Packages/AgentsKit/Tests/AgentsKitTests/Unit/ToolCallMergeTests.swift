@@ -71,7 +71,7 @@ struct ToolCallMergeTests {
     }
 
     @Test func aCallIsUnderwayUntilItsStatusSaysItEnded() {
-        // The live line's mark follows the call's own status (#2338).
+        // Voice mode speaks a call while its own status says it runs (#2338).
         #expect(ToolCall(title: "Read File", status: "pending").isUnderway)
         #expect(ToolCall(title: "Read File", status: "in_progress").isUnderway)
         #expect(!ToolCall(title: "Read File", status: "completed").isUnderway)

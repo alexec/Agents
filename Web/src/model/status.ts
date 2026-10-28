@@ -93,7 +93,7 @@ export function statusWords(agent: Agent, isComingBack = false): string {
 }
 
 /** What the chat's foot says to a screen reader (#2391): the words of the working line, as text in
- * one status node that stays put, also while a call's line has the tool mark (#2338). Empty when idle. */
+ * one status node that stays put. Empty when idle. */
 export function footStatusWords(agent: Agent, isComingBack = false): string {
   if (isComingBack) return comingBackDescription;
   if (agent.state === "running") return agent.runningTool ? runningToolLabel(agent.runningTool) : "Working";

@@ -15,7 +15,7 @@ import { backgroundEntryLine } from "../../model/background";
 import { outcomeNeedsAPerson } from "../../model/groups";
 import { outcomeHeadings, queuedLabel, startingLabel } from "../../model/status";
 import {
-  callIsUnderway, callLine, compactionLine, copiedText, drawnInTurn, fields, isSummaryOnly, kindOf, thoughtLine, turnLine, turnParts, type ChatTurn, type Item,
+  callLine, compactionLine, copiedText, drawnInTurn, fields, isSummaryOnly, kindOf, thoughtLine, turnLine, turnParts, type ChatTurn, type Item,
 } from "../../model/turns";
 import { fileLinkPath, Markdown } from "../../render/markdown";
 import { AppView } from "./AppView";
@@ -25,7 +25,6 @@ import { switchNote } from "../../model/switchNote";
 import { continueWithout, keepStopped, sandboxCard } from "../../model/sandboxWords";
 import { OrgPolicyLine } from "../OrgPolicyLine";
 import { memo } from "../../render/memo";
-import { WorkingMark } from "../SessionRow";
 
 /** The text of a message's blocks: text blocks as Markdown, anything else named. */
 export function Blocks({ blocks, text }: { blocks: ContentBlock[] | undefined; text: string }) {
@@ -165,10 +164,8 @@ export function EditDiff({ diff }: { diff: Extract<ToolCallContent, { type: "dif
 }
 
 /** One tool call: its line, and what it did once asked (ToolCallLine). Gone to from elsewhere, opened (#1315). */
-export function ToolCallLine({ call, text, focused = false, background, onClick, marksUnderway = false }: {
+export function ToolCallLine({ call, text, focused = false, background, onClick }: {
   call: ToolCall; text?: string; focused?: boolean; background: readonly BackgroundItem[]; onClick?: () => void;
-  /** In a turn still going, a call still underway has the tool mark in front of its words (#2338). */
-  marksUnderway?: boolean;
 }) {
   const expanded = useSignal(false);
   useEffect(() => {
@@ -181,7 +178,6 @@ export function ToolCallLine({ call, text, focused = false, background, onClick,
   const hasDetail = (call.content ?? []).length > 0 || (call.locations ?? []).length > 0
     || call.rawInput !== undefined || call.rawOutput !== undefined;
   const words = (text ?? callLine(call)) + runsOn;
-  const line = marksUnderway && callIsUnderway(call) ? <LiveCallMarked>{words}</LiveCallMarked> : words;
   const showsDetail = expanded.value;
   return (
     <div class="call">
@@ -189,9 +185,9 @@ export function ToolCallLine({ call, text, focused = false, background, onClick,
         <button class="call-line" aria-expanded={onClick ? undefined : showsDetail}
           title={onClick ? "Show the whole run" : showsDetail ? "Hide the argument and the return" : "Show the argument and the return"}
           onClick={onClick ?? (() => (expanded.value = !expanded.value))}>
-          {line}
+          {words}
         </button>
-      ) : <p class="call-line">{line}</p>}
+      ) : <p class="call-line">{words}</p>}
       {showsDetail && !onClick && (
         <div class="call-detail">
           {(call.content ?? []).map((piece, index) => {
@@ -494,42 +490,23 @@ export function elicitationTitle(request: { message?: string; mode: { form: { _0
  * The agent's thinking (ThoughtLine, #1315): one line, "Thought:" and its first words, and the
  * whole of it a click away, as a call's argument and return are.
  */
-function ThoughtLine({ text, live = false }: { text: string; live?: boolean }) {
+function ThoughtLine({ text }: { text: string }) {
   const expanded = useSignal(false);
   return (
     <div class="thought">
       <button class="call-line" aria-expanded={expanded.value}
         title={expanded.value ? "Hide the thought" : "Show the whole thought"}
         onClick={() => (expanded.value = !expanded.value)}>
-        {live ? <LiveThoughtMarked>{thoughtLine(text)}</LiveThoughtMarked> : thoughtLine(text)}
+        {thoughtLine(text)}
       </button>
       {expanded.value && <p class="quiet">{text}</p>}
     </div>
   );
 }
 
-/**
- * A call's words with the tool mark in front while it is underway (LiveCallMarked, #2338): the
- * mark by the words that say what runs, grey, the line's text height. The mark is hidden from the
- * screen reader, and the line says "Running" after its words.
- */
-function LiveCallMarked({ children }: { children: string }) {
-  return <><WorkingMark tool="" />{children}<span class="visually-hidden">, Running</span></>;
-}
-
-/**
- * A thought's words with the thinking mark in front while the agent thinks it (#2380): the ring
- * alone, as a call underway has the tool mark. Hidden from the screen reader, which hears
- * "Thinking" after the words.
- */
-function LiveThoughtMarked({ children }: { children: string }) {
-  return <><WorkingMark tool={null} />{children}<span class="visually-hidden">, Thinking</span></>;
-}
-
 /** A running turn's latest call, in one line, until the turn has its outcome (LiveLine). */
 function LiveRunLine({ call }: { call: ToolCall }) {
-  const words = turnLine(call);
-  return <p class="live quiet">{callIsUnderway(call) ? <LiveCallMarked>{words}</LiveCallMarked> : words}</p>;
+  return <p class="live quiet">{turnLine(call)}</p>;
 }
 
 /**
@@ -537,12 +514,8 @@ function LiveRunLine({ call }: { call: ToolCall }) {
  * calls is its last until it is clicked (#759); gone to from elsewhere, it is opened with its
  * first call (#1315).
  */
-function StepRow({ item, focused = false, background, isLive = false, isLiveThought = false }: {
+function StepRow({ item, focused = false, background }: {
   item: Item; focused?: boolean; background: readonly BackgroundItem[];
-  /** Its turn is still going: only then does a call's own status get the mark (#2338). */
-  isLive?: boolean;
-  /** The thought the agent is thinking now: its line has the thinking mark (#2380). */
-  isLiveThought?: boolean;
 }) {
   const unrolled = useSignal(false);
   useEffect(() => {
@@ -550,15 +523,15 @@ function StepRow({ item, focused = false, background, isLive = false, isLiveThou
   }, [focused]);
   if (item.kind === "run" && !unrolled.value && !focused && item.calls.length > 1) {
     const last = item.calls[item.calls.length - 1]!;
-    return <div class="run" data-entry={item.id}><ToolCallLine call={last} text={turnLine(last)} background={background} onClick={() => (unrolled.value = true)} marksUnderway={isLive} /></div>;
+    return <div class="run" data-entry={item.id}><ToolCallLine call={last} text={turnLine(last)} background={background} onClick={() => (unrolled.value = true)} /></div>;
   }
   if (item.kind === "run") {
-    return <div class="run" data-entry={item.id}>{item.calls.map((call, i) => <ToolCallLine key={i} call={call} text={turnLine(call)} focused={focused && i === 0} background={background} marksUnderway={isLive} />)}</div>;
+    return <div class="run" data-entry={item.id}>{item.calls.map((call, i) => <ToolCallLine key={i} call={call} text={turnLine(call)} focused={focused && i === 0} background={background} />)}</div>;
   }
   const call = fields(item.entry, "toolCall");
-  if (call) return <ToolCallLine call={call._0} text={turnLine(call._0)} focused={focused} background={background} marksUnderway={isLive} />;
+  if (call) return <ToolCallLine call={call._0} text={turnLine(call._0)} focused={focused} background={background} />;
   const thought = fields(item.entry, "agentThought");
-  if (thought) return <div class="entry-mark" data-entry={item.entry.id}><ThoughtLine text={thought.text} live={isLiveThought} /></div>;
+  if (thought) return <div class="entry-mark" data-entry={item.entry.id}><ThoughtLine text={thought.text} /></div>;
   return <EntryRow entry={item.entry} />;
 }
 
@@ -615,16 +588,16 @@ export const TurnView = memo(function TurnView({ turn, focusedRun, fetched, fetc
           : <button class="steps-control" onClick={ask}>Load steps</button>) : (
           <>
             {hasEarlier && <button class="steps-control" onClick={() => void loadEarlier(turn)}>Earlier steps</button>}
-            <div class="steps">{steps.map((item) => <StepRow key={item.id} item={item} focused={item.id === focusedRun} background={background} isLive={isLive} isLiveThought={item.id === parts?.liveThought} />)}</div>
-            {outcome.map((item) => <StepRow key={item.id} item={item} background={background} isLive={isLive} />)}
+            <div class="steps">{steps.map((item) => <StepRow key={item.id} item={item} focused={item.id === focusedRun} background={background} />)}</div>
+            {outcome.map((item) => <StepRow key={item.id} item={item} background={background} />)}
           </>
         )
       ) : (
         <>
           {parts?.live && (parts.live.kind === "run"
             ? <LiveRunLine call={parts.live.calls[parts.live.calls.length - 1]!} />
-            : <StepRow item={parts.live} background={background} isLive />)}
-          {outcome.map((item) => <StepRow key={item.id} item={item} background={background} isLive={isLive} />)}
+            : <StepRow item={parts.live} background={background} />)}
+          {outcome.map((item) => <StepRow key={item.id} item={item} background={background} />)}
         </>
       )}
     </article>

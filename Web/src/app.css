@@ -621,8 +621,6 @@ button.link.reading:hover { text-decoration: underline; }
   height: var(--well); vertical-align: middle; opacity: 0.3; animation: breathe var(--breath-period) linear infinite; }
 /* At the chat's foot only: .working is also the sidebar mark's and the status mark's class. */
 p.working .working-ring { --well: 16px; opacity: 0.6; }
-/* In front of a live call's words, the line's text height (#2338): the words truncate, not the mark. */
-.call-line .working-ring, .live .working-ring { --well: 14px; margin-right: 6px; vertical-align: -2px; }
 .jump {
   position: relative;
   align-self: center;

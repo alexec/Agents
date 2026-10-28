@@ -13,6 +13,9 @@ every turn, from `<its folder>/<its name>.behaviour`:
   stream <chunks> <ms>
           a long Markdown reply, in that many chunks, that many milliseconds apart:
           for watching a reply arrive in a long chat (#90).
+  work <seconds>
+          a thought, a call held `in_progress` that long, another thought held that long,
+          then a reply: for seeing where the working mark is in each (#2831).
   ok      (or no file) it answers, saying what it was handed.
 
 So a walk can make a runtime run out, and later come back, by rewriting one file.
@@ -87,6 +90,25 @@ def prompt(request_id, params):
                 piece += "\n\n- a point\n- another point\n\n"
             say(session_id, piece)
             time.sleep(pause)
+        reply(request_id, {"stopReason": "end_turn"})
+        return
+    if how and how[0] == "work":
+        hold = float(how[1]) if len(how) > 1 else 20
+
+        def update(body):
+            send({"jsonrpc": "2.0", "method": "session/update", "params": {"sessionId": session_id, "update": body}})
+
+        def think(text):
+            update({"sessionUpdate": "agent_thought_chunk", "content": {"type": "text", "text": text}})
+
+        think("Reading the project's notes first, to see how it is laid out.")
+        update({"sessionUpdate": "tool_call", "toolCallId": "work-1", "title": "Read notes.md",
+                "kind": "read", "status": "in_progress"})
+        time.sleep(hold)
+        update({"sessionUpdate": "tool_call_update", "toolCallId": "work-1", "status": "completed"})
+        think("The notes say what to change. Planning the edit now.")
+        time.sleep(hold)
+        say(session_id, "Done: the notes are read and the edit is planned.")
         reply(request_id, {"stopReason": "end_turn"})
         return
     handoff = next((b["resource"]["text"] for b in blocks

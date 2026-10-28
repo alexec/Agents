@@ -81,13 +81,6 @@ struct TurnView: View, Equatable {
         return read.drawsOutcome(detail) ? read.outcome : []
     }
 
-    /// Whether the turn draws a thought line with the thinking mark (#2380): then the chat's
-    /// foot draws none, as for a call's tool mark (#2338).
-    static func marksThought(_ turn: ChatTurn, detail: TurnDetail, fetched: [TranscriptItem]?,
-                             isLive: Bool) -> Bool {
-        detail.showsSteps && Read(turn: turn, fetched: fetched, isLive: isLive).parts?.liveThought != nil
-    }
-
     /// A turn's items, read once. Each of these used to fold the turn again (#285).
     private struct Read {
         let waiting: Bool
@@ -142,8 +135,7 @@ struct TurnView: View, Equatable {
                         // In the turn's own margin: no rule and no indent (#148).
                         VStack(alignment: .leading, spacing: 10) {
                             ForEach(steps) {
-                                StepRow(item: $0, isFocused: $0.id == focusedRun, isLive: isLive,
-                                        isLiveThought: $0.id == parts?.liveThought)
+                                StepRow(item: $0, isFocused: $0.id == focusedRun)
                             }
                         }
                     }
@@ -158,7 +150,7 @@ struct TurnView: View, Equatable {
                 ForEach(Self.shown(pieces, of: outcome), id: \.id) { shown in
                     switch shown.piece {
                     case .head: EmptyView()
-                    case .item(let index): StepRow(item: outcome[index], isLive: isLive)
+                    case .item(let index): StepRow(item: outcome[index])
                     case .blocks(let index, let range): ReplyBlocks(item: outcome[index], range: range)
                     }
                 }
@@ -287,15 +279,13 @@ private struct LiveLine: View {
 
     var body: some View {
         if case .toolRun(_, let calls) = item, let call = calls.last {
-            LiveCallMarked(isUnderway: call.isUnderway) {
-                Text(call.turnLine)
-                    .appText(.reading)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+            Text(call.turnLine)
+                .appText(.reading)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
         } else {
-            StepRow(item: item, isLive: true)
+            StepRow(item: item)
         }
     }
 }
@@ -305,11 +295,6 @@ private struct StepRow: View {
     let item: TranscriptItem
     /// Gone to from elsewhere: the run opened, and its first call (#1315).
     var isFocused = false
-    /// Whether its turn is still going: only then does a call's own status get a mark
-    /// (#2338), so a call a stopped turn left `in_progress` does not spin for ever.
-    var isLive = false
-    /// The thought the agent is thinking now: its line has the thinking mark (#2380).
-    var isLiveThought = false
     /// A run of calls is its last until it is clicked (#759).
     @State private var isUnrolled = false
 
@@ -318,22 +303,20 @@ private struct StepRow: View {
             switch item {
             case .toolRun(_, let calls) where !isUnrolled && calls.count > 1:
                 if let last = calls.last {
-                    ToolCallLine(call: last, lineText: last.turnLine, onClick: { isUnrolled = true }, brightensOnHover: true,
-                                 marksUnderway: isLive)
+                    ToolCallLine(call: last, lineText: last.turnLine, onClick: { isUnrolled = true }, brightensOnHover: true)
                 }
             case .toolRun(_, let calls):
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(Array(calls.enumerated()), id: \.offset) { index, call in
                         ToolCallLine(call: call, lineText: call.turnLine, isFocused: isFocused && index == 0,
-                                     brightensOnHover: true, marksUnderway: isLive)
+                                     brightensOnHover: true)
                     }
                 }
             case .entry(let entry):
                 if case .toolCall(let call) = entry.kind {
-                    ToolCallLine(call: call, lineText: call.turnLine, isFocused: isFocused, brightensOnHover: true,
-                                 marksUnderway: isLive)
+                    ToolCallLine(call: call, lineText: call.turnLine, isFocused: isFocused, brightensOnHover: true)
                 } else {
-                    EntryRow(entry: entry, isLiveThought: isLiveThought)
+                    EntryRow(entry: entry)
                 }
             }
         }
@@ -343,8 +326,6 @@ private struct StepRow: View {
 
 private struct EntryRow: View {
     let entry: TranscriptEntry
-    /// A thought the agent is thinking now (#2380).
-    var isLiveThought = false
 
     /// Who another agent's message is from (#560), as the queued bubble says it too.
     static func fromLine(_ sender: MessageSender?) -> String {
@@ -400,7 +381,7 @@ private struct EntryRow: View {
                 .copiesMessage(entry)
 
         case .agentThought(_, let text):
-            ThoughtLine(text: text, isLive: isLiveThought)
+            ThoughtLine(text: text)
 
         case .toolCall(let call), .toolCallUpdate(let call):
             // Reached only when something splits a run; a run is drawn by ToolRunRow.
@@ -537,9 +518,6 @@ private struct NoticeLine: View {
 /// at the Details level; a turn now draws every thought, so each has to be short.
 private struct ThoughtLine: View {
     let text: String
-    /// The agent is thinking it now: the thinking mark, left of its words (#2380), as a
-    /// call underway has the tool mark (#2338).
-    var isLive = false
     @State private var isExpanded = false
     @State private var isHovering = false
 
@@ -548,15 +526,13 @@ private struct ThoughtLine: View {
             Button {
                 withAnimation(.easeOut(duration: 0.15)) { isExpanded.toggle() }
             } label: {
-                LiveCallMarked(isUnderway: isLive, doing: false, value: "Thinking") {
-                    Text(TranscriptItem.thoughtLine(text))
-                        .appText(.reading)
-                        .foregroundStyle(isHovering ? .primary : .secondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .contentShape(.rect)
+                Text(TranscriptItem.thoughtLine(text))
+                    .appText(.reading)
+                    .foregroundStyle(isHovering ? .primary : .secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(.rect)
                 .onHover { isHovering = $0 }
             }
             .buttonStyle(.plain)
@@ -830,9 +806,6 @@ private struct ToolCallLine: View {
     /// Brighter under the pointer, as a turn's step is (069): the step is a line of
     /// text like the rest of the turn's margin, with no chevron in front of it (#112).
     var brightensOnHover = false
-    /// Whether a call still underway shows the tool mark in front of its words: in a
-    /// turn still going, and not elsewhere (#2338).
-    var marksUnderway = false
     @State private var isExpanded = false
     @State private var isHovering = false
 
@@ -873,15 +846,13 @@ private struct ToolCallLine: View {
     /// wraps to three lines is three lines of a run that reads as one call per line;
     /// the whole of it is a click away in the detail, where the raw input is.
     private var line: some View {
-        LiveCallMarked(isUnderway: marksUnderway && call.isUnderway) {
-            Text((lineText ?? call.line) + runsOn)
-                .appText(.reading)
-                .foregroundStyle(isHovering ? .primary : .secondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .contentShape(.rect)
+        Text((lineText ?? call.line) + runsOn)
+            .appText(.reading)
+            .foregroundStyle(isHovering ? .primary : .secondary)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(.rect)
         .onHover { isHovering = brightensOnHover && $0 }
     }
 
@@ -1035,42 +1006,6 @@ private extension JSONEncoder {
         e.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         return e
     }()
-}
-
-/// A call's line with the tool mark in front of it while the call is underway (#2338):
-/// the mark is next to the words that say what runs, not only at the chat's foot. The
-/// same ring as the sidebar's, in step with it, grey, in a well the line's text height.
-/// Inline: the words move right by its width while it is there, with the line's own
-/// short ease, so a run of finished calls keeps its edge. A thought the agent is thinking
-/// now has the thinking mark the same way (#2380).
-private struct LiveCallMarked<Line: View>: View {
-    let isUnderway: Bool
-    /// The tool mark (the ring that pivots); false is the thinking mark, the ring alone
-    /// (#2380).
-    var doing = true
-    /// What the line says it is, after its words, while marked.
-    var value = "Running"
-    @ViewBuilder var line: Line
-
-    var body: some View {
-        HStack(spacing: 6) {
-            if isUnderway {
-                WorkingRing(size: Self.size, doing: doing)
-                    .accessibilityHidden(true)
-                    .transition(.opacity)
-            }
-            line
-        }
-        .animation(.easeOut(duration: 0.15), value: isUnderway)
-        .accessibilityElement(children: .combine)
-        .accessibilityValue(isUnderway ? value : "")
-    }
-
-    #if os(macOS)
-    private static var size: CGFloat { 12 }
-    #else
-    private static var size: CGFloat { 14 }
-    #endif
 }
 
 /// The agent is at work and the person is waiting: the same mark the sidebar row shows,
