@@ -872,6 +872,20 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 .model-effort > summary { list-style: none; cursor: pointer; }
 .model-effort > summary::-webkit-details-marker { display: none; }
 .model-effort-menu { position: absolute; z-index: 20; right: 0; bottom: calc(100% + 6px); display: flex; gap: 6px; padding: 8px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); box-shadow: 0 4px 18px #0002; }
+/* The shared words' pills (#2658): the values in a column, the runtime's own behind ⋯. */
+.level-select { position: relative; }
+.level-select .model-effort-menu { flex-direction: column; align-items: stretch; min-width: 260px; left: 0; right: auto; }
+.menus-right .level-select .model-effort-menu { left: auto; right: 0; }
+.level-own summary { cursor: pointer; padding: 4px 0; }
+.level-own { display: flex; flex-direction: column; gap: 6px; }
+/* Settings ▸ Agent Runtimes ▸ Auto: the order, and the Mappings tables, scrolling sideways when narrow. */
+.auto-runtimes { list-style: none; padding: 0; margin: 0 0 8px; }
+.auto-runtimes li { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.auto-table { overflow-x: auto; margin: 8px 0 16px; }
+.auto-table table { border-collapse: collapse; }
+.auto-table th, .auto-table td { text-align: left; vertical-align: top; padding: 4px 10px 4px 0; }
+.auto-table caption { text-align: left; font-weight: 600; padding-bottom: 4px; }
+.auto-cell { display: flex; flex-direction: column; gap: 2px; }
 .client-permission-control { position: relative; flex: none; }
 .client-permission-control > summary { list-style: none; cursor: pointer; }
 .client-permission-control > summary::-webkit-details-marker { display: none; }

@@ -9,7 +9,7 @@ import type {
   Agent, AgentRemovedNotification, ResumingNotification, ControlMachine, MachineRef, MachineWorkspace, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, FolderSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, FolderRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeStatus,
-  StartRequest, UUID, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
+  StartRequest, UUID, AutoMappings, AutoPreview, AutoPreviewRequest, AutoSettings, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
   CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
@@ -1310,6 +1310,13 @@ export class Store extends Work {
         if (plane) this.plane.value = { ...plane, thisMacHost: (params as MachineJoinStatus | null) ?? undefined };
         return;
       }
+      if (method === "auto/changed") {
+        if (host) {
+          this.autoSettings.value = { ...this.autoSettings.value, [host]: params as AutoSettings };
+          void this.loadAuto(host);
+        }
+        return;
+      }
       if (method === "clientPermissions/changed") {
         if (host === this.macHostID.peek()) {
           this.clientPermissions.value = { ...this.clientPermissions.value, [host]: params as ClientPermissionSettings };
@@ -2045,6 +2052,9 @@ export class Store extends Work {
   readonly runtimeAllowances = signal<Record<string, RuntimeAllowances>>({});
   /** Each host's sandbox default per runtime (SandboxSettings); absent means its runtime decides. */
   readonly sandboxDefaults = signal<Record<string, Record<string, SandboxChoice>>>({});
+  /** Auto (#2658): the person's order, Include switches and own cells, and every cell, by host. */
+  readonly autoSettings = signal<Record<string, AutoSettings>>({});
+  readonly autoMappings = signal<Record<string, AutoMappings>>({});
   /** Each host's mark while the organisation requires the sandbox (SandboxSettings.setBy, #998). */
   readonly sandboxSetBy = signal<Record<string, PolicySetBy>>({});
   /** The Mac-wide permission choice for Cursor, Grok and OpenCode (061). */
@@ -2317,6 +2327,8 @@ export class Store extends Work {
   /** What runs on a host, and what each runtime takes; asked once a connection. */
   async loadRuntimes(host: string): Promise<void> {
     const macHost = this.macHostID.peek();
+    // Auto's cells, for the pills' words on every runtime (#2658): the Mac's host keeps them.
+    if (!this.autoMappings.peek()[macHost]) void this.loadAuto(macHost);
     const [runtimes, accounts, modes, sandbox, allowances, profiles, policy, passThrough, permissions] = await Promise.all([
       this.link.call("runtimes/list", {}, host).catch(() => null),
       this.link.call("runtimes/accounts", {}, host).catch(() => null),
@@ -2352,6 +2364,56 @@ export class Store extends Work {
   }
 
   /** Set the Mac-wide permission choice, even when this chat belongs to a server. */
+  /** Auto's settings and every cell on a host (#2658); an older host has none. */
+  async loadAuto(host: string): Promise<void> {
+    const [settings, mappings] = await Promise.all([
+      this.link.call("auto/state", {}, host).catch(() => null),
+      this.link.call("auto/mappings", {}, host).catch(() => null),
+    ]);
+    batch(() => {
+      if (settings) this.autoSettings.value = { ...this.autoSettings.value, [host]: settings };
+      if (mappings) this.autoMappings.value = { ...this.autoMappings.value, [host]: mappings };
+    });
+  }
+
+  /** Save Auto's settings on the Mac's host, which the Mac sends on to its machines (FR-017). */
+  async setAutoSettings(host: string, settings: AutoSettings): Promise<void> {
+    const before = this.autoSettings.value[host];
+    this.autoSettings.value = { ...this.autoSettings.value, [host]: settings };
+    try {
+      const saved = await this.link.call("auto/set", settings, host);
+      this.autoSettings.value = { ...this.autoSettings.value, [host]: saved };
+      await this.loadAuto(host);
+    } catch (error) {
+      if (before) this.autoSettings.value = { ...this.autoSettings.value, [host]: before };
+      this.say(describe(error));
+    }
+  }
+
+  /** What Auto would pick now for a folder and values, or null. */
+  async autoPreview(host: string, request: AutoPreviewRequest): Promise<AutoPreview | null> {
+    return this.link.call("auto/preview", request, host).catch(() => null);
+  }
+
+  /** A running agent's model level or permission mode, on its own runtime (#2658). */
+  async setLevels(host: string, agentID: string, field: "model" | "permission", level: string): Promise<void> {
+    const levels: Levels = field === "model" ? { model: level as ModelLevel } : { permission: level as PermissionLevel };
+    try {
+      await this.link.call("agents/setLevels", { agentID: agentID as UUID, levels }, host);
+    } catch (error) {
+      this.say(describe(error));
+    }
+  }
+
+  /** A running agent's own answer to permission requests; none follows Settings (FR-019). */
+  async setAgentClientPermission(host: string, agentID: string, mode: ClientPermissionMode | undefined): Promise<void> {
+    try {
+      await this.link.call("agents/setClientPermission", { agentID: agentID as UUID, ...(mode ? { mode } : {}) }, host);
+    } catch (error) {
+      this.say(describe(error));
+    }
+  }
+
   async setClientPermissionMode(runtimeID: string, mode: ClientPermissionSettings["cursor"]): Promise<void> {
     if (!["cursor", "grok", "opencode"].includes(runtimeID)) return;
     const host = this.macHostID.peek();
@@ -3092,10 +3154,12 @@ export class Store extends Work {
    * Starts an agent; answers its id, or null with `problem` saying why. A runtime whose sandbox
    * will not start (064) answers what it said instead, for the form to offer Start without sandbox.
    */
-  async start(host: string, request: StartRequest): Promise<string | SandboxWillNotStart | { kept: KeptRequest } | null> {
+  async start(host: string, request: StartRequest): Promise<string | SandboxWillNotStart | { kept: KeptRequest } | { autoRefusal: string } | null> {
     try {
       return await this.lending("agents/start", request, host);
     } catch (error) {
+      // No runtime Auto may use can take it (FR-011): said over the prompt, which keeps it.
+      if (error instanceof CallFailed && error.code === Failure.autoNoRuntime) return { autoRefusal: error.message };
       // Kept until its stopped workspace is up (#691 US3): the page shows it, then opens the agent.
       if (error instanceof CallFailed && error.code === Failure.kept) {
         const kept = this.noteKept(error);

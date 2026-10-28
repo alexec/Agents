@@ -25,7 +25,8 @@ import { formFor, keepForm, keptForm } from "../model/startForm";
 import { personaChoices, withPersonaLabels } from "../model/personas";
 import { sandboxCardTitle, sandboxChoiceWords, sandboxChoices, sandboxExplanation, sandboxOverrideWords, sandboxState,
   sandboxStateWords, sandboxWhy, startWithout, fixedSandbox } from "../model/sandbox";
-import { fieldWords, followsSettings } from "../model/levels";
+import { autoID, autoWords, cellOf, fieldWords, followsSettings, levelMeaning, levelWords, matchLevel, noneIncluded, picksWords, sandboxValues } from "../model/levels";
+import type { AutoPreview, ClientPermissionMode, Levels } from "../protocol/generated";
 import { accepted } from "../model/labels";
 import type { Start } from "./chat/appViewBridge";
 import { go } from "../route";
@@ -36,7 +37,7 @@ import { Reach } from "./Reach";
 import { Prompt } from "./Prompt";
 import { OfflineStrip } from "./OfflineStrip";
 import { DiskStrip } from "./DiskStrip";
-import { PromptMenus } from "./PromptMenus";
+import { LevelSelect, PromptMenus, type LevelProps } from "./PromptMenus";
 import { BackToList } from "./BackToList";
 import { orderedFolders, folderLabel } from "./Sidebar";
 import { GuardedChangeCards } from "./GuardedChange";
@@ -66,7 +67,8 @@ export function NewAgent({ store, host, folder, folderName, down }: {
   const runtimes = [...runs.available, ...runs.out];
   // The form as it was left, its runtime only while that can still start (DraftKeeper).
   const kept = useSignal(keptForm(storage));
-  const startable = runtimes.map((r) => r.runtime.id);
+  // Auto first, wherever a runtime can start (#2658).
+  const startable = runtimes.length ? [autoID, ...runtimes.map((r) => r.runtime.id)] : [];
   const left = formFor(kept.value, startable);
   const runtimeID = useSignal<string | undefined>(undefined);
   // The one rule (#264), frozen when the form opens (#291): a later listing, or another agent's
@@ -95,6 +97,13 @@ export function NewAgent({ store, host, folder, folderName, down }: {
   const form = useSignal<Form>({ options: [], chosen: {}, state: "loading" });
   /** This session's own sandbox; none follows the runtime's default. */
   const sandbox = useSignal<SandboxChoice | undefined>(undefined);
+  /** The values in the shared words (#2658), kept when the runtime changes. */
+  const levels = useSignal<Levels>({ model: "balanced", permission: "ask" });
+  /** This session's own answer to permission requests; none follows Settings (FR-019). */
+  const clientPermission = useSignal<ClientPermissionMode | undefined>(undefined);
+  /** What Auto would pick now, and why the last start on Auto did not happen. */
+  const autoPreview = useSignal<AutoPreview | null>(null);
+  const autoRefusal = useSignal<string | null>(null);
   const refusal = useSignal<SandboxWillNotStart | null>(null);
   /** What was last sent, for Start without sandbox to send again. */
   const lastSent = useRef<{ text: string; attachments: Attachment[] } | null>(null);
@@ -189,6 +198,11 @@ export function NewAgent({ store, host, folder, folderName, down }: {
   const cwd = where.value.kind === "existing" ? where.value.root : folder;
   useEffect(() => {
     if (!chosenRuntime) return;
+    // Auto has no runtime yet, so no options of its own (#2658).
+    if (chosenRuntime === autoID) {
+      form.value = { options: [], chosen: {}, state: "ready" };
+      return;
+    }
     let current = true;
     // The first draw opens on the choices left; a later one keeps what was chosen since.
     const draw = (offered: ConfigOption[], opening: boolean) => {
@@ -203,6 +217,8 @@ export function NewAgent({ store, host, folder, folderName, down }: {
       } else {
         chosen = keep(options, form.peek().chosen);
       }
+      // The values in the shared words, over the mode remembered (#2658).
+      if (opening) chosen = { ...chosen, ...levelOptions(options) };
       // Over the mode remembered, because the persona was picked after it (#760).
       const waiting = pendingPersona.current;
       if (waiting && options.length) {
@@ -279,6 +295,51 @@ export function NewAgent({ store, host, folder, folderName, down }: {
   const brokenPersonas = personas.value.filter((p) => p.problem !== undefined);
   const description = usablePersonas.find((p) => p.id === persona.value)?.description;
 
+  // What Auto would pick now, for "Picks Claude now" and each value's line (#2658).
+  const isAuto = chosenRuntime === autoID;
+  useEffect(() => {
+    if (!chosenRuntime) return;
+    let current = true;
+    void store.autoPreview(host, { cwd: cwd as never, levels: levels.value, ...(sandbox.value ? { sandbox: sandbox.value } : {}) })
+      .then((p) => { if (current) autoPreview.value = p; });
+    return () => { current = false; };
+  }, [host, cwd, isAuto, levels.value, sandbox.value, store.autoSettings.value]);
+  const mappings = store.autoMappings.value[store.macHostID.value];
+  /** The options a value sets on the chosen runtime, where it offers them. */
+  function levelOptions(options: ConfigOption[], only?: "model" | "permission"): Record<string, JSONValue> {
+    if (!chosenRuntime || chosenRuntime === autoID) return {};
+    const out: Record<string, JSONValue> = {};
+    for (const field of (only ? [only] : ["model", "permission"]) as ("model" | "permission")[]) {
+      const level = levels.peek()[field];
+      const cell = level ? cellOf(mappings, chosenRuntime, field, level) : undefined;
+      if (!cell || cell.mark === "notPossible" || cell.mark === "dropped") continue;
+      for (const [id, v] of Object.entries(cell.native?.options ?? {})) if (options.some((o) => o.id === id)) out[id] = v;
+    }
+    return out;
+  }
+  const levelProps: LevelProps = {
+    runtimeName: isAuto ? (autoPreview.value?.runtimeID ? runtimeNameOf(autoPreview.value.runtimeID) : undefined) : undefined,
+    chosen: (field) => isAuto ? levels.value[field]
+      : matchLevel(mappings, chosenRuntime ?? "", field, (id) => form.value.chosen[id] ?? form.value.options.find((o) => o.id === id)?.currentValue),
+    cell: (field, level) => cellOf(mappings, (isAuto ? autoPreview.value?.runtimeID : chosenRuntime) ?? "", field, level),
+    choose: (field, level) => {
+      levels.value = { ...levels.value, [field]: level };
+      autoRefusal.value = null;
+      if (!isAuto) {
+        const set = levelOptions(form.value.options, field);
+        form.value = { ...form.value, chosen: { ...form.value.chosen, ...set } };
+        note({ runtimeID: chosenRuntime!, chosen: form.value.chosen });
+      }
+    },
+  };
+  function runtimeNameOf(id: string): string {
+    return listed.find((r) => r.runtime.id === id)?.runtime.name ?? id;
+  }
+  // Under Auto in the chooser: what it picks now, or that none is included.
+  const excluded = store.autoSettings.value[store.macHostID.value]?.excluded ?? [];
+  const autoNote = runtimes.length && runtimes.every((r) => excluded.includes(r.runtime.id)) ? noneIncluded
+    : picksWords(autoPreview.value?.runtimeID ? runtimeNameOf(autoPreview.value.runtimeID) : undefined);
+
   const capabilities = chosenRuntime ? store.account(host, chosenRuntime)?.promptCapabilities : undefined;
   // The runtime's accounts beyond its own sign-in (#840), the organisation's included (#999): the
   // picker shows only when there is one. Undefined is the runtime's account for new sessions.
@@ -303,6 +364,7 @@ export function NewAgent({ store, host, folder, folderName, down }: {
     }
     lastSent.current = { text, attachments };
     refusal.value = null;
+    autoRefusal.value = null;
     const w = where.value;
     const request: StartRequest = {
       runtimeID: chosenRuntime, cwd: folder as never, prompt: text, attachments,
@@ -313,7 +375,8 @@ export function NewAgent({ store, host, folder, folderName, down }: {
         : w.kind === "branch" ? { worktree: { branch: { _0: w.name } } } : w.kind === "named" ? { worktree: { named: { _0: w.name } } } : {}),
       ...(override ? { sandbox: override } : {}),
       ...(persona.value ? { persona: persona.value } : {}),
-      ...(sentAccount ? { accountID: sentAccount } : {}),
+      ...(sentAccount && !isAuto ? { accountID: sentAccount } : {}),
+      levels: { ...levels.value, ...(clientPermission.value && !isAuto ? { permissionRequests: clientPermission.value } : {}) },
       // Kept until this start succeeds, so a retry after a timeout is the same start (#291).
       requestID: store.startRequestID(host, folder),
     };
@@ -324,6 +387,11 @@ export function NewAgent({ store, host, folder, folderName, down }: {
       store.finishStartRequest(host, folder);
       return true;
     }
+    if (typeof id === "object" && "autoRefusal" in id) {
+      // No runtime Auto may use can take it: each runtime and why, over the prompt (FR-011).
+      autoRefusal.value = id.autoRefusal;
+      return false;
+    }
     if (typeof id === "object") {
       refusal.value = id;
       return false;
@@ -331,6 +399,7 @@ export function NewAgent({ store, host, folder, folderName, down }: {
     store.finishStartRequest(host, folder);
     note({ runtimeID: chosenRuntime, chosen: form.value.chosen, folders: folders.value });
     sandbox.value = undefined;
+    clientPermission.value = undefined;
     // The runtime behind the form is the agent's now.
     const { draftID: _taken, ...rest } = form.value;
     form.value = rest;
@@ -351,7 +420,7 @@ export function NewAgent({ store, host, folder, folderName, down }: {
   const state = form.value.state;
   // Why nothing can start on this host now, in its organisation's words (#998).
   const refusedHere = composerReason(store.policyStates.value[host]);
-  const runtimeName = listed.find((r) => r.runtime.id === chosenRuntime)?.runtime.name ?? "the runtime";
+  const runtimeName = chosenRuntime === autoID ? autoWords : listed.find((r) => r.runtime.id === chosenRuntime)?.runtime.name ?? "the runtime";
   /** Under a runtime's name: its pool note, else whether it is signed in (the window's signInNote). */
   const runtimeNote = (r: RuntimeStatus) => {
     if (r.poolNote) return r.poolNote;
@@ -476,10 +545,14 @@ export function NewAgent({ store, host, folder, folderName, down }: {
                   runtimeID.value = id;
                   accountID.value = undefined;
                   sandbox.value = undefined;
+                  clientPermission.value = undefined;
                   refusal.value = null;
+                  autoRefusal.value = null;
                   note({ runtimeID: id, chosen: {} });
                 }}>
                 {!runtimes.length && <option value="">No runtime can start on this machine</option>}
+                {/* Auto first (#2658): the host picks the runtime when the session starts. */}
+                {runtimes.length > 0 && <option value={autoID}>{autoWords} — {autoNote}</option>}
                 {/* In runs only when one is out, as the window's chooser (065). */}
                 {runs.out.length ? <optgroup label="Available">{runs.available.map(runtimeOption)}</optgroup> : runs.available.map(runtimeOption)}
                 {runs.out.length > 0 && <optgroup label="Out">{runs.out.map(runtimeOption)}</optgroup>}
@@ -517,17 +590,43 @@ export function NewAgent({ store, host, folder, folderName, down }: {
               )}
             </div>
           )}
-          {saying}
-          {(!saying || form.value.state === "ready") && (
-            <PromptMenus options={form.value.options} value={(o) => form.value.chosen[o.id]}
+          {autoRefusal.value && (
+            <div class="sandbox-refusal" role="status">
+              <p class="quiet small">{autoRefusal.value}</p>
+              <button onClick={() => go({ settings: true })}>Auto settings</button>
+            </div>
+          )}
+          {isAuto ? (
+            // On Auto: Permission mode, Sandbox and Model, each said as it is on the runtime Auto
+            // picks now; no Permission requests, which follow the mode (FR-010).
+            <div class="menus" role="group" aria-label="Settings for this session">
+              <LevelSelect field="permission" levels={levelProps} own={[]} disabled={down} />
+              <label class="pill select" title={fieldWords.sandbox}>
+                <span aria-hidden="true">{levelWords("sandbox", sandbox.value ?? "runtime")} ▾</span>
+                <select aria-label="Sandbox" disabled={down} value={sandbox.value ?? "runtime"}
+                  onChange={(e) => {
+                    const v = (e.currentTarget as HTMLSelectElement).value as SandboxChoice;
+                    sandbox.value = v === "runtime" ? undefined : v;
+                  }}>
+                  {sandboxValues.map((v) => {
+                    const cell = levelProps.cell("sandbox", v);
+                    return <option key={v} value={v}>{levelWords("sandbox", v)} — {cell ? `${cell.words} on ${levelProps.runtimeName}` : levelMeaning("sandbox", v)}</option>;
+                  })}
+                </select>
+              </label>
+              <span class="spacer" />
+              <span class="menus-right"><LevelSelect field="model" levels={levelProps} own={[]} disabled={down} /></span>
+            </div>
+          ) : saying}
+          {!isAuto && (!saying || form.value.state === "ready") && (
+            <PromptMenus options={form.value.options} value={(o) => form.value.chosen[o.id]} levels={levelProps}
               onChange={(o, v) => setChosen(o.id, v)} disabled={down} runtime={chosenRuntime ? runtimeName : undefined}
               runtimeID={chosenRuntime ?? undefined}
-              clientPermissionMode={chosenRuntime
-                ? store.clientPermissions.value[store.macHostID.value]?.[chosenRuntime as keyof ClientPermissionSettings] ?? "default"
-                : undefined}
-              onClientPermissionModeChange={chosenRuntime
-                ? (mode) => void store.setClientPermissionMode(chosenRuntime, mode)
-                : undefined}
+              clientPermission={chosenRuntime ? {
+                own: clientPermission.value,
+                settings: store.clientPermissions.value[store.macHostID.value]?.[chosenRuntime as keyof ClientPermissionSettings] ?? "default",
+                set: (mode) => (clientPermission.value = mode),
+              } : undefined}
               besideMode={chosenRuntime && (
                 <SandboxPill runtimeID={chosenRuntime} name={runtimeName} override={sandbox.value} runtimeDefault={runtimeDefault}
                   codexMode={typeof codexMode === "string" ? codexMode : undefined} disabled={down}

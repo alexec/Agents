@@ -1,6 +1,6 @@
 // The words every runtime shares (#2658), as LevelWords says them: one set for each field,
 // so a pill under the prompt says its value only. Pinned by Fixtures/web/levels/words.json.
-import type { AutoField, AutoMark, AutoSkip, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, SandboxChoice } from "../protocol/generated";
+import type { AutoField, AutoMapping, AutoMappings, AutoMark, AutoSkip, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, SandboxChoice } from "../protocol/generated";
 
 export const autoID = "auto";
 export const autoWords = "Auto";
@@ -76,4 +76,30 @@ export function fileWord(field: AutoField, level: string): string {
     "permissionRequests:alwaysApprove": "yes-to-all", "sandbox:runtime": "default", "sandbox:on": "runtime", "sandbox:off": "none",
   };
   return special[`${field}:${level}`] ?? level;
+}
+
+/** The cell for a runtime, field and value, from auto/mappings. */
+export function cellOf(mappings: AutoMappings | undefined, runtimeID: string, field: AutoField, level: string): AutoMapping | undefined {
+  return mappings?.cells.find((c) => c.runtimeID === runtimeID && c.field === field && c.level === level);
+}
+
+/** The runtimes the cells are for, in the person's order. */
+export function mappedRuntimes(mappings: AutoMappings | undefined): string[] {
+  const out: string[] = [];
+  for (const c of mappings?.cells ?? []) if (!out.includes(c.runtimeID)) out.push(c.runtimeID);
+  return out;
+}
+
+/** Which value of a field a runtime's own settings are: the first cell whose every option
+ *  they have, Fast and Smart before Balanced, or undefined (Custom). */
+export function matchLevel(mappings: AutoMappings | undefined, runtimeID: string, field: "model" | "permission",
+  value: (optionID: string) => unknown): string | undefined {
+  const order = field === "model" ? ["fast", "smart", "balanced"] : levelsOf(field);
+  for (const level of order) {
+    const cell = cellOf(mappings, runtimeID, field, level);
+    const options = cell?.native?.options;
+    if (!cell || cell.mark === "notPossible" || !options || !Object.keys(options).length) continue;
+    if (Object.entries(options).every(([id, v]) => JSON.stringify(value(id)) === JSON.stringify(v))) return level;
+  }
+  return undefined;
 }
