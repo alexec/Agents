@@ -668,6 +668,26 @@ test("a chat's history that did not load is said, and Try Again loads it (#400)"
   assert.equal(store.transcriptLoadFailure.value, null);
 });
 
+test("a catch-up page that starts in the reply never puts the ask below it (#2807)", async () => {
+  let down = true;
+  const entry = (id, kind) => ({ id, at: "2026-10-27T00:00:00Z", kind });
+  const ask = entry("ask", { userMessage: { text: "Notify me?", from: "person" } });
+  const reply = ["r1", "r2", "r3"].map((id) => entry(id, { agentMessage: { text: id, messageID: "m" } }));
+  const link = fakeLink((method) => {
+    if (method === "agents/turns") return { turns: [], firstTurn: 0, openStart: 0 };
+    if (method === "agents/transcript") return down ? undefined : { firstIndex: 2, total: 4, entries: reply.slice(1) };
+    return undefined;
+  });
+  const store = new Store(link);
+  // The first load fails; the turn is heard as it runs; a catch-up reads its last entries.
+  await store.openSession("mac", "s");
+  for (const heard of [ask, ...reply]) link.notify("agent/entry", { agentID: "s", entry: heard }, "mac");
+  down = false;
+  await store.reloadTranscript();
+  assert.deepEqual(store.entries.value.map((e) => e.id), ["r2", "r3"]);
+  assert.ok(store.chatTurns.value.every((turn) => !turn.ask), "the ask is earlier than the page, not after it");
+});
+
 test("turns that fail still open the last page, and say so (#400)", async () => {
   const link = fakeLink((method) => (method === "agents/transcript" ? { firstIndex: 40, total: 41, entries: [] } : undefined));
   const store = new Store(link);

@@ -143,15 +143,17 @@ public final class AgentsModel {
     @ObservationIgnored private var fileIndex = TranscriptFileIndex()
     /// Every entry in hand, by id, so one that reaches us twice is kept once.
     @ObservationIgnored private var entryIDs: Set<UUID> = []
-    /// Entries heard as they happened since the last page arrived.
+    /// Entries heard as they happened while a page is on its way; nil when none is.
     ///
     /// A page and the entries streaming past it come by two different doors — a reply
     /// and a notification — and nothing orders one against the other. An entry written
     /// after the daemon read the page can be applied before the page lands, and the
     /// page would then replace it: a chunk of a reply gone from the middle of the chat
-    /// until it was next opened. These are laid back on top of the page. Bounded,
-    /// because a chat watched for hours hears thousands between pages.
-    @ObservationIgnored private var heardSincePage: [TranscriptEntry] = []
+    /// until it was next opened. These are laid back on top of the page. Only from when
+    /// the page was asked for: what was heard before it is on the page or before it, and
+    /// laid after a catch-up page that starts in the turn's reply, the turn's ask and
+    /// first steps were drawn below that reply (#2807). Bounded, as the web's is.
+    @ObservationIgnored private var heardSincePage: [TranscriptEntry]? = []
     private static let heardSincePageLimit = 1_000
 
     /// Why the open chat's history did not load, or only partly, until a page lands or
@@ -601,12 +603,12 @@ public final class AgentsModel {
             if notification.oversized != nil {
                 onOversized(notification.agentID, notification.entry.id, notification.index)
             }
-            if let heard = heardSincePage.firstIndex(where: { $0.id == notification.entry.id }) {
-                heardSincePage[heard] = notification.entry
-            } else {
-                heardSincePage.append(notification.entry)
-                if heardSincePage.count > Self.heardSincePageLimit {
-                    heardSincePage.removeFirst(heardSincePage.count - Self.heardSincePageLimit)
+            if let heard = heardSincePage?.firstIndex(where: { $0.id == notification.entry.id }) {
+                heardSincePage?[heard] = notification.entry
+            } else if heardSincePage != nil {
+                heardSincePage?.append(notification.entry)
+                if let count = heardSincePage?.count, count > Self.heardSincePageLimit {
+                    heardSincePage?.removeFirst(count - Self.heardSincePageLimit)
                 }
             }
             // Catch-up can repeat an id with newer contents. Replace the held copy in place.
@@ -777,7 +779,7 @@ public final class AgentsModel {
     /// One whose stub has gone with the page, or a chat that has changed, is let go.
     public func fillOversized(_ entry: TranscriptEntry, for agentID: UUID) {
         guard agentID == watching else { return }
-        if let at = heardSincePage.firstIndex(where: { $0.id == entry.id }) { heardSincePage[at] = entry }
+        if let at = heardSincePage?.firstIndex(where: { $0.id == entry.id }) { heardSincePage?[at] = entry }
         guard let at = entries.firstIndex(where: { $0.id == entry.id }) else { return }
         entries[at] = entry
         refold()
@@ -1337,6 +1339,10 @@ public final class AgentsModel {
     /// A load of the open chat's first page begins: the token its answer is put on
     /// screen with, by `isLatestTranscriptLoad`.
     public func beginTranscriptLoad() -> Int {
+        // A page on its way: only what is heard from now is laid over it. Its page is read
+        // after this, and only the latest load's page is put on screen; one that failed
+        // leaves nothing heard to lay over the next (#2807).
+        heardSincePage = []
         transcriptLoads += 1
         return transcriptLoads
     }
@@ -1353,8 +1359,8 @@ public final class AgentsModel {
     public func replaceTranscript(with page: TranscriptPage) {
         // What was heard was written after the page was read. When an id overlaps, its
         // notification is the newer copy of that entry.
-        entries = Self.entriesKeepingLatest(page.entries + heardSincePage)
-        heardSincePage = []
+        entries = Self.entriesKeepingLatest(page.entries + (heardSincePage ?? []))
+        heardSincePage = nil
         firstEntryIndex = page.firstIndex
         hasMoreBefore = page.firstIndex > openTurnStart
         transcriptLoadFailure = nil
@@ -1388,6 +1394,7 @@ public final class AgentsModel {
 
     public func clearTranscript() {
         entries = []
+        // A chat chosen is a page on its way.
         heardSincePage = []
         transcriptLoadFailure = nil
         firstEntryIndex = 0

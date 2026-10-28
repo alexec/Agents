@@ -1930,7 +1930,9 @@ export class Store extends Work {
    * its host answered: with the page, or that it has no such session (#2743).
    */
   private async loadPage(host: string, session: string): Promise<boolean> {
-    this.heardSincePage ??= [];
+    // Only what is heard from now: what came before is on the page or before it, and laid after a
+    // page that starts in a turn's reply it drew the turn's ask below that reply (#2807).
+    this.heardSincePage = [];
     const load = ++this.transcriptLoads;
     const agentID = session as never;
     // The last 12, as the window opens a chat (#90); the rest come as the top is reached. A host

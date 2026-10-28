@@ -254,6 +254,39 @@ struct AgentsModelTests {
         #expect(model.entries.first?.text == "new")
     }
 
+    /// A catch-up page that starts in a long turn's reply lays over it only what was heard
+    /// while it was on its way: the ask and steps heard live before it are not laid after
+    /// the reply, where the Remote drew the person's prompt below its own reply (#2807).
+    @Test func aCatchUpPageNeverPutsTheAskBelowTheReply() throws {
+        let model = AgentsModel()
+        let agentID = UUID()
+        model.watching = agentID
+        let ask = TranscriptEntry(kind: .userMessage("Do we have a way to notify the user?"))
+        let step = TranscriptEntry(kind: .agentMessage(messageID: "a", text: "Still checking."))
+        let reply = (0..<4).map { TranscriptEntry(kind: .agentMessage(messageID: "b", text: "Part \($0). ")) }
+        let after = TranscriptEntry(kind: .agentMessage(messageID: "b", text: "The end."))
+        func hear(_ entry: TranscriptEntry) {
+            model.apply(.entry(DaemonAPI.EntryNotification(agentID: agentID, entry: entry)))
+        }
+
+        // Opened as the turn starts, then the whole turn heard as it ran.
+        _ = model.beginTranscriptLoad()
+        model.replaceTranscript(with: TranscriptPage(firstIndex: 0, total: 1, entries: [ask]))
+        ([step] + reply).forEach(hear)
+        #expect(model.entries.map(\.id) == ([ask, step] + reply).map(\.id))
+
+        // A catch-up (a reconnect) reads the turn's last entries only, and one more
+        // entry is heard while that page is on its way.
+        _ = model.beginTranscriptLoad()
+        hear(after)
+        model.replaceTranscript(with: TranscriptPage(firstIndex: 4, total: 6, entries: Array(reply.suffix(2))))
+
+        #expect(model.entries.map(\.id) == (Array(reply.suffix(2)) + [after]).map(\.id))
+        #expect(model.hasMoreBefore)
+        let turns = model.transcriptItems.turns(reusing: [])
+        #expect(turns.allSatisfy { $0.ask == nil }, "the ask is earlier than the page, not after it")
+    }
+
     /// An agent's `cwd` is whatever it was started with and a folder is the
     /// resolved form. Comparing them raw is how a folder looks empty while its agents
     /// are plainly running.
