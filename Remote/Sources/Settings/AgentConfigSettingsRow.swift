@@ -5,9 +5,11 @@ struct AgentConfigSettingsRow: View {
     let kind: DaemonAPI.AgentConfigEditorKind
 
     var body: some View {
-        SettingsPageLink(kind.title, systemImage: symbol) {
+        // Not a SettingsPageLink: the editor is a list of its own, not a row in a Form (#2763).
+        NavigationLink {
             RemoteAgentConfigEditor(kind: kind, folder: nil)
-                .navigationTitle(kind.title)
+        } label: {
+            Label(kind.title, systemImage: symbol)
         }
     }
 
@@ -34,10 +36,13 @@ struct RemoteAgentConfigEditor: View {
                               },
                               // `~/.agents` is the Mac's: say so, and what goes to the other machines (#2766, #2704).
                               userScope: folder == nil)
+        .navigationTitle(kind.title)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
 struct RemoteFolderAgentConfiguration: View {
+    @Environment(\.dismiss) private var dismiss
     let folder: URL
 
     var body: some View {
@@ -48,6 +53,10 @@ struct RemoteFolderAgentConfiguration: View {
                 }
             }
             .navigationTitle("Agent Configuration")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+            }
         }
     }
 }
