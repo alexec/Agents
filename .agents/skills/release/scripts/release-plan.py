@@ -3,15 +3,22 @@
 
     release-plan.py            the last tag, the next version and every merged PR since
     release-plan.py --version  only the next version, e.g. 0.3.0 (nothing when nothing merged)
+    release-plan.py --selftest
 
 The version (Alex, 2026-10-13): minor (0.x+1.0) when a merged pull request since the last
 tag is labelled `enhancement` or fixes an issue labelled `enhancement`; otherwise patch
 (0.x.y+1). 1.0 and major versions only when Alex says, so this never makes one.
 
+The open milestone (the earliest open one by the version its title starts with, #1340) has a
+version too. When it differs from `next:`, the plan says why (#2779): an enhancement merged,
+or a capability was removed, which a patch may not hold. The release skill then asks Alex.
+
 It reads origin/main and the v* tags (fetched first) and asks GitHub through `gh` for the
 pull requests and their issues. It changes nothing.
 """
+import importlib.util
 import json
+import pathlib
 import re
 import subprocess
 import sys
@@ -36,7 +43,64 @@ def bump(tag, minor):
     return f"{major}.{mid + 1}.0" if minor else f"{major}.{mid}.{patch + 1}"
 
 
+def milestone_version(title):
+    """The version a milestone's title starts with: "0.13 Auto runtime" is 0.13.0."""
+    m = re.match(r"v?(\d+)\.(\d+)(?:\.(\d+))?(?:\s|$)", title)
+    return f"{m[1]}.{m[2]}.{m[3] or 0}" if m else None
+
+
+def key(version):
+    return tuple(int(n) for n in version.split("."))
+
+
+def open_milestone(titles):
+    """The earliest open milestone as (title, version), or None."""
+    found = sorted(((milestone_version(t), t) for t in titles if milestone_version(t)), key=lambda vt: key(vt[0]))
+    return (found[0][1], found[0][0]) if found else None
+
+
+def removed_capabilities(tag):
+    path = pathlib.Path(__file__).with_name("capability-changes.py")
+    spec = importlib.util.spec_from_file_location("capability_changes", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return sorted(module.at(tag)[0] - module.at("origin/main")[0])
+
+
+def differs(version, planned, enhancements, removed):
+    """Why the plan's version is not the milestone's, or None when they agree."""
+    if version == planned:
+        return None
+    why = []
+    if enhancements:
+        why.append("enhancements merged")
+    if removed:
+        why.append("capabilities removed: " + ", ".join(removed))
+    if not why:
+        why.append("no enhancement merged" if key(version) < key(planned) else "the milestone is behind the tag")
+    return f"plan v{version}, milestone v{planned} ({'; '.join(why)}); ask Alex which version"
+
+
+def selftest():
+    assert milestone_version("0.12.3 Bug fixes") == "0.12.3"
+    assert milestone_version("0.13 Auto runtime and voice mode") == "0.13.0"
+    assert milestone_version("1.0 Public release") == "1.0.0"
+    assert milestone_version("Backlog") is None
+    assert open_milestone(["0.15 Hosted", "1.0 Public release", "0.9 x", "0.12.3 Bug fixes", "Later"]) == ("0.9 x", "0.9.0")
+    assert open_milestone(["0.13 A", "0.12.3 B"]) == ("0.12.3 B", "0.12.3")
+    assert open_milestone([]) is None
+    assert differs("0.12.0", "0.12.0", [1], []) is None
+    assert differs("0.12.0", "0.11.2", [2700], ["files/1"]) == (
+        "plan v0.12.0, milestone v0.11.2 (enhancements merged; capabilities removed: files/1); ask Alex which version")
+    assert differs("0.11.2", "0.12.0", [], []) == (
+        "plan v0.11.2, milestone v0.12.0 (no enhancement merged); ask Alex which version")
+    print("release-plan selftest: ok")
+
+
 def main():
+    if sys.argv[1:] == ["--selftest"]:
+        selftest()
+        return
     only_version = "--version" in sys.argv[1:]
     run("git", "fetch", "--quiet", "--tags", "origin", "main")
     tag = last_tag()
@@ -82,8 +146,17 @@ def main():
         return
     why = (f"minor: enhancements {', '.join(f'#{n}' for n in enhancements[:8])}"
            f"{' …' if len(enhancements) > 8 else ''}") if enhancements else "patch: no enhancement merged"
+    milestone = open_milestone(run("gh", "api", "repos/{owner}/{repo}/milestones?state=open", "--paginate",
+                                   "--jq", ".[].title").splitlines())
     print(f"last: {tag} ({since[:10]})")
-    print(f"next: v{version} ({why})")
+    if milestone:
+        title, planned = milestone
+        print(f"next: v{version} ({why}); milestone: v{planned} ({title})")
+        mismatch = differs(version, planned, enhancements, removed_capabilities(tag))
+        if mismatch:
+            print(f"differs: {mismatch}")
+    else:
+        print(f"next: v{version} ({why}); milestone: none open")
     print(f"commits: {len(subjects)}, pull requests: {len(rows)}")
     print("pull requests:")
     for row in rows:
