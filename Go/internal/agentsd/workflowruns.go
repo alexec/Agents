@@ -846,14 +846,35 @@ func byHandTrigger() wire.WorkflowTrigger {
 		Hours: [2]int64{0, 23}, EndMinute: 30, Days: []wire.Weekday{"sun", "mon", "tue", "wed", "thu", "fri", "sat"}}}}
 }
 
+// startWorkflowClock ticks the workflows until stopWorkflowClock.
+func (d *Daemon) startWorkflowClock() {
+	stop := make(chan struct{})
+	d.clockStop = stop
+	d.clockRunning.Add(1)
+	safe.Go("workflow clock", func() { defer d.clockRunning.Done(); d.workflowClock(stop) })
+}
+
+// stopWorkflowClock ends the clock and waits for a tick still going, which scans and so
+// writes the ready-made workflows into the personal home (#2823). Once only.
+func (d *Daemon) stopWorkflowClock() {
+	d.clockStopOnce.Do(func() {
+		if d.clockStop != nil {
+			close(d.clockStop)
+		}
+	})
+	d.clockRunning.Wait()
+}
+
 // workflowClock ticks every 15 seconds: a schedule due since the last tick fires, or is
 // missed when the host was away longer than two minutes.
-func (d *Daemon) workflowClock() {
+func (d *Daemon) workflowClock(stop <-chan struct{}) {
 	t := time.NewTicker(workflowTick)
 	defer t.Stop()
 	for {
 		select {
 		case <-d.ctx.Done():
+			return
+		case <-stop:
 			return
 		case <-t.C:
 			d.workflowTickOnce(time.Now())
