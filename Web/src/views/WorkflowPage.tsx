@@ -11,7 +11,7 @@ import { useEffect } from "preact/hooks";
 import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
 import {
-  cooldownSentence, labelsNote, mcpMissedWords, mcpTriggerWords, agentModeWords, unknownLines, isUnapproved, canBeApproved, canBeDenied, workflowStatusLines, isOn, isSupportedTrigger, switchesSentence, lastRanLine, nextLine, resumedAgent, scopeLine, triggerFilters, triggerGlyph,
+  cooldownSentence, labelsNote, mcpMissedWords, mcpTriggerWords, agentModeWords, unknownLines, isUnapproved, canBeApproved, canBeDenied, workflowStatusLines, isOn, isSupportedTrigger, switchesSentence, scopeSentence, lastRanLine, nextLine, resumedAgent, scopeLine, triggerFilters, triggerGlyph,
   runsOnParts, triggerSummary, workflowRunsOnSentence, workflowHostChoices, workflowSummary,
 } from "../model/workflows";
 import { go } from "../route";
@@ -100,6 +100,8 @@ export function WorkflowPage({ store, host, folder, folderName, workflowID, down
         <div class="workflow-body">
           <div class="heading">
             {!workflow.problem && <p class="quiet">{workflowSummary(workflow, runtimeName)}</p>}
+            {/* Yours, in every folder (#2759): its rows under a folder do not say so. */}
+            {scopeSentence(summary) && <p class="quiet small">{scopeSentence(summary)}</p>}
           </div>
           {summary.isArchived ? (
             <div class="controls">

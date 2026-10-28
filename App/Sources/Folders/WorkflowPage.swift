@@ -202,6 +202,12 @@ struct WorkflowPage: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                // Yours, in every folder (#2759): its rows under a folder do not say so.
+                if let scope = summary.scopeSentence {
+                    Text(scope)
+                        .appText(.fine)
+                        .foregroundStyle(.tertiary)
+                }
                 // The toolbar's switches write the workflow's file (#125), so say so.
                 Text(summary.switchesSentence)
                     .appText(.fine)

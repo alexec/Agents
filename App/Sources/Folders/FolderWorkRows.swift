@@ -201,10 +201,12 @@ struct WorkflowListRow: View {
         }
         .padding(.leading, isNested ? 22 : 0)
         .listRowInsets(.vertical, 2)
-        .help(!summary.isEnabled && !summary.isArchived ? "Turned off. \(summary.workflow.summary)" : summary.workflow.summary)
+        // A user workflow says it is in every folder (#2759), pinned or under Needs You too.
+        .help(summary.rowHelp)
         .sidebarInk(.workflow(summary.id, in: folder))
         .tag(SidebarItem.workflow(summary.id, in: folder))
         .accessibilityElement(children: .combine)
+        .accessibilityValue(summary.scopeSentence ?? "")
         // Pin or Unpin (#432), from the other edge, as a session's row has it.
         .swipeActions(edge: .leading) {
             if !summary.isArchived {

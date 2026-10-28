@@ -158,6 +158,11 @@ test("the page says the switch is a line in the workflow's file, in the window's
     "Enabled and Archive are saved in .agents/workflows/nightly.md, a file in this folder you may commit");
 });
 
+test("a user workflow says it is in every folder, in the window's words (#2759)", () => {
+  assert.equal(w.scopeSentence({ scope: "user" }), "Your workflow: in every folder");
+  assert.equal(w.scopeSentence({ scope: "folder" }), null);
+});
+
 const dates = await load("src/protocol/dates.ts");
 const at = (text) => dates.toWireDate(new Date(text));
 

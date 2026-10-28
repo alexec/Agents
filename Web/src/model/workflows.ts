@@ -545,6 +545,11 @@ export function switchesSentence(s: WorkflowSummary): string {
   return `Enabled and Archive are saved in .agents/workflows/${s.workflow.workflowID}.md, a file in this folder you may commit`;
 }
 
+/** WorkflowSummary.scopeSentence (#2759): a user workflow is in every folder; null for a folder's own. */
+export function scopeSentence(s: WorkflowSummary): string | null {
+  return s.scope === "user" ? "Your workflow: in every folder" : null;
+}
+
 /** The instance WorkflowSummary.turnedOffSentence: led by why, when there is a why. */
 export function turnedOffSentenceFor(s: WorkflowSummary): string {
   const why = offReasonSentence(s);
