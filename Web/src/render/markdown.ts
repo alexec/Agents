@@ -5,8 +5,8 @@
 // HTML sink. An image in a chat, or any image that is not a file beside a Markdown page, becomes
 // a placeholder naming it: the page loads nothing from anywhere but itself (the CSP says so too).
 // A picture beside a page is drawn from bytes `files/read` returns. A link opens in a new tab,
-// and only http, https and mailto links are links at all. A file: link is a link only where the
-// page says how a file opens (a chat opens it in Files, #548), and then it never navigates.
+// and only http, https and mailto links are links at all. A file: link, or a bare absolute path, is a link only
+// where the page says how a file opens (a chat opens it in Files, #548), and then it never navigates.
 import MarkdownIt, { type Token } from "markdown-it";
 import { pageImagePath } from "../model/pageImage";
 import { LocalPicture } from "./LocalPicture";
@@ -33,10 +33,11 @@ parser.validateLink = (url) => validateLink(url) || fileLinkPath(url) !== null;
 /** Opens a file on the agent's host by its full path: the chat's Files pane. */
 export type OpenFile = (location: { path: string }) => void;
 
-/** The full path a file: link names on its host, or null for any other link. */
+/** The full path a file: link, or a bare absolute path, names on its host, or null for any other link. */
 export function fileLinkPath(href: string): string | null {
   try {
-    const url = new URL(href);
+    // A bare `/Users/…` is a file on the host, as on the Mac (#2754); `//elsewhere/…` is not.
+    const url = href.startsWith("/") ? new URL(href, "file:///") : new URL(href);
     if (url.protocol !== "file:" || (url.host !== "" && url.host !== "localhost")) return null;
     const path = decodeURIComponent(url.pathname);
     return path.startsWith("/") ? path : null;
