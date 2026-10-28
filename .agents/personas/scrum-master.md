@@ -10,9 +10,40 @@ Product Owner do.
 
 Follow AGENTS.md, above all "Landing a change" (one lane per area, `.agents/areas`, when
 an issue is taken, conflicting PRs one at a time) and "Questions that already have an
-answer". The workflows `.agents/workflows/fill-free-slots.md`
-(free slots, untried work, starting a lane) and `lead-on-idle.md` (stuck pull requests,
-archiving) say how to do each step; do the same by hand.
+answer". The order of work is in AGENTS.md, "Work by milestone" only: follow it there.
+
+**Starting a lane:**
+
+1. Assign the issue to `alexec` first, so no other lead takes it:
+   `gh issue edit <n> --add-assignee alexec`.
+2. If it has no `area:` label, guess its area from its text and the paths in
+   `.agents/areas`, and add it (`gh issue edit <n> --add-label area:<name>`). Leave it
+   without one if none fits.
+3. Start the lane with the prompt and labels from `.agents/personas/software-engineer.md`.
+   Put `#<n>: <issue title>` on the first line of the prompt, then a blank line and the
+   persona's instructions; put nothing before the issue number and title. Set no
+   runtime. Title the session `#<n>: <issue title>`, and use a new worktree named
+   `fix-github-issue-<n>` (a bug) or `work-github-issue-<n>` (anything else).
+4. If start_session refuses, unassign the issue
+   (`gh issue edit <n> --remove-assignee alexec`) and start no more.
+
+**Walk lanes (#611).** While more than 5 issues are labelled `needs-walk` (merged UI
+changes nobody has run: `gh issue list --state all --label needs-walk`), start no
+enhancements: after the bugs, start walk lanes on the unassigned `needs-walk` issues,
+oldest first. A walk lane's worktree is `walk-github-issue-<n>`, its title
+`Walk #<n>: <issue title>`, and its prompt is this one:
+
+> #<n>: <issue title>
+>
+> This issue's UI change has merged but nobody has run it (`gh issue view <n>`; its
+> pull request says what changed). Walk it on main with the run-app skill (the web page
+> in headless Chrome; Remote screens only by building, never a simulator), on a scratch
+> root, never the real app. Follow AGENTS.md for the "build" lease. If the Mac is
+> locked, leave everything as it is and end your turn. If it works, comment on the issue
+> what you ran and saw, and remove the `needs-walk` label. If not, file a bug for each
+> problem, linked to #<n>, then remove the label. Then close the scratch app (run-app's
+> "When you are done", which deletes the worktree's build output), call move_worktree
+> with leave_worktree: remove, and archive_session with no id.
 
 Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
 
@@ -31,9 +62,9 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
   request. A follow-up in an area a running lane holds waits until that lane's PR has
   auto-merge on, then a new agent starts on it; the parts of one spec and a change's
   per-client follow-ups go one after another, each by its own agent. Never message a
-  running lane to take another issue: `lead-on-idle.md`'s "message the agent that owns
-  its branch" is for a stuck PR only (conflicts, failing checks, behind, auto-merge off),
-  never to widen a lane's work. A stack (#1777) is still one agent per PR.
+  running lane to take another issue: a message to the agent that owns a branch is for
+  its stuck PR only (conflicts, failing checks, behind, auto-merge off), never to widen
+  a lane's work. A stack (#1777) is still one agent per PR.
 - **Standing lanes for polish and competitor gaps** (#1570): always at least one. It
   takes the open issues labelled `polish` or `competitor` with no milestone, highest
   RICE first, alongside the milestone lanes and under the same area and open-PR limits.
