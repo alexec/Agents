@@ -321,21 +321,51 @@ func (rt *readTokens) revoke(ctx context.Context, id string, actor wire.AuditAct
 		if t.Revoked != nil {
 			return nil
 		}
-		t.Revoked = &wire.OrgRouteStamp{By: actor, At: wire.DateOf(time.Now())}
-		data, err := records.Encode(t)
-		if err == nil {
-			_, err = rt.s.cfg.Store.Put(ctx, readTokenKey(t.SHA256), data, store.Matching(etags[t.ID]))
-		}
+		revoked, err := rt.markRevoked(ctx, t, etags[t.ID], &wire.OrgRouteStamp{By: actor, At: wire.DateOf(time.Now())})
 		if err != nil {
 			return fail(storeUnavailable, "The token could not be revoked: %v", err)
 		}
 		rt.mu.Lock()
 		delete(rt.read, t.SHA256)
 		rt.mu.Unlock()
+		if !revoked {
+			return nil
+		}
 		rt.s.auditAs(actor, "readApi/revoked", "token "+t.ID+" ("+t.Name+")")
 		return nil
 	}
 	return fail(invalidParams, "There is no read API token %s.", id)
+}
+
+// markRevoked writes t revoked against etag. A conflict is most often noteUse's last-use
+// stamp landing in between (#2830), so it reads the token again and tries once more, a
+// few times; false when another revoke got there first.
+func (rt *readTokens) markRevoked(ctx context.Context, t readTokenRecord, etag string, stamp *wire.OrgRouteStamp) (bool, error) {
+	key := readTokenKey(t.SHA256)
+	for try := 0; ; try++ {
+		t.Revoked = stamp
+		data, err := records.Encode(t)
+		if err != nil {
+			return false, err
+		}
+		_, err = rt.s.cfg.Store.Put(ctx, key, data, store.Matching(etag))
+		if err == nil || !store.IsConflict(err) || try == 3 {
+			return err == nil, err
+		}
+		object, err := rt.s.cfg.Store.Get(ctx, key)
+		if err != nil {
+			return false, err
+		}
+		var now readTokenRecord
+		if object == nil || json.Unmarshal(object.Data, &now) != nil {
+			return false, &store.ConflictError{Key: key}
+		}
+		t = now
+		if t.Revoked != nil {
+			return false, nil
+		}
+		etag = object.ETag
+	}
 }
 
 func (s *Service) otlpState() *wire.OTLPExport {

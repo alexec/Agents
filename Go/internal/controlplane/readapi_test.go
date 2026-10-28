@@ -151,3 +151,39 @@ func TestReadTokensAreBounded(t *testing.T) {
 		t.Fatal(e)
 	}
 }
+
+// A last-use stamp written between revoke's read and its write does not fail the revoke
+// (#2830), and the stamp is kept.
+func TestARevokeWinsOverALastUseStamp(t *testing.T) {
+	t.Parallel()
+	st := store.NewMemory()
+	p := startPlane(t, st, controllink.NewPrivateKey())
+	_, admin := p.client("Owner's window")
+	var made wire.ReadTokenMade
+	json.Unmarshal(call(t, admin, "", "readApi/make", wire.ReadTokenMake{Name: "Looker"}), &made)
+	all, etags, err := p.s.readAPI.list(t.Context())
+	if err != nil || len(all) != 1 {
+		t.Fatal(all, err)
+	}
+	used := all[0]
+	used.LastUse = &wire.SCIMTokenUse{At: wire.DateOf(time.Now())}
+	data, _ := json.Marshal(used)
+	if _, err := st.Put(t.Context(), readTokenKey(used.SHA256), data, store.Matching(etags[used.ID])); err != nil {
+		t.Fatal(err)
+	}
+	stamp := &wire.OrgRouteStamp{At: wire.DateOf(time.Now())}
+	if revoked, err := p.s.readAPI.markRevoked(t.Context(), all[0], etags[used.ID], stamp); err != nil || !revoked {
+		t.Fatal(revoked, err)
+	}
+	after, _, _ := p.s.readAPI.list(t.Context())
+	if len(after) != 1 || after[0].Revoked == nil || after[0].LastUse == nil {
+		t.Fatalf("%+v", after)
+	}
+	// Revoked again by another copy's stale read: nothing to do.
+	if revoked, err := p.s.readAPI.markRevoked(t.Context(), all[0], etags[used.ID], stamp); err != nil || revoked {
+		t.Fatal(revoked, err)
+	}
+	if code, _ := readReports(t, p, made.Value, ""); code != http.StatusUnauthorized {
+		t.Fatal(code)
+	}
+}
