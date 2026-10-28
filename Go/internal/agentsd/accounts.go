@@ -30,6 +30,9 @@ type accountBook struct {
 	accountMu     sync.Mutex
 	accountLoaded bool
 	profiles      []wire.AccountProfile
+	// signIns is this daemon's own: a package-wide cache let another daemon's new file
+	// clear this one's readings (#2826).
+	signIns signInCache
 }
 
 // accountKind is what a runtime that can have more than one account keeps in its folder.
@@ -132,7 +135,7 @@ func (d *Daemon) readSignIn(p *wire.AccountProfile) {
 	case "claude":
 		cmd := "CLAUDE_CONFIG_DIR=" + shellWord(folder) + " claude"
 		p.SignInCommand = &cmd
-		r = readSignInFile(filepath.Join(folder, ".claude.json"), func(b []byte) signIn {
+		r = d.signIns.read(filepath.Join(folder, ".claude.json"), func(b []byte) signIn {
 			var f struct {
 				OAuthAccount *struct {
 					EmailAddress string `json:"emailAddress"`
@@ -144,7 +147,7 @@ func (d *Daemon) readSignIn(p *wire.AccountProfile) {
 			return signIn{signedIn: true, as: f.OAuthAccount.EmailAddress}
 		})
 	case "codex":
-		r = readSignInFile(filepath.Join(folder, "auth.json"), func(b []byte) signIn {
+		r = d.signIns.read(filepath.Join(folder, "auth.json"), func(b []byte) signIn {
 			var f struct {
 				Tokens *struct {
 					IDToken string `json:"id_token"`
@@ -169,15 +172,17 @@ type signIn struct {
 	as       string
 }
 
-// signInCacheSize bounds signIns: one entry an added account's file, cleared when full.
+// signInCacheSize bounds a signInCache: one entry an added account's file, cleared when full.
 const signInCacheSize = 64
 
-// signIns keeps each sign-in file's reading by its size and modification time, so a
+// signInCache keeps each sign-in file's reading by its size and modification time, so a
 // broadcast does not read and decode every account's file again (#2251).
-var signIns = struct {
+type signInCache struct {
 	sync.Mutex
 	m map[string]signInReading
-}{m: map[string]signInReading{}}
+	// reads counts the files read; a test reads it.
+	reads atomic.Int64
+}
 
 type signInReading struct {
 	size  int64
@@ -185,34 +190,34 @@ type signInReading struct {
 	r     signIn
 }
 
-// signInReads counts the files readSignInFile read; a test reads it.
-var signInReads atomic.Int64
-
-// readSignInFile is parse of the file at path, or nothing when there is no file; the file
-// is read again only when its size or modification time changed.
-func readSignInFile(path string, parse func([]byte) signIn) signIn {
+// read is parse of the file at path, or nothing when there is no file; the file is read
+// again only when its size or modification time changed.
+func (c *signInCache) read(path string, parse func([]byte) signIn) signIn {
 	fi, err := os.Stat(path)
 	if err != nil || fi.IsDir() {
 		return signIn{}
 	}
-	signIns.Lock()
-	c, ok := signIns.m[path]
-	signIns.Unlock()
-	if ok && c.size == fi.Size() && c.mtime.Equal(fi.ModTime()) {
-		return c.r
+	c.Lock()
+	kept, ok := c.m[path]
+	c.Unlock()
+	if ok && kept.size == fi.Size() && kept.mtime.Equal(fi.ModTime()) {
+		return kept.r
 	}
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return signIn{}
 	}
-	signInReads.Add(1)
+	c.reads.Add(1)
 	r := parse(b)
-	signIns.Lock()
-	if _, ok := signIns.m[path]; !ok && len(signIns.m) >= signInCacheSize {
-		clear(signIns.m)
+	c.Lock()
+	if c.m == nil {
+		c.m = map[string]signInReading{}
 	}
-	signIns.m[path] = signInReading{size: fi.Size(), mtime: fi.ModTime(), r: r}
-	signIns.Unlock()
+	if _, ok := c.m[path]; !ok && len(c.m) >= signInCacheSize {
+		clear(c.m)
+	}
+	c.m[path] = signInReading{size: fi.Size(), mtime: fi.ModTime(), r: r}
+	c.Unlock()
 	return r
 }
 
