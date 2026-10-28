@@ -111,6 +111,15 @@ struct SettingsWindow: View {
             guard let asked else { return }
             pane.wrappedValue = asked
             model.settingsPaneAsked = nil
+            // A file for the editor (#2803): its page, unless edits not saved hold this one.
+            if asked == .agentConfiguration, let file = model.agentConfigFileAsked, file.folder == nil {
+                let wanted = AgentConfigurationPage(file.kind)
+                if sharedPage.wrappedValue == wanted || !unsaved {
+                    sharedPage.wrappedValue = wanted
+                } else {
+                    model.agentConfigFileAsked = nil
+                }
+            }
             if asked == .machines { machinesPage = .list }
         }
         .onChange(of: pane.wrappedValue) { _, chosen in

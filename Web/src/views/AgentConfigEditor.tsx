@@ -27,8 +27,10 @@ export const mayLeave = (unsaved: boolean, ask: (question: string) => boolean = 
   !unsaved || ask(discardQuestion);
 
 /** The same file controls serve personal Settings and a project's Agent Configuration. */
-export function AgentConfigEditor({ store, host, folder, kind, down, onUnsaved }: {
+export function AgentConfigEditor({ store, host, folder, kind, down, open, onUnsaved }: {
   store: Store; host: string; folder?: string; kind: AgentConfigKind; down: boolean;
+  /** A file to open once the list is read, such as a workflow page's Edit File… (#2803). */
+  open?: string;
   /** Told when the open file gets or loses edits not saved, for a container that can leave the editor. */
   onUnsaved?: (unsaved: boolean) => void;
 }) {
@@ -70,7 +72,7 @@ export function AgentConfigEditor({ store, host, folder, kind, down, onUnsaved }
     setFiles(listed);
     pick(listed.some((file) => file.path === wanted) ? wanted : listed[0]?.path ?? "", listed);
   }
-  useEffect(() => { setSelected(""); void reload(""); }, [host, folder, kind]);
+  useEffect(() => { setSelected(""); void reload(open ?? ""); }, [host, folder, kind]);
 
   async function add() {
     const name = newName.trim();
@@ -168,6 +170,24 @@ export function ProjectAgentConfigModal({ store, host, folder, down, close }: {
       </div>
       <AgentConfigEditor store={store} host={host} folder={folder} kind={kind} down={down} onUnsaved={setUnsaved} />
       <div class="sheet-actions"><button type="button" onClick={() => leave(close)}>Done</button></div>
+    </div>
+  </Modal>;
+}
+
+/** A workflow's file in the Workflows editor (#2803), over its page: yours, or the folder's, as Settings ▸ Agent
+ * Configuration and the folder's Agent Configuration… show them. */
+export function WorkflowFileModal({ store, host, folder, path, down, close }: {
+  store: Store; host: string; folder: string | undefined; path: string; down: boolean; close: () => void;
+}) {
+  const [unsaved, setUnsaved] = useState(false);
+  const leave = () => { if (mayLeave(unsaved)) { setUnsaved(false); close(); } };
+  return <Modal label="Workflows" close={close} keep={() => !mayLeave(unsaved)}>
+    <div class="sheet-body agent-config-project">
+      <h2>Workflows</h2>
+      {!folder && <UserScopeLines />}
+      <AgentConfigEditor store={store} host={host} {...(folder ? { folder } : {})} kind="workflows" down={down} open={path}
+        onUnsaved={setUnsaved} />
+      <div class="sheet-actions"><button type="button" onClick={leave}>Done</button></div>
     </div>
   </Modal>;
 }

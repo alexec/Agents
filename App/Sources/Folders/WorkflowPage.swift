@@ -26,6 +26,8 @@ import SwiftUI
 /// row you cannot open is a row that can only tell you that something is wrong.
 struct WorkflowPage: View {
     @Environment(AppModel.self) private var model
+    @Environment(WindowRequests.self) private var requests
+    @Environment(\.openSettings) private var openSettings
     /// The folder it is in, and how it leaves and opens a session: the main window's
     /// selection, or a folder's own window's (#1090).
     private var place = WindowPlace()
@@ -223,6 +225,16 @@ struct WorkflowPage: View {
     @ViewBuilder
     private func actions(_ summary: WorkflowSummary) -> some View {
         Group {
+            // Its file in Agent Configuration's editor (#2803): Settings' for yours, Folder
+            // Settings' for the folder's, which has that editor only on this Mac.
+            if summary.scope == "user" || place.host == .mac {
+                Button { editFile(summary) } label: {
+                    Label("Edit File…", systemImage: "square.and.pencil")
+                }
+                .help(summary.scope == "user"
+                      ? "Open this workflow's file in Settings ▸ Agent Configuration ▸ Workflows"
+                      : "Open this workflow's file in Folder Settings ▸ Agent Configuration ▸ Workflows")
+            }
             Button(role: .destructive) { confirmsDelete = true } label: {
                 Label("Delete…", systemImage: "trash")
             }
@@ -314,6 +326,18 @@ struct WorkflowPage: View {
             }
         }
         .labelStyle(.titleAndIcon)
+    }
+
+    private func editFile(_ summary: WorkflowSummary) {
+        let user = summary.scope == "user"
+        model.agentConfigFileAsked = AgentConfigFileAsk(folder: user ? nil : summary.workflow.folder, kind: .workflows,
+                                                        path: "\(summary.workflow.workflowID).\(WorkflowPaths.fileExtension)")
+        if user {
+            model.settingsPaneAsked = .agentConfiguration
+            openSettings()
+        } else {
+            requests.folderSettings = .workflows
+        }
     }
 
     /// What the file could not say, and the file itself.
