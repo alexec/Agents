@@ -9,7 +9,10 @@ description: The workflow file format — every trigger, every setting, and the 
 This page lists everything a workflow file can say: what makes it run, which agent runs
 it, and how that agent runs.
 
-A workflow is one Markdown file in the folder's `.agents/workflows` folder. The file
+A workflow is one Markdown file in the folder's `.agents/workflows` folder. A workflow
+of your own, in `~/.agents/workflows`, is in every folder: its page says **Your workflow:
+in every folder**. Create, edit and delete those in **Settings ▸ Agent Configuration ▸
+Workflows**, on the Mac, the iPhone, the iPad and the web. The file
 name, without `.md`, is the workflow's id. The file starts with front matter between two
 `---` lines, and everything under it is the prompt, sent to the agent as it is written:
 

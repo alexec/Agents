@@ -341,7 +341,7 @@ func (d *Daemon) manageWorkflows(caller wire.UUID, args map[string]json.RawMessa
 		}
 		if f.scope == "user" {
 			d.workflowMu.Unlock()
-			return "", &Error{Code: wire.FailureNotAllowed, Message: "This workflow belongs to your workflows. Open it in Settings ▸ Workflows."}
+			return "", &Error{Code: wire.FailureNotAllowed, Message: "This workflow belongs to your workflows. Open it in Settings ▸ Agent Configuration ▸ Workflows."}
 		}
 		if f.wf.Problem != nil && f.wf.Problem.Unreadable != nil {
 			d.workflowMu.Unlock()
@@ -356,7 +356,7 @@ func (d *Daemon) manageWorkflows(caller wire.UUID, args map[string]json.RawMessa
 		existing := d.fileLocked(folder, id)
 		d.workflowMu.Unlock()
 		if existing != nil && existing.scope == "user" {
-			return "", &Error{Code: wire.FailureNotAllowed, Message: "This workflow belongs to your workflows. Edit it in Settings ▸ Workflows."}
+			return "", &Error{Code: wire.FailureNotAllowed, Message: "This workflow belongs to your workflows. Edit it in Settings ▸ Agent Configuration ▸ Workflows."}
 		}
 		return d.writeWorkflow(folder, id, argString(args, "content"))
 	case "remove":
@@ -365,7 +365,7 @@ func (d *Daemon) manageWorkflows(caller wire.UUID, args map[string]json.RawMessa
 		existing := d.fileLocked(folder, id)
 		d.workflowMu.Unlock()
 		if existing != nil && existing.scope == "user" {
-			return "", &Error{Code: wire.FailureNotAllowed, Message: "This workflow belongs to your workflows. Remove it in Settings ▸ Workflows."}
+			return "", &Error{Code: wire.FailureNotAllowed, Message: "This workflow belongs to your workflows. Remove it in Settings ▸ Agent Configuration ▸ Workflows."}
 		}
 		path, ok := workflowPath(folder, id)
 		if !ok {
