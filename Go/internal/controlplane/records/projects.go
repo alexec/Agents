@@ -32,12 +32,12 @@ type Project struct {
 }
 
 type projectJSON struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Owner     string `json:"owner"`
-	MadeAt    Stamp  `json:"madeAt"`
-	Rev       int    `json:"rev,omitempty"`
-	Removed   *bool  `json:"removed,omitempty"`
+	ID        string             `json:"id"`
+	Name      string             `json:"name"`
+	Owner     string             `json:"owner"`
+	MadeAt    Stamp              `json:"madeAt"`
+	Rev       int                `json:"rev,omitempty"`
+	Removed   *bool              `json:"removed,omitempty"`
 	RemovedAt *Stamp             `json:"removedAt,omitempty"`
 	Slots     []wire.ProjectSlot `json:"slots,omitempty"`
 }
@@ -136,6 +136,28 @@ func (r *Records) ChangeProject(ctx context.Context, id string, change func(*Pro
 	if err := r.loadProjects(ctx); err != nil {
 		return nil, err
 	}
+	return r.changeProject(ctx, id, change)
+}
+
+// ChangeProjects is ChangeProject for each of ids, in their order, under one hold of the
+// write lock and one read of projects (#2735): a machine's new ids are adopted together.
+// It stops at the first error.
+func (r *Records) ChangeProjects(ctx context.Context, ids []string, change func(id string, p *Project) (*Project, error)) error {
+	r.writing.Lock()
+	defer r.writing.Unlock()
+	if err := r.loadProjects(ctx); err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if _, err := r.changeProject(ctx, id, func(p *Project) (*Project, error) { return change(id, p) }); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// changeProject is ChangeProject with the write lock held and projects read.
+func (r *Records) changeProject(ctx context.Context, id string, change func(*Project) (*Project, error)) (*Project, error) {
 	r.mu.Lock()
 	h, there := r.projects[id]
 	r.mu.Unlock()

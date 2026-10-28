@@ -3,10 +3,12 @@ package controlplane
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"unicode/utf8"
 
 	"github.com/alexec/agents/Go/internal/controlplane/records"
@@ -36,32 +38,37 @@ type storedProjectFolders struct {
 }
 
 // joinedFolders is every machine's folders as it last sent them, by machine. A machine
-// that is no longer known is left out.
+// that is no longer known is left out. A list whose entity tag has not moved since this
+// copy last read it is not read again (#2735): one listing, and a read only for each
+// machine whose list changed, at this copy or another.
 func (s *Service) joinedFolders(ctx context.Context) (map[string][]wire.JoinedFolder, error) {
-	keys, err := s.cfg.Store.List(ctx, projectFoldersPrefix)
+	listed, err := s.cfg.Store.List(ctx, projectFoldersPrefix)
+	if err != nil {
+		return nil, err
+	}
+	keys := make([]store.Key, 0, len(listed))
+	for _, k := range listed {
+		if s.records.Host(joinedHost(k.Key)) != nil {
+			keys = append(keys, k)
+		}
+	}
+	data, err := s.storeReads.read(ctx, s.cfg.Store, projectFoldersPrefix, listed, keys)
 	if err != nil {
 		return nil, err
 	}
 	out := map[string][]wire.JoinedFolder{}
-	for _, k := range keys {
-		host := strings.TrimSuffix(strings.TrimPrefix(k.Key, projectFoldersPrefix), ".json")
-		if s.records.Host(host) == nil {
-			continue
-		}
-		object, err := s.cfg.Store.Get(ctx, k.Key)
-		if err != nil {
-			return nil, err
-		}
-		if object == nil {
-			continue
-		}
+	for i, k := range keys {
 		var kept storedProjectFolders
-		if json.Unmarshal(object.Data, &kept) != nil {
+		if data[i] == nil || json.Unmarshal(data[i], &kept) != nil {
 			continue
 		}
-		out[host] = kept.Folders
+		out[joinedHost(k.Key)] = kept.Folders
 	}
 	return out, nil
+}
+
+func joinedHost(key string) string {
+	return strings.TrimSuffix(strings.TrimPrefix(key, projectFoldersPrefix), ".json")
 }
 
 func cleanProjectName(name string) (string, error) {
@@ -70,6 +77,16 @@ func cleanProjectName(name string) (string, error) {
 		return "", fail(invalidParams, "Give the project a name of 1 to %d characters.", mostProjectName)
 	}
 	return name, nil
+}
+
+// projectNames is each project's name in lower case, and its id: what freeProjectName
+// tries names against, read once for a machine's new ids (#2735).
+func (s *Service) projectNames() map[string]string {
+	out := map[string]string{}
+	for _, p := range s.records.Projects() {
+		out[strings.ToLower(p.Name)] = p.ID
+	}
+	return out
 }
 
 // nameTaken is the project, other than id, already called name in any case.
@@ -82,34 +99,42 @@ func (s *Service) nameTaken(name, id string) *records.Project {
 	return nil
 }
 
-// freeProjectName is name, or name with " 2", " 3", … when another project has it.
-func (s *Service) freeProjectName(name, id string) string {
+// freeProjectName is name, or name with " 2", " 3", … when another project in names
+// (projectNames) has it. The name it gives is added to names.
+func freeProjectName(names map[string]string, name, id string) string {
 	if utf8.RuneCountInString(name) > mostProjectName {
 		name = string([]rune(name)[:mostProjectName])
 	}
 	if strings.TrimSpace(name) == "" {
 		name = "Project"
 	}
+	taken := func(try string) bool {
+		other, ok := names[strings.ToLower(try)]
+		return ok && other != id
+	}
 	try := name
-	for n := 2; s.nameTaken(try, id) != nil; n++ {
+	for n := 2; taken(try); n++ {
 		try = fmt.Sprintf("%s %d", name, n)
 	}
+	names[strings.ToLower(try)] = id
 	return try
 }
 
 // keepJoined is projects/joined: the machine's list written over its last, and each id
-// that no project has, or a removed one has, adopted with its folder's name (FR-007).
-func (s *Service) keepJoined(ctx context.Context, host string, joined wire.ProjectsJoined) error {
+// that no project has, or a removed one has, adopted with its folder's name (FR-007). Its
+// answer is the folders' projects, which the machine then has: host/projects tells it
+// again only when they change.
+func (s *Service) keepJoined(ctx context.Context, host string, joined wire.ProjectsJoined) (wire.MachineProjects, error) {
 	if s.records.Host(host) == nil {
-		return fail(noSuchHost, "No machine is called %s.", host)
+		return wire.MachineProjects{}, fail(noSuchHost, "No machine is called %s.", host)
 	}
 	if len(joined.Folders) > mostJoinedFolders {
-		return fail(invalidParams, "Send at most %d folders.", mostJoinedFolders)
+		return wire.MachineProjects{}, fail(invalidParams, "Send at most %d folders.", mostJoinedFolders)
 	}
 	folders := []wire.JoinedFolder{}
 	for _, f := range joined.Folders {
 		if !wire.ValidProjectID(f.Project) {
-			return fail(invalidParams, "%q is not a project id.", f.Project)
+			return wire.MachineProjects{}, fail(invalidParams, "%q is not a project id.", f.Project)
 		}
 		if utf8.RuneCountInString(f.Name) > 200 {
 			f.Name = string([]rune(f.Name)[:200])
@@ -118,46 +143,58 @@ func (s *Service) keepJoined(ctx context.Context, host string, joined wire.Proje
 	}
 	data, err := records.Encode(storedProjectFolders{Folders: folders})
 	if err != nil {
-		return err
+		return wire.MachineProjects{}, err
 	}
 	// Only this machine writes its own list; the same list again changes nothing.
 	changed := true
 	if before, err := s.cfg.Store.Get(ctx, projectFoldersKey(host)); err == nil && before != nil && bytes.Equal(before.Data, data) {
 		changed = false
 	} else if _, err := s.cfg.Store.Put(ctx, projectFoldersKey(host), data, store.Always); err != nil {
-		return err
+		return wire.MachineProjects{}, err
 	}
-	owner := s.ownerOf(host)
-	if owner == "" {
-		owner = s.localOwner()
-	}
+	// The ids no project has, each once, adopted in one hold of the write lock (#2735).
+	var unknown []string
+	names := map[string]string{}
 	for _, f := range folders {
-		if s.records.Project(f.Project) != nil {
-			continue
+		if s.records.Project(f.Project) == nil && !slices.Contains(unknown, f.Project) {
+			unknown = append(unknown, f.Project)
+			names[f.Project] = f.Name
 		}
-		name := f.Name
-		_, err := s.records.ChangeProject(ctx, f.Project, func(p *records.Project) (*records.Project, error) {
+	}
+	if len(unknown) > 0 {
+		owner := s.ownerOf(host)
+		if owner == "" {
+			owner = s.localOwner()
+		}
+		var taken map[string]string
+		err := s.records.ChangeProjects(ctx, unknown, func(id string, p *records.Project) (*records.Project, error) {
 			if p != nil && !p.IsRemoved() {
 				return nil, nil
 			}
+			if taken == nil {
+				// Read under the lock, after projects were read again.
+				taken = s.projectNames()
+			}
+			changed = true
 			if p != nil {
 				// A removed id that a folder names again comes back, with its old name.
 				next := *p
 				next.Removed, next.RemovedAt = nil, nil
-				next.Name = s.freeProjectName(p.Name, p.ID)
+				next.Name = freeProjectName(taken, p.Name, p.ID)
 				return &next, nil
 			}
-			return &records.Project{ID: f.Project, Name: s.freeProjectName(name, f.Project), Owner: owner, MadeAt: records.Now()}, nil
+			return &records.Project{ID: id, Name: freeProjectName(taken, names[id], id), Owner: owner, MadeAt: records.Now()}, nil
 		})
 		if err != nil {
-			return err
+			return wire.MachineProjects{}, err
 		}
-		changed = true
 	}
+	answer := s.machineProjects(folders)
+	s.toldProjects.note(host, answer)
 	if changed {
 		s.projectsChanged("", false)
 	}
-	return nil
+	return answer, nil
 }
 
 // projectsMethod answers projects/list, projects/set, projects/setSlot and projects/remove.
@@ -309,7 +346,7 @@ func (s *Service) tellProjectsChanged(id string, removed bool) {
 		change.Removed = &removed
 	}
 	s.router.BroadcastControl(wire.NotifyControlProjectsChanged.Name, change)
-	safe.Go("host/projects", s.tellMachinesProjects)
+	s.toldProjects.soon(s.tellMachinesProjects)
 }
 
 // The project's slots (#2669, specs/2317-projects User Story 4): Tasks, Code review and
@@ -342,16 +379,117 @@ func (s *Service) machineProjects(folders []wire.JoinedFolder) wire.MachineProje
 	return out
 }
 
+// toldProjects is what each machine here was last sent of its folders' projects, by a
+// hash (#2735), so a change tells only the machines whose projects it changed. One send to
+// the machines runs at a time; a change while it runs makes one more.
+type toldProjects struct {
+	mu      sync.Mutex
+	last    map[string][sha256.Size]byte
+	running bool
+	again   bool
+}
+
+func projectsSum(m wire.MachineProjects) [sha256.Size]byte {
+	b, _ := json.Marshal(m)
+	return sha256.Sum256(b)
+}
+
+// note is what a machine has now: projects/joined's answer, or a send it took.
+func (t *toldProjects) note(host string, m wire.MachineProjects) {
+	sum := projectsSum(m)
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.last == nil {
+		t.last = map[string][sha256.Size]byte{}
+	}
+	t.last[host] = sum
+}
+
+// same says the machine has m already.
+func (t *toldProjects) same(host string, m wire.MachineProjects) bool {
+	sum := projectsSum(m)
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	last, ok := t.last[host]
+	return ok && last == sum
+}
+
+// keepOnly forgets each machine not in hosts: one whose uplink went is told again.
+func (t *toldProjects) keepOnly(hosts []string) {
+	here := make(map[string]bool, len(hosts))
+	for _, host := range hosts {
+		here[host] = true
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	for host := range t.last {
+		if !here[host] {
+			delete(t.last, host)
+		}
+	}
+}
+
+func (t *toldProjects) forget(host string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	delete(t.last, host)
+}
+
+// soon runs send, now if none is running, else once more when it ends.
+func (t *toldProjects) soon(send func()) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.running {
+		t.again = true
+		return
+	}
+	t.running = true
+	safe.Go("host/projects", func() {
+		defer func() {
+			t.mu.Lock()
+			t.running = false
+			t.mu.Unlock()
+		}()
+		for {
+			send()
+			t.mu.Lock()
+			again := t.again
+			t.again = false
+			t.mu.Unlock()
+			if !again {
+				return
+			}
+		}
+	})
+}
+
 // tellMachinesProjects sends each machine on this copy its folders' projects, when they
-// are not what it was last sent.
+// are not what it was last sent. No lock is held while it sends.
 func (s *Service) tellMachinesProjects() {
+	held := s.router.HostsHeldHere()
+	s.toldProjects.keepOnly(held)
+	if len(held) == 0 {
+		return
+	}
 	joined, err := s.joinedFolders(context.Background())
 	if err != nil {
 		s.log("projects could not be sent to the machines: " + err.Error())
 		return
 	}
-	for host, folders := range joined {
-		s.router.Tell(host, wire.NotifyHostProjects.Name, s.machineProjects(folders))
+	for _, host := range held {
+		folders, ok := joined[host]
+		if !ok {
+			continue
+		}
+		projects := s.machineProjects(folders)
+		if s.toldProjects.same(host, projects) {
+			continue
+		}
+		if s.router.Tell(host, wire.NotifyHostProjects.Name, projects) {
+			s.toldProjects.note(host, projects)
+		} else {
+			s.toldProjects.forget(host)
+		}
 	}
 }
 
