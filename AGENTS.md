@@ -22,12 +22,18 @@
 ## Keeping the three clients in step
 
 - **Three clients draw the same product:** the Mac window (`App/`), the Remote on iPhone and iPad (`Remote/`), and the web page (`Web/`). `Shared/UI` is drawn by both the window and the Remote.
+- **Each feature has a tier (#2796):** the Tier cell of its row in the parity table, below. The Mac window and the web page are full clients and are never trimmed; the tiers trim only the Remote.
+  - **Core:** all three clients (the session list, chat, question cards, the prompt bar, approvals, notices, the Brief, and the session and folder work the Remote keeps). The parity table lists it all.
+  - **Mac + web:** the Mac window and the web page. The Remote gets no parity issue, and shows at most a read-only view or "Open this on your Mac or the web page" (#2798).
+  - **One client:** by design, no follow-up.
+  - A new feature that is on neither of the parity table's lists is Mac + web.
 - **A change to any client's UI** (`App/Sources`, `Remote/Sources`, `Shared/UI` or `Web/src`) says, in its commit, what **each of the other two** does about it, one line each:
   - the same change in this branch: `remote: same`;
   - a parity issue filed: `web: #NNN`;
-  - left out on purpose: `mac: by design (no swipe on Mac)`.
-- **For example,** a Mac sidebar change ends with `remote: #226` and `web: same`; a web-only fix ends with `mac: same, remote: same` when both already do it. A change to docs only says `mac: docs only, remote: docs only, web: docs only`.
-- **The table of where each client stands** is `specs/071-web-remote/walks/parity.md`, a file per screen under `walks/parity/` (Mac / Remote / web, a row per feature; #2020). `scripts/parity-counts.py` counts the verdicts. A parity line that changes a row updates it in the same branch.
+  - left out on purpose: `mac: by design (no swipe on Mac)`;
+  - not on the Remote because of its tier: `remote: tier mac+web`.
+- **For example,** a Mac sidebar change ends with `remote: #226` and `web: same`; a new Settings ▸ People control ends with `remote: tier mac+web` and `web: same`; a web-only fix ends with `mac: same, remote: same` when both already do it. A change to docs only says `mac: docs only, remote: docs only, web: docs only`.
+- **The table of where each client stands** is `specs/071-web-remote/walks/parity.md`, a file per screen under `walks/parity/` (Mac / Remote / web, a row per feature; #2020). `scripts/parity-counts.py` counts the verdicts and the tiers. A parity line that changes a row updates it in the same branch.
 
 ## Web/dist and generated.ts
 
@@ -52,7 +58,7 @@ Alex answered these the same way every time (#601), so do them without asking an
 - **Alex's uncommitted edits in the main checkout:** leave them alone. When a pull needs a clean tree, carry them across it: `git stash push -u -m <your-tag>`, pull, `git stash apply` that entry, then drop it. The stash is shared by every worktree, so never use a bare `git stash pop`. Never commit or discard Alex's edits.
 - **Your own scratch worktrees and /tmp folders:** discard them when your work is committed.
 - **A PR that goes stale in conflict:** rebase it and let auto-merge take it once it is green.
-- **A UI change:** do all three clients unless Alex says otherwise.
+- **A UI change:** do every client its tier names (#2796): all three for Core, the Mac window and the web page for Mac + web, unless Alex says otherwise.
 - **Something to look at on a device or the screen:** look yourself first (`devicectl` screenshots, run-app on a scratch root). Ask Alex only for what needs Alex's hands, such as unlocking a phone.
 - **A report with nothing to choose** (stuck PRs, nothing found): say it and end. Do not ask what to do about it.
 - **"I'm just investigating", "what about…":** give the findings and the options in your reply and stop. Alex will say what to build.

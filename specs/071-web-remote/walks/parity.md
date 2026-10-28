@@ -13,9 +13,29 @@
 - **by design**: one leaves it out or does it differently on purpose, and why.
 - **delta**: they differ and shouldn't; the issue, and the side to change.
 
+## Tiers (#2796)
+
+Alex chose tiers on 2026-10-27 (#2796). Each row has a **Tier** cell after its Feature. The tier says which clients must have the feature. The Mac window and the web page are full clients: they are never trimmed. The tiers trim only the Remote.
+
+- **Core:** all three clients. A change is made on all three in the same branch, or a parity issue is filed for each client that does not get it yet.
+- **Mac + web:** the Mac window and the web page. The Remote shows no more than a read-only view, or the line "Open this on your Mac or the web page". Nobody files a Remote parity issue. #2798 removes these features from the Remote. Until it does, the Remote's cell says what the Remote has now.
+- **One client:** one client only, by design (hover, keyboard, Finder, the Mac's own host). No follow-up.
+
+**Core** is:
+- the session list, chat, question and permission cards, the prompt bar, approvals, notices and the Brief (the first list in #2796);
+- the session and folder work the Remote keeps (#2798): terminals, reading and editing files, diffs and Changes, the Worktrees list and the Simulator pane;
+- runtimes' details (accounts, Reaches the Model By, Mark Available), the Events and Resources pages, and MCP app views and their pins;
+- the workflow page's Activity, Run Now, Approve and Enabled; today's cost in Activity and the limit banners;
+- the kill switch, the join and sign-in approval cards, pairing and sign-in, and the strips that say a machine or the control plane is away;
+- the Remote's trimmed Settings: Appearance, Sidebar and Finished chats.
+
+**Mac + web** is: Console and Reports; the control plane's Settings panes (People, Groups, Bots, Channels, Sign-in Providers, Policy, Secrets, Backups); Add a Machine, machine providers, Start a Machine from a Repository and Versions; connector set-up (Connect your tools, GitLab, Email); Agent Configuration's editors; the workflow page's Configuration pane; Add Folder, Clone Git URL, a folder's Project, Export/Import and the Drop Box; the usage pages (Cost, Tokens, Time, Milestones and their charts); and Folder Settings.
+
+A new row gets its tier when it is added, from the lists above. When a new feature is on neither list, its tier is Mac + web, because the Remote keeps only Core by default (Alex, #2796). An issue that wants it on the Remote says why.
+
 ## Counts
 
-`scripts/parity-counts.py` counts the rows of every screen by verdict: **same**, **by design** and **delta**. A row with any open delta counts as delta, even where another side's difference is by design. The counts are not kept by hand (#2020).
+`scripts/parity-counts.py` counts the rows of every screen by verdict: **same**, **by design** and **delta**, and by tier: **Core**, **Mac + web** and **One client**. A row with any open delta counts as delta, even where another side's difference is by design. The script fails when a row has no tier it knows. The counts are not kept by hand (#2020).
 
 The deltas are tracked by 31 issues:
 - **Already open:** #226 (the Remote's one sidebar) and #235 (the page's one sidebar at phone width).

@@ -391,7 +391,8 @@ opens it in headless Chrome. Run it once per press, on the same profile.
    your root's control plane (its `control/control.pid`) with the arguments `launch.sh` used.
 2. Add or update the change's row in its screen's file, `specs/071-web-remote/walks/parity/<screen>.md`: the page's shot, the
    window's shot, and has, partly, lacks or by design.
-3. A gap you don't close in the same branch gets a parity issue, named in the commit.
+3. A gap you don't close in the same branch gets a parity issue, named in the commit, when the row's
+   tier names that client (#2796). A Mac + web row gets no Remote issue: its line is `remote: tier mac+web`.
 
 ## Screenshots for Alex (#2811)
 
