@@ -1,6 +1,7 @@
 [
   {
     "expected" : {
+      "cardTitle" : "Waiting for sessions",
       "carryOnHelp" : "Stop waiting and carry on now",
       "checksAgain" : false,
       "isBlocked" : true,
@@ -120,6 +121,7 @@
   },
   {
     "expected" : {
+      "cardTitle" : "Waiting for sessions",
       "carryOnHelp" : "Stop waiting and carry on now",
       "checksAgain" : false,
       "isBlocked" : true,
@@ -240,6 +242,7 @@
   },
   {
     "expected" : {
+      "cardTitle" : "Waiting for sessions",
       "carryOnHelp" : "Stop waiting and carry on now",
       "checksAgain" : false,
       "isBlocked" : true,
@@ -360,6 +363,7 @@
   },
   {
     "expected" : {
+      "cardTitle" : "Waiting for a session",
       "carryOnHelp" : "Stop waiting and carry on now",
       "checksAgain" : true,
       "isBlocked" : true,
@@ -466,6 +470,7 @@
   },
   {
     "expected" : {
+      "cardTitle" : "Waiting to check again",
       "carryOnHelp" : "Stop waiting and carry on now",
       "checksAgain" : true,
       "isBlocked" : true,
@@ -568,6 +573,7 @@
   },
   {
     "expected" : {
+      "cardTitle" : "Waiting for sessions",
       "carryOnHelp" : "Stop waiting and carry on now",
       "checksAgain" : false,
       "isBlocked" : true,
@@ -760,6 +766,7 @@
   },
   {
     "expected" : {
+      "cardTitle" : null,
       "carryOnHelp" : "Stop waiting and carry on now",
       "checksAgain" : false,
       "isBlocked" : false,
@@ -879,6 +886,7 @@
   },
   {
     "expected" : {
+      "cardTitle" : null,
       "carryOnHelp" : "Stop waiting and carry on now",
       "checksAgain" : false,
       "isBlocked" : false,
@@ -975,6 +983,7 @@
   },
   {
     "expected" : {
+      "cardTitle" : null,
       "carryOnHelp" : "Stop waiting and carry on now",
       "checksAgain" : false,
       "isBlocked" : false,

@@ -18,7 +18,8 @@ for (const { name, input, expected } of cases("block/lines.json")) {
       ? rowLines.waitMark(agent, { names, lines: block.blockLines(agent, input.agents) }, null, () => undefined)?.line ?? "" : null;
     const checksAgain = open !== null && block.checkAgainLine(open) !== null;
     if (checksAgain) assert.match(lines.pop(), /^Checks again at \d{1,2}:\d{2}/);
-    assert.deepEqual({ isBlocked: open !== null, lines, checksAgain, waitLine, carryOnHelp: block.carryOnHelp(agent) }, expected);
+    assert.deepEqual({ isBlocked: open !== null, lines, checksAgain, waitLine, carryOnHelp: block.carryOnHelp(agent),
+      cardTitle: open === null ? null : block.cardTitle(open) }, expected);
   });
 }
 

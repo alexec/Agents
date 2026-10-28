@@ -214,15 +214,6 @@ struct RemoteChatView: View {
                     RemoteContinueWhenBackStrip(agent: agent)
                         .background(Paper.ground)
                 }
-                // Blocked (039): what it waits on, as the row says it (#341). Carry on is
-                // the toolbar's, in the ··· menu on a phone (#981).
-                if let agent, model.isBlocked(agent) {
-                    WaitLines(lines: model.blockLines(agent))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 6)
-                        .background(Paper.ground)
-                }
                 // Under the banner, not over it: when the Mac has gone quiet, what
                 // the agent last said it would do is the less urgent of the two.
                 if let agent { CurrentPlanStrip(agent: agent) }
@@ -285,19 +276,6 @@ struct RemoteChatView: View {
             // Stop is the prompt's own button while the agent works, as on the Mac;
             // Pin and Archive are in the bar where there is room, as the Mac's toolbar
             // has them, and in the ··· menu on a phone (#586).
-            // Blocked (039): the card's Carry on, where the chat's own controls are. On a
-            // phone, one ··· button and nothing else: Carry on and the panes are in it (#981).
-            if let agent, sizeClass == .regular, model.isBlocked(agent) {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        Task { await model.carryOn(agent.id) }
-                    } label: {
-                        Label(AgentsModel.carryOnLabel, systemImage: "play.circle")
-                    }
-                    .disabled(model.isStale(agent))
-                    .accessibilityHint(AgentsModel.carryOnHelp(for: agent))
-                }
-            }
             if let agent, sizeClass == .regular {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     if agent.state == .archived {
@@ -375,6 +353,18 @@ struct RemoteChatView: View {
                                    approve: { await model.archive(agent.id) },
                                    keep: { await model.keepSession(agent) },
                                    isDisabled: model.isStale(agent) || model.acting(agent.id) != nil)
+                    .chatColumn()
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            })
+        }
+        // A wait on sessions or on a time, the same card in the same place (#2750): it was
+        // lines under the chat's head, with Carry on in the toolbar.
+        if let (report, block) = model.work.openBlock(agent) {
+            cards.append(WaitingCard(id: "block:" + agent.id.uuidString) {
+                BlockWaitCard(block: block, since: report.at, lines: model.blockLines(agent),
+                              stop: { await model.carryOn(agent.id) },
+                              help: AgentsModel.carryOnHelp(for: agent),
+                              isDisabled: model.isStale(agent))
                     .chatColumn()
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             })

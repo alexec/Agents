@@ -165,6 +165,16 @@ public extension Block {
         return "Checks again at \(checkAgainAt.formatted(date: .omitted, time: .shortened))"
     }
 
+    /// The heading of its card at the foot of the chat, where a wait on events has its own
+    /// (#2750): what it waits for, in a few words.
+    func cardTitle() -> String {
+        switch waits.count {
+        case 0: "Waiting to check again"
+        case 1: "Waiting for a session"
+        default: "Waiting for sessions"
+        }
+    }
+
     /// What Carry on sends, as the person.
     static let carryOnPrompt = "I've cleared the block you were waiting on. Carry on."
 

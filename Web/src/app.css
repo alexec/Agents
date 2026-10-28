@@ -813,12 +813,6 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 .changed-on-disk-diff { max-height: 240px; overflow: auto; }
 .problem.folder-gone { flex-wrap: wrap; }
 .subtitle.missing-folder { opacity: 0.7; }
-/* A blocked agent (039, #157): what it waits on, on its row and under its chat's head. */
-.block-strip { padding: 6px 16px; font-size: 0.75rem; background: var(--paper-well); border-bottom: 1px solid var(--paper-rule);
-  display: flex; align-items: flex-start; gap: 8px; }
-.block-strip .wait-lines { flex: 1; min-width: 0; margin: 0; padding: 0; list-style: none; opacity: 0.7; }
-.block-strip .wait-lines li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.block-strip .carry-on { margin-left: auto; flex: none; }
 /* A chat paused by a spent allowance (#1859): Continue when it is back, or when it continues. */
 .continue-strip { padding: 6px 16px; font-size: 0.75rem; background: var(--paper-well); border-bottom: 1px solid var(--paper-rule);
   display: flex; align-items: center; gap: 8px; }

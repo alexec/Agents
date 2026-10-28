@@ -155,3 +155,73 @@ private struct WaitEventSummary: Identifiable {
     var events: [String]
     let arguments: [String]
 }
+
+/// A wait on sessions or on a time (`wait_for_agents`, `check_again`), drawn as the wait on
+/// events is (#2750): the same card at the foot of the chat, with what it waits on, when it
+/// checks again as its deadline, and one way to stop it. It was a strip under the chat's
+/// head with Carry on. Stop Waiting carries the agent on now, as Stop Waiting does to a
+/// wait on events whose call is still open. The web page's is `BlockWaitCard` in `Chat.tsx`.
+struct BlockWaitCard: View {
+    let block: Block
+    /// When it began to wait: its report's time.
+    let since: Date
+    /// `AgentsModel.blockLines`: any of or all of, one line a session, and when it checks again.
+    let lines: [String]
+    let stop: () async -> Void
+    var help = "Stop waiting and carry on now"
+    var isDisabled = false
+
+    @State private var busy = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            TimelineView(.periodic(from: .now, by: 20)) { context in
+                content(now: context.date)
+            }
+            HStack(spacing: 10) {
+                Spacer()
+                Button("Stop Waiting") {
+                    busy = true
+                    Task {
+                        await stop()
+                        busy = false
+                    }
+                }
+                .buttonStyle(.paper)
+                .help(help)
+                .disabled(busy || isDisabled)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.secondary.opacity(0.25)))
+        .accessibilityElement(children: .contain)
+    }
+
+    @ViewBuilder
+    private func content(now: Date) -> some View {
+        let deadline = block.checkAgainAt
+        let total = deadline.map { max(1, Int(ceil($0.timeIntervalSince(since) / 60))) }
+        let elapsed = max(0, Int(now.timeIntervalSince(since) / 60))
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 7) {
+                Image(systemName: StatusShape.waitingSymbol).foregroundStyle(Paper.accent)
+                Text(block.cardTitle()).fontWeight(.semibold)
+                Spacer(minLength: 6)
+                Text(total.map { "\(elapsed) / \($0) min" } ?? "\(elapsed) min")
+                    .appText(.fine).foregroundStyle(.secondary).monospacedDigit()
+            }
+            ForEach(lines, id: \.self) { line in
+                Text(line)
+                    .appText(.fine)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let deadline, deadline > since {
+                ProgressView(value: min(1, max(0, now.timeIntervalSince(since) / deadline.timeIntervalSince(since))))
+                    .tint(.blue)
+                    .controlSize(.mini)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
