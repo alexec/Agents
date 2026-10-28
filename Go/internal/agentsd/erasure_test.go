@@ -189,8 +189,7 @@ func TestTheErasedListIsBounded(t *testing.T) {
 // A restore never brings back an agent this machine deleted, also from another machine's
 // backup that carries its list (#1001, SC-003).
 func TestARestoreSkipsAnErasedAgent(t *testing.T) {
-	clock := time.Date(2026, 10, 22, 9, 0, 0, 0, time.UTC)
-	atTime(t, &clock)
+	clock := atTime(t, time.Date(2026, 10, 22, 9, 0, 0, 0, time.UTC))
 	shared := t.TempDir()
 	a, ca := start(t, t.TempDir())
 	dir := folder(t, ca, 1)
@@ -213,7 +212,7 @@ func TestARestoreSkipsAnErasedAgent(t *testing.T) {
 
 	// A newer backup carries the list: a new machine that restores it, then the older one,
 	// does not bring the deleted agent back either.
-	clock = clock.Add(time.Hour)
+	clock.add(time.Hour)
 	newer, err := a.makeBackup()
 	if err != nil {
 		t.Fatal(err)

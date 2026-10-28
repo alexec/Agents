@@ -71,8 +71,7 @@ func TestBackupDefaults(t *testing.T) {
 // One machine backs up; a second, reading the same folder, restores it: the agents come
 // back archived, with their transcripts, and are never run there. Nothing is overwritten.
 func TestBackupAndRestoreOnAnotherMachine(t *testing.T) {
-	clock := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
-	atTime(t, &clock)
+	atTime(t, time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC))
 	shared := t.TempDir()
 	rootA, rootB := t.TempDir(), t.TempDir()
 	a, ca := start(t, rootA)
@@ -162,8 +161,7 @@ func TestBackupAndRestoreOnAnotherMachine(t *testing.T) {
 // says it was made under, and brings no MCP servers. A backup whose manifest names this
 // root, but that is not in this machine's folder, is never run here either.
 func TestARestoreFromAnotherMachineNeverRunsHere(t *testing.T) {
-	clock := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
-	atTime(t, &clock)
+	atTime(t, time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC))
 	shared := t.TempDir()
 	a, ca := start(t, t.TempDir())
 	b, cb := start(t, t.TempDir())
@@ -210,8 +208,7 @@ func TestARestoreFromAnotherMachineNeverRunsHere(t *testing.T) {
 // A v0.11.1 backup names a worktree's folder "project", from before #2617: the restored
 // agent gets that folder, not a blank one (#2709).
 func TestARestoreOfAnOlderBackupKeepsTheWorktreesFolder(t *testing.T) {
-	clock := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
-	atTime(t, &clock)
+	atTime(t, time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC))
 	shared := t.TempDir()
 	a, ca := start(t, t.TempDir())
 	dir := folder(t, ca, 1)
@@ -312,8 +309,7 @@ func rewriteArchive(t *testing.T, path string, edit func(name string, data []byt
 }
 
 func TestBackupsKeepTheNewestOfThisMachine(t *testing.T) {
-	clock := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
-	atTime(t, &clock)
+	clock := atTime(t, time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC))
 	shared := t.TempDir()
 	d, c := start(t, t.TempDir())
 	c.call(t, 1, "backups/configure", map[string]any{"every": "off", "keep": 2, "folder": shared})
@@ -325,7 +321,7 @@ func TestBackupsKeepTheNewestOfThisMachine(t *testing.T) {
 		if _, err := d.makeBackup(); err != nil {
 			t.Fatal(err)
 		}
-		clock = clock.Add(time.Hour)
+		clock.add(time.Hour)
 	}
 	s := backupsIn(t, c, 2)
 	if len(s.Backups) != 3 || s.Backups[0].ID != d.Store.RootID+"/20261020T120000Z" ||
@@ -340,8 +336,7 @@ func TestBackupsKeepTheNewestOfThisMachine(t *testing.T) {
 }
 
 func TestBackupIfDueFollowsTheSchedule(t *testing.T) {
-	clock := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
-	atTime(t, &clock)
+	clock := atTime(t, time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC))
 	d, c := start(t, t.TempDir())
 	c.call(t, 1, "backups/configure", map[string]any{"every": "off", "keep": 3})
 	d.backupIfDue()
@@ -349,10 +344,10 @@ func TestBackupIfDueFollowsTheSchedule(t *testing.T) {
 	c.call(t, 2, "backups/configure", map[string]any{"every": "daily", "keep": 3})
 	d.backupIfDue()
 	waitBackups(t, d, 1)
-	clock = clock.Add(23 * time.Hour)
+	clock.add(23 * time.Hour)
 	d.backupIfDue()
 	waitBackups(t, d, 1)
-	clock = clock.Add(2 * time.Hour)
+	clock.add(2 * time.Hour)
 	d.backupIfDue()
 	waitBackups(t, d, 2)
 }
@@ -471,8 +466,7 @@ func (f *fakeStore) askFor(host string) askControl {
 // A server backs up to the control plane's store in parts, waiting when asked to, and
 // leaves no archive behind; a new server of the same person lists it and restores it.
 func TestBackupToTheControlPlaneAndRestoreOnANewServer(t *testing.T) {
-	clock := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
-	atTime(t, &clock)
+	atTime(t, time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC))
 	was := backupPartBytes
 	backupPartBytes = 512
 	t.Cleanup(func() { backupPartBytes = was })
@@ -541,8 +535,7 @@ func TestBackupToTheControlPlaneAndRestoreOnANewServer(t *testing.T) {
 // folder and a folder on another disk are not. A backup in a folder on another volume
 // restores on a new machine.
 func TestABackupFolderOnTheSameDiskIsSaid(t *testing.T) {
-	clock := time.Date(2026, 10, 22, 9, 0, 0, 0, time.UTC)
-	atTime(t, &clock)
+	atTime(t, time.Date(2026, 10, 22, 9, 0, 0, 0, time.UTC))
 	root := t.TempDir()
 	a, ca := start(t, root)
 	if s := backupsIn(t, ca, 1); s.SameDisk == nil || !*s.SameDisk {

@@ -11,8 +11,7 @@ import (
 )
 
 func TestAttachmentsAreWrittenWholeAndBound(t *testing.T) {
-	clock := time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)
-	atTime(t, &clock)
+	clock := atTime(t, time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC))
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
 	a := seeded(t, d, t.TempDir(), nil)
@@ -26,7 +25,7 @@ func TestAttachmentsAreWrittenWholeAndBound(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		os.Chtimes(path, clock, clock)
+		os.Chtimes(path, clock.now(), clock.now())
 		return path
 	}
 	exists := func(path string) bool { _, err := os.Stat(path); return err == nil }
@@ -45,7 +44,7 @@ func TestAttachmentsAreWrittenWholeAndBound(t *testing.T) {
 	place := func(name string, age time.Duration) string {
 		path := filepath.Join(filepath.Dir(first), name)
 		os.WriteFile(path, []byte(strings.Repeat("x", 10)), 0o600)
-		at := clock.Add(-age)
+		at := clock.now().Add(-age)
 		os.Chtimes(path, at, at)
 		return path
 	}
@@ -67,7 +66,7 @@ func TestAttachmentsAreWrittenWholeAndBound(t *testing.T) {
 	for _, p := range []string{tmpOld, tmpNew} {
 		os.WriteFile(p, []byte("x"), 0o600)
 	}
-	day := clock.Add(-25 * time.Hour)
+	day := clock.now().Add(-25 * time.Hour)
 	os.Chtimes(tmpOld, day, day)
 	d.sweepAttachments()
 	if exists(unnamed) || exists(tmpOld) {
@@ -93,8 +92,7 @@ func TestAttachmentsAreWrittenWholeAndBound(t *testing.T) {
 // looks for the names. The sweep remembers which agent names an old file it keeps, so
 // the next sweep does not look again, until that agent goes.
 func TestAttachmentWritesReadNoTranscript(t *testing.T) {
-	clock := time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)
-	atTime(t, &clock)
+	clock := atTime(t, time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC))
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
 	cwd := t.TempDir()
@@ -112,7 +110,7 @@ func TestAttachmentWritesReadNoTranscript(t *testing.T) {
 	place := func(name string) string {
 		path := filepath.Join(dir, name)
 		os.WriteFile(path, []byte("x"), 0o600)
-		at := clock.Add(-8 * 24 * time.Hour)
+		at := clock.now().Add(-8 * 24 * time.Hour)
 		os.Chtimes(path, at, at)
 		return path
 	}
@@ -164,8 +162,7 @@ func TestAttachmentWritesReadNoTranscript(t *testing.T) {
 // A folder can commit .agents/attachments, or .agents, as a link to a folder outside
 // it. The sweep deletes nothing there, and a write puts nothing there.
 func TestAttachmentsRefuseALinkedFolder(t *testing.T) {
-	clock := time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)
-	atTime(t, &clock)
+	clock := atTime(t, time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC))
 	for _, linked := range []string{".agents", attachmentsFolder} {
 		t.Run(linked, func(t *testing.T) {
 			d, _ := start(t, t.TempDir())
@@ -182,7 +179,7 @@ func TestAttachmentsRefuseALinkedFolder(t *testing.T) {
 				victim = filepath.Join(outside, "attachments", "4E5F6A7B-old.png")
 			}
 			os.WriteFile(victim, []byte("x"), 0o600)
-			old := clock.Add(-30 * 24 * time.Hour)
+			old := clock.now().Add(-30 * 24 * time.Hour)
 			os.Chtimes(victim, old, old)
 			if linked == attachmentsFolder {
 				os.Mkdir(filepath.Join(root, ".agents"), 0o700)
