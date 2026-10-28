@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/mcpcatalog"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
@@ -285,5 +286,25 @@ func TestAnswerASignUpCodeHearsOnlyItsSenders(t *testing.T) {
 	}
 	if strings.Contains(skill, "send_") {
 		t.Error("the skill names a tool that sends")
+	}
+}
+
+// Shutdown ends the workflow clock (#2823): on a context nobody cancels, a stopped host's
+// tick scanned again and wrote the ready-made skills into the next test's personal home,
+// which AGENTS_PERSONAL_HOME names, while its TempDir was being removed.
+func TestShutdownEndsTheWorkflowClock(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	d.Shutdown()
+	select {
+	case <-d.clockStop:
+	default:
+		t.Fatal("the clock was not told to stop")
+	}
+	ended := make(chan struct{})
+	go func() { d.clockRunning.Wait(); close(ended) }()
+	select {
+	case <-ended:
+	case <-time.After(time.Second):
+		t.Fatal("the clock still runs")
 	}
 }

@@ -136,7 +136,7 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	d.resumeContinues()
 	d.checkEveryQueue()
 	d.restoreRuns()
-	safe.Go("workflow clock", d.workflowClock)
+	d.startWorkflowClock()
 	// Each folder's one watch (#173), which the first workflow scan starts too.
 	d.kickFolderWatches()
 	if done := ctx.Done(); done != nil {
@@ -206,6 +206,8 @@ func (d *Daemon) Shutdown() {
 		d.machineStop = nil
 	}
 	d.machineMu.Unlock()
+	// No tick fires a workflow, or scans, once the host is going.
+	d.stopWorkflowClock()
 	d.stopIdleTimers()
 	// Nothing more is routed or written down once the host is going.
 	d.attentionMu.Lock()

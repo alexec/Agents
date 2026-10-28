@@ -113,6 +113,11 @@ type workflowBook struct {
 	workflowFiles    map[string]map[string]*workflowFile // folder → id → file
 	machineIDOnce    sync.Once
 	machineValue     string
+	// clockStop ends the workflow clock, and clockRunning waits for a tick still going:
+	// Shutdown stops it, as a host on a context nobody cancels would keep ticking (#2823).
+	clockStop     chan struct{}
+	clockStopOnce sync.Once
+	clockRunning  sync.WaitGroup
 }
 
 func (d *Daemon) workflowsPath() string  { return filepath.Join(d.Store.Loc.Root, "workflows.json") }
