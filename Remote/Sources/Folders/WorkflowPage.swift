@@ -540,13 +540,15 @@ struct WorkflowPage: View {
 
     // MARK: What it may do
 
-    /// The runtime, then the mode, the model and the effort, then every other option
-    /// the runtime last advertised here — one row each. A `triggering` workflow resumes
-    /// an agent already running and applies none of them, so they are shown disabled
-    /// under a line saying so rather than hidden.
+    /// The runtime a run will use and why (#2764), then the mode, the model and the
+    /// effort, then every other option the runtime last advertised here — one row each.
+    /// A runtime this version does not know is marked, because its rows cannot be shown.
+    /// A `triggering` workflow resumes an agent already running and applies none of them,
+    /// so they are shown disabled under a line saying so rather than hidden.
     private func settings(_ summary: WorkflowSummary) -> some View {
         let workflow = summary.workflow
-        let runtime = RuntimeCatalog.runtime(id: runtimeID(workflow))
+        let runs = runsOn(workflow)
+        let runtime = runs.runtime
         return VStack(alignment: .leading, spacing: 10) {
             sectionTitle("Settings")
             if workflow.settingsLocked {
@@ -561,6 +563,12 @@ struct WorkflowPage: View {
                 EmptyView()
             }
             VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    note(runs.line)
+                    if let unknown = runs.unknown {
+                        marked(unknown)
+                    }
+                }
                 if let runtime {
                     settingRow(summary, name: "Permission mode",
                                setting: WorkflowSettings.Setting.permissionMode,
@@ -600,11 +608,14 @@ struct WorkflowPage: View {
         var folder: URL
     }
 
-    private func runtimeID(_ workflow: Workflow) -> String {
+    /// The runtime the file names, or the most recently active runtime on its machine.
+    private func runsOn(_ workflow: Workflow) -> WorkflowSettings.RunsOn {
         let host = model.work.folder(workflow.folder)?.host ?? .mac
-        return workflow.settings.runtimeID
-            ?? model.work.lastRuntimes[host]
-            ?? RuntimeCatalog.defaultRuntime.id
+        return workflow.settings.runsOn(lastUsed: model.work.lastRuntimes[host])
+    }
+
+    private func runtimeID(_ workflow: Workflow) -> String {
+        runsOn(workflow).runtimeID
     }
 
     /// One setting the runtime defines: its menu when the choices are known, the file's

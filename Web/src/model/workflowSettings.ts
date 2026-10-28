@@ -6,6 +6,28 @@
 // which is what each menu's first, "runtime default" choice means.
 import type { ConfigChoice, ConfigChoiceGroup, ConfigOption, JSONValue, WorkflowSettings, WorkflowWhenDone } from "../protocol/generated";
 import { choiceGroups, choices, isRenderable, modeOption } from "./options";
+import { runtimeNames } from "./orgPolicy";
+import { defaultRuntime } from "./workflows";
+
+/** Which runtime a run will use, and why (#2764): WorkflowSettings.RunsOn. */
+export interface RunsOn { runtimeID: string; line: string; unknown: string | null }
+
+/**
+ * WorkflowSettings.runsOn: the runtime the file names, else the newest agent's on the machine
+ * that runs it, else the default, said in the window's words; and a mark when this version
+ * does not know it.
+ */
+export function runsOn(named: string | undefined, lastUsed: string | undefined): RunsOn {
+  const source = named !== undefined ? "named in the file" : lastUsed !== undefined ? "the last used here" : "the default";
+  const runtimeID = named ?? lastUsed ?? defaultRuntime;
+  const known = runtimeNames[runtimeID];
+  const why = named !== undefined ? "so this workflow does not run" : "so its settings cannot be shown";
+  return {
+    runtimeID,
+    line: `Runs on ${known ?? `"${runtimeID}"`} (${source})`,
+    unknown: known ? null : `"${runtimeID}" is not a runtime this version knows, ${why}.`,
+  };
+}
 
 function selects(options: readonly ConfigOption[]): ConfigOption[] {
   return options.filter((o) => o.type === "select");
