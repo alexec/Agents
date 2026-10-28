@@ -212,6 +212,12 @@ type startedBy struct {
 }
 
 func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) {
+	// Auto picks the runtime, and the shared words become the runtime's own settings
+	// (#2658), before anything else reads them.
+	pick, client, err := d.resolveLevels(&r, by)
+	if err != nil {
+		return "", err
+	}
 	// The organisation's policy first (#998): its refusal says why, in its own words.
 	policyNote, err := d.policyStart(&r, by)
 	if err != nil {
@@ -308,7 +314,9 @@ func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) 
 		AdvertisedOptions: []wire.ConfigOption{}, AvailableCommands: []wire.SlashCommand{},
 		CreatedAt: t, LastActivityAt: t, MadeInRoot: &d.Store.RootID, StartRequestID: r.RequestID,
 		StartedByAgent: by.agent, SandboxOverride: r.Sandbox, Persona: r.Persona, AccountID: r.AccountID,
+		Auto: pick, ClientPermission: client,
 	}
+	a.Levels = d.matchLevels(&a)
 	if q := by.queued; q != nil {
 		// Out of the queue, the same agent: its id, its title and when it was asked for.
 		a.ID, a.CreatedAt, a.Title, a.Labels = q.ID, q.CreatedAt, q.Title, q.Labels
@@ -333,6 +341,9 @@ func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) 
 	d.folderChanged(folderPath(&a))
 	if wt != nil {
 		d.record(a.ID, runtimeNote(worktreeNote(*wt)))
+	}
+	if pick != nil {
+		d.record(a.ID, runtimeNote(autoNote(*pick)))
 	}
 	if policyNote != "" {
 		d.record(a.ID, runtimeNote(policyNote))
@@ -594,6 +605,7 @@ func (l *live) turn() bool {
 			a.RuntimeSessionID = &sessionID
 			if opts := configOptions(s.NewResult.ConfigOptions); opts != nil {
 				a.AdvertisedOptions = d.markOptions(a.RuntimeID, withAppOptions(a.RuntimeID, a.StartOptions.Values, opts))
+				a.Levels = d.matchLevels(a)
 			}
 		})
 		safe.Go("session watch", func() {
@@ -1189,6 +1201,7 @@ func (l *live) Update(n sdk.SessionNotification) {
 					keepMode(a, now.ID, now.CurrentValue)
 				}
 				a.AdvertisedOptions = d.markOptions(a.RuntimeID, withAppOptions(a.RuntimeID, a.StartOptions.Values, opts))
+				a.Levels = d.matchLevels(a)
 			})
 		}
 	case u.AvailableCommandsUpdate != nil:
@@ -1274,7 +1287,7 @@ func (l *live) Permission(ctx context.Context, p sdk.RequestPermissionRequest) s
 	}
 	// Always-approve answers before a card, for Cursor, Grok and OpenCode (061). A request
 	// with no allow option still waits for the person.
-	if a := d.Store.Agent(l.id); a != nil && d.alwaysApproves(a.RuntimeID) {
+	if a := d.Store.Agent(l.id); a != nil && d.agentAlwaysApproves(a) {
 		for _, kind := range []wire.PermissionOptionKind{wire.PermissionOptionKindAllowOnce, wire.PermissionOptionKindAllowAlways} {
 			for _, o := range req.Options {
 				if o.Kind == kind {

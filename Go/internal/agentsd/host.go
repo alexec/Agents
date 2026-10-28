@@ -203,6 +203,15 @@ func (d *Daemon) setClientPermissions(in wire.ClientPermissionSettings) (wire.Cl
 	return saved, nil
 }
 
+// agentAlwaysApproves is the agent's own Yes to all, else the person's in Settings (#2658,
+// FR-019).
+func (d *Daemon) agentAlwaysApproves(a *wire.Agent) bool {
+	if a.ClientPermission != nil && clientAnswered[a.RuntimeID] {
+		return *a.ClientPermission == wire.ClientPermissionModeAlwaysApprove
+	}
+	return d.alwaysApproves(a.RuntimeID)
+}
+
 // alwaysApproves is the person's Always-approve for Cursor, Grok and OpenCode (061).
 func (d *Daemon) alwaysApproves(runtimeID string) bool {
 	s := d.clientPermissions()

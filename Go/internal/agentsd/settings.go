@@ -297,10 +297,21 @@ func workflowSettings(m map[string]yamlnode.Node) (wire.WorkflowSettings, error)
 	}
 	var err error
 	for key, to := range map[string]**string{"permission-mode": &s.PermissionMode, "runtime": &s.RuntimeID,
-		"model": &s.Model, "effort": &s.Effort} {
+		"model": &s.Model, "effort": &s.Effort, "permission-requests": &s.PermissionRequests, "sandbox": &s.Sandbox} {
 		if *to, err = setting(key); err != nil {
 			return s, err
 		}
+	}
+	// The shared words (#2658): `runtime: auto` takes only them, and the two keys that
+	// have no runtime's own values take only theirs.
+	runtimeID, model, requests, box := "", "", "", ""
+	for to, from := range map[*string]*string{&runtimeID: s.RuntimeID, &model: s.Model, &requests: s.PermissionRequests, &box: s.Sandbox} {
+		if from != nil {
+			*to = *from
+		}
+	}
+	if _, _, _, _, err := fileLevels(runtimeID, model, s.PermissionMode, requests, box); err != nil {
+		return s, &yamlnode.Failure{Message: err.(*Error).Message}
 	}
 	if n, ok := m["options"]; ok {
 		if v, isText := n.Text(); !(isText && v == "") {

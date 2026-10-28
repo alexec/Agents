@@ -600,6 +600,7 @@ func (d *Daemon) setOption(ctx context.Context, r wire.SetOptionRequest) ([]wire
 		if s != nil {
 			a.AdvertisedOptions = d.markOptions(a.RuntimeID, withAppOptions(a.RuntimeID, values, options))
 		}
+		a.Levels = d.matchLevels(a)
 	})
 	known := options
 	if s == nil {
