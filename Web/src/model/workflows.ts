@@ -129,6 +129,12 @@ function scalar(value: JSONValue): string | null {
   return typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : null;
 }
 
+/** EventPattern.meaning: the catalogue's meaning, "Anything about agents" for `agent.*`, else the name. */
+export function eventMeaning(name: string): string {
+  const subject = name.endsWith(".*") ? name.slice(0, -2) : null;
+  return subject ? `Anything about ${subject}s` : eventMeanings[name] ?? name;
+}
+
 /** WorkflowTrigger.summary, with an event said by its catalogue meaning and filters in words. */
 export function triggerSummary(trigger: WorkflowTriggerStored): string {
   if ("schedule" in trigger) return scheduleSummary(trigger.schedule._0);
@@ -137,8 +143,7 @@ export function triggerSummary(trigger: WorkflowTriggerStored): string {
   if (server) return serverEventSummary(server);
   if (isEvent(trigger)) {
     const filters = eventFilters(trigger).map(([k, values]) => filterWords(k, values)).join(", ");
-    const subject = name.endsWith(".*") ? name.slice(0, -2) : null;
-    const meaning = subject ? `Anything about ${subject}s` : eventMeanings[name] ?? name;
+    const meaning = eventMeaning(name);
     return filters ? `${meaning} (${filters})` : meaning;
   }
   return `Waits for "${name}", which this version does not know about yet${guess(name)}`;

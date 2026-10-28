@@ -840,9 +840,9 @@ function WaitCard({ agent, title, disabled, stop }: { agent: Agent; title: (id: 
             <span class="wait-card-time">{total === undefined ? `${elapsed} min` : `${elapsed} / ${total} min`}</span>
           </div>
           <div class="wait-card-events">
-            {eventWaitSummaryLines(wait).map((line) => <p class="wait-card-event" key={line.id}>
+            {eventWaitSummaryLines(wait, title).map((line) => <p class="wait-card-event" key={line.id} title={line.events.join(", ")}>
               <span class="wait-card-source">{line.source}</span><span class="wait-card-separator">·</span>
-              <span class="wait-card-kind">{line.events.join(", ")}</span>
+              <span class="wait-card-kind">{line.words}</span>
               {line.arguments.length > 0 && <span class="wait-card-filters">({line.arguments.join(", ")})</span>}
             </p>)}
           </div>

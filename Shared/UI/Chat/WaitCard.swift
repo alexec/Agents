@@ -15,6 +15,8 @@ struct WaitCard: View {
     let status: WaitStatus
     let eventWait: EventWait?
     let isLineWait: Bool
+    /// `AgentsModel.waitEventLines`: its events in words, sessions by their titles (#2747).
+    var lines: [WaitEventLine] = []
     var open: (() -> Void)?
     let stop: () async -> Void
     var isDisabled = false
@@ -71,17 +73,19 @@ struct WaitCard: View {
                 Text(total.map { "\(elapsed) / \($0) min" } ?? "\(elapsed) min")
                     .appText(.fine).foregroundStyle(.secondary).monospacedDigit()
             }
-            ForEach(Self.eventLines(for: wait)) { line in
+            ForEach(lines) { line in
                 HStack(spacing: 5) {
                     Text(line.source).foregroundStyle(.secondary)
                     Text("·").foregroundStyle(.tertiary)
-                    Text(line.events.joined(separator: ", ")).fontWeight(.medium)
+                    Text(line.words).fontWeight(.medium)
                     if !line.arguments.isEmpty {
                         Text("(\(line.arguments.joined(separator: ", ")))").foregroundStyle(.secondary)
                     }
                 }
                 .appText(.fine)
                 .fixedSize(horizontal: false, vertical: true)
+                // The events' own names, for whoever writes a wait or a workflow.
+                .help(line.events.joined(separator: ", "))
             }
             if let deadline = wait.deadline {
                 ProgressView(value: min(1, max(0, now.timeIntervalSince(wait.since) / deadline.timeIntervalSince(wait.since))))
@@ -91,69 +95,6 @@ struct WaitCard: View {
         }
         .fixedSize(horizontal: false, vertical: true)
     }
-
-    private static func sourceName(_ event: String) -> String {
-        switch event.split(separator: ".").first.map(String.init) {
-        case "mac", "machine", "person", "system", "cost", "lease": "This Mac"
-        case "workflow": "Workflows"
-        case "branch": "Branches"
-        case "dropbox": "Drop box"
-        default: "Agents"
-        }
-    }
-
-    private static func eventLines(for wait: EventWait) -> [WaitEventSummary] {
-        var lines: [WaitEventSummary] = []
-        for pattern in wait.patterns {
-            let server = wait.serverEvents?.first { $0.trigger.event == pattern.name }
-            let names = server.map { $0.servers.isEmpty ? ($0.trigger.servers ?? []) : $0.servers } ?? []
-            let source = if server == nil {
-                sourceName(pattern.name)
-            } else if names.isEmpty {
-                "Connected tools"
-            } else {
-                names.map(serverName).joined(separator: " or ")
-            }
-            let arguments = server.map {
-                $0.trigger.arguments.sorted { $0.key < $1.key }.map { "\($0.key) \(valueWords($0.value))" }
-            } ?? pattern.filters.sorted { $0.key < $1.key }.map { "\($0.key) \($0.value.label)" }
-            let id = source + "\u{0}" + arguments.joined(separator: "\u{0}")
-            if let index = lines.firstIndex(where: { $0.id == id }) {
-                if !lines[index].events.contains(pattern.name) { lines[index].events.append(pattern.name) }
-            } else {
-                lines.append(WaitEventSummary(id: id, source: source, events: [pattern.name], arguments: arguments))
-            }
-        }
-        return lines
-    }
-
-    private static func serverName(_ name: String) -> String {
-        switch name.lowercased() {
-        case "github": "GitHub"
-        case "gitlab": "GitLab"
-        case "linear": "Linear"
-        case "email": "Email"
-        default: name.replacingOccurrences(of: "_", with: " ").replacingOccurrences(of: "-", with: " ").capitalized
-        }
-    }
-
-    private static func valueWords(_ value: JSONValue) -> String {
-        switch value {
-        case .string(let text): text
-        case .int(let number): String(number)
-        case .double(let number): String(number)
-        case .bool(let flag): String(flag)
-        case .null: "null"
-        case .array, .object: String(describing: value)
-        }
-    }
-}
-
-private struct WaitEventSummary: Identifiable {
-    let id: String
-    let source: String
-    var events: [String]
-    let arguments: [String]
 }
 
 /// A wait on sessions or on a time (`wait_for_agents`, `check_again`), drawn as the wait on

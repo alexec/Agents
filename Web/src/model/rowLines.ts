@@ -3,6 +3,7 @@
 // started it (028), and its worktree's help (WorktreeBadge). Worked out here, so the row only draws them.
 import type { Agent, AgentWorktree, EventPattern, EventWait, LeaseSnapshot, ResourceKind } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
+import { eventMeaning } from "./workflows";
 
 /** LeaseWords.clock: "14:12". */
 export function clock(date: Date): string {
@@ -176,32 +177,78 @@ export function eventWaitCardLines(agent: Agent, title: (id: string) => string |
 export interface EventWaitSummaryLine {
   id: string;
   source: string;
+  /** The events' names, as the wait has them, for the line's title. */
   events: string[];
+  /** What the events mean, joined with "or". */
+  words: string;
   arguments: string[];
 }
 
-/** Events from one source with the same filters share a compact line in the wait card. */
-export function eventWaitSummaryLines(wait: EventWait): EventWaitSummaryLine[] {
-  const lines: EventWaitSummaryLine[] = [];
+/**
+ * WaitEventLine.lines (#2599, #2747): events from one source with the same filters share a line,
+ * a session said by its title and an event by its catalogue meaning.
+ */
+export function eventWaitSummaryLines(wait: EventWait, title: (id: string) => string | undefined): EventWaitSummaryLine[] {
+  type Phrase = { finishers: true } | { words: string };
+  const groups: { id: string; source: string; arguments: string[]; events: string[]; finishers: string[]; phrases: Phrase[] }[] = [];
   for (const pattern of wait.patterns) {
     const server = wait.serverEvents?.find((entry) => entry.trigger.event === pattern.name);
     const servers = server ? (server.servers.length > 0 ? server.servers : server.trigger.servers ?? []) : [];
     const source = server
       ? servers.length > 0 ? servers.map(serverName).join(" or ") : "Connected tools"
       : waitSourceName(pattern.name);
+    const filterKeys = [...new Set([...Object.keys(pattern.filters), ...Object.keys(pattern.anyOf ?? {})])].sort();
+    const finisherID = pattern.name === "agent.finished" && Object.keys(pattern.anyOf ?? pattern.filters).length === 1
+      ? single(pattern, "agent") : undefined;
+    const finisher = finisherID === undefined ? undefined : title(finisherID) ?? finisherID;
     const args = server
       ? Object.entries(server.trigger.arguments).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => `${key} ${valueWords(value)}`)
-      : Object.entries(pattern.anyOf ?? pattern.filters).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) =>
-        `${key} ${Array.isArray(value) ? value.join("|") : value}`);
+      : finisher !== undefined ? []
+      : filterKeys.map((key) => {
+        const values = pattern.anyOf?.[key] ?? pattern.filters[key]!.split("|");
+        return `${key} ${(key === "agent" ? values.map((id) => `“${title(id) ?? id}”`) : values).join("|")}`;
+      });
     const id = `${source}\u0000${args.join("\u0000")}`;
-    const line = lines.find((candidate) => candidate.id === id);
-    if (line) {
-      if (!line.events.includes(pattern.name)) line.events.push(pattern.name);
+    let group = groups.find((candidate) => candidate.id === id);
+    if (!group) {
+      group = { id, source, arguments: args, events: [], finishers: [], phrases: [] };
+      groups.push(group);
+    }
+    if (!group.events.includes(pattern.name)) group.events.push(pattern.name);
+    if (finisher !== undefined) {
+      if (!group.finishers.includes(finisher)) group.finishers.push(finisher);
+      if (!group.phrases.some((phrase) => "finishers" in phrase)) group.phrases.push({ finishers: true });
     } else {
-      lines.push({ id, source, events: [pattern.name], arguments: args });
+      const words = server ? serverWords(pattern.name) : eventMeaning(pattern.name);
+      if (!group.phrases.some((phrase) => "words" in phrase && phrase.words === words)) group.phrases.push({ words });
     }
   }
-  return lines;
+  return groups.map((group) => ({
+    id: group.id,
+    source: group.source,
+    events: group.events,
+    words: group.phrases.map((phrase, index) =>
+      "finishers" in phrase ? finishing(group.finishers) : index === 0 ? phrase.words : lowered(phrase.words)).join(" or "),
+    arguments: group.arguments,
+  }));
+}
+
+/** WaitEventLine.lowered: "An agent…" after "or" reads "an agent…"; "PR merged" and "This Mac woke up" keep their capitals. */
+function lowered(words: string): string {
+  const first = words[0];
+  const second = words[1];
+  if (!first || first === first.toLowerCase() || words.startsWith("This Mac")) return words;
+  if (second && second !== second.toLowerCase()) return words;
+  return first.toLowerCase() + words.slice(1);
+}
+
+/** WaitEventLine.serverWords: a server's event by its name in words, "checks.failed" as "Checks failed", "pr.merged" as "PR merged". */
+function serverWords(name: string): string {
+  const words = name.split(/[._-]/).filter((word) => word.length > 0)
+    .map((word) => ["pr", "mr", "ci"].includes(word.toLowerCase()) ? word.toUpperCase() : word);
+  const first = words[0];
+  if (first === undefined) return name;
+  return [first[0]!.toUpperCase() + first.slice(1), ...words.slice(1)].join(" ");
 }
 
 function serverName(name: string): string {

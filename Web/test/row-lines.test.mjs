@@ -79,9 +79,26 @@ test("the event wait card groups events with the same source and filters", () =>
     { trigger: { event: "pr.merged", servers: ["github"], arguments: { pr: 123 } }, servers: ["github"] },
     { trigger: { event: "pr.closed", servers: ["github"], arguments: { pr: 456 } }, servers: ["github"] },
   ] };
-  assert.deepEqual(lines.eventWaitSummaryLines(wait), [
-    { id: "GitHub\u0000pr 123", source: "GitHub", events: ["checks.failed", "pr.merged"], arguments: ["pr 123"] },
-    { id: "GitHub\u0000pr 456", source: "GitHub", events: ["pr.closed"], arguments: ["pr 456"] },
+  assert.deepEqual(lines.eventWaitSummaryLines(wait, title), [
+    { id: "GitHub\u0000pr 123", source: "GitHub", events: ["checks.failed", "pr.merged"], words: "Checks failed or PR merged", arguments: ["pr 123"] },
+    { id: "GitHub\u0000pr 456", source: "GitHub", events: ["pr.closed"], words: "PR closed", arguments: ["pr 456"] },
+  ]);
+});
+
+test("the event wait card names a session by its title and an event by its meaning (#2747)", () => {
+  const wait = { id: "w", from: 0, since: 0, patterns: [
+    { name: "agent.finished", filters: { agent: "a" } },
+    { name: "agent.finished", filters: { agent: "gone" } },
+    { name: "agent.failed", filters: { agent: "a" } },
+    { name: "agent.stopped", filters: { agent: "a" } },
+    { name: "mac.wake", filters: {} },
+  ] };
+  const said = lines.eventWaitSummaryLines(wait, title).map((line) =>
+    `${line.source} · ${line.words}${line.arguments.length ? ` (${line.arguments.join(", ")})` : ""}`);
+  assert.deepEqual(said, [
+    "Agents · “Fix login” and “gone” to finish",
+    "Agents · An agent in this folder ended in an error or an agent in this folder was stopped before finishing (agent “Fix login”)",
+    "This Mac · This Mac woke up",
   ]);
 });
 

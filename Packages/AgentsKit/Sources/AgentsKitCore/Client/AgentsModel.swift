@@ -1201,6 +1201,12 @@ public final class AgentsModel {
         WaitStatus.of(agent, names: { self.agentTitles[$0] }, lease: leaseStatus(of: agent.id))
     }
 
+    /// The wait card's lines (#2747): its events in words, sessions by their titles.
+    public func waitEventLines(of agent: Agent) -> [WaitEventLine] {
+        guard let wait = agent.eventWait else { return [] }
+        return WaitEventLine.lines(for: wait, names: { self.agentTitles[$0] })
+    }
+
     /// What an agent holds and waits for, in the words the row, the card and the chat
     /// use. Nil when it is nothing, or the daemon has no leases to say. The agent's
     /// own cell, so a lease changing redraws the rows it touches (#285).
