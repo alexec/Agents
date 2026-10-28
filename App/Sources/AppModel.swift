@@ -3114,8 +3114,18 @@ final class AppModel {
 
         case DaemonAPI.Notification.autoChanged:
             guard let settings = try? params?.decode(AutoSettings.self) else { return }
+            let changed = autoSettings != settings
             autoSettings = settings
-            Task { await refreshAuto(); await refreshDraftAutoPreview() }
+            Task {
+                await refreshAuto()
+                await refreshDraftAutoPreview()
+                // Set from the Remote or the web page on the Mac's host: the servers too (FR-017).
+                if changed {
+                    for host in hosts.hosts.all where !hosts.isOffline(host.id) {
+                        _ = try? await client(for: host.id).call(DaemonAPI.Method.autoSet, settings, returning: AutoSettings.self)
+                    }
+                }
+            }
 
         case DaemonAPI.Notification.daemonPolicyStateChanged:
             guard let state = try? params?.decode(DaemonAPI.PolicyState.self) else { return }
