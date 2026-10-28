@@ -343,6 +343,17 @@ jobs:
           security find-identity -v "$keychain" | grep -q "3rd Party Mac Developer Installer" || {
             echo "::error::MAC_INSTALLER_P12 holds no 3rd Party Mac Developer Installer identity, or its password is wrong"; exit 1; }
 
+      # Before the archive, so a profile made before an entitlement was added (v0.12.1, #2781)
+      # names the entitlement and the secret rather than failing the archive.
+      - name: The App Store profiles allow every entitlement
+        run: |
+          profiles="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+          python3 scripts/check-store-profiles.py \
+            "PROFILE_UNIVERSAL_MAC=$profiles/agents-universal-mac.provisionprofile" \
+            "PROFILE_REMOTE=$profiles/agents-remote.mobileprovision" \
+            "PROFILE_REMOTE_NOTIFY=$profiles/agents-remote-notify.mobileprovision" \
+            "PROFILE_REMOTE_WIDGET=$profiles/agents-remote-widget.mobileprovision"
+
       - name: Archive, check, export and upload
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
