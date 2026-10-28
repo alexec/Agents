@@ -44,9 +44,9 @@ Each takes `--dry-run`, which prints every command and runs none.
 
 1. A Google Cloud project, with a billing account linked to it. Link it in the console
    (**Billing ▸ Link a billing account**). A billing account that is not linked to the
-   folder is not sufficient: without the link, `up.sh` can't turn on Compute Engine or
+   project is not sufficient: without the link, `up.sh` can't turn on Compute Engine or
    Cloud KMS.
-2. In that folder, a service account for the scripts, with these roles: **Service Usage
+2. In that project, a service account for the scripts, with these roles: **Service Usage
    Admin**, **Compute Admin**, **Cloud KMS Admin**, **Service Account Admin** and **Service
    Account User**. Make a JSON key for it, and put the key in
    `~/.agents/secrets/gcp-agents-control.json` (`chmod 600`). The scripts read the project
@@ -211,23 +211,23 @@ The control plane's key proves to every window, phone and host that it is your c
 plane. On the machine it is sealed in the store by a key in Cloud KMS, which never leaves
 Google Cloud. The machine gets only the right to use that key.
 
-On your Mac, with `gcloud` (put your folder's id in place of `my-folder`):
+On your Mac, with `gcloud` (put your Google Cloud project's id in place of `my-project`):
 
 1. Make a key ring and a key:
 
    ```sh
-   gcloud kms keyrings create agents --location global --folder my-folder
+   gcloud kms keyrings create agents --location global --project my-project
    gcloud kms keys create control --keyring agents --location global \
-       --purpose encryption --folder my-folder
+       --purpose encryption --project my-project
    ```
 
 2. Make a service account that may use only that key:
 
    ```sh
-   gcloud iam service-accounts create agents-control --folder my-folder
+   gcloud iam service-accounts create agents-control --project my-project
    gcloud kms keys add-iam-policy-binding control --keyring agents --location global \
-       --member serviceAccount:agents-control@my-folder.iam.gserviceaccount.com \
-       --role roles/cloudkms.cryptoKeyEncrypterDecrypter --folder my-folder
+       --member serviceAccount:agents-control@my-project.iam.gserviceaccount.com \
+       --role roles/cloudkms.cryptoKeyEncrypterDecrypter --project my-project
    ```
 
 3. If the machine is not a Google Compute Engine VM that runs as that service account,
@@ -235,7 +235,7 @@ On your Mac, with `gcloud` (put your folder's id in place of `my-folder`):
 
    ```sh
    gcloud iam service-accounts keys create sa.json \
-       --iam-account agents-control@my-folder.iam.gserviceaccount.com
+       --iam-account agents-control@my-project.iam.gserviceaccount.com
    ```
 
    On a Compute Engine VM that runs as the service account, make no key file: the VM gets
@@ -712,7 +712,7 @@ If the zone itself is down, make the disk from the snapshot in another zone of
 `us-west1` (`--zone us-west1-a`). The snapshots are kept in the region, not in the zone.
 Then make a machine there that starts from that disk, with the flags of `up.sh`'s
 `instances create`, but `--disk name=agents-control-restored,boot=yes` in place of the
-`--image-family`, `--image-folder` and `--boot-disk-*` flags. Set `zone` in
+`--image-family`, `--image-project` and `--boot-disk-*` flags. Set `zone` in
 `deploy/gcp/common.sh` to the new zone before you run `up.sh` again.
 
 ## The image

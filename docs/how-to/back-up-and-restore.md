@@ -113,9 +113,3 @@ backup is made is left out, never cut in half.
   certificate, which these backups do not hold
 - [Archive and stop agents](archive-and-stop.md)
 - [Move an existing set-up across](move-an-existing-set-up.md)
-# Agent configuration sync is not a backup
-
-Agent instructions, personas, skills, MCP server settings and plugin files sync across
-your machines when they connect to the same control plane. This keeps the files available
-on those machines. It is not a backup: it does not keep earlier versions or protect the
-files if they are deleted everywhere. Keep a separate backup of configuration you need.
