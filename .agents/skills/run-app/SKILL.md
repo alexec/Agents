@@ -421,8 +421,8 @@ PR's earlier set, and prints a Markdown image line per file:
 $S/pr-shots.sh 2850 /tmp/run-mychange-shots/*.png > /tmp/run-mychange-shots/body.md
 ```
 
-Put the lines under `## Screenshots` in the PR body (`gh pr edit <n> --body-file`). After
-`changes-wanted`, take the whole set again and run it again: Alex sees only the new set.
+Put the lines under `## Screenshots` in the PR body (`gh pr edit <n> --body-file`). When Alex
+asks for changes, take the whole set again and run it again: Alex sees only the new set.
 The shots go with the root in "When you are done"; keep them under `/tmp/run-<slug>-*`.
 
 ## When you are done

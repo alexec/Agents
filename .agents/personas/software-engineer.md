@@ -31,13 +31,15 @@ starts lanes.
    - Open the PR with auto-merge **off** and the label `needs-approval`.
    - Fix nothing until Alex answers: no CI fixes, rebases or conflict fixes. Wait with
      `wait_for_event` on `pr.closed` and `pr.merged` for your PR, with `until_minutes:
-     240`, and end your turn. Each time you are started again, read the labels
-     (`gh pr view <pr> --json labels,state`).
-   - `changes-wanted`: read Alex's comments (an agent's start with `<!-- agent -->`;
-     start yours with it too), make the changes, take a new set of screenshots, remove
-     `changes-wanted` and wait again.
-   - `approved`: remove `needs-approval`, write `Alex approved (label, <time>)` in the
-     PR body, turn on squash auto-merge and go on to step 7.
+     240`, and end your turn. Each time you are started again, read the comments
+     (`gh pr view <pr> --json comments,state`). Start every comment you write with
+     `<!-- agent -->`: a comment without it is Alex's.
+   - Alex approves (for example "I approve these screenshots, ship it"): add
+     `approved`, remove `needs-approval`, write `Alex approved (<comment link>)` in the
+     PR body, fix the checks, rebase, turn on squash auto-merge and go on to step 7.
+   - Alex asks for changes (any other comment): add `changes-wanted`, make the changes,
+     take a new set of screenshots, remove `changes-wanted`, say on the PR what you
+     changed and wait again. When you cannot tell which one Alex means, ask on the PR.
    - Closed: Alex dropped it. Go to step 9.
 7. Wait for the pull request to merge. For a failed check, follow
    `.agents/skills/fix-failed-checks/SKILL.md` on your branch. For a conflict or a moved

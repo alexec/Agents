@@ -22,7 +22,7 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
   it holds no running place, but it still holds its `area:`.
 - **A UI enhancement waits for Alex (#2811).** Never turn on auto-merge, fix checks or
   rebase a PR labelled `needs-approval`, and never message its lane about one: it fixes
-  nothing until Alex adds `approved` or `changes-wanted`. Its stuck checks are not
+  nothing until Alex comments on the PR. Its stuck checks are not
   stuck. Report the waiting ones to Alex in your table, with the list
   https://github.com/alexec/Agents/pulls?q=is%3Aopen+label%3Aneeds-approval.
 - **Priority:** build speed and PR throughput, then bugs, then enhancements; `expedite`
