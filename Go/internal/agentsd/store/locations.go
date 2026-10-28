@@ -100,6 +100,11 @@ func (l Locations) Socket() string       { return filepath.Join(l.Root, "daemon.
 func (l Locations) Lock() string         { return filepath.Join(l.Root, "daemon.lock") }
 func (l Locations) Log() string          { return filepath.Join(l.Logs, "daemon.log") }
 
+// ProjectTools is the last MachineProjects the control plane sent (#2669). It is not
+// projects.json: that is v0.11's folder list, which a person may still move to folders.json
+// by hand (#2707).
+func (l Locations) ProjectTools() string { return filepath.Join(l.Root, "project-tools.json") }
+
 // ArchiveIndex is the Swift daemon's index of archived agents (051), a cache.
 func (l Locations) ArchiveIndex() string { return filepath.Join(l.Cache, "archive.json") }
 

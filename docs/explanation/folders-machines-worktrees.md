@@ -176,7 +176,7 @@ that the project does not set is the folder's own, from its git remote, as befor
 cannot skip a slot that the project sets.
 
 The control plane keeps the slots in the project's record, and sends them to each machine
-whose folders are in the project. The machine keeps the last copy in `<root>/projects.json`,
+whose folders are in the project. The machine keeps the last copy in `<root>/project-tools.json`,
 so a folder keeps its project's slots while the control plane is away.
 
 `.agents/mcp.json`, the Where agents run slot, helper limits, disk space, skills, personas
