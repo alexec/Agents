@@ -370,6 +370,7 @@ struct ChatView: View {
             cards.append(WaitingCard(id: "wait:" + agent.id.uuidString) {
                 WaitCard(status: status, eventWait: agent.eventWait,
                          isLineWait: agent.eventWait?.lineResource != nil,
+                         lines: model.work.waitEventLines(of: agent),
                          open: { model.showEvents(at: .waitingNow) },
                          stop: { await model.cancelWait(of: agent.id) },
                          isDisabled: selectedHostOffline)

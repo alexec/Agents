@@ -388,6 +388,7 @@ struct RemoteChatView: View {
             cards.append(WaitingCard(id: "wait:" + agent.id.uuidString) {
                 WaitCard(status: status, eventWait: agent.eventWait,
                          isLineWait: agent.eventWait?.lineResource != nil,
+                         lines: model.work.waitEventLines(of: agent),
                          open: open,
                          stop: { await model.cancelWait(of: agent.id) },
                          isDisabled: model.isStale(agent))

@@ -101,4 +101,39 @@ struct WaitStatusTests {
         #expect(lease.without(wait) == nil)
         #expect(lease.without(nil) == lease)
     }
+
+    /// The wait card names a session by its title and an event by its meaning (#2747).
+    @Test func theWaitCardSaysItsEventsInWords() throws {
+        let fixLogin = UUID(), docs = UUID()
+        let names: (UUID) -> String? = { [fixLogin: "Fix login", docs: "Docs"][$0] }
+        let wait = EventWait(patterns: [
+            EventPattern("agent.finished", filters: ["agent": DetailFilter(fixLogin.uuidString)]),
+            EventPattern("agent.finished", filters: ["agent": DetailFilter(docs.uuidString)]),
+            EventPattern("agent.failed", filters: ["agent": DetailFilter(docs.uuidString)]),
+            EventPattern("agent.stopped", filters: ["agent": DetailFilter(docs.uuidString)]),
+            EventPattern("mac.wake"),
+            EventPattern("checks.failed"),
+            EventPattern("pr.merged"),
+        ], from: 0, since: since, serverEvents: [
+            WaitServerEvent(trigger: MCPEventTrigger(event: "checks.failed", arguments: ["pr": .int(123)]), servers: ["github"]),
+            WaitServerEvent(trigger: MCPEventTrigger(event: "pr.merged", arguments: ["pr": .int(123)]), servers: ["github"]),
+        ])
+        let lines = WaitEventLine.lines(for: wait, names: names)
+        try #require(lines.count == 4)
+        #expect(lines.map { "\($0.source) · \($0.words)" + ($0.arguments.isEmpty ? "" : " (\($0.arguments.joined(separator: ", ")))") } == [
+            "Agents · “Fix login” and “Docs” to finish",
+            "Agents · An agent in this folder ended in an error or an agent in this folder was stopped before finishing (agent “Docs”)",
+            "This Mac · This Mac woke up",
+            "GitHub · Checks failed or PR merged (pr 123)",
+        ])
+        #expect(lines[0].events == ["agent.finished"]) // index-ok: required four above
+        #expect(lines[3].events == ["checks.failed", "pr.merged"]) // index-ok: required four above
+    }
+
+    @Test func aSessionTheWindowDoesNotKnowIsItsID() {
+        let gone = UUID()
+        let wait = EventWait(patterns: [EventPattern("agent.finished", filters: ["agent": DetailFilter(gone.uuidString)])],
+                             from: 0, since: since)
+        #expect(WaitEventLine.lines(for: wait, names: { _ in nil }).first?.words == "“\(gone.uuidString)” to finish")
+    }
 }
