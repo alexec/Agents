@@ -4488,6 +4488,40 @@ final class RemoteModel {
         }
     }
 
+    /// A running agent's own answer to permission requests; nil follows Settings (#2658).
+    func setAgentClientPermission(_ agentID: UUID, _ mode: ClientPermissionMode?) async {
+        guard !isStale else {
+            problem = "Your Mac is not answering, so that could not be changed."
+            return
+        }
+        do {
+            let request = SetClientPermissionRequest(agentID: agentID, mode: mode)
+            try await client(for: request).call(DaemonAPI.Method.agentsSetClientPermission, request)
+        } catch {
+            problem = (error as? JSONRPCError)?.message ?? "That did not reach your Mac."
+        }
+    }
+
+    /// A running agent's model level or permission mode, mapped on its own runtime (#2658).
+    func setAgentLevel(_ agentID: UUID, _ field: AutoField, _ level: String) async {
+        var levels = Levels()
+        switch field {
+        case .model: levels.model = ModelLevel(rawValue: level)
+        case .permission: levels.permission = PermissionLevel(rawValue: level)
+        default: return
+        }
+        guard !isStale else {
+            problem = "Your Mac is not answering, so that could not be changed."
+            return
+        }
+        do {
+            let request = SetLevelsRequest(agentID: agentID, levels: levels)
+            try await client(for: request).call(DaemonAPI.Method.agentsSetLevels, request)
+        } catch {
+            problem = (error as? JSONRPCError)?.message ?? "That did not reach your Mac."
+        }
+    }
+
     /// The sandbox card's answer, from the phone (064, FR-007a).
     func answerSandbox(_ agentID: UUID, carryOn: Bool) async {
         do {

@@ -51,14 +51,17 @@ enum PromptWords {
 
     /// The runtime's name as a person knows it.
     static func runtimeName(_ id: String) -> String {
-        RuntimeCatalog.runtime(id: id)?.name ?? id
+        if id == LevelWords.autoID { return LevelWords.auto }
+        return RuntimeCatalog.runtime(id: id)?.name ?? id
     }
 
     /// A started session's runtime, and the account it runs on when that is not the
     /// runtime's own sign-in, as the Runtimes rows name it: "Claude · Work" (#2259).
     static func runtimeName(_ agent: Agent, accounts: [AccountProfile]) -> String {
         let runtime = runtimeName(agent.runtimeID)
-        return accounts.name(of: agent.accountID, on: agent.runtimeID).map { "\(runtime) · \($0)" } ?? runtime
+        let named = accounts.name(of: agent.accountID, on: agent.runtimeID).map { "\(runtime) · \($0)" } ?? runtime
+        // An Auto agent says so, with the runtime it picked (#2658, FR-009): "Auto · Claude".
+        return agent.auto == nil ? named : LevelWords.header(named)
     }
 }
 

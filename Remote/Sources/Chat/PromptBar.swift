@@ -537,10 +537,9 @@ struct PromptBar: View {
         ScrollView(.horizontal) {
             HStack(spacing: 10) {
                 if ClientPermissionSettings.supports(agent.runtimeID) {
-                    ClientPermissionCapsule(runtimeID: agent.runtimeID,
-                                            mode: model.clientPermissions.mode(for: agent.runtimeID)) { mode in
-                        let settings = model.clientPermissions.setting(mode, for: agent.runtimeID)
-                        Task { await model.setClientPermissions(settings) }
+                    ClientPermissionCapsule(runtimeID: agent.runtimeID, own: agent.clientPermission,
+                                            settings: model.clientPermissions.mode(for: agent.runtimeID)) { mode in
+                        Task { await model.setAgentClientPermission(agent.id, mode) }
                     }
                 }
                 ForEach(shown.filter(\.isAboutPermission)) { option in

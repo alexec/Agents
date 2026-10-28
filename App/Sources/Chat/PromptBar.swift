@@ -15,6 +15,7 @@ struct PromptBar: View {
     /// Set in a window of its own (#826): this bar is that session's.
     @Environment(\.poppedChat) private var popped
     @Environment(\.openURL) private var openURL
+    @Environment(\.openSettings) private var openSettings
     /// Whether the folder is the caller's to decide rather than this bar's.
     ///
     /// Set on a folder page, where the folder is the folder and changing it would
@@ -152,6 +153,9 @@ struct PromptBar: View {
                     }
                     if agent == nil, let refusal = model.draftSandboxRefusal {
                         sandboxRefusal(refusal)
+                    }
+                    if agent == nil, let reasons = model.draftAutoRefusal {
+                        autoRefusal(reasons)
                     }
                     // On its way (#87): a start can take seconds, making a worktree and a
                     // runtime, and a send to a slow host as long.
@@ -358,13 +362,20 @@ struct PromptBar: View {
                 }
                 .buttonStyle(.paper)
                 .appText(.fine)
-                .disabled(model.draftCwd == nil || model.draftRuntimeID == nil)
+                .disabled(model.draftCwd == nil || model.draftRuntimeID == nil || model.isAutoDraft)
                 .help("Conversations this runtime is already holding here")
                 .accessibilityLabel("Sessions")
 
                 SelectCapsule(name: "Runtime",
                               title: model.draftRuntimeID.map(runtimeName) ?? "Runtime") { dismiss in
                     ScrollingChoices {
+                        // Auto first (#2658): the app picks the runtime when the session starts.
+                        SelectChoice(title: LevelWords.auto, description: autoNote,
+                                     isChosen: model.isAutoDraft) {
+                            chooseRuntime(LevelWords.autoID)
+                            dismiss()
+                        }
+                        Divider().padding(.vertical, 4)
                         if !outRuntimes.isEmpty {
                             SelectGroupHeading(title: "Available")
                         }
@@ -875,7 +886,9 @@ struct PromptBar: View {
     /// failed and a folder not yet chosen were all the same silent gap.
     @ViewBuilder
     private var options: some View {
-        if case .controls(let shown) = controlsState {
+        if agent == nil, model.isAutoDraft {
+            autoRow
+        } else if case .controls(let shown) = controlsState {
             optionsRow(shown)
         } else {
             VStack(alignment: .leading, spacing: 8) {
@@ -982,17 +995,105 @@ struct PromptBar: View {
 
     @ViewBuilder
     private func permissionOptions(_ shown: [ConfigOption]) -> some View {
-        if let runtimeID = agent?.runtimeID ?? model.draftRuntimeID,
-           ClientPermissionSettings.supports(runtimeID) {
-            ClientPermissionCapsule(runtimeID: runtimeID,
-                                    mode: model.clientPermissions.mode(for: runtimeID)) { mode in
-                let settings = model.clientPermissions.setting(mode, for: runtimeID)
-                Task { await model.setClientPermissions(settings) }
+        if let runtimeID = agent?.runtimeID ?? model.draftRuntimeID {
+            let own = shown.filter(\.isAboutPermission)
+            // The permission mode in the shared words (#2658), the runtime's own behind ⋯.
+            if !own.isEmpty || model.autoMappings.cell(runtimeID, .permission, "ask")?.native != nil {
+                levelPill(.permission, runtimeID: runtimeID, own: own)
+            }
+            // Its own answer to permission requests, else Settings' (FR-019).
+            if ClientPermissionSettings.supports(runtimeID) {
+                ClientPermissionCapsule(runtimeID: runtimeID,
+                                        own: agent == nil ? model.draftClientPermission : agent?.clientPermission,
+                                        settings: model.clientPermissions.mode(for: runtimeID)) { mode in
+                    if let agent {
+                        Task { await model.setAgentClientPermission(agent.id, mode) }
+                    } else {
+                        model.draftClientPermission = mode
+                    }
+                }
             }
         }
-        ForEach(shown.filter(\.isAboutPermission)) { option in
-            OptionMenu(option: option, chosen: binding(for: option))
+    }
+
+    /// A Model or Permission mode pill (#2658): the value in force, Custom where the
+    /// runtime's own setting matches none, each value said as it is on this runtime.
+    private func levelPill(_ field: AutoField, runtimeID: String, own: [ConfigOption]) -> some View {
+        let chosen: String? = if let agent {
+            field == .model ? agent.levels?.model?.rawValue : agent.levels?.permission?.rawValue
+        } else {
+            model.draftLevel(field)
         }
+        return LevelPill(field: field, chosen: chosen, runtimeName: runtimeName(runtimeID),
+                         cell: { model.autoMappings.cell(runtimeID, field, $0) },
+                         own: own, binding: binding(for:)) { level in
+            if let agent {
+                Task { await model.setAgentLevel(agent.id, field, level) }
+            } else {
+                model.chooseDraftLevel(field, level)
+            }
+        }
+    }
+
+    /// The pills of a new session on Auto (#2658): Permission mode, Sandbox and Model, each
+    /// said as it is on the runtime Auto picks now. No Permission requests: on Auto they
+    /// follow the permission mode (FR-010).
+    private var autoRow: some View {
+        let picked = model.draftAutoPreview?.runtimeID
+        return HStack(spacing: 10) {
+            LevelPill(field: .permission, chosen: model.draftLevels.permission?.rawValue,
+                      runtimeName: picked.map(runtimeName),
+                      cell: { level in picked.flatMap { model.autoMappings.cell($0, .permission, level) } }) {
+                model.chooseDraftLevel(.permission, $0)
+            }
+            SelectCapsule(name: LevelWords.sandboxField, title: LevelWords.sandbox(model.draftSandbox ?? .runtime)) { dismiss in
+                SelectGroupHeading(title: LevelWords.sandboxField)
+                ForEach(SandboxChoice.allCases, id: \.self) { choice in
+                    let cell = picked.flatMap { model.autoMappings.cell($0, .sandbox, choice.rawValue) }
+                    SelectChoice(title: LevelWords.sandbox(choice),
+                                 description: cell.map { "\($0.words) on \(runtimeName($0.runtimeID))" } ?? LevelWords.meaning(sandbox: choice),
+                                 isChosen: (model.draftSandbox ?? .runtime) == choice,
+                                 setBy: choice == .on ? nil : model.sandboxSettings.setBy) {
+                        model.chooseDraftLevel(.sandbox, choice.rawValue)
+                        dismiss()
+                    }
+                }
+            }
+            Spacer(minLength: 16)
+            LevelPill(field: .model, chosen: model.draftLevels.model?.rawValue,
+                      runtimeName: picked.map(runtimeName),
+                      cell: { level in picked.flatMap { model.autoMappings.cell($0, .model, level) } }) {
+                model.chooseDraftLevel(.model, $0)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Under Auto in the chooser: the runtime it picks now, or that none is included.
+    private var autoNote: String {
+        if model.autoSettings.excluded.count >= model.availableRuntimes.count, !model.availableRuntimes.isEmpty {
+            return LevelWords.noneIncluded
+        }
+        return LevelWords.picks(model.draftAutoPreview?.runtimeID.map(runtimeName))
+    }
+
+    /// No runtime Auto may use can take the session (FR-011): each runtime and why, with
+    /// the way to Settings ▸ Agent Runtimes ▸ Auto. The prompt stays in the field.
+    private func autoRefusal(_ reasons: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(reasons)
+                .appText(.fine)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+            Button(LevelWords.openAutoSettings) {
+                WindowDefaults.store.set(LevelWords.autoID, forKey: "settingsRuntimeID")
+                openSettings()
+            }
+            .controlSize(.small)
+        }
+        .padding(10)
+        .background(StateTint.attention.color?.opacity(0.07) ?? .clear, in: RoundedRectangle(cornerRadius: 8))
     }
 
     /// The command sandbox, beside the mode it is so often mistaken for (064, FR-004).
@@ -1028,8 +1129,9 @@ struct PromptBar: View {
     @ViewBuilder
     private func otherOptions(_ shown: [ConfigOption]) -> some View {
         let others = shown.filter { !$0.isAboutPermission }
-        if !others.isEmpty {
-            ModelPill(options: others, binding: binding(for:))
+        if !others.isEmpty, let runtimeID = agent?.runtimeID ?? model.draftRuntimeID {
+            // The model in the shared words (#2658); effort, fast mode and the rest behind ⋯.
+            levelPill(.model, runtimeID: runtimeID, own: others)
         }
     }
 
@@ -1311,11 +1413,11 @@ struct PromptBar: View {
         DraftKeeper.shared.putBackStartForm(into: model)
         // Else what the person last chose on any client (#1033).
         if model.draftRuntimeID == nil, let shared = DraftKeeper.shared.sharedStartForm(in: model),
-           model.availableRuntimes.contains(where: { $0.id == shared.runtimeID }) {
+           shared.runtimeID == LevelWords.autoID || model.availableRuntimes.contains(where: { $0.id == shared.runtimeID }) {
             model.draftRuntimeID = shared.runtimeID
             DraftKeeper.shared.putBackSharedChoices(shared.chosen)
         }
-        if model.draftRuntimeID == nil || !model.availableRuntimes.contains(where: { $0.id == model.draftRuntimeID }) {
+        if model.draftRuntimeID == nil || !model.isAutoDraft && !model.availableRuntimes.contains(where: { $0.id == model.draftRuntimeID }) {
             // The one rule (#264): what was put back, else the catalog's default, else the first.
             model.draftRuntimeID = model.defaultRuntimeID
         }
