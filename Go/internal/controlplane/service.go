@@ -215,6 +215,8 @@ type Service struct {
 	starts botStarts
 	// What Reports and the Console read from the store, by entity tag (#2054, #2056).
 	storeReads readCache
+	// What each machine here was last sent of its projects (#2735).
+	toldProjects toldProjects
 
 	mu       sync.Mutex
 	servers  []*http.Server

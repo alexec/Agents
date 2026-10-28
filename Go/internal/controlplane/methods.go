@@ -1034,10 +1034,7 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 		if err != nil {
 			return nil, err
 		}
-		if err := m.s.keepJoined(ctx, host, joined); err != nil {
-			return nil, err
-		}
-		return m.s.machineProjects(joined.Folders), nil
+		return m.s.keepJoined(ctx, host, joined)
 	case "usage/rollup":
 		rollup, err := require[wire.UsageRollup](params, "UsageRollup")
 		if err != nil {

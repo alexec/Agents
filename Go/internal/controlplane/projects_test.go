@@ -1,13 +1,17 @@
 package controlplane
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -232,5 +236,98 @@ func waitFor(t *testing.T, ok func() bool) {
 		if time.Now().After(deadline) {
 			t.Fatal("not in time")
 		}
+	}
+}
+
+// prefixReads counts the store's reads and listings under each of two prefixes.
+type prefixReads struct {
+	store.Store
+	folderGets, projectLists atomic.Int64
+}
+
+func (c *prefixReads) Get(ctx context.Context, key string) (*store.Object, error) {
+	if strings.HasPrefix(key, projectFoldersPrefix) {
+		c.folderGets.Add(1)
+	}
+	return c.Store.Get(ctx, key)
+}
+
+func (c *prefixReads) List(ctx context.Context, prefix string) ([]store.Key, error) {
+	if prefix == records.ProjectsPrefix {
+		c.projectLists.Add(1)
+	}
+	return c.Store.List(ctx, prefix)
+}
+
+// #2735: a project change reads no machine's folder list that has not changed, and tells
+// only the machines whose projects it changed; a machine's new ids are adopted in one
+// pass, each with a free name.
+func TestAProjectChangeReadsAndTellsOnlyWhatChanged(t *testing.T) {
+	t.Parallel()
+	st := &prefixReads{Store: store.NewMemory()}
+	p := startPlane(t, st, controllink.NewPrivateKey())
+	var mu sync.Mutex
+	heard := map[string]int{}
+	p.told = func(host, method string, params json.RawMessage) {
+		if method == wire.NotifyHostProjects.Name {
+			mu.Lock()
+			heard[host]++
+			mu.Unlock()
+		}
+	}
+	_, owner := p.client("Alex's Mac")
+	mac, box := p.host("MAC"), p.host("BOX")
+	settled := func() {
+		t.Helper()
+		waitFor(t, func() bool {
+			p.s.toldProjects.mu.Lock()
+			defer p.s.toldProjects.mu.Unlock()
+			return !p.s.toldProjects.running
+		})
+	}
+
+	// Fifty folders on the box, fifty new ids of one name: one read of the projects, and
+	// fifty names.
+	var many []wire.JoinedFolder
+	for i := range 50 {
+		many = append(many, wire.JoinedFolder{Folder: wire.URL(fmt.Sprintf("file:///home/a/app-%d/", i)), Name: "app", Project: fmt.Sprintf("p-app%d", i)})
+	}
+	before := st.projectLists.Load()
+	joinFolders(t, p, box.member.Host, many...)
+	if lists := st.projectLists.Load() - before; lists > 2 {
+		t.Fatalf("the projects were listed %d times for one join", lists)
+	}
+	names := map[string]bool{}
+	for _, project := range listedProjects(t, owner) {
+		names[project.Name] = true
+	}
+	if len(names) != 50 || !names["app"] || !names["app 50"] {
+		t.Fatalf("%v", names)
+	}
+	joinFolders(t, p, mac.member.Host, wire.JoinedFolder{Folder: "file:///Users/a/Agents/", Name: "Agents", Project: "p-agents"})
+	settled()
+	// Each machine has its projects from its own answer: nothing more to send.
+	mu.Lock()
+	if heard[mac.member.Host] != 0 || heard[box.member.Host] != 0 {
+		t.Fatalf("told after their own answers: %v", heard)
+	}
+	mu.Unlock()
+
+	// A rename of the Mac's project: the Mac is told, the box is not, and no folder list
+	// is read again.
+	st.folderGets.Store(0)
+	id := "p-agents"
+	call(t, owner, "", "projects/set", wire.ProjectSet{ID: &id, Name: "Agents app"})
+	waitFor(t, func() bool { mu.Lock(); defer mu.Unlock(); return heard[mac.member.Host] == 1 })
+	settled()
+	p.s.tellMachinesProjects()
+	listedProjects(t, owner)
+	mu.Lock()
+	if heard[mac.member.Host] != 1 || heard[box.member.Host] != 0 {
+		t.Fatalf("%v", heard)
+	}
+	mu.Unlock()
+	if gets := st.folderGets.Load(); gets != 0 {
+		t.Fatalf("%d folder lists read again", gets)
 	}
 }
