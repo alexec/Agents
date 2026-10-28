@@ -60,6 +60,20 @@ extension EnvironmentValues {
     /// The session this chat is in a scene of its own for (#888); nil in the main scene,
     /// whose chat is the selection.
     @Entry var poppedChat: PoppedChat? = nil
+    /// Opens the folder's own shell (#418) from the chat's ··· menu (#2808); nil where the
+    /// chat has none, as in a scene of its own.
+    @Entry var openFolderTerminal: OpenFolderTerminal? = nil
+}
+
+/// Opens a folder's own shell (#418). Told apart by the folder, not the closure, so a
+/// chat is not drawn again each time the scene is (#2808).
+struct OpenFolderTerminal: Equatable {
+    let folder: URL
+    let open: @MainActor () -> Void
+
+    @MainActor func callAsFunction() { open() }
+
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.folder == rhs.folder }
 }
 
 /// A session in a scene of its own (#888): its chat, its prompt, what it asks and its
