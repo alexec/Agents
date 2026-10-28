@@ -204,7 +204,7 @@ extension AgentConfigurationOverview.Cell: View {
 }
 
 /// A Needs a look row: what kind, what about, why, and the whole row opens its page.
-private struct LookRow: View {
+struct LookRow: View {
     let look: DaemonAPI.Look
     let show: () -> Void
 

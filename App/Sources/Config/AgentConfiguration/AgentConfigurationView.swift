@@ -95,7 +95,9 @@ struct AgentConfigurationView: View {
         switch page {
         case .overview: AgentConfigurationOverview(place: place, snapshot: snapshot, workflows: workflows, page: $page)
         case .instructions: AgentsSetupPage { AgentsInstructionsSection(place: place) }.task { await refresh() }
-        case .skills: AgentConfigurationFilesPage(place: place, kind: .skills, unsaved: unsavedEdits)
+        case .skills:
+            AgentConfigurationFilesPage(place: place, kind: .skills, unsaved: unsavedEdits,
+                                        looks: snapshot.needsALook.filter { $0.page == .skills })
         case .personas: AgentConfigurationFilesPage(place: place, kind: .personas, unsaved: unsavedEdits)
         case .workflows: AgentConfigurationFilesPage(place: place, kind: .workflows, unsaved: unsavedEdits)
         case .mcp: AgentsSetupPage { FolderMCPSection(place: place) }.task { await refresh() }
