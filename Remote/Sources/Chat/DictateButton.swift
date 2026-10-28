@@ -14,7 +14,7 @@ struct DictateButton: View {
     @State private var isPriming = false
 
     var body: some View {
-        PushToTalkButton(tap: toggle, begin: beginPushToTalk, end: finishPushToTalk) {
+        PushToTalkButton(tap: toggle, begin: beginPushToTalk, end: finishPushToTalk, cancel: dictation.stop) {
             Image(systemName: dictation.isListening ? "waveform" : "microphone")
                 .appText(.reading).fontWeight(.semibold)
                 .frame(width: 22, height: 22)
@@ -54,10 +54,13 @@ struct DictateButton: View {
         else { isPriming = true }
     }
 
+    /// Sends once the last words said are in the field (#2753).
     private func finishPushToTalk() {
         guard dictation.isListening else { return }
-        dictation.stop()
-        send()
+        Task {
+            await dictation.finish()
+            send()
+        }
     }
 
     /// Our own words before the system's alert, the first time only.

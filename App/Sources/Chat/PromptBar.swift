@@ -593,7 +593,8 @@ struct PromptBar: View {
 
                 Spacer(minLength: 0)
                 // Dictate and voice mode sit with send, on the right (#2634).
-                PushToTalkButton(tap: toggleDictation, begin: beginDictation, end: finishPushToTalk) {
+                PushToTalkButton(tap: toggleDictation, begin: beginDictation, end: finishPushToTalk,
+                                 cancel: dictation.stop) {
                     Image(systemName: dictation.isListening ? "waveform" : "microphone")
                         .appText(.reading).fontWeight(.semibold)
                         .frame(width: 22, height: 22)
@@ -712,10 +713,13 @@ struct PromptBar: View {
         }
     }
 
+    /// Sends once the last words said are in the field (#2753).
     private func finishPushToTalk() {
         guard dictation.isListening else { return }
-        dictation.stop()
-        send()
+        Task {
+            await dictation.finish()
+            send()
+        }
     }
 
     // MARK: What goes with the words

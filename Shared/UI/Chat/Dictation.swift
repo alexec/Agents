@@ -132,6 +132,8 @@ final class Dictation {
     /// and the button's pulse is the listening mark (#2515).
     private(set) var volatileIsLate = false
     private(set) var problem: Problem?
+    /// `finish()` is waiting for the last words.
+    private var isFinishing = false
 
     private let engine: AVAudioEngine
     private let model: Model
@@ -471,6 +473,30 @@ final class Dictation {
     /// so saying nothing is what dismisses it — `stop()` will not, because by the time
     /// a problem is set there is nothing left running for it to stop.
     func dismissProblem() { problem = nil }
+
+    /// How long `finish()` waits for the last words before it stops anyway.
+    static let lastWordsWait: Duration = .seconds(2)
+
+    /// Stops listening once the last words said are in the field, so a prompt sent next
+    /// holds all of them (#2753). The microphone closes at once; the analyser then turns
+    /// the audio it still has into final words, for up to `lastWordsWait`.
+    func finish() async {
+        guard isListening, !isFinishing, let analyzer, let results else {
+            stop()
+            return
+        }
+        isFinishing = true
+        defer { isFinishing = false }
+        note("dictation: finish, \(sink.counts)")
+        // Closing the microphone ends the analyser's input.
+        closeMicrophone()
+        let inTime = await waitAtMost(Self.lastWordsWait) {
+            try? await analyzer.finalizeAndFinishThroughEndOfInput()
+            await results.value
+        }
+        if !inTime { note("dictation: last words not in after \(Self.lastWordsWait)") }
+        stop()
+    }
 
     /// Stops listening. What is in the field stays as it is, words still being heard
     /// and all: they were shown, so they are kept (#69).
