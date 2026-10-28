@@ -173,10 +173,11 @@ struct RemoteChatView: View {
         .environment(\.chatActions, actions)
         .environment(\.orgSandboxSetBy, model.sandboxSettings.setBy)
         // A file a message links to is on the Mac: it opens in Files, as a file a tool
-        // call touched does (#548). Links to the web are the system's.
+        // call touched does (#548), a bare absolute path too, as on the Mac (#2754).
+        // Links to the web are the system's.
         .environment(\.openURL, OpenURLAction { [actions] url in
-            guard url.isFileURL else { return .systemAction }
-            actions.open(ToolCallLocation(path: url.path(percentEncoded: false)))
+            guard let fileURL = ChatLinkURL.fileURL(from: url) else { return .systemAction }
+            actions.open(ToolCallLocation(path: fileURL.path(percentEncoded: false)))
             return .handled
         })
         .environment(\.appViewStore, views)
