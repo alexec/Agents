@@ -191,11 +191,10 @@ struct FolderAgentsView: View {
         VStack(spacing: 4) {
             if !model.draftPersonas.isEmpty {
                 if !usable.isEmpty {
-                    // Centred under the folder when it fits; it scrolls when it does not (#2649).
+                    // Centred under the folder when it fits; a menu of them when it does not (#2795).
                     ViewThatFits(in: .horizontal) {
                         personaPicker(usable, picked: picked)
-                        ScrollView(.horizontal) { personaPicker(usable, picked: picked) }
-                            .scrollIndicators(.hidden)
+                        personaPicker(usable, picked: picked, menu: true)
                     }
                     .disabled(model.isStarting)
                     .help("Start a kind of session: a persona sets what it names")
@@ -216,8 +215,10 @@ struct FolderAgentsView: View {
 
     static let noPersona = "No persona"
 
-    private func personaPicker(_ usable: [Persona], picked: Persona?) -> some View {
-        Picker("Persona", selection: Binding<String?>(
+    /// Segments, or a menu: the picked one's name and a chevron, where they do not fit (#2795).
+    @ViewBuilder
+    private func personaPicker(_ usable: [Persona], picked: Persona?, menu: Bool = false) -> some View {
+        let picker = Picker("Persona", selection: Binding<String?>(
             get: { model.draftPersona },
             set: { id in model.choosePersona(usable.first { $0.id == id }) }
         )) {
@@ -226,10 +227,19 @@ struct FolderAgentsView: View {
                 Text(persona.name).tag(Optional(persona.id))
             }
         }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .fixedSize(horizontal: true, vertical: false)
-        .accessibilityLabel("Persona: \(picked?.name ?? Self.noPersona)")
+        if menu {
+            picker
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .fixedSize()
+                .accessibilityLabel("Persona: \(picked?.name ?? Self.noPersona)")
+        } else {
+            picker
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize(horizontal: true, vertical: false)
+                .accessibilityLabel("Persona: \(picked?.name ?? Self.noPersona)")
+        }
     }
 
     private func label(_ folder: DaemonAPI.FolderSummary) -> String {

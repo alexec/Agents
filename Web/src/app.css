@@ -956,9 +956,9 @@ button.remove:hover { opacity: 1; }
 /* A new session: the folder's name and folder in the middle, the bar at the foot (#108). */
 .new-heading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 20px; text-align: center; }
 .new-heading h1 { margin: 0; font-size: 1.375rem; font-weight: 600; }
-.new-heading .persona-choice { display: flex; flex-direction: column; align-items: center; gap: 4px; max-width: 100%; }
+.new-heading .persona-choice { display: flex; flex-direction: column; align-items: center; gap: 4px; max-width: 100%; align-self: stretch; }
 .new-heading .persona-choice p { white-space: normal; }
-.new-heading .persona-segments { max-width: 100%; flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; }
+.new-heading .persona-segments { flex-wrap: nowrap; }
 .new-heading .persona-segments button { flex: none; white-space: nowrap; }
 .segmented { display: inline-flex; background: var(--paper-raised); flex-wrap: wrap; justify-content: center; border: 1px solid var(--paper-rule); border-radius: 8px; overflow: hidden; }
 .segmented button { border: 0; border-radius: 0; background: none; padding: 4px 12px; font: inherit; font-size: 0.8125rem; color: inherit; cursor: pointer; }
@@ -1475,8 +1475,14 @@ button.plain:hover { opacity: 1; }
 .new-heading .folder-switch .caret { font-size: 0.8125rem; opacity: 0.5; }
 .new-heading .folder-switch select { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; font: inherit; }
 /* The persona (#913): the folder's control, a size smaller, under it. */
-.new-heading .persona-switch { max-width: 100%; }
+.new-heading .persona-switch { display: flex; justify-content: center; position: relative; width: 100%; }
 .new-heading .persona-switch.none { opacity: 0.65; }
+/* Where the segments do not fit, a menu in their place, as the folder's (#2795). They stay,
+   hidden, to be measured. */
+.new-heading .persona-switch.menu .persona-segments { position: absolute; visibility: hidden; pointer-events: none; }
+.new-heading .persona-menu { position: relative; cursor: pointer; font-size: 0.9375rem; }
+.new-heading .persona-menu .caret { font-size: 0.8125rem; opacity: 0.5; }
+.new-heading .persona-menu select { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; font: inherit; }
 
 /* A server's dot on an MCP Servers page (#753): filled when it answers or runs, the failure tint
    when it does not, hollow otherwise, as the window's. */

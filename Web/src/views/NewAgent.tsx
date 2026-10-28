@@ -636,18 +636,44 @@ function PersonaSwitch({ personas, picked, down, choose }: {
   personas: Persona[]; picked: string | undefined; down: boolean; choose: (id: string) => void;
 }) {
   const name = personas.find((p) => p.id === picked)?.name;
+  // The segments when they fit; where they do not, a menu drawn as the folder's (#2795). The
+  // segments stay, hidden, so a wider page can bring them back.
+  const box = useRef<HTMLDivElement>(null);
+  const segments = useRef<HTMLDivElement>(null);
+  const fits = useSignal(true);
+  useEffect(() => {
+    const b = box.current, s = segments.current;
+    if (!b || !s) return;
+    const measure = () => { fits.value = s.scrollWidth <= b.clientWidth; };
+    measure();
+    const resized = new ResizeObserver(measure);
+    resized.observe(b);
+    resized.observe(s);
+    return () => resized.disconnect();
+  }, [personas]);
   return (
-    <div class={`persona-switch${name ? "" : " none"}`} title="Start a kind of session: a persona sets what it names">
-      <div class="segmented persona-segments" role="group" aria-label="Persona">
+    <div ref={box} class={`persona-switch${name ? "" : " none"}${fits.value ? "" : " menu"}`} title="Start a kind of session: a persona sets what it names">
+      <div ref={segments} class="segmented persona-segments" role="group" aria-label="Persona" aria-hidden={!fits.value}>
         <button type="button" aria-pressed={picked === undefined} class={picked === undefined ? "on" : ""}
-          disabled={down} onClick={() => choose("")}>No persona</button>
+          disabled={down} tabIndex={fits.value ? undefined : -1} onClick={() => choose("")}>No persona</button>
         {personas.map((persona) => (
           <button key={persona.id} type="button" aria-pressed={picked === persona.id}
-            class={picked === persona.id ? "on" : ""} disabled={down} onClick={() => choose(persona.id)}>
+            class={picked === persona.id ? "on" : ""} disabled={down} tabIndex={fits.value ? undefined : -1}
+            onClick={() => choose(persona.id)}>
             {persona.name}
           </button>
         ))}
       </div>
+      {!fits.value && (
+        <label class="persona-menu">
+          <span aria-hidden="true">{name ?? "No persona"} <span class="caret">▾</span></span>
+          <select aria-label="Persona" disabled={down} value={picked ?? ""}
+            onChange={(e) => choose((e.currentTarget as HTMLSelectElement).value)}>
+            <option value="">No persona</option>
+            {personas.map((persona) => <option key={persona.id} value={persona.id}>{persona.name}</option>)}
+          </select>
+        </label>
+      )}
     </div>
   );
 }
