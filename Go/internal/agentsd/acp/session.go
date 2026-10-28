@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -467,12 +468,22 @@ func (c *client) takeRaw(p sdk.UnstableCreateElicitationRequest) json.RawMessage
 }
 
 // rawElicitations reads the runtime's output for the SDK, keeping a copy of each
-// elicitation/create's params on the way (at most 16, the oldest dropped).
+// elicitation/create's params on the way (at most 16, the oldest dropped), and whether the
+// initialize response advertised systemPrompt. Only lines with a marker are decoded: every
+// chunk, tool result and replayed line passes through here (#2733).
 type rawElicitations struct {
 	r       *bufio.Reader
 	c       *client
 	pending []byte
+	// handshook is set once the initialize response has been read; no later line is
+	// decoded for capabilities.
+	handshook bool
 }
+
+var (
+	agentCapabilitiesMarker = []byte(`"agentCapabilities"`)
+	elicitationCreateMarker = []byte(`"elicitation/create"`)
+)
 
 func (e *rawElicitations) Read(b []byte) (int, error) {
 	if len(e.pending) == 0 {
@@ -489,24 +500,10 @@ func (e *rawElicitations) Read(b []byte) (int, error) {
 }
 
 func (e *rawElicitations) keep(line []byte) {
-	var response struct {
-		Result struct {
-			AgentCapabilities struct {
-				SessionCapabilities map[string]json.RawMessage `json:"sessionCapabilities"`
-			} `json:"agentCapabilities"`
-		} `json:"result"`
+	if !e.handshook && bytes.Contains(line, agentCapabilitiesMarker) {
+		e.capabilities(line)
 	}
-	if json.Unmarshal(line, &response) == nil {
-		if raw, ok := response.Result.AgentCapabilities.SessionCapabilities["systemPrompt"]; ok {
-			var capability map[string]json.RawMessage
-			if json.Unmarshal(raw, &capability) == nil && capability != nil {
-				e.c.mu.Lock()
-				e.c.supportsSystemPrompt = true
-				e.c.mu.Unlock()
-			}
-		}
-	}
-	if !bytes.Contains(line, []byte(`"elicitation/create"`)) {
+	if !bytes.Contains(line, elicitationCreateMarker) {
 		return
 	}
 	var m struct {
@@ -524,6 +521,30 @@ func (e *rawElicitations) keep(line []byte) {
 	}
 }
 
+// capabilities reads the systemPrompt capability from the initialize response, and marks
+// the handshake done once a response with agentCapabilities has been read.
+func (e *rawElicitations) capabilities(line []byte) {
+	var response struct {
+		Result struct {
+			AgentCapabilities *struct {
+				SessionCapabilities map[string]json.RawMessage `json:"sessionCapabilities"`
+			} `json:"agentCapabilities"`
+		} `json:"result"`
+	}
+	if json.Unmarshal(line, &response) != nil || response.Result.AgentCapabilities == nil {
+		return
+	}
+	e.handshook = true
+	if raw, ok := response.Result.AgentCapabilities.SessionCapabilities["systemPrompt"]; ok {
+		var capability map[string]json.RawMessage
+		if json.Unmarshal(raw, &capability) == nil && capability != nil {
+			e.c.mu.Lock()
+			e.c.supportsSystemPrompt = true
+			e.c.mu.Unlock()
+		}
+	}
+}
+
 // sessionPromptWriter adds standard ACP systemPrompt fields to the lifecycle calls. This
 // keeps the draft protocol field out of the pinned SDK's generated request structs.
 type sessionPromptWriter struct {
@@ -537,14 +558,16 @@ func (w *sessionPromptWriter) Write(p []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.buf = append(w.buf, p...)
+	start := 0
+	defer func() { w.buf = append(w.buf[:0], w.buf[start:]...) }()
 	for {
-		i := bytes.IndexByte(w.buf, '\n')
+		i := bytes.IndexByte(w.buf[start:], '\n')
 		if i < 0 {
 			break
 		}
-		line := append([]byte(nil), w.buf[:i+1]...)
-		w.buf = w.buf[i+1:]
-		line = w.inject(line)
+		// The line is written before w.buf changes, so it needs no copy of its own.
+		line := w.inject(w.buf[start : start+i+1])
+		start += i + 1
 		n, err := w.w.Write(line)
 		if err != nil {
 			return 0, err
@@ -560,7 +583,7 @@ func (w *sessionPromptWriter) inject(line []byte) []byte {
 	w.c.mu.Lock()
 	brief, supported := w.c.systemPrompt, w.c.supportsSystemPrompt
 	w.c.mu.Unlock()
-	if !supported || brief == "" {
+	if !supported || brief == "" || !isSessionLifecycle(line) {
 		return line
 	}
 	var message map[string]any
@@ -568,9 +591,7 @@ func (w *sessionPromptWriter) inject(line []byte) []byte {
 		return line
 	}
 	method, _ := message["method"].(string)
-	switch method {
-	case "session/new", "session/load", "session/resume", "session/fork":
-	default:
+	if !slices.Contains(sessionLifecycleMethods, method) {
 		return line
 	}
 	params, ok := message["params"].(map[string]any)
@@ -583,6 +604,30 @@ func (w *sessionPromptWriter) inject(line []byte) []byte {
 		return line
 	}
 	return append(out, '\n')
+}
+
+// sessionLifecycleMethods are the requests that carry systemPrompt, and
+// sessionLifecycleMarkers their quoted names to look for before any decode.
+var (
+	sessionLifecycleMethods = []string{"session/new", "session/load", "session/resume", "session/fork"}
+	sessionLifecycleMarkers = func() [][]byte {
+		markers := make([][]byte, len(sessionLifecycleMethods))
+		for i, method := range sessionLifecycleMethods {
+			markers[i] = []byte(`"` + method + `"`)
+		}
+		return markers
+	}()
+)
+
+// isSessionLifecycle is a byte check for a lifecycle method name, so prompts, attachments
+// and replies are not decoded on the way out (#2733).
+func isSessionLifecycle(line []byte) bool {
+	for _, marker := range sessionLifecycleMarkers {
+		if bytes.Contains(line, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *client) SessionUpdate(ctx context.Context, n sdk.SessionNotification) (err error) {
