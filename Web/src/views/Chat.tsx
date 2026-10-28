@@ -19,7 +19,6 @@ import { DiskStrip } from "./DiskStrip";
 import { KeptBubbles } from "./Kept";
 import { FolderGoneNotice, MissingFolderStrip } from "./MissingFolder";
 import { AccountMoveStrip } from "./AccountMove";
-import { BlockStrip } from "./BlockStrip";
 import { ContinueStrip } from "./ContinueStrip";
 import { CurrentPlanStrip } from "./PlanStrip";
 import { Telling } from "./Telling";
@@ -31,6 +30,7 @@ import { branchFromPrompt, RenameInput, SessionButtons, SessionMenu } from "./Se
 import { Beacon } from "./SessionRow";
 import { drawable } from "../model/options";
 import { quietLine } from "../model/activity";
+import { cardTitle, carryOnHelp, carryOnPrompt, openBlock } from "../model/block";
 import { sentPrompts } from "../model/promptHistory";
 import { sessionPrompts } from "../model/sessionPrompts";
 import { PromptList } from "./chat/PromptList";
@@ -565,7 +565,6 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       <FolderGoneNotice store={store} host={host} agent={agent} />
       <MissingFolderStrip store={store} host={host} agent={agent} />
       <AccountMoveStrip store={store} host={host} agent={agent} />
-      <BlockStrip store={store} host={host} agent={agent} disabled={down} />
       <ContinueStrip store={store} host={host} agent={agent} disabled={down} />
       {/* What it said it would do, under what it waits on, as the Remote has it (#341). */}
       <CurrentPlanStrip agent={agent} />
@@ -609,6 +608,9 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
             {cards.map((card) => <Fragment key={card.key}>{card.node}</Fragment>)}
           </div>
         )}
+        {/* A wait on sessions or on a time, the same card in the same place (#2750): it was a strip
+            under the chat's head with Carry on. */}
+        {agent && openBlock(agent) && <BlockWaitCard store={store} host={host} agent={agent} disabled={down} />}
         {/* Under them, and not in "Waiting for you": the agent waits, not the person (#2084). Only
             while the wait is open: an ended one stays on the record until the agent goes on (#2749). */}
         {agent?.eventWait && agent.eventWait.ending === undefined && <WaitCard agent={agent} title={(id) => store.agent(host, id)?.title}
@@ -853,6 +855,45 @@ function WaitCard({ agent, title, disabled, stop }: { agent: Agent; title: (id: 
           <button onClick={() => { location.hash = routeHash({ activity: "events" }); }}>Show in Events</button>
           <button disabled={disabled || busy.value} title="Stop waiting. Nothing will start it again for this wait."
             onClick={() => { busy.value = true; void stop().finally(() => (busy.value = false)); }}>Stop Waiting</button>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A wait on sessions or on a time (BlockWaitCard in WaitCard.swift, #2750), drawn as WaitCard is:
+ * what it waits on, since when, when it checks again, and Stop Waiting, which carries it on now.
+ */
+function BlockWaitCard({ store, host, agent, disabled }: { store: Store; host: string; agent: Agent; disabled: boolean }) {
+  const busy = useSignal(false);
+  const now = useSignal(Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => { now.value = Date.now(); }, 20_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const block = openBlock(agent);
+  if (!block || !agent.report) return null;
+  const since = fromWireDate(agent.report.at).getTime();
+  const deadline = block.checkAgainAt === undefined ? undefined : fromWireDate(block.checkAgainAt).getTime();
+  const total = deadline === undefined ? undefined : Math.max(1, Math.ceil((deadline - since) / 60_000));
+  const elapsed = Math.max(0, Math.floor((now.value - since) / 60_000));
+  const share = deadline === undefined || deadline <= since ? undefined : Math.min(100, Math.max(0, (now.value - since) / (deadline - since) * 100));
+  return (
+    <div class="cards">
+      <div class="card wait-card block-wait-card">
+        <div class="wait-card-heading">
+          <span class="wait-card-title"><span class="wait-card-broadcast" aria-hidden="true"><Beacon /></span>{cardTitle(block)}</span>
+          <span class="wait-card-time">{total === undefined ? `${elapsed} min` : `${elapsed} / ${total} min`}</span>
+        </div>
+        <div class="wait-card-events">
+          {store.waitsOf(host, agent).map((line) => <p class="wait-card-event" key={line}>{line}</p>)}
+        </div>
+        {share !== undefined && <div class="wait-card-progress" role="progressbar" aria-label="Wait time"
+          aria-valuemin={0} aria-valuemax={100} aria-valuenow={share}><span style={{ width: `${share}%` }} /></div>}
+        <p class="wait-answers">
+          <button disabled={disabled || busy.value} title={carryOnHelp(agent)}
+            onClick={() => { busy.value = true; void store.prompt(host, agent.id, carryOnPrompt, []).finally(() => (busy.value = false)); }}>Stop Waiting</button>
         </p>
       </div>
     </div>

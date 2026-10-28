@@ -49,6 +49,11 @@ export function checkAgainLine(block: Block): string | null {
   return `Checks again at ${at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
 }
 
+/** Block.cardTitle: the heading of its card at the foot of the chat (#2750). */
+export function cardTitle(block: Block): string {
+  return block.waits.length === 0 ? "Waiting to check again" : block.waits.length === 1 ? "Waiting for a session" : "Waiting for sessions";
+}
+
 /** AgentsModel.waitName: its title now, or the one it had when the block was made. */
 export function waitName(wait: Wait, agents: readonly Agent[]): string {
   const title = agents.find((a) => a.id === wait.agentID)?.title?.trim();

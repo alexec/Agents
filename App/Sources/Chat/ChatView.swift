@@ -300,27 +300,6 @@ struct ChatView: View {
         } else if ContinueWhenBackWords.offers(agent) || agent.continueWhenBack != nil,
                   model.host(agent.host, has: Capability.chatContinueWhenBack1) {
             ContinueWhenBackStrip(agent: agent)
-        } else if model.isBlocked(agent) {
-            // Stop is the prompt's own button while the agent works; Archive is on the
-            // session's row and in the toolbar. What is left here is only what the page
-            // has to say: what a blocked one waits on and the way on (039). An ask to be
-            // archived is a card at the end of the transcript (#827).
-            HStack(alignment: .top, spacing: 8) {
-                // What it waits on, as its row says it (#341).
-                WaitLines(lines: model.blockLines(agent))
-                Spacer(minLength: 0)
-                // What the card's Carry on does.
-                Button {
-                    Task { await model.carryOn(agent.id) }
-                } label: {
-                    Label(AgentsModel.carryOnLabel, systemImage: "play.circle")
-                }
-                .buttonStyle(.paper)
-                .appText(.fine)
-                .help(AgentsModel.carryOnHelp(for: agent))
-            }
-            .chatColumn()
-            .padding(.vertical, 8)
         }
     }
 
@@ -369,6 +348,18 @@ struct ChatView: View {
                                    approve: { await model.archive(agent.id, andLeave: true) },
                                    keep: { await model.keepSession(agent) },
                                    isDisabled: selectedHostOffline || model.acting(agent.id) != nil)
+                    .chatColumn()
+                    .help(selectedHostOffline ? offlineHelp : "")
+            })
+        }
+        // A wait on sessions or on a time, the same card in the same place (#2750): it was
+        // a strip under the chat's head with Carry on.
+        if let (report, block) = model.work.openBlock(agent) {
+            cards.append(WaitingCard(id: "block:" + agent.id.uuidString) {
+                BlockWaitCard(block: block, since: report.at, lines: model.blockLines(agent),
+                              stop: { await model.carryOn(agent.id) },
+                              help: AgentsModel.carryOnHelp(for: agent),
+                              isDisabled: selectedHostOffline)
                     .chatColumn()
                     .help(selectedHostOffline ? offlineHelp : "")
             })

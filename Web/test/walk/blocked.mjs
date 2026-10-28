@@ -26,9 +26,9 @@ try {
   await page.shot(`${out}/web-rows-${width}.png`);
   for (const [title, name] of [["Lead, all of", "all"], ["Lead, any of", "any"]]) {
     await page.eval(`${row(title)}.click()`);
-    await page.waitFor(`document.querySelector(".chat .column-head h1")?.textContent.includes(${JSON.stringify(title)}) && document.querySelector(".block-strip")`, 20_000);
+    await page.waitFor(`document.querySelector(".chat .column-head h1")?.textContent.includes(${JSON.stringify(title)}) && document.querySelector(".block-wait-card")`, 20_000);
     await new Promise((done) => setTimeout(done, 800));
-    console.log(`chat "${title}": ${await page.eval(`[...document.querySelectorAll(".block-strip li")].map((e) => e.textContent).join(" | ")`)}; button: ${await page.eval(`document.querySelector(".block-strip .carry-on").title`)}`);
+    console.log(`chat "${title}": ${await page.eval(`[...document.querySelectorAll(".block-wait-card .wait-card-event")].map((e) => e.textContent).join(" | ")`)}; button: ${await page.eval(`document.querySelector(".block-wait-card .wait-answers button").title`)}`);
     await page.shot(`${out}/web-chat-${name}-${width}.png`);
   }
 } finally {

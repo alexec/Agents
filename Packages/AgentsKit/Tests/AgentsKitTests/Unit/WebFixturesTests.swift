@@ -272,7 +272,8 @@ struct WebFixturesTests {
             return .object(["isBlocked": .bool(model.openBlock(agent) != nil),
                             "lines": .array(lines.map(JSONValue.string)), "checksAgain": .bool(checksAgain),
                             "waitLine": names ? .string(model.waitMark(of: agent)?.line ?? "") : .null,
-                            "carryOnHelp": .string(AgentsModel.carryOnHelp(for: agent))])
+                            "carryOnHelp": .string(AgentsModel.carryOnHelp(for: agent)),
+                            "cardTitle": model.openBlock(agent).map { .string($0.block.cardTitle()) } ?? .null])
         }
     }
 
