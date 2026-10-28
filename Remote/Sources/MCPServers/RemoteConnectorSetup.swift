@@ -48,7 +48,7 @@ struct RemoteConnectorSetup: View {
                 }
             }
             if setup.project != nil {
-                // The project's tools (#2669): the same card as the window's.
+                // The project's tools (#2669), as List rows of this section (#2757).
                 Section(ProjectWords.title) {
                     ProjectSlotsCard(control: model.controlPlane, setup: setup) { await reload(.cached) }
                         .paperListRow()
