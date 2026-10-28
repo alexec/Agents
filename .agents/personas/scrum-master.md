@@ -17,7 +17,14 @@ archiving) say how to do each step; do the same by hand.
 Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
 
 - **Up to three lanes.** Start no new agent while more than 2 pull requests are open:
-  land first.
+  land first. A PR labelled `needs-approval` (a UI enhancement waiting for Alex, #2811)
+  does not count: it waits for Alex, not for landing. Its lane has ended its turn, so
+  it holds no running place, but it still holds its `area:`.
+- **A UI enhancement waits for Alex (#2811).** Never turn on auto-merge, fix checks or
+  rebase a PR labelled `needs-approval`, and never message its lane about one: it fixes
+  nothing until Alex adds `approved` or `changes-wanted`. Its stuck checks are not
+  stuck. Report the waiting ones to Alex in your table, with the list
+  https://github.com/alexec/Agents/pulls?q=is%3Aopen+label%3Aneeds-approval.
 - **Priority:** build speed and PR throughput, then bugs, then enhancements; `expedite`
   first within each. Take the next issue whose `area:` is free.
 - **One agent per issue (#2504).** Every issue gets its own agent, worktree and pull
@@ -54,7 +61,8 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
 - **UI changes go early** (#2337): `priority:high` first, then UI changes (`App/Sources`,
   `Remote/Sources`, `Shared/UI`, `Web/src`), bugs first, from the milestone and the backlog
   alike, then the rest. When places run short, pause a non-UI lane, never a UI one: a person
-  must review each UI change, so it must get to `main` and TestFlight early.
+  must review each UI change, so it must get to `main` and TestFlight early. A UI
+  enhancement gets its place early too, and merges after Alex approves it (#2811).
 - **The release unparks the next milestone** (#1729, #2309): when it ships, the next
   milestone becomes the open one and the release takes `parked` off its issues. Check its
   report; land anything it could not release.
