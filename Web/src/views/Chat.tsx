@@ -50,7 +50,7 @@ import { comingBackDescription, footStatusWords } from "../model/status";
 import { ArchiveCard } from "./ArchiveCard";
 import { showsThoughts, shownItems } from "../model/thoughts";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
-import { eventWaitLine, eventWaitSummaryLines, leaseMark, lineResource } from "../model/rowLines";
+import { eventWaitLine, eventWaitMinutes, eventWaitSummaryLines, leaseMark, lineResource } from "../model/rowLines";
 import { routeHash } from "../route";
 import { sessionRuntimeName } from "../model/runtimes";
 import { GuardedChangeCard } from "./GuardedChange";
@@ -827,10 +827,7 @@ function WaitCard({ agent, title, disabled, stop }: { agent: Agent; title: (id: 
   const wait = agent.eventWait;
   const line = eventWaitLine(agent, title);
   if (!wait || wait.ending !== undefined || (!line && wait.patterns.length === 0)) return null;
-  const since = new Date(wait.since).getTime();
-  const deadline = wait.deadline ? new Date(wait.deadline).getTime() : undefined;
-  const total = deadline === undefined ? undefined : Math.max(1, Math.ceil((deadline - since) / 60_000));
-  const elapsed = Math.max(0, Math.floor((now.value - since) / 60_000));
+  const { elapsed, total, percent } = eventWaitMinutes(wait, new Date(now.value));
   return (
     <div class="cards">
       <div class="card wait-card">
@@ -846,9 +843,9 @@ function WaitCard({ agent, title, disabled, stop }: { agent: Agent; title: (id: 
               {line.arguments.length > 0 && <span class="wait-card-filters">({line.arguments.join(", ")})</span>}
             </p>)}
           </div>
-          {total !== undefined && deadline !== undefined && <div class="wait-card-progress" role="progressbar" aria-label="Event wait time"
-            aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, Math.max(0, (now.value - since) / (deadline! - since) * 100))}>
-            <span style={{ width: `${Math.min(100, Math.max(0, (now.value - since) / (deadline - since) * 100))}%` }} />
+          {percent !== undefined && <div class="wait-card-progress" role="progressbar" aria-label="Event wait time"
+            aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
+            <span style={{ width: `${percent}%` }} />
           </div>}
         </>}
         <p class="wait-answers">

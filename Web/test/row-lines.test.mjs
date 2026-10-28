@@ -69,6 +69,16 @@ test("an event wait card separates its timeout, event and elapsed minutes (#2565
   assert.equal(lines.eventWaitCardLines({ ...agent, eventWait: { ...agent.eventWait, ending: { timedOut: {} } } }, title, since), null);
 });
 
+test("the event wait card reads its wire dates as seconds since 2001 (#2843)", () => {
+  const since = new Date(Date.UTC(2026, 9, 27, 21, 0));
+  const deadline = new Date(Date.UTC(2026, 9, 27, 21, 30));
+  const wait = { id: "w", from: 0, since: wire(since), deadline: wire(deadline), patterns: [] };
+  assert.deepEqual(lines.eventWaitMinutes(wait, new Date(since.getTime() + 5 * 60_000)),
+    { elapsed: 5, total: 30, percent: 5 / 30 * 100 });
+  assert.deepEqual(lines.eventWaitMinutes(wait, new Date(deadline.getTime() + 60_000)), { elapsed: 31, total: 30, percent: 100 });
+  assert.deepEqual(lines.eventWaitMinutes({ ...wait, deadline: undefined }, new Date(since.getTime() + 2 * 60_000)), { elapsed: 2 });
+});
+
 test("the event wait card groups events with the same source and filters", () => {
   const wait = { id: "w", from: 0, since: 0, patterns: [
     { name: "checks.failed", filters: {} },
