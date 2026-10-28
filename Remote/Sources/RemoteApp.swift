@@ -339,9 +339,24 @@ struct RemoteView: View {
     /// A page of the folder, with the way to the folder's own shell (#418) on it:
     /// Control-` from an iPad's keyboard, as on the Mac.
     private func page(_ route: RemoteRoute) -> some View {
-        pageContent(route)
+        let folder = model.selectedFolder
+        let opensTerminal = folder != nil
+        // On a chat it is in the chat's ··· menu: one menu in the bar, not two (#2808).
+        let isChat = if case .agent = route { true } else { false }
+        return pageContent(route)
+            .environment(\.openFolderTerminal, folder.flatMap { folder in
+                isChat ? OpenFolderTerminal(folder: folder) { showsFolderTerminal = true } : nil
+            })
+            .background {
+                if opensTerminal, isChat {
+                    Button("Folder Terminal") { showsFolderTerminal = true }
+                        .keyboardShortcut("`", modifiers: .control)
+                        .opacity(0)
+                        .accessibilityHidden(true)
+                }
+            }
             .toolbar {
-                if model.selectedFolder != nil {
+                if opensTerminal, !isChat {
                     ToolbarItem(placement: .secondaryAction) {
                         Button {
                             showsFolderTerminal = true
