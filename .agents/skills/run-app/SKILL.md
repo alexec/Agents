@@ -393,6 +393,38 @@ opens it in headless Chrome. Run it once per press, on the same profile.
    window's shot, and has, partly, lacks or by design.
 3. A gap you don't close in the same branch gets a parity issue, named in the commit.
 
+## Screenshots for Alex (#2811)
+
+A UI enhancement merges only after Alex approves its screenshots on the PR (AGENTS.md,
+"A UI enhancement waits for Alex"). Alex reviews the pictures, not the walk, so take a set
+that shows the change as a person meets it:
+
+- **One shot per state and per client.** The states are the ones the change draws: for
+  example empty, filled, while it works, an error, and a sheet or a card open. Take each
+  state on every client that draws it: the Mac window (`$S/walk.py $ROOT shot`, or
+  `$S/shot.sh $ROOT`), the Remote in the walk simulator (`$S/walk.py remote shot`, with
+  `key escape` first) and the web page in headless Chrome (`cdp.mjs`'s screenshot). The
+  iPad (`AGENTS_WALK_SIM`) only when the change draws differently there. A client that
+  does not have the change gets no shot; the PR says why, as its parity line does.
+- **Name each file `<client>-<state>.png`**, with `mac`, `remote`, `ipad` or `web` and a
+  short state: `mac-empty.png`, `web-error.png`, `remote-question.png`.
+- **Only scratch data.** The repo is public: a scratch root and the fake runtime, never a
+  real name, path, token, session or Alex's own windows. Read each PNG before you push it.
+- **Not a video.** Screenshots are easier to review. Voice mode is the exception: Alex
+  tests it on the installed Mac app, because a scratch app has no microphone or speech.
+
+Put them on the PR with `pr-shots.sh`. It commits them to the orphan branch `screenshots`
+as `pr-<n>/<file>` (so `main` gets no images and you need no worktree), takes away that
+PR's earlier set, and prints a Markdown image line per file:
+
+```sh
+$S/pr-shots.sh 2850 /tmp/run-mychange-shots/*.png > /tmp/run-mychange-shots/body.md
+```
+
+Put the lines under `## Screenshots` in the PR body (`gh pr edit <n> --body-file`). When Alex
+asks for changes, take the whole set again and run it again: Alex sees only the new set.
+The shots go with the root in "When you are done"; keep them under `/tmp/run-<slug>-*`.
+
 ## When you are done
 
 Before you commit, hand back or end your turn, close everything you started and delete

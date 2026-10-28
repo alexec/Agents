@@ -17,6 +17,9 @@ On GitLab a merge request is `pr` in the event, and its number is its iid (`!12`
 | Run the failed jobs again | `actions_run_trigger` (`method: rerun_failed_jobs`, `run_id`) | `retry_pipeline` with `pipelineId` |
 | Comment | `add_issue_comment` on the pull request | `comment_on_merge_request` |
 
+0. **Stop at once when the pull request is labelled `needs-approval`** (#2811). It is a UI
+   enhancement that waits for Alex's approval, and its checks are fixed only after Alex
+   approves it. Do not comment.
 1. **Read the failure.** Use the tools in the table.
 2. **Decide.** When the failure is not caused by the change (a test that fails on the
    default branch too, a timeout, a runner or network problem), run the failed jobs again,

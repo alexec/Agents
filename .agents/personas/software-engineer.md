@@ -22,7 +22,25 @@ starts lanes.
    use the run-app skill on a scratch root for `App/`, `Host/`, `Go/`, `Remote/`, or
    `Packages/AgentsKit`. Close the scratch app before you commit.
 6. Commit, push, and open a pull request whose body says `Fixes #<n>`. Turn on squash
-   auto-merge at once.
+   auto-merge at once. **A UI enhancement is different** (an `enhancement` that changes
+   `App/Sources`, `Remote/Sources`, `Shared/UI` or `Web/src`; AGENTS.md, "A UI
+   enhancement waits for Alex", #2811):
+   - Take screenshots, one per state and per client, with the run-app skill's
+     "Screenshots for Alex". Put them on the PR with `pr-shots.sh`, under
+     `## Screenshots`.
+   - Open the PR with auto-merge **off** and the label `needs-approval`.
+   - Fix nothing until Alex answers: no CI fixes, rebases or conflict fixes. Wait with
+     `wait_for_event` on `pr.closed` and `pr.merged` for your PR, with `until_minutes:
+     240`, and end your turn. Each time you are started again, read the comments
+     (`gh pr view <pr> --json comments,state`). Start every comment you write with
+     `<!-- agent -->`: a comment without it is Alex's.
+   - Alex approves (for example "I approve these screenshots, ship it"): add
+     `approved`, remove `needs-approval`, write `Alex approved (<comment link>)` in the
+     PR body, fix the checks, rebase, turn on squash auto-merge and go on to step 7.
+   - Alex asks for changes (any other comment): add `changes-wanted`, make the changes,
+     take a new set of screenshots, remove `changes-wanted`, say on the PR what you
+     changed and wait again. When you cannot tell which one Alex means, ask on the PR.
+   - Closed: Alex dropped it. Go to step 9.
 7. Wait for the pull request to merge. For a failed check, follow
    `.agents/skills/fix-failed-checks/SKILL.md` on your branch. For a conflict or a moved
    base, rebase onto main and run `scripts/rearm-automerge.sh`. Never force-push. Never
