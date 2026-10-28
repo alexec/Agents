@@ -769,6 +769,8 @@ func (d *Daemon) restoreAgent(id wire.UUID, raw []byte, files map[string]string,
 		return false, nil
 	}
 	a.ID = id
+	// A backup from before #2617 names the worktree's folder "project" (#2709).
+	store.FillFolder(&a, raw)
 	if into != "" {
 		a.Cwd, a.Worktree = store.FolderURL(into), nil
 	}

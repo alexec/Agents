@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -203,6 +204,110 @@ func TestARestoreFromAnotherMachineNeverRunsHere(t *testing.T) {
 	}
 	if err := c.refuseToRun(got); err == nil {
 		t.Fatal("it may run on C")
+	}
+}
+
+// A v0.11.1 backup names a worktree's folder "project", from before #2617: the restored
+// agent gets that folder, not a blank one (#2709).
+func TestARestoreOfAnOlderBackupKeepsTheWorktreesFolder(t *testing.T) {
+	clock := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
+	atTime(t, &clock)
+	shared := t.TempDir()
+	a, ca := start(t, t.TempDir())
+	dir := folder(t, ca, 1)
+	ca.call(t, 2, "backups/configure", map[string]any{"every": "off", "keep": 2, "folder": shared})
+	repo := "file:///Users/old/repo/"
+	agent := seeded(t, a, dir, func(x *wire.Agent) {
+		// A worktree under a root that is not on the new machine, so git can't say.
+		x.Worktree = &wire.AgentWorktree{Name: "w", Root: "file:///Users/old/elsewhere/w/", Folder: wire.URL(repo)}
+	})
+	made, err := a.makeBackup()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rewriteArchive(t, filepath.Join(shared, a.Store.RootID, "20261020T090000Z.tar.gz"), func(name string, data []byte) []byte {
+		if !strings.HasSuffix(name, "/agent.json") {
+			return data
+		}
+		var record map[string]any
+		if err := json.Unmarshal(data, &record); err != nil {
+			t.Fatal(err)
+		}
+		w := record["worktree"].(map[string]any)
+		w["project"] = w["folder"]
+		delete(w, "folder")
+		out, _ := json.Marshal(record)
+		return out
+	})
+
+	b, cb := start(t, t.TempDir())
+	cb.call(t, 1, "backups/configure", map[string]any{"every": "off", "keep": 2, "folder": shared})
+	var res wire.BackupRestoreResult
+	json.Unmarshal(cb.call(t, 2, "backups/restore", map[string]any{"id": made.ID}), &res)
+	got := b.Store.Agent(agent.ID)
+	if res.Restored != 1 || got == nil || got.Worktree == nil || got.Worktree.Folder != wire.URL(repo) {
+		t.Fatalf("restored %+v as %+v", res, got)
+	}
+	var saved wire.Agent
+	raw, _ := os.ReadFile(b.Store.Loc.Record(string(agent.ID)))
+	if diskjson.Unmarshal(raw, &saved) != nil || saved.Worktree == nil || saved.Worktree.Folder != wire.URL(repo) {
+		t.Fatalf("saved %s", raw)
+	}
+}
+
+// rewriteArchive passes each file of a backup archive through edit, in place.
+func rewriteArchive(t *testing.T, path string, edit func(name string, data []byte) []byte) {
+	t.Helper()
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	type entry struct {
+		h    *tar.Header
+		data []byte
+	}
+	var entries []entry
+	tr := tar.NewReader(gz)
+	for {
+		h, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := io.ReadAll(tr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entries = append(entries, entry{h, edit(h.Name, data)})
+	}
+	f.Close()
+	out, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zw := gzip.NewWriter(out)
+	tw := tar.NewWriter(zw)
+	for _, e := range entries {
+		e.h.Size = int64(len(e.data))
+		if err := tw.WriteHeader(e.h); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tw.Write(e.data); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	zw.Close()
+	if err := out.Close(); err != nil {
+		t.Fatal(err)
 	}
 }
 

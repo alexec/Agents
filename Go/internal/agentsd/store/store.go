@@ -86,7 +86,7 @@ func wireUUID(s string) bool {
 	return len(s) == 36 && strings.Count(s, "-") == 4 && s == strings.ToUpper(s)
 }
 
-// load reads a record, and says whether it filled the worktree's folder (fillFolder).
+// load reads a record, and says whether it filled the worktree's folder (FillFolder).
 func (s *Store) load(id string) (*wire.Agent, bool, error) {
 	b, err := os.ReadFile(s.Loc.Record(id))
 	if err != nil {
@@ -97,15 +97,15 @@ func (s *Store) load(id string) (*wire.Agent, bool, error) {
 		return nil, false, err
 	}
 	a.ID = wire.UUID(strings.ToUpper(string(a.ID)))
-	return &a, fillFolder(&a, b), nil
+	return &a, FillFolder(&a, b), nil
 }
 
-// fillFolder gives a worktree with no folder one (#2650). #2617 renamed the record's
+// FillFolder gives a worktree with no folder one (#2650). #2617 renamed the record's
 // "project" key to "folder" with no migration, and records written since have "folder": "",
 // which no client reads as a URL. The folder is the old "project" key when the record has
 // it, else the repository the worktree's root belongs to, else the folder its
 // .agents/worktrees is in, else the root itself: never empty.
-func fillFolder(a *wire.Agent, record []byte) bool {
+func FillFolder(a *wire.Agent, record []byte) bool {
 	w := a.Worktree
 	if w == nil || w.Folder != "" {
 		return false
