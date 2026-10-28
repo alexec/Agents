@@ -2578,6 +2578,9 @@ type ContinueInNewRequest struct {
 	AccountID *string `json:"accountID,omitzero"`
 
 	RequestID *UUID `json:"requestID,omitzero"`
+
+	// Continue on Auto (#2658, FR-022): the successor starts on the runtime Auto would pick now, with the session's values. Only for an Auto session.
+	Auto *bool `json:"auto,omitzero"`
 }
 
 // When a chat paused by a spent allowance carries on by itself (#1859).

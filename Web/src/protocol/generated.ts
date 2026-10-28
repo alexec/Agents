@@ -2130,6 +2130,11 @@ export interface ContinueInNewRequest {
    */
   accountID?: string;
   requestID?: UUID;
+  /**
+   * Continue on Auto (#2658, FR-022): the successor starts on the runtime Auto would pick now, with
+   * the session's values. Only for an Auto session.
+   */
+  auto?: boolean;
 }
 
 /** When a chat paused by a spent allowance carries on by itself (#1859). */
@@ -9193,7 +9198,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConsoleStopAgent: { required: ["host", "agent"], optional: [] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ContinueInFolderRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
-  ContinueInNewRequest: { required: ["agentID"], optional: ["accountID", "requestID"] },
+  ContinueInNewRequest: { required: ["agentID"], optional: ["accountID", "requestID", "auto"] },
   ContinueWhenBack: { required: ["at", "resetKnown"], optional: [] },
   ControlAuth: { required: ["id", "nonce", "mac", "kind"], optional: ["for", "epoch", "capabilities", "page", "publicKey"] },
   ControlClientChanged: { required: [], optional: ["client", "removed"] },

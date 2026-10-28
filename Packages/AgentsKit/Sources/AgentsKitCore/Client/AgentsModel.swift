@@ -1817,15 +1817,21 @@ public final class AgentsModel {
     /// One machine's last runtime again, from the front of the list: it stops at that
     /// machine's newest agent. Set only when it moves, so its readers draw only then.
     private func noteLastRuntime(on host: MachineRef) {
-        let runtimeID = agents.first { $0.host == host }?.runtimeID
+        let runtimeID = agents.first { $0.host == host }.map(Self.chosenRuntime)
         if lastRuntimes[host] != runtimeID { lastRuntimes[host] = runtimeID }
     }
 
     /// Every machine's last runtime again, in one pass of the list.
     private func noteLastRuntimes() {
         var latest: [MachineRef: String] = [:]
-        for agent in agents where latest[agent.host] == nil { latest[agent.host] = agent.runtimeID }
+        for agent in agents where latest[agent.host] == nil { latest[agent.host] = Self.chosenRuntime(agent) }
         if latest != lastRuntimes { lastRuntimes = latest }
+    }
+
+    /// The runtime the person chose for an agent: Auto for one Auto picked a runtime for
+    /// (#2658), so the next session opens on Auto too.
+    private static func chosenRuntime(_ agent: Agent) -> String {
+        agent.auto == nil ? agent.runtimeID : LevelWords.autoID
     }
 
     /// Agents let go of without being gone: an Archived fold closed, a search ended

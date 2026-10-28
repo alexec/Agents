@@ -37,12 +37,16 @@ check    Starts a scratch host on that build (the run-app skill's launch.sh --no
          takes about five minutes a runtime. The agent's own report is kept in the run.
          A turn the account ended (not signed in, its allowance spent, rate limited) is
          not the runtime's failure: the runtime is skipped, with that as the reason.
+         Then Auto's mappings (#2658, FR-020): a cell whose model or mode the runtime no
+         longer offers is "dropped"; each is listed, and does not fail the runtime.
          Stops the host.
 report   A pinned runtime that passed every step: one PR per runtime, on the branch
          nightly/runtime-<id> off origin/main (only its toolset folder changes), opened or
          updated. A runtime that failed a step: one issue per runtime, opened or commented
          on, with the version, the step and its output; runtimes that failed the same step for
          the same cause share one issue. What already fails on main is listed, never filed.
+         A runtime with a dropped Auto mapping: one issue, "Auto mapping: <runtime>", opened
+         or commented on, naming each cell; the pin's PR is still opened.
          An assessment step that failed fails the runtime only when it did not fail last
          time; one that failed last time too is listed, not filed again. Then one PR on
          nightly/runtime-assessments off origin/main, with auto-merge: a record per runtime
@@ -604,6 +608,28 @@ def assessment(tree, client, root, rid, run):
             {c["id"]: c["verdict"] for c in checks})
 
 
+def dropped_cells(mappings, rid):
+    """Auto's cells for a runtime whose value it no longer offers, one line each (#2658)."""
+    out = []
+    for cell in (mappings or {}).get("cells", []):
+        if cell.get("runtimeID") == rid and cell.get("mark") == "dropped":
+            out.append(f"- {cell['field']} {cell['level']}: {cell.get('words', '?')} ({cell.get('note', 'no longer offered')})")
+    return out
+
+
+def open_mapping_issue(record, rid, entry, dry_run):
+    """A runtime that dropped a model or mode an Auto cell uses: Auto skips it for that value
+    until the table or the person's own cell is changed (FR-020)."""
+    spec = RUNTIMES[rid]
+    prefix = f"Auto mapping: {spec['name']}"
+    title = f"{prefix} {entry.get('to', '?')} no longer offers a mapped value"
+    body = (f"{spec['name']} {entry.get('to')}, run {record['started']}, no longer offers what these cells of "
+            f"Settings ▸ Agent Runtimes ▸ Auto use:\n\n{entry['mappings']['output']}\n\n"
+            f"Auto skips {spec['name']} for those values until the shipped table "
+            f"(`Go/internal/agentsd/automap.go`) or the person's own cell is changed. Found by the runtime check (#2658).")
+    return file_issue(prefix, title, body, dry_run)
+
+
 # The verdict kept for an assessment that never started.
 START = "(start)"
 
@@ -681,6 +707,14 @@ def check(args):
                 # did not fail last time does (#1284).
                 steps["assess"] = {"ok": ok, "output": out if len(out) <= 3 * OUTPUT_LIMIT else tail(out),
                                    "verdicts": verdicts}
+            # Auto's cells, now the runtime has said what it offers (#2658, FR-020): one it no
+            # longer offers is dropped. Listed and filed on its own; the runtime is not failed.
+            if ok:
+                try:
+                    dropped = dropped_cells(client.call("auto/mappings", {}), rid)
+                    entry["mappings"] = {"ok": not dropped, "output": "\n".join(dropped)}
+                except Exception as e:
+                    entry["mappings"] = {"ok": True, "output": f"not read: {type(e).__name__}: {e}"}
             print(f"{rid}: " + ", ".join(f"{s} {'ok' if v['ok'] else 'FAILED'}" for s, v in steps.items()))
     finally:
         save(os.path.join(run, "run.json"), record)
@@ -1019,6 +1053,10 @@ def report(args):
             lines.append(f"- {spec['name']} {entry['to']} (installed by the person): passed")
         else:
             failed.setdefault(cause(entry), []).append(rid)
+        if entry.get("mappings") and not entry["mappings"]["ok"]:
+            sent = open_mapping_issue(record, rid, entry, args.dry_run)
+            lines.append(f"- {spec['name']}: Auto mapping no longer offered; issue {'would be ' if args.dry_run else ''}"
+                         f"{'opened or updated' if sent else 'NOT opened (see above)'}")
         if not args.dry_run:
             previous = state.get(rid, {}).get("assessment")
             state[rid] = {"version": entry["to"], "result": "passed" if passed else "failed",

@@ -2592,8 +2592,9 @@ export class Store extends Work {
    * Continue in New (#999): a session in the same folder that reads this one and carries on, on the
    * runtime's account for new sessions. Answers its id, or null with `problem` saying why.
    */
-  async continueInNew(host: string, agentID: string): Promise<string | null> {
-    return this.act("agents/continueInNew", { agentID: agentID as UUID, requestID: crypto.randomUUID().toUpperCase() as UUID }, host);
+  async continueInNew(host: string, agentID: string, onAuto = false): Promise<string | null> {
+    return this.act("agents/continueInNew", { agentID: agentID as UUID, requestID: crypto.randomUUID().toUpperCase() as UUID,
+      ...(onAuto ? { auto: true } : {}) }, host);
   }
 
   /**

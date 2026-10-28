@@ -235,3 +235,22 @@ func TestWorkflowWordsOnAuto(t *testing.T) {
 		t.Fatal(levels, model, mode, box, err)
 	}
 }
+
+// FR-022: an Auto session whose runtime ran out carries on where Auto would start one now,
+// with its values, only when asked.
+func TestContinueOnAuto(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	d.SettingsDir = t.TempDir()
+	var first wire.UUID
+	json.Unmarshal(c.call(t, 1, "agents/start", map[string]any{"runtimeID": "auto", "cwd": "file://" + t.TempDir(), "prompt": "hello",
+		"levels": map[string]any{"model": "smart", "permission": "plan"}}), &first)
+	out(d, "claude", false)
+	var next wire.UUID
+	json.Unmarshal(c.call(t, 2, "agents/continueInNew", map[string]any{"agentID": first, "auto": true}), &next)
+	a := d.Store.Agent(next)
+	if a.RuntimeID != "codex" || a.Auto == nil || *a.Auto.Levels.Model != wire.ModelLevelSmart || stringValue(a.StartOptions.Values["collaboration_mode"]) != "plan" {
+		t.Fatalf("%s %+v %s", a.RuntimeID, a.Auto, a.StartOptions.Values)
+	}
+}

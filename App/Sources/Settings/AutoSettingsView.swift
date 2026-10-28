@@ -159,7 +159,7 @@ private struct MappingCell: View {
             if let cell {
                 Text(markLine(cell))
                     .appText(.fine)
-                    .foregroundStyle(cell.mark == .dropped ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+                    .foregroundStyle((cell.mark == .dropped ? StateTint.attention : .none).style(or: .secondary))
                     .lineLimit(2)
                     .help(cell.note ?? "")
             }

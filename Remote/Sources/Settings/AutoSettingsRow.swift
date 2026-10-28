@@ -98,7 +98,7 @@ private struct AutoSettingsPage: View {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(cell?.words ?? "—").foregroundStyle(.primary)
                     Text(mark).appText(.supporting)
-                        .foregroundStyle(cell?.mark == .dropped ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+                        .foregroundStyle((cell?.mark == .dropped ? StateTint.attention : .none).style(or: .secondary))
                 }
             } label: {
                 Text(LevelWords.level(field, level))

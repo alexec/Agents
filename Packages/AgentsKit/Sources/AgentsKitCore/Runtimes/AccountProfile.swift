@@ -167,10 +167,14 @@ public extension DaemonAPI {
         public var accountID: String?
         /// As `StartRequest.requestID`: a retry answers with the first try's agent.
         public var requestID: UUID?
-        public init(agentID: UUID, accountID: String? = nil, requestID: UUID? = nil) {
+        /// Continue on Auto (#2658, FR-022): the successor starts where Auto would start one
+        /// now, with the session's values. Only for an Auto session.
+        public var auto: Bool?
+        public init(agentID: UUID, accountID: String? = nil, requestID: UUID? = nil, auto: Bool? = nil) {
             self.agentID = agentID
             self.accountID = accountID
             self.requestID = requestID
+            self.auto = auto
         }
     }
 }

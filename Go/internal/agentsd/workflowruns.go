@@ -522,8 +522,9 @@ func (d *Daemon) runAgent(w wire.Workflow, run workflowRun, fr fireRequest) (wir
 	}
 	// New sessions and workflows use the runtime of the most recently active agent on
 	// this host. The store orders agents by LastActivityAt, just as the clients do.
-	runtimeID := defaultRuntimeID
-	if agents := d.Store.Agents(); len(agents) > 0 && agents[0].RuntimeID != "" {
+	// Auto on a new host, and after an Auto agent (#2658, FR-013).
+	runtimeID := autoRuntimeID
+	if agents := d.Store.Agents(); len(agents) > 0 && agents[0].RuntimeID != "" && agents[0].Auto == nil {
 		runtimeID = agents[0].RuntimeID
 	}
 	if w.Settings.RuntimeID != nil {

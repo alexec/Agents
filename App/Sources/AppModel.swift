@@ -2367,6 +2367,14 @@ final class AppModel {
         }
     }
 
+    /// Where Auto would start an Auto session's successor now (FR-022), on its machine.
+    func autoPreview(for agent: Agent) async -> AutoPreview? {
+        guard let pick = agent.auto else { return nil }
+        return try? await client(forAgent: agent.id).call(DaemonAPI.Method.autoPreview,
+                                                          AutoPreviewRequest(cwd: agent.cwd, levels: pick.levels, sandbox: agent.sandboxOverride),
+                                                          returning: AutoPreview.self)
+    }
+
     /// A running agent's value, mapped on its own runtime from its next step (Story 2).
     func setAgentLevel(_ agentID: UUID, _ field: AutoField, _ level: String) async {
         var levels = Levels()
@@ -4976,12 +4984,12 @@ final class AppModel {
     /// **Continue in New** (#999): a session in the same folder that reads this one and
     /// carries on, on the runtime's account for new sessions, and open it.
     @discardableResult
-    func continueInNew(_ agentID: UUID) async -> Bool {
+    func continueInNew(_ agentID: UUID, onAuto: Bool = false) async -> Bool {
         var made: UUID?
         let went = await attempt(on: host(ofAgent: agentID)) {
             made = try await self.client(forAgent: agentID).call(
                 DaemonAPI.Method.agentsContinueInNew,
-                DaemonAPI.ContinueInNewRequest(agentID: agentID, requestID: UUID()),
+                DaemonAPI.ContinueInNewRequest(agentID: agentID, requestID: UUID(), auto: onAuto ? true : nil),
                 returning: UUID.self)
         }
         guard went, let made else { return false }
@@ -5082,7 +5090,9 @@ final class AppModel {
     /// Which runtime a new agent gets: the most recently active agent's runtime on this
     /// folder's host, then the kept form choice, then the first available (#264).
     var defaultRuntimeID: String? {
-        work.defaultRuntimeID(available: availableRuntimes.map(\.runtime.id), kept: draftRuntimeID, host: selectedFolderHost)
+        // Auto first: the runtime a new install opens on, where nothing was chosen before (#2658, FR-013).
+        let ids = availableRuntimes.map(\.runtime.id)
+        return work.defaultRuntimeID(available: ids.isEmpty ? ids : [LevelWords.autoID] + ids, kept: draftRuntimeID, host: selectedFolderHost)
     }
 
     /// Take something back off the queue before it goes.

@@ -5550,6 +5550,10 @@
         },
         "requestID": {
           "$ref": "#/definitions/UUID"
+        },
+        "auto": {
+          "type": "boolean",
+          "description": "Continue on Auto (#2658, FR-022): the successor starts on the runtime Auto would pick now, with the session's values. Only for an Auto session."
         }
       },
       "required": [

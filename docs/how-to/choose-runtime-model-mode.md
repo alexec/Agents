@@ -20,22 +20,28 @@ running, and reads the meter that says how full its context is.
 **For a new agent**
 
 1. Unfold the folder in the sidebar and click **New session**, the first row under it (or press ⌘N).
-2. Click the runtime above the prompt, on the right, and choose one. A runtime that cannot
-   be used says why under its name, such as **Needs signing in**.
-3. Under the prompt, the runtime's own choices appear as capsules. Their names and values
-   are the runtime's, so they differ from one to the next. Usually:
-   - the mode, on the left, such as **Ask for approval** or **Full access** for Codex, or
-     a plan or read-only mode;
-   - on the right, the model, and effort where the runtime has it.
+2. Click the runtime above the prompt, on the right, and choose one. **Auto** is the first
+   item: the app picks the runtime when the session starts (see [Use Auto](use-auto.md)). A
+   runtime that cannot be used says why under its name, such as **Needs signing in**.
+3. Under the prompt, the pills use the same words on every runtime. Each pill shows only its
+   value:
+   - **Permission mode**, on the left: **Plan** (the agent reads and plans, and changes
+     nothing), **Ask** (it asks before it changes things) or **Approve for me** (it does not
+     ask for normal changes in its folder);
+   - **Model**, on the right: **Fast** (the runtime's smallest quick model), **Balanced** (its
+     usual model) or **Smart** (its most capable model). Effort follows the model: low for
+     Fast, high for Smart.
 
-   Click one and choose. A runtime that offers no runtime-native choices, such as Cursor,
-   shows none of those. Its permission capsule is separate.
+   Each value in a menu says what it is on this runtime, such as **Sonnet on Claude**. The
+   runtime's own choices, such as a fourth Claude mode or the effort, are under **⋯ Claude's
+   own** in the same menu. When you choose one that is not a value, the pill says **Custom**.
+   The values you chose stay when you change the runtime.
 
    Cursor, Grok and OpenCode also have a **Permission requests** pill under the prompt.
    Choose **Request cards** to be asked, with a card, before an action that needs permission,
    or **Yes to all** for the app to say yes to each permission request. Questions that are
-   not permission still wait. Cursor's **Agent**, **Plan** and **Ask**, and OpenCode's own
-   modes, stay separate.
+   not permission still wait. The choice is for this agent only. The value from
+   **Settings ▸ Agent Runtimes ▸ Cursor** (or Grok, OpenCode) is marked **follows Settings**.
 
    Beside the mode is the **Sandbox** pill: **Default sandbox** (the runtime's own settings
    decide), **Runtime sandbox** (the app turns the runtime's sandbox on) or **No sandbox**
@@ -47,13 +53,14 @@ running, and reads the meter that says how full its context is.
    runtime the app cannot change shows its fixed value; hover over it for why.
 4. Type the prompt and send it. The agent starts with what you chose.
 
-   On iPhone and iPad, the start form has **Runtime**, **Permission** for Cursor, Grok or
-   OpenCode, **Sandbox**, **Mode**, **Model** and **Effort** rows instead.
+   On iPhone and iPad, the start form has **Runtime**, **Model** (Fast, Balanced, Smart),
+   **Permission mode**, **Permission requests** for Cursor, Grok or OpenCode, and **Sandbox**
+   rows, and the runtime's own choices under **⋯ <runtime>'s own**.
 
 **For an agent that is running**
 
 1. Open its conversation.
-2. Change the mode, model or sandbox in the same capsules under the prompt. A mode or model
+2. Change the permission mode, model or sandbox in the same pills under the prompt. A mode or model
    change applies from the agent's next step, a sandbox change from its next turn, never
    in the middle of a command; the runtime itself cannot be changed. To carry the work on with
    another runtime, start a new chat there and ask it to continue this one; see
@@ -72,7 +79,9 @@ ring where the runtime says how big its context is.
   says so, and no limit applies to it. See [Limit what agents spend](limit-spending.md).
 
 A workflow sets the same choices in its file, with `runtime:`, `model:`, `effort:`,
-`permission-mode:` and `options:`. See [Workflow triggers and actions](../reference/workflows.md).
+`permission-mode:`, `permission-requests:`, `sandbox:` and `options:`. The values are the
+same words in lower case: `runtime: auto`, `model: smart`, `permission-mode: plan`. See
+[Workflow triggers and actions](../reference/workflows.md).
 
 ## If it doesn't work
 

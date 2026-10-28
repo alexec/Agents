@@ -4609,6 +4609,14 @@ final class RemoteModel {
         }
     }
 
+    /// Where Auto would start an Auto session's successor now (FR-022).
+    func autoPreview(for agent: Agent) async -> AutoPreview? {
+        guard let pick = agent.auto else { return nil }
+        let request = AutoPreviewRequest(cwd: agent.cwd, levels: pick.levels, sandbox: agent.sandboxOverride)
+        guard let client = try? client(for: DaemonAPI.AgentRequest(agentID: agent.id)) else { return nil }
+        return try? await client.call(DaemonAPI.Method.autoPreview, request, returning: AutoPreview.self)
+    }
+
     /// A running agent's model level or permission mode, mapped on its own runtime (#2658).
     func setAgentLevel(_ agentID: UUID, _ field: AutoField, _ level: String) async {
         var levels = Levels()
@@ -5212,14 +5220,15 @@ final class RemoteModel {
     /// **Continue in New** (#999): a session in the same folder that reads this one and
     /// carries on, on the runtime's account for new sessions, and open it.
     @discardableResult
-    func continueInNew(_ agentID: UUID) async -> Bool {
+    func continueInNew(_ agentID: UUID, onAuto: Bool = false) async -> Bool {
         guard !isStale else {
             problem = "Your Mac is not answering, so that could not be sent."
             return false
         }
         do {
             let id = try await sendOnce(DaemonAPI.Method.agentsContinueInNew,
-                                        DaemonAPI.ContinueInNewRequest(agentID: agentID, requestID: UUID())).decode(UUID.self)
+                                        DaemonAPI.ContinueInNewRequest(agentID: agentID, requestID: UUID(),
+                                                                       auto: onAuto ? true : nil)).decode(UUID.self)
             await loadWholeAgent(id)
             selection = id
             return true

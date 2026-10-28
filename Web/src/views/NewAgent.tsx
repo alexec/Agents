@@ -76,13 +76,13 @@ export function NewAgent({ store, host, folder, folderName, down }: {
   const openedRuntime = useRef<{ host: string; folder: string; runtimeID?: string }>({ host, folder });
   if (openedRuntime.current.host !== host || openedRuntime.current.folder !== folder) openedRuntime.current = { host, folder };
   if (openedRuntime.current.runtimeID === undefined) {
-    const lastUsed = (store.agents.value[host] ?? [])[0]?.runtimeID;
+    const lastUsed = chosenRuntimeOf((store.agents.value[host] ?? [])[0]);
     const opening = newSessionRuntime(lastUsed, left.runtimeID, startable);
     if (opening !== undefined) openedRuntime.current = { host, folder, runtimeID: opening };
   }
   // A runtime picked here counts only while this host offers it: the bar can move to another host.
   const picked = runtimeID.value !== undefined && startable.includes(runtimeID.value) ? runtimeID.value : undefined;
-  const lastUsedRuntime = (store.agents.value[host] ?? [])[0]?.runtimeID;
+  const lastUsedRuntime = chosenRuntimeOf((store.agents.value[host] ?? [])[0]);
   const chosenRuntime = formRuntime(openedRuntime.current.runtimeID, picked, startable, lastUsedRuntime, left.runtimeID);
   /** The added account the session uses (#840); undefined for the runtime's own sign-in. */
   const accountID = useSignal<string | undefined>(undefined);
@@ -646,6 +646,12 @@ export function NewAgent({ store, host, folder, folderName, down }: {
       </footer>
     </section>
   );
+}
+
+/** The runtime the person chose for an agent: Auto for one Auto picked a runtime for (#2658), so
+ *  the next session opens on Auto too. */
+function chosenRuntimeOf(agent: { runtimeID: string; auto?: unknown } | undefined): string | undefined {
+  return agent ? (agent.auto ? autoID : agent.runtimeID) : undefined;
 }
 
 /** The prompt's own field, not another control in the bar. */

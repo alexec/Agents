@@ -48,6 +48,9 @@ func sessionStatus(a *wire.Agent) string {
 }
 
 func runtimeName(id string) string {
+	if id == autoRuntimeID {
+		return "Auto"
+	}
 	if rt := runtimeByID(id); rt != nil && rt.Name != "" {
 		return rt.Name
 	}

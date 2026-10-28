@@ -470,7 +470,7 @@ not set them.
 Most runtimes can run their commands inside a sandbox of their own, which limits what a
 command can write and, for some, what it can reach on the network. It is separate from the
 permission mode, which decides when the runtime asks you, and from the app's own folder and
-tool rules, which apply either way. **Settings ▸ Agent Runtimes** has a **Command sandbox**
+tool rules, which apply either way. **Settings ▸ Agent Runtimes** has a **Sandbox**
 default for each runtime, and each agent has its own choice beside its mode; see
 [Settings](settings.md) and [Choose a runtime, model and mode](../how-to/choose-runtime-model-mode.md).
 
@@ -478,7 +478,7 @@ Each choice the app offers was measured to take effect, on 2026-09-29, by
 `scripts/sandbox-probe.sh`: a real conversation, asked to write outside its folder, on the
 version below. A runtime the app cannot reach offers no choice, and says why.
 
-| Runtime | Measured on | **On** | **Off** | Without a choice | When the sandbox cannot start |
+| Runtime | Measured on | **Runtime sandbox** | **No sandbox** | **Default sandbox** | When the sandbox cannot start |
 | --- | --- | --- | --- | --- | --- |
 | **Claude** | Claude Code 2.1.284 | `sandbox.enabled` true, through `_meta`: writes only in the folder, asks before a new website | false | your settings decide: **Default sandbox** | On a server without bubblewrap and socat, it will not start the conversation. On a Mac already inside a sandbox, each command fails. |
 | **Codex** | Codex 0.156.1 | **Ask for approval** or **Approve for me**: writes only in the folder, no network | **Full access**, which also stops approval prompts | the mode decides | Each command fails, on a server without user namespaces or a Mac already inside a sandbox; Codex says so in its reply. |
@@ -493,8 +493,73 @@ When a runtime's sandbox cannot start, the agent stops with a card saying so, an
 **Continue without sandbox** turns it off for that agent only. See
 [Answer a question or a permission request](../how-to/answer-a-question.md).
 
+## Auto
+
+**Auto** is a runtime choice that is not a runtime (#2658). When a session starts on Auto,
+the host picks the first runtime in your order (**Settings ▸ Agent Runtimes ▸ Auto**) that is
+included, installed, signed in, not out, and can give every value asked for; a rate-limited
+runtime is tried after the others. The agent keeps that runtime, and records what Auto
+picked, the values asked for, the runtime's own settings it gave, and why each runtime before
+it was not used. Its header says **Auto · Claude**. See [Use Auto](../how-to/use-auto.md).
+
+The same words apply on every runtime, on Auto or not:
+
+| Field | Values | In a file |
+| --- | --- | --- |
+| Model | **Fast**, **Balanced**, **Smart** | `fast`, `balanced`, `smart` |
+| Permission mode | **Plan**, **Ask**, **Approve for me** | `plan`, `ask`, `approve-for-me` |
+| Permission requests (Cursor, Grok, OpenCode) | **Request cards**, **Yes to all** | `request-cards`, `yes-to-all` |
+| Sandbox | **Default sandbox**, **Runtime sandbox**, **No sandbox** | `default`, `runtime`, `none` |
+
+The app ships a mapping for each runtime and value (`Go/internal/agentsd/automap.go`). Where a
+runtime has no exact match, the mapping is its nearest setting that gives **less** access,
+never more, and the cell says so; where none exists, the cell is **Not possible**, and Auto
+does not use that runtime for that value. A test over the table checks that no shipped cell
+gives more access than its value. You can change any cell; the runtime check (#39) marks a
+cell whose model or mode the runtime no longer offers, and files an issue.
+
+**Permission mode** (on Auto, **Approve for me** also says yes to permission requests; the
+other two give a card):
+
+| Runtime | Plan | Ask | Approve for me |
+| --- | --- | --- | --- |
+| Claude | Plan | Manual (default) | Accept edits |
+| Codex | Ask for approval, with Plan | Ask for approval | Approve for me |
+| Gemini | Plan | Default | Auto Edit |
+| Grok | Default, Request cards (nearest safer: no plan mode) | Default, Request cards | Default, Yes to all |
+| Cursor | Plan | Agent, Request cards | Agent, Yes to all |
+| OpenCode | plan | build, Request cards | build, Yes to all |
+| Copilot | Plan | Agent | Agent (nearest safer: Autopilot and Allow all approve everything) |
+| Antigravity | Default (nearest safer: no plan mode) | Default | Auto Edit |
+
+**Model** (effort low for Fast, the runtime's own for Balanced, high for Smart):
+
+| Runtime | Fast | Balanced | Smart |
+| --- | --- | --- | --- |
+| Claude | Haiku | Sonnet | Opus |
+| Codex | 5.6 Luna | its default | 6 Luna |
+| Grok | Grok 4.7 Fast | its default | Grok 4.7 |
+| Antigravity | Gemini 3.8 Flash (Low) | its default | Gemini 3.8 Flash (High) |
+| Copilot | its default (nearest: no smaller model known) | its default | Claude Sonnet 5.5 |
+| Gemini, Cursor, OpenCode | its default (nearest: no other model known) | its default | its default (nearest: no other model known) |
+
+**Sandbox**:
+
+| Runtime | Default sandbox | Runtime sandbox | No sandbox |
+| --- | --- | --- | --- |
+| Claude | as configured | on | off |
+| Codex | as configured | on (Ask for approval or Approve for me) | off (Full access) |
+| Gemini | as configured | Not possible | off |
+| Grok, Cursor, Copilot | its own setting (fixed) | Not possible | its own setting (nearest safer) |
+| OpenCode, Antigravity | no sandbox (fixed) | Not possible | no sandbox (fixed) |
+
+A runtime's own value that matches no shared one makes its pill say **Custom**; the
+runtime's own choices stay under **⋯ <runtime>'s own**. Gemini's own **Auto** model is one of
+those: it is not the Auto runtime.
+
 ## See also
 
+- [Use Auto](../how-to/use-auto.md)
 - [Sign a runtime in](../how-to/sign-a-runtime-in.md)
 - [Assess a runtime](../how-to/assess-a-runtime.md)
 - [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md)
