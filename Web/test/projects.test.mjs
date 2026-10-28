@@ -3,14 +3,21 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";
 
-const p = await load("src/model/projects.ts");
+const p = await load("test/projects.ts");
 const projects = [{ id: "p-a", name: "Agents", owner: "local", folders: [], mayChange: true }];
 
 test("projects: a folder's project by its id", () => {
   assert.equal(p.projectName("p-a", projects), "Agents");
   assert.equal(p.projectName("p-b", projects), undefined);
   assert.equal(p.projectName(undefined, projects), undefined);
-  assert.equal(p.unknownProject("p-b"), "Not on the control plane yet (p-b)");
+});
+
+test("projects: a failed read says why, and an older control plane says nothing (#2756)", () => {
+  assert.equal(p.projectsNotRead(new p.CallFailed(-32601, "Method not found")), undefined);
+  assert.equal(p.projectsNotRead(new p.CallFailed(-32000, "The store is busy.")),
+    "Couldn't read the projects. The store is busy.");
+  assert.equal(p.projectsNotRead(new p.LinkDown()),
+    "Couldn't read the projects. The control plane isn't answering. Try again when it's back.");
 });
 
 test("projects: a name is taken in any case, but not by itself", () => {
