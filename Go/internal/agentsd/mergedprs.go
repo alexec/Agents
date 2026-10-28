@@ -33,7 +33,8 @@ const (
 // mergedPRsDelay is how long after the start the first ask is, when the folders are known.
 var mergedPRsDelay = time.Minute
 
-// findGH is the person's gh, or "" when it is not installed. A test puts a fake one here.
+// findGH is the person's gh, or "" when it is not installed. Only TestMain sets it, before
+// any daemon starts: a test hands its fake gh to countMergedPRsWith instead (#2806).
 var findGH = func() string {
 	for _, dir := range searchPaths() {
 		p := filepath.Join(dir, "gh")
@@ -71,13 +72,16 @@ func (d *Daemon) countMergedPRsEveryHour() {
 	})
 }
 
-// countMergedPRs asks every folder's gh, and writes what they said for the days asked
-// about. The first answer goes back as far as the Time page keeps days.
+// countMergedPRs asks every folder's gh, when the person has one.
 func (d *Daemon) countMergedPRs() {
-	gh := findGH()
-	if gh == "" {
-		return
+	if gh := findGH(); gh != "" {
+		d.countMergedPRsWith(gh)
 	}
+}
+
+// countMergedPRsWith asks every folder's gh, and writes what they said for the days asked
+// about. The first answer goes back as far as the Time page keeps days.
+func (d *Daemon) countMergedPRsWith(gh string) {
 	d.timeMu.Lock()
 	days := usageDaysKept
 	for _, r := range d.timeLocked().Recap {
