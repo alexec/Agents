@@ -20,6 +20,8 @@ import (
 type deliveries struct {
 	mu  sync.Mutex
 	got map[string][]wire.MachineUserSettings
+	// more has a value once a delivery is heard after it was last emptied.
+	more chan struct{}
 }
 
 func (d *deliveries) heard(host, method string, params json.RawMessage) {
@@ -31,6 +33,31 @@ func (d *deliveries) heard(host, method string, params json.RawMessage) {
 	d.mu.Lock()
 	d.got[host] = append(d.got[host], u)
 	d.mu.Unlock()
+	select {
+	case d.more <- struct{}{}:
+	default:
+	}
+}
+
+// waitTold waits until host is told settings that satisfy ok, for as long as the run of
+// the tests lasts: a delivery is heard, not polled for under a wall clock of its own.
+func (d *deliveries) waitTold(t *testing.T, host string, ok func(wire.MachineUserSettings) bool, what string) {
+	t.Helper()
+	end := time.Minute
+	if deadline, set := t.Deadline(); set {
+		end = time.Until(deadline) - 10*time.Second
+	}
+	gone := time.After(end)
+	for {
+		if u, told := d.last(host); told && ok(u) {
+			return
+		}
+		select {
+		case <-d.more:
+		case <-gone:
+			t.Fatalf("waited for %s", what)
+		}
+	}
 }
 
 // last is what host was told last, and whether it was told anything.
@@ -246,7 +273,7 @@ func TestADeliveryFitsTheMachinesLink(t *testing.T) {
 	t.Parallel()
 	st := store.NewMemory()
 	p := startPlane(t, st, controllink.NewPrivateKey())
-	told := &deliveries{got: map[string][]wire.MachineUserSettings{}}
+	told := &deliveries{got: map[string][]wire.MachineUserSettings{}, more: make(chan struct{}, 1)}
 	p.told = told.heard
 	_, window := p.client("Alex's Mac")
 	alex := &person{id: p.s.localOwner(), window: window}
@@ -270,7 +297,9 @@ func TestADeliveryFitsTheMachinesLink(t *testing.T) {
 	}
 
 	box := p.machineSaying(alex, takingHello("MACHINE-41"))
-	p.waitFor(func() bool { u, ok := told.last(box.member.Host); return ok && u.Settings.McpServers != nil }, "the machine told its settings")
+	// Over 64 MB of JSON is read for the delivery: seconds under -race, more on a loaded
+	// runner, so the wait is for the delivery and not for a fixed time (#2824).
+	told.waitTold(t, box.member.Host, func(u wire.MachineUserSettings) bool { return u.Settings.McpServers != nil }, "the machine told its settings")
 	if u, _ := told.last(box.member.Host); u.Settings.AgentConfigFiles != nil {
 		t.Fatalf("the machine was sent %d agent configuration files", len(u.Settings.AgentConfigFiles.Files))
 	}
