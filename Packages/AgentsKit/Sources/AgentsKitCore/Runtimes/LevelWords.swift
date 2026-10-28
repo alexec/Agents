@@ -199,3 +199,18 @@ public extension Levels {
     var modelWords: String { model.map(LevelWords.model) ?? LevelWords.custom }
     var permissionWords: String { permission.map(LevelWords.permission) ?? LevelWords.custom }
 }
+
+public extension LevelWords {
+    /// A runtime's state on the Auto page (Story 3): Available, Rate limited, Out, Not signed
+    /// in or Not installed, from what the window already has.
+    static func state(_ status: RuntimeStatus?, allowances: RuntimeAllowances?) -> String {
+        guard let status else { return state(available: false, signedIn: false, out: false, rateLimited: false) }
+        if case .needsSignIn = status.availability {
+            return state(available: true, signedIn: false, out: false, rateLimited: false)
+        }
+        var limited = false
+        if case .rateLimited = allowances?.row(status.id, account: nil)?.state.status { limited = true }
+        return state(available: status.availability.isAvailable, signedIn: true,
+                     out: allowances?.isOut(status.id) == true, rateLimited: limited)
+    }
+}
