@@ -44,9 +44,9 @@ struct AgentConfigFileEditor: View {
     /// A file to open, such as a Needs a look row's skill (#2761); set back to nil once it is
     /// open, or when there is no such file. Edits not saved keep the open file.
     var open: Binding<String?> = .constant(nil)
-    /// For `~/.agents`: when it last synced, said under "Yours, on every machine", as the Mac's
-    /// Agent Configuration says at its top (#2766). Nil for a folder's `.agents`.
-    var synced: String?
+    /// For `~/.agents`: say it is this Mac's and what goes to the other machines, as the Mac's
+    /// Agent Configuration says at its top (#2766, #2704). False for a folder's `.agents`.
+    var userScope = false
 
     @State private var files: [DaemonAPI.AgentConfigEditorFile] = []
     @State private var selected: String?
@@ -73,10 +73,11 @@ struct AgentConfigFileEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(kind.title).appText(.title)
-            if let synced {
+            if userScope {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(UserScopeWords.yoursOnEveryMachine).appText(.supporting).fontWeight(.semibold)
-                    Text(synced).appText(.fine).foregroundStyle(.secondary)
+                    Text(UserScopeWords.thisMacOnly).appText(.supporting).fontWeight(.semibold)
+                    Text(UserScopeWords.agentConfigurationFollows).appText(.fine).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             Text(location).appText(.code).foregroundStyle(.secondary)

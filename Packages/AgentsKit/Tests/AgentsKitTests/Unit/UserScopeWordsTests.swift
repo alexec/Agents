@@ -24,10 +24,9 @@ struct UserScopeWordsTests {
         #expect(UserScopeWords.thisMacOnly == "This Mac's")
     }
 
-    @Test func theAgentsEditorsSayWhenTheyLastSynced() {
-        #expect(UserScopeWords.agentConfigurationUpdated(nil) == "Waiting for the first sync")
-        #expect(UserScopeWords.agentConfigurationUpdated("not a date") == "Waiting for the first sync")
-        #expect(UserScopeWords.agentConfigurationUpdated("2026-10-27T15:00:00Z").hasPrefix("Last synced "))
+    @Test func theAgentsEditorsSayWhatGoesToTheOtherMachines() {
+        #expect(UserScopeWords.agentConfigurationFollows.hasPrefix("Your other machines get this Mac's instructions"))
+        #expect(UserScopeWords.agentConfigurationFollows.hasSuffix("Workflows, plugins and a skill's other files stay on this Mac."))
     }
 
     @Test func aPersonSettingCanBeKept() throws {

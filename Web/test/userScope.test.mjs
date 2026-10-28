@@ -22,9 +22,8 @@ test("user scope: a secret's name is an environment variable's", () => {
   assert.equal(u.isSecretName(""), false);
 });
 
-test("user scope: the ~/.agents editors say they are yours on every machine, and when they last synced (#2766)", () => {
-  assert.equal(u.yoursOnEveryMachine, "Yours, on every machine");
-  assert.equal(u.agentConfigurationUpdated(undefined), "Waiting for the first sync");
-  assert.equal(u.agentConfigurationUpdated("not a date"), "Waiting for the first sync");
-  assert.match(u.agentConfigurationUpdated("2026-10-27T15:00:00Z", "en-US"), /^Last synced Oct 2\d, 2026, /);
+test("user scope: the ~/.agents editors say they are this Mac's, and what goes to the other machines (#2704)", () => {
+  assert.equal(u.thisMacOnly, "This Mac's");
+  assert.match(u.agentConfigurationFollows, /^Your other machines get this Mac's instructions/);
+  assert.match(u.agentConfigurationFollows, /Workflows, plugins and a skill's other files stay on this Mac\.$/);
 });

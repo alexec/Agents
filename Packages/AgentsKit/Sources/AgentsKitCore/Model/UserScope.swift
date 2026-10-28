@@ -183,10 +183,11 @@ public enum UserScopeWords {
     /// Machines ▸ Secrets.
     public static let secretsTitle = "Secrets"
     public static let yoursOnEveryMachine = "Yours, on every machine"
-    public static func agentConfigurationUpdated(_ updated: String?) -> String {
-        guard let updated, let date = ISO8601DateFormatter().date(from: updated) else { return "Waiting for the first sync" }
-        return "Last synced \(date.formatted(date: .abbreviated, time: .shortened))"
-    }
+    /// Under "This Mac's" at the top of the `~/.agents` pages and editors (#2704): what goes to
+    /// the person's other machines. A machine does not send its `~/.agents` files (#2703); the
+    /// Mac's Settings window sets these parts at the user scope (`keepFollowingParts`).
+    public static let agentConfigurationFollows = "Your other machines get this Mac's instructions, personas, "
+        + "skills and MCP servers from the Mac's Settings window. Workflows, plugins and a skill's other files stay on this Mac."
 
     public static let thisMacOnly = "This Mac's"
     public static let addSecret = "Add a Secret…"
