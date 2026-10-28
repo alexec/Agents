@@ -130,19 +130,6 @@ struct OutcomePageTests {
         #expect(parts.stepCount == 1)
     }
 
-    /// The thinking mark sits on the thought the agent is thinking now (#2380): the last
-    /// item of a running turn that draws its steps, and no other.
-    @Test func theLiveThoughtIsTheLastItemOfARunningTurn() {
-        let thought = TranscriptEntry(kind: .agentThought(messageID: nil, text: "Hmm"))
-        let thinking = turn([ask("Go"), call("1", "Read"), thought]).items
-        #expect(TurnParts(thinking, isLive: true).liveThought == thinking.last?.id)
-        // Ended, or something after it: words alone.
-        #expect(TurnParts(thinking, isLive: false).liveThought == nil)
-        #expect(TurnParts(turn([ask("Go"), thought, call("1", "Read")]).items, isLive: true).liveThought == nil)
-        // No steps yet, so no thought line is drawn: the foot keeps the ring.
-        #expect(TurnParts(turn([ask("Go"), thought]).items, isLive: true).liveThought == nil)
-    }
-
     @Test func aSummaryKeepsTheOutcomeAndTheStepCount() {
         let summary = TurnSummary.of([ask("Go"), said("Looking"), call("1", "List files"),
                                       said("Found it"), report("Found")], start: 0)

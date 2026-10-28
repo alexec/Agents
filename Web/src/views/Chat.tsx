@@ -9,7 +9,7 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import { openTurnsHeld, rememberOpen, type Store } from "../model/store";
 import { backgroundAge, backgroundEnded, backgroundNoun, isRunning, subagentNoSteps, subagentStatus } from "../model/background";
-import { callIsUnderway, display, isPersonsAsk, isSummaryOnly, isWorking, turnParts, type ChatTurn, type Item } from "../model/turns";
+import { display, isPersonsAsk, isWorking, type ChatTurn, type Item } from "../model/turns";
 import { fromWireDate, toWireDate } from "../protocol/dates";
 import type { Agent, AppViewCall, BackgroundItem, ClientPermissionSettings, FileMentionDTO, FindMatch, FindResult, TranscriptEntry, TurnSummary } from "../protocol/generated";
 import { replace, route } from "../route";
@@ -164,12 +164,6 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   const runningCalls = (allBackground ?? []).filter(isRunning).map((item) => item.toolCallID ?? "").join(" ");
   const background = useMemo(() => (allBackground ?? []).filter(isRunning), [runningCalls]);
   const live = agent ? isWorking(agent.state) : false;
-  // The live turn ends on a call still underway: that line has the tool mark, so the foot has none (#2338).
-  const lastItem = rows[rows.length - 1]?.items.at(-1);
-  const callIsMarked = live && lastItem?.kind === "run" && callIsUnderway(lastItem.calls[lastItem.calls.length - 1]!);
-  // Or on a thought the agent is thinking now: that line has the thinking mark (#2380).
-  const lastTurn = rows[rows.length - 1];
-  const thoughtIsMarked = live && !!lastTurn && !isSummaryOnly(lastTurn) && turnParts(lastTurn.items, true).liveThought !== undefined;
   const failure = store.transcriptLoadFailure.value;
 
   // What an open call's links do here (the window's ChatActions): a file it touched opens in the
@@ -592,9 +586,10 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         ))}
         {agent && <Queued store={store} host={host} agent={agent} disabled={down} draftKey={`${host}|${session}`} />}
         {agent && <KeptBubbles store={store} kept={store.keptFor(host, agent.id)} />}
-        {/* Live, at the foot: what the row says, until the prompt lands (ChatTranscript, #251). */}
+        {/* Live, at the foot: what the row says, until the prompt lands (ChatTranscript, #251). The one
+            working mark on the page, never in a tool's or a thought's line (#2831). */}
         {agent && store.isComingBack(host, agent.id) ? <p class="working coming-back" aria-hidden="true">↻ {comingBackDescription}</p>
-          : agent && (agent.state === "running" || agent.state === "starting") && !callIsMarked && !thoughtIsMarked && (
+          : agent && (agent.state === "running" || agent.state === "starting") && (
           <p class="working" aria-hidden="true"><WorkingMark tool={runningTool(agent)} /></p>
         )}
         {/* What the foot says to a screen reader, as text, in one node that is always there: a

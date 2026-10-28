@@ -52,10 +52,6 @@ export function describedAs(call: ToolCall): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-/** Still going, by its own status (ToolCall.isUnderway, #2338). No status, as from an old host, is not. */
-export function callIsUnderway(call: ToolCall): boolean {
-  return call.status === "pending" || call.status === "in_progress";
-}
 
 /** ToolCall.line: the description where the agent wrote one, else the runtime's title. */
 export function callLine(call: ToolCall): string {
@@ -634,9 +630,6 @@ export interface TurnParts {
   stepCount: number;
   /** The latest step, while the turn runs and has said nothing after it. */
   live?: Item;
-  /** The thought the agent is thinking now (#2380): the last item drawn in a turn still going, when
-   * that is a thought and the turn draws its steps. Its line has the thinking mark; the foot none. */
-  liveThought?: string;
 }
 
 /** TurnParts(items, isLive:). */
@@ -658,9 +651,7 @@ export function turnParts(items: readonly Item[], isLive: boolean): TurnParts {
   if (isLive && replied.size === 0) {
     for (let i = shown.length - 1; i >= 0; i--) if (!isOutcome(shown[i]!)) { live = shown[i]; break; }
   }
-  const last = drawn.at(-1);
-  const liveThought = isLive && steps !== 0 && last && isThought(last) ? last.id : undefined;
-  return { outcome: [...outcome, ...reports], stepCount: steps, ...(live ? { live } : {}), ...(liveThought ? { liveThought } : {}) };
+  return { outcome: [...outcome, ...reports], stepCount: steps, ...(live ? { live } : {}) };
 }
 
 /** Whether the conversation's last turn is still going. */

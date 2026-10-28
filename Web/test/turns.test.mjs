@@ -48,26 +48,3 @@ test("copy takes the whole message as written (#519)", () => {
   assert.equal(turns.copiedText(agent("")), undefined);
   assert.equal(turns.copiedText({ id: "n", at: "", kind: { runtimeNote: { _0: "note" } } }), undefined);
 });
-
-
-test("a call is underway until its status says it ended (#2338)", () => {
-  const call = (status) => ({ title: "Read File", status, content: [], locations: [] });
-  assert.equal(turns.callIsUnderway(call("pending")), true);
-  assert.equal(turns.callIsUnderway(call("in_progress")), true);
-  assert.equal(turns.callIsUnderway(call("completed")), false);
-  assert.equal(turns.callIsUnderway(call("failed")), false);
-  assert.equal(turns.callIsUnderway(call(undefined)), false);
-});
-
-test("the thinking mark sits on the thought the agent thinks now, and no other (#2380)", () => {
-  const ask = { id: "u", at: 0, kind: { userMessage: { _0: "Go" } } };
-  const call = { id: "c", at: 1, kind: { toolCall: { _0: { toolCallID: "c1", title: "Read", status: "completed" } } } };
-  const thought = { id: "t", at: 2, kind: { agentThought: { messageID: "m", text: "Planning" } } };
-  const live = (entries, isLive = true) => turns.turnParts(turns.turns(turns.display(entries))[0].items, isLive).liveThought;
-  assert.equal(live([ask, call, thought]), "t");
-  // Ended, or something after it: words alone.
-  assert.equal(live([ask, call, thought], false), undefined);
-  assert.equal(live([ask, thought, call]), undefined);
-  // No steps yet, so no thought line is drawn: the foot keeps the ring.
-  assert.equal(live([ask, thought]), undefined);
-});
