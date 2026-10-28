@@ -88,7 +88,7 @@ func TestAllowancesLocateOnceAndReadSignInOnce(t *testing.T) {
 	d.runtimeAllowances()
 	shells.Store(0)
 	located.Store(0)
-	reads := signInReads.Load()
+	reads := d.signIns.reads.Load()
 	out := d.runtimeAllowances()
 	if n := located.Load(); n != int64(len(catalog)) {
 		t.Fatalf("located %d times for %d runtimes and 3 accounts", n, len(catalog))
@@ -96,7 +96,7 @@ func TestAllowancesLocateOnceAndReadSignInOnce(t *testing.T) {
 	if n := shells.Load(); n != 0 {
 		t.Fatalf("%d login shells within a minute of the last", n)
 	}
-	if n := signInReads.Load() - reads; n != 0 {
+	if n := d.signIns.reads.Load() - reads; n != 0 {
 		t.Fatalf("read %d unchanged sign-in files", n)
 	}
 	accounts := 0
@@ -111,13 +111,13 @@ func TestAllowancesLocateOnceAndReadSignInOnce(t *testing.T) {
 
 	// A changed file is read again, and says what it says now.
 	os.WriteFile(filepath.Join(folders[0], ".claude.json"), []byte(`{"oauthAccount":{"emailAddress":"someone.else@example.com"}}`), 0o600)
-	reads = signInReads.Load()
+	reads = d.signIns.reads.Load()
 	for _, p := range d.accountProfiles() {
 		if accountFolder(p) == folders[0] && (p.SignedInAs == nil || *p.SignedInAs != "someone.else@example.com") {
 			t.Fatalf("%+v", p)
 		}
 	}
-	if n := signInReads.Load() - reads; n != 1 {
+	if n := d.signIns.reads.Load() - reads; n != 1 {
 		t.Fatalf("read %d files for one change", n)
 	}
 
@@ -135,13 +135,14 @@ func TestAllowancesLocateOnceAndReadSignInOnce(t *testing.T) {
 // The sign-in cache is bounded: it never holds more than signInCacheSize files.
 func TestSignInCacheBounded(t *testing.T) {
 	dir := t.TempDir()
+	var c signInCache
 	for i := range signInCacheSize + 10 {
 		path := filepath.Join(dir, strconv.Itoa(i))
 		os.WriteFile(path, []byte("{}"), 0o600)
-		readSignInFile(path, func([]byte) signIn { return signIn{signedIn: true} })
-		signIns.Lock()
-		n := len(signIns.m)
-		signIns.Unlock()
+		c.read(path, func([]byte) signIn { return signIn{signedIn: true} })
+		c.Lock()
+		n := len(c.m)
+		c.Unlock()
 		if n > signInCacheSize {
 			t.Fatalf("%d entries", n)
 		}
