@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log"
 	"os"
-	"path/filepath"
 	"sync"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
@@ -16,7 +15,7 @@ import (
 // A project's tools (#2669, specs/2317-projects User Story 4): the Tasks, Code review and
 // CI slots that a folder's project sets, for every folder in it. The control plane sends
 // them in projects/joined's answer and again in host/projects; this machine keeps the last
-// it heard in <root>/projects.json, so a folder keeps its project's slots while the
+// it heard in <root>/project-tools.json, so a folder keeps its project's slots while the
 // control plane is away. A slot the project does not set is the folder's own, from its git
 // remote, as before.
 
@@ -26,7 +25,7 @@ type projectToolsBook struct {
 	projectTools map[string]wire.ProjectTools
 }
 
-func (d *Daemon) projectToolsPath() string { return filepath.Join(d.Store.Loc.Root, "projects.json") }
+func (d *Daemon) projectToolsPath() string { return d.Store.Loc.ProjectTools() }
 
 // projectToolsLocked reads the file once. projectToolsMu is held.
 func (d *Daemon) projectToolsLocked() map[string]wire.ProjectTools {
