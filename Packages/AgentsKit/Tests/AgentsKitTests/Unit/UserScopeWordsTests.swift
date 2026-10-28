@@ -24,6 +24,12 @@ struct UserScopeWordsTests {
         #expect(UserScopeWords.thisMacOnly == "This Mac's")
     }
 
+    @Test func theAgentsEditorsSayWhenTheyLastSynced() {
+        #expect(UserScopeWords.agentConfigurationUpdated(nil) == "Waiting for the first sync")
+        #expect(UserScopeWords.agentConfigurationUpdated("not a date") == "Waiting for the first sync")
+        #expect(UserScopeWords.agentConfigurationUpdated("2026-10-27T15:00:00Z").hasPrefix("Last synced "))
+    }
+
     @Test func aPersonSettingCanBeKept() throws {
         let settings = try JSONValue.parse(Data(#"{"costLimits":{"dailyTokens":5}}"#.utf8)).decode(DaemonAPI.UserSettings.self)
         #expect(settings[.costLimits] != nil)

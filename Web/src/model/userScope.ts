@@ -9,6 +9,15 @@ export const secretsFoot = "A secret goes only to your own machines, into ~/.age
   + "Write ${NAME} for it in an MCP server's env or headers. Nobody can read it back, you included: to change it, replace it.";
 export const noSealing = "This control plane has no key to seal secrets with, so it keeps none. "
   + "Its operator starts it with a key file or AGENTS_CONTROL_KMS.";
+export const yoursOnEveryMachine = "Yours, on every machine";
+
+/** Under yoursOnEveryMachine at the top of the ~/.agents editors (#2766): when the files last synced. */
+export function agentConfigurationUpdated(updated: string | undefined, locale?: string): string {
+  const date = updated ? new Date(updated) : null;
+  if (!date || Number.isNaN(date.getTime())) return "Waiting for the first sync";
+  return `Last synced ${date.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" })}`;
+}
+
 export const nameHint = "Capital letters, digits and _, such as GITHUB_TOKEN.";
 
 /** A secret's row: where it is. */
