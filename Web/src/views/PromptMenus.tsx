@@ -2,6 +2,7 @@
 // advertises, in the window's order, permission on the left and the rest on the right. Nothing
 // here knows what a model or a mode is: the choices come from the runtime.
 import type { ComponentChildren } from "preact";
+import { useState } from "preact/hooks";
 import type { ClientPermissionSettings, ConfigOption, JSONValue } from "../protocol/generated";
 import { choiceGroups, closedTitle, isAboutPermission, same } from "../model/options";
 import { nothingToAdjust } from "../model/promptWords";
@@ -87,31 +88,60 @@ function ClientPermissionControl({ runtime, mode, onChange, disabled }: {
   runtime: string; mode: ClientPermissionSettings["cursor"];
   onChange: (mode: ClientPermissionSettings["cursor"]) => void; disabled?: boolean;
 }) {
-  const title = mode === "alwaysApprove" ? "Always-approve" : "Default";
+  // Always-approve answers every request for every agent of the runtime: one more click (#2746).
+  const [confirming, setConfirming] = useState(false);
+  const title = (choice: ClientPermissionSettings["cursor"]) => choice === "alwaysApprove" ? "Always-approve" : "Default";
   const choices: ClientPermissionSettings["cursor"][] = ["default", "alwaysApprove"];
+  const scope = `Applies to every ${runtime} agent, including workflows and server folders.`;
   const description = (choice: ClientPermissionSettings["cursor"]) => choice === "default"
     ? `Asks before ${runtime} does something that needs permission.`
     : "Answers every permission request for you. Questions that are not permission still wait.";
+  const close = () => {
+    setConfirming(false);
+    const details = document.activeElement?.closest("details");
+    if (details instanceof HTMLDetailsElement) details.open = false;
+  };
   return (
-    <details class="client-permission-control">
-      <summary class="pill" title={`Permission for ${runtime}. Applies to every ${runtime} agent, including workflows and server folders.`}
-        aria-label={`${runtime} permission: ${title}`} aria-disabled={disabled}>
-        {title} <span aria-hidden="true">▾</span>
+    <details class="client-permission-control" onToggle={(e) => {
+      if (!(e.currentTarget as HTMLDetailsElement).open) setConfirming(false);
+    }}>
+      {/* What it sets, then its value: beside the sandbox pill, "Default" alone says nothing. */}
+      <summary class="pill" title={`${runtime} permissions. ${scope}`}
+        aria-label={`${runtime} permissions: ${title(mode)}`} aria-disabled={disabled}>
+        Permissions: {title(mode)} <span aria-hidden="true">▾</span>
       </summary>
-      <div class="client-permission-menu" role="group" aria-label={`${runtime} permission`}>
-        {choices.map((choice) => (
-          <button type="button" key={choice} class="client-permission-choice" disabled={disabled}
-            aria-pressed={mode === choice} title={description(choice)} onClick={() => {
-              onChange(choice);
-              const details = document.activeElement?.closest("details");
-              if (details instanceof HTMLDetailsElement) details.open = false;
-            }}>
-            <span class="client-permission-title"><span aria-hidden="true">{mode === choice ? "✓" : " "}</span>
-              {choice === "alwaysApprove" ? "Always-approve" : "Default"}</span>
-            <span class="quiet small">{description(choice)}</span>
-          </button>
-        ))}
-        <p class="quiet small">Applies to every {runtime} agent, including workflows and server folders.</p>
+      <div class="client-permission-menu" role="group" aria-label={`${runtime} permissions`}>
+        {confirming ? (
+          <div class="client-permission-confirm" role="alertdialog"
+            aria-label={`Always approve every ${runtime} permission request?`}>
+            <p>Always approve every {runtime} permission request?</p>
+            <p class="quiet small">No {runtime} agent, workflow or server folder will ask before it edits files or runs commands. Set Default to make them ask again.</p>
+            <div class="client-permission-actions">
+              <button type="button" onClick={close}>Cancel</button>
+              <button type="button" class="destructive" disabled={disabled} onClick={() => {
+                onChange("alwaysApprove");
+                close();
+              }}>Always Approve</button>
+            </div>
+          </div>
+        ) : (<>
+          {choices.map((choice) => (
+            <button type="button" key={choice} class="client-permission-choice" disabled={disabled}
+              aria-pressed={mode === choice} title={description(choice)} onClick={() => {
+                if (choice === "alwaysApprove" && mode !== "alwaysApprove") {
+                  setConfirming(true);
+                  return;
+                }
+                onChange(choice);
+                close();
+              }}>
+              <span class="client-permission-title"><span aria-hidden="true">{mode === choice ? "✓" : " "}</span>
+                {title(choice)}</span>
+              <span class="quiet small">{description(choice)}</span>
+            </button>
+          ))}
+          <p class="quiet small">{scope}</p>
+        </>)}
       </div>
     </details>
   );
