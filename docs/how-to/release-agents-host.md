@@ -117,6 +117,11 @@ two identities and the four profiles, and the App Store Connect key in `~/.priva
 `--no-upload` stops before the upload. `--dry-run` needs no certificate: it proves both
 archives build and pass `check-store-archive.sh`.
 
+The `release-dry-run` workflow runs both dry runs on a runner with an empty build cache
+(#2780). It starts on a pull request that changes `scripts/build-cache.sh`,
+`scripts/release-*.sh`, `release.yml` or `project.yml`, and the release skill's gate runs it on
+the commit it will tag: `gh workflow run release-dry-run.yml -f ref=<sha>`.
+
 ## If something goes wrong
 
 - **"is not on main":** the tag points at a commit main doesn't have. Delete the tag
