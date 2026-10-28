@@ -78,6 +78,19 @@ You set this up once, as the Apple Developer account's Account Holder.
    Without them the GitHub release still goes out, and the `testflight` job fails at its
    first step, naming the secrets that are missing.
 
+   Before it archives, the job runs `scripts/check-store-profiles.py` on the four decoded
+   profiles (#2781). Each must allow every entitlement in the `.entitlements` file its target
+   signs with in Release. The check names a missing entitlement and the secret, never a
+   secret's value. `release-secrets.sh --store` runs the same check on the installed profiles
+   before it sets anything.
+
+   **A change that adds an entitlement makes the profiles again.** When a pull request adds a
+   capability to an App Store target (Sign in with Apple did, #2507), make that target's
+   profile again in the developer site, install it, and update the `release` environment in
+   the same change: `scripts/release-secrets.sh --store …`, or
+   `base64 -i <profile> | gh secret set PROFILE_… --env release`. Say so in the pull request.
+   Setting the secrets is Alex's to approve.
+
 ## Steps
 
 1. Choose the version, for example `0.2.0`: minor when an enhancement merged since the
@@ -133,3 +146,6 @@ the commit it will tag: `gh workflow run release-dry-run.yml -f ref=<sha>`.
   `scripts/release-secrets.sh --store …`, then run the **release** workflow again with the tag.
 - **An upload is refused as a duplicate:** that build number is taken for the version. Run
   the workflow again: the new run number is a new build.
+- **"PROFILE_… has no …, which ….entitlements asks for":** the profile in that secret was
+  made before the entitlement was added. Make it again in the developer site, install it, run
+  `scripts/release-secrets.sh --store …`, then run the **release** workflow again with the tag.
