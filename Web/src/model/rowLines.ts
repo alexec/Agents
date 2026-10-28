@@ -174,6 +174,20 @@ export function eventWaitCardLines(agent: Agent, title: (id: string) => string |
   return [`Waiting for ${duration} min for:`, mark.replace(/^◷ Waiting for /, ""), `${elapsed} min elapsed so far.`];
 }
 
+/**
+ * The event wait card's minutes and bar (#2843): elapsed and, with a deadline, the timeout and how
+ * far through it the wait is, 0–100. The wire's dates are seconds since 2001, not 1970.
+ */
+export function eventWaitMinutes(wait: EventWait, now: Date): { elapsed: number; total?: number; percent?: number } {
+  const since = fromWireDate(wait.since).getTime();
+  const elapsed = Math.max(0, Math.floor((now.getTime() - since) / 60_000));
+  if (wait.deadline === undefined) return { elapsed };
+  const deadline = fromWireDate(wait.deadline).getTime();
+  const total = Math.max(1, Math.ceil((deadline - since) / 60_000));
+  const percent = deadline > since ? Math.min(100, Math.max(0, (now.getTime() - since) / (deadline - since) * 100)) : 100;
+  return { elapsed, total, percent };
+}
+
 export interface EventWaitSummaryLine {
   id: string;
   source: string;
