@@ -157,7 +157,7 @@ private struct MappingCell: View {
                 Text(cell?.words ?? "—").lineLimit(1)
             }
             if let cell {
-                Text(markLine(cell))
+                Text(LevelWords.markLine(cell))
                     .appText(.fine)
                     .foregroundStyle((cell.mark == .dropped ? StateTint.attention : .none).style(or: .secondary))
                     .lineLimit(2)
@@ -165,14 +165,6 @@ private struct MappingCell: View {
             }
         }
         .appText(.fine)
-    }
-
-    private func markLine(_ cell: AutoMapping) -> String {
-        let mark = cell.mark == .dropped ? "⚠︎ \(LevelWords.mark(cell.mark))" : LevelWords.mark(cell.mark)
-        guard cell.mark != .notPossible, cell.mark != .dropped, let note = cell.note else {
-            return cell.mark == .notPossible ? (cell.note ?? "") : mark
-        }
-        return note.hasPrefix(mark) ? note : "\(mark): \(note)"
     }
 
     private func set(_ native: NativeSetting?) {

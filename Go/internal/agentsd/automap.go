@@ -96,7 +96,7 @@ var autoModels = map[string]map[string]autoCell{
 		"smart":    {models: []string{"gemini-3.8-flash-high"}, words: "Gemini 3.8 Flash (High)"},
 	},
 	"copilot": {
-		"fast":     {words: "Its default model", mark: wire.AutoMarkNearestSafer, note: "nearest: no smaller model known"},
+		"fast":     {words: "Its default model", mark: wire.AutoMarkNearestSafer, note: "no smaller model known"},
 		"balanced": {words: "Its default model"},
 		"smart":    {models: []string{"claude-sonnet-5.5"}, words: "Claude Sonnet 5.5"},
 	},
@@ -105,7 +105,7 @@ var autoModels = map[string]map[string]autoCell{
 // The runtimes whose model list the app has not measured get their default model for every
 // level, said in the cell, until the nightly check or the person sets them.
 func defaultModelCells() map[string]autoCell {
-	same := autoCell{words: "Its default model", mark: wire.AutoMarkNearestSafer, note: "nearest: no other model known"}
+	same := autoCell{words: "Its default model", mark: wire.AutoMarkNearestSafer, note: "no other model known"}
 	return map[string]autoCell{"fast": same, "balanced": {words: "Its default model"}, "smart": same}
 }
 

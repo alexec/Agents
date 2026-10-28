@@ -107,7 +107,8 @@ function Cell({ cell, choices, set, down, label }: {
             if (picked) set(picked.native);
           }}>
           {index < 0 && <option value="" disabled>{cell.words}</option>}
-          {choices.map((c, i) => <option key={i} value={String(i)}>{c.words}</option>)}
+          {/* The cell's own words for the setting in force; the runtime's for the rest. */}
+          {choices.map((c, i) => <option key={i} value={String(i)}>{i === index ? cell.words : c.words}</option>)}
         </select>
       ) : <span>{cell.words}</span>}
       <span class={`small ${cell.mark === "dropped" ? "failure" : "quiet"}`}>{cell.mark === "dropped" ? "⚠︎ " : ""}{mark}</span>

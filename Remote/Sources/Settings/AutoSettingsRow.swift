@@ -77,7 +77,7 @@ private struct AutoSettingsPage: View {
     private func cellRow(_ runtimeID: String, _ field: AutoField, _ level: String) -> some View {
         let cell = model.autoMappings.cell(runtimeID, field, level)
         let choices = model.autoMappings.choices.filter { $0.runtimeID == runtimeID && $0.field == field }
-        let mark = cell.map { [LevelWords.mark($0.mark), $0.note].compactMap { $0 }.joined(separator: ": ") } ?? ""
+        let mark = cell.map(LevelWords.markLine) ?? ""
         return Menu {
             ForEach(choices, id: \.self) { choice in
                 Button {

@@ -214,3 +214,15 @@ public extension LevelWords {
                      out: allowances?.isOut(status.id) == true, rateLimited: limited)
     }
 }
+
+public extension LevelWords {
+    /// The grey line under a cell (#2658): its mark, and its note where it has one; Not
+    /// possible says why alone, as its words already say it is not possible.
+    static func markLine(_ cell: AutoMapping) -> String {
+        let mark = mark(cell.mark)
+        if cell.mark == .notPossible { return cell.note ?? "" }
+        guard let note = cell.note else { return mark }
+        if cell.mark == .dropped { return "⚠︎ \(mark)" }
+        return note.hasPrefix(mark) ? note : "\(mark): \(note)"
+    }
+}

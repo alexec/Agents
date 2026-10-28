@@ -540,8 +540,8 @@ other two give a card):
 | Codex | 5.6 Luna | its default | 6 Luna |
 | Grok | Grok 4.7 Fast | its default | Grok 4.7 |
 | Antigravity | Gemini 3.8 Flash (Low) | its default | Gemini 3.8 Flash (High) |
-| Copilot | its default (nearest: no smaller model known) | its default | Claude Sonnet 5.5 |
-| Gemini, Cursor, OpenCode | its default (nearest: no other model known) | its default | its default (nearest: no other model known) |
+| Copilot | its default (nearest safer: no smaller model known) | its default | Claude Sonnet 5.5 |
+| Gemini, Cursor, OpenCode | its default (nearest safer: no other model known) | its default | its default (nearest safer: no other model known) |
 
 **Sandbox**:
 
