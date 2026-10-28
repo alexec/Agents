@@ -254,6 +254,7 @@ run_checks() {
 	sh scripts/version.sh --selftest || status=1
 	bash scripts/build-cache-test.sh || status=1
 	python3 .agents/skills/release/scripts/capability-changes.py --selftest || status=1
+	python3 .agents/skills/release/scripts/release-plan.py --selftest || status=1
 	python3 .agents/skills/release/scripts/advisory.py --selftest || status=1
 	return $status
 }

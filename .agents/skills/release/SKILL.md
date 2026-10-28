@@ -243,7 +243,10 @@ All of these, on the commit you will tag (`git rev-parse origin/main`, fetched a
 
 ## 6. Version and notes
 
-1. Run `release-plan.py` again. Its `next:` is the version.
+1. Run `release-plan.py` again. Its `next:` is the version, when it agrees with the open
+   milestone's version beside it. When the plan prints `differs:` (#2779), stop before the
+   tag and ask Alex by form which version to use, with the `differs:` line's reason (an
+   enhancement merged, a capability removed). Renumber the milestones only when Alex says.
 2. **Milestone:** for a minor version, find its milestone
    (`gh api 'repos/alexec/Agents/milestones?state=open' --jq '.[]|[.number,.title]|@tsv'`)
    and its open issues (`gh issue list --milestone "<title>" --state open`). Open issues
