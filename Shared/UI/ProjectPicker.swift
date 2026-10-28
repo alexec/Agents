@@ -3,7 +3,7 @@ import SwiftUI
 
 /// A folder's Project (#2317): the organisation's projects to put it in, New Project… and,
 /// for the owner or an admin, Rename Project…. The Mac's Folder Settings ▸ General and the
-/// Remote's folder menu show it; the web page's is `Web/src/views/ProjectPicker.tsx`.
+/// Remote's folder menu show it; on the Remote it is a Form section of its own; the web page's is `Web/src/views/ProjectPicker.tsx`.
 struct ProjectPicker: View {
     /// The control plane, which keeps the projects; nil when there is none.
     let control: DaemonClient?
@@ -34,25 +34,14 @@ struct ProjectPicker: View {
     private var current: DaemonAPI.Project? { projects.first { $0.id == summary.project } }
 
     var body: some View {
+        #if os(macOS)
         VStack(alignment: .leading, spacing: 6) {
             if control == nil {
                 Text(ProjectWords.noControlPlane)
                     .foregroundStyle(.secondary)
             } else {
                 HStack(spacing: 8) {
-                    Picker(ProjectWords.title, selection: Binding(get: { summary.project ?? "" },
-                                                                 set: { id in Task { await pick(id) } })) {
-                        if summary.project == nil {
-                            Text("None").tag("")
-                        } else if let id = summary.project, current == nil {
-                            // Not listed yet: most often its own project, being made (#2756).
-                            Text(summary.name).tag(id)
-                        }
-                        ForEach(projects) { Text($0.name).tag($0.id) }
-                    }
-                    .labelsHidden()
-                    .fixedSize()
-                    .disabled(isAsking)
+                    asking(picker.labelsHidden().fixedSize())
                     Menu {
                         Button(ProjectWords.newProject) { ask(.new) }
                         if let current, current.mayChange {
@@ -77,14 +66,8 @@ struct ProjectPicker: View {
                         .disabled(isAsking)
                 }
             }
-            if let why = summary.projectProblem {
+            ForEach(failures, id: \.self) { why in
                 Text(why)
-                    .appText(.fine)
-                    .tinted(.failure)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if let problem {
-                Text(problem)
                     .appText(.fine)
                     .tinted(.failure)
                     .fixedSize(horizontal: false, vertical: true)
@@ -94,14 +77,69 @@ struct ProjectPicker: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .task(id: summary.project) { await load() }
-        .alert(naming.map { if case .new = $0 { ProjectWords.newProject } else { ProjectWords.rename } } ?? "",
-               isPresented: Binding(get: { naming != nil }, set: { if !$0 { naming = nil } }),
-               presenting: naming) { asked in
-            TextField(ProjectWords.namePrompt, text: $name)
-            Button("Save") { Task { await save(asked) } }
-            Button("Cancel", role: .cancel) {}
+        #else
+        // A Form section of its own on the iPhone and iPad (#2757): the Picker as a row, and
+        // New Project… and Rename Project… as rows, not in a small menu.
+        Section {
+            if control == nil {
+                Text(ProjectWords.noControlPlane)
+                    .foregroundStyle(.secondary)
+            } else {
+                asking(picker)
+                Button(ProjectWords.newProject) { ask(.new) }
+                    .disabled(isAsking)
+                if let current, current.mayChange {
+                    Button(ProjectWords.rename) { ask(.rename(current)) }
+                        .disabled(isAsking)
+                }
+            }
+            if let notRead {
+                Text(notRead)
+                    .tinted(.failure)
+                Button(ProjectWords.tryAgain) { Task { await load() } }
+                    .disabled(isAsking)
+            }
+            ForEach(failures, id: \.self) { why in
+                Text(why)
+                    .tinted(.failure)
+            }
+        } header: {
+            Text(summary.name)
+        } footer: {
+            Text(ProjectWords.explanation)
         }
+        #endif
+    }
+
+    private var picker: some View {
+        Picker(ProjectWords.title, selection: Binding(get: { summary.project ?? "" },
+                                                     set: { id in Task { await pick(id) } })) {
+            if summary.project == nil {
+                Text("None").tag("")
+            } else if let id = summary.project, current == nil {
+                // Not listed yet: most often its own project, being made (#2756).
+                Text(summary.name).tag(id)
+            }
+            ForEach(projects) { Text($0.name).tag($0.id) }
+        }
+        .disabled(isAsking)
+    }
+
+    /// Why the folder is not in its project, then why the last change was refused.
+    private var failures: [String] { [summary.projectProblem, problem].compactMap { $0 } }
+
+    /// The picker's row reads the projects and asks for a name, so the one view that is
+    /// always there with a control plane holds them.
+    private func asking(_ content: some View) -> some View {
+        content
+            .task(id: summary.project) { await load() }
+            .alert(naming.map { if case .new = $0 { ProjectWords.newProject } else { ProjectWords.rename } } ?? "",
+                   isPresented: Binding(get: { naming != nil }, set: { if !$0 { naming = nil } }),
+                   presenting: naming) { asked in
+                TextField(ProjectWords.namePrompt, text: $name)
+                Button("Save") { Task { await save(asked) } }
+                Button("Cancel", role: .cancel) {}
+            }
     }
 
     private func ask(_ asked: Naming) {

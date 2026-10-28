@@ -990,10 +990,9 @@ private struct RemoteFolderProject: View {
         NavigationStack {
             Form {
                 if let summary = model.work.folders.first(where: { $0.key == key }) {
-                    Section(summary.name) {
-                        ProjectPicker(control: model.controlPlane, summary: summary) { id in
-                            await model.setProject(id, for: summary)
-                        }
+                    // Its own section, headed by the folder's name (#2757).
+                    ProjectPicker(control: model.controlPlane, summary: summary) { id in
+                        await model.setProject(id, for: summary)
                     }
                 }
             }
@@ -1003,5 +1002,7 @@ private struct RemoteFolderProject: View {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
         }
+        // Short: a picker and two buttons (#2757).
+        .presentationDetents([.medium, .large])
     }
 }
