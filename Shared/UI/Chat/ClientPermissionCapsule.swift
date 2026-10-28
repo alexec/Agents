@@ -30,6 +30,12 @@ struct ClientPermissionCapsule: View {
                     confirmation(dismiss)
                 }
             }
+            .fixedSize(horizontal: false, vertical: true)
+            #if os(iOS)
+            // A phone's popover measures its content at one line of text, then wraps it
+            // narrower and cuts off the end: a set width gives it the height it needs.
+            .frame(width: 320, alignment: .leading)
+            #endif
         }
         // `.help` is not read on iOS: VoiceOver hears what the pill sets, then its value.
         .accessibilityLabel(ClientPermissionWords.name(runtimeName: runtimeName))
