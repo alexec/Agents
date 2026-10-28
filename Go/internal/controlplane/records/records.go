@@ -283,13 +283,19 @@ func (r *Records) HostUnreadable(id string) bool {
 	return ok
 }
 
-// TombstoneKeys is the key of every tombstone read, for the sweep (#174).
+// TombstoneKeys is the key of every tombstone read, for the sweep (#174): forgotten
+// clients and machines, and removed projects (#2711).
 func (r *Records) TombstoneKeys() []string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	out := make([]string, 0, len(r.tombstones))
 	for key := range r.tombstones {
 		out = append(out, key)
+	}
+	for _, h := range r.projects {
+		if h.record.IsRemoved() {
+			out = append(out, ProjectKey(h.record.ID))
+		}
 	}
 	sort.Strings(out)
 	return out

@@ -331,3 +331,23 @@ func TestAProjectChangeReadsAndTellsOnlyWhatChanged(t *testing.T) {
 		t.Fatalf("%d folder lists read again", gets)
 	}
 }
+
+// #2711: one person's project records are bounded. Ids past the bound are not adopted, and
+// projects/set refuses a new one.
+func TestAPersonsProjectsAreBounded(t *testing.T) {
+	t.Parallel()
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	mac := p.host("MAC")
+	_, owner := p.client("Alex's Mac")
+	folders := make([]wire.JoinedFolder, 0, mostOwnedProjects+1)
+	for n := range mostOwnedProjects + 1 {
+		folders = append(folders, wire.JoinedFolder{Folder: wire.URL(fmt.Sprintf("file:///x/%d/", n)), Name: fmt.Sprint(n), Project: fmt.Sprintf("p-%d", n)})
+	}
+	joinFolders(t, p, mac.member.Host, folders...)
+	if got := listedProjects(t, owner); len(got) != mostOwnedProjects {
+		t.Fatalf("%d projects", len(got))
+	}
+	if e := callError(t, owner, "", "projects/set", wire.ProjectSet{Name: "One more"}); !strings.Contains(e, "Remove one first") {
+		t.Fatal(e)
+	}
+}

@@ -126,6 +126,20 @@ func (r *Records) Project(id string) *Project {
 	return nil
 }
 
+// ProjectsOwnedBy is how many project records owner has, removed ones too: they are
+// kept until the sweep deletes them (#2711).
+func (r *Records) ProjectsOwnedBy(owner string) int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	n := 0
+	for _, h := range r.projects {
+		if h.record.Owner == owner {
+			n++
+		}
+	}
+	return n
+}
+
 // ChangeProject changes one project under the write lock, after reading projects again,
 // and writes it against the version read; a new one is written only if absent. change
 // gets the project, removed ones too (nil for none), and returns what to write, or nil to

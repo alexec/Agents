@@ -112,6 +112,43 @@ func TestTheSweepRemovesTheDeadAndKeepsTheLive(t *testing.T) {
 	}
 }
 
+// #2711: a removed project's record goes a week on, as a forgotten client's does; a live
+// one stays.
+func TestTheSweepRemovesRemovedProjects(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	s := store.NewMemory()
+	rs := records.New(s)
+	rs.SettingsOrMake(ctx, func() records.Settings { return records.Settings{Name: "test", MachineID: "m"} })
+	for _, id := range []string{"p-live", "p-gone"} {
+		rs.ChangeProject(ctx, id, func(*records.Project) (*records.Project, error) {
+			return &records.Project{ID: id, Name: id, Owner: "u", MadeAt: records.Now()}, nil
+		})
+	}
+	rs.ChangeProject(ctx, "p-gone", func(p *records.Project) (*records.Project, error) {
+		yes, now := true, records.Now()
+		next := *p
+		next.Removed, next.RemovedAt = &yes, &now
+		return &next, nil
+	})
+	if got := rs.ProjectsOwnedBy("u"); got != 2 {
+		t.Fatal(got)
+	}
+	now := time.Now()
+	if report, err := sweep(ctx, rs, now, mostPerSweep, nil); err != nil || report.tombstones != 0 {
+		t.Fatalf("%+v %v", report, err)
+	}
+	if report, err := sweep(ctx, rs, now.Add(8*24*time.Hour), mostPerSweep, nil); err != nil || report.tombstones != 1 {
+		t.Fatalf("%+v %v", report, err)
+	}
+	if o, _ := s.Get(ctx, records.ProjectKey("p-gone")); o != nil {
+		t.Fatal("the removed project stayed")
+	}
+	if rs.Project("p-live") == nil || rs.ProjectsOwnedBy("u") != 1 {
+		t.Fatal("the records did not follow")
+	}
+}
+
 func TestTheSweepStopsAtItsBound(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
