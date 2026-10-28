@@ -1,0 +1,150 @@
+# The release's two archives, on a runner with an empty build cache, before a tag is spent
+# on them (#2780). v0.12.0's `mac` and `testflight` jobs both failed: scripts/build-cache.sh
+# resolved packages with no -scheme, which only a cold cache shows (#2773). Lanes and the
+# merge wave build on Macs with a warm cache, so nothing saw it before the tag.
+#
+# It runs release.yml's archive commands as dry runs: scripts/release-host.sh --dry-run
+# (ad hoc signed, not notarized) and scripts/release-store.sh --dry-run (archived without a
+# certificate and checked, not exported or uploaded). No secret, no `release` environment.
+#
+# It starts only:
+#   - on a pull request that changes what the release builds with (the paths below), so CI
+#     stays fast for every other pull request. It is not a required check;
+#   - by hand, as the release skill's gate does on the commit it will tag:
+#     `gh workflow run release-dry-run.yml -f ref=<sha>`.
+name: release-dry-run
+run-name: release dry run ${{ inputs.ref || github.head_ref || github.sha }}
+
+on:
+  pull_request:
+    paths:
+      - scripts/build-cache.sh
+      - scripts/release-*.sh
+      - scripts/check-store-archive.sh
+      - scripts/build-linux-agentsd.sh
+      - .github/workflows/release.yml
+      - .github/workflows/release-dry-run.yml
+      - project.yml
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: The commit (or branch) to archive; the release gate gives the one it will tag
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-dry-run-${{ inputs.ref || github.ref }}
+  cancel-in-progress: true
+
+env:
+  REF: ${{ inputs.ref || github.sha }}
+  # The version the archives carry: any SemVer does, nothing is published.
+  VERSION: 0.0.0
+
+jobs:
+  # As release.yml's linux job: Agents Host carries the Linux agentsd and the MCP servers.
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.REF }}
+
+      - name: Tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh >/dev/null
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: Go/go.mod
+          cache: false
+
+      - name: Build agentsd for Linux
+        run: AGENTS_MARKETING_VERSION=$VERSION zsh scripts/build-linux-agentsd.sh
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: servers
+          path: App/Resources/servers
+          retention-days: 1
+
+  # As release.yml's mac job, up to the archive and the packaging; no signing or notarizing.
+  host:
+    needs: linux
+    runs-on: xcode-27
+    timeout-minutes: 75
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.REF }}
+
+      - uses: actions/download-artifact@v6
+        with:
+          name: servers
+          path: App/Resources/servers
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: Web/.node-version
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: Go/go.mod
+          cache: false
+
+      - name: Tools
+        run: |
+          brew install xcodegen &
+          xcodegen_pid=$!
+          xcodebuild -downloadComponent MetalToolchain
+          wait "$xcodegen_pid"
+
+      # An empty build cache of the run's own: the point of this job (#2773). Nothing is
+      # restored into it and nothing is saved from it.
+      - name: Archive and package Agents Host (dry run, cold cache)
+        run: |
+          export AGENTS_BUILD_CACHE="$RUNNER_TEMP/build-cache"
+          test ! -e "$AGENTS_BUILD_CACHE"
+          scripts/release-host.sh --dry-run "$VERSION" "${{ github.run_number }}"
+
+      - name: Logs
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: host-logs
+          path: build/release/*.log
+
+  # As release.yml's testflight job, up to the archives and their check; no export or upload.
+  store:
+    runs-on: xcode-27
+    timeout-minutes: 90
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.REF }}
+
+      - name: Tools
+        run: |
+          brew install xcodegen &
+          xcodegen_pid=$!
+          xcodebuild -downloadComponent MetalToolchain
+          wait "$xcodegen_pid"
+
+      - name: Archive and check the store app and the Remote (dry run, cold cache)
+        run: |
+          export AGENTS_BUILD_CACHE="$RUNNER_TEMP/build-cache"
+          test ! -e "$AGENTS_BUILD_CACHE"
+          scripts/release-store.sh --dry-run "$VERSION" "${{ github.run_number }}"
+
+      - name: Logs
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: store-logs
+          path: build/store/*.log

@@ -240,6 +240,14 @@ All of these, on the commit you will tag (`git rev-parse origin/main`, fetched a
 4. **No tag today** (#2462): look again as in step 0. The release can run past midnight, so a
    tag pushed today by another run ends this one with `nothing_to_do` and "released today
    (vX.Y.Z at HH:MM); next release tomorrow", unless Alex's prompt says to release again today.
+5. **The archives build on a cold cache** (#2780): `gh workflow run release-dry-run.yml -f
+   ref=<sha>`, then find its run (`gh run list --workflow release-dry-run.yml --json
+   databaseId,displayTitle,status --jq '.[] | select(.displayTitle == "release dry run <sha>")'`)
+   and wait for it as in item 1 (it takes up to an hour). It runs release.yml's `mac` and
+   `testflight` archives as dry runs on a runner with an empty build cache, which no lane
+   or merge wave does (#2773 spent v0.12.0's tag). A run of it on a pull request does not
+   count: run it on `<sha>`. If it failed, end with `partly_done`, naming the job and its
+   first error; the fix goes through the Scrum Master as for main broken.
 
 ## 6. Version and notes
 
