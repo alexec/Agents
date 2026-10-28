@@ -97,6 +97,44 @@ public struct WorkflowSettings: Codable, Hashable, Sendable {
         return clauses.isEmpty ? nil : clauses.joined(separator: ", ")
     }
 
+    /// Which runtime a run will use, and why, as the workflow page says it (#2764): the
+    /// one the file names, else the newest agent's on the machine that runs it, else the
+    /// default. The web says the same in `runsOn` (`Web/src/model/workflowSettings.ts`).
+    public struct RunsOn: Hashable, Sendable {
+        public enum Source: Hashable, Sendable { case file, lastUsed, fallback }
+        public var runtimeID: String
+        public var source: Source
+
+        /// `nil` when this version does not know the runtime.
+        public var runtime: Runtime? { RuntimeCatalog.runtime(id: runtimeID) }
+
+        /// `Runs on Codex (named in the file)`.
+        public var line: String {
+            let name = runtime?.name ?? "\"\(runtimeID)\""
+            switch source {
+            case .file: return "Runs on \(name) (named in the file)"
+            case .lastUsed: return "Runs on \(name) (the last used here)"
+            case .fallback: return "Runs on \(name) (the default)"
+            }
+        }
+
+        /// What to mark under the line when this version does not know the runtime:
+        /// its settings cannot be shown, and a file that names it never runs.
+        public var unknown: String? {
+            guard runtime == nil else { return nil }
+            return source == .file
+                ? "\"\(runtimeID)\" is not a runtime this version knows, so this workflow does not run."
+                : "\"\(runtimeID)\" is not a runtime this version knows, so its settings cannot be shown."
+        }
+    }
+
+    /// The runtime a run will use, given the newest agent's runtime on its machine.
+    public func runsOn(lastUsed: String?) -> RunsOn {
+        if let runtimeID { return RunsOn(runtimeID: runtimeID, source: .file) }
+        if let lastUsed { return RunsOn(runtimeID: lastUsed, source: .lastUsed) }
+        return RunsOn(runtimeID: RuntimeCatalog.defaultRuntime.id, source: .fallback)
+    }
+
     /// The names these settings go by in the file, and the names a refusal is grouped
     /// by afterwards.
     ///

@@ -813,29 +813,41 @@ struct WorkflowPage: View {
         }
     }
 
-    /// The workflow file, without a runtime picker. The runtime follows the last agent
-    /// on this host unless the file names an override.
+    /// The workflow file on the left, and on the right the runtime a run will use and
+    /// why (#2764): the file's, else the last agent's on this machine, else the default.
+    /// There is no picker; one this version does not know is marked under it.
     private func fileRow(_ summary: WorkflowSummary) -> some View {
         let workflow = summary.workflow
         let file = url(workflow)
         let here = model.isOnThisMac(place.host)
-        return HStack(spacing: 12) {
-            if here {
-                Button {
-                    model.reveal(file, on: place.host)
-                } label: {
-                    Label(file.lastPathComponent, systemImage: "doc.text")
-                        .lineLimit(1)
-                }
-                .buttonStyle(.paper)
-                .appText(.fine)
-                .help("\(file.path) — click to show in Finder")
-            } else {
-                // The file is on the host. Finder here cannot show it (058, FR-019).
-                Label(file.lastPathComponent, systemImage: "doc.text")
+        let runs = runsOn(workflow)
+        return VStack(alignment: .trailing, spacing: 4) {
+            HStack(spacing: 12) {
+                if here {
+                    Button {
+                        model.reveal(file, on: place.host)
+                    } label: {
+                        Label(file.lastPathComponent, systemImage: "doc.text")
+                            .lineLimit(1)
+                    }
+                    .buttonStyle(.paper)
                     .appText(.fine)
+                    .help("\(file.path) — click to show in Finder")
+                } else {
+                    // The file is on the host. Finder here cannot show it (058, FR-019).
+                    Label(file.lastPathComponent, systemImage: "doc.text")
+                        .appText(.fine)
+                        .lineLimit(1)
+                        .help("On \(model.hosts.label(place.host)). Open it there.")
+                }
+                Spacer(minLength: 8)
+                Text(runs.line)
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
-                    .help("On \(model.hosts.label(place.host)). Open it there.")
+            }
+            if let unknown = runs.unknown {
+                marked(unknown)
             }
         }
     }
@@ -846,10 +858,12 @@ struct WorkflowPage: View {
     }
 
     /// The runtime the file names, or the most recently active runtime on this host.
+    private func runsOn(_ workflow: Workflow) -> WorkflowSettings.RunsOn {
+        workflow.settings.runsOn(lastUsed: model.work.lastRuntimes[place.host])
+    }
+
     private func runtimeID(_ workflow: Workflow) -> String {
-        workflow.settings.runtimeID
-            ?? model.work.lastRuntimes[place.host]
-            ?? RuntimeCatalog.defaultRuntime.id
+        runsOn(workflow).runtimeID
     }
 
     /// One of the settings the runtime itself defines, in the four states the

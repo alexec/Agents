@@ -1,5 +1,5 @@
 // A workflow's settings on its page (#162; the window's WorkflowPage form and the Remote's): the
-// permission mode on the left and the model, effort and the runtime's other options
+// runtime a run will use and why (#2764), the permission mode on the left and the model, effort and the runtime's other options
 // on the right, as the prompt's menus are laid out; then its labels, in the tag input sessions
 // use; and, under the triggers, its cooldown and what a run may do when done (#433). Each control writes its one key in the file through
 // the daemon (`workflows/settings`) and is drawn from what the file says, so a refusal leaves the
@@ -13,9 +13,8 @@ import { useEffect } from "preact/hooks";
 import type { ConfigOption, JSONValue, WorkflowSettings, WorkflowSummary } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { modeOption } from "../model/options";
-import { defaultRuntime } from "../model/workflows";
 import {
-  cooldownChoices, cooldownFileText, effortOption, fileValue, modelOption, otherOptions, refusals, selectable, shown, withDefault,
+  cooldownChoices, cooldownFileText, effortOption, fileValue, modelOption, otherOptions, refusals, runsOn, selectable, shown, withDefault,
   whenDoneChoices, whenDoneWords, type WhenDone,
 } from "../model/workflowSettings";
 import { cooldownWords } from "../model/workflows";
@@ -44,7 +43,9 @@ export function WorkflowSettingsForm({ store, host, summary, disabled, problem, 
 }) {
   const workflow = summary.workflow;
   const settings = workflow.settings;
-  const runtimeID = settings.runtimeID ?? store.agents.value[host]?.[0]?.runtimeID ?? defaultRuntime;
+  // A host's agents are held newest first, so the first is the last used there.
+  const runs = runsOn(settings.runtimeID, store.agents.value[host]?.[0]?.runtimeID);
+  const runtimeID = runs.runtimeID;
   const runtimes = (store.runtimes.value[host] ?? []).map((r) => r.runtime);
   const runtimeName = runtimes.find((r) => r.id === runtimeID)?.name ?? runtimeID;
   const remembered = useSignal<ConfigOption[] | null>(null);
@@ -68,6 +69,8 @@ export function WorkflowSettingsForm({ store, host, summary, disabled, problem, 
 
   return (
     <div class="workflow-settings">
+      <p class="quiet small">{runs.line}</p>
+      {runs.unknown && <p class="marked small">⚠︎ {runs.unknown}</p>}
       {triggering && <p class="quiet small">This workflow resumes the agent that triggered it, so these do not apply.</p>}
       {workflow.mode === "standing" && <p class="quiet small">Applied when its standing agent is started, and again if it has to be replaced.</p>}
       <div class="menus" role="group" aria-label="Settings for each run">
