@@ -606,7 +606,7 @@ func (d *Daemon) editWorkflowLocked(folder, id string, byPerson bool, edit func(
 		return noSuchWorkflow(id)
 	}
 	if f.scope == "user" && folder != d.personalHome() {
-		return &Error{Code: wire.FailureNotAllowed, Message: "Edit this workflow in Settings ▸ Workflows. Its file belongs to your workflows."}
+		return &Error{Code: wire.FailureNotAllowed, Message: "Edit this workflow in Settings ▸ Agent Configuration ▸ Workflows. Its file belongs to your workflows."}
 	}
 	path, ok := workflowSourcePath(folder, id, f)
 	if !ok {
@@ -858,7 +858,7 @@ func (d *Daemon) deleteWorkflow(r wire.WorkflowRequest) error {
 		return noSuchWorkflow(r.WorkflowID)
 	} else if f.scope == "user" && folder != d.personalHome() {
 		d.workflowMu.Unlock()
-		return &Error{Code: wire.FailureDeleteRefused, Message: f.wf.Name + " belongs to your workflows. Delete it in Settings ▸ Workflows."}
+		return &Error{Code: wire.FailureDeleteRefused, Message: f.wf.Name + " belongs to your workflows. Delete it in Settings ▸ Agent Configuration ▸ Workflows."}
 	}
 	f := d.fileLocked(folder, r.WorkflowID)
 	path, ok := workflowSourcePath(folder, r.WorkflowID, f)
