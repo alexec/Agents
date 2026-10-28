@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -119,13 +120,127 @@ func TestSelfUpdateWaitsForTheTurnToEnd(t *testing.T) {
 	if r.which(t) != "new" || r.restarts.Load() != 1 {
 		t.Fatalf("not updated: %s, %d restarts", r.which(t), r.restarts.Load())
 	}
-	// The old copy waits beside it until the next start takes it away.
+	// The old copy waits beside it until the new one has stayed up.
 	if len(r.leftovers()) != 1 {
 		t.Fatalf("%v", r.leftovers())
 	}
-	cleanSelfUpdates(r.app)
-	if len(r.leftovers()) != 0 {
+	// One swap, so the app was never missing: the old copy is where the new one was.
+	if m := r.mark(t); m.Old != filepath.Join("new", "Agents Host.app") {
+		t.Fatalf("not swapped in one step: %+v", m)
+	}
+	if keep, back := r.settle("0.12.0"); len(keep) != 1 || back {
+		t.Fatalf("the old copy was not kept for the new one's first start: %v %v", keep, back)
+	}
+}
+
+func (r *selfUpdateRig) settle(running string) ([]string, bool) {
+	return settleSelfUpdates(r.app, running, r.u.file, exchangePaths)
+}
+
+func (r *selfUpdateRig) updated(t *testing.T) {
+	t.Helper()
+	r.u.Named("0.12.0")
+	r.until(t, wire.SelfUpdateStateRestarting)
+	r.restarted(t)
+	if r.which(t) != "new" {
+		t.Fatal("not updated")
+	}
+}
+
+func (r *selfUpdateRig) mark(t *testing.T) selfUpdateMarkFile {
+	t.Helper()
+	if len(r.leftovers()) != 1 {
 		t.Fatalf("%v", r.leftovers())
+	}
+	var m selfUpdateMarkFile
+	b, err := os.ReadFile(filepath.Join(r.leftovers()[0], selfUpdateMark))
+	if err != nil || json.Unmarshal(b, &m) != nil {
+		t.Fatalf("no mark: %v", err)
+	}
+	return m
+}
+
+// A folder that cannot swap in one step takes two renames, and the mark says where the old
+// copy went (#2710).
+func TestSelfUpdateWithNoSwapTakesTwoRenames(t *testing.T) {
+	r := newSelfUpdateRig(t, []byte("zip"))
+	r.u.swap = func(a, b string) error { return errors.ErrUnsupported }
+	r.updated(t)
+	m := r.mark(t)
+	if m.Old != "old.app" || m.From != "0.11.0" || m.To != "0.12.0" {
+		t.Fatalf("%+v", m)
+	}
+	if b, _ := os.ReadFile(filepath.Join(r.leftovers()[0], "old.app", "which")); string(b) != "old" {
+		t.Fatalf("the old copy is not where the mark says: %q", b)
+	}
+}
+
+// A cut between the two renames leaves no app; the next start puts the old copy back (#2710).
+func TestSelfUpdateCutBetweenRenamesPutsTheOldCopyBack(t *testing.T) {
+	r := newSelfUpdateRig(t, []byte("zip"))
+	work := filepath.Join(filepath.Dir(r.app), ".Agents Host.update-cut")
+	os.MkdirAll(work, 0o755)
+	if err := writeSelfUpdateMark(work, selfUpdateMarkFile{From: "0.11.0", To: "0.12.0", Old: "old.app"}); err != nil {
+		t.Fatal(err)
+	}
+	// The first rename, and then the cut.
+	if err := os.Rename(r.app, filepath.Join(work, "old.app")); err != nil {
+		t.Fatal(err)
+	}
+	keep, back := r.settle("0.11.0")
+	if !back || len(keep) != 0 {
+		t.Fatalf("%v %v", keep, back)
+	}
+	if r.which(t) != "old" || len(r.leftovers()) != 0 {
+		t.Fatalf("the old copy did not go back: %v", r.leftovers())
+	}
+}
+
+// A new copy that starts selfUpdateTries times without staying up is swapped back, and its
+// release is not taken again (#2710).
+func TestSelfUpdateRollsBackACopyThatDoesNotStayUp(t *testing.T) {
+	r := newSelfUpdateRig(t, []byte("zip"))
+	r.updated(t)
+	for i := 1; i <= selfUpdateTries; i++ {
+		if keep, back := r.settle("0.12.0"); len(keep) != 1 || back {
+			t.Fatalf("start %d: %v %v", i, keep, back)
+		}
+		if m := r.mark(t); m.Starts != i {
+			t.Fatalf("start %d counted as %d", i, m.Starts)
+		}
+	}
+	if r.which(t) != "new" {
+		t.Fatal("rolled back too soon")
+	}
+	if _, back := r.settle("0.12.0"); !back {
+		t.Fatal("not rolled back")
+	}
+	if r.which(t) != "old" || len(r.leftovers()) != 0 {
+		t.Fatalf("the old copy is not back: %s %v", r.which(t), r.leftovers())
+	}
+	if s := readSelfUpdateSettings(r.u.file); s.RolledBack != "0.12.0" || !s.AutoUpdate {
+		t.Fatalf("%+v", s)
+	}
+	again := newSelfUpdater(r.u.file, r.app, "0.11.0")
+	again.writable = func(string) error { return nil }
+	again.Named("0.12.0")
+	if s := again.Status(); s.State != wire.SelfUpdateStateFailed || s.Message == nil || !strings.Contains(*s.Message, "did not stay running") {
+		t.Fatalf("the release that rolled back would be taken again: %+v", s)
+	}
+	// Setting updating keeps the release that rolled back.
+	again.Set(wire.SelfUpdateSet{AutoUpdate: true})
+	if s := readSelfUpdateSettings(r.u.file); s.RolledBack != "0.12.0" {
+		t.Fatalf("%+v", s)
+	}
+}
+
+// When the old copy runs again, or a download was cut short, the start takes the folder away.
+func TestSelfUpdateStartTakesAwayWhatItNoLongerNeeds(t *testing.T) {
+	r := newSelfUpdateRig(t, []byte("zip"))
+	r.updated(t)
+	os.MkdirAll(filepath.Join(filepath.Dir(r.app), ".Agents Host.update-cut", "new"), 0o755)
+	if keep, back := r.settle("0.11.0"); len(keep) != 0 || back || len(r.leftovers()) != 0 {
+		t.Fatalf("%v %v %v", keep, back, r.leftovers())
 	}
 }
 

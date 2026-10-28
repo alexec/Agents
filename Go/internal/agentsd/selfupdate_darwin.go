@@ -3,14 +3,18 @@ package agentsd
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/buildinfo"
+	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
+	"golang.org/x/sys/unix"
 )
 
 // registerSelfUpdate serves selfUpdate/status and selfUpdate/set on a Mac whose host runs
@@ -31,8 +35,26 @@ func (d *Daemon) registerSelfUpdate() {
 	if app == "" {
 		return
 	}
-	cleanSelfUpdates(app)
-	u := newSelfUpdater(filepath.Join(d.Store.Loc.Root, selfUpdateFile), app, buildinfo.Version)
+	file := filepath.Join(d.Store.Loc.Root, selfUpdateFile)
+	keep, back := settleSelfUpdates(app, buildinfo.Version, file, exchangePaths)
+	if back {
+		if err := restartLaunchAgents(); err != nil {
+			log.Printf("self-update: the old copy is back; quit and open Agents Host to run it: %v", err)
+		}
+		return
+	}
+	if len(keep) > 0 {
+		safe.Go("self-update-settle", func() {
+			select {
+			case <-d.ctx.Done():
+			case <-time.After(selfUpdateHealthy):
+				for _, work := range keep {
+					os.RemoveAll(work)
+				}
+			}
+		})
+	}
+	u := newSelfUpdater(file, app, buildinfo.Version)
 	u.unpack, u.verify, u.version, u.restart = dittoUnpack, verifyRelease, bundleVersion, restartLaunchAgents
 	if u.status.State != wire.SelfUpdateStateCannot {
 		if team, _ := signingOf(app); team == "" {
@@ -41,6 +63,11 @@ func (d *Daemon) registerSelfUpdate() {
 		}
 	}
 	d.serveSelfUpdate(u)
+}
+
+// exchangePaths swaps two paths in one step (renamex_np with RENAME_SWAP, #2710).
+func exchangePaths(a, b string) error {
+	return unix.RenamexNp(a, b, unix.RENAME_SWAP)
 }
 
 func dittoUnpack(zip, dir string) error {

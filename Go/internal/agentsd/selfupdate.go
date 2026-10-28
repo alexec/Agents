@@ -32,8 +32,13 @@ import (
 //  1. downloads the release's Agents-Host-<version>.zip and SHA256SUMS, and checks the sum;
 //  2. unpacks it beside this copy, and checks the new copy's signature (the same team and
 //     identifier as this one), its notarisation and its version;
-//  3. waits until no turn runs, then puts the new copy where this one is;
+//  3. waits until no turn runs, then swaps the new copy and this one in one step, and keeps
+//     this one beside it, with a mark (#2710);
 //  4. restarts the launch agents, which run what is in the bundle now.
+//
+// The old copy stays until the new one has stayed up selfUpdateHealthy. A new copy that
+// starts selfUpdateTries times without staying up is swapped back for the old one, and its
+// release is not taken again (settleSelfUpdates).
 //
 // It never asks for an administrator (#2178, hosts never escalate): a copy in a folder the
 // person cannot change, such as /Applications for a standard user, says so and stays.
@@ -43,6 +48,25 @@ const selfUpdateFile = "self-update.json"
 
 // selfUpdateLimit bounds the download: the release's zip is about 100 MB.
 const selfUpdateLimit = 1 << 30
+
+// selfUpdateMark is the mark an update leaves in its folder beside the app just before the
+// swap (#2710): which release replaced which, where the old copy is, and how many times the
+// new copy has started.
+const selfUpdateMark = "update.json"
+
+// A new copy has selfUpdateTries starts to stay up selfUpdateHealthy; then the old copy
+// goes back. launchd starts a host that ends again after about ten seconds.
+const (
+	selfUpdateTries   = 3
+	selfUpdateHealthy = 5 * time.Minute
+)
+
+type selfUpdateMarkFile struct {
+	From   string `json:"from"`
+	To     string `json:"to"`
+	Old    string `json:"old"` // the old copy, in the update's folder
+	Starts int    `json:"starts"`
+}
 
 // releaseDownloads is where a release's files are, by tag. AGENTS_RELEASE_DOWNLOADS
 // replaces it, for a test or a mirror.
@@ -63,6 +87,7 @@ type selfUpdater struct {
 	verify   func(next, running string) error
 	version  func(app string) (string, error)
 	writable func(app string) error
+	swap     func(a, b string) error
 	restart  func() error
 	pause    time.Duration
 
@@ -71,6 +96,8 @@ type selfUpdater struct {
 	// busy is a release being downloaded, checked or waited on; another named meanwhile
 	// waits for it to end.
 	busy bool
+	// rolledBack is a release that did not stay up here, so it is not taken again.
+	rolledBack string
 }
 
 type selfUpdateState struct {
@@ -78,7 +105,8 @@ type selfUpdateState struct {
 }
 
 type selfUpdateSettings struct {
-	AutoUpdate bool `json:"autoUpdate"`
+	AutoUpdate bool   `json:"autoUpdate"`
+	RolledBack string `json:"rolledBack,omitempty"`
 }
 
 func readSelfUpdateSettings(path string) selfUpdateSettings {
@@ -87,15 +115,23 @@ func readSelfUpdateSettings(path string) selfUpdateSettings {
 		var m map[string]json.RawMessage
 		if json.Unmarshal(b, &m) == nil {
 			json.Unmarshal(m["autoUpdate"], &s.AutoUpdate)
+			json.Unmarshal(m["rolledBack"], &s.RolledBack)
 		}
 	}
 	return s
 }
 
+func writeSelfUpdateSettings(path string, s selfUpdateSettings) error {
+	b, _ := json.Marshal(s)
+	return store.WriteAtomically(path, b, 0o600)
+}
+
 func newSelfUpdater(file, app, running string) *selfUpdater {
 	u := &selfUpdater{file: file, app: app, running: running, pause: 15 * time.Second,
-		fetch: fetchTo, writable: folderWritable, ctx: context.Background()}
-	u.status = wire.SelfUpdate{AutoUpdate: readSelfUpdateSettings(file).AutoUpdate, State: wire.SelfUpdateStateUpToDate, Running: running}
+		fetch: fetchTo, writable: folderWritable, swap: exchangePaths, ctx: context.Background()}
+	settings := readSelfUpdateSettings(file)
+	u.rolledBack = settings.RolledBack
+	u.status = wire.SelfUpdate{AutoUpdate: settings.AutoUpdate, State: wire.SelfUpdateStateUpToDate, Running: running}
 	if why := u.cannot(); why != "" {
 		u.status.State, u.status.Message = wire.SelfUpdateStateCannot, &why
 	} else if !u.status.AutoUpdate {
@@ -133,8 +169,9 @@ func (u *selfUpdater) set(change func(*wire.SelfUpdate)) {
 
 // Set is selfUpdate/set: kept, and a release named before is taken up at once.
 func (u *selfUpdater) Set(r wire.SelfUpdateSet) (wire.SelfUpdate, error) {
-	b, _ := json.Marshal(selfUpdateSettings{AutoUpdate: r.AutoUpdate})
-	if err := store.WriteAtomically(u.file, b, 0o600); err != nil {
+	settings := readSelfUpdateSettings(u.file)
+	settings.AutoUpdate = r.AutoUpdate
+	if err := writeSelfUpdateSettings(u.file, settings); err != nil {
 		return u.Status(), err
 	}
 	u.mu.Lock()
@@ -177,6 +214,12 @@ func (u *selfUpdater) Named(version string) {
 		u.set(func(s *wire.SelfUpdate) { s.State, s.Message = wire.SelfUpdateStateUpToDate, nil })
 		return
 	}
+	if version == u.rolledBack {
+		why := "Agents Host " + version + " did not stay running here, so this Mac went back to " + u.running +
+			". It waits for the next release."
+		u.set(func(s *wire.SelfUpdate) { s.State, s.Message = wire.SelfUpdateStateFailed, &why })
+		return
+	}
 	if err := u.writable(u.app); err != nil {
 		why := "Agents Host is in a folder you can change only as an administrator (" + filepath.Dir(u.app) +
 			"). Move it to Applications in your home folder, then open it again, so it can update itself."
@@ -216,7 +259,7 @@ func (u *selfUpdater) update(version string) error {
 	swapped := false
 	defer func() {
 		// After the swap the folder holds the old copy, which may still be running: the
-		// next start takes it away (cleanSelfUpdates).
+		// new copy takes it away once it has stayed up (settleSelfUpdates).
 		if !swapped {
 			os.RemoveAll(work)
 		}
@@ -235,13 +278,8 @@ func (u *selfUpdater) update(version string) error {
 	if err := u.betweenTurns(); err != nil {
 		return err
 	}
-	old := filepath.Join(work, "old.app")
-	if err := os.Rename(u.app, old); err != nil {
-		return fmt.Errorf("Agents Host could not move itself aside: %w", err)
-	}
-	if err := os.Rename(next, u.app); err != nil {
-		os.Rename(old, u.app)
-		return fmt.Errorf("Agents Host could not put the new copy in its place: %w", err)
+	if err := u.putInPlace(version, work, next); err != nil {
+		return err
 	}
 	swapped = true
 	log.Printf("self-update: Agents Host %s is in place of %s", version, u.running)
@@ -254,6 +292,40 @@ func (u *selfUpdater) update(version string) error {
 		return fmt.Errorf("Agents Host %s is installed. Quit and open Agents Host to finish: %v", version, err)
 	}
 	return nil
+}
+
+// putInPlace swaps the new copy and this one in one step, so the app is never missing; the
+// old copy is then where the new one was. Where the folder cannot swap, it takes two
+// renames, and a start that finds no app puts the old copy back. The mark is written
+// first either way.
+func (u *selfUpdater) putInPlace(version, work, next string) error {
+	mark := selfUpdateMarkFile{From: u.running, To: version, Old: strings.TrimPrefix(next, work+string(filepath.Separator))}
+	if err := writeSelfUpdateMark(work, mark); err != nil {
+		return fmt.Errorf("Agents Host could not keep a note of the update: %w", err)
+	}
+	err := u.swap(u.app, next)
+	if err == nil {
+		return nil
+	}
+	log.Printf("self-update: no swap in one step (%v): two renames", err)
+	mark.Old = "old.app"
+	if err := writeSelfUpdateMark(work, mark); err != nil {
+		return fmt.Errorf("Agents Host could not keep a note of the update: %w", err)
+	}
+	old := filepath.Join(work, mark.Old)
+	if err := os.Rename(u.app, old); err != nil {
+		return fmt.Errorf("Agents Host could not move itself aside: %w", err)
+	}
+	if err := os.Rename(next, u.app); err != nil {
+		os.Rename(old, u.app)
+		return fmt.Errorf("Agents Host could not put the new copy in its place: %w", err)
+	}
+	return nil
+}
+
+func writeSelfUpdateMark(work string, m selfUpdateMarkFile) error {
+	b, _ := json.Marshal(m)
+	return store.WriteAtomically(filepath.Join(work, selfUpdateMark), b, 0o600)
 }
 
 // betweenTurns waits until no turn runs; it ends early when the host stops or updating is
@@ -364,13 +436,80 @@ func folderWritable(app string) error {
 	return unix.Access(app, unix.W_OK)
 }
 
-// cleanSelfUpdates takes away what an update left beside the app: the old copy, which
-// ran until the restart, or a download that a stop cut short.
-func cleanSelfUpdates(app string) {
+// settleSelfUpdates is what a start does with what an update left beside the app (#2710).
+// A folder with no mark is a download that a stop cut short: it goes. A folder with a mark
+// holds the old copy:
+//   - with no app in place (a cut between two renames), the old copy goes back;
+//   - when this is the new copy, the start is counted, and the folder is kept until this
+//     copy has stayed up; a start past selfUpdateTries swaps the old copy back and keeps its
+//     release from being taken again;
+//   - otherwise (the old copy runs again, or another copy was put there), it goes.
+//
+// keep is the folders to take away once this copy has stayed up selfUpdateHealthy. back is
+// the old copy put back: this host restarts, to run it.
+func settleSelfUpdates(app, running, settingsFile string, swap func(a, b string) error) (keep []string, back bool) {
 	matches, _ := filepath.Glob(filepath.Join(filepath.Dir(app), ".Agents Host.update-*"))
-	for _, m := range matches {
-		os.RemoveAll(m)
+	for _, work := range matches {
+		var mark selfUpdateMarkFile
+		b, err := os.ReadFile(filepath.Join(work, selfUpdateMark))
+		if err != nil || json.Unmarshal(b, &mark) != nil || mark.Old == "" {
+			os.RemoveAll(work)
+			continue
+		}
+		old := filepath.Join(work, mark.Old)
+		if _, err := os.Stat(app); errors.Is(err, os.ErrNotExist) {
+			if err := os.Rename(old, app); err != nil {
+				log.Printf("self-update: no app at %s, and the old copy did not go back: %v", app, err)
+				continue
+			}
+			log.Printf("self-update: no app at %s: Agents Host %s went back", app, mark.From)
+			os.RemoveAll(work)
+			back = true
+			continue
+		}
+		if mark.To != running {
+			os.RemoveAll(work)
+			continue
+		}
+		mark.Starts++
+		if mark.Starts <= selfUpdateTries {
+			if err := writeSelfUpdateMark(work, mark); err != nil {
+				log.Printf("self-update: %v", err)
+			}
+			keep = append(keep, work)
+			continue
+		}
+		if err := swapBack(app, old, swap); err != nil {
+			log.Printf("self-update: Agents Host %s did not stay up, and %s did not go back: %v", mark.To, mark.From, err)
+			keep = append(keep, work)
+			continue
+		}
+		log.Printf("self-update: Agents Host %s started %d times without staying up: %s went back", mark.To, selfUpdateTries, mark.From)
+		settings := readSelfUpdateSettings(settingsFile)
+		settings.RolledBack = mark.To
+		if err := writeSelfUpdateSettings(settingsFile, settings); err != nil {
+			log.Printf("self-update: %v", err)
+		}
+		os.RemoveAll(work)
+		back = true
 	}
+	return keep, back
+}
+
+// swapBack puts the old copy in the app's place: in one step, or with two renames.
+func swapBack(app, old string, swap func(a, b string) error) error {
+	if swap(app, old) == nil {
+		return nil
+	}
+	aside := old + ".failed"
+	if err := os.Rename(app, aside); err != nil {
+		return err
+	}
+	if err := os.Rename(old, app); err != nil {
+		os.Rename(aside, app)
+		return err
+	}
+	return nil
 }
 
 // releaseVersion is X.Y.Z as three numbers; not ok for a development build (a suffix).
