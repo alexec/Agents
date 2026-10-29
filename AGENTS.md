@@ -24,7 +24,7 @@
 - **Three clients draw the same product:** the Mac window (`App/`), the Remote on iPhone and iPad (`Remote/`), and the web page (`Web/`). `Shared/UI` is drawn by both the window and the Remote.
 - **Each feature has a tier (#2796):** the Tier cell of its row in the parity table, below. The Mac window and the web page are full clients and are never trimmed; the tiers trim only the Remote.
   - **Core:** all three clients (the session list, chat, question cards, the prompt bar, approvals, notices, the Brief, and the session and folder work the Remote keeps). The parity table lists it all.
-  - **Mac + web:** the Mac window and the web page. The Remote gets no parity issue, and shows at most a read-only view or "Open this on your Mac or the web page" (#2798).
+  - **Mac + web:** the Mac window and the web page. The Remote gets no parity issue and does not have the feature: #2798 removes it, with no line in its place (Alex, 2026-10-29).
   - **One client:** by design, no follow-up.
   - A new feature that is on neither of the parity table's lists is Mac + web.
 - **A change to any client's UI** (`App/Sources`, `Remote/Sources`, `Shared/UI` or `Web/src`) says, in its commit, what **each of the other two** does about it, one line each:

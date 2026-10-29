@@ -18,7 +18,7 @@
 Alex chose tiers on 2026-10-27 (#2796). Each row has a **Tier** cell after its Feature. The tier says which clients must have the feature. The Mac window and the web page are full clients: they are never trimmed. The tiers trim only the Remote.
 
 - **Core:** all three clients. A change is made on all three in the same branch, or a parity issue is filed for each client that does not get it yet.
-- **Mac + web:** the Mac window and the web page. The Remote shows no more than a read-only view, or the line "Open this on your Mac or the web page". Nobody files a Remote parity issue. #2798 removes these features from the Remote. Until it does, the Remote's cell says what the Remote has now.
+- **Mac + web:** the Mac window and the web page. The Remote does not have them: #2798 removes each one from the Remote completely, with no line in its place (Alex, 2026-10-29). Nobody files a Remote parity issue. Until a feature is removed, the Remote's cell says what the Remote has now.
 - **One client:** one client only, by design (hover, keyboard, Finder, the Mac's own host). No follow-up.
 
 **Core** is:

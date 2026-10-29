@@ -228,13 +228,6 @@ private struct RemoteSlotView: View {
                             Text(ConnectorSetupWords.otherTrackers(linearConnected: linearConnected != false))
                                 .appText(.fine).foregroundStyle(.secondary)
                         }
-                    } else {
-                        // Adding a machine or a provider is Mac + web (#2798).
-                        OnMacOrWeb(page: "settings")
-                        if setup.forgeOrGitHub == .github, setup.repository != nil, setup.connection?.state == .connected {
-                            Text("GitHub Codespaces: Set up on the Mac.").appText(.fine).foregroundStyle(.secondary)
-                        }
-                        Text(WhereAgentsRun.addProviderNote).appText(.fine).foregroundStyle(.secondary)
                     }
                 }
                 .paperListRow()

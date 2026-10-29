@@ -3,10 +3,10 @@ import SwiftUI
 
 /// Settings (#846), in the window's three groups by subject (#2157): This app (Voice; Live
 /// Activities, which only a phone or an iPad has (#1657); and Sidebar, kept on the Mac's host and the same on
-/// every client: #1033, #2079); Machines (git access); and Control plane (Sign-ins and the Policy with its
-/// kill switch), only once paired (#2260). Each row opens its page. People, Groups, Bots, Channels,
-/// Sign-in Providers, Secrets, Backups, Versions and the machine providers are Mac + web (#2796, #2798):
-/// a line says where they are.
+/// every client: #1033, #2079); git access while a machine uses a Mac's; and Control plane (Sign-ins
+/// and the Policy with its kill switch), only once paired (#2260). Each row opens its page. People,
+/// Groups, Bots, Channels, Sign-in Providers, Secrets, Backups, Versions and the machine providers are
+/// Mac + web (#2796, #2798): the Remote does not have them.
 ///
 /// Each row is a view in a file of its own in this folder, and one line here (#2020), so two
 /// features that each add a row touch different lines.
@@ -24,10 +24,8 @@ struct RemoteSettings: View {
                     SettingsPageLink("Sidebar", systemImage: "sidebar.left") { SidebarSettingsSection() }
                 }
                 .paperListRow()
-                Section(SettingsScope.machines.title) {
-                    MachinesSettingsRow()
-                }
-                .paperListRow()
+                // Git access, shown only while a machine uses a Mac's (#1122).
+                GitAccessSettingsSection()
                 // Auto's order and Mappings, kept on the Mac's host (#2658).
                 Section("Agent Runtimes") {
                     AutoSettingsRow()
@@ -46,13 +44,10 @@ struct RemoteSettings: View {
                         // In the window's and the page's order (#2267).
                         SignInsSettingsRow()
                         PolicySettingsRow()
-                        // People, Groups, Bots, Channels, Sign-in Providers and the machine
-                        // providers are Mac + web (#2798).
-                        OnMacOrWeb(page: "settings")
                     } header: {
                         Text(SettingsScope.controlPlane.title)
                     } footer: {
-                        Text("How you sign in, and the organisation's policy. People, groups, bots, channels and providers are on your Mac and the web page.")
+                        Text("How you sign in, and the organisation's policy.")
                     }
                     .paperListRow()
                 }

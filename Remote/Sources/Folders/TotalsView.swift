@@ -19,7 +19,7 @@ struct TotalsView: View {
 
     private var spending: Spending { Spending(model.allFolders) }
 
-    /// Reports is Mac + web (#2798): a line under the page says where it is.
+    /// Reports is Mac + web (#2798).
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -62,7 +62,6 @@ struct TotalsView: View {
                 }
                 // Where each runtime's allowance stands, a tap away (065).
                 RuntimesLink()
-                OnMacOrWeb(page: "reports")
             }
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
