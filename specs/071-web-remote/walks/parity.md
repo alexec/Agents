@@ -18,7 +18,7 @@
 Alex chose tiers on 2026-10-27 (#2796). Each row has a **Tier** cell after its Feature. The tier says which clients must have the feature. The Mac window and the web page are full clients: they are never trimmed. The tiers trim only the Remote.
 
 - **Core:** all three clients. A change is made on all three in the same branch, or a parity issue is filed for each client that does not get it yet.
-- **Mac + web:** the Mac window and the web page. The Remote shows no more than a read-only view, or the line "Open this on your Mac or the web page". Nobody files a Remote parity issue. #2798 removes these features from the Remote. Until it does, the Remote's cell says what the Remote has now.
+- **Mac + web:** the Mac window and the web page. The Remote does not have them: #2798 removes each one from the Remote completely, with no line in its place (Alex, 2026-10-29). Nobody files a Remote parity issue. Until a feature is removed, the Remote's cell says what the Remote has now.
 - **One client:** one client only, by design (hover, keyboard, Finder, the Mac's own host). No follow-up.
 
 **Core** is:
@@ -26,10 +26,10 @@ Alex chose tiers on 2026-10-27 (#2796). Each row has a **Tier** cell after its F
 - the session and folder work the Remote keeps (#2798): terminals, reading and editing files, diffs and Changes, the Worktrees list and the Simulator pane;
 - runtimes' details (accounts, Reaches the Model By, Mark Available), the Events and Resources pages, and MCP app views and their pins;
 - the workflow page's Activity, Run Now, Approve and Enabled; today's cost in Activity and the limit banners;
-- the kill switch, the join and sign-in approval cards, pairing and sign-in, and the strips that say a machine or the control plane is away;
-- the Remote's trimmed Settings: Appearance, Sidebar and Finished chats.
+- the join and sign-in approval cards, pairing and sign-in, and the strips that say a machine or the control plane is away;
+- the Remote's trimmed Settings: This app (Voice, Notifications, Sidebar) and Help.
 
-**Mac + web** is: Console and Reports; the control plane's Settings panes (People, Groups, Bots, Channels, Sign-in Providers, Policy, Secrets, Backups); Add a Machine, machine providers, Start a Machine from a Repository and Versions; connector set-up (Connect your tools, GitLab, Email); Agent Configuration's editors; the workflow page's Configuration pane; Add Folder, Clone Git URL, a folder's Project, Export/Import and the Drop Box; the usage pages (Cost, Tokens, Time, Milestones and their charts); and Folder Settings.
+**Mac + web** is: Console and Reports; every control plane management page (Sign-ins, People, Groups, Bots and their caps, Channels, Sign-in Providers, Policy and its kill switch, Secrets, Backups, Git access, Add a Browser); Add a Machine, machine providers, Start a Machine from a Repository and Versions; Connectors and connector set-up (Connect your tools, GitLab, Email); Agent Configuration (Skills, Personas and Workflows editors), personas on the new-session form, and the Auto runtime and its settings; the workflow page's Configuration pane, Edit File… and Delete…; folder management (Add Folder, Clone Git URL, a folder's Project, Archive, Archived folders, Export/Import and the Drop Box); the usage pages (Cost, Tokens, Time, Milestones and their charts); and Folder Settings (Alex, 2026-10-29, #2798).
 
 A new row gets its tier when it is added, from the lists above. When a new feature is on neither list, its tier is Mac + web, because the Remote keeps only Core by default (Alex, #2796). An issue that wants it on the Remote says why.
 

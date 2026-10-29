@@ -95,38 +95,6 @@ struct FolderRow: View {
     }
 }
 
-/// What today has cost, the Mac's row: drawn whether or not anything has been spent so
-/// Spending is always there to go in by. The title alone (#587): the day's figure and
-/// what is left are VoiceOver's, and near the limit the row's icon turns red.
-struct SpendingRow: View {
-    @Environment(RemoteModel.self) private var model
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text("Cost")
-            Spacer()
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityValue(figures ?? "")
-        .accessibilityHint("Opens Cost")
-    }
-
-    /// Today's cost, and what is left of a daily limit where there is one.
-    private var figures: String? {
-        guard let today else { return nil }
-        if let state = model.costState, let left = state.dayHeadroom, let daily = state.limits.daily {
-            return "\(today) today, \(left.money(in: daily.currency)) left"
-        }
-        return "\(today) today"
-    }
-
-    private var today: String? {
-        model.costState.flatMap {
-            Cost.total(of: $0.today.merging(model.serversToday, uniquingKeysWith: +))
-        }
-    }
-}
-
 /// The first second of the app's life, over a connection with seconds in it.
 ///
 /// Says which of the two things is happening rather than spinning at the user: still
@@ -134,7 +102,6 @@ struct SpendingRow: View {
 struct Waiting: View {
     @Environment(RemoteModel.self) private var model
     @State private var pairingAgain = false
-    @State private var adding: NewFolder?
 
     var body: some View {
         if model.needsPairing {
@@ -154,15 +121,8 @@ struct Waiting: View {
         } else {
             VStack(spacing: 12) {
                 Text("No folders yet").appText(.title)
-                Text("Add a folder on your Mac or clone a Git repository to get started.")
-                    .appText(.supporting).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                Button("Add Folder…") { adding = .folder(.mac) }
-                    .buttonStyle(.borderedProminent)
-                Button("Clone Folder from Git URL…") { adding = .clone(.mac) }
-                    .buttonStyle(.bordered)
             }
             .padding()
-            .sheet(item: $adding) { NewFolderSheet(adding: $0) }
         }
     }
 }

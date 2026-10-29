@@ -156,7 +156,7 @@ struct RemoteView: View {
     /// one the sidebar lights; the rest are pushed over it. With none, a new session in the
     /// folder when one was asked for (#366), else nothing (#2090).
     private var routes: [RemoteRoute] {
-        let open = [model.openArchive ? RemoteRoute.archive : nil, model.openMCPServers ? RemoteRoute.mcpServers : nil,
+        let open = [model.openArchive ? RemoteRoute.archive : nil,
                     model.openPin.map(RemoteRoute.page),
                     model.openWorkflow.map(RemoteRoute.workflow), model.selection.map(RemoteRoute.agent),
                     model.openReview.map(RemoteRoute.review)]
@@ -173,7 +173,6 @@ struct RemoteView: View {
                     guard let root = routes.first else { return }
                     let all = [root] + more
                     model.openArchive = all.contains(.archive)
-                    model.openMCPServers = all.contains(.mcpServers)
                     model.openPin = all.lazy.compactMap(\.pinPath).first
                     model.openWorkflow = all.lazy.compactMap(\.workflowID).first
                     model.selection = all.compactMap(\.agentID).last
@@ -205,17 +204,6 @@ struct RemoteView: View {
         .navigationSplitViewStyle(.balanced)
         // A folder shown alone on an iPhone (#1089), over every folder, with ‹ All.
         .modifier(PhoneFolderCover())
-        // A milestone just earned (#984), on the iPad: once, until closed or opened.
-        .overlay(alignment: .bottomTrailing) {
-            if let milestone = model.milestoneCard {
-                MilestoneCard(milestone: milestone,
-                              open: { model.dismissMilestone(milestone); model.sidebarItem = .milestones },
-                              dismiss: { model.dismissMilestone(milestone) })
-                    .frame(maxWidth: 320)
-                    .shadow(color: .black.opacity(0.12), radius: 8, y: 2)
-                    .padding(20)
-            }
-        }
         // Something picked, here or from a banner, a widget or a start, is shown; back to
         // the list on a phone puts it down, so the same row opens it again.
         // Nothing left to show, as after Archive: back to the list it came from (#2090).
@@ -296,28 +284,6 @@ struct RemoteView: View {
         } message: { _ in
             Text("An empty title gives the session the runtime's name again.")
         }
-        // Archive… on a folder's long press (#668), named as its row is.
-        .confirmationDialog(FolderArchiveWords.confirmTitle(model.askingToArchiveFolder.map { summary in
-                                SidebarOrder.label(summary) { model.hostLabel($0) } } ?? ""),
-                            isPresented: Binding(get: { model.askingToArchiveFolder != nil },
-                                                 set: { if !$0 { model.askingToArchiveFolder = nil } }),
-                            titleVisibility: .visible, presenting: model.askingToArchiveFolder) { summary in
-            Button("Archive") { Task { await model.archiveFolder(summary) } }
-            Button("Cancel", role: .cancel) {}
-        } message: { _ in
-            Text(FolderArchiveWords.confirmMessage)
-        }
-        // Delete… on an archived folder (#677), asked here as a session's is.
-        .confirmationDialog(DeletionWords.folderConfirmTitle(model.askingToDeleteFolder.map { summary in
-                                SidebarOrder.label(summary) { model.hostLabel($0) } } ?? ""),
-                            isPresented: Binding(get: { model.askingToDeleteFolder != nil },
-                                                 set: { if !$0 { model.askingToDeleteFolder = nil } }),
-                            titleVisibility: .visible, presenting: model.askingToDeleteFolder) { summary in
-            Button("Delete", role: .destructive) { Task { await model.deleteFolder(summary) } }
-            Button("Cancel", role: .cancel) {}
-        } message: { _ in
-            Text(DeletionWords.folderConfirmMessage)
-        }
         // A send refused because the folder has gone (#119), with the ways on.
         .alert("This agent’s folder isn’t there",
                isPresented: Binding(get: { model.folderGone != nil && model.problem == nil },
@@ -383,10 +349,6 @@ struct RemoteView: View {
             if let summary = model.selectedSummary {
                 ArchivePage(folder: summary.key).paperGround()
             }
-        case .mcpServers:
-            if let summary = model.selectedSummary {
-                MCPServersListView(folder: summary.key).paperGround()
-            }
         case .start:
             if let folder = model.selectedFolder {
                 // Held open while it is on screen: the runtime behind its choices is let
@@ -435,12 +397,9 @@ struct RemoteView: View {
         case .events: EventsListView().paperGround()
         case .resources: ResourcesListView().paperGround()
         case .runtimes: RuntimesView().paperGround()
-        case .mcpServers: MCPServersListView().paperGround()
-        case .tokens: TokensView().paperGround()
-        case .time: TimeView().paperGround()
-        case .milestones: MilestonesView().paperGround()
         case .worktrees: WorktreesListView().paperGround()
-        default: TotalsView().paperGround()
+        // Usage and connectors are Mac + web (#2798): nothing opens them here.
+        default: NothingPickedPage()
         }
     }
 }
@@ -455,8 +414,6 @@ enum RemoteRoute: Hashable {
     case page(String)
     /// What the folder has archived (#495, #498), from its Archived row in the sidebar.
     case archive
-    /// The folder's MCP servers (#753), from its MCP Servers row in the sidebar.
-    case mcpServers
     /// A change waiting for an OK, on its Review page (#1472), by its `Approval.id`.
     case review(String)
 

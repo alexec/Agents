@@ -65,7 +65,6 @@ final class RemoteModel {
             openWorkflow = nil
             openPin = nil
             openArchive = false
-            openMCPServers = false
             if selectedFolder != nil { openActivity = nil }
             letGoOfFolders(keeping: selectedFolder)
         }
@@ -106,8 +105,6 @@ final class RemoteModel {
     var folderScenes: [FolderKey: RemoteFolderState] = [:]
     /// The folder an iPhone shows alone, over the sidebar of every folder (#1089).
     var phoneFolder: FolderKey?
-    /// The Export… or Import Agents… on its way, drawn as a busy sheet with Cancel (#2437).
-    var exportImport: ExportImportProgress?
     /// The folder whose own scene's start page the start form is for, while one is (#1089).
     var composingScene: FolderKey?
     /// Brings a folder's scene forward, or opens it: handed over by a view that has the
@@ -309,8 +306,6 @@ final class RemoteModel {
     let people = PeopleState()
     /// The GitHub sign-ins waiting for this person's Approve (#995).
     let signIn = SignInState()
-    /// The settings and secrets that follow the person to their machines (#1760).
-    let userScope = UserScopeState()
     /// What `hosts/list` last said, so the folder list can name each host (058, frame H).
     /// Empty when this phone is not a client of a control plane.
     private(set) var controlHosts: [DaemonAPI.ControlMachine] = []
@@ -321,17 +316,8 @@ final class RemoteModel {
     /// What `control/status` last said: its version and capabilities, for Settings (#1748).
     private(set) var controlStatus: DaemonAPI.ControlStatus?
 
-    /// Each connected server's local daily ledger, matching the window's combined
-    /// Today figure. Limits remain local to the host that owns them.
-    private(set) var serverCosts: [MachineRef: DaemonAPI.CostState] = [:]
     /// Each other host's disk alarms, kept separate from this Mac's strip (#263).
     private(set) var serverDisks: [MachineRef: DiskState] = [:]
-
-    var serversToday: [String: Decimal] {
-        serverCosts.values.reduce(into: [:]) { sum, state in
-            for (currency, amount) in state.today { sum[currency, default: 0] += amount }
-        }
-    }
 
     init(link: any DaemonLink) {
         baseLink = link
@@ -439,38 +425,6 @@ final class RemoteModel {
         return nil
     }
 
-    // MARK: Add a Browser (#1459)
-
-    /// A code for a browser, as the window's Add a Browser… makes one, and the page's
-    /// address on the control plane's own domain when it serves one there. Or why not, in
-    /// words to show.
-    func startBrowserCode() async -> Result<BrowserCode, BrowserCodeProblem> {
-        do {
-            // Who was there before the code, so whoever it lets in can be named (#1537).
-            let listed = await pairedClients()
-            let before = Set(listed?.map(\.id) ?? [])
-            let shown = try await client.call(DaemonAPI.Method.clientsStartPairing,
-                                              JSONValue.object(["kind": .string(ClientRecord.Kind.browser.rawValue)]),
-                                              returning: DaemonAPI.ControlCodeShown.self)
-            let status = try? await client.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
-            return .success(BrowserCode(shown: shown, page: status?.publicWeb, web: status?.web, before: before))
-        } catch let error as JSONRPCError {
-            return .failure(BrowserCodeProblem(words: error.message))
-        } catch {
-            return .failure(BrowserCodeProblem(words: "The control plane can’t be reached."))
-        }
-    }
-
-    /// The control plane's paired clients, or nil when it can't say.
-    func pairedClients() async -> [ClientRecord]? {
-        try? await client.call(DaemonAPI.Method.clientsList, returning: [ClientRecord].self)
-    }
-
-    /// The code is no longer shown: it can't be used.
-    func stopBrowserCode() async {
-        _ = try? await client.call(DaemonAPI.Method.clientsStopPairing)
-    }
-
     // MARK: A server's key (#344)
 
     /// A server asked for a key this device has none of to lend: the window's card asks the
@@ -553,45 +507,12 @@ final class RemoteModel {
         }
     }
 
-    /// Why a file is not sent to a drop box from a phone: too big for one record.
-    static func dropboxTooBig(_ name: String) -> String {
-        "From a phone, a drop box file can be 900 KB, and \(name) is bigger. Copy it into .agents/dropbox/ on the Mac instead."
-    }
-
-    /// A file put into a folder's drop box (#231), where a workflow on
-    /// `dropbox.file_added` can pick it up. `subfolder` is inside `.agents/dropbox/`, empty
-    /// for its top. Held to what crosses the relayed link in one record, as an attachment
-    /// is. Answers why it did not go, or nil.
-    func putInDropbox(_ data: Data, name: String, subfolder: String, folder: FolderKey) async -> String? {
-        guard !isStale(on: folder.host) else { return notAnswering(folder.host, "\(name) was not sent.") }
-        guard data.count <= PhoneAttachment.limit else { return Self.dropboxTooBig(name) }
-        let subfolder = subfolder.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
-        let request = DaemonAPI.DropboxPutRequest(folder: folder.folder, subfolder: subfolder.isEmpty ? nil : subfolder,
-                                                  name: name, data: data)
-        do {
-            _ = try await client(for: request).call(DaemonAPI.Method.dropboxPut, request,
-                                                    returning: DaemonAPI.DropboxPutResponse.self)
-            return nil
-        } catch let error as JSONRPCError {
-            return error.message
-        } catch {
-            return notAnswering(folder.host, "\(name) was not sent.")
-        }
-    }
-
     /// The Mac predates the panes, and the phone does what it did before them (FR-029).
     var macLacksPanes: Bool { files.macLacksPanes }
 
     // MARK: What the screens read
 
     var folders: [DaemonAPI.FolderSummary] { work.liveFolders }
-
-    /// The hosts a folder can be added on or cloned to (#537): this Mac, then each
-    /// other host of the control plane, as the window's + menu lists them.
-    var folderHosts: [HostSection] {
-        let sections = hostSections
-        return sections.isEmpty ? [HostSection(id: .mac, title: "This Mac", offline: false)] : sections
-    }
 
     /// The client for `host` itself, for a call that names no folder there yet.
     private func client(on host: MachineRef) throws -> DaemonClient {
@@ -600,51 +521,6 @@ final class RemoteModel {
         return other
     }
 
-    /// One folder on `host`, for choosing a folder there (#537): `files/browse`, as the
-    /// window's and the page's folder sheets read a server's. `~` is the host's home.
-    func browse(_ path: String, on host: MachineRef) async -> Result<DirectoryListing, BrowseProblem> {
-        do {
-            return .success(try await client(on: host).call(DaemonAPI.Method.filesBrowse,
-                                                             DaemonAPI.FilesBrowseRequest(path: path),
-                                                             returning: DirectoryListing.self))
-        } catch let error as JSONRPCError {
-            return .failure(BrowseProblem(message: error.message))
-        } catch {
-            return .failure(BrowseProblem(message: notAnswering(host, "its folders can't be shown.")))
-        }
-    }
-
-    struct BrowseProblem: Error {
-        let message: String
-    }
-
-    /// Add a folder on `host` as a folder, and open it: in `project` when one was picked
-    /// (#2671). Answers why not, or nil.
-    func addFolder(_ folder: URL, on host: MachineRef, project: String? = nil) async -> String? {
-        do {
-            let summary = try await client(on: host).call(DaemonAPI.Method.foldersAdd,
-                                                          DaemonAPI.AddFolderRequest(folder: folder, project: project),
-                                                          returning: DaemonAPI.FolderSummary.self)
-            show(summary, on: host)
-            return nil
-        } catch {
-            return away(error, "the folder was not added.") ?? sentence(for: error)
-        }
-    }
-
-    /// Clone a repository into `host`'s home folder as a folder, and open it. Answers
-    /// why not, or nil.
-    func cloneFolder(url: String, on host: MachineRef) async -> String? {
-        do {
-            let summary = try await client(on: host).call(DaemonAPI.Method.foldersClone,
-                                                          DaemonAPI.CloneRequest(url: url),
-                                                          returning: DaemonAPI.FolderSummary.self)
-            show(summary, on: host)
-            return nil
-        } catch {
-            return away(error, "nothing was cloned.") ?? sentence(for: error)
-        }
-    }
 
     /// A folder just added on `host`, listed and opened at once rather than when the
     /// host next says so.
@@ -686,13 +562,6 @@ final class RemoteModel {
     func hostIsOffline(_ host: MachineRef) -> Bool {
         hostSections.first { $0.id == host }?.offline ?? false
     }
-    /// Archived ones too, for the spending page. A folder put away still cost what it
-    /// cost, and a grand total that quietly dropped it would be wrong rather than tidy.
-    /// The archived ones are fetched when that page opens (`loadArchivedFolders`).
-    var allFolders: [DaemonAPI.FolderSummary] {
-        let held = Set(work.folders.map(\.key))
-        return work.folders + archivedFolders.filter { !held.contains($0.key) }
-    }
     /// The open folder's standing arrangements.
     var workflows: [WorkflowSummary] { work.workflows(in: selectedFolder) }
     var userWorkflows: [WorkflowSummary] { work.userWorkflows }
@@ -706,14 +575,9 @@ final class RemoteModel {
     /// The folder's archive (#495, #498): its archived sessions and workflows, a page
     /// opened from one row in the sidebar rather than folds inside the folder's.
     var openArchive = false
-    /// The folder's MCP servers (#753), a page opened from its row in the sidebar.
-    var openMCPServers = false
     /// A change waiting for an OK, on its Review page (#1472), by its `Approval.id`: from
     /// Needs You, the detail's own page; from Review… on a chat's card, pushed over the chat.
     var openReview: String?
-    /// The milestones this device has shown (#984); nil before its first look. See
-    /// `RemoteModel+Milestones`.
-    var milestonesSeen: Set<String>? = RemoteModel.keptMilestonesSeen
     /// The session opened while it was unread, kept in the sidebar's Unread until another
     /// is opened (#495), so it does not leave the list under the finger on the tap.
     private(set) var keptInUnread: UUID?
@@ -738,7 +602,6 @@ final class RemoteModel {
             guard let folder = selectedFolder else { return nil }
             let key = FolderKey(host: selectedSummary?.host ?? .mac, folder: folder)
             if openArchive { return .archive(key) }
-            if openMCPServers { return .folderMCPServers(key) }
             if let openPin { return .pin(openPin, in: key) }
             if let openWorkflow { return .workflow(openWorkflow, in: key) }
             if let selection { return .session(selection) }
@@ -757,7 +620,6 @@ final class RemoteModel {
                 openWorkflow = nil
                 openPin = nil
                 openArchive = false
-                openMCPServers = false
                 openReview = nil
             case .folder(let key):
                 selectedFolder = key.folder
@@ -765,7 +627,6 @@ final class RemoteModel {
                 openPin = nil
                 openWorkflow = nil
                 openArchive = false
-                openMCPServers = false
                 openReview = nil
                 // The next New Session at the sidebar's top starts here too (#495).
                 rememberNewSessionFolder(key)
@@ -774,7 +635,6 @@ final class RemoteModel {
                 openPin = nil
                 openWorkflow = nil
                 openArchive = false
-                openMCPServers = false
                 openReview = nil
                 selection = id
             case .workflow(let id, let key):
@@ -782,7 +642,6 @@ final class RemoteModel {
                 openPin = nil
                 selection = nil
                 openArchive = false
-                openMCPServers = false
                 openReview = nil
                 openWorkflow = id
             case .pin(let path, let key):
@@ -790,7 +649,6 @@ final class RemoteModel {
                 openWorkflow = nil
                 selection = nil
                 openArchive = false
-                openMCPServers = false
                 openReview = nil
                 openPin = path
             case .review(let id, let key):
@@ -800,9 +658,8 @@ final class RemoteModel {
                 openPin = nil
                 openWorkflow = nil
                 openArchive = false
-                openMCPServers = false
                 openReview = id
-            case .spending, .tokens, .time, .milestones, .resources, .events, .runtimes, .mcpServers, .worktrees:
+            case .resources, .events, .runtimes, .worktrees:
                 openActivity = newValue
             case .archive(let key):
                 // The folder's archive page (#495, #498), with what is opened from it
@@ -811,18 +668,11 @@ final class RemoteModel {
                 selection = nil
                 openPin = nil
                 openWorkflow = nil
-                openMCPServers = false
                 openReview = nil
                 openArchive = true
-            case .folderMCPServers(let key):
-                // The folder's MCP servers (#753), with what is opened from it pushed over it.
-                selectedFolder = key.folder
-                selection = nil
-                openPin = nil
-                openWorkflow = nil
-                openArchive = false
-                openMCPServers = true
-                openReview = nil
+            case .spending, .tokens, .time, .milestones, .mcpServers, .folderMCPServers:
+                // Usage and connectors are Mac + web (#2798): the Remote opens none of them.
+                break
             }
         }
     }
@@ -1049,16 +899,13 @@ final class RemoteModel {
         didSet { UserDefaults.standard.set(startFolders.map(\.path), forKey: "remote.startFolders") }
     }
     /// The new agent's own sandbox choice (064). Nil follows its runtime's default.
-    var startSandbox: SandboxChoice? { didSet { if isAutoStart { Task { await refreshStartAutoPreview() } } } }
+    var startSandbox: SandboxChoice?
     /// The new agent's values in the shared words (#2658), kept when the runtime changes.
     private(set) var startLevels = Levels(model: .balanced, permission: .ask)
     /// The new agent's own answer to permission requests (#2658); nil follows Settings.
     var startClientPermission: ClientPermissionMode?
-    /// What Auto would pick now for the page, for "Auto (Claude)".
-    private(set) var startAutoPreview: AutoPreview?
-    var isAutoStart: Bool { startRuntimeID == LevelWords.autoID }
-    /// Auto's settings and every cell (#2658), as the Mac's host has them.
-    private(set) var autoSettings = AutoSettings()
+    /// Every runtime's cells for the shared words (#2658), as the Mac's host has them. The
+    /// Auto runtime itself is Mac + web (#2798).
     private(set) var autoMappings = AutoMappings()
     /// Each runtime's sandbox default, read from the Mac, for "Use runtime default (Off)".
     private(set) var sandboxSettings = SandboxSettings()
@@ -1092,12 +939,6 @@ final class RemoteModel {
     /// person has since moved off is recognised as that and let go.
     private var startGeneration = 0
 
-    /// The kinds of session the page's folder offers (#760), the folder's and the
-    /// home's as its host lists them, and the one picked, by id.
-    private(set) var startPersonas: [Persona] = []
-    private(set) var startPersona: String?
-    /// Picked while its runtime's choices were still to come: laid over them on arrival.
-    private var pendingStartPersona: Persona?
 
     var startRuntime: RuntimeStatus? { startRuntimes.first { $0.runtime.id == startRuntimeID } }
 
@@ -1107,8 +948,7 @@ final class RemoteModel {
 
     private var startAvailableRuntimeIDs: [String] {
         let ids = startRuntimes.filter(\.canStart).map(\.runtime.id)
-        // Auto is a choice wherever a runtime is (#2658).
-        return ids.isEmpty ? ids : [LevelWords.autoID] + ids
+        return ids
     }
 
     /// What the page reads: the runtimes to choose from, and, for its runtime menu, what
@@ -1132,10 +972,6 @@ final class RemoteModel {
         startWorktree = nil
         startWorktrees = .notARepository
         Task { await loadStartWorktrees(in: folder) }
-        startPersona = nil
-        pendingStartPersona = nil
-        startPersonas = []
-        Task { await loadStartPersonas(in: folder) }
         // Each with a deadline, and waited on only when the page has no runtimes to pick
         // from yet (#1096): one lost reply here used to hold the page on "Asking…" before
         // it had asked anything, with nothing that would ask again.
@@ -1216,7 +1052,6 @@ final class RemoteModel {
         let again = startAsks.toAskAgain
         guard !again.isEmpty else { return }
         note("start: back in touch; asking again for \(again.map(\.rawValue).sorted().joined(separator: ", "))")
-        if again.contains(.personas) { Task { await loadStartPersonas(in: folder) } }
         if again.contains(.worktrees) { Task { await loadStartWorktrees(in: folder) } }
         guard again.contains(.choices) else { return }
         if startRuntimeID == nil { startRuntimeID = pickedStartRuntime }
@@ -1304,59 +1139,6 @@ final class RemoteModel {
 
     /// The folder's personas (#760). A host too old to know the method offers none; one
     /// that did not answer is asked again once it does (#1096).
-    private func loadStartPersonas(in folder: URL) async {
-        let request = DaemonAPI.PersonasListRequest(folder: folder)
-        startAsks.asking(.personas)
-        let listed: [Persona]
-        do {
-            listed = try await askForStart(DaemonAPI.Method.personasList, request, returning: [Persona].self)
-        } catch let error as JSONRPCError where error.isMethodNotFound {
-            listed = []
-        } catch {
-            return
-        }
-        guard startingIn == folder else { return }
-        startAsks.answered(.personas)
-        startPersonas = listed
-    }
-
-    func agentConfigEditorFiles(in folder: URL?, kind: DaemonAPI.AgentConfigEditorKind)
-        async -> [DaemonAPI.AgentConfigEditorFile]? {
-        let request = DaemonAPI.AgentConfigEditorRequest(folder: folder, kind: kind)
-        return try? await client(for: request).call(DaemonAPI.Method.agentConfigEditorFiles, request,
-                                                     returning: [DaemonAPI.AgentConfigEditorFile].self)
-    }
-
-    func saveAgentConfigEditorFile(in folder: URL?, kind: DaemonAPI.AgentConfigEditorKind,
-                                   path: String, content: String, delete: Bool) async -> String? {
-        let request = DaemonAPI.AgentConfigEditorSaveRequest(folder: folder, kind: kind, path: path,
-                                                               content: content, delete: delete)
-        do {
-            try await client(for: request).call(DaemonAPI.Method.agentConfigEditorSave, request)
-            await refreshWorkflows()
-            return nil
-        } catch { return String(describing: error) }
-    }
-
-    /// Pick a kind of session (#760): every setting it names is set, every one it leaves
-    /// out stays as the page has it. Nil picks none and changes nothing else.
-    func choosePersona(_ persona: Persona?) async {
-        startPersona = persona?.id
-        pendingStartPersona = nil
-        guard let persona else { return }
-        if let runtimeID = persona.settings.runtimeID, runtimeID != startRuntimeID,
-           startAvailableRuntimeIDs.contains(runtimeID) {
-            pendingStartPersona = persona
-            await chooseRuntime(runtimeID)
-            return
-        }
-        if startChoicesState != .ready {
-            pendingStartPersona = persona
-        } else {
-            startChosen.merge(persona.choices(against: startOptions)) { _, new in new }
-        }
-    }
-
     /// The branch an agent's folder is on, for the place over its prompt (#242).
     /// Nil outside a repository or when its host does not answer.
     func folderPathBranch(of agent: Agent) async -> String? {
@@ -1400,15 +1182,11 @@ final class RemoteModel {
         case .permissionRequests: startClientPermission = ClientPermissionMode(rawValue: level)
         case .sandbox: startSandbox = SandboxChoice(rawValue: level)
         }
-        if isAutoStart {
-            Task { await refreshStartAutoPreview() }
-        } else {
-            applyStartLevel(field)
-        }
+        applyStartLevel(field)
     }
 
     private func applyStartLevel(_ field: AutoField) {
-        guard let runtimeID = startRuntimeID, !isAutoStart else { return }
+        guard let runtimeID = startRuntimeID else { return }
         let level: String? = switch field {
         case .model: startLevels.model?.rawValue
         case .permission: startLevels.permission?.rawValue
@@ -1424,41 +1202,15 @@ final class RemoteModel {
 
     /// The value of a field the page's own options are now, or nil (Custom).
     func startLevel(_ field: AutoField) -> String? {
-        if isAutoStart {
-            return field == .model ? startLevels.model?.rawValue : startLevels.permission?.rawValue
-        }
         guard let runtimeID = startRuntimeID else { return nil }
         return LevelMatch.level(field, runtimeID: runtimeID, mappings: autoMappings) { id in
             self.startChosen[id] ?? self.startOptions.first { $0.id == id }?.currentValue
         }
     }
 
-    /// What Auto would pick now, on the page's machine.
-    func refreshStartAutoPreview() async {
-        guard isAutoStart, let folder = startOptionsFolder else { startAutoPreview = nil; return }
-        let request = AutoPreviewRequest(cwd: folder, levels: startLevels, sandbox: startSandbox)
-        startAutoPreview = try? await askForStart(DaemonAPI.Method.autoPreview, request, returning: AutoPreview.self)
-    }
-
     func refreshAuto() async {
-        if let s = try? await client.call(DaemonAPI.Method.autoState, DaemonAPI.Empty(), returning: AutoSettings.self) {
-            autoSettings = s
-        }
         if let m = try? await client.call(DaemonAPI.Method.autoMappings, DaemonAPI.Empty(), returning: AutoMappings.self) {
             autoMappings = m
-        }
-    }
-
-    /// Save Auto's settings on the Mac, which sends them on to its machines (FR-017).
-    func setAutoSettings(_ wanted: AutoSettings) async {
-        let before = autoSettings
-        autoSettings = wanted
-        do {
-            autoSettings = try await client.call(DaemonAPI.Method.autoSet, wanted, returning: AutoSettings.self)
-            await refreshAuto()
-        } catch {
-            autoSettings = before
-            problem = (error as? JSONRPCError)?.message ?? "That did not reach your Mac."
         }
     }
 
@@ -1473,17 +1225,6 @@ final class RemoteModel {
     /// choices on the page.
     func loadStartChoices() async {
         guard let folder = startOptionsFolder else { return }
-        // Auto has no runtime yet, so no options of its own: what it would pick (#2658).
-        if startRuntimeID == LevelWords.autoID {
-            startGeneration += 1
-            discardStartDraft()
-            startOptions = []
-            startChosen = [:]
-            startChoicesState = .ready
-            startAsks.answered(.choices)
-            await refreshStartAutoPreview()
-            return
-        }
         guard let runtimeID = startRuntimeID else {
             // Not "asking": there is nobody to ask.
             let host = startHost == .mac ? "the Mac" : hostName(startHost)
@@ -1540,11 +1281,6 @@ final class RemoteModel {
         if opening, let runtimeID = startRuntimeID, let mode = ModeMemory.modeOption(in: startOptions),
            let value = ModeMemory.startingValue(remembered: work.rememberedMode(for: runtimeID), for: mode) {
             kept[mode.id] = value
-        }
-        // Over the mode remembered, because the persona was picked after it (#760).
-        if let persona = pendingStartPersona, !startOptions.isEmpty {
-            kept.merge(persona.choices(against: startOptions)) { _, new in new }
-            pendingStartPersona = nil
         }
         startChosen = kept
         // The values chosen in the shared words, over the mode remembered (#2658).
@@ -1636,10 +1372,10 @@ final class RemoteModel {
             runtimeID: runtimeID, cwd: folder, prompt: words, attachments: attachments,
             startOptions: StartOptions(values: startChosen), draftID: startDraftID,
             additionalDirectories: startFolders, worktree: startWorktree, requestID: retrying ?? UUID(), sandbox: startSandbox,
-            labels: labels, persona: startPersona,
-            accountID: isAutoStart ? nil : startAccountChoices?.sent(startAccountID),
+            labels: labels,
+            accountID: startAccountChoices?.sent(startAccountID),
             levels: Levels(model: startLevels.model, permission: startLevels.permission,
-                           permissionRequests: isAutoStart ? nil : startClientPermission))
+                           permissionRequests: startClientPermission))
         startingPage = page
         defer { startingPage = nil }
         return await send(start: request)
@@ -1773,10 +1509,6 @@ final class RemoteModel {
         (error as? JSONRPCError)?.message ?? "Your Mac did not answer."
     }
 
-    /// Start a Machine from a Repository (#1809): its calls over the control plane, or nil
-    /// while it isn't answering.
-    var machineCalls: MachineFromRepositorySheet.Calls? { controlPlane.map(MachineFromRepositorySheet.Calls.through) }
-
     /// A refusal in the Remote's words.
     func refusal(_ error: any Error) -> String { sentence(for: error) }
 
@@ -1801,7 +1533,7 @@ final class RemoteModel {
     /// none for a server's folder. The picker shows only when there is one.
     var startAccounts: [AccountProfile] { startAccountChoices?.accounts ?? [] }
     var startAccountChoices: AccountChoices? {
-        guard startHost == .mac, let startRuntimeID, startRuntimeID != LevelWords.autoID else { return nil }
+        guard startHost == .mac, let startRuntimeID else { return nil }
         return AccountChoices(runtimeID: startRuntimeID, profiles: accountProfiles, policy: policyState?.policy)
     }
 
@@ -2453,127 +2185,6 @@ final class RemoteModel {
         }
     }
 
-    // MARK: Machine providers (#1819)
-
-    /// The control plane's machine providers, as Settings ▸ Machine providers last listed
-    /// them (the web page's Providers, the window's ControlProvidersPage); nil before the first.
-    var machineProviders: [DaemonAPI.ProviderSummary]?
-    /// Why none are shown: a control plane with several copies, or a list that failed.
-    var machineProvidersProblem: String?
-    /// Whether the control plane runs machine providers: one with several copies does not,
-    /// so Settings lists no row for them, as the window does (#2260).
-    private(set) var providersHere = true
-    /// The groups providers are given to (#1761): every one for an admin, a member's own.
-    var providerGroups: [DaemonAPI.Group] = []
-    /// Whether this person is an admin, who adds and changes providers (#1761).
-    var isAdmin: Bool { people.you?.isAdmin ?? true }
-
-    /// Lists them, and asks every provider to list again (FR-004), as the page opens.
-    func loadMachineProviders() async {
-        guard let control = controlPlane else {
-            // An empty list, so the page does not wait for one for ever (#2260).
-            machineProviders = []
-            machineProvidersProblem = "The control plane isn’t answering."
-            return
-        }
-        do {
-            let answer = try await control.call(DaemonAPI.Method.providersList, DaemonAPI.Empty())
-            machineProviders = (try? answer["providers"]?.decode([DaemonAPI.ProviderSummary].self)) ?? []
-            machineProvidersProblem = nil
-            providersHere = true
-            providerGroups = (try? await control.call(DaemonAPI.Method.groupsList, DaemonAPI.Empty(),
-                                                      returning: DaemonAPI.GroupList.self))?.groups ?? []
-        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.providersNeedOneCopy {
-            machineProviders = []
-            machineProvidersProblem = MachineProviderWords.oneCopy
-            providersHere = false
-            return
-        } catch {
-            machineProviders = []
-            machineProvidersProblem = sentence(for: error)
-            return
-        }
-        await listMachinesAgain()
-    }
-
-    /// Whether Settings lists Machine providers: asks the control plane for its list, and
-    /// asks no provider to list again (#2260). As the window's `providersHere`.
-    func checkProvidersHere() async {
-        guard let control = controlPlane else { return }
-        do {
-            _ = try await control.call(DaemonAPI.Method.providersList, DaemonAPI.Empty())
-            providersHere = true
-        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.providersNeedOneCopy
-            || error.code == JSONRPCError.methodNotFound {
-            providersHere = false
-        } catch {}
-    }
-
-    /// List Again: one provider, or every one. The new list comes as control/providersChanged.
-    func listMachinesAgain(_ provider: ProviderID? = nil) async {
-        _ = try? await controlPlane?.call(DaemonAPI.Method.providersRefresh, DaemonAPI.ProviderRequest(id: provider))
-    }
-
-    /// Add or Save: nil, or why the control plane refused it, to say in the sheet.
-    func saveWorkspaceProvider(_ request: DaemonAPI.ProviderAdd) async -> String? {
-        guard let control = controlPlane else { return "The control plane isn’t answering." }
-        do {
-            let saved = try await control.call(request.id == nil ? DaemonAPI.Method.providersAdd : DaemonAPI.Method.providersUpdate,
-                                               request, returning: DaemonAPI.ProviderSummary.self)
-            var list = machineProviders ?? []
-            if let index = list.firstIndex(where: { $0.id == saved.id }) { list[index] = saved } else { list.append(saved) }
-            machineProviders = list
-            return nil
-        } catch {
-            return sentence(for: error)
-        }
-    }
-
-    /// Gives a provider to a group, or with nil to the admins alone (#1761): nil, or why not.
-    func setProviderGroup(_ provider: ProviderID, _ group: String?) async -> String? {
-        await controlRequest(DaemonAPI.Method.providersSetGroup, DaemonAPI.ProviderGroup(provider: provider, group: group))
-    }
-
-    /// Remove, Link, Unlink: nil, or why the control plane refused it.
-    func removeWorkspaceProvider(_ id: ProviderID) async -> String? {
-        let refused = await controlRequest(DaemonAPI.Method.providersRemove, DaemonAPI.ProviderRequest(id: id))
-        if refused == nil { machineProviders?.removeAll { $0.id == id } }
-        return refused
-    }
-
-    func linkWorkspace(host: MachineRef, provider: ProviderID, workspace: String, startWhenUsed: Bool,
-                       stopWhenIdleMinutes: Int) async -> String? {
-        await controlRequest(DaemonAPI.Method.hostsLink,
-                             DaemonAPI.MachineLink(host: host, provider: provider, workspace: workspace,
-                                                startWhenUsed: startWhenUsed, stopWhenIdleMinutes: stopWhenIdleMinutes))
-    }
-
-    func unlinkWorkspace(host: MachineRef) async -> String? {
-        await controlRequest(DaemonAPI.Method.hostsUnlink, DaemonAPI.MachineRequest(host: host))
-    }
-
-    /// Stop. With agents at work there and not `confirmed`, answers the question to ask first.
-    func stopMachine(host: MachineRef, confirmed: Bool = false) async -> (refused: String?, ask: String?) {
-        guard let control = controlPlane else { return ("The control plane isn’t answering.", nil) }
-        do {
-            _ = try await control.call(DaemonAPI.Method.hostsStop, DaemonAPI.MachineStop(host: host, confirmRunning: confirmed ? true : nil))
-            return (nil, nil)
-        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.agentsWorking && !confirmed {
-            return (nil, error.message)
-        } catch {
-            return (sentence(for: error), nil)
-        }
-    }
-
-    private func controlRequest(_ method: String, _ params: some Encodable & Sendable) async -> String? {
-        guard let control = controlPlane else { return "The control plane isn’t answering." }
-        do {
-            _ = try await control.call(method, params)
-            return nil
-        } catch {
-            return sentence(for: error)
-        }
-    }
 
     /// A host's git asking to use a Mac's git access (#1122), not answered here yet. Any
     /// client may answer it; the control plane takes the first answer.
@@ -2641,26 +2252,11 @@ final class RemoteModel {
                     await self?.signIn.connected(control)
                     for await change in control.notifications() {
                         guard let self, !Task.isCancelled else { return }
-                        if await self.people.heard(change.method, change.params, on: control) {
-                            // A provider's group's name, on Settings ▸ Machine providers (#1761),
-                            // from the groups people loaded once (#2055).
-                            if change.method == DaemonAPI.Notification.controlGroupsChanged {
-                                self.providerGroups = self.people.groups
-                            }
-                            continue
-                        }
+                        if await self.people.heard(change.method, change.params, on: control) { continue }
                         if self.signIn.heard(change.method, change.params) { continue }
-                        if await self.userScope.heard(change.method, change.params, on: control) { continue }
                         if change.method == DaemonAPI.Notification.controlKeptChanged
                             || change.method == DaemonAPI.Notification.controlKeptDelivered {
                             await self.heardKept(change.method, change.params)
-                            continue
-                        }
-                        // Settings ▸ Machine providers keeps up (#1819).
-                        if change.method == DaemonAPI.Notification.controlProvidersChanged {
-                            if let listed = try? change.params?["providers"]?.decode([DaemonAPI.ProviderSummary].self) {
-                                self.machineProviders = listed
-                            }
                             continue
                         }
                         guard change.method == DaemonAPI.Notification.controlHostChanged else { continue }
@@ -2741,7 +2337,6 @@ final class RemoteModel {
                 work.replaceAgents(agents, from: id)
             }
             await refreshServerRuntimes(id)
-            await refreshServerCost(id)
             await refreshServerDisk(id)
             let notes = other.notifications()
             let shown = work.shown
@@ -2770,7 +2365,6 @@ final class RemoteModel {
                     await self?.work.apply(update, from: id)
                     await self?.applyToPopouts(update)
                     if added { await self?.refreshWorkflows() }
-                    if case .folderRemoved = update { await self?.forgetArchived(AgentsModel.stamp(update, host: id)) }
                 }
                 // Its connection ended: its cards are stale until the watch reaches it again.
                 await MainActor.run { [weak self] in
@@ -2798,7 +2392,6 @@ final class RemoteModel {
                 work.replaceFolders([], from: id)
                 work.replaceAgents([], from: id)
                 serverRuntimes[id] = nil
-                serverCosts[id] = nil
                 serverDisks[id] = nil
             }
         }
@@ -2810,8 +2403,6 @@ final class RemoteModel {
         switch method {
         case DaemonAPI.Notification.runtimeChanged:
             await refreshServerRuntimes(host)
-        case DaemonAPI.Notification.costChanged:
-            await refreshServerCost(host)
         case DaemonAPI.Notification.diskChanged:
             if let state = try? params?.decode(DiskState.self) { serverDisks[host] = state }
         case DaemonAPI.Notification.draftOptions:
@@ -2858,7 +2449,6 @@ final class RemoteModel {
             let added = self.work.addsFolder(update)
             self.work.apply(update)
             applyToPopouts(update)
-            forgetArchived(update)
             if added { Task { await refreshWorkflows() } }
         }
         // Nothing below waits on the network: one slow answer would hold every
@@ -2916,10 +2506,8 @@ final class RemoteModel {
            let settings = try? notification.params?.decode(SandboxSettings.self) {
             self.sandboxSettings = settings
         }
-        if notification.method == DaemonAPI.Notification.autoChanged,
-           let settings = try? notification.params?.decode(AutoSettings.self) {
-            self.autoSettings = settings
-            Task { await refreshAuto(); await refreshStartAutoPreview() }
+        if notification.method == DaemonAPI.Notification.autoChanged {
+            Task { await refreshAuto() }
         }
         if notification.method == DaemonAPI.Notification.clientPermissionsChanged,
            let settings = try? notification.params?.decode(ClientPermissionSettings.self) {
@@ -3093,13 +2681,6 @@ final class RemoteModel {
         await refreshPolicyState()
         // What the Mac could not read (#205, #223), at the foot of the folders list.
         if carried?.storeNotes == nil { await refreshStoreNotes() }
-        // The milestones (#984), for the Time page and the iPad's card.
-        if let milestones = carried?.milestones {
-            takeMilestones(milestones)
-        } else if let milestones = try? await client.call(DaemonAPI.Method.milestonesState, Optional<String>.none,
-                                                          returning: Milestones.self) {
-            takeMilestones(milestones)
-        }
         await settleUnsettledStart()
         await reopenStartChoices()
         settleSelection()
@@ -3783,87 +3364,9 @@ final class RemoteModel {
         return listed.count > limit
     }
 
-    /// Archived folders, as each host listed them: for the sidebar's Archived folders
-    /// (#343), and for Spending, where what they cost still counts. Asked for when either
-    /// appears, since the catch-up leaves them out.
-    private(set) var archivedFolders: [DaemonAPI.FolderSummary] = []
 
-    /// Every host's archived folders, the latest archived first (#2153), as the window's
-    /// Archived folders (#343): those listed, less any brought back since, and any put
-    /// away since, as their hosts said.
-    var shelvedFolders: [DaemonAPI.FolderSummary] {
-        let held = Set(work.folders.map(\.key))
-        return (work.archivedFolders + archivedFolders.filter { !held.contains($0.key) })
-            .sorted(by: DaemonAPI.FolderSummary.byArchived)
-    }
-
-    func loadArchivedFolders() async {
-        let request = DaemonAPI.FoldersListRequest(includeArchived: true)
-        guard let listed = try? await client.call(DaemonAPI.Method.foldersList, request,
-                                                  returning: [DaemonAPI.FolderSummary].self)
-        else { return }
-        var archived = listed.filter(\.folder.isArchived)
-        // The control plane's other hosts that answer, each stamped as its own.
-        for host in reachableHosts.sorted(by: { $0.rawValue < $1.rawValue }) {
-            guard let other = otherHosts[host],
-                  let theirs = try? await other.call(DaemonAPI.Method.foldersList, request,
-                                                     returning: [DaemonAPI.FolderSummary].self)
-            else { continue }
-            archived += theirs.filter(\.folder.isArchived).map { var summary = $0; summary.host = host; return summary }
-        }
-        archivedFolders = archived
-    }
-
-    /// A deleted folder (#677) out of the archived ones listed, as the shared model
-    /// takes it out of its own.
-    func forgetArchived(_ update: AgentsModel.Update) {
-        if case .folderRemoved(let key) = update { archivedFolders.removeAll { $0.key == key } }
-    }
-
-    /// The archived folder a Delete… is asking about, until it is answered (#677).
-    var askingToDeleteFolder: DaemonAPI.FolderSummary?
-
-    /// Delete an archived folder (#677), once asked, through its own host: every
-    /// session in it and its record; its folder stays. A refusal says which sessions
-    /// hold it.
-    func deleteFolder(_ summary: DaemonAPI.FolderSummary) async {
-        let host = summary.host
-        let target = host == .mac ? client : otherHosts[host]
-        guard let target, !isStale(on: host), host == .mac || reachableHosts.contains(host) else {
-            problem = "\(hostLabel(host)) is not answering, so that could not be sent."
-            return
-        }
-        do {
-            _ = try await target.call(DaemonAPI.Method.foldersDelete, DaemonAPI.FolderRequest(folder: summary.folder.folder),
-                                      returning: DaemonAPI.Empty.self)
-            work.removeFolder(summary.key)
-            archivedFolders.removeAll { $0.key == summary.key }
-        } catch let error as JSONRPCError {
-            problem = error.message
-        } catch {
-            problem = sentence(for: error)
-        }
-    }
 
     /// A folder pinned to the top of the sidebar, or not, through its own host.
-    /// The folder joins a project (#2317), through its own machine, as the window's Folder
-    /// Settings ▸ Project. Nil, or why not.
-    func setProject(_ project: String, for summary: DaemonAPI.FolderSummary) async -> String? {
-        let host = summary.host
-        guard let target = host == .mac ? client : otherHosts[host] else { return "The folder's machine is not connected." }
-        do {
-            var changed = try await target.call(DaemonAPI.Method.foldersSetProject,
-                                                DaemonAPI.SetFolderProjectRequest(folder: summary.folder.folder,
-                                                                                  project: project),
-                                                returning: DaemonAPI.FolderSummary.self)
-            changed.host = host
-            work.upsert(changed)
-            return nil
-        } catch {
-            return sentence(for: error)
-        }
-    }
-
     func setPinned(_ pinned: Bool, for summary: DaemonAPI.FolderSummary) async {
         let host = summary.host
         guard let target = host == .mac ? client : otherHosts[host] else { return }
@@ -3878,51 +3381,6 @@ final class RemoteModel {
         }
     }
 
-    /// The folder an Archive… is asking about, until it is answered (#668).
-    var askingToArchiveFolder: DaemonAPI.FolderSummary?
-
-    /// Put a folder away (#668), once asked, through its own host, as the window's
-    /// Archive: it moves to Archived folders, its sessions and folder kept. A refusal
-    /// names the sessions to stop first.
-    func archiveFolder(_ summary: DaemonAPI.FolderSummary) async {
-        let host = summary.host
-        let target = host == .mac ? client : otherHosts[host]
-        guard let target, !isStale(on: host), host == .mac || reachableHosts.contains(host) else {
-            problem = "\(hostLabel(host)) is not answering, so that could not be sent."
-            return
-        }
-        do {
-            var archived = try await target.call(DaemonAPI.Method.foldersArchive,
-                                                 DaemonAPI.FolderRequest(folder: summary.folder.folder),
-                                                 returning: DaemonAPI.FolderSummary.self)
-            archived.host = host
-            work.upsert(archived)
-            if sidebarItem == .folder(summary.key) { sidebarItem = nil }
-        } catch let error as JSONRPCError {
-            problem = error.message
-        } catch {
-            problem = sentence(for: error)
-        }
-    }
-
-    /// Bring an archived folder back (#343), through its own host, as the window's Bring
-    /// Back does: a folder again, with its new-session form open.
-    func unarchiveFolder(_ summary: DaemonAPI.FolderSummary) async {
-        let host = summary.host
-        let target = host == .mac ? client : otherHosts[host]
-        guard let target, host == .mac || reachableHosts.contains(host) else { return }
-        do {
-            var brought = try await target.call(DaemonAPI.Method.foldersUnarchive,
-                                                DaemonAPI.FolderRequest(folder: summary.folder.folder),
-                                                returning: DaemonAPI.FolderSummary.self)
-            brought.host = host
-            work.upsert(brought)
-            archivedFolders.removeAll { $0.key == summary.key }
-            sidebarItem = .folder(brought.key)
-        } catch {
-            problem = sentence(for: error)
-        }
-    }
 
     /// What today has cost and what the reader will allow. The phone shows limits
     /// and never sets them. A daemon too old to know the method leaves this nil, and
@@ -3932,7 +3390,6 @@ final class RemoteModel {
                                                  Optional<String>.none,
                                                  returning: DaemonAPI.CostState.self) else { return }
         work.replaceCostState(state)
-        for host in reachableHosts { await refreshServerCost(host) }
     }
 
     /// Cancel the wait shown in Waiting now, on the agent's own host (#2068), then refresh
@@ -3951,46 +3408,6 @@ final class RemoteModel {
             problem = away(error, "the wait could not be stopped.") ?? sentence(for: error)
         }
         await refreshEvents()
-    }
-
-    /// What the work used by hour and by day (#823), for the charts on Cost: the Mac's and
-    /// every reachable server's, each moved into this device's days (#1267). Nil when no
-    /// host knows the method.
-    func usageHistory() async -> UsageHistory? {
-        var histories: [UsageHistory] = []
-        for host in chartHosts {
-            if let history = try? await host.call(DaemonAPI.Method.usageHistory, Optional<String>.none,
-                                                  returning: UsageHistory.self) {
-                histories.append(history)
-            }
-        }
-        return histories.isEmpty ? nil : .merged(histories)
-    }
-
-    /// Where the time of running chats went (#852), for the Time page, from every host as
-    /// `usageHistory` is. The recap is the Mac's. Nil when no host knows the method.
-    func timeHistory() async -> TimeHistory? {
-        var histories: [TimeHistory] = []
-        for host in chartHosts {
-            if let history = try? await host.call(DaemonAPI.Method.timeHistory, Optional<String>.none,
-                                                  returning: TimeHistory.self) {
-                histories.append(history)
-            }
-        }
-        return histories.isEmpty ? nil : .merged(histories)
-    }
-
-    /// The Mac first, then every other host reachable now.
-    private var chartHosts: [DaemonClient] {
-        [client] + reachableHosts.compactMap { otherHosts[$0] }
-    }
-
-    private func refreshServerCost(_ host: MachineRef) async {
-        guard let other = otherHosts[host], reachableHosts.contains(host),
-              let state = try? await other.call(DaemonAPI.Method.costState,
-                                                Optional<String>.none,
-                                                returning: DaemonAPI.CostState.self) else { return }
-        serverCosts[host] = state
     }
 
     private func refreshServerDisk(_ host: MachineRef) async {
@@ -4039,17 +3456,6 @@ final class RemoteModel {
                                                returning: DaemonAPI.MCPHealthSnapshot.self) {
             work.replaceMCPHealth(health)
         }
-    }
-
-    /// Check Now on the person's own servers (no folder) or a folder's (#753), on the
-    /// folder's own host.
-    func checkMCPHealth(folder: FolderKey?) async {
-        let host = folder?.host ?? .mac
-        guard let target = hostClient(host),
-              let snapshot = try? await target.call(DaemonAPI.Method.mcpHealthCheck,
-                                                    DaemonAPI.MCPHealthCheckRequest(folder: folder?.folder.path),
-                                                    returning: DaemonAPI.MCPHealthSnapshot.self) else { return }
-        work.replaceMCPHealth(snapshot, from: host)
     }
 
     /// Every folder's worktrees on the Mac, for Activity ▸ Worktrees (#790). Sizes not
@@ -4366,19 +3772,6 @@ final class RemoteModel {
         }
     }
 
-    /// Delete a workflow's file from its folder (#605).
-    func deleteWorkflow(_ summary: WorkflowSummary) async -> Bool {
-        do {
-            let request = DaemonAPI.WorkflowRequest(folder: summary.workflow.folder,
-                                                    workflowID: summary.workflow.workflowID)
-            try await client(for: request).call(DaemonAPI.Method.workflowsDelete, request)
-            return true
-        } catch {
-            problem = sentence(for: error)
-            return false
-        }
-    }
-
     /// Let a waiting one run as its file now reads (#142): the digest is what the page
     /// was showing, so a file changed since is still waiting afterwards.
     func approveWorkflow(_ summary: WorkflowSummary) async {
@@ -4434,44 +3827,6 @@ final class RemoteModel {
         }
     }
 
-    /// Clear a server's event trigger's missed-events mark (#383).
-    func clearMCPMissed(_ summary: WorkflowSummary, _ status: MCPTriggerStatus) async {
-        do {
-            let request = DaemonAPI.WorkflowMCPClearMissedRequest(folder: summary.folder, workflowID: summary.workflowID,
-                                                                  name: status.name, server: status.server)
-            try await client(for: request).call(DaemonAPI.Method.workflowsClearMCPMissed, request)
-        } catch {
-            problem = sentence(for: error)
-        }
-    }
-
-    /// Change what a workflow is allowed to do. The Mac's daemon writes the file and
-    /// answers with what it now says; a refusal has to reach the person, and the list
-    /// is asked again so the menu goes back to what the file still holds (FR-025).
-    func setWorkflowSettings(_ summary: WorkflowSummary, _ settings: WorkflowSettings,
-                             cooldown: String? = nil, labels: [String]? = nil,
-                             runsOn: [String]? = nil, whenDone: String? = nil,
-                             continueWhenBack: Bool? = nil) async {
-        do {
-            let request = DaemonAPI.WorkflowSettingsRequest(folder: summary.folder,
-                                                            workflowID: summary.workflowID,
-                                                            settings: settings, cooldown: cooldown,
-                                                            labels: labels, runsOn: runsOn, whenDone: whenDone,
-                                                            continueWhenBack: continueWhenBack)
-            let updated: WorkflowSummary = try await client(for: request).call(
-                DaemonAPI.Method.workflowsSettings, request, returning: WorkflowSummary.self)
-            keepWorkflow(updated, named: request)
-        } catch {
-            problem = sentence(for: error)
-            await refreshWorkflows()
-        }
-    }
-
-    /// The computers the workflow page can pin to, under the names already on screen.
-    var workflowHostChoices: [WorkflowHostChoice] {
-        WorkflowHosts.choices(from: controlHosts, thisMachine: nil)
-    }
-
     /// Keep a workflow the host still runs (#317). The host is the one the call named.
     private func keepWorkflow(_ summary: WorkflowSummary, named params: some Encodable) {
         let host = otherHost(named: params) ?? controlHome ?? .mac
@@ -4480,14 +3835,6 @@ final class RemoteModel {
         } else {
             work.upsert(summary)
         }
-    }
-
-    /// What a runtime last advertised for a folder, for the workflow page's menus.
-    /// Empty is an answer: nothing has been remembered for it there yet.
-    func rememberedOptions(runtimeID: String, cwd: URL) async -> [ConfigOption] {
-        let request = DaemonAPI.RememberedOptionsRequest(runtimeID: runtimeID, cwd: cwd)
-        return (try? await client(for: request).call(DaemonAPI.Method.optionsRemembered, request,
-                                                     returning: [ConfigOption].self)) ?? []
     }
 
     /// The mode last chosen for each runtime, on any device. `modes/changed` keeps it
@@ -4515,29 +3862,6 @@ final class RemoteModel {
         guard let modes = try? await client.call(DaemonAPI.Method.modesRemembered, Optional<Int>.none,
                                                  returning: DaemonAPI.RememberedModes.self) else { return }
         work.replaceRememberedModes(modes)
-    }
-
-    /// Settings ▸ Backups (#1810): the Mac's. A Mac too old to keep backups answers
-    /// nothing, which leaves the section out.
-    func refreshBackupState() async {
-        guard let state = try? await client.call(DaemonAPI.Method.backupsState, DaemonAPI.Empty(),
-                                                 returning: DaemonAPI.BackupState.self) else { return }
-        work.replaceBackupState(state)
-    }
-
-    func configureBackups(_ settings: DaemonAPI.BackupSettings) async throws {
-        work.replaceBackupState(try await client.call(DaemonAPI.Method.backupsConfigure, settings,
-                                                      returning: DaemonAPI.BackupState.self))
-    }
-
-    func makeBackup() async throws {
-        work.replaceBackupState(try await client.call(DaemonAPI.Method.backupsMake, DaemonAPI.BackupMakeRequest(),
-                                                      returning: DaemonAPI.BackupState.self))
-    }
-
-    func restoreBackup(_ backup: DaemonAPI.Backup) async throws -> DaemonAPI.BackupRestoreResult {
-        try await client.call(DaemonAPI.Method.backupsRestore, DaemonAPI.BackupRestoreRequest(id: backup.id),
-                              returning: DaemonAPI.BackupRestoreResult.self)
     }
 
     /// The Runtimes page's pass-through names; none from a Mac too old to say.
@@ -4607,14 +3931,6 @@ final class RemoteModel {
         } catch {
             problem = (error as? JSONRPCError)?.message ?? "That did not reach your Mac."
         }
-    }
-
-    /// Where Auto would start an Auto session's successor now (FR-022).
-    func autoPreview(for agent: Agent) async -> AutoPreview? {
-        guard let pick = agent.auto else { return nil }
-        let request = AutoPreviewRequest(cwd: agent.cwd, levels: pick.levels, sandbox: agent.sandboxOverride)
-        guard let client = try? client(for: DaemonAPI.AgentRequest(agentID: agent.id)) else { return nil }
-        return try? await client.call(DaemonAPI.Method.autoPreview, request, returning: AutoPreview.self)
     }
 
     /// A running agent's model level or permission mode, mapped on its own runtime (#2658).
@@ -5220,15 +4536,14 @@ final class RemoteModel {
     /// **Continue in New** (#999): a session in the same folder that reads this one and
     /// carries on, on the runtime's account for new sessions, and open it.
     @discardableResult
-    func continueInNew(_ agentID: UUID, onAuto: Bool = false) async -> Bool {
+    func continueInNew(_ agentID: UUID) async -> Bool {
         guard !isStale else {
             problem = "Your Mac is not answering, so that could not be sent."
             return false
         }
         do {
             let id = try await sendOnce(DaemonAPI.Method.agentsContinueInNew,
-                                        DaemonAPI.ContinueInNewRequest(agentID: agentID, requestID: UUID(),
-                                                                       auto: onAuto ? true : nil)).decode(UUID.self)
+                                        DaemonAPI.ContinueInNewRequest(agentID: agentID, requestID: UUID())).decode(UUID.self)
             await loadWholeAgent(id)
             selection = id
             return true

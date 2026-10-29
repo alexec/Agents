@@ -600,11 +600,10 @@ struct ConsistencyTests {
     /// A feature left out because the host is too old says so (#1866): the line in the
     /// hidden section's place, or the control greyed with it as its help, on the Mac and the
     /// Remote alike. Each file that gates one names `hostNeedsUpdate`, or passes the greying
-    /// on to the shared view that does.
+    /// on to the shared view that does. The Remote has no Connectors page (#2798).
     @Test func aFeatureTheHostIsTooOldForSaysSo() throws {
         let saying: [String: String] = [
             "App/Sources/MCPServers/MCPServersView.swift": "UpdateWords.hostNeedsUpdate",
-            "Remote/Sources/MCPServers/MCPServersListView.swift": "UpdateWords.hostNeedsUpdate",
             "App/Sources/Sidebar/MacPageActions.swift": "reason: UpdateWords.hostNeedsUpdate",
             "Remote/Sources/Panes/FilesPane.swift": "reason: UpdateWords.hostNeedsUpdate",
             "Shared/UI/Chat/TranscriptRows.swift": ".help(UpdateWords.hostNeedsUpdate)",
