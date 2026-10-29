@@ -326,7 +326,9 @@ final class RemoteModel {
         pictures = PhonePictures(files: files)
         // From the start, not once connected: a banner tapped to launch or wake the app
         // arrives before then, and was dropped (#1045).
-        notifier.open = { [weak self] agentID in
+        notifier.open = { [weak self] agentID, line in
+            // A notice's line (#2860): gone to and lit once its chat has settled.
+            if let line { self?.focusedEntry = line }
             // In its folder's own scene or screen when one is open (#1089, Alex).
             if self?.showInFolderScene(agentID) == true { return }
             // Not in the folder an iPhone shows alone: back to every folder, to it.
@@ -3020,6 +3022,8 @@ final class RemoteModel {
     /// model does not hold yet (a cold launch, a wake) is kept and opened once caught up,
     /// as `open(_:)` keeps an agent (#1045).
     func open(needToken token: String) {
+        // A notice's line (#2860): gone to and lit once its chat has settled.
+        if let line = NeedID.noticeEntry(fromToken: token) { focusedEntry = line }
         if let agentID = agentID(forNeedToken: token) {
             pendingNeed = nil
             open(agentID)

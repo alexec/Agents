@@ -2750,6 +2750,22 @@
       }
     },
     {
+      "name": "notices/delivered",
+      "x-capability": "notices/1",
+      "description": "To the host whose notice it is, on its channel 0 (#2860): the control plane sent it to one of the person's devices, so the host records where on the notice's line.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/NoticeDelivered"
+          }
+        }
+      ]
+    },
+    {
       "name": "notices/take",
       "x-capability": "notices/1",
       "description": "A host, on its channel 0 (#2859): may a notice go now? One bucket for the person, shared by every machine of theirs, with the limits the host has.",

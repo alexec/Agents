@@ -26,3 +26,17 @@ test("it says what became of the notice", () => {
   assert.equal(notified.noticeOutcome({ title: "t", outcome: "muted" }), "Muted: not sent");
   assert.match(notified.noticeOutcome({ title: "t", outcome: "coolingDown", nextAt: 0 }), /^Not sent: the next notice can go at /);
 });
+
+// Where it went (#2860) is said on its line, and is no line of its own.
+test("where a notice went is said on its line", () => {
+  const entries = [
+    { id: "n", at: 2, kind: { notified: { _0: { title: "The deploy finished", outcome: "sent" } } } },
+    { id: "d", at: 3, kind: { noticeDelivered: { _0: { notice: "n", to: "iPhone" } } } },
+  ];
+  const items = turns.display(entries);
+  assert.deepEqual(items.map((i) => i.id), ["n"]);
+  assert.equal(notified.noticeOutcome(items[0].entry.kind.notified._0), "Sent to iPhone");
+  assert.equal(notified.noticeOutcome({ title: "t", outcome: "sent", to: "computer" }), "Sent to the computer");
+  // One whose line is on an earlier page is left out.
+  assert.deepEqual(turns.display([entries[1]]), []);
+});

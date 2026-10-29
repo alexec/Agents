@@ -261,6 +261,8 @@ export class DisplayBuilder {
   private closedRunAt = new Map<string, number>();
   /** Where each view is (#187), by its call's id: drawn once, where the call began. */
   private viewAt = new Map<string, number>();
+  /** Where each notice's line is (#2860), by its entry's id: where it went is said on it. */
+  private noticeAt = new Map<string, number>();
   private last: TranscriptEntry | undefined;
   /** How much of `drawn` is past the agent carrying on (#394). */
   private settled = 0;
@@ -321,7 +323,19 @@ export class DisplayBuilder {
       // the agent told the person (#2805).
       this.closeRun();
       this.resolveRetried();
+      if (kind === "notified") this.noticeAt.set(entry.id, this.drawn.length);
       this.drawn.push({ kind: "entry", id: entry.id, entry });
+      return;
+    }
+    const delivered = fields(entry, "noticeDelivered");
+    if (delivered) {
+      // Said on the notice's line (#2860), never a line of its own.
+      const at = this.noticeAt.get(delivered._0.notice);
+      const line = at === undefined ? undefined : this.drawn[at];
+      const notice = line?.kind === "entry" ? fields(line.entry, "notified") : undefined;
+      if (at !== undefined && line?.kind === "entry" && notice) {
+        this.drawn[at] = { kind: "entry", id: line.id, entry: { ...line.entry, kind: { notified: { _0: { ...notice._0, to: delivered._0.to } } } } };
+      }
       return;
     }
     const compaction = fields(entry, "compaction");

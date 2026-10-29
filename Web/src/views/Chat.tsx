@@ -261,12 +261,16 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     failedTurns.value = {};
     subagent.value = null;
     openedTurns.current = [];
-    following.current = true;
-    away.value = false;
-    store.setFollowingEnd(true);
     settled.current = false;
     const timer = setTimeout(() => (settled.current = true), 400);
     return () => clearTimeout(timer);
+  }, [session]);
+  // A chat opens following its end, before the layout effects below: a line asked for as it
+  // opens (a notice's, from its notification, #2860) then leaves the end, and stays left.
+  useLayoutEffect(() => {
+    following.current = true;
+    away.value = false;
+    store.setFollowingEnd(true);
   }, [session]);
 
   // Following the end: every kind of growth, a new line or a longer one, keeps the foot in view.
@@ -409,6 +413,11 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     if (target) {
       follow(false);
       target.scrollIntoView({ block: "center", behavior: "smooth" });
+      // A notice's line, gone to from its notification, is lit a moment so the eye finds it (#2860).
+      if (target.classList.contains("notice-line")) {
+        target.classList.add("lit");
+        setTimeout(() => target.classList.remove("lit"), 2000);
+      }
       focusedEntry.value = null;
       focusedIndex.value = null;
       return;

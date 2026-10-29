@@ -43,12 +43,14 @@ const (
 )
 
 // postedNotice is a notice still posted: withdrawn when its chat is opened, the session
-// goes, or a day passes.
+// goes, or a day passes. Its id is its transcript entry's, so the banner names the line a
+// tap goes to (#2860); to is where its line last said it went.
 type postedNotice struct {
 	id      string
 	agentID wire.UUID
 	h3      string
 	raised  wire.Date
+	to      wire.NoticeDevice
 }
 
 // noticeLimits are the person's burst and cool-down, or the defaults.
@@ -175,6 +177,7 @@ func (d *Daemon) notify(id wire.UUID, args map[string]json.RawMessage) (string, 
 	}
 	burst, cooldown := d.noticeLimits()
 	at := nowFunc()
+	entryID := store.NewUUID()
 	var reply string
 	switch {
 	case d.muted(&id):
@@ -197,7 +200,7 @@ func (d *Daemon) notify(id wire.UUID, args map[string]json.RawMessage) (string, 
 			if body != "" {
 				h3 += " — " + body
 			}
-			d.notices = append(d.notices, postedNotice{id: string(store.NewUUID()), agentID: id, h3: h3, raised: wire.DateOf(at)})
+			d.notices = append(d.notices, postedNotice{id: string(entryID), agentID: id, h3: h3, raised: wire.DateOf(at)})
 		}
 		d.attentionMu.Unlock()
 		if !ok {
@@ -211,7 +214,7 @@ func (d *Daemon) notify(id wire.UUID, args map[string]json.RawMessage) (string, 
 		notice.Outcome = wire.NoticeOutcomeSent
 		reply = fmt.Sprintf("Sent. %d more can go now; the next comes back at %s.", left, noticeTime(next))
 	}
-	d.record(id, wire.TranscriptEntryKind{Notified: &wire.TranscriptEntryKindNotified{Value: notice}})
+	d.recordEntry(id, entryID, wire.TranscriptEntryKind{Notified: &wire.TranscriptEntryKindNotified{Value: notice}}, nil)
 	// Something new for the person, as a reply is (#70): unread until they look.
 	if notice.Outcome != wire.NoticeOutcomeShownHere {
 		d.change(id, func(a *wire.Agent) {
@@ -223,4 +226,36 @@ func (d *Daemon) notify(id wire.UUID, args map[string]json.RawMessage) (string, 
 		d.reconsider()
 	}
 	return reply, nil
+}
+
+// noticeWentTo records where a posted notice went (#2860), after its line, once each time
+// it goes somewhere new: the computer, when reconsider sends it to the window, or a device,
+// when the control plane says so (notices/delivered). A notice no longer posted is not
+// recorded: its chat was opened, so the line is in front of the person already.
+func (d *Daemon) noticeWentTo(id string, to wire.NoticeDevice) {
+	d.attentionMu.Lock()
+	var agentID wire.UUID
+	found := false
+	for i := range d.notices {
+		if d.notices[i].id == id && d.notices[i].to != to {
+			d.notices[i].to, agentID, found = to, d.notices[i].agentID, true
+		}
+	}
+	d.attentionMu.Unlock()
+	if !found {
+		return
+	}
+	delivery := wire.NoticeDelivery{Notice: wire.UUID(id), To: to}
+	d.record(agentID, wire.TranscriptEntryKind{NoticeDelivered: &wire.TranscriptEntryKindNoticeDelivered{Value: delivery}})
+}
+
+// toldNoticeDelivered is notices/delivered: the control plane sent one of this host's
+// notices to a device of the person's.
+func (d *Daemon) toldNoticeDelivered(params json.RawMessage) {
+	var told wire.NoticeDelivered
+	if err := json.Unmarshal(params, &told); err != nil || told.Need.Notice == nil {
+		log.Printf("notices/delivered: %v", err)
+		return
+	}
+	d.noticeWentTo(*told.Need.Notice, told.To)
 }

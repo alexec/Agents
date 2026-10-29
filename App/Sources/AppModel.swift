@@ -908,7 +908,9 @@ final class AppModel {
         if let controlLink { client = DaemonClient(link: hostLink(.mac, through: controlLink)) }
         // From the start, not once connected: a banner tapped to launch the app arrives
         // before then, and was dropped (#1055).
-        notifier.open = { [weak self] agentID in
+        notifier.open = { [weak self] agentID, line in
+            // A notice's line (#2860): gone to and lit once its chat has settled.
+            if let line { self?.focusEntry(line) }
             // In its folder's own window when one is open (#1089, Alex).
             if self?.showInFolderWindow(agentID) == true { return }
             // Its own folder first, because picking a folder empties the selection:
@@ -3800,6 +3802,12 @@ final class AppModel {
         let arguments = ProcessInfo.processInfo.arguments
         guard let index = arguments.firstIndex(of: "-open-agent"), index + 1 < arguments.endIndex,
               let id = UUID(uuidString: arguments[index + 1]) else { return }
+        // With `-open-line <entry>`, as a tap on a notice's banner opens it (#2860).
+        if let at = arguments.firstIndex(of: "-open-line"), at + 1 < arguments.endIndex,
+           let line = UUID(uuidString: arguments[at + 1]) {
+            notifier.open(id, line)
+            return
+        }
         openAgent(id)
     }
     private static var launchArgumentsOpened = false

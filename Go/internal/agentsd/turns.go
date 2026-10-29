@@ -114,7 +114,13 @@ func (d *Daemon) record(id wire.UUID, kind wire.TranscriptEntryKind) {
 
 // recordFrom is record with the agent that sent the words, for a message between agents.
 func (d *Daemon) recordFrom(id wire.UUID, kind wire.TranscriptEntryKind, sender *wire.MessageSender) {
-	e := wire.TranscriptEntry{ID: store.NewUUID(), At: now(), Kind: kind, Sender: sender}
+	d.recordEntry(id, store.NewUUID(), kind, sender)
+}
+
+// recordEntry is record with the entry's id chosen first, for one named before it is
+// written: a notice's need is its entry, so a tap on its banner goes to its line (#2860).
+func (d *Daemon) recordEntry(id, entryID wire.UUID, kind wire.TranscriptEntryKind, sender *wire.MessageSender) {
+	e := wire.TranscriptEntry{ID: entryID, At: now(), Kind: kind, Sender: sender}
 	n, e, err := d.Store.AppendOne(id, e)
 	if err != nil {
 		log.Printf("agent %s: could not record an entry: %v", id, err)

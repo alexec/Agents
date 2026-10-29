@@ -614,6 +614,7 @@ var NotifyHostProjects = Notification[MachineProjects]{"host/projects"}
 var NotifyHostRelease = Notification[MachineRelease]{"host/release"}
 var NotifyHostUser = Notification[MachineUser]{"host/user"}
 var NotifyHostUserSettings = Notification[MachineUserSettings]{"host/userSettings"}
+var NotifyNoticesDelivered = Notification[NoticeDelivered]{"notices/delivered"}
 var NotifyRelayCount = Notification[RelayCount]{"relay/count"}
 var NotifyRelayDeliver = Notification[RelayDelivery]{"relay/deliver"}
 var NotifyRelayDevices = Notification[RelayDevices]{"relay/devices"}

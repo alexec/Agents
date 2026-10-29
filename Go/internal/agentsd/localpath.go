@@ -196,6 +196,10 @@ func (d *Daemon) Told(method string, params json.RawMessage) {
 		d.toldOrgRoutes(params)
 		return
 	}
+	if method == wire.NotifyNoticesDelivered.Name {
+		d.toldNoticeDelivered(params)
+		return
+	}
 	if method != wire.NotifyHostClients.Name {
 		return
 	}

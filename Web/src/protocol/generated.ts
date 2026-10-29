@@ -4466,6 +4466,34 @@ export type NeedKind =
   | "notice";
 
 /**
+ * notices/delivered (#2860): the control plane sent a host's notice to one of the person's devices.
+ */
+export interface NoticeDelivered {
+  need: NeedID;
+  to: NoticeDevice;
+}
+
+/**
+ * Where the notice recorded as entry `notice` went (#2860), recorded after it once the host knows:
+ * when it sends it to the computer, or when the control plane says which device it sent it to. A
+ * client draws it on that notice's line.
+ */
+export interface NoticeDelivery {
+  notice: UUID;
+  to: NoticeDevice;
+}
+
+/**
+ * Where a notice went (#2860): the computer (the Mac window or the web page, the "mac" surface), an
+ * iPhone, an iPad, or a device of a kind the control plane does not know.
+ */
+export type NoticeDevice =
+  | "computer"
+  | "iPhone"
+  | "iPad"
+  | "device";
+
+/**
  * The person's attention (#2805, #2859): how many notices agents may send at once (burst, 1–20),
  * and the minutes until one comes back (cooldownMinutes, 1–1440). The notifications part of the
  * user settings, user/setNoticeLimits, and notices/take, which a host asks on its channel 0 before
@@ -6643,6 +6671,7 @@ export interface SentNotice {
   body?: string;
   outcome: NoticeOutcome;
   nextAt?: WireDate;
+  to?: NoticeDevice;
 }
 
 export interface ServedRequest {
@@ -7674,7 +7703,8 @@ export type TranscriptEntryKind =
   | { settingsChanged: { _0: SwitchRecord } }
   | { appView: { _0: AppViewCall } }
   | { fileShown: { _0: ShownFile } }
-  | { notified: { _0: SentNotice } };
+  | { notified: { _0: SentNotice } }
+  | { noticeDelivered: { _0: NoticeDelivery } };
 
 export interface TranscriptPage {
   firstIndex: number;
@@ -9536,6 +9566,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MoveRequest: { required: ["agentID", "removeLeft", "discardChanges"], optional: ["target"] },
   NativeSetting: { required: [], optional: ["options", "sandbox", "clientPermission"] },
   Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID"] },
+  NoticeDelivered: { required: ["need", "to"], optional: [] },
+  NoticeDelivery: { required: ["notice", "to"], optional: [] },
   NoticeLimits: { required: ["burst", "cooldownMinutes"], optional: [] },
   NoticeTaken: { required: ["sent", "left", "nextAt"], optional: [] },
   OTLPExport: { required: ["endpoint", "every"], optional: ["lastSent", "lastFailure", "failedAt"] },
@@ -9749,7 +9781,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SendRead: { required: ["data", "end"], optional: [] },
   SendReadRequest: { required: ["id", "offset"], optional: [] },
   SentBranch: { required: ["name", "commit"], optional: [] },
-  SentNotice: { required: ["title", "outcome"], optional: ["body", "nextAt"] },
+  SentNotice: { required: ["title", "outcome"], optional: ["body", "nextAt", "to"] },
   ServedRequest: { required: ["kind", "outcome"], optional: [] },
   ServerReachabilityChange: { required: ["server", "online"], optional: [] },
   SessionLabel: { required: ["value", "owner", "addedAt"], optional: [] },

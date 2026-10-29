@@ -30,6 +30,34 @@ struct SentNoticeTests {
             == "Not sent: the next notice can go at 14:20")
     }
 
+    /// Where it went (#2860) is said on its line, and is no line of its own.
+    @Test func whereItWentIsSaidOnItsLine() throws {
+        let line = TranscriptEntry(kind: .notified(SentNotice(title: "The deploy finished", outcome: .sent)))
+        let delivery = TranscriptEntry(kind: .noticeDelivered(NoticeDelivery(notice: line.id, to: .iPhone)))
+        let decoded = try JSONDecoder().decode(TranscriptEntry.self, from: JSONEncoder().encode(delivery))
+        #expect(decoded.kind == delivery.kind)
+
+        let items = TranscriptEntry.display([line, delivery])
+        #expect(items.count == 1)
+        guard case .entry(let drawn) = items.first, case .notified(let notice) = drawn.kind else {
+            Issue.record("not the notice's line")
+            return
+        }
+        #expect(drawn.id == line.id)
+        #expect(notice.outcomeText() == "Sent to iPhone")
+        #expect(SentNotice(title: "t", outcome: .sent, to: .computer).outcomeText() == "Sent to the computer")
+        // One whose line is on an earlier page is left out.
+        #expect(TranscriptEntry.display([delivery]).isEmpty)
+    }
+
+    /// A tap on a notice's banner goes to its line (#2860): its token names the entry.
+    @Test func aNoticeTokenNamesItsLine() {
+        let id = UUID()
+        #expect(NeedID.noticeEntry(fromToken: NeedID.notice(id.uuidString).token) == id)
+        #expect(NeedID.noticeEntry(fromToken: "permission:\(id.uuidString)") == nil)
+        #expect(NeedID.noticeEntry(fromToken: nil) == nil)
+    }
+
     @Test func aNoticeNeedReadsAsTheHostWritesIt() throws {
         let json = #"{"notice":"e0000000-0000-4000-8000-000000000006"}"#
         let id = try JSONDecoder().decode(NeedID.self, from: Data(json.utf8))

@@ -1,10 +1,12 @@
 // Settings ▸ This browser ▸ What agents tell you (#2805): how many notices agents may send, kept on the Mac's host,
 // so the same on every client. Its heading is the window's and the Remote's, and its hint says the limits are not
-// this browser's, which gets no notices (#2895, #1486). Listed in ./sections.ts.
+// this browser's (#2895); the page gets notices only while it is open and in front (#2860, #1486), allowed under
+// This page. Listed in ./sections.ts.
 import {
   noticeBurst, noticeBurstMost, noticeCooldown, noticeCooldownMost, noticeLimitsFooter, noticeLimitsWhere, setNoticeBurst,
   setNoticeCooldown,
 } from "../../model/notified";
+import { allowPageNotices, pagePermission, pagePermissionText } from "../../pageNotices";
 
 export function NotificationsSection() {
   return (
@@ -21,6 +23,11 @@ export function NotificationsSection() {
           onChange={(e) => setNoticeCooldown(e.currentTarget.valueAsNumber)} />
       </label>
       <p class="hint">{noticeLimitsFooter} {noticeLimitsWhere}</p>
+      <div class="setting">
+        <span>This page</span>
+        {pagePermission.value === "default" && <button type="button" onClick={() => void allowPageNotices()}>Allow Notifications</button>}
+      </div>
+      <p class="hint">{pagePermissionText(pagePermission.value)}</p>
     </section>
   );
 }

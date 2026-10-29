@@ -484,7 +484,11 @@ private struct EntryRow: View {
             FileCard(file: file)
 
         case .notified(let notice):
-            NotifiedLine(notice: notice, at: entry.at)
+            NotifiedLine(id: entry.id, notice: notice, at: entry.at)
+
+        case .noticeDelivered:
+            // Said on the notice's line by `TranscriptEntry.display` (#2860), never here.
+            EmptyView()
 
         case .unrecognised:
             // Written by a newer version of this app. Kept in the record, skipped here.

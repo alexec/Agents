@@ -463,6 +463,8 @@ func (d *Daemon) reconsider() {
 		live[token(n.ID)] = true
 	}
 	var notes []wire.AttentionNotification
+	// Notices sent to the window now, for their lines (#2860), recorded once unlocked.
+	var toComputer []string
 	tell := d.tellControl.Load()
 	var told []wire.AttentionNeed
 	withdraw := func(t string) {
@@ -569,6 +571,9 @@ func (d *Daemon) reconsider() {
 			}
 			d.deliveries[t] = dv
 			notes = append(notes, wire.AttentionNotification{NeedID: n.ID, Need: &need, To: to, Alert: alert})
+			if to != nil && n.ID.Notice != nil {
+				toComputer = append(toComputer, *n.ID.Notice)
+			}
 		case to == nil:
 			// Shown nowhere, yet still news to every client (#1367): its model is what
 			// Needs you and the phone's widget draw from. Not a banner: no surface is named.
@@ -579,6 +584,9 @@ func (d *Daemon) reconsider() {
 		default:
 			d.deliveries[t] = delivery{NeedID: n.ID, To: to, AlertedAt: wire.DateOf(at), AlertCount: 1}
 			notes = append(notes, wire.AttentionNotification{NeedID: n.ID, Need: &need, To: to, Alert: true})
+			if n.ID.Notice != nil {
+				toComputer = append(toComputer, *n.ID.Notice)
+			}
 		}
 	}
 	// Each recent turn that moved, for its Live Activity (#1744).
@@ -610,6 +618,9 @@ func (d *Daemon) reconsider() {
 	}
 	for _, turn := range turns {
 		(*tell)(wire.CallAttentionTurn.Name, turn)
+	}
+	for _, id := range toComputer {
+		d.noticeWentTo(id, wire.NoticeDeviceComputer)
 	}
 }
 
