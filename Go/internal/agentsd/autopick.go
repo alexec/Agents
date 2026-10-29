@@ -501,7 +501,7 @@ func (d *Daemon) resolveLevels(r *wire.StartRequest, by startedBy) (*wire.AutoPi
 // with hyphens.
 var (
 	modelLevelWords      = map[string]wire.ModelLevel{"fast": wire.ModelLevelFast, "balanced": wire.ModelLevelBalanced, "smart": wire.ModelLevelSmart}
-	permissionLevelWords = map[string]wire.PermissionLevel{"plan": wire.PermissionLevelPlan, "ask": wire.PermissionLevelAsk, "approve-for-me": wire.PermissionLevelApproveForMe}
+	permissionLevelWords = map[string]wire.PermissionLevel{"plan": wire.PermissionLevelPlan, "ask": wire.PermissionLevelAsk, "approve-for-me": wire.PermissionLevelApproveForMe, "bypass-permissions": wire.PermissionLevelBypassPermissions}
 	requestWords         = map[string]wire.ClientPermissionMode{"request-cards": wire.ClientPermissionModeDefault, "yes-to-all": wire.ClientPermissionModeAlwaysApprove}
 	sandboxWords         = map[string]wire.SandboxChoice{"default": wire.SandboxChoiceRuntime, "runtime": wire.SandboxChoiceOn, "none": wire.SandboxChoiceOff}
 )
@@ -537,7 +537,7 @@ func fileLevels(runtimeID, model string, mode *string, requests, sandbox string)
 		if p, ok := permissionLevelWords[*mode]; ok {
 			l.Permission, set = &p, true
 		} else if auto {
-			return nil, "", nil, nil, Invalid("`runtime: auto` takes `permission-mode: plan`, `ask` or `approve-for-me`, not %s", *mode)
+			return nil, "", nil, nil, Invalid("`runtime: auto` takes `permission-mode: plan`, `ask`, `approve-for-me` or `bypass-permissions`, not %s", *mode)
 		} else {
 			nativeMode = mode
 		}

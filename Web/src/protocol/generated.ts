@@ -4896,12 +4896,14 @@ export interface PeopleList {
 
 /**
  * Plan: reads and plans, changes nothing; Ask: asks before it changes things; Approve for me: does
- * not ask for normal changes in its folder (#2658).
+ * not ask for normal changes in its folder; Bypass Permissions: never asks, even for a change
+ * outside its folder (#2658, #2864).
  */
 export type PermissionLevel =
   | "plan"
   | "ask"
-  | "approveForMe";
+  | "approveForMe"
+  | "bypassPermissions";
 
 export interface PermissionNotification {
   agentID: UUID;

@@ -21,13 +21,13 @@ or when one of your accounts runs out.
 2. Click the runtime above the prompt. **Auto** is the first item. Its line says the runtime
    it picks now, such as **Picks Claude now**. On a new install, Auto is already chosen.
 3. Under the prompt, choose the values:
-   - **Permission mode**: **Plan**, **Ask** or **Approve for me**.
+   - **Permission mode**: **Plan**, **Ask**, **Approve for me** or **Bypass Permissions**.
    - **Sandbox**: **Default sandbox**, **Runtime sandbox** or **No sandbox**.
    - **Model**: **Fast**, **Balanced** or **Smart**.
 
    Each value in a menu says what it is on the runtime Auto picks now, such as **Sonnet on
-   Claude**. On Auto there is no **Permission requests** pill: **Approve for me** says yes
-   to each request, and the other two values give a card.
+   Claude**. On Auto there is no **Permission requests** pill: **Approve for me** and
+   **Bypass Permissions** say yes to each request, and the other two values give a card.
 4. Type the prompt and send it. The header of the session says **Auto · Claude**: Auto, and
    the runtime it picked. The session stays on that runtime.
 

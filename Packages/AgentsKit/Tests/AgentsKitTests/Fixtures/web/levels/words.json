@@ -52,6 +52,7 @@
       "files" : {
         "approveForMe" : "approve-for-me",
         "ask" : "ask",
+        "bypassPermissions" : "bypass-permissions",
         "plan" : "plan"
       },
       "followsSettings" : "follows Settings",
@@ -59,7 +60,8 @@
       "levels" : [
         "plan",
         "ask",
-        "approveForMe"
+        "approveForMe",
+        "bypassPermissions"
       ],
       "marks" : {
         "autoMapped" : "auto-mapped",
@@ -71,6 +73,7 @@
       "meanings" : {
         "approveForMe" : "Does not ask for normal changes in its folder.",
         "ask" : "Asks before it changes things.",
+        "bypassPermissions" : "Never asks, even for a change outside its folder.",
         "plan" : "Reads and plans; cannot change files or run commands that change things."
       },
       "noRuntime" : "Claude: out; Codex: not signed in",
@@ -81,6 +84,7 @@
       "words" : {
         "approveForMe" : "Approve for me",
         "ask" : "Ask",
+        "bypassPermissions" : "Bypass Permissions",
         "plan" : "Plan"
       }
     },
