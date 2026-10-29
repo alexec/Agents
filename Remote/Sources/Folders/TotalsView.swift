@@ -19,40 +19,8 @@ struct TotalsView: View {
 
     private var spending: Spending { Spending(model.allFolders) }
 
-    /// Cost, or Reports: every person's machines, from the control plane (#1811).
-    @State private var pane: Pane = .cost
-
-    enum Pane: String, CaseIterable, Identifiable {
-        case cost = "Cost"
-        case reports = "Reports"
-
-        var id: Self { self }
-    }
-
+    /// Reports is Mac + web (#2798): a line under the page says where it is.
     var body: some View {
-        Group {
-            switch pane {
-            case .cost: cost
-            case .reports:
-                ReportsPane(control: model.controlPlane)
-                    .paperGround()
-                    .navigationTitle("Reports")
-                    .navigationBarTitleDisplayMode(.inline)
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Picker("Show", selection: $pane) {
-                    ForEach(Pane.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
-            }
-        }
-    }
-
-    private var cost: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 // The day's ledger or the limits set aside as unreadable (#171).
@@ -94,6 +62,7 @@ struct TotalsView: View {
                 }
                 // Where each runtime's allowance stands, a tap away (065).
                 RuntimesLink()
+                OnMacOrWeb(page: "reports")
             }
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)

@@ -309,8 +309,6 @@ final class RemoteModel {
     let people = PeopleState()
     /// The GitHub sign-ins waiting for this person's Approve (#995).
     let signIn = SignInState()
-    /// The settings and secrets that follow the person to their machines (#1760).
-    let userScope = UserScopeState()
     /// What `hosts/list` last said, so the folder list can name each host (058, frame H).
     /// Empty when this phone is not a client of a control plane.
     private(set) var controlHosts: [DaemonAPI.ControlMachine] = []
@@ -2354,124 +2352,18 @@ final class RemoteModel {
 
     // MARK: Machine providers (#1819)
 
-    /// The control plane's machine providers, as Settings ▸ Machine providers last listed
-    /// them (the web page's Providers, the window's ControlProvidersPage); nil before the first.
+    /// The control plane's machine providers, by name on a folder's Where Agents Run (#2131);
+    /// nil before the first list. Adding and changing them is Mac + web (#2798).
     var machineProviders: [DaemonAPI.ProviderSummary]?
-    /// Why none are shown: a control plane with several copies, or a list that failed.
-    var machineProvidersProblem: String?
-    /// Whether the control plane runs machine providers: one with several copies does not,
-    /// so Settings lists no row for them, as the window does (#2260).
-    private(set) var providersHere = true
-    /// The groups providers are given to (#1761): every one for an admin, a member's own.
-    var providerGroups: [DaemonAPI.Group] = []
-    /// Whether this person is an admin, who adds and changes providers (#1761).
-    var isAdmin: Bool { people.you?.isAdmin ?? true }
 
-    /// Lists them, and asks every provider to list again (FR-004), as the page opens.
+    /// Lists them, as the connector set-up's machine slot opens.
     func loadMachineProviders() async {
         guard let control = controlPlane else {
-            // An empty list, so the page does not wait for one for ever (#2260).
             machineProviders = []
-            machineProvidersProblem = "The control plane isn’t answering."
             return
         }
-        do {
-            let answer = try await control.call(DaemonAPI.Method.providersList, DaemonAPI.Empty())
-            machineProviders = (try? answer["providers"]?.decode([DaemonAPI.ProviderSummary].self)) ?? []
-            machineProvidersProblem = nil
-            providersHere = true
-            providerGroups = (try? await control.call(DaemonAPI.Method.groupsList, DaemonAPI.Empty(),
-                                                      returning: DaemonAPI.GroupList.self))?.groups ?? []
-        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.providersNeedOneCopy {
-            machineProviders = []
-            machineProvidersProblem = MachineProviderWords.oneCopy
-            providersHere = false
-            return
-        } catch {
-            machineProviders = []
-            machineProvidersProblem = sentence(for: error)
-            return
-        }
-        await listMachinesAgain()
-    }
-
-    /// Whether Settings lists Machine providers: asks the control plane for its list, and
-    /// asks no provider to list again (#2260). As the window's `providersHere`.
-    func checkProvidersHere() async {
-        guard let control = controlPlane else { return }
-        do {
-            _ = try await control.call(DaemonAPI.Method.providersList, DaemonAPI.Empty())
-            providersHere = true
-        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.providersNeedOneCopy
-            || error.code == JSONRPCError.methodNotFound {
-            providersHere = false
-        } catch {}
-    }
-
-    /// List Again: one provider, or every one. The new list comes as control/providersChanged.
-    func listMachinesAgain(_ provider: ProviderID? = nil) async {
-        _ = try? await controlPlane?.call(DaemonAPI.Method.providersRefresh, DaemonAPI.ProviderRequest(id: provider))
-    }
-
-    /// Add or Save: nil, or why the control plane refused it, to say in the sheet.
-    func saveWorkspaceProvider(_ request: DaemonAPI.ProviderAdd) async -> String? {
-        guard let control = controlPlane else { return "The control plane isn’t answering." }
-        do {
-            let saved = try await control.call(request.id == nil ? DaemonAPI.Method.providersAdd : DaemonAPI.Method.providersUpdate,
-                                               request, returning: DaemonAPI.ProviderSummary.self)
-            var list = machineProviders ?? []
-            if let index = list.firstIndex(where: { $0.id == saved.id }) { list[index] = saved } else { list.append(saved) }
-            machineProviders = list
-            return nil
-        } catch {
-            return sentence(for: error)
-        }
-    }
-
-    /// Gives a provider to a group, or with nil to the admins alone (#1761): nil, or why not.
-    func setProviderGroup(_ provider: ProviderID, _ group: String?) async -> String? {
-        await controlRequest(DaemonAPI.Method.providersSetGroup, DaemonAPI.ProviderGroup(provider: provider, group: group))
-    }
-
-    /// Remove, Link, Unlink: nil, or why the control plane refused it.
-    func removeWorkspaceProvider(_ id: ProviderID) async -> String? {
-        let refused = await controlRequest(DaemonAPI.Method.providersRemove, DaemonAPI.ProviderRequest(id: id))
-        if refused == nil { machineProviders?.removeAll { $0.id == id } }
-        return refused
-    }
-
-    func linkWorkspace(host: MachineRef, provider: ProviderID, workspace: String, startWhenUsed: Bool,
-                       stopWhenIdleMinutes: Int) async -> String? {
-        await controlRequest(DaemonAPI.Method.hostsLink,
-                             DaemonAPI.MachineLink(host: host, provider: provider, workspace: workspace,
-                                                startWhenUsed: startWhenUsed, stopWhenIdleMinutes: stopWhenIdleMinutes))
-    }
-
-    func unlinkWorkspace(host: MachineRef) async -> String? {
-        await controlRequest(DaemonAPI.Method.hostsUnlink, DaemonAPI.MachineRequest(host: host))
-    }
-
-    /// Stop. With agents at work there and not `confirmed`, answers the question to ask first.
-    func stopMachine(host: MachineRef, confirmed: Bool = false) async -> (refused: String?, ask: String?) {
-        guard let control = controlPlane else { return ("The control plane isn’t answering.", nil) }
-        do {
-            _ = try await control.call(DaemonAPI.Method.hostsStop, DaemonAPI.MachineStop(host: host, confirmRunning: confirmed ? true : nil))
-            return (nil, nil)
-        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.agentsWorking && !confirmed {
-            return (nil, error.message)
-        } catch {
-            return (sentence(for: error), nil)
-        }
-    }
-
-    private func controlRequest(_ method: String, _ params: some Encodable & Sendable) async -> String? {
-        guard let control = controlPlane else { return "The control plane isn’t answering." }
-        do {
-            _ = try await control.call(method, params)
-            return nil
-        } catch {
-            return sentence(for: error)
-        }
+        let answer = try? await control.call(DaemonAPI.Method.providersList, DaemonAPI.Empty())
+        machineProviders = (try? answer?["providers"]?.decode([DaemonAPI.ProviderSummary].self)) ?? []
     }
 
     /// A host's git asking to use a Mac's git access (#1122), not answered here yet. Any
@@ -2540,16 +2432,8 @@ final class RemoteModel {
                     await self?.signIn.connected(control)
                     for await change in control.notifications() {
                         guard let self, !Task.isCancelled else { return }
-                        if await self.people.heard(change.method, change.params, on: control) {
-                            // A provider's group's name, on Settings ▸ Machine providers (#1761),
-                            // from the groups people loaded once (#2055).
-                            if change.method == DaemonAPI.Notification.controlGroupsChanged {
-                                self.providerGroups = self.people.groups
-                            }
-                            continue
-                        }
+                        if await self.people.heard(change.method, change.params, on: control) { continue }
                         if self.signIn.heard(change.method, change.params) { continue }
-                        if await self.userScope.heard(change.method, change.params, on: control) { continue }
                         if change.method == DaemonAPI.Notification.controlKeptChanged
                             || change.method == DaemonAPI.Notification.controlKeptDelivered {
                             await self.heardKept(change.method, change.params)
@@ -4408,29 +4292,6 @@ final class RemoteModel {
         guard let modes = try? await client.call(DaemonAPI.Method.modesRemembered, Optional<Int>.none,
                                                  returning: DaemonAPI.RememberedModes.self) else { return }
         work.replaceRememberedModes(modes)
-    }
-
-    /// Settings ▸ Backups (#1810): the Mac's. A Mac too old to keep backups answers
-    /// nothing, which leaves the section out.
-    func refreshBackupState() async {
-        guard let state = try? await client.call(DaemonAPI.Method.backupsState, DaemonAPI.Empty(),
-                                                 returning: DaemonAPI.BackupState.self) else { return }
-        work.replaceBackupState(state)
-    }
-
-    func configureBackups(_ settings: DaemonAPI.BackupSettings) async throws {
-        work.replaceBackupState(try await client.call(DaemonAPI.Method.backupsConfigure, settings,
-                                                      returning: DaemonAPI.BackupState.self))
-    }
-
-    func makeBackup() async throws {
-        work.replaceBackupState(try await client.call(DaemonAPI.Method.backupsMake, DaemonAPI.BackupMakeRequest(),
-                                                      returning: DaemonAPI.BackupState.self))
-    }
-
-    func restoreBackup(_ backup: DaemonAPI.Backup) async throws -> DaemonAPI.BackupRestoreResult {
-        try await client.call(DaemonAPI.Method.backupsRestore, DaemonAPI.BackupRestoreRequest(id: backup.id),
-                              returning: DaemonAPI.BackupRestoreResult.self)
     }
 
     /// The Runtimes page's pass-through names; none from a Mac too old to say.

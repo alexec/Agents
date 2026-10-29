@@ -164,11 +164,6 @@ private struct RemoteSlotView: View {
     /// Tasks only (#1682): whether the person's Linear connection is there, nil until read.
     @State private var linearConnected: Bool?
     @State private var connectingLinear = false
-    @State private var addingMachine = false
-    @State private var addingProvider = false
-    /// The providers before Add Provider…: the new one goes on to its New Machine.
-    @State private var before: Set<ProviderID> = []
-    @State private var making: DaemonAPI.ProviderSummary?
 
     private var slot: DaemonAPI.ConnectorSlot? { setup?.slot(kind) }
 
@@ -234,11 +229,8 @@ private struct RemoteSlotView: View {
                                 .appText(.fine).foregroundStyle(.secondary)
                         }
                     } else {
-                        // Add a Machine… and Add Provider… in place (#2131).
-                        Button(AddMachine.Words.menuItem) { addingMachine = true }
-                        if model.isAdmin {
-                            Button(AddMachine.Words.addProvider) { addingProvider = true }
-                        }
+                        // Adding a machine or a provider is Mac + web (#2798).
+                        OnMacOrWeb(page: "settings")
                         if setup.forgeOrGitHub == .github, setup.repository != nil, setup.connection?.state == .connected {
                             Text("GitHub Codespaces: Set up on the Mac.").appText(.fine).foregroundStyle(.secondary)
                         }
@@ -255,19 +247,6 @@ private struct RemoteSlotView: View {
         .task {
             if kind == .tasks { await readLinear() }
             if kind == .workspace { await model.loadMachineProviders() }
-        }
-        .sheet(isPresented: $addingMachine) { AddMachineSheet() }
-        .sheet(isPresented: $addingProvider, onDismiss: {
-            Task {
-                await model.loadMachineProviders()
-                making = model.machineProviders?.first { !before.contains($0.id) }
-            }
-        }) {
-            AddMachineProviderSheet(editing: nil)
-                .onAppear { before = Set((model.machineProviders ?? []).map(\.id)) }
-        }
-        .sheet(item: $making) { provider in
-            NavigationStack { NewMachinePage(picked: provider.id, close: { making = nil }) }
         }
         .sheet(isPresented: $connectingLinear) {
             RemoteConnectSheet(provider: .linear, host: folder.host, onConnected: { Task { await readLinear() } })
