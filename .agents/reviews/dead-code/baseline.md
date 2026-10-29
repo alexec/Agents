@@ -29,6 +29,15 @@ Added 2026-10-27 (first run, `2026-10-27.md`).
   files; the `GOOS=darwin` scan reaches them. Scan with `GOOS=darwin` as well before
   reading any `internal/mac` finding.
 
+Added 2026-10-29 (`2026-10-29.md`, the first complete `GOOS=darwin -test` scan):
+
+- `Go/internal/agentsd/procstatus.go` `readProcStatus`: unreachable only in a darwin
+  scan. Its caller is `roles_linux.go` (`sshSessions`). The mirror of the entry above:
+  read a darwin finding against the linux scan.
+- Functions that only the non-test scans list (`deadcode ./...` without `-test`), such as
+  the fakes in `s3store/s3fake`, `signin/signintest` and `store.NewMemory`: tests reach
+  them, so they are test hooks, not dead. Only a `-test` finding is a candidate.
+
 ### Knip (Web)
 
 - Any export of `Web/src` that a `Web/test/*.test.mjs` file names: the tests bundle the
@@ -44,3 +53,11 @@ Added 2026-10-27 (first run, `2026-10-27.md`).
   compatibility between machines on different versions; not migration code.
 - "A host (or daemon) too old to know the method": a client and a host of different
   versions, which is live in v0.x; not migration code.
+- `App/Sources/Control/ControlConfig.swift` `retiredFileKey` and
+  `Remote/Sources/Link/ControlPlaneLink.swift` (the `control-client-key` comment, #1031):
+  they delete a key that an older build kept where backups copied it. A secret clean-up,
+  live; not migration code (added 2026-10-29).
+- A shim whose comment says the #58 cut-off keeps it (spec 051 or later, for example
+  "Kept while 056 is after the #58 cut-off", "before 069 (after the #58 cut-off)"): live
+  while #58's cut-off stands. Moving the cut-off is decision D2 in `2026-10-29.md`
+  (added 2026-10-29).
