@@ -205,11 +205,17 @@ public extension Levels {
 
 public extension LevelWords {
     /// A runtime's state on the Auto page (Story 3): Available, Rate limited, Out, Not signed
-    /// in or Not installed, from what the window already has.
+    /// in, Failed, Installing…, Install failed or Not installed, from what the window already
+    /// has. Not installed is only for one that is not there (#2890).
     static func state(_ status: RuntimeStatus?, allowances: RuntimeAllowances?) -> String {
         guard let status else { return state(available: false, signedIn: false, out: false, rateLimited: false) }
-        if case .needsSignIn = status.availability {
-            return state(available: true, signedIn: false, out: false, rateLimited: false)
+        switch status.availability {
+        case .available: break
+        case .missing: return state(available: false, signedIn: false, out: false, rateLimited: false)
+        case .needsSignIn: return state(available: true, signedIn: false, out: false, rateLimited: false)
+        case .failed: return "Failed"
+        case .installing: return "Installing…"
+        case .installFailed: return "Install failed"
         }
         var limited = false
         if case .rateLimited = allowances?.row(status.id, account: nil)?.state.status { limited = true }

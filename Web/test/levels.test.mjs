@@ -32,3 +32,7 @@ for (const { name, input, expected } of cases("levels/words.json")) {
     }, expected);
   });
 }
+
+for (const { name, input, expected } of cases("runtimes/auto-state.json")) {
+  test(`levels: the Auto page's state, ${name} (#2890)`, () => assert.equal(l.unavailableState(input) ?? "Available", expected));
+}

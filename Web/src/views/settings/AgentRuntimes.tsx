@@ -3,11 +3,12 @@
 // machines; the same on every client. Listed in ./sections.ts.
 import type { AutoField, AutoMapping, AutoSettings, NativeSetting, RuntimeStatus } from "../../protocol/generated";
 import type { Store } from "../../model/store";
-import { autoFields, cellOf, fieldWords, levelWords, levelsOf, mappedRuntimes, markWords } from "../../model/levels";
+import { autoFields, cellOf, fieldWords, levelWords, levelsOf, mappedRuntimes, markWords, unavailableState } from "../../model/levels";
 
 /** A runtime's state, as the Auto page says it. */
 function stateWords(store: Store, host: string, status: RuntimeStatus | undefined): string {
-  if (!status || !("available" in status.availability)) return "Not installed";
+  const unavailable = unavailableState(status);
+  if (unavailable || !status) return unavailable ?? "Not installed";
   if (store.account(host, status.runtime.id)?.state === "needsSignIn") return "Not signed in";
   const row = store.runtimeAllowances.value[host]?.rows.find((r) => r.credentialKey.startsWith(`${status.runtime.id}:`) && r.accountID === undefined);
   if (row && "out" in row.state.status) return "Out";
