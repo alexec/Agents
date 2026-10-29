@@ -105,9 +105,7 @@ test("when done offers the three choices in the window's words (#433)", () => {
 });
 
 test("the page says which runtime a run will use and why (#2764), as WorkflowSettings.runsOn", () => {
-  assert.equal(ws.runsOn("codex", "grok").line, "Runs on Codex (named in the file)");
-  assert.equal(ws.runsOn(undefined, "grok").line, "Runs on Grok (the last used here)");
-  assert.deepEqual(ws.runsOn(undefined, undefined), { runtimeID: "claude", line: "Runs on Claude (the default)", unknown: null });
-  assert.equal(ws.runsOn("nope", "codex").unknown, '"nope" is not a runtime this version knows, so this workflow does not run.');
-  assert.equal(ws.runsOn(undefined, "nope").unknown, '"nope" is not a runtime this version knows, so its settings cannot be shown.');
+  assert.equal(ws.runsOn("codex").line, "Runs on Codex (named in the file)");
+  assert.deepEqual(ws.runsOn(undefined), { runtimeID: "claude", line: "Runs on Claude (the default)", unknown: null });
+  assert.equal(ws.runsOn("nope").unknown, '"nope" is not a runtime this version knows, so this workflow does not run.');
 });

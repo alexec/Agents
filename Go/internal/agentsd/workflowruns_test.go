@@ -50,7 +50,8 @@ func TestAWorkflowRuns(t *testing.T) {
 	}
 	agent := s.LastOutcome.Ran.AgentID
 	a := d.Store.Agent(agent)
-	if a == nil || a.RuntimeID != "grok" || *a.Title != "Review" || a.StartedByWorkflow == nil || *a.StartedByWorkflow != "review" || *a.ChainDepth != 1 {
+	// A file with no runtime: runs on the default, not on the newest agent's runtime.
+	if a == nil || a.RuntimeID != defaultRuntimeID || *a.Title != "Review" || a.StartedByWorkflow == nil || *a.StartedByWorkflow != "review" || *a.ChainDepth != 1 {
 		t.Fatalf("%+v", a)
 	}
 	waitFor(t, "the run over", func() bool {
@@ -81,6 +82,29 @@ func TestAWorkflowRuns(t *testing.T) {
 		defer d.workflowMu.Unlock()
 		return len(d.recordsLocked().Runs) == 0
 	})
+}
+
+// A mode the runtime does not offer stops the run, rather than leaving the agent in the
+// runtime's own default; with nothing offered yet, the mode is taken as offered.
+func TestAWorkflowModeTheRuntimeDoesNotOffer(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	if id, why := d.offeredMode("grok", "auto"); id != "mode" || why != "" {
+		t.Fatal(id, why)
+	}
+	cat := "mode"
+	d.remember("grok\t/x\t", optionEntry{SavedAt: now(), Options: []wire.ConfigOption{{ID: "permission", Name: "Mode", Type: "select", Category: &cat,
+		Options: json.RawMessage(`[{"value":"default","name":"Default"},{"value":"read-only","name":"Read only"}]`)}}})
+	if id, why := d.offeredMode("grok", "read-only"); id != "permission" || why != "" {
+		t.Fatal(id, why)
+	}
+	if _, why := d.offeredMode("grok", "auto"); !strings.Contains(why, "does not offer the mode auto") || !strings.Contains(why, "default, read-only") {
+		t.Fatal(why)
+	}
+	d.remember("codex\t/x\t", optionEntry{SavedAt: now(), Options: []wire.ConfigOption{{ID: "model", Name: "Model", Type: "select"}}})
+	if _, why := d.offeredMode("codex", "auto"); !strings.Contains(why, "offers no modes") {
+		t.Fatal(why)
+	}
 }
 
 func TestAllowanceFailureDoesNotAutoarchiveWorkflowRun(t *testing.T) {
