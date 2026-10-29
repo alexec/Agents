@@ -624,7 +624,7 @@ export function NewAgent({ store, host, folder, folderName, down }: {
               runtimeID={chosenRuntime ?? undefined}
               clientPermission={chosenRuntime ? {
                 own: clientPermission.value,
-                settings: store.clientPermissions.value[store.macHostID.value]?.[chosenRuntime as keyof ClientPermissionSettings] ?? "default",
+                settings: store.clientPermissions.value[store.macHostID.value]?.[chosenRuntime as Exclude<keyof ClientPermissionSettings, "setBy">] ?? "default",
                 set: (mode) => (clientPermission.value = mode),
               } : undefined}
               besideMode={chosenRuntime && (
