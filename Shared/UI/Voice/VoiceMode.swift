@@ -221,7 +221,12 @@ final class VoiceMode {
         Task {
             guard self.agentID == agentID, phase == .loading else { return }
             do {
-                try audio.open()
+                try await audio.open()
+                // Turned off, or on elsewhere, while a set-up ahead was waited for.
+                guard self.agentID == agentID, phase == .loading else {
+                    if phase == .off { audio.close() }
+                    return
+                }
                 audioOpenedAt = .now
                 note("voice: audio open, \(audio.route)")
             } catch {

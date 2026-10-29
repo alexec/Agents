@@ -17,6 +17,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/noticebucket"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -98,9 +99,9 @@ type attentionState struct {
 	// askControl asks the control plane on channel 0 and waits (workspacetools.go).
 	askControl atomic.Pointer[askControl]
 	// notices are what agents told the person and are still posted, and noticeBucket the
-	// person's attention they share (#2805, notify.go).
+	// person's attention they share when this host has no control plane (#2805, notify.go).
 	notices      []postedNotice
-	noticeBucket noticeBucket
+	noticeBucket noticebucket.Bucket
 }
 
 // token is Need.token: one string per need, for keys and the file's order.

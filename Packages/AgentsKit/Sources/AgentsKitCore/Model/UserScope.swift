@@ -6,7 +6,7 @@ import Foundation
 public extension DaemonAPI {
     /// A part of the user settings. Each keeps the shape its file has on a machine.
     enum UserSettingsPartName: String, Codable, Sendable, Hashable, CaseIterable {
-        case mcpServers, agentConfig, runtimes, costLimits
+        case mcpServers, agentConfig, runtimes, costLimits, notifications
     }
 
     /// The agentConfig part: the person's own instructions, personas and skills.
@@ -50,15 +50,18 @@ public extension DaemonAPI {
         public var agentConfigFiles: AgentConfigFiles?
         public var runtimes: JSONValue?
         public var costLimits: JSONValue?
+        /// The person's notice limits (#2859): `{"burst", "cooldownMinutes"}`.
+        public var notifications: JSONValue?
         public var updated: String?
 
         public init(mcpServers: JSONValue? = nil, agentConfig: JSONValue? = nil, agentConfigFiles: AgentConfigFiles? = nil, runtimes: JSONValue? = nil,
-                    costLimits: JSONValue? = nil, updated: String? = nil) {
+                    costLimits: JSONValue? = nil, notifications: JSONValue? = nil, updated: String? = nil) {
             self.mcpServers = mcpServers
             self.agentConfig = agentConfig
             self.agentConfigFiles = agentConfigFiles
             self.runtimes = runtimes
             self.costLimits = costLimits
+            self.notifications = notifications
             self.updated = updated
         }
 
@@ -68,6 +71,7 @@ public extension DaemonAPI {
             case .agentConfig: agentConfig
             case .runtimes: runtimes
             case .costLimits: costLimits
+            case .notifications: notifications
             }
         }
     }

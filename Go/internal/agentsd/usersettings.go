@@ -28,6 +28,7 @@ import (
 //	agentConfig   ~/.agents/AGENTS.md, ~/.agents/personas/<name>.md, ~/.agents/skills/<name>/SKILL.md
 //	runtimes      <settings>/sandbox.json and <settings>/client-permissions.json
 //	costLimits    <settings>/limits.json
+//	notifications <settings>/display.json's noticeBurst and noticeCooldownMinutes (#2859)
 //	resources     <root>/resources.json
 //	secrets       ~/.agents-secrets/secrets.env, NAME=value
 //
@@ -121,6 +122,9 @@ func (d *Daemon) ApplyUserSettings(u wire.MachineUserSettings) error {
 	}
 	if partSent(s.CostLimits) {
 		note(wire.UserSettingsPartNameCostLimits, d.writeCostLimits(s.CostLimits))
+	}
+	if partSent(s.Notifications) {
+		note(wire.UserSettingsPartNameNotifications, d.writeNoticeLimits(s.Notifications))
 	}
 	names, err := writeSecrets(home, u.Secrets, before.Secrets)
 	if err != nil {
@@ -348,7 +352,7 @@ func (d *Daemon) writeRuntimeChoices(raw wire.JSONValue) error {
 	}
 	if r.ClientPermissions != nil {
 		b, _ := json.Marshal(r.ClientPermissions)
-		if err := store.WriteAtomically(filepath.Join(d.SettingsDir, "client-permissions.json"), b, 0o644); err != nil {
+		if err := store.WriteAtomically(filepath.Join(d.SettingsDir, "client-permissions.json"), b, 0o600); err != nil {
 			return err
 		}
 	}

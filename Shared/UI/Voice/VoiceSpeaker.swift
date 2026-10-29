@@ -42,7 +42,7 @@ final class VoiceSpeaker {
         guard let format, var sentence = next() else { return }
         run += 1
         let thisRun = run
-        try openOutput()
+        try await openOutput()
         defer { if thisRun == run { closeOutput() } }
         var samples = try await voice.audio(for: sentence)
         while thisRun == run {
@@ -93,8 +93,8 @@ final class VoiceSpeaker {
     }
 
     /// The route is voice mode's (`VoiceAudio.open`): this joins the player and starts the engine.
-    private func openOutput() throws {
-        try audio.open()
+    private func openOutput() async throws {
+        try await audio.open()
         // Again each time the engine is stopped: voice processing turned off and on
         // remakes the engine's graph.
         if !isConnected || !engine.isRunning, let format {

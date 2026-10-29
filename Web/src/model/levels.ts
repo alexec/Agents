@@ -1,13 +1,10 @@
 // The words every runtime shares (#2658), as LevelWords says them: one set for each field,
 // so a pill under the prompt says its value only. Pinned by Fixtures/web/levels/words.json.
-import type { AutoField, AutoMapping, AutoMappings, AutoMark, AutoSkip, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, RuntimeStatus, SandboxChoice } from "../protocol/generated";
+import type { AutoField, AutoMapping, AutoMappings, AutoMark, AutoSkip, RuntimeStatus, SandboxChoice } from "../protocol/generated";
 
 export const autoID = "auto";
 export const autoWords = "Auto";
 
-export const modelLevels: ModelLevel[] = ["fast", "balanced", "smart"];
-export const permissionLevels: PermissionLevel[] = ["plan", "ask", "approveForMe", "bypassPermissions"];
-export const requestModes: ClientPermissionMode[] = ["default", "alwaysApprove"];
 export const sandboxValues: SandboxChoice[] = ["runtime", "on", "off"];
 export const autoFields: AutoField[] = ["model", "permission", "permissionRequests", "sandbox"];
 
@@ -63,12 +60,6 @@ export const continueOn = (runtimeName: string): string => `Continue on ${runtim
 export const markWords: Record<AutoMark, string> = {
   autoMapped: "auto-mapped", nearestSafer: "nearest safer", yours: "yours", notPossible: "Not possible", dropped: "no longer offered",
 };
-
-/** A pill's words for a field of an agent: its value, or Custom. */
-export function levelPill(levels: Levels | undefined, field: "model" | "permission"): string {
-  const v = levels?.[field];
-  return v ? levelWords(field, v) : customWords;
-}
 
 /** The words in workflow, persona and start_session files. */
 export function fileWord(field: AutoField, level: string): string {

@@ -13,13 +13,12 @@ import { defaultRuntime } from "./workflows";
 export interface RunsOn { runtimeID: string; line: string; unknown: string | null }
 
 /**
- * WorkflowSettings.runsOn: the runtime the file names, else the newest agent's on the machine
- * that runs it, else the default, said in the window's words; and a mark when this version
- * does not know it.
+ * WorkflowSettings.runsOn: the runtime the file names, else the default, said in the window's
+ * words; and a mark when this version does not know it.
  */
-export function runsOn(named: string | undefined, lastUsed: string | undefined): RunsOn {
-  const source = named !== undefined ? "named in the file" : lastUsed !== undefined ? "the last used here" : "the default";
-  const runtimeID = named ?? lastUsed ?? defaultRuntime;
+export function runsOn(named: string | undefined): RunsOn {
+  const source = named !== undefined ? "named in the file" : "the default";
+  const runtimeID = named ?? defaultRuntime;
   const known = runtimeNames[runtimeID];
   const why = named !== undefined ? "so this workflow does not run" : "so its settings cannot be shown";
   return {

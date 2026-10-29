@@ -60,7 +60,7 @@ func (d *Daemon) registerHost() {
 		return d.sandboxState(), nil
 	})
 	On(d, wire.CallClientPermissionsState, func(ctx context.Context, c *Client, _ wire.Empty) (wire.ClientPermissionSettings, error) {
-		return d.clientPermissions(), nil
+		return d.clientPermissionsState(), nil
 	})
 	On(d, wire.CallClientPermissionsSet, func(ctx context.Context, c *Client, s wire.ClientPermissionSettings) (wire.ClientPermissionSettings, error) {
 		return d.setClientPermissions(s)
@@ -150,7 +150,7 @@ func (d *Daemon) writeSetting(name string, v any) error {
 	if err := os.MkdirAll(d.SettingsDir, 0o700); err != nil {
 		return err
 	}
-	return store.WriteAtomically(filepath.Join(d.SettingsDir, name), b, 0o644)
+	return store.WriteAtomically(filepath.Join(d.SettingsDir, name), b, 0o600)
 }
 
 // sandboxState is sandbox/state: the saved defaults, and who required them when the
@@ -196,18 +196,62 @@ func (d *Daemon) clientPermissions() wire.ClientPermissionSettings {
 func (d *Daemon) setClientPermissions(in wire.ClientPermissionSettings) (wire.ClientPermissionSettings, error) {
 	saved := wire.ClientPermissionSettings{Cursor: clientPermissionMode(string(in.Cursor)), Grok: clientPermissionMode(string(in.Grok)),
 		Opencode: clientPermissionMode(string(in.Opencode))}
+	if saved.Cursor == wire.ClientPermissionModeAlwaysApprove || saved.Grok == wire.ClientPermissionModeAlwaysApprove ||
+		saved.Opencode == wire.ClientPermissionModeAlwaysApprove {
+		if err := d.alwaysApproveRefusal(); err != nil {
+			return wire.ClientPermissionSettings{}, err
+		}
+	}
 	if err := d.writeSetting("client-permissions.json", saved); err != nil {
 		return wire.ClientPermissionSettings{}, &Error{Code: wire.FailureCouldNotSave, Message: "client-permissions.json: " + err.Error()}
 	}
+	saved.SetBy = d.clientPermissionsState().SetBy
 	Broadcast(d, wire.NotifyClientPermissionsChanged, saved)
 	return saved, nil
 }
 
+// clientPermissionsState is clientPermissions/state: the saved choices, and who turned
+// Always-approve off when the organisation's policy does, as sandboxState says it.
+func (d *Daemon) clientPermissionsState() wire.ClientPermissionSettings {
+	s := d.clientPermissions()
+	if ceiling, _, ok := d.alwaysApproveCeiling(); ok {
+		s.SetBy = setBy("modeCeiling", modeWords(ceiling))
+	}
+	return s
+}
+
+// alwaysApproveCeiling is the policy's mode ceiling when it ranks below approving every
+// request, which Always-approve does.
+func (d *Daemon) alwaysApproveCeiling() (string, int, bool) {
+	ceiling, rank, ok := modeCeiling(d.orgPolicy())
+	if !ok || !approvesAll("on", rank) {
+		return "", 0, false
+	}
+	return ceiling, rank, true
+}
+
+// alwaysApproveRefusal is why the policy does not allow Always-approve, or nil.
+func (d *Daemon) alwaysApproveRefusal() error {
+	if ceiling, _, ok := d.alwaysApproveCeiling(); ok {
+		return policyRefusal("policy", "modeCeiling", modeWords(ceiling), nil)
+	}
+	return nil
+}
+
 // agentAlwaysApproves is the agent's own Yes to all, else the person's in Settings (#2658,
 // FR-019).
+// Under a policy's mode ceiling below approving every request, neither answers (#2307
+// does the same for Copilot's). A helper or a workflow's agent follows its own choice
+// only: the person's in Settings is for the agents they start.
 func (d *Daemon) agentAlwaysApproves(a *wire.Agent) bool {
+	if _, _, capped := d.alwaysApproveCeiling(); capped {
+		return false
+	}
 	if a.ClientPermission != nil && clientAnswered[a.RuntimeID] {
 		return *a.ClientPermission == wire.ClientPermissionModeAlwaysApprove
+	}
+	if a.StartedByAgent != nil || a.StartedByWorkflow != nil || a.StartedByRun != nil {
+		return false
 	}
 	return d.alwaysApproves(a.RuntimeID)
 }

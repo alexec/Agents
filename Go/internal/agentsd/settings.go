@@ -350,7 +350,11 @@ func (d *Daemon) registerSettings() {
 		return d.preferences(), nil
 	})
 	On(d, wire.CallPreferencesSet, func(ctx context.Context, c *Client, r map[string]wire.JSONValue) (map[string]wire.JSONValue, error) {
-		return d.setPreferences(r)
+		m, err := d.setPreferences(r)
+		if err == nil {
+			d.noticeLimitsChanged(r)
+		}
+		return m, err
 	})
 	On(d, wire.CallModesRemembered, func(ctx context.Context, c *Client, _ wire.Empty) (map[string]wire.JSONValue, error) {
 		return d.modes(), nil

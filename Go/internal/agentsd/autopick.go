@@ -403,6 +403,11 @@ func (d *Daemon) setClientPermission(r wire.SetClientPermissionRequest) (wire.Ag
 	if !clientAnswered[a.RuntimeID] {
 		return wire.Agent{}, Invalid("%s asks by its permission mode; the app does not answer its requests.", runtimeName(a.RuntimeID))
 	}
+	if r.Mode != nil && clientPermissionMode(string(*r.Mode)) == wire.ClientPermissionModeAlwaysApprove {
+		if err := d.alwaysApproveRefusal(); err != nil {
+			return wire.Agent{}, err
+		}
+	}
 	d.change(a.ID, func(a *wire.Agent) {
 		if r.Mode == nil {
 			a.ClientPermission = nil
@@ -460,7 +465,6 @@ func autoNote(p wire.AutoPick) string {
 	}
 	return s
 }
-
 
 // resolveLevels is a start's levels made the runtime's own settings (#2658): on Auto, the
 // runtime is picked first (FR-006); then the model and mode cells fill the options the start

@@ -87,6 +87,9 @@ type workflowRecords struct {
 	LastTickAt     *wire.Date      `json:"lastTickAt,omitempty"`
 	Runs           []workflowRun   `json:"runs"`
 	ApprovalsBegan *wire.Date      `json:"approvalsBegan,omitempty"`
+	// UserApprovalsBegan is when the user's own workflows began to need approval too: then
+	// each was approved as it stood, as every file is at the first start.
+	UserApprovalsBegan *wire.Date `json:"userApprovalsBegan,omitempty"`
 	// RanBy is, for a session a workflow started on manage_workflows run, the session that
 	// ran it: that one may stop and archive it as one it started (#1730).
 	RanBy map[wire.UUID]wire.UUID `json:"ranBy,omitempty"`
@@ -339,6 +342,81 @@ func (d *Daemon) scanLocked() {
 		}
 		d.saveRecordsLocked(false)
 	}
+	if home != "" && !d.workflowRecsBad && (r.UserApprovalsBegan == nil || d.approveReadyMadeLocked(home, files[home])) {
+		if r.UserApprovalsBegan == nil {
+			t := now()
+			r.UserApprovalsBegan = &t
+			for id, f := range files[home] {
+				if f.digest != "" {
+					d.keepCopyLocked(d.stateLocked(home, id, true), f)
+				}
+			}
+		}
+		d.saveRecordsLocked(false)
+	}
+}
+
+// approveReadyMadeLocked approves each ready-made user workflow that is, with its skill, the
+// app's own text, unless the person denied it; and says whether it approved one.
+func (d *Daemon) approveReadyMadeLocked(home string, files map[string]*workflowFile) bool {
+	changed := false
+	for _, id := range readyMadeIDs() {
+		f := files[id]
+		if f == nil || f.digest == "" {
+			continue
+		}
+		workflow, skill := readyMadeText(id)
+		if f.text != workflow || len(f.skills) != 1 || f.skills[0].name != id || f.skills[0].text != skill {
+			continue
+		}
+		st := d.stateLocked(home, id, false)
+		if st != nil && (same(st.ApprovedDigest, &f.digest) || same(st.DeniedDigest, &f.digest)) {
+			continue
+		}
+		d.keepCopyLocked(d.stateLocked(home, id, true), f)
+		changed = true
+	}
+	return changed
+}
+
+// approvalFolderOf is the folder whose record holds a workflow's approval: a user
+// workflow's is the user's folder, so one approval covers every folder it is shown in.
+func approvalFolderOf(folder string, f *workflowFile) string {
+	if f != nil && f.scope == "user" && f.sourceFolder != "" {
+		return f.sourceFolder
+	}
+	return folder
+}
+
+// approvedUserWorkflowsLocked is the user workflows approved as they stand now.
+func (d *Daemon) approvedUserWorkflowsLocked() map[string]bool {
+	home := d.personalHome()
+	out := map[string]bool{}
+	for id, f := range d.workflowFiles[home] {
+		if awaiting, denied := d.approvalOf(home, id, f); awaiting == nil && denied == nil {
+			out[id] = true
+		}
+	}
+	return out
+}
+
+// reapproveUserWorkflowsLocked approves, as they stand after the person's own save in
+// Settings, the user workflows that were approved before it.
+func (d *Daemon) reapproveUserWorkflowsLocked(ids map[string]bool) {
+	home := d.personalHome()
+	changed := false
+	for id := range ids {
+		if f := d.workflowFiles[home][id]; f != nil && f.digest != "" {
+			st := d.stateLocked(home, id, true)
+			if !same(st.ApprovedDigest, &f.digest) {
+				d.keepCopyLocked(st, f)
+				changed = true
+			}
+		}
+	}
+	if changed {
+		d.saveRecordsLocked(false)
+	}
 }
 
 func (d *Daemon) fileLocked(folder, id string) *workflowFile {
@@ -353,12 +431,9 @@ func isArchived(w wire.Workflow) bool { return w.Archived != nil && *w.Archived 
 
 // approvalOf says whether a workflow waits for the person, or is denied here.
 func (d *Daemon) approvalOf(folder, id string, f *workflowFile) (awaiting, denied *wire.WorkflowApproval) {
-	// A file in the person's own workflow folder is trusted by its owner. Folders still
-	// keep it off by default, and their enabled state stays in their own record.
-	if f.scope == "user" {
-		return nil, nil
-	}
-	st := d.stateLocked(folder, id, false)
+	// A user workflow, and the skills it names, is approved once in the user's folder: it
+	// waits, as a folder's does, after any change but the person's own save in Settings.
+	st := d.stateLocked(approvalFolderOf(folder, f), id, false)
 	if d.workflowRecsBad {
 		note := "workflows.json could not be read, so nothing is approved until you approve it again."
 		return &wire.WorkflowApproval{Digest: f.digest, IsNew: st == nil || st.ApprovedDigest == nil, Note: &note}, nil
@@ -712,11 +787,15 @@ func (d *Daemon) writeUserWorkflow(r wire.WorkflowWriteRequest) (wire.WorkflowSu
 	}
 	d.workflowMu.Lock()
 	d.scanLocked()
+	// The person's own save approves it, when it was approved as it stood or is new.
+	approved := d.approvedUserWorkflowsLocked()
 	if existing := d.fileLocked(home, r.WorkflowID); existing != nil {
 		if _, _, why := readWorkflowFile(path); why != "" {
 			d.workflowMu.Unlock()
 			return wire.WorkflowSummary{}, &Error{Code: wire.FailureWorkflowUnreadable, Message: why + ". Nothing was written."}
 		}
+	} else {
+		approved[r.WorkflowID] = true
 	}
 	if err := os.MkdirAll(workflowsFolder(home), 0o755); err != nil {
 		d.workflowMu.Unlock()
@@ -727,6 +806,7 @@ func (d *Daemon) writeUserWorkflow(r wire.WorkflowWriteRequest) (wire.WorkflowSu
 		return wire.WorkflowSummary{}, &Error{Code: wire.FailureCouldNotSave, Message: "The workflow was not saved: " + err.Error()}
 	}
 	d.scanLocked()
+	d.reapproveUserWorkflowsLocked(approved)
 	summary := d.summaryLocked(home, r.WorkflowID, d.ceilingsLocked())
 	d.workflowMu.Unlock()
 	d.tellEveryWorkflow()
@@ -1026,7 +1106,10 @@ func (d *Daemon) approveWorkflow(r wire.WorkflowApproveRequest, approve bool) (w
 		d.workflowMu.Unlock()
 		return wire.WorkflowSummary{}, &Error{Code: wire.FailureNotChanged, Message: f.wf.Name + " changed after you looked at it, so it was not " + verb + ". Look again."}
 	}
-	st := d.stateLocked(folder, r.WorkflowID, true)
+	// The approval is kept where approvalOf reads it; what it refused stays in this folder's.
+	d.stateLocked(approvalFolderOf(folder, f), r.WorkflowID, true)
+	here := d.stateLocked(folder, r.WorkflowID, true)
+	st := d.stateLocked(approvalFolderOf(folder, f), r.WorkflowID, false)
 	if approve {
 		if d.recordsLocked().ApprovalsBegan == nil {
 			t := now()
@@ -1040,8 +1123,8 @@ func (d *Daemon) approveWorkflow(r wire.WorkflowApproveRequest, approve bool) (w
 			d.keepCopyLocked(st, f)
 		}
 		st.DeniedDigest = nil
-		if o := st.LastOutcome; o != nil && o.Refused != nil && (o.Refused.Value.AwaitingApproval != nil || o.Refused.Value.DeniedHere != nil) {
-			st.LastOutcome = nil
+		if o := here.LastOutcome; o != nil && o.Refused != nil && (o.Refused.Value.AwaitingApproval != nil || o.Refused.Value.DeniedHere != nil) {
+			here.LastOutcome = nil
 		}
 	} else {
 		digest := f.digest
@@ -1052,8 +1135,8 @@ func (d *Daemon) approveWorkflow(r wire.WorkflowApproveRequest, approve bool) (w
 		if st.HeardDigest != nil && *st.HeardDigest == digest {
 			st.HeardDigest = nil
 		}
-		if o := st.LastOutcome; o != nil && o.Refused != nil && o.Refused.Value.AwaitingApproval != nil {
-			st.LastOutcome = nil
+		if o := here.LastOutcome; o != nil && o.Refused != nil && o.Refused.Value.AwaitingApproval != nil {
+			here.LastOutcome = nil
 		}
 	}
 	d.saveRecordsLocked(true)
