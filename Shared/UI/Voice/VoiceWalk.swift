@@ -12,7 +12,6 @@ import Foundation
 ///     {"cmd": "voice", "sendFails": true}               the prompts heard next do not go, until false
 ///     {"cmd": "voice", "refuse": true}                  the microphone as if refused: voice mode's alert
 ///     {"cmd": "voice", "voiceOver": true}               as if VoiceOver were on: its note and announcements
-///     {"cmd": "voice", "wake": "Hey Agents, hi."}       words as if the wake listener heard them (Mac, #2420)
 @MainActor
 enum VoiceWalk {
     static func perform(_ request: [String: Any]) -> [String: Any] {
@@ -35,12 +34,6 @@ enum VoiceWalk {
         if let heard = request["heard"] as? String {
             voice.walkHeard(heard)
         }
-        var woke: Bool?
-        #if os(macOS)
-        if let wake = request["wake"] as? String {
-            woke = WakeListener.shared.walkHeard(wake)
-        }
-        #endif
         return [
             "ok": true,
             "enabled": WindowDefaults.store.bool(forKey: VoiceSettings.onKey),
@@ -52,7 +45,6 @@ enum VoiceWalk {
             "said": voice.said,
             "announced": voice.announcements,
             "problem": voice.problem ?? "",
-            "woke": woke as Any,
         ]
     }
 }

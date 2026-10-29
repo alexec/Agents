@@ -201,18 +201,27 @@ struct StartAgentView: View {
                     AttachmentStrip(attachments: $attachments,
                                     capabilities: model.promptCapabilities(for: model.startRuntimeID))
                 }
-                TextField(policyRefusal ?? "What should it do?", text: $text, selection: $selection, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .lineLimit(2...8)
-                    .focused($focused)
-                    .appText(.reading)
-                    .overlay(alignment: .topLeading) { HeardUnderline(dictation: dictation, text: text) }
-                    .accessibilityLabel("What the new agent should do")
-                    // ⌘V of a picture from an iPad's keyboard attaches it (#396).
-                    .modifier(PastesPictures(attachments: $attachments, refusal: $attachNote))
-                    // Held, words and all, while they start an agent (#87).
-                    .disabled(model.isStarting)
-                    .frame(minHeight: 44, alignment: .topLeading)
+                // Voice mode (#2375) in a new session, as on the Mac: its first words start it,
+                // and the options stay (Alex, 2026-10-29).
+                if voiceIsOn {
+                    VoiceSpeechPrompt()
+                        .frame(minHeight: 44, alignment: .topLeading)
+                        // Left before its first words: a new session's voice mode ends (#2388).
+                        .onDisappear { VoiceMode.shared.leave(nil) }
+                } else {
+                    TextField(policyRefusal ?? "What should it do?", text: $text, selection: $selection, axis: .vertical)
+                        .textFieldStyle(.plain)
+                        .lineLimit(2...8)
+                        .focused($focused)
+                        .appText(.reading)
+                        .overlay(alignment: .topLeading) { HeardUnderline(dictation: dictation, text: text) }
+                        .accessibilityLabel("What the new agent should do")
+                        // ⌘V of a picture from an iPad's keyboard attaches it (#396).
+                        .modifier(PastesPictures(attachments: $attachments, refusal: $attachNote))
+                        // Held, words and all, while they start an agent (#87).
+                        .disabled(model.isStarting)
+                        .frame(minHeight: 44, alignment: .topLeading)
+                }
 
                 HStack(spacing: 8) {
                     AttachButton(attachments: $attachments, refusal: $attachNote)
@@ -221,26 +230,33 @@ struct StartAgentView: View {
                     DictateButton(dictation: dictation, begin: beginDictation, send: send)
                         .disabled(model.isStarting)
 
-                    Button {
-                        send()
-                    } label: {
-                        Group {
-                            if model.isStarting {
-                                ProgressView()
-                            } else {
-                                Image(systemName: "arrow.up")
-                                    .appText(.reading).fontWeight(.semibold)
+                    VoiceModeButton(agentID: nil, vocabulary: { seeds }, send: sendSpoken)
+                        .disabled(model.isStarting)
+
+                    if voiceIsOn {
+                        VoiceStopButton()
+                    } else {
+                        Button {
+                            send()
+                        } label: {
+                            Group {
+                                if model.isStarting {
+                                    ProgressView()
+                                } else {
+                                    Image(systemName: "arrow.up")
+                                        .appText(.reading).fontWeight(.semibold)
+                                }
                             }
+                            .frame(width: 22, height: 22)
                         }
-                        .frame(width: 22, height: 22)
+                        .buttonStyle(.paperProminent)
+                        .buttonBorderShape(.circle)
+                        // Bright while its own spinner turns, as the answer that went stays bright
+                        // on the cards (#86); `send()` refuses the press meanwhile.
+                        .disabled(!canSend && !model.isStarting)
+                        .accessibilityLabel("Start agent")
+                        .accessibilityValue(model.isStarting ? AgentState.startingLabel : "")
                     }
-                    .buttonStyle(.paperProminent)
-                    .buttonBorderShape(.circle)
-                    // Bright while its own spinner turns, as the answer that went stays bright
-                    // on the cards (#86); `send()` refuses the press meanwhile.
-                    .disabled(!canSend && !model.isStarting)
-                    .accessibilityLabel("Start agent")
-                    .accessibilityValue(model.isStarting ? AgentState.startingLabel : "")
                 }
             }
             .padding(10)
@@ -280,13 +296,28 @@ struct StartAgentView: View {
         Task { _ = await model.startAgent(prompt: words, attachments: attached, labels: draftLabels, in: folder, page: page) }
     }
 
+    /// Voice mode is on in this new session, not started yet.
+    private var voiceIsOn: Bool { VoiceMode.shared.isOn(in: nil) }
+
+    private var seeds: [String] {
+        DictationVocabulary.seeds(folders: model.work.folders, agents: model.work.agents, in: folder)
+    }
+
+    /// The first words said in voice mode start the session, with this page's choices, and
+    /// say which it is, so voice mode goes on in its chat (#2375).
+    private func sendSpoken(_ words: String, _ stopping: UUID?) async -> UUID? {
+        var started: UUID?
+        guard await model.startAgent(prompt: words, labels: draftLabels, in: folder, page: page, voice: true,
+                                     started: { started = $0 }) else { return nil }
+        return started
+    }
+
     /// Listens, as the chat's bar does: what is in the field stays, and the words go in at
     /// the cursor (#427).
     private func beginDictation() {
         focused = true
         dictation.start(in: text, selection: DictationCursor.range(of: selection, in: text),
-                        vocabulary: DictationVocabulary.seeds(folders: model.work.folders,
-                                                             agents: model.work.agents, in: folder)) { field, cursor in
+                        vocabulary: seeds) { field, cursor in
             text = field
             selection = DictationCursor.selection(cursor, in: field)
         }

@@ -18,11 +18,16 @@ not (Alex, 2026-10-22: "would be weird").
 
 ## What the person sees
 
-1. **Voice mode**, a switch on each device: Settings ▸ Appearance ▸ Voice on the Mac, Settings ▸
-   Voice on the Remote. Off at first. Off, the chat has no
-   voice control and no voice model is loaded.
-2. **A voice button in the prompt bar**, beside the dictate button, when the switch is on. It
-   turns on voice mode for this chat:
+1. **Voice mode**, a switch on each device: Settings ▸ Voice on the Mac and the Remote (#2869;
+   was under Appearance on the Mac). On at first since #2869: nothing loads and no microphone
+   opens until the voice button is pressed. Off, the chat has no voice control and no voice
+   model is loaded. The same page sets the voice, its speed, the pause between sentences, the
+   wait before the words go, and plays a sample of them; on the Mac it also picks each sound
+   and plays it (#2869).
+2. **A voice button in the prompt bar**, beside the dictate button, when the switch is on, in a
+   chat and in a new session, whose first words start it. On, only the field changes, to the
+   words heard or said: every pill and option stays, Stop is where send and stop are, and the
+   button is the moving blue waveform (#2869). It turns on voice mode for this chat:
    - the microphone opens (the system's "listening" sound), and what the person says goes into
      the prompt, as dictation does;
    - after a pause of 2.5 seconds with words in the prompt, the prompt is sent (the "sent"
@@ -35,23 +40,26 @@ not (Alex, 2026-10-22: "would be weird").
    the question, then its options with numbers: "Two choices. One: Keychain. Two: File. One
    is recommended." The person says a number or the choice's words; voice mode says
    "Sending: File." and sends it unless the person says "no" within 2 seconds.
-5. **Sounds**: built-in system sounds only. Mac: `NSSound(named:)`. iPhone and iPad:
-   `AudioServicesPlaySystemSound`. Moments: microphone open, prompt sent, done, question
-   waiting, error.
+5. **Sounds**: built-in system sounds only. Mac: `NSSound(named:)`, each one chosen in Settings ▸
+   Voice. iPhone and iPad: `AudioServicesPlaySystemSound`. Moments: starts listening (once the
+   microphone really hears), stops listening (the words went), working (every few seconds while
+   the agent works and nothing is said), still listening, question waiting, error, voice mode
+   ends (#2869).
 
 ## Decisions
 
 | Question | Answer | Who, when |
 |---|---|---|
 | Clients | The Mac and the Remote. Web: by design, none. | Alex, 2026-10-22 |
-| The setting | Per device, in `WindowDefaults.store`, as Show thoughts is (#1725). Off by default. | Alex, 2026-10-22; default decided on #2322 |
-| The voice | Paradee-8M int8, through FluidAudio 0.17.7's Core ML build, inside each app (about 24 MB), no download. Loaded when voice mode turns on. Kokoro is out. | Alex's blind listen, #1920, 2026-10-22 |
+| The setting | Per device, in `WindowDefaults.store`, as Show thoughts is (#1725). On by default since #2869. | Alex, 2026-10-22; default decided on #2322, then on #2869 |
+| The voice | Kokoro-82M through FluidAudio 0.17.7's Neural Engine build, `af_heart` at first and 28 American and British English voices to choose from, inside each app (about 104 MB), no download. Loaded as voice mode turns on, while the person speaks. Was Paradee-8M (#1920). The integration videos' Chatterbox was tried and is too slow on device: over ten minutes of GPU compile per process for the full model, three seconds per second of speech for Nano. | Alex, #2869, 2026-10-29 |
+| How fast it listens | Within 100 ms of the press on the Mac: echo cancellation is set up when the voice button shows and kept between uses; the microphone is on only while voice mode is. | Alex, #2869, 2026-10-29 |
 | Listening | `Dictation.swift` (`SpeechAnalyzer`), on the device. | #2322 |
 | What is spoken | Only the reply (`TurnParts.reply`), cleaned by `Speakable`. Never thoughts or tool calls. | #2322 |
 | Short replies | `PromptRequest.voice` makes the daemon put the voice-mode text in front of the words, as the prompt's preface. The person's bubble shows only their words. | #2322 |
 | Where voice mode turns on | A button by the prompt box that puts this chat in voice mode, not a mode for the whole app. | Decided 2026-10-22, because a chat is what is spoken to, and one tap undoes it |
 | Speech while a turn runs | It goes on the queue as a queued prompt (#95), as typed words do. | Decided 2026-10-22, because the queue is there and every runtime takes it |
-| Model files | Not in git. `scripts/voice-models.sh` fetches them at a pinned Hugging Face revision, checks each SHA-256, and keeps them in the build cache. A build phase copies them into each app. | Decided 2026-10-22, because 23 MB of binaries in git stays in every clone for ever |
+| Model files | Not in git. `scripts/voice-models.sh` fetches them at a pinned Hugging Face revision, checks each SHA-256, turns the JSON voices into the `.bin` FluidAudio reads, and keeps them in the build cache. A build phase copies them into each app. | Decided 2026-10-22, because 23 MB of binaries in git stays in every clone for ever |
 
 ## Slices
 
@@ -76,14 +84,14 @@ not (Alex, 2026-10-22: "would be weird").
 
 ## Not in this feature
 
-- The wake word on the Mac (#1800). Shipped after this spec, in #2420: "Hey Agents" opens this voice mode, off by default, under Settings ▸ Appearance ▸ Voice.
-- The web page. No Paradee in WASM and no phonemes on the wire.
-- Paradee v1.1 in Core ML. Move to it when FluidAudio has it.
+- The wake word on the Mac (#1800). Shipped in #2420 and removed in #2869 (Alex, 2026-10-29).
+- The web page. No voice model in WASM and no phonemes on the wire.
 
 ## Still to measure
 
 - The iPhone's Core ML numbers (first sound, real-time factor, memory) and an hour of synthesis
-  there: does Paradee's CPU path meet the libBNNS bug that Kokoro meets on iOS 27? On Alex's
-  checklist #2222.
+  there: does Kokoro meet the libBNNS bug on iOS 27? On Alex's checklist #2222. The Mac trapped
+  in libBNNS once (2026-10-29), most likely two Core ML runs at once; `KokoroVoice` now runs one at
+  a time.
 - Barge-in on the iPhone speaker, on AirPods and on the Mac speakers: does the app's own voice
   stop itself?

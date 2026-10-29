@@ -3,16 +3,13 @@ import SwiftUI
 
 /// The prompt bar's voice button (#2322), beside the dictate button, while Settings has
 /// voice mode on. It turns voice mode on in this chat, or in a new session (#2375), whose
-/// first words start it. On, `VoiceModeBar` takes the bar's place.
+/// first words start it. On, `VoiceSpeechPrompt` takes the field's place.
 struct VoiceModeButton: View {
     /// Nil for a new session, not started yet.
     let agentID: UUID?
     /// Words for the recogniser that a dictionary would not have: agent, file and runtime names.
     /// Run when voice mode starts, not in `body`, which then does not read every agent (#2732).
     var vocabulary: () -> [String] = { [] }
-    /// Whether "Hey Agents" (#2420) turns voice mode on here, as a press does, with the words
-    /// said after the phrase. One bar of a chat takes it: the main window's.
-    var takesWake = false
     /// Sends the words as a voice prompt, and says which chat took them.
     let send: VoiceMode.Send
 
@@ -20,6 +17,7 @@ struct VoiceModeButton: View {
     @Environment(\.openURL) private var openURL
     @State private var isPriming = false
     private var voice: VoiceMode { VoiceMode.shared }
+    private var isOnHere: Bool { voice.isOn(in: agentID) }
 
     var body: some View {
         if isEnabled {
@@ -31,20 +29,27 @@ struct VoiceModeButton: View {
                     return
                 }
                 #endif
+                if isOnHere {
+                    voice.turnOff()
+                    return
+                }
                 voice.turnOn(in: agentID, vocabulary: vocabulary(), send: send)
             } label: {
-                Image(systemName: "waveform.circle")
+                // On, the blue waveform, moving while it listens or speaks (Alex, 2026-10-29).
+                Image(systemName: isOnHere ? "waveform" : "waveform.circle")
                     .appText(.reading).fontWeight(.semibold)
+                    .foregroundStyle(isOnHere ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
                     .frame(width: 22, height: 22)
+                    .symbolEffect(.variableColor.iterative,
+                                  isActive: isOnHere && (voice.phase == .listening || voice.phase == .speaking))
             }
             .buttonStyle(.paper)
             .buttonBorderShape(.circle)
-            .help("Voice mode: say what you want and hear the reply")
+            .help(isOnHere ? "Stop voice mode" : "Voice mode: say what you want and hear the reply")
             .accessibilityLabel("Voice mode")
-            .onChange(of: voice.wake, initial: true) {
-                guard takesWake, let wake = voice.takeWake(for: agentID) else { return }
-                voice.turnOn(in: agentID, vocabulary: vocabulary(), words: wake.words, send: send)
-            }
+            .accessibilityValue(isOnHere ? "On" : "")
+            // Echo cancellation set up before the press: it is most of the wait (Alex, 2026-10-29).
+            .task { voice.prepare() }
             #if os(iOS)
             .sheet(isPresented: $isPriming) {
                 DictationPrimer(title: PromptWords.voicePrimerTitle, what: PromptWords.voicePrimer,
@@ -70,10 +75,11 @@ struct VoiceModeButton: View {
     }
 }
 
-/// Voice mode in place of the whole prompt bar (#2375), field and pills: the blue waveform,
-/// moving while it listens or speaks, the words heard or said, never cut, and Stop (or
-/// Escape) to end it (#2517).
-struct VoiceModeBar: View {
+/// What voice mode shows in place of the prompt field: the blue waveform, moving while it
+/// listens or speaks, the words heard or said, never cut, and Don't Send while an answer
+/// waits. The bar keeps its pills around it, and the moving waveform is on the voice button
+/// (Alex, 2026-10-29).
+struct VoiceSpeechPrompt: View {
     private var voice: VoiceMode { VoiceMode.shared }
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverIsOn
 
@@ -88,7 +94,6 @@ struct VoiceModeBar: View {
                 Text(VoiceModeWords.voiceOverNote)
                     .appText(.supporting)
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 14)
             }
         }
         // VoiceOver is told what only the strip says: on, off, and what it waits for. The
@@ -106,12 +111,6 @@ struct VoiceModeBar: View {
 
     private var strip: some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "waveform")
-                .appText(.reading)
-                .foregroundStyle(.tint)
-                .frame(width: 22, height: 22)
-                .symbolEffect(.variableColor.iterative, isActive: voice.phase == .listening || voice.phase == .speaking)
-                .accessibilityHidden(true)
             Text(words)
                 .appText(.reading)
                 .foregroundStyle(voice.heard.isEmpty || voice.phase == .speaking ? .secondary : .primary)
@@ -124,25 +123,12 @@ struct VoiceModeBar: View {
                     .buttonStyle(.paper)
                     .help("Don't send this answer; the question is asked again")
             }
-            Button {
-                voice.turnOff()
-            } label: {
-                Image(systemName: PromptWords.stopSymbol)
-                    .appText(.reading).fontWeight(.semibold)
-                    .frame(width: 22, height: 22)
-            }
-            .buttonStyle(.paper)
-            .buttonBorderShape(.circle)
-            .keyboardShortcut(.cancelAction)
-            .help("Stop voice mode (Esc)")
-            .accessibilityLabel("Stop voice mode")
         }
-        .padding(14)
-        .paperRaised(in: RoundedRectangle(cornerRadius: 18))
         .background {
             Button("Send") { voice.sendNow() }
                 .keyboardShortcut(.defaultAction)
                 .frame(width: 0, height: 0)
+                .opacity(0)
                 .accessibilityHidden(true)
         }
         .accessibilityElement(children: .contain)
@@ -155,6 +141,25 @@ struct VoiceModeBar: View {
         case .listening, .sending: voice.heard.isEmpty || voice.confirmLine != nil ? voice.hint : voice.heard
         default: voice.hint
         }
+    }
+}
+
+/// Stop (or Escape) ends voice mode. It is where send and stop are when voice mode is off
+/// (Alex, 2026-10-29).
+struct VoiceStopButton: View {
+    var body: some View {
+        Button {
+            VoiceMode.shared.turnOff()
+        } label: {
+            Image(systemName: PromptWords.stopSymbol)
+                .appText(.reading).fontWeight(.semibold)
+                .frame(width: 22, height: 22)
+        }
+        .buttonStyle(.paperProminent)
+        .buttonBorderShape(.circle)
+        .keyboardShortcut(.cancelAction)
+        .help("Stop voice mode (Esc)")
+        .accessibilityLabel("Stop voice mode")
     }
 }
 

@@ -454,14 +454,19 @@ final class Dictation {
             sink.point(at: nil)
             return
         }
-        if engine.isRunning {
+        let wasListening = engine.isRunning
+        if wasListening {
             engine.inputNode.removeTap(onBus: 0)
             engine.stop()
         }
         sink.point(at: nil)
         #if os(iOS)
-        // Give the route back, so whatever was playing before carries on.
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        // Give the route back, so whatever was playing before carries on: only a route this
+        // took, and never voice mode's, which a field's stop as its page goes would end
+        // (Alex's iPhone, 2026-10-29).
+        if wasListening, !VoiceMode.shared.isOn {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
         #endif
     }
 

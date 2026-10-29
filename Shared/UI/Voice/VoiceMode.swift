@@ -13,7 +13,7 @@ import Observation
 /// `voice` set so the daemon asks for a short spoken reply. Words said while a turn runs
 /// are sent the same way, and wait on the chat's queue (#95). The reply
 /// (`TurnParts.replyText`, never the thoughts or the steps) is cleaned by `Speakable` and
-/// spoken in the Paradee voice a sentence at a time, each one as soon as it is written
+/// spoken in the Kokoro voice a sentence at a time, each one as soon as it is written
 /// (#2375). The microphone stays open while it speaks, with echo cancellation
 /// (`VoiceAudio`), and words said over the voice stop it and are the next prompt. Enter
 /// sends the words heard so far at once (#2519).
@@ -84,14 +84,17 @@ final class VoiceMode {
 
     /// How long a pause is before the words go: 2.5 s at first (#1792), 2 s since Alex
     /// tried it (#2375).
-    static let pause: Duration = .milliseconds(2_000)
+    /// Settings ▸ Voice can make it longer or shorter (Alex, 2026-10-29).
+    static var pause: Duration { .milliseconds(Int(VoiceSettings.wait * 1000)) }
 
     /// How often a tick says it is still listening, while nothing is heard (#2520).
     static let tickEvery: Duration = .seconds(8)
+    /// How often the working sound plays while the agent works and nothing is said.
+    static var workingEvery: Duration { .milliseconds(Int(VoiceSettings.workingEvery * 1000)) }
 
     @ObservationIgnored let dictation: Dictation
     @ObservationIgnored private let audio: VoiceAudio
-    @ObservationIgnored private let voice: ParadeeVoice
+    @ObservationIgnored private let voice: KokoroVoice
     @ObservationIgnored private let speaker: VoiceSpeaker
     /// Sends words as a voice prompt, and says which chat took them: nil when none did.
     /// A new session's starts the chat with them (#2375).
@@ -123,6 +126,8 @@ final class VoiceMode {
     private var joinTarget: UUID?
     private var joinFirstText: String?
     private var joinText: String?
+    /// When voice mode last opened the audio, so late word of an older session is not an end.
+    private(set) var audioOpenedAt: ContinuousClock.Instant?
     private var joinStarted = false
     private var joinDeadline: ContinuousClock.Instant?
     private var joinBaselineItemIDs: Set<UUID> = []
@@ -132,7 +137,7 @@ final class VoiceMode {
 
     private init() {
         let audio = VoiceAudio()
-        let voice = ParadeeVoice()
+        let voice = KokoroVoice()
         self.audio = audio
         self.voice = voice
         #if os(macOS)
@@ -150,6 +155,13 @@ final class VoiceMode {
                                                queue: .main) { _ in
             MainActor.assumeIsolated {
                 guard VoiceMode.shared.phase != .off else { return }
+                // Late word of a session given back just before (Dictate's, or the last
+                // voice mode's) comes as voice mode opens it again: not a call (Alex's iPad,
+                // 2026-10-29, once it listened at once).
+                if let opened = VoiceMode.shared.audioOpenedAt, ContinuousClock.now - opened < .seconds(1) {
+                    note("voice: the audio session went inactive just after it opened: kept on")
+                    return
+                }
                 note("voice: the audio session went inactive in \(VoiceMode.shared.phase): off")
                 VoiceMode.shared.turnOff()
             }
@@ -186,8 +198,7 @@ final class VoiceMode {
     /// Turns voice mode on in a chat, or a new session (nil) that its first words start.
     /// `send` sends words to it as a voice prompt, and says
     /// whether the host took them.
-    /// `words`: what was said after "Hey Agents" (#2420), the start of the first prompt.
-    func turnOn(in agentID: UUID?, vocabulary: [String] = [], words: String = "", send: @escaping Send) {
+    func turnOn(in agentID: UUID?, vocabulary: [String] = [], send: @escaping Send) {
         if phase != .off { turnOff() }
         self.agentID = agentID
         self.send = send
@@ -205,26 +216,38 @@ final class VoiceMode {
         clearJoin()
         phase = .loading
         note("voice: on")
+        // Listening at once, and the voice loads while the person speaks: it is needed only
+        // for the reply (Alex, 2026-10-29). A sentence said before it is ready waits for it.
         Task {
-            do {
-                try await voice.load()
-            } catch {
-                guard self.agentID == agentID else { return }
-                note("voice: the voice would not load: \(error)")
-                fail("The voice would not load: \(error.localizedDescription)")
-                return
-            }
             guard self.agentID == agentID, phase == .loading else { return }
             do {
                 try audio.open()
+                audioOpenedAt = .now
                 note("voice: audio open, \(audio.route)")
             } catch {
                 note("voice: audio would not open: \(error)")
                 fail("The microphone and speaker would not start: \(error.localizedDescription)")
                 return
             }
-            listen(after: words)
+            listen()
         }
+        Task {
+            do {
+                try await voice.load()
+                note("voice: the voice is ready")
+            } catch {
+                guard self.agentID == agentID, phase != .off else { return }
+                note("voice: the voice would not load: \(error)")
+                fail("The voice would not load: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// Readies the microphone's echo cancellation while voice mode is off, so a press listens
+    /// at once. Opens no microphone.
+    func prepare() {
+        guard phase == .off, !isWalked else { return }
+        audio.prepare()
     }
 
     /// Turns voice mode off: the microphone closes, the voice stops and is let go.
@@ -273,26 +296,10 @@ final class VoiceMode {
         Task { await voice.unload() }
     }
 
-    /// "Hey Agents" was heard (#2420): voice mode, in this chat or a new session (nil), with
-    /// `words` said after the phrase as the start of the first prompt. The prompt bar of that
-    /// chat takes it (`takeWake`) and turns voice mode on, as its button does.
-    struct Wake: Equatable {
-        let id = UUID()
-        let agentID: UUID?
-        let words: String
-    }
-
-    private(set) var wake: Wake?
-
-    func wake(in agentID: UUID?, words: String) {
-        wake = Wake(agentID: agentID, words: words)
-    }
-
-    /// The wake for the prompt bar of this chat, once.
-    func takeWake(for agentID: UUID?) -> Wake? {
-        guard let wake, wake.agentID == agentID else { return nil }
-        self.wake = nil
-        return wake
+    /// A sentence in the voice Settings has now, for Settings' sample (Alex, 2026-10-29):
+    /// the same voice, so no second copy of the model and no two runs at once.
+    func sample(_ sentence: String) async throws -> [Float] {
+        try await voice.audio(for: sentence)
     }
 
     /// The person left this chat, or the new session (nil), or the app went to the
@@ -682,8 +689,22 @@ final class VoiceMode {
         defer { askIfWaiting() }
         if !words.isEmpty { heardChanged(words) }
         guard !isWalked else { return }
-        if chime { sound(.listening) }
         startDictation(after: words)
+        // The sound once the microphone really hears, so words said on it are not lost.
+        if chime { chimeWhenListening() }
+    }
+
+    /// Plays the listening sound as soon as dictation listens, or after a second at most.
+    private func chimeWhenListening() {
+        Task { [weak self] in
+            for _ in 0..<20 {
+                guard let self, self.phase == .listening else { return }
+                if self.dictation.isListening { break }
+                try? await Task.sleep(for: .milliseconds(50))
+            }
+            guard let self, self.phase == .listening else { return }
+            self.sound(.listening)
+        }
     }
 
     /// Dictation afresh, so what was heard before is not in what comes next.
@@ -968,11 +989,13 @@ final class VoiceMode {
         }
         guard tickTask == nil else { return }
         tickTask = Task { [weak self] in
-            try? await Task.sleep(for: Self.tickEvery)
+            // While the agent works, the working sound, more often; else the tick.
+            let working = self?.isWaitingForReply == true
+            try? await Task.sleep(for: working ? Self.workingEvery : Self.tickEvery)
             guard !Task.isCancelled, let self else { return }
             self.tickTask = nil
             guard self.ticksInSilence else { return }
-            self.sound(.tick)
+            self.sound(self.isWaitingForReply ? .working : .tick)
             self.armTick()
         }
     }

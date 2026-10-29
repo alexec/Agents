@@ -98,14 +98,8 @@ struct PromptBar: View {
             if sending > 0, sendingIsSlow {
                 Telling(host: model.answerRecipient(agent.id), doing: "Sending")
             }
-            // Voice mode (#2322) is the whole bar, field and options: what it hears and
-            // says, and Stop to end it (#2375, #2517).
-            if VoiceMode.shared.isOn(in: agent.id) {
-                VoiceModeBar()
-            } else {
-                field
-                if isShowingEverything { options }
-            }
+            field
+            if isShowingEverything { options }
         }
         .task(id: sending > 0) {
             sendingIsSlow = false
@@ -180,89 +174,99 @@ struct PromptBar: View {
 
     // MARK: What you want done
 
+    /// Voice mode is on in this chat (#2375).
+    private var voiceIsOn: Bool { VoiceMode.shared.isOn(in: agent.id) }
+
     private var field: some View {
         VStack(alignment: .leading, spacing: 8) {
             if !attachments.isEmpty {
                 AttachmentStrip(attachments: $attachments,
                                 capabilities: model.promptCapabilities(for: agent.runtimeID))
             }
-            TextField(policyRefusal ?? PromptWords.placeholder(for: agent), text: $text, selection: $selection, axis: .vertical)
-                .textFieldStyle(.plain)
-                .appText(.reading)
-                .lineLimit(2...8)
-                .overlay(alignment: .topLeading) { HeardUnderline(dictation: dictation, text: text) }
-                .focused($focused)
-                .onChange(of: focused) { _, now in model.isTyping = now }
-                // ⌘V of a picture from an iPad's keyboard attaches it (#396).
-                .modifier(PastesPictures(attachments: $attachments, refusal: $attachRefusal))
-                .accessibilityLabel("What to say to \(agent.title ?? "this agent")")
-                // The Mac's keys, from an iPad's keyboard. SwiftUI hands these over from
-                // a hardware keyboard only, so the on-screen one is left as iOS has it:
-                // Return is a new line and Send is the button. From a hardware keyboard,
-                // Return sends, and Shift-Return and Option-Return are a new line (#377, #1514).
-                .onKeyPress(.return, phases: .down) { press in
-                    guard PromptReturn(option: press.modifiers.contains(.option),
-                                       shift: press.modifiers.contains(.shift)) == .send else { return .ignored }
-                    if isCompleting || isMentioning { acceptSelected() } else { send() }
-                    return .handled
-                }
-                .onKeyPress(.tab) {
-                    if isCompleting || isMentioning {
-                        acceptSelected()
+            // Voice mode (#2322) takes only the field's place: the options stay, to change
+            // one while it listens, as on the Mac (Alex, 2026-10-29).
+            if voiceIsOn {
+                VoiceSpeechPrompt()
+                    .frame(minHeight: 44, alignment: .topLeading)
+            } else {
+                TextField(policyRefusal ?? PromptWords.placeholder(for: agent), text: $text, selection: $selection, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .appText(.reading)
+                    .lineLimit(2...8)
+                    .overlay(alignment: .topLeading) { HeardUnderline(dictation: dictation, text: text) }
+                    .focused($focused)
+                    .onChange(of: focused) { _, now in model.isTyping = now }
+                    // ⌘V of a picture from an iPad's keyboard attaches it (#396).
+                    .modifier(PastesPictures(attachments: $attachments, refusal: $attachRefusal))
+                    .accessibilityLabel("What to say to \(agent.title ?? "this agent")")
+                    // The Mac's keys, from an iPad's keyboard. SwiftUI hands these over from
+                    // a hardware keyboard only, so the on-screen one is left as iOS has it:
+                    // Return is a new line and Send is the button. From a hardware keyboard,
+                    // Return sends, and Shift-Return and Option-Return are a new line (#377, #1514).
+                    .onKeyPress(.return, phases: .down) { press in
+                        guard PromptReturn(option: press.modifiers.contains(.option),
+                                           shift: press.modifiers.contains(.shift)) == .send else { return .ignored }
+                        if isCompleting || isMentioning { acceptSelected() } else { send() }
                         return .handled
                     }
-                    guard let suggestion else { return .ignored }
-                    take(suggestion)
-                    return .handled
-                }
-                .onKeyPress(.downArrow) {
-                    if isCompleting {
-                        selectedCommand = min(selectedCommand + 1, matchingCommands.count - 1)
+                    .onKeyPress(.tab) {
+                        if isCompleting || isMentioning {
+                            acceptSelected()
+                            return .handled
+                        }
+                        guard let suggestion else { return .ignored }
+                        take(suggestion)
                         return .handled
                     }
-                    if isMentioning {
-                        selectedMention = min(selectedMention + 1, mentions.count - 1)
+                    .onKeyPress(.downArrow) {
+                        if isCompleting {
+                            selectedCommand = min(selectedCommand + 1, matchingCommands.count - 1)
+                            return .handled
+                        }
+                        if isMentioning {
+                            selectedMention = min(selectedMention + 1, mentions.count - 1)
+                            return .handled
+                        }
+                        // The prompts sent before, as a terminal gives back its commands (#1551).
+                        if let step = PromptHistory.recall(.down, text: text, sent: sentPrompts, at: recalled) {
+                            text = step.text
+                            recalled = step.at
+                            return .handled
+                        }
+                        return .ignored
+                    }
+                    .onKeyPress(.upArrow) {
+                        if isCompleting {
+                            selectedCommand = max(selectedCommand - 1, 0)
+                            return .handled
+                        }
+                        if isMentioning {
+                            selectedMention = max(selectedMention - 1, 0)
+                            return .handled
+                        }
+                        // The prompts sent before, as a terminal gives back its commands (#1551).
+                        if let step = PromptHistory.recall(.up, text: text, sent: sentPrompts, at: recalled) {
+                            text = step.text
+                            recalled = step.at
+                            return .handled
+                        }
+                        return .ignored
+                    }
+                    .onKeyPress(.escape) {
+                        if isCompleting {
+                            dismissedCommandTerm = commandQuery?.term
+                            return .handled
+                        }
+                        if isMentioning {
+                            dismissedMentionTerm = mentionQuery?.term
+                            return .handled
+                        }
+                        guard suggestion != nil else { return .ignored }
+                        dismissedSuggestions = true
                         return .handled
                     }
-                    // The prompts sent before, as a terminal gives back its commands (#1551).
-                    if let step = PromptHistory.recall(.down, text: text, sent: sentPrompts, at: recalled) {
-                        text = step.text
-                        recalled = step.at
-                        return .handled
-                    }
-                    return .ignored
-                }
-                .onKeyPress(.upArrow) {
-                    if isCompleting {
-                        selectedCommand = max(selectedCommand - 1, 0)
-                        return .handled
-                    }
-                    if isMentioning {
-                        selectedMention = max(selectedMention - 1, 0)
-                        return .handled
-                    }
-                    // The prompts sent before, as a terminal gives back its commands (#1551).
-                    if let step = PromptHistory.recall(.up, text: text, sent: sentPrompts, at: recalled) {
-                        text = step.text
-                        recalled = step.at
-                        return .handled
-                    }
-                    return .ignored
-                }
-                .onKeyPress(.escape) {
-                    if isCompleting {
-                        dismissedCommandTerm = commandQuery?.term
-                        return .handled
-                    }
-                    if isMentioning {
-                        dismissedMentionTerm = mentionQuery?.term
-                        return .handled
-                    }
-                    guard suggestion != nil else { return .ignored }
-                    dismissedSuggestions = true
-                    return .handled
-                }
-                .frame(minHeight: 44, alignment: .topLeading)
+                    .frame(minHeight: 44, alignment: .topLeading)
+            }
 
             HStack(spacing: 8) {
                 AttachButton(attachments: $attachments, refusal: $attachRefusal)
@@ -277,9 +281,12 @@ struct PromptBar: View {
                     return await model.send(words, to: agent.id, voice: true) ? agent.id : nil
                 }
 
+                // Voice mode's Stop is where send and stop are, as on the Mac (Alex, 2026-10-29).
                 // While it works and nothing is typed, send is stop. Type and it is send
                 // again, queueing what is typed for when the turn ends.
-                if model.canStop(agent), !model.isStale(agent), text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                if voiceIsOn {
+                    VoiceStopButton()
+                } else if model.canStop(agent), !model.isStale(agent), text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                    sending == 0 {
                     let acting = model.acting(agent.id)
                     Button {
