@@ -43,6 +43,10 @@ func (d *Daemon) waitingWorkflowChanges(folder string) []wire.GuardedChange {
 		if !d.listedHere(f.wf) || isArchived(f.wf) {
 			continue
 		}
+		// A user workflow asks only where it is on: it is shown, off, in every forge folder.
+		if f.scope == "user" && folder != d.personalHome() && isOff(f.wf) {
+			continue
+		}
 		awaiting, _ := d.approvalOf(folder, id, f)
 		if awaiting == nil {
 			continue
@@ -108,7 +112,7 @@ func (d *Daemon) readWorkflowChange(folder, id string) (wire.GuardedChangeReadin
 		return wire.GuardedChangeReading{}, noSuchWorkflow(id)
 	}
 	current, digest := shownWorkflow(f.text, f.skills), f.digest
-	approved, skills, hasApproved := d.approvedCopyLocked(folder, id)
+	approved, skills, hasApproved := d.approvedCopyLocked(approvalFolderOf(folder, f), id)
 	approved = shownWorkflow(approved, skills)
 	d.workflowMu.Unlock()
 	out := wire.GuardedChangeReading{Path: workflowChangePath(id), Digest: &digest, Current: &current}
@@ -162,7 +166,7 @@ func (d *Daemon) keepOrUndoWorkflow(folder, id string, digest *string, keep bool
 		d.workflowMu.Unlock()
 		return wire.FolderSummary{}, &Error{Code: wire.FailureNotChanged, Message: f.wf.Name + " changed after you looked at it, so it was not undone. Look again."}
 	}
-	approved, skills, had := d.approvedCopyLocked(folder, id)
+	approved, skills, had := d.approvedCopyLocked(approvalFolderOf(folder, f), id)
 	d.workflowMu.Unlock()
 	path, ok := workflowSourcePath(folder, id, f)
 	err := errors.New("that is not a workflow's name")
