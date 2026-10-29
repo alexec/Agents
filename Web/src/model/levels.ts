@@ -6,7 +6,7 @@ export const autoID = "auto";
 export const autoWords = "Auto";
 
 export const modelLevels: ModelLevel[] = ["fast", "balanced", "smart"];
-export const permissionLevels: PermissionLevel[] = ["plan", "ask", "approveForMe"];
+export const permissionLevels: PermissionLevel[] = ["plan", "ask", "approveForMe", "bypassPermissions"];
 export const requestModes: ClientPermissionMode[] = ["default", "alwaysApprove"];
 export const sandboxValues: SandboxChoice[] = ["runtime", "on", "off"];
 export const autoFields: AutoField[] = ["model", "permission", "permissionRequests", "sandbox"];
@@ -17,7 +17,7 @@ export const fieldWords: Record<AutoField, string> = {
 
 const words: Record<AutoField, Record<string, string>> = {
   model: { fast: "Fast", balanced: "Balanced", smart: "Smart" },
-  permission: { plan: "Plan", ask: "Ask", approveForMe: "Approve for me" },
+  permission: { plan: "Plan", ask: "Ask", approveForMe: "Approve for me", bypassPermissions: "Bypass Permissions" },
   permissionRequests: { default: "Request cards", alwaysApprove: "Yes to all" },
   sandbox: { runtime: "Default sandbox", on: "Runtime sandbox", off: "No sandbox" },
 };
@@ -32,6 +32,7 @@ const meanings: Record<AutoField, Record<string, string>> = {
     plan: "Reads and plans; cannot change files or run commands that change things.",
     ask: "Asks before it changes things.",
     approveForMe: "Does not ask for normal changes in its folder.",
+    bypassPermissions: "Never asks, even for a change outside its folder.",
   },
   permissionRequests: {
     default: "Each permission request is a card for you.",
@@ -72,7 +73,7 @@ export function levelPill(levels: Levels | undefined, field: "model" | "permissi
 /** The words in workflow, persona and start_session files. */
 export function fileWord(field: AutoField, level: string): string {
   const special: Record<string, string> = {
-    "permission:approveForMe": "approve-for-me", "permissionRequests:default": "request-cards",
+    "permission:approveForMe": "approve-for-me", "permission:bypassPermissions": "bypass-permissions", "permissionRequests:default": "request-cards",
     "permissionRequests:alwaysApprove": "yes-to-all", "sandbox:runtime": "default", "sandbox:on": "runtime", "sandbox:off": "none",
   };
   return special[`${field}:${level}`] ?? level;

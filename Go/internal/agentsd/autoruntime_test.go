@@ -174,7 +174,7 @@ func TestTheMappingsAreThePersons(t *testing.T) {
 			found = cell.Mark == wire.AutoMarkYours && stringValue(cell.Native.Options["mode"]) == "bypassPermissions"
 		}
 	}
-	if !found || len(m.Cells) != len(catalog)*11 || len(m.Choices) == 0 {
+	if !found || len(m.Cells) != len(catalog)*12 || len(m.Choices) == 0 {
 		t.Fatalf("%v %d", found, len(m.Cells))
 	}
 	var id wire.UUID

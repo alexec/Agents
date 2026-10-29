@@ -17,9 +17,9 @@ public enum ModelLevel: String, Codable, Sendable, Hashable, CaseIterable {
     }
 }
 
-/// Plan, Ask or Approve for me.
+/// Plan, Ask, Approve for me or Bypass Permissions.
 public enum PermissionLevel: String, Codable, Sendable, Hashable, CaseIterable {
-    case plan, ask, approveForMe
+    case plan, ask, approveForMe, bypassPermissions
 
     /// A value this build does not know reads as Ask.
     public init(from decoder: any Decoder) throws {

@@ -507,7 +507,7 @@ The same words apply on every runtime, on Auto or not:
 | Field | Values | In a file |
 | --- | --- | --- |
 | Model | **Fast**, **Balanced**, **Smart** | `fast`, `balanced`, `smart` |
-| Permission mode | **Plan**, **Ask**, **Approve for me** | `plan`, `ask`, `approve-for-me` |
+| Permission mode | **Plan**, **Ask**, **Approve for me**, **Bypass Permissions** | `plan`, `ask`, `approve-for-me`, `bypass-permissions` |
 | Permission requests (Cursor, Grok, OpenCode) | **Request cards**, **Yes to all** | `request-cards`, `yes-to-all` |
 | Sandbox | **Default sandbox**, **Runtime sandbox**, **No sandbox** | `default`, `runtime`, `none` |
 
@@ -518,19 +518,19 @@ does not use that runtime for that value. A test over the table checks that no s
 gives more access than its value. You can change any cell; the runtime check (#39) marks a
 cell whose model or mode the runtime no longer offers, and files an issue.
 
-**Permission mode** (on Auto, **Approve for me** also says yes to permission requests; the
-other two give a card):
+**Permission mode** (on Auto, **Approve for me** and **Bypass Permissions** also say yes to
+permission requests; the other two give a card):
 
-| Runtime | Plan | Ask | Approve for me |
-| --- | --- | --- | --- |
-| Claude | Plan | Manual (default) | Accept edits |
-| Codex | Ask for approval, with Plan | Ask for approval | Approve for me |
-| Gemini | Plan | Default | Auto Edit |
-| Grok | Default, Request cards (nearest safer: no plan mode) | Default, Request cards | Default, Yes to all |
-| Cursor | Plan | Agent, Request cards | Agent, Yes to all |
-| OpenCode | plan | build, Request cards | build, Yes to all |
-| Copilot | Plan | Agent | Agent (nearest safer: Autopilot and Allow all approve everything) |
-| Antigravity | Default (nearest safer: no plan mode) | Default | Auto Edit |
+| Runtime | Plan | Ask | Approve for me | Bypass Permissions |
+| --- | --- | --- | --- | --- |
+| Claude | Plan | Manual (default) | Accept edits | Bypass permissions |
+| Codex | Ask for approval, with Plan | Ask for approval | Approve for me | Approve for me (nearest safer: no mode past Approve for me) |
+| Gemini | Plan | Default | Auto Edit | YOLO |
+| Grok | Default, Request cards (nearest safer: no plan mode) | Default, Request cards | Default, Yes to all | Default, Yes to all (nearest safer: no mode past Approve for me) |
+| Cursor | Plan | Agent, Request cards | Agent, Yes to all | Agent, Yes to all (nearest safer: no mode past Approve for me) |
+| OpenCode | plan | build, Request cards | build, Yes to all | build, Yes to all (nearest safer: no mode past Approve for me) |
+| Copilot | Plan | Agent | Agent (nearest safer: Autopilot and Allow all approve everything) | Agent (nearest safer: no mode past Approve for me) |
+| Antigravity | Default (nearest safer: no plan mode) | Default | Auto Edit | Auto Edit (nearest safer: no mode past Approve for me) |
 
 **Model** (effort low for Fast, the runtime's own for Balanced, high for Smart):
 

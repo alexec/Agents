@@ -28,6 +28,7 @@ public enum LevelWords {
         case .plan: "Plan"
         case .ask: "Ask"
         case .approveForMe: "Approve for me"
+        case .bypassPermissions: "Bypass Permissions"
         }
     }
 
@@ -60,6 +61,7 @@ public enum LevelWords {
         case .plan: "Reads and plans; cannot change files or run commands that change things."
         case .ask: "Asks before it changes things."
         case .approveForMe: "Does not ask for normal changes in its folder."
+        case .bypassPermissions: "Never asks, even for a change outside its folder."
         }
     }
 
@@ -183,6 +185,7 @@ public enum LevelWords {
     public static func fileWord(_ field: AutoField, _ raw: String) -> String {
         switch (field, raw) {
         case (.permission, "approveForMe"): "approve-for-me"
+        case (.permission, "bypassPermissions"): "bypass-permissions"
         case (.permissionRequests, "default"): "request-cards"
         case (.permissionRequests, "alwaysApprove"): "yes-to-all"
         case (.sandbox, "runtime"): "default"

@@ -6228,12 +6228,13 @@ type PeopleList struct {
 	Admin bool `json:"admin"`
 }
 
-// Plan: reads and plans, changes nothing; Ask: asks before it changes things; Approve for me: does not ask for normal changes in its folder (#2658).
+// Plan: reads and plans, changes nothing; Ask: asks before it changes things; Approve for me: does not ask for normal changes in its folder; Bypass Permissions: never asks, even for a change outside its folder (#2658, #2864).
 type PermissionLevel string
 
 const PermissionLevelPlan PermissionLevel = "plan"
 const PermissionLevelAsk PermissionLevel = "ask"
 const PermissionLevelApproveForMe PermissionLevel = "approveForMe"
+const PermissionLevelBypassPermissions PermissionLevel = "bypassPermissions"
 
 // UnmarshalJSON reads a value this build does not know as "ask".
 func (v *PermissionLevel) UnmarshalJSON(b []byte) error {
@@ -6244,7 +6245,8 @@ func (v *PermissionLevel) UnmarshalJSON(b []byte) error {
 	switch PermissionLevel(s) {
 	case PermissionLevelPlan,
 		PermissionLevelAsk,
-		PermissionLevelApproveForMe:
+		PermissionLevelApproveForMe,
+		PermissionLevelBypassPermissions:
 		*v = PermissionLevel(s)
 
 	default:

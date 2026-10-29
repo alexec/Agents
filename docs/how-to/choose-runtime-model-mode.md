@@ -26,8 +26,9 @@ running, and reads the meter that says how full its context is.
 3. Under the prompt, the pills use the same words on every runtime. Each pill shows only its
    value:
    - **Permission mode**, on the left: **Plan** (the agent reads and plans, and changes
-     nothing), **Ask** (it asks before it changes things) or **Approve for me** (it does not
-     ask for normal changes in its folder);
+     nothing), **Ask** (it asks before it changes things), **Approve for me** (it does not
+     ask for normal changes in its folder) or **Bypass Permissions** (it never asks, even
+     for a change outside its folder);
    - **Model**, on the right: **Fast** (the runtime's smallest quick model), **Balanced** (its
      usual model) or **Smart** (its most capable model). Effort follows the model: low for
      Fast, high for Smart.

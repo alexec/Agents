@@ -36,7 +36,7 @@ type autoCell struct {
 
 var (
 	modelLevels      = []string{string(wire.ModelLevelFast), string(wire.ModelLevelBalanced), string(wire.ModelLevelSmart)}
-	permissionLevels = []string{string(wire.PermissionLevelPlan), string(wire.PermissionLevelAsk), string(wire.PermissionLevelApproveForMe)}
+	permissionLevels = []string{string(wire.PermissionLevelPlan), string(wire.PermissionLevelAsk), string(wire.PermissionLevelApproveForMe), string(wire.PermissionLevelBypassPermissions)}
 	requestLevels    = []string{string(wire.ClientPermissionModeDefault), string(wire.ClientPermissionModeAlwaysApprove)}
 	sandboxLevels    = []string{string(wire.SandboxChoiceRuntime), string(wire.SandboxChoiceOn), string(wire.SandboxChoiceOff)}
 	autoFields       = []wire.AutoField{wire.AutoFieldModel, wire.AutoFieldPermission, wire.AutoFieldPermissionRequests, wire.AutoFieldSandbox}
@@ -44,16 +44,25 @@ var (
 
 // levelRank is how much a value lets the agent do, on the cells' scale.
 var levelRank = map[wire.AutoField]map[string]int{
-	wire.AutoFieldPermission: {"plan": 0, "ask": 1, "approveForMe": 2},
+	wire.AutoFieldPermission: {"plan": 0, "ask": 1, "approveForMe": 2, "bypassPermissions": 3},
 	wire.AutoFieldSandbox:    {"on": 0, "runtime": 1, "off": 2},
 }
 
 // levelWords is each value's words, as the clients show them.
 var levelWords = map[string]string{
 	"fast": "Fast", "balanced": "Balanced", "smart": "Smart",
-	"plan": "Plan", "ask": "Ask", "approveForMe": "Approve for me",
+	"plan": "Plan", "ask": "Ask", "approveForMe": "Approve for me", "bypassPermissions": "Bypass Permissions",
 	"default": "Request cards", "alwaysApprove": "Yes to all",
 	"runtime": "Default sandbox", "on": "Runtime sandbox", "off": "No sandbox",
+}
+
+// noMorePastApproveForMe is the Permission mode cell for a runtime whose own settings go
+// no further than Approve for me (SC-005): the nearest safer cell is the same as its, so
+// Bypass Permissions never gives more access than Approve for me already does.
+func noMorePastApproveForMe(runtimeID string) autoCell {
+	c := autoPermissions[runtimeID]["approveForMe"]
+	c.mark, c.note = wire.AutoMarkNearestSafer, "nearest safer: no mode past Approve for me"
+	return c
 }
 
 // clientAnswered is the runtimes whose permission requests the app answers (061).
@@ -112,9 +121,10 @@ func defaultModelCells() map[string]autoCell {
 // autoPermissions is the Permission mode table (spec, "Default mappings").
 var autoPermissions = map[string]map[string]autoCell{
 	"claude": {
-		"plan":         {options: map[string]string{"mode": "plan"}, words: "Plan", rank: 0},
-		"ask":          {options: map[string]string{"mode": "default"}, words: "Manual", rank: 1},
-		"approveForMe": {options: map[string]string{"mode": "acceptEdits"}, words: "Accept edits", rank: 2},
+		"plan":              {options: map[string]string{"mode": "plan"}, words: "Plan", rank: 0},
+		"ask":               {options: map[string]string{"mode": "default"}, words: "Manual", rank: 1},
+		"approveForMe":      {options: map[string]string{"mode": "acceptEdits"}, words: "Accept edits", rank: 2},
+		"bypassPermissions": {options: map[string]string{"mode": "bypassPermissions"}, words: "Bypass permissions", rank: 3},
 	},
 	"codex": {
 		"plan":         {options: map[string]string{"mode": "read-only", "collaboration_mode": "plan"}, words: "Ask for approval, Plan", rank: 0},
@@ -122,9 +132,10 @@ var autoPermissions = map[string]map[string]autoCell{
 		"approveForMe": {options: map[string]string{"mode": "agent", "collaboration_mode": "default"}, words: "Approve for me", rank: 2},
 	},
 	"gemini": {
-		"plan":         {options: map[string]string{"mode": "plan"}, words: "Plan", rank: 0},
-		"ask":          {options: map[string]string{"mode": "default"}, words: "Default", rank: 1},
-		"approveForMe": {options: map[string]string{"mode": "autoEdit"}, words: "Auto Edit", rank: 2},
+		"plan":              {options: map[string]string{"mode": "plan"}, words: "Plan", rank: 0},
+		"ask":               {options: map[string]string{"mode": "default"}, words: "Default", rank: 1},
+		"approveForMe":      {options: map[string]string{"mode": "autoEdit"}, words: "Auto Edit", rank: 2},
+		"bypassPermissions": {options: map[string]string{"mode": "yolo"}, words: "YOLO", rank: 3},
 	},
 	"grok": {
 		"plan":         {client: requestCards, words: "Default, Request cards", mark: wire.AutoMarkNearestSafer, note: "nearest safer: no plan mode", rank: 1},
@@ -214,7 +225,11 @@ func shippedCell(runtimeID string, field wire.AutoField, level string) autoCell 
 		}
 		c = table[level]
 	case wire.AutoFieldPermission:
-		c = autoPermissions[runtimeID][level]
+		var ok bool
+		c, ok = autoPermissions[runtimeID][level]
+		if !ok && level == string(wire.PermissionLevelBypassPermissions) {
+			c = noMorePastApproveForMe(runtimeID)
+		}
 	case wire.AutoFieldPermissionRequests:
 		c = requestCell(runtimeID, level)
 	case wire.AutoFieldSandbox:
