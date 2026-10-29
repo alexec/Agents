@@ -1470,6 +1470,12 @@ button.plain:hover { opacity: 1; }
 .plan-strip .plan-bar { display: block; height: 4px; border-radius: 2px; background: var(--paper-rule); overflow: hidden; }
 .plan-strip .plan-bar > span { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
 .plan-strip .plan-block { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--paper-rule); font-size: 0.8125rem; }
+/* The goal card over the plan's (#2742), in its look: why it stopped, and how far, in grey. */
+.goal-strip { padding-bottom: 0; }
+.goal-strip .goal-reason, .goal-strip .goal-progress { font-size: 0.75rem; opacity: 0.6; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.goal-strip .open .plan-step, .goal-strip .open .goal-reason { white-space: normal; }
+.goal-strip .plan-summary { gap: 6px; }
 .plan .in_progress .content { font-weight: 600; }
 .plan-block.withdrawn .plan .in_progress .content { font-weight: inherit; }
 /* With the working line: what the open agent holds and waits for in line (036, #2344). Untinted. */

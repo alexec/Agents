@@ -224,7 +224,11 @@ struct RemoteChatView: View {
                 }
                 // Under the banner, not over it: when the Mac has gone quiet, what
                 // the agent last said it would do is the less urgent of the two.
-                if let agent { CurrentPlanStrip(agent: agent) }
+                if let agent {
+                    // The goal it keeps working towards over the plan, as the window has them (#2742).
+                    GoalCard(agent: agent)
+                    CurrentPlanStrip(agent: agent)
+                }
                 // The agent asked to be looked at while something was being typed: said
                 // here, to be opened when the person chooses (034 FR-005). The main scene's.
                 if popped == nil, let wanted = model.fileTheAgentWants { OfferedFileStrip(file: wanted) }

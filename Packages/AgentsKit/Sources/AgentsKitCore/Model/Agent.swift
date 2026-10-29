@@ -259,6 +259,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// While a turn runs, the title of the tool it is running now (#1902); nil while it
     /// thinks or replies. The daemon changes it only once a new value has held a second.
     public var runningTool: String?
+    /// The goal its runtime keeps working towards over many turns (#2742), the card over
+    /// the plan's; nil when the runtime reports none or cleared it.
+    public var goal: Goal?
     /// Paused by a spent allowance, and asked to carry on when it is back (#1859): the
     /// daemon sends "continue" in this chat at `at`, or sooner when the runtime is back.
     public var continueWhenBack: ContinueWhenBack?
@@ -440,6 +443,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         branchedFrom = (try? c.decodeIfPresent(UUID.self, forKey: .branchedFrom)) ?? nil
         fileToSee = (try? c.decodeIfPresent(ShownFile.self, forKey: .fileToSee)) ?? nil
         runningTool = (try? c.decodeIfPresent(String.self, forKey: .runningTool)) ?? nil
+        goal = (try? c.decodeIfPresent(Goal.self, forKey: .goal)) ?? nil
         continueWhenBack = (try? c.decodeIfPresent(ContinueWhenBack.self, forKey: .continueWhenBack)) ?? nil
         // Only the keys this build does not know are read as open-ended values.
         // Reading the whole record that way too — which is what this did — decoded
@@ -527,6 +531,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(branchedFrom, forKey: .branchedFrom)
         try c.encodeIfPresent(fileToSee, forKey: .fileToSee)
         try c.encodeIfPresent(runningTool, forKey: .runningTool)
+        try c.encodeIfPresent(goal, forKey: .goal)
         try c.encodeIfPresent(continueWhenBack, forKey: .continueWhenBack)
         // Whatever a newer version wrote, written back out beside our own fields.
         if !unknownFields.isEmpty {
@@ -576,6 +581,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case branchedFrom
         case fileToSee
         case runningTool
+        case goal
         case continueWhenBack
     }
 

@@ -545,6 +545,10 @@
         "voiceHungUpAt": {
           "$ref": "#/definitions/WireDate",
           "description": "When the agent last ended voice mode with hang_up (#2375): the person said they were done talking. A client in voice mode on this chat says the reply, then turns voice mode off."
+        },
+        "goal": {
+          "$ref": "#/definitions/Goal",
+          "description": "The standing aim its runtime keeps working towards over many turns (#2742), as Codex's and Claude's adapters report it on a session_info_update under _meta.jetbrains.air.goal. Absent when the runtime reports none, or cleared it."
         }
       },
       "required": [
@@ -9070,6 +9074,56 @@
         }
       ],
       "description": "GitView (Model/AgentChanges.swift): `{ shared: { since } }`, `{ unavailable: … }` and so on."
+    },
+    "Goal": {
+      "type": "object",
+      "properties": {
+        "objective": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/definitions/GoalStatus"
+        },
+        "iterations": {
+          "type": "integer",
+          "description": "How many turns it took towards the goal, where the runtime counts them."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why it last stopped or paused, in the runtime's words."
+        },
+        "tokensUsed": {
+          "type": "integer"
+        },
+        "tokenBudget": {
+          "type": "integer",
+          "description": "The tokens it can use on the goal, when it has a budget."
+        },
+        "timeUsedSeconds": {
+          "type": "number"
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate",
+          "description": "When the host last heard of it."
+        }
+      },
+      "required": [
+        "objective",
+        "status",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "GoalStatus": {
+      "type": "string",
+      "enum": [
+        "active",
+        "paused",
+        "blocked",
+        "limited",
+        "complete"
+      ],
+      "description": "Where a goal stands (#2742): active (it can drive more work, whether or not a turn runs now), paused, blocked, limited (a usage or token budget ran out) or complete."
     },
     "Group": {
       "type": "object",

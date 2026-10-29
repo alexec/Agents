@@ -57,7 +57,9 @@ struct ChatView: View {
                                                 go: { [model] match in await model.reveal(match) },
                                                 close: { finding = false })
                                 }
-                                // What it said it would do, as the phone has it (#341).
+                                // What it keeps working towards (#2742), then what it said
+                                // it would do, as the phone has them (#341).
+                                GoalCard(agent: agent)
                                 CurrentPlanStrip(agent: agent)
                             }
                             // On the page's own paper, across the whole pane: the
