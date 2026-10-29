@@ -3,14 +3,14 @@ import SwiftUI
 import UIKit
 
 /// The Mac's one sidebar, on an iPad or an iPhone (#226, #498): New Session at the top,
-/// then Status and Usage, then what wants the person across every folder — Pinned, Needs You,
+/// then Status, then what wants the person across every folder — Pinned, Needs You,
 /// Working, Unread — then a group per folder, its sessions newest first with their state
 /// the row's mark, its workflows, and one Archived row opening a page; then the archived
 /// folders, folded, each with Unarchive (#343). Never more than two levels deep (#495).
 ///
 /// The rules are the Mac's own, from `SidebarFolderFold`, `SidebarSmartRow`,
 /// `SidebarOrder` and `SidebarFolds` in AgentsKitCore: the same groups, order, pins and
-/// folds, kept the same way. The views are this device's: on an iPad the list sits beside
+/// folds, kept the same way. Usage, connectors and folder management are Mac + web (#2798). The views are this device's: on an iPad the list sits beside
 /// what it picked; on an iPhone it is the screen the app opens on and a pick is pushed
 /// over it. Swipe actions and a long press stand in for the Mac's context menus.
 struct RemoteSidebar: View {
@@ -28,16 +28,10 @@ struct RemoteSidebar: View {
     /// Status, open until folded, and kept so, as the window keeps it. It keeps Activity's
     /// key (#915), so it opens as Activity was left.
     @AppStorage("showsActivity") private var showsStatus = true
-    /// Usage, open until folded, and kept so, as the window keeps it (#915).
-    @AppStorage("showsUsage") private var showsUsage = true
-    /// Add Folder… or Clone Folder from Git URL…, on a host, from the + (#537).
-    @State private var adding: NewFolder?
     /// The smart groups turned off in Settings ▸ Sidebar (#846).
     @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = SidebarSmartRow.offAtFirst
     /// Settings (#846), opened from the sidebar's foot.
     @State private var showsSettings = false
-    /// Add a Browser… (#1459): a code for a browser, as the window's.
-    @State private var addsBrowser = false
 
     private var selection: Binding<SidebarItem?> {
         Binding(get: { model.sidebarItem },
@@ -57,11 +51,6 @@ struct RemoteSidebar: View {
         RuntimeTally(model.runtimes, allowances: model.runtimeAllowances)?.noneWorking == true
     }
 
-    /// One of the person's servers does not answer: MCP Servers' icon says so in red (#587, #753).
-    private var mcpServersStopped: Bool {
-        MCPHealthWords.tally(model.work.mcpHealthSnapshot()?.personal ?? [])?.failing == true
-    }
-
     private var servers: [MachineRef] {
         model.hostSections.map(\.id).filter { $0 != .mac }
     }
@@ -78,17 +67,6 @@ struct RemoteSidebar: View {
                         JoinRequestCard(request: request, you: model.people.you?.id,
                                         isAnswering: model.people.answering.contains(request.request),
                                         answer: { approve in Task { await model.answerJoin(request, approve: approve) } })
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-                            .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
-                    }
-                }
-            }
-            // A bot stopped at its cap (#2073), for an admin, beside the machines.
-            if model.people.list?.admin == true, !model.people.capped.isEmpty {
-                Section {
-                    ForEach(model.people.capped, id: \.user) { reached in
-                        CapReachedCard(reached: reached, control: model.controlPlane, people: model.people)
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
                             .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
@@ -132,34 +110,16 @@ struct RemoteSidebar: View {
 
                 // Pages about all the work rather than one folder, above the smart
                 // groups, as the window has them (#495). Plain titles beside their icons
-                // in the accent (#155). Each folds, as a folder does. Status is what
-                // goes on now; Usage charts the past (#915).
+                // in the accent (#155). It folds, as a folder does.
                 Section(isExpanded: $showsStatus) {
                     EventsRow().activityIcon("list.bullet.rectangle").appText(.supporting).tag(SidebarItem.events)
                     ResourcesRow().activityIcon("square.stack.3d.up").appText(.supporting).tag(SidebarItem.resources)
                     RuntimesRow().activityIcon("cpu", warns: runtimesFailing)
                         .appText(.supporting).tag(SidebarItem.runtimes)
-                    MCPServersRow().activityIcon("server.rack", warns: mcpServersStopped)
-                        .appText(.supporting).tag(SidebarItem.mcpServers)
                     WorktreesRow().activityIcon("arrow.triangle.branch")
                         .appText(.supporting).tag(SidebarItem.worktrees)
                 } header: {
                     Text("Status")
-                }
-
-                Section(isExpanded: $showsUsage) {
-                    SpendingRow().activityIcon("dollarsign.circle", warns: model.costState?.daySpendIsCloseToFull == true)
-                        .appText(.supporting).tag(SidebarItem.spending)
-                    TokensRow().activityIcon("number", warns: model.costState?.dayTokensAreCloseToFull == true)
-                        .appText(.supporting).tag(SidebarItem.tokens)
-                    TimeRow().activityIcon("clock").appText(.supporting).tag(SidebarItem.time)
-                    // The newcomer's checklist (#1067), only while a milestone is still to
-                    // earn, as an empty smart group hides (#507).
-                    if model.work.milestones?.isComplete == false {
-                        MilestonesRow().activityIcon("checkmark.seal").appText(.supporting).tag(SidebarItem.milestones)
-                    }
-                } header: {
-                    Text("Usage")
                 }
 
                 // Pinned, Needs You, Working, Unread: a group each across every folder
@@ -184,22 +144,6 @@ struct RemoteSidebar: View {
                 Button("More matches…") { Task { await model.searchMore() } }
                     .appText(.fine)
                     .foregroundStyle(.secondary)
-            }
-
-            // Folders put away, closed until opened, as the window's (#343).
-            if !model.shelvedFolders.isEmpty, searched.isEmpty {
-                Section(isExpanded: $showsArchived) {
-                    ForEach(model.shelvedFolders, id: \.key) { summary in
-                        ArchivedFolderRow(summary: summary,
-                                           label: SidebarOrder.label(summary) { model.hostLabel($0) },
-                                           isDisabled: model.isStale || model.hostIsOffline(summary.host),
-                                           unarchive: { await model.unarchiveFolder(summary) },
-                                           delete: { model.askingToDeleteFolder = summary })
-                        .appText(.supporting)
-                    }
-                } header: {
-                    Text("Archived folders")
-                }
             }
 
             // A server gone quiet greys its folders; this says why, once, as the window's
@@ -250,8 +194,6 @@ struct RemoteSidebar: View {
                 Button("Settings…") { showsSettings = true }
                     .appText(.supporting)
                 if !model.needsPairing {
-                    Button("Add a Browser…") { addsBrowser = true }
-                        .appText(.supporting)
                     ForgetThisDeviceRow()
                 }
             }
@@ -261,14 +203,7 @@ struct RemoteSidebar: View {
         .background(Paper.sidebar)
         .toolbarBackground(Paper.sidebar, for: .navigationBar)
         .navigationTitle("Agents")
-        .toolbar {
-            if !model.needsPairing {
-                ToolbarItem(placement: .primaryAction) { NewFolderMenu(adding: $adding) }
-            }
-        }
-        .sheet(item: $adding) { NewFolderSheet(adding: $0) }
         .sheet(isPresented: $showsSettings) { RemoteSettings() }
-        .sheet(isPresented: $addsBrowser) { AddBrowserSheet() }
         .searchable(text: $query, prompt: "Search")
         .task(id: query) {
             let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -292,15 +227,7 @@ struct RemoteSidebar: View {
                 Waiting()
             }
         }
-        // The catch-up leaves archived folders out; they are asked for here (#343), and
-        // again once the list is pulled.
-        .task(id: model.isConnected) {
-            if model.isConnected { await model.loadArchivedFolders() }
-        }
-        .refreshable {
-            await model.catchUp()
-            await model.loadArchivedFolders()
-        }
+        .refreshable { await model.catchUp() }
     }
 
     /// Said once on the screen. Beside the detail on a wide iPad, the detail carries the
@@ -561,8 +488,6 @@ struct RemoteFolderFold: View {
     var showsAllMatches = false
     var showAllMatches: () -> Void = {}
 
-    /// Put Files in Drop Box… from the row's menu (#231).
-    @State private var fillingDropbox = false
     /// The smart groups turned off in Settings ▸ Sidebar (#846).
     @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = SidebarSmartRow.offAtFirst
     /// The smart groups the list draws, when not those Settings turns on (#1089).
@@ -601,13 +526,6 @@ struct RemoteFolderFold: View {
                     // match is one tap away.
                     searchMatches(fold)
                 } else if isOpen {
-                    // Its connectors (#753), under every folder even with none yet (#1422):
-                    // a page, red when one does not answer, with how many (#1569).
-                    let servers = model.work.mcpServers(in: key)
-                    let tally = MCPHealthWords.tally(servers)
-                    FolderPageRow(title: "Connectors", systemImage: "server.rack", count: servers.count,
-                                   item: .folderMCPServers(key), warns: tally?.failing ?? false,
-                                   value: tally?.words ?? "none yet", showsCount: true)
                     // The archive, one row opening a page (#495): never a fold inside
                     // the group.
                     let archived = fold.archivedCount(summary) + fold.archivedWorkflows.count
@@ -640,10 +558,7 @@ struct RemoteFolderFold: View {
     private func heading(_ isOpen: Bool) -> some View {
         FolderRow(summary: summary, label: label, isFolded: !isOpen, asHeading: true)
             .foregroundStyle(model.hostIsOffline(summary.host) ? .secondary : .primary)
-            .contextMenu { FolderMenuItems(summary: summary) { fillingDropbox = true } }
-            .sheet(isPresented: $fillingDropbox) {
-                DropboxSheet(folder: key, label: label)
-            }
+            .contextMenu { FolderMenuItems(summary: summary) }
             .accessibilityHint(isOpen ? "Folds the folder" : "Unfolds the folder")
             // The rest of its live sessions when the first page did not hold them
             // all. On the heading, which is always there, not on every row.
@@ -740,35 +655,21 @@ private struct FolderPageRow: View {
     let systemImage: String
     let count: Int?
     let item: SidebarItem
-    /// Red when the page has something wrong to say (#753).
-    var warns = false
-    /// What VoiceOver says after the title, when it is not the count.
-    var value: String?
-    /// The count small and grey after the title (#1569), none at zero: the Connectors
-    /// row's, which Alex asked to see. The Archived row's stays VoiceOver's.
-    var showsCount = false
 
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: systemImage)
-                .sidebarMark(warns ? StateTint.failure.style(or: .primary) : AnyShapeStyle(Paper.accent))
+                .sidebarMark(Paper.accent)
                 .frame(width: 20)
                 .accessibilityHidden(true)
-            // Nothing at its end, which is only a session's (#587): the count is
-            // VoiceOver's, or after the title when `showsCount`.
+            // Nothing at its end, which is only a session's (#587): the count is VoiceOver's.
             Text(title)
                 .lineLimit(1)
-            if showsCount, let count, count > 0 {
-                Text("\(count)")
-                    .monospacedDigit()
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
-            }
             Spacer(minLength: 4)
         }
         .appText(.supporting)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel([title, value ?? count.map(String.init)].compactMap { $0 }.joined(separator: ", "))
+        .accessibilityLabel([title, count.map(String.init)].compactMap { $0 }.joined(separator: ", "))
         .tag(item)
     }
 }
@@ -852,38 +753,17 @@ private struct ForgetThisDeviceRow: View {
     }
 }
 
-/// A folder's long-press menu: the Mac's, less what the phone leaves to the Mac
-/// (Folder Settings, Show in Finder).
+/// A folder's long-press menu: New Session, Open Folder, its hidden views and Pin. Folder
+/// management (Agent Configuration, Project, the Drop Box, Archive, Export and Import) is
+/// Mac + web (#2798).
 private struct FolderMenuItems: View {
     @Environment(RemoteModel.self) private var model
-    @State private var showingAgentConfiguration = false
-    @State private var showingProject = false
     let summary: DaemonAPI.FolderSummary
-    /// Files into the folder's drop box (#231), as a drag onto the Mac's row puts them.
-    let putInDropbox: () -> Void
 
     var body: some View {
         NewSessionButton(folder: summary.folder.folder)
         // The folder alone (#1089): a scene of its own on an iPad, a screen on an iPhone.
         OpenFolderButton(key: summary.key)
-        Button("Agent Configuration…", systemImage: "slider.horizontal.3") {
-            showingAgentConfiguration = true
-        }
-        .sheet(isPresented: $showingAgentConfiguration) {
-            RemoteFolderAgentConfiguration(folder: summary.folder.folder)
-        }
-        // What people work on, across machines (#2317), as the window's Folder Settings ▸ Project.
-        Button("\(ProjectWords.title)…", systemImage: "square.stack.3d.up") {
-            showingProject = true
-        }
-        .disabled(model.isStale(on: summary.host))
-        .sheet(isPresented: $showingProject) {
-            RemoteFolderProject(key: summary.key)
-        }
-        Button(action: putInDropbox) {
-            Label("Put Files in Drop Box…", systemImage: "tray.and.arrow.down")
-        }
-        .disabled(model.isStale(on: summary.host))
         ShowHiddenViewsButton(summary: summary)
         // To the top of the sidebar, as the window's Pin.
         Button {
@@ -893,15 +773,6 @@ private struct FolderMenuItems: View {
                   systemImage: summary.folder.isPinned ? "pin.slash" : "pin")
         }
         .disabled(model.isStale(on: summary.host))
-        // Into Archived folders, asked first (#668), as the window's Archive.
-        Button {
-            model.askingToArchiveFolder = summary
-        } label: {
-            Label("Archive…", systemImage: "archivebox")
-        }
-        .disabled(model.isStale(on: summary.host))
-        // Its agents as a .tar.gz, and an export brought back on its machine (#1001).
-        ExportImportFolderButtons(summary: summary)
     }
 }
 
@@ -976,33 +847,5 @@ private struct RuntimesRow: View {
         .accessibilityValue(tally.map { $0.noneWorking ? "None of \($0.total) working"
                                                        : "\($0.working) of \($0.total) working" } ?? "")
         .accessibilityHint("Opens Runtimes")
-    }
-}
-
-/// A folder's Project (#2317), in a sheet of its own: the shared picker, on the folder as
-/// the model has it now, so a pick shows at once.
-private struct RemoteFolderProject: View {
-    @Environment(RemoteModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
-    let key: FolderKey
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                if let summary = model.work.folders.first(where: { $0.key == key }) {
-                    // Its own section, headed by the folder's name (#2757).
-                    ProjectPicker(control: model.controlPlane, summary: summary) { id in
-                        await model.setProject(id, for: summary)
-                    }
-                }
-            }
-            .navigationTitle(ProjectWords.title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
-            }
-        }
-        // Short: a picker and two buttons (#2757).
-        .presentationDetents([.medium, .large])
     }
 }

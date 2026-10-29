@@ -321,7 +321,6 @@ struct SidebarWorkflowRow: View {
     let folder: FolderKey
     /// In its folder's Workflows fold: one level in, under the word Workflows (#1079).
     var isNested = false
-    @State private var confirmsDelete = false
     /// The mark's well and the gap after it, as a session's row has them (#750).
     @ScaledMetric private var scale: CGFloat = 1
 
@@ -417,15 +416,6 @@ struct SidebarWorkflowRow: View {
                 }
                 Button("Archive", systemImage: "archivebox") { Task { await model.setWorkflowArchived(summary, true) } }
             }
-            Divider()
-            Button("Delete…", systemImage: "trash", role: .destructive) { confirmsDelete = true }
-        }
-        .confirmationDialog("Delete \"\(summary.workflow.name)\"? Its file is removed from disk.",
-                            isPresented: $confirmsDelete, titleVisibility: .visible) {
-            Button("Delete", role: .destructive) { Task { await model.deleteWorkflow(summary) } }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("The file can be restored from the folder's git history.")
         }
     }
 

@@ -28,9 +28,7 @@ struct ChoiceRows: View {
             sandboxRow
         }
         .paperListRow()
-        // The runtime's own choices, behind the shared ones; none on Auto, which has no
-        // runtime yet (#2658).
-        if !model.isAutoStart {
+        // The runtime's own choices, behind the shared ones (#2658).
         Section {
             switch model.startChoicesState {
             case .loading:
@@ -62,18 +60,10 @@ struct ChoiceRows: View {
             }
         }
         .paperListRow()
-        }
     }
 
-    /// The runtime Auto picks now, by name.
-    private var autoPicked: String? {
-        model.startAutoPreview?.runtimeID.map(PromptWords.runtimeName)
-    }
-
-    /// The runtime each value is said on: the one chosen, or the one Auto picks now.
-    private var mappedRuntime: String? {
-        model.isAutoStart ? model.startAutoPreview?.runtimeID : model.startRuntimeID
-    }
+    /// The runtime each value is said on: the one chosen.
+    private var mappedRuntime: String? { model.startRuntimeID }
 
     /// Model: Fast, Balanced, Smart as a segmented control (Story 6); the runtime's own
     /// setting that matches none says Custom under it.
@@ -136,21 +126,13 @@ struct ChoiceRows: View {
         model.startRuntime?.runtime.name ?? PromptControlsState.unnamedRuntime
     }
 
-    /// "Auto (Claude)" on Auto (Story 6), else the runtime's name.
+    /// The runtime's name. The Auto runtime is Mac + web (#2798).
     private var runtimeTitle: String {
-        if model.isAutoStart { return LevelWords.autoRow(autoPicked) }
         return model.startRuntime?.runtime.name ?? "None set up on \(model.startHost == .mac ? "the Mac" : model.hostName(model.startHost))"
     }
 
     private var runtimeRow: some View {
         Menu {
-            // Auto first (#2658): the Mac picks the runtime when the session starts.
-            Button {
-                Task { await model.chooseRuntime(LevelWords.autoID) }
-            } label: {
-                Text(LevelWords.auto)
-                Text(LevelWords.picks(autoPicked))
-            }
             if !outRuntimes.isEmpty {
                 Section("Available") {
                     runtimeButtons(in: availableRuntimes)
@@ -395,27 +377,7 @@ struct ChoiceRows: View {
     /// A runtime with no choice says its state, with why.
     @ViewBuilder
     private var sandboxRow: some View {
-        if model.isAutoStart {
-            // On Auto, the three values, each said as it is on the runtime Auto picks now.
-            let chosen = model.startSandbox ?? .runtime
-            Menu {
-                ForEach(SandboxChoice.allCases, id: \.self) { choice in
-                    let cell = mappedRuntime.flatMap { model.autoMappings.cell($0, .sandbox, choice.rawValue) }
-                    Button {
-                        model.chooseStartLevel(.sandbox, choice.rawValue)
-                    } label: {
-                        choiceLabel(LevelWords.sandbox(choice), chosen: chosen == choice)
-                        Text(cell.map { "\($0.words) on \(PromptWords.runtimeName($0.runtimeID))" } ?? LevelWords.meaning(sandbox: choice))
-                    }
-                }
-            } label: {
-                LabeledContent(LevelWords.sandboxField) {
-                    Text(LevelWords.sandbox(chosen)).foregroundStyle(.secondary)
-                }
-                .appText(.reading)
-            }
-            .accessibilityLabel("\(LevelWords.sandboxField), \(LevelWords.sandbox(chosen))")
-        } else if let runtimeID = model.startRuntimeID {
+        if let runtimeID = model.startRuntimeID {
             let choices = SandboxCatalog.choices(for: runtimeID)
             let runtimeDefault = model.sandboxSettings.choice(for: runtimeID)
             let title = SandboxWords.override(model.startSandbox, runtimeDefault: runtimeDefault, runtimeID: runtimeID)
