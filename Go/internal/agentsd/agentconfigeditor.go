@@ -176,6 +176,18 @@ func (d *Daemon) saveAgentConfigEditorFile(r wire.AgentConfigEditorSaveRequest) 
 	if err := unreadableFrontMatter(r.Kind, r.Path, r.Content); err != nil {
 		return err
 	}
+	// The person's own save of a skill keeps each user workflow that names it approved,
+	// when it was approved as it stood.
+	if r.Kind == "skills" && r.Folder == nil {
+		d.workflowMu.Lock()
+		defer d.workflowMu.Unlock()
+		d.scanLocked()
+		approved := d.approvedUserWorkflowsLocked()
+		defer func() {
+			d.scanLocked()
+			d.reapproveUserWorkflowsLocked(approved)
+		}()
+	}
 	if err := store.WriteAtomically(path, []byte(r.Content), 0o644); err != nil {
 		return fileError(CodeFileNotReadable, "The file could not be saved: "+err.Error())
 	}

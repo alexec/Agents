@@ -98,10 +98,10 @@ public struct WorkflowSettings: Codable, Hashable, Sendable {
     }
 
     /// Which runtime a run will use, and why, as the workflow page says it (#2764): the
-    /// one the file names, else the newest agent's on the machine that runs it, else the
-    /// default. The web says the same in `runsOn` (`Web/src/model/workflowSettings.ts`).
+    /// one the file names, else the default, never the runtime another agent used last.
+    /// The web says the same in `runsOn` (`Web/src/model/workflowSettings.ts`).
     public struct RunsOn: Hashable, Sendable {
-        public enum Source: Hashable, Sendable { case file, lastUsed, fallback }
+        public enum Source: Hashable, Sendable { case file, fallback }
         public var runtimeID: String
         public var source: Source
 
@@ -113,7 +113,6 @@ public struct WorkflowSettings: Codable, Hashable, Sendable {
             let name = runtime?.name ?? "\"\(runtimeID)\""
             switch source {
             case .file: return "Runs on \(name) (named in the file)"
-            case .lastUsed: return "Runs on \(name) (the last used here)"
             case .fallback: return "Runs on \(name) (the default)"
             }
         }
@@ -128,10 +127,9 @@ public struct WorkflowSettings: Codable, Hashable, Sendable {
         }
     }
 
-    /// The runtime a run will use, given the newest agent's runtime on its machine.
-    public func runsOn(lastUsed: String?) -> RunsOn {
+    /// The runtime a run will use.
+    public func runsOn() -> RunsOn {
         if let runtimeID { return RunsOn(runtimeID: runtimeID, source: .file) }
-        if let lastUsed { return RunsOn(runtimeID: lastUsed, source: .lastUsed) }
         return RunsOn(runtimeID: RuntimeCatalog.defaultRuntime.id, source: .fallback)
     }
 
