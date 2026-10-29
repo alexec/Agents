@@ -1658,6 +1658,11 @@ export interface ClientPermissionSettings {
   cursor: ClientPermissionMode;
   grok: ClientPermissionMode;
   opencode: ClientPermissionMode;
+  /**
+   * Set when the organisation's mode ceiling is below approving every request: Always-approve is
+   * refused, and no agent's requests are answered for the person.
+   */
+  setBy?: PolicySetBy;
 }
 
 /**
@@ -9227,7 +9232,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ClientAnnounce: { required: ["id", "publicKey", "name", "kind"], optional: [] },
   ClientConnection: { required: ["client", "relayed"], optional: ["through"] },
   ClientPairingRequest: { required: [], optional: ["kind", "grant"] },
-  ClientPermissionSettings: { required: ["cursor", "grok", "opencode"], optional: [] },
+  ClientPermissionSettings: { required: ["cursor", "grok", "opencode"], optional: ["setBy"] },
   ClientRecord: { required: ["id", "name", "kind", "publicKey", "grant", "paired", "rev"], optional: ["lastSeen", "mayNotify", "owner", "forgotten", "forgottenAt", "knownEpoch"] },
   ClientRequest: { required: ["client"], optional: [] },
   CloneNotification: { required: ["clone", "finished"], optional: [] },

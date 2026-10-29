@@ -4407,6 +4407,10 @@
         },
         "opencode": {
           "$ref": "#/definitions/ClientPermissionMode"
+        },
+        "setBy": {
+          "$ref": "#/definitions/PolicySetBy",
+          "description": "Set when the organisation's mode ceiling is below approving every request: Always-approve is refused, and no agent's requests are answered for the person."
         }
       },
       "required": [

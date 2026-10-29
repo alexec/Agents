@@ -348,7 +348,7 @@ func (d *Daemon) writeRuntimeChoices(raw wire.JSONValue) error {
 	}
 	if r.ClientPermissions != nil {
 		b, _ := json.Marshal(r.ClientPermissions)
-		if err := store.WriteAtomically(filepath.Join(d.SettingsDir, "client-permissions.json"), b, 0o644); err != nil {
+		if err := store.WriteAtomically(filepath.Join(d.SettingsDir, "client-permissions.json"), b, 0o600); err != nil {
 			return err
 		}
 	}
