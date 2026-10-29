@@ -20,13 +20,13 @@ newer version.
 | Runtime | Command it starts | Pictures | Sign in from the app | App tools available | Notes |
 | --- | --- | --- | --- | --- | --- |
 | **Claude** | `npx -y @agentclientprotocol/claude-agent-acp` | Yes | Partly. Sign in with Claude Code itself, in Terminal: run `claude` and type `/login`. The sheet then shows the account, such as **Claude Max**, and offers **Sign out** and **Who answers**. | All | `claude` has no mode the app can talk to, so the app runs this adapter through your Node instead. Its questions reach you as a card you can answer on the Mac or phone. It asks your permission before using some of the app's tools. Its subagents and background commands are shown over the prompt as they run. |
-| **Grok** | `grok --permission-mode default agent stdio` | No | Yes, with **grok.com** | All | It cannot ask you a question mid-turn in a way the app can show, so it ends its turn with the question instead, and the agent shows **Waiting on your answer**. Its image and video generation is switched off for the conversations the app starts. Under the prompt, set **Default** or **Always-approve**. Agents the app starts follow this Mac-wide choice, even when Grok's own saved mode elsewhere would approve everything. |
+| **Grok** | `grok --permission-mode default agent stdio` | No | Yes, with **grok.com** | All | It cannot ask you a question mid-turn in a way the app can show, so it ends its turn with the question instead, and the agent shows **Waiting on your answer**. Its image and video generation is switched off for the conversations the app starts. Under the prompt, set **Request cards** or **Yes to all**. Agents the app starts follow this Mac-wide choice, even when Grok's own saved mode elsewhere would approve everything. |
 | **Copilot** | `copilot --acp` | Yes | Hands you the exact command to run in Terminal, with **Open Terminal** and **Copy** | All | It takes no MCP server it would have to start itself, so the app runs those and hands each to Copilot over a local http address only that agent can use. It uses its own follow-up suggestions instead of the app's. It asks permission before every tool call. |
 | **Gemini** | the app's own `gemini --acp --skip-trust`, installed from **Settings ▸ Agent Runtimes** | Yes | No. Paste a Gemini API key under Gemini in **Settings ▸ Agent Runtimes** (get one at aistudio.google.com/apikey). | All | A `gemini` you installed yourself is never used: the app runs the version it was built against. Google's own sign-in no longer works for individuals, so a key is the way in; the same key is used on servers. The app's tools reach Gemini only in a folder it trusts, so the app trusts the agent's folder for that conversation only, which also loads that folder's own Gemini hooks and settings. It cannot ask you a question mid-turn, so it ends its turn with the question and the agent shows **Waiting on your answer**. Its own subagents and task tracker stay. It reports tokens but no cost. On Google's free tier a spent daily quota ends the turn with Google's own sentence, and **Auto** in the model menu may pick a Pro model, which has the smallest free quota: choose a Flash model to go further. Picking a conversation back up may make Gemini record, once, that it signs in with an API key, in its own `~/.gemini/settings.json`. |
-| **Cursor** | `cursor-agent acp` | Yes | Yes | All | The command is `cursor-agent`, not `agent`, which is Grok's. It offers no options to pick from and no way to sign out, so the app shows neither. Three of its own tools, which overlap with the app's, cannot be turned off. It asks your permission before using some of the app's tools. Its Agent, Plan and Ask stay under the prompt beside a separate, Mac-wide permission capsule: **Default** or **Always-approve**. |
+| **Cursor** | `cursor-agent acp` | Yes | Yes | All | The command is `cursor-agent`, not `agent`, which is Grok's. It offers no options to pick from and no way to sign out, so the app shows neither. Three of its own tools, which overlap with the app's, cannot be turned off. It asks your permission before using some of the app's tools. Its Agent, Plan and Ask stay under the prompt beside a separate, Mac-wide permission capsule: **Request cards** or **Yes to all**. |
 | **Codex** | The app's own copy of `@agentclientprotocol/codex-acp`, installed from the set-up page or **Settings ▸ Agent Runtimes** | Yes | Yes: **ChatGPT** first, then a ChatGPT device code or an OpenAI API key | All | Never a `codex` or `npx` of yours: the app runs the exact version it carries, and offers **Update** when a newer app carries a newer one. Signing in with ChatGPT is shared with Codex in Terminal. Its questions reach you as a card. Its three modes are **Ask for approval**, **Approve for me** and **Full access**. It shows how much of its context is used, with no cost. Its own sub-agents and goals are on, and its sub-agents are shown over the prompt as they run. |
 | **Antigravity** | The app's own copy of Google's Antigravity ACP server (`agy_acp_server`, not the `agy` command), downloaded from Google by the set-up page or **Settings ▸ Agent Runtimes** | Yes | Yes, with a personal or business Google account, in your browser | All | The one Google runtime a Google account alone can sign in to; Gemini is for an API key, and the Gemini key is never lent to Antigravity. It keeps its settings, conversations and sign-in in a folder of the app's own, never in `~/.gemini`. It runs on this Mac only; servers are not supported yet. Its questions reach you as a card. Its own tool for starting subagents stays. |
-| **OpenCode** | The app's own copy of OpenCode (`opencode acp`), downloaded from its GitHub releases by the set-up page or **Settings ▸ Agent Runtimes** | Yes | Hands you the command to run in Terminal, the app's own copy by its full path, with **Open Terminal** and **Copy**. It adds one provider at a time, so the sheet keeps offering it when ready, and names `opencode auth logout` for taking one away. | All | Never an `opencode` of yours: two different programs go by that name, and the app runs the version it carries. It works signed out, on OpenCode Zen's free models. It asks your permission before editing files, running commands and fetching web pages; set **Default** or **Always-approve** in the permission capsule under the prompt. The choice applies to every OpenCode agent this Mac starts. Its questions reach you as a card. Sharing and self-update are off, and its own tool for starting subagents stays. A picked model whose provider is not signed in is dropped at the next start, with a note saying so. On a server it borrows this Mac's provider keys for each run. |
+| **OpenCode** | The app's own copy of OpenCode (`opencode acp`), downloaded from its GitHub releases by the set-up page or **Settings ▸ Agent Runtimes** | Yes | Hands you the command to run in Terminal, the app's own copy by its full path, with **Open Terminal** and **Copy**. It adds one provider at a time, so the sheet keeps offering it when ready, and names `opencode auth logout` for taking one away. | All | Never an `opencode` of yours: two different programs go by that name, and the app runs the version it carries. It works signed out, on OpenCode Zen's free models. It asks your permission before editing files, running commands and fetching web pages; set **Request cards** or **Yes to all** in the permission capsule under the prompt. The choice applies to every OpenCode agent this Mac starts. Its questions reach you as a card. Sharing and self-update are off, and its own tool for starting subagents stays. A picked model whose provider is not signed in is dropped at the next start, with a note saying so. On a server it borrows this Mac's provider keys for each run. |
 
 In every column:
 
@@ -277,7 +277,7 @@ on Linux).
 | **OpenCode** | Asks before editing, running commands and fetching pages; sharing and self-update off | `OPENCODE_CONFIG_CONTENT`, `OPENCODE_DISABLE_SHARE`, `OPENCODE_DISABLE_AUTOUPDATE` | Left alone, it does all three without asking; no conversation is published; the app's copy is never replaced under a running agent. |
 | | A temporary folder of its own | `TMPDIR` | It walks that folder at every turn: 40 seconds before the first word with the Mac's own. |
 | | Its question tool off | `OPENCODE_ENABLE_QUESTION_TOOL` removed | Questions go through the app's `ask_question`. |
-| **Grok** | Asks, whatever you saved in its own config | `--permission-mode default` | The app's **Default** or **Always-approve** in the prompt permission capsule decides. |
+| **Grok** | Asks, whatever you saved in its own config | `--permission-mode default` | The app's **Request cards** or **Yes to all** in the prompt permission capsule decides. |
 | | Its scheduler, workflow, monitor and feedback tools off; its subagents and question tool stay; the app's rules | `_meta.agentProfile.disallowedTools`, `_meta.rules` | Its `--disallowed-tools` does nothing here, so the list is in a profile of the app's. It was an allowlist until Grok 1.0.52 stopped giving the subagent tools it named (#1447). |
 | | Image and video generation off | `GROK_CONFIG_PATH`, a file of the app's | Its config file is the only place for them, and yours is yours. |
 | **Copilot** | Its session-store tool, your `software-factory` server and its built-in MCP servers off | `--excluded-tools`, `--disable-mcp-server`, `--disable-builtin-mcps` | The work stays where the app can see it. |
@@ -443,7 +443,7 @@ server's own.
 | Scheduled prompts, fleet, computer use | `/every`, `/after`, `/fleet`, `/computer` | offered | Offered as commands | — | Leave alone: commands you type |
 | Compaction ("infinite sessions") | none documented | on, from 80% of the window, blocking at 95% | Yes, but only the context meter shows it; `/compact` offered | Yes | Leave alone: on with nothing set, no off switch; see [Compaction in each runtime](../explanation/compaction-by-runtime.md) |
 | Usage data | none documented | — | — | — | Nothing to set |
-| Folders and sandbox | `--add-dir`, `--allow-all-paths`, `--sandbox`, `--no-sandbox`, `sandbox.*` | this folder only; sandbox off | Not measured: its quota was spent | — | Leave alone: **Runtime controlled**, until measured |
+| Folders and sandbox | `--add-dir`, `--allow-all-paths`, `--sandbox`, `--no-sandbox`, `sandbox.*` | this folder only; sandbox off | Not measured: its quota was spent | — | Leave alone: **Default sandbox**, until measured |
 | Default mode, theme and other terminal settings | settings | — | No | — | Leave alone |
 
 #### Cursor
@@ -455,22 +455,22 @@ not set them.
 | Option | Where | Values (default) | Under ACP | On servers | Decided |
 | --- | --- | --- | --- | --- | --- |
 | Effort, thinking, context, fast | part of each model's value, such as `claude-opus-5[effort=high,fast=false]`; separate options when the client sends `_meta.parameterizedModelPicker` | per model | Yes, under the prompt, as one long list | Yes | Leave alone: already under the prompt, in the model |
-| Always approve | `--force` | off | Yes | Yes | Leave alone: the app's **Always-approve** answers for it |
-| Approval mode | `approvalMode` | allowlist | Not measured | Server's own | Leave alone. **Unrestricted** means it never asks, so the app's **Default** cannot hold it back. |
+| Always approve | `--force` | off | Yes | Yes | Leave alone: the app's **Yes to all** answers for it |
+| Approval mode | `approvalMode` | allowlist | Not measured | Server's own | Leave alone. **Unrestricted** means it never asks, so the app's **Request cards** cannot hold it back. |
 | Web search | `autoAcceptWebSearch` | asks | Yes | Server's own | Leave alone: no switch the app can reach |
 | Compaction (summarization) | none: its backend decides | on | Yes, but nothing is sent over ACP and `/summarize` is not offered | Yes | Nothing to set; see [Compaction in each runtime](../explanation/compaction-by-runtime.md) |
 | Attribution | `attribution.*` | on | Not measured | Server's own | Leave alone |
 | Model shared with Terminal | — | — | A model picked in the app may become Cursor's default in Terminal too | — | Measure |
 | Permission rules, MCP, hooks, rules, skills | files | — | Yes | Server's own | Leave alone |
 | `--mode`, `--sandbox`, `--approve-mcps`, `--plugin-dir`, `--exclude-tools` | flags | — | No: not read by `acp` | — | Leave alone |
-| Sandbox | `sandbox.mode` | off | Only its own setting: `acp` does not read `--sandbox` | Server's own | Leave alone: **Runtime controlled** |
+| Sandbox | `sandbox.mode` | off | Only its own setting: `acp` does not read `--sandbox` | Server's own | Leave alone: **Default sandbox** |
 
 ## Command sandbox
 
 Most runtimes can run their commands inside a sandbox of their own, which limits what a
 command can write and, for some, what it can reach on the network. It is separate from the
 permission mode, which decides when the runtime asks you, and from the app's own folder and
-tool rules, which apply either way. **Settings ▸ Agent Runtimes** has a **Command sandbox**
+tool rules, which apply either way. **Settings ▸ Agent Runtimes** has a **Sandbox**
 default for each runtime, and each agent has its own choice beside its mode; see
 [Settings](settings.md) and [Choose a runtime, model and mode](../how-to/choose-runtime-model-mode.md).
 
@@ -478,14 +478,14 @@ Each choice the app offers was measured to take effect, on 2026-09-29, by
 `scripts/sandbox-probe.sh`: a real conversation, asked to write outside its folder, on the
 version below. A runtime the app cannot reach offers no choice, and says why.
 
-| Runtime | Measured on | **On** | **Off** | Without a choice | When the sandbox cannot start |
+| Runtime | Measured on | **Runtime sandbox** | **No sandbox** | **Default sandbox** | When the sandbox cannot start |
 | --- | --- | --- | --- | --- | --- |
-| **Claude** | Claude Code 2.1.284 | `sandbox.enabled` true, through `_meta`: writes only in the folder, asks before a new website | false | your settings decide: **Runtime controlled** | On a server without bubblewrap and socat, it will not start the conversation. On a Mac already inside a sandbox, each command fails. |
+| **Claude** | Claude Code 2.1.284 | `sandbox.enabled` true, through `_meta`: writes only in the folder, asks before a new website | false | your settings decide: **Default sandbox** | On a server without bubblewrap and socat, it will not start the conversation. On a Mac already inside a sandbox, each command fails. |
 | **Codex** | Codex 0.156.1 | **Ask for approval** or **Approve for me**: writes only in the folder, no network | **Full access**, which also stops approval prompts | the mode decides | Each command fails, on a server without user namespaces or a Mac already inside a sandbox; Codex says so in its reply. |
-| **Grok** | Grok 1.0.67 | not offered: `grok agent stdio --help` has no `--sandbox` option | not offered | **Runtime controlled**: the app cannot change Grok’s sandbox | Grok 1.0.44 refused to start when the flag was passed. |
-| **Gemini** | Gemini CLI 0.61.0 | not offered: with its sandbox on, Gemini never answers the app | `GEMINI_SANDBOX=false`, above your own settings | your settings decide: **Runtime controlled** | On a server without Docker or Podman it will not start; on a Mac it never answers, and after 90 seconds the app says so. |
-| **Cursor** | 2026.09.26 | — | — | **Runtime controlled**: its own `sandbox.mode` | — |
-| **Copilot** | 1.0.89-5 | — | — | **Runtime controlled**; not measured yet | — |
+| **Grok** | Grok 1.0.67 | not offered: `grok agent stdio --help` has no `--sandbox` option | not offered | **Default sandbox**: the app cannot change Grok’s sandbox | Grok 1.0.44 refused to start when the flag was passed. |
+| **Gemini** | Gemini CLI 0.61.0 | not offered: with its sandbox on, Gemini never answers the app | `GEMINI_SANDBOX=false`, above your own settings | your settings decide: **Default sandbox** | On a server without Docker or Podman it will not start; on a Mac it never answers, and after 90 seconds the app says so. |
+| **Cursor** | 2026.09.26 | — | — | **Default sandbox**: its own `sandbox.mode` | — |
+| **Copilot** | 1.0.89-5 | — | — | **Default sandbox**; not measured yet | — |
 | **Antigravity** | 1.2.1 | — | — | **No sandbox**, unless a business account's admin turns **Sandbox mode** on | Never fails: it asks before each command instead. |
 | **OpenCode** | 1.18.33 | — | — | **No sandbox** | — |
 
@@ -493,8 +493,73 @@ When a runtime's sandbox cannot start, the agent stops with a card saying so, an
 **Continue without sandbox** turns it off for that agent only. See
 [Answer a question or a permission request](../how-to/answer-a-question.md).
 
+## Auto
+
+**Auto** is a runtime choice that is not a runtime (#2658). When a session starts on Auto,
+the host picks the first runtime in your order (**Settings ▸ Agent Runtimes ▸ Auto**) that is
+included, installed, signed in, not out, and can give every value asked for; a rate-limited
+runtime is tried after the others. The agent keeps that runtime, and records what Auto
+picked, the values asked for, the runtime's own settings it gave, and why each runtime before
+it was not used. Its header says **Auto · Claude**. See [Use Auto](../how-to/use-auto.md).
+
+The same words apply on every runtime, on Auto or not:
+
+| Field | Values | In a file |
+| --- | --- | --- |
+| Model | **Fast**, **Balanced**, **Smart** | `fast`, `balanced`, `smart` |
+| Permission mode | **Plan**, **Ask**, **Approve for me** | `plan`, `ask`, `approve-for-me` |
+| Permission requests (Cursor, Grok, OpenCode) | **Request cards**, **Yes to all** | `request-cards`, `yes-to-all` |
+| Sandbox | **Default sandbox**, **Runtime sandbox**, **No sandbox** | `default`, `runtime`, `none` |
+
+The app ships a mapping for each runtime and value (`Go/internal/agentsd/automap.go`). Where a
+runtime has no exact match, the mapping is its nearest setting that gives **less** access,
+never more, and the cell says so; where none exists, the cell is **Not possible**, and Auto
+does not use that runtime for that value. A test over the table checks that no shipped cell
+gives more access than its value. You can change any cell; the runtime check (#39) marks a
+cell whose model or mode the runtime no longer offers, and files an issue.
+
+**Permission mode** (on Auto, **Approve for me** also says yes to permission requests; the
+other two give a card):
+
+| Runtime | Plan | Ask | Approve for me |
+| --- | --- | --- | --- |
+| Claude | Plan | Manual (default) | Accept edits |
+| Codex | Ask for approval, with Plan | Ask for approval | Approve for me |
+| Gemini | Plan | Default | Auto Edit |
+| Grok | Default, Request cards (nearest safer: no plan mode) | Default, Request cards | Default, Yes to all |
+| Cursor | Plan | Agent, Request cards | Agent, Yes to all |
+| OpenCode | plan | build, Request cards | build, Yes to all |
+| Copilot | Plan | Agent | Agent (nearest safer: Autopilot and Allow all approve everything) |
+| Antigravity | Default (nearest safer: no plan mode) | Default | Auto Edit |
+
+**Model** (effort low for Fast, the runtime's own for Balanced, high for Smart):
+
+| Runtime | Fast | Balanced | Smart |
+| --- | --- | --- | --- |
+| Claude | Haiku | Sonnet | Opus |
+| Codex | 5.6 Luna | its default | 6 Luna |
+| Grok | Grok 4.7 Fast | its default | Grok 4.7 |
+| Antigravity | Gemini 3.8 Flash (Low) | its default | Gemini 3.8 Flash (High) |
+| Copilot | its default (nearest safer: no smaller model known) | its default | Claude Sonnet 5.5 |
+| Gemini, Cursor, OpenCode | its default (nearest safer: no other model known) | its default | its default (nearest safer: no other model known) |
+
+**Sandbox**:
+
+| Runtime | Default sandbox | Runtime sandbox | No sandbox |
+| --- | --- | --- | --- |
+| Claude | as configured | on | off |
+| Codex | as configured | on (Ask for approval or Approve for me) | off (Full access) |
+| Gemini | as configured | Not possible | off |
+| Grok, Cursor, Copilot | its own setting (fixed) | Not possible | its own setting (nearest safer) |
+| OpenCode, Antigravity | no sandbox (fixed) | Not possible | no sandbox (fixed) |
+
+A runtime's own value that matches no shared one makes its pill say **Custom**; the
+runtime's own choices stay under **⋯ <runtime>'s own**. Gemini's own **Auto** model is one of
+those: it is not the Auto runtime.
+
 ## See also
 
+- [Use Auto](../how-to/use-auto.md)
 - [Sign a runtime in](../how-to/sign-a-runtime-in.md)
 - [Assess a runtime](../how-to/assess-a-runtime.md)
 - [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md)

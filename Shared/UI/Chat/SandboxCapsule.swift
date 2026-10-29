@@ -25,30 +25,31 @@ struct SandboxCapsule: View {
         // The start's own record while it still stands: a capped helper says so. A choice
         // changed since shows what the next turn will be.
         let standing = effective.flatMap { $0.requested == asked ? $0 : nil }
-        let words = SandboxWords.state(standing?.state
+        let state = SandboxWords.state(standing?.state
             ?? SandboxCatalog.state(runtimeID: runtimeID, choice: asked, codexMode: codexMode))
         if choices.isEmpty {
-            Text(words)
+            // A runtime that cannot change its sandbox: its fixed value, and why (#2658).
+            let fixed: SandboxChoice = SandboxCatalog.state(runtimeID: runtimeID, choice: .runtime, codexMode: nil) == .none ? .off : .runtime
+            Text(LevelWords.sandbox(fixed))
                 .appText(.fine)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 10)
                 .padding(.vertical, TouchTarget.capsuleVertical)
                 .fixedSize()
-                .help(setBy.map(OrgPolicyWords.line) ?? SandboxCatalog.entry(for: runtimeID)?.why ?? words)
+                .help(setBy.map(OrgPolicyWords.line) ?? SandboxCatalog.entry(for: runtimeID)?.why ?? state)
         } else {
-            SelectCapsule(name: standing?.reason.map { "Command sandbox: \($0)" } ?? "Command sandbox",
-                          title: words) { dismiss in
-                SelectChoice(title: SandboxWords.override(nil, runtimeDefault: runtimeDefault, runtimeID: runtimeID),
-                             description: nil, isChosen: override == nil, setBy: runtimeDefault == .on ? nil : setBy) {
-                    choose(nil)
-                    dismiss()
-                }
+            // The pill says the value; the menu marks the one Settings gives (#2658).
+            SelectCapsule(name: standing?.reason.map { "\(LevelWords.sandboxField): \($0)" } ?? "\(LevelWords.sandboxField): \(state)",
+                          title: SandboxWords.override(override, runtimeDefault: runtimeDefault, runtimeID: runtimeID)) { dismiss in
+                SelectGroupHeading(title: LevelWords.sandboxField)
                 ForEach(choices, id: \.self) { choice in
                     SelectChoice(title: SandboxWords.choice(choice, runtimeID: runtimeID),
                                  description: description(for: choice),
-                                 isChosen: override == choice,
-                                 setBy: choice == .on ? nil : setBy) {
-                        choose(choice)
+                                 isChosen: asked == choice,
+                                 setBy: choice == .on ? nil : setBy,
+                                 mark: override == nil && choice == runtimeDefault ? LevelWords.followsSettings : nil) {
+                        // The value Settings gives, chosen again, follows Settings still.
+                        choose(override == nil && choice == runtimeDefault ? nil : choice)
                         dismiss()
                     }
                 }

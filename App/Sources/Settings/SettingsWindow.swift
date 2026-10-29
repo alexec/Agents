@@ -44,7 +44,7 @@ struct SettingsWindow: View {
     private var runtimeID: Binding<String> {
         Binding(
             get: {
-                let known = Set(model.runtimes.map(\.id))
+                let known = Set(model.runtimes.map(\.id)).union([LevelWords.autoID])
                 if known.contains(runtimeIDRaw) { return runtimeIDRaw }
                 return model.runtimes.first?.id ?? RuntimeCatalog.claude.id
             },
@@ -171,6 +171,7 @@ struct SettingsWindow: View {
 
     private var title: String {
         guard pane.wrappedValue == .runtimes else { return pane.wrappedValue.title }
+        if runtimeID.wrappedValue == LevelWords.autoID { return LevelWords.auto }
         return model.runtimes.first { $0.id == runtimeID.wrappedValue }?.runtime.name
             ?? SettingsPane.runtimes.title
     }
@@ -203,7 +204,12 @@ struct SettingsWindow: View {
         case .runtimes:
             HStack(spacing: 0) {
                 RuntimePageList(runtimeID: runtimeID)
-                FormColumn { AgentRuntimesSettingsView(runtimeID: runtimeID.wrappedValue) }
+                // Auto's own page, first (#2658).
+                if runtimeID.wrappedValue == LevelWords.autoID {
+                    FormColumn { AutoSettingsView() }
+                } else {
+                    FormColumn { AgentRuntimesSettingsView(runtimeID: runtimeID.wrappedValue) }
+                }
             }
         case .agentConfiguration: AgentConfigurationView(place: .you, snapshot: sharedSnapshot, page: sharedPage, refresh: { await refreshShared() },
                                                          unsaved: $unsaved)
@@ -585,6 +591,11 @@ private struct RuntimePageList: View {
 
     var body: some View {
         PageList {
+            // Auto first: the runtime choice that is not a runtime (#2658, Story 3).
+            PageLine(title: LevelWords.auto, lit: runtimeID == LevelWords.autoID,
+                     action: { runtimeID = LevelWords.autoID }) {
+                EmptyView()
+            }
             ForEach(model.runtimes) { status in
                 PageLine(title: status.runtime.name, lit: runtimeID == status.id,
                          action: { runtimeID = status.id }) {

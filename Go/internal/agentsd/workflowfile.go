@@ -486,7 +486,7 @@ func parseWorkflow(text, id, folder string) wire.Workflow {
 	w.Settings = s
 	known := map[string]bool{"on": true, "agent": true, "name": true, "permission-mode": true, "runtime": true, "model": true,
 		"labels": true, "effort": true, "options": true, "enabled": true, "archived": true, "cooldown": true, "runs-on": true, "when-done": true,
-		"continue-when-back": true}
+		"continue-when-back": true, "permission-requests": true, "sandbox": true}
 	for k, v := range m {
 		if !known[k] {
 			b, _ := json.Marshal(v.JSON())

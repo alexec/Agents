@@ -3,21 +3,16 @@ import Foundation
 /// What the Mac and the phone say about a runtime's command sandbox (064, FR-014): one
 /// place, so Settings, the prompt bar, the conversation and the card agree.
 public enum SandboxWords {
-    /// A choice in a runtime's Settings menu.
+    /// A choice, in the words every runtime shares (#2658): **Default sandbox**, **Runtime
+    /// sandbox**, **No sandbox**. What it does on the runtime is its explanation.
     public static func choice(_ choice: SandboxChoice, runtimeID: String) -> String {
-        switch choice {
-        case .runtime: "As configured by runtime"
-        case .on: runtimeID == RuntimeCatalog.codex.id ? "On (Ask or Approve for me)" : "On"
-        case .off: runtimeID == RuntimeCatalog.codex.id ? "Off (Full access)" : "Off"
-        }
+        LevelWords.sandbox(choice)
     }
 
-    /// A choice in one agent's menu, where `runtime` means following the runtime's default.
+    /// One agent's pill: its own choice, else the one Settings gives. In the menu, that one
+    /// is marked **follows Settings** (`LevelWords.followsSettings`); there is no fourth value.
     public static func override(_ choice: SandboxChoice?, runtimeDefault: SandboxChoice, runtimeID: String) -> String {
-        guard let choice else {
-            return "Use runtime default (\(Self.choice(runtimeDefault, runtimeID: runtimeID)))"
-        }
-        return Self.choice(choice, runtimeID: runtimeID)
+        Self.choice(choice ?? runtimeDefault, runtimeID: runtimeID)
     }
 
     /// The state an agent's conversation shows (FR-010).

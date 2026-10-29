@@ -1,15 +1,22 @@
 import AgentsKitCore
 import SwiftUI
 
-/// The Mac-wide permission choice for runtimes that do not offer a mode of their own.
+/// One agent's answer to permission requests, for runtimes whose requests the app answers
+/// (Cursor, Grok, OpenCode): its own choice, else the one Settings gives (#2658, FR-019).
 ///
-/// It says what it sets ("Permissions: Default"), not the value alone, because it sits
-/// beside the sandbox pill and is the only place to set it (#2559). Always-approve answers
-/// every request for every agent of the runtime, so it asks once more before it is set (#2746).
+/// It says its value alone, **Request cards** or **Yes to all**, as every pill does (#2658);
+/// the menu's header names the field. Yes to all answers every request, so it asks once
+/// more before it is set (#2746).
 struct ClientPermissionCapsule: View {
     let runtimeID: String
-    let mode: ClientPermissionMode
-    let set: (ClientPermissionMode) -> Void
+    /// The agent's own choice; nil follows Settings.
+    let own: ClientPermissionMode?
+    /// The value Settings ▸ Agent Runtimes gives this runtime.
+    let settings: ClientPermissionMode
+    /// The agent's own choice, or nil to follow Settings again.
+    let set: (ClientPermissionMode?) -> Void
+
+    private var mode: ClientPermissionMode { own ?? settings }
 
     @State private var isConfirming = false
 
@@ -48,11 +55,13 @@ struct ClientPermissionCapsule: View {
             ForEach([ClientPermissionMode.default, .alwaysApprove], id: \.self) { choice in
                 SelectChoice(title: ClientPermissionWords.title(choice),
                              description: ClientPermissionWords.description(choice, runtimeName: runtimeName),
-                             isChosen: choice == mode) {
+                             isChosen: choice == mode,
+                             mark: own == nil && choice == settings ? LevelWords.followsSettings : nil) {
                     if choice == .alwaysApprove, mode != .alwaysApprove {
                         isConfirming = true
                     } else {
-                        set(choice)
+                        // The value Settings gives, chosen again, follows Settings still.
+                        set(own == nil && choice == settings ? nil : choice)
                         dismiss()
                     }
                 }
@@ -86,7 +95,7 @@ struct ClientPermissionCapsule: View {
                 Spacer(minLength: 12)
                 Button(ClientPermissionWords.confirmButton, role: .destructive) {
                     isConfirming = false
-                    set(.alwaysApprove)
+                    set(own == nil && settings == .alwaysApprove ? nil : .alwaysApprove)
                     dismiss()
                 }
             }
@@ -101,40 +110,35 @@ struct ClientPermissionCapsule: View {
 }
 
 enum ClientPermissionWords {
+    /// In the words every runtime shares (#2658): **Request cards** or **Yes to all**.
     static func title(_ mode: ClientPermissionMode) -> String {
-        mode == .alwaysApprove ? "Always-approve" : "Default"
+        LevelWords.requests(mode)
     }
 
-    /// The closed pill: what it sets, then its value.
+    /// The closed pill: the value alone, as every pill says (#2658).
     static func pill(_ mode: ClientPermissionMode) -> String {
-        "Permissions: \(title(mode))"
+        title(mode)
     }
 
     static func name(runtimeName: String) -> String {
-        "\(runtimeName) permissions"
+        "\(runtimeName) \(LevelWords.requestsField.lowercased())"
     }
 
     static func description(_ choice: ClientPermissionMode, runtimeName: String) -> String {
-        switch choice {
-        case .default:
-            "Asks before \(runtimeName) does something that needs permission."
-        case .alwaysApprove:
-            "Answers every permission request for you. Questions that are not permission still wait."
-        }
+        LevelWords.meaning(requests: choice)
     }
 
     static func scope(runtimeName: String) -> String {
-        "Applies to every \(runtimeName) agent, including workflows and server folders."
+        "For this agent. Settings ▸ Agent Runtimes ▸ \(runtimeName) gives every new one its value."
     }
 
     static func confirmTitle(runtimeName: String) -> String {
-        "Always approve every \(runtimeName) permission request?"
+        "Say yes to every permission request of this \(runtimeName) agent?"
     }
 
     static func confirmMessage(runtimeName: String) -> String {
-        "No \(runtimeName) agent, workflow or server folder will ask before it edits files or runs commands. "
-            + "Set Default to make them ask again."
+        "It will not ask before it edits files or runs commands. Choose Request cards to make it ask again."
     }
 
-    static let confirmButton = "Always Approve"
+    static let confirmButton = "Yes to All"
 }

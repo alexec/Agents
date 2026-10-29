@@ -522,21 +522,38 @@ func (d *Daemon) runAgent(w wire.Workflow, run workflowRun, fr fireRequest) (wir
 	}
 	// New sessions and workflows use the runtime of the most recently active agent on
 	// this host. The store orders agents by LastActivityAt, just as the clients do.
-	runtimeID := defaultRuntimeID
-	if agents := d.Store.Agents(); len(agents) > 0 && agents[0].RuntimeID != "" {
+	// Auto on a new host, and after an Auto agent (#2658, FR-013).
+	runtimeID := autoRuntimeID
+	if agents := d.Store.Agents(); len(agents) > 0 && agents[0].RuntimeID != "" && agents[0].Auto == nil {
 		runtimeID = agents[0].RuntimeID
 	}
 	if w.Settings.RuntimeID != nil {
 		runtimeID = *w.Settings.RuntimeID
 	}
-	if runtimeByID(runtimeID) == nil {
+	if runtimeByID(runtimeID) == nil && runtimeID != autoRuntimeID {
 		return "", settingRefused("runtime", "There is no runtime called \""+runtimeID+"\" — this version knows "+knownRuntimes())
 	}
-	model := ""
-	if w.Settings.Model != nil {
-		model = *w.Settings.Model
+	model, requests, box := "", "", ""
+	for to, from := range map[*string]*string{&model: w.Settings.Model, &requests: w.Settings.PermissionRequests, &box: w.Settings.Sandbox} {
+		if from != nil {
+			*to = *from
+		}
 	}
-	r := helperRequest(runtimeID, fr.folder, prompt, model, w.Settings.PermissionMode, nil, w.Settings.Labels)
+	levels, nativeModel, nativeMode, sandbox, err := fileLevels(runtimeID, model, w.Settings.PermissionMode, requests, box)
+	if err != nil {
+		return "", settingRefused("runtime", err.(*Error).Message)
+	}
+	r := helperRequest(runtimeID, fr.folder, prompt, nativeModel, nativeMode, nil, w.Settings.Labels)
+	if levels != nil {
+		r.Levels = levels
+	}
+	r.Sandbox = sandbox
+	// Effort, as the file says, on a named runtime; on Auto it follows the model (FR-003).
+	if w.Settings.Effort != nil && runtimeID != autoRuntimeID {
+		if id := effortOptionID(d.runtimeOffers(runtimeID)); id != "" {
+			r.StartOptions.Values[id] = jsonString(*w.Settings.Effort)
+		}
+	}
 	for id, v := range w.Settings.Options {
 		b := []byte(`"` + strings.ReplaceAll(v, `"`, `\"`) + `"`)
 		r.StartOptions.Values[id] = b

@@ -118,6 +118,10 @@ final class AppModel {
     private(set) var person: PersonSettings?
     /// Each runtime's command sandbox default (064).
     private(set) var sandboxSettings = SandboxSettings()
+    /// Auto (#2658): the person's order, Include switches and own cells, and every cell
+    /// of the Mappings, as this Mac's host has them.
+    private(set) var autoSettings = AutoSettings()
+    private(set) var autoMappings = AutoMappings()
     /// The organisation's policy as this Mac's host follows it (#998): the red strip and the
     /// composer's reason while the kill switch is on. Nil from a host without a policy capability.
     private(set) var policyState: DaemonAPI.PolicyState?
@@ -814,7 +818,7 @@ final class AppModel {
     /// nil for the runtime's account for new sessions. Back to that whenever the runtime changes.
     var draftAccountID: String?
     var draftAccountChoices: AccountChoices? {
-        guard draftHost == .mac, let runtimeID = draftRuntimeID else { return nil }
+        guard draftHost == .mac, let runtimeID = draftRuntimeID, runtimeID != LevelWords.autoID else { return nil }
         return AccountChoices(runtimeID: runtimeID, profiles: accountProfiles, policy: policyState?.policy)
     }
     /// The kinds of session the draft folder offers (#760): the folder's personas and
@@ -843,7 +847,18 @@ final class AppModel {
     private(set) var draftCommands: [SlashCommand] = []
     var draftChosen: [String: JSONValue] = [:]
     /// The next agent's own sandbox choice (064). Nil follows its runtime's default.
-    var draftSandbox: SandboxChoice? { didSet { draftSandboxRefusal = nil } }
+    var draftSandbox: SandboxChoice? { didSet { draftSandboxRefusal = nil; draftAutoRefusal = nil } }
+    /// The next agent's values in the words every runtime shares (#2658), kept when the
+    /// runtime changes: on a named runtime they are put into its own options.
+    var draftLevels = Levels(model: .balanced, permission: .ask)
+    /// The next agent's own answer to permission requests (#2658); nil follows Settings.
+    var draftClientPermission: ClientPermissionMode?
+    /// What Auto would pick now for the draft (#2658), for "Picks Claude now".
+    private(set) var draftAutoPreview: AutoPreview?
+    /// Why the last start on Auto did not happen: each runtime and why (FR-011). The prompt
+    /// stays in the field.
+    var draftAutoRefusal: String?
+    var isAutoDraft: Bool { draftRuntimeID == LevelWords.autoID }
     /// Why the last start of a new agent did not happen, when its sandbox is why (064):
     /// shown over the prompt with **Start without sandbox**.
     var draftSandboxRefusal: DaemonAPI.SandboxWillNotStart?
@@ -2275,6 +2290,113 @@ final class AppModel {
         passThrough = state
     }
 
+    /// Auto's settings and every cell (#2658), from this Mac's host.
+    func refreshAuto() async {
+        async let settings = try? macClient.call(DaemonAPI.Method.autoState, DaemonAPI.Empty(), returning: AutoSettings.self)
+        async let mappings = try? macClient.call(DaemonAPI.Method.autoMappings, DaemonAPI.Empty(), returning: AutoMappings.self)
+        if let s = await settings { autoSettings = s }
+        if let m = await mappings { autoMappings = m }
+    }
+
+    /// Save Auto's settings and copy them to every connected machine (FR-017), as the
+    /// sandbox defaults are.
+    func setAutoSettings(_ wanted: AutoSettings) async {
+        let before = autoSettings
+        autoSettings = wanted
+        var saved: AutoSettings?
+        await attempt {
+            saved = try await self.macClient.call(DaemonAPI.Method.autoSet, wanted, returning: AutoSettings.self)
+        }
+        guard let saved else { autoSettings = before; return }
+        autoSettings = saved
+        await refreshAuto()
+        await refreshDraftAutoPreview()
+        for host in hosts.hosts.all where !hosts.isOffline(host.id) {
+            _ = try? await client(for: host.id).call(DaemonAPI.Method.autoSet, saved, returning: AutoSettings.self)
+        }
+    }
+
+    /// What Auto would pick now for the draft, on the draft's machine.
+    func refreshDraftAutoPreview() async {
+        guard isAutoDraft, let cwd = draftCwd else { draftAutoPreview = nil; return }
+        let request = AutoPreviewRequest(cwd: cwd, levels: draftLevels, sandbox: draftSandbox)
+        draftAutoPreview = try? await draftHostClient.call(DaemonAPI.Method.autoPreview, request, returning: AutoPreview.self)
+    }
+
+    /// A value chosen on the form (#2658): kept for the next runtime too, and on a named one
+    /// put into its own options at once, so the pills and the start agree.
+    func chooseDraftLevel(_ field: AutoField, _ level: String) {
+        switch field {
+        case .model: draftLevels.model = ModelLevel(rawValue: level)
+        case .permission: draftLevels.permission = PermissionLevel(rawValue: level)
+        case .permissionRequests: draftClientPermission = ClientPermissionMode(rawValue: level)
+        case .sandbox: draftSandbox = SandboxChoice(rawValue: level)
+        }
+        draftAutoRefusal = nil
+        if isAutoDraft {
+            Task { await refreshDraftAutoPreview() }
+        } else {
+            applyDraftLevel(field)
+        }
+    }
+
+    /// The draft's value for a field put into the named runtime's own options.
+    private func applyDraftLevel(_ field: AutoField) {
+        guard let runtimeID = draftRuntimeID, !isAutoDraft else { return }
+        let level: String? = switch field {
+        case .model: draftLevels.model?.rawValue
+        case .permission: draftLevels.permission?.rawValue
+        default: nil
+        }
+        guard let level, let cell = autoMappings.cell(runtimeID, field, level),
+              cell.mark != .notPossible, cell.mark != .dropped else { return }
+        let offered = Set(draftOptions.map(\.id))
+        for (id, value) in cell.native?.options ?? [:] where offered.contains(id) {
+            draftChosen[id] = value
+        }
+    }
+
+    /// The value of a field the draft's own options are now, or nil (Custom).
+    func draftLevel(_ field: AutoField) -> String? {
+        if isAutoDraft {
+            return field == .model ? draftLevels.model?.rawValue : draftLevels.permission?.rawValue
+        }
+        guard let runtimeID = draftRuntimeID else { return nil }
+        return LevelMatch.level(field, runtimeID: runtimeID, mappings: autoMappings) { id in
+            self.draftChosen[id] ?? self.draftOptions.first { $0.id == id }?.currentValue
+        }
+    }
+
+    /// Where Auto would start an Auto session's successor now (FR-022), on its machine.
+    func autoPreview(for agent: Agent) async -> AutoPreview? {
+        guard let pick = agent.auto else { return nil }
+        return try? await client(forAgent: agent.id).call(DaemonAPI.Method.autoPreview,
+                                                          AutoPreviewRequest(cwd: agent.cwd, levels: pick.levels, sandbox: agent.sandboxOverride),
+                                                          returning: AutoPreview.self)
+    }
+
+    /// A running agent's value, mapped on its own runtime from its next step (Story 2).
+    func setAgentLevel(_ agentID: UUID, _ field: AutoField, _ level: String) async {
+        var levels = Levels()
+        switch field {
+        case .model: levels.model = ModelLevel(rawValue: level)
+        case .permission: levels.permission = PermissionLevel(rawValue: level)
+        default: return
+        }
+        _ = await attempt {
+            try await self.client(forAgent: agentID).call(DaemonAPI.Method.agentsSetLevels,
+                                                           SetLevelsRequest(agentID: agentID, levels: levels))
+        }
+    }
+
+    /// A running agent's own answer to permission requests; nil follows Settings (FR-019).
+    func setAgentClientPermission(_ agentID: UUID, _ mode: ClientPermissionMode?) async {
+        _ = await attempt {
+            try await self.client(forAgent: agentID).call(DaemonAPI.Method.agentsSetClientPermission,
+                                                           SetClientPermissionRequest(agentID: agentID, mode: mode))
+        }
+    }
+
     func refreshSandboxSettings() async {
         guard let settings = try? await macClient.call(DaemonAPI.Method.sandboxState, Optional<String>.none,
                                                     returning: SandboxSettings.self) else { return }
@@ -2998,6 +3120,21 @@ final class AppModel {
             guard let settings = try? params?.decode(SandboxSettings.self) else { return }
             sandboxSettings = settings
 
+        case DaemonAPI.Notification.autoChanged:
+            guard let settings = try? params?.decode(AutoSettings.self) else { return }
+            let changed = autoSettings != settings
+            autoSettings = settings
+            Task {
+                await refreshAuto()
+                await refreshDraftAutoPreview()
+                // Set from the Remote or the web page on the Mac's host: the servers too (FR-017).
+                if changed {
+                    for host in hosts.hosts.all where !hosts.isOffline(host.id) {
+                        _ = try? await client(for: host.id).call(DaemonAPI.Method.autoSet, settings, returning: AutoSettings.self)
+                    }
+                }
+            }
+
         case DaemonAPI.Notification.daemonPolicyStateChanged:
             guard let state = try? params?.decode(DaemonAPI.PolicyState.self) else { return }
             policyState = state
@@ -3520,6 +3657,8 @@ final class AppModel {
         // And each runtime's sandbox default (064).
         _ = try? await server.call(DaemonAPI.Method.sandboxSet, sandboxSettings,
                                    returning: SandboxSettings.self)
+        // And Auto's order, Include switches and own cells (#2658, FR-017).
+        _ = try? await server.call(DaemonAPI.Method.autoSet, autoSettings, returning: AutoSettings.self)
         // And what the Mac knows of the plans it relays (052, R6): a server's Codex
         // spends the Mac's ChatGPT plan, so the Mac's word that it is out is the server's.
         if let allowances = work.runtimeAllowances {
@@ -3576,7 +3715,7 @@ final class AppModel {
         DaemonAPI.Notification.milestonesChanged, DaemonAPI.Notification.preferencesChanged,
         DaemonAPI.Notification.runtimeChanged, DaemonAPI.Notification.runtimeAccountChanged,
         DaemonAPI.Notification.signInNeeded, DaemonAPI.Notification.clientPermissionsChanged,
-        DaemonAPI.Notification.personChanged, DaemonAPI.Notification.sandboxChanged,
+        DaemonAPI.Notification.personChanged, DaemonAPI.Notification.sandboxChanged, DaemonAPI.Notification.autoChanged,
         DaemonAPI.Notification.backupsChanged, DaemonAPI.Notification.runtimesAccountProfilesChanged,
         DaemonAPI.Notification.daemonPolicyStateChanged,
     ]
@@ -3601,8 +3740,9 @@ final class AppModel {
         async let events: Void = refreshEvents()
         async let modes: Void = refreshModes()
         async let display: Void = refreshDisplayPreferences()
+        async let auto: Void = refreshAuto()
         _ = await (runtimes, accounts, cost, retention, clientPermissions, sandbox, policy, person, runtimeStates, wake,
-                   storeNotes, milestones, leases, hostedMCP, events, modes, display)
+                   storeNotes, milestones, leases, hostedMCP, events, modes, display, auto)
     }
 
     func refreshEverything() async {
@@ -3640,10 +3780,11 @@ final class AppModel {
         async let display: Void = refreshDisplayPreferences()
         async let transcript: Void = loadTranscript()
         async let popped: Void = loadPoppedTranscripts()
+        async let auto: Void = refreshAuto()
         _ = await (popped, runtimes, accounts, workflows, pinned, permissions,
                    elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
                    transcript, runtimeStates, sandbox, person, disk, storeNotes, hostedMCP, mcpHealth, milestones,
-                   display)
+                   display, auto)
     }
 
     #if DEBUG
@@ -4570,6 +4711,19 @@ final class AppModel {
     /// runtime starts one. It is kept and used by the start that follows.
     func loadDraftOptions() async {
         guard let runtimeID = draftRuntimeID, let cwd = draftOptionsFolder else { return }
+        // Auto has no runtime yet, so no options of its own: what it would pick (#2658).
+        if runtimeID == LevelWords.autoID {
+            draftOptionsGeneration += 1
+            draftOptions = []
+            draftCommands = []
+            draftChosen = [:]
+            draftOptionsFailure = nil
+            isLoadingDraftOptions = false
+            letGo(draft: draftID)
+            draftID = nil
+            await refreshDraftAutoPreview()
+            return
+        }
         draftOptionsGeneration += 1
         let generation = draftOptionsGeneration
         isLoadingDraftOptions = true
@@ -4640,6 +4794,12 @@ final class AppModel {
             draftChosen[mode.id] = ModeMemory.startingValue(
                 remembered: rememberedMode(for: runtimeID), for: mode)
         }
+        // The values chosen in the shared words (#2658), kept from the runtime before, over
+        // the mode remembered: the form says the same words on every runtime.
+        if opening {
+            applyDraftLevel(.model)
+            applyDraftLevel(.permission)
+        }
         // Over the mode remembered, because the persona was picked after it (#760).
         if let persona = pendingPersona, !draftOptions.isEmpty {
             draftChosen.merge(persona.choices(against: draftOptions)) { _, new in new }
@@ -4686,8 +4846,10 @@ final class AppModel {
                                              mcpServers: draftServers,
                                              worktree: draftWorktree,
                                              sandbox: draftSandbox, labels: labels, persona: draftPersona,
-                                             accountID: draftAccountChoices?.sent(draftAccountID),
-                                             voice: voice ? true : nil)
+                                             accountID: isAutoDraft ? nil : draftAccountChoices?.sent(draftAccountID),
+                                             voice: voice ? true : nil,
+                                             levels: Levels(model: draftLevels.model, permission: draftLevels.permission,
+                                                            permissionRequests: isAutoDraft ? nil : draftClientPermission))
         // A stopped workspace that starts when used: kept, and shown under this prompt (#691 US3).
         if draftHost != .mac, hosts.isOffline(draftHost), startsWhenUsed(draftHost) {
             var kept = request
@@ -4723,7 +4885,13 @@ final class AppModel {
                 selection = id
             }
             draftSandboxRefusal = nil
+            draftAutoRefusal = nil
+            draftClientPermission = nil
             return true
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.autoNoRuntime {
+            // No runtime Auto may use can take it (FR-011): said over the prompt, which keeps it.
+            draftAutoRefusal = error.message
+            return false
         } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.kept {
             // Kept until its stopped workspace is up (#691 US3): shown under this prompt, and
             // the agent it makes opens once the host is up.
@@ -4816,12 +4984,12 @@ final class AppModel {
     /// **Continue in New** (#999): a session in the same folder that reads this one and
     /// carries on, on the runtime's account for new sessions, and open it.
     @discardableResult
-    func continueInNew(_ agentID: UUID) async -> Bool {
+    func continueInNew(_ agentID: UUID, onAuto: Bool = false) async -> Bool {
         var made: UUID?
         let went = await attempt(on: host(ofAgent: agentID)) {
             made = try await self.client(forAgent: agentID).call(
                 DaemonAPI.Method.agentsContinueInNew,
-                DaemonAPI.ContinueInNewRequest(agentID: agentID, requestID: UUID()),
+                DaemonAPI.ContinueInNewRequest(agentID: agentID, requestID: UUID(), auto: onAuto ? true : nil),
                 returning: UUID.self)
         }
         guard went, let made else { return false }
@@ -4922,7 +5090,9 @@ final class AppModel {
     /// Which runtime a new agent gets: the most recently active agent's runtime on this
     /// folder's host, then the kept form choice, then the first available (#264).
     var defaultRuntimeID: String? {
-        work.defaultRuntimeID(available: availableRuntimes.map(\.runtime.id), kept: draftRuntimeID, host: selectedFolderHost)
+        // Auto first: the runtime a new install opens on, where nothing was chosen before (#2658, FR-013).
+        let ids = availableRuntimes.map(\.runtime.id)
+        return work.defaultRuntimeID(available: ids.isEmpty ? ids : [LevelWords.autoID] + ids, kept: draftRuntimeID, host: selectedFolderHost)
     }
 
     /// Take something back off the queue before it goes.

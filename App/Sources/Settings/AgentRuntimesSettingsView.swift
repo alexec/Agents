@@ -34,10 +34,30 @@ struct AgentRuntimesSettingsView: View {
                 .paperListRow()
                 // Its command sandbox (064): a default every agent on it follows, or why
                 // the app has no say.
-                Section("Command sandbox") {
+                Section(LevelWords.sandboxField) {
                     SandboxDefaultRow(runtimeID: status.id, name: status.runtime.name)
                 }
                 .paperListRow()
+                // The answer to permission requests every new agent on it starts with; an
+                // agent can have its own under the prompt (#2658, FR-019).
+                if ClientPermissionSettings.supports(status.id) {
+                    Section(LevelWords.requestsField) {
+                        Picker(LevelWords.requestsField, selection: Binding(
+                            get: { model.clientPermissions.mode(for: status.id) },
+                            set: { mode in
+                                let settings = model.clientPermissions.setting(mode, for: status.id)
+                                Task { await model.setClientPermissions(settings) }
+                            })) {
+                            ForEach([ClientPermissionMode.default, .alwaysApprove], id: \.self) { mode in
+                                Text(LevelWords.requests(mode)).tag(mode)
+                            }
+                        }
+                        Text("New \(status.runtime.name) agents, workflows and server folders follow this unless one is set otherwise under the prompt.")
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                    }
+                    .paperListRow()
+                }
                 // The person's own pass-through names, a name the policy does not allow dimmed (#998).
                 let names = model.passThrough.names(for: status.id)
                 if !names.isEmpty {
@@ -109,9 +129,9 @@ private struct SandboxDefaultRow: View {
 
     private func stateWords(_ entry: SandboxCatalog.Entry?) -> String {
         if case .fixed(let state) = entry?.route {
-            return state == .none ? "No sandbox" : "Runtime controlled"
+            return LevelWords.sandbox(state == .none ? .off : .runtime)
         }
-        return "Runtime controlled"
+        return LevelWords.sandbox(.runtime)
     }
 
     private func supporting(_ text: String) -> some View {

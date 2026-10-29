@@ -43,6 +43,14 @@ If the allowance is still out when the chat tries, the chat waits again, for the
 To stop waiting, choose **Cancel** in the chat. A message you send, **Stop** or **Archive**
 also cancels it. The wait is kept over a restart of the Mac.
 
+## Continue an Auto session on the next runtime
+
+A session that started on [Auto](use-auto.md) has one more button under its head:
+**Continue on Codex**, with the runtime that Auto would pick now. Choose it to start a new
+session there, on Auto, with the same values (model, permission mode and sandbox). The new
+session reads this one with `read_session` and carries on. Auto does not do this by itself:
+a new runtime reads the work again, and that costs money.
+
 ### Workflows and helpers that nobody watches
 
 A workflow's run or a session started by a session can wait by itself, with nobody to choose

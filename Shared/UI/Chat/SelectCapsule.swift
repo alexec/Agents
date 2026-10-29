@@ -115,6 +115,8 @@ struct SelectChoice: View {
     var setBy: DaemonAPI.PolicySetBy?
     /// The description's lines, cut short with "…" past them; nil wraps it (#2659).
     var descriptionLines: Int?
+    /// A short mark after the title, such as **follows Settings** (#2658).
+    var mark: String?
     let choose: () -> Void
 
     @State private var isHovered = false
@@ -126,8 +128,13 @@ struct SelectChoice: View {
                     .appText(.code)
                     .foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(title).appText(.fine)
-                        .foregroundStyle(setBy == nil ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(title).appText(.fine)
+                            .foregroundStyle(setBy == nil ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+                        if let mark {
+                            Text(mark).appText(.fine).foregroundStyle(.tertiary)
+                        }
+                    }
                     if let setBy {
                         OrgPolicyLine(mark: setBy)
                     } else if let description, !description.isEmpty {

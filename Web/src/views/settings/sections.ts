@@ -9,6 +9,7 @@ import { BotsSection, PeopleSection } from "../People";
 import { ProvidersSection } from "../Providers";
 import { SignInSection, SignInsSection } from "../SignInSection";
 import { SecretsSection } from "../UserScope";
+import { AgentRuntimesSection } from "./AgentRuntimes";
 import { BackupsSection, ServerBackupsSection } from "./Backups";
 import { FinishedChatsSection } from "./FinishedChats";
 import { GitAccessSection } from "./GitAccess";
@@ -32,6 +33,8 @@ export interface SettingsSection {
 }
 
 export const settingsSections: readonly SettingsSection[] = [
+  // Auto's order and Mappings (#2658), kept on the Mac's host.
+  { name: "agentRuntimes", scope: "machines", order: 50, Section: AgentRuntimesSection },
   { name: "backups", scope: "machines", order: 30, Section: BackupsSection },
   // The bots that run the team's workflows, apart from the people (#2132): an admin's.
   { name: "bots", scope: "controlPlane", order: 15, Section: BotsSection, shows: (store) => store.person.value?.role === "admin" },

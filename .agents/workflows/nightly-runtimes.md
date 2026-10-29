@@ -24,7 +24,8 @@ or branch yourself: the script works in a tree of its own.
    own; never stop any other `agentsd` or `agents-control`.
 4. Run `scripts/nightly-runtimes.py report`. It opens or updates one pull request per pinned
    runtime that passed, and one issue per cause of failure (runtimes that failed for the same
-   cause share it).
+   cause share it), and one issue per runtime that no longer offers a model or mode an Auto
+   mapping uses (#2658).
 5. If you started any helper agent, archive it with `archive_session` (never delete its
    worktree).
 
