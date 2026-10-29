@@ -1603,6 +1603,11 @@ button.plain:hover { opacity: 1; }
   padding: 12px; margin: 2px 0; text-align: left; font: inherit; color: inherit;
   background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }
 button.file-card { cursor: pointer; }
+/* What an agent told the person with notify (#2805): Shared/UI/Chat/NotifiedLine.swift. */
+.notice-line { display: flex; gap: 8px; align-items: baseline; }
+.notice-bell { opacity: 0.65; }
+.notice-title { margin: 0; font-weight: 600; }
+.notice-body { margin: 2px 0 0; }
 button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, transparent); }
 .file-card-preview { display: flex; align-items: center; justify-content: center; height: 150px; overflow: hidden;
   border-radius: 6px; background: var(--paper-well); }

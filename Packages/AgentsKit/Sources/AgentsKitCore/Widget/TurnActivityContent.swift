@@ -124,7 +124,7 @@ public struct TurnActivityContent: Codable, Hashable, Sendable {
             return TurnActivityContent(phase: .approval, title: title, line: need?.headline.h3, startedAt: startedAt)
         case .elicitation?:
             return TurnActivityContent(phase: .question, title: title, line: need?.headline.h3, startedAt: startedAt)
-        case .report?, nil:
+        case .report?, .notice?, nil:
             break
         }
         switch agent.state {

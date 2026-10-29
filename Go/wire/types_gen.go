@@ -5690,7 +5690,7 @@ type Need struct {
 	Headline Headline `json:"headline"`
 }
 
-// NeedID (Attention/Need.swift): what is being answered, one key per kind.
+// NeedID (Attention/Need.swift): what is being answered, one key per kind. A notice (#2805) is what an agent told the person with `notify`: posted, never a Needs you row.
 type NeedID struct {
 	Permission *UUID `json:"permission,omitzero"`
 
@@ -5699,6 +5699,8 @@ type NeedID struct {
 	Report *NeedIDReport `json:"report,omitzero"`
 
 	GuardedChange *NeedIDGuardedChange `json:"guardedChange,omitzero"`
+
+	Notice *string `json:"notice,omitzero"`
 }
 
 type NeedIDReport struct {
@@ -5719,6 +5721,15 @@ const NeedKindPermission NeedKind = "permission"
 const NeedKindElicitation NeedKind = "elicitation"
 const NeedKindReport NeedKind = "report"
 const NeedKindGuardedChange NeedKind = "guardedChange"
+const NeedKindNotice NeedKind = "notice"
+
+// What became of a notice an agent sent with `notify` (#2805): sent to where the person is, shown here (the person was looking at that chat), muted (#2003), or held in the cool-down.
+type NoticeOutcome string
+
+const NoticeOutcomeSent NoticeOutcome = "sent"
+const NoticeOutcomeShownHere NoticeOutcome = "shownHere"
+const NoticeOutcomeMuted NoticeOutcome = "muted"
+const NoticeOutcomeCoolingDown NoticeOutcome = "coolingDown"
 
 // The OTLP exporter of the report figures (#2019, #1804 decision 4), set on agents-control by OTEL_EXPORTER_OTLP_ENDPOINT, as this copy runs it: where it sends, the last send and the last failure.
 type OTLPExport struct {
@@ -8262,6 +8273,17 @@ type SentBranch struct {
 	Commit string `json:"commit"`
 }
 
+// What an agent told the person with `notify` (#2805), on the record where it called it: the notification's words, what became of it, and, in the cool-down, when the next can go.
+type SentNotice struct {
+	Title string `json:"title"`
+
+	Body *string `json:"body,omitzero"`
+
+	Outcome NoticeOutcome `json:"outcome"`
+
+	NextAt *Date `json:"nextAt,omitzero"`
+}
+
 type ServedRequest struct {
 	Kind ServedRequestKind `json:"kind"`
 
@@ -9512,6 +9534,8 @@ type TranscriptEntryKind struct {
 
 	FileShown *TranscriptEntryKindFileShown `json:"fileShown,omitzero"`
 
+	Notified *TranscriptEntryKindNotified `json:"notified,omitzero"`
+
 	// Unrecognised is a case this build does not know, written back as it was read.
 	Unrecognised JSONValue `json:"-"`
 }
@@ -9529,7 +9553,7 @@ func (v TranscriptEntryKind) MarshalJSON() ([]byte, error) {
 func (v *TranscriptEntryKind) UnmarshalJSON(b []byte) error {
 	type plain TranscriptEntryKind
 	var p plain
-	if err := json.Unmarshal(b, &p); err != nil || (p.UserMessage == nil && p.AgentMessage == nil && p.AgentThought == nil && p.ToolCall == nil && p.ToolCallUpdate == nil && p.PlanUpdated == nil && p.UsageRecorded == nil && p.ServedRequest == nil && p.ElicitationAsked == nil && p.ElicitationAnswered == nil && p.Compaction == nil && p.Notice == nil && p.PermissionAsked == nil && p.PermissionAnswered == nil && p.OptionChanged == nil && p.StateChanged == nil && p.Background == nil && p.WorkReported == nil && p.RuntimeNote == nil && p.PoolSwitch == nil && p.SandboxFailure == nil && p.Handoff == nil && p.SettingsChanged == nil && p.AppView == nil && p.FileShown == nil) {
+	if err := json.Unmarshal(b, &p); err != nil || (p.UserMessage == nil && p.AgentMessage == nil && p.AgentThought == nil && p.ToolCall == nil && p.ToolCallUpdate == nil && p.PlanUpdated == nil && p.UsageRecorded == nil && p.ServedRequest == nil && p.ElicitationAsked == nil && p.ElicitationAnswered == nil && p.Compaction == nil && p.Notice == nil && p.PermissionAsked == nil && p.PermissionAnswered == nil && p.OptionChanged == nil && p.StateChanged == nil && p.Background == nil && p.WorkReported == nil && p.RuntimeNote == nil && p.PoolSwitch == nil && p.SandboxFailure == nil && p.Handoff == nil && p.SettingsChanged == nil && p.AppView == nil && p.FileShown == nil && p.Notified == nil) {
 		*v = TranscriptEntryKind{Unrecognised: append(JSONValue(nil), b...)}
 		return nil
 	}
@@ -9663,6 +9687,10 @@ type TranscriptEntryKindAppView struct {
 
 type TranscriptEntryKindFileShown struct {
 	Value ShownFile `json:"_0"`
+}
+
+type TranscriptEntryKindNotified struct {
+	Value SentNotice `json:"_0"`
 }
 
 type TranscriptPage struct {

@@ -15,8 +15,11 @@ public enum NeedID: Hashable, Sendable, Codable {
     /// A change to one of the app's own files in a folder's `.agents`, waiting for Keep
     /// or Undo (#531): the folder and the file, since there is one question per file.
     case guardedChange(URL, String)
+    /// What an agent told the person with `notify` (#2805): the host's id for it. Posted
+    /// as a need is, but asks nothing, so never a Needs you row or a widget's.
+    case notice(String)
 
-    private enum CodingKeys: String, CodingKey { case permission, elicitation, report, guardedChange }
+    private enum CodingKeys: String, CodingKey { case permission, elicitation, report, guardedChange, notice }
     private struct Report: Codable { var agentID: UUID; var at: Date }
     private struct Guarded: Codable { var folder: URL; var path: String }
 
@@ -32,6 +35,8 @@ public enum NeedID: Hashable, Sendable, Codable {
         } else if c.contains(.guardedChange) {
             let g = try c.decode(Guarded.self, forKey: .guardedChange)
             self = .guardedChange(g.folder, g.path)
+        } else if c.contains(.notice) {
+            self = .notice(try c.decode(String.self, forKey: .notice))
         } else {
             throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
                                                     debugDescription: "a need id names what is asked"))
@@ -46,6 +51,7 @@ public enum NeedID: Hashable, Sendable, Codable {
         case .report(let agentID, let at): try c.encode(Report(agentID: agentID, at: at), forKey: .report)
         case .guardedChange(let folder, let path):
             try c.encode(Guarded(folder: folder, path: path), forKey: .guardedChange)
+        case .notice(let id): try c.encode(id, forKey: .notice)
         }
     }
 
@@ -56,7 +62,14 @@ public enum NeedID: Hashable, Sendable, Codable {
         case .elicitation(let id): return "elicitation:\(id.uuidString)"
         case .report(let agentID, let at): return "report:\(agentID.uuidString):\(at.timeIntervalSinceReferenceDate)"
         case .guardedChange(let folder, let path): return "guarded:\(folder.path):\(path)"
+        case .notice(let id): return "notice:\(id)"
         }
+    }
+
+    /// A notice (#2805): posted, never a Needs you row or a widget's.
+    public var isNotice: Bool {
+        if case .notice = self { return true }
+        return false
     }
 
     /// The folder a guarded change's token names (#531), for a banner opened with no
@@ -86,6 +99,8 @@ public enum NeedID: Hashable, Sendable, Codable {
 public struct Need: Hashable, Sendable, Codable, Identifiable {
     public enum Kind: String, Hashable, Sendable, Codable {
         case permission, elicitation, report, guardedChange
+        /// What an agent told the person (#2805): posted, never a Needs you row.
+        case notice
     }
 
     public var id: NeedID

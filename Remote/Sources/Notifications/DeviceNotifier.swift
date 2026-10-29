@@ -69,7 +69,8 @@ final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
         let live = Set(pending.needs.map(\.id.token))
         let delivered = await center.deliveredNotifications().map(\.request.identifier)
         let stale = delivered.filter { !live.contains($0) }
-            .filter { $0.hasPrefix("permission:") || $0.hasPrefix("elicitation:") || $0.hasPrefix("report:") }
+            .filter { $0.hasPrefix("permission:") || $0.hasPrefix("elicitation:") || $0.hasPrefix("report:")
+                || $0.hasPrefix("notice:") }
         if !stale.isEmpty { center.removeDeliveredNotifications(withIdentifiers: stale) }
         showing = showing.filter { live.contains($0.key) }
         for delivery in pending.deliveries where delivery.to == me {
