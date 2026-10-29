@@ -124,6 +124,20 @@ export function byArchived(a: Agent, b: Agent): number {
   return (b.archivedAt ?? b.lastActivityAt) - (a.archivedAt ?? a.lastActivityAt) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 }
 
+/** How long ago a session may have been archived and still be Recently archived (#2868), in seconds. */
+export const recentArchivedWithin = 24 * 60 * 60;
+
+/**
+ * SidebarFolderFold.recentArchived(now:): the first `shown` of the archived, newest first, of those
+ * archived in the last 24 hours (#2868). An older one is not recent, so none is shown in its place.
+ */
+export function recentlyArchived(archived: readonly Agent[], shown: number, now: number): Agent[] {
+  const since = now - recentArchivedWithin;
+  const recent = archived.slice(0, shown);
+  const old = recent.findIndex((a) => (a.archivedAt ?? a.lastActivityAt) < since);
+  return old < 0 ? recent : recent.slice(0, old);
+}
+
 /**
  * FolderShelf.byStart: newest started first, then by id (#182). A working agent's activity
  * changes with every line, so a live group ordered by it shuffled; when it started never changes.

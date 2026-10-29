@@ -19,7 +19,7 @@ import { useEffect } from "preact/hooks";
 import { ProjectAgentConfigModal } from "./AgentConfigEditor";
 import { ProjectModal } from "./ProjectPicker";
 import { actDoing, recentArchivedShown, type Store } from "../model/store";
-import { byStart, folderKey, folderPath as agentFolderPath, showsUnread } from "../model/groups";
+import { byStart, folderKey, recentlyArchived, folderPath as agentFolderPath, showsUnread } from "../model/groups";
 import { folds } from "../model/folds";
 import { smartGroupsOn } from "../model/smartGroups";
 import { macHostNoticeDetail, macHostNoticeTitle } from "../model/macHostNotice";
@@ -30,7 +30,7 @@ import { keepsInUnread, newSessionFolder, pinnedSessions, pinnedWorkflows, folde
   smartAgents, smartApprovals, smartRows, smartTitles, withKept, type FolderKey, type SmartRow } from "../model/sidebar";
 import { updatedLine } from "../model/updated";
 import { namedRelative, workflowSummary } from "../model/workflows";
-import { fromWireDate } from "../protocol/dates";
+import { fromWireDate, toWireDate } from "../protocol/dates";
 import type { Agent, AgentsExportRequest, ControlMachine, FolderSummary, WorkflowSummary } from "../protocol/generated";
 import { alone, aloneURL, go, route, showAll, type ActivityPage } from "../route";
 import { onThisMac } from "../place";
@@ -543,7 +543,7 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
   const keptAgent = keptID ? live.find((a) => a.id === keptID) : undefined;
   const kept = keptAgent && keepsInUnread(keptAgent, pins, on) ? keptAgent.id : undefined;
   const sessions = !unfolded ? [] : folderSessions(live, pins, parsed, kept, on);
-  const recentArchived = !parsed ? view.archived.slice(0, recentArchivedShown) : [];
+  const recentArchived = !parsed ? recentlyArchived(view.archived, recentArchivedShown, toWireDate(new Date())) : [];
   const archived = !unfolded || !parsed ? [] : view.archived.filter((a) => queryMatches(parsed, a));
   const allWorkflows = (unfolded ? store.folderWorkflows(host.id, folder) : [])
     .filter(workflowMatches(store, host.id, parsed))
