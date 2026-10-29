@@ -72,9 +72,9 @@ packages:
   # the grammars are seventeen megabytes it has no use for.
   CodeText:
     path: Packages/CodeText
-  # The voice of voice mode (#2322): Paradee-8M through Core ML. The two apps link this;
-  # AgentsKitCore does not, so `swift test` never resolves it. Exact, because Paradee is a
-  # beta conversion and its API may change in any release.
+  # The voice of voice mode (#2322): Kokoro-82M through Core ML (was Paradee-8M). The two
+  # apps link this; AgentsKitCore does not, so `swift test` never resolves it. Exact,
+  # because FluidAudio's Kokoro build is a beta conversion and its API may change in any release.
   FluidAudio:
     url: https://github.com/FluidInference/FluidAudio.git
     exactVersion: 0.17.7
@@ -141,8 +141,8 @@ targets:
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
         NSHumanReadableCopyright: © 2026 Alex Collins
         NSMicrophoneUsageDescription: >-
-          So you can say what you want done instead of typing it, and, when you turn it
-          on, so this Mac can listen for "Hey Agents". No audio is kept.
+          So you can say what you want done instead of typing it, and talk to your
+          agents in voice mode. No audio is kept.
         NSSpeechRecognitionUsageDescription: >-
           So what you say becomes the words in the prompt. It is recognised on this Mac
           where this Mac can do it.

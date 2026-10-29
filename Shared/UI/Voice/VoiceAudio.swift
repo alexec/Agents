@@ -17,6 +17,11 @@ final class VoiceAudio {
     private(set) var cancelsEcho = false
     /// Off in a walk: no microphone, so nothing to ask for and nothing to cancel.
     var listens = true
+    /// On the Mac, voice processing is set up once and kept between uses: switching it on
+    /// takes about a second, nearly all of turning voice mode on, and Alex wants it to
+    /// listen within 100 ms of the press (2026-10-29). Set up, it opens no microphone: the
+    /// microphone is on only while the engine runs.
+    private var isPrepared = false
 
     /// The route and the microphone's format, for the log: no words.
     var route: String {
@@ -34,9 +39,36 @@ final class VoiceAudio {
         return parts.joined(separator: ", ")
     }
 
+    /// Voice processing switched on ahead of the press, on the Mac (`isPrepared`). Does
+    /// nothing in a walk, or when it is set up already; a failure is left for `open`.
+    func prepare() {
+        #if os(macOS)
+        guard listens, !isPrepared, !isOpen else { return }
+        do {
+            try engine.inputNode.setVoiceProcessingEnabled(true)
+            engine.inputNode.voiceProcessingOtherAudioDuckingConfiguration =
+                AVAudioVoiceProcessingOtherAudioDuckingConfiguration(enableAdvancedDucking: false, duckingLevel: .min)
+            cancelsEcho = true
+            try joinOutput()
+            // Its resources ahead too: that is the rest of the wait, at the first start.
+            engine.prepare()
+            isPrepared = true
+        } catch {
+            try? engine.inputNode.setVoiceProcessingEnabled(false)
+            cancelsEcho = false
+        }
+        #endif
+    }
+
     /// Opens the audio route for talking and listening. Throws when there is none.
     func open() throws {
         guard !isOpen else { return }
+        #if os(macOS)
+        if isPrepared, listens {
+            isOpen = true
+            return
+        }
+        #endif
         #if os(iOS)
         // Speaker and microphone at once. The silent switch does not mute it, since the
         // person asked to hear the reply, and other sound ducks under it.
@@ -74,6 +106,9 @@ final class VoiceAudio {
                 try joinOutput()
             }
         }
+        #if os(macOS)
+        isPrepared = cancelsEcho
+        #endif
         isOpen = true
     }
 
@@ -104,10 +139,13 @@ final class VoiceAudio {
     func close() {
         guard isOpen else { return }
         engine.inputNode.removeTap(onBus: 0)
-        if engine.isRunning { engine.stop() }
+        // Paused keeps what the engine prepared, so the next start is quick; stopped lets it go.
+        if engine.isRunning { if isPrepared { engine.pause() } else { engine.stop() } }
+        isOpen = false
+        // Kept on the Mac for the next time (`isPrepared`): stopped, it hears nothing.
+        guard !isPrepared else { return }
         if cancelsEcho { try? engine.inputNode.setVoiceProcessingEnabled(false) }
         cancelsEcho = false
-        isOpen = false
         #if os(iOS)
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         #endif

@@ -9,11 +9,11 @@ import Foundation
 /// microphone can leave it out (#2375).
 @MainActor
 final class VoiceSpeaker {
-    private let voice: ParadeeVoice
+    private let voice: KokoroVoice
     private let audio: VoiceAudio
     private var engine: AVAudioEngine { audio.engine }
     private let player = AVAudioPlayerNode()
-    private let format = AVAudioFormat(standardFormatWithSampleRate: ParadeeVoice.sampleRate, channels: 1)
+    private let format = AVAudioFormat(standardFormatWithSampleRate: KokoroVoice.sampleRate, channels: 1)
     private var run = 0
     private var isConnected = false
     /// Made and played in silence: a walk on the person's Mac says nothing out loud.
@@ -21,7 +21,7 @@ final class VoiceSpeaker {
         didSet { engine.mainMixerNode.outputVolume = isMuted ? 0 : 1 }
     }
 
-    init(voice: ParadeeVoice, audio: VoiceAudio) {
+    init(voice: KokoroVoice, audio: VoiceAudio) {
         self.voice = voice
         self.audio = audio
         engine.attach(player)

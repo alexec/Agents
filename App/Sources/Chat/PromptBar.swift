@@ -126,47 +126,39 @@ struct PromptBar: View {
 
     var body: some View {
         GlassEffectContainer(spacing: 12) {
-            // Voice mode (#2322) is the whole bar, field and pills: what it hears and says,
-            // and Stop to end it (#2375, #2517).
-            if VoiceMode.shared.isOn(in: agent?.id) {
-                VoiceModeBar()
-                    // Left before its first words: a new session's voice mode ends (#2388).
-                    .onDisappear { if agent == nil { VoiceMode.shared.leave(nil) } }
-            } else {
-                VStack(alignment: .leading, spacing: 12) {
-                    whereAndWhat
-                    atItsLimit
-                    startingOnOut
-                    if draftLostSomething {
-                        Text(PromptWords.draftLostSomething)
-                            .appText(.fine)
-                            .foregroundStyle(.secondary)
-                    }
-                    if isCompleting {
-                        CommandList(commands: matchingCommands, selected: selectedCommand,
-                                    choose: accept)
-                            .transition(.opacity)
-                    }
-                    if isMentioning {
-                        MentionList(mentions: mentions, selected: selectedMention, choose: accept)
-                            .transition(.opacity)
-                    }
-                    if agent == nil, let refusal = model.draftSandboxRefusal {
-                        sandboxRefusal(refusal)
-                    }
-                    if agent == nil, let reasons = model.draftAutoRefusal {
-                        autoRefusal(reasons)
-                    }
-                    // On its way (#87): a start can take seconds, making a worktree and a
-                    // runtime, and a send to a slow host as long.
-                    if agent == nil, model.isStarting {
-                        Telling(host: recipient, doing: AgentState.startingLabel)
-                    } else if agent != nil, sending > 0, sendingIsSlow {
-                        Telling(host: recipient, doing: "Sending")
-                    }
-                    field
-                    options
+            VStack(alignment: .leading, spacing: 12) {
+                whereAndWhat
+                atItsLimit
+                startingOnOut
+                if draftLostSomething {
+                    Text(PromptWords.draftLostSomething)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
                 }
+                if isCompleting {
+                    CommandList(commands: matchingCommands, selected: selectedCommand,
+                                choose: accept)
+                        .transition(.opacity)
+                }
+                if isMentioning {
+                    MentionList(mentions: mentions, selected: selectedMention, choose: accept)
+                        .transition(.opacity)
+                }
+                if agent == nil, let refusal = model.draftSandboxRefusal {
+                    sandboxRefusal(refusal)
+                }
+                if agent == nil, let reasons = model.draftAutoRefusal {
+                    autoRefusal(reasons)
+                }
+                // On its way (#87): a start can take seconds, making a worktree and a
+                // runtime, and a send to a slow host as long.
+                if agent == nil, model.isStarting {
+                    Telling(host: recipient, doing: AgentState.startingLabel)
+                } else if agent != nil, sending > 0, sendingIsSlow {
+                    Telling(host: recipient, doing: "Sending")
+                }
+                field
+                options
             }
         }
         // A send is usually back before anyone could read a word; the spinner in the
@@ -478,6 +470,9 @@ struct PromptBar: View {
 
     // MARK: What you want done
 
+    /// Voice mode is on in this chat, or in this new session (#2375).
+    private var voiceIsOn: Bool { VoiceMode.shared.isOn(in: agent?.id) }
+
     private var field: some View {
         VStack(alignment: .leading, spacing: 8) {
             if !attachments.isEmpty {
@@ -485,111 +480,120 @@ struct PromptBar: View {
                                 refusal: { $0.refusal(from: promptCapabilities) },
                                 remove: { attachment in attachments.removeAll { $0.id == attachment.id } })
             }
-            TextField(placeholder, text: $text, selection: $selection, axis: .vertical)
-                .textFieldStyle(.plain)
-                .appText(.reading)
-                .lineLimit(2...12)
-                .overlay(alignment: .topLeading) { HeardUnderline(dictation: dictation, text: text) }
-                .focused($focused)
-                .onChange(of: focused) { presence?(focused, text.count) }
-                // ⌘V attaches pictures and files too, and still pastes the words (#396).
-                .modifier(PastesIntoPrompt(isFocused: focused, attachFile: attach,
-                                           attachPicture: attachPicture))
-                // Held, words and all, while they start an agent (#87).
-                .disabled(agent == nil && model.isStarting)
-                // Return sends. Shift-Return and Option-Return break the line (#377,
-                // #1514), put in here: the field editor takes Shift-Return for Return.
-                .onKeyPress(.return, phases: .down) { press in
-                    guard PromptReturn(option: press.modifiers.contains(.option),
-                                       shift: press.modifiers.contains(.shift)) == .send else {
-                        guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView else { return .ignored }
-                        editor.insertNewlineIgnoringFieldEditor(nil)
+            // Voice mode (#2322) takes only the field's place: the pills stay, to change an
+            // option while it listens (Alex, 2026-10-29).
+            if voiceIsOn {
+                VoiceSpeechPrompt()
+                    .frame(minHeight: 44, alignment: .topLeading)
+                    // Left before its first words: a new session's voice mode ends (#2388).
+                    .onDisappear { if agent == nil { VoiceMode.shared.leave(nil) } }
+            } else {
+                TextField(placeholder, text: $text, selection: $selection, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .appText(.reading)
+                    .lineLimit(2...12)
+                    .overlay(alignment: .topLeading) { HeardUnderline(dictation: dictation, text: text) }
+                    .focused($focused)
+                    .onChange(of: focused) { presence?(focused, text.count) }
+                    // ⌘V attaches pictures and files too, and still pastes the words (#396).
+                    .modifier(PastesIntoPrompt(isFocused: focused, attachFile: attach,
+                                               attachPicture: attachPicture))
+                    // Held, words and all, while they start an agent (#87).
+                    .disabled(agent == nil && model.isStarting)
+                    // Return sends. Shift-Return and Option-Return break the line (#377,
+                    // #1514), put in here: the field editor takes Shift-Return for Return.
+                    .onKeyPress(.return, phases: .down) { press in
+                        guard PromptReturn(option: press.modifiers.contains(.option),
+                                           shift: press.modifiers.contains(.shift)) == .send else {
+                            guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView else { return .ignored }
+                            editor.insertNewlineIgnoringFieldEditor(nil)
+                            return .handled
+                        }
+                        // While the list is up, Return takes the command rather than
+                        // sending a half-typed one.
+                        if isCompleting || isMentioning {
+                            acceptSelected()
+                        } else {
+                            send()
+                        }
                         return .handled
                     }
-                    // While the list is up, Return takes the command rather than
-                    // sending a half-typed one.
-                    if isCompleting || isMentioning {
-                        acceptSelected()
-                    } else {
-                        send()
-                    }
-                    return .handled
-                }
-                .onKeyPress(.tab) {
-                    if isCompleting || isMentioning {
-                        acceptSelected()
+                    .onKeyPress(.tab) {
+                        if isCompleting || isMentioning {
+                            acceptSelected()
+                            return .handled
+                        }
+                        // Tab takes what is being offered, the way it does everywhere else
+                        // something is written ahead of you.
+                        guard suggestion != nil else { return .ignored }
+                        takeSuggestion()
                         return .handled
                     }
-                    // Tab takes what is being offered, the way it does everywhere else
-                    // something is written ahead of you.
-                    guard suggestion != nil else { return .ignored }
-                    takeSuggestion()
-                    return .handled
-                }
-                .onKeyPress(.downArrow) {
-                    if isCompleting {
-                        selectedCommand = min(selectedCommand + 1, matchingCommands.count - 1)
+                    .onKeyPress(.downArrow) {
+                        if isCompleting {
+                            selectedCommand = min(selectedCommand + 1, matchingCommands.count - 1)
+                            return .handled
+                        }
+                        if isMentioning {
+                            selectedMention = min(selectedMention + 1, mentions.count - 1)
+                            return .handled
+                        }
+                        // The prompts sent before, as a terminal gives back its commands (#1551).
+                        if let step = PromptHistory.recall(.down, text: text, sent: sentPrompts, at: recalled) {
+                            text = step.text
+                            recalled = step.at
+                            return .handled
+                        }
+                        return .ignored
+                    }
+                    .onKeyPress(.upArrow) {
+                        if isCompleting {
+                            selectedCommand = max(selectedCommand - 1, 0)
+                            return .handled
+                        }
+                        if isMentioning {
+                            selectedMention = max(selectedMention - 1, 0)
+                            return .handled
+                        }
+                        // The prompts sent before, as a terminal gives back its commands (#1551).
+                        if let step = PromptHistory.recall(.up, text: text, sent: sentPrompts, at: recalled) {
+                            text = step.text
+                            recalled = step.at
+                            return .handled
+                        }
+                        return .ignored
+                    }
+                    .onKeyPress(.escape) {
+                        if isCompleting {
+                            dismissedCommandTerm = commandQuery?.term
+                            return .handled
+                        }
+                        if isMentioning {
+                            dismissedMentionTerm = mentionQuery?.term
+                            return .handled
+                        }
+                        // Put it away, and it stays away until the next turn ends.
+                        guard suggestion != nil else { return .ignored }
+                        dismissedSuggestions = true
                         return .handled
                     }
-                    if isMentioning {
-                        selectedMention = min(selectedMention + 1, mentions.count - 1)
-                        return .handled
+                    .onChange(of: text) {
+                        selectedCommand = 0
+                        selectedMention = 0
+                        if dismissedCommandTerm != commandQuery?.term { dismissedCommandTerm = nil }
+                        if dismissedMentionTerm != mentionQuery?.term { dismissedMentionTerm = nil }
+                        updateMentions()
+                        presence?(focused, text.count)
+                        // Typed while dictating: theirs, and never written over (#427).
+                        dictation.edited(text)
+                        // Typing is a prompt coming (#183).
+                        if !text.isEmpty, let id = agent?.id { Task { await model.prewarm(id, .typing) } }
                     }
-                    // The prompts sent before, as a terminal gives back its commands (#1551).
-                    if let step = PromptHistory.recall(.down, text: text, sent: sentPrompts, at: recalled) {
-                        text = step.text
-                        recalled = step.at
-                        return .handled
+                    .onChange(of: selection) {
+                        if let range = DictationCursor.range(of: selection, in: text) { dictation.selected(range) }
                     }
-                    return .ignored
-                }
-                .onKeyPress(.upArrow) {
-                    if isCompleting {
-                        selectedCommand = max(selectedCommand - 1, 0)
-                        return .handled
-                    }
-                    if isMentioning {
-                        selectedMention = max(selectedMention - 1, 0)
-                        return .handled
-                    }
-                    // The prompts sent before, as a terminal gives back its commands (#1551).
-                    if let step = PromptHistory.recall(.up, text: text, sent: sentPrompts, at: recalled) {
-                        text = step.text
-                        recalled = step.at
-                        return .handled
-                    }
-                    return .ignored
-                }
-                .onKeyPress(.escape) {
-                    if isCompleting {
-                        dismissedCommandTerm = commandQuery?.term
-                        return .handled
-                    }
-                    if isMentioning {
-                        dismissedMentionTerm = mentionQuery?.term
-                        return .handled
-                    }
-                    // Put it away, and it stays away until the next turn ends.
-                    guard suggestion != nil else { return .ignored }
-                    dismissedSuggestions = true
-                    return .handled
-                }
-                .onChange(of: text) {
-                    selectedCommand = 0
-                    selectedMention = 0
-                    if dismissedCommandTerm != commandQuery?.term { dismissedCommandTerm = nil }
-                    if dismissedMentionTerm != mentionQuery?.term { dismissedMentionTerm = nil }
-                    updateMentions()
-                    presence?(focused, text.count)
-                    // Typed while dictating: theirs, and never written over (#427).
-                    dictation.edited(text)
-                    // Typing is a prompt coming (#183).
-                    if !text.isEmpty, let id = agent?.id { Task { await model.prewarm(id, .typing) } }
-                }
-                .onChange(of: selection) {
-                    if let range = DictationCursor.range(of: selection, in: text) { dictation.selected(range) }
-                }
-                .frame(minHeight: 44, alignment: .topLeading)
+                    .frame(minHeight: 44, alignment: .topLeading)
+            }
 
             HStack(spacing: 8) {
                 Button(action: chooseAttachment) {
@@ -606,10 +610,12 @@ struct PromptBar: View {
                 // Dictate and voice mode sit with send, on the right (#2634).
                 PushToTalkButton(tap: toggleDictation, begin: beginDictation, end: finishPushToTalk,
                                  cancel: dictation.stop) {
-                    Image(systemName: dictation.isListening ? "waveform" : "microphone")
+                    // The microphone, blue while it listens: the waveform is voice mode's (Alex, 2026-10-29).
+                    Image(systemName: "microphone")
                         .appText(.reading).fontWeight(.semibold)
+                        .foregroundStyle(dictation.isListening ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
                         .frame(width: 22, height: 22)
-                        .symbolEffect(.variableColor, isActive: dictation.isListening)
+                        .symbolEffect(.variableColor.iterative, isActive: dictation.isListening)
                 }
                 .buttonStyle(.paper)
                 .buttonBorderShape(.circle)
@@ -629,12 +635,15 @@ struct PromptBar: View {
 
                 // Voice mode (#2322), while Settings ▸ Appearance has it on: in this chat, or in a
                 // new session that its first words start (#2375).
-                // A session's own window does not take "Hey Agents" (#2420): the main window does.
-                VoiceModeButton(agentID: agent?.id, vocabulary: { speechSeeds }, takesWake: popped == nil, send: sendSpoken)
+                VoiceModeButton(agentID: agent?.id, vocabulary: { speechSeeds }, send: sendSpoken)
+
+                // Voice mode's Stop is where send and stop are (Alex, 2026-10-29).
 
                 // While it works and nothing is typed, send is stop. Type and it is send
                 // again, queueing what is typed for when the turn ends.
-                if let agent, model.canStop(agent), text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                if voiceIsOn {
+                    VoiceStopButton()
+                } else if let agent, model.canStop(agent), text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                    sending == 0 {
                     let acting = model.acting(agent.id)
                     Button {

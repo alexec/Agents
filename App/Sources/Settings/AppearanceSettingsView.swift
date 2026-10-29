@@ -108,7 +108,7 @@ struct MacSettingsView: View {
     }
 }
 
-/// Settings ▸ Appearance: the theme and voice mode (#2322), each kept on this Mac only. Show
+/// Settings ▸ Appearance: the theme, kept on this Mac only. Voice mode has its own pane. Show
 /// Thoughts (#1725) is in the View menu, next to the chat (#2383).
 /// The Dock icon always shows the agents' mood (#2156).
 struct AppearanceSettingsView: View {
@@ -126,6 +126,5 @@ struct AppearanceSettingsView: View {
                 .foregroundStyle(.secondary)
         }
         .paperListRow()
-        VoiceSettingsSection(header: "Voice")
     }
 }

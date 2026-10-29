@@ -1333,8 +1333,11 @@ final class RemoteModel {
     /// folder cannot take a new agent. Refused by the Mac, its sentence is shown as it
     /// is. Lost on the way back, nothing is assumed: the start is kept, and settled by
     /// its request id once the Mac is heard from again.
+    /// `voice`: said in voice mode, so its replies are spoken, as on the Mac; `started` is
+    /// told the new session's id (Alex, 2026-10-29).
     func startAgent(prompt: String, attachments: [Attachment] = [], labels: [String] = [],
-                    in folder: URL, page: UUID) async -> Bool {
+                    in folder: URL, page: UUID, voice: Bool = false,
+                    started: (UUID) -> Void = { _ in }) async -> Bool {
         let words = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !words.isEmpty, !isStarting else { return false }
         // On screen but not held (#1044): held again, and said, rather than a Send that
@@ -1374,11 +1377,12 @@ final class RemoteModel {
             additionalDirectories: startFolders, worktree: startWorktree, requestID: retrying ?? UUID(), sandbox: startSandbox,
             labels: labels,
             accountID: startAccountChoices?.sent(startAccountID),
+            voice: voice ? true : nil,
             levels: Levels(model: startLevels.model, permission: startLevels.permission,
                            permissionRequests: startClientPermission))
         startingPage = page
         defer { startingPage = nil }
-        return await send(start: request)
+        return await send(start: request, told: started)
     }
 
     func setLabels(on id: UUID, add: [String] = [], remove: [String] = []) async -> Bool {
@@ -1407,7 +1411,7 @@ final class RemoteModel {
         labelVocabularies[folder] = values
     }
 
-    private func send(start request: DaemonAPI.StartRequest) async -> Bool {
+    private func send(start request: DaemonAPI.StartRequest, told: (UUID) -> Void = { _ in }) async -> Bool {
         isStarting = true
         defer { isStarting = false }
         startRefusal = nil
@@ -1429,6 +1433,7 @@ final class RemoteModel {
             // Taken by the start. One that answered after the Send (#1171) is let go as the
             // page closes.
             if startDraftID == request.draftID { startDraftID = nil }
+            told(id)
             await started(id, in: request.cwd)
             return true
         } catch let refused as JSONRPCError {

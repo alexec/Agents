@@ -15,10 +15,12 @@ struct DictateButton: View {
 
     var body: some View {
         PushToTalkButton(tap: toggle, begin: beginPushToTalk, end: finishPushToTalk, cancel: dictation.stop) {
-            Image(systemName: dictation.isListening ? "waveform" : "microphone")
+            // The microphone, blue while it listens: the waveform is voice mode's (Alex, 2026-10-29).
+            Image(systemName: "microphone")
                 .appText(.reading).fontWeight(.semibold)
+                .foregroundStyle(dictation.isListening ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
                 .frame(width: 22, height: 22)
-                .symbolEffect(.variableColor, isActive: dictation.isListening)
+                .symbolEffect(.variableColor.iterative, isActive: dictation.isListening)
         }
         .buttonStyle(.paper)
         .buttonBorderShape(.circle)
