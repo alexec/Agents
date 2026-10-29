@@ -181,6 +181,7 @@ struct SettingsWindow: View {
         switch pane.wrappedValue {
         case .appearance: FormColumn { Form { AppearanceSettingsView() }.paperForm() }
         case .sidebar: FormColumn { Form { SidebarSettingsSection() }.paperForm() }
+        case .notifications: FormColumn { Form { NotificationLimitsSection() }.paperForm() }
         case .account: FormColumn { AccountSettingsView() }
         case .signIns:
             FormColumn {
@@ -253,7 +254,7 @@ extension SettingsScope {
         switch self {
         // How this app draws: Sidebar is kept on the Mac's host so every client draws the
         // same (#1033, #2079), but its subject is the app (#2157).
-        case .thisApp: [.appearance, .sidebar]
+        case .thisApp: [.appearance, .sidebar, .notifications]
         case .machines: [.machines, .runtimes, .agentConfiguration, .spending, .resources, .secrets]
         // The person's account first, shown with no control plane too (#2157).
         case .controlPlane: [.account, .signIns, .people, .bots, .groups, .channels, .signIn, .policy, .providers, .clients, .controlPlane]
@@ -265,6 +266,8 @@ enum SettingsPane: String, Hashable, CaseIterable {
     /// Was General (#846), split in four: its raw value is what a window left open on it kept.
     case appearance = "general"
     case sidebar, account
+    /// How many notices agents may send (#2805), kept on the Mac's host.
+    case notifications
     /// Every machine, and this Mac's own settings (#1759). Was the Mac pane: its raw value is
     /// what a window left open on it kept.
     case machines = "mac"
@@ -302,7 +305,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
     var isThisMacs: Bool {
         switch self {
         case .runtimes, .agentConfiguration, .spending, .resources: true
-        case .appearance, .sidebar, .account, .machines, .controlPlane, .providers, .clients, .people, .bots, .groups,
+        case .appearance, .sidebar, .notifications, .account, .machines, .controlPlane, .providers, .clients, .people, .bots, .groups,
              .channels, .signIn, .signIns, .secrets, .policy: false
         }
     }
@@ -318,6 +321,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         switch self {
         case .appearance: "Appearance"
         case .sidebar: "Sidebar"
+        case .notifications: "Notifications"
         case .account: "Account"
         case .machines: "Machines"
         case .runtimes: "Agent Runtimes"
@@ -342,6 +346,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         switch self {
         case .appearance: "paintbrush"
         case .sidebar: "sidebar.left"
+        case .notifications: "bell"
         case .account: "person.crop.circle"
         case .machines: "desktopcomputer"
         case .runtimes: "cpu"

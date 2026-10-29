@@ -26,6 +26,10 @@ public enum AppTool {
     /// What one passes to this becomes the file open in the sidebar.
     public static let showFile = "show_file"
 
+    /// Tell the person something happened, with a notification that opens the chat
+    /// (#2805). It asks nothing; the chat keeps a line of what was sent.
+    public static let notify = "notify"
+
     /// And this one reads and writes the folder's standing arrangements: the prompts
     /// that run themselves when something happens.
     public static let manageWorkflows = "manage_workflows"
@@ -162,7 +166,7 @@ public enum AppTool {
 
     /// Every tool the app's MCP server serves.
     public static let all: [String] = [
-        finishTurn, showFile, manageWorkflows, askQuestion, suggestNextPrompt, hangUp, startSession, stopSession, archiveSession,
+        finishTurn, showFile, notify, manageWorkflows, askQuestion, suggestNextPrompt, hangUp, startSession, stopSession, archiveSession,
         leaseResource, releaseResource, listResources, waitForEvent, waitForAgents, checkAgain,
         cancelWait, listSessions, readSession,
         setSessionLabels, moveWorktree, messageSession, cancelMessage,

@@ -189,6 +189,31 @@
     "title": "Suggest the next prompt"
   },
   {
+    "description": "Tell the person that something happened, with a notification, when nothing is to be answered: a deploy finished, a long test passed, a run you were asked to watch failed. It goes to the device the person is at, and a tap opens this conversation. It asks nothing, puts nothing in Needs you, and does not end your turn; to ask, use ask_question.\n\nThe person's attention is limited, so every agent shares a few notices: a short burst, then one comes back each cool-down. When none is left, nothing is sent and you are told when the next can go; nothing is queued, so decide whether it is still worth telling then. A notice is not sent while the person is looking at this conversation, nor when they muted it. Keep the title short, and say what happened, not what you will do.",
+    "inputSchema": {
+      "properties": {
+        "body": {
+          "description": "One or two sentences under the title, if the title is not enough.",
+          "type": "string"
+        },
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        },
+        "title": {
+          "description": "What happened, in a few words, e.g. \"The deploy finished\".",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "type": "object"
+    },
+    "name": "notify",
+    "title": "Tell the person something happened"
+  },
+  {
     "description": "In voice mode, when the person says they are done talking (\"that's all\", \"bye\", \"thanks, I'm done\"), say a short goodbye in your reply and call this: voice mode ends once the goodbye is said. Only in voice mode, and only when the person is done.",
     "inputSchema": {
       "properties": {

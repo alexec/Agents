@@ -4410,18 +4410,33 @@ export interface Need {
   headline: Headline;
 }
 
-/** NeedID (Attention/Need.swift): what is being answered, one key per kind. */
+/**
+ * NeedID (Attention/Need.swift): what is being answered, one key per kind. A notice (#2805) is what
+ * an agent told the person with `notify`: posted, never a Needs you row.
+ */
 export type NeedID =
   | { permission: UUID }
   | { elicitation: UUID }
   | { report: { agentID: UUID; at: WireDate } }
-  | { guardedChange: { folder: URLString; path: string } };
+  | { guardedChange: { folder: URLString; path: string } }
+  | { notice: string };
 
 export type NeedKind =
   | "permission"
   | "elicitation"
   | "report"
-  | "guardedChange";
+  | "guardedChange"
+  | "notice";
+
+/**
+ * What became of a notice an agent sent with `notify` (#2805): sent to where the person is, shown
+ * here (the person was looking at that chat), muted (#2003), or held in the cool-down.
+ */
+export type NoticeOutcome =
+  | "sent"
+  | "shownHere"
+  | "muted"
+  | "coolingDown";
 
 /**
  * The OTLP exporter of the report figures (#2019, #1804 decision 4), set on agents-control by
@@ -6558,6 +6573,17 @@ export interface SentBranch {
   commit: string;
 }
 
+/**
+ * What an agent told the person with `notify` (#2805), on the record where it called it: the
+ * notification's words, what became of it, and, in the cool-down, when the next can go.
+ */
+export interface SentNotice {
+  title: string;
+  body?: string;
+  outcome: NoticeOutcome;
+  nextAt?: WireDate;
+}
+
 export interface ServedRequest {
   kind: ServedRequestKind;
   outcome: ServedRequestOutcome;
@@ -7586,7 +7612,8 @@ export type TranscriptEntryKind =
   | { handoff: { markdown: string; characters: number } }
   | { settingsChanged: { _0: SwitchRecord } }
   | { appView: { _0: AppViewCall } }
-  | { fileShown: { _0: ShownFile } };
+  | { fileShown: { _0: ShownFile } }
+  | { notified: { _0: SentNotice } };
 
 export interface TranscriptPage {
   firstIndex: number;
@@ -9655,6 +9682,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SendRead: { required: ["data", "end"], optional: [] },
   SendReadRequest: { required: ["id", "offset"], optional: [] },
   SentBranch: { required: ["name", "commit"], optional: [] },
+  SentNotice: { required: ["title", "outcome"], optional: ["body", "nextAt"] },
   ServedRequest: { required: ["kind", "outcome"], optional: [] },
   ServerReachabilityChange: { required: ["server", "online"], optional: [] },
   SessionLabel: { required: ["value", "owner", "addedAt"], optional: [] },

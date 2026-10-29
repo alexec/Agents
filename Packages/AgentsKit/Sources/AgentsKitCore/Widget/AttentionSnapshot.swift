@@ -132,6 +132,8 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
 
     /// The push's need on the rows, and the count guessed from it.
     private func laying(_ push: AttentionPush, at date: Date) -> AttentionSnapshot? {
+        // A notice (#2805) asks nothing, so it is no row and not in the count.
+        if push.kind == .notice { return nil }
         var next = self
         // As of the Mac's count where the push carries one, so the count lays over it.
         next.writtenAt = push.count?.countedAt ?? date
@@ -184,7 +186,8 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
         var newestNeed: [UUID: Need] = [:]
         for need in model.needs.values {
             // A folder's own question (#531) has no session to stand beside.
-            guard let agentID = need.agentID,
+            // A notice (#2805) asks nothing: it is no row's words.
+            guard !need.id.isNotice, let agentID = need.agentID,
                   newestNeed[agentID].map({ $0.raisedAt < need.raisedAt }) ?? true else { continue }
             newestNeed[agentID] = need
         }
@@ -267,6 +270,8 @@ public struct AttentionPush: Hashable, Sendable {
             self.init(token: need.token, kind: .report, agentID: agentID, headline: headline, withdrawn: withdrawn, count: count)
         case .guardedChange:
             self.init(token: need.token, kind: .guardedChange, agentID: nil, headline: headline, withdrawn: withdrawn, count: count)
+        case .notice:
+            self.init(token: need.token, kind: .notice, agentID: nil, headline: headline, withdrawn: withdrawn, count: count)
         }
     }
 }

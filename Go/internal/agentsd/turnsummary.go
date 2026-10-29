@@ -99,7 +99,7 @@ func (it item) isOutcome() bool {
 	switch {
 	case it.isRun():
 		return false
-	case k.ElicitationAnswered != nil, k.WorkReported != nil, k.SandboxFailure != nil, k.AppView != nil, k.FileShown != nil:
+	case k.ElicitationAnswered != nil, k.WorkReported != nil, k.SandboxFailure != nil, k.AppView != nil, k.FileShown != nil, k.Notified != nil:
 		return true
 	case k.StateChanged != nil:
 		return k.StateChanged.Value == wire.AgentStateStopped
@@ -178,7 +178,7 @@ func entryIsPassing(e *wire.TranscriptEntry) bool {
 
 func carriesOn(k *wire.TranscriptEntryKind) bool {
 	return k.AgentMessage != nil || k.AgentThought != nil || k.ToolCall != nil || k.ToolCallUpdate != nil ||
-		k.AppView != nil || k.FileShown != nil || k.PlanUpdated != nil || k.PermissionAsked != nil || k.ElicitationAsked != nil
+		k.AppView != nil || k.FileShown != nil || k.Notified != nil || k.PlanUpdated != nil || k.PermissionAsked != nil || k.ElicitationAsked != nil
 }
 
 func endsTheWork(k *wire.TranscriptEntryKind) bool {
@@ -395,8 +395,9 @@ func (b *displayBuilder) add(e wire.TranscriptEntry) {
 		b.resolveIntermittentErrors()
 		b.viewAt[id] = len(b.drawn)
 		b.drawn = append(b.drawn, item{entry: &e})
-	case k.FileShown != nil:
-		// The card stands on its own, after the run that called it (#836).
+	case k.FileShown != nil, k.Notified != nil:
+		// The card stands on its own, after the run that called it (#836); so does what
+		// the agent told the person (#2805).
 		b.closeRun()
 		b.resolveIntermittentErrors()
 		b.drawn = append(b.drawn, item{entry: &e})

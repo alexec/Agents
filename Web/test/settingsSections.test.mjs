@@ -8,8 +8,8 @@ const store = (role) => ({ person: { value: role ? { role } : null } });
 
 test("each group's sections are in their subject's order", () => {
   const names = (scope, role) => sectionsIn(scope, store(role)).map((s) => s.name);
-  // By subject (#2157): Sidebar and Finished chats are how this app draws, though the Mac's host keeps them (#2079).
-  assert.deepEqual(names("thisApp"), ["sidebar", "finishedChats"]);
+  // By subject (#2157): Sidebar, Finished chats and Notifications are how this app works, though the Mac's host keeps them (#2079, #2805).
+  assert.deepEqual(names("thisApp"), ["sidebar", "finishedChats", "notifications"]);
   assert.deepEqual(names("machines"), ["gitAccess", "machines", "backups", "serverBackups", "agentRuntimes", "secrets"]);
   assert.deepEqual(names("agentConfiguration"), ["skills", "personas", "workflows"]);
   assert.deepEqual(names("controlPlane", "admin"), ["signIns", "people", "bots", "groups", "channels", "signInProviders", "policy", "providers"]);

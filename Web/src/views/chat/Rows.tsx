@@ -20,6 +20,8 @@ import {
 import { fileLinkPath, Markdown } from "../../render/markdown";
 import { AppView } from "./AppView";
 import { FileCard } from "./FileCard";
+import { noticeClock, noticeOutcome } from "../../model/notified";
+import { fromWireDate } from "../../protocol/dates";
 import type { Shown } from "../../model/shownFile";
 import { switchNote } from "../../model/switchNote";
 import { continueWithout, keepStopped, sandboxCard } from "../../model/sandboxWords";
@@ -458,6 +460,20 @@ function entryBody(entry: TranscriptEntry) {
       return <AppView call={fields(entry, "appView")!._0} />;
     case "fileShown":
       return <FileCard file={fields(entry, "fileShown")!._0} />;
+    case "notified": {
+      // What the agent told the person (#2805): Shared/UI/Chat/NotifiedLine.swift.
+      const notice = fields(entry, "notified")!._0;
+      return (
+        <div class="notice-line">
+          <span class="notice-bell" aria-hidden="true">🔔︎</span>
+          <div>
+            <p class="notice-title">{notice.title}</p>
+            {notice.body !== undefined && <p class="notice-body">{notice.body}</p>}
+            <p class="quiet-line">{noticeClock(fromWireDate(entry.at))} · {noticeOutcome(notice)}</p>
+          </div>
+        </div>
+      );
+    }
     case "background": {
       // As the window's line: how it started or ended, a failure in the failure tint (#253).
       return <BackgroundEntryLine item={fields(entry, "background")!._0} />;

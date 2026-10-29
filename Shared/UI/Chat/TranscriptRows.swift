@@ -483,6 +483,9 @@ private struct EntryRow: View {
         case .fileShown(let file):
             FileCard(file: file)
 
+        case .notified(let notice):
+            NotifiedLine(notice: notice, at: entry.at)
+
         case .unrecognised:
             // Written by a newer version of this app. Kept in the record, skipped here.
             EmptyView()
