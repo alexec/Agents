@@ -75,6 +75,7 @@ const CapMcp1 = "mcp/1"
 const CapMilestones1 = "milestones/1"
 const CapModes1 = "modes/1"
 const CapMute1 = "mute/1"
+const CapNotices1 = "notices/1"
 const CapOptions1 = "options/1"
 const CapOrgIdentity1 = "org-identity/1"
 const CapOrgRoutes1 = "org-routes/1"
@@ -590,6 +591,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"links/remove", "links/1"},
 	{"links/requests", "links/1"},
 	{"machines/forAgent", "machines/1"},
+	{"notices/take", "notices/1"},
 	{"orgRoutes/check", "org-routes/1"},
 	{"orgRoutes/list", "org-routes/1"},
 	{"orgRoutes/mine", "org-routes/1"},
@@ -667,6 +669,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"user/removeSecret", "user/1"},
 	{"user/secretNames", "user/1"},
 	{"user/setAgentConfigFile", "user/1"},
+	{"user/setNoticeLimits", "notices/1"},
 	{"user/setSecret", "user/1"},
 	{"user/setSettings", "user/1"},
 	{"user/settings", "user/1"},

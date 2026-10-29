@@ -1,7 +1,9 @@
 package agentsd
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -95,5 +97,53 @@ func TestNotifyingThePerson(t *testing.T) {
 	}
 	if text, _ := m.tool(9, "notify", map[string]any{"title": "Seen"}); !strings.HasPrefix(text, "Not sent as a notification") {
 		t.Fatal(text)
+	}
+}
+
+// With a control plane (#2859), the person's one bucket there decides, Burst and
+// Cool-down set in a client go to it, and its notifications part is written here.
+func TestNoticeLimitsFollowThePerson(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	d.SettingsDir = t.TempDir()
+	asked := make(chan string, 8)
+	var sent wire.NoticeLimits
+	d.SetControlAsk(func(_ context.Context, method string, params any) (json.RawMessage, error) {
+		switch method {
+		case wire.CallNoticesTake.Name:
+			asked <- method
+			return mustJSON(wire.NoticeTaken{Sent: false, NextAt: wire.DateOf(time.Now().Add(time.Minute))}), nil
+		case wire.CallUserSetNoticeLimits.Name:
+			sent = params.(wire.NoticeLimits)
+			asked <- method
+			return json.RawMessage(`{}`), nil
+		}
+		return nil, errors.New("no such method")
+	})
+	c.call(t, 1, "preferences/set", map[string]any{noticeBurstKey: 7, "other": true})
+	if got := <-asked; got != wire.CallUserSetNoticeLimits.Name || sent.Burst != 7 || sent.CooldownMinutes != 10 {
+		t.Fatalf("%s %+v", got, sent)
+	}
+	// The control plane's bucket is empty, though this host's is full.
+	a := seeded(t, d, t.TempDir(), nil)
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+	if text, _ := m.tool(2, "notify", map[string]any{"title": "Done"}); !strings.HasPrefix(text, "In the cool-down") {
+		t.Fatal(text)
+	}
+	// A control plane that cannot be asked leaves this host's own bucket to decide.
+	d.SetControlAsk(func(context.Context, string, any) (json.RawMessage, error) { return nil, errors.New("gone") })
+	if text, _ := m.tool(3, "notify", map[string]any{"title": "Done"}); !strings.HasPrefix(text, "Sent. 6 more") {
+		t.Fatal(text)
+	}
+	// The person's part from the control plane is what every client here shows.
+	d.SetControlAsk(nil)
+	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(wire.MachineUserSettings{User: "sam", Secrets: []wire.UserSecret{},
+		Settings: wire.UserSettings{Notifications: json.RawMessage(`{"burst":4,"cooldownMinutes":30}`)}}))
+	if burst, cooldown := d.noticeLimits(); burst != 4 || cooldown != 30*time.Minute {
+		t.Fatal(burst, cooldown)
+	}
+	if prefs := d.preferences(); string(prefs["other"]) != "true" {
+		t.Fatalf("%s", prefs)
 	}
 }

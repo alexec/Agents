@@ -5,6 +5,7 @@
 // does not read inside:
 //
 //	v1/users/<user>/settings.json          wire.UserSettings
+//	v1/users/<user>/notices.json           the person's notice bucket (#2859)
 //	v1/users/<user>/secrets/<NAME>.json    a secret, sealed (FR-025, SC-007)
 //
 // Each secret is sealed in an envelope (kms.SealFor): a data key of its own encrypts it,
@@ -31,6 +32,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/kms"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/internal/noticebucket"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -105,6 +107,7 @@ func secretsPrefix(user string) string {
 	return Prefix + user + "/secrets/"
 }
 func secretKey(user, name string) string { return secretsPrefix(user) + name + ".json" }
+func noticesKey(user string) string      { return Prefix + user + "/notices.json" }
 
 // secretRecord is a secret as stored. Sealed is nil once the secret is removed: the record
 // stays, as a tombstone, so a removal is a conditional write like any other.
@@ -168,7 +171,7 @@ func (b *Book) Forget(ctx context.Context, user string) error {
 func partKind(part wire.UserSettingsPartName) (string, bool) {
 	switch part {
 	case wire.UserSettingsPartNameMcpServers, wire.UserSettingsPartNameAgentConfig,
-		wire.UserSettingsPartNameRuntimes, wire.UserSettingsPartNameCostLimits:
+		wire.UserSettingsPartNameRuntimes, wire.UserSettingsPartNameCostLimits, wire.UserSettingsPartNameNotifications:
 		return "{", true
 	}
 	return "", false
@@ -243,6 +246,8 @@ func partOf(s *wire.UserSettings, part wire.UserSettingsPartName) *wire.JSONValu
 		return &s.Runtimes
 	case wire.UserSettingsPartNameCostLimits:
 		return &s.CostLimits
+	case wire.UserSettingsPartNameNotifications:
+		return &s.Notifications
 	}
 	return nil
 }
@@ -272,6 +277,49 @@ func (b *Book) change(ctx context.Context, key string, edit func(raw []byte) ([]
 	}
 	return fmt.Errorf("%s kept changing; try again", key)
 }
+
+// SetNoticeLimits is the notifications part as a machine of the person's sends it
+// (user/setNoticeLimits), within the bounds. It says whether anything changed.
+func (b *Book) SetNoticeLimits(ctx context.Context, user string, limits wire.NoticeLimits) (bool, error) {
+	burst, cooldown := noticebucket.Limits(limits.Burst, limits.CooldownMinutes)
+	value, _ := json.Marshal(wire.NoticeLimits{Burst: int64(burst), CooldownMinutes: cooldown.Minutes()})
+	return b.SetPart(ctx, user, wire.UserSettingsPartNameNotifications, value)
+}
+
+// TakeNotice is notices/take: one notice from the person's one bucket, which every
+// machine of theirs shares (#2859). The person's notifications part decides the limits;
+// without one, the machine's own (given).
+func (b *Book) TakeNotice(ctx context.Context, user string, given wire.NoticeLimits) (wire.NoticeTaken, error) {
+	var out wire.NoticeTaken
+	if err := checkUser(user); err != nil {
+		return out, err
+	}
+	settings, err := b.Settings(ctx, user)
+	if err != nil {
+		return out, err
+	}
+	limits := given
+	if partSent(settings.Notifications) {
+		var kept wire.NoticeLimits
+		if json.Unmarshal(settings.Notifications, &kept) == nil {
+			limits = kept
+		}
+	}
+	burst, cooldown := noticebucket.Limits(limits.Burst, limits.CooldownMinutes)
+	err = b.change(ctx, noticesKey(user), func(raw []byte) ([]byte, error) {
+		var bucket noticebucket.Bucket
+		if raw != nil {
+			// A record that will not read is a full bucket, not a person who can be told nothing.
+			json.Unmarshal(raw, &bucket)
+		}
+		left, next, ok := bucket.Take(b.now(), burst, cooldown)
+		out = wire.NoticeTaken{Sent: ok, Left: int64(left), NextAt: wire.DateOf(next)}
+		return records.Encode(bucket)
+	})
+	return out, err
+}
+
+func partSent(v wire.JSONValue) bool { return len(v) > 0 && string(v) != "null" }
 
 // CheckSecret says whether a secret may be kept, with words that never hold its value.
 func CheckSecret(name, value string) error {

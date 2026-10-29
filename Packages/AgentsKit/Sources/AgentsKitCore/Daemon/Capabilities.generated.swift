@@ -76,6 +76,7 @@ public enum Capability {
     public static let milestones1 = "milestones/1"
     public static let modes1 = "modes/1"
     public static let mute1 = "mute/1"
+    public static let notices1 = "notices/1"
     public static let options1 = "options/1"
     public static let orgIdentity1 = "org-identity/1"
     public static let orgRoutes1 = "org-routes/1"
@@ -540,6 +541,7 @@ public enum Capability {
         "links/remove": "links/1",
         "links/requests": "links/1",
         "machines/forAgent": "machines/1",
+        "notices/take": "notices/1",
         "orgRoutes/check": "org-routes/1",
         "orgRoutes/list": "org-routes/1",
         "orgRoutes/mine": "org-routes/1",
@@ -617,6 +619,7 @@ public enum Capability {
         "user/removeSecret": "user/1",
         "user/secretNames": "user/1",
         "user/setAgentConfigFile": "user/1",
+        "user/setNoticeLimits": "notices/1",
         "user/setSecret": "user/1",
         "user/setSettings": "user/1",
         "user/settings": "user/1",

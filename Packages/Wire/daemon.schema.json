@@ -13254,6 +13254,23 @@
         "notice"
       ]
     },
+    "NoticeLimits": {
+      "type": "object",
+      "description": "The person's attention (#2805, #2859): how many notices agents may send at once (burst, 1–20), and the minutes until one comes back (cooldownMinutes, 1–1440). The notifications part of the user settings, user/setNoticeLimits, and notices/take, which a host asks on its channel 0 before it posts a notice.",
+      "properties": {
+        "burst": {
+          "type": "integer"
+        },
+        "cooldownMinutes": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "burst",
+        "cooldownMinutes"
+      ],
+      "additionalProperties": false
+    },
     "NoticeOutcome": {
       "type": "string",
       "enum": [
@@ -13263,6 +13280,27 @@
         "coolingDown"
       ],
       "description": "What became of a notice an agent sent with `notify` (#2805): sent to where the person is, shown here (the person was looking at that chat), muted (#2003), or held in the cool-down."
+    },
+    "NoticeTaken": {
+      "type": "object",
+      "description": "notices/take (#2859): whether a notice may go now, from the one bucket the control plane keeps for the person and every machine of theirs: how many more can go now, and when the next comes back.",
+      "properties": {
+        "sent": {
+          "type": "boolean"
+        },
+        "left": {
+          "type": "integer"
+        },
+        "nextAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "sent",
+        "left",
+        "nextAt"
+      ],
+      "additionalProperties": false
     },
     "OTLPExport": {
       "type": "object",
@@ -23399,6 +23437,10 @@
         "costLimits": {
           "$ref": "#/definitions/JSONValue"
         },
+        "notifications": {
+          "$ref": "#/definitions/JSONValue",
+          "description": "The person's notice limits (#2859), as a NoticeLimits."
+        },
         "updated": {
           "type": "string",
           "format": "date-time",
@@ -23450,9 +23492,10 @@
         "mcpServers",
         "agentConfig",
         "runtimes",
-        "costLimits"
+        "costLimits",
+        "notifications"
       ],
-      "description": "A part of a person's user settings (#1760, #2410). Each part has one fixed scope: MCP servers, agent configuration, runtimes and cost limits follow the person. Resources belong to each machine."
+      "description": "A part of a person's user settings (#1760, #2410). Each part has one fixed scope: MCP servers, agent configuration, runtimes, cost limits and notices (#2859) follow the person. Resources belong to each machine."
     },
     "UserSuspended": {
       "type": "object",

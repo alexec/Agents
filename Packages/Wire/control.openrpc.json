@@ -2750,6 +2750,27 @@
       }
     },
     {
+      "name": "notices/take",
+      "x-capability": "notices/1",
+      "description": "A host, on its channel 0 (#2859): may a notice go now? One bucket for the person, shared by every machine of theirs, with the limits the host has.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/NoticeLimits"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/NoticeTaken"
+        }
+      }
+    },
+    {
       "name": "orgRoutes/check",
       "x-capability": "org-routes/1",
       "description": "An admin's: one small request from the control plane with the route's credential, where it can make one (#999).",
@@ -4692,6 +4713,27 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/AgentConfigFileRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "user/setNoticeLimits",
+      "x-capability": "notices/1",
+      "description": "A host, on its channel 0 (#2859): the person changed Burst or Cool-down in one of its clients, so the notifications part of their user settings takes it. A machine may set this part and no other.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/NoticeLimits"
           }
         }
       ],
