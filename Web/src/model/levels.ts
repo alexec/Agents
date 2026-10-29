@@ -1,6 +1,6 @@
 // The words every runtime shares (#2658), as LevelWords says them: one set for each field,
 // so a pill under the prompt says its value only. Pinned by Fixtures/web/levels/words.json.
-import type { AutoField, AutoMapping, AutoMappings, AutoMark, AutoSkip, SandboxChoice } from "../protocol/generated";
+import type { AutoField, AutoMapping, AutoMappings, AutoMark, AutoSkip, RuntimeStatus, SandboxChoice } from "../protocol/generated";
 
 export const autoID = "auto";
 export const autoWords = "Auto";
@@ -93,5 +93,19 @@ export function matchLevel(mappings: AutoMappings | undefined, runtimeID: string
     if (!cell || cell.mark === "notPossible" || !options || !Object.keys(options).length) continue;
     if (Object.entries(options).every(([id, v]) => JSON.stringify(value(id)) === JSON.stringify(v))) return level;
   }
+  return undefined;
+}
+
+/**
+ * A runtime's state on the Auto page when it cannot start, as LevelWords.state says it, or
+ * undefined when it is available. Not installed is only for one that is not there (#2890).
+ */
+export function unavailableState(status: RuntimeStatus | undefined): string | undefined {
+  const a = status?.availability;
+  if (!a || "missing" in a) return "Not installed";
+  if ("needsSignIn" in a) return "Not signed in";
+  if ("failed" in a) return "Failed";
+  if ("installing" in a) return "Installing…";
+  if ("installFailed" in a) return "Install failed";
   return undefined;
 }

@@ -1121,6 +1121,10 @@ struct WebFixturesTests {
         try pin("runtimes/reasons.json", cases) { input in
             try input.decode(RuntimeStatus.self).unavailableReason.map(JSONValue.string) ?? .null
         }
+        // The Auto page's state words for each availability (#2890).
+        try pin("runtimes/auto-state.json", cases) { input in
+            .string(LevelWords.state(try input.decode(RuntimeStatus.self), allowances: nil))
+        }
 
         let starts: [(String, String?, String?, [String])] = [
             ("last used wins over Claude and the kept choice", "codex", "grok", ["claude", "codex", "grok"]),
