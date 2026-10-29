@@ -55,3 +55,15 @@ test("an empty worktree folder counts as none", () => {
   assert.equal(groups.folderPath({ cwd: "file:///r/.agents/worktrees/lane/", worktree }), "file:///r/.agents/worktrees/lane");
   assert.equal(groups.folderPath({ cwd: "file:///w/", worktree: { ...worktree, folder: "file:///r/" } }), "file:///r");
 });
+
+test("Recently archived sessions are the newest three archived in the last 24 hours (#2868)", () => {
+  const now = 900_000_000;
+  const day = groups.recentArchivedWithin;
+  const archived = [now - 10, now - 20, now - day + 60, now - day - 60].map((archivedAt, i) =>
+    ({ id: `a${i}`, archivedAt, lastActivityAt: 0 }));
+  assert.deepEqual(groups.recentlyArchived(archived, 3, now).map((a) => a.id), ["a0", "a1", "a2"]);
+  assert.deepEqual(groups.recentlyArchived(archived.slice(2), 3, now).map((a) => a.id), ["a2"]);
+  assert.deepEqual(groups.recentlyArchived(archived, 3, now + day), []);
+  const before = [{ id: "old", lastActivityAt: now - 5 }];
+  assert.deepEqual(groups.recentlyArchived(before, 3, now).map((a) => a.id), ["old"]);
+});
