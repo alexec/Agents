@@ -38,7 +38,7 @@ down for a runtime that has none. [Overall score](#overall-score), after the
 tables, adds every feature up.
 
 The matrix was filled in on 2026-10-12 from each app's own docs, changelog, README,
-releases and, where open, source. Agents' row was last brought up to date on 2026-10-27. Every app is held to the same bar, Agents included: a ●
+releases and, where open, source. Agents' row was last brought up to date on 2026-10-29. Every app is held to the same bar, Agents included: a ●
 needs the whole feature, documented by the app itself, and a ○ needs evidence, such as an
 app that ships for macOS alone having no Android app. Once per release, after the
 Competitor check, the Feature matrix workflow (`.agents/workflows/feature-matrix.md`)
@@ -183,12 +183,12 @@ Agents has none of these at all:
 | Codeg | ● | ◐ | ◐ | ● | ○ | ● | 67% |
 | Cursor | ● | ● | ○ | ● | ○ | ● | 67% |
 | Orca | ● | ◐ | ◐ | ◐ | ◐ | ● | 67% |
+| Threadlines | ● | ○ | ○ | ● | ● | ● | 67% |
 | CodeAgentSwarm | ● | ◐ | ◐ | ◐ | ?⃝ | ● | 58% |
 | Nuphos | ● | ● | ◐ | ?⃝ | ○ | ● | 58% |
 | Warp | ● | ○ | ○ | ● | ◐ | ● | 58% |
 | Maestro | ● | ○ | ○ | ● | ○ | ● | 50% |
 | Roamgate | ◐ | ○ | ○ | ● | ◐ | ● | 50% |
-| Threadlines | ● | ○ | ○ | ● | ● | ?⃝ | 50% |
 | Vibe Kanban | ● | ○ | ○ | ● | ?⃝ | ● | 50% |
 | VibeiDE | ● | ○ | ○ | ● | ● | ?⃝ | 50% |
 | Agentastic | ○ | ◐ | ○ | ○ | ● | ● | 42% |
@@ -227,12 +227,12 @@ Agents has none of these at all:
 | Codeg | ● | ● | ◐ | ● | ?⃝ | ● | ?⃝ | 64% |
 | Happy | ● | ?⃝ | ◐ | ● | ● | ● | ?⃝ | 64% |
 | T3 Code | ● | ?⃝ | ◐ | ● | ◐ | ● | ◐ | 64% |
+| Ace | ● | ?⃝ | ● | ?⃝ | ● | ● | ?⃝ | 57% |
 | Emdash | ● | ● | ?⃝ | ● | ◐ | ◐ | ?⃝ | 57% |
 | Maestro | ● | ● | ◐ | ● | ?⃝ | ◐ | ?⃝ | 57% |
 | Pragma | ● | ● | ◐ | ● | ?⃝ | ◐ | ?⃝ | 57% |
 | DockTerm | ● | ● | ◐ | ?⃝ | ● | ?⃝ | ?⃝ | 50% |
 | tuios | ● | ● | ◐ | ● | ?⃝ | ○ | ○ | 50% |
-| Ace | ● | ?⃝ | ● | ?⃝ | ● | ?⃝ | ?⃝ | 43% |
 | Conductor | ● | ?⃝ | ?⃝ | ● | ◐ | ◐ | ?⃝ | 43% |
 | CodeAgentSwarm | ● | ● | ◐ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 36% |
 | Helicon | ● | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 29% |
@@ -343,6 +343,7 @@ Agents has none of these at all:
 | Conductor | ?⃝ | ● | ● | ● | ◐ | ● | ?⃝ | ?⃝ | ?⃝ | 50% |
 | Nimbalyst | ● | ?⃝ | ◐ | ● | ● | ● | ?⃝ | ?⃝ | ?⃝ | 50% |
 | Pragma | ● | ◐ | ?⃝ | ● | ● | ● | ?⃝ | ?⃝ | ?⃝ | 50% |
+| Threadlines | ?⃝ | ● | ?⃝ | ● | ● | ● | ○ | ◐ | ○ | 50% |
 | Nuphos | ?⃝ | ?⃝ | ● | ● | ● | ● | ○ | ○ | ○ | 44% |
 | CodeAgentSwarm | ● | ?⃝ | ◐ | ?⃝ | ● | ● | ?⃝ | ?⃝ | ?⃝ | 39% |
 | T3 Code | ?⃝ | ?⃝ | ○ | ● | ● | ● | ○ | ◐ | ○ | 39% |
@@ -350,7 +351,6 @@ Agents has none of these at all:
 | Emdash | ○ | ● | ● | ● | ?⃝ | ○ | ○ | ○ | ○ | 33% |
 | Happy | ?⃝ | ?⃝ | ?⃝ | ● | ● | ● | ○ | ○ | ○ | 33% |
 | Sculptor | ?⃝ | ?⃝ | ● | ◐ | ?⃝ | ● | ○ | ◐ | ○ | 33% |
-| Threadlines | ?⃝ | ?⃝ | ?⃝ | ◐ | ● | ● | ○ | ◐ | ○ | 33% |
 | tuios | ?⃝ | ?⃝ | ?⃝ | ◐ | ● | ● | ○ | ◐ | ○ | 33% |
 | Vibe Kanban | ○ | ?⃝ | ◐ | ?⃝ | ● | ● | ○ | ○ | ○ | 28% |
 | ReevesAgents | ?⃝ | ○ | ?⃝ | ○ | ● | ● | ○ | ○ | ○ | 22% |
@@ -380,6 +380,7 @@ Agents has none of these at all:
 | Paseo | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ | 60% |
 | Pragma | ?⃝ | ● | ● | ?⃝ | ● | ● | 60% |
 | Threadlines | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ | 60% |
+| Ace | ?⃝ | ?⃝ | ● | ?⃝ | ● | ◐ | 40% |
 | Codeg | ● | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 40% |
 | Emdash | ● | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 40% |
 | Happy | ?⃝ | ?⃝ | ● | ?⃝ | ● | ● | 40% |
@@ -387,7 +388,6 @@ Agents has none of these at all:
 | Rove | ?⃝ | ● | ● | ?⃝ | ?⃝ | ◐ | 40% |
 | T3 Code | ?⃝ | ?⃝ | ● | ?⃝ | ● | ◐ | 40% |
 | tuios | ?⃝ | ● | ◐ | ?⃝ | ?⃝ | ?⃝ | 30% |
-| Ace | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ● | ◐ | 20% |
 | Atelier (was Acepe) | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 20% |
 | DockTerm | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 20% |
 | Nuphos | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 20% |
@@ -458,8 +458,8 @@ Each app's score in every table, and overall: its points over the 49 scored feat
 | 11 | OpenAI Codex | 67% | 83% | 71% | 70% | 40% | 67% | 80% | 67% | **68%** |
 | 11 | Warp | 83% | 58% | 86% | 60% | 70% | 67% | 70% | 50% | **68%** |
 | 13 | T3 Code | 83% | 92% | 64% | 80% | 80% | 39% | 40% | 67% | **66%** |
-| 14 | Pragma | 75% | 83% | 57% | 60% | 60% | 50% | 60% | 50% | **61%** |
-| 14 | Threadlines | 83% | 50% | 71% | 100% | 40% | 33% | 60% | 67% | **61%** |
+| 13 | Threadlines | 83% | 67% | 71% | 100% | 40% | 50% | 60% | 67% | **66%** |
+| 15 | Pragma | 75% | 83% | 57% | 60% | 60% | 50% | 60% | 50% | **61%** |
 | 16 | Nuphos | 83% | 58% | 79% | 70% | 40% | 44% | 20% | 83% | **60%** |
 | 17 | Happy | 92% | 100% | 64% | 30% | 20% | 33% | 40% | 67% | **56%** |
 | 18 | Emdash | 83% | 33% | 57% | 70% | 70% | 33% | 40% | 67% | **55%** |
@@ -473,9 +473,9 @@ Each app's score in every table, and overall: its points over the 49 scored feat
 | 25 | Vibe Kanban | 67% | 50% | 29% | 60% | 30% | 28% | 20% | 67% | **43%** |
 | 27 | Sculptor | 58% | 33% | 29% | 80% | 20% | 33% | 20% | 33% | **38%** |
 | 28 | Roamgate | 67% | 50% | 29% | 80% | 20% | 11% | 0% | 50% | **37%** |
-| 29 | Helicon | 42% | 33% | 29% | 20% | 0% | 6% | 40% | 67% | **29%** |
-| 29 | VibeiDE | 50% | 50% | 29% | 40% | 30% | 11% | 20% | 8% | **29%** |
-| 31 | Ace | 33% | 17% | 43% | 20% | 40% | 11% | 20% | 33% | **27%** |
+| 29 | Ace | 33% | 17% | 57% | 20% | 40% | 11% | 40% | 33% | **31%** |
+| 30 | Helicon | 42% | 33% | 29% | 20% | 0% | 6% | 40% | 67% | **29%** |
+| 30 | VibeiDE | 50% | 50% | 29% | 40% | 30% | 11% | 20% | 8% | **29%** |
 | 32 | DockTerm | 17% | 33% | 50% | 20% | 40% | 0% | 20% | 33% | **26%** |
 | 33 | ReevesAgents | 33% | 17% | 29% | 0% | 20% | 22% | 0% | 50% | **22%** |
 | 34 | Claude Squad | 50% | 0% | 14% | 20% | 20% | 0% | 0% | 33% | **16%** |
