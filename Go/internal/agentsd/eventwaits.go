@@ -557,7 +557,7 @@ func endedWords(w *wire.EventWait, by wire.EventWaitEndingCanceller) string {
 	l := waitLabel(w)
 	switch by {
 	case "person":
-		return "The person cancelled your wait for " + l + "."
+		return "The person cancelled your wait for " + l + ". Check whether " + l + " happened anyway before you stop: the person may only be telling you to carry on without waiting, not that it did not happen."
 	case "prompt":
 		return "The person sent you a message, which cancelled your wait for " + l + "."
 	case "stopped":

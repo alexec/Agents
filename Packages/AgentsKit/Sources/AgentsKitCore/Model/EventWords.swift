@@ -178,7 +178,7 @@ public enum EventWords {
     public static func ended(_ wait: EventWait, by canceller: EventWaitEnding.Canceller) -> String {
         switch canceller {
         case .agent: return stoppedWaiting(wait)
-        case .person: return "The person cancelled your wait for \(wait.label)."
+        case .person: return "The person cancelled your wait for \(wait.label). Check whether \(wait.label) happened anyway before you stop: the person may only be telling you to carry on without waiting, not that it did not happen."
         case .prompt: return "The person sent you a message, which cancelled your wait for \(wait.label)."
         case .stopped: return "You were stopped, which ended your wait for \(wait.label)."
         case .archived: return "You were archived, which ended your wait for \(wait.label)."
