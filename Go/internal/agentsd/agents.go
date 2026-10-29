@@ -600,6 +600,7 @@ func (d *Daemon) setOption(ctx context.Context, r wire.SetOptionRequest) ([]wire
 		if s != nil {
 			a.AdvertisedOptions = d.markOptions(a.RuntimeID, withAppOptions(a.RuntimeID, values, options))
 		}
+		a.Levels = d.matchLevels(a)
 	})
 	known := options
 	if s == nil {
@@ -686,9 +687,19 @@ func (d *Daemon) continueInNew(r wire.ContinueInNewRequest) (wire.UUID, error) {
 			labels = append(labels, l.Value)
 		}
 	}
-	id, err := d.start(wire.StartRequest{RuntimeID: a.RuntimeID, Cwd: cwd, Prompt: prompt, Attachments: []wire.Attachment{},
+	start := wire.StartRequest{RuntimeID: a.RuntimeID, Cwd: cwd, Prompt: prompt, Attachments: []wire.Attachment{},
 		StartOptions: a.StartOptions, AdditionalDirectories: a.AdditionalDirectories, McpServers: a.McpServers,
-		RequestID: r.RequestID, Sandbox: a.SandboxOverride, Labels: labels, AccountID: r.AccountID})
+		RequestID: r.RequestID, Sandbox: a.SandboxOverride, Labels: labels, AccountID: r.AccountID}
+	// Continue on Auto (#2658, FR-022): an Auto session whose runtime ran out carries on where
+	// Auto would start one now, with its values; its own runtime's options stay behind.
+	if r.Auto != nil && *r.Auto && a.Auto != nil {
+		levels := a.Auto.Levels
+		start.RuntimeID, start.Levels, start.AccountID = autoRuntimeID, &levels, nil
+		start.StartOptions = wire.StartOptions{Values: map[string]wire.JSONValue{}, ExtraArguments: []string{}}
+		start.Prompt = "Continue the work of the session " + name + ", whose runtime, " + runtimeName(a.RuntimeID) +
+			", ran out. Read that session with read_session to see what it did and what is left, then carry on."
+	}
+	id, err := d.start(start)
 	if err != nil {
 		return "", err
 	}

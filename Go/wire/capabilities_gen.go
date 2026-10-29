@@ -14,6 +14,7 @@ const CapApprovals1 = "approvals/1"
 const CapArtifact1 = "artifact/1"
 const CapAttention1 = "attention/1"
 const CapAuditSinks1 = "audit.sinks/1"
+const CapAuto1 = "auto/1"
 const CapBackupsStore1 = "backups.store/1"
 const CapBackups1 = "backups/1"
 const CapBots1 = "bots/1"
@@ -156,7 +157,9 @@ var HostCapabilities = pairs([][2]string{
 	{"agents/said", "agents.said/1"},
 	{"agents/sendNow", "agents/1"},
 	{"agents/setCeiling", "agents/1"},
+	{"agents/setClientPermission", "auto/1"},
 	{"agents/setLabels", "agents/1"},
+	{"agents/setLevels", "auto/1"},
 	{"agents/setMuted", "mute/1"},
 	{"agents/setOption", "agents/1"},
 	{"agents/setSandbox", "agents/1"},
@@ -173,6 +176,10 @@ var HostCapabilities = pairs([][2]string{
 	{"approvals/read", "approvals/1"},
 	{"artifact/write", "artifact/1"},
 	{"attention/pending", "attention/1"},
+	{"auto/mappings", "auto/1"},
+	{"auto/preview", "auto/1"},
+	{"auto/set", "auto/1"},
+	{"auto/state", "auto/1"},
 	{"backups/configure", "backups/1"},
 	{"backups/make", "backups/1"},
 	{"backups/restore", "backups/1"},
@@ -404,6 +411,7 @@ var HostCapabilities = pairs([][2]string{
 	{"agent/showFile", "agent/1"},
 	{"agents/draftOptions", "agents/1"},
 	{"attention/changed", "attention/1"},
+	{"auto/changed", "auto/1"},
 	{"backups/changed", "backups/1"},
 	{"clientPermissions/changed", "client-permissions/1"},
 	{"clone/changed", "clone/1"},
@@ -454,6 +462,7 @@ var HostNotifications = set([]string{
 	"agent/showFile",
 	"agents/draftOptions",
 	"attention/changed",
+	"auto/changed",
 	"backups/changed",
 	"clientPermissions/changed",
 	"clone/changed",

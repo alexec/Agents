@@ -64,6 +64,8 @@ something particular done.
 
 - [Choose a runtime, model and mode](choose-runtime-model-mode.md): what an agent runs
   on, and the meter for its context and cost.
+- [Use Auto](use-auto.md): start a session on Auto, choose which runtimes it uses and in
+  what order, and read or change what each value is on each runtime.
 - [Pick up a conversation started somewhere else](pick-up-a-conversation.md): carry on
   in Agents with one you began in Terminal, or delete one.
 - [Answer a question or a permission request](answer-a-question.md): from the Mac, the

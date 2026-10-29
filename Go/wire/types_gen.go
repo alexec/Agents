@@ -270,6 +270,15 @@ type Agent struct {
 	// The added account its runtime runs with (#840); absent for the runtime's own sign-in.
 	AccountID *string `json:"accountID,omitzero"`
 
+	// Set when the agent started on Auto (#2658, FR-007).
+	Auto *AutoPick `json:"auto,omitzero"`
+
+	// The agent's own answer to permission requests (#2658, FR-019); absent follows Settings.
+	ClientPermission *ClientPermissionMode `json:"clientPermission,omitzero"`
+
+	// The shared values the agent runs with now (#2658), where its own settings match one; a field that is absent shows Custom.
+	Levels *Levels `json:"levels,omitzero"`
+
 	// When the agent last ended voice mode with hang_up (#2375): the person said they were done talking. A client in voice mode on this chat says the reply, then turns voice mode off.
 	VoiceHungUpAt *Date `json:"voiceHungUpAt,omitzero"`
 }
@@ -963,6 +972,138 @@ type AuthenticateRequest struct {
 
 	// An added account to sign in (#840); absent for the runtime's own sign-in.
 	AccountID *string `json:"accountID,omitzero"`
+}
+
+// A field Auto maps (#2658): the model level, the permission mode, the permission requests and the sandbox.
+type AutoField string
+
+const AutoFieldModel AutoField = "model"
+const AutoFieldPermission AutoField = "permission"
+const AutoFieldPermissionRequests AutoField = "permissionRequests"
+const AutoFieldSandbox AutoField = "sandbox"
+
+// One cell of Settings ▸ Agent Runtimes ▸ Auto ▸ Mappings (#2658): what a level is on one runtime. native is absent when the runtime cannot honour the level.
+type AutoMapping struct {
+	RuntimeID string `json:"runtimeID"`
+
+	Field AutoField `json:"field"`
+
+	// A ModelLevel, PermissionLevel, ClientPermissionMode or SandboxChoice, by field.
+	Level string `json:"level"`
+
+	Native *NativeSetting `json:"native,omitzero"`
+
+	// The runtime's own words for native, such as Sonnet 5 or Accept edits.
+	Words string `json:"words"`
+
+	Mark AutoMark `json:"mark"`
+
+	// One line, such as nearest safer: no plan mode.
+	Note *string `json:"note,omitzero"`
+}
+
+// auto/mappings: every cell, and each runtime's own choices a cell can be set to.
+type AutoMappings struct {
+	Cells []AutoMapping `json:"cells"`
+
+	Choices []AutoNativeChoice `json:"choices"`
+}
+
+// How a cell got its value: the shipped map, the nearest value with less access, the person's own, none possible, or a value the runtime no longer offers.
+type AutoMark string
+
+const AutoMarkAutoMapped AutoMark = "autoMapped"
+const AutoMarkNearestSafer AutoMark = "nearestSafer"
+const AutoMarkYours AutoMark = "yours"
+const AutoMarkNotPossible AutoMark = "notPossible"
+const AutoMarkDropped AutoMark = "dropped"
+
+// UnmarshalJSON reads a value this build does not know as "autoMapped".
+func (v *AutoMark) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	switch AutoMark(s) {
+	case AutoMarkAutoMapped,
+		AutoMarkNearestSafer,
+		AutoMarkYours,
+		AutoMarkNotPossible,
+		AutoMarkDropped:
+		*v = AutoMark(s)
+
+	default:
+		*v = AutoMarkAutoMapped
+	}
+	return nil
+}
+
+// One of a runtime's own settings that a cell of a field can be set to.
+type AutoNativeChoice struct {
+	RuntimeID string `json:"runtimeID"`
+
+	Field AutoField `json:"field"`
+
+	Native NativeSetting `json:"native"`
+
+	Words string `json:"words"`
+}
+
+// The person's own value for one cell (#2658, FR-016).
+type AutoOverride struct {
+	RuntimeID string `json:"runtimeID"`
+
+	Field AutoField `json:"field"`
+
+	Level string `json:"level"`
+
+	Native NativeSetting `json:"native"`
+}
+
+// On an Auto agent (#2658, FR-007): the runtime Auto picked, the levels asked for, the native settings given, and why each runtime before it was not used. The runtime never changes in the session.
+type AutoPick struct {
+	RuntimeID string `json:"runtimeID"`
+
+	Levels Levels `json:"levels"`
+
+	Native NativeSetting `json:"native"`
+
+	Skipped []AutoSkip `json:"skipped"`
+}
+
+// auto/preview: the runtime Auto would pick now and what it would give, or why none can.
+type AutoPreview struct {
+	RuntimeID *string `json:"runtimeID,omitzero"`
+
+	Native *NativeSetting `json:"native,omitzero"`
+
+	Skipped []AutoSkip `json:"skipped"`
+}
+
+type AutoPreviewRequest struct {
+	Cwd URL `json:"cwd"`
+
+	Levels *Levels `json:"levels,omitzero"`
+
+	Sandbox *SandboxChoice `json:"sandbox,omitzero"`
+}
+
+// The person's Auto settings (#2658, FR-017), in <settings>/auto.json: the order Auto tries the runtimes in (one not named goes last, in the shipped order), the runtimes it never uses, and their own values for cells.
+type AutoSettings struct {
+	Order []string `json:"order"`
+
+	Excluded []string `json:"excluded"`
+
+	Overrides []AutoOverride `json:"overrides"`
+
+	SetBy *PolicySetBy `json:"setBy,omitzero"`
+}
+
+// Why Auto did not use a runtime, in short: out, not signed in, not installed, excluded, no Runtime sandbox.
+type AutoSkip struct {
+	RuntimeID string `json:"runtimeID"`
+
+	Reason string `json:"reason"`
 }
 
 type BackgroundItem struct {
@@ -2437,6 +2578,9 @@ type ContinueInNewRequest struct {
 	AccountID *string `json:"accountID,omitzero"`
 
 	RequestID *UUID `json:"requestID,omitzero"`
+
+	// Continue on Auto (#2658, FR-022): the successor starts on the runtime Auto would pick now, with the session's values. Only for an Auto session.
+	Auto *bool `json:"auto,omitzero"`
 }
 
 // When a chat paused by a spent allowance carries on by itself (#1859).
@@ -4258,6 +4402,15 @@ type LendSignIn struct {
 	Allowed bool `json:"allowed"`
 }
 
+// The values a session asks for in the words every runtime shares (#2658). Each is mapped to the runtime's own setting; a native value in startOptions for the same option wins.
+type Levels struct {
+	Model *ModelLevel `json:"model,omitzero"`
+
+	Permission *PermissionLevel `json:"permission,omitzero"`
+
+	PermissionRequests *ClientPermissionMode `json:"permissionRequests,omitzero"`
+}
+
 type LineMember struct {
 	AgentID UUID `json:"agentID"`
 
@@ -5442,6 +5595,31 @@ type MissingFolder struct {
 	BranchKept bool `json:"branchKept"`
 }
 
+// Fast: the runtime's smallest quick model; Balanced: its usual model; Smart: its most capable model (#2658).
+type ModelLevel string
+
+const ModelLevelFast ModelLevel = "fast"
+const ModelLevelBalanced ModelLevel = "balanced"
+const ModelLevelSmart ModelLevel = "smart"
+
+// UnmarshalJSON reads a value this build does not know as "balanced".
+func (v *ModelLevel) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	switch ModelLevel(s) {
+	case ModelLevelFast,
+		ModelLevelBalanced,
+		ModelLevelSmart:
+		*v = ModelLevel(s)
+
+	default:
+		*v = ModelLevelBalanced
+	}
+	return nil
+}
+
 // What a person's move came to. The message is what the window may show.
 type MoveAnswer struct {
 	When MoveWhen `json:"when"`
@@ -5488,6 +5666,15 @@ type MoveWhen string
 const MoveWhenNow MoveWhen = "now"
 const MoveWhenAfterTurn MoveWhen = "afterTurn"
 const MoveWhenNothing MoveWhen = "nothing"
+
+// A runtime's own setting for one level: config option values (mode, model, effort), a sandbox choice, or the answer to permission requests.
+type NativeSetting struct {
+	Options map[string]JSONValue `json:"options,omitzero"`
+
+	Sandbox *SandboxChoice `json:"sandbox,omitzero"`
+
+	ClientPermission *ClientPermissionMode `json:"clientPermission,omitzero"`
+}
 
 type Need struct {
 	ID NeedID `json:"id"`
@@ -5994,6 +6181,31 @@ type PeopleList struct {
 	People []PersonRow `json:"people"`
 
 	Admin bool `json:"admin"`
+}
+
+// Plan: reads and plans, changes nothing; Ask: asks before it changes things; Approve for me: does not ask for normal changes in its folder (#2658).
+type PermissionLevel string
+
+const PermissionLevelPlan PermissionLevel = "plan"
+const PermissionLevelAsk PermissionLevel = "ask"
+const PermissionLevelApproveForMe PermissionLevel = "approveForMe"
+
+// UnmarshalJSON reads a value this build does not know as "ask".
+func (v *PermissionLevel) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	switch PermissionLevel(s) {
+	case PermissionLevelPlan,
+		PermissionLevelAsk,
+		PermissionLevelApproveForMe:
+		*v = PermissionLevel(s)
+
+	default:
+		*v = PermissionLevelAsk
+	}
+	return nil
 }
 
 type PermissionNotification struct {
@@ -8137,6 +8349,13 @@ type SetCeilingRequest struct {
 	TokenCeiling *int64 `json:"tokenCeiling,omitzero"`
 }
 
+// An agent's own answer to permission requests (#2658, FR-019); no mode follows Settings.
+type SetClientPermissionRequest struct {
+	AgentID UUID `json:"agentID"`
+
+	Mode *ClientPermissionMode `json:"mode,omitzero"`
+}
+
 type SetDiskSpaceRequest struct {
 	Folder URL `json:"folder"`
 
@@ -8162,6 +8381,13 @@ type SetLabelsRequest struct {
 	Add []string `json:"add"`
 
 	Remove []string `json:"remove"`
+}
+
+// Change a running agent's model level or permission mode on its own runtime (#2658): each is mapped as at its start. An Auto agent keeps its runtime.
+type SetLevelsRequest struct {
+	AgentID UUID `json:"agentID"`
+
+	Levels Levels `json:"levels"`
 }
 
 type SetLimitsRequest struct {
@@ -8951,6 +9177,9 @@ type StartRequest struct {
 	Labels []string `json:"labels"`
 
 	Persona *string `json:"persona,omitzero"`
+
+	// The values in the shared words (#2658). With runtimeID auto, the daemon picks the runtime (FR-006).
+	Levels *Levels `json:"levels,omitzero"`
 
 	Purpose *AgentPurpose `json:"purpose,omitzero"`
 
@@ -10337,6 +10566,12 @@ type WorkflowSettings struct {
 	Model *string `json:"model,omitzero"`
 
 	Effort *string `json:"effort,omitzero"`
+
+	// permission-requests: request-cards or yes-to-all (#2658).
+	PermissionRequests *string `json:"permissionRequests,omitzero"`
+
+	// sandbox: default, runtime or none (#2658).
+	Sandbox *string `json:"sandbox,omitzero"`
 
 	Options map[string]string `json:"options"`
 

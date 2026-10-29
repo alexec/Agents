@@ -533,18 +533,30 @@ struct PromptBar: View {
     /// order. It scrolls sideways, as the Mac's does in a narrow window, rather than
     /// wrapping or cutting a control short; the row is given a floor of its own width
     /// so the spacer has something to push against.
+    /// A Model or Permission mode pill (#2658), as the Mac's.
+    private func levelPill(_ field: AutoField, own: [ConfigOption]) -> some View {
+        LevelPill(field: field,
+                  chosen: field == .model ? agent.levels?.model?.rawValue : agent.levels?.permission?.rawValue,
+                  runtimeName: PromptWords.runtimeName(agent.runtimeID),
+                  cell: { model.autoMappings.cell(agent.runtimeID, field, $0) },
+                  own: own, binding: binding(for:)) { level in
+            Task { await model.setAgentLevel(agent.id, field, level) }
+        }
+    }
+
     private func optionsRow(_ shown: [ConfigOption]) -> some View {
         ScrollView(.horizontal) {
             HStack(spacing: 10) {
                 if ClientPermissionSettings.supports(agent.runtimeID) {
-                    ClientPermissionCapsule(runtimeID: agent.runtimeID,
-                                            mode: model.clientPermissions.mode(for: agent.runtimeID)) { mode in
-                        let settings = model.clientPermissions.setting(mode, for: agent.runtimeID)
-                        Task { await model.setClientPermissions(settings) }
+                    ClientPermissionCapsule(runtimeID: agent.runtimeID, own: agent.clientPermission,
+                                            settings: model.clientPermissions.mode(for: agent.runtimeID)) { mode in
+                        Task { await model.setAgentClientPermission(agent.id, mode) }
                     }
                 }
-                ForEach(shown.filter(\.isAboutPermission)) { option in
-                    OptionMenu(option: option, chosen: binding(for: option))
+                // The permission mode in the shared words (#2658), the runtime's own behind ⋯.
+                let permissions = shown.filter(\.isAboutPermission)
+                if !permissions.isEmpty || model.autoMappings.cell(agent.runtimeID, .permission, "ask")?.native != nil {
+                    levelPill(.permission, own: permissions)
                 }
                 // The command sandbox, beside the mode, as on the Mac (064).
                 SandboxCapsule(runtimeID: agent.runtimeID,
@@ -559,7 +571,7 @@ struct PromptBar: View {
                 Spacer(minLength: 16)
                 let others = shown.filter { !$0.isAboutPermission }
                 if !others.isEmpty {
-                    ModelPill(options: others, binding: binding(for:))
+                    levelPill(.model, own: others)
                 }
                 // What it has used, beside how it thinks.
                 ContextMeter(agent: agent)

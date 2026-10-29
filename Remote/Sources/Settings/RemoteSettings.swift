@@ -28,6 +28,11 @@ struct RemoteSettings: View {
                     MachinesSettingsRow()
                 }
                 .paperListRow()
+                // Auto's order and Mappings, kept on the Mac's host (#2658).
+                Section("Agent Runtimes") {
+                    AutoSettingsRow()
+                }
+                .paperListRow()
                 Section("Agent Configuration") {
                     AgentConfigSettingsRow(kind: .skills)
                     AgentConfigSettingsRow(kind: .personas)

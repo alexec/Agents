@@ -207,6 +207,13 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// When the agent last ended voice mode with hang_up (#2375): the person said they
     /// were done talking. Voice mode on this chat says the reply, then turns off.
     public var voiceHungUpAt: Date?
+    /// Set when the agent started on Auto (#2658): the runtime picked and what it was given.
+    public var auto: AutoPick?
+    /// The agent's own answer to permission requests (#2658); nil follows Settings.
+    public var clientPermission: ClientPermissionMode?
+    /// The shared values it runs with now, where its own settings match one; a field that is
+    /// nil shows Custom (#2658).
+    public var levels: Levels?
 
     /// How many times in a row this chat has been picked back up after the daemon
     /// went, without a turn since reaching its own end. On the record and not in
@@ -383,6 +390,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         persona = try c.decodeIfPresent(String.self, forKey: .persona)
         accountID = try c.decodeIfPresent(String.self, forKey: .accountID)
         voiceHungUpAt = try c.decodeIfPresent(Date.self, forKey: .voiceHungUpAt)
+        auto = try? c.decodeIfPresent(AutoPick.self, forKey: .auto)
+        clientPermission = try? c.decodeIfPresent(ClientPermissionMode.self, forKey: .clientPermission)
+        levels = try? c.decodeIfPresent(Levels.self, forKey: .levels)
         // New in 011, and counted from nothing, so every record written before the
         // restart guard existed opens as a chat that has never been picked back up.
         restartPickUps = try c.decodeIfPresent(Int.self, forKey: .restartPickUps) ?? 0
@@ -493,6 +503,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(persona, forKey: .persona)
         try c.encodeIfPresent(accountID, forKey: .accountID)
         try c.encodeIfPresent(voiceHungUpAt, forKey: .voiceHungUpAt)
+        try c.encodeIfPresent(auto, forKey: .auto)
+        try c.encodeIfPresent(clientPermission, forKey: .clientPermission)
+        try c.encodeIfPresent(levels, forKey: .levels)
         if restartPickUps != 0 { try c.encode(restartPickUps, forKey: .restartPickUps) }
         try c.encodeIfPresent(report, forKey: .report)
         if outcomeAsked { try c.encode(outcomeAsked, forKey: .outcomeAsked) }
@@ -535,6 +548,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case persona
         case accountID
         case voiceHungUpAt
+        case auto
+        case clientPermission
+        case levels
         case worktree
         case pendingMove
         case startingPoint

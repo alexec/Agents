@@ -23,6 +23,7 @@ export type ResourceName = string & { readonly __brand: "ResourceName" };
 export const Failure = {
   agentLimitReached: -32023,
   agentsWorking: -32068,
+  autoNoRuntime: -32083,
   botMachine: -32073,
   busy: -32040,
   catalogRefused: -32080,
@@ -293,6 +294,15 @@ export interface Agent {
   runningTool?: string;
   /** The added account its runtime runs with (#840); absent for the runtime's own sign-in. */
   accountID?: string;
+  /** Set when the agent started on Auto (#2658, FR-007). */
+  auto?: AutoPick;
+  /** The agent's own answer to permission requests (#2658, FR-019); absent follows Settings. */
+  clientPermission?: ClientPermissionMode;
+  /**
+   * The shared values the agent runs with now (#2658), where its own settings match one; a field
+   * that is absent shows Custom.
+   */
+  levels?: Levels;
   /**
    * When the agent last ended voice mode with hang_up (#2375): the person said they were done
    * talking. A client in voice mode on this chat says the reply, then turns voice mode off.
@@ -841,6 +851,112 @@ export interface AuthenticateRequest {
   methodID: string;
   /** An added account to sign in (#840); absent for the runtime's own sign-in. */
   accountID?: string;
+}
+
+/**
+ * A field Auto maps (#2658): the model level, the permission mode, the permission requests and the
+ * sandbox.
+ */
+export type AutoField =
+  | "model"
+  | "permission"
+  | "permissionRequests"
+  | "sandbox";
+
+/**
+ * One cell of Settings ▸ Agent Runtimes ▸ Auto ▸ Mappings (#2658): what a level is on one runtime.
+ * native is absent when the runtime cannot honour the level.
+ */
+export interface AutoMapping {
+  runtimeID: string;
+  field: AutoField;
+  /** A ModelLevel, PermissionLevel, ClientPermissionMode or SandboxChoice, by field. */
+  level: string;
+  native?: NativeSetting;
+  /** The runtime's own words for native, such as Sonnet 5 or Accept edits. */
+  words: string;
+  mark: AutoMark;
+  /** One line, such as nearest safer: no plan mode. */
+  note?: string;
+}
+
+/** auto/mappings: every cell, and each runtime's own choices a cell can be set to. */
+export interface AutoMappings {
+  cells: AutoMapping[];
+  choices: AutoNativeChoice[];
+}
+
+/**
+ * How a cell got its value: the shipped map, the nearest value with less access, the person's own,
+ * none possible, or a value the runtime no longer offers.
+ */
+export type AutoMark =
+  | "autoMapped"
+  | "nearestSafer"
+  | "yours"
+  | "notPossible"
+  | "dropped";
+
+/** One of a runtime's own settings that a cell of a field can be set to. */
+export interface AutoNativeChoice {
+  runtimeID: string;
+  field: AutoField;
+  native: NativeSetting;
+  words: string;
+}
+
+/** The person's own value for one cell (#2658, FR-016). */
+export interface AutoOverride {
+  runtimeID: string;
+  field: AutoField;
+  level: string;
+  native: NativeSetting;
+}
+
+/**
+ * On an Auto agent (#2658, FR-007): the runtime Auto picked, the levels asked for, the native
+ * settings given, and why each runtime before it was not used. The runtime never changes in the
+ * session.
+ */
+export interface AutoPick {
+  runtimeID: string;
+  levels: Levels;
+  native: NativeSetting;
+  skipped: AutoSkip[];
+}
+
+/** auto/preview: the runtime Auto would pick now and what it would give, or why none can. */
+export interface AutoPreview {
+  runtimeID?: string;
+  native?: NativeSetting;
+  skipped: AutoSkip[];
+}
+
+export interface AutoPreviewRequest {
+  cwd: URLString;
+  levels?: Levels;
+  sandbox?: SandboxChoice;
+}
+
+/**
+ * The person's Auto settings (#2658, FR-017), in <settings>/auto.json: the order Auto tries the
+ * runtimes in (one not named goes last, in the shipped order), the runtimes it never uses, and
+ * their own values for cells.
+ */
+export interface AutoSettings {
+  order: string[];
+  excluded: string[];
+  overrides: AutoOverride[];
+  setBy?: PolicySetBy;
+}
+
+/**
+ * Why Auto did not use a runtime, in short: out, not signed in, not installed, excluded, no Runtime
+ * sandbox.
+ */
+export interface AutoSkip {
+  runtimeID: string;
+  reason: string;
 }
 
 export interface BackgroundItem {
@@ -2014,6 +2130,11 @@ export interface ContinueInNewRequest {
    */
   accountID?: string;
   requestID?: UUID;
+  /**
+   * Continue on Auto (#2658, FR-022): the successor starts on the runtime Auto would pick now, with
+   * the session's values. Only for an Auto session.
+   */
+  auto?: boolean;
 }
 
 /** When a chat paused by a spent allowance carries on by itself (#1859). */
@@ -3384,6 +3505,16 @@ export interface LendSignIn {
   allowed: boolean;
 }
 
+/**
+ * The values a session asks for in the words every runtime shares (#2658). Each is mapped to the
+ * runtime's own setting; a native value in startOptions for the same option wins.
+ */
+export interface Levels {
+  model?: ModelLevel;
+  permission?: PermissionLevel;
+  permissionRequests?: ClientPermissionMode;
+}
+
 export interface LineMember {
   agentID: UUID;
   askedAt: WireDate;
@@ -4222,6 +4353,15 @@ export interface MissingFolder {
   branchKept: boolean;
 }
 
+/**
+ * Fast: the runtime's smallest quick model; Balanced: its usual model; Smart: its most capable
+ * model (#2658).
+ */
+export type ModelLevel =
+  | "fast"
+  | "balanced"
+  | "smart";
+
 /** What a person's move came to. The message is what the window may show. */
 export interface MoveAnswer {
   when: MoveWhen;
@@ -4250,6 +4390,16 @@ export type MoveWhen =
   | "now"
   | "afterTurn"
   | "nothing";
+
+/**
+ * A runtime's own setting for one level: config option values (mode, model, effort), a sandbox
+ * choice, or the answer to permission requests.
+ */
+export interface NativeSetting {
+  options?: Record<string, JSONValue>;
+  sandbox?: SandboxChoice;
+  clientPermission?: ClientPermissionMode;
+}
 
 export interface Need {
   id: NeedID;
@@ -4696,6 +4846,15 @@ export interface PeopleList {
   people: PersonRow[];
   admin: boolean;
 }
+
+/**
+ * Plan: reads and plans, changes nothing; Ask: asks before it changes things; Approve for me: does
+ * not ask for normal changes in its folder (#2658).
+ */
+export type PermissionLevel =
+  | "plan"
+  | "ask"
+  | "approveForMe";
 
 export interface PermissionNotification {
   agentID: UUID;
@@ -6446,6 +6605,12 @@ export interface SetCeilingRequest {
   tokenCeiling?: number;
 }
 
+/** An agent's own answer to permission requests (#2658, FR-019); no mode follows Settings. */
+export interface SetClientPermissionRequest {
+  agentID: UUID;
+  mode?: ClientPermissionMode;
+}
+
 export interface SetDiskSpaceRequest {
   folder: URLString;
   diskSpace: DiskThresholds;
@@ -6466,6 +6631,15 @@ export interface SetLabelsRequest {
   agentID: UUID;
   add: string[];
   remove: string[];
+}
+
+/**
+ * Change a running agent's model level or permission mode on its own runtime (#2658): each is
+ * mapped as at its start. An Auto agent keeps its runtime.
+ */
+export interface SetLevelsRequest {
+  agentID: UUID;
+  levels: Levels;
 }
 
 export interface SetLimitsRequest {
@@ -7150,6 +7324,11 @@ export interface StartRequest {
   sandbox?: SandboxChoice;
   labels: string[];
   persona?: string;
+  /**
+   * The values in the shared words (#2658). With runtimeID auto, the daemon picks the runtime
+   * (FR-006).
+   */
+  levels?: Levels;
   purpose?: AgentPurpose;
   /** The added account the session uses (#840); absent for the runtime's own sign-in. */
   accountID?: string;
@@ -8069,6 +8248,10 @@ export interface WorkflowSettings {
   runtimeID?: string;
   model?: string;
   effort?: string;
+  /** permission-requests: request-cards or yes-to-all (#2658). */
+  permissionRequests?: string;
+  /** sandbox: default, runtime or none (#2658). */
+  sandbox?: string;
   options: Record<string, string>;
   labels: string[];
 }
@@ -8250,7 +8433,9 @@ export interface Methods {
   "agents/said": { params: SaidSearchRequest; result: SaidSearchResult };
   "agents/sendNow": { params: UnqueueRequest; result: Empty };
   "agents/setCeiling": { params: SetCeilingRequest; result: Agent };
+  "agents/setClientPermission": { params: SetClientPermissionRequest; result: Agent };
   "agents/setLabels": { params: SetLabelsRequest; result: Agent };
+  "agents/setLevels": { params: SetLevelsRequest; result: Agent };
   "agents/setMuted": { params: SetMutedRequest; result: Empty };
   "agents/setOption": { params: SetOptionRequest; result: ConfigOption[] };
   "agents/setSandbox": { params: SetSandboxRequest; result: Agent };
@@ -8271,6 +8456,10 @@ export interface Methods {
   "audit/list": { params: AuditQuery; result: AuditList };
   "audit/setSinks": { params: AuditSinks; result: AuditSinksState };
   "audit/sinks": { params: Empty; result: AuditSinksState };
+  "auto/mappings": { params: Empty; result: AutoMappings };
+  "auto/preview": { params: AutoPreviewRequest; result: AutoPreview };
+  "auto/set": { params: AutoSettings; result: AutoSettings };
+  "auto/state": { params: Empty; result: AutoSettings };
   "backups/configure": { params: BackupSettings; result: BackupState };
   "backups/make": { params: BackupMakeRequest; result: BackupState };
   "backups/restore": { params: BackupRestoreRequest; result: BackupRestoreResult };
@@ -8529,7 +8718,9 @@ export const MethodTarget = {
   "agents/said": "host",
   "agents/sendNow": "host",
   "agents/setCeiling": "host",
+  "agents/setClientPermission": "host",
   "agents/setLabels": "host",
+  "agents/setLevels": "host",
   "agents/setMuted": "host",
   "agents/setOption": "host",
   "agents/setSandbox": "host",
@@ -8550,6 +8741,10 @@ export const MethodTarget = {
   "audit/list": "control",
   "audit/setSinks": "control",
   "audit/sinks": "control",
+  "auto/mappings": "host",
+  "auto/preview": "host",
+  "auto/set": "host",
+  "auto/state": "host",
   "backups/configure": "host",
   "backups/make": "host",
   "backups/restore": "host",
@@ -8788,6 +8983,7 @@ export interface Notifications {
   "agent/showFile": ShowFileNotification;
   "agents/draftOptions": DraftOptionsNotification;
   "attention/changed": AttentionNotification;
+  "auto/changed": AutoSettings;
   "backups/changed": BackupState;
   "clientPermissions/changed": ClientPermissionSettings;
   "clone/changed": CloneNotification;
@@ -8845,7 +9041,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AddFolderRequest: { required: ["folder"], optional: ["project"] },
   Admitted: { required: [], optional: ["client", "host", "grant"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "voiceHungUpAt"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt"] },
   AgentConfigEditorFile: { required: ["path", "content"], optional: [] },
   AgentConfigEditorRequest: { required: ["kind"], optional: ["folder"] },
   AgentConfigEditorSaveRequest: { required: ["kind", "path", "content"], optional: ["folder", "delete"] },
@@ -8899,6 +9095,15 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AuditSinksState: { required: ["sinks"], optional: [] },
   AuthStatus: { required: ["kind", "label"], optional: [] },
   AuthenticateRequest: { required: ["runtimeID", "methodID"], optional: ["accountID"] },
+  AutoMapping: { required: ["runtimeID", "field", "level", "words", "mark"], optional: ["native", "note"] },
+  AutoMappings: { required: ["cells", "choices"], optional: [] },
+  AutoNativeChoice: { required: ["runtimeID", "field", "native", "words"], optional: [] },
+  AutoOverride: { required: ["runtimeID", "field", "level", "native"], optional: [] },
+  AutoPick: { required: ["runtimeID", "levels", "native", "skipped"], optional: [] },
+  AutoPreview: { required: ["skipped"], optional: ["runtimeID", "native"] },
+  AutoPreviewRequest: { required: ["cwd"], optional: ["levels", "sandbox"] },
+  AutoSettings: { required: ["order", "excluded", "overrides"], optional: ["setBy"] },
+  AutoSkip: { required: ["runtimeID", "reason"], optional: [] },
   BackgroundItem: { required: ["id", "kind", "name", "state", "canStop", "isStopping", "startedAt"], optional: ["taskType", "detail", "command", "parentID", "toolCallID", "outputFilePath", "summary", "lastToolName", "endedAt"] },
   Backup: { required: ["id", "machine", "rootID", "madeAt", "bytes", "agents", "thisMachine"], optional: [] },
   BackupMakeRequest: { required: [], optional: ["wait"] },
@@ -8993,7 +9198,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConsoleStopAgent: { required: ["host", "agent"], optional: [] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ContinueInFolderRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
-  ContinueInNewRequest: { required: ["agentID"], optional: ["accountID", "requestID"] },
+  ContinueInNewRequest: { required: ["agentID"], optional: ["accountID", "requestID", "auto"] },
   ContinueWhenBack: { required: ["at", "resetKnown"], optional: [] },
   ControlAuth: { required: ["id", "nonce", "mac", "kind"], optional: ["for", "epoch", "capabilities", "page", "publicKey"] },
   ControlClientChanged: { required: [], optional: ["client", "removed"] },
@@ -9145,6 +9350,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LeaseTokenRequest: { required: ["token"], optional: [] },
   LendGit: { required: ["host", "from", "server", "allowed"], optional: [] },
   LendSignIn: { required: ["host", "from", "runtime", "allowed"], optional: [] },
+  Levels: { required: [], optional: ["model", "permission", "permissionRequests"] },
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
   ListCursor: { required: ["lastActivityAt", "id"], optional: ["archivedAt"] },
   ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query"] },
@@ -9236,6 +9442,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MissingFolder: { required: ["branchKept"], optional: [] },
   MoveAnswer: { required: ["when", "message"], optional: ["agent"] },
   MoveRequest: { required: ["agentID", "removeLeft", "discardChanges"], optional: ["target"] },
+  NativeSetting: { required: [], optional: ["options", "sandbox", "clientPermission"] },
   Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID"] },
   OTLPExport: { required: ["endpoint", "every"], optional: ["lastSent", "lastFailure", "failedAt"] },
   OptionsRequest: { required: ["runtimeID", "cwd", "mcpServers"], optional: [] },
@@ -9454,10 +9661,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SessionNotice: { required: ["severity", "title"], optional: ["detail"] },
   SessionsListRequest: { required: ["runtimeID", "cwd"], optional: [] },
   SetCeilingRequest: { required: ["agentID"], optional: ["ceiling", "tokenCeiling"] },
+  SetClientPermissionRequest: { required: ["agentID"], optional: ["mode"] },
   SetDiskSpaceRequest: { required: ["folder", "diskSpace"], optional: [] },
   SetFolderProjectRequest: { required: ["folder", "project"], optional: [] },
   SetHelperLimitsRequest: { required: ["folder", "limits"], optional: [] },
   SetLabelsRequest: { required: ["agentID", "add", "remove"], optional: [] },
+  SetLevelsRequest: { required: ["agentID", "levels"], optional: [] },
   SetLimitsRequest: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
   SetMutedRequest: { required: ["agentID", "muted"], optional: [] },
   SetOptionRequest: { required: ["agentID", "optionID", "value"], optional: [] },
@@ -9536,7 +9745,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SlashCommand: { required: ["name"], optional: ["description", "inputHint"] },
   SpendCaps: { required: [], optional: ["dailyUSD"] },
   StartOptions: { required: ["values", "extraArguments"], optional: [] },
-  StartRequest: { required: ["runtimeID", "cwd", "prompt", "attachments", "startOptions", "additionalDirectories", "mcpServers", "labels"], optional: ["draftID", "worktree", "requestID", "sandbox", "persona", "purpose", "accountID", "voice"] },
+  StartRequest: { required: ["runtimeID", "cwd", "prompt", "attachments", "startOptions", "additionalDirectories", "mcpServers", "labels"], optional: ["draftID", "worktree", "requestID", "sandbox", "persona", "levels", "purpose", "accountID", "voice"] },
   StartedMachinePreview: { required: ["host", "name", "state", "unpushed"], optional: ["unknown"] },
   StartingPoint: { required: ["repository", "commit"], optional: [] },
   StopBackgroundRequest: { required: ["agentID", "itemID"], optional: [] },
@@ -9617,7 +9826,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowRemovedNotification: { required: ["folder", "workflowID"], optional: [] },
   WorkflowRequest: { required: ["folder", "workflowID"], optional: [] },
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
-  WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort"] },
+  WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort", "permissionRequests", "sandbox"] },
   WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "whenDone", "continueWhenBack", "runsOn"] },
   WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["scope", "content", "overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "hearsFor", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
   WorkflowWriteRequest: { required: ["workflowID", "content"], optional: [] },

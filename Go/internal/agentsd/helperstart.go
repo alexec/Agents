@@ -257,6 +257,10 @@ func (d *Daemon) startSession(caller wire.UUID, args map[string]json.RawMessage)
 	runtimeID := strings.TrimSpace(argString(args, "runtime"))
 	if runtimeID == "" {
 		runtimeID = me.RuntimeID
+		// A helper of an Auto agent is on Auto too, and Auto picks again (FR-012).
+		if me.Auto != nil {
+			runtimeID = autoRuntimeID
+		}
 	}
 	model := strings.TrimSpace(argString(args, "model"))
 	labels, err := stringList(args, "labels")
@@ -264,6 +268,9 @@ func (d *Daemon) startSession(caller wire.UUID, args map[string]json.RawMessage)
 		return "", err
 	}
 	mode := inheritedMode(me, runtimeID)
+	if runtimeID == autoRuntimeID {
+		return d.startAutoHelper(me, args, prompt, model, labels)
+	}
 	if wanted := strings.TrimSpace(argString(args, "permission_mode")); wanted != "" {
 		own := inheritedMode(me, me.RuntimeID)
 		if own == nil || !noLooser(wanted, *own) {
@@ -322,6 +329,12 @@ func (d *Daemon) startSession(caller wire.UUID, args map[string]json.RawMessage)
 
 func helperRequest(runtimeID, folder, prompt, model string, mode *string, worktree *wire.WorktreeChoice, labels []string) wire.StartRequest {
 	values := map[string]wire.JSONValue{}
+	// On Auto the model and mode are the shared words (#2658); on a named runtime they are its
+	// own, and a workflow has made its words levels already (runAgent).
+	var levels *wire.Levels
+	if runtimeID == autoRuntimeID {
+		levels, model, mode, _, _ = fileLevels(runtimeID, model, mode, "", "")
+	}
 	if mode != nil {
 		values["mode"], _ = json.Marshal(*mode)
 	}
@@ -333,7 +346,7 @@ func helperRequest(runtimeID, folder, prompt, model string, mode *string, worktr
 	}
 	return wire.StartRequest{RuntimeID: runtimeID, Cwd: store.FolderURL(folder), Prompt: prompt, Attachments: []wire.Attachment{},
 		StartOptions: wire.StartOptions{Values: values, ExtraArguments: []string{}}, AdditionalDirectories: []wire.URL{},
-		McpServers: []wire.MCPServer{}, Worktree: worktree, Labels: labels}
+		McpServers: []wire.MCPServer{}, Worktree: worktree, Labels: labels, Levels: levels}
 }
 
 // queueHelper is queueHelper: a queued record, started by itself when there is a place.
@@ -585,4 +598,65 @@ func (d *Daemon) runtimeChoices(callerRuntime string) string {
 		lines = append(lines, "Not available on this machine: "+strings.Join(not, ", ")+".")
 	}
 	return strings.Join(lines, "\n")
+}
+
+// startAutoHelper is start_session on Auto (#2658, FR-012): the levels in the shared words,
+// none looser than the caller's own permission mode, which it takes when it names none.
+func (d *Daemon) startAutoHelper(me *wire.Agent, args map[string]json.RawMessage, prompt, model string, labels []string) (string, error) {
+	var own *wire.PermissionLevel
+	if me.Levels != nil {
+		own = me.Levels.Permission
+	}
+	if own == nil && me.Auto != nil {
+		own = me.Auto.Levels.Permission
+	}
+	var mode *string
+	if wanted := strings.TrimSpace(argString(args, "permission_mode")); wanted != "" {
+		mode = &wanted
+	} else if own != nil {
+		w := permissionWord(*own)
+		mode = &w
+	}
+	levels, _, _, _, err := fileLevels(autoRuntimeID, model, mode, "", "")
+	if err != nil {
+		return "", &Error{Code: CodeInvalidParams, Message: "Nothing was started: " + err.(*Error).Message}
+	}
+	// With no mode of the caller's to take, the helper plans: the least it may do.
+	if levels.Permission == nil {
+		p := wire.PermissionLevelPlan
+		levels.Permission = &p
+	}
+	rank := levelRank[wire.AutoFieldPermission]
+	if wanted := rank[string(*levels.Permission)]; own == nil && wanted > 0 || own != nil && wanted > rank[string(*own)] {
+		ownWords := "your runtime's own mode"
+		if own != nil {
+			ownWords = permissionWord(*own)
+		}
+		return "", Invalid("Nothing was started: %s would let it do more without asking than you may (%s). Name no mode and it takes yours.",
+			permissionWord(*levels.Permission), ownWords)
+	}
+	folder := folderPath(me)
+	worktree, err := d.helperWorktree(argString(args, "worktree"), folder)
+	if err != nil {
+		code, msg := errMessage(err)
+		return "", &Error{Code: code, Message: "Nothing was started: " + msg}
+	}
+	if full := d.helperLimitRefusal(folder); full != "" || len(d.helperQueue(folder)) > 0 {
+		w := permissionWord(*levels.Permission)
+		m := ""
+		if levels.Model != nil {
+			m = string(*levels.Model)
+		}
+		return d.queueHelper(me, prompt, autoRuntimeID, m, &w, worktree, labels, full)
+	}
+	r := helperRequest(autoRuntimeID, folder, prompt, "", nil, worktree, labels)
+	r.Levels = levels
+	id, err := d.startFor(r, startedBy{agent: &me.ID, owner: wire.SessionLabelOwnerAgent})
+	if err != nil {
+		code, msg := errMessage(err)
+		return "", &Error{Code: code, Message: "Nothing was started: " + msg}
+	}
+	a := d.Store.Agent(id)
+	return fmt.Sprintf("Started %s (id %s) on Auto, which picked %s. This folder now has %s.", quotedTitle(a.Title), id,
+		runtimeName(a.RuntimeID), d.helperPlaces(folder)), nil
 }

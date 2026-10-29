@@ -61,6 +61,11 @@ public extension DaemonAPI {
                 Row(Method.runtimesAccountProfiles, params: Empty.self, result: [AccountProfile].self, kind: .hostRequest),
                 // Each runtime's sandbox default, for the new session's "Use runtime default (…)" (#257).
                 Row(Method.sandboxState, params: Empty.self, result: SandboxSettings.self, kind: .hostRequest),
+                // Auto (#2658): the order and cells, what it would pick now.
+                Row(Method.autoState, params: Empty.self, result: AutoSettings.self, kind: .hostRequest),
+                Row(Method.autoSet, params: AutoSettings.self, result: AutoSettings.self, kind: .hostRequest),
+                Row(Method.autoMappings, params: Empty.self, result: AutoMappings.self, kind: .hostRequest),
+                Row(Method.autoPreview, params: AutoPreviewRequest.self, result: AutoPreview.self, kind: .hostRequest),
                 // The Mac-wide permission choices shown under Cursor, Grok and OpenCode.
                 Row(Method.clientPermissionsState, params: Empty.self, result: ClientPermissionSettings.self,
                     kind: .hostRequest),
@@ -223,6 +228,8 @@ public extension DaemonAPI {
                 Row(Method.agentsSetLabels, params: SetLabelsRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.agentsSetCeiling, params: SetCeilingRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.agentsSetSandbox, params: SetSandboxRequest.self, result: Agent.self, kind: .hostRequest),
+                Row(Method.agentsSetLevels, params: SetLevelsRequest.self, result: Agent.self, kind: .hostRequest),
+                Row(Method.agentsSetClientPermission, params: SetClientPermissionRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.agentsSetOption, params: SetOptionRequest.self, result: [ConfigOption].self, kind: .hostRequest),
                 Row(Method.permissionsAnswer, params: AnswerRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.elicitationsAnswer, params: AnswerElicitationRequest.self, result: Empty.self, kind: .hostRequest),
@@ -449,6 +456,7 @@ public extension DaemonAPI {
                 Row(Notification.agentChanged, params: Agent.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.clientPermissionsChanged, params: ClientPermissionSettings.self, result: Empty.self,
                     kind: .hostNotification),
+                Row(Notification.autoChanged, params: AutoSettings.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.daemonPolicyStateChanged, params: PolicyState.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.runtimesAccountProfilesChanged, params: [AccountProfile].self, result: Empty.self,

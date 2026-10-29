@@ -59,6 +59,7 @@ import { hostNeedsUpdate } from "../model/capabilities";
 import { WorkingMark } from "./SessionRow";
 import { runningTool } from "../model/sidebar";
 import { composerReason } from "../model/orgPolicy";
+import { autoHeader, cellOf } from "../model/levels";
 
 /** One opened turn's entries, so an earlier page can be put in front and drawn again (#291). */
 interface HeldTurn {
@@ -655,8 +656,17 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           {agent && (
           <PromptMenus options={drawable(agent.advertisedOptions, [])} disabled={down} runtime={runtimeNameOn(store, host, agent.runtimeID)}
               runtimeID={agent.runtimeID}
-              clientPermissionMode={store.clientPermissions.value[store.macHostID.value]?.[agent.runtimeID as keyof ClientPermissionSettings] ?? "default"}
-              onClientPermissionModeChange={(mode) => void store.setClientPermissionMode(agent.runtimeID, mode)}
+              clientPermission={{
+                own: agent.clientPermission,
+                settings: store.clientPermissions.value[store.macHostID.value]?.[agent.runtimeID as keyof ClientPermissionSettings] ?? "default",
+                set: (mode) => void store.setAgentClientPermission(host, agent.id, mode),
+              }}
+              levels={{
+                runtimeName: runtimeNameOn(store, host, agent.runtimeID),
+                chosen: (field) => agent.levels?.[field],
+                cell: (field, level) => cellOf(store.autoMappings.value[store.macHostID.value], agent.runtimeID, field, level),
+                choose: (field, level) => void store.setLevels(host, agent.id, field, level),
+              }}
               value={(o) => store.pendingOptions.value[agent.id]?.[o.id] ?? agent.startOptions.values[o.id] ?? o.currentValue}
               onChange={(o, v) => void store.setOption(host, agent.id, o.id, v)}
               trailing={<ContextMeter agent={agent} costs={store.costs.value[host]} />}
@@ -698,8 +708,10 @@ function runtimeNameOn(store: Store, host: string, runtimeID: string): string {
 
 /** With the account it runs on, when that is not the runtime's own sign-in: "Claude · Work" (#2259). */
 function RuntimeLabel({ store, host, agent }: { store: Store; host: string; agent: Agent }) {
-  const name = sessionRuntimeName(runtimeNameOn(store, host, agent.runtimeID), agent.runtimeID, agent.accountID,
+  const named = sessionRuntimeName(runtimeNameOn(store, host, agent.runtimeID), agent.runtimeID, agent.accountID,
     store.accountProfiles.value[host] ?? []);
+  // An Auto agent says so, with the runtime it picked (#2658, FR-009).
+  const name = agent.auto ? autoHeader(named) : named;
   const title = agent.accountID === undefined ? "Runtime" : "Runtime and account";
   return <span class="pill" title={title} aria-label={`Runtime: ${name}`}>{name}</span>;
 }
