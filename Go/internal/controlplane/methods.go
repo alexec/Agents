@@ -1001,6 +1001,35 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 	case "attention/need":
 		m.s.heard(host, params)
 		return map[string]any{}, nil
+	case "notices/take":
+		// The person's one bucket of notices, for every machine of theirs (#2859).
+		limits, err := require[wire.NoticeLimits](params, "NoticeLimits")
+		if err != nil {
+			return nil, err
+		}
+		if m.s.users == nil {
+			return nil, fail(notSupported, "This control plane keeps no user settings.")
+		}
+		return m.s.users.TakeNotice(ctx, m.s.ownerOf(host), limits)
+	case "user/setNoticeLimits":
+		// The one part a machine may set (#2859): its person's Burst and Cool-down, which
+		// run nothing on the person's other machines.
+		limits, err := require[wire.NoticeLimits](params, "NoticeLimits")
+		if err != nil {
+			return nil, err
+		}
+		if m.s.users == nil {
+			return nil, fail(notSupported, "This control plane keeps no user settings.")
+		}
+		user := m.s.ownerOf(host)
+		changed, err := m.s.users.SetNoticeLimits(ctx, user, limits)
+		if err != nil {
+			return nil, userFailure(err)
+		}
+		if changed {
+			m.s.userChanged(user, []wire.UserSettingsPartName{wire.UserSettingsPartNameNotifications}, false, host)
+		}
+		return map[string]any{}, nil
 	case "host/policyApplied":
 		applied, err := require[wire.PolicyApplied](params, "PolicyApplied")
 		if err != nil {

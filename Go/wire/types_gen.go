@@ -5757,6 +5757,13 @@ const NeedKindReport NeedKind = "report"
 const NeedKindGuardedChange NeedKind = "guardedChange"
 const NeedKindNotice NeedKind = "notice"
 
+// The person's attention (#2805, #2859): how many notices agents may send at once (burst, 1–20), and the minutes until one comes back (cooldownMinutes, 1–1440). The notifications part of the user settings, user/setNoticeLimits, and notices/take, which a host asks on its channel 0 before it posts a notice.
+type NoticeLimits struct {
+	Burst int64 `json:"burst"`
+
+	CooldownMinutes float64 `json:"cooldownMinutes"`
+}
+
 // What became of a notice an agent sent with `notify` (#2805): sent to where the person is, shown here (the person was looking at that chat), muted (#2003), or held in the cool-down.
 type NoticeOutcome string
 
@@ -5764,6 +5771,15 @@ const NoticeOutcomeSent NoticeOutcome = "sent"
 const NoticeOutcomeShownHere NoticeOutcome = "shownHere"
 const NoticeOutcomeMuted NoticeOutcome = "muted"
 const NoticeOutcomeCoolingDown NoticeOutcome = "coolingDown"
+
+// notices/take (#2859): whether a notice may go now, from the one bucket the control plane keeps for the person and every machine of theirs: how many more can go now, and when the next comes back.
+type NoticeTaken struct {
+	Sent bool `json:"sent"`
+
+	Left int64 `json:"left"`
+
+	NextAt Date `json:"nextAt"`
+}
 
 // The OTLP exporter of the report figures (#2019, #1804 decision 4), set on agents-control by OTEL_EXPORTER_OTLP_ENDPOINT, as this copy runs it: where it sends, the last send and the last failure.
 type OTLPExport struct {
@@ -10062,6 +10078,9 @@ type UserSettings struct {
 
 	CostLimits JSONValue `json:"costLimits,omitzero"`
 
+	// The person's notice limits (#2859), as a NoticeLimits.
+	Notifications JSONValue `json:"notifications,omitzero"`
+
 	// When a part last changed.
 	Updated *string `json:"updated,omitzero"`
 }
@@ -10083,13 +10102,14 @@ type UserSettingsPart struct {
 	Value JSONValue `json:"value"`
 }
 
-// A part of a person's user settings (#1760, #2410). Each part has one fixed scope: MCP servers, agent configuration, runtimes and cost limits follow the person. Resources belong to each machine.
+// A part of a person's user settings (#1760, #2410). Each part has one fixed scope: MCP servers, agent configuration, runtimes, cost limits and notices (#2859) follow the person. Resources belong to each machine.
 type UserSettingsPartName string
 
 const UserSettingsPartNameMcpServers UserSettingsPartName = "mcpServers"
 const UserSettingsPartNameAgentConfig UserSettingsPartName = "agentConfig"
 const UserSettingsPartNameRuntimes UserSettingsPartName = "runtimes"
 const UserSettingsPartNameCostLimits UserSettingsPartName = "costLimits"
+const UserSettingsPartNameNotifications UserSettingsPartName = "notifications"
 
 // user/suspended (#1002, FR-018): to each machine of a suspended person, at hello before its settings and within 5 seconds of a change; off: true ends it.
 type UserSuspended struct {
