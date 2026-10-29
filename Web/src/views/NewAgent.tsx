@@ -318,7 +318,9 @@ export function NewAgent({ store, host, folder, folderName, down }: {
     return out;
   }
   const levelProps: LevelProps = {
-    runtimeName: isAuto ? (autoPreview.value?.runtimeID ? runtimeNameOf(autoPreview.value.runtimeID) : undefined) : undefined,
+    // On a named runtime too, so the menus show "⋯ <runtime>'s own" as the chat's do (#2889).
+    runtimeName: isAuto ? (autoPreview.value?.runtimeID ? runtimeNameOf(autoPreview.value.runtimeID) : undefined)
+      : chosenRuntime ? runtimeNameOf(chosenRuntime) : undefined,
     chosen: (field) => isAuto ? levels.value[field]
       : matchLevel(mappings, chosenRuntime ?? "", field, (id) => form.value.chosen[id] ?? form.value.options.find((o) => o.id === id)?.currentValue),
     cell: (field, level) => cellOf(mappings, (isAuto ? autoPreview.value?.runtimeID : chosenRuntime) ?? "", field, level),
