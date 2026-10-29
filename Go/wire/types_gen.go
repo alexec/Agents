@@ -2065,6 +2065,9 @@ type ClientPermissionSettings struct {
 	Grok ClientPermissionMode `json:"grok"`
 
 	Opencode ClientPermissionMode `json:"opencode"`
+
+	// Set when the organisation's mode ceiling is below approving every request: Always-approve is refused, and no agent's requests are answered for the person.
+	SetBy *PolicySetBy `json:"setBy,omitzero"`
 }
 
 // A paired screen, as clients/list says it (ClientRecord). `grant` is always `operator`, for an older build (#111).

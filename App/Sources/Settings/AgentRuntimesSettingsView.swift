@@ -52,6 +52,8 @@ struct AgentRuntimesSettingsView: View {
                                 Text(LevelWords.requests(mode)).tag(mode)
                             }
                         }
+                        .disabled(model.clientPermissions.setBy != nil)
+                        if let mark = model.clientPermissions.setBy { OrgPolicyLine(mark: mark) }
                         Text("New \(status.runtime.name) agents, workflows and server folders follow this unless one is set otherwise under the prompt.")
                             .appText(.fine)
                             .foregroundStyle(.secondary)
