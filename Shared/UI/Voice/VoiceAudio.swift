@@ -44,6 +44,9 @@ final class VoiceAudio {
     func prepare() {
         #if os(macOS)
         guard listens, !isPrepared, !isOpen else { return }
+        // What it costs the window (P20261029-1): every millisecond here, it does not draw.
+        let started = ContinuousClock.now
+        defer { note("voice: prepare held the main thread \(Int((ContinuousClock.now - started) / .milliseconds(1))) ms") }
         do {
             try engine.inputNode.setVoiceProcessingEnabled(true)
             engine.inputNode.voiceProcessingOtherAudioDuckingConfiguration =
