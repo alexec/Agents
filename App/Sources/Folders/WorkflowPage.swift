@@ -881,9 +881,9 @@ struct WorkflowPage: View {
         var folder: URL
     }
 
-    /// The runtime the file names, or the most recently active runtime on this host.
+    /// The runtime the file names, or the default.
     private func runsOn(_ workflow: Workflow) -> WorkflowSettings.RunsOn {
-        workflow.settings.runsOn(lastUsed: model.work.lastRuntimes[place.host])
+        workflow.settings.runsOn()
     }
 
     private func runtimeID(_ workflow: Workflow) -> String {

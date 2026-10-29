@@ -43,8 +43,7 @@ export function WorkflowSettingsForm({ store, host, summary, disabled, problem, 
 }) {
   const workflow = summary.workflow;
   const settings = workflow.settings;
-  // A host's agents are held newest first, so the first is the last used there.
-  const runs = runsOn(settings.runtimeID, store.agents.value[host]?.[0]?.runtimeID);
+  const runs = runsOn(settings.runtimeID);
   const runtimeID = runs.runtimeID;
   const runtimes = (store.runtimes.value[host] ?? []).map((r) => r.runtime);
   const runtimeName = runtimes.find((r) => r.id === runtimeID)?.name ?? runtimeID;
