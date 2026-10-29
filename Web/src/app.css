@@ -1470,6 +1470,12 @@ button.plain:hover { opacity: 1; }
 .plan-strip .plan-bar { display: block; height: 4px; border-radius: 2px; background: var(--paper-rule); overflow: hidden; }
 .plan-strip .plan-bar > span { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
 .plan-strip .plan-block { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--paper-rule); font-size: 0.8125rem; }
+/* The goal card over the plan's (#2742), in its look: why it stopped, and how far, in grey. */
+.goal-strip { padding-bottom: 0; }
+.goal-strip .goal-reason, .goal-strip .goal-progress { font-size: 0.75rem; opacity: 0.6; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.goal-strip .open .plan-step, .goal-strip .open .goal-reason { white-space: normal; }
+.goal-strip .plan-summary { gap: 6px; }
 .plan .in_progress .content { font-weight: 600; }
 .plan-block.withdrawn .plan .in_progress .content { font-weight: inherit; }
 /* With the working line: what the open agent holds and waits for in line (036, #2344). Untinted. */
@@ -1603,6 +1609,11 @@ button.plain:hover { opacity: 1; }
   padding: 12px; margin: 2px 0; text-align: left; font: inherit; color: inherit;
   background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }
 button.file-card { cursor: pointer; }
+/* What an agent told the person with notify (#2805): Shared/UI/Chat/NotifiedLine.swift. */
+.notice-line { display: flex; gap: 8px; align-items: baseline; }
+.notice-bell { opacity: 0.65; }
+.notice-title { margin: 0; font-weight: 600; }
+.notice-body { margin: 2px 0 0; }
 button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, transparent); }
 .file-card-preview { display: flex; align-items: center; justify-content: center; height: 150px; overflow: hidden;
   border-radius: 6px; background: var(--paper-well); }

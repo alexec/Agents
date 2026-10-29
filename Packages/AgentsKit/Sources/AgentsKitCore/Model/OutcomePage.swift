@@ -313,6 +313,9 @@ extension TranscriptItem {
         // So is a file shown (#836): the chart or the page is what the work made.
         case .fileShown:
             return true
+        // And what the agent told the person (#2805): why a notification opened this chat.
+        case .notified:
+            return true
         case .stateChanged(let state, _):
             return state == .stopped
         case .notice(let notice):

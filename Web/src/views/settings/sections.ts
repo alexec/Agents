@@ -14,6 +14,7 @@ import { BackupsSection, ServerBackupsSection } from "./Backups";
 import { FinishedChatsSection } from "./FinishedChats";
 import { GitAccessSection } from "./GitAccess";
 import { VersionsSection } from "./Machines";
+import { NotificationsSection } from "./Notifications";
 import { PolicySection } from "./Policy";
 import { SidebarGroupsSection } from "./SidebarGroups";
 import { PersonasConfigSection, SkillsConfigSection, WorkflowsConfigSection } from "../AgentConfigEditor";
@@ -45,6 +46,8 @@ export const settingsSections: readonly SettingsSection[] = [
   // Groups own machine providers (#1761).
   { name: "groups", scope: "controlPlane", order: 20, Section: GroupsSection },
   { name: "machines", scope: "machines", order: 20, Section: VersionsSection },
+  // How many notices agents may send you (#2805), kept on the Mac's host, the same on every client.
+  { name: "notifications", scope: "thisApp", order: 40, Section: NotificationsSection },
   // Who belongs to the control plane, and their machines and clients (#994).
   { name: "people", scope: "controlPlane", order: 10, Section: PeopleSection },
   { name: "personas", scope: "agentConfiguration", order: 20, Section: PersonasConfigSection },

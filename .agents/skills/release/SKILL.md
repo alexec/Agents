@@ -14,7 +14,9 @@ Alex decided (2026-10-13, #914):
 
 - **When the gate passes, push the tag.** Do not ask for approval. Alex has already started the release.
 - **Version:** minor when an `enhancement` merged since the last tag, otherwise patch.
-  1.0 and major versions only when Alex says.
+  1.0 and major versions only when Alex says. An enhancement counts only when its files
+  change a client's UI, the host or daemon, or the capability list (#2857); the plan lists
+  a tooling, workflow or docs enhancement as `[tooling]`, and it does not make a minor.
 - **Every minor release runs the eight reviews and checks once each** (#1462, #1557, #2161):
   security, performance, HADR, dead code, runtimes, usability, competitors and the feature
   matrix.
@@ -276,7 +278,7 @@ All of these, on the commit you will tag (`git rev-parse origin/main`, fetched a
    do not stop the release: each one goes into the notes as a known issue.
 3. Write the notes in Markdown, in plain short sentences:
    - one heading per kind that has changes, in this order: `## New` (the plan's
-     `[enhancement]`), `## Fixed` (`[bug]`) and `## Changed` (the rest), with a line per
+     `[enhancement]`), `## Fixed` (`[bug]`) and `## Changed` (the rest, `[tooling]` too), with a line per
      change, from the pull requests the plan lists. A line names the pull request:
      `- The sidebar shows … (#698)`. A pull request whose body has a `Release note:`
      paragraph gives that paragraph as its line, as written: it says what a person has to

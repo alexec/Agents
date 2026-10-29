@@ -97,6 +97,10 @@ type attentionState struct {
 	tellControl atomic.Pointer[func(method string, params any)]
 	// askControl asks the control plane on channel 0 and waits (workspacetools.go).
 	askControl atomic.Pointer[askControl]
+	// notices are what agents told the person and are still posted, and noticeBucket the
+	// person's attention they share (#2805, notify.go).
+	notices      []postedNotice
+	noticeBucket noticeBucket
 }
 
 // token is Need.token: one string per need, for keys and the file's order.
@@ -110,6 +114,8 @@ func token(id wire.NeedID) string {
 		return fmt.Sprintf("report:%s:%v", id.Report.AgentID, float64(id.Report.At))
 	case id.GuardedChange != nil:
 		return "guarded:" + store.FolderPath(id.GuardedChange.Folder) + ":" + id.GuardedChange.Path
+	case id.Notice != nil:
+		return "notice:" + *id.Notice
 	}
 	return ""
 }
@@ -377,6 +383,12 @@ func (d *Daemon) needs() []wire.Need {
 			found = append(found, wire.Need{ID: id, AgentID: c.AskedIn, Folder: fileURL(folder, true), Kind: wire.NeedKindGuardedChange,
 				RaisedAt: raised, Headline: truncating(wire.Headline{H1: filepath.Base(folder), H2: title, H3: guardedHeadline(c)})})
 		}
+	}
+	// What an agent told the person (#2805): posted as a need is, never a Needs you row.
+	notices := d.noticeNeedsLocked(at.Time())
+	found = append(found, notices...)
+	for _, n := range notices {
+		ids = append(ids, n.ID)
 	}
 	// Forget the first-seen time of anything no longer outstanding.
 	live := map[string]bool{}

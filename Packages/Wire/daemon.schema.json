@@ -545,6 +545,10 @@
         "voiceHungUpAt": {
           "$ref": "#/definitions/WireDate",
           "description": "When the agent last ended voice mode with hang_up (#2375): the person said they were done talking. A client in voice mode on this chat says the reply, then turns voice mode off."
+        },
+        "goal": {
+          "$ref": "#/definitions/Goal",
+          "description": "The standing aim its runtime keeps working towards over many turns (#2742), as Codex's and Claude's adapters report it on a session_info_update under _meta.jetbrains.air.goal. Absent when the runtime reports none, or cleared it."
         }
       },
       "required": [
@@ -9071,6 +9075,56 @@
       ],
       "description": "GitView (Model/AgentChanges.swift): `{ shared: { since } }`, `{ unavailable: … }` and so on."
     },
+    "Goal": {
+      "type": "object",
+      "properties": {
+        "objective": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/definitions/GoalStatus"
+        },
+        "iterations": {
+          "type": "integer",
+          "description": "How many turns it took towards the goal, where the runtime counts them."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why it last stopped or paused, in the runtime's words."
+        },
+        "tokensUsed": {
+          "type": "integer"
+        },
+        "tokenBudget": {
+          "type": "integer",
+          "description": "The tokens it can use on the goal, when it has a budget."
+        },
+        "timeUsedSeconds": {
+          "type": "number"
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate",
+          "description": "When the host last heard of it."
+        }
+      },
+      "required": [
+        "objective",
+        "status",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "GoalStatus": {
+      "type": "string",
+      "enum": [
+        "active",
+        "paused",
+        "blocked",
+        "limited",
+        "complete"
+      ],
+      "description": "Where a goal stands (#2742): active (it can drive more work, whether or not a turn runs now), paused, blocked, limited (a usage or token budget ran out) or complete."
+    },
     "Group": {
       "type": "object",
       "description": "A group (#1761, spec 736 FR-027): everyone, or named users. It owns machine providers: only its users see them and start machines from them (FR-028).",
@@ -13174,9 +13228,21 @@
             "guardedChange"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "notice": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "notice"
+          ],
+          "additionalProperties": false
         }
       ],
-      "description": "NeedID (Attention/Need.swift): what is being answered, one key per kind."
+      "description": "NeedID (Attention/Need.swift): what is being answered, one key per kind. A notice (#2805) is what an agent told the person with `notify`: posted, never a Needs you row."
     },
     "NeedKind": {
       "type": "string",
@@ -13184,8 +13250,19 @@
         "permission",
         "elicitation",
         "report",
-        "guardedChange"
+        "guardedChange",
+        "notice"
       ]
+    },
+    "NoticeOutcome": {
+      "type": "string",
+      "enum": [
+        "sent",
+        "shownHere",
+        "muted",
+        "coolingDown"
+      ],
+      "description": "What became of a notice an agent sent with `notify` (#2805): sent to where the person is, shown here (the person was looking at that chat), muted (#2003), or held in the cool-down."
     },
     "OTLPExport": {
       "type": "object",
@@ -18870,6 +18947,29 @@
       ],
       "additionalProperties": false
     },
+    "SentNotice": {
+      "type": "object",
+      "description": "What an agent told the person with `notify` (#2805), on the record where it called it: the notification's words, what became of it, and, in the cool-down, when the next can go.",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "outcome": {
+          "$ref": "#/definitions/NoticeOutcome"
+        },
+        "nextAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "title",
+        "outcome"
+      ],
+      "additionalProperties": false
+    },
     "ServedRequest": {
       "type": "object",
       "properties": {
@@ -22496,6 +22596,27 @@
           },
           "required": [
             "fileShown"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "notified": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/SentNotice"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "notified"
           ],
           "additionalProperties": false
         }

@@ -1240,6 +1240,10 @@ func (l *live) Update(n sdk.SessionNotification) {
 				d.noteFailure(l.id, a.RuntimeID, f)
 			}
 		}
+		// The goal it keeps working towards (#2742), drawn as a card over the plan's.
+		if g, said := goalIn(u.SessionInfoUpdate.Meta, now()); said {
+			d.change(l.id, func(a *wire.Agent) { a.Goal = g })
+		}
 		// The runtime names the conversation (#492), unless the person named it.
 		if t := u.SessionInfoUpdate.Title; t != nil && *t != "" {
 			d.change(l.id, func(a *wire.Agent) {

@@ -181,8 +181,8 @@ extension TranscriptEntry {
     /// error before it a blip it got past (#394).
     var carriesOn: Bool {
         switch kind {
-        case .agentMessage, .agentThought, .toolCall, .toolCallUpdate, .appView, .fileShown, .planUpdated,
-             .permissionAsked, .elicitationAsked:
+        case .agentMessage, .agentThought, .toolCall, .toolCallUpdate, .appView, .fileShown, .notified,
+             .planUpdated, .permissionAsked, .elicitationAsked:
             return true
         default:
             return false
@@ -300,8 +300,9 @@ public struct TranscriptDisplayBuilder: Sendable {
             resolveIntermittentErrors()
             viewAt[call.id] = drawn.count
             drawn.append(.entry(entry))
-        case .fileShown:
-            // The card stands on its own, after the run that called it (#836).
+        case .fileShown, .notified:
+            // The card stands on its own, after the run that called it (#836); so does
+            // what the agent told the person (#2805).
             closeRun()
             resolveIntermittentErrors()
             drawn.append(.entry(entry))

@@ -16,6 +16,9 @@ every turn, from `<its folder>/<its name>.behaviour`:
   work <seconds>
           a thought, a call held `in_progress` that long, another thought held that long,
           then a reply: for seeing where the working mark is in each (#2831).
+  goal    the turn sends the goal in `<its folder>/<its name>.goal` (JSON: a snapshot, or
+          null to clear it) on a session_info_update, as Codex's and Claude's adapters do
+          for an AIR client, then answers: for seeing the goal card (#2742).
   ok      (or no file) it answers, saying what it was handed.
 
 So a walk can make a runtime run out, and later come back, by rewriting one file.
@@ -109,6 +112,14 @@ def prompt(request_id, params):
         think("The notes say what to change. Planning the edit now.")
         time.sleep(hold)
         say(session_id, "Done: the notes are read and the edit is planned.")
+        reply(request_id, {"stopReason": "end_turn"})
+        return
+    if how and how[0] == "goal":
+        with open(os.path.join(HERE, f"{NAME}.goal")) as f:
+            goal = json.load(f)
+        send({"jsonrpc": "2.0", "method": "session/update", "params": {"sessionId": session_id, "update": {
+            "sessionUpdate": "session_info_update", "_meta": {"jetbrains": {"air": {"version": 1, "goal": goal}}}}}})
+        say(session_id, "Working towards the goal." if goal else "The goal is cleared.")
         reply(request_id, {"stopReason": "end_turn"})
         return
     handoff = next((b["resource"]["text"] for b in blocks

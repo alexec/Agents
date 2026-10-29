@@ -368,6 +368,10 @@ func TestTokensAndCollapseIDs(t *testing.T) {
 	if c := CollapseID(guarded); strings.Contains(c, "secret") || len(c) != 64 {
 		t.Fatal(c)
 	}
+	notice := "e0000000-0000-4000-8000-000000000006"
+	if got := Token(wire.NeedID{Notice: &notice}); got != "notice:"+notice {
+		t.Fatal(got)
+	}
 }
 
 // Cut before it is sealed, as Headline.truncating does.

@@ -64,7 +64,8 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
     func sweep(keeping pending: DaemonAPI.AttentionPending, me: Surface = .mac) async {
         let live = Set(pending.needs.map(\.id.token))
         let delivered = await center.deliveredNotifications().map(\.request.identifier)
-        let stale = delivered.filter { $0.hasPrefix("permission:") || $0.hasPrefix("elicitation:") || $0.hasPrefix("report:") }
+        let stale = delivered.filter { $0.hasPrefix("permission:") || $0.hasPrefix("elicitation:") || $0.hasPrefix("report:")
+            || $0.hasPrefix("notice:") }
             .filter { !live.contains($0) }
         if !stale.isEmpty {
             note("notifier: sweep removing stale \(stale); live \(Array(live))")

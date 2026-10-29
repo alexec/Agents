@@ -91,6 +91,9 @@ extension TranscriptEntry.Kind {
         case "fileShown":
             guard let file = try? payload["_0"]?.decode(ShownFile.self) else { return nil }
             return .fileShown(file)
+        case "notified":
+            guard let notice = try? payload["_0"]?.decode(SentNotice.self) else { return nil }
+            return .notified(notice)
         case "workReported":
             // An outcome this build does not know is a report that never arrived, and
             // the entry falls to `.unrecognised` rather than being rounded to `done`.
@@ -176,6 +179,8 @@ extension TranscriptEntry.Kind {
             return ["appView": ["_0": (try? JSONValue.encoding(call)) ?? .null]]
         case .fileShown(let file):
             return ["fileShown": ["_0": (try? JSONValue.encoding(file)) ?? .null]]
+        case .notified(let notice):
+            return ["notified": ["_0": (try? JSONValue.encoding(notice)) ?? .null]]
         case .unrecognised(let raw):
             // Written back exactly as it was read, so passing a record through an
             // older build does not quietly delete what it did not understand.

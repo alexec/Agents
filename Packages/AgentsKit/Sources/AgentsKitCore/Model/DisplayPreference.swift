@@ -24,13 +24,23 @@ public enum DisplayPreference {
     /// unless they turn it off; the host reads it when such a turn ends.
     public static let agentsMayArchiveMyChats = "agentsMayArchiveMyChats"
     public static let agentsMayArchiveMyChatsDefault = true
+    /// The person's attention (#2805): how many notices agents may send at once, and how
+    /// many minutes one takes to come back. Every agent on the host shares them; the host
+    /// reads them each time an agent calls `notify`.
+    public static let noticeBurst = "noticeBurst"
+    public static let noticeBurstDefault = 3
+    public static let noticeBurstRange = 1...20
+    public static let noticeCooldownMinutes = "noticeCooldownMinutes"
+    public static let noticeCooldownDefault = 10
+    public static let noticeCooldownRange = 1...1440
 
     /// The ones kept as a plain value in a client's defaults, and the kind of each.
-    public enum Kind: Sendable { case bool, string }
+    public enum Kind: Sendable { case bool, string, int }
     public static let mirrored: [String: Kind] = [
         smartGroupsOff: .string,
         showsArchivedFolders: .bool, showsActivity: .bool, showsUsage: .bool,
         startRuntimeID: .string, skillsMarketplace: .string, mcpMarketplace: .string,
         agentsMayArchiveMyChats: .bool,
+        noticeBurst: .int, noticeCooldownMinutes: .int,
     ]
 }

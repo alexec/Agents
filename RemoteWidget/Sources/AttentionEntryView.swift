@@ -271,6 +271,8 @@ private struct LargeRow: View {
         case .elicitation: "asks a question"
         case .report: "has a report"
         case .guardedChange: "asks to keep a change"
+        // A notice (#2805) is never a row; the widget reads what an older file says.
+        case .notice: "told you something"
         case nil: "finished, unread"
         }
         let waited = session.since.formatted(.relative(presentation: .named, unitsStyle: .wide))
@@ -330,6 +332,7 @@ private struct SessionRow: View {
         case .elicitation: "questionmark.circle.fill"
         case .report: "exclamationmark.bubble.fill"
         case .guardedChange: "exclamationmark.shield.fill"
+        case .notice: "bell.fill"
         case nil: nil
         }
     }

@@ -91,7 +91,7 @@ each one has.
 - **Codex** takes feature switches in a variable set only for the sessions the app starts.
   It loses its sleep tool, its automations, its memories and its ChatGPT connectors. Its
   sub-agents and its goals are switched on, and the app shows the sub-agents as it does
-  Claude's. Its question tool stays, and its questions reach you as a card.
+  Claude's, and its goal as a card over the plan, as it does Claude's `/goal` (#2742). Its question tool stays, and its questions reach you as a card.
 - **Gemini** keeps its own subagents and task tracker, so it is sent no policy file at all.
 - **Antigravity** takes a list of tools to deny for each session, and has nothing left in
   it, so it is sent no list; its question tool stays, and its questions reach you as a card.
