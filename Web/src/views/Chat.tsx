@@ -661,7 +661,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
               runtimeID={agent.runtimeID}
               clientPermission={{
                 own: agent.clientPermission,
-                settings: store.clientPermissions.value[store.macHostID.value]?.[agent.runtimeID as keyof ClientPermissionSettings] ?? "default",
+                settings: store.clientPermissions.value[store.macHostID.value]?.[agent.runtimeID as Exclude<keyof ClientPermissionSettings, "setBy">] ?? "default",
                 set: (mode) => void store.setAgentClientPermission(host, agent.id, mode),
               }}
               levels={{
