@@ -281,6 +281,9 @@ type Agent struct {
 
 	// When the agent last ended voice mode with hang_up (#2375): the person said they were done talking. A client in voice mode on this chat says the reply, then turns voice mode off.
 	VoiceHungUpAt *Date `json:"voiceHungUpAt,omitzero"`
+
+	// The standing aim its runtime keeps working towards over many turns (#2742), as Codex's and Claude's adapters report it on a session_info_update under _meta.jetbrains.air.goal. Absent when the runtime reports none, or cleared it.
+	Goal *Goal `json:"goal,omitzero"`
 }
 
 type AgentArchivedReason string
@@ -4042,6 +4045,37 @@ type GitViewOwned struct {
 type GitViewShared struct {
 	Since string `json:"since"`
 }
+
+type Goal struct {
+	Objective string `json:"objective"`
+
+	Status GoalStatus `json:"status"`
+
+	// How many turns it took towards the goal, where the runtime counts them.
+	Iterations *int64 `json:"iterations,omitzero"`
+
+	// Why it last stopped or paused, in the runtime's words.
+	Reason *string `json:"reason,omitzero"`
+
+	TokensUsed *int64 `json:"tokensUsed,omitzero"`
+
+	// The tokens it can use on the goal, when it has a budget.
+	TokenBudget *int64 `json:"tokenBudget,omitzero"`
+
+	TimeUsedSeconds *float64 `json:"timeUsedSeconds,omitzero"`
+
+	// When the host last heard of it.
+	At Date `json:"at"`
+}
+
+// Where a goal stands (#2742): active (it can drive more work, whether or not a turn runs now), paused, blocked, limited (a usage or token budget ran out) or complete.
+type GoalStatus string
+
+const GoalStatusActive GoalStatus = "active"
+const GoalStatusPaused GoalStatus = "paused"
+const GoalStatusBlocked GoalStatus = "blocked"
+const GoalStatusLimited GoalStatus = "limited"
+const GoalStatusComplete GoalStatus = "complete"
 
 // A group (#1761, spec 736 FR-027): everyone, or named users. It owns machine providers: only its users see them and start machines from them (FR-028).
 type Group struct {

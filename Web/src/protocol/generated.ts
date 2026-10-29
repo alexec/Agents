@@ -308,6 +308,12 @@ export interface Agent {
    * talking. A client in voice mode on this chat says the reply, then turns voice mode off.
    */
   voiceHungUpAt?: WireDate;
+  /**
+   * The standing aim its runtime keeps working towards over many turns (#2742), as Codex's and
+   * Claude's adapters report it on a session_info_update under _meta.jetbrains.air.goal. Absent
+   * when the runtime reports none, or cleared it.
+   */
+  goal?: Goal;
 }
 
 export type AgentArchivedReason =
@@ -3225,6 +3231,32 @@ export type GitView =
   | { shared: { since: string } }
   | { sharedFromHead: Record<string, never> }
   | { unavailable: ChangesUnavailable };
+
+export interface Goal {
+  objective: string;
+  status: GoalStatus;
+  /** How many turns it took towards the goal, where the runtime counts them. */
+  iterations?: number;
+  /** Why it last stopped or paused, in the runtime's words. */
+  reason?: string;
+  tokensUsed?: number;
+  /** The tokens it can use on the goal, when it has a budget. */
+  tokenBudget?: number;
+  timeUsedSeconds?: number;
+  /** When the host last heard of it. */
+  at: WireDate;
+}
+
+/**
+ * Where a goal stands (#2742): active (it can drive more work, whether or not a turn runs now),
+ * paused, blocked, limited (a usage or token budget ran out) or complete.
+ */
+export type GoalStatus =
+  | "active"
+  | "paused"
+  | "blocked"
+  | "limited"
+  | "complete";
 
 /**
  * A group (#1761, spec 736 FR-027): everyone, or named users. It owns machine providers: only its
@@ -9068,7 +9100,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AddFolderRequest: { required: ["folder"], optional: ["project"] },
   Admitted: { required: [], optional: ["client", "host", "grant"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt", "goal"] },
   AgentConfigEditorFile: { required: ["path", "content"], optional: [] },
   AgentConfigEditorRequest: { required: ["kind"], optional: ["folder"] },
   AgentConfigEditorSaveRequest: { required: ["kind", "path", "content"], optional: ["folder", "delete"] },
@@ -9341,6 +9373,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   GitAsk: { required: ["server", "from"], optional: [] },
   GitCredential: { required: ["username", "password"], optional: [] },
   GitCredentialRequest: { required: ["protocol", "host"], optional: ["path"] },
+  Goal: { required: ["objective", "status", "at"], optional: ["iterations", "reason", "tokensUsed", "tokenBudget", "timeUsedSeconds"] },
   Group: { required: ["id", "name", "everyone", "members"], optional: ["caps", "source", "role"] },
   GroupList: { required: ["groups"], optional: [] },
   GroupRequest: { required: ["id"], optional: [] },

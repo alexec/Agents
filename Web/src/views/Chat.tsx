@@ -21,6 +21,7 @@ import { FolderGoneNotice, MissingFolderStrip } from "./MissingFolder";
 import { AccountMoveStrip } from "./AccountMove";
 import { ContinueStrip } from "./ContinueStrip";
 import { CurrentPlanStrip } from "./PlanStrip";
+import { GoalCard } from "./GoalCard";
 import { Telling } from "./Telling";
 import { Labels } from "./Labels";
 import { Prompt } from "./Prompt";
@@ -561,7 +562,9 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       <MissingFolderStrip store={store} host={host} agent={agent} />
       <AccountMoveStrip store={store} host={host} agent={agent} />
       <ContinueStrip store={store} host={host} agent={agent} disabled={down} />
-      {/* What it said it would do, under what it waits on, as the Remote has it (#341). */}
+      {/* What it keeps working towards (#2742), then what it said it would do, under what it
+          waits on, as the Remote has them (#341). */}
+      <GoalCard agent={agent} />
       <CurrentPlanStrip agent={agent} />
       {finding.value && agent && <FindBar store={store} host={host} agentID={agent.id} close={() => (finding.value = false)} />}
       <CallActionsContext.Provider value={callActions}>

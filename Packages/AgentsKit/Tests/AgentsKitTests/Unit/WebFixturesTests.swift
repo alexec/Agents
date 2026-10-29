@@ -799,6 +799,40 @@ struct WebFixturesTests {
         }
     }
 
+    /// The goal card over the plan's (#2742): its status word, the reason it stopped, how far
+    /// along, the budget's bar and the line read aloud. The input is the whole agent, so the
+    /// wire schema test checks the goal's shape too.
+    @Test func goalCard() throws {
+        let goals: [(String, Goal?)] = [
+            ("no goal", nil),
+            ("active, nothing counted", Goal(objective: "Ship the change", status: .active, at: Self.at(1))),
+            ("Claude's turns and reason", Goal(objective: "Tests pass", status: .paused, iterations: 3,
+                                               reason: "Waiting on review", at: Self.at(1))),
+            ("one turn", Goal(objective: "Tests pass", status: .active, iterations: 1, at: Self.at(1))),
+            ("Codex's budget", Goal(objective: "Port the parser", status: .limited, tokensUsed: 950,
+                                    tokenBudget: 1_000, timeUsedSeconds: 3_900, at: Self.at(1))),
+            ("tokens with no budget", Goal(objective: "Port the parser", status: .active, tokensUsed: 52_000,
+                                           timeUsedSeconds: 30, at: Self.at(1))),
+            ("blocked", Goal(objective: "Deploy", status: .blocked, reason: "No credentials", timeUsedSeconds: 720,
+                             at: Self.at(1))),
+            ("met", Goal(objective: "Deploy", status: .complete, iterations: 5, timeUsedSeconds: 7_200, at: Self.at(1))),
+        ]
+        let cases = try goals.map { name, goal in
+            var agent = Self.agent(1, .running)
+            agent.goal = goal
+            return Case(name: name, input: .object(["agent": try Self.encode(agent)]))
+        }
+        try pin("goal/card.json", cases) { input in
+            let agent = try (input["agent"] ?? .null).decode(Agent.self)
+            return agent.goal.map { goal in
+                .object(["status": .string(goal.statusWord), "stopped": .bool(goal.isStopped),
+                         "progress": goal.progressLine.map(JSONValue.string) ?? .null,
+                         "fraction": goal.budgetFraction.map(JSONValue.double) ?? .null,
+                         "summary": .string(goal.summary)])
+            } ?? .null
+        }
+    }
+
     // MARK: activity/
 
     /// The time in the corner of a session row (#341).

@@ -1,0 +1,323 @@
+[
+  {
+    "expected" : null,
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/folder/",
+        "id" : "00000000-0000-0000-0000-000000000001",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "running",
+        "title" : "Session 1"
+      }
+    },
+    "name" : "no goal"
+  },
+  {
+    "expected" : {
+      "fraction" : null,
+      "progress" : null,
+      "status" : "Active",
+      "stopped" : false,
+      "summary" : "Goal: Ship the change. Active"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/folder/",
+        "goal" : {
+          "at" : 812500060,
+          "objective" : "Ship the change",
+          "status" : "active"
+        },
+        "id" : "00000000-0000-0000-0000-000000000001",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "running",
+        "title" : "Session 1"
+      }
+    },
+    "name" : "active, nothing counted"
+  },
+  {
+    "expected" : {
+      "fraction" : null,
+      "progress" : "3 turns",
+      "status" : "Paused",
+      "stopped" : true,
+      "summary" : "Goal: Tests pass. Paused: Waiting on review. 3 turns"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/folder/",
+        "goal" : {
+          "at" : 812500060,
+          "iterations" : 3,
+          "objective" : "Tests pass",
+          "reason" : "Waiting on review",
+          "status" : "paused"
+        },
+        "id" : "00000000-0000-0000-0000-000000000001",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "running",
+        "title" : "Session 1"
+      }
+    },
+    "name" : "Claude's turns and reason"
+  },
+  {
+    "expected" : {
+      "fraction" : null,
+      "progress" : "1 turn",
+      "status" : "Active",
+      "stopped" : false,
+      "summary" : "Goal: Tests pass. Active. 1 turn"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/folder/",
+        "goal" : {
+          "at" : 812500060,
+          "iterations" : 1,
+          "objective" : "Tests pass",
+          "status" : "active"
+        },
+        "id" : "00000000-0000-0000-0000-000000000001",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "running",
+        "title" : "Session 1"
+      }
+    },
+    "name" : "one turn"
+  },
+  {
+    "expected" : {
+      "fraction" : 0.95,
+      "progress" : "950 of 1,000 tokens · 1 h 5 min",
+      "status" : "Limit reached",
+      "stopped" : true,
+      "summary" : "Goal: Port the parser. Limit reached. 950 of 1,000 tokens · 1 h 5 min"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/folder/",
+        "goal" : {
+          "at" : 812500060,
+          "objective" : "Port the parser",
+          "status" : "limited",
+          "timeUsedSeconds" : 3900,
+          "tokenBudget" : 1000,
+          "tokensUsed" : 950
+        },
+        "id" : "00000000-0000-0000-0000-000000000001",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "running",
+        "title" : "Session 1"
+      }
+    },
+    "name" : "Codex's budget"
+  },
+  {
+    "expected" : {
+      "fraction" : null,
+      "progress" : "52,000 tokens · under a minute",
+      "status" : "Active",
+      "stopped" : false,
+      "summary" : "Goal: Port the parser. Active. 52,000 tokens · under a minute"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/folder/",
+        "goal" : {
+          "at" : 812500060,
+          "objective" : "Port the parser",
+          "status" : "active",
+          "timeUsedSeconds" : 30,
+          "tokensUsed" : 52000
+        },
+        "id" : "00000000-0000-0000-0000-000000000001",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "running",
+        "title" : "Session 1"
+      }
+    },
+    "name" : "tokens with no budget"
+  },
+  {
+    "expected" : {
+      "fraction" : null,
+      "progress" : "12 min",
+      "status" : "Blocked",
+      "stopped" : true,
+      "summary" : "Goal: Deploy. Blocked: No credentials. 12 min"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/folder/",
+        "goal" : {
+          "at" : 812500060,
+          "objective" : "Deploy",
+          "reason" : "No credentials",
+          "status" : "blocked",
+          "timeUsedSeconds" : 720
+        },
+        "id" : "00000000-0000-0000-0000-000000000001",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "running",
+        "title" : "Session 1"
+      }
+    },
+    "name" : "blocked"
+  },
+  {
+    "expected" : {
+      "fraction" : null,
+      "progress" : "5 turns · 2 h",
+      "status" : "Met",
+      "stopped" : false,
+      "summary" : "Goal: Deploy. Met. 5 turns · 2 h"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/folder/",
+        "goal" : {
+          "at" : 812500060,
+          "iterations" : 5,
+          "objective" : "Deploy",
+          "status" : "complete",
+          "timeUsedSeconds" : 7200
+        },
+        "id" : "00000000-0000-0000-0000-000000000001",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "running",
+        "title" : "Session 1"
+      }
+    },
+    "name" : "met"
+  }
+]
