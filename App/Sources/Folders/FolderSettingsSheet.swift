@@ -272,6 +272,18 @@ private struct FolderGeneralPane: View {
                         }
                     }
                     row("Spent") { spent(summary) }
+                    // What a merged pull request says it cost (#2352); an older host has no such setting.
+                    if model.host(summary.host, has: Capability.lineageComment1) {
+                        row("Cost on pull requests") {
+                            VStack(alignment: .leading, spacing: 6) {
+                                prCostComment(in: summary)
+                                Text(PRCostComment.help + " Saved in .agents/folder.json.")
+                                    .appText(.fine)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
                     row("Helpers running") {
                         VStack(alignment: .leading, spacing: 6) {
                             helperLimit(\.running, in: summary, default: HelperLimit.defaultRunning,
@@ -411,6 +423,22 @@ private struct FolderGeneralPane: View {
                 // Above the organisation's cap: shown, not chosen (#998).
                 Text(number == standard ? "\(number) (default)" : "\(number)").tag(number)
                     .disabled(cap.map { number > $0 } ?? false)
+            }
+        }
+        .labelsHidden()
+        .fixedSize()
+        .disabled(model.hosts.isOffline(summary.host))
+    }
+
+    /// What the host says on the folder's merged pull requests (#2352): off, the default, or
+    /// the tokens and time, or the cost too.
+    private func prCostComment(in summary: DaemonAPI.FolderSummary) -> some View {
+        let current = summary.folder.prCostComment ?? .off
+        return Picker("", selection: Binding(get: { current }, set: { chosen in
+            Task { await model.setPRCostComment(chosen, for: summary.key) }
+        })) {
+            ForEach(PRCostComment.allCases, id: \.self) { choice in
+                Text(choice == .off ? "\(choice.words) (default)" : choice.words).tag(choice)
             }
         }
         .labelsHidden()

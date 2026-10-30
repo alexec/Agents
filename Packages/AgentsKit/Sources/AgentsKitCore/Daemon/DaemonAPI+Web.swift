@@ -292,6 +292,9 @@ public extension DaemonAPI {
                 // A folder joins a project (#2317).
                 Row(Method.foldersSetProject, params: SetFolderProjectRequest.self, result: FolderSummary.self,
                     kind: .hostRequest),
+                // Cost on Pull Requests… on a folder's menu (#2352), as the window's Folder Settings has it.
+                Row(Method.foldersSetPRCostComment, params: SetPRCostCommentRequest.self, result: FolderSummary.self,
+                    kind: .hostRequest),
                 // A change to the folder's own files made outside the app (#531): read, Keep, Undo.
                 Row(Method.foldersReadGuardedChange, params: GuardedChangeRequest.self, result: GuardedChangeReading.self,
                     kind: .hostRequest),

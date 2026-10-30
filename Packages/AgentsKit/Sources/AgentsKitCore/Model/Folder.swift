@@ -36,6 +36,10 @@ public struct Folder: Codable, Hashable, Sendable, Identifiable {
     /// pinned. In `folders.json`, only what the person chose. Set only by
     /// `folders/setPinned`, which agents cannot call.
     public var pinned: Bool?
+    /// What the host says on the folder's pull requests when they merge (#2352), from the
+    /// folder's own `.agents/folder.json`. Nil is off. Only ever in a summary. Set only by
+    /// `folders/setPRCostComment`, which agents cannot call.
+    public var prCostComment: PRCostComment?
 
     /// Keys a newer version wrote that this one does not know. Kept so that opening a
     /// record in an older build and saving it does not quietly delete them.
@@ -81,7 +85,8 @@ public struct Folder: Codable, Hashable, Sendable, Identifiable {
 
     public init(folder: URL, archivedAt: Date? = nil, addedAt: Date = Date(),
                 laidOutAt: Date? = nil, layoutVersion: Int? = nil, helperLimits: HelperLimits? = nil,
-                diskSpace: DiskThresholds? = nil, pinned: Bool? = nil, unknownFields: [String: JSONValue] = [:]) {
+                diskSpace: DiskThresholds? = nil, pinned: Bool? = nil, prCostComment: PRCostComment? = nil,
+                unknownFields: [String: JSONValue] = [:]) {
         self.folder = Self.standardize(folder)
         self.archivedAt = archivedAt
         self.addedAt = addedAt
@@ -90,6 +95,7 @@ public struct Folder: Codable, Hashable, Sendable, Identifiable {
         self.helperLimits = helperLimits
         self.diskSpace = diskSpace
         self.pinned = pinned
+        self.prCostComment = prCostComment
         self.unknownFields = unknownFields
     }
 
@@ -104,6 +110,7 @@ public struct Folder: Codable, Hashable, Sendable, Identifiable {
         helperLimits = (try? c.decodeIfPresent(HelperLimits.self, forKey: .helperLimits)) ?? nil
         diskSpace = (try? c.decodeIfPresent(DiskThresholds.self, forKey: .diskSpace)) ?? nil
         pinned = (try? c.decodeIfPresent(Bool.self, forKey: .pinned)) ?? nil
+        prCostComment = (try? c.decodeIfPresent(PRCostComment.self, forKey: .prCostComment)) ?? nil
         let known = Set(CodingKeys.allCases.map(\.stringValue))
         unknownFields = [:]
         if let extra = try? decoder.container(keyedBy: AnyKey.self) {
@@ -123,6 +130,7 @@ public struct Folder: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(helperLimits, forKey: .helperLimits)
         try c.encodeIfPresent(diskSpace, forKey: .diskSpace)
         try c.encodeIfPresent(pinned, forKey: .pinned)
+        try c.encodeIfPresent(prCostComment, forKey: .prCostComment)
         if !unknownFields.isEmpty {
             var extra = encoder.container(keyedBy: AnyKey.self)
             for (key, value) in unknownFields {
@@ -132,7 +140,7 @@ public struct Folder: Codable, Hashable, Sendable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey, CaseIterable {
-        case folder, archivedAt, addedAt, laidOutAt, layoutVersion, helperLimits, diskSpace, pinned
+        case folder, archivedAt, addedAt, laidOutAt, layoutVersion, helperLimits, diskSpace, pinned, prCostComment
     }
 
     struct AnyKey: CodingKey {

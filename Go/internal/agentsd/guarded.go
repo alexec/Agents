@@ -22,7 +22,7 @@ import (
 // agent works there, or by a pull, waits for the person to keep or undo it, and the app
 // goes on using the copy last approved, kept in <root>/guarded-files.json.
 
-var guardedFiles = map[string]string{".agents/folder.json": "the helper limits and disk space lines", ".agents/pins.json": "the pins"}
+var guardedFiles = map[string]string{".agents/folder.json": "the helper limits, disk space lines and cost on pull requests", ".agents/pins.json": "the pins"}
 
 type guardedPending struct {
 	Digest       *string     `json:"digest,omitempty"`

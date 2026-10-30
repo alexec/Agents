@@ -3130,6 +3130,8 @@ export interface Folder {
   helperLimits?: HelperLimits;
   diskSpace?: DiskThresholds;
   pinned?: boolean;
+  /** Absent is off (#2352). */
+  prCostComment?: PRCostComment;
 }
 
 export interface FolderDetection {
@@ -5102,6 +5104,16 @@ export interface OrgRoutesLeft {
 export interface OrgRoutesMine {
   routes: OrgRouteMine[];
 }
+
+/**
+ * What the host says on a folder's pull request when it merges (#2352): nothing (off, the default),
+ * the tokens and time only, or the cost too. Kept in the folder's .agents/folder.json, so the
+ * repo's people choose what a public repo publishes.
+ */
+export type PRCostComment =
+  | "off"
+  | "tokens"
+  | "cost";
 
 export interface PagesChangedNotification {
   folder: URLString;
@@ -7083,6 +7095,11 @@ export interface SetOptionRequest {
   value: JSONValue;
 }
 
+export interface SetPRCostCommentRequest {
+  folder: URLString;
+  prCostComment: PRCostComment;
+}
+
 export interface SetPinnedRequest {
   folder: URLString;
   pinned: boolean;
@@ -8983,6 +9000,7 @@ export interface Methods {
   "folders/keepGuardedChange": { params: GuardedChangeRequest; result: FolderSummary };
   "folders/list": { params: FoldersListRequest; result: FolderSummary[] };
   "folders/readGuardedChange": { params: GuardedChangeRequest; result: GuardedChangeReading };
+  "folders/setPRCostComment": { params: SetPRCostCommentRequest; result: FolderSummary };
   "folders/setPinned": { params: SetPinnedRequest; result: FolderSummary };
   "folders/setProject": { params: SetFolderProjectRequest; result: FolderSummary };
   "folders/unarchive": { params: FolderRequest; result: FolderSummary };
@@ -9271,6 +9289,7 @@ export const MethodTarget = {
   "folders/keepGuardedChange": "host",
   "folders/list": "host",
   "folders/readGuardedChange": "host",
+  "folders/setPRCostComment": "host",
   "folders/setPinned": "host",
   "folders/setProject": "host",
   "folders/unarchive": "host",
@@ -9771,7 +9790,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FindResult: { required: ["matches", "more"], optional: [] },
   FleetBoard: { required: ["machines"], optional: [] },
   FleetMachine: { required: ["host", "ownerName", "bot"], optional: ["running", "heardAt"] },
-  Folder: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits", "diskSpace", "pinned"] },
+  Folder: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits", "diskSpace", "pinned", "prCostComment"] },
   FolderDetection: { required: ["enabled", "paths"], optional: [] },
   FolderHunk: { required: ["oldStart", "newStart", "noNewlineAtEnd", "lines"], optional: [] },
   FolderMCPServer: { required: ["name", "summary", "approval", "missingSecrets", "secretNames", "entryDigest"], optional: ["managed", "signIn", "views"] },
@@ -10168,6 +10187,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SetLimitsRequest: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
   SetMutedRequest: { required: ["agentID", "muted"], optional: [] },
   SetOptionRequest: { required: ["agentID", "optionID", "value"], optional: [] },
+  SetPRCostCommentRequest: { required: ["folder", "prCostComment"], optional: [] },
   SetPinnedRequest: { required: ["folder", "pinned"], optional: [] },
   SetProviderRequest: { required: ["runtimeID", "providerID"], optional: [] },
   SetSandboxRequest: { required: ["agentID"], optional: ["choice"] },

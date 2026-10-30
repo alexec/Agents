@@ -67,6 +67,7 @@ public enum Capability {
     public static let host1 = "host/1"
     public static let hostsJoin1 = "hosts.join/1"
     public static let hosts1 = "hosts/1"
+    public static let lineageComment1 = "lineage.comment/1"
     public static let lineage1 = "lineage/1"
     public static let links1 = "links/1"
     public static let liveactivity1 = "liveactivity/1"
@@ -263,6 +264,7 @@ public enum Capability {
         "folders/sendRead": "folders/1",
         "folders/setDiskSpace": "folders/1",
         "folders/setHelperLimits": "folders/1",
+        "folders/setPRCostComment": "lineage.comment/1",
         "folders/setPinned": "folders/1",
         "folders/setProject": "projects/1",
         "folders/unarchive": "folders/1",

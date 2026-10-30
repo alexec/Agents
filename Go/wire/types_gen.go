@@ -3883,6 +3883,9 @@ type Folder struct {
 	DiskSpace *DiskThresholds `json:"diskSpace,omitzero"`
 
 	Pinned *bool `json:"pinned,omitzero"`
+
+	// Absent is off (#2352).
+	PrCostComment *PRCostComment `json:"prCostComment,omitzero"`
 }
 
 type FolderDetection struct {
@@ -6371,6 +6374,13 @@ type OrgRoutesMine struct {
 	Routes []OrgRouteMine `json:"routes"`
 }
 
+// What the host says on a folder's pull request when it merges (#2352): nothing (off, the default), the tokens and time only, or the cost too. Kept in the folder's .agents/folder.json, so the repo's people choose what a public repo publishes.
+type PRCostComment string
+
+const PRCostCommentOff PRCostComment = "off"
+const PRCostCommentTokens PRCostComment = "tokens"
+const PRCostCommentCost PRCostComment = "cost"
+
 type PagesChangedNotification struct {
 	Folder URL `json:"folder"`
 
@@ -8802,6 +8812,12 @@ type SetOptionRequest struct {
 	OptionID string `json:"optionID"`
 
 	Value JSONValue `json:"value"`
+}
+
+type SetPRCostCommentRequest struct {
+	Folder URL `json:"folder"`
+
+	PrCostComment PRCostComment `json:"prCostComment"`
 }
 
 type SetPinnedRequest struct {

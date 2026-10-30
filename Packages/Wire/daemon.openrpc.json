@@ -3515,6 +3515,31 @@
       }
     },
     {
+      "name": "folders/setPRCostComment",
+      "x-capability": "lineage.comment/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SetPRCostCommentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
       "name": "folders/setPinned",
       "x-capability": "folders/1",
       "tags": [

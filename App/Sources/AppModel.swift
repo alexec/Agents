@@ -2789,6 +2789,19 @@ final class AppModel {
         }
     }
 
+    func setPRCostComment(_ choice: PRCostComment, for key: FolderKey) async {
+        do {
+            var summary = try await client(for: key.host).call(
+                DaemonAPI.Method.foldersSetPRCostComment,
+                DaemonAPI.SetPRCostCommentRequest(folder: key.folder, prCostComment: choice),
+                returning: DaemonAPI.FolderSummary.self)
+            summary.host = key.host
+            upsert(summary)
+        } catch {
+            problem = describe(error)
+        }
+    }
+
     private func callFolder(_ method: String, _ key: FolderKey,
                              then: ((DaemonAPI.FolderSummary) -> Void)? = nil) async {
         do {
