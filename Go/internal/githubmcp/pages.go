@@ -60,7 +60,10 @@ type BoardPR struct {
 	CodeRabbit string
 	// ReviewRequested is the logins a review is asked of (#2453).
 	ReviewRequested []string
-	authorInfo      author
+	// Labels are its label names; LabelColors each one's #rrggbb, for those GitHub gives a colour (#2956).
+	Labels      []string
+	LabelColors map[string]string
+	authorInfo  author
 }
 
 func (p BoardPR) json() map[string]any {
@@ -81,6 +84,10 @@ func (p BoardPR) json() map[string]any {
 	}
 	if p.CodeRabbit != "" {
 		j["codeRabbit"] = p.CodeRabbit
+	}
+	j["labels"] = p.Labels
+	if p.Labels == nil {
+		j["labels"] = []string{}
 	}
 	return j
 }
@@ -262,6 +269,13 @@ func (a *gqlActor) isBot() bool { return a != nil && a.Typename == "Bot" }
 const rollupFields = `commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {
   __typename ... on CheckRun { name status conclusion detailsUrl } ... on StatusContext { context state targetUrl } } } } } } }`
 
+// labelFields are a PR's labels, with their colours (#2956).
+const labelFields = `labels(first: 50) { nodes { name color } }`
+
+type gqlLabels struct {
+	Nodes []label `json:"nodes"`
+}
+
 type gqlRollup struct {
 	Nodes []struct {
 		Commit struct {
@@ -298,7 +312,7 @@ const boardQuery = `query($owner: String!, $name: String!) { viewer { login } re
     number title url headRefName baseRefName isDraft updatedAt mergeable reviewDecision authorAssociation
     author { login __typename } autoMergeRequest { enabledAt }
     reviewRequests(first: 20) { nodes { requestedReviewer { ... on User { login } ... on Bot { login } } } }
-    ` + rollupFields + ` } } } }`
+    ` + labelFields + ` ` + rollupFields + ` } } } }`
 
 func (g *RealGitHub) BoardPRs(ctx context.Context, repo string) (Board, error) {
 	owner, name, err := ownerName(repo)
@@ -327,6 +341,7 @@ func (g *RealGitHub) BoardPRs(ctx context.Context, repo string) (Board, error) {
 							Reviewer *gqlActor `json:"requestedReviewer"`
 						} `json:"nodes"`
 					} `json:"reviewRequests"`
+					Labels  gqlLabels `json:"labels"`
 					Commits gqlRollup `json:"commits"`
 				} `json:"nodes"`
 			} `json:"pullRequests"`
@@ -352,12 +367,13 @@ func (g *RealGitHub) BoardPRs(ctx context.Context, repo string) (Board, error) {
 		if n.Author != nil {
 			typ = n.Author.Typename
 		}
+		labels, colors := labelsOf(n.Labels.Nodes)
 		b.PRs = append(b.PRs, BoardPR{
 			PR:   PR{Number: n.Number, Title: n.Title, Branch: n.HeadRefName, URL: n.URL},
 			Base: n.BaseRefName, Author: n.Author.login(), UpdatedAt: n.UpdatedAt, Draft: n.IsDraft,
 			AutoMerge: n.AutoMerge != nil, Checks: checks, FailedRunID: runID, Conflicts: conflictsOf(n.Mergeable),
 			Review: strings.ToLower(n.Review), CodeRabbit: codeRabbitState(n.Commits.items()),
-			ReviewRequested: requested, authorInfo: authorOf(n.Author.login(), n.Association, typ),
+			ReviewRequested: requested, Labels: labels, LabelColors: colors, authorInfo: authorOf(n.Author.login(), n.Association, typ),
 		})
 	}
 	return b, nil
@@ -439,13 +455,20 @@ func (g *RealGitHub) searchIssues(ctx context.Context, repo string, filter Issue
 
 var hexColor = regexp.MustCompile(`^[0-9a-fA-F]{6}$`)
 
-func (i issueJSON) listed() ListedIssue {
-	colors := map[string]string{}
-	for _, l := range i.Labels {
+// labelsOf is the labels' names, and each one's #rrggbb for those GitHub gives a colour.
+func labelsOf(ls []label) ([]string, map[string]string) {
+	names, colors := make([]string, len(ls)), map[string]string{}
+	for n, l := range ls {
+		names[n] = l.Name
 		if hexColor.MatchString(l.Color) {
 			colors[l.Name] = "#" + strings.ToLower(l.Color)
 		}
 	}
+	return names, colors
+}
+
+func (i issueJSON) listed() ListedIssue {
+	_, colors := labelsOf(i.Labels)
 	return ListedIssue{Issue: i.issue(), Comments: i.Comments, UpdatedAt: i.UpdatedAt, Milestone: i.Milestone.title(),
 		LabelColors: colors, authorInfo: authorOf(i.User.Login, i.Association, i.User.Type)}
 }
@@ -464,7 +487,7 @@ func (i issueJSON) hasLabels(names []string) bool {
 const pageQuery = `query($owner: String!, $name: String!, $number: Int!) { viewer { login } repository(owner: $owner, name: $name) {
   pullRequest(number: $number) {
     number title url headRefName headRefOid baseRefName state isDraft body createdAt additions deletions mergeable reviewDecision
-    author { login __typename } autoMergeRequest { enabledAt }
+    author { login __typename } autoMergeRequest { enabledAt } ` + labelFields + `
     files(first: 100) { totalCount nodes { path additions deletions changeType } }
     comments(first: 100) { nodes { author { login __typename } body createdAt url } }
     reviews(first: 100) { nodes { author { login __typename } body state submittedAt url } }
@@ -517,6 +540,7 @@ func (g *RealGitHub) PRPage(ctx context.Context, repo string, number int) (map[s
 				Review      string    `json:"reviewDecision"`
 				Author      *gqlActor `json:"author"`
 				AutoMerge   *struct{} `json:"autoMergeRequest"`
+				Labels      gqlLabels `json:"labels"`
 				Files       struct {
 					TotalCount int `json:"totalCount"`
 					Nodes      []struct {
@@ -642,6 +666,7 @@ func (g *RealGitHub) PRPage(ctx context.Context, repo string, number int) (map[s
 		"checkRuns": runs, "files": files, "filesTotal": p.Files.TotalCount,
 		"comments": conversation, "threads": threads, "viewer": data.Viewer.Login,
 	}
+	page["labels"], page["labelColors"] = labelsOf(p.Labels.Nodes)
 	if runID != 0 {
 		page["failedRunId"] = runID
 	}
