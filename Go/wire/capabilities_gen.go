@@ -101,6 +101,7 @@ const CapProviders1 = "providers/1"
 const CapReadapi1 = "readapi/1"
 const CapRelay1 = "relay/1"
 const CapReportsScope1 = "reports.scope/1"
+const CapReportsValue1 = "reports.value/1"
 const CapReportsViews1 = "reports.views/1"
 const CapReports1 = "reports/1"
 const CapResourcesLeases1 = "resources.leases/1"
@@ -656,6 +657,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"reports/scopes", "reports.scope/1"},
 	{"reports/setPolicy", "reports.scope/1"},
 	{"reports/usage", "reports/1"},
+	{"reports/value", "reports.value/1"},
 	{"reports/views", "reports.views/1"},
 	{"scim/set", "org-identity/1"},
 	{"scim/tokens/list", "org-identity/1"},

@@ -3630,6 +3630,13 @@ export interface LineageCostNode {
   outcome?: string;
   /** A PR's failed CI rounds: checks.failed, once per run and attempt. */
   failedChecks?: number;
+  /**
+   * When the machine first banked or noted the node (#2351): the start of the work on it, for lead
+   * time.
+   */
+  firstAt?: WireDate;
+  /** When a PR ended (#2351): merged, closed or reverted. Absent while open. */
+  endedAt?: WireDate;
   lastAt: WireDate;
 }
 
@@ -6265,7 +6272,8 @@ export type ReportPage =
   | "time"
   | "runtimes"
   | "adoption"
-  | "workflows";
+  | "workflows"
+  | "value";
 
 /** Who sees what in Reports (#1804), set by an admin in Console ▸ Report Policy. */
 export interface ReportPolicy {
@@ -6369,6 +6377,48 @@ export interface ReportScopeOption {
 export interface ReportScopes {
   scopes: ReportScopeOption[];
   admin: boolean;
+}
+
+/**
+ * reports/value (#2351): what the work in a scope cost and what it delivered, from the lineage
+ * nodes that the scope's machines send (#2350). A node is in the range when it last changed in it,
+ * with its whole cost. total is the work on issues and PRs; waste is the PRs closed without a merge
+ * and merged reverts; unlinked is the turns with no issue or PR. perMergedPR is total by the PRs
+ * merged, by currency. leadTimeSeconds is the median of the issues' lead times. issues and
+ * milestones are the most costly first, at most 100 each; limited says there are more.
+ */
+export interface ReportValue {
+  range: ReportRange;
+  scope: ReportScope;
+  total: LineageCost;
+  waste: LineageCost;
+  unlinked: LineageCost;
+  /** By currency. */
+  perMergedPR: Record<string, number>;
+  prsMerged: number;
+  prsClosed: number;
+  prsReverted: number;
+  failedChecks: number;
+  leadTimeSeconds?: number;
+  issues: ReportValueRow[];
+  milestones: ReportValueRow[];
+  limited?: boolean;
+}
+
+/**
+ * One issue or milestone on Reports ▸ Value (#2351): its cost rolled up from every machine in the
+ * scope, as lineage/cost adds it up, and how its PRs ended.
+ */
+export interface ReportValueRow {
+  node: LineageNode;
+  total: LineageCost;
+  waste: LineageCost;
+  prsMerged: number;
+  prsClosed: number;
+  prsReverted: number;
+  failedChecks: number;
+  /** From the first work on it to its last PR merged; absent before a merge. */
+  leadTimeSeconds?: number;
 }
 
 /**
@@ -9047,6 +9097,7 @@ export interface Methods {
   "reports/scopes": { params: Empty; result: ReportScopes };
   "reports/setPolicy": { params: ReportPolicy; result: ReportPolicy };
   "reports/usage": { params: ReportQuery; result: UsageReport };
+  "reports/value": { params: ReportQuery; result: ReportValue };
   "reports/views": { params: Empty; result: ReportViews };
   "resources/snapshot": { params: Empty; result: LeaseSnapshot };
   "runtimes/accountProfiles": { params: Empty; result: AccountProfile[] };
@@ -9335,6 +9386,7 @@ export const MethodTarget = {
   "reports/scopes": "control",
   "reports/setPolicy": "control",
   "reports/usage": "control",
+  "reports/value": "control",
   "reports/views": "control",
   "resources/snapshot": "host",
   "runtimes/accountProfiles": "host",
@@ -9789,7 +9841,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Levels: { required: [], optional: ["model", "permission", "permissionRequests"] },
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
   LineageCost: { required: ["cost", "inputTokens", "outputTokens", "turns", "workingSeconds", "waitingSeconds"], optional: ["limitTokens"] },
-  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["project", "fixes", "partOf", "outcome", "failedChecks"] },
+  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["project", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "endedAt"] },
   LineageCostRollup: { required: ["node", "own", "total", "waste", "unlinked", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "parts"], optional: ["limited"] },
   LineageEndRequest: { required: ["from", "to", "rel"], optional: [] },
   LineageGraph: { required: ["nodes", "links"], optional: ["limited"] },
@@ -10058,6 +10110,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ReportScope: { required: ["kind"], optional: ["group"] },
   ReportScopeOption: { required: ["scope", "name"], optional: [] },
   ReportScopes: { required: ["scopes", "admin"], optional: [] },
+  ReportValue: { required: ["range", "scope", "total", "waste", "unlinked", "perMergedPR", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "issues", "milestones"], optional: ["leadTimeSeconds", "limited"] },
+  ReportValueRow: { required: ["node", "total", "waste", "prsMerged", "prsClosed", "prsReverted", "failedChecks"], optional: ["leadTimeSeconds"] },
   ReportView: { required: ["id", "name", "page", "scope", "range"], optional: ["by"] },
   ReportViewID: { required: ["id"], optional: [] },
   ReportViews: { required: ["views"], optional: [] },

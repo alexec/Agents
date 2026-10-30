@@ -146,6 +146,11 @@ func TestAnIssueAddsUpItsPRsAndTheirWaste(t *testing.T) {
 		len(work["github:alexec/agents#7"].PartOf) != 1 {
 		t.Fatalf("%+v", work)
 	}
+	// Reports ▸ Value's lead time (#2351): when the work started, and when a PR ended.
+	if closed.EndedAt == nil || closed.FirstAt == nil || *closed.FirstAt > *closed.EndedAt ||
+		work["github:alexec/agents#7"].FirstAt == nil || work["github:alexec/agents#7"].EndedAt != nil {
+		t.Fatalf("%+v", work)
+	}
 	sent = nil
 	d.sendReport()
 	for _, r := range sent {
