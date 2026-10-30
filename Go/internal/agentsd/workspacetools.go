@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/safe"
@@ -44,12 +45,25 @@ func (d *Daemon) SetControlAsk(ask askControl) {
 
 // askWorkspaces is one host/machines call for an agent, named for the control plane's log.
 func (d *Daemon) askWorkspaces(agent wire.UUID, method string, params any) (json.RawMessage, error) {
+	return d.askWorkspacesCtx(d.ctx, agent, method, params)
+}
+
+// askWorkspacesPatient is askWorkspaces that gives up after patience rather than waiting on
+// d.ctx's own lifetime (P20261030-1): a status probe that must not keep list_sessions, or
+// askThereWaits, waiting on one slow machine as long as the control plane itself would.
+func (d *Daemon) askWorkspacesPatient(agent wire.UUID, method string, params any, patience time.Duration) (json.RawMessage, error) {
+	ctx, cancel := context.WithTimeout(d.ctx, patience)
+	defer cancel()
+	return d.askWorkspacesCtx(ctx, agent, method, params)
+}
+
+func (d *Daemon) askWorkspacesCtx(ctx context.Context, agent wire.UUID, method string, params any) (json.RawMessage, error) {
 	ask := d.askControl.Load()
 	if ask == nil {
 		return nil, &Error{Code: wire.FailureNotSupported, Message: "This machine isn’t on a control plane, so it has no machines."}
 	}
 	p, _ := json.Marshal(params)
-	out, err := (*ask)(d.ctx, "host/machines", wire.MachineWorkspaceCall{Agent: d.agentWho(agent), Method: method, Params: json.RawMessage(p)})
+	out, err := (*ask)(ctx, "host/machines", wire.MachineWorkspaceCall{Agent: d.agentWho(agent), Method: method, Params: json.RawMessage(p)})
 	var refused *controllink.AskError
 	if errors.As(err, &refused) {
 		return nil, &Error{Code: refused.Code, Message: refused.Message}
