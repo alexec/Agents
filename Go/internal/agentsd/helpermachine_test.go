@@ -3,6 +3,8 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -153,4 +155,61 @@ func TestASessionStartedFromAnotherMachineSaysWho(t *testing.T) {
 	if n := notes(d, id); len(n) == 0 || n[0] != "Claude (fix-login) on Alex's Mac started this session with start_session." {
 		t.Fatalf("%q", n)
 	}
+}
+
+// With the folder's switch on (#2928), start_session on another machine asks no one; off
+// again, it is kept as no choice at all.
+func TestTheFolderSwitchStartsOnAnotherMachineWithoutAsking(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := folder(t, c, 1)
+	a := seeded(t, d, dir, func(a *wire.Agent) { a.State, a.EndedReason, a.RuntimeID = wire.AgentStateRunning, nil, "claude" })
+	var mu sync.Mutex
+	starts := 0
+	d.SetControlAsk(func(_ context.Context, method string, params any) (json.RawMessage, error) {
+		if call, ok := params.(wire.MachineWorkspaceCall); ok && call.Method == "machines/startSession" {
+			mu.Lock()
+			starts++
+			mu.Unlock()
+			return json.RawMessage(`"11111111-2222-3333-4444-555555555555"`), nil
+		}
+		return nil, &controllink.AskError{Code: -32010, Message: "Agents can’t ask that of the control plane."}
+	})
+	c.call(t, 2, "folders/setHelperLimits", map[string]any{"folder": "file://" + dir + "/", "limits": map[string]any{"agentsMayStartOnMachines": true}})
+	if b, _ := os.ReadFile(filepath.Join(dir, ".agents", "folder.json")); !strings.Contains(string(b), `"agentsMayStartOnMachines" : true`) {
+		t.Fatalf("%s", b)
+	}
+
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+	// Not in a turn, so no card could be asked: only the switch lets it through.
+	if text, isErr := m.tool(2, "start_session", map[string]any{"prompt": "Check the Windows bug", "machine": "pc", "folder": "/home/me/app"}); isErr ||
+		!strings.HasPrefix(text, "Started “Check the Windows bug” on pc, in /home/me/app (id 11111111-2222-3333-4444-555555555555).") {
+		t.Fatal(text)
+	}
+	mu.Lock()
+	if starts != 1 {
+		t.Fatalf("%d starts", starts)
+	}
+	mu.Unlock()
+	var pending []wire.ElicitationRequest
+	json.Unmarshal(c.call(t, 3, "elicitations/pending", nil), &pending)
+	if len(pending) != 0 {
+		t.Fatalf("asked anyway: %+v", pending)
+	}
+
+	c.call(t, 4, "folders/setHelperLimits", map[string]any{"folder": "file://" + dir + "/", "limits": map[string]any{"agentsMayStartOnMachines": false}})
+	if b, _ := os.ReadFile(filepath.Join(dir, ".agents", "folder.json")); strings.Contains(string(b), "agentsMayStartOnMachines") {
+		t.Fatalf("off is kept as a choice: %s", b)
+	}
+	// Off, it asks again: out of a turn, that cannot be done, so nothing goes.
+	if text, isErr := m.tool(5, "start_session", map[string]any{"prompt": "x", "machine": "pc", "folder": "/a"}); !isErr ||
+		text != "A question can only be asked while this agent is working." {
+		t.Fatal(text)
+	}
+	mu.Lock()
+	if starts != 1 {
+		t.Fatalf("%d starts", starts)
+	}
+	mu.Unlock()
 }
