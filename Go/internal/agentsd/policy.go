@@ -1002,7 +1002,29 @@ func (d *Daemon) agentBudgetRefusal(a *wire.Agent) error {
 // policyStart applies the policy to a start (FR-009): what it refuses, it refuses; a
 // helper's or a workflow's mode looser than the ceiling falls to the ceiling, and note
 // says so in the new agent's chat. A person's own looser choice is refused.
-func (d *Daemon) policyStart(r *wire.StartRequest, by startedBy) (note string, err error) {
+func (d *Daemon) policyStart(r *wire.StartRequest, by startedBy, client *wire.ClientPermissionMode) (note string, _ *wire.ClientPermissionMode, err error) {
+	note, err = d.policyStartNote(r, by)
+	if err != nil {
+		return "", nil, err
+	}
+	// Yes to all, the agent's own answer to permission requests, is under the ceiling too:
+	// a person who asked for it is refused; a helper, a workflow, or Auto's Approve for me
+	// cell starts asking.
+	if client != nil && *client == wire.ClientPermissionModeAlwaysApprove {
+		if ceiling, _, capped := d.alwaysApproveCeiling(); capped {
+			asked := r.Levels != nil && r.Levels.PermissionRequests != nil && *r.Levels.PermissionRequests == wire.ClientPermissionModeAlwaysApprove
+			if asked && by.owner == wire.SessionLabelOwnerPerson && by.agent == nil {
+				return "", nil, d.alwaysApproveRefusal()
+			}
+			client = requestCards
+			note = strings.TrimSpace(note + " It asked to answer Yes to all requests. " + orgSetBy + " " + modeWords(ceiling) + " It asks.")
+		}
+	}
+	return note, client, nil
+}
+
+// policyStartNote is policyStart for everything but the answer to permission requests.
+func (d *Daemon) policyStartNote(r *wire.StartRequest, by startedBy) (note string, err error) {
 	if err := d.workRefusal(); err != nil {
 		return "", err
 	}

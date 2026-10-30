@@ -159,6 +159,10 @@ span.tabs { display: inline-flex; margin: 0; border-bottom: 0; }
 .console-table td { padding: 7px 12px; border-bottom: 1px solid var(--paper-rule); vertical-align: middle; }
 .console-table tbody tr:last-child td { border-bottom: 0; }
 .console-table tbody tr:hover td { background: var(--paper-wash); }
+/* A row that waits on its owner (Live Now): a tinted wash, its state in the attention tint (#2996). */
+.console-table tbody tr.attention-row td { background: color-mix(in srgb, var(--tint-attention) 7%, transparent); }
+.console-table tbody tr.attention-row:hover td { background: color-mix(in srgb, var(--tint-attention) 12%, transparent); }
+.console-table .attention { color: var(--tint-attention); font-weight: 600; }
 .console-table tr.empty td { text-align: left; opacity: 0.65; background: none; }
 .console-table tr.opens { cursor: pointer; }
 .console-table .num { text-align: right; font-variant-numeric: tabular-nums; }

@@ -6,8 +6,9 @@ description: Follow a turn you sent from your iPhone or iPad on the Lock Screen 
 
 # Follow a turn on the Lock Screen
 
-When you send a prompt from the iPhone or iPad app, the turn shows as a Live Activity. It
-is on the Lock Screen, and in the Dynamic Island on an iPhone that has one. You can put
+When you send a prompt from the iPhone or iPad app, the turn shows in a Live Activity. It
+is on the Lock Screen, and in the Dynamic Island on an iPhone that has one. There is one
+Live Activity in total, for all the turns you sent from this device. You can put
 the phone down and see when the agent asks you something or ends, without opening the
 app.
 
@@ -31,9 +32,13 @@ page or a workflow does not, because you did not ask for it here.
 3. Lock the phone, or go to another app. The turn shows on the Lock Screen.
 4. Tap the Live Activity to open its session. A question waits there as its card.
 
-There is at most one Live Activity for each session. A prompt you send while the turn
-still runs does not start a second one, and the time goes on from the first prompt. A
-prompt you send after the turn ends starts the time again from that prompt.
+There is one Live Activity in total, not one for each session. A prompt to another
+session joins the Live Activity that shows. A prompt you send while the turn still runs
+does not start a new turn, and the time goes on from the first prompt.
+
+When more than one turn runs, the Live Activity shows the session that most needs you:
+one that asks a question or an approval, else the one you sent a prompt to last. Below
+it, a line counts the others, such as **+1 needs you · +2 working**.
 
 ## Read it
 
@@ -45,8 +50,9 @@ The Lock Screen shows these, from left to right:
 - **The title** of the session. A session with no title yet is **New session**.
 - **The phase**, then the runtime and the folder, such as **Working · Claude · api**.
 - **A grey line**, of at most two lines, that says more.
-- **The time** the turn has worked, on the right. The system counts it, also when the
-  app does not run. When the turn ends, the time stops.
+- **The others**, when more than one turn runs, such as **+2 working**.
+- **The time** on the right, from the oldest turn that still runs. The system counts it,
+  also when the app does not run. When the last turn ends, the time stops.
 
 The phase is one of these:
 
@@ -63,16 +69,20 @@ The phase is one of these:
 
 The words are the ones the sidebar uses. See [Statuses and groups](../reference/statuses.md).
 
-The Dynamic Island shows the mark and the time. Touch and hold it to see the phase, the
-title and the grey line.
+The Dynamic Island shows the mark and the time. When more than one turn runs, a number
+next to the mark says how many. Touch and hold it to see the phase, the title, the grey
+line and the others.
 
 ## When it ends
 
-- **The turn ends.** The Live Activity shows how it ended, and stays on the Lock Screen
-  for 15 minutes. It does not stay the system's four hours, because the notification for
-  the end says the same.
-- **You archive or delete the session.** The Live Activity goes at once.
-- **You turn Live Activities off.** Every Live Activity goes at once.
+- **A turn ends while others run.** It leaves the Live Activity, which goes on for the
+  others. The notification for the end tells you.
+- **The last turn ends.** The Live Activity shows how it ended, and stays on the Lock
+  Screen for 15 minutes. It does not stay the system's four hours, because the
+  notification for the end says the same.
+- **You archive or delete a session.** It leaves the Live Activity at once. If it was the
+  last one, the Live Activity goes at once.
+- **You turn Live Activities off.** The Live Activity goes at once.
 
 ## Turn it off or on
 
@@ -91,8 +101,8 @@ are likely to want to follow it. The switch is for this device only.
   line comes back.
 - **The line says Open Agents to answer it, Open Agents to decide, or Open Agents to see
   what it needs.** The update came by push from your control plane while the app did
-  not run. A push carries no words, so the line cannot say the question. Open the app to
-  read it.
+  not run. A push carries no words, so the line cannot say the question, and the title
+  says how many sessions, such as **2 sessions**. Open the app to read it.
 - **The Live Activity does not change while the app is shut.** Your control plane sends
   updates by push only when it has an APNs key. A control plane on your Mac has none. See
   [How a Live Activity keeps up](../explanation/live-activities.md).

@@ -651,6 +651,7 @@ func (d *Daemon) startAutoHelper(me *wire.Agent, args map[string]json.RawMessage
 	if onMachine(args) != "" {
 		r := helperRequest(autoRuntimeID, "", prompt, "", nil, nil, labels)
 		r.Levels = levels
+		d.helperRequests(&r, me)
 		return d.startOnMachine(me, args, r)
 	}
 	folder := folderPath(me)
@@ -677,4 +678,28 @@ func (d *Daemon) startAutoHelper(me *wire.Agent, args map[string]json.RawMessage
 	a := d.Store.Agent(id)
 	return fmt.Sprintf("Started %s (id %s) on Auto, which picked %s. This folder now has %s.", quotedTitle(a.Title), id,
 		runtimeName(a.RuntimeID), d.helperPlaces(folder)), nil
+}
+
+// helperRequests keeps a helper on Auto to Request cards unless its starter approves every
+// request itself: Yes to all, the Approve for me cell on Cursor, Grok and OpenCode, answers
+// shell commands too, which Approve for me on Claude still asks about.
+func (d *Daemon) helperRequests(r *wire.StartRequest, starter *wire.Agent) {
+	if r.RuntimeID != autoRuntimeID || starter != nil && d.approvesEverything(starter) {
+		return
+	}
+	l := wire.Levels{}
+	if r.Levels != nil {
+		l = *r.Levels
+	}
+	l.PermissionRequests = requestCards
+	r.Levels = &l
+}
+
+// approvesEverything is an agent that runs every command without asking: in Bypass
+// permissions, or answering its requests with Yes to all.
+func (d *Daemon) approvesEverything(a *wire.Agent) bool {
+	bypass := func(l *wire.Levels) bool {
+		return l != nil && l.Permission != nil && *l.Permission == wire.PermissionLevelBypassPermissions
+	}
+	return bypass(a.Levels) || a.Auto != nil && bypass(&a.Auto.Levels) || d.agentAlwaysApproves(a)
 }

@@ -1,7 +1,11 @@
 package controlplane
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -96,4 +100,61 @@ func TestReportsValueAddsUpTheWork(t *testing.T) {
 		Scope: &wire.ReportScope{Kind: wire.ReportScopeKindOrg}}); e == "" {
 		t.Fatal("a member read the organisation")
 	}
+}
+
+// #2975: every machine's lineage is read once, and a view again with nothing changed
+// reads none of it from the store; a machine that sent new work is read again.
+func TestReportsValueReadsLineageOnceByTag(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	st := &lineageGets{Store: store.NewMemory()}
+	p := startPlane(t, st, controllink.NewPrivateKey())
+	now := time.Now()
+	put := func(host string, usd float64) {
+		t.Helper()
+		node := wire.LineageCostNode{Node: wire.LineageNode{Kind: "issue", Ref: "github:o/r#1"},
+			Banked: wire.LineageCost{Cost: map[string]float64{"USD": usd}}, LastAt: wire.DateOf(now)}
+		if err := p.s.keepWork(ctx, host, []wire.LineageCostNode{node}, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const machines = 40
+	for i := range machines {
+		put(fmt.Sprintf("HOST-%02d", i), 1)
+	}
+	all := func(string) bool { return true }
+	usd := func() float64 {
+		t.Helper()
+		nodes, err := p.s.scopeLineage(ctx, all)
+		if err != nil || len(nodes) != 1 {
+			t.Fatalf("%v %+v", err, nodes)
+		}
+		return nodes[0].Banked.Cost["USD"]
+	}
+	before := st.gets.Load()
+	if got := usd(); got != machines || st.gets.Load()-before != machines {
+		t.Fatalf("%v USD, %d reads", got, st.gets.Load()-before)
+	}
+	before = st.gets.Load()
+	if got := usd(); got != machines || st.gets.Load() != before {
+		t.Fatalf("%v USD, read again: %d", got, st.gets.Load()-before)
+	}
+	put("HOST-07", 5)
+	before = st.gets.Load()
+	if got := usd(); got != machines+4 || st.gets.Load()-before != 1 {
+		t.Fatalf("%v USD, %d reads", got, st.gets.Load()-before)
+	}
+}
+
+// lineageGets counts the reads of lineage objects only, as the plane reads its records too.
+type lineageGets struct {
+	store.Store
+	gets atomic.Int64
+}
+
+func (g *lineageGets) Get(ctx context.Context, key string) (*store.Object, error) {
+	if strings.HasPrefix(key, lineagePrefix) {
+		g.gets.Add(1)
+	}
+	return g.Store.Get(ctx, key)
 }

@@ -221,12 +221,15 @@ type startedBy struct {
 func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) {
 	// Auto picks the runtime, and the shared words become the runtime's own settings
 	// (#2658), before anything else reads them.
+	if by.agent != nil {
+		d.helperRequests(&r, d.Store.Agent(*by.agent))
+	}
 	pick, client, err := d.resolveLevels(&r, by)
 	if err != nil {
 		return "", err
 	}
 	// The organisation's policy first (#998): its refusal says why, in its own words.
-	policyNote, err := d.policyStart(&r, by)
+	policyNote, client, err := d.policyStart(&r, by, client)
 	if err != nil {
 		return "", err
 	}

@@ -1,7 +1,5 @@
 {
   "name": "agents-codex-toolset",
   "private": true,
-  "dependencies": {
-    "@agentclientprotocol/codex-acp": "2.2.2"
-  }
+  "dependencies": { "@agentclientprotocol/codex-acp": "2.5.0" }
 }

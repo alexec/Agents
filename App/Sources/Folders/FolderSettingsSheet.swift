@@ -211,18 +211,6 @@ struct FolderSettingsSheet: View {
             }
         }
     }
-
-    @ViewBuilder
-    private func paneTitle(_ pane: FolderSettingsPane, note: String? = nil) -> some View {
-        Text(pane.title)
-            .appText(.title).fontWeight(.semibold)
-        if let note {
-            Text(note)
-                .appText(.fine).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 4)
-        }
-    }
 }
 
 /// The folder itself: its name, where it is, what it has cost, and how many agents its
