@@ -341,9 +341,7 @@ func (l *links) every(ctx context.Context) ([]linkRecord, error) {
 }
 
 // open says a request still waits.
-func (l *links) open(r linkRequestRecord) bool {
-	return r.Result == "" && l.now().Before(r.Expires.Time)
-}
+func (l *links) open(r linkRequestRecord) bool { return r.Result == "" && l.now().Before(r.Expires.Time) }
 
 // mayDecide says a person may decide a request: the person named, or an admin when it
 // names nobody.

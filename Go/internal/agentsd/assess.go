@@ -72,7 +72,7 @@ var appToolMethods = map[string]string{
 	"set_session_labels":  "sessions/setLabels",
 	"move_worktree":       "worktrees/move",
 	"show_file":           "files/show",
-	"ask_question":        "questions/ask",
+	"ask_question":            "questions/ask",
 	"suggest_next_prompt": "prompts/suggest",
 	"notify":              "people/notify",
 	"hang_up":             "calls/hangUp",
@@ -84,11 +84,11 @@ var appToolMethods = map[string]string{
 	"wait_for_agents":     "agents/wait",
 	"check_again":         "waits/checkAgain",
 	"cancel_wait":         "events/cancel",
-	"list_machines":       "machines/list",
-	"start_machine":       "machines/start",
-	"stop_machine":        "machines/stop",
-	"make_machine":        "machines/make",
-	"delete_machine":      "machines/delete",
+	"list_machines":     "machines/list",
+	"start_machine":     "machines/start",
+	"stop_machine":      "machines/stop",
+	"make_machine":      "machines/make",
+	"delete_machine":    "machines/delete",
 }
 
 // appToolMethod is the method a tool is, or the tool's own name for one not in the table.

@@ -59,7 +59,7 @@ const (
 // mcpSubscription is one server's event, as the workflows' triggers ask for it.
 type mcpSubscription struct {
 	id, key, folder, server, event string
-	arguments                      map[string]json.RawMessage
+	arguments                       map[string]json.RawMessage
 	// workflows are the ids of the workflows whose triggers make it, sorted.
 	workflows []string
 	// waits are the agents whose open waits hold it (#577), sorted.
