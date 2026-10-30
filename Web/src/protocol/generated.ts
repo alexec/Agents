@@ -2937,6 +2937,29 @@ export interface EventsPage {
 }
 
 /**
+ * reports/features (#2165): each feature this host counted, a method it serves or an app tool, with
+ * its uses in the last 7 and the last `days` days, the least used first. A feature with no use is
+ * in it too. Counts only, never what a call said; they stay on the machine. since is the first day
+ * counted in the range.
+ */
+export interface FeatureUsage {
+  days: number;
+  /** YYYY-MM-DD in the host's zone. */
+  since?: string;
+  features: FeatureUse[];
+}
+
+/** One feature's uses (#2165). clients is who used it: mac, remote, web, agent or workflow. */
+export interface FeatureUse {
+  method: string;
+  week: number;
+  quarter: number;
+  clients: string[];
+  /** YYYY-MM-DD in the host's zone. */
+  lastUsed?: string;
+}
+
+/**
  * One thing to write: what the list shows, what goes in the text (the label when left out), and a
  * line about it.
  */
@@ -9099,6 +9122,7 @@ export interface Methods {
   "readApi/revoke": { params: ReadTokenRevoke; result: ReadAPI };
   "reports/deleteView": { params: ReportViewID; result: ReportViews };
   "reports/export": { params: ReportQuery; result: ReportExport };
+  "reports/features": { params: Empty; result: FeatureUsage };
   "reports/policy": { params: Empty; result: ReportPolicy };
   "reports/saveView": { params: ReportView; result: ReportViews };
   "reports/scopes": { params: Empty; result: ReportScopes };
@@ -9390,6 +9414,7 @@ export const MethodTarget = {
   "readApi/revoke": "control",
   "reports/deleteView": "control",
   "reports/export": "control",
+  "reports/features": "host",
   "reports/policy": "control",
   "reports/saveView": "control",
   "reports/scopes": "control",
@@ -9770,6 +9795,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   EventsChange: { required: ["waiting"], optional: ["event"] },
   EventsListRequest: { required: ["limit"], optional: ["before", "scope", "groups"] },
   EventsPage: { required: ["events", "waiting", "hasMore"], optional: [] },
+  FeatureUsage: { required: ["days", "features"], optional: ["since"] },
+  FeatureUse: { required: ["method", "week", "quarter", "clients"], optional: ["lastUsed"] },
   FileCompletion: { required: ["label"], optional: ["insert", "detail"] },
   FileCompletionRequest: { required: ["agentID", "path", "text", "line", "column"], optional: [] },
   FileCompletions: { required: ["items"], optional: ["reason"] },

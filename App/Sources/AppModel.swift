@@ -1971,6 +1971,19 @@ final class AppModel {
         return histories.isEmpty ? nil : .merged(histories)
     }
 
+    /// Which features were used (#2165), for Reports ▸ Features: this Mac's counts and every
+    /// connected server's, added up. Nil when no host knows the method.
+    func featureUsage() async -> DaemonAPI.FeatureUsage? {
+        var all: [DaemonAPI.FeatureUsage] = []
+        for host in chartHosts {
+            if let usage = try? await client(for: host).call(DaemonAPI.Method.reportsFeatures, DaemonAPI.Empty(),
+                                                              returning: DaemonAPI.FeatureUsage.self) {
+                all.append(usage)
+            }
+        }
+        return all.isEmpty ? nil : .merged(all)
+    }
+
     /// This Mac first, then every server that has said what it spends.
     private var chartHosts: [MachineRef] { [.mac] + serverCosts.keys.filter { $0 != .mac } }
 

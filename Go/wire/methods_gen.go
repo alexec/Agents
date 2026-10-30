@@ -201,6 +201,7 @@ var CallPresenceReport = Method[PresenceReport, Empty]{"presence/report"}
 var CallRelayGrant = Method[RelayGrantRequest, RelayGrantReply]{"relay/grant"}
 var CallRelayOffer = Method[RelayOffer, Empty]{"relay/offer"}
 var CallRelayRegister = Method[RelayRegistration, Empty]{"relay/register"}
+var CallReportsFeatures = Method[Empty, FeatureUsage]{"reports/features"}
 var CallResourcesDeclare = Method[DeclareResourceRequest, LeaseSnapshot]{"resources/declare"}
 var CallResourcesEnd = Method[PersonEndRequest, LeaseSnapshot]{"resources/end"}
 var CallResourcesLease = Method[LeaseRequest, LeaseNote]{"resources/lease"}

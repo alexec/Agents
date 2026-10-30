@@ -432,6 +432,8 @@ public enum DaemonAPI {
         /// Where the time of running chats went by hour and by day, per runtime (#852).
         /// No params.
         public static let timeHistory = "time/history"
+        /// Which features this host counted (#2165), for Reports ▸ Features. No params.
+        public static let reportsFeatures = "reports/features"
         /// The milestones the person has earned (#984), for the Time page. No params.
         public static let milestonesState = "milestones/state"
         public static let costSetLimits = "cost/setLimits"

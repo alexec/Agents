@@ -3664,6 +3664,30 @@ type EventsPage struct {
 	HasMore bool `json:"hasMore"`
 }
 
+// reports/features (#2165): each feature this host counted, a method it serves or an app tool, with its uses in the last 7 and the last `days` days, the least used first. A feature with no use is in it too. Counts only, never what a call said; they stay on the machine. since is the first day counted in the range.
+type FeatureUsage struct {
+	Days int64 `json:"days"`
+
+	// YYYY-MM-DD in the host's zone.
+	Since *string `json:"since,omitzero"`
+
+	Features []FeatureUse `json:"features"`
+}
+
+// One feature's uses (#2165). clients is who used it: mac, remote, web, agent or workflow.
+type FeatureUse struct {
+	Method string `json:"method"`
+
+	Week int64 `json:"week"`
+
+	Quarter int64 `json:"quarter"`
+
+	Clients []string `json:"clients"`
+
+	// YYYY-MM-DD in the host's zone.
+	LastUsed *string `json:"lastUsed,omitzero"`
+}
+
 // One thing to write: what the list shows, what goes in the text (the label when left out), and a line about it.
 type FileCompletion struct {
 	Label string `json:"label"`

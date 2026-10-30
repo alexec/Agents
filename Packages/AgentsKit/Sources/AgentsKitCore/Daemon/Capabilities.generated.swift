@@ -47,6 +47,7 @@ public enum Capability {
     public static let eventsAudit1 = "events.audit/1"
     public static let eventsTeam1 = "events.team/1"
     public static let events1 = "events/1"
+    public static let features1 = "features/1"
     public static let filesComplete1 = "files.complete/1"
     public static let filesDiagnostics1 = "files.diagnostics/1"
     public static let files1 = "files/1"
@@ -333,6 +334,7 @@ public enum Capability {
         "relay/grant": "relay/1",
         "relay/offer": "relay/1",
         "relay/register": "relay/1",
+        "reports/features": "features/1",
         "resources/declare": "resources/1",
         "resources/end": "resources.leases/1",
         "resources/lease": "resources.leases/1",

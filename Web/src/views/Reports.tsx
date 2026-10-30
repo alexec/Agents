@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef } from "preact/hooks";
 import { signal, useSignal } from "@preact/signals";
 import { go } from "../route";
 import type { Store } from "../model/store";
-import type { ReportFormat, ReportPage, ReportRange, ReportRow, ReportScope, ReportScopeOption, ReportValue, ReportValueRow, ReportView,
+import type { FeatureUsage, ReportFormat, ReportPage, ReportRange, ReportRow, ReportScope, ReportScopeOption, ReportValue, ReportValueRow, ReportView,
   UsageReport } from "../protocol/generated";
 import { CallFailed } from "../wire/link";
 import { adoption, adoptionLine, barCaption, adoptionNote, budgetWords, dimensionTitle, empty, exportName, groupNote, hiddenNote, line, meNote,
@@ -14,6 +14,8 @@ import { adoption, adoptionLine, barCaption, adoptionNote, budgetWords, dimensio
   runtimesNote, sameScope, spendBarCaption, scopeKey, scopeNote, scopedDimensions, share, timeLine, timeNote, utcNote, waitingShare, weekTitle, workflowLine,
   workflowRows, workflowsNote, deleteViewWords, digestText, noCopy, noViews, noViewsHere, viewBy, viewWords, viewsNote } from "../model/reports";
 import type { OutcomeGroup, OutcomeOrder, ReportDimension, ReportGroup } from "../model/reports";
+import { featureLine, featureUnused, featuresNote, mergeFeatures, noFeatures } from "../model/features";
+import { hostAnswers } from "../model/capabilities";
 import { leadLine, noValue, noValueHere, nodeName, rowLine, unlinkedLine, valueHeadline, valueNote, wasteLine } from "../model/value";
 import type { Section } from "../model/console";
 
@@ -430,6 +432,37 @@ function ValuePane({ store, scope, initial }: { store: Store; scope: ReportScope
   );
 }
 
+/** Reports ▸ Features (#2165), as the window's: which methods the clients and agents called on the
+ * person's own machines, from each machine's counts added up, the least used first. The counts stay
+ * on the machines, so it has no scope. */
+function FeaturesPane({ store }: { store: Store }) {
+  const usage = useSignal<FeatureUsage | null>(null);
+  const hosts = store.hosts.value.filter((h) => hostAnswers(h.state)).map((h) => h.id);
+  useEffect(() => {
+    usage.value = null;
+    void Promise.all(hosts.map((host) => store.link.call("reports/features", {}, host).catch(() => null))).then((all) => {
+      usage.value = mergeFeatures(all.filter((u): u is FeatureUsage => u !== null));
+    });
+  }, [hosts.join(" ")]);
+  const shown = usage.value;
+  return (
+    <div class="reports-pane">
+      {shown && <p class="quiet small">{featuresNote(shown)}</p>}
+      {!shown && <p class="hint">Loading…</p>}
+      {shown && (shown.features.length === 0 ? <p class="hint">{noFeatures}</p> : (
+        <ul class="report-list">
+          {shown.features.map((f) => (
+            <li key={f.method}>
+              <span><code>{f.method}</code>{f.quarter === 0 && <span class="report-unused small"> {featureUnused}</span>}</span>
+              <span class="quiet small">{featureLine(f, shown.days)}</span>
+            </li>
+          ))}
+        </ul>
+      ))}
+    </div>
+  );
+}
+
 /** A runtime's name, from the first host that knows it. */
 export function runtimeNameIn(store: Store) {
   return (id: string) => Object.values(store.runtimes.value).map((list) => list.find((s) => s.runtime.id === id)?.runtime.name)
@@ -472,7 +505,7 @@ export function ReportsPage({ store, section, down }: { store: Store; section: S
   const option = list.find((o) => scopeKey(o.scope) === picked.value) ?? list[0];
   return (
     <>
-      {list.length > 1 && section.id !== "saved" && (
+      {list.length > 1 && section.id !== "saved" && section.id !== "features" && (
         <div class="segmented report-scopes" role="radiogroup" aria-label="Scope">
           {list.map((o) => {
             const k = scopeKey(o.scope);
@@ -483,7 +516,8 @@ export function ReportsPage({ store, section, down }: { store: Store; section: S
           })}
         </div>
       )}
-      {scopes.value !== null && (section.id === "saved" ? <SavedPage store={store} scopes={list} />
+      {section.id === "features" ? <FeaturesPane store={store} />
+        : scopes.value !== null && (section.id === "saved" ? <SavedPage store={store} scopes={list} />
         : section.id in countsPages
         ? <CountsPane key={`${section.id}:${view?.id ?? ""}`} store={store} runtimeName={runtimeNameIn(store)} scope={option?.scope}
           kind={section.id as CountsKind} initial={initial} />

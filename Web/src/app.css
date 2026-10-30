@@ -1162,6 +1162,8 @@ button.remove:hover { opacity: 1; }
 .report-budget { display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card);
   padding: 10px 12px; background: var(--paper-raised); }
 .report-scopes { margin-bottom: 8px; }
+/* A feature with no use in 90 days (#2165), as the window's orange mark. */
+.report-unused { color: var(--tint-attention); }
 /* The Console's pages draw Settings' sections (People, Groups): Settings' rows, as sidebar.css has them under .with-sidebar. */
 .sub-app .settings-body > section { margin-bottom: 12px; }
 .sub-app .settings-body .setting { display: flex; align-items: center; justify-content: space-between; gap: 12px;
