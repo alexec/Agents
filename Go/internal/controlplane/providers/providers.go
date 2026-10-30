@@ -466,8 +466,15 @@ func (p *Providers) AgentCall(host, agent, method string, params json.RawMessage
 	if named, ok := str(given["host"]); ok && p.hooks.OwnerOf(named) != caller.Person {
 		return nil, fail(CodeNoSuchHost, "No machine is called %s.", named)
 	}
-	if method == MethodSessionOnMachine {
+	switch method {
+	case MethodSessionOnMachine:
 		return p.startSessionOn(hostName, agent, rawOf(given), caller)
+	case MethodSessionCall:
+		return p.sessionCall(hostName, agent, rawOf(given), caller)
+	case MethodSessionEnded:
+		return p.sessionEnded(hostName, rawOf(given), caller)
+	case MethodSendFolder:
+		return p.sendFolder(hostName, agent, rawOf(given), caller)
 	}
 	if named, ok := str(given["id"]); ok && (method == MethodProvidersCreate || method == MethodProvidersOptions) {
 		p.mu.Lock()

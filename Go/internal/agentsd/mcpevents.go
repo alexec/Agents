@@ -63,7 +63,9 @@ type mcpSubscription struct {
 	// workflows are the ids of the workflows whose triggers make it, sorted.
 	workflows []string
 	// waits are the agents whose open waits hold it (#577), sorted.
-	waits  []wire.UUID
+	waits []wire.UUID
+	// archives is whether Archive a session when its pull request merges holds it (#2886).
+	archives bool
 	pool   string
 	filled sdk.McpServer
 	cwd    string
@@ -719,6 +721,17 @@ func (d *Daemon) reconcileMCPEvents(ctx context.Context) {
 		}
 		return resolved[folder]
 	})
+	d.addMergeArchives(wanted, func(folder string) map[string]found {
+		if resolved[folder] == nil {
+			m := map[string]found{}
+			for _, n := range d.mcpServerNames(folder) {
+				s, problem := d.eventServerNamed(n, folder, secrets)
+				m[n] = found{s, problem}
+			}
+			resolved[folder] = m
+		}
+		return resolved[folder]
+	})
 	// A workflow's file is part of what a stopped subscription waits on.
 	digests := map[string]string{}
 	for _, w := range hearing {
@@ -874,6 +887,9 @@ func (d *Daemon) applyMCPSubscriptionsLocked(ctx context.Context, wanted map[str
 		holders := append([]string(nil), s.workflows...)
 		for _, w := range s.waits {
 			holders = append(holders, "wait of "+string(w))
+		}
+		if s.archives {
+			holders = append(holders, "archive when merged")
 		}
 		log.Printf("mcp events: %s %s subscribed for %s (key %s)", s.server, s.event, strings.Join(holders, ", "), s.key)
 		subCtx, cancel := context.WithCancel(ctx)
@@ -1273,6 +1289,7 @@ func (d *Daemon) raiseMCPEvent(e mcpPolled, s *mcpSubscription, checks senderChe
 		Sentence: sentence, Details: details})
 	d.lineageEvent(raised)
 	log.Printf("mcp events: %s %s evt %s raised (position %d, workflows: %s)", s.server, s.event, *e.EventID, raised.Position, strings.Join(s.workflows, ", "))
+	d.archiveMergedSessions(raised)
 	return raised
 }
 

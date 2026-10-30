@@ -122,6 +122,9 @@ type Config struct {
 	// Posts this copy's own pushes through APNs (#1460) when no Mac host relays a notice.
 	// Nil, with no key on the machine, sends none.
 	Push Pusher
+	// Posts this copy's own Web Push to a browser (#1486), relay or none: a browser has
+	// neither. Nil, with no VAPID key on the machine, sends none.
+	WebPush WebPusher
 	// The sign-in providers this copy can check, and where it asks them (#995); nil is the
 	// app's own client ids, or AGENTS_SIGNIN_* over them.
 	SignIn *signin.Config
@@ -161,6 +164,8 @@ type Service struct {
 	desk *notices.Desk
 	// This copy's own pushes, when no relay host is online (#1460); nil with no key.
 	pushes *pushes
+	// This copy's Web Push to browsers (#1486); nil with no VAPID key.
+	webPush *webPushes
 	// What each host last listed (#962), for hosts/lastHeard.
 	copies *hostCopies
 	// The reverse tunnels this copy holds for servers behind a bastion (#435): a single
@@ -263,6 +268,9 @@ func New(cfg Config) (*Service, error) {
 	s.downloads, s.socketsMost, s.refusals = newAddressRates(), socketsMost, newRefusalLog(s.log)
 	if cfg.Push != nil {
 		s.pushes = newPushes(s, cfg.Push)
+	}
+	if cfg.WebPush != nil {
+		s.webPush = newWebPushes(s, cfg.WebPush)
 	}
 	s.codes = &Codes{Store: cfg.Store, Private: cfg.PrivateKey, Public: public, URL: cfg.URL, Pin: cfg.Pin, Name: cfg.Name,
 		Keys: func() ([]byte, []byte) { k := s.currentKeys(); return k.private, k.public }}
@@ -367,6 +375,9 @@ func (s *Service) Records() *records.Records { return s.records }
 func (s *Service) Start(ctx context.Context) (int, error) {
 	if s.pushes == nil {
 		s.log("notice: no APNs key, so this control plane sends no pushes; a Mac host that relays still does")
+	}
+	if s.webPush == nil {
+		s.log("notice: no VAPID key, so this control plane sends no Web Push to a browser")
 	}
 	if err := store.Probe(ctx, s.cfg.Store, s.copyID); err != nil {
 		return 0, fmt.Errorf("the store can't be used: %w", err)
@@ -877,7 +888,7 @@ func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool, owner, host
 		if fromPeer {
 			return
 		}
-		if s.pushes == nil || s.router.RelayOnline() {
+		if s.pushes == nil && s.webPush == nil || s.router.RelayOnline() {
 			if s.mesh != nil {
 				s.mesh.broadcast(encodeNeed(need, owner))
 			}
@@ -899,11 +910,28 @@ func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool, owner, host
 	flags := s.router.NotifyFlags()
 	var devices []notices.Device
 	for _, c := range s.records.Clients() {
-		if !c.IsDevice() || len(c.PublicKey) == 0 || owner != "" && s.PersonOf(c.ID) != owner {
+		if owner != "" && s.PersonOf(c.ID) != owner {
+			continue
+		}
+		// A browser goes by Web Push from here, relay or none (#1486): only one that
+		// subscribed, which says it may be notified.
+		if c.Kind == records.KindBrowser {
+			if s.webPush == nil || c.WebPush == nil {
+				continue
+			}
+			may := true
+			d := notices.Device{ID: c.ID, Kind: notices.Browser, MayNotify: &may}
+			if c.LastSeen != nil {
+				d.LastSeen = c.LastSeen.Time
+			}
+			devices = append(devices, d)
+			continue
+		}
+		if !c.IsDevice() || len(c.PublicKey) == 0 {
 			continue
 		}
 		// Pushed from here, only a device that gave its token can be chosen.
-		if relay == "" && c.PushToken == nil {
+		if relay == "" && (s.pushes == nil || c.PushToken == nil) {
 			continue
 		}
 		kind := notices.Unknown
@@ -942,7 +970,21 @@ func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool, owner, host
 		if delivery.Headline != nil && delivery.NeedID.Notice != nil && host != "" {
 			s.router.Tell(host, wire.NotifyNoticesDelivered.Name, wire.NoticeDelivered{Need: delivery.NeedID, To: noticeDevice(kinds[string(delivery.Device)])})
 		}
+		// A browser gets no withdrawal: a push that shows nothing costs a browser its
+		// subscription (Safari) or shows one of its own (Chrome). The page takes its
+		// notices back when it comes into view.
+		if s.isBrowser(string(delivery.Device)) {
+			if s.webPush != nil && delivery.Headline != nil {
+				s.webPush.deliver(delivery)
+				s.log(fmt.Sprintf("notice: %s %s for %s by Web Push", did, needID, delivery.Device))
+			}
+			continue
+		}
 		// A withdrawal goes the way its post went.
+		if relay == "" && s.pushes == nil {
+			s.log(fmt.Sprintf("notice: could not withdraw %s from %s: this copy has no APNs key", needID, delivery.Device))
+			continue
+		}
 		if relay == "" || s.pushes != nil && delivery.Headline == nil && s.pushes.pushedHere(delivery) {
 			s.pushes.deliver(delivery)
 			s.log(fmt.Sprintf("notice: %s %s for %s through APNs", did, needID, delivery.Device))
@@ -953,6 +995,13 @@ func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool, owner, host
 	}
 }
 
+// isBrowser says whether a client is a browser, for a withdrawal from one the ladder no
+// longer lists.
+func (s *Service) isBrowser(client string) bool {
+	c := s.records.Client(client)
+	return c != nil && c.Kind == records.KindBrowser
+}
+
 // noticeDevice is a device's kind as a notice's line says it (#2860).
 func noticeDevice(kind string) wire.NoticeDevice {
 	switch kind {
@@ -960,6 +1009,8 @@ func noticeDevice(kind string) wire.NoticeDevice {
 		return wire.NoticeDeviceIPhone
 	case records.KindIPad:
 		return wire.NoticeDeviceIPad
+	case notices.Browser:
+		return wire.NoticeDeviceComputer
 	}
 	return wire.NoticeDeviceDevice
 }

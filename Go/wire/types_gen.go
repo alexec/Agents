@@ -3328,6 +3328,8 @@ type ElicitationRequest struct {
 	Scope ElicitationRequestScope `json:"scope"`
 
 	AskedAt Date `json:"askedAt"`
+
+	Secret *ElicitationSecret `json:"secret,omitzero"`
 }
 
 type ElicitationRequestMode struct {
@@ -3426,6 +3428,15 @@ type ElicitationSchemaPropertyKindMultiSelect struct {
 	MinItems *int64 `json:"minItems,omitzero"`
 
 	MaxItems *int64 `json:"maxItems,omitzero"`
+}
+
+// An agent's ask_secret (#2885): one named secret, typed into a masked field. The value goes to the person's secrets.env on the host, never into the record.
+type ElicitationSecret struct {
+	Name string `json:"name"`
+
+	URL *string `json:"url,omitzero"`
+
+	IsSet bool `json:"isSet"`
 }
 
 type Empty struct {
@@ -4257,6 +4268,9 @@ type HelperLimits struct {
 
 	// A helper's turn refused for a spent allowance waits for it at once, as if the person had chosen Continue (#1918). Off unless set.
 	ContinueWhenBack *bool `json:"continueWhenBack,omitzero"`
+
+	// A session whose pull request merges is archived, when its turn has ended and its worktree has nothing uncommitted (#2886). On unless set.
+	ArchiveWhenMerged *bool `json:"archiveWhenMerged,omitzero"`
 }
 
 type HostedMCPSnapshot struct {
@@ -5355,6 +5369,24 @@ type MachineEnroll struct {
 	As *string `json:"as,omitzero"`
 }
 
+// machines/sendFolder, through host/machines (#2929): one step of an agent's start_session with send, which sends this folder's branch to another of the person's machines first. Exactly one of state, upload and receive; the control plane sends that machine's folders/receiveState, folders/receiveUpload or folders/receive.
+type MachineFolderSend struct {
+	Host string `json:"host"`
+
+	State *ReceiveStateRequest `json:"state,omitzero"`
+
+	Upload *ReceiveUploadRequest `json:"upload,omitzero"`
+
+	Receive *ReceiveRequest `json:"receive,omitzero"`
+}
+
+// What machines/sendFolder's step answered (#2929): state for state, folder for receive, neither for upload.
+type MachineFolderSent struct {
+	State *ReceiveState `json:"state,omitzero"`
+
+	Folder *FolderSummary `json:"folder,omitzero"`
+}
+
 // host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).
 type MachineHello struct {
 	Host *MachineRef `json:"host,omitzero"`
@@ -5539,6 +5571,13 @@ type MachineSchedule struct {
 	At *Date `json:"at,omitzero"`
 
 	Workflow *string `json:"workflow,omitzero"`
+}
+
+// machines/sessionCall, through host/machines (#2927): an agent's read_session, message_session, stop_session, archive_session, or list_sessions and wait_for_agents status, on a session it started on another of the person's machines with start_session. The control plane sends that machine's agents/fromStarter, with call.from in its own words.
+type MachineSessionCall struct {
+	Host string `json:"host"`
+
+	Call SessionCall `json:"call"`
 }
 
 // machines/startSession, through host/machines (#2887): an agent's start_session on another of the person's machines, by its name. The control plane sends that machine's agents/start.
@@ -8625,6 +8664,43 @@ type ServerReachabilityChange struct {
 	Online bool `json:"online"`
 }
 
+// agents/fromStarter (#2927): the agent that started a session from another machine reads, messages, stops or archives it, or asks how it stands. The host answers only when from is the session's StartedFrom. The control plane writes from.machine and from.who; the asking host writes from.agent.
+type SessionCall struct {
+	From StartedFrom `json:"from"`
+
+	Session UUID `json:"session"`
+
+	Op string `json:"op"`
+
+	// With op message: the words.
+	Message *string `json:"message,omitzero"`
+
+	// With op message: replace the message of the starter's that waits, as message_session's replace.
+	Replace *bool `json:"replace,omitzero"`
+}
+
+// What agents/fromStarter says (#2927): the words for the agent, the session's title, and how it ended, absent while it goes on.
+type SessionCallReply struct {
+	Said string `json:"said"`
+
+	Title *string `json:"title,omitzero"`
+
+	Ended *WaitEndingHow `json:"ended,omitzero"`
+}
+
+// machines/sessionEnded through host/machines, then agents/endedElsewhere (#2927): a session started from another machine has ended, so its starter's wait_for_agents can wake. The host sends machine as the starter's machine; the control plane sends it on as the ended session's.
+type SessionEnded struct {
+	Machine string `json:"machine"`
+
+	Session UUID `json:"session"`
+
+	Starter UUID `json:"starter"`
+
+	How WaitEndingHow `json:"how"`
+
+	Title *string `json:"title,omitzero"`
+}
+
 type SessionLabel struct {
 	Value string `json:"value"`
 
@@ -10570,6 +10646,20 @@ type WakeState struct {
 	GraceUntil *Date `json:"graceUntil,omitzero"`
 
 	OnPower bool `json:"onPower"`
+}
+
+// clients/webPushKey (#1486): the control plane's VAPID public key, X9.63, base64url without padding, as pushManager.subscribe takes it. None when this control plane sends no Web Push.
+type WebPushKey struct {
+	PublicKey *string `json:"publicKey,omitzero"`
+}
+
+// clients/setWebPush (#1486): a browser's push endpoint and its two keys, base64url, as PushSubscription.toJSON() gives them. No endpoint takes it away.
+type WebPushSubscription struct {
+	Endpoint *string `json:"endpoint,omitzero"`
+
+	P256dh *string `json:"p256dh,omitzero"`
+
+	Auth *string `json:"auth,omitzero"`
 }
 
 type WebRemoteStatus struct {

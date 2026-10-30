@@ -7305,6 +7305,9 @@
         },
         "askedAt": {
           "$ref": "#/definitions/WireDate"
+        },
+        "secret": {
+          "$ref": "#/definitions/ElicitationSecret"
         }
       },
       "required": [
@@ -7567,6 +7570,26 @@
           "additionalProperties": false
         }
       ]
+    },
+    "ElicitationSecret": {
+      "description": "An agent's ask_secret (#2885): one named secret, typed into a masked field. The value goes to the person's secrets.env on the host, never into the record.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "isSet": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "isSet"
+      ],
+      "additionalProperties": false
     },
     "Empty": {
       "type": "object",
@@ -9537,6 +9560,10 @@
         },
         "continueWhenBack": {
           "description": "A helper's turn refused for a spent allowance waits for it at once, as if the person had chosen Continue (#1918). Off unless set.",
+          "type": "boolean"
+        },
+        "archiveWhenMerged": {
+          "description": "A session whose pull request merges is archived, when its turn has ended and its worktree has nothing uncommitted (#2886). On unless set.",
           "type": "boolean"
         }
       },
@@ -12374,6 +12401,41 @@
       "required": [],
       "additionalProperties": false
     },
+    "MachineFolderSend": {
+      "type": "object",
+      "description": "machines/sendFolder, through host/machines (#2929): one step of an agent's start_session with send, which sends this folder's branch to another of the person's machines first. Exactly one of state, upload and receive; the control plane sends that machine's folders/receiveState, folders/receiveUpload or folders/receive.",
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/ReceiveStateRequest"
+        },
+        "upload": {
+          "$ref": "#/definitions/ReceiveUploadRequest"
+        },
+        "receive": {
+          "$ref": "#/definitions/ReceiveRequest"
+        }
+      },
+      "required": [
+        "host"
+      ],
+      "additionalProperties": false
+    },
+    "MachineFolderSent": {
+      "type": "object",
+      "description": "What machines/sendFolder's step answered (#2929): state for state, folder for receive, neither for upload.",
+      "properties": {
+        "state": {
+          "$ref": "#/definitions/ReceiveState"
+        },
+        "folder": {
+          "$ref": "#/definitions/FolderSummary"
+        }
+      },
+      "additionalProperties": false
+    },
     "MachineHello": {
       "type": "object",
       "description": "host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).",
@@ -12772,6 +12834,23 @@
           "type": "string"
         }
       },
+      "additionalProperties": false
+    },
+    "MachineSessionCall": {
+      "type": "object",
+      "description": "machines/sessionCall, through host/machines (#2927): an agent's read_session, message_session, stop_session, archive_session, or list_sessions and wait_for_agents status, on a session it started on another of the person's machines with start_session. The control plane sends that machine's agents/fromStarter, with call.from in its own words.",
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "call": {
+          "$ref": "#/definitions/SessionCall"
+        }
+      },
+      "required": [
+        "host",
+        "call"
+      ],
       "additionalProperties": false
     },
     "MachineSessionStart": {
@@ -19695,6 +19774,89 @@
       ],
       "additionalProperties": false
     },
+    "SessionCall": {
+      "type": "object",
+      "description": "agents/fromStarter (#2927): the agent that started a session from another machine reads, messages, stops or archives it, or asks how it stands. The host answers only when from is the session's StartedFrom. The control plane writes from.machine and from.who; the asking host writes from.agent.",
+      "properties": {
+        "from": {
+          "$ref": "#/definitions/StartedFrom"
+        },
+        "session": {
+          "$ref": "#/definitions/UUID"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "status",
+            "read",
+            "message",
+            "stop",
+            "archive"
+          ]
+        },
+        "message": {
+          "description": "With op message: the words.",
+          "type": "string"
+        },
+        "replace": {
+          "description": "With op message: replace the message of the starter's that waits, as message_session's replace.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "from",
+        "session",
+        "op"
+      ],
+      "additionalProperties": false
+    },
+    "SessionCallReply": {
+      "type": "object",
+      "description": "What agents/fromStarter says (#2927): the words for the agent, the session's title, and how it ended, absent while it goes on.",
+      "properties": {
+        "said": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "ended": {
+          "$ref": "#/definitions/WaitEndingHow"
+        }
+      },
+      "required": [
+        "said"
+      ],
+      "additionalProperties": false
+    },
+    "SessionEnded": {
+      "type": "object",
+      "description": "machines/sessionEnded through host/machines, then agents/endedElsewhere (#2927): a session started from another machine has ended, so its starter's wait_for_agents can wake. The host sends machine as the starter's machine; the control plane sends it on as the ended session's.",
+      "properties": {
+        "machine": {
+          "type": "string"
+        },
+        "session": {
+          "$ref": "#/definitions/UUID"
+        },
+        "starter": {
+          "$ref": "#/definitions/UUID"
+        },
+        "how": {
+          "$ref": "#/definitions/WaitEndingHow"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "machine",
+        "session",
+        "starter",
+        "how"
+      ],
+      "additionalProperties": false
+    },
     "SessionLabel": {
       "type": "object",
       "properties": {
@@ -24551,6 +24713,32 @@
         "heldBackByBattery",
         "onPower"
       ],
+      "additionalProperties": false
+    },
+    "WebPushKey": {
+      "type": "object",
+      "description": "clients/webPushKey (#1486): the control plane's VAPID public key, X9.63, base64url without padding, as pushManager.subscribe takes it. None when this control plane sends no Web Push.",
+      "properties": {
+        "publicKey": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "WebPushSubscription": {
+      "type": "object",
+      "description": "clients/setWebPush (#1486): a browser's push endpoint and its two keys, base64url, as PushSubscription.toJSON() gives them. No endpoint takes it away.",
+      "properties": {
+        "endpoint": {
+          "type": "string"
+        },
+        "p256dh": {
+          "type": "string"
+        },
+        "auth": {
+          "type": "string"
+        }
+      },
       "additionalProperties": false
     },
     "WebRemoteStatus": {

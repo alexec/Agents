@@ -131,13 +131,21 @@ const (
 	MethodHostsRetryKept    = "hosts/retryKept"
 	MethodWorkspacesAgent   = "machines/forAgent"
 	MethodSessionOnMachine  = "machines/startSession"
+	MethodSessionCall       = "machines/sessionCall"
+	MethodSessionEnded      = "machines/sessionEnded"
+	MethodSendFolder        = "machines/sendFolder"
 	MethodHostMachines      = "host/machines"
 	MethodHostProviderDraft = "host/providerDraft"
 	MethodHostStatus        = "host/status"
 	MethodAgentsPrompt      = "agents/prompt"
 	MethodAgentsStart       = "agents/start"
 	MethodAgentsStop        = "agents/stop"
+	MethodAgentsFromStarter = "agents/fromStarter"
+	MethodAgentsEndedThere  = "agents/endedElsewhere"
 	MethodFoldersClone      = "folders/clone"
+	MethodReceiveState      = "folders/receiveState"
+	MethodReceiveUpload     = "folders/receiveUpload"
+	MethodReceive           = "folders/receive"
 )
 
 // Notification names (DaemonAPI.Notification).
@@ -162,7 +170,8 @@ var WorkspaceMethods = map[string]bool{
 // through host/machines.
 var AgentWorkspaceMethods = map[string]bool{
 	MethodWorkspacesAgent: true, MethodHostsStart: true, MethodHostsStop: true, MethodProvidersOptions: true,
-	MethodProvidersCreate: true, MethodHostsDelete: true, MethodSessionOnMachine: true,
+	MethodProvidersCreate: true, MethodHostsDelete: true, MethodSessionOnMachine: true, MethodSessionCall: true,
+	MethodSessionEnded: true, MethodSendFolder: true,
 }
 
 // KeptMethods is DaemonAPI.Method.keptMethods: the only requests that are kept.

@@ -317,6 +317,18 @@ private struct FolderGeneralPane: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
+                    row("Pull request merged") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            archiveWhenMerged(in: summary)
+                            Text("A session in a worktree is archived when the pull request from its branch merges, "
+                                 + "once its turn has ended and its worktree has nothing uncommitted. Any other session "
+                                 + "gets a line in its chat. This needs the github or gitlab connector in this folder. "
+                                 + "You can bring any of them back.")
+                                .appText(.fine)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
                     row("Allowance spent") {
                         VStack(alignment: .leading, spacing: 6) {
                             helpersContinue(in: summary)
@@ -423,6 +435,20 @@ private struct FolderGeneralPane: View {
         return Toggle("Sessions may archive the sessions they started", isOn: Binding(get: { kept.mayArchive }, set: { on in
             var limits = kept
             limits.agentsMayArchive = on == HelperLimit.defaultAgentsMayArchive ? nil : on
+            Task { await model.setHelperLimits(limits, for: summary.key) }
+        }))
+        .toggleStyle(.switch)
+        .controlSize(.small)
+        .disabled(model.hosts.isOffline(summary.host))
+    }
+
+    /// Whether a session is archived when its pull request merges (#2886). On is the default,
+    /// and back to nil.
+    private func archiveWhenMerged(in summary: DaemonAPI.FolderSummary) -> some View {
+        let kept = summary.folder.helperLimits ?? HelperLimits()
+        return Toggle("Archive a session when its pull request merges", isOn: Binding(get: { kept.archivesWhenMerged }, set: { on in
+            var limits = kept
+            limits.archiveWhenMerged = on == HelperLimit.defaultArchiveWhenMerged ? nil : on
             Task { await model.setHelperLimits(limits, for: summary.key) }
         }))
         .toggleStyle(.switch)

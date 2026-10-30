@@ -63,6 +63,7 @@ export const noticeLimitsFooter = "What agents tell you with a notification, whe
   + "Questions and approvals are not limited.";
 
 /** Under the web's limits only (#2895): they sit under This browser, but are the Mac's host's, and the page gets
- * notices only while it is open and in front (#2860; Web Push is #1486). */
+ * notices while it is open and in front (#2860), or by Web Push when no iPhone gets them (#1486). */
 export const noticeLimitsWhere = "Kept on your Mac, the same on every client of yours. "
-  + "The notices go to your Mac, iPhone and iPad, and to this page while it is open and in front.";
+  + "The notices go to your Mac, iPhone and iPad, and to this browser: while this page is open and in front, "
+  + "or by Web Push when no iPhone gets them.";

@@ -17,15 +17,28 @@
 # the ones nobody re-armed. `--stalled` re-arms a PR only once per head commit; a PR it has
 # re-armed before at the same head is listed for a person to look at.
 #
+# A PR labelled `hold:v*` waits for that release to ship (#2931): this script never arms it.
+# Only the release takes the label off and turns auto-merge on.
+#
 # GH_REPO picks the repository, as for gh; by default it is this checkout's.
 set -euo pipefail
 
 me=$(basename "$0")
 die() { echo "$me: $*" >&2; exit 1; }
 
+# The labels on a PR that start with `hold:v`, one per line.
+holds() {
+	gh pr view "$1" --json labels --jq '.labels[].name | select(startswith("hold:v"))'
+}
+
 # The repository only allows squash merges.
 rearm() {
-	local pr=$1
+	local pr=$1 held
+	held=$(holds "$pr")
+	if [[ -n $held ]]; then
+		echo "$me: #$pr is labelled ${held//$'\n'/, }: it waits for that release, so it is not armed (#2931)" >&2
+		return 1
+	fi
 	gh pr merge "$pr" --disable-auto >/dev/null 2>&1 || true
 	gh pr merge "$pr" --auto --squash >/dev/null || die "could not turn auto-merge on again for #$pr"
 	echo "$me: re-armed auto-merge on #$pr"
@@ -57,7 +70,7 @@ stalled() {
 			echo "$me: #$pr is still CLEAN and unmerged ${age}m on, after a re-arm at this head: a person should look"
 			continue
 		fi
-		rearm "$pr"
+		rearm "$pr" || continue
 		gh pr comment "$pr" --body "Auto-merge re-armed by \`scripts/rearm-automerge.sh --stalled\`: this PR was CLEAN with auto-merge on for ${age} minutes and had not merged (#1741).
 
 $marker" >/dev/null
@@ -70,7 +83,9 @@ if [[ $1 == --stalled ]]; then
 	stalled "${2:-10}"
 	exit 0
 fi
+status=0
 for pr in "$@"; do
 	[[ $pr =~ ^[0-9]+$ ]] || die "not a PR number: '$pr'"
-	rearm "$pr"
+	rearm "$pr" || status=1
 done
+exit "$status"

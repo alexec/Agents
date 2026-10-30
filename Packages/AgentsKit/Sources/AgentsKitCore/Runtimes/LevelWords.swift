@@ -85,6 +85,17 @@ public enum LevelWords {
     /// The mark on the value that Settings gives, when the agent has no choice of its own.
     public static let followsSettings = "follows Settings"
 
+    /// Bypass Permissions asks once more before it is set, as Yes to all does (#2892, #2746):
+    /// it lets the agent change things outside its folder.
+    public static func asksFirst(_ field: AutoField, _ level: String) -> Bool {
+        field == .permission && level == PermissionLevel.bypassPermissions.rawValue
+    }
+
+    public static let bypassConfirmTitle = "Let this agent bypass every permission?"
+    public static let bypassConfirmMessage = "It will not ask before it edits files or runs commands, even outside its folder. "
+        + "Choose Ask to make it ask again."
+    public static let bypassConfirmButton = "Bypass Permissions"
+
     /// The menu of a runtime's own choices, behind the shared ones.
     public static func own(_ runtimeName: String) -> String { "⋯ \(runtimeName)’s own" }
 

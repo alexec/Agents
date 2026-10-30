@@ -39,7 +39,11 @@ This holds on the machine too:
   machine, so an agent acts as its machine's user, and reaches only that user's sessions.
   `start_session` with a `machine` (#2887) is the one exception. It goes through the
   control plane, only to another machine of the same user, and only after that user says
-  yes.
+  yes. The agent that started such a session then reaches it, and only it (#2927):
+  its `list_sessions`, `read_session`, `message_session`, `wait_for_agents`,
+  `stop_session` and `archive_session` go through the control plane to that machine,
+  which answers only the agent its own record says started the session. Each machine
+  keeps that record in `elsewhere.json` in its data folder.
 
 ## What an admin sees
 

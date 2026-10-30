@@ -65,9 +65,11 @@ type Daemon struct {
 	viewBook
 	mcpHealthBook
 	mcpEventsBook
+	mergeArchiveBook
 	restartBook
 	machineBook
 	hostStatusBook
+	elsewhereBook
 	idleBook
 	turnBook
 	findBook
