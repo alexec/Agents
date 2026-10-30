@@ -104,6 +104,9 @@ final class VoiceMode {
     private var pauseTimer: Task<Void, Never>?
     /// The next quiet tick (#2520). Nil while one should not play.
     private var tickTask: Task<Void, Never>?
+    /// Lets the voice go a minute after Settings' sample while voice mode is off (#2880).
+    private var sampleUnload: Task<Void, Never>?
+    private static let sampleKeptFor: Duration = .seconds(60)
     private var speaking: Task<Void, Never>?
     /// The last turn when the latest words went, and whether the agent was seen working
     /// since: a turn has ended only once both have moved on.
@@ -200,6 +203,8 @@ final class VoiceMode {
     /// whether the host took them.
     func turnOn(in agentID: UUID?, vocabulary: [String] = [], send: @escaping Send) {
         if phase != .off { turnOff() }
+        sampleUnload?.cancel()
+        sampleUnload = nil
         self.agentID = agentID
         self.send = send
         self.vocabulary = vocabulary
@@ -303,8 +308,24 @@ final class VoiceMode {
 
     /// A sentence in the voice Settings has now, for Settings' sample (Alex, 2026-10-29):
     /// the same voice, so no second copy of the model and no two runs at once.
+    /// With voice mode off, the voice is let go a minute after the last sample, so one
+    /// press of Play does not keep the model in memory (#2880).
     func sample(_ sentence: String) async throws -> [Float] {
-        try await voice.audio(for: sentence)
+        sampleUnload?.cancel()
+        sampleUnload = nil
+        defer { unloadAfterSample() }
+        return try await voice.audio(for: sentence)
+    }
+
+    private func unloadAfterSample() {
+        guard phase == .off else { return }
+        sampleUnload?.cancel()
+        sampleUnload = Task { [voice] in
+            try? await Task.sleep(for: Self.sampleKeptFor)
+            guard !Task.isCancelled, phase == .off else { return }
+            note("voice: let go after the sample")
+            await voice.unload()
+        }
     }
 
     /// The person left this chat, or the new session (nil), or the app went to the

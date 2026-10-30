@@ -9,7 +9,7 @@ import Foundation
 /// Its models and its 28 English voices are inside the app (`Resources/Voice`,
 /// `scripts/voice-models.sh`), so nothing is downloaded. FluidAudio reads them only from its
 /// own cache folder, so they are linked there from the bundle before it loads. Loaded when
-/// voice mode turns on and let go when it turns off.
+/// voice mode turns on and let go when it turns off, or a minute after Settings' sample (#2880).
 actor KokoroVoice {
     /// 24 kHz mono.
     static let sampleRate = Double(KokoroAneConstants.sampleRate)
