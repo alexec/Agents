@@ -17,8 +17,10 @@ struct NotificationLimitsSection: View {
             Stepper(value: $burst, in: DisplayPreference.noticeBurstRange) {
                 LabeledContent("Burst", value: "\(burst)")
             }
-            Stepper(value: $cooldown, in: DisplayPreference.noticeCooldownRange) {
-                LabeledContent("Cool-down", value: "\(cooldown) min")
+            Picker("Cool-down", selection: $cooldown) {
+                ForEach(cooldownChoices, id: \.self) { minutes in
+                    Text(Self.label(minutes)).tag(minutes)
+                }
             }
         } header: {
             Text("What agents tell you")
@@ -31,5 +33,17 @@ struct NotificationLimitsSection: View {
                 .foregroundStyle(.secondary)
         }
         .paperListRow()
+    }
+
+    /// The presets, and the stored value when the web set one that is none of them (#2896).
+    private var cooldownChoices: [Int] {
+        let presets = DisplayPreference.noticeCooldownPresets
+        return presets.contains(cooldown) ? presets : (presets + [cooldown]).sorted()
+    }
+
+    static func label(_ minutes: Int) -> String {
+        guard minutes >= 60, minutes % 60 == 0 else { return "\(minutes) min" }
+        let hours = minutes / 60
+        return hours == 1 ? "1 hour" : "\(hours) hours"
     }
 }
