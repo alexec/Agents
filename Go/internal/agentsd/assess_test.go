@@ -176,4 +176,8 @@ func TestShouldAskCountsOnlyTheQuestionsBeforeTheBriefSaysToAsk(t *testing.T) {
 	if v, why := r.shouldAsk(); v != passed || why != "asked the person with the app's `ask_question`" {
 		t.Fatal(v, why)
 	}
+	// ask_question scores the brief's form, not the shelf question before it.
+	if v, why := r.askQuestion(); why == "`ask_question` was not asked with both a choice and a text field" {
+		t.Fatal(v, why)
+	}
 }

@@ -561,10 +561,13 @@ func questionsOf(c appToolCall) []formQuestion {
 }
 
 func (r assessRecord) askQuestion() (verdict, string) {
+	// The brief's form, not should_ask's question before it (#2416): the first answered
+	// call at or after toldToAsk, or the first answered call without one.
 	asked := r.callsOf("questions/ask")
+	from := r.toldToAsk()
 	var call *appToolCall
 	for i := range asked {
-		if asked[i].Ok {
+		if asked[i].Ok && (from == nil || asked[i].At >= *from) {
 			call = &asked[i]
 			break
 		}
