@@ -496,6 +496,32 @@
       }
     },
     {
+      "name": "clients/setWebPush",
+      "x-capability": "clients/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "A browser, over its own session (#1486): its Web Push subscription, kept in its own client record, which only it may set. No endpoint takes it away. Refused from a phone, an iPad or a window, and when this control plane has no VAPID key.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/WebPushSubscription"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "clients/startPairing",
       "x-capability": "clients/1",
       "paramStructure": "by-name",
@@ -532,6 +558,32 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "clients/webPushKey",
+      "x-capability": "clients/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "The control plane's VAPID public key (#1486), for a browser to subscribe with; none when it sends no Web Push.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/WebPushKey"
         }
       }
     },

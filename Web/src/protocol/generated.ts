@@ -8176,6 +8176,24 @@ export interface WakeState {
   onPower: boolean;
 }
 
+/**
+ * clients/webPushKey (#1486): the control plane's VAPID public key, X9.63, base64url without
+ * padding, as pushManager.subscribe takes it. None when this control plane sends no Web Push.
+ */
+export interface WebPushKey {
+  publicKey?: string;
+}
+
+/**
+ * clients/setWebPush (#1486): a browser's push endpoint and its two keys, base64url, as
+ * PushSubscription.toJSON() gives them. No endpoint takes it away.
+ */
+export interface WebPushSubscription {
+  endpoint?: string;
+  p256dh?: string;
+  auth?: string;
+}
+
 export interface WebRemoteStatus {
   port: number;
   served: boolean;
@@ -8593,6 +8611,8 @@ export interface Methods {
   "clientPermissions/set": { params: ClientPermissionSettings; result: ClientPermissionSettings };
   "clientPermissions/state": { params: Empty; result: ClientPermissionSettings };
   "clients/forgetSelf": { params: Empty; result: Empty };
+  "clients/setWebPush": { params: WebPushSubscription; result: Empty };
+  "clients/webPushKey": { params: Empty; result: WebPushKey };
   "connections/disconnect": { params: ConnectionProviderRequest; result: ConnectionDisconnectAnswer };
   "connections/list": { params: Empty; result: ConnectionsList };
   "connections/sign-in": { params: ConnectionProviderRequest; result: ConnectionSignIn };
@@ -8878,6 +8898,8 @@ export const MethodTarget = {
   "clientPermissions/set": "host",
   "clientPermissions/state": "host",
   "clients/forgetSelf": "control",
+  "clients/setWebPush": "control",
+  "clients/webPushKey": "control",
   "connections/disconnect": "host",
   "connections/list": "host",
   "connections/sign-in": "host",
@@ -9938,6 +9960,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WaitingAgent: { required: ["agentID", "title", "folder", "status"], optional: [] },
   WakeSettings: { required: ["keepsAwake", "graceHours", "warmRuntimes", "awakeOnPower"], optional: [] },
   WakeState: { required: ["isHolding", "agentsInFlight", "heldBackByBattery", "onPower"], optional: ["batteryPercent", "since", "graceUntil"] },
+  WebPushKey: { required: [], optional: ["publicKey"] },
+  WebPushSubscription: { required: [], optional: ["endpoint", "p256dh", "auth"] },
   WebRemoteStatus: { required: ["port", "served"], optional: ["reason", "detail"] },
   WorkReport: { required: ["outcome", "message", "at"], optional: ["block"] },
   Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "enabled", "archived", "whenDone", "continueWhenBack", "muted", "runsOn"] },

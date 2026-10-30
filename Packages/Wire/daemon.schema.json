@@ -24057,6 +24057,32 @@
       ],
       "additionalProperties": false
     },
+    "WebPushKey": {
+      "type": "object",
+      "description": "clients/webPushKey (#1486): the control plane's VAPID public key, X9.63, base64url without padding, as pushManager.subscribe takes it. None when this control plane sends no Web Push.",
+      "properties": {
+        "publicKey": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "WebPushSubscription": {
+      "type": "object",
+      "description": "clients/setWebPush (#1486): a browser's push endpoint and its two keys, base64url, as PushSubscription.toJSON() gives them. No endpoint takes it away.",
+      "properties": {
+        "endpoint": {
+          "type": "string"
+        },
+        "p256dh": {
+          "type": "string"
+        },
+        "auth": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
     "WebRemoteStatus": {
       "type": "object",
       "properties": {

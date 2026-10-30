@@ -58,6 +58,10 @@ public extension DaemonAPI.Method {
     /// `PushToken` (#1460): a device's own APNs token, for the control plane to push to
     /// when no Mac host relays its notices. Only the device sets its own.
     static let clientsSetPushToken = "clients/setPushToken"
+    /// A browser's Web Push subscription (#1486), set by the page over its own session, and the
+    /// control plane's VAPID key it subscribes with. Only the web page calls them.
+    static let clientsSetWebPush = "clients/setWebPush"
+    static let clientsWebPushKey = "clients/webPushKey"
     /// `ActivityToken` (#1744): the push token of one session's Live Activity on a device,
     /// for the control plane to update it by APNs. Only the device sets its own.
     static let clientsSetActivityToken = "clients/setActivityToken"

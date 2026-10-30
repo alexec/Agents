@@ -173,6 +173,7 @@ Open issues: `is:open label:integration notification`.
 | --- | --- | --- | --- | --- | --- |
 | CloudKit mailbox push | Remote | built | — | `Packages/AgentsKit/Sources/AgentsKitCore/Remote/CloudKitMailbox.swift`, `RemoteNotify/Sources/NotificationService.swift` | |
 | APNs from the control plane (#1460) | Remote | built, not working live (#1509) | 2026-10-18, live on control.agentloops.dev with the real key: no push with the relay off, two tries (`specs/058-control-plane/walks/1461.md`) | `Go/internal/controlplane/apns/`, `Go/internal/controlplane/push.go`, `Packages/AgentsKit/Sources/AgentsKitCore/Remote/ControlPush.swift` | #1509 (fix in v0.5.1) |
+| Web Push from the control plane (#1486) | web | built, not walked | — | `Go/internal/controlplane/webpush/`, `Go/internal/controlplane/webpushes.go`, `Web/src/pageNotices.ts`, `Web/src/sw.ts` | Alex's test in Chrome, Firefox and Safari (iOS from the Home Screen) on the live control plane |
 | Live Activity updates by APNs (#1744) | Remote | built, not walked | — | `Go/internal/controlplane/activities.go`, `Go/internal/controlplane/apns/`, `Go/internal/agentsd/turnphase.go`, `Remote/Sources/Notifications/TurnActivities.swift` | Alex's test on a device |
 | CloudKit relay channel (Remote to Mac) | Remote, Mac | built | — | `Packages/AgentsKit/Sources/AgentsKit/Relay/ControlRelay.swift`, `Host/Relay/Sources/main.swift` | |
 | Local notifications | Mac, Remote | built | — | `App/Sources/Notifications/MacNotifier.swift`, `Remote/Sources/Notifications/DeviceNotifier.swift` | |
