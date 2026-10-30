@@ -258,6 +258,8 @@ struct StartAgentView: View {
                         .accessibilityValue(model.isStarting ? AgentState.startingLabel : "")
                     }
                 }
+                // Each button takes a 44 pt tap, though it is drawn at 32 (#2897).
+                .environment(\.paperTapTargets, true)
             }
             .padding(10)
             .frame(minHeight: 94, alignment: .topLeading)

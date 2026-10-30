@@ -332,6 +332,8 @@ struct PromptBar: View {
                     .accessibilityHint(willQueue ? PromptWords.sendHelp(willQueue: true) : "")
                 }
             }
+            // Each button takes a 44 pt tap, though it is drawn at 32 (#2897).
+            .environment(\.paperTapTargets, true)
         }
         .padding(10)
         .frame(minHeight: 94, alignment: .topLeading)
