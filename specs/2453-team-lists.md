@@ -55,11 +55,11 @@ checks); on Issues, the issues assigned to the viewer (before: none).
 
 1. **This part (#2453):** the github server: sections, the bot pill and the Needs you
    count, from GitHub's own data.
-2. **The gitlab server:** the same on Merge requests and Issues (GitLab's `reviewers`,
+2. **The gitlab server (#2952):** the same on Merge requests and Issues (GitLab's `reviewers`,
    `assignees`, and the project's members for Team).
-3. **The linear server:** Issues: Needs you (assigned to you), Yours, Team (the
+3. **The linear server (#2950):** Issues: Needs you (assigned to you), Yours, Team (the
    workspace's members), Others.
-4. **The people map:** the host passes the control plane's people and bots, with their
+4. **The people map (#2951):** the host passes the control plane's people and bots, with their
    logins, in the feeding tool's `_meta`, so a row names a person as the control plane
    knows them, Team is "people on this control plane", and the viewer's own sessions show
    "An agent is on it" (session label `#n` or `P#n`) with a link. A person who signed in
