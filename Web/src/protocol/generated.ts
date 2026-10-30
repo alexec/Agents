@@ -3558,6 +3558,81 @@ export interface LineMember {
   isCallOpen: boolean;
 }
 
+/**
+ * lineage/end (#2348): the link from one node to another by this relationship stops being active
+ * now. Nothing is removed: the link keeps its start and gets an end.
+ */
+export interface LineageEndRequest {
+  from: LineageNode;
+  to: LineageNode;
+  rel: string;
+}
+
+/**
+ * lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the
+ * walk stopped at its limit on nodes, so there is more.
+ */
+export interface LineageGraph {
+  nodes: LineageNode[];
+  links: LineageLink[];
+  limited?: boolean;
+}
+
+/**
+ * A typed link in the lineage graph (#2348): from works-on, opens, fixes, started, reviews, closes
+ * or part-of to. source is how the host knows it: start, branch, pr-body, helper, agent or person.
+ * at is when it started; endedAt is set when it stops being active (a PR merged, a session
+ * archived). Both lists are open: a host keeps a relationship or a source it does not know.
+ */
+export interface LineageLink {
+  from: LineageNode;
+  to: LineageNode;
+  rel: string;
+  source: string;
+  at: WireDate;
+  endedAt?: WireDate;
+}
+
+/**
+ * lineage/link (#2348): start a link. When the same link is active already, it is the answer,
+ * unchanged.
+ */
+export interface LineageLinkRequest {
+  from: LineageNode;
+  to: LineageNode;
+  rel: string;
+  source: string;
+}
+
+/**
+ * The links of a node, newest first (#2348), or the links lineage/end ended. limited says there are
+ * more than the answer holds.
+ */
+export interface LineageLinks {
+  links: LineageLink[];
+  limited?: boolean;
+}
+
+/**
+ * A node in the lineage graph (#2348). kind is what it is: issue, pr, session, workflow-run,
+ * commit, file, branch or milestone, and the list is open. ref names it apart from any tracker, as
+ * <scheme>:<id>: github:alexec/Agents#123, gitlab:group/repo!45, linear:ENG-4, jira:ABC-9,
+ * session:<agent id>.
+ */
+export interface LineageNode {
+  kind: string;
+  ref: string;
+}
+
+/**
+ * lineage/links and lineage/walk (#2348): a node, and for a walk how many links away to go (1 to 4;
+ * 2 when not said: issue, sessions, PRs).
+ */
+export interface LineageNodeRequest {
+  node: LineageNode;
+  depth?: number;
+}
+
 export interface ListCursor {
   lastActivityAt: WireDate;
   id: UUID;
@@ -9474,6 +9549,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LendSignIn: { required: ["host", "from", "runtime", "allowed"], optional: [] },
   Levels: { required: [], optional: ["model", "permission", "permissionRequests"] },
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
+  LineageEndRequest: { required: ["from", "to", "rel"], optional: [] },
+  LineageGraph: { required: ["nodes", "links"], optional: ["limited"] },
+  LineageLink: { required: ["from", "to", "rel", "source", "at"], optional: ["endedAt"] },
+  LineageLinkRequest: { required: ["from", "to", "rel", "source"], optional: [] },
+  LineageLinks: { required: ["links"], optional: ["limited"] },
+  LineageNode: { required: ["kind", "ref"], optional: [] },
+  LineageNodeRequest: { required: ["node"], optional: ["depth"] },
   ListCursor: { required: ["lastActivityAt", "id"], optional: ["archivedAt"] },
   ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query"] },
   ListedSkill: { required: ["name", "folder"], optional: ["description", "managed"] },

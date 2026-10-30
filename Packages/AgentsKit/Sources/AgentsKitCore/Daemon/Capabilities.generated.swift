@@ -66,6 +66,7 @@ public enum Capability {
     public static let host1 = "host/1"
     public static let hostsJoin1 = "hosts.join/1"
     public static let hosts1 = "hosts/1"
+    public static let lineage1 = "lineage/1"
     public static let links1 = "links/1"
     public static let liveactivity1 = "liveactivity/1"
     public static let mac1 = "mac/1"
@@ -261,6 +262,10 @@ public enum Capability {
         "folders/unarchive": "folders/1",
         "folders/undoGuardedChange": "folders/1",
         "git/fill": "git/1",
+        "lineage/end": "lineage/1",
+        "lineage/link": "lineage/1",
+        "lineage/links": "lineage/1",
+        "lineage/walk": "lineage/1",
         "mac/open": "mac/1",
         "mac/reveal": "mac/1",
         "mac/terminal": "mac/1",

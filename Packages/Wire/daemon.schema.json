@@ -10035,6 +10035,162 @@
       ],
       "additionalProperties": false
     },
+    "LineageEndRequest": {
+      "type": "object",
+      "description": "lineage/end (#2348): the link from one node to another by this relationship stops being active now. Nothing is removed: the link keeps its start and gets an end.",
+      "properties": {
+        "from": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "to": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "rel": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to",
+        "rel"
+      ],
+      "additionalProperties": false
+    },
+    "LineageGraph": {
+      "type": "object",
+      "description": "lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more.",
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageNode"
+          }
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageLink"
+          }
+        },
+        "limited": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "nodes",
+        "links"
+      ],
+      "additionalProperties": false
+    },
+    "LineageLink": {
+      "type": "object",
+      "description": "A typed link in the lineage graph (#2348): from works-on, opens, fixes, started, reviews, closes or part-of to. source is how the host knows it: start, branch, pr-body, helper, agent or person. at is when it started; endedAt is set when it stops being active (a PR merged, a session archived). Both lists are open: a host keeps a relationship or a source it does not know.",
+      "properties": {
+        "from": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "to": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "rel": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "endedAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "from",
+        "to",
+        "rel",
+        "source",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "LineageLinkRequest": {
+      "type": "object",
+      "description": "lineage/link (#2348): start a link. When the same link is active already, it is the answer, unchanged.",
+      "properties": {
+        "from": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "to": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "rel": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to",
+        "rel",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "LineageLinks": {
+      "type": "object",
+      "description": "The links of a node, newest first (#2348), or the links lineage/end ended. limited says there are more than the answer holds.",
+      "properties": {
+        "links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageLink"
+          }
+        },
+        "limited": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "links"
+      ],
+      "additionalProperties": false
+    },
+    "LineageNode": {
+      "type": "object",
+      "description": "A node in the lineage graph (#2348). kind is what it is: issue, pr, session, workflow-run, commit, file, branch or milestone, and the list is open. ref names it apart from any tracker, as <scheme>:<id>: github:alexec/Agents#123, gitlab:group/repo!45, linear:ENG-4, jira:ABC-9, session:<agent id>.",
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "ref"
+      ],
+      "additionalProperties": false
+    },
+    "LineageNodeRequest": {
+      "type": "object",
+      "description": "lineage/links and lineage/walk (#2348): a node, and for a walk how many links away to go (1 to 4; 2 when not said: issue, sessions, PRs).",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "depth": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "node"
+      ],
+      "additionalProperties": false
+    },
     "ListCursor": {
       "type": "object",
       "properties": {

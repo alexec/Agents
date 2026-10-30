@@ -65,6 +65,7 @@ const CapHostWire1 = "host.wire/1"
 const CapHost1 = "host/1"
 const CapHostsJoin1 = "hosts.join/1"
 const CapHosts1 = "hosts/1"
+const CapLineage1 = "lineage/1"
 const CapLinks1 = "links/1"
 const CapLiveactivity1 = "liveactivity/1"
 const CapMac1 = "mac/1"
@@ -260,6 +261,10 @@ var HostCapabilities = pairs([][2]string{
 	{"folders/unarchive", "folders/1"},
 	{"folders/undoGuardedChange", "folders/1"},
 	{"git/fill", "git/1"},
+	{"lineage/end", "lineage/1"},
+	{"lineage/link", "lineage/1"},
+	{"lineage/links", "lineage/1"},
+	{"lineage/walk", "lineage/1"},
 	{"mac/open", "mac/1"},
 	{"mac/reveal", "mac/1"},
 	{"mac/terminal", "mac/1"},

@@ -74,6 +74,7 @@ type Daemon struct {
 	optionBook
 	timeBook
 	reportBook
+	lineageBook
 	projectBook
 	projectToolsBook
 	milestoneBook
@@ -223,6 +224,7 @@ func (d *Daemon) Shutdown() {
 	d.waitAfterTurns(afterTurnLimit)
 	d.noteCutOffAgents(stoppedAt)
 	d.closeReport()
+	d.closeLineage()
 	d.clearPickUps()
 	d.stopMCPEvents()
 	d.stopEvents()
