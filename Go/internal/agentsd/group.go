@@ -2,11 +2,19 @@ package agentsd
 
 import "github.com/alexec/agents/Go/wire"
 
+// waitingOnEvents is whether the agent has an open wait on something the app watches: an
+// event (wait_for_event), or its place in a lease's line (#2361), which is the same wait.
+// A turn that ends while this is open is not done: it is started again when the wait ends,
+// so when-done: archive and a plain archive_session request must not archive it (#2911).
+func waitingOnEvents(a *wire.Agent) bool {
+	return a.EventWait != nil && a.EventWait.Ending == nil
+}
+
 // Group is the sidebar heading an agent is under (AgentGroup.init(for:…)), for a
 // folder's counts.
 func Group(a *wire.Agent) string {
 	outcomeAsked := a.OutcomeAsked != nil && *a.OutcomeAsked
-	waitingOnEvents := a.EventWait != nil && a.EventWait.Ending == nil
+	waiting := waitingOnEvents(a)
 	wantsAnswer := a.Report != nil && needsAPerson(a.Report.Outcome)
 	switch a.State {
 	case wire.AgentStateStarting:
@@ -15,11 +23,11 @@ func Group(a *wire.Agent) string {
 		return "needsAttention"
 	case wire.AgentStateRunning:
 		if outcomeAsked {
-			return settled(wantsAnswer || a.Report == nil, a.Report, waitingOnEvents)
+			return settled(wantsAnswer || a.Report == nil, a.Report, waiting)
 		}
 		return "running"
 	case wire.AgentStateFinished:
-		return settled(wantsAnswer || (outcomeAsked && a.Report == nil), a.Report, waitingOnEvents)
+		return settled(wantsAnswer || (outcomeAsked && a.Report == nil), a.Report, waiting)
 	case wire.AgentStateStopped:
 		if a.EndedReason != nil {
 			switch *a.EndedReason {

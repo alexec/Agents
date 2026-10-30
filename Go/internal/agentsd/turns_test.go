@@ -210,6 +210,13 @@ func (f *fakeRuntime) Prompt(ctx context.Context, p sdk.PromptRequest) (sdk.Prom
 		<-ctx.Done()
 		return sdk.PromptResponse{StopReason: sdk.StopReasonCancelled}, nil
 	}
+	// A pause before ending the turn, so a test can open an event wait on this agent
+	// first, as joining a lease's line does mid-turn (#2911).
+	if strings.Contains(text, "line for a lease") {
+		time.Sleep(300 * time.Millisecond)
+		say("Waiting for the build lease.")
+		return sdk.PromptResponse{StopReason: sdk.StopReasonEndTurn}, nil
+	}
 	// Refused once for too many requests, then answered.
 	if strings.Contains(text, "rate limit me") {
 		if !f.rateLimited {
