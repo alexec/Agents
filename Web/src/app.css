@@ -1136,6 +1136,7 @@ button.remove:hover { opacity: 1; }
 .workflow-page .run-now { padding: 5px 16px; border-radius: 999px; }
 .workflow-page .switch { display: inline-flex; align-items: center; gap: 6px; }
 .workflow-page .section-head { margin: 14px 0 2px; font-size: 0.8125rem; }
+.workflow-run > p { margin: 2px 12px 6px; }
 .workflow-page .workflow-panes { align-self: center; margin: 10px 0 4px; }
 /* Events | Audit (#996). */
 .activity-page .events-panes { display: flex; width: fit-content; margin: 4px auto 12px; }

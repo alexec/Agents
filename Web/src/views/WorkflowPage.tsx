@@ -18,7 +18,7 @@ import { go } from "../route";
 import { RunNow } from "./WorkflowRow";
 import { rowExtras, SessionRow } from "./SessionRow";
 import { CooldownMenu, WhenDoneMenu, WorkflowSettingsForm } from "./WorkflowSettings";
-import { whenDoneSentence } from "../model/workflowSettings";
+import { picked, whenDoneSentence } from "../model/workflowSettings";
 import { workflowContinueSentence, workflowContinueSwitch } from "../model/continueWhenBack";
 import { BackToList } from "./BackToList";
 import { isWorkflowMuted, muteLabel, workflowMuteHelp } from "../model/mute";
@@ -198,10 +198,16 @@ export function WorkflowPage({ store, host, folder, folderName, workflowID, down
             <p class="last-ran quiet small">{lastRanLine(summary)}</p>
 
             {!loadingRuns.value && runs.value.length === 0 && <p class="hint">Nothing has run yet.</p>}
-            {runs.value.map((agent) => (
-              <SessionRow key={agent.id} agent={agent} chosen={false} onPick={() => go({ host, folder: folder, session: agent.id })}
-                extras={rowExtras(store, host, agent)} />
-            ))}
+            {runs.value.map((agent) => {
+              const pick = picked(agent.auto, (id) => runtimeName(id) ?? id);
+              return (
+                <div key={agent.id} class="workflow-run">
+                  <SessionRow agent={agent} chosen={false} onPick={() => go({ host, folder: folder, session: agent.id })}
+                    extras={rowExtras(store, host, agent)} />
+                  {pick && <p class="quiet small">{pick}</p>}
+                </div>
+              );
+            })}
             {runs.value.length === runLimit.value && <button class="link" disabled={loadingRuns.value}
               onClick={() => { runLimit.value += 3; }}>Show more</button>}
             </>

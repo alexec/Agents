@@ -50,8 +50,8 @@ func TestAWorkflowRuns(t *testing.T) {
 	}
 	agent := s.LastOutcome.Ran.AgentID
 	a := d.Store.Agent(agent)
-	// A file with no runtime: runs on the default, not on the newest agent's runtime.
-	if a == nil || a.RuntimeID != defaultRuntimeID || *a.Title != "Review" || a.StartedByWorkflow == nil || *a.StartedByWorkflow != "review" || *a.ChainDepth != 1 {
+	// A file with no runtime: runs on Auto, not on the newest agent's runtime (#2873).
+	if a == nil || a.Auto == nil || *a.Title != "Review" || a.StartedByWorkflow == nil || *a.StartedByWorkflow != "review" || *a.ChainDepth != 1 {
 		t.Fatalf("%+v", a)
 	}
 	waitFor(t, "the run over", func() bool {

@@ -168,7 +168,7 @@ and you change the method without touching the workflow's triggers.
          at: [":00"]
          between: "07:00-07:00"
    agent: new
-   permission-mode: auto
+   permission-mode: approve-for-me
    when-done: archive
    ---
 

@@ -4,28 +4,52 @@
 //
 // The file holds strings, so a menu's value is a string or nothing; nothing leaves the key out,
 // which is what each menu's first, "runtime default" choice means.
-import type { ConfigChoice, ConfigChoiceGroup, ConfigOption, JSONValue, WorkflowSettings, WorkflowWhenDone } from "../protocol/generated";
+import type { AutoPick, ConfigChoice, ConfigChoiceGroup, ConfigOption, JSONValue, WorkflowSettings, WorkflowWhenDone } from "../protocol/generated";
+import { autoID, autoWords, fieldWords, fileWord, levelsOf, levelWords, noRuntimeWords } from "./levels";
 import { choiceGroups, choices, isRenderable, modeOption } from "./options";
 import { runtimeNames } from "./orgPolicy";
 import { defaultRuntime } from "./workflows";
 
 /** Which runtime a run will use, and why (#2764): WorkflowSettings.RunsOn. */
-export interface RunsOn { runtimeID: string; line: string; unknown: string | null }
+export interface RunsOn { runtimeID: string; isAuto: boolean; line: string; unknown: string | null }
 
 /**
- * WorkflowSettings.runsOn: the runtime the file names, else the default, said in the window's
+ * WorkflowSettings.runsOn: the runtime the file names, else Auto (#2873), said in the window's
  * words; and a mark when this version does not know it.
  */
 export function runsOn(named: string | undefined): RunsOn {
   const source = named !== undefined ? "named in the file" : "the default";
   const runtimeID = named ?? defaultRuntime;
-  const known = runtimeNames[runtimeID];
+  const isAuto = runtimeID === autoID;
+  const known = isAuto ? autoWords : runtimeNames[runtimeID];
   const why = named !== undefined ? "so this workflow does not run" : "so its settings cannot be shown";
   return {
     runtimeID,
+    isAuto,
     line: `Runs on ${known ?? `"${runtimeID}"`} (${source})`,
     unknown: known ? null : `"${runtimeID}" is not a runtime this version knows, ${why}.`,
   };
+}
+
+/** WorkflowSettings.autoPermissionOption and autoModelOption: on Auto, the shared words (#2873). */
+export function autoOption(field: "permission" | "model"): ConfigOption {
+  return {
+    id: field === "model" ? "model" : "permission-mode", name: fieldWords[field], type: "select", currentValue: null,
+    options: levelsOf(field).map((level) => ({ value: fileWord(field, level), name: levelWords(field, level) })),
+  };
+}
+
+/** WorkflowSettings.autoEffortNote: on Auto, effort follows the model (FR-003). */
+export function autoEffortNote(s: WorkflowSettings): string | null {
+  if (!runsOn(s.runtimeID).isAuto || s.effort === undefined) return null;
+  return `On Auto, effort follows the model, so \`effort: ${s.effort}\` does nothing.`;
+}
+
+/** WorkflowSettings.picked: the runtime an Auto run took, and why (#2873). */
+export function picked(pick: AutoPick | undefined, name: (id: string) => string): string | null {
+  if (!pick) return null;
+  const line = `${autoWords} picked ${name(pick.runtimeID)}`;
+  return pick.skipped.length ? `${line}. ${noRuntimeWords(pick.skipped, name)}` : line;
 }
 
 function selects(options: readonly ConfigOption[]): ConfigOption[] {
