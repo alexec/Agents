@@ -43,6 +43,17 @@ export function accepted(typed: readonly string[], existing: readonly string[]):
   return result;
 }
 
+export type LabelKind = "issue" | "pullRequest" | "finished" | "plain";
+
+/** What a label names, by its text alone, so a chip can be coloured by it (SessionLabel.kind, #2958). */
+export function labelKind(value: string): LabelKind {
+  const text = trim(value);
+  if (/^#[0-9]+$/.test(text) || /^[A-Z][A-Z0-9]*-[0-9]+$/.test(text)) return "issue";
+  if (/^[Pp]#[0-9]+$/.test(text)) return "pullRequest";
+  if (["merged", "closed", "archived"].includes(text.toLowerCase())) return "finished";
+  return "plain";
+}
+
 export interface LabelQuery {
   label: string | null;
   text: string;

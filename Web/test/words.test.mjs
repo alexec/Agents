@@ -60,6 +60,12 @@ for (const { name, input, expected } of cases("labels/query.json")) {
   });
 }
 
+for (const { name, input, expected } of cases("labels/kind.json")) {
+  test(`label kind: ${name}`, () => {
+    assert.equal(labels.labelKind(input), expected);
+  });
+}
+
 // Who is asking at the head of a card (#121), as AgentsModel.askerLine says it.
 const asker = await load("src/model/asker.ts");
 

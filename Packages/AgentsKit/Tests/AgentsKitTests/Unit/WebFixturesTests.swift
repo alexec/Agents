@@ -723,6 +723,12 @@ struct WebFixturesTests {
             return .object(["label": query.label.map(JSONValue.string) ?? .null, "text": .string(query.text),
                             "matches": .bool(query.matches(try input["agent"]!.decode(Agent.self)))])
         }
+
+        let kinds = ["#2958", "P#2955", "p#7", "ENG-4", " #12 ", "#", "#12a", "P#", "eng-4", "merged", "Archived",
+                     "closed", "bug", "web ui"]
+        try pin("labels/kind.json", kinds.map { Case(name: $0, input: .string($0)) }) { input in
+            .string(SessionLabel.kind(of: input.stringValue!).rawValue)
+        }
     }
 
     // MARK: completions/
