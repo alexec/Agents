@@ -4175,6 +4175,8 @@ final class AppModel {
            let reason = try? rpc.data?.decode(DaemonAPI.MCPCatalogError.self) {
             return reason
         }
+        // The organisation's policy refused it (#998, #2355): its own words, so the sheet can ask an admin.
+        if let refusal = DaemonAPI.PolicyRefusal(error: error) { return .failed(refusal.line) }
         return .failed(String(describing: error))
     }
 

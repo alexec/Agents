@@ -62,4 +62,25 @@ struct GovernanceWordsTests {
         #expect(rows.contains { $0.method == DaemonAPI.Notification.controlGovernanceRequested
             && $0.params == DaemonAPI.CatalogRequest.self })
     }
+    /// #2355: a catalogue sheet offers Ask an Admin under the organisation's refusal only, and says
+    /// the refusal in its own words.
+    @Test func aPolicyRefusalOffersAskAnAdmin() {
+        let line = DaemonAPI.PolicyRefusal(reason: "policy", rule: "marketplaces",
+                                           words: "Your organisation does not allow this marketplace.").line
+        #expect(GovernanceWords.refusedByPolicy(line))
+        #expect(DaemonAPI.MCPCatalogError.failed(line).policyWords == line)
+        #expect(DaemonAPI.CatalogError.failed(line).policyWords == line)
+        #expect(MCPCatalogWords.sentence(.failed(line)) == line)
+        #expect(DaemonAPI.MCPCatalogError.failed("disk full").policyWords == nil)
+        #expect(DaemonAPI.MCPCatalogError.unreachable(host: "registry").policyWords == nil)
+        #expect(GovernanceWords.askFor(.mcp, "github") == "Ask for the MCP server github")
+    }
+
+    @Test func anAskAlreadyMadeIsFoundByName() {
+        let list = [Self.request(.waiting), Self.request(.refused, kind: .skills)]
+        #expect(GovernanceWords.asked(list, kind: .mcp, name: " GitHub ")?.state == .waiting)
+        #expect(GovernanceWords.asked(list, kind: .skills, name: "github") == nil)
+        #expect(GovernanceWords.request(kind: .mcp, name: "github", why: "", source: "io.github/github")?.source
+            == "io.github/github")
+    }
 }
