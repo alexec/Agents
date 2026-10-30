@@ -166,8 +166,10 @@ func (d *Daemon) localClient(id string) (wire.MachineClient, bool) {
 	return c, ok
 }
 
-// Told is what the control plane tells this host on its uplink's channel 0.
+// Told is what the control plane tells this host on its uplink's channel 0, a machine/*
+// method under its old name (#2653).
 func (d *Daemon) Told(method string, params json.RawMessage) {
+	method = wire.OldMethodName(method)
 	if method == wire.NotifyHostUserSettings.Name {
 		d.toldUserSettings(params)
 		return

@@ -10,6 +10,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/hostinstall"
 	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // JSON-RPC as the daemon speaks it, enough for the control plane: it reads a request's
@@ -104,11 +105,13 @@ type message struct {
 	Error  json.RawMessage `json:"error,omitempty"`
 }
 
+// decode reads a line, with a machine/* or machines/* method under its old name (#2653).
 func decode(line string) (*message, bool) {
 	var m message
 	if json.Unmarshal([]byte(line), &m) != nil {
 		return nil, false
 	}
+	m.Method = wire.OldMethodName(m.Method)
 	return &m, true
 }
 

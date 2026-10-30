@@ -23,7 +23,7 @@ func TestControlPlaneAnswersItsDocument(t *testing.T) {
 		}
 	}
 	list := capabilities()
-	for _, c := range []string{wire.CapMachines1, wire.CapControl1} {
+	for _, c := range []string{wire.CapMachines1, wire.CapMachine1, wire.CapHost1, wire.CapHosts1, wire.CapControl1} {
 		if !slices.Contains(list, c) {
 			t.Errorf("%s is not in the control plane's list", c)
 		}
@@ -50,6 +50,12 @@ func TestStatusAndHostsSayCapabilities(t *testing.T) {
 		if string(h.ID) == box.member.Host && (h.Capabilities != nil || h.Missing != nil || h.State != "online") {
 			t.Fatalf("an older host: %+v", h)
 		}
+	}
+	// machines/list is hosts/list under its new name (#2653).
+	var machines []wire.ControlMachine
+	json.Unmarshal(call(t, window, "", "machines/list", map[string]any{}), &machines)
+	if len(machines) == 0 || len(machines) != len(hosts) {
+		t.Fatalf("machines/list: %+v, hosts/list: %+v", machines, hosts)
 	}
 }
 
