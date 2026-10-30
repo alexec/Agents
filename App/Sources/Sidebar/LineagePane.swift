@@ -135,7 +135,7 @@ private struct LineageRowView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(row.name)
                 .appText(.reading).fontWeight(.medium)
-                .foregroundStyle(open == nil ? .primary : Color.accentColor)
+                .foregroundStyle(open == nil ? .primary : Paper.accent)
                 .lineLimit(1)
                 .truncationMode(.middle)
             if let cost = row.cost {
