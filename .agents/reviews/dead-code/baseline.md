@@ -11,8 +11,8 @@ Tool pins for the first scan:
 - `golang.org/x/tools/cmd/deadcode` v0.49.0
 - Knip 6.42.1
 
-The Web Knip entry points are `src/main.tsx` and `src/sandbox/proxy.ts`, the two
-JavaScript bundles declared in `Web/build.mjs`. Knip does not infer these API-based
+The Web Knip entry points are `src/main.tsx`, `src/sandbox/proxy.ts` and `src/sw.ts` (the
+service worker), the JavaScript bundles declared in `Web/build.mjs`. Knip does not infer these API-based
 esbuild entries, so `Web/knip.json` names them. The analyzer configuration has no ignores.
 
 ## Confirmed false positives
@@ -38,6 +38,12 @@ Added 2026-10-29 (`2026-10-29.md`, the first complete `GOOS=darwin -test` scan):
   the fakes in `s3store/s3fake`, `signin/signintest` and `store.NewMemory`: tests reach
   them, so they are test hooks, not dead. Only a `-test` finding is a candidate.
 
+### Periphery (Swift)
+
+- `Agents.xcodeproj` is not checked in. Run `xcodegen generate` in the review worktree
+  after merging `main` and before the index build, or files added since the project was
+  made are missing from the build and from the index (added 2026-10-30).
+
 ### Knip (Web)
 
 - Any export of `Web/src` that a `Web/test/*.test.mjs` file names: the tests bundle the
@@ -61,3 +67,8 @@ Added 2026-10-29 (`2026-10-29.md`, the first complete `GOOS=darwin -test` scan):
   "Kept while 056 is after the #58 cut-off", "before 069 (after the #58 cut-off)"): live
   while #58's cut-off stands. Moving the cut-off is decision D2 in `2026-10-29.md`
   (added 2026-10-29).
+- `Go/wire/rename.go` `OldMethodName`, read in `Go/internal/agentsd/localpath.go` and
+  `Go/internal/controlplane/rpc.go`: receivers accept `machine/*` and `machines/*` under
+  their old `host/*` names, step 1 of the two-release rename that the open issue #2653
+  tracks. Live: it is the rename, not migration code. It goes in #2653's step 3
+  (added 2026-10-30).
