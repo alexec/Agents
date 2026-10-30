@@ -176,6 +176,23 @@ branch as the code:
 - A new row in `console-and-reports.md`: **Overview**, web only, **by design** (#2141).
 - `scripts/parity-counts.py` gives the same totals but for the new row.
 
+## What the build settled (2026-10-30)
+
+Alex approved the spec and the mocks (PR #2967). Building it settled these, each easy to undo:
+
+- Decided: **no Person filter in Agents**, because the list holds only the person's own sessions;
+  every person's running agents are Live Now's, a row at the list's foot for an admin.
+- Decided: **the filters are kept for the tab** (sessionStorage), not in the address, because the
+  address's pairs are the place's and a filter is how the list is read.
+- Decided: **the hosts' strip, Help and Forget This Browser stay at the sidebar's foot**, and only
+  Settings moves to the bar, because they say what this browser and its machines are doing while
+  the person reads their agents.
+- Decided: **below 760 px a section's list of pages wraps above the page**, as the Console's did,
+  in place of a root list with ‹ back; Agents keeps its root list.
+- Decided: **Usage is one page with Cost, Tokens and Time**, each Activity's page as it was.
+- The words that named the Console on the web name the new place: "Edit Policy", "Edit in
+  People", "Settings ▸ Policy on the web page", "Workflows ▸ Team Workflows".
+
 ## Build
 
 One PR, after Alex approves this spec and the mock. It is a UI enhancement, so it

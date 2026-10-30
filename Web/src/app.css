@@ -1215,6 +1215,7 @@ button.remove:hover { opacity: 1; }
   box-shadow: 0 6px 20px var(--paper-shadow); }
 .nav-menu-list .nav-item { justify-content: space-between; padding: 8px 10px; }
 .sub-app .back { display: none; }
+@media (max-width: 759px) { .nav-bar .nav-items { display: none; } }
 /* The Overview (#2141): five cards in a grid. */
 .columns.overview-columns { grid-template-columns: minmax(0, 1fr); }
 .overview-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); margin-top: 8px; }
@@ -1229,7 +1230,7 @@ button.remove:hover { opacity: 1; }
 .overview-figure { font-size: 1.75rem; font-weight: 700; }
 .overview .attention { color: var(--tint-attention); }
 /* Agents' filters and its pages at the sidebar's foot (#2141). */
-.agent-filters { display: flex; gap: 6px; flex-basis: 100%; }
+.agent-filters { display: flex; gap: 6px; padding: 4px 10px 2px; }
 .agent-filters select { flex: 1; min-width: 0; font: inherit; font-size: 0.75rem; color: inherit; background: var(--paper-raised);
   border: 1px solid var(--paper-rule); border-radius: var(--radius-control); padding: 2px 4px; }
 .agents-pages { border-top: 1px solid var(--paper-rule); margin-top: 8px; padding-top: 4px; }

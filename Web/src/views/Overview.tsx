@@ -129,7 +129,7 @@ export function Overview({ store, down }: { store: Store; down: boolean }) {
               </ul>
             </Card>
             <Card title="Spend today" links={[["Spend", { nav: "reports", section: "spend" }]]}>
-              <p class="overview-figure">{spent ?? noSpend}</p>
+              {spent ? <p class="overview-figure">{spent}</p> : <p class="quiet">{noSpend}</p>}
               <p class="quiet small">{spend.value?.scope?.kind === "org" ? "The organisation" : "Your machines"}</p>
               {spend.value?.budgetUSD !== undefined && spend.value.monthSpentUSD !== undefined && (
                 <p class="small">{budgetWords(spend.value.monthSpentUSD, spend.value.budgetUSD)}</p>

@@ -172,8 +172,8 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
           value={search.value} onInput={(e) => (search.value = (e.currentTarget as HTMLInputElement).value)} />
         {/* New folder, which the window has in its File menu (#115): the page has no menu bar. */}
         <NewFolderMenu store={store} newSession={newSessionStart(store, folders, linkDown)} />
-        {!held && <AgentFilters store={store} />}
       </header>
+      {!held && <AgentFilters store={store} />}
       <div class="scroll" onKeyDown={(e) => moveWithKeys(e)}>
         {folders.length > 0 && <NewSessionTopRow store={store} folders={folders} linkDown={linkDown} />}
         {/* A machine asking to join (#994): at the top, whatever groups are on, and with no folder yet. */}
@@ -215,8 +215,8 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
         )}
         {/* Every person's running agents for an admin, and every project (#2141): pages in the chat's place. */}
         {!held && <section class="agents-pages" aria-label="More">
-          {adminOf(store) === true && <AgentsPageRow id="live" title="Live Now" />}
-          <AgentsPageRow id="projects" title="Projects" />
+          {adminOf(store) === true && <AgentsPageRow id="live" title="Live Now" icon={"◉"} />}
+          <AgentsPageRow id="projects" title="Projects" icon={"▦"} />
         </section>}
       </div>
       {/* What the hosts and this browser are doing, pinned at the foot: status lines rather than
@@ -296,10 +296,11 @@ function AgentFilters({ store }: { store: Store }) {
 }
 
 /** A row at the sidebar's foot that opens one of Agents' pages in the chat's place. */
-function AgentsPageRow({ id, title }: { id: string; title: string }) {
+function AgentsPageRow({ id, title, icon }: { id: string; title: string; icon: string }) {
   const chosen = route.value.nav === "agents" && route.value.section === id;
   return (
     <button class={`row activity-row${chosen ? " chosen" : ""}`} aria-current={chosen} onClick={() => go({ nav: "agents", section: id })}>
+      <span class="activity-icon" aria-hidden="true">{icon}</span>
       <span class="title">{title}</span>
     </button>
   );
