@@ -219,7 +219,7 @@ function SavedPage({ store, scopes }: { store: Store; scopes: readonly ReportSco
   const scopeName = (v: ReportView) => scopes.find((o) => scopeKey(o.scope) === scopeKey(v.scope))?.name ?? "A scope you no longer see";
   const open = (v: ReportView) => {
     opened.value = v;
-    go({ app: "reports", section: v.page });
+    go({ nav: "reports", section: v.page });
   };
   const digest = async (v: ReportView) => {
     const text = store.link.call("reports/usage", { range: v.range, scope: v.scope }).then((r) => digestText(v, scopeName(v), r));

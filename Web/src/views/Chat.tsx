@@ -823,7 +823,7 @@ function LeaseLine({ store, host, agent }: { store: Store; host: string; agent: 
     <div class="lease-line" role="status" aria-label={leases.full}>
       {leases.lines.map((text) => (
         <button key={text} class="link" title={leases.full}
-          onClick={() => { location.hash = routeHash({ activity: "resources" }); }}>
+          onClick={() => { location.hash = routeHash({ nav: "machines", section: "resources" }); }}>
           <span class="words">{text}</span><span class="chevron" aria-hidden="true">›</span>
         </button>
       ))}
@@ -868,7 +868,7 @@ function WaitCard({ agent, title, disabled, stop }: { agent: Agent; title: (id: 
           </div>}
         </>}
         <p class="wait-answers">
-          <button onClick={() => { location.hash = routeHash({ activity: "events" }); }}>Show in Events</button>
+          <button onClick={() => { location.hash = routeHash({ nav: "reports", section: "events" }); }}>Show in Events</button>
           <button disabled={disabled || busy.value} title="Stop waiting. Nothing will start it again for this wait."
             onClick={() => { busy.value = true; void stop().finally(() => (busy.value = false)); }}>Stop Waiting</button>
         </p>

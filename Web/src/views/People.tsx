@@ -12,7 +12,7 @@ import type { ControlCodeShown, Group, PeopleList, PersonInvited, PersonRemovePr
 import { botLine, botWords, capReachedWords, dollars, readCap } from "../model/teamGroups";
 import { CallFailed } from "../wire/link";
 import { describe, methodNotFound } from "../model/errors";
-import { editInConsole } from "../model/orgPolicy";
+import { editInPeople } from "../model/orgPolicy";
 import { go, route } from "../route";
 import { askingLine, badges, checkFailedLine, canRemove, orgLines, providerManaged, roleSetBy, joinCommandNote, joinCommandTitle, canSetRole, clientLine, inviteNote, machineLine, memberNote, noPeople, ordered, removeLines,
   removeTitle, roleNote, roleWord, roles, rotateFoot, rotateMessage, rotateTitle, rotated } from "../model/people";
@@ -274,8 +274,8 @@ function PersonItem({ person, list, groups, names, joinCommand, setRole, askRemo
   const marks = badges(person);
   const lines = orgLines(person, names);
   const setBy = roleSetBy(person, groups, names);
-  // In the Console it is open already.
-  const editHere = list.admin && providerManaged(person) && route.value.app !== "console";
+  // In People ▸ People and Groups it is open already.
+  const editHere = list.admin && providerManaged(person) && route.value.nav !== "people";
   return (
     <li class="person">
       <div class="setting">
@@ -295,7 +295,7 @@ function PersonItem({ person, list, groups, names, joinCommand, setRole, askRemo
         <div class="person-org">
           {lines.map((line) => <span key={line} class="quiet small">{line}</span>)}
           {editHere && (
-            <button type="button" class="link" onClick={() => go({ app: "console", section: "people" })}>{editInConsole}</button>
+            <button type="button" class="link" onClick={() => go({ nav: "people", section: "people" })}>{editInPeople}</button>
           )}
         </div>
       )}

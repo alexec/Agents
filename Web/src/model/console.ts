@@ -1,46 +1,29 @@
-// The control plane's three apps (#1804): Workspace (the sidebar and the chats), the Console (admins
-// only: people, machines, requests, audit, team workflows) and Reports (everyone, scoped by role).
-// One web bundle; the switcher at the top moves between them. The Mac window and the Remote draw
-// the Me scope of Reports already (Cost, Time, Pool), and leave the Console to the web.
-import type { SubApp } from "../route";
+// The words and figures of what was the Console (#1804, admins only: people, machines, requests,
+// audit, team workflows) and of Reports (everyone, scoped by role), each a page in its section of the
+// bar since #2141 (model/nav.ts). The Mac window and the Remote draw the Me scope of Reports already
+// (Cost, Time, Pool), and leave the admins' pages to the web.
 import type { ChannelLinkRequest, FleetMachine, Group, LiveAgent, LiveBoard, PersonRow, TeamBot } from "../protocol/generated";
 import { dollars } from "./teamGroups";
 import { money } from "./limits";
 import { CallFailed } from "../wire/link";
+import type { Store } from "./store";
 
-export type AppName = "workspace" | SubApp;
-
-export const apps: readonly AppName[] = ["workspace", "console", "reports"];
-export const appTitle: Record<AppName, string> = { workspace: "Workspace", console: "Console", reports: "Reports" };
+/** Whether this person is an admin of the control plane, from the store's one people list (#2055): null until it answers. */
+export function adminOf(store: Store): boolean | null {
+  const list = store.people.value;
+  if (list) return list.admin;
+  return store.peopleFailure.value ? false : null;
+}
 
 export interface Section {
   id: string;
   title: string;
-  /** One line on what the page is for, on the Overview. */
+  /** One line on what the page is for. */
   about: string;
-  /** Under which heading of the Console's list it goes. */
+  /** Under which heading of its section's list it goes. */
   group: string;
-  /** False for a page a later release builds: listed on the Overview, not opened. */
   built: boolean;
 }
-
-/** The Console's pages, in the order of its list (the concepts M1–M9 that 0.9 Team builds; #2019 has the rest). */
-export const consoleSections: readonly Section[] = [
-  { id: "overview", title: "Overview", about: "What the Console has, and what waits for you.", group: "Organisation", built: true },
-  { id: "people", title: "People and Groups", about: "Who belongs, their roles, bots and groups.", group: "Organisation", built: true },
-  { id: "machines", title: "Machines", about: "Every machine: its owner, state, version and agents.", group: "Organisation", built: true },
-  { id: "projects", title: "Projects", about: "Every project: its owner and its folders on each machine. Rename and remove.", group: "Organisation", built: true },
-  { id: "signIn", title: "Sign-In", about: "Your organisation’s sign-in providers, their domains and SCIM.", group: "Organisation", built: true },
-  { id: "live", title: "Live Now", about: "Every agent running now, its cost so far, and Stop.", group: "Organisation", built: true },
-  { id: "policy", title: "Policy", about: "The rules every machine follows: modes, sandbox, runtimes, budgets, and the kill switch.", group: "Rules", built: true },
-  { id: "modelAccess", title: "Model Access", about: "The organisation’s keys and gateways to the model, and who may use each.", group: "Rules", built: true },
-  { id: "reportPolicy", title: "Report Policy", about: "Who leads each group, what leads see, and each budget.", group: "Rules", built: true },
-  { id: "workflows", title: "Team Workflows", about: "The bots that run the team’s workflows, and their runs.", group: "Rules", built: true },
-  { id: "catalogue", title: "Catalogue", about: "Who uses each MCP server and skill, at which version, and what is approved for whom.", group: "Rules", built: true },
-  { id: "requests", title: "Requests", about: "Machines asking to join, channel identities to link, bots stopped at a cap, and people asking for an MCP server or skill.", group: "Records", built: true },
-  { id: "audit", title: "Audit", about: "Who did what on each machine, for one person or everyone.", group: "Records", built: true },
-  { id: "readApi", title: "Read API", about: "Tokens for BI tools to read the reports, and the OTLP exporter.", group: "Records", built: true },
-];
 
 /** Reports' pages. Each has three scopes: Me, a group and the organisation. */
 export const reportSections: readonly Section[] = [
@@ -54,23 +37,6 @@ export const reportSections: readonly Section[] = [
   { id: "saved", title: "Saved Views", about: "Your saved views, each to open or copy as a digest.", group: "Saved", built: true },
 ];
 
-export function sectionsOf(app: SubApp): readonly Section[] {
-  return app === "console" ? consoleSections : reportSections;
-}
-
-/** The page a route opens: the one named, when it is built, or the app's first. */
-export function openSection(app: SubApp, id: string | undefined): Section {
-  const list = sectionsOf(app);
-  return list.find((s) => s.id === id && s.built) ?? list[0]!;
-}
-
-/** The Console's groups, in order, with their pages. */
-export function grouped(list: readonly Section[]): [string, Section[]][] {
-  const out = new Map<string, Section[]>();
-  for (const s of list) out.set(s.group, [...(out.get(s.group) ?? []), s]);
-  return [...out];
-}
-
 /** The words of a call that failed, for the page. */
 export function failedWords(error: unknown): string {
   if (error instanceof CallFailed) {
@@ -79,17 +45,15 @@ export function failedWords(error: unknown): string {
   return "The control plane can’t be reached.";
 }
 
-export const notBuilt = "Comes in a later release.";
-export const adminsOnly = "The Console is for admins. An admin of this control plane can make you one in Console ▸ People and Groups.";
-export const noRoles = "This control plane keeps no roles. Update it to use the Console.";
-export const consoleFoot = "The Console reads what the control plane keeps: people, machines and the numbers and events they send. It never reads a conversation.";
+export const adminsOnly = "This page is for admins. An admin of this control plane can make you one in People ▸ People and Groups.";
+export const noRoles = "This control plane keeps no roles. Update it to use this page.";
 
 // Console ▸ Machines (M1): every machine, its owner, state, version and running agents.
 
 export type FleetFilter = "all" | "offline" | "outOfDate";
 export const fleetFilters: readonly FleetFilter[] = ["all", "offline", "outOfDate"];
 export const fleetFilterTitle: Record<FleetFilter, string> = { all: "All", offline: "Offline", outOfDate: "Out of Date" };
-export const fleetFoot = "Each machine says how many of its agents run each time it lists them. The Console counts them; it never reads what they say.";
+export const fleetFoot = "Each machine says how many of its agents run each time it lists them. The control plane counts them; it never reads what they say.";
 export const noMachines = "No machines yet. A person adds one on their Mac, in Settings ▸ Machines.";
 
 /** -1, 0 or 1 as dotted version a is older than, the same as or newer than b; 0 for one that is not a number, such as "dev". */

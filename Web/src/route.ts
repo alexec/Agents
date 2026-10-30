@@ -1,31 +1,24 @@
 // Where the page is, in the URL's fragment (071 research R2): #/h/<host>/p/<folder>/s/<session>, or
 // /w/<workflow> for a workflow's page in the chat's place (#98), /ar/1 for the folder's archive (#499),
 // /rv/<kind:key> for a change waiting for an OK, on its Review page (#1472),
-// or #/a/<page> for an Activity page of the sidebar (#151): events, resources, runtimes, mcp (#589),
-// worktrees (#790), spending, tokens (#956) or time, or #/settings for this browser's Settings (#846).
-// The Console and Reports (#1804), the control plane's other two apps beside this Workspace, are
-// #/console/<section> and #/reports/<section>.
+// The page is by section (#2141): #/ is the Overview, #/agents the sidebar with nothing chosen, and
+// #/<section>/<page> a page of another section (#/machines/runtimes, #/reports/spend, #/settings/policy).
+// The addresses before it, #/console/<page> (#1804) and #/a/<page> (#151), are read as their new place.
 // A tab holding one folder alone (#1089) starts #/o/1/…: Open in New Tab on its heading. It keeps
 // to that folder until ‹ All.
 // Every step is a history entry, so the browser's own Back moves between columns (US6).
 import { signal } from "@preact/signals";
+import { movedPage, navSections, type NavSection, type UsagePane } from "./model/nav";
 
 export type ActivityPage = "events" | "resources" | "runtimes" | "mcp" | "worktrees" | "spending" | "tokens" | "time" | "milestones";
 
 export const activityPages: readonly ActivityPage[] = ["events", "resources", "runtimes", "mcp", "worktrees", "spending", "tokens", "time", "milestones"];
 
-/** The control plane's three apps (#1804): this Workspace, the admins' Console and Reports. */
-export type SubApp = "console" | "reports";
-
 export interface Route {
-  /** The Console or Reports (#1804), in place of the sidebar and the chat. */
-  app?: SubApp | undefined;
-  /** The page of the Console or Reports; its first when absent. */
+  /** The section (#2141); none is the Overview, or Agents when a host is named. */
+  nav?: Exclude<NavSection, "overview"> | undefined;
+  /** The page of the section; its first when absent. In Agents, Live Now or Projects in the chat's place. */
   section?: string | undefined;
-  /** This browser's Settings (#846): which smart groups are on. */
-  settings?: boolean | undefined;
-  /** An Activity page (#151): about all the work rather than one folder. */
-  activity?: ActivityPage | undefined;
   host?: string | undefined;
   /** The folder URL, as the host writes it. */
   folder?: string | undefined;
@@ -51,12 +44,23 @@ export interface Route {
 /** The folder this tab holds alone (#1089), from the address it was opened at; undefined for every folder. */
 export interface AloneFolder { host: string; folder: string }
 
+/** Usage's pane, when an old address (#/a/tokens) named one. */
+export const usageAsked = signal<UsagePane | undefined>(undefined);
+
 export function parseRoute(hash: string): Route {
   const path = hash.replace(/^#\/?/, "");
-  if (path === "settings") return { settings: true };
   const [first, section] = path.split("/");
-  if (first === "console" || first === "reports") {
-    return section ? { app: first, section: decodeURIComponent(section) } : { app: first };
+  if (first === "console" || first === "a") {
+    const moved = movedPage(first, section === undefined ? undefined : decodeURIComponent(section));
+    if (moved.usage) usageAsked.value = moved.usage;
+    const r: Route = {};
+    if (moved.nav && moved.nav !== "overview") r.nav = moved.nav;
+    if (moved.section) r.section = moved.section;
+    return r;
+  }
+  if (first && first !== "overview" && (navSections as readonly string[]).includes(first)) {
+    const nav = first as Exclude<NavSection, "overview">;
+    return section ? { nav, section: decodeURIComponent(section) } : { nav };
   }
   const parts = path.split("/").map((part) => decodeURIComponent(part));
   const route: Route = {};
@@ -74,7 +78,6 @@ export function parseRoute(hash: string): Route {
       case "m": route.mcp = value === "1"; break;
       case "rv": route.review = value; break;
       case "o": route.alone = value === "1"; break;
-      case "a": if ((activityPages as readonly string[]).includes(value)) route.activity = value as ActivityPage; break;
     }
   }
   return route;
@@ -86,9 +89,7 @@ export function routeHash(route: Route, aloneIn: AloneFolder | undefined = alone
   const held = aloneIn !== undefined && route.host === aloneIn.host && route.folder !== undefined
     && sameFolder(route.folder, aloneIn.folder);
   if (held || (route.alone && route.host && route.folder)) parts.push("o", "1");
-  if (route.settings) return "#/settings";
-  if (route.app) return `#/${route.app}` + (route.section ? "/" + encodeURIComponent(route.section) : "");
-  if (route.activity) return "#/a/" + route.activity;
+  if (route.nav && !(route.nav === "agents" && route.host)) return sectionHash(route);
   if (route.host) parts.push("h", route.host);
   if (route.host && route.folder) parts.push("p", route.folder);
   if (route.host && route.folder && route.review) parts.push("rv", route.review);
@@ -112,9 +113,32 @@ export function aloneFolder(r: Route): AloneFolder | undefined {
   return r.alone && r.host && r.folder ? { host: r.host, folder: r.folder } : undefined;
 }
 
+/** A section's page's address: #/reports/spend; #/ for the Overview. */
+function sectionHash(r: Route): string {
+  return r.nav ? `#/${r.nav}` + (r.section ? "/" + encodeURIComponent(r.section) : "") : "#/";
+}
+
+/** Whether an address is one from before #2141, which the page writes again as its new place. */
+export function isOldAddress(hash: string): boolean {
+  return /^#\/?(console|a)(\/|$)/.test(hash);
+}
+
+/** The section a route is in: Agents for a host's places, the Overview for none. */
+export function sectionOf(r: Route): NavSection {
+  return r.nav ?? (r.host ? "agents" : "overview");
+}
+
+/** An old address is replaced by its new one, so Back never goes to it. */
+function settle(): void {
+  const hash = globalThis.location?.hash ?? "";
+  if (isOldAddress(hash)) history.replaceState(null, "", sectionHash(parseRoute(hash)));
+}
+settle();
+
 export const route = signal<Route>(parseRoute(globalThis.location?.hash ?? ""));
 export const alone = signal<AloneFolder | undefined>(aloneFolder(route.peek()));
 globalThis.addEventListener?.("hashchange", () => {
+  settle();
   route.value = parseRoute(location.hash);
   // Back to where the tab held one folder, or a link to one: it holds it again.
   const held = aloneFolder(route.value);

@@ -67,7 +67,7 @@ export const botWords = {
   make: "Make a Bot…",
   addMachine: "Add a Machine…",
   setCap: "Group and Cap…",
-  foot: "A bot runs the team’s workflows: a workflow whose runs-on: names it runs on its machines, once per trigger. Nobody can start, message or answer its agents; an admin can stop a run in Console ▸ Team Workflows, on the web page. Its spend counts against its own cap and its group’s.",
+  foot: "A bot runs the team’s workflows: a workflow whose runs-on: names it runs on its machines, once per trigger. Nobody can start, message or answer its agents; an admin can stop a run in Workflows ▸ Team Workflows, on the web page. Its spend counts against its own cap and its group’s.",
   machineFoot: "Run this on the machine for the bot. It joins as the bot’s machine; the code works once, for 10 minutes.",
 };
 

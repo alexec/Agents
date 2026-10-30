@@ -1,11 +1,11 @@
 // The page's one sidebar (#151), as the window's (#145, FolderListView.swift) and the Remote's
 // (RemoteSidebar.swift), and below 760 the root list, as the iPhone Remote's (#226, #235).
-// Things-style since #495 (#499): New Session at the top, in the folder last started in; Activity;
-// then what wants the person across every folder — Pinned, Needs You, Working, Unread — each drawn
+// Things-style since #495 (#499): New Session at the top, in the folder last started in, and Agents'
+// filters, a machine and a state (#2141); then what wants the person across every folder — Pinned, Needs You, Working, Unread — each drawn
 // only with something in it (#507), Needs You with what waits for an OK after its sessions (#773); then a group per folder, its sessions newest started first
 // with their state the row's mark, its Workflows fold (#885), and one Archived row opening a page; then the
-// archived folders; and at the foot what the hosts and this browser are doing, and Settings (#846),
-// where each smart group can be turned off. Never more than three
+// archived folders, Live Now (an admin's) and Projects (#2141); and at the foot what the hosts and
+// this browser are doing. The Activity pages are in Machines and Reports since #2141. Never more than three
 // levels deep: a folder's Workflows fold (#885) is the third. No host headings: a server's folder reads `host:Folder`. A folder's row only
 // folds (#375).
 //
@@ -33,10 +33,12 @@ import { updatedLine } from "../model/updated";
 import { namedRelative, workflowSummary } from "../model/workflows";
 import { fromWireDate, toWireDate } from "../protocol/dates";
 import type { Agent, AgentsExportRequest, ControlMachine, FolderSummary, WorkflowSummary } from "../protocol/generated";
-import { alone, aloneURL, go, route, showAll, type ActivityPage } from "../route";
+import { alone, aloneURL, go, route, showAll } from "../route";
 import { onThisMac } from "../place";
 import { browserName, type Session } from "../session";
-import { ActivityRows } from "./Activity";
+import { keptByState, machineFilter, setMachineFilter, setStateFilter, stateFilter, stateFilterTitle, stateFilters,
+  type StateFilter } from "../model/agentFilters";
+import { adminOf } from "../model/console";
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
 import { CloningRows, EmptyFolders, NewFolderMenu } from "./NewFolder";
 import { putFilesInDropbox, useDropboxDrop } from "./DropboxDialog";
@@ -145,8 +147,13 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
   // A tab holding one folder alone (#1089): its sidebar is that folder's only.
   const held = alone.value;
   const every = orderedFolders(store.hosts.value, store.folders.value, store.macHostID.value);
+  // Agents' filters (#2141): one machine's folders, and only the folders with a session in the state asked for.
+  const machine = held ? null : machineFilter.value;
+  const state = held ? "any" : stateFilter.value;
   const folders = held ? every.filter(({ host, folder }) => host.id === held.host
-    && folderKey(folder.folder.folder) === folderKey(held.folder)) : every;
+    && folderKey(folder.folder.folder) === folderKey(held.folder))
+    : every.filter(({ host, folder }) => (machine === null || host.id === machine)
+      && (state === "any" || liveSessions(store, host.id, folder.folder.folder).length > 0));
   const archived = held ? [] : archivedFolders(store.hosts.value, store.folders.value);
   const showsArchived = folds.showsArchivedFolders.value;
   const offline = store.hosts.value.filter((h) => !hostAnswers(h.state));
@@ -165,6 +172,7 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
           value={search.value} onInput={(e) => (search.value = (e.currentTarget as HTMLInputElement).value)} />
         {/* New folder, which the window has in its File menu (#115): the page has no menu bar. */}
         <NewFolderMenu store={store} newSession={newSessionStart(store, folders, linkDown)} />
+        {!held && <AgentFilters store={store} />}
       </header>
       <div class="scroll" onKeyDown={(e) => moveWithKeys(e)}>
         {folders.length > 0 && <NewSessionTopRow store={store} folders={folders} linkDown={linkDown} />}
@@ -174,21 +182,6 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
         {!held && <LinkRequests store={store} down={linkDown} />}
         {/* A new client that signed in with GitHub as this person (#995), beside them. */}
         {!held && <SignInRequests store={store} down={linkDown} />}
-        {/* Pages about all the work rather than one folder, above the smart groups, as the
-            window's (#495): Status, what goes on now, and Usage, the past (#915). Each folds, as
-            a folder does, and stays while searching, as the window's and the Remote's do (#547). */}
-        {!held && <>
-        <details class="activity" aria-label="Status" open={folds.showsStatus.value}
-          onToggle={(e) => folds.setShowsStatus((e.currentTarget as HTMLDetailsElement).open)}>
-          <summary class="sidebar-head-label" data-fold="status">Status</summary>
-          <ActivityRows group="status" store={store} chosen={r.activity} onPick={(page: ActivityPage) => go({ activity: page })} />
-        </details>
-        <details class="activity" aria-label="Usage" open={folds.showsUsage.value}
-          onToggle={(e) => folds.setShowsUsage((e.currentTarget as HTMLDetailsElement).open)}>
-          <summary class="sidebar-head-label" data-fold="usage">Usage</summary>
-          <ActivityRows group="usage" store={store} chosen={r.activity} onPick={(page: ActivityPage) => go({ activity: page })} />
-        </details>
-        </>}
         {/* Pinned, Needs You, Working, Unread: a group each across every folder and host (#495, #773),
             each that is on in this browser's Settings (#846). */}
         {folders.length > 0 && smartRows.filter((row) => smartGroupsOn.value.has(row) && (!held || aloneRows.has(row))).map((row) => (
@@ -220,6 +213,11 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
             ))}
           </details>
         )}
+        {/* Every person's running agents for an admin, and every project (#2141): pages in the chat's place. */}
+        {!held && <section class="agents-pages" aria-label="More">
+          {adminOf(store) === true && <AgentsPageRow id="live" title="Live Now" />}
+          <AgentsPageRow id="projects" title="Projects" />
+        </section>}
       </div>
       {/* What the hosts and this browser are doing, pinned at the foot: status lines rather than
           somewhere to go. Each is absent when there is nothing to say. */}
@@ -254,9 +252,6 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
         )))}
         <div class="identity">
           <span>{browserName()} {onThisMac() ? "on this Mac" : "on the web"}</span>
-          {/* This browser's Settings (#846): which smart groups are on, as the window's
-              Settings ▸ Sidebar. */}
-          <button class="link" aria-current={!!r.settings} onClick={() => go({ settings: true })}>Settings</button>
           {/* The docs site (#1327), as the window's Help ▸ Agents Help. */}
           <a class="link" href={helpSite} target="_blank" rel="noopener">Help</a>
           {/* What forgetting does, beside the confirm, in the Remote's words (#935). */}
@@ -281,6 +276,35 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
   );
 }
 
+/** Agents' filters (#2141): one machine, and a state. A machine filter only with more than one machine. */
+function AgentFilters({ store }: { store: Store }) {
+  const hosts = store.hosts.value;
+  const machine = machineFilter.value;
+  return (
+    <div class="agent-filters" role="group" aria-label="Filters">
+      {(hosts.length > 1 || machine !== null) && (
+        <select aria-label="Machine" value={machine ?? ""} onChange={(e) => setMachineFilter((e.currentTarget as HTMLSelectElement).value || null)}>
+          <option value="">Every machine</option>
+          {hosts.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+        </select>
+      )}
+      <select aria-label="State" value={stateFilter.value} onChange={(e) => setStateFilter((e.currentTarget as HTMLSelectElement).value as StateFilter)}>
+        {stateFilters.map((f) => <option key={f} value={f}>{stateFilterTitle[f]}</option>)}
+      </select>
+    </div>
+  );
+}
+
+/** A row at the sidebar's foot that opens one of Agents' pages in the chat's place. */
+function AgentsPageRow({ id, title }: { id: string; title: string }) {
+  const chosen = route.value.nav === "agents" && route.value.section === id;
+  return (
+    <button class={`row activity-row${chosen ? " chosen" : ""}`} aria-current={chosen} onClick={() => go({ nav: "agents", section: id })}>
+      <span class="title">{title}</span>
+    </button>
+  );
+}
+
 // Through window, so a test without a page reads nothing (Node warns on a bare localStorage).
 const storage = globalThis.window?.localStorage;
 
@@ -300,7 +324,8 @@ function startedByOf(store: Store, id: string): string | undefined {
 }
 
 function liveSessions(store: Store, host: string, folder: string): Agent[] {
-  return store.folderView(host, folder).headings.flatMap((h) => h.agents);
+  const state = alone.value ? "any" : stateFilter.value;
+  return store.folderView(host, folder).headings.flatMap((h) => h.agents).filter((a) => keptByState(a, state));
 }
 
 /** Whether a session is in sight under an open group at the top, so its folder need not unfold. */
@@ -535,7 +560,7 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
   const view = store.folderView(host.id, folder);
   // The matcher is made once per fold, not per row.
   const parsed = searching ? { ...parseQuery(query), said: store.saidLines.value } : undefined;
-  const live = view.headings.flatMap((h) => h.agents);
+  const live = view.headings.flatMap((h) => h.agents).filter((a) => isAlone || keptByState(a, stateFilter.value));
   // Those a group at the top lists are there alone (#495, #587), out of the folder's list. A
   // group turned off (#846) lists nothing, so its sessions are here unless the next group has them.
   const on = smartGroupsOn.value;
@@ -600,7 +625,7 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
       run: () => {
         if (!confirm(`${archiveFolderTitle(label)}\n\n${archiveFolderMessage}`)) return;
         void store.archiveFolder(host.id, folder).then((summary) => {
-          if (summary && here) go({});
+          if (summary && here) go({ nav: "agents" });
         });
       } },
     // Its agents as a .tar.gz, and an export brought back on its machine (#1001), as the window's.
