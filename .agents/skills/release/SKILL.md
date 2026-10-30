@@ -239,13 +239,21 @@ Until the gate can pass:
 
 ## 5. Gate
 
-All of these, on the commit you will tag (`git rev-parse origin/main`, fetched again now):
+All of these, on the commit you will tag (`git rev-parse origin/main`, fetched again now).
+If `origin/main` now names a newer commit than the one the gate started on (a PR landed
+while an item below was waiting), re-pick the newest main and start the gate over on it
+from item 1: a run on the stale commit may already be cancelled, which is not a failure.
+`branch.moved` is never raised for `main`, the default branch; `pr.merged` is what wakes a
+wait for this instead.
 
 1. **CI is green on it:** `gh run list --branch main --commit <sha> --json name,conclusion`
-   shows every run `success` (or `skipped`). If one is still running, wait for it with
-   `wait_for_event` (`checks.failed`, or `until_minutes: 30`) and look again. If one
-   failed, end with `partly_done`; main broken is fixed by its own PR, through the Scrum
-   Master.
+   shows every run `success` (or `skipped`). If one is still running, wait for it: a push
+   to `main` is never a pull request, so `checks.failed` (a PR's own runs) never fires for
+   it, and nothing wakes on a pass either. Wait instead with `wait_for_event` (`pr.merged`,
+   `until_minutes: 10`), since a PR landing is what would cancel this run by moving main
+   past `<sha>`, then look again however it woke (re-pick as above if it did move). If a
+   run failed and main did not move, end with `partly_done`; main broken is fixed by its
+   own PR, through the Scrum Master.
 2. **No open high:** none of step 3's high issues is open, and none of its high security
    advisories is without its fix. **For a patch** (#2801), instead: no `priority:high` or
    `priority:medium` bug is open in its milestone. Two days after the last tag
@@ -260,11 +268,14 @@ All of these, on the commit you will tag (`git rev-parse origin/main`, fetched a
 5. **The archives build on a cold cache** (#2780): `gh workflow run release-dry-run.yml -f
    ref=<sha>`, then find its run (`gh run list --workflow release-dry-run.yml --json
    databaseId,displayTitle,status --jq '.[] | select(.displayTitle == "release dry run <sha>")'`)
-   and wait for it as in item 1 (it takes up to an hour). It runs release.yml's `mac` and
-   `testflight` archives as dry runs on a runner with an empty build cache, which no lane
-   or merge wave does (#2773 spent v0.12.0's tag). A run of it on a pull request does not
-   count: run it on `<sha>`. If it failed, end with `partly_done`, naming the job and its
-   first error; the fix goes through the Scrum Master as for main broken.
+   and look again until it is `completed` (it takes up to an hour). It runs by
+   `workflow_dispatch`, not a pull request, so no event here wakes on it ending, in success
+   or failure: `check_again` (`in_minutes: 10`) and look again (re-pick as above if main
+   moved meanwhile). It runs release.yml's `mac` and `testflight` archives as dry runs on a
+   runner with an empty build cache, which no lane or merge wave does (#2773 spent
+   v0.12.0's tag). A run of it on a pull request does not count: run it on `<sha>`. If it
+   failed, end with `partly_done`, naming the job and its first error; the fix goes through
+   the Scrum Master as for main broken.
 
 ## 6. Version and notes
 
