@@ -205,10 +205,38 @@ func (d *Daemon) askAt(id wire.UUID, ends []int64, line int) (ask, person bool) 
 		return false, false
 	}
 	entries, _, err := d.Store.Entries(id, ends, line, line+1)
-	if err != nil || len(entries) != 1 || !isPersonsAsk(&entries[0]) {
+	if err != nil || len(entries) != 1 {
 		return false, false
 	}
-	return true, isPersonsPrompt(&entries[0])
+	if isPersonsAsk(&entries[0]) {
+		return true, isPersonsPrompt(&entries[0])
+	}
+	return d.bringsLateAnswer(id, ends, line, &entries[0]), false
+}
+
+// lateAnswerLookBack is how many lines askAt passes over, back from an app prompt, to the
+// form answer it brings: state changes and passing lines ("Starting Claude…").
+const lateAnswerLookBack = 8
+
+// bringsLateAnswer is startsTurn(after:) for the app's prompt: the one that brings the
+// answer to a form left open (#1641) starts a turn, so the answer is drawn at the end of
+// the turn that asked (#2934).
+func (d *Daemon) bringsLateAnswer(id wire.UUID, ends []int64, line int, e *wire.TranscriptEntry) bool {
+	u := e.Kind.UserMessage
+	if u == nil || u.From == nil || *u.From != wire.PromptOriginApp {
+		return false
+	}
+	from := max(0, line-lateAnswerLookBack)
+	before, _, err := d.Store.Entries(id, ends, from, line)
+	if err != nil {
+		return false
+	}
+	for i := len(before) - 1; i >= 0; i-- {
+		if before[i].Kind.StateChanged == nil && !entryIsPassing(&before[i]) {
+			return before[i].Kind.ElicitationAnswered != nil
+		}
+	}
+	return false
 }
 
 // isPersonsPrompt is a prompt the person sent, as promptNumber counts them.
