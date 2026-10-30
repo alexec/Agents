@@ -125,11 +125,54 @@ public enum GovernanceWords {
         isAdmin ? requests.filter { $0.user == user } : requests
     }
 
+    // MARK: Ask an Admin on a catalogue sheet (#2355)
+
+    /// The button under a catalogue sheet's policy refusal.
+    public static let askAdmin = "Ask an Admin…"
+    public static let askAdminHelp = "Ask your organisation's admins to approve it. They decide on Console ▸ Requests."
+
+    /// The popover's title: "Ask for the MCP server github".
+    public static func askFor(_ kind: DaemonAPI.CatalogKind, _ name: String) -> String {
+        "Ask for \(item(kind, name))"
+    }
+
+    /// Whether a catalogue refusal's words are the organisation's policy: the machine says them after
+    /// **Set by your organisation** (`PolicyRefusal.line`, the daemon's `orgSetBy`), and a sheet then
+    /// offers Ask an Admin.
+    public static func refusedByPolicy(_ words: String) -> Bool {
+        words.hasPrefix(OrgPolicyWords.setBy)
+    }
+
+    /// The person's own request for this item, if they asked already: the sheet says where it stands
+    /// rather than offering Ask again. Names are matched as the control plane matches them, case aside.
+    public static func asked(_ requests: [DaemonAPI.CatalogRequest], kind: DaemonAPI.CatalogKind,
+                             name: String) -> DaemonAPI.CatalogRequest? {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return requests.last { $0.kind == kind && $0.name.caseInsensitiveCompare(name) == .orderedSame }
+    }
+
     /// The ask to send, or nil while the name is empty. A why of spaces only is no why.
-    public static func request(kind: DaemonAPI.CatalogKind, name: String, why: String) -> DaemonAPI.CatalogAsk? {
+    public static func request(kind: DaemonAPI.CatalogKind, name: String, why: String,
+                               source: String? = nil) -> DaemonAPI.CatalogAsk? {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let why = why.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return nil }
-        return DaemonAPI.CatalogAsk(kind: kind, name: name, why: why.isEmpty ? nil : why)
+        return DaemonAPI.CatalogAsk(kind: kind, name: name, source: source, why: why.isEmpty ? nil : why)
+    }
+}
+
+public extension DaemonAPI.CatalogError {
+    /// The organisation's words when its policy refused this (#2355), or nil.
+    var policyWords: String? {
+        if case .failed(let why) = self, GovernanceWords.refusedByPolicy(why) { return why }
+        return nil
+    }
+}
+
+public extension DaemonAPI.MCPCatalogError {
+    /// The organisation's words when its policy refused this (#2355), or nil.
+    var policyWords: String? {
+        if case .failed(let why) = self, GovernanceWords.refusedByPolicy(why) { return why }
+        return nil
     }
 }
