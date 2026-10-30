@@ -690,9 +690,9 @@ func TestMachineBudgets(t *testing.T) {
 	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 1, map[string]any{"budgets": map[string]any{"daily": 1, "dailyTokens": 50000,
 		"allowUnmetered": []string{"grok"}, "raises": []any{}}}))
 	// An unmetered runtime not allowed is refused; one allowed is not.
-	_, err := d.policyStart(&wire.StartRequest{RuntimeID: "cursor"}, startedBy{owner: wire.SessionLabelOwnerPerson})
+	_, _, err := d.policyStart(&wire.StartRequest{RuntimeID: "cursor"}, startedBy{owner: wire.SessionLabelOwnerPerson}, nil)
 	refused(t, asError(err), "policy", "budgets.allowUnmetered")
-	if _, err := d.policyStart(&wire.StartRequest{RuntimeID: "grok"}, startedBy{owner: wire.SessionLabelOwnerPerson}); err != nil {
+	if _, _, err := d.policyStart(&wire.StartRequest{RuntimeID: "grok"}, startedBy{owner: wire.SessionLabelOwnerPerson}, nil); err != nil {
 		t.Fatal(err)
 	}
 	var cost wire.CostState
@@ -802,6 +802,26 @@ func TestAlwaysApproveIsUnderTheModeCeiling(t *testing.T) {
 	}
 	refused(t, c.callError(t, 3, "clientPermissions/set", map[string]any{"cursor": "alwaysApprove", "grok": "default", "opencode": "default"}), "policy", "modeCeiling")
 	refused(t, c.callError(t, 4, "agents/setClientPermission", map[string]any{"agentID": person.ID, "mode": "alwaysApprove"}), "policy", "modeCeiling")
+	refused(t, c.callError(t, 4, "agents/setLevels", map[string]any{"agentID": person.ID, "levels": map[string]any{"permissionRequests": "alwaysApprove"}}), "policy", "modeCeiling")
+	// A start's own Yes to all: a person's is refused; a workflow's, and Auto's Approve for
+	// me cell, start asking.
+	yesToAll := map[string]any{"permissionRequests": "alwaysApprove"}
+	refused(t, c.callError(t, 4, "agents/start", map[string]any{"runtimeID": "grok", "cwd": "file://" + dir, "prompt": "x", "levels": yesToAll}), "policy", "modeCeiling")
+	asks := func(a *wire.Agent) bool {
+		return a.ClientPermission != nil && *a.ClientPermission == wire.ClientPermissionModeDefault && !d.agentAlwaysApproves(a)
+	}
+	r := helperRequest("grok", dir, "x", "", nil, nil, nil)
+	r.Levels = &wire.Levels{PermissionRequests: &yes}
+	id, err := d.startFor(r, startedBy{owner: wire.SessionLabelOwnerAgent})
+	if err != nil || !asks(d.Store.Agent(id)) {
+		t.Fatal("a workflow's Yes to all above the ceiling", err)
+	}
+	c.call(t, 4, "auto/set", map[string]any{"order": []string{"grok"}, "excluded": []string{"claude", "codex", "cursor", "copilot", "gemini", "opencode", "antigravity"}, "overrides": []any{}})
+	var auto wire.UUID
+	json.Unmarshal(c.call(t, 4, "agents/start", map[string]any{"runtimeID": "auto", "cwd": "file://" + dir, "prompt": "x", "levels": map[string]any{"permission": "approveForMe"}}), &auto)
+	if a := d.Store.Agent(auto); a == nil || a.RuntimeID != "grok" || !asks(a) {
+		t.Fatalf("Auto's Yes to all above the ceiling: %+v", a)
+	}
 	c.call(t, 5, "clientPermissions/set", map[string]any{"cursor": "default", "grok": "default", "opencode": "default"})
 	if fi, err := os.Stat(filepath.Join(d.SettingsDir, "client-permissions.json")); err != nil || fi.Mode().Perm() != 0o600 {
 		t.Fatal(fi.Mode(), err)
