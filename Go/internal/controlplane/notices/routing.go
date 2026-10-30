@@ -4,7 +4,6 @@
 package notices
 
 import (
-	"sort"
 	"time"
 )
 
@@ -41,9 +40,12 @@ const (
 	IPhone  = "iPhone"
 	IPad    = "iPad"
 	Unknown = "unknown"
+	// A browser that subscribed to Web Push (#1486). Its presence is the Mac's surface,
+	// so it is never the device in hand: it is the default after the iPhone.
+	Browser = "browser"
 )
 
-// Device is Device: a paired phone or iPad, as routing needs it.
+// Device is Device: a paired phone or iPad, or a browser, as routing needs it.
 type Device struct {
 	ID        string
 	PublicKey []byte
@@ -85,7 +87,7 @@ type Decision struct {
 
 // Decide is Routing.decide: the ladder, one pure function. The first rung that applies
 // wins: being watched anywhere, at the Mac (with the settling pause), the device in
-// hand, the default iPhone, nowhere.
+// hand, the default iPhone, the default browser (#1486), nowhere.
 func Decide(need Need, presences map[Surface]Presence, devices []Device, delivery *Delivery, t Thresholds, now time.Time) Decision {
 	// 1. Being watched, anywhere.
 	if need.Agent != "" {
@@ -133,24 +135,32 @@ func Decide(need Need, presences map[Surface]Presence, devices []Device, deliver
 		return Decision{To: &to, Alert: alert(to, delivery, t, now)}
 	}
 	// 4. The default: the most recently used eligible iPhone. An unknown kind never is.
-	var phones []Device
-	for _, d := range eligible {
-		if d.Kind == IPhone {
-			phones = append(phones, d)
-		}
-	}
-	if len(phones) > 0 {
-		sort.Slice(phones, func(i, j int) bool {
-			if !phones[i].LastSeen.Equal(phones[j].LastSeen) {
-				return phones[i].LastSeen.Before(phones[j].LastSeen)
-			}
-			return phones[i].ID < phones[j].ID
-		})
-		to := Surface{Device: phones[len(phones)-1].ID}
+	if phone := latest(eligible, IPhone); phone != nil {
+		to := Surface{Device: phone.ID}
 		return Decision{To: &to, Alert: alert(to, delivery, t, now)}
 	}
-	// 5. Nowhere.
+	// 5. With no iPhone, the most recently used browser that subscribed to Web Push.
+	if browser := latest(eligible, Browser); browser != nil {
+		to := Surface{Device: browser.ID}
+		return Decision{To: &to, Alert: alert(to, delivery, t, now)}
+	}
+	// 6. Nowhere.
 	return Decision{}
+}
+
+// latest is the most recently used device of a kind, a tie going to the id.
+func latest(devices []Device, kind string) *Device {
+	var best *Device
+	for i := range devices {
+		d := &devices[i]
+		if d.Kind != kind {
+			continue
+		}
+		if best == nil || best.LastSeen.Before(d.LastSeen) || best.LastSeen.Equal(d.LastSeen) && best.ID < d.ID {
+			best = d
+		}
+	}
+	return best
 }
 
 // later says whether b beats a: heard later, or at the same instant an iPhone, or the id.

@@ -26,3 +26,33 @@ test("the page says whether it may show them", () => {
   assert.match(pageNotices.pagePermissionText("default"), /^Allow notifications/);
   assert.match(pageNotices.pagePermissionText("denied"), /blocks/);
 });
+
+// Web Push (#1486): what the worker shows, where it can be had, and what Settings says.
+const pushItem = await load("src/pushItem.ts");
+
+test("a Web Push shows the need's words, buzzing only for an alert, one a need", () => {
+  const shown = pushItem.notificationFor({ needID: { permission: "P" }, alert: true, headline: { h1: "work", h2: "Fix the gallery", h3: "may run" } });
+  assert.equal(shown.title, "Fix the gallery");
+  assert.equal(shown.options.body, "may run");
+  assert.equal(shown.options.silent, false);
+  assert.equal(shown.options.tag, 'need:{"permission":"P"}');
+  const quiet = pushItem.notificationFor({ needID: { permission: "P" }, alert: false });
+  assert.equal(quiet.title, "Agents");
+  assert.equal(quiet.options.body, "An agent needs you");
+  assert.equal(quiet.options.silent, true);
+});
+
+test("Web Push needs a worker and a push manager; on iOS, the Home Screen", () => {
+  assert.equal(pageNotices.webPushHere(true, true, false), "off");
+  assert.equal(pageNotices.webPushHere(true, false, true), "homeScreen");
+  assert.equal(pageNotices.webPushHere(false, false, false), "unsupported");
+  assert.match(pageNotices.webPushText("homeScreen"), /Home Screen/);
+  assert.match(pageNotices.webPushText("on"), /page closed/);
+  assert.match(pageNotices.webPushText("none"), /no Web Push/);
+  assert.equal(pageNotices.webPushText("off"), "");
+});
+
+test("a key is said in base64url without padding", () => {
+  assert.equal(pageNotices.base64url(new Uint8Array([251, 255, 0]).buffer), "-_8A");
+  assert.equal(pageNotices.base64url(null), "");
+});

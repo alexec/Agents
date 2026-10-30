@@ -508,6 +508,14 @@ yet: with **Relay for my devices** off, a need from a host does not get to the l
 With only Linux hosts, devices reach the control plane at its address and get no
 notifications.
 
+The web page gets notifications by Web Push (#1486). `make-secrets.sh` makes the VAPID key
+once, in `deploy/secrets/vapid-key`, and `up.sh` makes it on the VM and never replaces it: a
+new key ends every browser's subscription. Allow notifications in the page's Settings ▸
+Notifications; when no iPhone gets a need, that browser shows it, also with the page closed.
+On an iPhone or iPad, Safari gives Web Push only to the page added to the Home Screen.
+`AGENTS_WEBPUSH_SUBJECT` in `deploy/.env` is the `mailto:` or `https:` address a push service
+may write to about it; without it, the project's page.
+
 ## What to know
 
 - **The certificate renews itself.** Caddy renews it about a month before it runs out.

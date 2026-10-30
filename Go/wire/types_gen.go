@@ -10513,6 +10513,20 @@ type WakeState struct {
 	OnPower bool `json:"onPower"`
 }
 
+// clients/webPushKey (#1486): the control plane's VAPID public key, X9.63, base64url without padding, as pushManager.subscribe takes it. None when this control plane sends no Web Push.
+type WebPushKey struct {
+	PublicKey *string `json:"publicKey,omitzero"`
+}
+
+// clients/setWebPush (#1486): a browser's push endpoint and its two keys, base64url, as PushSubscription.toJSON() gives them. No endpoint takes it away.
+type WebPushSubscription struct {
+	Endpoint *string `json:"endpoint,omitzero"`
+
+	P256dh *string `json:"p256dh,omitzero"`
+
+	Auth *string `json:"auth,omitzero"`
+}
+
 type WebRemoteStatus struct {
 	Port int64 `json:"port"`
 
