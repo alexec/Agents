@@ -5289,6 +5289,31 @@
       }
     },
     {
+      "name": "reports/features",
+      "x-capability": "features/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/FeatureUsage"
+        }
+      }
+    },
+    {
       "name": "resources/changed",
       "x-capability": "resources.leases/1",
       "tags": [

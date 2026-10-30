@@ -8062,6 +8062,62 @@
       ],
       "additionalProperties": false
     },
+    "FeatureUsage": {
+      "type": "object",
+      "description": "reports/features (#2165): each feature this host counted, a method it serves or an app tool, with its uses in the last 7 and the last `days` days, the least used first. A feature with no use is in it too. Counts only, never what a call said; they stay on the machine. since is the first day counted in the range.",
+      "properties": {
+        "days": {
+          "type": "integer"
+        },
+        "since": {
+          "type": "string",
+          "description": "YYYY-MM-DD in the host's zone."
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FeatureUse"
+          }
+        }
+      },
+      "required": [
+        "days",
+        "features"
+      ],
+      "additionalProperties": false
+    },
+    "FeatureUse": {
+      "type": "object",
+      "description": "One feature's uses (#2165). clients is who used it: mac, remote, web, agent or workflow.",
+      "properties": {
+        "method": {
+          "type": "string"
+        },
+        "week": {
+          "type": "integer"
+        },
+        "quarter": {
+          "type": "integer"
+        },
+        "clients": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "lastUsed": {
+          "type": "string",
+          "description": "YYYY-MM-DD in the host's zone."
+        }
+      },
+      "required": [
+        "method",
+        "week",
+        "quarter",
+        "clients"
+      ],
+      "additionalProperties": false
+    },
     "FileCompletion": {
       "type": "object",
       "description": "One thing to write: what the list shows, what goes in the text (the label when left out), and a line about it.",

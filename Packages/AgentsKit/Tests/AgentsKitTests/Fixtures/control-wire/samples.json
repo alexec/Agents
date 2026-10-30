@@ -1088,5 +1088,28 @@
   "SignInDecided": {
     "request": "request",
     "result": "approved"
+  },
+  "FeatureUsage": {
+    "days": 90,
+    "since": "2026-08-02",
+    "features": [
+      {
+        "method": "workflows/run",
+        "week": 0,
+        "quarter": 0,
+        "clients": []
+      },
+      {
+        "method": "sessions/start",
+        "week": 7,
+        "quarter": 30,
+        "clients": [
+          "agent",
+          "mac",
+          "web"
+        ],
+        "lastUsed": "2026-10-30"
+      }
+    ]
   }
 }

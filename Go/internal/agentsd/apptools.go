@@ -432,6 +432,7 @@ func (d *Daemon) appToolsHandle(ctx context.Context, g *appGrant, method string,
 		began := time.Now()
 		note, err := tool.call(d, g.agent, p.Arguments)
 		d.keepAppToolCall(g.agent, tool.name, p.Arguments, note, err, began)
+		d.countAppTool(g.agent, tool.name)
 		if err != nil {
 			msg := err.Error()
 			if e, ok := err.(*Error); ok {

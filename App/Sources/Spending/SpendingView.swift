@@ -27,7 +27,7 @@ struct SpendingView: View {
         Group {
             switch pane {
             case .cost: cost
-            case .reports: ReportsPane(control: model.controlRequests)
+            case .reports: ReportsPane(control: model.controlRequests, features: { await model.featureUsage() })
             }
         }
         .navigationTitle(pane.rawValue)

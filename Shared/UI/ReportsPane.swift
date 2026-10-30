@@ -8,14 +8,21 @@ import UniformTypeIdentifiers
 /// Reports on the web page. Export saves the rows as CSV or JSON lines. Page picks Spend or
 /// one of the pages of what the agents did (#2183): Outcomes, Time, Runtimes, Adoption and
 /// Workflows, from the same rows' counts. Value (#2351) is what the work cost and delivered, on
-/// the Mac only: the Remote's tier leaves it out (#2796).
+/// the Mac only: the Remote's tier leaves it out (#2796). Features (#2165) is which methods the clients and
+/// agents called on the person's own machines, from each host's counts; the Mac's and the web
+/// page's too.
 ///
 /// One view for the Mac's page and the Remote's (the web page's is `Web/src/views/Reports.tsx`).
 struct ReportsPane: View {
     /// The control plane, or nil while it cannot be reached.
     let control: DaemonClient?
+    /// Every host's feature counts (#2165), added up; nil where the page is not drawn.
+    var features: (() async -> DaemonAPI.FeatureUsage?)?
 
     @State private var page: DaemonAPI.ReportPage = .spend
+    /// Features is shown in place of the page (#2165): it is no page of the control plane's.
+    @State private var showsFeatures = false
+    @State private var featureUsage: DaemonAPI.FeatureUsage?
     @State private var range: DaemonAPI.ReportRange = .week
     @State private var dimension: ReportTotals.Dimension = .person
     @State private var report: DaemonAPI.UsageReport?
@@ -41,7 +48,13 @@ struct ReportsPane: View {
                 }
             }
             .paperListRow()
-            if page == .value {
+            if showsFeatures {
+                if let featureUsage {
+                    featuresPage(featureUsage)
+                } else {
+                    Text("Loading…").appText(.supporting).foregroundStyle(.secondary).paperListRow()
+                }
+            } else if page == .value {
                 if let value, value.range == range {
                     valuePage(value)
                 } else if problem == nil {
@@ -61,7 +74,10 @@ struct ReportsPane: View {
         .listStyle(.insetGrouped)
         #endif
         .scrollContentBackground(.hidden)
-        .refreshable { await load() }
+        .refreshable {
+            if showsFeatures { await loadFeatures() } else { await load() }
+        }
+        .task(id: showsFeatures) { if showsFeatures { await loadFeatures() } }
         .task(id: Ask(range: range, connected: control != nil, isValue: page == .value)) { await load() }
         .onChange(of: dimension) { addUp() }
         .onChange(of: page) {
@@ -147,6 +163,26 @@ struct ReportsPane: View {
         }
     }
 
+    /// Features (#2165): each method with its uses, the least used first; one never used in
+    /// the range is marked.
+    @ViewBuilder private func featuresPage(_ usage: DaemonAPI.FeatureUsage) -> some View {
+        Section {
+            // Above the rows, not in the footer, where a long list cuts it to one line.
+            Text(FeatureWords.note(usage))
+                .appText(.fine)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if usage.features.isEmpty {
+                Text(FeatureWords.none).appText(.supporting).foregroundStyle(.secondary)
+            } else {
+                ForEach(usage.features) { feature in
+                    FeatureRow(feature: feature, days: usage.days)
+                }
+            }
+        }
+        .paperListRow()
+    }
+
     /// Adoption (#2183): each week's active people, sessions, runtimes and workflows.
     @ViewBuilder private var adoption: some View {
         if let weeks {
@@ -198,11 +234,26 @@ struct ReportsPane: View {
         #endif
     }
 
-    /// The range, what to add up by, and Export.
+    /// The page picked: a page of the control plane's, or Features.
+    private var choice: Binding<String> {
+        Binding(get: { showsFeatures ? Self.featuresTag : page.rawValue }, set: { tag in
+            if tag == Self.featuresTag {
+                showsFeatures = true
+            } else if let picked = DaemonAPI.ReportPage(rawValue: tag) {
+                showsFeatures = false
+                page = picked
+            }
+        })
+    }
+
+    private static let featuresTag = "features"
+
+    /// The page, then the range, what to add up by, and Export.
     private var controls: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Picker("Page", selection: $page) {
-                ForEach(Self.pages, id: \.self) { Text(ReportOutcomeWords.title($0)).tag($0) }
+            Picker("Page", selection: choice) {
+                ForEach(Self.pages, id: \.self) { Text(ReportOutcomeWords.title($0)).tag($0.rawValue) }
+                if features != nil { Text("Features").tag(Self.featuresTag) }
             }
             // Six pages fit a segmented control on the Mac, not on a phone (#2183).
             #if os(macOS)
@@ -211,35 +262,40 @@ struct ReportsPane: View {
             .pickerStyle(.menu)
             #endif
             .fixedSize()
-            HStack(spacing: 12) {
-                Picker("Range", selection: $range) {
-                    // Adoption counts weeks, so it starts at W.
-                    ForEach(DaemonAPI.ReportRange.allCases.filter { page != .adoption || $0 != .day }, id: \.self) {
-                        Text(ReportWords.short($0)).accessibilityLabel(ReportWords.spoken($0)).tag($0)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
-                .help(ReportWords.span(range))
-                Spacer(minLength: 0)
-                // Value's numbers are not rows to export.
-                if page != .value { exportMenu }
-            }
-            if !Self.ways(page).isEmpty {
-                Picker("By", selection: $dimension) {
-                    ForEach(Self.ways(page)) { Text($0.rawValue).tag($0) }
-                }
-                // Up to six ways with Project (#2670): segments on the Mac, a menu on a phone.
-                #if os(macOS)
-                .pickerStyle(.segmented)
-                #else
-                .pickerStyle(.menu)
-                .fixedSize()
-                #endif
-            }
-            Text(ReportWords.span(range)).appText(.fine).foregroundStyle(.secondary)
+            if !showsFeatures { reportControls }
         }
+    }
+
+    /// The range, what to add up by, and Export, for a page of the control plane's.
+    @ViewBuilder private var reportControls: some View {
+        HStack(spacing: 12) {
+            Picker("Range", selection: $range) {
+                // Adoption counts weeks, so it starts at W.
+                ForEach(DaemonAPI.ReportRange.allCases.filter { page != .adoption || $0 != .day }, id: \.self) {
+                    Text(ReportWords.short($0)).accessibilityLabel(ReportWords.spoken($0)).tag($0)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+            .help(ReportWords.span(range))
+            Spacer(minLength: 0)
+            // Value's numbers are not rows to export.
+            if page != .value { exportMenu }
+        }
+        if !Self.ways(page).isEmpty {
+            Picker("By", selection: $dimension) {
+                ForEach(Self.ways(page)) { Text($0.rawValue).tag($0) }
+            }
+            // Up to six ways with Project (#2670): segments on the Mac, a menu on a phone.
+            #if os(macOS)
+            .pickerStyle(.segmented)
+            #else
+            .pickerStyle(.menu)
+            .fixedSize()
+            #endif
+        }
+        Text(ReportWords.span(range)).appText(.fine).foregroundStyle(.secondary)
     }
 
     private var exportMenu: some View {
@@ -254,6 +310,11 @@ struct ReportsPane: View {
     }
 
     // MARK: Asking
+
+    private func loadFeatures() async {
+        guard let features else { return }
+        featureUsage = await features() ?? DaemonAPI.FeatureUsage(days: 90, features: [])
+    }
 
     private func load() async {
         guard let control else {
@@ -319,6 +380,29 @@ private struct ReportValueRowView: View {
                 Text(ReportValueWords.name(row.node)).appText(.reading).lineLimit(1)
             }
             Text(ReportValueWords.line(row))
+                .appText(.fine)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// One feature on Features (#2165): its method, its uses and its clients, marked when unused.
+private struct FeatureRow: View {
+    let feature: DaemonAPI.FeatureUse
+    let days: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Text(feature.method).appText(.reading).monospaced().lineLimit(1)
+                if feature.quarter == 0 {
+                    Text(FeatureWords.unused).appText(.fine).tinted(.attention)
+                }
+            }
+            Text(FeatureWords.line(feature, days: days))
                 .appText(.fine)
                 .monospacedDigit()
                 .foregroundStyle(.secondary)

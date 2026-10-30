@@ -20,6 +20,7 @@ func (d *Daemon) register() {
 	Quiet(d, wire.CallAgentsPrewarm.Name)
 	d.registerLend()
 	d.registerFiles()
+	d.registerFeatures()
 	d.registerMac()
 	d.registerAgents()
 	d.registerPins()

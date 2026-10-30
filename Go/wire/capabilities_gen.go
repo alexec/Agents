@@ -46,6 +46,7 @@ const CapElicitations1 = "elicitations/1"
 const CapEventsAudit1 = "events.audit/1"
 const CapEventsTeam1 = "events.team/1"
 const CapEvents1 = "events/1"
+const CapFeatures1 = "features/1"
 const CapFilesComplete1 = "files.complete/1"
 const CapFilesDiagnostics1 = "files.diagnostics/1"
 const CapFiles1 = "files/1"
@@ -332,6 +333,7 @@ var HostCapabilities = pairs([][2]string{
 	{"relay/grant", "relay/1"},
 	{"relay/offer", "relay/1"},
 	{"relay/register", "relay/1"},
+	{"reports/features", "features/1"},
 	{"resources/declare", "resources/1"},
 	{"resources/end", "resources.leases/1"},
 	{"resources/lease", "resources.leases/1"},

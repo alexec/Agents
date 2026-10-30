@@ -256,6 +256,7 @@ struct WireSchemaTests {
             "UsageReport": Self.through(DaemonAPI.UsageReport.self),
             "ReportExport": Self.through(DaemonAPI.ReportExport.self),
             "ReportValue": Self.through(DaemonAPI.ReportValue.self),
+            "FeatureUsage": Self.through(DaemonAPI.FeatureUsage.self),
             // The user scope (#1760).
             "UserSettings": Self.through(DaemonAPI.UserSettings.self),
             "UserSettingsPart": Self.through(DaemonAPI.UserSettingsPart.self),

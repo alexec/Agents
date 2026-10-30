@@ -6,7 +6,7 @@ description: What Agents keeps, where it keeps it, and what it sends to other se
 
 # Privacy
 
-Last changed: 21 October 2026.
+Last changed: 30 October 2026.
 
 Agents is local first. Your folders, conversations, settings and keys stay on machines
 that you control. Agents has no analytics, no tracking and no advertising. The people who
@@ -17,6 +17,11 @@ make Agents do not see your data and do not sell it.
 - **Your Mac:** Agents Host keeps its records in `~/.agents` and the folders of your
   folders: conversations, workflows, labels, usage numbers and settings. It keeps tokens and
   passwords in the Mac's Keychain.
+- **Feature counts (#2165):** each machine counts how many times a day each feature (a
+  method of the host or an app tool) is used, and by which client: the Mac, the Remote, the
+  web page, an agent or a workflow. It keeps only the counts, never what a call said, for 90
+  days in `features-history.json`. Reports ▸ Features shows them to you. They never leave
+  your machines.
 - **Your Linux servers:** a server that you add keeps the records of its own agents on its
   own disk.
 - **Your control plane:** it keeps the list of your hosts, clients and pairings, in the store
