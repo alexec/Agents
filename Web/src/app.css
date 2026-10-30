@@ -1,6 +1,7 @@
 /* The web remote's styles: the Paper palette, then the page. */
 @import "./theme/paper.css";
 @import "./sidebar.css";
+@import "./theme/console.css";
 
 /* 1rem is the root's size, so the root alone sets the scale of the page (#2135): two steps
    over the browser's own size (18px at its default), which the person's zoom still scales.
@@ -984,10 +985,6 @@ button.remove:hover { opacity: 1; }
 .new-heading .persona-choice p { white-space: normal; }
 .new-heading .persona-segments { flex-wrap: nowrap; }
 .new-heading .persona-segments button { flex: none; white-space: nowrap; }
-.segmented { display: inline-flex; background: var(--paper-raised); flex-wrap: wrap; justify-content: center; border: 1px solid var(--paper-rule); border-radius: 8px; overflow: hidden; }
-.segmented button { border: 0; border-radius: 0; background: none; padding: 4px 12px; font: inherit; font-size: 0.8125rem; color: inherit; cursor: pointer; }
-.segmented button + button { border-left: 1px solid var(--paper-rule); }
-.segmented button.on { background: var(--paper-selection); }
 .new-heading p { margin: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The Huddle (#987): the Blobs' eyes ease to where they look, and blink. */
 .new-heading .huddle { flex: none; margin-bottom: 10px; overflow: visible; }
@@ -1157,7 +1154,7 @@ button.remove:hover { opacity: 1; }
 .audit-sink p { flex-basis: 100%; margin: 0; }
 .audit-sinks-foot { display: flex; gap: 8px; }
 .reports-pane { display: flex; flex-direction: column; gap: 8px; }
-.reports-pane .segmented { align-self: flex-start; }
+.reports-pane .choice { align-self: flex-start; }
 .reports-head { display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .reports-export { display: inline-flex; gap: 6px; }
 .report-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
@@ -1193,7 +1190,6 @@ button.remove:hover { opacity: 1; }
 .sub-app .settings-body .settings-scope { margin-bottom: 20px; }
 .sub-app .settings-body .scope-head { font-size: 0.875rem; font-weight: 600; margin: 8px 8px 4px; }
 .sub-app-row { display: flex; justify-content: space-between; align-items: center; }
-.sub-app-count { font-size: 0.6875rem; font-weight: 600; padding: 0 6px; border-radius: 8px; background: var(--accent); color: var(--paper-ground); }
 .team-workflows { display: flex; flex-direction: column; gap: 12px; max-width: 720px; }
 .bot-card { border: 1px solid var(--paper-rule); border-radius: var(--radius-card); padding: 10px 12px; background: var(--paper-raised); }
 .bot-card h3 { margin: 0 0 2px; font-size: 0.875rem; }
@@ -1213,30 +1209,30 @@ button.remove:hover { opacity: 1; }
   background: var(--paper-sidebar); position: relative; }
 .nav-home { border: 0; background: none; font: inherit; font-weight: 700; color: inherit; cursor: pointer; padding: 4px 6px; white-space: nowrap; }
 .nav-items { display: flex; flex-wrap: wrap; gap: 2px; }
-.nav-item { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 6px; background: none; font: inherit;
-  color: inherit; padding: 4px 10px; cursor: pointer; }
-.nav-item.on { background: var(--paper-selection); font-weight: 600; }
 .nav-menu { margin-left: auto; }
 .nav-menu-button { border: 1px solid var(--paper-rule); border-radius: 6px; background: var(--paper-raised); font: inherit; color: inherit;
   padding: 4px 10px; display: inline-flex; gap: 6px; align-items: center; }
 .nav-menu-list { position: absolute; right: 8px; top: 100%; z-index: 20; display: flex; flex-direction: column; min-width: 200px;
   padding: 4px; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card);
   box-shadow: 0 6px 20px var(--paper-shadow); }
+/* Only the bar's: the sidebar's rows have a .nav-item of their own (Pins, approvals). */
+:is(.nav-bar, .nav-menu-list) .nav-item { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 6px; background: none;
+  font: inherit; color: inherit; padding: 4px 10px; cursor: pointer; }
 .nav-menu-list .nav-item { justify-content: space-between; padding: 8px 10px; }
+.nav-menu-list .nav-item.on { background: var(--paper-wash); font-weight: 600; }
 .sub-app .back { display: none; }
 @media (max-width: 759px) { .nav-bar .nav-items { display: none; } }
 /* The Overview (#2141): five cards in a grid. */
 .columns.overview-columns { grid-template-columns: minmax(0, 1fr); }
-.overview-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); margin-top: 8px; }
-.overview-card { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card);
-  padding: 12px 14px; background: var(--paper-raised); min-height: 180px; }
+.overview-card { display: flex; flex-direction: column; border: 1px solid var(--paper-rule); background: var(--paper-raised); min-height: 180px; }
 .overview-card h2 { font-size: 0.9375rem; margin: 0; }
 .overview-card p { margin: 0; }
-.overview-rows { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.overview-rows { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; flex: 1; }
 .overview-rows li { display: flex; flex-direction: column; gap: 1px; }
+.overview-grid { display: grid; margin-top: 8px; }
+.overview-links { display: flex; gap: 14px; }
+.overview-figure { font-weight: 700; }
 .overview-rows .link, .overview-links .link { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-align: left; }
-.overview-links { display: flex; gap: 14px; margin-top: auto; }
-.overview-figure { font-size: 1.75rem; font-weight: 700; }
 .overview .attention { color: var(--tint-attention); }
 /* Agents' filters and its pages at the sidebar's foot (#2141). */
 .agent-filters { display: flex; gap: 6px; padding: 4px 10px 2px; }
@@ -1248,21 +1244,12 @@ button.remove:hover { opacity: 1; }
 .usage-pane .column-head { display: none; }
 .usage-pane > .chat { display: block; border: 0; }
 .usage-pane > .chat .scroll { overflow: visible; }
-.columns.sub-app { grid-template-columns: 220px minmax(0, 1fr); }
-.sub-app-list { overflow-y: auto; padding: 4px 6px 8px; }
 .sub-app-group { display: flex; flex-direction: column; }
-.sub-app-group .section-head { opacity: 0.5; margin: 12px 8px 4px; }
-.sub-app-row { text-align: left; border: 0; border-radius: 6px; background: none; font: inherit; color: inherit; padding: 5px 10px; cursor: pointer; }
-.sub-app-row.on { background: var(--paper-selection); font-weight: 600; }
 .sub-app-row:disabled { opacity: 0.45; cursor: default; }
 .console-cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
 .console-card { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; border: 1px solid var(--paper-rule);
   border-radius: var(--radius-card); padding: 10px 12px; background: var(--paper-raised); }
 .fleet { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
-.console-table { border-collapse: collapse; width: 100%; font-size: 0.8125rem; }
-.console-table th { text-align: left; font-weight: 600; font-size: 0.6875rem; opacity: 0.6; padding: 6px 8px; border-bottom: 1px solid var(--paper-rule); }
-.console-table td { padding: 7px 8px; border-bottom: 1px solid var(--paper-rule); vertical-align: top; }
-.console-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 /* Console ▸ Projects (#2671): each project's folders, and its Rename… and Remove. */
 .console-projects ul { list-style: none; margin: 0; padding: 0; }
 .console-projects td.actions { white-space: nowrap; text-align: right; }
@@ -1609,7 +1596,7 @@ button.plain:hover { opacity: 1; }
 .connect-sheet ul.abilities li:first-child { border-top: 0; }
 .sign-in-code { padding: 10px 12px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .sign-in-code p { margin: 0 0 4px; }
-.connect-sheet .segmented { align-self: flex-start; margin-bottom: 8px; }
+.connect-sheet .button-group { align-self: flex-start; margin-bottom: 8px; }
 .connect-sheet .token-form { display: flex; flex-direction: column; gap: 6px; margin: 0 0 8px; }
 .connect-sheet .token-form label { display: flex; flex-direction: column; gap: 2px; font-size: 0.8125rem; }
 .connect-sheet .token-form .link { align-self: flex-start; }
@@ -1617,7 +1604,7 @@ button.plain:hover { opacity: 1; }
 
 /* The usage charts on Cost (#823), as Health draws them. */
 .usage-charts { margin-bottom: 24px; }
-.usage-charts .segmented { margin: 0 4px 8px 0; }
+.usage-charts .choice { margin: 0 4px 8px 0; }
 .usage-headline p { margin: 0; }
 .usage-figure { font-size: 1.75rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .usage-bars { width: 100%; height: auto; display: block; margin: 8px 0 12px; }

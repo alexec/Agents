@@ -14,6 +14,7 @@ import { fromWireDate } from "../protocol/dates";
 import { ago } from "../model/connectorSetup";
 import { missingWords, stateWords, versionWords } from "../model/capabilities";
 import { runtimeNameIn } from "./Reports";
+import { DataTable } from "./DataTable";
 import { BotsSection, PeopleSection } from "./People";
 import { GroupsSection } from "./Groups";
 import { ReportPolicyPage } from "./ConsolePolicy";
@@ -101,41 +102,35 @@ export function MachinesPage({ store, down }: { store: Store; down: boolean }) {
       {board.value && (
         <>
           <p class="quiet small">{fleetSummary(all, version)}</p>
-          <div class="segmented" role="radiogroup" aria-label="Show">
-            {fleetFilters.map((f) => (
-              <button key={f} role="radio" aria-checked={filter.value === f} class={filter.value === f ? "on" : ""}
-                onClick={() => { filter.value = f; }}>{fleetFilterTitle[f]} {fleetShown(all, f, version).length}</button>
-            ))}
+          <div class="table-tools">
+            <label class="select-label">State
+              <select value={filter.value} onChange={(e) => { filter.value = (e.target as HTMLSelectElement).value as FleetFilter; }}>
+                {fleetFilters.map((f) => <option key={f} value={f}>{fleetFilterTitle[f]} ({fleetShown(all, f, version).length})</option>)}
+              </select>
+            </label>
           </div>
-          {all.length === 0 ? <p class="hint">{noMachines}</p> : (
-            <table class="console-table">
-              <thead>
-                <tr><th>Machine</th><th>Owner</th><th>State</th><th>Version</th><th class="num">Running</th><th>Last listed</th></tr>
-              </thead>
-              <tbody>
-                {shown.map((m) => {
-                  const missing = missingWords(m.host, version);
-                  return (
-                    <tr key={m.host.id}>
-                      <td><span class="strong">{m.host.name}</span><br /><span class="quiet small">{kindWords(m)}</span></td>
-                      <td>{ownerWords(m)}</td>
-                      <td><span class={`fleet-state ${m.host.state}`}>{stateWords(m.host)}</span></td>
-                      <td title={missing ?? undefined}>
-                        {versionWords(m.host)}
-                        {outOfDate(m, version) && <><br /><span class="small attention">Out of date</span></>}
-                        {followsWords(m, policy.value?.policy, policy.value?.machines) !== null && (
-                          <><br /><span class={`small${m.host.capabilities?.includes("host.policy/1") ? " quiet" : " attention"}`}>
-                            {followsWords(m, policy.value?.policy, policy.value?.machines)}</span></>
-                        )}
-                      </td>
-                      <td class="num">{runningWords(m)}</td>
-                      <td class="quiet">{m.heardAt === undefined ? "—" : ago(fromWireDate(m.heardAt))}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
+          <DataTable id="machines" label="Machines" rows={shown} rowKey={(m) => m.host.id} order={{ column: "name", dir: "asc" }}
+            empty={all.length === 0 ? noMachines : "No machine is in this state."} columns={[
+              { id: "name", title: "Machine", sort: (m) => m.host.name,
+                cell: (m) => <><span class="strong">{m.host.name}</span><br /><span class="quiet small">{kindWords(m)}</span></> },
+              { id: "owner", title: "Owner", sort: ownerWords, cell: ownerWords },
+              { id: "state", title: "State", sort: (m) => stateWords(m.host),
+                cell: (m) => <span class={`fleet-state ${m.host.state}`}>{stateWords(m.host)}</span> },
+              { id: "version", title: "Version", sort: (m) => m.host.version, cell: (m) => {
+                const missing = missingWords(m.host, version);
+                const follows = followsWords(m, policy.value?.policy, policy.value?.machines);
+                return (
+                  <span title={missing ?? undefined}>
+                    {versionWords(m.host)}
+                    {outOfDate(m, version) && <><br /><span class="small attention">Out of date</span></>}
+                    {follows !== null && <><br /><span class={`small${m.host.capabilities?.includes("host.policy/1") ? " quiet" : " attention"}`}>{follows}</span></>}
+                  </span>
+                );
+              } },
+              { id: "running", title: "Running", num: true, first: "desc", sort: (m) => m.running, cell: runningWords },
+              { id: "heard", title: "Last listed", first: "desc", sort: (m) => m.heardAt,
+                cell: (m) => <span class="quiet">{m.heardAt === undefined ? "—" : ago(fromWireDate(m.heardAt))}</span> },
+            ]} />
           <p class="hint">{fleetFoot}</p>
         </>
       )}

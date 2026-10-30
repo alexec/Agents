@@ -7,6 +7,8 @@ import type { UsageBucket, UsageHistory } from "../protocol/generated";
 export type UsageRange = "D" | "W" | "M" | "3M";
 export type UsageMetric = "cost" | "tokens";
 export const usageRanges: readonly UsageRange[] = ["D", "W", "M", "3M"];
+/** Each range in words, in its Range select (#2142). */
+export const usageRangeWords: Record<UsageRange, string> = { D: "Day", W: "Week", M: "Month", "3M": "3 months" };
 
 export interface UsageBar { stamp: string; start: Date; value: number }
 export interface UsageShare { runtime: string; value: number }

@@ -9,6 +9,7 @@ import { failedWords } from "../model/console";
 import { describe } from "../model/errors";
 import { hostLabel } from "./NewFolder";
 import { projectFolders, projectOwner, projectsFoot, projectTaken, projectWords, removeQuestion, removeRefusal } from "../model/projects";
+import { DataTable } from "./DataTable";
 
 export function ProjectsPage({ store, down }: { store: Store; down: boolean }) {
   const projects = useSignal<Project[] | null>(null);
@@ -59,61 +60,52 @@ export function ProjectsPage({ store, down }: { store: Store; down: boolean }) {
       {problem.value && <p class="hint" role="alert">{problem.value}</p>}
       {!list && !problem.value && <p class="hint">Loading…</p>}
       {list && (list.length === 0 ? <p class="hint">No projects yet. Each folder added makes one of its own name.</p> : (
-        <table class="console-table">
-          <thead>
-            <tr><th>Project</th><th>Owner</th><th>Folders</th><th /></tr>
-          </thead>
-          <tbody>
-            {list.map((project) => {
+        <DataTable id="projects" label="Projects" rows={list} rowKey={(p) => p.id} order={{ column: "name", dir: "asc" }}
+          empty="No projects yet." columns={[
+            { id: "name", title: "Project", sort: (p) => p.name, cell: (project) => (
+              <>
+                {renaming.value?.id === project.id ? (
+                  <form onSubmit={(e) => { e.preventDefault(); rename(project); }}>
+                    <input type="text" aria-label={projectWords.namePrompt} value={name.value} autofocus autocomplete="off"
+                      onInput={(e) => (name.value = (e.currentTarget as HTMLInputElement).value)} />
+                    {projectTaken(name.value, list, project.id) && (
+                      <p class="small attention">There is already a project called {name.value.trim()}.</p>
+                    )}
+                  </form>
+                ) : <span class="strong">{project.name}</span>}
+                <br /><span class="quiet small">{project.id}</span>
+              </>
+            ) },
+            { id: "owner", title: "Owner", sort: (p) => projectOwner(p.owner, people), cell: (p) => projectOwner(p.owner, people) },
+            { id: "folders", title: "Folders", first: "desc", sort: (p) => p.folders.length, cell: (project) => (
+              project.folders.length === 0 ? <span class="quiet">None</span> : (
+                <ul>
+                  {projectFolders(project, (id) => hostLabel(store, id)).map(({ machine, folder }) => (
+                    <li key={`${folder.machine} ${folder.folder}`} title={folder.folder}>
+                      {folder.name} <span class="quiet small">on {machine}</span>
+                    </li>
+                  ))}
+                </ul>
+              )
+            ) },
+            { id: "actions", title: "", class: "actions", cell: (project) => {
               const refusal = removeRefusal(project);
-              const editing = renaming.value?.id === project.id;
-              return (
-                <tr key={project.id}>
-                  <td>
-                    {editing ? (
-                      <form onSubmit={(e) => { e.preventDefault(); rename(project); }}>
-                        <input type="text" aria-label={projectWords.namePrompt} value={name.value} autofocus autocomplete="off"
-                          onInput={(e) => (name.value = (e.currentTarget as HTMLInputElement).value)} />
-                        {projectTaken(name.value, list, project.id) && (
-                          <p class="small attention">There is already a project called {name.value.trim()}.</p>
-                        )}
-                      </form>
-                    ) : <span class="strong">{project.name}</span>}
-                    <br /><span class="quiet small">{project.id}</span>
-                  </td>
-                  <td>{projectOwner(project.owner, people)}</td>
-                  <td>
-                    {project.folders.length === 0 ? <span class="quiet">None</span> : (
-                      <ul>
-                        {projectFolders(project, (id) => hostLabel(store, id)).map(({ machine, folder }) => (
-                          <li key={`${folder.machine} ${folder.folder}`} title={folder.folder}>
-                            {folder.name} <span class="quiet small">on {machine}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </td>
-                  <td class="actions">
-                    {editing ? (
-                      <>
-                        <button type="button" disabled={busy.value} onClick={() => (renaming.value = null)}>Cancel</button>
-                        <button type="button" class="prominent" disabled={busy.value || !name.value.trim()}
-                          onClick={() => rename(project)}>Save</button>
-                      </>
-                    ) : project.mayChange && (
-                      <>
-                        <button type="button" disabled={busy.value || down}
-                          onClick={() => { name.value = project.name; renaming.value = project; }}>{projectWords.rename}</button>
-                        <button type="button" disabled={busy.value || down || refusal !== null} title={refusal ?? undefined}
-                          onClick={() => remove(project)}>{projectWords.remove}</button>
-                      </>
-                    )}
-                  </td>
-                </tr>
+              return renaming.value?.id === project.id ? (
+                <>
+                  <button type="button" disabled={busy.value} onClick={() => (renaming.value = null)}>Cancel</button>
+                  <button type="button" class="prominent" disabled={busy.value || !name.value.trim()}
+                    onClick={() => rename(project)}>Save</button>
+                </>
+              ) : project.mayChange && (
+                <>
+                  <button type="button" disabled={busy.value || down}
+                    onClick={() => { name.value = project.name; renaming.value = project; }}>{projectWords.rename}</button>
+                  <button type="button" disabled={busy.value || down || refusal !== null} title={refusal ?? undefined}
+                    onClick={() => remove(project)}>{projectWords.remove}</button>
+                </>
               );
-            })}
-          </tbody>
-        </table>
+            } },
+          ]} />
       ))}
       <p class="hint">{projectsFoot}</p>
     </div>

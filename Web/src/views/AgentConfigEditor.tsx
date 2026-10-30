@@ -164,7 +164,7 @@ export function ProjectAgentConfigModal({ store, host, folder, down, close }: {
   return <Modal label="Agent Configuration" close={close} keep={() => !mayLeave(unsaved)}>
     <div class="sheet-body agent-config-project">
       <h2>Agent Configuration</h2>
-      <div class="segmented" role="tablist" aria-label="Configuration files">
+      <div class="tabs" role="tablist" aria-label="Configuration files">
         {kinds.map((item) => <button type="button" key={item} role="tab" aria-selected={kind === item}
           class={kind === item ? "on" : ""} onClick={() => { if (item !== kind) leave(() => setKind(item)); }}>{title(item)}</button>)}
       </div>

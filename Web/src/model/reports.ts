@@ -10,7 +10,6 @@ export const dimensions: readonly ReportDimension[] = ["person", "project", "fol
 export const dimensionTitle: Record<ReportDimension, string> = { person: "Person", project: "Project", folder: "Folder", machine: "Machine", runtime: "Runtime", group: "Group",
   workflow: "Workflow" };
 export const ranges: readonly ReportRange[] = ["day", "week", "month", "threeMonths"];
-export const rangeShort: Record<ReportRange, string> = { day: "D", week: "W", month: "M", threeMonths: "3M" };
 /** The range's name as a screen reader says it: "D" alone means nothing (#2440). */
 export const rangeSpoken: Record<ReportRange, string> = { day: "Day", week: "Week", month: "Month", threeMonths: "3 months" };
 /** What Spend's bars measure (#2440). */

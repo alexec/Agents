@@ -9,6 +9,7 @@ import type { Store } from "../model/store";
 import type { LiveAgent, LiveBoard } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import { ago } from "../model/connectorSetup";
+import { DataTable } from "./DataTable";
 import { failedWords, liveCostWords, liveFoot, liveMachines, liveShortID, liveStateWords, liveStopLabel, liveStopQuestion, liveSummary,
   noLive } from "../model/console";
 
@@ -53,23 +54,23 @@ export function LiveNowPage({ store, down, runtimeName }: { store: Store; down: 
       {shown && shown.agents.length > 0 && (
         <>
           <p class="quiet small">{liveSummary(shown)}</p>
-          <table class="console-table">
-            <thead><tr><th>Agent</th><th>Whose</th><th>State</th><th>Running</th><th class="num">So far</th><th /></tr></thead>
-            <tbody>
-              {shown.agents.map((a) => (
-                <tr key={`${a.host} ${a.agent}`}>
-                  <td>{runtimeName(a.runtime)} <span class="quiet small live-id">{liveShortID(a)}</span>
-                    {a.workflow && <span class="quiet small"> · {a.workflow}</span>}</td>
-                  <td>{a.ownerName}<span class="quiet small"> · {a.hostName}</span></td>
-                  <td class={a.state === "waitingOnUser" ? "attention" : ""}>{liveStateWords(a)}</td>
-                  <td class="quiet">{a.since === undefined ? "—" : `started ${ago(fromWireDate(a.since))}`}</td>
-                  <td class="num">{liveCostWords(a.costToDate)}</td>
-                  <td><button type="button" disabled={down || stopping.value.has(a.agent)} aria-label={liveStopLabel(a, runtimeName(a.runtime))}
-                    onClick={() => { if (window.confirm(liveStopQuestion(a, runtimeName(a.runtime)))) void stop([a]); }}>Stop…</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable id="live" label="Live Now" rows={shown.agents} rowKey={(a) => `${a.host} ${a.agent}`}
+            order={{ column: "cost", dir: "desc" }} empty={noLive}
+            rowClass={(a) => a.state === "waitingOnUser" ? "attention-row" : undefined} columns={[
+              { id: "agent", title: "Agent", sort: (a) => runtimeName(a.runtime), cell: (a) => <>
+                {runtimeName(a.runtime)} <span class="quiet small live-id">{liveShortID(a)}</span>
+                {a.workflow && <span class="quiet small"> · {a.workflow}</span>}</> },
+              { id: "whose", title: "Whose", sort: (a) => a.ownerName, cell: (a) => a.bot ? `${a.ownerName} (bot)` : a.ownerName },
+              { id: "machine", title: "Machine", sort: (a) => a.hostName, cell: (a) => a.hostName },
+              { id: "state", title: "State", sort: liveStateWords,
+                cell: (a) => <span class={a.state === "waitingOnUser" ? "attention" : ""}>{liveStateWords(a)}</span> },
+              { id: "since", title: "Running", first: "desc", sort: (a) => a.since,
+                cell: (a) => <span class="quiet">{a.since === undefined ? "—" : `started ${ago(fromWireDate(a.since))}`}</span> },
+              { id: "cost", title: "So far", num: true, first: "desc", sort: (a) => Object.values(a.costToDate ?? {}).reduce((x, y) => x + y, 0), cell: (a) => liveCostWords(a.costToDate) },
+              { id: "stop", title: "", cell: (a) => (
+                <button type="button" disabled={down || stopping.value.has(a.agent)} aria-label={liveStopLabel(a, runtimeName(a.runtime))}
+                  onClick={() => { if (window.confirm(liveStopQuestion(a, runtimeName(a.runtime)))) void stop([a]); }}>Stop…</button>) },
+            ]} />
           {machines.some((m) => m.agents.length > 1) && (
             <ul class="request-list">
               {machines.filter((m) => m.agents.length > 1).map((m) => (

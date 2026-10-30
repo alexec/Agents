@@ -61,6 +61,7 @@ import { WorkingMark } from "./SessionRow";
 import { runningTool } from "../model/sidebar";
 import { composerReason } from "../model/orgPolicy";
 import { autoHeader, cellOf } from "../model/levels";
+import { PageTitle, chatCrumbs } from "./TopBar";
 
 /** One opened turn's entries, so an earlier page can be put in front and drawn again (#291). */
 interface HeldTurn {
@@ -550,11 +551,13 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           branchFrom={agent.state !== "archived" && !down && store.has(host, Capability.chatBranch1) ? (prompt) => void branchFromPrompt(store, host, agent, prompt.id, prompt.text) : undefined}
           branchNeedsUpdate={agent.state !== "archived" && !store.has(host, Capability.chatBranch1)} />
       )}
-      <header class="column-head">
+      <header class="column-head page-head">
         <BackToList />
-        {agent && store.renaming.value?.id === agent.id && store.renaming.value.inChat
-          ? <h1><RenameInput store={store} host={host} agent={agent} /></h1>
-          : <h1>{agent?.title ?? "New session"}</h1>}
+        <PageTitle parts={chatCrumbs(store, host, agent?.title ?? "New session")}>
+          {agent && store.renaming.value?.id === agent.id && store.renaming.value.inChat
+            ? <h1><RenameInput store={store} host={host} agent={agent} /></h1>
+            : <h1>{agent?.title ?? "New session"}</h1>}
+        </PageTitle>
         <span class="actions">
           <button class="wide-only" onClick={() => replace({ ...r, files: !r.files })} aria-pressed={!!r.files}>Files</button>
           <SessionButtons store={store} host={host} agent={agent} disabled={down} />

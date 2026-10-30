@@ -110,9 +110,6 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
   // What the folds filter by: the field's words once typing pauses, so a keystroke costs the
   // field and not a pass over every folder (#176, #193).
   const searched = useSignal("");
-  const confirming = useSignal(false);
-  // Why Forget This Browser did not forget it, under the confirm, as the Remote's (#935).
-  const forgetProblem = useSignal<string | null>(null);
   const r = route.value;
   // After a pause in the typing: the folds filter what is held, and the archived sessions that
   // match are the hosts' to find, a capped page each (#165).
@@ -254,22 +251,7 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
           <span>{browserName()} {onThisMac() ? "on this Mac" : "on the web"}</span>
           {/* The docs site (#1327), as the window's Help ▸ Agents Help. */}
           <a class="link" href={helpSite} target="_blank" rel="noopener">Help</a>
-          {/* What forgetting does, beside the confirm, in the Remote's words (#935). */}
-          {confirming.value ? (
-            <div class="forget" role="group" aria-label="Forget This Browser">
-              <p class="small">This browser is cut off at once, at home and away, until it is paired again.</p>
-              <span class="confirm">
-                <button onClick={() => {
-                  forgetProblem.value = null;
-                  void session.forgetThisBrowser().then((problem) => (forgetProblem.value = problem));
-                }}>Forget</button>
-                <button onClick={() => { confirming.value = false; forgetProblem.value = null; }}>Cancel</button>
-              </span>
-            </div>
-          ) : (
-            <button class="link" onClick={() => (confirming.value = true)}>Forget This Browser…</button>
-          )}
-          {forgetProblem.value && <p class="failure small" role="alert">{forgetProblem.value}</p>}
+          {/* Forget This Browser is in the person's menu, in the top bar (#2142). */}
         </div>
       </footer>
     </nav>

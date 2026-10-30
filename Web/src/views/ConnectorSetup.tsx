@@ -507,7 +507,7 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
           </div>
         </div>
         {provider === "gitlab" && (
-          <div class="segmented" role="radiogroup" aria-label="Connect with">
+          <div class="button-group" role="radiogroup" aria-label="Connect with">
             {([false, true] as const).map((t) => (
               <button key={String(t)} type="button" role="radio" aria-checked={withToken === t} class={withToken === t ? "on" : ""}
                 disabled={busy} onClick={() => { setWithToken(t); if (step.kind === "failed") setStep({ kind: "asking" }); }}>
