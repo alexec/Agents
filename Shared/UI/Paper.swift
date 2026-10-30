@@ -217,7 +217,40 @@ struct PaperButtonStyle<Outline: InsettableShape>: ButtonStyle {
             .background(configuration.isPressed ? Paper.wash : Paper.raised, in: outline)
             .overlay(outline.strokeBorder(Paper.rule, lineWidth: 1))
             .contentShape(outline)
+            .paperTapTarget()
             .opacity(isEnabled ? 1 : 0.4)
+    }
+}
+
+extension EnvironmentValues {
+    /// Set on a row of small round paper buttons (a prompt bar's) so that each takes a tap
+    /// of at least 44 pt on iOS, the HIG's minimum (#2897). The capsule is drawn at its
+    /// own 32 pt; the space around it takes the tap too. The Mac is clicked, so it is unchanged.
+    @Entry var paperTapTargets = false
+}
+
+extension View {
+    /// A tap area of at least 44 pt around the paper button, while `paperTapTargets` is set on iOS.
+    fileprivate func paperTapTarget() -> some View {
+        modifier(PaperTapTarget())
+    }
+}
+
+private struct PaperTapTarget: ViewModifier {
+    @Environment(\.paperTapTargets) private var isOn
+
+    func body(content: Content) -> some View {
+        #if os(iOS)
+        if isOn {
+            content
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
     }
 }
 
@@ -253,6 +286,7 @@ struct PaperProminentButtonStyle<Outline: InsettableShape>: ButtonStyle {
             .overlay(outline.strokeBorder(Paper.rule, lineWidth: 1))
             .opacity(isEnabled ? 1 : 0.4)
             .contentShape(outline)
+            .paperTapTarget()
     }
 }
 
