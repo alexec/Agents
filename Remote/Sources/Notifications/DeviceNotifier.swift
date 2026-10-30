@@ -16,8 +16,9 @@ import UserNotifications
 /// showing → withdraw. It decides nothing (FR-012).
 @MainActor
 final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
-    /// Open that agent's conversation, with the question in front of the person.
-    var open: @MainActor (UUID) -> Void = { _ in }
+    /// Open that agent's conversation, with the question in front of the person, or at a
+    /// notice's line (#2860) when the banner was one.
+    var open: @MainActor (UUID, UUID?) -> Void = { _, _ in }
     /// The same, from a pushed banner that names only the need.
     var openNeed: @MainActor (String) -> Void = { _ in }
     /// One of the banner's own buttons (#1170): the need's token, the answer, and the line
@@ -189,7 +190,7 @@ final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
         }
         Task { @MainActor in
             if let agentID {
-                open(agentID)
+                open(agentID, NeedID.noticeEntry(fromToken: token))
             } else if let token {
                 openNeed(token)
             }

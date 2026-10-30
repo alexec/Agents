@@ -669,6 +669,7 @@ export const ControlCapabilities: Readonly<Record<string, Capability>> = {
   "host/release": "host.update/1",
   "host/user": "bots/1",
   "host/userSettings": "user/1",
+  "notices/delivered": "notices/1",
   "relay/count": "relay/1",
   "relay/deliver": "relay/1",
   "relay/devices": "relay/1",

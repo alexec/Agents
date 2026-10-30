@@ -72,6 +72,13 @@ public enum NeedID: Hashable, Sendable, Codable {
         return false
     }
 
+    /// The line a notice's token names (#2860): a notice's id is its transcript entry's,
+    /// so a tap on its banner goes to the line where the agent called `notify`.
+    public static func noticeEntry(fromToken token: String?) -> UUID? {
+        guard let token, token.hasPrefix("notice:") else { return nil }
+        return UUID(uuidString: String(token.dropFirst("notice:".count)))
+    }
+
     /// The folder a guarded change's token names (#531), for a banner opened with no
     /// session behind it: its page is where the question is. Standardised as a folder's
     /// folder is, so `folder(_:)` finds it (#1367): a folder with a trailing slash is not

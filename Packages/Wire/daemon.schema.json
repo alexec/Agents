@@ -13258,6 +13258,50 @@
         "notice"
       ]
     },
+    "NoticeDelivered": {
+      "type": "object",
+      "description": "notices/delivered (#2860): the control plane sent a host's notice to one of the person's devices.",
+      "properties": {
+        "need": {
+          "$ref": "#/definitions/NeedID"
+        },
+        "to": {
+          "$ref": "#/definitions/NoticeDevice"
+        }
+      },
+      "required": [
+        "need",
+        "to"
+      ],
+      "additionalProperties": false
+    },
+    "NoticeDelivery": {
+      "type": "object",
+      "description": "Where the notice recorded as entry `notice` went (#2860), recorded after it once the host knows: when it sends it to the computer, or when the control plane says which device it sent it to. A client draws it on that notice's line.",
+      "properties": {
+        "notice": {
+          "$ref": "#/definitions/UUID"
+        },
+        "to": {
+          "$ref": "#/definitions/NoticeDevice"
+        }
+      },
+      "required": [
+        "notice",
+        "to"
+      ],
+      "additionalProperties": false
+    },
+    "NoticeDevice": {
+      "type": "string",
+      "enum": [
+        "computer",
+        "iPhone",
+        "iPad",
+        "device"
+      ],
+      "description": "Where a notice went (#2860): the computer (the Mac window or the web page, the \"mac\" surface), an iPhone, an iPad, or a device of a kind the control plane does not know."
+    },
     "NoticeLimits": {
       "type": "object",
       "description": "The person's attention (#2805, #2859): how many notices agents may send at once (burst, 1–20), and the minutes until one comes back (cooldownMinutes, 1–1440). The notifications part of the user settings, user/setNoticeLimits, and notices/take, which a host asks on its channel 0 before it posts a notice.",
@@ -19005,6 +19049,9 @@
         },
         "nextAt": {
           "$ref": "#/definitions/WireDate"
+        },
+        "to": {
+          "$ref": "#/definitions/NoticeDevice"
         }
       },
       "required": [
@@ -22660,6 +22707,27 @@
           },
           "required": [
             "notified"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "noticeDelivered": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/NoticeDelivery"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "noticeDelivered"
           ],
           "additionalProperties": false
         }

@@ -847,12 +847,12 @@ func (s *Service) heard(host string, params json.RawMessage) {
 	if owner := s.ownerOf(host); s.isBot(owner) {
 		for _, p := range s.records.People() {
 			if p.IsAdmin() {
-				s.deliver(need, false, p.ID)
+				s.deliver(need, false, p.ID, host)
 			}
 		}
 		return
 	}
-	s.deliver(need, false, s.ownerOf(host))
+	s.deliver(need, false, s.ownerOf(host), host)
 }
 
 // deliver posts a need through the relay host if it is held here. With none here but one
@@ -861,7 +861,8 @@ func (s *Service) heard(host string, params json.RawMessage) {
 // no other copy does, so a notice goes one way and arrives once.
 //
 // owner is the person whose devices it goes to; "" (from an older copy) is every device.
-func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool, owner string) {
+// host is the machine whose need it is, told where a notice went (#2860); "" from a peer.
+func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool, owner, host string) {
 	relays := []string{}
 	for _, r := range s.router.RelaysHeldHere() {
 		if owner == "" || s.ownerOf(r) == owner {
@@ -918,6 +919,10 @@ func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool, owner strin
 		}
 		devices = append(devices, d)
 	}
+	kinds := map[string]string{}
+	for _, d := range devices {
+		kinds[d.ID] = d.Kind
+	}
 	noDevice := need.Need != nil && !slices.ContainsFunc(devices, func(d notices.Device) bool { return d.MayNotify != nil && *d.MayNotify })
 	if noDevice {
 		needID, _ := json.Marshal(need.Need.ID)
@@ -934,6 +939,9 @@ func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool, owner strin
 			did = "withdrew"
 		}
 		needID, _ := json.Marshal(delivery.NeedID)
+		if delivery.Headline != nil && delivery.NeedID.Notice != nil && host != "" {
+			s.router.Tell(host, wire.NotifyNoticesDelivered.Name, wire.NoticeDelivered{Need: delivery.NeedID, To: noticeDevice(kinds[string(delivery.Device)])})
+		}
 		// A withdrawal goes the way its post went.
 		if relay == "" || s.pushes != nil && delivery.Headline == nil && s.pushes.pushedHere(delivery) {
 			s.pushes.deliver(delivery)
@@ -943,6 +951,17 @@ func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool, owner strin
 		s.router.Tell(relay, "relay/deliver", delivery)
 		s.log(fmt.Sprintf("notice: %s %s for %s to relay %s", did, needID, delivery.Device, relay))
 	}
+}
+
+// noticeDevice is a device's kind as a notice's line says it (#2860).
+func noticeDevice(kind string) wire.NoticeDevice {
+	switch kind {
+	case records.KindIPhone:
+		return wire.NoticeDeviceIPhone
+	case records.KindIPad:
+		return wire.NoticeDeviceIPad
+	}
+	return wire.NoticeDeviceDevice
 }
 
 // serveHTTP answers the TLS listener: the WebSocket at /v1/connect, the probes, and what

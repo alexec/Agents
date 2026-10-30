@@ -5760,6 +5760,28 @@ const NeedKindReport NeedKind = "report"
 const NeedKindGuardedChange NeedKind = "guardedChange"
 const NeedKindNotice NeedKind = "notice"
 
+// notices/delivered (#2860): the control plane sent a host's notice to one of the person's devices.
+type NoticeDelivered struct {
+	Need NeedID `json:"need"`
+
+	To NoticeDevice `json:"to"`
+}
+
+// Where the notice recorded as entry `notice` went (#2860), recorded after it once the host knows: when it sends it to the computer, or when the control plane says which device it sent it to. A client draws it on that notice's line.
+type NoticeDelivery struct {
+	Notice UUID `json:"notice"`
+
+	To NoticeDevice `json:"to"`
+}
+
+// Where a notice went (#2860): the computer (the Mac window or the web page, the "mac" surface), an iPhone, an iPad, or a device of a kind the control plane does not know.
+type NoticeDevice string
+
+const NoticeDeviceComputer NoticeDevice = "computer"
+const NoticeDeviceIPhone NoticeDevice = "iPhone"
+const NoticeDeviceIPad NoticeDevice = "iPad"
+const NoticeDeviceDevice NoticeDevice = "device"
+
 // The person's attention (#2805, #2859): how many notices agents may send at once (burst, 1–20), and the minutes until one comes back (cooldownMinutes, 1–1440). The notifications part of the user settings, user/setNoticeLimits, and notices/take, which a host asks on its channel 0 before it posts a notice.
 type NoticeLimits struct {
 	Burst int64 `json:"burst"`
@@ -8337,6 +8359,8 @@ type SentNotice struct {
 	Outcome NoticeOutcome `json:"outcome"`
 
 	NextAt *Date `json:"nextAt,omitzero"`
+
+	To *NoticeDevice `json:"to,omitzero"`
 }
 
 type ServedRequest struct {
@@ -9591,6 +9615,8 @@ type TranscriptEntryKind struct {
 
 	Notified *TranscriptEntryKindNotified `json:"notified,omitzero"`
 
+	NoticeDelivered *TranscriptEntryKindNoticeDelivered `json:"noticeDelivered,omitzero"`
+
 	// Unrecognised is a case this build does not know, written back as it was read.
 	Unrecognised JSONValue `json:"-"`
 }
@@ -9608,7 +9634,7 @@ func (v TranscriptEntryKind) MarshalJSON() ([]byte, error) {
 func (v *TranscriptEntryKind) UnmarshalJSON(b []byte) error {
 	type plain TranscriptEntryKind
 	var p plain
-	if err := json.Unmarshal(b, &p); err != nil || (p.UserMessage == nil && p.AgentMessage == nil && p.AgentThought == nil && p.ToolCall == nil && p.ToolCallUpdate == nil && p.PlanUpdated == nil && p.UsageRecorded == nil && p.ServedRequest == nil && p.ElicitationAsked == nil && p.ElicitationAnswered == nil && p.Compaction == nil && p.Notice == nil && p.PermissionAsked == nil && p.PermissionAnswered == nil && p.OptionChanged == nil && p.StateChanged == nil && p.Background == nil && p.WorkReported == nil && p.RuntimeNote == nil && p.PoolSwitch == nil && p.SandboxFailure == nil && p.Handoff == nil && p.SettingsChanged == nil && p.AppView == nil && p.FileShown == nil && p.Notified == nil) {
+	if err := json.Unmarshal(b, &p); err != nil || (p.UserMessage == nil && p.AgentMessage == nil && p.AgentThought == nil && p.ToolCall == nil && p.ToolCallUpdate == nil && p.PlanUpdated == nil && p.UsageRecorded == nil && p.ServedRequest == nil && p.ElicitationAsked == nil && p.ElicitationAnswered == nil && p.Compaction == nil && p.Notice == nil && p.PermissionAsked == nil && p.PermissionAnswered == nil && p.OptionChanged == nil && p.StateChanged == nil && p.Background == nil && p.WorkReported == nil && p.RuntimeNote == nil && p.PoolSwitch == nil && p.SandboxFailure == nil && p.Handoff == nil && p.SettingsChanged == nil && p.AppView == nil && p.FileShown == nil && p.Notified == nil && p.NoticeDelivered == nil) {
 		*v = TranscriptEntryKind{Unrecognised: append(JSONValue(nil), b...)}
 		return nil
 	}
@@ -9746,6 +9772,10 @@ type TranscriptEntryKindFileShown struct {
 
 type TranscriptEntryKindNotified struct {
 	Value SentNotice `json:"_0"`
+}
+
+type TranscriptEntryKindNoticeDelivered struct {
+	Value NoticeDelivery `json:"_0"`
 }
 
 type TranscriptPage struct {

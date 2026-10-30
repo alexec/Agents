@@ -119,6 +119,9 @@ struct TranscriptRowID: LayoutValueKey {
 struct TranscriptStack: Layout {
     /// Every row, top first, drawn or not.
     let ids: [UUID]
+    /// The rows' own places, as the geometry has them: a line in a turn says where it is in
+    /// these (#2860).
+    static let space = "transcriptRows"
     let geometry: TranscriptGeometry
     /// Changed to lay the rows out again when what holds them changed outside a pass.
     var pass = 0
