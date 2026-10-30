@@ -322,7 +322,7 @@ export function NewAgent({ store, host, folder, folderName, down }: {
     runtimeName: isAuto ? (autoPreview.value?.runtimeID ? runtimeNameOf(autoPreview.value.runtimeID) : undefined)
       : chosenRuntime ? runtimeNameOf(chosenRuntime) : undefined,
     chosen: (field) => isAuto ? levels.value[field]
-      : matchLevel(mappings, chosenRuntime ?? "", field, (id) => form.value.chosen[id] ?? form.value.options.find((o) => o.id === id)?.currentValue),
+      : matchLevel(mappings, chosenRuntime ?? "", field, (id) => form.value.chosen[id] ?? form.value.options.find((o) => o.id === id)?.currentValue, levels.value[field]),
     cell: (field, level) => cellOf(mappings, (isAuto ? autoPreview.value?.runtimeID : chosenRuntime) ?? "", field, level),
     choose: (field, level) => {
       levels.value = { ...levels.value, [field]: level };

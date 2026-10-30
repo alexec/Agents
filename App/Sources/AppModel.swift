@@ -2362,7 +2362,8 @@ final class AppModel {
             return field == .model ? draftLevels.model?.rawValue : draftLevels.permission?.rawValue
         }
         guard let runtimeID = draftRuntimeID else { return nil }
-        return LevelMatch.level(field, runtimeID: runtimeID, mappings: autoMappings) { id in
+        let chosen = field == .model ? draftLevels.model?.rawValue : draftLevels.permission?.rawValue
+        return LevelMatch.level(field, runtimeID: runtimeID, mappings: autoMappings, preferring: chosen) { id in
             self.draftChosen[id] ?? self.draftOptions.first { $0.id == id }?.currentValue
         }
     }

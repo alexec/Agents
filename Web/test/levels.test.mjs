@@ -36,3 +36,23 @@ for (const { name, input, expected } of cases("levels/words.json")) {
 for (const { name, input, expected } of cases("runtimes/auto-state.json")) {
   test(`levels: the Auto page's state, ${name} (#2890)`, () => assert.equal(l.unavailableState(input) ?? "Available", expected));
 }
+
+// Codex has no bypass mode: Bypass Permissions is Approve for me's options, nearest safer (#2893).
+const codex = { cells: [
+  { runtimeID: "codex", field: "permission", level: "approveForMe", words: "Default", mark: "autoMapped", native: { options: { mode: "auto" } } },
+  { runtimeID: "codex", field: "permission", level: "bypassPermissions", words: "Default", mark: "nearestSafer",
+    note: "nearest safer: no mode past Approve for me", native: { options: { mode: "auto" } } },
+] };
+const value = (id) => (id === "mode" ? "auto" : undefined);
+
+test("levels: the chosen value stays ticked when another sets the same options (#2893)", () => {
+  assert.equal(l.matchLevel(codex, "codex", "permission", value), "approveForMe");
+  assert.equal(l.matchLevel(codex, "codex", "permission", value, "bypassPermissions"), "bypassPermissions");
+  assert.equal(l.matchLevel(codex, "codex", "permission", value, "ask"), "approveForMe");
+});
+
+test("levels: a nearest safer value's line says why (#2893)", () => {
+  assert.equal(l.cellLine(codex.cells[1], "Codex"), "Default on Codex · nearest safer: no mode past Approve for me");
+  assert.equal(l.cellLine(codex.cells[0], "Codex"), "Default on Codex");
+  assert.equal(l.cellLine({ ...codex.cells[0], mark: "notPossible", note: "no such mode" }, "Codex"), "Not possible: no such mode");
+});
