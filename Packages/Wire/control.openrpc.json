@@ -15,6 +15,11 @@
       "name": "client.team/1",
       "by": "client",
       "description": "A client knows it belongs to one person of a team (#994, #1763). On a control plane with more than one person, the control plane answers a client without it -32074 updateToJoinTeam (R14)."
+    },
+    {
+      "name": "machine/1",
+      "by": "control",
+      "description": "The control plane answers each host/* method as machine/* too, and a hosts/* method as machines/*, which machines/1 names (#2653). A step of the rename over three releases: the names in this document stay host/* and hosts/* until the senders move."
     }
   ],
   "methods": [

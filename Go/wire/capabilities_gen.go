@@ -72,6 +72,7 @@ const CapLineage1 = "lineage/1"
 const CapLinks1 = "links/1"
 const CapLiveactivity1 = "liveactivity/1"
 const CapMac1 = "mac/1"
+const CapMachine1 = "machine/1"
 const CapMachines1 = "machines/1"
 const CapMailbox1 = "mailbox/1"
 const CapMarketplaces1 = "marketplaces/1"
@@ -801,6 +802,9 @@ var DeclaredCapabilities = map[string][]string{
 	"client": {
 		"client.wire/1",
 		"client.team/1",
+	},
+	"control": {
+		"machine/1",
 	},
 	"host": {
 		"host.wire/1",

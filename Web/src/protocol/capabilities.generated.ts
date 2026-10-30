@@ -73,6 +73,7 @@ export const Capability = {
   links1: "links/1",
   liveactivity1: "liveactivity/1",
   mac1: "mac/1",
+  machine1: "machine/1",
   machines1: "machines/1",
   mailbox1: "mailbox/1",
   marketplaces1: "marketplaces/1",
@@ -704,6 +705,9 @@ export const DeclaredCapabilities: Readonly<Record<string, readonly Capability[]
   client: [
     "client.wire/1",
     "client.team/1",
+  ],
+  control: [
+    "machine/1",
   ],
   host: [
     "host.wire/1",

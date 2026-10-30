@@ -52,6 +52,10 @@ A conflict in a generated file is settled by running `gen` again, never by hand.
 - **`x-capability`** on each method and notification names its capability, `<name>/<n>`
   (#1748, `docs/explanation/versions.md`). A method added for a new feature takes the feature's
   name (`chat.branch/1`); the generator refuses a method without one.
+- **`host/*` and `hosts/*` become `machine/*` and `machines/*` (#2653).** The documents keep
+  the old names for now. The control plane and `agentsd` accept the new names too
+  (`wire.OldMethodName`, where they decode a message), and the control plane says
+  `machine/1`. The next release moves the senders; the one after removes the old names.
 - **Numbers.** `integer` is Swift's `Int` (Go `int64`); `number` is `Double` (Go `float64`).
 - **The five meaning-types,** written by hand in each language and named by `x-swift-type`
   and `x-go-type` (Go's are in `Go/wire/meaning.go`):

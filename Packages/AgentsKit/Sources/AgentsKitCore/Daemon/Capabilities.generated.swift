@@ -73,6 +73,7 @@ public enum Capability {
     public static let links1 = "links/1"
     public static let liveactivity1 = "liveactivity/1"
     public static let mac1 = "mac/1"
+    public static let machine1 = "machine/1"
     public static let machines1 = "machines/1"
     public static let mailbox1 = "mailbox/1"
     public static let marketplaces1 = "marketplaces/1"
@@ -701,6 +702,9 @@ public enum Capability {
         "client": [
             "client.wire/1",
             "client.team/1",
+        ],
+        "control": [
+            "machine/1",
         ],
         "host": [
             "host.wire/1",
