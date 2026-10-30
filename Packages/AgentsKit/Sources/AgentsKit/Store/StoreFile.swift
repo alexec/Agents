@@ -101,42 +101,13 @@ enum StoreFile {
         return empty
     }
 
-    /// A list read one element at a time (`Lossy`): one bad entry costs that entry, not
-    /// the list. When any is dropped, the whole file is first copied aside and the
-    /// readable ones written back, so what was dropped is kept and the file is clean; a
-    /// file that is not a list at all is set aside.
-    static func loadList<Element: Codable>(_ type: Element.Type, at url: URL,
-                                           encoder: JSONEncoder = StoreCoding.encoder,
-                                           decoder: JSONDecoder = StoreCoding.decoder,
-                                           meaning: String) -> [Element] {
-        switch read([Lossy<Element>].self, at: url, decoder: decoder, meaning: meaning) {
-        case .missing, .unreadable: return []
-        case .read(let entries):
-            let kept = entries.compactMap(\.value)
-            guard kept.count < entries.count else { return kept }
-            if let aside = StoreCoding.setAside(url, copy: true) {
-                do {
-                    try write(try encoder.encode(kept), to: url)
-                    DaemonLog.shared.write("store: \(entries.count - kept.count) of \(entries.count) entries in \(url.lastPathComponent) could not be read; the whole file is kept as \(aside.lastPathComponent)")
-                } catch {
-                    DaemonLog.shared.write("store: \(entries.count - kept.count) entries in \(url.lastPathComponent) could not be read; kept as \(aside.lastPathComponent), and the readable ones could not be written back: \(error)")
-                }
-                SetAsideNotes.shared.add(url, aside: aside, partly: true)
-            } else {
-                DaemonLog.shared.write("store: \(entries.count - kept.count) entries in \(url.lastPathComponent) could not be read, and it could not be copied aside")
-            }
-            return kept
-        }
-    }
-
-    /// Move an unreadable `url` aside, log it, and keep the note. `meaning` finishes the
-    /// log line: what the store carries on as ("starting with no devices").
+    /// Move an unreadable `url` aside and log it. `meaning` finishes the log
+    /// line: what the store carries on as ("starting with no devices").
     @discardableResult
     static func setAside(_ url: URL, meaning: String) -> URL? {
         let aside = StoreCoding.setAside(url)
         if let aside {
             DaemonLog.shared.write("store: \(url.lastPathComponent) could not be read; set aside as \(aside.lastPathComponent), \(meaning)")
-            SetAsideNotes.shared.add(url, aside: aside)
         } else if FileManager.default.fileExists(atPath: url.path) {
             DaemonLog.shared.write("store: \(url.lastPathComponent) could not be read nor moved aside; left as it is, \(meaning)")
             hold(url, forRun: true, because: "it could not be moved aside", meaning: meaning)
@@ -158,10 +129,8 @@ enum StoreFile {
         StoreHolds.shared.hold(url, forRun: false)
         if let aside {
             DaemonLog.shared.write("store: \(url.path) could not be read; a copy is kept as \(aside.path), and nothing is written to it until it reads again; \(meaning)")
-            SetAsideNotes.shared.add(url, sentence: "\(url.lastPathComponent) could not be read, so it is left as it is and nothing is written to it until it is fixed; a copy is kept as \(aside.lastPathComponent).")
         } else {
             DaemonLog.shared.write("store: \(url.path) could not be read nor copied; nothing is written to it until it reads again; \(meaning)")
-            SetAsideNotes.shared.add(url, sentence: "\(url.lastPathComponent) could not be read, so it is left as it is and nothing is written to it until it is fixed.")
         }
         return aside
     }
@@ -169,7 +138,6 @@ enum StoreFile {
     private static func hold(_ url: URL, forRun: Bool, because why: String, meaning: String) {
         guard StoreHolds.shared.hold(url, forRun: forRun) else { return }
         DaemonLog.shared.write("store: \(url.lastPathComponent) could not be read (\(why)); left where it is and held: nothing is written to it this run, \(meaning)")
-        SetAsideNotes.shared.add(url, sentence: "\(url.lastPathComponent) could not be read (\(why)), so it is left as it is and nothing is written to it until Agents restarts.")
     }
 
     /// Write `data` to `url` whole and synced, unless it is held.
@@ -200,73 +168,14 @@ final class StoreHolds: @unchecked Sendable {
     /// A read that worked lets a folder's file be written again.
     func released(_ url: URL, unlessForRun: Bool) {
         let key = url.standardizedFileURL.path
-        let released: Bool = lock.withLock {
-            guard let forRun = held[key], !(forRun && unlessForRun) else { return false }
+        lock.withLock {
+            guard let forRun = held[key], !(forRun && unlessForRun) else { return }
             held[key] = nil
-            return true
         }
-        if released { SetAsideNotes.shared.clear(url) }
     }
 
     /// Nil when it may be written; otherwise whether it is held until a restart.
     func isHeld(_ url: URL) -> Bool? {
         lock.withLock { held[url.standardizedFileURL.path] }
-    }
-}
-
-/// The files set aside in this run, so a page that shows a store can say its file was
-/// set aside. Kept in memory only: the log keeps the lasting record, and the
-/// `.corrupt-` file itself stays beside the store until the person removes it.
-final class SetAsideNotes: @unchecked Sendable {
-    static let shared = SetAsideNotes()
-    private let lock = NSLock()
-    private var notes: [String: String] = [:]
-    /// Told after a note is added or cleared, so the daemon can tell its windows (#205).
-    private var watchers: [UUID: @Sendable () -> Void] = [:]
-
-    @discardableResult
-    func watch(_ changed: @escaping @Sendable () -> Void) -> UUID {
-        let id = UUID()
-        lock.withLock { watchers[id] = changed }
-        return id
-    }
-
-    func unwatch(_ id: UUID) {
-        _ = lock.withLock { watchers.removeValue(forKey: id) }
-    }
-
-    private func changed() {
-        for watcher in lock.withLock({ Array(watchers.values) }) { watcher() }
-    }
-
-    func add(_ url: URL, aside: URL, partly: Bool = false) {
-        add(url, sentence: partly
-            ? "Some of \(url.lastPathComponent) could not be read; the whole file was kept as \(aside.lastPathComponent)."
-            : "\(url.lastPathComponent) could not be read, so it was set aside as \(aside.lastPathComponent) and started afresh.")
-    }
-
-    func add(_ url: URL, sentence: String) {
-        let new = lock.withLock { () -> Bool in
-            let key = url.standardizedFileURL.path
-            defer { notes[key] = sentence }
-            return notes[key] != sentence
-        }
-        if new { changed() }
-    }
-
-    func clear(_ url: URL) {
-        let removed = lock.withLock { notes.removeValue(forKey: url.standardizedFileURL.path) }
-        if removed != nil { changed() }
-    }
-
-    /// What to say where the store at `url` shows, or nil when it was read.
-    func note(for url: URL) -> String? {
-        lock.withLock { notes[url.standardizedFileURL.path] }
-    }
-
-    /// Every note for files under `folder`, oldest path first.
-    func notes(under folder: URL) -> [String] {
-        let prefix = folder.standardizedFileURL.path + "/"
-        return lock.withLock { notes.filter { $0.key.hasPrefix(prefix) }.sorted { $0.key < $1.key }.map(\.value) }
     }
 }

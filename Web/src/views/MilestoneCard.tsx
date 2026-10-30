@@ -2,7 +2,7 @@
 // iPad's MilestoneCard, at the bottom right until closed or opened; See Milestones opens their page
 // (#1067). Apart from Milestones.tsx so the pages do not load the router.
 import { type MilestoneID, milestoneList, milestonesSeen } from "../model/milestones";
-import { go, route } from "../route";
+import { go } from "../route";
 import type { Store } from "../model/store";
 
 /** The one-time card for a milestone just earned on this Mac's host. No notification is sent. */
@@ -23,7 +23,7 @@ export function MilestoneCard({ store }: { store: Store }) {
         </span>
         <button class="link close" aria-label="Dismiss milestone" title="Dismiss" onClick={() => dismiss(id)}>✕</button>
       </div>
-      <button class="link small" onClick={() => { dismiss(id); go({ ...route.peek(), activity: "milestones", settings: undefined }); }}>
+      <button class="link small" onClick={() => { dismiss(id); go({ nav: "reports", section: "milestones" }); }}>
         See Milestones
       </button>
     </aside>

@@ -182,6 +182,25 @@ func TestAForgottenWindowIsCutOff(t *testing.T) {
 	}
 }
 
+// machine/clients is host/clients under its new name (#2653): a window it leaves out is cut
+// off as well.
+func TestMachineClientsIsHostClients(t *testing.T) {
+	root := t.TempDir()
+	d, _ := start(t, root)
+	w, listed := newWindow(t)
+	d.SetLocalClients(wire.MachineClients{Clients: []wire.MachineClient{listed}})
+	path := serveLocal(t, d, RoleWindow)
+	c, r, reply := prove(t, path, w)
+	if reply.OK == nil {
+		t.Fatalf("%+v", reply)
+	}
+	d.Told("machine/clients", []byte(`{"clients":[]}`))
+	c.SetDeadline(time.Now().Add(5 * time.Second))
+	if _, err := r.ReadString('\n'); err == nil {
+		t.Fatal("a window left out of machine/clients is still connected")
+	}
+}
+
 // control-clients.json is written only when host/clients changes, not on every notice
 // (#1528), and a host that starts with the same list kept does not write it again.
 func TestTheLocalClientsFileIsWrittenOnlyWhenItChanges(t *testing.T) {

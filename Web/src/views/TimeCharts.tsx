@@ -3,10 +3,11 @@
 // bars, and a bar picked to read its own figures. The bars are worked out in model/time.ts.
 import { useSignal } from "@preact/signals";
 import type { TimeHistory } from "../protocol/generated";
-import { usageRanges, type UsageRange } from "../model/usage";
+import { usageRanges, usageRangeWords, type UsageRange } from "../model/usage";
 import {
   type TimeBar, type TimeKind, timeChart, timeKinds, timeKindTitles, timePercent, timeTotal, timeWords,
 } from "../model/time";
+import { Choice } from "./Choice";
 
 const width = 600;
 const height = 200;
@@ -27,12 +28,7 @@ export function TimeCharts({ history, runtimeName }: { history: TimeHistory | un
 
   return (
     <section class="usage-charts time-charts">
-      <div class="segmented" role="radiogroup" aria-label="Range">
-        {usageRanges.map((r) => (
-          <button key={r} role="radio" aria-checked={range.value === r} class={range.value === r ? "on" : ""}
-            onClick={() => choose(r)}>{r}</button>
-        ))}
-      </div>
+      <Choice label="Range" value={range.value} options={usageRanges.map((r) => [r, usageRangeWords[r]] as const)} onPick={(r) => choose(r)} />
       <div class="usage-headline">
         <p class="quiet small strong">{(bar ? "Total" : chart.range === "D" ? "Total" : "Daily average").toUpperCase()}</p>
         <p class="usage-figure">{timeWords(bar?.total ?? chart.average)}</p>

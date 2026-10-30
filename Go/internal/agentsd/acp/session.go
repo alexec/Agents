@@ -271,11 +271,13 @@ func (s *Session) SupportsSteering() bool {
 	return supported
 }
 
-// SupportsSystemPrompt reports the draft ACP session system-prompt capability.
+// SupportsSystemPrompt reports whether initialize advertised a session system prompt: the
+// draft ACP sessionCapabilities.systemPrompt, or Antigravity's
+// agentCapabilities._meta.antigravity.systemPrompt.append (agy_acp_server 1.4.5, #2613).
 func (s *Session) SupportsSystemPrompt() bool {
 	s.client.mu.Lock()
 	defer s.client.mu.Unlock()
-	return s.client.supportsSystemPrompt
+	return s.client.supportsSystemPrompt || s.client.antigravitySystemPrompt
 }
 
 // Steer puts words into the running turn (ACPSession.steer), always with idleBehavior
@@ -335,6 +337,10 @@ type client struct {
 	// advertised the draft ACP sessionCapabilities.systemPrompt field.
 	systemPrompt         string
 	supportsSystemPrompt bool
+	// antigravitySystemPrompt is Antigravity's own advertised route, used only without the
+	// draft ACP one: _meta.antigravity.systemPrompt.append on each lifecycle request. The
+	// runtime keeps it only for the life of its process, so load and resume send it again.
+	antigravitySystemPrompt bool
 	// env is the runtime's own environment (environment, runtimes.go), which its
 	// terminals get too: never the daemon's whole one.
 	env       []string
@@ -528,6 +534,13 @@ func (e *rawElicitations) capabilities(line []byte) {
 		Result struct {
 			AgentCapabilities *struct {
 				SessionCapabilities map[string]json.RawMessage `json:"sessionCapabilities"`
+				Meta                struct {
+					Antigravity struct {
+						SystemPrompt struct {
+							Append bool `json:"append"`
+						} `json:"systemPrompt"`
+					} `json:"antigravity"`
+				} `json:"_meta"`
 			} `json:"agentCapabilities"`
 		} `json:"result"`
 	}
@@ -535,6 +548,11 @@ func (e *rawElicitations) capabilities(line []byte) {
 		return
 	}
 	e.handshook = true
+	if response.Result.AgentCapabilities.Meta.Antigravity.SystemPrompt.Append {
+		e.c.mu.Lock()
+		e.c.antigravitySystemPrompt = true
+		e.c.mu.Unlock()
+	}
 	if raw, ok := response.Result.AgentCapabilities.SessionCapabilities["systemPrompt"]; ok {
 		var capability map[string]json.RawMessage
 		if json.Unmarshal(raw, &capability) == nil && capability != nil {
@@ -545,8 +563,9 @@ func (e *rawElicitations) capabilities(line []byte) {
 	}
 }
 
-// sessionPromptWriter adds standard ACP systemPrompt fields to the lifecycle calls. This
-// keeps the draft protocol field out of the pinned SDK's generated request structs.
+// sessionPromptWriter adds standard ACP systemPrompt fields to the lifecycle calls, or
+// Antigravity's _meta.antigravity.systemPrompt where only that is advertised. This keeps
+// the draft protocol field out of the pinned SDK's generated request structs.
 type sessionPromptWriter struct {
 	w   io.Writer
 	c   *client
@@ -581,9 +600,9 @@ func (w *sessionPromptWriter) Write(p []byte) (int, error) {
 
 func (w *sessionPromptWriter) inject(line []byte) []byte {
 	w.c.mu.Lock()
-	brief, supported := w.c.systemPrompt, w.c.supportsSystemPrompt
+	brief, standard, antigravity := w.c.systemPrompt, w.c.supportsSystemPrompt, w.c.antigravitySystemPrompt
 	w.c.mu.Unlock()
-	if !supported || brief == "" || !isSessionLifecycle(line) {
+	if !(standard || antigravity) || brief == "" || !isSessionLifecycle(line) {
 		return line
 	}
 	var message map[string]any
@@ -598,7 +617,21 @@ func (w *sessionPromptWriter) inject(line []byte) []byte {
 	if !ok {
 		return line
 	}
-	params["systemPrompt"] = map[string]any{"mode": "append", "content": []any{map[string]any{"type": "text", "text": brief}}}
+	if standard {
+		params["systemPrompt"] = map[string]any{"mode": "append", "content": []any{map[string]any{"type": "text", "text": brief}}}
+	} else {
+		meta, _ := params["_meta"].(map[string]any)
+		if meta == nil {
+			meta = map[string]any{}
+		}
+		own, _ := meta["antigravity"].(map[string]any)
+		if own == nil {
+			own = map[string]any{}
+		}
+		own["systemPrompt"] = map[string]any{"append": brief}
+		meta["antigravity"] = own
+		params["_meta"] = meta
+	}
 	out, err := json.Marshal(message)
 	if err != nil {
 		return line

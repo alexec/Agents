@@ -799,6 +799,124 @@
     "count": 7,
     "format": "jsonl"
   },
+  "ReportValue": {
+    "range": "month",
+    "scope": {
+      "kind": "me"
+    },
+    "total": {
+      "cost": {
+        "USD": 4.5
+      },
+      "inputTokens": 7,
+      "outputTokens": 7,
+      "limitTokens": 7,
+      "turns": 1.5,
+      "workingSeconds": 60,
+      "waitingSeconds": 30
+    },
+    "waste": {
+      "cost": {
+        "USD": 4.5
+      },
+      "inputTokens": 7,
+      "outputTokens": 7,
+      "limitTokens": 7,
+      "turns": 1.5,
+      "workingSeconds": 60,
+      "waitingSeconds": 30
+    },
+    "unlinked": {
+      "cost": {
+        "USD": 4.5
+      },
+      "inputTokens": 7,
+      "outputTokens": 7,
+      "limitTokens": 7,
+      "turns": 1.5,
+      "workingSeconds": 60,
+      "waitingSeconds": 30
+    },
+    "perMergedPR": {
+      "USD": 4.5
+    },
+    "prsMerged": 1,
+    "prsClosed": 1,
+    "prsReverted": 0,
+    "failedChecks": 2,
+    "leadTimeSeconds": 3600,
+    "issues": [
+      {
+        "node": {
+          "kind": "issue",
+          "ref": "github:alexec/agents#12"
+        },
+        "total": {
+          "cost": {
+            "USD": 4.5
+          },
+          "inputTokens": 7,
+          "outputTokens": 7,
+          "limitTokens": 7,
+          "turns": 1.5,
+          "workingSeconds": 60,
+          "waitingSeconds": 30
+        },
+        "waste": {
+          "cost": {
+            "USD": 4.5
+          },
+          "inputTokens": 7,
+          "outputTokens": 7,
+          "limitTokens": 7,
+          "turns": 1.5,
+          "workingSeconds": 60,
+          "waitingSeconds": 30
+        },
+        "prsMerged": 1,
+        "prsClosed": 1,
+        "prsReverted": 0,
+        "failedChecks": 2,
+        "leadTimeSeconds": 3600
+      }
+    ],
+    "milestones": [
+      {
+        "node": {
+          "kind": "issue",
+          "ref": "github:alexec/agents#12"
+        },
+        "total": {
+          "cost": {
+            "USD": 4.5
+          },
+          "inputTokens": 7,
+          "outputTokens": 7,
+          "limitTokens": 7,
+          "turns": 1.5,
+          "workingSeconds": 60,
+          "waitingSeconds": 30
+        },
+        "waste": {
+          "cost": {
+            "USD": 4.5
+          },
+          "inputTokens": 7,
+          "outputTokens": 7,
+          "limitTokens": 7,
+          "turns": 1.5,
+          "workingSeconds": 60,
+          "waitingSeconds": 30
+        },
+        "prsMerged": 1,
+        "prsClosed": 1,
+        "prsReverted": 0,
+        "failedChecks": 2,
+        "leadTimeSeconds": 3600
+      }
+    ],
+    "limited": true
+  },
   "UserSettings": {
     "mcpServers": {
       "github": {
@@ -970,5 +1088,28 @@
   "SignInDecided": {
     "request": "request",
     "result": "approved"
+  },
+  "FeatureUsage": {
+    "days": 90,
+    "since": "2026-08-02",
+    "features": [
+      {
+        "method": "workflows/run",
+        "week": 0,
+        "quarter": 0,
+        "clients": []
+      },
+      {
+        "method": "sessions/start",
+        "week": 7,
+        "quarter": 30,
+        "clients": [
+          "agent",
+          "mac",
+          "web"
+        ],
+        "lastUsed": "2026-10-30"
+      }
+    ]
   }
 }

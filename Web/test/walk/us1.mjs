@@ -76,6 +76,8 @@ await a.shot(`${out}/us1-5-forgotten.png`);
 // Scenario 6: paired again, then Forget This Browser… in the page.
 await pairIn(a, await newCode());
 await a.waitFor(`document.body.innerText.includes("on this Mac")`);
+// In the person's menu, in the top bar, since #2142.
+await a.eval(`document.querySelector(".person-button").click()`);
 await a.press("Forget This Browser…");
 await a.shot(`${out}/us1-6-confirm.png`);
 await a.press("Forget");

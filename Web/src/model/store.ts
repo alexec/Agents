@@ -15,7 +15,7 @@ import type {
   GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
-  PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, RemoveRequest, ClientPermissionSettings } from "../protocol/generated";
+  PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, RemoveRequest, ClientPermissionSettings, PRCostComment } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
@@ -2055,6 +2055,9 @@ export class Store extends Work {
   /** Auto (#2658): the person's order, Include switches and own cells, and every cell, by host. */
   readonly autoSettings = signal<Record<string, AutoSettings>>({});
   readonly autoMappings = signal<Record<string, AutoMappings>>({});
+  /** Why the last load of a host's Auto cells failed (#2894); cleared when one starts. */
+  readonly autoProblems = signal<Record<string, string>>({});
+  private readonly autoLoading = new Set<string>();
   /** Each host's mark while the organisation requires the sandbox (SandboxSettings.setBy, #998). */
   readonly sandboxSetBy = signal<Record<string, PolicySetBy>>({});
   /** The Mac-wide permission choice for Cursor, Grok and OpenCode (061). */
@@ -2313,6 +2316,12 @@ export class Store extends Work {
     this.upsertFolder(summary, host);
   }
 
+  /** What a folder's merged pull requests say of their cost (#2352). Throws a refusal. */
+  async setFolderPRCostComment(host: string, folder: string, prCostComment: PRCostComment): Promise<void> {
+    const summary = await this.link.call("folders/setPRCostComment", { folder: folder as never, prCostComment }, host);
+    this.upsertFolder(summary, host);
+  }
+
   /** A folder pinned to the top of the sidebar, or not, as the window's Pin and Unpin. */
   async setFolderPinned(host: string, folder: string, pinned: boolean): Promise<void> {
     const summary = await this.act("folders/setPinned", { folder: folder as never, pinned }, host);
@@ -2365,15 +2374,29 @@ export class Store extends Work {
 
   /** Set the Mac-wide permission choice, even when this chat belongs to a server. */
   /** Auto's settings and every cell on a host (#2658); an older host has none. */
+  /** One load at a time per host: the Auto page asks on each draw until the cells come. */
   async loadAuto(host: string): Promise<void> {
-    const [settings, mappings] = await Promise.all([
-      this.link.call("auto/state", {}, host).catch(() => null),
-      this.link.call("auto/mappings", {}, host).catch(() => null),
-    ]);
-    batch(() => {
-      if (settings) this.autoSettings.value = { ...this.autoSettings.value, [host]: settings };
-      if (mappings) this.autoMappings.value = { ...this.autoMappings.value, [host]: mappings };
-    });
+    if (this.autoLoading.has(host)) return;
+    this.autoLoading.add(host);
+    const { [host]: _, ...others } = this.autoProblems.value;
+    this.autoProblems.value = others;
+    let problem: string | undefined;
+    try {
+      const [settings, mappings] = await Promise.all([
+        this.link.call("auto/state", {}, host).catch(() => null),
+        this.link.call("auto/mappings", {}, host).catch((error: unknown) => {
+          problem = describe(error);
+          return null;
+        }),
+      ]);
+      batch(() => {
+        if (settings) this.autoSettings.value = { ...this.autoSettings.value, [host]: settings };
+        if (mappings) this.autoMappings.value = { ...this.autoMappings.value, [host]: mappings };
+        if (problem) this.autoProblems.value = { ...this.autoProblems.value, [host]: problem };
+      });
+    } finally {
+      this.autoLoading.delete(host);
+    }
   }
 
   /** Save Auto's settings on the Mac's host, which the Mac sends on to its machines (FR-017). */

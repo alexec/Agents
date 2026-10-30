@@ -30,7 +30,8 @@
 # account file (an empty one): it uses the key as its own service account.
 #
 # --apns gives the APNs key (deploy/make-secrets.sh --apns); without it, a key already on the
-# VM is kept. --seal-key seals a control key from elsewhere before the first start, for a move
+# VM is kept. The VAPID key for Web Push (#1486) is made on the VM the first time and never
+# sent: a new one would end every browser's subscription. --seal-key seals a control key from elsewhere before the first start, for a move
 # from a Mac (docs/how-to/run-the-control-plane-in-the-cloud.md). --dry-run prints every command
 # and runs none: it needs no gcloud, no key file and no account.
 #
@@ -203,9 +204,10 @@ cp "$root/deploy/compose.public.yaml" "$root/deploy/Caddyfile.public" "$root/dep
 cp -R "$root/deploy/site" "$stage/deploy/site"
 # No --service-account: an empty file, and the VM's own service account uses the key.
 run "$stage/deploy/make-secrets.sh" --public --kms "$kms" ${apns[@]+"${apns[@]}"}
-# Without --apns, a key already on the VM stays: the empty one is not sent.
-tar_skip=()
-((${#apns[@]})) || tar_skip=(--exclude deploy/secrets/apns-key)
+# Without --apns, a key already on the VM stays: the empty one is not sent. The VM's own VAPID
+# key always stays.
+tar_skip=(--exclude deploy/secrets/vapid-key)
+((${#apns[@]})) || tar_skip+=(--exclude deploy/secrets/apns-key)
 {
 	printf '%s=%s\n' AGENTS_DOMAIN "$domain" AGENTS_VIEWS_DOMAIN "$views_domain" ACME_EMAIL "$email" \
 		AGENTS_VERSION "$tag"
@@ -216,7 +218,9 @@ rm -f "$stage/deploy/.env" "$stage/deploy/make-secrets.sh"
 install='set -e; sudo mkdir -p /opt/agents; sudo tar -C /opt/agents --no-same-owner -xzf -; cd /opt/agents/deploy
 sudo touch .env; sudo chmod 600 .env
 while IFS= read -r line; do k=${line%%=*}; { sudo grep -v "^$k=" .env || true; echo "$line"; } | sudo tee .env.t >/dev/null; sudo mv .env.t .env; done < .env.new
-sudo rm .env.new; [ -f secrets/apns-key ] || { sudo touch secrets/apns-key; sudo chmod 644 secrets/apns-key; }'
+sudo rm .env.new; [ -f secrets/apns-key ] || { sudo touch secrets/apns-key; sudo chmod 644 secrets/apns-key; }
+[ -s secrets/vapid-key ] || { openssl ecparam -name prime256v1 -genkey -noout | openssl pkcs8 -topk8 -nocrypt |
+sudo tee secrets/vapid-key >/dev/null; sudo chmod 644 secrets/vapid-key; }'
 if ((dry_run)); then
 	if ((build)); then
 		say "+ docker save $image:$tag | gzip | $(shown gcloud compute ssh "$name" --zone "$zone" --quiet --command 'gunzip | sudo docker load')"

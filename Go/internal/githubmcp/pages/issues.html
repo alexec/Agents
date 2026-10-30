@@ -1,6 +1,7 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Issues</title>
-<!-- The github server's Issues (ui://github/issues, #1341): show_issues's result; labels
+<!-- The github server's Issues (ui://github/issues, #1341): show_issues's result, in sections by
+     how each relates to the viewer (#2453); labels
      and a search narrow it, in one call (#2686). Start Agent opens the app's new-agent form filled in for the issue
      (agents/start-agent, #834). It has no network: it speaks only the MCP Apps bridge. -->
 <style>
@@ -41,6 +42,8 @@ button.pill.colored:hover { filter: brightness(0.9); }
 </main>
 <script>
 /*bridge.js*/
+/*labels.js*/
+/*lineage.js*/
 (() => {
   let repo = "", activeLabels = [], query = "", searchTimer = 0;
   const labelColors = {};
@@ -55,21 +58,11 @@ button.pill.colored:hover { filter: brightness(0.9); }
   const { $, el, link, button } = ui;
   const say = (text, isError) => { $("state").textContent = text; $("state").className = isError ? "error" : "muted"; ui.size(); };
 
-  // A label pill in its GitHub colour, its text black or white by the colour's luminance.
-  const labelPill = (text, name, onClick, chosen, title) => {
-    const color = labelColors[name];
-    const pill = button(text, onClick, { className: "pill" + (chosen ? " chosen" : "") + (color ? " colored" : ""), title });
-    if (color) {
-      const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16) / 255)
-        .map((c) => c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-      pill.style.background = color;
-      pill.style.color = 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.179 ? "#000" : "#fff";
-    }
-    return pill;
-  };
+  const filterPill = (text, name, onClick, chosen, title) =>
+    labelPill(ui, text, labelColors[name], onClick, { className: chosen ? "chosen" : "", title });
 
   const drawLabel = () => {
-    $("label-tags").replaceChildren(...activeLabels.map((name) => labelPill(name + " ✕", name, () => removeLabel(name),
+    $("label-tags").replaceChildren(...activeLabels.map((name) => filterPill(name + " ✕", name, () => removeLabel(name),
       true, `Remove ${name} label filter`)));
   };
 
@@ -81,7 +74,7 @@ button.pill.colored:hover { filter: brightness(0.9); }
     const issues = Array.isArray(found.issues) ? found.issues : [];
     const options = [...new Set(issues.flatMap((issue) => issue.labels || []))].filter((name) => !activeLabels.includes(name));
     $("label-options").replaceChildren(...options.map((name) => el("option", { value: name })));
-    $("issues").replaceChildren(...issues.map(row));
+    $("issues").replaceChildren(...ui.sections(issues, row));
     drawLabel();
     const assigned = issues.filter((issue) => (issue.assignees || []).length).length;
     say(issues.length ? `${issues.length} open · ${assigned} assigned · as of ${new Date().toLocaleTimeString()}`
@@ -91,12 +84,12 @@ button.pill.colored:hover { filter: brightness(0.9); }
   };
 
   const row = (issue) => {
-    const issueLabels = (issue.labels || []).map((name) => labelPill(name, name, () => addLabel(name),
+    const issueLabels = (issue.labels || []).map((name) => filterPill(name, name, () => addLabel(name),
       activeLabels.includes(name), "Filter by label " + name));
     // Who works on it (#905): an issue is taken by assigning it.
     const assignees = (issue.assignees || []).map((login) =>
       el("span", { className: "pill assigned", textContent: "@" + login, title: "Assigned to " + login }));
-    const comments = issue.comments ? ` · ${issue.comments} comment${issue.comments === 1 ? "" : "s"}` : "";
+    const comments = issue.comments ? `${issue.comments} comment${issue.comments === 1 ? "" : "s"}` : "";
     const start = button("Start Agent", () => startAgent(issue),
       { className: "start", title: `A new agent for #${issue.number}, in a worktree of its own` });
     const details = el("div", { className: "issue-details", hidden: true });
@@ -107,7 +100,8 @@ button.pill.colored:hover { filter: brightness(0.9); }
       start,
       el("span", { className: "meta" }, [
         ...assignees,
-        el("span", { textContent: `${issue.author || "someone"}${comments}${issue.updatedAt ? " · " + ui.ago(issue.updatedAt) : ""}` }),
+        ...ui.who(issue.author, issue.authorBot),
+        el("span", { textContent: [comments, issue.updatedAt ? ui.ago(issue.updatedAt) : ""].filter(Boolean).join(" · ") }),
         issue.milestone ? el("span", { className: "pill", textContent: issue.milestone, title: "Milestone" }) : null,
         ...issueLabels,
       ]),
@@ -170,7 +164,8 @@ button.pill.colored:hover { filter: brightness(0.9); }
     const description = el("div", { className: "issue-body" });
     if (body === "No description.") description.textContent = body;
     else renderMarkdown(description, details.bodyHTML || "", issue.url);
-    target.replaceChildren(el("span", { className: "muted", textContent: "Description" }), description, linked);
+    target.replaceChildren(el("span", { className: "muted", textContent: "Description" }), description, linked,
+      lineageSection(ui, issue.url));
   };
 
   const renderMarkdown = (target, html, base) => {

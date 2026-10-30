@@ -20,13 +20,15 @@ import (
 
 const boardAnswer = `{"data":{"viewer":{"login":"alexec"},"repository":{"pullRequests":{"nodes":[
  {"number":7,"title":"Fix the mean","url":"https://github.com/o/r/pull/7","headRefName":"fix-mean","baseRefName":"main",
-  "isDraft":false,"updatedAt":"2026-10-18T10:00:00Z","mergeable":"CONFLICTING","reviewDecision":"CHANGES_REQUESTED",
+  "isDraft":false,"updatedAt":"2026-10-18T10:00:00Z","mergeable":"CONFLICTING","reviewDecision":"CHANGES_REQUESTED","authorAssociation":"COLLABORATOR",
   "author":{"login":"sam","__typename":"User"},"autoMergeRequest":null,
+  "reviewRequests":{"nodes":[{"requestedReviewer":{}},{"requestedReviewer":{"login":"alexec"}}]},
+  "labels":{"nodes":[{"name":"needs-approval","color":"FBCA04"},{"name":"odd","color":"red"}]},
   "commits":{"nodes":[{"commit":{"statusCheckRollup":{"contexts":{"nodes":[
    {"__typename":"CheckRun","name":"test","status":"COMPLETED","conclusion":"FAILURE","detailsUrl":"https://github.com/o/r/actions/runs/99/job/1"},
    {"__typename":"StatusContext","context":"CodeRabbit","state":"SUCCESS","targetUrl":""}]}}}}]}},
  {"number":8,"title":"Docs","url":"https://github.com/o/r/pull/8","headRefName":"docs","baseRefName":"main",
-  "isDraft":true,"updatedAt":"2026-10-18T09:00:00Z","mergeable":"MERGEABLE","reviewDecision":null,
+  "isDraft":true,"updatedAt":"2026-10-18T09:00:00Z","mergeable":"MERGEABLE","reviewDecision":null,"authorAssociation":"OWNER",
   "author":{"login":"alexec","__typename":"User"},"autoMergeRequest":{"enabledAt":"2026-10-18T09:00:00Z"},
   "commits":{"nodes":[{"commit":{"statusCheckRollup":{"contexts":{"nodes":[
    {"__typename":"CheckRun","name":"test","status":"IN_PROGRESS","conclusion":null,"detailsUrl":""}]}}}}]}}]}}}}`
@@ -35,6 +37,7 @@ const pageAnswer = `{"data":{"viewer":{"login":"alexec"},"repository":{"pullRequ
  "number":7,"title":"Fix the mean","url":"https://github.com/o/r/pull/7","headRefName":"fix-mean","headRefOid":"c0ffee","baseRefName":"main",
  "state":"OPEN","isDraft":false,"body":"Divide by the count.","createdAt":"2026-10-18T08:00:00Z","additions":3,"deletions":1,
  "mergeable":"MERGEABLE","reviewDecision":"REVIEW_REQUIRED","author":{"login":"sam","__typename":"User"},"autoMergeRequest":null,
+ "labels":{"nodes":[{"name":"approved","color":"0e8a16"}]},
  "files":{"totalCount":1,"nodes":[{"path":"average.py","additions":3,"deletions":1,"changeType":"MODIFIED"}]},
  "comments":{"nodes":[{"author":{"login":"coderabbitai","__typename":"Bot"},"body":"<!-- This is an auto-generated comment: summarize by coderabbit.ai -->\n## Walkthrough","createdAt":"2026-10-18T08:05:00Z","url":"u1"}]},
  "reviews":{"nodes":[
@@ -84,11 +87,13 @@ func (a *viewsAPI) serve(t *testing.T) *httptest.Server {
 			io.WriteString(w, `{"data":{"enablePullRequestAutoMerge":{"pullRequest":{"number":7}}}}`)
 		case r.URL.Path == "/graphql" && strings.Contains(string(body), "pullRequest(number"):
 			io.WriteString(w, pageAnswer)
+		case r.URL.Path == "/user":
+			io.WriteString(w, `{"login":"alexec","type":"User"}`)
 		case r.URL.Path == "/repos/o/r/issues":
 			io.WriteString(w, `[{"number":3,"title":"Mean is off by one","html_url":"https://github.com/o/r/issues/3","user":{"login":"kim"},
-			  "labels":[{"name":"bug","color":"D73A4A"},{"name":"odd","color":"red"}],"assignees":[{"login":"sam"}],"comments":2,"updated_at":"2026-10-18T07:00:00Z",
+			  "labels":[{"name":"bug","color":"D73A4A"},{"name":"odd","color":"red"}],"assignees":[{"login":"sam"},{"login":"AlexEC"}],"comments":2,"updated_at":"2026-10-18T07:00:00Z",
 			  "milestone":{"title":"0.13 Lineage and value"}},
-			 {"number":4,"title":"No milestone yet","html_url":"https://github.com/o/r/issues/4","user":{"login":"kim"},
+			 {"number":4,"title":"No milestone yet","html_url":"https://github.com/o/r/issues/4","user":{"login":"dependabot[bot]","type":"Bot"},
 			  "labels":[],"assignees":[],"comments":0,"updated_at":"2026-10-18T07:00:00Z"},
 			 {"number":7,"title":"a PR","pull_request":{"url":"x"}}]`)
 		case r.URL.Path == "/search/issues":
@@ -313,8 +318,15 @@ func TestEachViewHasAToolThatFeedsItAndAPage(t *testing.T) {
 		}
 		html := r.Contents[0].Text
 		if r.Contents[0].MIMEType != viewMime || !strings.HasPrefix(html, "<!doctype html>") ||
-			strings.Contains(html, "/*common.css*/") || strings.Contains(html, "/*bridge.js*/") || !strings.Contains(html, "const bridge") {
+			strings.Contains(html, "/*common.css*/") || strings.Contains(html, "/*bridge.js*/") || strings.Contains(html, "/*lineage.js*/") || !strings.Contains(html, "const bridge") {
 			t.Errorf("%s is not a whole page", uri)
+		}
+		// One label pill for every page (#2956).
+		if strings.Contains(html, "/*labels.js*/") || strings.Count(html, "const labelPill") != 1 {
+			t.Errorf("%s does not have the shared label pill once", uri)
+		}
+		if uri != issuesURI && !strings.Contains(html, "prLabels(ui, pr") {
+			t.Errorf("%s does not show a pull request's labels", uri)
 		}
 		if uri != issuesURI && !strings.Contains(html, "const prPage") {
 			t.Errorf("%s has no pull request page in it", uri)
@@ -349,6 +361,20 @@ func TestThePullRequestsListSaysEachOnesState(t *testing.T) {
 		second["review"] != nil {
 		t.Errorf("#8: %v", second)
 	}
+	// #2453: a review asked of the viewer needs them; their own, with nothing wrong, is theirs.
+	if first["section"] != sectionNeedsYou || second["section"] != sectionYours || data["attention"] != 1.0 {
+		t.Errorf("sections: #7 %v, #8 %v, attention %v", first["section"], second["section"], data["attention"])
+	}
+	// #2956: each one's labels, and their colours; a colour that is not #rrggbb is none.
+	if l, _ := first["labels"].([]any); len(l) != 2 || l[0] != "needs-approval" || l[1] != "odd" {
+		t.Errorf("#7's labels: %v", first["labels"])
+	}
+	if l, ok := second["labels"].([]any); !ok || len(l) != 0 {
+		t.Errorf("#8's labels: %v", second["labels"])
+	}
+	if colors, _ := data["labelColors"].(map[string]any); len(colors) != 1 || colors["needs-approval"] != "#fbca04" {
+		t.Errorf("labelColors: %v", data["labelColors"])
+	}
 }
 
 func TestTheIssuesListLeavesOutPullRequests(t *testing.T) {
@@ -362,6 +388,13 @@ func TestTheIssuesListLeavesOutPullRequests(t *testing.T) {
 	if i["number"] != 3.0 || i["comments"] != 2.0 || i["assignees"].([]any)[0] != "sam" || i["labels"].([]any)[0] != "bug" ||
 		i["milestone"] != "0.13 Lineage and value" {
 		t.Errorf("#3: %v", i)
+	}
+	// #2453: assigned to the viewer (any case) needs them; a bot's is the team's, with its pill.
+	if i["section"] != sectionNeedsYou || data["viewer"] != "alexec" || data["attention"] != 1.0 {
+		t.Errorf("#3's section: %v, viewer %v, attention %v", i["section"], data["viewer"], data["attention"])
+	}
+	if second := issues[1].(map[string]any); second["section"] != sectionTeam || second["authorBot"] != true {
+		t.Errorf("#4's section: %v", second)
 	}
 	if second := issues[1].(map[string]any); second["number"] != 4.0 {
 		t.Errorf("#4: %v", second)
@@ -382,8 +415,10 @@ func TestTheIssuesListTakesAllItsLabelsInOneCall(t *testing.T) {
 	callTool(t, c, "show_issues", map[string]any{"repo": "o/r", "label": "bug", "labels": []string{"ui", "bug"}})
 	api.mu.Lock()
 	defer api.mu.Unlock()
-	if len(api.queries) != 1 || !strings.Contains(api.queries[0], "labels="+url.QueryEscape("ui,bug")+"&") {
-		t.Errorf("queries: %v", api.queries)
+	// One listing; the other call is the viewer's login (#2453), after it.
+	if len(api.queries) != 2 || !strings.Contains(api.queries[0], "labels="+url.QueryEscape("ui,bug")+"&") ||
+		api.calls[1] != "GET /user" {
+		t.Errorf("calls: %v, queries: %v", api.calls, api.queries)
 	}
 }
 
@@ -447,6 +482,12 @@ func TestAPullRequestsPageHasItsConversationReviewAndChecks(t *testing.T) {
 	if p["number"] != 7.0 || p["state"] != "open" || p["checks"] != "passing" || p["conflicts"] != false || p["review"] != "review_required" ||
 		p["viewer"] != "alexec" || p["filesTotal"] != 1.0 {
 		t.Fatalf("page: %v", p)
+	}
+	if l, _ := p["labels"].([]any); len(l) != 1 || l[0] != "approved" {
+		t.Errorf("labels: %v", p["labels"])
+	}
+	if colors, _ := p["labelColors"].(map[string]any); colors["approved"] != "#0e8a16" {
+		t.Errorf("labelColors: %v", p["labelColors"])
 	}
 	// CodeRabbit's review is marked as an app's (its summary is its own block); a review with no words is in its threads.
 	comments := p["comments"].([]any)

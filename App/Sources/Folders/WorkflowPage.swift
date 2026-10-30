@@ -703,7 +703,10 @@ struct WorkflowPage: View {
                     }
                     // The prompt's two pills: the permission mode on the left, and the
                     // model, its effort and the rest behind one pill on the right.
-                    if let runtime = RuntimeCatalog.runtime(id: runtimeID(workflow)) {
+                    if runsOn(workflow).isAuto {
+                        autoSettings(summary)
+                            .disabled(workflow.mode == .triggering || workflow.settingsLocked)
+                    } else if let runtime = RuntimeCatalog.runtime(id: runtimeID(workflow)) {
                         HStack(alignment: .top, spacing: 10) {
                             settingControl(summary, name: "Permission mode",
                                            setting: WorkflowSettings.Setting.permissionMode,
@@ -838,7 +841,7 @@ struct WorkflowPage: View {
     }
 
     /// The workflow file on the left, and on the right the runtime a run will use and
-    /// why (#2764): the file's, else the last agent's on this machine, else the default.
+    /// why (#2764): the file's, else Auto (#2873).
     /// There is no picker; one this version does not know is marked under it.
     private func fileRow(_ summary: WorkflowSummary) -> some View {
         let workflow = summary.workflow
@@ -881,13 +884,30 @@ struct WorkflowPage: View {
         var folder: URL
     }
 
-    /// The runtime the file names, or the most recently active runtime on this host.
+    /// The runtime the file names, or Auto.
     private func runsOn(_ workflow: Workflow) -> WorkflowSettings.RunsOn {
-        workflow.settings.runsOn(lastUsed: model.work.lastRuntimes[place.host])
+        workflow.settings.runsOn()
     }
 
     private func runtimeID(_ workflow: Workflow) -> String {
         runsOn(workflow).runtimeID
+    }
+
+    /// On Auto, the permission mode and the model in the shared words (#2873): Auto
+    /// picks the runtime each run, so there are no runtime's own choices to show.
+    private func autoSettings(_ summary: WorkflowSummary) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .top, spacing: 10) {
+                OptionMenu(option: withDefault(WorkflowSettings.autoPermissionOption, named: LevelWords.permissionField),
+                           chosen: binding(summary, \.permissionMode) { $0.permissionMode = $1 })
+                Spacer(minLength: 16)
+                OptionMenu(option: withDefault(WorkflowSettings.autoModelOption, named: LevelWords.modelField),
+                           chosen: binding(summary, \.model) { $0.model = $1 })
+            }
+            if let note = summary.workflow.settings.autoEffortNote {
+                self.note(note)
+            }
+        }
     }
 
     /// One of the settings the runtime itself defines, in the four states the
@@ -1068,7 +1088,14 @@ struct WorkflowPage: View {
                 Button {
                     place.open(session: agent.id)
                 } label: {
-                    AgentRow(agent: agent)
+                    VStack(alignment: .leading, spacing: 6) {
+                        AgentRow(agent: agent)
+                        if let picked = WorkflowSettings.picked(agent.auto, name: runtimeName) {
+                            Text(picked)
+                                .appText(.fine)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 13)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1088,6 +1115,10 @@ struct WorkflowPage: View {
     }
 
     // MARK: Pieces
+
+    private func runtimeName(_ id: String) -> String {
+        RuntimeCatalog.runtime(id: id)?.name ?? id
+    }
 
     private func sectionTitle(_ text: String) -> some View {
         Text(text)

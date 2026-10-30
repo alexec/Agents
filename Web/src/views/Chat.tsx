@@ -61,6 +61,7 @@ import { WorkingMark } from "./SessionRow";
 import { runningTool } from "../model/sidebar";
 import { composerReason } from "../model/orgPolicy";
 import { autoHeader, cellOf } from "../model/levels";
+import { PageTitle, chatCrumbs } from "./TopBar";
 
 /** One opened turn's entries, so an earlier page can be put in front and drawn again (#291). */
 interface HeldTurn {
@@ -261,12 +262,16 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     failedTurns.value = {};
     subagent.value = null;
     openedTurns.current = [];
-    following.current = true;
-    away.value = false;
-    store.setFollowingEnd(true);
     settled.current = false;
     const timer = setTimeout(() => (settled.current = true), 400);
     return () => clearTimeout(timer);
+  }, [session]);
+  // A chat opens following its end, before the layout effects below: a line asked for as it
+  // opens (a notice's, from its notification, #2860) then leaves the end, and stays left.
+  useLayoutEffect(() => {
+    following.current = true;
+    away.value = false;
+    store.setFollowingEnd(true);
   }, [session]);
 
   // Following the end: every kind of growth, a new line or a longer one, keeps the foot in view.
@@ -409,6 +414,11 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     if (target) {
       follow(false);
       target.scrollIntoView({ block: "center", behavior: "smooth" });
+      // A notice's line, gone to from its notification, is lit a moment so the eye finds it (#2860).
+      if (target.classList.contains("notice-line")) {
+        target.classList.add("lit");
+        setTimeout(() => target.classList.remove("lit"), 2000);
+      }
       focusedEntry.value = null;
       focusedIndex.value = null;
       return;
@@ -541,11 +551,13 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           branchFrom={agent.state !== "archived" && !down && store.has(host, Capability.chatBranch1) ? (prompt) => void branchFromPrompt(store, host, agent, prompt.id, prompt.text) : undefined}
           branchNeedsUpdate={agent.state !== "archived" && !store.has(host, Capability.chatBranch1)} />
       )}
-      <header class="column-head">
+      <header class="column-head page-head">
         <BackToList />
-        {agent && store.renaming.value?.id === agent.id && store.renaming.value.inChat
-          ? <h1><RenameInput store={store} host={host} agent={agent} /></h1>
-          : <h1>{agent?.title ?? "New session"}</h1>}
+        <PageTitle parts={chatCrumbs(store, host, agent?.title ?? "New session")}>
+          {agent && store.renaming.value?.id === agent.id && store.renaming.value.inChat
+            ? <h1><RenameInput store={store} host={host} agent={agent} /></h1>
+            : <h1>{agent?.title ?? "New session"}</h1>}
+        </PageTitle>
         <span class="actions">
           <button class="wide-only" onClick={() => replace({ ...r, files: !r.files })} aria-pressed={!!r.files}>Files</button>
           <SessionButtons store={store} host={host} agent={agent} disabled={down} />
@@ -661,7 +673,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
               runtimeID={agent.runtimeID}
               clientPermission={{
                 own: agent.clientPermission,
-                settings: store.clientPermissions.value[store.macHostID.value]?.[agent.runtimeID as keyof ClientPermissionSettings] ?? "default",
+                settings: store.clientPermissions.value[store.macHostID.value]?.[agent.runtimeID as Exclude<keyof ClientPermissionSettings, "setBy">] ?? "default",
                 set: (mode) => void store.setAgentClientPermission(host, agent.id, mode),
               }}
               levels={{
@@ -814,7 +826,7 @@ function LeaseLine({ store, host, agent }: { store: Store; host: string; agent: 
     <div class="lease-line" role="status" aria-label={leases.full}>
       {leases.lines.map((text) => (
         <button key={text} class="link" title={leases.full}
-          onClick={() => { location.hash = routeHash({ activity: "resources" }); }}>
+          onClick={() => { location.hash = routeHash({ nav: "machines", section: "resources" }); }}>
           <span class="words">{text}</span><span class="chevron" aria-hidden="true">›</span>
         </button>
       ))}
@@ -859,7 +871,7 @@ function WaitCard({ agent, title, disabled, stop }: { agent: Agent; title: (id: 
           </div>}
         </>}
         <p class="wait-answers">
-          <button onClick={() => { location.hash = routeHash({ activity: "events" }); }}>Show in Events</button>
+          <button onClick={() => { location.hash = routeHash({ nav: "reports", section: "events" }); }}>Show in Events</button>
           <button disabled={disabled || busy.value} title="Stop waiting. Nothing will start it again for this wait."
             onClick={() => { busy.value = true; void stop().finally(() => (busy.value = false)); }}>Stop Waiting</button>
         </p>

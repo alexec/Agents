@@ -1,0 +1,196 @@
+/* The web console's look (#2142), on #2141's structure: a top bar of section tabs with search and the
+   person's menu; a side navigation of a section's pages; a breadcrumb over each page's title; dense
+   sortable tables; tabs, selects and button groups in place of the iOS segmented control. The Paper
+   colours stay (theme/paper.css): flat surfaces and hairlines, the accent only on the open tab, links,
+   focus and the primary button. The chat keeps its Paper look inside this frame; the rules for the
+   section pages are under .console, so nothing in a chat changes. Every size in rem or px of the
+   hairline, as the rest of the page (#1034). */
+
+:root {
+  --console-row: 2.25rem;
+  --console-control: 2rem;
+  --radius-console: 6px;
+}
+
+/* The top bar: the name, the sections as tabs, search, the person. */
+.top-bar { display: flex; align-items: stretch; gap: 16px; height: 3rem; padding: 0 16px; box-sizing: border-box;
+  background: var(--paper-raised); border-bottom: 1px solid var(--paper-rule); position: relative; z-index: 15; }
+.top-bar .nav-bar { flex: 1; min-width: 0; display: flex; align-items: stretch; gap: 16px; padding: 0; border: 0; background: none; }
+.top-bar .nav-home { padding: 0; font-size: 0.9375rem; font-weight: 700; align-self: center; }
+.top-bar .nav-items { display: flex; flex-wrap: nowrap; gap: 0; align-items: stretch; overflow-x: auto; scrollbar-width: none; }
+.top-bar .nav-items .nav-item { position: relative; border-radius: 0; padding: 0 12px; background: none; font-weight: 400; white-space: nowrap; }
+.top-bar .nav-items .nav-item:hover { background: var(--paper-wash); }
+.top-bar .nav-items .nav-item.on { background: none; font-weight: 600; }
+.top-bar .nav-items .nav-item.on::after { content: ""; position: absolute; left: 6px; right: 6px; bottom: 0; height: 3px;
+  border-radius: 2px 2px 0 0; background: var(--accent); }
+.top-bar .nav-menu { align-self: center; margin-left: 0; }
+.top-bar .sub-app-count, .sub-app-list .sub-app-count { background: var(--tint-failure); color: #fff; min-width: 1.1em; text-align: center;
+  line-height: 1.35; padding: 0 5px; border-radius: 999px; font-size: 0.625rem; }
+@media (prefers-color-scheme: dark) {
+  .top-bar .sub-app-count, .sub-app-list .sub-app-count { color: var(--paper-ground); }
+}
+
+.top-search { position: relative; align-self: center; display: flex; align-items: center; }
+.top-search input { width: 17rem; height: var(--console-control); box-sizing: border-box; padding: 0 2rem 0 10px; font: inherit;
+  color: inherit; background: var(--paper-well); border: 1px solid var(--paper-rule); border-radius: var(--radius-console); }
+.top-search input:focus { outline: 2px solid var(--accent); outline-offset: -1px; background: var(--paper-raised); }
+.top-search-key { position: absolute; right: 8px; font: inherit; font-size: 0.6875rem; opacity: 0.6; padding: 0 5px;
+  border: 1px solid var(--paper-rule); border-radius: 4px; pointer-events: none; }
+.top-search-found { position: absolute; top: calc(100% + 4px); right: 0; width: 24rem; max-width: 90vw; margin: 0; padding: 4px;
+  list-style: none; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-console);
+  box-shadow: 0 8px 24px var(--paper-shadow); z-index: 30; }
+.top-search-found li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border-radius: 4px; cursor: pointer; }
+.top-search-found li.on { background: var(--paper-wash); }
+.top-search-found li.none { cursor: default; opacity: 0.65; }
+.top-search-found .found-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.top-search-found .found-detail { flex: none; opacity: 0.6; font-size: 0.75rem; }
+.top-search-button { border: 0; background: none; font-size: 1.125rem; padding: 0 6px; }
+
+.person-menu { position: relative; align-self: center; }
+.person-button { width: 2rem; height: 2rem; padding: 0; border: 0; border-radius: 50%; background: var(--accent); color: var(--paper-ground);
+  font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+.person-list { position: absolute; top: calc(100% + 6px); right: 0; width: 16rem; display: flex; flex-direction: column; padding: 4px 0;
+  background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-console);
+  box-shadow: 0 8px 24px var(--paper-shadow); z-index: 30; }
+.person-list .person-who { display: flex; flex-direction: column; gap: 2px; padding: 8px 14px 10px; border-bottom: 1px solid var(--paper-rule); }
+.person-list > button { text-align: left; border: 0; border-radius: 0; background: none; padding: 0 14px; min-height: var(--console-control); }
+.person-list > button:hover { background: var(--paper-wash); }
+.person-list .danger-text { color: var(--tint-failure); border-top: 1px solid var(--paper-rule); }
+.person-list .forget { padding: 8px 14px; border-top: 1px solid var(--paper-rule); }
+.person-list .forget p { margin: 0 0 8px; }
+.person-list .forget .confirm { display: flex; gap: 6px; }
+.person-list .failure { margin: 4px 14px; }
+
+/* Below 760: the name, the section's menu, a search button that opens the field over the bar, the person. */
+@media (max-width: 759px) {
+  .top-bar { gap: 8px; padding: 0 10px; }
+  .top-bar .nav-bar { gap: 8px; align-items: center; }
+  .top-search input, .top-search-key { display: none; }
+  .top-search.opened { position: absolute; inset: 0; padding: 0 10px; background: var(--paper-raised); z-index: 20; }
+  .top-search.opened input { display: block; width: 100%; }
+  .top-search.opened .top-search-button { display: none; }
+  .top-search.opened .top-search-found { left: 10px; right: 10px; width: auto; }
+}
+
+/* A page's header: the breadcrumb over the title, the actions at the right. */
+.column-head.page-head { min-height: 3.25rem; padding: 6px 16px; }
+.page-title { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+.page-title h1 { flex: none; }
+.crumbs ol { display: flex; flex-wrap: wrap; margin: 0; padding: 0; list-style: none; font-size: 0.75rem; }
+.crumbs li { display: inline-flex; align-items: baseline; min-width: 0; color: color-mix(in srgb, var(--paper-ink) 62%, transparent); }
+.crumbs li + li::before { content: "›"; margin: 0 6px; opacity: 0.7; }
+.crumbs a { text-decoration: none; }
+.crumbs a:hover { text-decoration: underline; }
+.crumbs span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat .page-head .page-title h1 { font-size: 1rem; }
+.console .column-head.page-head { min-height: 0; padding: 18px 24px 6px; border-bottom: 0; }
+.console .page-title h1 { font-size: 1.25rem; font-weight: 700; white-space: normal; }
+.console .activity-body { padding: 4px 24px 24px; max-width: none; }
+.console .activity-body > :first-child { margin-top: 0; }
+
+/* A section's pages: a web side navigation, the open one marked by a bar of the accent. */
+.columns.sub-app { grid-template-columns: 15rem minmax(0, 1fr); }
+.sub-app-list { padding: 8px 0 12px; background: var(--paper-sidebar); border-right: 1px solid var(--paper-rule); }
+.sub-app-group .section-head { opacity: 1; margin: 14px 20px 4px; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: color-mix(in srgb, var(--paper-ink) 58%, transparent); }
+.sub-app-group:first-child .section-head { margin-top: 6px; }
+.sub-app-row { position: relative; border: 0; border-radius: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer;
+  min-height: var(--console-control); padding: 0 20px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sub-app-row:hover { background: var(--paper-wash); }
+.sub-app-row.on { background: var(--paper-wash); font-weight: 600; }
+.sub-app-row.on::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); }
+@media (max-width: 759px) {
+  .columns.sub-app { grid-template-columns: minmax(0, 1fr); }
+  .columns.sub-app .sub-app-list { display: flex; flex-direction: row; align-items: stretch; padding: 0 8px; gap: 0; background: var(--paper-raised); overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
+  .columns.sub-app .sub-app-group { display: flex; flex-direction: row; flex-wrap: nowrap; flex: none; }
+  /* A section's pages are its tabs here; ‹ Agents is Agents' own. */
+  .columns.sub-app button.back.narrow-only { display: none; }
+  .sub-app-row { padding: 0 10px; white-space: nowrap; min-height: 2.5rem; }
+  .sub-app-row.on::before { left: 8px; right: 8px; top: auto; width: auto; height: 3px; }
+  .console .column-head.page-head { padding: 10px 14px 4px; }
+  .console .activity-body { padding: 4px 14px 18px; }
+}
+
+/* The console's buttons: one height, small corners; the primary in the accent; danger in the failure tint. */
+.console button:not(.link):not(.sort):not(.sub-app-row):not(.nav-item), .person-list .confirm button {
+  min-height: var(--console-control); border-radius: var(--radius-console); padding: 0 12px; }
+.console button.prominent { font-weight: 600; }
+.console button.destructive, .console button.danger, .person-list button.danger { color: var(--tint-failure);
+  border-color: color-mix(in srgb, var(--tint-failure) 45%, transparent); }
+.console input[type="text"], .console input[type="search"], .console input[type="number"], .console input[type="email"],
+.console input[type="url"], .console input[type="password"], .console select, .console textarea {
+  border-radius: var(--radius-console); }
+
+/* A value to pick (Range, By, Scope, State): its name, then a native select drawn as a button. */
+.choice { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8125rem; }
+.choice-name { opacity: 0.7; }
+.choice select, .select-label select { height: var(--console-control); padding: 0 1.75rem 0 10px; font: inherit; color: inherit;
+  background-color: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-console); cursor: pointer;
+  appearance: none; -webkit-appearance: none; }
+/* The arrow on the label, so a page's own select rules (Settings', a sheet's) never hide it. */
+.choice, .select-label { position: relative; }
+.choice::after, .select-label::after { content: "▾"; position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  font-size: 0.75rem; opacity: 0.65; pointer-events: none; }
+.select-label { display: inline-flex; align-items: center; gap: 6px; opacity: 1; }
+.table-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 4px 0 10px; }
+
+/* Tabs: what a page shows (Show: …). Text, the open one underlined in the accent, a hairline under all. */
+.tabs { display: flex; flex-wrap: wrap; gap: 0; border-bottom: 1px solid var(--paper-rule); margin: 0 0 12px; }
+.tabs button { position: relative; border: 0; border-radius: 0; background: none; padding: 6px 12px 8px; font: inherit; color: inherit;
+  opacity: 0.72; cursor: pointer; min-height: 0; }
+.tabs button:hover { opacity: 1; }
+.tabs button[aria-selected="true"] { opacity: 1; font-weight: 600; }
+.tabs button[aria-selected="true"]::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 2px; background: var(--accent); }
+span.tabs { display: inline-flex; margin: 0; border-bottom: 0; }
+
+/* A choice in a form: a group of buttons, the picked one in the accent's tint. */
+.button-group { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--paper-rule); border-radius: var(--radius-console);
+  overflow: hidden; background: var(--paper-raised); }
+.button-group button { border: 0; border-radius: 0; background: none; padding: 5px 12px; font: inherit; color: inherit; cursor: pointer; }
+.button-group button + button { border-left: 1px solid var(--paper-rule); }
+.button-group button.on { background: color-mix(in srgb, var(--accent) 14%, var(--paper-raised)); color: var(--accent); font-weight: 600; }
+
+/* The console's table: dense rows, hairlines, numbers right, the header kept at the top, sortable. */
+.data-table-wrap { overflow-x: auto; border: 1px solid var(--paper-rule); border-radius: var(--radius-console); background: var(--paper-raised); }
+.console-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 0.8125rem; }
+.console-table th { position: sticky; top: 0; z-index: 1; text-align: left; font-weight: 600; font-size: 0.75rem; opacity: 1;
+  color: color-mix(in srgb, var(--paper-ink) 62%, transparent); background: var(--paper-raised); padding: 0 12px; height: var(--console-row);
+  border-bottom: 1px solid var(--paper-rule); white-space: nowrap; }
+.console-table td { padding: 7px 12px; border-bottom: 1px solid var(--paper-rule); vertical-align: middle; }
+.console-table tbody tr:last-child td { border-bottom: 0; }
+.console-table tbody tr:hover td { background: var(--paper-wash); }
+.console-table tr.empty td { text-align: left; opacity: 0.65; background: none; }
+.console-table tr.opens { cursor: pointer; }
+.console-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.console-table .sort { display: inline-flex; align-items: center; vertical-align: middle; height: 1.5em; gap: 4px; border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+.console-table .sort:hover, .console-table .sort.on { color: var(--paper-ink); }
+.console-table .sort-mark { font-size: 0.5625rem; min-width: 0.6rem; }
+.console-table td.actions { white-space: nowrap; text-align: right; }
+.console-table ul { margin: 0; padding: 0; list-style: none; }
+@media (max-width: 759px) {
+  .data-table th:first-child, .data-table td:first-child { position: sticky; left: 0; z-index: 2; background: var(--paper-raised);
+    border-right: 1px solid var(--paper-rule); }
+  .data-table td, .data-table th { white-space: nowrap; }
+}
+
+/* The lists whose rows carry their own controls (Requests, People, Events, Audit, Worktrees, Connectors): the table's rows. */
+.console .request-list, .console .people-list, .console .event-list, .console .resources ul {
+  border: 1px solid var(--paper-rule); border-radius: var(--radius-console); background: var(--paper-raised); padding: 0; margin: 0 0 12px; }
+.console .request-list > li, .console .people-list > li, .console .event-list > li, .console .resources ul > li {
+  padding: 8px 12px; border-bottom: 1px solid var(--paper-rule); margin: 0; }
+.console .request-list > li:last-child, .console .people-list > li:last-child, .console .event-list > li:last-child,
+.console .resources ul > li:last-child { border-bottom: 0; }
+.console .requests, .console .team-workflows { max-width: none; }
+
+/* The Overview: flat cards, each with its title and its link in a header over a hairline. */
+.console .overview-grid { gap: 16px; grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr)); }
+.overview-card { padding: 0; gap: 0; border-radius: 8px; box-shadow: none; }
+.overview-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 12px 16px;
+  border-bottom: 1px solid var(--paper-rule); }
+.overview-card-head h2 { font-size: 0.875rem; font-weight: 700; }
+.overview-card-head .overview-links { margin: 0; font-size: 0.8125rem; }
+.overview-card-body { display: flex; flex-direction: column; gap: 6px; padding: 12px 16px 14px; flex: 1; }
+.overview-card .overview-rows { gap: 0; }
+.overview-card .overview-rows li { padding: 6px 0; border-bottom: 1px solid color-mix(in srgb, var(--paper-rule) 60%, transparent); }
+.overview-card .overview-rows li:last-child { border-bottom: 0; }
+.overview-figure { font-size: 2rem; }

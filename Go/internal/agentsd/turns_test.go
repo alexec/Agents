@@ -38,6 +38,8 @@ func TestMain(m *testing.M) {
 	}
 	// No test asks the person's gh about merged pull requests unless it says so.
 	findGH = func() string { return "" }
+	// Nor asks the forge for an issue's milestone (#2935): a test sets issueLookup.
+	milestoneLookup = func(context.Context, string, forgeRepo, int) (int, error) { return 0, errNoForgeInTests }
 	// Nor erases a deleted agent's runtime copy (#1001): that starts the runtime.
 	erasing = false
 	os.Exit(m.Run())
@@ -209,6 +211,13 @@ func (f *fakeRuntime) Prompt(ctx context.Context, p sdk.PromptRequest) (sdk.Prom
 	if strings.Contains(text, "wait for me") {
 		<-ctx.Done()
 		return sdk.PromptResponse{StopReason: sdk.StopReasonCancelled}, nil
+	}
+	// A pause before ending the turn, so a test can open an event wait on this agent
+	// first, as joining a lease's line does mid-turn (#2911).
+	if strings.Contains(text, "line for a lease") {
+		time.Sleep(300 * time.Millisecond)
+		say("Waiting for the build lease.")
+		return sdk.PromptResponse{StopReason: sdk.StopReasonEndTurn}, nil
 	}
 	// Refused once for too many requests, then answered.
 	if strings.Contains(text, "rate limit me") {

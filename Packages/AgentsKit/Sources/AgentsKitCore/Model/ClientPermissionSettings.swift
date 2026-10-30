@@ -22,12 +22,16 @@ public struct ClientPermissionSettings: Codable, Sendable, Hashable {
     public var cursor: ClientPermissionMode
     public var grok: ClientPermissionMode
     public var opencode: ClientPermissionMode
+    /// Set when the organisation's mode ceiling is below approving every request:
+    /// **Always approve** is refused and answers nothing. Only read: never written.
+    public var setBy: DaemonAPI.PolicySetBy?
 
     public init(cursor: ClientPermissionMode = .default, grok: ClientPermissionMode = .default,
-                opencode: ClientPermissionMode = .default) {
+                opencode: ClientPermissionMode = .default, setBy: DaemonAPI.PolicySetBy? = nil) {
         self.cursor = cursor
         self.grok = grok
         self.opencode = opencode
+        self.setBy = setBy
     }
 
     /// A key a saved file or an older daemon never wrote reads as asking, so a new runtime
@@ -37,9 +41,18 @@ public struct ClientPermissionSettings: Codable, Sendable, Hashable {
         cursor = try c.decodeIfPresent(ClientPermissionMode.self, forKey: .cursor) ?? .default
         grok = try c.decodeIfPresent(ClientPermissionMode.self, forKey: .grok) ?? .default
         opencode = try c.decodeIfPresent(ClientPermissionMode.self, forKey: .opencode) ?? .default
+        setBy = try c.decodeIfPresent(DaemonAPI.PolicySetBy.self, forKey: .setBy)
     }
 
-    private enum CodingKeys: String, CodingKey { case cursor, grok, opencode }
+    /// The choices only: `setBy` is the daemon's to say.
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(cursor, forKey: .cursor)
+        try c.encode(grok, forKey: .grok)
+        try c.encode(opencode, forKey: .opencode)
+    }
+
+    private enum CodingKeys: String, CodingKey { case cursor, grok, opencode, setBy }
 
     public static func supports(_ runtimeID: String) -> Bool {
         [RuntimeCatalog.cursor.id, RuntimeCatalog.grok.id, RuntimeCatalog.opencode.id].contains(runtimeID)

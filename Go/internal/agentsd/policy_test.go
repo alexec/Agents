@@ -767,3 +767,49 @@ func TestARollupRowCarriesLimitTokens(t *testing.T) {
 		t.Fatalf("%+v", r.LimitTokens)
 	}
 }
+
+// Always-approve for the runtimes the app answers for is under the mode ceiling too: a
+// saved Yes answers nothing, setting one is refused, and the state says who set it. A
+// helper or a workflow's agent never takes the person's from Settings.
+func TestAlwaysApproveIsUnderTheModeCeiling(t *testing.T) {
+	fakeRuntimes(t)
+	k := newControlKeys(t)
+	root := t.TempDir()
+	d, c := joined(t, root, k)
+	dir := t.TempDir()
+	os.MkdirAll(d.SettingsDir, 0o700)
+	os.WriteFile(filepath.Join(d.SettingsDir, "client-permissions.json"), []byte(`{"grok":"alwaysApprove"}`), 0o600)
+	person := seeded(t, d, dir, func(a *wire.Agent) { a.RuntimeID = "grok" })
+	helper := seeded(t, d, dir, func(a *wire.Agent) { a.RuntimeID = "grok"; a.StartedByAgent = &person.ID })
+	workflow := seeded(t, d, dir, func(a *wire.Agent) { a.RuntimeID = "grok"; a.StartedByWorkflow = new("wf") })
+	if !d.agentAlwaysApproves(&person) || d.agentAlwaysApproves(&helper) || d.agentAlwaysApproves(&workflow) {
+		t.Fatal("Settings' Yes is for the person's own agents only")
+	}
+	yes := wire.ClientPermissionModeAlwaysApprove
+	helper.ClientPermission = &yes
+	if !d.agentAlwaysApproves(&helper) {
+		t.Fatal("the helper's own Yes")
+	}
+
+	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 1, map[string]any{"modeCeiling": "acceptEdits"}))
+	if d.agentAlwaysApproves(&person) || d.agentAlwaysApproves(&helper) {
+		t.Fatal("Always-approve answers above the ceiling")
+	}
+	var cp wire.ClientPermissionSettings
+	json.Unmarshal(c.call(t, 2, "clientPermissions/state", nil), &cp)
+	if cp.SetBy == nil || cp.SetBy.Rule != "modeCeiling" {
+		t.Fatalf("%+v", cp)
+	}
+	refused(t, c.callError(t, 3, "clientPermissions/set", map[string]any{"cursor": "alwaysApprove", "grok": "default", "opencode": "default"}), "policy", "modeCeiling")
+	refused(t, c.callError(t, 4, "agents/setClientPermission", map[string]any{"agentID": person.ID, "mode": "alwaysApprove"}), "policy", "modeCeiling")
+	c.call(t, 5, "clientPermissions/set", map[string]any{"cursor": "default", "grok": "default", "opencode": "default"})
+	if fi, err := os.Stat(filepath.Join(d.SettingsDir, "client-permissions.json")); err != nil || fi.Mode().Perm() != 0o600 {
+		t.Fatal(fi.Mode(), err)
+	}
+
+	// The loosest ceiling allows it.
+	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 6, map[string]any{"modeCeiling": "bypassPermissions"}))
+	if !d.agentAlwaysApproves(&helper) {
+		t.Fatal("bypassPermissions allows it")
+	}
+}

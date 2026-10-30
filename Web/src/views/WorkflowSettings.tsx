@@ -14,7 +14,7 @@ import type { ConfigOption, JSONValue, WorkflowSettings, WorkflowSummary } from 
 import type { Store } from "../model/store";
 import { modeOption } from "../model/options";
 import {
-  cooldownChoices, cooldownFileText, effortOption, fileValue, modelOption, otherOptions, refusals, runsOn, selectable, shown, withDefault,
+  autoEffortNote, autoOption, cooldownChoices, cooldownFileText, effortOption, fileValue, modelOption, otherOptions, refusals, runsOn, selectable, shown, withDefault,
   whenDoneChoices, whenDoneWords, type WhenDone,
 } from "../model/workflowSettings";
 import { cooldownWords } from "../model/workflows";
@@ -43,8 +43,7 @@ export function WorkflowSettingsForm({ store, host, summary, disabled, problem, 
 }) {
   const workflow = summary.workflow;
   const settings = workflow.settings;
-  // A host's agents are held newest first, so the first is the last used there.
-  const runs = runsOn(settings.runtimeID, store.agents.value[host]?.[0]?.runtimeID);
+  const runs = runsOn(settings.runtimeID);
   const runtimeID = runs.runtimeID;
   const runtimes = (store.runtimes.value[host] ?? []).map((r) => r.runtime);
   const runtimeName = runtimes.find((r) => r.id === runtimeID)?.name ?? runtimeID;
@@ -73,6 +72,7 @@ export function WorkflowSettingsForm({ store, host, summary, disabled, problem, 
       {runs.unknown && <p class="marked small">⚠︎ {runs.unknown}</p>}
       {triggering && <p class="quiet small">This workflow resumes the agent that triggered it, so these do not apply.</p>}
       {workflow.mode === "standing" && <p class="quiet small">Applied when its standing agent is started, and again if it has to be replaced.</p>}
+      {runs.isAuto ? <AutoMenus settings={settings} disabled={off} set={set} /> : <>
       <div class="menus" role="group" aria-label="Settings for each run">
         {mode
           ? <OptionControl option={withDefault(mode, "Permission mode")} value={settings.permissionMode ?? null} disabled={off}
@@ -99,6 +99,7 @@ export function WorkflowSettingsForm({ store, host, summary, disabled, problem, 
       </div>
       {(!mode || !model) && notKnownYet}
       {marks.map((line) => <p key={line} class="marked small">⚠︎ {line}</p>)}
+      </>}
       <LabelField store={store} host={host} folder={workflow.folder} disabled={disabled}
         listID={`workflow-labels-${workflow.workflowID}`}
         labels={settings.labels.map((value) => ({ value, owner: "person" as const }))}
@@ -106,6 +107,28 @@ export function WorkflowSettingsForm({ store, host, summary, disabled, problem, 
         remove={(value) => change({ labels: (held) => held.filter((l) => labelKey(l) !== labelKey(value)) })} />
       {problem && <p class="marked small" role="alert">⚠︎ {problem}</p>}
     </div>
+  );
+}
+
+/** On Auto, the permission mode and the model in the shared words (#2873), as the window's
+ *  WorkflowPage.autoSettings: Auto picks the runtime each run, so it has no choices of its own. */
+function AutoMenus({ settings, disabled, set }: {
+  settings: WorkflowSettings; disabled: boolean; set: ReturnType<typeof writer>;
+}) {
+  const note = autoEffortNote(settings);
+  return (
+    <>
+      <div class="menus" role="group" aria-label="Settings for each run">
+        <OptionControl option={withDefault(autoOption("permission"), "Permission mode")} value={settings.permissionMode ?? null} disabled={disabled}
+          onChange={set((s, v) => without(s, "permissionMode", v))} />
+        <span class="spacer" />
+        <span class="menus-right">
+          <OptionControl option={withDefault(autoOption("model"), "Model")} value={settings.model ?? null} disabled={disabled}
+            onChange={set((s, v) => without(s, "model", v))} />
+        </span>
+      </div>
+      {note && <p class="quiet small">{note}</p>}
+    </>
   );
 }
 

@@ -70,9 +70,10 @@ public struct QuickAnswer: Hashable, Sendable, Codable {
     /// four options, or a Reply for a form with one free-text field. A choice may carry
     /// its optional note beside it (`question_0_custom`, see `ElicitationSchema.pages`):
     /// left empty, the choice is still a whole answer. Nil for anything else: a page to
-    /// open, more than one question, a number, more options than fit.
+    /// open, more than one question, a number, more options than fit, or a secret, which a
+    /// banner's reply would take in clear (#2885).
     public static func answers(for request: ElicitationRequest) -> [QuickAnswer]? {
-        guard case .form(let schema) = request.mode else { return nil }
+        guard case .form(let schema) = request.mode, request.secret == nil else { return nil }
         let pages = schema.pages
         guard pages.count == 1, let only = pages[0].first,
               case .string(let format, _, _, let choices) = only.kind else { return nil }

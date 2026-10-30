@@ -908,7 +908,9 @@ final class AppModel {
         if let controlLink { client = DaemonClient(link: hostLink(.mac, through: controlLink)) }
         // From the start, not once connected: a banner tapped to launch the app arrives
         // before then, and was dropped (#1055).
-        notifier.open = { [weak self] agentID in
+        notifier.open = { [weak self] agentID, line in
+            // A notice's line (#2860): gone to and lit once its chat has settled.
+            if let line { self?.focusEntry(line) }
             // In its folder's own window when one is open (#1089, Alex).
             if self?.showInFolderWindow(agentID) == true { return }
             // Its own folder first, because picking a folder empties the selection:
@@ -1969,6 +1971,19 @@ final class AppModel {
         return histories.isEmpty ? nil : .merged(histories)
     }
 
+    /// Which features were used (#2165), for Reports ▸ Features: this Mac's counts and every
+    /// connected server's, added up. Nil when no host knows the method.
+    func featureUsage() async -> DaemonAPI.FeatureUsage? {
+        var all: [DaemonAPI.FeatureUsage] = []
+        for host in chartHosts {
+            if let usage = try? await client(for: host).call(DaemonAPI.Method.reportsFeatures, DaemonAPI.Empty(),
+                                                              returning: DaemonAPI.FeatureUsage.self) {
+                all.append(usage)
+            }
+        }
+        return all.isEmpty ? nil : .merged(all)
+    }
+
     /// This Mac first, then every server that has said what it spends.
     private var chartHosts: [MachineRef] { [.mac] + serverCosts.keys.filter { $0 != .mac } }
 
@@ -2362,7 +2377,8 @@ final class AppModel {
             return field == .model ? draftLevels.model?.rawValue : draftLevels.permission?.rawValue
         }
         guard let runtimeID = draftRuntimeID else { return nil }
-        return LevelMatch.level(field, runtimeID: runtimeID, mappings: autoMappings) { id in
+        let chosen = field == .model ? draftLevels.model?.rawValue : draftLevels.permission?.rawValue
+        return LevelMatch.level(field, runtimeID: runtimeID, mappings: autoMappings, preferring: chosen) { id in
             self.draftChosen[id] ?? self.draftOptions.first { $0.id == id }?.currentValue
         }
     }
@@ -2778,6 +2794,19 @@ final class AppModel {
             var summary = try await client(for: key.host).call(
                 DaemonAPI.Method.foldersSetDiskSpace,
                 DaemonAPI.SetDiskSpaceRequest(folder: key.folder, diskSpace: lines),
+                returning: DaemonAPI.FolderSummary.self)
+            summary.host = key.host
+            upsert(summary)
+        } catch {
+            problem = describe(error)
+        }
+    }
+
+    func setPRCostComment(_ choice: PRCostComment, for key: FolderKey) async {
+        do {
+            var summary = try await client(for: key.host).call(
+                DaemonAPI.Method.foldersSetPRCostComment,
+                DaemonAPI.SetPRCostCommentRequest(folder: key.folder, prCostComment: choice),
                 returning: DaemonAPI.FolderSummary.self)
             summary.host = key.host
             upsert(summary)
@@ -3799,6 +3828,12 @@ final class AppModel {
         let arguments = ProcessInfo.processInfo.arguments
         guard let index = arguments.firstIndex(of: "-open-agent"), index + 1 < arguments.endIndex,
               let id = UUID(uuidString: arguments[index + 1]) else { return }
+        // With `-open-line <entry>`, as a tap on a notice's banner opens it (#2860).
+        if let at = arguments.firstIndex(of: "-open-line"), at + 1 < arguments.endIndex,
+           let line = UUID(uuidString: arguments[at + 1]) {
+            notifier.open(id, line)
+            return
+        }
         openAgent(id)
     }
     private static var launchArgumentsOpened = false
@@ -4166,6 +4201,8 @@ final class AppModel {
            let reason = try? rpc.data?.decode(DaemonAPI.MCPCatalogError.self) {
             return reason
         }
+        // The organisation's policy refused it (#998, #2355): its own words, so the sheet can ask an admin.
+        if let refusal = DaemonAPI.PolicyRefusal(error: error) { return .failed(refusal.line) }
         return .failed(String(describing: error))
     }
 
@@ -5652,6 +5689,22 @@ final class AppModel {
         try? await client(forAgent: agentID).call(DaemonAPI.Method.agentsFind,
                                                    DaemonAPI.FindRequest(agentID: agentID, text: text),
                                                    returning: DaemonAPI.FindResult.self)
+    }
+
+    // MARK: Lineage
+
+    /// What a session is linked to (#2940): `lineage/walk` from it, on its host.
+    func lineageWalk(of agentID: UUID) async throws -> DaemonAPI.LineageGraph {
+        try await client(forAgent: agentID).call(
+            DaemonAPI.Method.lineageWalk,
+            DaemonAPI.LineageNodeRequest(node: LineageList.node(ofSession: agentID), depth: LineageList.depth),
+            returning: DaemonAPI.LineageGraph.self)
+    }
+
+    /// An issue's or a PR's cost rolled up, from the session's host; nil when it will not say.
+    func lineageCost(_ node: DaemonAPI.LineageNode, of agentID: UUID) async -> DaemonAPI.LineageCostRollup? {
+        try? await client(forAgent: agentID).call(DaemonAPI.Method.lineageCost, DaemonAPI.LineageNodeRequest(node: node),
+                                                   returning: DaemonAPI.LineageCostRollup.self)
     }
 
     /// Go to a match in the open chat: earlier pages come in until its turn is in hand

@@ -36,6 +36,8 @@ import { MilestonesSection, TimeMilestonesUnder } from "./Milestones";
 import { isComplete } from "../model/milestones";
 import { Capability } from "../protocol/capabilities.generated";
 import { OrgBudget, OrgPolicyLine, PassThroughList } from "./OrgPolicyLine";
+import { PageTitle } from "./TopBar";
+import { pageCrumbs, sectionOfActivity } from "../model/crumbs";
 
 function navigate(destination: { host: string; folder: string; session?: string; workflow?: string }): void {
   const parts = ["h", destination.host, "p", destination.folder];
@@ -310,13 +312,15 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
   const costPane = useSignal<"cost" | "reports">("cost");
   return (
     <section class={`chat activity-page ${page}-page`} aria-label={pageTitles[page]}>
-      <header class="column-head"><BackToList /><h1>{pageTitles[page]}</h1></header>
+      <header class="column-head page-head"><BackToList />
+        <PageTitle parts={sectionOfActivity(page) ? pageCrumbs(sectionOfActivity(page)!, pageTitles[page]) : []}><h1>{pageTitles[page]}</h1></PageTitle>
+      </header>
       <div class="scroll">
         <div class="activity-body">
           {page === "events" && (
-            <div class="segmented events-panes" role="radiogroup" aria-label="Show">
+            <div class="tabs events-panes" role="tablist" aria-label="Show">
               {(["events", "audit"] as const).map((p) => (
-                <button key={p} role="radio" aria-checked={pane.value === p} class={pane.value === p ? "on" : ""}
+                <button key={p} role="tab" aria-selected={pane.value === p} class={pane.value === p ? "on" : ""}
                   onClick={() => { pane.value = p; }}>{p === "events" ? "Events" : "Audit"}</button>
               ))}
             </div>
@@ -426,9 +430,9 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
           )}
           {page === "runtimes" && <p class="hint">Install a runtime on the Mac, in Settings ▸ Agent Runtimes. Sign it in on the Mac, in Runtimes.</p>}
           {page === "spending" && (
-            <div class="segmented events-panes" role="radiogroup" aria-label="Show">
+            <div class="tabs events-panes" role="tablist" aria-label="Show">
               {(["cost", "reports"] as const).map((p) => (
-                <button key={p} role="radio" aria-checked={costPane.value === p} class={costPane.value === p ? "on" : ""}
+                <button key={p} role="tab" aria-selected={costPane.value === p} class={costPane.value === p ? "on" : ""}
                   onClick={() => { costPane.value = p; }}>{p === "cost" ? "Cost" : "Reports"}</button>
               ))}
             </div>

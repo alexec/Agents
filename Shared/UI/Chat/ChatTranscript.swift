@@ -58,6 +58,8 @@ struct ChatTranscript: View {
     @State private var turnViews: [UUID: TurnDetail] = [:]
     /// The run of calls gone to from elsewhere: opened, with its first call (#1315).
     @State private var focusedRun: UUID?
+    /// The line just gone to from elsewhere, lit for a moment (#2860).
+    @State private var highlightedEntry: UUID?
     /// Every entry of a stored turn once it has been opened, folded. Eight at a time:
     /// opening one lets the oldest opened one go (#285).
     @State private var fetchedTurns: [UUID: FetchedTurn] = [:]
@@ -285,9 +287,14 @@ struct ChatTranscript: View {
                 // Out of the slack: the rows less the empty space above them. Not a negative
                 // top margin on the scroll view, which hid every row from the pointer: no
                 // click reached a question card's choices or any other row (#2374).
+                .coordinateSpace(.named(TranscriptStack.space))
                 .padding(.top, -slackMargin)
             }
             .scrollPosition($position)
+            .environment(\.highlightedEntry, highlightedEntry)
+            // The pane knows where turns start, not the lines in them: a line lit in a long
+            // turn says where it is, and the pane goes to it (#2860).
+            .environment(\.revealLine, LineRevealer { y in scroll(to: max(geometry.slack, y - Double(paneHeight ?? 800) / 3)) })
             // Hidden from choosing a conversation until it is placed at its end: its first
             // frame is the end, never a jump to it (#1287, #1349).
             .opacity(isPlacing ? 0 : 1)
@@ -362,38 +369,10 @@ struct ChatTranscript: View {
             .onChange(of: settleKey) { startSettling() }
             // Asked for from elsewhere. A message entry is drawn with its own id, so
             // this lands on it once its turn is drawn.
-            .onChange(of: focusedEntry) {
-                guard let focusedEntry else { return }
-                // In a stored turn's steps, not yet drawn: the turn is drawn, its steps
-                // fetched, and then gone to (#1532).
-                if let focusedIndex, !rows.contains(where: { $0.draws(focusedEntry) }),
-                   let turn = rows.first(where: { $0.range?.contains(focusedIndex) == true }) {
-                    turnViews[turn.id] = .open
-                    goTo(turn.id)
-                    clearFocus()
-                    Task {
-                        await fetch(turn)
-                        try? await Task.sleep(for: .milliseconds(50))
-                        scroller.scrollTo(focusedEntry, anchor: .center)
-                    }
-                    return
-                }
-                if let turn = rows.first(where: { $0.items.contains { $0.id == focusedEntry } }) {
-                    if !(turnViews[turn.id] ?? .initial).showsSteps { turnViews[turn.id] = .open }
-                    // A run of calls is drawn as its last: open that run and its call, and
-                    // nothing else in the turn (#1315).
-                    if turn.items.contains(where: { if case .toolRun = $0 { $0.id == focusedEntry } else { false } }) {
-                        focusedRun = focusedEntry
-                    }
-                    goTo(turn.id)
-                }
-                // Being sent to a line in the middle is being sent away from the end,
-                // and it was asked for. Following on from here would take the reader
-                // straight back off the line they were sent to.
-                stopFollowing()
-                Task { @MainActor in scroller.scrollTo(focusedEntry, anchor: .center) }
-                clearFocus()
-            }
+            .onChange(of: focusedEntry) { goToFocus(scroller) }
+            // A banner's line (#2860) is asked for as its chat opens: gone to once the chat
+            // has settled at the end, or not at all when its turn is not in hand.
+            .onChange(of: hasSettled) { if hasSettled { goToFocus(scroller) } }
             .onChange(of: scrollToEndToken) { goToEnd() }
             .onChange(of: isFollowing) { _, now in onFollowing(now) }
             // Nobody is reading a chat that is not on screen, so it may be trimmed again.
@@ -671,6 +650,55 @@ struct ChatTranscript: View {
     }
 
     /// To a turn: drawn first, held where it is laid out, and the pane put at its top.
+    /// Goes to the entry asked for from elsewhere, and lights it a moment (#2860). One asked
+    /// for as its chat opens waits until the chat has settled at the end; one this chat
+    /// does not draw is left for the chat that does (a folder's own window, #1089).
+    private func goToFocus(_ scroller: ScrollViewProxy) {
+        guard let focusedEntry, hasSettled, motion.key == settleKey,
+              focusedIndex != nil || rows.contains(where: { $0.draws(focusedEntry) }) else { return }
+        // In a stored turn's steps, not yet drawn: the turn is drawn, its steps
+        // fetched, and then gone to (#1532).
+        if let focusedIndex, !rows.contains(where: { $0.draws(focusedEntry) }),
+           let turn = rows.first(where: { $0.range?.contains(focusedIndex) == true }) {
+            turnViews[turn.id] = .open
+            goTo(turn.id)
+            clearFocus()
+            Task {
+                await fetch(turn)
+                try? await Task.sleep(for: .milliseconds(50))
+                scroller.scrollTo(focusedEntry, anchor: .center)
+                light(focusedEntry)
+            }
+            return
+        }
+        if let turn = rows.first(where: { $0.items.contains { $0.id == focusedEntry } }) {
+            if !(turnViews[turn.id] ?? .initial).showsSteps { turnViews[turn.id] = .open }
+            // A run of calls is drawn as its last: open that run and its call, and
+            // nothing else in the turn (#1315).
+            if turn.items.contains(where: { if case .toolRun = $0 { $0.id == focusedEntry } else { false } }) {
+                focusedRun = focusedEntry
+            }
+            goTo(turn.id)
+        }
+        // Being sent to a line in the middle is being sent away from the end,
+        // and it was asked for. Following on from here would take the reader
+        // straight back off the line they were sent to.
+        stopFollowing()
+        Task { @MainActor in scroller.scrollTo(focusedEntry, anchor: .center) }
+        light(focusedEntry)
+        clearFocus()
+    }
+
+    /// The line gone to, lit for a moment so the eye finds it (#2860).
+    private func light(_ id: UUID) {
+        withAnimation(.easeIn(duration: 0.2)) { highlightedEntry = id }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            guard highlightedEntry == id else { return }
+            withAnimation(.easeOut(duration: 0.6)) { highlightedEntry = nil }
+        }
+    }
+
     private func goTo(_ id: UUID) {
         guard let top = geometry.top(of: id) else { return }
         stopFollowing()

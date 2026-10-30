@@ -24,7 +24,7 @@ import { accountChoices, accountRows, choiceNote, defaultAccountName, formRuntim
 import { formFor, keepForm, keptForm } from "../model/startForm";
 import { personaChoices, withPersonaLabels } from "../model/personas";
 import { sandboxCardTitle, sandboxChoiceWords, sandboxChoices, sandboxExplanation, sandboxOverrideWords, sandboxState,
-  sandboxStateWords, sandboxWhy, startWithout, fixedSandbox } from "../model/sandbox";
+  sandboxStateWords, sandboxWhy, startWithout, fixedSandbox, sandboxRefusedBy } from "../model/sandbox";
 import { autoID, autoWords, cellOf, fieldWords, followsSettings, levelMeaning, levelWords, matchLevel, noneIncluded, picksWords, sandboxValues } from "../model/levels";
 import type { AutoPreview, ClientPermissionMode, Levels } from "../protocol/generated";
 import { accepted } from "../model/labels";
@@ -318,9 +318,11 @@ export function NewAgent({ store, host, folder, folderName, down }: {
     return out;
   }
   const levelProps: LevelProps = {
-    runtimeName: isAuto ? (autoPreview.value?.runtimeID ? runtimeNameOf(autoPreview.value.runtimeID) : undefined) : undefined,
+    // On a named runtime too, so the menus show "⋯ <runtime>'s own" as the chat's do (#2889).
+    runtimeName: isAuto ? (autoPreview.value?.runtimeID ? runtimeNameOf(autoPreview.value.runtimeID) : undefined)
+      : chosenRuntime ? runtimeNameOf(chosenRuntime) : undefined,
     chosen: (field) => isAuto ? levels.value[field]
-      : matchLevel(mappings, chosenRuntime ?? "", field, (id) => form.value.chosen[id] ?? form.value.options.find((o) => o.id === id)?.currentValue),
+      : matchLevel(mappings, chosenRuntime ?? "", field, (id) => form.value.chosen[id] ?? form.value.options.find((o) => o.id === id)?.currentValue, levels.value[field]),
     cell: (field, level) => cellOf(mappings, (isAuto ? autoPreview.value?.runtimeID : chosenRuntime) ?? "", field, level),
     choose: (field, level) => {
       levels.value = { ...levels.value, [field]: level };
@@ -593,7 +595,7 @@ export function NewAgent({ store, host, folder, folderName, down }: {
           {autoRefusal.value && (
             <div class="sandbox-refusal" role="status">
               <p class="quiet small">{autoRefusal.value}</p>
-              <button onClick={() => go({ settings: true })}>Auto settings</button>
+              <button onClick={() => go({ nav: "settings" })}>Auto settings</button>
             </div>
           )}
           {isAuto ? (
@@ -610,7 +612,10 @@ export function NewAgent({ store, host, folder, folderName, down }: {
                   }}>
                   {sandboxValues.map((v) => {
                     const cell = levelProps.cell("sandbox", v);
-                    return <option key={v} value={v}>{levelWords("sandbox", v)} — {cell ? `${cell.words} on ${levelProps.runtimeName}` : levelMeaning("sandbox", v)}</option>;
+                    // While the organisation requires the sandbox, each choice but On is shown, dimmed, not chosen (#998, #2891).
+                    const refusedBy = sandboxRefusedBy(v, store.sandboxSetBy.value[host]);
+                    return <option key={v} value={v} disabled={!!refusedBy} title={refusedBy ? line(refusedBy) : undefined}>
+                      {optionLabel(`${levelWords("sandbox", v)} — ${cell ? `${cell.words} on ${levelProps.runtimeName}` : levelMeaning("sandbox", v)}`, refusedBy)}</option>;
                   })}
                 </select>
               </label>
@@ -624,7 +629,7 @@ export function NewAgent({ store, host, folder, folderName, down }: {
               runtimeID={chosenRuntime ?? undefined}
               clientPermission={chosenRuntime ? {
                 own: clientPermission.value,
-                settings: store.clientPermissions.value[store.macHostID.value]?.[chosenRuntime as keyof ClientPermissionSettings] ?? "default",
+                settings: store.clientPermissions.value[store.macHostID.value]?.[chosenRuntime as Exclude<keyof ClientPermissionSettings, "setBy">] ?? "default",
                 set: (mode) => (clientPermission.value = mode),
               } : undefined}
               besideMode={chosenRuntime && (
@@ -705,7 +710,7 @@ function SandboxPill({ runtimeID, name, override, runtimeDefault, codexMode, dis
   if (!choices.length) {
     return <span class="pill quiet" title={setBy ? line(setBy) : sandboxWhy(runtimeID) ?? state}>{sandboxChoiceWords(fixedSandbox(runtimeID), runtimeID)}</span>;
   }
-  const refused = (choice: SandboxChoice) => setBy !== undefined && choice !== "on";
+  const refused = (choice: SandboxChoice) => sandboxRefusedBy(choice, setBy) !== undefined;
   const asked = override ?? runtimeDefault;
   return (
     <label class="pill select" title={`${fieldWords.sandbox}: ${state}`}>
@@ -763,7 +768,7 @@ function PersonaSwitch({ personas, picked, down, choose }: {
   }, [personas]);
   return (
     <div ref={box} class={`persona-switch${name ? "" : " none"}${fits.value ? "" : " menu"}`} title="Start a kind of session: a persona sets what it names">
-      <div ref={segments} class="segmented persona-segments" role="group" aria-label="Persona" aria-hidden={!fits.value}>
+      <div ref={segments} class="button-group persona-segments" role="group" aria-label="Persona" aria-hidden={!fits.value}>
         <button type="button" aria-pressed={picked === undefined} class={picked === undefined ? "on" : ""}
           disabled={down} tabIndex={fits.value ? undefined : -1} onClick={() => choose("")}>No persona</button>
         {personas.map((persona) => (

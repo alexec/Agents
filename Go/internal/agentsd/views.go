@@ -572,6 +572,16 @@ func (d *Daemon) callFromView(ctx context.Context, r wire.ViewCallRequest) (wire
 	if err != nil {
 		return nil, err
 	}
+	// The Lineage section (#2941): the host answers it, from its own record.
+	if r.Name == lineageViewTool {
+		result, err := d.lineageViewResult(s, r.Arguments)
+		if err == nil {
+			log.Printf("view %s of %s called %s", r.ViewID, name, r.Name)
+		} else {
+			log.Printf("view %s of %s asked for %s, which only ours may call", r.ViewID, name, r.Name)
+		}
+		return result, err
+	}
 	catalog := d.loadViewCatalog(ctx, s)
 	if catalog != nil && !catalog.appTool(r.Name) {
 		catalog = d.refreshViewCatalog(ctx, s)

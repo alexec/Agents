@@ -709,10 +709,33 @@
           "items": {
             "$ref": "#/definitions/AgentMachinesProvider"
           }
+        },
+        "hosts": {
+          "description": "Every machine of the person's, by name, where start_session can start a session (#2887). Absent from an older control plane.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AgentMachinesHost"
+          }
         }
       },
       "required": [
         "providers"
+      ],
+      "additionalProperties": false
+    },
+    "AgentMachinesHost": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "state"
       ],
       "additionalProperties": false
     },
@@ -4407,6 +4430,10 @@
         },
         "opencode": {
           "$ref": "#/definitions/ClientPermissionMode"
+        },
+        "setBy": {
+          "$ref": "#/definitions/PolicySetBy",
+          "description": "Set when the organisation's mode ceiling is below approving every request: Always-approve is refused, and no agent's requests are answered for the person."
         }
       },
       "required": [
@@ -7278,6 +7305,9 @@
         },
         "askedAt": {
           "$ref": "#/definitions/WireDate"
+        },
+        "secret": {
+          "$ref": "#/definitions/ElicitationSecret"
         }
       },
       "required": [
@@ -7540,6 +7570,26 @@
           "additionalProperties": false
         }
       ]
+    },
+    "ElicitationSecret": {
+      "description": "An agent's ask_secret (#2885): one named secret, typed into a masked field. The value goes to the person's secrets.env on the host, never into the record.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "isSet": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "isSet"
+      ],
+      "additionalProperties": false
     },
     "Empty": {
       "type": "object",
@@ -8009,6 +8059,62 @@
         "events",
         "waiting",
         "hasMore"
+      ],
+      "additionalProperties": false
+    },
+    "FeatureUsage": {
+      "type": "object",
+      "description": "reports/features (#2165): each feature this host counted, a method it serves or an app tool, with its uses in the last 7 and the last `days` days, the least used first. A feature with no use is in it too. Counts only, never what a call said; they stay on the machine. since is the first day counted in the range.",
+      "properties": {
+        "days": {
+          "type": "integer"
+        },
+        "since": {
+          "type": "string",
+          "description": "YYYY-MM-DD in the host's zone."
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FeatureUse"
+          }
+        }
+      },
+      "required": [
+        "days",
+        "features"
+      ],
+      "additionalProperties": false
+    },
+    "FeatureUse": {
+      "type": "object",
+      "description": "One feature's uses (#2165). clients is who used it: mac, remote, web, agent or workflow.",
+      "properties": {
+        "method": {
+          "type": "string"
+        },
+        "week": {
+          "type": "integer"
+        },
+        "quarter": {
+          "type": "integer"
+        },
+        "clients": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "lastUsed": {
+          "type": "string",
+          "description": "YYYY-MM-DD in the host's zone."
+        }
+      },
+      "required": [
+        "method",
+        "week",
+        "quarter",
+        "clients"
       ],
       "additionalProperties": false
     },
@@ -8587,6 +8693,10 @@
         },
         "pinned": {
           "type": "boolean"
+        },
+        "prCostComment": {
+          "$ref": "#/definitions/PRCostComment",
+          "description": "Absent is off (#2352)."
         }
       },
       "required": [
@@ -9511,6 +9621,14 @@
         "continueWhenBack": {
           "description": "A helper's turn refused for a spent allowance waits for it at once, as if the person had chosen Continue (#1918). Off unless set.",
           "type": "boolean"
+        },
+        "archiveWhenMerged": {
+          "description": "A session whose pull request merges is archived, when its turn has ended and its worktree has nothing uncommitted (#2886). On unless set.",
+          "type": "boolean"
+        },
+        "agentsMayStartOnMachines": {
+          "description": "start_session with a machine starts the session on another of the person's machines without asking first (#2928). Off unless set; only the person sets it, from Folder Settings.",
+          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -10028,6 +10146,315 @@
         "agentID",
         "askedAt",
         "isCallOpen"
+      ],
+      "additionalProperties": false
+    },
+    "LineageCost": {
+      "type": "object",
+      "description": "What was banked under lineage nodes (#2350): a turn's cost, tokens and time, split evenly among the links active when it was banked. turns is a share of turns, so a turn on two nodes is half a turn on each.",
+      "properties": {
+        "cost": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "By currency."
+        },
+        "inputTokens": {
+          "type": "integer"
+        },
+        "outputTokens": {
+          "type": "integer"
+        },
+        "limitTokens": {
+          "type": "integer",
+          "description": "Fresh input and output, as a limit counts them (#998)."
+        },
+        "turns": {
+          "type": "number"
+        },
+        "workingSeconds": {
+          "type": "number",
+          "description": "The agent, its tools and others at work."
+        },
+        "waitingSeconds": {
+          "type": "number",
+          "description": "Waiting for the person."
+        }
+      },
+      "required": [
+        "cost",
+        "inputTokens",
+        "outputTokens",
+        "turns",
+        "workingSeconds",
+        "waitingSeconds"
+      ],
+      "additionalProperties": false
+    },
+    "LineageCostNode": {
+      "type": "object",
+      "description": "One node's banked cost on a machine (#2350), whole, with what its rollups need: the project its ref is in, the issues a PR fixes (ended links too: a PR closed without a merge still counts against its issue, as waste), the milestones it is part of, and how a PR ended. A session's own cost is its turns that had no active link.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "project": {
+          "type": "string",
+          "description": "The repo or tracker the node is in: github:alexec/agents, linear, or for a session its folder's repo (folder:<name> without one)."
+        },
+        "banked": {
+          "$ref": "#/definitions/LineageCost"
+        },
+        "fixes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "A PR's issues, by ref."
+        },
+        "partOf": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The milestones it is part of, by ref."
+        },
+        "outcome": {
+          "type": "string",
+          "description": "A PR's end: merged, closed (without a merge: waste) or reverted (a merged revert: waste). Absent while open. The list is open."
+        },
+        "failedChecks": {
+          "type": "integer",
+          "description": "A PR's failed CI rounds: checks.failed, once per run and attempt."
+        },
+        "firstAt": {
+          "$ref": "#/definitions/WireDate",
+          "description": "When the machine first banked or noted the node (#2351): the start of the work on it, for lead time."
+        },
+        "endedAt": {
+          "$ref": "#/definitions/WireDate",
+          "description": "When a PR ended (#2351): merged, closed or reverted. Absent while open."
+        },
+        "lastAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "node",
+        "banked",
+        "lastAt"
+      ],
+      "additionalProperties": false
+    },
+    "LineageCostRollup": {
+      "type": "object",
+      "description": "lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a milestone's issues, their PRs and the PRs part of it; a project's every node (kind project, ref github:alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "own": {
+          "$ref": "#/definitions/LineageCost"
+        },
+        "total": {
+          "$ref": "#/definitions/LineageCost"
+        },
+        "waste": {
+          "$ref": "#/definitions/LineageCost"
+        },
+        "unlinked": {
+          "$ref": "#/definitions/LineageCost"
+        },
+        "prsMerged": {
+          "type": "integer"
+        },
+        "prsClosed": {
+          "type": "integer"
+        },
+        "prsReverted": {
+          "type": "integer"
+        },
+        "failedChecks": {
+          "type": "integer"
+        },
+        "parts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageCostNode"
+          }
+        },
+        "limited": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "node",
+        "own",
+        "total",
+        "waste",
+        "unlinked",
+        "prsMerged",
+        "prsClosed",
+        "prsReverted",
+        "failedChecks",
+        "parts"
+      ],
+      "additionalProperties": false
+    },
+    "LineageEndRequest": {
+      "type": "object",
+      "description": "lineage/end (#2348): the link from one node to another by this relationship stops being active now. Nothing is removed: the link keeps its start and gets an end.",
+      "properties": {
+        "from": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "to": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "rel": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to",
+        "rel"
+      ],
+      "additionalProperties": false
+    },
+    "LineageGraph": {
+      "type": "object",
+      "description": "lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more.",
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageNode"
+          }
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageLink"
+          }
+        },
+        "limited": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "nodes",
+        "links"
+      ],
+      "additionalProperties": false
+    },
+    "LineageLink": {
+      "type": "object",
+      "description": "A typed link in the lineage graph (#2348): from works-on, opens, fixes, started, reviews, closes or part-of to. source is how the host knows it: start, branch, pr-body, helper, agent, person or forge. at is when it started; endedAt is set when it stops being active (a PR merged, a session archived). Both lists are open: a host keeps a relationship or a source it does not know.",
+      "properties": {
+        "from": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "to": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "rel": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "endedAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "from",
+        "to",
+        "rel",
+        "source",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "LineageLinkRequest": {
+      "type": "object",
+      "description": "lineage/link (#2348): start a link. When the same link is active already, it is the answer, unchanged.",
+      "properties": {
+        "from": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "to": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "rel": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to",
+        "rel",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "LineageLinks": {
+      "type": "object",
+      "description": "The links of a node, newest first (#2348), or the links lineage/end ended. limited says there are more than the answer holds.",
+      "properties": {
+        "links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageLink"
+          }
+        },
+        "limited": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "links"
+      ],
+      "additionalProperties": false
+    },
+    "LineageNode": {
+      "type": "object",
+      "description": "A node in the lineage graph (#2348). kind is what it is: issue, pr, session, workflow-run, commit, file, branch or milestone, and the list is open. ref names it apart from any tracker, as <scheme>:<id>: github:alexec/Agents#123, gitlab:group/repo!45, linear:ENG-4, jira:ABC-9, session:<agent id>.",
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "ref"
+      ],
+      "additionalProperties": false
+    },
+    "LineageNodeRequest": {
+      "type": "object",
+      "description": "lineage/links and lineage/walk (#2348): a node, and for a walk how many links away to go (1 to 4; 2 when not said: issue, sessions, PRs).",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "depth": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "node"
       ],
       "additionalProperties": false
     },
@@ -12038,6 +12465,41 @@
       "required": [],
       "additionalProperties": false
     },
+    "MachineFolderSend": {
+      "type": "object",
+      "description": "machines/sendFolder, through host/machines (#2929): one step of an agent's start_session with send, which sends this folder's branch to another of the person's machines first. Exactly one of state, upload and receive; the control plane sends that machine's folders/receiveState, folders/receiveUpload or folders/receive.",
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/ReceiveStateRequest"
+        },
+        "upload": {
+          "$ref": "#/definitions/ReceiveUploadRequest"
+        },
+        "receive": {
+          "$ref": "#/definitions/ReceiveRequest"
+        }
+      },
+      "required": [
+        "host"
+      ],
+      "additionalProperties": false
+    },
+    "MachineFolderSent": {
+      "type": "object",
+      "description": "What machines/sendFolder's step answered (#2929): state for state, folder for receive, neither for upload.",
+      "properties": {
+        "state": {
+          "$ref": "#/definitions/ReceiveState"
+        },
+        "folder": {
+          "$ref": "#/definitions/FolderSummary"
+        }
+      },
+      "additionalProperties": false
+    },
     "MachineHello": {
       "type": "object",
       "description": "host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).",
@@ -12436,6 +12898,40 @@
           "type": "string"
         }
       },
+      "additionalProperties": false
+    },
+    "MachineSessionCall": {
+      "type": "object",
+      "description": "machines/sessionCall, through host/machines (#2927): an agent's read_session, message_session, stop_session, archive_session, or list_sessions and wait_for_agents status, on a session it started on another of the person's machines with start_session. The control plane sends that machine's agents/fromStarter, with call.from in its own words.",
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "call": {
+          "$ref": "#/definitions/SessionCall"
+        }
+      },
+      "required": [
+        "host",
+        "call"
+      ],
+      "additionalProperties": false
+    },
+    "MachineSessionStart": {
+      "type": "object",
+      "description": "machines/startSession, through host/machines (#2887): an agent's start_session on another of the person's machines, by its name. The control plane sends that machine's agents/start.",
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "start": {
+          "$ref": "#/definitions/StartRequest"
+        }
+      },
+      "required": [
+        "host",
+        "start"
+      ],
       "additionalProperties": false
     },
     "MachineStatus": {
@@ -13253,6 +13749,50 @@
         "guardedChange",
         "notice"
       ]
+    },
+    "NoticeDelivered": {
+      "type": "object",
+      "description": "notices/delivered (#2860): the control plane sent a host's notice to one of the person's devices.",
+      "properties": {
+        "need": {
+          "$ref": "#/definitions/NeedID"
+        },
+        "to": {
+          "$ref": "#/definitions/NoticeDevice"
+        }
+      },
+      "required": [
+        "need",
+        "to"
+      ],
+      "additionalProperties": false
+    },
+    "NoticeDelivery": {
+      "type": "object",
+      "description": "Where the notice recorded as entry `notice` went (#2860), recorded after it once the host knows: when it sends it to the computer, or when the control plane says which device it sent it to. A client draws it on that notice's line.",
+      "properties": {
+        "notice": {
+          "$ref": "#/definitions/UUID"
+        },
+        "to": {
+          "$ref": "#/definitions/NoticeDevice"
+        }
+      },
+      "required": [
+        "notice",
+        "to"
+      ],
+      "additionalProperties": false
+    },
+    "NoticeDevice": {
+      "type": "string",
+      "enum": [
+        "computer",
+        "iPhone",
+        "iPad",
+        "device"
+      ],
+      "description": "Where a notice went (#2860): the computer (the Mac window or the web page, the \"mac\" surface), an iPhone, an iPad, or a device of a kind the control plane does not know."
     },
     "NoticeLimits": {
       "type": "object",
@@ -14091,6 +14631,15 @@
         "routes"
       ],
       "additionalProperties": false
+    },
+    "PRCostComment": {
+      "type": "string",
+      "enum": [
+        "off",
+        "tokens",
+        "cost"
+      ],
+      "description": "What the host says on a folder's pull request when it merges (#2352): nothing (off, the default), the tokens and time only, or the cost too. Kept in the folder's .agents/folder.json, so the repo's people choose what a public repo publishes."
     },
     "PagesChangedNotification": {
       "type": "object",
@@ -17252,7 +17801,8 @@
         "time",
         "runtimes",
         "adoption",
-        "workflows"
+        "workflows",
+        "value"
       ],
       "description": "A page of Reports (#1804, #2019)."
     },
@@ -17487,6 +18037,120 @@
       "required": [
         "scopes",
         "admin"
+      ],
+      "additionalProperties": false
+    },
+    "ReportValue": {
+      "type": "object",
+      "description": "reports/value (#2351): what the work in a scope cost and what it delivered, from the lineage nodes that the scope's machines send (#2350). A node is in the range when it last changed in it, with its whole cost. total is the work on issues and PRs; waste is the PRs closed without a merge and merged reverts; unlinked is the turns with no issue or PR. perMergedPR is total by the PRs merged, by currency. leadTimeSeconds is the median of the issues' lead times. issues and milestones are the most costly first, at most 100 each; limited says there are more.",
+      "properties": {
+        "range": {
+          "$ref": "#/definitions/ReportRange"
+        },
+        "scope": {
+          "$ref": "#/definitions/ReportScope"
+        },
+        "total": {
+          "$ref": "#/definitions/LineageCost"
+        },
+        "waste": {
+          "$ref": "#/definitions/LineageCost"
+        },
+        "unlinked": {
+          "$ref": "#/definitions/LineageCost"
+        },
+        "perMergedPR": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "By currency."
+        },
+        "prsMerged": {
+          "type": "integer"
+        },
+        "prsClosed": {
+          "type": "integer"
+        },
+        "prsReverted": {
+          "type": "integer"
+        },
+        "failedChecks": {
+          "type": "integer"
+        },
+        "leadTimeSeconds": {
+          "type": "number"
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReportValueRow"
+          }
+        },
+        "milestones": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReportValueRow"
+          }
+        },
+        "limited": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "range",
+        "scope",
+        "total",
+        "waste",
+        "unlinked",
+        "perMergedPR",
+        "prsMerged",
+        "prsClosed",
+        "prsReverted",
+        "failedChecks",
+        "issues",
+        "milestones"
+      ],
+      "additionalProperties": false
+    },
+    "ReportValueRow": {
+      "type": "object",
+      "description": "One issue or milestone on Reports ▸ Value (#2351): its cost rolled up from every machine in the scope, as lineage/cost adds it up, and how its PRs ended.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "total": {
+          "$ref": "#/definitions/LineageCost"
+        },
+        "waste": {
+          "$ref": "#/definitions/LineageCost"
+        },
+        "prsMerged": {
+          "type": "integer"
+        },
+        "prsClosed": {
+          "type": "integer"
+        },
+        "prsReverted": {
+          "type": "integer"
+        },
+        "failedChecks": {
+          "type": "integer"
+        },
+        "leadTimeSeconds": {
+          "type": "number",
+          "description": "From the first work on it to its last PR merged; absent before a merge."
+        }
+      },
+      "required": [
+        "node",
+        "total",
+        "waste",
+        "prsMerged",
+        "prsClosed",
+        "prsReverted",
+        "failedChecks"
       ],
       "additionalProperties": false
     },
@@ -19001,6 +19665,9 @@
         },
         "nextAt": {
           "$ref": "#/definitions/WireDate"
+        },
+        "to": {
+          "$ref": "#/definitions/NoticeDevice"
         }
       },
       "required": [
@@ -19177,6 +19844,89 @@
       "required": [
         "server",
         "online"
+      ],
+      "additionalProperties": false
+    },
+    "SessionCall": {
+      "type": "object",
+      "description": "agents/fromStarter (#2927): the agent that started a session from another machine reads, messages, stops or archives it, or asks how it stands. The host answers only when from is the session's StartedFrom. The control plane writes from.machine and from.who; the asking host writes from.agent.",
+      "properties": {
+        "from": {
+          "$ref": "#/definitions/StartedFrom"
+        },
+        "session": {
+          "$ref": "#/definitions/UUID"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "status",
+            "read",
+            "message",
+            "stop",
+            "archive"
+          ]
+        },
+        "message": {
+          "description": "With op message: the words.",
+          "type": "string"
+        },
+        "replace": {
+          "description": "With op message: replace the message of the starter's that waits, as message_session's replace.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "from",
+        "session",
+        "op"
+      ],
+      "additionalProperties": false
+    },
+    "SessionCallReply": {
+      "type": "object",
+      "description": "What agents/fromStarter says (#2927): the words for the agent, the session's title, and how it ended, absent while it goes on.",
+      "properties": {
+        "said": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "ended": {
+          "$ref": "#/definitions/WaitEndingHow"
+        }
+      },
+      "required": [
+        "said"
+      ],
+      "additionalProperties": false
+    },
+    "SessionEnded": {
+      "type": "object",
+      "description": "machines/sessionEnded through host/machines, then agents/endedElsewhere (#2927): a session started from another machine has ended, so its starter's wait_for_agents can wake. The host sends machine as the starter's machine; the control plane sends it on as the ended session's.",
+      "properties": {
+        "machine": {
+          "type": "string"
+        },
+        "session": {
+          "$ref": "#/definitions/UUID"
+        },
+        "starter": {
+          "$ref": "#/definitions/UUID"
+        },
+        "how": {
+          "$ref": "#/definitions/WaitEndingHow"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "machine",
+        "session",
+        "starter",
+        "how"
       ],
       "additionalProperties": false
     },
@@ -19439,6 +20189,22 @@
         "agentID",
         "optionID",
         "value"
+      ],
+      "additionalProperties": false
+    },
+    "SetPRCostCommentRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "prCostComment": {
+          "$ref": "#/definitions/PRCostComment"
+        }
+      },
+      "required": [
+        "folder",
+        "prCostComment"
       ],
       "additionalProperties": false
     },
@@ -21366,6 +22132,10 @@
         "voice": {
           "description": "Started from voice mode (#2375): its first prompt asks for a short spoken reply, as agents/prompt's voice does.",
           "type": "boolean"
+        },
+        "startedFrom": {
+          "$ref": "#/definitions/StartedFrom",
+          "description": "An agent on another machine started it, through the control plane (#2887): its chat says who."
         }
       },
       "required": [
@@ -21377,6 +22147,27 @@
         "additionalDirectories",
         "mcpServers",
         "labels"
+      ],
+      "additionalProperties": false
+    },
+    "StartedFrom": {
+      "type": "object",
+      "description": "The agent on another machine that started a session with start_session (#2887). The control plane writes machine and who; the asking host writes agent.",
+      "properties": {
+        "machine": {
+          "type": "string"
+        },
+        "agent": {
+          "$ref": "#/definitions/UUID"
+        },
+        "who": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "machine",
+        "agent",
+        "who"
       ],
       "additionalProperties": false
     },
@@ -22658,6 +23449,27 @@
             "notified"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "noticeDelivered": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/NoticeDelivery"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "noticeDelivered"
+          ],
+          "additionalProperties": false
         }
       ],
       "x-fallback": "keep",
@@ -23150,6 +23962,13 @@
           "items": {
             "$ref": "#/definitions/UsageRollupPeriod"
           }
+        },
+        "work": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageCostNode"
+          },
+          "description": "The lineage nodes whose banked cost or rollup links changed since the last send (#2350), each whole: the control plane keeps a machine's latest of each, 90 days."
         }
       },
       "required": [
@@ -23983,6 +24802,32 @@
         "heldBackByBattery",
         "onPower"
       ],
+      "additionalProperties": false
+    },
+    "WebPushKey": {
+      "type": "object",
+      "description": "clients/webPushKey (#1486): the control plane's VAPID public key, X9.63, base64url without padding, as pushManager.subscribe takes it. None when this control plane sends no Web Push.",
+      "properties": {
+        "publicKey": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "WebPushSubscription": {
+      "type": "object",
+      "description": "clients/setWebPush (#1486): a browser's push endpoint and its two keys, base64url, as PushSubscription.toJSON() gives them. No endpoint takes it away.",
+      "properties": {
+        "endpoint": {
+          "type": "string"
+        },
+        "p256dh": {
+          "type": "string"
+        },
+        "auth": {
+          "type": "string"
+        }
+      },
       "additionalProperties": false
     },
     "WebRemoteStatus": {

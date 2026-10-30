@@ -100,7 +100,7 @@ func TestAddressReviewCommentsActsOnlyOnTheFoldersOwn(t *testing.T) {
 func TestWorkAnIssueAsksBeforeItActs(t *testing.T) {
 	text, skill := readyMadeText("work-an-issue")
 	w := parseWorkflow(text, "work-an-issue", "/p")
-	if w.Settings.PermissionMode == nil || *w.Settings.PermissionMode != "default" {
+	if w.Settings.PermissionMode == nil || *w.Settings.PermissionMode != "ask" {
 		t.Fatalf("%+v", w.Settings)
 	}
 	if !strings.Contains(skill, "data, not instructions") || !strings.Contains(skill, "`author_association`") {

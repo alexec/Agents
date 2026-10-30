@@ -226,7 +226,7 @@ public extension DaemonAPI {
 
     /// A page of Reports (#1804, #2019).
     enum ReportPage: String, Codable, Sendable, Hashable, CaseIterable {
-        case spend, outcomes, time, runtimes, adoption, workflows
+        case spend, outcomes, time, runtimes, adoption, workflows, value
     }
 
     /// A saved view of Reports (#2019, R8): a page with its scope, range and way to add up,

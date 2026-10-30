@@ -29,7 +29,8 @@ page.
   project's id and name.
 - **Page** (the Mac and the Remote, #2183): Spend, or Outcomes, Time, Runtimes, Adoption or
   Workflows, which are the web page's Reports pages below at the Me scope. A segmented control
-  on the Mac, and a menu on the Remote. On the web page these pages are in Reports.
+  on the Mac, and a menu on the Remote. On the web page these pages are in Reports. Value
+  (#2351) is on the Mac only, not on the Remote (tier Mac + web, #2796).
 - **A control plane that keeps no reports** (one from before #1811) says so, and says to
   update it.
 
@@ -85,6 +86,24 @@ Three more pages of Reports (#2019), with the same scopes:
   ended in an error), the cost of a run and the time working a run. By Workflow first. The
   most failed runs come first. By Person shows each bot's runs under its name.
 
+## Reports ▸ Value, on the web page and the Mac (#2351)
+
+What the work cost and what it delivered, from the cost on the links (#2350). The control
+plane adds up the nodes that the scope's machines send (`v1/lineage/<host>.json`); the
+machines' copies of one node add up, as each banked its own turns.
+
+- **The headline:** the cost of the work on issues and pull requests, the PRs merged, and
+  the cost per merged PR (that cost by the PRs merged, waste included).
+- **Waste:** the PRs closed without a merge and the merged reverts, and the failed CI rounds.
+- **Lead time:** the median of the issues' lead times, each from the first work on the issue
+  or its PRs (`firstAt`) to its last PR merged (`endedAt`).
+- **Unlinked:** the turns with no issue or PR.
+- **Issues and Milestones:** each one's cost (its own and its PRs'), how its PRs ended, its
+  waste and lead time, the most costly first, at most 100 each. On the Mac a GitHub one is a
+  link.
+- **The range:** a node counts when it last changed in the range, with all of its cost: a
+  node's total is not kept by the day.
+
 ## Reports ▸ Saved Views, on the web page
 
 - **Save View…** on each page of Reports keeps its scope, range and **By** under a name
@@ -101,6 +120,27 @@ Three more pages of Reports (#2019), with the same scopes:
 
 ## What a machine sends
 
+- **Each machine keeps a graph of the work** (#2348): links from a session to the issue it
+  works on, the PRs it opens, and more, in `<root>/lineage.jsonl`. It keeps an ended link
+  90 days and at most 20,000 links. `specs/2348-lineage/spec.md` says the rest.
+- **Cost goes on the links** (#2350). When a turn's cost, tokens or time are banked, the
+  machine banks them under the issues and PRs the session works on then, split evenly. A
+  helper with no links of its own banks under its parent's. A turn with no link stays on
+  its session. Each node's total is in `<root>/lineage-cost.json`, at most 5,000 nodes, 90
+  days after the last change. `lineage/cost` adds them up to a PR, an issue (with the PRs
+  that fix it), a milestone or a project, with the waste: the PRs closed without a merge
+  and the merged reverts. The nodes that changed go with each `usage/rollup` (`work`).
+- **A merged pull request can say what it cost** (#2352). When the folder's
+  `.agents/folder.json` says `prCostComment` (`tokens` or `cost`; off is the default), the
+  machine that hears `pr.merged` comments on the PR with the cost of the PR and the issues
+  it fixes: cost, tokens, sessions, agent time, wait time and failed CI rounds. It edits
+  that one comment when more is banked on them, for 30 days. The person's own `gh` or
+  `glab` posts it. Folder Settings ▸ Cost on pull requests on the Mac, and the folder's
+  **Cost on Pull Requests…** on the web page, set it.
+- **The machine makes most links itself** (#2349): a session's `#n`, `P#n` or Linear-key
+  label, a helper's parent, a workflow's run, the sessions on a pull request's branch and
+  the issues its body closes (`Fixes #n`). A merged or closed pull request, a label taken
+  off and an archived session end their links.
 - **Each machine keeps its usage by the UTC hour**, by folder and runtime, in
   `<root>/report-hours.json`. It keeps 8 days.
 - **A row** has the cost (by currency), the tokens (input, output, thought, cache read and
@@ -131,6 +171,9 @@ Three more pages of Reports (#2019), with the same scopes:
   days.
 - **A send replaces the file** for that machine and period. Only that machine writes it.
 - **The hourly sweep** deletes older hours and days.
+- **The cost on links** (#2350): one file for each machine, `v1/lineage/<host>.json`. A
+  node sent replaces that machine's copy of it. It keeps 90 days after a node's last
+  change, at most 5,000 nodes. The sweep deletes the file of a removed machine.
 - **The person is the machine's owner** (#994). Each machine belongs to one user. A row of
   a machine that was removed has no person. Only an admin sees it.
 
@@ -153,6 +196,7 @@ Three more pages of Reports (#2019), with the same scopes:
   `waits`, `workflowRuns`, `workflowFailures`; blank from a machine before #2019), then
   `groups`.
 
+- `reports/value` (#2351) with a range and a scope: Reports ▸ Value (`ReportValue`).
 - `reports/views`, `reports/saveView` (a view with no `id` is new) and `reports/deleteView`
   (#2019): the caller's saved views.
 

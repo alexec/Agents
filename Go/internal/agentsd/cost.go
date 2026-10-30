@@ -322,6 +322,8 @@ func (d *Daemon) bankSessionCost(id wire.UUID, c wire.Cost) {
 	d.recordUsageLocked(runtime, wire.UsageBucket{Cost: map[string]float64{c.Currency: added}})
 	d.addReport(a, runtime, time.Now(), wire.UsageRollupRow{Cost: map[string]float64{c.Currency: added}})
 	d.costMu.Unlock()
+	// On the work the session is on now (#2350).
+	d.bankWork(a, wire.LineageCost{Cost: map[string]float64{c.Currency: added}})
 	d.change(id, func(a *wire.Agent) {
 		to := map[string]float64{}
 		for k, v := range a.CostToDate {
@@ -389,6 +391,8 @@ func (d *Daemon) bankTurnUsage(id wire.UUID, u wire.TurnUsage) {
 		OutputTokens: b.OutputTokens, ThoughtTokens: b.ThoughtTokens, CachedReadTokens: b.CachedReadTokens,
 		CachedWriteTokens: b.CachedWriteTokens, Turns: b.Turns, UnpricedTurns: b.UnpricedTurns, LimitTokens: &counted})
 	d.costMu.Unlock()
+	d.bankWork(a, wire.LineageCost{Cost: map[string]float64{}, InputTokens: b.InputTokens, OutputTokens: b.OutputTokens,
+		LimitTokens: &counted, Turns: 1})
 	d.change(id, func(a *wire.Agent) {
 		a.LastTurnUsage = &u
 		if counted > 0 {

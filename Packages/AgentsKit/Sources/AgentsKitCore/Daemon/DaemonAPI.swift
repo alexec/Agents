@@ -137,6 +137,10 @@ public enum DaemonAPI {
         public static let filesComplete = "files/complete"
         /// The iOS simulators on a Mac host (#842): listed, booted and shut down on the
         /// person's press, and a booted one's screen as a JPEG.
+        /// The lineage graph from a node, and a node's cost rolled up (#2348, #2350): read by a
+        /// session's Lineage pane (#2940).
+        public static let lineageWalk = "lineage/walk"
+        public static let lineageCost = "lineage/cost"
         public static let simulatorsList = "simulators/list"
         public static let simulatorsBoot = "simulators/boot"
         public static let simulatorsShutdown = "simulators/shutdown"
@@ -233,6 +237,10 @@ public enum DaemonAPI {
         public static let foldersSetPinned = "folders/setPinned"
         /// A folder's disk space lines (#195), kept in its `.agents/folder.json`.
         public static let foldersSetDiskSpace = "folders/setDiskSpace"
+        /// What the host says on a folder's pull requests when they merge (#2352), kept in
+        /// its `.agents/folder.json`. Not in `ConnectionRole.agentMethods`: an agent cannot
+        /// choose to publish what its work cost.
+        public static let foldersSetPRCostComment = "folders/setPRCostComment"
         /// A change to an app-owned file in `.agents` made outside the app (#502): what the
         /// file was and is, line by line; and the person's Keep (the change is used from
         /// now on) or Undo (the approved copy is written back). Not in
@@ -424,6 +432,8 @@ public enum DaemonAPI {
         /// Where the time of running chats went by hour and by day, per runtime (#852).
         /// No params.
         public static let timeHistory = "time/history"
+        /// Which features this host counted (#2165), for Reports ▸ Features. No params.
+        public static let reportsFeatures = "reports/features"
         /// The milestones the person has earned (#984), for the Time page. No params.
         public static let milestonesState = "milestones/state"
         public static let costSetLimits = "cost/setLimits"
@@ -685,6 +695,16 @@ public enum DaemonAPI {
         public init(folder: URL, diskSpace: DiskThresholds) {
             self.folder = folder
             self.diskSpace = diskSpace
+        }
+    }
+
+    /// What the host says on a folder's pull requests when they merge (#2352).
+    public struct SetPRCostCommentRequest: Codable, Sendable {
+        public var folder: URL
+        public var prCostComment: PRCostComment
+        public init(folder: URL, prCostComment: PRCostComment) {
+            self.folder = folder
+            self.prCostComment = prCostComment
         }
     }
 

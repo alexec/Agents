@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -37,6 +38,8 @@ func (d *Daemon) SetControlAsk(ask askControl) {
 		return
 	}
 	d.askControl.Store(&ask)
+	// What ended on other machines while this one was away (#2927).
+	safe.Go("ask how sessions elsewhere stand", d.askThereWaits)
 }
 
 // askWorkspaces is one host/machines call for an agent, named for the control plane's log.
@@ -290,10 +293,10 @@ func noProvider(given string, listed wire.AgentMachines) string {
 // workspacesNote is list_machines for an agent to read: each provider, its workspaces and
 // their hosts, and what a new one takes.
 func workspacesNote(listed wire.AgentMachines) string {
-	if len(listed.Providers) == 0 {
-		return "This control plane has no machine providers. The person adds them in Settings ▸ Machine Providers."
-	}
 	var lines []string
+	if len(listed.Providers) == 0 {
+		lines = append(lines, "This control plane has no machine providers. The person adds them in Settings ▸ Machine Providers.")
+	}
 	for _, p := range listed.Providers {
 		var can []string
 		if p.CanMake {
@@ -331,6 +334,15 @@ func workspacesNote(listed wire.AgentMachines) string {
 			}
 		}
 	}
-	lines = append(lines, "Start or stop one by its host's name. Making and deleting ask the person first.")
+	if len(listed.Providers) > 0 {
+		lines = append(lines, "Start or stop one by its host's name. Making and deleting ask the person first.")
+	}
+	// Every machine of the person's, for start_session's machine (#2887).
+	if len(listed.Hosts) > 0 {
+		lines = append(lines, "The person's machines, where start_session with machine and folder starts a session once the person says yes:")
+		for _, h := range listed.Hosts {
+			lines = append(lines, "  - "+h.Name+": "+h.State)
+		}
+	}
 	return strings.Join(lines, "\n")
 }

@@ -6,14 +6,19 @@ import { useEffect, useMemo, useRef } from "preact/hooks";
 import { signal, useSignal } from "@preact/signals";
 import { go } from "../route";
 import type { Store } from "../model/store";
-import type { ReportFormat, ReportPage, ReportRange, ReportRow, ReportScope, ReportScopeOption, ReportView, UsageReport } from "../protocol/generated";
+import type { FeatureUsage, ReportFormat, ReportPage, ReportRange, ReportRow, ReportScope, ReportScopeOption, ReportValue, ReportValueRow, ReportView,
+  UsageReport } from "../protocol/generated";
 import { CallFailed } from "../wire/link";
 import { adoption, adoptionLine, barCaption, adoptionNote, budgetWords, dimensionTitle, empty, exportName, groupNote, hiddenNote, line, meNote,
-  memberNote, noOutcomes, noWorkflows, outcomeLine, outcomeTotals, outcomesNote, rangeShort, rangeSpan, rangeSpoken, ranges, reportTotals, runtimeLine,
+  memberNote, noOutcomes, noWorkflows, outcomeLine, outcomeTotals, outcomesNote, rangeSpan, ranges, reportTotals, runtimeLine,
   runtimesNote, sameScope, spendBarCaption, scopeKey, scopeNote, scopedDimensions, share, timeLine, timeNote, utcNote, waitingShare, weekTitle, workflowLine,
   workflowRows, workflowsNote, deleteViewWords, digestText, noCopy, noViews, noViewsHere, viewBy, viewWords, viewsNote } from "../model/reports";
 import type { OutcomeGroup, OutcomeOrder, ReportDimension, ReportGroup } from "../model/reports";
+import { featureLine, featureUnused, featuresNote, mergeFeatures, noFeatures } from "../model/features";
+import { hostAnswers } from "../model/capabilities";
+import { leadLine, noValue, noValueHere, nodeName, rowLine, unlinkedLine, valueHeadline, valueNote, wasteLine } from "../model/value";
 import type { Section } from "../model/console";
+import { Choice } from "./Choice";
 
 function sentence(error: unknown): string {
   if (error instanceof CallFailed) {
@@ -94,24 +99,14 @@ export function ReportsPane({ store, runtimeName, scope, seesMore, initial }: { 
   return (
     <div class="reports-pane">
       <div class="reports-head">
-        <div class="segmented" role="radiogroup" aria-label="Range" title={rangeSpan[range.value]}>
-          {ranges.map((r) => (
-            <button key={r} role="radio" aria-checked={range.value === r} class={range.value === r ? "on" : ""}
-              aria-label={rangeSpoken[r]} onClick={() => { range.value = r; }}>{rangeShort[r]}</button>
-          ))}
-        </div>
+        <Choice label="Range" value={range.value} options={ranges.map((r) => [r, rangeSpan[r]] as const)} onPick={(r) => { range.value = r; }} />
         <span class="reports-export">
           <button title="Save the rows of this range as CSV" onClick={() => void exportRows("csv")}>Export CSV</button>
           <button title="Save the rows of this range as JSON lines" onClick={() => void exportRows("jsonl")}>Export JSON lines</button>
           {scope && <SaveView store={store} page="spend" scope={scope} range={range.value} by={way} />}
         </span>
       </div>
-      <div class="segmented" role="radiogroup" aria-label="By">
-        {ways.map((d) => (
-          <button key={d} role="radio" aria-checked={way === d} class={way === d ? "on" : ""}
-            onClick={() => { by.value = d; }}>{dimensionTitle[d]}</button>
-        ))}
-      </div>
+      <Choice label="By" value={way} options={ways.map((d) => [d, dimensionTitle[d]] as const)} onPick={(d) => { by.value = d; }} />
       <p class="quiet small">{rangeSpan[range.value]}</p>
       {scope && shown?.budgetUSD !== undefined && shown.monthSpentUSD !== undefined && <Budget spent={shown.monthSpentUSD} budget={shown.budgetUSD} />}
       {problem.value && <p class="hint">{problem.value}</p>}
@@ -217,7 +212,7 @@ function SavedPage({ store, scopes }: { store: Store; scopes: readonly ReportSco
   const scopeName = (v: ReportView) => scopes.find((o) => scopeKey(o.scope) === scopeKey(v.scope))?.name ?? "A scope you no longer see";
   const open = (v: ReportView) => {
     opened.value = v;
-    go({ app: "reports", section: v.page });
+    go({ nav: "reports", section: v.page });
   };
   const digest = async (v: ReportView) => {
     const text = store.link.call("reports/usage", { range: v.range, scope: v.scope }).then((r) => digestText(v, scopeName(v), r));
@@ -271,12 +266,7 @@ function SavedPage({ store, scopes }: { store: Store; scopes: readonly ReportSco
 
 function RangePicker({ range, from = 0 }: { range: { value: ReportRange }; from?: number }) {
   return (
-    <div class="segmented" role="radiogroup" aria-label="Range" title={rangeSpan[range.value]}>
-      {ranges.slice(from).map((r) => (
-        <button key={r} role="radio" aria-checked={range.value === r} class={range.value === r ? "on" : ""}
-          aria-label={rangeSpoken[r]} onClick={() => { range.value = r; }}>{rangeShort[r]}</button>
-      ))}
-    </div>
+    <Choice label="Range" value={range.value} options={ranges.slice(from).map((r) => [r, rangeSpan[r]] as const)} onPick={(r) => { range.value = r; }} />
   );
 }
 
@@ -307,12 +297,7 @@ function CountsPane({ store, runtimeName, scope, kind, initial }: { store: Store
         <RangePicker range={range} />
         {scope && <SaveView store={store} page={kind} scope={scope} range={range.value} by={way} />}
       </div>
-      <div class="segmented" role="radiogroup" aria-label="By">
-        {ways.map((d) => (
-          <button key={d} role="radio" aria-checked={way === d} class={way === d ? "on" : ""}
-            onClick={() => { by.value = d; }}>{dimensionTitle[d]}</button>
-        ))}
-      </div>
+      <Choice label="By" value={way} options={ways.map((d) => [d, dimensionTitle[d]] as const)} onPick={(d) => { by.value = d; }} />
       <p class="quiet small">{rangeSpan[range.value]}</p>
       {problem.value && <p class="hint">{problem.value}</p>}
       {!totals && !problem.value && <p class="hint">Loading…</p>}
@@ -370,6 +355,95 @@ function AdoptionPane({ store, scope, initial }: { store: Store; scope: ReportSc
   );
 }
 
+/** Reports ▸ Value (#2351): what the work cost and delivered, from the machines' lineage nodes:
+ * cost per merged pull request, waste and lead time, then each issue and milestone, the most costly first. */
+function ValuePane({ store, scope, initial }: { store: Store; scope: ReportScope | undefined; initial?: Initial | undefined }) {
+  const range = useSignal<ReportRange>(initial?.range ?? "month");
+  const value = useSignal<ReportValue | null>(null);
+  const problem = useSignal<string | null>(null);
+  const asked = { range: range.value, scope: scope ?? { kind: "me" as const } };
+  const current = useRef(asked);
+  current.current = asked;
+  useEffect(() => {
+    value.value = null;
+    const ask = asked;
+    store.link.call("reports/value", ask).then((got) => {
+      if (ask.range !== current.current.range || !sameScope(ask.scope, current.current.scope)) return;
+      value.value = got;
+      problem.value = null;
+    }, (error: unknown) => {
+      problem.value = error instanceof CallFailed && error.code === -32601 ? noValueHere : sentence(error);
+    });
+  }, [range.value, scope && scopeKey(scope)]);
+  const shown = value.value?.range === range.value && sameScope(value.value.scope, asked.scope) ? value.value : null;
+  const row = (r: ReportValueRow) => (
+    <li key={r.node.ref}>
+      <span>{nodeName(r.node)}</span>
+      <span class="quiet small">{rowLine(r)}</span>
+    </li>
+  );
+  const lead = shown && leadLine(shown);
+  const unlinked = shown && unlinkedLine(shown);
+  return (
+    <div class="reports-pane">
+      <div class="reports-head">
+        <RangePicker range={range} />
+        {scope && <SaveView store={store} page="value" scope={scope} range={range.value} />}
+      </div>
+      <p class="quiet small">{rangeSpan[range.value]}</p>
+      {problem.value && <p class="hint">{problem.value}</p>}
+      {!shown && !problem.value && <p class="hint">Loading…</p>}
+      {shown && (shown.issues.length === 0 && shown.prsMerged + shown.prsClosed === 0 ? <p class="hint">{noValue}</p> : (
+        <>
+          <ul class="report-list">
+            <li class="report-total"><span class="strong">{valueHeadline(shown)}</span><span class="quiet small">{wasteLine(shown)}</span></li>
+            {lead && <li><span>{lead}</span></li>}
+            {unlinked && <li><span class="quiet">{unlinked}</span></li>}
+          </ul>
+          {shown.issues.length > 0 && <h3>Issues</h3>}
+          {shown.issues.length > 0 && <ul class="report-list">{shown.issues.map(row)}</ul>}
+          {shown.milestones.length > 0 && <h3>Milestones</h3>}
+          {shown.milestones.length > 0 && <ul class="report-list">{shown.milestones.map(row)}</ul>}
+          {shown.limited && <p class="quiet small">The 100 most costly of each.</p>}
+        </>
+      ))}
+      <p class="quiet small">{valueNote}</p>
+      {scope && <p class="quiet small">{scopeNote(scope, undefined)}</p>}
+    </div>
+  );
+}
+
+/** Reports ▸ Features (#2165), as the window's: which methods the clients and agents called on the
+ * person's own machines, from each machine's counts added up, the least used first. The counts stay
+ * on the machines, so it has no scope. */
+function FeaturesPane({ store }: { store: Store }) {
+  const usage = useSignal<FeatureUsage | null>(null);
+  const hosts = store.hosts.value.filter((h) => hostAnswers(h.state)).map((h) => h.id);
+  useEffect(() => {
+    usage.value = null;
+    void Promise.all(hosts.map((host) => store.link.call("reports/features", {}, host).catch(() => null))).then((all) => {
+      usage.value = mergeFeatures(all.filter((u): u is FeatureUsage => u !== null));
+    });
+  }, [hosts.join(" ")]);
+  const shown = usage.value;
+  return (
+    <div class="reports-pane">
+      {shown && <p class="quiet small">{featuresNote(shown)}</p>}
+      {!shown && <p class="hint">Loading…</p>}
+      {shown && (shown.features.length === 0 ? <p class="hint">{noFeatures}</p> : (
+        <ul class="report-list">
+          {shown.features.map((f) => (
+            <li key={f.method}>
+              <span><code>{f.method}</code>{f.quarter === 0 && <span class="report-unused small"> {featureUnused}</span>}</span>
+              <span class="quiet small">{featureLine(f, shown.days)}</span>
+            </li>
+          ))}
+        </ul>
+      ))}
+    </div>
+  );
+}
+
 /** A runtime's name, from the first host that knows it. */
 export function runtimeNameIn(store: Store) {
   return (id: string) => Object.values(store.runtimes.value).map((list) => list.find((s) => s.runtime.id === id)?.runtime.name)
@@ -412,21 +486,16 @@ export function ReportsPage({ store, section, down }: { store: Store; section: S
   const option = list.find((o) => scopeKey(o.scope) === picked.value) ?? list[0];
   return (
     <>
-      {list.length > 1 && section.id !== "saved" && (
-        <div class="segmented report-scopes" role="radiogroup" aria-label="Scope">
-          {list.map((o) => {
-            const k = scopeKey(o.scope);
-            return (
-              <button key={k} role="radio" aria-checked={option === o} class={option === o ? "on" : ""}
-                onClick={() => { picked.value = k; }}>{o.name}</button>
-            );
-          })}
-        </div>
+      {list.length > 1 && section.id !== "saved" && section.id !== "features" && (
+        <Choice label="Scope" class="report-scopes" value={option ? scopeKey(option.scope) : picked.value}
+          options={list.map((o) => [scopeKey(o.scope), o.name] as const)} onPick={(k) => { picked.value = k; }} />
       )}
-      {scopes.value !== null && (section.id === "saved" ? <SavedPage store={store} scopes={list} />
+      {section.id === "features" ? <FeaturesPane store={store} />
+        : scopes.value !== null && (section.id === "saved" ? <SavedPage store={store} scopes={list} />
         : section.id in countsPages
         ? <CountsPane key={`${section.id}:${view?.id ?? ""}`} store={store} runtimeName={runtimeNameIn(store)} scope={option?.scope}
           kind={section.id as CountsKind} initial={initial} />
+        : section.id === "value" ? <ValuePane key={view?.id ?? ""} store={store} scope={option?.scope} initial={initial} />
         : section.id === "adoption" ? <AdoptionPane key={view?.id ?? ""} store={store} scope={option?.scope} initial={initial} />
         : <ReportsPane key={view?.id ?? ""} store={store} runtimeName={runtimeNameIn(store)} scope={option?.scope} seesMore={list.length > 1} initial={initial} />)}
     </>

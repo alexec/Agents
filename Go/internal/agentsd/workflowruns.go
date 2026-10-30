@@ -520,13 +520,9 @@ func (d *Daemon) runAgent(w wire.Workflow, run workflowRun, fr fireRequest) (wir
 			}
 		}
 	}
-	// New sessions and workflows use the runtime of the most recently active agent on
-	// this host. The store orders agents by LastActivityAt, just as the clients do.
-	// Auto on a new host, and after an Auto agent (#2658, FR-013).
+	// The runtime the file names, else Auto (#2873). Never the runtime another agent used
+	// last: what the run may do must not depend on which agent was active.
 	runtimeID := autoRuntimeID
-	if agents := d.Store.Agents(); len(agents) > 0 && agents[0].RuntimeID != "" && agents[0].Auto == nil {
-		runtimeID = agents[0].RuntimeID
-	}
 	if w.Settings.RuntimeID != nil {
 		runtimeID = *w.Settings.RuntimeID
 	}
@@ -543,7 +539,19 @@ func (d *Daemon) runAgent(w wire.Workflow, run workflowRun, fr fireRequest) (wir
 	if err != nil {
 		return "", settingRefused("runtime", err.(*Error).Message)
 	}
+	modeID := "mode"
+	if nativeMode != nil {
+		id, refusal := d.offeredMode(runtimeID, *nativeMode)
+		if refusal != "" {
+			return "", settingRefused("permission-mode", refusal)
+		}
+		modeID = id
+	}
 	r := helperRequest(runtimeID, fr.folder, prompt, nativeModel, nativeMode, nil, w.Settings.Labels)
+	if v, ok := r.StartOptions.Values["mode"]; ok && modeID != "mode" {
+		delete(r.StartOptions.Values, "mode")
+		r.StartOptions.Values[modeID] = v
+	}
 	if levels != nil {
 		r.Levels = levels
 	}
@@ -579,6 +587,31 @@ func (d *Daemon) runAgent(w wire.Workflow, run workflowRun, fr fireRequest) (wir
 		d.workflowMu.Unlock()
 	}
 	return id, nil
+}
+
+// offeredMode is the id of the runtime's mode option, when it offered mode last time, or
+// why the run must not start: a mode the runtime does not offer would leave the agent in
+// the runtime's own default, which may ask less than the file says. With nothing offered
+// yet, the mode is taken as offered, as on the workflow's page.
+func (d *Daemon) offeredMode(runtimeID, mode string) (string, string) {
+	offers := d.runtimeOffers(runtimeID)
+	if len(offers) == 0 {
+		return "mode", ""
+	}
+	name := runtimeName(runtimeID)
+	o := modeOption(offers)
+	if o == nil {
+		return "", name + " offers no modes, so it cannot run in " + mode + " mode."
+	}
+	if _, ok := offeredName(offers, o.ID, mode); ok {
+		return o.ID, ""
+	}
+	choices, _ := optionChoices(offers, o.ID)
+	values := make([]string, 0, len(choices))
+	for _, c := range choices {
+		values = append(values, c.Value)
+	}
+	return "", name + " does not offer the mode " + mode + ". It offers: " + strings.Join(values, ", ") + "."
 }
 
 // runPrompt is the file's prompt, after a note that says why the run started (#1562,

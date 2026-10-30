@@ -2,7 +2,8 @@
 //
 // The page reports presence as the Mac window does: active while it is visible and has focus,
 // with the session open, on every change of either (half a second settled; a session opened at
-// once) and on every connection. It takes no notices, so it never says whether it may show one. The title is
+// once) and on every connection. It never says whether it may show a notice: only what agents tell the
+// person shows here, while the page is in front (pageNotices.ts, #2860). The title is
 // `(N) Agents` when N sessions need the person, counted as the window counts its Dock badge.
 import { effect } from "@preact/signals";
 import type { Store } from "./model/store";

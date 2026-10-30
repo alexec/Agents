@@ -176,7 +176,7 @@ export function AddProviderDialog({ store, editing, close, added }: {
       <div class="sheet-body connect-sheet provider-sheet">
         <p class="strong">{editing ? `Edit ${editing.name}` : "Add a Provider"}</p>
         {!editing && (
-          <div class="segmented" role="radiogroup" aria-label="Kind">
+          <div class="button-group" role="radiogroup" aria-label="Kind">
             {providerKinds.map((k) => (
               <button key={k} type="button" role="radio" aria-checked={kind === k} class={kind === k ? "on" : ""}
                 disabled={working} onClick={() => choose(k)}>{kindTitle(k)}</button>

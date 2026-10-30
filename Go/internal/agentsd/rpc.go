@@ -152,6 +152,7 @@ func (d *Daemon) dispatch(c *Client, m message) {
 	}
 	if err == nil && h != nil {
 		d.noteMilestones(c, m.Method)
+		d.countCall(c, m.Method)
 	}
 	if m.ID == nil {
 		return // a notification

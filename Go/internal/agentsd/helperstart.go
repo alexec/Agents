@@ -120,6 +120,10 @@ func (d *Daemon) heldMessage(q wire.QueuedPrompt, target *wire.Agent) bool {
 	if q.Sender == nil {
 		return true
 	}
+	// Its starter on another machine: its words go at once (#2927).
+	if from := d.startedFromOf(target.ID); from != nil && from.Agent == q.Sender.AgentID {
+		return false
+	}
 	sender := d.Store.Agent(q.Sender.AgentID)
 	return sender == nil || d.holdsMessageFrom(target, sender) != ""
 }
@@ -286,6 +290,10 @@ func (d *Daemon) startSession(caller wire.UUID, args map[string]json.RawMessage)
 	if rt == nil {
 		return "", Invalid("Nothing was started: there is no runtime called \"%s\" — this version knows %s.", runtimeID, knownRuntimes())
 	}
+	// Another machine has runtimes, folders and limits of its own (#2887).
+	if onMachine(args) != "" {
+		return d.startOnMachine(me, args, helperRequest(runtimeID, "", prompt, model, mode, nil, labels))
+	}
 	if why := d.unavailableRuntime(rt); why != "" {
 		return "", Invalid("Nothing was started: %s.", why)
 	}
@@ -399,6 +407,7 @@ func (d *Daemon) queueHelper(caller *wire.Agent, prompt, runtimeID, model string
 		return "", &Error{Code: wire.FailureCouldNotSave, Message: "Nothing was started: the queued agent could not be saved: " + err.Error()}
 	}
 	d.tellChanged(a, nil)
+	d.noteLineage(nil, a)
 	d.folderChanged(folder)
 	d.record(a.ID, runtimeNote("Queued by "+d.holderName(caller.ID)+". It starts by itself when this folder has a place free."))
 	position := len(queue) + 1
@@ -518,6 +527,9 @@ func (d *Daemon) listHelpers(caller *wire.Agent) string {
 	places := "This folder has " + d.helperPlaces(folder) + "."
 	var mine []wire.Agent
 	for _, a := range append(d.helpersIn(folder), d.helperQueue(folder)...) {
+		if d.Store.Agent(a.ID) == nil {
+			continue
+		}
 		for _, s := range d.starters(&a) {
 			if s == caller.ID {
 				mine = append(mine, a)
@@ -526,7 +538,8 @@ func (d *Daemon) listHelpers(caller *wire.Agent) string {
 		}
 	}
 	runtimes := d.runtimeChoices(caller.RuntimeID)
-	if len(mine) == 0 {
+	there := d.listThere(caller.ID)
+	if len(mine) == 0 && len(there) == 0 {
 		return "You have not started any sessions that are still here. " + places + "\n" + runtimes
 	}
 	lines := []string{places}
@@ -538,7 +551,7 @@ func (d *Daemon) listHelpers(caller *wire.Agent) string {
 		}
 		lines = append(lines, "- "+string(a.ID)+": "+quotedTitle(a.Title)+below+" — "+helperStatus(&a, queue)+labelsLine(&a)+waitingLine(&a, caller.ID))
 	}
-	return strings.Join(append(lines, runtimes), "\n")
+	return strings.Join(append(append(lines, there...), runtimes), "\n")
 }
 
 func helperStatus(a *wire.Agent, queue []wire.Agent) string {
@@ -634,6 +647,11 @@ func (d *Daemon) startAutoHelper(me *wire.Agent, args map[string]json.RawMessage
 		}
 		return "", Invalid("Nothing was started: %s would let it do more without asking than you may (%s). Name no mode and it takes yours.",
 			permissionWord(*levels.Permission), ownWords)
+	}
+	if onMachine(args) != "" {
+		r := helperRequest(autoRuntimeID, "", prompt, "", nil, nil, labels)
+		r.Levels = levels
+		return d.startOnMachine(me, args, r)
 	}
 	folder := folderPath(me)
 	worktree, err := d.helperWorktree(argString(args, "worktree"), folder)

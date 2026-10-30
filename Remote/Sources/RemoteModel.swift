@@ -326,7 +326,9 @@ final class RemoteModel {
         pictures = PhonePictures(files: files)
         // From the start, not once connected: a banner tapped to launch or wake the app
         // arrives before then, and was dropped (#1045).
-        notifier.open = { [weak self] agentID in
+        notifier.open = { [weak self] agentID, line in
+            // A notice's line (#2860): gone to and lit once its chat has settled.
+            if let line { self?.focusedEntry = line }
             // In its folder's own scene or screen when one is open (#1089, Alex).
             if self?.showInFolderScene(agentID) == true { return }
             // Not in the folder an iPhone shows alone: back to every folder, to it.
@@ -899,13 +901,16 @@ final class RemoteModel {
         didSet { UserDefaults.standard.set(startFolders.map(\.path), forKey: "remote.startFolders") }
     }
     /// The new agent's own sandbox choice (064). Nil follows its runtime's default.
-    var startSandbox: SandboxChoice?
+    var startSandbox: SandboxChoice? { didSet { if isAutoStart { Task { await refreshStartAutoPreview() } } } }
     /// The new agent's values in the shared words (#2658), kept when the runtime changes.
     private(set) var startLevels = Levels(model: .balanced, permission: .ask)
     /// The new agent's own answer to permission requests (#2658); nil follows Settings.
     var startClientPermission: ClientPermissionMode?
-    /// Every runtime's cells for the shared words (#2658), as the Mac's host has them. The
-    /// Auto runtime itself is Mac + web (#2798).
+    /// What Auto would pick now for the page, for "Auto (Claude)".
+    private(set) var startAutoPreview: AutoPreview?
+    var isAutoStart: Bool { startRuntimeID == LevelWords.autoID }
+    /// Every runtime's cells for the shared words (#2658), as the Mac's host has them. Auto's
+    /// own settings are Mac + web (#2923).
     private(set) var autoMappings = AutoMappings()
     /// Each runtime's sandbox default, read from the Mac, for "Use runtime default (Off)".
     private(set) var sandboxSettings = SandboxSettings()
@@ -939,6 +944,12 @@ final class RemoteModel {
     /// person has since moved off is recognised as that and let go.
     private var startGeneration = 0
 
+    /// The kinds of session the page's folder offers (#760), the folder's and the
+    /// home's as its host lists them, and the one picked, by id.
+    private(set) var startPersonas: [Persona] = []
+    private(set) var startPersona: String?
+    /// Picked while its runtime's choices were still to come: laid over them on arrival.
+    private var pendingStartPersona: Persona?
 
     var startRuntime: RuntimeStatus? { startRuntimes.first { $0.runtime.id == startRuntimeID } }
 
@@ -948,7 +959,8 @@ final class RemoteModel {
 
     private var startAvailableRuntimeIDs: [String] {
         let ids = startRuntimes.filter(\.canStart).map(\.runtime.id)
-        return ids
+        // Auto is a choice wherever a runtime is (#2658).
+        return ids.isEmpty ? ids : [LevelWords.autoID] + ids
     }
 
     /// What the page reads: the runtimes to choose from, and, for its runtime menu, what
@@ -972,6 +984,10 @@ final class RemoteModel {
         startWorktree = nil
         startWorktrees = .notARepository
         Task { await loadStartWorktrees(in: folder) }
+        startPersona = nil
+        pendingStartPersona = nil
+        startPersonas = []
+        Task { await loadStartPersonas(in: folder) }
         // Each with a deadline, and waited on only when the page has no runtimes to pick
         // from yet (#1096): one lost reply here used to hold the page on "Asking…" before
         // it had asked anything, with nothing that would ask again.
@@ -1052,6 +1068,7 @@ final class RemoteModel {
         let again = startAsks.toAskAgain
         guard !again.isEmpty else { return }
         note("start: back in touch; asking again for \(again.map(\.rawValue).sorted().joined(separator: ", "))")
+        if again.contains(.personas) { Task { await loadStartPersonas(in: folder) } }
         if again.contains(.worktrees) { Task { await loadStartWorktrees(in: folder) } }
         guard again.contains(.choices) else { return }
         if startRuntimeID == nil { startRuntimeID = pickedStartRuntime }
@@ -1139,6 +1156,22 @@ final class RemoteModel {
 
     /// The folder's personas (#760). A host too old to know the method offers none; one
     /// that did not answer is asked again once it does (#1096).
+    private func loadStartPersonas(in folder: URL) async {
+        let request = DaemonAPI.PersonasListRequest(folder: folder)
+        startAsks.asking(.personas)
+        let listed: [Persona]
+        do {
+            listed = try await askForStart(DaemonAPI.Method.personasList, request, returning: [Persona].self)
+        } catch let error as JSONRPCError where error.isMethodNotFound {
+            listed = []
+        } catch {
+            return
+        }
+        guard startingIn == folder else { return }
+        startAsks.answered(.personas)
+        startPersonas = listed
+    }
+
     /// The branch an agent's folder is on, for the place over its prompt (#242).
     /// Nil outside a repository or when its host does not answer.
     func folderPathBranch(of agent: Agent) async -> String? {
@@ -1163,6 +1196,25 @@ final class RemoteModel {
         if startOptionsFolder != before { await loadStartChoices() }
     }
 
+    /// Pick a kind of session (#760): every setting it names is set, every one it leaves
+    /// out stays as the page has it. Nil picks none and changes nothing else.
+    func choosePersona(_ persona: Persona?) async {
+        startPersona = persona?.id
+        pendingStartPersona = nil
+        guard let persona else { return }
+        if let runtimeID = persona.settings.runtimeID, runtimeID != startRuntimeID,
+           startAvailableRuntimeIDs.contains(runtimeID) {
+            pendingStartPersona = persona
+            await chooseRuntime(runtimeID)
+            return
+        }
+        if startChoicesState != .ready {
+            pendingStartPersona = persona
+        } else {
+            startChosen.merge(persona.choices(against: startOptions)) { _, new in new }
+        }
+    }
+
     func chooseRuntime(_ runtimeID: String) async {
         guard runtimeID != startRuntimeID else { return }
         startRuntimeID = runtimeID
@@ -1182,11 +1234,15 @@ final class RemoteModel {
         case .permissionRequests: startClientPermission = ClientPermissionMode(rawValue: level)
         case .sandbox: startSandbox = SandboxChoice(rawValue: level)
         }
-        applyStartLevel(field)
+        if isAutoStart {
+            Task { await refreshStartAutoPreview() }
+        } else {
+            applyStartLevel(field)
+        }
     }
 
     private func applyStartLevel(_ field: AutoField) {
-        guard let runtimeID = startRuntimeID else { return }
+        guard let runtimeID = startRuntimeID, !isAutoStart else { return }
         let level: String? = switch field {
         case .model: startLevels.model?.rawValue
         case .permission: startLevels.permission?.rawValue
@@ -1202,10 +1258,21 @@ final class RemoteModel {
 
     /// The value of a field the page's own options are now, or nil (Custom).
     func startLevel(_ field: AutoField) -> String? {
+        if isAutoStart {
+            return field == .model ? startLevels.model?.rawValue : startLevels.permission?.rawValue
+        }
         guard let runtimeID = startRuntimeID else { return nil }
-        return LevelMatch.level(field, runtimeID: runtimeID, mappings: autoMappings) { id in
+        let chosen = field == .model ? startLevels.model?.rawValue : startLevels.permission?.rawValue
+        return LevelMatch.level(field, runtimeID: runtimeID, mappings: autoMappings, preferring: chosen) { id in
             self.startChosen[id] ?? self.startOptions.first { $0.id == id }?.currentValue
         }
+    }
+
+    /// What Auto would pick now, on the page's machine.
+    func refreshStartAutoPreview() async {
+        guard isAutoStart, let folder = startOptionsFolder else { startAutoPreview = nil; return }
+        let request = AutoPreviewRequest(cwd: folder, levels: startLevels, sandbox: startSandbox)
+        startAutoPreview = try? await askForStart(DaemonAPI.Method.autoPreview, request, returning: AutoPreview.self)
     }
 
     func refreshAuto() async {
@@ -1225,6 +1292,17 @@ final class RemoteModel {
     /// choices on the page.
     func loadStartChoices() async {
         guard let folder = startOptionsFolder else { return }
+        // Auto has no runtime yet, so no options of its own: what it would pick (#2658).
+        if startRuntimeID == LevelWords.autoID {
+            startGeneration += 1
+            discardStartDraft()
+            startOptions = []
+            startChosen = [:]
+            startChoicesState = .ready
+            startAsks.answered(.choices)
+            await refreshStartAutoPreview()
+            return
+        }
         guard let runtimeID = startRuntimeID else {
             // Not "asking": there is nobody to ask.
             let host = startHost == .mac ? "the Mac" : hostName(startHost)
@@ -1281,6 +1359,11 @@ final class RemoteModel {
         if opening, let runtimeID = startRuntimeID, let mode = ModeMemory.modeOption(in: startOptions),
            let value = ModeMemory.startingValue(remembered: work.rememberedMode(for: runtimeID), for: mode) {
             kept[mode.id] = value
+        }
+        // Over the mode remembered, because the persona was picked after it (#760).
+        if let persona = pendingStartPersona, !startOptions.isEmpty {
+            kept.merge(persona.choices(against: startOptions)) { _, new in new }
+            pendingStartPersona = nil
         }
         startChosen = kept
         // The values chosen in the shared words, over the mode remembered (#2658).
@@ -1375,11 +1458,11 @@ final class RemoteModel {
             runtimeID: runtimeID, cwd: folder, prompt: words, attachments: attachments,
             startOptions: StartOptions(values: startChosen), draftID: startDraftID,
             additionalDirectories: startFolders, worktree: startWorktree, requestID: retrying ?? UUID(), sandbox: startSandbox,
-            labels: labels,
-            accountID: startAccountChoices?.sent(startAccountID),
+            labels: labels, persona: startPersona,
+            accountID: isAutoStart ? nil : startAccountChoices?.sent(startAccountID),
             voice: voice ? true : nil,
             levels: Levels(model: startLevels.model, permission: startLevels.permission,
-                           permissionRequests: startClientPermission))
+                           permissionRequests: isAutoStart ? nil : startClientPermission))
         startingPage = page
         defer { startingPage = nil }
         return await send(start: request, told: started)
@@ -1538,7 +1621,7 @@ final class RemoteModel {
     /// none for a server's folder. The picker shows only when there is one.
     var startAccounts: [AccountProfile] { startAccountChoices?.accounts ?? [] }
     var startAccountChoices: AccountChoices? {
-        guard startHost == .mac, let startRuntimeID else { return nil }
+        guard startHost == .mac, let startRuntimeID, startRuntimeID != LevelWords.autoID else { return nil }
         return AccountChoices(runtimeID: startRuntimeID, profiles: accountProfiles, policy: policyState?.policy)
     }
 
@@ -2512,7 +2595,7 @@ final class RemoteModel {
             self.sandboxSettings = settings
         }
         if notification.method == DaemonAPI.Notification.autoChanged {
-            Task { await refreshAuto() }
+            Task { await refreshAuto(); await refreshStartAutoPreview() }
         }
         if notification.method == DaemonAPI.Notification.clientPermissionsChanged,
            let settings = try? notification.params?.decode(ClientPermissionSettings.self) {
@@ -3019,6 +3102,8 @@ final class RemoteModel {
     /// model does not hold yet (a cold launch, a wake) is kept and opened once caught up,
     /// as `open(_:)` keeps an agent (#1045).
     func open(needToken token: String) {
+        // A notice's line (#2860): gone to and lit once its chat has settled.
+        if let line = NeedID.noticeEntry(fromToken: token) { focusedEntry = line }
         if let agentID = agentID(forNeedToken: token) {
             pendingNeed = nil
             open(agentID)
@@ -3938,6 +4023,14 @@ final class RemoteModel {
         }
     }
 
+    /// Where Auto would start an Auto session's successor now (FR-022).
+    func autoPreview(for agent: Agent) async -> AutoPreview? {
+        guard let pick = agent.auto else { return nil }
+        let request = AutoPreviewRequest(cwd: agent.cwd, levels: pick.levels, sandbox: agent.sandboxOverride)
+        guard let client = try? client(for: DaemonAPI.AgentRequest(agentID: agent.id)) else { return nil }
+        return try? await client.call(DaemonAPI.Method.autoPreview, request, returning: AutoPreview.self)
+    }
+
     /// A running agent's model level or permission mode, mapped on its own runtime (#2658).
     func setAgentLevel(_ agentID: UUID, _ field: AutoField, _ level: String) async {
         var levels = Levels()
@@ -4541,14 +4634,15 @@ final class RemoteModel {
     /// **Continue in New** (#999): a session in the same folder that reads this one and
     /// carries on, on the runtime's account for new sessions, and open it.
     @discardableResult
-    func continueInNew(_ agentID: UUID) async -> Bool {
+    func continueInNew(_ agentID: UUID, onAuto: Bool = false) async -> Bool {
         guard !isStale else {
             problem = "Your Mac is not answering, so that could not be sent."
             return false
         }
         do {
             let id = try await sendOnce(DaemonAPI.Method.agentsContinueInNew,
-                                        DaemonAPI.ContinueInNewRequest(agentID: agentID, requestID: UUID())).decode(UUID.self)
+                                        DaemonAPI.ContinueInNewRequest(agentID: agentID, requestID: UUID(),
+                                                                       auto: onAuto ? true : nil)).decode(UUID.self)
             await loadWholeAgent(id)
             selection = id
             return true

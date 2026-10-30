@@ -498,6 +498,21 @@ struct WebFixturesTests {
                 entry(10, .agentMessage(messageID: "z", text: "Fine.")),
                 finished,
             ], false),
+            ("a form left open is answered at the end of the turn that asked (#2934)", [
+                ask(1, "Get the key"),
+                entry(2, .toolCall(call("t1", "ask_secret", name: "mcp__agents__ask_secret", status: "completed"))),
+                entry(3, .agentMessage(messageID: "a", text: "Waiting for the key.")),
+                finished,
+                entry(4, .elicitationAnswered(id: id(5), summary: "Saved to your secrets")),
+                entry(5, .runtimeNote("Starting Claude\u{2026}")),
+                entry(12, .stateChanged(.running, reason: nil)),
+                entry(6, .userMessage("The person replied to your ask_secret.", from: .app)),
+                entry(7, .toolCall(call("t2", "ask_question", name: "mcp__agents__ask_question", status: "completed"))),
+                entry(8, .elicitationAnswered(id: id(6), summary: "Answered")),
+                entry(9, .userMessage("The person replied to your form.", from: .app)),
+                entry(10, .agentMessage(messageID: "b", text: "Thanks.")),
+                entry(11, .userMessage("How did it go?", from: .app)),
+            ], false),
             ("retried errors the agent got past (#394)", [
                 ask(1, "Fix it"),
                 entry(2, .agentMessage(messageID: "a", text: "Looking.")),
@@ -707,6 +722,12 @@ struct WebFixturesTests {
             let query = SessionLabelQuery(input["query"]!.stringValue!)
             return .object(["label": query.label.map(JSONValue.string) ?? .null, "text": .string(query.text),
                             "matches": .bool(query.matches(try input["agent"]!.decode(Agent.self)))])
+        }
+
+        let kinds = ["#2958", "P#2955", "p#7", "ENG-4", " #12 ", "#", "#12a", "P#", "eng-4", "merged", "Archived",
+                     "closed", "bug", "web ui"]
+        try pin("labels/kind.json", kinds.map { Case(name: $0, input: .string($0)) }) { input in
+            .string(SessionLabel.kind(of: input.stringValue!).rawValue)
         }
     }
 
@@ -1097,6 +1118,10 @@ struct WebFixturesTests {
                     RuntimeCatalog.runtime(id: $0)?.name ?? $0
                 }),
                 "continueOn": .string(LevelWords.continueOn("Codex")),
+                "asksFirst": .object(Dictionary(uniqueKeysWithValues: levels.map { ($0, JSONValue.bool(LevelWords.asksFirst(field, $0))) })),
+                "bypassConfirm": .object(["title": .string(LevelWords.bypassConfirmTitle),
+                                          "message": .string(LevelWords.bypassConfirmMessage),
+                                          "button": .string(LevelWords.bypassConfirmButton)]),
             ])
         }
     }
@@ -1120,6 +1145,10 @@ struct WebFixturesTests {
         }
         try pin("runtimes/reasons.json", cases) { input in
             try input.decode(RuntimeStatus.self).unavailableReason.map(JSONValue.string) ?? .null
+        }
+        // The Auto page's state words for each availability (#2890).
+        try pin("runtimes/auto-state.json", cases) { input in
+            .string(LevelWords.state(try input.decode(RuntimeStatus.self), allowances: nil))
         }
 
         let starts: [(String, String?, String?, [String])] = [

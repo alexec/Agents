@@ -12,8 +12,8 @@ import type {
 } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 
-/** `RuntimeCatalog.builtIn[0]`: left unsaid in a row. */
-export const defaultRuntime = "claude";
+/** What a workflow with no `runtime:` runs on (#2873): Auto, left unsaid in a row. */
+export const defaultRuntime = "auto";
 
 const allWeekdays: Weekday[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 const workweek: Weekday[] = ["mon", "tue", "wed", "thu", "fri"];

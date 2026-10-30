@@ -10,7 +10,6 @@ export const dimensions: readonly ReportDimension[] = ["person", "project", "fol
 export const dimensionTitle: Record<ReportDimension, string> = { person: "Person", project: "Project", folder: "Folder", machine: "Machine", runtime: "Runtime", group: "Group",
   workflow: "Workflow" };
 export const ranges: readonly ReportRange[] = ["day", "week", "month", "threeMonths"];
-export const rangeShort: Record<ReportRange, string> = { day: "D", week: "W", month: "M", threeMonths: "3M" };
 /** The range's name as a screen reader says it: "D" alone means nothing (#2440). */
 export const rangeSpoken: Record<ReportRange, string> = { day: "Day", week: "Week", month: "Month", threeMonths: "3 months" };
 /** What Spend's bars measure (#2440). */
@@ -399,7 +398,7 @@ export const adoptionNote = "A person is active in a week when one of their mach
 // control plane for the person who saved it, and its numbers as a few lines to paste.
 
 export const pageTitle: Record<ReportPage, string> = { spend: "Spend", outcomes: "Outcomes", time: "Time", runtimes: "Runtimes",
-  adoption: "Adoption", workflows: "Workflows" };
+  adoption: "Adoption", workflows: "Workflows", value: "Value" };
 
 const isDimension = (by: string | undefined): by is ReportDimension =>
   by !== undefined && ["person", "project", "folder", "machine", "runtime", "group", "workflow"].includes(by);

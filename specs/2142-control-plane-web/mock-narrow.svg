@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="760" viewBox="0 0 860 760" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="14" fill="#1c1d20">
+  <rect width="860" height="760" fill="#e7eaee"/>
+  <!-- Phone 1: the bar and a table -->
+  <g transform="translate(20,20)">
+    <rect width="390" height="720" fill="#f7f8f9" stroke="#dde1e6"/>
+    <rect width="390" height="52" fill="#fff"/><line x1="0" y1="52" x2="390" y2="52" stroke="#dde1e6"/>
+    <text x="16" y="32" font-weight="700">acme</text>
+    <rect x="72" y="12" width="128" height="28" rx="6" fill="#fff" stroke="#dde1e6"/><text x="84" y="31" font-size="13">Machines ▾</text>
+    <circle cx="316" cy="26" r="13" fill="none" stroke="#6b7078"/><line x1="324" y1="34" x2="330" y2="40" stroke="#6b7078" stroke-width="2"/><circle cx="316" cy="26" r="0" />
+    <circle cx="360" cy="26" r="14" fill="#1f5fc8"/><text x="354" y="31" font-size="13" font-weight="700" fill="#fff">B</text>
+    <!-- Page list wraps above the page (#2141), as tabs -->
+    <g font-size="13"><text x="16" y="84" font-weight="700">Machines</text><text x="100" y="84">Runtimes</text><text x="180" y="84">Resources</text><text x="268" y="84">Worktrees</text></g>
+    <rect x="16" y="92" width="66" height="3" fill="#1f5fc8"/><line x1="0" y1="95" x2="390" y2="95" stroke="#dde1e6"/>
+    <text x="16" y="128" font-size="13" fill="#1f5fc8">‹ Machines</text>
+    <text x="16" y="158" font-size="20" font-weight="700">Machines</text>
+    <rect x="16" y="172" width="358" height="32" rx="6" fill="#1f5fc8"/><text x="148" y="193" fill="#fff" font-size="13" font-weight="600">Add Machine</text>
+    <!-- Table scrolling sideways, first column fixed -->
+    <g font-size="13">
+      <rect x="0" y="220" width="390" height="34" fill="#fff" stroke="#dde1e6"/>
+      <g font-size="12" font-weight="600" fill="#6b7078"><text x="16" y="242" fill="#1c1d20">Name ▲</text><text x="128" y="242">State</text><text x="232" y="242">Platform</text><text x="340" y="242">Vers</text></g>
+      <text x="16" y="280" font-weight="600">bea-mbp</text><text x="128" y="280" fill="#2d765c">● Online</text><text x="232" y="280">macOS 27</text><text x="340" y="280">0.14</text>
+      <line x1="0" y1="294" x2="390" y2="294" stroke="#eceef1"/>
+      <text x="16" y="318" font-weight="600">build-01</text><text x="128" y="318" fill="#2d765c">● Online</text><text x="232" y="318">Linux</text><text x="340" y="318">0.14</text>
+      <line x1="0" y1="332" x2="390" y2="332" stroke="#eceef1"/>
+      <text x="16" y="356" font-weight="600">sam-mini</text><text x="128" y="356" fill="#b4232b">○ Offline</text><text x="232" y="356">macOS 26</text><text x="340" y="356" fill="#ba4a13">0.13</text>
+      <line x1="0" y1="370" x2="390" y2="370" stroke="#eceef1"/>
+      <line x1="112" y1="220" x2="112" y2="370" stroke="#dde1e6"/>
+      <rect x="370" y="220" width="20" height="150" fill="url(#fade)"/>
+    </g>
+    <text x="16" y="402" font-size="12" fill="#6b7078">The table scrolls sideways; Name stays.</text>
+  </g>
+  <!-- Phone 2: the person menu open -->
+  <g transform="translate(450,20)">
+    <rect width="390" height="720" fill="#f7f8f9" stroke="#dde1e6"/>
+    <rect width="390" height="52" fill="#fff"/><line x1="0" y1="52" x2="390" y2="52" stroke="#dde1e6"/>
+    <text x="16" y="32" font-weight="700">acme</text>
+    <rect x="72" y="12" width="128" height="28" rx="6" fill="#fff" stroke="#dde1e6"/><text x="84" y="31" font-size="13">Overview ▾</text>
+    <circle cx="316" cy="26" r="13" fill="none" stroke="#6b7078"/><line x1="324" y1="34" x2="330" y2="40" stroke="#6b7078" stroke-width="2"/>
+    <circle cx="360" cy="26" r="14" fill="#1f5fc8"/><text x="354" y="31" font-size="13" font-weight="700" fill="#fff">B</text>
+    <rect x="130" y="50" width="250" height="176" rx="6" fill="#fff" stroke="#dde1e6"/>
+    <rect x="132" y="52" width="250" height="176" rx="6" fill="none" stroke="#000" stroke-opacity="0.04" stroke-width="4"/>
+    <g font-size="13"><text x="146" y="78" font-weight="700">Bea Lopez</text><text x="146" y="96" fill="#6b7078">bea@acme.dev · Admin</text>
+      <line x1="130" y1="110" x2="380" y2="110" stroke="#dde1e6"/>
+      <text x="146" y="138">Settings</text>
+      <line x1="130" y1="156" x2="380" y2="156" stroke="#dde1e6"/>
+      <text x="146" y="186" fill="#b4232b">Forget This Browser…</text></g>
+    <text x="16" y="270" font-size="12" fill="#6b7078">The person's initial opens a menu: who, their role,</text>
+    <text x="16" y="288" font-size="12" fill="#6b7078">Settings and Forget This Browser.</text>
+  </g>
+  <defs><linearGradient id="fade" x1="0" x2="1"><stop offset="0" stop-color="#f7f8f9" stop-opacity="0"/><stop offset="1" stop-color="#f7f8f9"/></linearGradient></defs>
+</svg>

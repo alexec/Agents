@@ -3,11 +3,12 @@
 // machines; the same on every client. Listed in ./sections.ts.
 import type { AutoField, AutoMapping, AutoSettings, NativeSetting, RuntimeStatus } from "../../protocol/generated";
 import type { Store } from "../../model/store";
-import { autoFields, cellOf, fieldWords, levelWords, levelsOf, mappedRuntimes, markWords } from "../../model/levels";
+import { autoFields, cellOf, fieldWords, levelWords, levelsOf, mappedRuntimes, markWords, unavailableState } from "../../model/levels";
 
 /** A runtime's state, as the Auto page says it. */
 function stateWords(store: Store, host: string, status: RuntimeStatus | undefined): string {
-  if (!status || !("available" in status.availability)) return "Not installed";
+  const unavailable = unavailableState(status);
+  if (unavailable || !status) return unavailable ?? "Not installed";
   if (store.account(host, status.runtime.id)?.state === "needsSignIn") return "Not signed in";
   const row = store.runtimeAllowances.value[host]?.rows.find((r) => r.credentialKey.startsWith(`${status.runtime.id}:`) && r.accountID === undefined);
   if (row && "out" in row.state.status) return "Out";
@@ -38,13 +39,24 @@ export function AgentRuntimesSection({ store, down }: { store: Store; down: bool
     const overrides = settings.overrides.filter((o) => !(o.runtimeID === runtimeID && o.field === field && o.level === level));
     save({ ...settings, overrides: native ? [...overrides, { runtimeID, field, level, native }] : overrides });
   };
+  const heading = <h3 class="section-head" id="settings-auto">Agent Runtimes ▸ Auto</h3>;
   if (!mappings) {
-    if (host) void store.loadAuto(host);
-    return null;
+    // Shown while the cells load, and with why and Try again when they did not come (#2894).
+    const problem = store.autoProblems.value[host];
+    if (host && !problem) void store.loadAuto(host);
+    return (
+      <section aria-labelledby="settings-auto">
+        {heading}
+        {problem ? (
+          <p class="failure small" role="alert">{problem}{" "}
+            <button type="button" class="link" disabled={down} onClick={() => void store.loadAuto(host)}>Try again</button></p>
+        ) : <p class="hint">Loading…</p>}
+      </section>
+    );
   }
   return (
     <section aria-labelledby="settings-auto">
-      <h3 class="section-head" id="settings-auto">Agent Runtimes ▸ Auto</h3>
+      {heading}
       <h4 class="small">Runtimes</h4>
       <ol class="auto-runtimes">
         {order.map((id, i) => (

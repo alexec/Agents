@@ -116,6 +116,15 @@ struct HelperLimitTests {
         #expect(before.unknownFields.isEmpty)
     }
 
+    /// #2886: on by default; off is a choice the file keeps, and on again is none.
+    @Test func archivingWhenMergedIsOnUnlessThePersonSaidNot() {
+        #expect(HelperLimits().archivesWhenMerged)
+        #expect(HelperLimits(archiveWhenMerged: true).orNilIfDefault == nil)
+        let off = HelperLimits(archiveWhenMerged: false)
+        #expect(!off.archivesWhenMerged)
+        #expect(off.orNilIfDefault == off)
+    }
+
     @Test func stoppedAndFinishedHelpersStillHoldTheirPlace() {
         let agents = [helper(.running), helper(.stopped), helper(.finished)]
         #expect(HelperLimit.placesInUse(in: folder, agents: agents) == 3)

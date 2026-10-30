@@ -105,9 +105,20 @@ test("when done offers the three choices in the window's words (#433)", () => {
 });
 
 test("the page says which runtime a run will use and why (#2764), as WorkflowSettings.runsOn", () => {
-  assert.equal(ws.runsOn("codex", "grok").line, "Runs on Codex (named in the file)");
-  assert.equal(ws.runsOn(undefined, "grok").line, "Runs on Grok (the last used here)");
-  assert.deepEqual(ws.runsOn(undefined, undefined), { runtimeID: "claude", line: "Runs on Claude (the default)", unknown: null });
-  assert.equal(ws.runsOn("nope", "codex").unknown, '"nope" is not a runtime this version knows, so this workflow does not run.');
-  assert.equal(ws.runsOn(undefined, "nope").unknown, '"nope" is not a runtime this version knows, so its settings cannot be shown.');
+  assert.equal(ws.runsOn("codex").line, "Runs on Codex (named in the file)");
+  assert.deepEqual(ws.runsOn(undefined), { runtimeID: "auto", isAuto: true, line: "Runs on Auto (the default)", unknown: null });
+  assert.equal(ws.runsOn("auto").unknown, null);
+  assert.equal(ws.runsOn("auto").line, "Runs on Auto (named in the file)");
+  assert.equal(ws.runsOn("nope").unknown, '"nope" is not a runtime this version knows, so this workflow does not run.');
+});
+
+test("on Auto the page offers the shared words, says effort does nothing, and what each run picked (#2873)", () => {
+  assert.deepEqual(ws.autoOption("permission").options.map((c) => c.value), ["plan", "ask", "approve-for-me", "bypass-permissions"]);
+  assert.deepEqual(ws.autoOption("model").options.map((c) => c.value), ["fast", "balanced", "smart"]);
+  assert.equal(ws.autoEffortNote({ effort: "high", options: {}, labels: [] }), "On Auto, effort follows the model, so `effort: high` does nothing.");
+  assert.equal(ws.autoEffortNote({ runtimeID: "claude", effort: "high", options: {}, labels: [] }), null);
+  const name = (id) => ({ codex: "Codex", claude: "Claude" })[id] ?? id;
+  assert.equal(ws.picked(undefined, name), null);
+  assert.equal(ws.picked({ runtimeID: "codex", levels: {}, native: {}, skipped: [{ runtimeID: "claude", reason: "not signed in" }] }, name),
+    "Auto picked Codex. Claude: not signed in");
 });

@@ -465,7 +465,7 @@ func (m *mesh) received(line string, link *peerLink) {
 		var owner string
 		json.Unmarshal(o["owner"], &owner)
 		if json.Unmarshal(o["need"], &need) == nil {
-			m.s.deliver(need, true, owner)
+			m.s.deliver(need, true, owner, "")
 		}
 	}
 }

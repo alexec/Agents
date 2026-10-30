@@ -27,6 +27,10 @@
 # The APNs key (#1460) is a secret here too, deploy/secrets/apns-key, never in the store or a
 # code: with it, the control plane pushes to a device itself when no Mac host relays its
 # notices. Empty (make-secrets.sh without --apns), it sends no pushes and says so in its log.
+#
+# So is the VAPID key for Web Push to a browser (#1486), deploy/secrets/vapid-key: make-secrets.sh
+# makes it once (deploy/gcp/up.sh, on the VM) and keeps it, since a new one ends every browser's
+# subscription. Empty, the control plane sends no Web Push and says so in its log.
 name: agents-control
 
 # Docker's json-file driver keeps every log line for ever on the one disk (#2290): each service
@@ -82,6 +86,9 @@ services:
       AGENTS_APNS_KEY_FILE: /run/secrets/apns-key
       AGENTS_APNS_KEY_ID: ${AGENTS_APNS_KEY_ID:-}
       AGENTS_APNS_TEAM_ID: ${AGENTS_APNS_TEAM_ID:-}
+      # The VAPID key's file (#1486), and the address a push service may write to about it.
+      AGENTS_WEBPUSH_KEY_FILE: /run/secrets/vapid-key
+      AGENTS_WEBPUSH_SUBJECT: ${AGENTS_WEBPUSH_SUBJECT:-}
       # Prometheus /metrics (#2176), off unless set: an address in the container such as
       # 0.0.0.0:9791, which Caddy does not serve, and then the token a scraper sends. A
       # scraper on the same Docker network reaches http://control:9791/metrics.
@@ -96,7 +103,7 @@ services:
       # adds a line for each request).
       AGENTS_CONTROL_LOG_FORMAT: ${AGENTS_CONTROL_LOG_FORMAT:-text}
       AGENTS_CONTROL_LOG_LEVEL: ${AGENTS_CONTROL_LOG_LEVEL:-info}
-    secrets: [gcp-service-account, apns-key]
+    secrets: [gcp-service-account, apns-key, vapid-key]
     # The Linux host (/servers, served at /v1/servers/… to servers joining with the install
     # command) and the runtimes' toolsets (/toolsets, at /v1/toolsets/…, so a server that joins
     # installs Claude by itself, #1312) are in the image, of its version (#2140).
@@ -139,6 +146,8 @@ secrets:
     file: ./secrets/gcp-service-account
   apns-key:
     file: ./secrets/apns-key
+  vapid-key:
+    file: ./secrets/vapid-key
 
 volumes:
   data:

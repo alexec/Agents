@@ -15,6 +15,11 @@
       "name": "client.team/1",
       "by": "client",
       "description": "A client knows it belongs to one person of a team (#994, #1763). On a control plane with more than one person, the control plane answers a client without it -32074 updateToJoinTeam (R14)."
+    },
+    {
+      "name": "machine/1",
+      "by": "control",
+      "description": "The control plane answers each host/* method as machine/* too, and a hosts/* method as machines/*, which machines/1 names (#2653). A step of the rename over three releases: the names in this document stay host/* and hosts/* until the senders move."
     }
   ],
   "methods": [
@@ -496,6 +501,32 @@
       }
     },
     {
+      "name": "clients/setWebPush",
+      "x-capability": "clients/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "A browser, over its own session (#1486): its Web Push subscription, kept in its own client record, which only it may set. No endpoint takes it away. Refused from a phone, an iPad or a window, and when this control plane has no VAPID key.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/WebPushSubscription"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "clients/startPairing",
       "x-capability": "clients/1",
       "paramStructure": "by-name",
@@ -532,6 +563,32 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "clients/webPushKey",
+      "x-capability": "clients/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "The control plane's VAPID public key (#1486), for a browser to subscribe with; none when it sends no Web Push.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/WebPushKey"
         }
       }
     },
@@ -2750,6 +2807,106 @@
       }
     },
     {
+      "name": "machines/sendFolder",
+      "x-capability": "folders.to-machine/1",
+      "description": "Through host/machines only (#2929): one step of an agent's start_session with send, which sends this folder's branch to another of the person's machines, as Send to ‹machine›… does. The control plane sends that machine's folders/receiveState, folders/receiveUpload or folders/receive; the machine has to be online.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineFolderSend"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MachineFolderSent"
+        }
+      }
+    },
+    {
+      "name": "machines/sessionCall",
+      "x-capability": "sessions.elsewhere/1",
+      "description": "Through host/machines only (#2927): an agent's call on a session it started on another of the person's machines. The control plane sends that machine's agents/fromStarter, saying which machine and agent ask.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineSessionCall"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SessionCallReply"
+        }
+      }
+    },
+    {
+      "name": "machines/sessionEnded",
+      "x-capability": "sessions.elsewhere/1",
+      "description": "Through host/machines only (#2927): a session started from another machine ended. The control plane sends that machine's agents/endedElsewhere, naming this one; an offline one is not told, and finds out when it next asks.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SessionEnded"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "machines/startSession",
+      "x-capability": "sessions.on-machine/1",
+      "description": "Through host/machines only (#2887): an agent's start_session on another of the person's machines. The id of the session it started; kept (-32067) when the machine is stopped and is starting.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineSessionStart"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/UUID"
+        }
+      }
+    },
+    {
+      "name": "notices/delivered",
+      "x-capability": "notices/1",
+      "description": "To the host whose notice it is, on its channel 0 (#2860): the control plane sent it to one of the person's devices, so the host records where on the notice's line.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/NoticeDelivered"
+          }
+        }
+      ]
+    },
+    {
       "name": "notices/take",
       "x-capability": "notices/1",
       "description": "A host, on its channel 0 (#2859): may a notice go now? One bucket for the person, shared by every machine of theirs, with the limits the host has.",
@@ -3932,6 +4089,32 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/UsageReport"
+        }
+      }
+    },
+    {
+      "name": "reports/value",
+      "x-capability": "reports.value/1",
+      "description": "What the work in a scope cost and delivered (#2351): cost per merged PR, per issue and per milestone, waste and lead time, from the machines' lineage nodes.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ReportQuery"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ReportValue"
         }
       }
     },

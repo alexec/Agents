@@ -8,7 +8,7 @@ import { choiceGroups, closedTitle, isAboutPermission, same } from "../model/opt
 import { nothingToAdjust } from "../model/promptWords";
 import { line } from "../model/orgPolicy";
 import { optionLabel } from "./OrgPolicyLine";
-import { customWords, fieldWords, followsSettings, levelMeaning, levelWords, levelsOf, markWords, ownWords } from "../model/levels";
+import { asksFirst, bypassConfirm, cellLine, customWords, fieldWords, followsSettings, levelMeaning, levelWords, levelsOf, ownWords } from "../model/levels";
 
 type Mode = ClientPermissionSettings["cursor"];
 
@@ -38,23 +38,47 @@ export function LevelSelect({ field, levels, own, value, onChange, disabled }: {
 }) {
   const chosen = levels.chosen(field);
   const title = chosen ? levelWords(field, chosen) : customWords;
+  // Bypass Permissions asks once more, as Yes to all does (#2892).
+  const [confirming, setConfirming] = useState<string | undefined>();
   const close = (e: Event) => {
+    setConfirming(undefined);
     const details = (e.currentTarget as HTMLElement).closest("details");
     if (details) details.open = false;
   };
   return (
-    <details class="level-select model-effort">
+    <details class="level-select model-effort" onToggle={(e) => {
+      if (!(e.currentTarget as HTMLDetailsElement).open) setConfirming(undefined);
+    }}>
       <summary class="pill" aria-label={`${fieldWords[field]}: ${title}`} aria-disabled={disabled}>{title} <span aria-hidden="true">▾</span></summary>
       <div class="model-effort-menu" role="group" aria-label={fieldWords[field]}>
+        {confirming ? (
+          <div class="client-permission-confirm" role="alertdialog" aria-label={bypassConfirm.title}>
+            <p>{bypassConfirm.title}</p>
+            <p class="quiet small">{bypassConfirm.message}</p>
+            <div class="client-permission-actions">
+              <button type="button" onClick={close}>Cancel</button>
+              <button type="button" class="destructive" disabled={disabled} onClick={(e) => {
+                levels.choose(field, confirming);
+                close(e);
+              }}>{bypassConfirm.button}</button>
+            </div>
+          </div>
+        ) : (<>
         <p class="quiet small">{fieldWords[field]}</p>
         {levelsOf(field).map((level) => {
           const cell = levels.cell(field, level);
           const cannot = cell?.mark === "notPossible" || cell?.mark === "dropped";
-          const line = cell ? (cannot ? [markWords[cell.mark], cell.note].filter(Boolean).join(": ")
-            : `${cell.words}${levels.runtimeName ? ` on ${levels.runtimeName}` : ""}`) : levelMeaning(field, level);
+          const line = cell ? cellLine(cell, levels.runtimeName) : levelMeaning(field, level);
           return (
             <button type="button" key={level} class="client-permission-choice" disabled={disabled || cannot}
-              aria-pressed={chosen === level} onClick={(e) => { levels.choose(field, level); close(e); }}>
+              aria-pressed={chosen === level} onClick={(e) => {
+                if (asksFirst(field, level) && chosen !== level) {
+                  setConfirming(level);
+                  return;
+                }
+                levels.choose(field, level);
+                close(e);
+              }}>
               <span class="client-permission-title"><span aria-hidden="true">{chosen === level ? "✓" : " "}</span>
                 {levelWords(field, level)}</span>
               <span class="quiet small">{line}</span>
@@ -68,6 +92,7 @@ export function LevelSelect({ field, levels, own, value, onChange, disabled }: {
               onChange={(v) => onChange(option, v)} />)}
           </details>
         )}
+        </>)}
       </div>
     </details>
   );

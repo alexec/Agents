@@ -3,6 +3,8 @@ package linearmcp
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"strings"
 	"testing"
 )
 
@@ -58,5 +60,26 @@ func TestTeamsAreByKey(t *testing.T) {
 	teams, err := l.Teams(context.Background())
 	if err != nil || len(teams) != 2 || teams[0].Key != "DES" || teams[1].Name != "Engineering" {
 		t.Fatalf("%v %v", teams, err)
+	}
+}
+
+// The bridge, the Lineage section and the styles are the github server's, word for word: one
+// host draws both (#2941).
+func TestThePageSharesTheGitHubServersBridge(t *testing.T) {
+	for _, name := range []string{"bridge.js", "lineage.js", "common.css"} {
+		ours, err := pageFiles.ReadFile("pages/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		theirs, err := os.ReadFile("../githubmcp/pages/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(ours) != string(theirs) {
+			t.Errorf("pages/%s is not the github server's: copy it again", name)
+		}
+	}
+	if html := page("issues.html"); strings.Contains(html, "/*lineage.js*/") || !strings.Contains(html, "lineageSection(ui, issue.url)") {
+		t.Error("the Issues page has no Lineage section")
 	}
 }

@@ -100,6 +100,58 @@ func TestNotifyingThePerson(t *testing.T) {
 	}
 }
 
+// A notice's need is its line (#2860), so a tap on the banner goes to it, and the line
+// says where it went: the computer once the window has it, then the device the control
+// plane says, each once.
+func TestNoticeLineSaysWhereItWent(t *testing.T) {
+	was := settlingPause
+	settlingPause = 0
+	defer func() { settlingPause = was }()
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	a := seeded(t, d, t.TempDir(), nil)
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+	c.call(t, 2, "presence/report", map[string]any{"active": true})
+	if text, _ := m.tool(3, "notify", map[string]any{"title": "The deploy finished"}); !strings.HasPrefix(text, "Sent.") {
+		t.Fatal(text)
+	}
+	var pending wire.AttentionPending
+	json.Unmarshal(c.call(t, 4, "attention/pending", nil), &pending)
+	var need *wire.NeedID
+	for _, n := range pending.Needs {
+		if n.Kind == wire.NeedKindNotice {
+			need = &n.ID
+		}
+	}
+	if need == nil {
+		t.Fatalf("%+v", pending.Needs)
+	}
+	told, _ := json.Marshal(wire.NoticeDelivered{Need: *need, To: wire.NoticeDeviceIPhone})
+	d.Told(wire.NotifyNoticesDelivered.Name, told)
+	d.Told(wire.NotifyNoticesDelivered.Name, told)
+	entries, _, _ := d.Store.Transcript(a.ID, 0)
+	var line wire.UUID
+	var went []wire.NoticeDevice
+	for _, e := range entries {
+		if e.Kind.Notified != nil {
+			line = e.ID
+		}
+		if v := e.Kind.NoticeDelivered; v != nil {
+			if v.Value.Notice != line {
+				t.Fatalf("delivery of %s, line %s", v.Value.Notice, line)
+			}
+			went = append(went, v.Value.To)
+		}
+	}
+	if string(line) != *need.Notice {
+		t.Fatalf("need %s, line %s", *need.Notice, line)
+	}
+	if len(went) != 2 || went[0] != wire.NoticeDeviceComputer || went[1] != wire.NoticeDeviceIPhone {
+		t.Fatalf("%v", went)
+	}
+}
+
 // With a control plane (#2859), the person's one bucket there decides, Burst and
 // Cool-down set in a client go to it, and its notifications part is written here.
 func TestNoticeLimitsFollowThePerson(t *testing.T) {

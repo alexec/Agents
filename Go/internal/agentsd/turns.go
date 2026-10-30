@@ -114,7 +114,13 @@ func (d *Daemon) record(id wire.UUID, kind wire.TranscriptEntryKind) {
 
 // recordFrom is record with the agent that sent the words, for a message between agents.
 func (d *Daemon) recordFrom(id wire.UUID, kind wire.TranscriptEntryKind, sender *wire.MessageSender) {
-	e := wire.TranscriptEntry{ID: store.NewUUID(), At: now(), Kind: kind, Sender: sender}
+	d.recordEntry(id, store.NewUUID(), kind, sender)
+}
+
+// recordEntry is record with the entry's id chosen first, for one named before it is
+// written: a notice's need is its entry, so a tap on its banner goes to its line (#2860).
+func (d *Daemon) recordEntry(id, entryID wire.UUID, kind wire.TranscriptEntryKind, sender *wire.MessageSender) {
+	e := wire.TranscriptEntry{ID: entryID, At: now(), Kind: kind, Sender: sender}
 	n, e, err := d.Store.AppendOne(id, e)
 	if err != nil {
 		log.Printf("agent %s: could not record an entry: %v", id, err)
@@ -169,6 +175,7 @@ func (d *Daemon) changeAgent(id wire.UUID, moveOn bool, edit func(a *wire.Agent)
 		return nil
 	}
 	d.tellChanged(*a, &before)
+	d.noteLineage(&before, *a)
 	d.folderChanged(folderPath(a))
 	// A folder quiet after working says folder.idle (#1368).
 	if before.State != a.State {
@@ -338,7 +345,11 @@ func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) 
 	}
 	d.actedOn(a.ID, by.actor)
 	d.tellChanged(a, nil)
+	d.noteLineage(nil, a)
 	d.folderChanged(folderPath(&a))
+	if r.StartedFrom != nil {
+		d.record(a.ID, runtimeNote(startedFromNote(r.StartedFrom)))
+	}
 	if wt != nil {
 		d.record(a.ID, runtimeNote(worktreeNote(*wt)))
 	}
@@ -972,8 +983,13 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 		a.IsUnread = &unread
 		if s == wire.AgentStateFinished && !(reported && a.Report != nil) {
 			outcome, message := wire.WorkOutcomeDone, firstSentence(last)
-			if strings.HasSuffix(strings.TrimSpace(last), "?") {
+			switch {
+			case strings.HasSuffix(strings.TrimSpace(last), "?"):
 				outcome = wire.WorkOutcomeNeedsAnswer
+			case waitingOnEvents(a):
+				// Ended in a lease's line or on wait_for_event's held call (#2911): it is
+				// started again when the wait ends, not done.
+				outcome = wire.WorkOutcomeWaiting
 			}
 			if message == "" {
 				message = "Finished."

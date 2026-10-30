@@ -272,6 +272,18 @@ private struct FolderGeneralPane: View {
                         }
                     }
                     row("Spent") { spent(summary) }
+                    // What a merged pull request says it cost (#2352); an older host has no such setting.
+                    if model.host(summary.host, has: Capability.lineageComment1) {
+                        row("Cost on pull requests") {
+                            VStack(alignment: .leading, spacing: 6) {
+                                prCostComment(in: summary)
+                                Text(PRCostComment.help + " Saved in .agents/folder.json.")
+                                    .appText(.fine)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
                     row("Helpers running") {
                         VStack(alignment: .leading, spacing: 6) {
                             helperLimit(\.running, in: summary, default: HelperLimit.defaultRunning,
@@ -317,11 +329,34 @@ private struct FolderGeneralPane: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
+                    row("Pull request merged") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            archiveWhenMerged(in: summary)
+                            Text("A session in a worktree is archived when the pull request from its branch merges, "
+                                 + "once its turn has ended and its worktree has nothing uncommitted. Any other session "
+                                 + "gets a line in its chat. This needs the github or gitlab connector in this folder. "
+                                 + "You can bring any of them back.")
+                                .appText(.fine)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
                     row("Allowance spent") {
                         VStack(alignment: .leading, spacing: 6) {
                             helpersContinue(in: summary)
                             Text("A session started by a session waits for the allowance and carries on "
                                  + "when it is back, as if you had chosen Continue. Off, it stops until you do.")
+                                .appText(.fine)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    row("Other machines") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            startOnMachines(in: summary)
+                            Text("On, a session here may start a session on another of your machines without "
+                                 + "asking you first. The new session's chat still says which session started it, "
+                                 + "and from which machine. Off, it asks you each time.")
                                 .appText(.fine)
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -395,6 +430,22 @@ private struct FolderGeneralPane: View {
         .disabled(model.hosts.isOffline(summary.host))
     }
 
+    /// What the host says on the folder's merged pull requests (#2352): off, the default, or
+    /// the tokens and time, or the cost too.
+    private func prCostComment(in summary: DaemonAPI.FolderSummary) -> some View {
+        let current = summary.folder.prCostComment ?? .off
+        return Picker("", selection: Binding(get: { current }, set: { chosen in
+            Task { await model.setPRCostComment(chosen, for: summary.key) }
+        })) {
+            ForEach(PRCostComment.allCases, id: \.self) { choice in
+                Text(choice == .off ? "\(choice.words) (default)" : choice.words).tag(choice)
+            }
+        }
+        .labelsHidden()
+        .fixedSize()
+        .disabled(model.hosts.isOffline(summary.host))
+    }
+
     /// One disk space line (#195) as a menu of sizes, its default marked and choosing it
     /// putting the folder back to the default. A size set by hand is offered too.
     private func diskLine(_ key: WritableKeyPath<DiskThresholds, Int?>, in summary: DaemonAPI.FolderSummary,
@@ -430,6 +481,20 @@ private struct FolderGeneralPane: View {
         .disabled(model.hosts.isOffline(summary.host))
     }
 
+    /// Whether a session is archived when its pull request merges (#2886). On is the default,
+    /// and back to nil.
+    private func archiveWhenMerged(in summary: DaemonAPI.FolderSummary) -> some View {
+        let kept = summary.folder.helperLimits ?? HelperLimits()
+        return Toggle("Archive a session when its pull request merges", isOn: Binding(get: { kept.archivesWhenMerged }, set: { on in
+            var limits = kept
+            limits.archiveWhenMerged = on == HelperLimit.defaultArchiveWhenMerged ? nil : on
+            Task { await model.setHelperLimits(limits, for: summary.key) }
+        }))
+        .toggleStyle(.switch)
+        .controlSize(.small)
+        .disabled(model.hosts.isOffline(summary.host))
+    }
+
     /// Whether helpers carry on by themselves when a spent allowance is back (#1918). Off
     /// is the default, and back to nil.
     private func helpersContinue(in summary: DaemonAPI.FolderSummary) -> some View {
@@ -437,6 +502,21 @@ private struct FolderGeneralPane: View {
         return Toggle("Helpers continue when the allowance is back", isOn: Binding(get: { kept.continueWhenBack == true }, set: { on in
             var limits = kept
             limits.continueWhenBack = on ? true : nil
+            Task { await model.setHelperLimits(limits, for: summary.key) }
+        }))
+        .toggleStyle(.switch)
+        .controlSize(.small)
+        .disabled(model.hosts.isOffline(summary.host))
+    }
+
+    /// Whether start_session with a machine skips the question to the person (#2928). Off is
+    /// the default, and back to nil. Only the person sets it, here.
+    private func startOnMachines(in summary: DaemonAPI.FolderSummary) -> some View {
+        let kept = summary.folder.helperLimits ?? HelperLimits()
+        return Toggle("Agents may start sessions on my other machines without asking",
+                      isOn: Binding(get: { kept.agentsMayStartOnMachines == true }, set: { on in
+            var limits = kept
+            limits.agentsMayStartOnMachines = on ? true : nil
             Task { await model.setHelperLimits(limits, for: summary.key) }
         }))
         .toggleStyle(.switch)

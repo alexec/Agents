@@ -3,8 +3,8 @@
 // foot; #499), then the chat, a folder's new-session form, a workflow, its archive, an Activity
 // page, a change's Review page (#1472), this browser's Settings (#846), or help text with nothing chosen; the files pane a third column from 1440, over the chat below that. Below 760 the same
 // sidebar is the root list, as the iPhone Remote's is (#226), and what it picks takes its place,
-// with ‹ Agents back to it. Above it all, Workspace | Console | Reports (#1804): the Console and
-// Reports take the place of the sidebar and the chat.
+// with ‹ Agents back to it. Above it all, the bar of sections (#2141): this is Agents; the Overview
+// and every other section take the place of the sidebar and the chat.
 import { useEffect } from "preact/hooks";
 import type { Store } from "../model/store";
 import { folderKey } from "../model/groups";
@@ -27,18 +27,21 @@ import { ArchivePage } from "./ArchivePage";
 import { MCPServersPage } from "./MCPServers";
 import { ReviewPage } from "./Review";
 import { Sidebar } from "./Sidebar";
-import { ActivityPageView } from "./Activity";
-import { SettingsPage } from "./Settings";
 import { ContextMenu } from "./ContextMenu";
 import { MilestoneCard } from "./MilestoneCard";
-import { AppSwitcher, SubAppPage } from "./ConsoleApp";
+import { NavBar, PageView, SectionPage } from "./Nav";
+import { Overview } from "./Overview";
+import { navPages } from "../model/nav";
+import { sectionOf } from "../route";
 import { OrgPolicyStrip } from "./OrgPolicyLine";
 
 export function Columns({ session, store }: { session: Session; store: Store }) {
   const r = route.value;
   const down = session.state.value.kind === "down";
   // What a narrow window shows: the list, or what the route opens in the chat's place.
-  const depth = r.app || r.settings || r.activity || r.session || r.workflow || r.page || r.compose || r.archive || r.mcp || r.review ? "chat" : "list";
+  const section = sectionOf(r);
+  const agentsPage = section === "agents" && !r.host ? navPages.agents.find((p) => p.id === r.section) : undefined;
+  const depth = section !== "agents" || agentsPage || r.session || r.workflow || r.page || r.compose || r.archive || r.mcp || r.review ? "chat" : "list";
   const folder = r.host && r.folder
     ? (store.folders.value[r.host] ?? []).find((p) => folderKey(p.folder.folder) === folderKey(r.folder!))
     : undefined;
@@ -61,11 +64,11 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
       {down && <Banner session={session} />}
       <Problem store={store} />
       <OrgPolicyStrip store={store} />
-      <AppSwitcher store={store} down={down} />
-      {r.app ? <SubAppPage store={store} app={r.app} down={down} /> : <div class="columns with-sidebar" aria-busy={down}>
+      <NavBar store={store} session={session} />
+      {section === "overview" ? <div class="columns overview-columns console" aria-busy={down}><Overview store={store} down={down} /></div>
+        : section !== "agents" ? <SectionPage store={store} section={section} down={down} /> : <div class="columns with-sidebar" aria-busy={down}>
         <Sidebar session={session} store={store} linkDown={down} />
-        {r.settings ? <SettingsPage store={store} down={down} />
-          : r.activity ? <ActivityPageView store={store} page={r.activity} />
+        {agentsPage ? <PageView store={store} page={agentsPage} down={down} />
           : r.host && r.folder && folder && r.review ? (
             <ReviewPage key={`${r.host}|${r.review}`} store={store} host={r.host} folder={folder.folder.folder} folderName={folder.name}
               id={r.review} down={down || !store.hostIsOnline(r.host)} />

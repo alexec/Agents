@@ -52,6 +52,9 @@ type ClientRecord struct {
 	// The push tokens of its Live Activities (#1744), one for each session it shows,
 	// newest last, held to MostActivityTokens. Set only by the device, as PushToken is.
 	ActivityTokens []ActivityToken
+	// A browser's own Web Push subscription (#1486), set only by that browser over its
+	// own session, as PushToken is: where the control plane posts its notices.
+	WebPush *WebPushSubscription
 	// When its key stops being accepted (#997, spec 736 FR-042); renewed while in use.
 	// None on a record paired before #997, until the sweep or its next connection sets it.
 	Expires *Stamp
@@ -80,6 +83,14 @@ type PushToken struct {
 	Environment string `json:"environment"`
 }
 
+// WebPushSubscription is a browser's push service endpoint and the two keys its pushes are
+// sealed with (RFC 8291): the P-256 public key, X9.63, and the 16-byte auth secret.
+type WebPushSubscription struct {
+	Endpoint string `json:"endpoint"`
+	P256dh   []byte `json:"p256dh"`
+	Auth     []byte `json:"auth"`
+}
+
 type clientJSON struct {
 	ID          string     `json:"id"`
 	Name        string     `json:"name"`
@@ -96,15 +107,16 @@ type clientJSON struct {
 	KnownEpoch  *int       `json:"knownEpoch,omitempty"`
 	PushToken   *PushToken `json:"pushToken,omitempty"`
 	// Activities: the push tokens of its Live Activities (#1744).
-	Activities []ActivityToken `json:"activityTokens,omitempty"`
-	Expires    *Stamp          `json:"expires,omitempty"`
+	Activities []ActivityToken      `json:"activityTokens,omitempty"`
+	Expires    *Stamp               `json:"expires,omitempty"`
+	WebPush    *WebPushSubscription `json:"webPush,omitempty"`
 }
 
 // MarshalJSON writes grant: operator, which an older copy needs to read the record at
 // all, and which tells it the truth.
 func (c ClientRecord) MarshalJSON() ([]byte, error) {
 	return encodeKeeping(clientJSON{c.ID, c.Name, c.Kind, c.PublicKey, LegacyGrant, c.Paired, c.LastSeen, c.MayNotify,
-		c.Owner, c.Rev, c.Forgotten, c.ForgottenAt, c.KnownEpoch, c.PushToken, c.ActivityTokens, c.Expires}, c.Extra)
+		c.Owner, c.Rev, c.Forgotten, c.ForgottenAt, c.KnownEpoch, c.PushToken, c.ActivityTokens, c.Expires, c.WebPush}, c.Extra)
 }
 
 // UnmarshalJSON does not read the grant: every client may do everything (#111).
@@ -123,7 +135,7 @@ func (c *ClientRecord) UnmarshalJSON(data []byte) error {
 		j.Kind = KindUnknown
 	}
 	*c = ClientRecord{strings.ToUpper(j.ID), j.Name, j.Kind, j.PublicKey, j.Paired, j.LastSeen, j.MayNotify, j.Owner,
-		j.Rev, j.Forgotten, j.ForgottenAt, j.KnownEpoch, j.PushToken, j.Activities, j.Expires, extra}
+		j.Rev, j.Forgotten, j.ForgottenAt, j.KnownEpoch, j.PushToken, j.Activities, j.WebPush, j.Expires, extra}
 	return nil
 }
 

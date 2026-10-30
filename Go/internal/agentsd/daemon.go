@@ -58,6 +58,7 @@ type Daemon struct {
 	messageState
 	helperQueueState
 	costBook
+	featureBook
 	workflowBook
 	allowanceBook
 	accountBook
@@ -65,15 +66,18 @@ type Daemon struct {
 	viewBook
 	mcpHealthBook
 	mcpEventsBook
+	mergeArchiveBook
 	restartBook
 	machineBook
 	hostStatusBook
+	elsewhereBook
 	idleBook
 	turnBook
 	findBook
 	optionBook
 	timeBook
 	reportBook
+	lineageBook
 	projectBook
 	projectToolsBook
 	milestoneBook
@@ -144,6 +148,7 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	}
 	d.checkMilestonesSoon()
 	d.countMergedPRsEveryHour()
+	d.saveFeaturesEveryMinute()
 	d.watchDisk()
 	// The counts on the servers' list view rows (#2033).
 	d.startViewCounts()
@@ -223,6 +228,7 @@ func (d *Daemon) Shutdown() {
 	d.waitAfterTurns(afterTurnLimit)
 	d.noteCutOffAgents(stoppedAt)
 	d.closeReport()
+	d.closeLineage()
 	d.clearPickUps()
 	d.stopMCPEvents()
 	d.stopEvents()

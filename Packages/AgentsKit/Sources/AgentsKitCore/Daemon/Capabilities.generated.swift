@@ -47,10 +47,12 @@ public enum Capability {
     public static let eventsAudit1 = "events.audit/1"
     public static let eventsTeam1 = "events.team/1"
     public static let events1 = "events/1"
+    public static let features1 = "features/1"
     public static let filesComplete1 = "files.complete/1"
     public static let filesDiagnostics1 = "files.diagnostics/1"
     public static let files1 = "files/1"
     public static let folder1 = "folder/1"
+    public static let foldersToMachine1 = "folders.to-machine/1"
     public static let folders1 = "folders/1"
     public static let git1 = "git/1"
     public static let governance1 = "governance/1"
@@ -66,9 +68,12 @@ public enum Capability {
     public static let host1 = "host/1"
     public static let hostsJoin1 = "hosts.join/1"
     public static let hosts1 = "hosts/1"
+    public static let lineageComment1 = "lineage.comment/1"
+    public static let lineage1 = "lineage/1"
     public static let links1 = "links/1"
     public static let liveactivity1 = "liveactivity/1"
     public static let mac1 = "mac/1"
+    public static let machine1 = "machine/1"
     public static let machines1 = "machines/1"
     public static let mailbox1 = "mailbox/1"
     public static let marketplaces1 = "marketplaces/1"
@@ -99,6 +104,7 @@ public enum Capability {
     public static let readapi1 = "readapi/1"
     public static let relay1 = "relay/1"
     public static let reportsScope1 = "reports.scope/1"
+    public static let reportsValue1 = "reports.value/1"
     public static let reportsViews1 = "reports.views/1"
     public static let reports1 = "reports/1"
     public static let resourcesLeases1 = "resources.leases/1"
@@ -108,6 +114,8 @@ public enum Capability {
     public static let runtimesAccounts1 = "runtimes.accounts/1"
     public static let runtimes1 = "runtimes/1"
     public static let sandbox1 = "sandbox/1"
+    public static let sessionsElsewhere1 = "sessions.elsewhere/1"
+    public static let sessionsOnMachine1 = "sessions.on-machine/1"
     public static let sessions1 = "sessions/1"
     public static let shell1 = "shell/1"
     public static let signinAsk1 = "signin.ask/1"
@@ -141,10 +149,12 @@ public enum Capability {
         "agents/delete": "agents/1",
         "agents/discardDraft": "agents/1",
         "agents/editQueued": "agents.edit-queued/1",
+        "agents/endedElsewhere": "sessions.elsewhere/1",
         "agents/export": "agents.export/1",
         "agents/exportRead": "agents.export/1",
         "agents/find": "agents.find/1",
         "agents/fork": "agents/1",
+        "agents/fromStarter": "sessions.elsewhere/1",
         "agents/import": "agents.export/1",
         "agents/importUpload": "agents.export/1",
         "agents/labelVocabulary": "agents/1",
@@ -256,11 +266,17 @@ public enum Capability {
         "folders/sendRead": "folders/1",
         "folders/setDiskSpace": "folders/1",
         "folders/setHelperLimits": "folders/1",
+        "folders/setPRCostComment": "lineage.comment/1",
         "folders/setPinned": "folders/1",
         "folders/setProject": "projects/1",
         "folders/unarchive": "folders/1",
         "folders/undoGuardedChange": "folders/1",
         "git/fill": "git/1",
+        "lineage/cost": "lineage/1",
+        "lineage/end": "lineage/1",
+        "lineage/link": "lineage/1",
+        "lineage/links": "lineage/1",
+        "lineage/walk": "lineage/1",
         "mac/open": "mac/1",
         "mac/reveal": "mac/1",
         "mac/terminal": "mac/1",
@@ -319,6 +335,7 @@ public enum Capability {
         "relay/grant": "relay/1",
         "relay/offer": "relay/1",
         "relay/register": "relay/1",
+        "reports/features": "features/1",
         "resources/declare": "resources/1",
         "resources/end": "resources.leases/1",
         "resources/lease": "resources.leases/1",
@@ -476,8 +493,10 @@ public enum Capability {
         "clients/setActivityToken": "liveactivity/1",
         "clients/setGrant": "clients/1",
         "clients/setPushToken": "clients/1",
+        "clients/setWebPush": "clients/1",
         "clients/startPairing": "clients/1",
         "clients/stopPairing": "clients/1",
+        "clients/webPushKey": "clients/1",
         "console/fleet": "console/1",
         "console/live": "console/1",
         "console/stopAgent": "console/1",
@@ -541,6 +560,10 @@ public enum Capability {
         "links/remove": "links/1",
         "links/requests": "links/1",
         "machines/forAgent": "machines/1",
+        "machines/sendFolder": "folders.to-machine/1",
+        "machines/sessionCall": "sessions.elsewhere/1",
+        "machines/sessionEnded": "sessions.elsewhere/1",
+        "machines/startSession": "sessions.on-machine/1",
         "notices/take": "notices/1",
         "orgRoutes/check": "org-routes/1",
         "orgRoutes/list": "org-routes/1",
@@ -587,6 +610,7 @@ public enum Capability {
         "reports/scopes": "reports.scope/1",
         "reports/setPolicy": "reports.scope/1",
         "reports/usage": "reports/1",
+        "reports/value": "reports.value/1",
         "reports/views": "reports.views/1",
         "scim/set": "org-identity/1",
         "scim/tokens/list": "org-identity/1",
@@ -666,6 +690,7 @@ public enum Capability {
         "host/release": "host.update/1",
         "host/user": "bots/1",
         "host/userSettings": "user/1",
+        "notices/delivered": "notices/1",
         "relay/count": "relay/1",
         "relay/deliver": "relay/1",
         "relay/devices": "relay/1",
@@ -677,6 +702,9 @@ public enum Capability {
         "client": [
             "client.wire/1",
             "client.team/1",
+        ],
+        "control": [
+            "machine/1",
         ],
         "host": [
             "host.wire/1",

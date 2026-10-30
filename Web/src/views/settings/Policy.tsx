@@ -8,7 +8,7 @@ import type { OrgPolicy, OrgRouteMine } from "../../protocol/generated";
 import { fromWireDate } from "../../protocol/dates";
 import { go } from "../../route";
 import { describe } from "../../model/errors";
-import { changed, editInConsole, foot, none, resumeAll, resumeMessage, resumeTitle, rules, runningAgents, stopAll, stopFoot,
+import { changed, editPolicy, foot, none, resumeAll, resumeMessage, resumeTitle, rules, runningAgents, stopAll, stopFoot,
   stopMessage, stopTitle, stoppedBy, stoppedStrip, title, viewOf } from "../../model/orgPolicy";
 import { fromOrganisation, mineLine, noRoutes, routesFoot, routesTitle } from "../../model/orgAccounts";
 import { GovernanceAsk } from "../Governance";
@@ -120,7 +120,7 @@ export function PolicySection({ store, down }: { store: Store; down: boolean }) 
           {admin && (
             <>
               <div class="policy-kill">
-                <button type="button" onClick={() => go({ app: "console", section: "policy" })}>{editInConsole}</button>
+                <button type="button" onClick={() => go({ nav: "settings", section: "policy" })}>{editPolicy}</button>
               </div>
               <KillSwitch store={store} policy={policy} down={down} />
             </>

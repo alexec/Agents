@@ -124,6 +124,10 @@ public struct TranscriptEntry: Codable, Hashable, Sendable, Identifiable {
         /// it was called, with what became of the notification.
         case notified(SentNotice)
 
+        /// Where the notice recorded as `notice` went (#2860), once its host knew. Not
+        /// drawn: it is said on that notice's line.
+        case noticeDelivered(NoticeDelivery)
+
         /// Something a newer version of this app wrote down, read by an older one.
         /// Kept whole and skipped when drawing, so a transcript is never lost to a
         /// kind that did not exist when this build was made.

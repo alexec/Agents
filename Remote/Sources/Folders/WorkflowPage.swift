@@ -56,11 +56,12 @@ struct WorkflowPage: View {
             moreRuns = await model.loadRuns(of: summary.workflowID, in: summary.workflow.folder,
                                             limit: shownRuns)
         }
-        .task(id: summary?.workflow) {
-            guard let workflow = summary?.workflow, workflow.problem?.needsAPerson == true else {
+        .task(id: summary.flatMap { $0.showsFile ? $0.workflow : nil }) {
+            guard let summary, summary.showsFile else {
                 rawWorkflowText = nil
                 return
             }
+            let workflow = summary.workflow
             guard case .text(let text, let isTruncated, let size, _)? = try? await model.readPage(
                 ".agents/workflows/\(workflow.workflowID).md", in: workflow.folder) else { return }
             rawWorkflowText = isTruncated
@@ -77,7 +78,7 @@ struct WorkflowPage: View {
             runButton(summary)
             // What it has done. How it is set up is Mac + web (#2798).
             status(summary)
-            if workflow.problem?.needsAPerson == true { unreadableFile() }
+            if summary.showsFile { unreadableFile() }
             runs(workflow)
         }
         .padding(.horizontal, 16)
@@ -305,4 +306,12 @@ struct WorkflowPage: View {
 private struct RunsAsk: Equatable {
     var workflowID: Workflow.ID
     var shown: Int
+}
+
+private extension WorkflowSummary {
+    /// The status card says "The file is below" for a file it cannot use and for an
+    /// event's bad arguments (#2900), so the page shows the file for both.
+    var showsFile: Bool {
+        workflow.problem?.needsAPerson == true || !mcpArgumentLines.isEmpty
+    }
 }

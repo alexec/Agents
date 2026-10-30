@@ -18,12 +18,14 @@ import { go } from "../route";
 import { RunNow } from "./WorkflowRow";
 import { rowExtras, SessionRow } from "./SessionRow";
 import { CooldownMenu, WhenDoneMenu, WorkflowSettingsForm } from "./WorkflowSettings";
-import { whenDoneSentence } from "../model/workflowSettings";
+import { picked, whenDoneSentence } from "../model/workflowSettings";
 import { workflowContinueSentence, workflowContinueSwitch } from "../model/continueWhenBack";
 import { BackToList } from "./BackToList";
 import { isWorkflowMuted, muteLabel, workflowMuteHelp } from "../model/mute";
 import { Capability } from "../protocol/capabilities.generated";
 import { WorkflowFileModal } from "./AgentConfigEditor";
+import { PageTitle } from "./TopBar";
+import { navTitle } from "../model/nav";
 
 export function WorkflowPage({ store, host, folder, folderName, workflowID, down }: {
   store: Store; host: string; folder: string; folderName: string; workflowID: string; down: boolean;
@@ -104,7 +106,9 @@ export function WorkflowPage({ store, host, folder, folderName, workflowID, down
     onClick={() => { editsFile.value = true; }}>Edit File…</button>;
   return (
     <section class="chat workflow-page" aria-label="Workflow">
-      <header class="column-head">{back}<h1>{workflow.name}</h1></header>
+      <header class="column-head page-head">{back}
+        <PageTitle parts={[{ title: navTitle.workflows, to: { nav: "workflows" } }, { title: folderName }, { title: workflow.name }]}><h1>{workflow.name}</h1></PageTitle>
+      </header>
       {editsFile.value && <WorkflowFileModal store={store} host={yours ? store.macHostID.value : host}
         folder={yours ? undefined : folder} path={`${workflow.workflowID}.md`} down={down}
         close={() => { editsFile.value = false; }} />}
@@ -168,9 +172,9 @@ export function WorkflowPage({ store, host, folder, folderName, workflowID, down
           {/* The switches write the workflow's file (#125), the window's words. */}
           {!summary.isArchived && <p class="quiet small">{switchesSentence(summary)}</p>}
 
-          <div class="segmented workflow-panes" role="radiogroup" aria-label="Show">
+          <div class="tabs workflow-panes" role="tablist" aria-label="Show">
             {(["activity", "configuration"] as const).map((p) => (
-              <button key={p} role="radio" aria-checked={pane.value === p} class={pane.value === p ? "on" : ""}
+              <button key={p} role="tab" aria-selected={pane.value === p} class={pane.value === p ? "on" : ""}
                 onClick={() => { pane.value = p; }}>{p === "activity" ? "Activity" : "Configuration"}</button>
             ))}
           </div>
@@ -198,10 +202,16 @@ export function WorkflowPage({ store, host, folder, folderName, workflowID, down
             <p class="last-ran quiet small">{lastRanLine(summary)}</p>
 
             {!loadingRuns.value && runs.value.length === 0 && <p class="hint">Nothing has run yet.</p>}
-            {runs.value.map((agent) => (
-              <SessionRow key={agent.id} agent={agent} chosen={false} onPick={() => go({ host, folder: folder, session: agent.id })}
-                extras={rowExtras(store, host, agent)} />
-            ))}
+            {runs.value.map((agent) => {
+              const pick = picked(agent.auto, (id) => runtimeName(id) ?? id);
+              return (
+                <div key={agent.id} class="workflow-run">
+                  <SessionRow agent={agent} chosen={false} onPick={() => go({ host, folder: folder, session: agent.id })}
+                    extras={rowExtras(store, host, agent)} />
+                  {pick && <p class="quiet small">{pick}</p>}
+                </div>
+              );
+            })}
             {runs.value.length === runLimit.value && <button class="link" disabled={loadingRuns.value}
               onClick={() => { runLimit.value += 3; }}>Show more</button>}
             </>

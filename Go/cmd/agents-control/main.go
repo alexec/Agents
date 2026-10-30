@@ -60,6 +60,9 @@
 //	AGENTS_CONTROL_NAME, AGENTS_CONTROL_MACHINE_ID, AGENTS_CONTROL_SERVERS,
 //	AGENTS_CONTROL_TOOLSETS
 //	AGENTS_APNS_KEY_FILE, AGENTS_APNS_KEY_ID, AGENTS_APNS_TEAM_ID: the APNs key (#1460)
+//	AGENTS_WEBPUSH_KEY_FILE, AGENTS_WEBPUSH_SUBJECT: the VAPID key for Web Push to a
+//	                            browser (#1486), and the mailto: or https: address a push
+//	                            service may write to about it
 //	AGENTS_CONTROL_LOG_FORMAT, AGENTS_CONTROL_LOG_LEVEL  as --log-format and --log-level
 //	AGENTS_CONTROL_METRICS      as --metrics: host:port, such as 127.0.0.1:9791; off when unset
 //	AGENTS_CONTROL_METRICS_TOKEN  the bearer token a scraper sends; needed on any address but
@@ -99,6 +102,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/internal/controlplane/web"
+	"github.com/alexec/agents/Go/internal/controlplane/webpush"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -261,6 +265,24 @@ func pusher() controlplane.Pusher {
 	client, err := apns.New(cfg)
 	if err != nil {
 		say("no pushes: " + err.Error())
+		return nil
+	}
+	return client
+}
+
+// webPusher is the VAPID key (#1486), a compose secret on the machine as the APNs key is:
+// nil when there is none, which the service says once.
+func webPusher() controlplane.WebPusher {
+	file := os.Getenv("AGENTS_WEBPUSH_KEY_FILE")
+	if file == "" {
+		return nil
+	}
+	if info, err := os.Stat(file); err != nil || info.Size() == 0 {
+		return nil
+	}
+	client, err := webpush.New(webpush.Config{KeyFile: file, Subject: strings.TrimSpace(os.Getenv("AGENTS_WEBPUSH_SUBJECT"))})
+	if err != nil {
+		say("no Web Push: " + err.Error())
 		return nil
 	}
 	return client
@@ -572,6 +594,9 @@ func serve() {
 	}
 	if p := pusher(); p != nil {
 		cfg.Push = p
+	}
+	if p := webPusher(); p != nil {
+		cfg.WebPush = p
 	}
 	// Whether the page is served, for Agents Host to read (071 R3): this run's, or none.
 	if home() != "" {

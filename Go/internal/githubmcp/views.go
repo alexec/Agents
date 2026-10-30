@@ -39,7 +39,7 @@ const (
 	IssuesURI = issuesURI
 )
 
-// page is a view's HTML: its file, with the PR page's script and styles put in.
+// page is a view's HTML: its file, with the shared scripts and styles put in.
 func page(name string) string {
 	read := func(n string) string {
 		b, err := pageFiles.ReadFile("pages/" + n)
@@ -49,7 +49,7 @@ func page(name string) string {
 		return string(b)
 	}
 	return strings.NewReplacer("/*common.css*/", read("common.css"), "/*prpage.css*/", read("prpage.css"),
-		"/*bridge.js*/", read("bridge.js"), "/*prpage.js*/", read("prpage.js")).Replace(read(name))
+		"/*bridge.js*/", read("bridge.js"), "/*labels.js*/", read("labels.js"), "/*lineage.js*/", read("lineage.js"), "/*prpage.js*/", read("prpage.js")).Replace(read(name))
 }
 
 func uiMeta(uri string, visibility ...string) mcp.Meta {
@@ -153,7 +153,10 @@ func AddViews(server *mcp.Server, gh Views, person bool) {
 
 	mcp.AddTool(server, &mcp.Tool{Name: "show_pull_requests", Title: "Show pull requests",
 		Description: "The repo's open pull requests, newest created first, each with its checks (passing, failing, running or none), " +
-			"its review (approved, changes_requested or review_required), whether it conflicts with its base, and whether auto-merge is on. " +
+			"its review (approved, changes_requested or review_required), whether it conflicts with its base, whether auto-merge is on, " +
+			"and its section for the signed-in login (viewer): needs_you (a review asked of you, or yours with failing checks, a conflict or " +
+			"changes requested), yours, team (the repo's members and bots) or others; attention counts needs_you. " +
+			"Each has its labels; labelColors maps each label to its #rrggbb. " +
 			"Its view is the Pull requests page, where a person opens a pull request's page.",
 		Annotations: readOnly, Meta: uiMeta(pullsURI, "model", "app")},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in repoArgs) (*mcp.CallToolResult, any, error) {
@@ -166,21 +169,28 @@ func AddViews(server *mcp.Server, gh Views, person bool) {
 				return failed(err), nil, nil
 			}
 			prs := make([]any, len(b.PRs))
-			// The count on the sidebar's row (#2033), and the signed-in person's PRs whose checks fail.
-			failing := 0
+			// The count on the sidebar's row (#2033), and the PRs that need the signed-in person (#2453).
+			colors := map[string]string{}
+			needsYou := 0
 			for i, p := range b.PRs {
-				prs[i] = p.json()
-				if p.Checks == "failing" && p.Author != "" && p.Author == b.Viewer {
-					failing++
+				j := p.json()
+				for name, color := range p.LabelColors {
+					colors[name] = color
 				}
+				j["section"] = prSection(p, b.Viewer)
+				if j["section"] == sectionNeedsYou {
+					needsYou++
+				}
+				prs[i] = j
 			}
 			return structured(map[string]any{"repo": repo, "viewer": b.Viewer, "prs": prs,
-				"count": len(prs), "attention": failing}), nil, nil
+				"count": len(prs), "attention": needsYou, "labelColors": colors}), nil, nil
 		})
 
 	mcp.AddTool(server, &mcp.Tool{Name: "show_issues", Title: "Show issues",
 		Description: "The repo's open issues (not pull requests), newest created first, at most 100, each with its labels, " +
-			"assignees (logins), milestone and comment count; labelColors maps each label to its #rrggbb. " +
+			"assignees (logins), milestone, comment count and section for the signed-in login (viewer): needs_you (assigned to you), " +
+			"yours, team (the repo's members and bots) or others; attention counts needs_you. labelColors maps each label to its #rrggbb. " +
 			"A query searches titles and descriptions. Its view is the Issues page, where a person expands a row to read its rich-text description and linked pull requests.",
 		Annotations: readOnly, Meta: uiMeta(issuesURI, "model", "app")},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in issuesArgs) (*mcp.CallToolResult, any, error) {
@@ -196,15 +206,24 @@ func AddViews(server *mcp.Server, gh Views, person bool) {
 			if err != nil {
 				return failed(err), nil, nil
 			}
+			// Without the viewer the list still shows, as Team and Others only.
+			viewer, _ := gh.Viewer(ctx)
 			issues := make([]any, len(list))
 			colors := map[string]string{}
+			needsYou := 0
 			for i, l := range list {
-				issues[i] = l.json()
+				j := l.json()
+				j["section"] = issueSection(l, viewer)
+				if j["section"] == sectionNeedsYou {
+					needsYou++
+				}
+				issues[i] = j
 				for name, color := range l.LabelColors {
 					colors[name] = color
 				}
 			}
-			return structured(map[string]any{"repo": repo, "issues": issues, "count": len(issues), "labelColors": colors}), nil, nil
+			return structured(map[string]any{"repo": repo, "viewer": viewer, "issues": issues, "count": len(issues),
+				"attention": needsYou, "labelColors": colors}), nil, nil
 		})
 
 	mcp.AddTool(server, &mcp.Tool{Name: "show_issue_details", Title: "Show issue details",
@@ -229,7 +248,8 @@ func AddViews(server *mcp.Server, gh Views, person bool) {
 
 	mcp.AddTool(server, &mcp.Tool{Name: "show_pull_request", Title: "Show a pull request",
 		Description: "One pull request: its description, checks (a failing one with its run's id for failed_log), files, comments, " +
-			"reviews and review threads (path and line), whether it conflicts with its base, its review decision, and the signed-in login (viewer). " +
+			"reviews and review threads (path and line), whether it conflicts with its base, its review decision, its labels (labelColors maps each to its #rrggbb), " +
+			"and the signed-in login (viewer). " +
 			"An app's words say which app (app: CodeRabbit); codeRabbit is CodeRabbit's summary, its review status and its last review's state. " +
 			"Its view is the pull request's page.",
 		Annotations: readOnly, Meta: uiMeta(prURI, "model", "app")},

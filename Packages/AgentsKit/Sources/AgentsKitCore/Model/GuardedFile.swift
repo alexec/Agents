@@ -19,7 +19,7 @@ public enum GuardedFile: String, Codable, CaseIterable, Sendable {
     /// What the file holds, in a person's words.
     public var holds: String {
         switch self {
-        case .folderConfig: "the helper limits and disk space lines"
+        case .folderConfig: "the helper limits, disk space lines and cost on pull requests"
         case .pins: "the pins"
         }
     }

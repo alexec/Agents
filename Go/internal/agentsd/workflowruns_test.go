@@ -50,7 +50,8 @@ func TestAWorkflowRuns(t *testing.T) {
 	}
 	agent := s.LastOutcome.Ran.AgentID
 	a := d.Store.Agent(agent)
-	if a == nil || a.RuntimeID != "grok" || *a.Title != "Review" || a.StartedByWorkflow == nil || *a.StartedByWorkflow != "review" || *a.ChainDepth != 1 {
+	// A file with no runtime: runs on Auto, not on the newest agent's runtime (#2873).
+	if a == nil || a.Auto == nil || *a.Title != "Review" || a.StartedByWorkflow == nil || *a.StartedByWorkflow != "review" || *a.ChainDepth != 1 {
 		t.Fatalf("%+v", a)
 	}
 	waitFor(t, "the run over", func() bool {
@@ -81,6 +82,29 @@ func TestAWorkflowRuns(t *testing.T) {
 		defer d.workflowMu.Unlock()
 		return len(d.recordsLocked().Runs) == 0
 	})
+}
+
+// A mode the runtime does not offer stops the run, rather than leaving the agent in the
+// runtime's own default; with nothing offered yet, the mode is taken as offered.
+func TestAWorkflowModeTheRuntimeDoesNotOffer(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	if id, why := d.offeredMode("grok", "auto"); id != "mode" || why != "" {
+		t.Fatal(id, why)
+	}
+	cat := "mode"
+	d.remember("grok\t/x\t", optionEntry{SavedAt: now(), Options: []wire.ConfigOption{{ID: "permission", Name: "Mode", Type: "select", Category: &cat,
+		Options: json.RawMessage(`[{"value":"default","name":"Default"},{"value":"read-only","name":"Read only"}]`)}}})
+	if id, why := d.offeredMode("grok", "read-only"); id != "permission" || why != "" {
+		t.Fatal(id, why)
+	}
+	if _, why := d.offeredMode("grok", "auto"); !strings.Contains(why, "does not offer the mode auto") || !strings.Contains(why, "default, read-only") {
+		t.Fatal(why)
+	}
+	d.remember("codex\t/x\t", optionEntry{SavedAt: now(), Options: []wire.ConfigOption{{ID: "model", Name: "Model", Type: "select"}}})
+	if _, why := d.offeredMode("codex", "auto"); !strings.Contains(why, "offers no modes") {
+		t.Fatal(why)
+	}
 }
 
 func TestAllowanceFailureDoesNotAutoarchiveWorkflowRun(t *testing.T) {
@@ -318,4 +342,41 @@ func TestAWorkflowPinnedHereRuns(t *testing.T) {
 		defer d.workflowMu.Unlock()
 		return len(d.recordsLocked().Runs) == 0
 	})
+}
+
+// A run that ends its turn in a lease's line is not done (#2911): the line's wait is the
+// same wait wait_for_event makes, and the agent is started again when it is granted. A
+// workflow that may archive a done run must not archive one still waiting on that.
+func TestAWorkflowRunQueuedForALeaseIsNotArchived(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := folder(t, c, 1)
+	folder := store.FolderURL(dir)
+	os.MkdirAll(workflowsFolder(dir), 0o755)
+	os.WriteFile(filepath.Join(workflowsFolder(dir), "drill.md"),
+		[]byte("---\nname: Drill\nwhen-done: archive\n---\nJoin the line for a lease.\n"), 0o644)
+	approveAll(t, c, folder)
+	var s wire.WorkflowSummary
+	json.Unmarshal(c.call(t, 2, "workflows/run", map[string]any{"folder": folder, "workflowID": "drill"}), &s)
+	if s.LastOutcome == nil || s.LastOutcome.Ran == nil {
+		t.Fatalf("%+v", s)
+	}
+	agent := s.LastOutcome.Ran.AgentID
+	// Joins build's line while its turn runs, as lease_resource does when another agent
+	// holds it: the turn ends on the fake runtime's own words a moment later (above).
+	d.leaseMu.Lock()
+	d.loadLeases()
+	d.leaseMu.Unlock()
+	d.openLineWait(agent, "build")
+	waitFor(t, "the run over", func() bool {
+		return strings.Contains(strings.Join(names(d), " "), "workflow.completed")
+	})
+	if got := d.Store.Agent(agent); got == nil || got.State == wire.AgentStateArchived {
+		t.Fatalf("archived while still in build's line: %+v", got)
+	} else if got.Report == nil || got.Report.Outcome != wire.WorkOutcomeWaiting {
+		t.Fatalf("report %+v", got.Report)
+	} else if got.EventWait == nil || got.EventWait.Ending != nil {
+		t.Fatalf("left the line: %+v", got.EventWait)
+	}
 }

@@ -403,6 +403,11 @@ func (d *Daemon) setClientPermission(r wire.SetClientPermissionRequest) (wire.Ag
 	if !clientAnswered[a.RuntimeID] {
 		return wire.Agent{}, Invalid("%s asks by its permission mode; the app does not answer its requests.", runtimeName(a.RuntimeID))
 	}
+	if r.Mode != nil && clientPermissionMode(string(*r.Mode)) == wire.ClientPermissionModeAlwaysApprove {
+		if err := d.alwaysApproveRefusal(); err != nil {
+			return wire.Agent{}, err
+		}
+	}
 	d.change(a.ID, func(a *wire.Agent) {
 		if r.Mode == nil {
 			a.ClientPermission = nil
@@ -461,7 +466,6 @@ func autoNote(p wire.AutoPick) string {
 	return s
 }
 
-
 // resolveLevels is a start's levels made the runtime's own settings (#2658): on Auto, the
 // runtime is picked first (FR-006); then the model and mode cells fill the options the start
 // did not set itself. It returns the pick, for an Auto start, and the agent's own answer to
@@ -504,6 +508,9 @@ var (
 	permissionLevelWords = map[string]wire.PermissionLevel{"plan": wire.PermissionLevelPlan, "ask": wire.PermissionLevelAsk, "approve-for-me": wire.PermissionLevelApproveForMe, "bypass-permissions": wire.PermissionLevelBypassPermissions}
 	requestWords         = map[string]wire.ClientPermissionMode{"request-cards": wire.ClientPermissionModeDefault, "yes-to-all": wire.ClientPermissionModeAlwaysApprove}
 	sandboxWords         = map[string]wire.SandboxChoice{"default": wire.SandboxChoiceRuntime, "runtime": wire.SandboxChoiceOn, "none": wire.SandboxChoiceOff}
+	// A runtime's own permission modes that Auto takes as a level (#2873), so a file
+	// written for Claude runs the same on Auto.
+	permissionAliases = map[string]wire.PermissionLevel{"default": wire.PermissionLevelAsk, "auto": wire.PermissionLevelApproveForMe, "bypassPermissions": wire.PermissionLevelBypassPermissions}
 )
 
 // permissionWord is a permission level in a file's words.
@@ -519,7 +526,7 @@ func permissionWord(p wire.PermissionLevel) string {
 // fileLevels is a workflow's or a helper's model, permission mode, permission requests and
 // sandbox: the shared words become levels, and anything else stays the runtime's own value.
 // On Auto a runtime's own model or mode is refused: Auto cannot map one runtime's name onto
-// another (Story 5).
+// another (Story 5). The exceptions are the modes in permissionAliases (#2873).
 func fileLevels(runtimeID, model string, mode *string, requests, sandbox string) (levels *wire.Levels, nativeModel string, nativeMode *string, box *wire.SandboxChoice, err error) {
 	auto := runtimeID == autoRuntimeID
 	l := wire.Levels{}
@@ -535,6 +542,8 @@ func fileLevels(runtimeID, model string, mode *string, requests, sandbox string)
 	}
 	if mode != nil && *mode != "" {
 		if p, ok := permissionLevelWords[*mode]; ok {
+			l.Permission, set = &p, true
+		} else if p, ok := permissionAliases[*mode]; ok && auto {
 			l.Permission, set = &p, true
 		} else if auto {
 			return nil, "", nil, nil, Invalid("`runtime: auto` takes `permission-mode: plan`, `ask`, `approve-for-me` or `bypass-permissions`, not %s", *mode)

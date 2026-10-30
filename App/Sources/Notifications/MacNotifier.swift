@@ -19,8 +19,9 @@ import UserNotifications
 /// blocked, and the folder row still says so.
 @MainActor
 final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
-    /// Open that agent's conversation, with the question in front of the person.
-    var open: @MainActor (UUID) -> Void = { _ in }
+    /// Open that agent's conversation, with the question in front of the person, or at a
+    /// notice's line (#2860) when the banner was one.
+    var open: @MainActor (UUID, UUID?) -> Void = { _, _ in }
     /// A folder's page, for a question asked of the folder rather than a session (#531).
     var openFolder: @MainActor (URL) -> Void = { _ in }
     /// One of the banner's own buttons (#1170): the need's token, the answer, and the line
@@ -170,9 +171,10 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
         }
         let request = response.notification.request
         if let text = request.content.userInfo["agentID"] as? String, let agentID = UUID(uuidString: text) {
+            let line = NeedID.noticeEntry(fromToken: request.identifier)
             await MainActor.run {
                 NSApp.activate()
-                open(agentID)
+                open(agentID, line)
             }
         } else if let folder = NeedID.guardedFolder(fromToken: request.identifier) {
             await MainActor.run {

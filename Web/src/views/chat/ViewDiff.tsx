@@ -37,9 +37,9 @@ export function ViewDiff({ layer, openLink }: { layer: ViewLayer; openLink: (url
         <h1>{diff.title}</h1>
         <span class="spacer" />
         {wide.value && (
-          <span class="segmented" role="radiogroup" aria-label="Show">
-            <button type="button" role="radio" class={layout.value === "unified" ? "on" : ""} aria-checked={layout.value === "unified"} onClick={() => choose("unified")}>Unified</button>
-            <button type="button" role="radio" class={layout.value === "sideBySide" ? "on" : ""} aria-checked={layout.value === "sideBySide"} onClick={() => choose("sideBySide")}>Side by Side</button>
+          <span class="tabs" role="tablist" aria-label="Show">
+            <button type="button" role="tab" class={layout.value === "unified" ? "on" : ""} aria-selected={layout.value === "unified"} onClick={() => choose("unified")}>Unified</button>
+            <button type="button" role="tab" class={layout.value === "sideBySide" ? "on" : ""} aria-selected={layout.value === "sideBySide"} onClick={() => choose("sideBySide")}>Side by Side</button>
           </span>
         )}
         <button type="button" class="prominent" onClick={() => { layer.diff.value = null; }}>Done</button>

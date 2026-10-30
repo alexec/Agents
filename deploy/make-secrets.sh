@@ -26,6 +26,9 @@
 #   an empty file without --apns, and then the control plane sends no pushes and says so;
 # - AGENTS_APNS_KEY_ID and AGENTS_APNS_TEAM_ID in deploy/.env. The Key ID is read from the
 #   file's name (AuthKey_KEYID.p8) when not given; the Team ID is the app's, 6T4RVD5724.
+#
+# Web Push to a browser (#1486): vapid-key, a P-256 key made here the first time and kept, since
+# a new one ends every browser's subscription.
 set -euo pipefail
 dir=${0:A:h}/secrets
 env_file=${0:A:h}/.env
@@ -75,6 +78,11 @@ if [[ ${1:-} == --public ]]; then
         : > $dir/apns-key
         chmod 644 $dir/apns-key
         print "no APNs key: the control plane sends no pushes until you give one with --apns"
+    fi
+    if [[ ! -s $dir/vapid-key ]]; then
+        openssl ecparam -name prime256v1 -genkey -noout | openssl pkcs8 -topk8 -nocrypt -out $dir/vapid-key
+        chmod 644 $dir/vapid-key
+        print "a VAPID key for Web Push is in $dir/vapid-key"
     fi
     if [[ -z $kms ]]; then
         # Only the APNs key, given after the rest.
