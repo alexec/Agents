@@ -18,10 +18,11 @@
 </div><div id="page" hidden></div></main>
 <script>
 /*bridge.js*/
+/*labels.js*/
 /*lineage.js*/
 /*prpage.js*/
 (() => {
-  let repo = "", viewer = "";
+  let repo = "", viewer = "", labelColors = {};
   const ui = bridge("github-pulls", {
     input: (args) => { repo = args.repo || ""; ui.$("repo").textContent = repo; say("Listing…"); },
     result: (result) => draw(result),
@@ -36,6 +37,7 @@
     if (!found) { say("Couldn't list pull requests: " + ui.errorText(result), true); $("refresh").disabled = !repo; return; }
     if (found.repo) { repo = found.repo; $("repo").textContent = repo; }
     viewer = found.viewer || "";
+    labelColors = found.labelColors && typeof found.labelColors === "object" ? found.labelColors : {};
     const prs = Array.isArray(found.prs) ? found.prs : [];
     $("prs").replaceChildren(...ui.sections(prs, row));
     say(prs.length ? `${prs.length} open · as of ${new Date().toLocaleTimeString()}` : "No open pull requests.");
@@ -56,6 +58,7 @@
         el("span", { className: "branch", textContent: pr.branch, title: `${pr.branch} → ${pr.base}` }),
         ...ui.who(pr.author, pr.authorBot),
         pr.updatedAt ? el("span", { textContent: ui.ago(pr.updatedAt) }) : null,
+        ...prLabels(ui, pr, labelColors),
       ]),
       action,
     ]);

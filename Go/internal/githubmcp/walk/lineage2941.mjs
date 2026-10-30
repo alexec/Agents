@@ -26,7 +26,7 @@ const check = (ok, line) => { if (!ok) failed += 1; console.log(`${ok ? "ok  " :
 const page = (server, name) => {
   const read = (n) => readFileSync(join(internal, server, "pages", n), "utf8");
   let html = read(name);
-  for (const part of ["common.css", "prpage.css", "mrpage.css", "bridge.js", "lineage.js", "prpage.js", "mrpage.js"]) {
+  for (const part of ["common.css", "prpage.css", "mrpage.css", "bridge.js", "labels.js", "lineage.js", "prpage.js", "mrpage.js"]) {
     if (html.includes(`/*${part}*/`)) html = html.replace(`/*${part}*/`, () => read(part));
   }
   return html;

@@ -277,7 +277,7 @@ const prPage = (ui, repo, back) => {
     root.replaceChildren(
       el("div", { className: "bar" }, head),
       el("div", { className: "bar" }, [link(`#${pr.number}`, pr.url), el("h2", { className: "grow", textContent: pr.title })]),
-      el("div", { className: "pills" }, prPills(ui, pr)),
+      el("div", { className: "pills" }, [...prPills(ui, pr), ...prLabels(ui, pr, pr.labelColors)]),
       el("div", { className: "branch", textContent: `${pr.branch} → ${pr.base} · ${pr.author || "someone"} · ${ui.ago(pr.createdAt)} · +${pr.additions} −${pr.deletions}` }),
       el("div", { className: "tabs" }, tabs),
       ...panel.filter(Boolean),

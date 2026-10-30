@@ -23,6 +23,7 @@ const boardAnswer = `{"data":{"viewer":{"login":"alexec"},"repository":{"pullReq
   "isDraft":false,"updatedAt":"2026-10-18T10:00:00Z","mergeable":"CONFLICTING","reviewDecision":"CHANGES_REQUESTED","authorAssociation":"COLLABORATOR",
   "author":{"login":"sam","__typename":"User"},"autoMergeRequest":null,
   "reviewRequests":{"nodes":[{"requestedReviewer":{}},{"requestedReviewer":{"login":"alexec"}}]},
+  "labels":{"nodes":[{"name":"needs-approval","color":"FBCA04"},{"name":"odd","color":"red"}]},
   "commits":{"nodes":[{"commit":{"statusCheckRollup":{"contexts":{"nodes":[
    {"__typename":"CheckRun","name":"test","status":"COMPLETED","conclusion":"FAILURE","detailsUrl":"https://github.com/o/r/actions/runs/99/job/1"},
    {"__typename":"StatusContext","context":"CodeRabbit","state":"SUCCESS","targetUrl":""}]}}}}]}},
@@ -36,6 +37,7 @@ const pageAnswer = `{"data":{"viewer":{"login":"alexec"},"repository":{"pullRequ
  "number":7,"title":"Fix the mean","url":"https://github.com/o/r/pull/7","headRefName":"fix-mean","headRefOid":"c0ffee","baseRefName":"main",
  "state":"OPEN","isDraft":false,"body":"Divide by the count.","createdAt":"2026-10-18T08:00:00Z","additions":3,"deletions":1,
  "mergeable":"MERGEABLE","reviewDecision":"REVIEW_REQUIRED","author":{"login":"sam","__typename":"User"},"autoMergeRequest":null,
+ "labels":{"nodes":[{"name":"approved","color":"0e8a16"}]},
  "files":{"totalCount":1,"nodes":[{"path":"average.py","additions":3,"deletions":1,"changeType":"MODIFIED"}]},
  "comments":{"nodes":[{"author":{"login":"coderabbitai","__typename":"Bot"},"body":"<!-- This is an auto-generated comment: summarize by coderabbit.ai -->\n## Walkthrough","createdAt":"2026-10-18T08:05:00Z","url":"u1"}]},
  "reviews":{"nodes":[
@@ -319,6 +321,13 @@ func TestEachViewHasAToolThatFeedsItAndAPage(t *testing.T) {
 			strings.Contains(html, "/*common.css*/") || strings.Contains(html, "/*bridge.js*/") || strings.Contains(html, "/*lineage.js*/") || !strings.Contains(html, "const bridge") {
 			t.Errorf("%s is not a whole page", uri)
 		}
+		// One label pill for every page (#2956).
+		if strings.Contains(html, "/*labels.js*/") || strings.Count(html, "const labelPill") != 1 {
+			t.Errorf("%s does not have the shared label pill once", uri)
+		}
+		if uri != issuesURI && !strings.Contains(html, "prLabels(ui, pr") {
+			t.Errorf("%s does not show a pull request's labels", uri)
+		}
 		if uri != issuesURI && !strings.Contains(html, "const prPage") {
 			t.Errorf("%s has no pull request page in it", uri)
 		}
@@ -355,6 +364,16 @@ func TestThePullRequestsListSaysEachOnesState(t *testing.T) {
 	// #2453: a review asked of the viewer needs them; their own, with nothing wrong, is theirs.
 	if first["section"] != sectionNeedsYou || second["section"] != sectionYours || data["attention"] != 1.0 {
 		t.Errorf("sections: #7 %v, #8 %v, attention %v", first["section"], second["section"], data["attention"])
+	}
+	// #2956: each one's labels, and their colours; a colour that is not #rrggbb is none.
+	if l, _ := first["labels"].([]any); len(l) != 2 || l[0] != "needs-approval" || l[1] != "odd" {
+		t.Errorf("#7's labels: %v", first["labels"])
+	}
+	if l, ok := second["labels"].([]any); !ok || len(l) != 0 {
+		t.Errorf("#8's labels: %v", second["labels"])
+	}
+	if colors, _ := data["labelColors"].(map[string]any); len(colors) != 1 || colors["needs-approval"] != "#fbca04" {
+		t.Errorf("labelColors: %v", data["labelColors"])
 	}
 }
 
@@ -463,6 +482,12 @@ func TestAPullRequestsPageHasItsConversationReviewAndChecks(t *testing.T) {
 	if p["number"] != 7.0 || p["state"] != "open" || p["checks"] != "passing" || p["conflicts"] != false || p["review"] != "review_required" ||
 		p["viewer"] != "alexec" || p["filesTotal"] != 1.0 {
 		t.Fatalf("page: %v", p)
+	}
+	if l, _ := p["labels"].([]any); len(l) != 1 || l[0] != "approved" {
+		t.Errorf("labels: %v", p["labels"])
+	}
+	if colors, _ := p["labelColors"].(map[string]any); colors["approved"] != "#0e8a16" {
+		t.Errorf("labelColors: %v", p["labelColors"])
 	}
 	// CodeRabbit's review is marked as an app's (its summary is its own block); a review with no words is in its threads.
 	comments := p["comments"].([]any)

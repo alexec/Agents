@@ -39,7 +39,7 @@ const (
 	IssuesURI = issuesURI
 )
 
-// page is a view's HTML: its file, with the PR page's script and styles put in.
+// page is a view's HTML: its file, with the shared scripts and styles put in.
 func page(name string) string {
 	read := func(n string) string {
 		b, err := pageFiles.ReadFile("pages/" + n)
@@ -49,7 +49,7 @@ func page(name string) string {
 		return string(b)
 	}
 	return strings.NewReplacer("/*common.css*/", read("common.css"), "/*prpage.css*/", read("prpage.css"),
-		"/*bridge.js*/", read("bridge.js"), "/*lineage.js*/", read("lineage.js"), "/*prpage.js*/", read("prpage.js")).Replace(read(name))
+		"/*bridge.js*/", read("bridge.js"), "/*labels.js*/", read("labels.js"), "/*lineage.js*/", read("lineage.js"), "/*prpage.js*/", read("prpage.js")).Replace(read(name))
 }
 
 func uiMeta(uri string, visibility ...string) mcp.Meta {
@@ -156,6 +156,7 @@ func AddViews(server *mcp.Server, gh Views, person bool) {
 			"its review (approved, changes_requested or review_required), whether it conflicts with its base, whether auto-merge is on, " +
 			"and its section for the signed-in login (viewer): needs_you (a review asked of you, or yours with failing checks, a conflict or " +
 			"changes requested), yours, team (the repo's members and bots) or others; attention counts needs_you. " +
+			"Each has its labels; labelColors maps each label to its #rrggbb. " +
 			"Its view is the Pull requests page, where a person opens a pull request's page.",
 		Annotations: readOnly, Meta: uiMeta(pullsURI, "model", "app")},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in repoArgs) (*mcp.CallToolResult, any, error) {
@@ -169,9 +170,13 @@ func AddViews(server *mcp.Server, gh Views, person bool) {
 			}
 			prs := make([]any, len(b.PRs))
 			// The count on the sidebar's row (#2033), and the PRs that need the signed-in person (#2453).
+			colors := map[string]string{}
 			needsYou := 0
 			for i, p := range b.PRs {
 				j := p.json()
+				for name, color := range p.LabelColors {
+					colors[name] = color
+				}
 				j["section"] = prSection(p, b.Viewer)
 				if j["section"] == sectionNeedsYou {
 					needsYou++
@@ -179,7 +184,7 @@ func AddViews(server *mcp.Server, gh Views, person bool) {
 				prs[i] = j
 			}
 			return structured(map[string]any{"repo": repo, "viewer": b.Viewer, "prs": prs,
-				"count": len(prs), "attention": needsYou}), nil, nil
+				"count": len(prs), "attention": needsYou, "labelColors": colors}), nil, nil
 		})
 
 	mcp.AddTool(server, &mcp.Tool{Name: "show_issues", Title: "Show issues",
@@ -243,7 +248,8 @@ func AddViews(server *mcp.Server, gh Views, person bool) {
 
 	mcp.AddTool(server, &mcp.Tool{Name: "show_pull_request", Title: "Show a pull request",
 		Description: "One pull request: its description, checks (a failing one with its run's id for failed_log), files, comments, " +
-			"reviews and review threads (path and line), whether it conflicts with its base, its review decision, and the signed-in login (viewer). " +
+			"reviews and review threads (path and line), whether it conflicts with its base, its review decision, its labels (labelColors maps each to its #rrggbb), " +
+			"and the signed-in login (viewer). " +
 			"An app's words say which app (app: CodeRabbit); codeRabbit is CodeRabbit's summary, its review status and its last review's state. " +
 			"Its view is the pull request's page.",
 		Annotations: readOnly, Meta: uiMeta(prURI, "model", "app")},
