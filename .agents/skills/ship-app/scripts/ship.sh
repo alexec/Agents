@@ -227,6 +227,17 @@ run() { # name, then the command; quiet unless it fails
   fi
 }
 
+# No point building the Remote to install it on nothing: check before the build, not
+# after. --build-only still builds it even with no device, to prove the build itself.
+if (( DEVICES )) && (( ! BUILD_ONLY )); then
+  if (( ${#ONLY} )); then
+    UDIDS=($ONLY)
+  else
+    choose_devices $LOGS/devices.json || exit 1
+    (( ${#UDIDS} )) || { echo "no paired iPhone/iPad available; skipping the Remote build and install"; DEVICES=0 }
+  fi
+fi
+
 # The apps say the version of this commit, X.Y.Z after its tag (#1748): project.yml's is only
 # for a plain xcodebuild; a release sets its own from the tag.
 XFLAGS=(-skipPackagePluginValidation -skipMacroValidation MARKETING_VERSION=$("$REPO/scripts/version.sh" --marketing))
@@ -270,12 +281,6 @@ fi
 if (( DEVICES )); then
   [[ -d $IOSAPP ]] || { echo "no device build at $IOSAPP" >&2; exit 1; }
   BID=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' $IOSAPP/Info.plist)
-  if (( ${#ONLY} )); then
-    UDIDS=($ONLY)
-  else
-    choose_devices $LOGS/devices.json || exit 1
-  fi
-  (( ${#UDIDS} )) || echo "no paired iPhone/iPad visible; skipping devices"
   # One installer at a time across agents: a directory lock, stale after 10 minutes.
   LOCK=/tmp/agents-device-install.lock
   for i in {1..60}; do
