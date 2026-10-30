@@ -3,10 +3,13 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -107,6 +110,42 @@ func TestTheStarterReachesItsSessionOnAnotherMachine(t *testing.T) {
 	}
 	if p := d.helperPlaces(dir); p != "0 of 3 running, 0 of 5 not archived" {
 		t.Fatal(p)
+	}
+}
+
+// P20261030-1: list_sessions must not wait on every session on another machine in turn —
+// one slow machine should not cost the others their share of the wait.
+func TestListThereAsksEveryMachineAtOnce(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := t.TempDir()
+	title := "watcher"
+	a := seeded(t, d, dir, func(a *wire.Agent) { a.State, a.RuntimeID, a.Title = wire.AgentStateRunning, "claude", &title })
+
+	const n = 6
+	const delay = 80 * time.Millisecond
+	for i := 0; i < n; i++ {
+		d.noteStartedThere(startedThere{Machine: fmt.Sprintf("pc%d", i), Session: store.NewUUID(), Starter: a.ID,
+			Folder: dir, There: "/home/me/app", Title: fmt.Sprintf("session %d", i), At: now()})
+	}
+	d.SetControlAsk(func(_ context.Context, method string, params any) (json.RawMessage, error) {
+		call, _ := params.(wire.MachineWorkspaceCall)
+		if call.Method != "machines/sessionCall" {
+			return nil, &controllink.AskError{Code: -32010, Message: "Agents can’t ask that of the control plane."}
+		}
+		time.Sleep(delay)
+		return json.Marshal(wire.SessionCallReply{Said: "working"})
+	})
+
+	began := time.Now()
+	lines := d.listThere(a.ID)
+	elapsed := time.Since(began)
+	if len(lines) != n {
+		t.Fatalf("got %d lines, want %d", len(lines), n)
+	}
+	// Serial would take at least n*delay; asked at once, it should take closer to one delay.
+	if elapsed > delay*time.Duration(n)/2 {
+		t.Fatalf("listThere took %v for %d sessions at %v each: not asked at once", elapsed, n, delay)
 	}
 }
 
