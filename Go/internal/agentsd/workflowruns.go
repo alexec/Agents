@@ -520,9 +520,9 @@ func (d *Daemon) runAgent(w wire.Workflow, run workflowRun, fr fireRequest) (wir
 			}
 		}
 	}
-	// The runtime the file names, else the default. Never the runtime another agent used
+	// The runtime the file names, else Auto (#2873). Never the runtime another agent used
 	// last: what the run may do must not depend on which agent was active.
-	runtimeID := defaultRuntimeID
+	runtimeID := autoRuntimeID
 	if w.Settings.RuntimeID != nil {
 		runtimeID = *w.Settings.RuntimeID
 	}

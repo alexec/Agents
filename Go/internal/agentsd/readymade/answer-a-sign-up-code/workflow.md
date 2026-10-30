@@ -27,7 +27,7 @@ on:
       authenticated: "true"
 agent: new
 labels: [email]
-permission-mode: auto
+permission-mode: approve-for-me
 enabled: false
 when-done: archive
 ---

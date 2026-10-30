@@ -230,6 +230,32 @@ func TestWorkflowWordsOnAuto(t *testing.T) {
 	if err := read("permission-requests: always\n"); err == nil {
 		t.Fatal("took a word it does not know")
 	}
+	// A runtime's own mode that says the same as a level is that level on Auto (#2873).
+	for word, level := range map[string]wire.PermissionLevel{"auto": wire.PermissionLevelApproveForMe,
+		"bypassPermissions": wire.PermissionLevelBypassPermissions, "default": wire.PermissionLevelAsk} {
+		levels, _, mode, _, err := fileLevels("auto", "", new(word), "", "")
+		if err != nil || mode != nil || *levels.Permission != level {
+			t.Fatal(word, levels, mode, err)
+		}
+		if _, _, mode, _, _ := fileLevels("claude", "", new(word), "", ""); mode == nil || *mode != word {
+			t.Fatal("a named runtime keeps its own word", word)
+		}
+	}
+	if err := read("runtime: auto\npermission-mode: acceptEdits\n"); err == nil {
+		t.Fatal("took a mode that is no level")
+	}
+	// A file with no `runtime:` runs on Auto, so its page says a runtime's own value when
+	// the file is read, not when a run starts.
+	if w := parseWorkflow("---\nmodel: opus\n---\nGo", "x", "/p"); w.Problem == nil || w.Problem.Unreadable == nil ||
+		!strings.Contains(w.Problem.Unreadable.Value, "no `runtime:`") {
+		t.Fatalf("%+v", w.Problem)
+	}
+	if w := parseWorkflow("---\npermission-mode: auto\n---\nGo", "x", "/p"); w.Problem != nil {
+		t.Fatalf("%+v", w.Problem)
+	}
+	if w := parseWorkflow("---\nruntime: claude\nmodel: opus\n---\nGo", "x", "/p"); w.Problem != nil {
+		t.Fatalf("%+v", w.Problem)
+	}
 	levels, model, mode, box, err := fileLevels("auto", "fast", new("approve-for-me"), "", "none")
 	if err != nil || model != "" || mode != nil || *levels.Model != wire.ModelLevelFast || *levels.Permission != wire.PermissionLevelApproveForMe || *box != wire.SandboxChoiceOff {
 		t.Fatal(levels, model, mode, box, err)

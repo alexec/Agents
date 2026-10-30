@@ -480,6 +480,9 @@ func parseWorkflow(text, id, folder string) wire.Workflow {
 		}
 	}
 	s, err := workflowSettings(m)
+	if err == nil && s.RuntimeID == nil {
+		err = autoWords(s) // a file with no `runtime:` runs on Auto (#2873)
+	}
 	if err != nil {
 		return broken(failureMessage(err, "The settings could not be read"))
 	}
@@ -758,4 +761,17 @@ func triggerSupported(t wire.WorkflowTrigger) bool {
 	}
 	_, ok := triggerPattern(t)
 	return ok
+}
+
+// autoWords is why settings with no `runtime:` cannot run on Auto, or nil: the file's
+// page says so when it is read, rather than a run saying it when it starts (#2873).
+func autoWords(s wire.WorkflowSettings) error {
+	model := ""
+	if s.Model != nil {
+		model = *s.Model
+	}
+	if _, _, _, _, err := fileLevels(autoRuntimeID, model, s.PermissionMode, "", ""); err != nil {
+		return failure("With no `runtime:`, a workflow runs on Auto, and " + err.(*Error).Message)
+	}
+	return nil
 }

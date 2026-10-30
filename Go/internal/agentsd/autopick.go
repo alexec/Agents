@@ -508,6 +508,9 @@ var (
 	permissionLevelWords = map[string]wire.PermissionLevel{"plan": wire.PermissionLevelPlan, "ask": wire.PermissionLevelAsk, "approve-for-me": wire.PermissionLevelApproveForMe, "bypass-permissions": wire.PermissionLevelBypassPermissions}
 	requestWords         = map[string]wire.ClientPermissionMode{"request-cards": wire.ClientPermissionModeDefault, "yes-to-all": wire.ClientPermissionModeAlwaysApprove}
 	sandboxWords         = map[string]wire.SandboxChoice{"default": wire.SandboxChoiceRuntime, "runtime": wire.SandboxChoiceOn, "none": wire.SandboxChoiceOff}
+	// A runtime's own permission modes that Auto takes as a level (#2873), so a file
+	// written for Claude runs the same on Auto.
+	permissionAliases = map[string]wire.PermissionLevel{"default": wire.PermissionLevelAsk, "auto": wire.PermissionLevelApproveForMe, "bypassPermissions": wire.PermissionLevelBypassPermissions}
 )
 
 // permissionWord is a permission level in a file's words.
@@ -523,7 +526,7 @@ func permissionWord(p wire.PermissionLevel) string {
 // fileLevels is a workflow's or a helper's model, permission mode, permission requests and
 // sandbox: the shared words become levels, and anything else stays the runtime's own value.
 // On Auto a runtime's own model or mode is refused: Auto cannot map one runtime's name onto
-// another (Story 5).
+// another (Story 5). The exceptions are the modes in permissionAliases (#2873).
 func fileLevels(runtimeID, model string, mode *string, requests, sandbox string) (levels *wire.Levels, nativeModel string, nativeMode *string, box *wire.SandboxChoice, err error) {
 	auto := runtimeID == autoRuntimeID
 	l := wire.Levels{}
@@ -539,6 +542,8 @@ func fileLevels(runtimeID, model string, mode *string, requests, sandbox string)
 	}
 	if mode != nil && *mode != "" {
 		if p, ok := permissionLevelWords[*mode]; ok {
+			l.Permission, set = &p, true
+		} else if p, ok := permissionAliases[*mode]; ok && auto {
 			l.Permission, set = &p, true
 		} else if auto {
 			return nil, "", nil, nil, Invalid("`runtime: auto` takes `permission-mode: plan`, `ask`, `approve-for-me` or `bypass-permissions`, not %s", *mode)
