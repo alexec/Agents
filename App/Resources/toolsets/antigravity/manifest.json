@@ -5,37 +5,37 @@
     "darwin-aarch64": {
       "arguments": [],
       "command": "agy_acp_server.par",
-      "sha256": "0fab9938812e6b32b3b543e65e4f3a0025ceef755413db13542d9a9b81ea803c",
-      "size": 111725488,
-      "url": "https://dl.google.com/agy-extensions/releases/macos/agy-acp-server-1.2.1-darwin-arm64.zip"
+      "sha256": "886fff7767d08994ca39eb02c3d01a7532c7325a94aa33aaf52d52068733284f",
+      "size": 97923855,
+      "url": "https://dl.google.com/agy-extensions/releases/macos/agy-acp-server-1.4.5-darwin-arm64.zip"
     },
     "darwin-x86_64": {
       "arguments": [],
       "command": "agy_acp_server.par",
-      "sha256": "d09bf99bdea7b82021e1afcff829da35e4aa583d8f0984ef364dc3a7c064e07e",
-      "size": 117493869,
-      "url": "https://dl.google.com/agy-extensions/releases/macos/agy-acp-server-1.2.1-darwin-x86_64.zip"
+      "sha256": "b39f3573c03b9acb9df028853f647527f1f3133f32bd77e78b796e48a205114a",
+      "size": 103577295,
+      "url": "https://dl.google.com/agy-extensions/releases/macos/agy-acp-server-1.4.5-darwin-x86_64.zip"
     },
     "linux-aarch64": {
       "arguments": [
         "--uid="
       ],
       "command": "agy_acp_server.par",
-      "sha256": "7e7ef4088bc185e1af4204029e0f4ec4210af20724f3ff262186ac0bcea6aa0e",
-      "size": 321280184,
-      "url": "https://dl.google.com/agy-extensions/releases/linux/agy-acp-server-1.2.1-linux-arm64.zip"
+      "sha256": "7d64246633ae094f67e3bbcd2d679e89048f91346d5339313336e7483f40f056",
+      "size": 307829008,
+      "url": "https://dl.google.com/agy-extensions/releases/linux/agy-acp-server-1.4.5-linux-arm64.zip"
     },
     "linux-x86_64": {
       "arguments": [
         "--uid="
       ],
       "command": "agy_acp_server.par",
-      "sha256": "9fbf0bd584a26478161f637cabd75113f72541c842d148f578ef1a6a9edcb843",
-      "size": 333590110,
-      "url": "https://dl.google.com/agy-extensions/releases/linux/agy-acp-server-1.2.1-linux-x86_64.zip"
+      "sha256": "923923a0d7dc8073f66cc6f78647a3107e3a7ee2b7e1a24df8b3927b5188013b",
+      "size": 321783181,
+      "url": "https://dl.google.com/agy-extensions/releases/linux/agy-acp-server-1.4.5-linux-x86_64.zip"
     }
   },
   "runtimeID": "antigravity",
   "source": "acp-registry:antigravity-acp",
-  "version": "1.2.1"
+  "version": "1.4.5"
 }

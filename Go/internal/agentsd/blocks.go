@@ -76,6 +76,12 @@ func (d *Daemon) waitTarget(name string, caller *wire.Agent) (*wire.Agent, error
 			target = found
 		}
 	}
+	// One it started on another machine (#2927).
+	if target == nil && (!isUUID(name) || d.Store.Agent(wire.UUID(strings.ToUpper(name))) == nil) {
+		if there, err := d.waitThere(name, caller.ID); there != nil || err != nil {
+			return there, err
+		}
+	}
 	if target == nil {
 		var here, matches []wire.Agent
 		for _, a := range d.Store.Agents() {
@@ -611,6 +617,10 @@ func (d *Daemon) resumeBlocks() {
 			}
 			t := d.Store.Agent(w.AgentID)
 			if t == nil {
+				// One on another machine is asked once this host is on its control plane (#2927).
+				if d.thereNamed(a.ID, string(w.AgentID)) != nil {
+					continue
+				}
 				d.closeWaits(w.AgentID, wire.WaitEndingHow{Gone: &struct{}{}})
 				continue
 			}
@@ -644,5 +654,7 @@ func (d *Daemon) agentEnded(id wire.UUID) {
 	if how := waitEndingHow(a); how != nil {
 		h := *how
 		d.goAfterTurn("close waits", func() { d.closeWaits(id, h) })
+		// Started from another machine: its starter is told (#2927).
+		d.tellStarter(id, h)
 	}
 }

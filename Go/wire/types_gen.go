@@ -368,6 +368,15 @@ const AgentGroupArchived AgentGroup = "archived"
 // machines/forAgent: what list_machines shows an agent.
 type AgentMachines struct {
 	Providers []AgentMachinesProvider `json:"providers"`
+
+	// Every machine of the person's, by name, where start_session can start a session (#2887). Absent from an older control plane.
+	Hosts []AgentMachinesHost `json:"hosts,omitzero"`
+}
+
+type AgentMachinesHost struct {
+	Name string `json:"name"`
+
+	State string `json:"state"`
 }
 
 type AgentMachinesMachine struct {
@@ -3319,6 +3328,8 @@ type ElicitationRequest struct {
 	Scope ElicitationRequestScope `json:"scope"`
 
 	AskedAt Date `json:"askedAt"`
+
+	Secret *ElicitationSecret `json:"secret,omitzero"`
 }
 
 type ElicitationRequestMode struct {
@@ -3417,6 +3428,15 @@ type ElicitationSchemaPropertyKindMultiSelect struct {
 	MinItems *int64 `json:"minItems,omitzero"`
 
 	MaxItems *int64 `json:"maxItems,omitzero"`
+}
+
+// An agent's ask_secret (#2885): one named secret, typed into a masked field. The value goes to the person's secrets.env on the host, never into the record.
+type ElicitationSecret struct {
+	Name string `json:"name"`
+
+	URL *string `json:"url,omitzero"`
+
+	IsSet bool `json:"isSet"`
 }
 
 type Empty struct {
@@ -3863,6 +3883,9 @@ type Folder struct {
 	DiskSpace *DiskThresholds `json:"diskSpace,omitzero"`
 
 	Pinned *bool `json:"pinned,omitzero"`
+
+	// Absent is off (#2352).
+	PrCostComment *PRCostComment `json:"prCostComment,omitzero"`
 }
 
 type FolderDetection struct {
@@ -4248,6 +4271,12 @@ type HelperLimits struct {
 
 	// A helper's turn refused for a spent allowance waits for it at once, as if the person had chosen Continue (#1918). Off unless set.
 	ContinueWhenBack *bool `json:"continueWhenBack,omitzero"`
+
+	// A session whose pull request merges is archived, when its turn has ended and its worktree has nothing uncommitted (#2886). On unless set.
+	ArchiveWhenMerged *bool `json:"archiveWhenMerged,omitzero"`
+
+	// start_session with a machine starts the session on another of the person's machines without asking first (#2928). Off unless set; only the person sets it, from Folder Settings.
+	AgentsMayStartOnMachines *bool `json:"agentsMayStartOnMachines,omitzero"`
 }
 
 type HostedMCPSnapshot struct {
@@ -4454,6 +4483,147 @@ type LineMember struct {
 	AskedAt Date `json:"askedAt"`
 
 	IsCallOpen bool `json:"isCallOpen"`
+}
+
+// What was banked under lineage nodes (#2350): a turn's cost, tokens and time, split evenly among the links active when it was banked. turns is a share of turns, so a turn on two nodes is half a turn on each.
+type LineageCost struct {
+	// By currency.
+	Cost map[string]float64 `json:"cost"`
+
+	InputTokens int64 `json:"inputTokens"`
+
+	OutputTokens int64 `json:"outputTokens"`
+
+	// Fresh input and output, as a limit counts them (#998).
+	LimitTokens *int64 `json:"limitTokens,omitzero"`
+
+	Turns float64 `json:"turns"`
+
+	// The agent, its tools and others at work.
+	WorkingSeconds float64 `json:"workingSeconds"`
+
+	// Waiting for the person.
+	WaitingSeconds float64 `json:"waitingSeconds"`
+}
+
+// One node's banked cost on a machine (#2350), whole, with what its rollups need: the project its ref is in, the issues a PR fixes (ended links too: a PR closed without a merge still counts against its issue, as waste), the milestones it is part of, and how a PR ended. A session's own cost is its turns that had no active link.
+type LineageCostNode struct {
+	Node LineageNode `json:"node"`
+
+	// The repo or tracker the node is in: github:alexec/agents, linear, or for a session its folder's repo (folder:<name> without one).
+	Project *string `json:"project,omitzero"`
+
+	Banked LineageCost `json:"banked"`
+
+	// A PR's issues, by ref.
+	Fixes []string `json:"fixes,omitzero"`
+
+	// The milestones it is part of, by ref.
+	PartOf []string `json:"partOf,omitzero"`
+
+	// A PR's end: merged, closed (without a merge: waste) or reverted (a merged revert: waste). Absent while open. The list is open.
+	Outcome *string `json:"outcome,omitzero"`
+
+	// A PR's failed CI rounds: checks.failed, once per run and attempt.
+	FailedChecks *int64 `json:"failedChecks,omitzero"`
+
+	// When the machine first banked or noted the node (#2351): the start of the work on it, for lead time.
+	FirstAt *Date `json:"firstAt,omitzero"`
+
+	// When a PR ended (#2351): merged, closed or reverted. Absent while open.
+	EndedAt *Date `json:"endedAt,omitzero"`
+
+	LastAt Date `json:"lastAt"`
+}
+
+// lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a milestone's issues, their PRs and the PRs part of it; a project's every node (kind project, ref github:alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.
+type LineageCostRollup struct {
+	Node LineageNode `json:"node"`
+
+	Own LineageCost `json:"own"`
+
+	Total LineageCost `json:"total"`
+
+	Waste LineageCost `json:"waste"`
+
+	Unlinked LineageCost `json:"unlinked"`
+
+	PrsMerged int64 `json:"prsMerged"`
+
+	PrsClosed int64 `json:"prsClosed"`
+
+	PrsReverted int64 `json:"prsReverted"`
+
+	FailedChecks int64 `json:"failedChecks"`
+
+	Parts []LineageCostNode `json:"parts"`
+
+	Limited *bool `json:"limited,omitzero"`
+}
+
+// lineage/end (#2348): the link from one node to another by this relationship stops being active now. Nothing is removed: the link keeps its start and gets an end.
+type LineageEndRequest struct {
+	From LineageNode `json:"from"`
+
+	To LineageNode `json:"to"`
+
+	Rel string `json:"rel"`
+}
+
+// lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more.
+type LineageGraph struct {
+	Nodes []LineageNode `json:"nodes"`
+
+	Links []LineageLink `json:"links"`
+
+	Limited *bool `json:"limited,omitzero"`
+}
+
+// A typed link in the lineage graph (#2348): from works-on, opens, fixes, started, reviews, closes or part-of to. source is how the host knows it: start, branch, pr-body, helper, agent or person. at is when it started; endedAt is set when it stops being active (a PR merged, a session archived). Both lists are open: a host keeps a relationship or a source it does not know.
+type LineageLink struct {
+	From LineageNode `json:"from"`
+
+	To LineageNode `json:"to"`
+
+	Rel string `json:"rel"`
+
+	Source string `json:"source"`
+
+	At Date `json:"at"`
+
+	EndedAt *Date `json:"endedAt,omitzero"`
+}
+
+// lineage/link (#2348): start a link. When the same link is active already, it is the answer, unchanged.
+type LineageLinkRequest struct {
+	From LineageNode `json:"from"`
+
+	To LineageNode `json:"to"`
+
+	Rel string `json:"rel"`
+
+	Source string `json:"source"`
+}
+
+// The links of a node, newest first (#2348), or the links lineage/end ended. limited says there are more than the answer holds.
+type LineageLinks struct {
+	Links []LineageLink `json:"links"`
+
+	Limited *bool `json:"limited,omitzero"`
+}
+
+// A node in the lineage graph (#2348). kind is what it is: issue, pr, session, workflow-run, commit, file, branch or milestone, and the list is open. ref names it apart from any tracker, as <scheme>:<id>: github:alexec/Agents#123, gitlab:group/repo!45, linear:ENG-4, jira:ABC-9, session:<agent id>.
+type LineageNode struct {
+	Kind string `json:"kind"`
+
+	Ref string `json:"ref"`
+}
+
+// lineage/links and lineage/walk (#2348): a node, and for a walk how many links away to go (1 to 4; 2 when not said: issue, sessions, PRs).
+type LineageNodeRequest struct {
+	Node LineageNode `json:"node"`
+
+	Depth *int64 `json:"depth,omitzero"`
 }
 
 type ListCursor struct {
@@ -5205,6 +5375,24 @@ type MachineEnroll struct {
 	As *string `json:"as,omitzero"`
 }
 
+// machines/sendFolder, through host/machines (#2929): one step of an agent's start_session with send, which sends this folder's branch to another of the person's machines first. Exactly one of state, upload and receive; the control plane sends that machine's folders/receiveState, folders/receiveUpload or folders/receive.
+type MachineFolderSend struct {
+	Host string `json:"host"`
+
+	State *ReceiveStateRequest `json:"state,omitzero"`
+
+	Upload *ReceiveUploadRequest `json:"upload,omitzero"`
+
+	Receive *ReceiveRequest `json:"receive,omitzero"`
+}
+
+// What machines/sendFolder's step answered (#2929): state for state, folder for receive, neither for upload.
+type MachineFolderSent struct {
+	State *ReceiveState `json:"state,omitzero"`
+
+	Folder *FolderSummary `json:"folder,omitzero"`
+}
+
 // host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).
 type MachineHello struct {
 	Host *MachineRef `json:"host,omitzero"`
@@ -5389,6 +5577,20 @@ type MachineSchedule struct {
 	At *Date `json:"at,omitzero"`
 
 	Workflow *string `json:"workflow,omitzero"`
+}
+
+// machines/sessionCall, through host/machines (#2927): an agent's read_session, message_session, stop_session, archive_session, or list_sessions and wait_for_agents status, on a session it started on another of the person's machines with start_session. The control plane sends that machine's agents/fromStarter, with call.from in its own words.
+type MachineSessionCall struct {
+	Host string `json:"host"`
+
+	Call SessionCall `json:"call"`
+}
+
+// machines/startSession, through host/machines (#2887): an agent's start_session on another of the person's machines, by its name. The control plane sends that machine's agents/start.
+type MachineSessionStart struct {
+	Host string `json:"host"`
+
+	Start StartRequest `json:"start"`
 }
 
 // host/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next scheduled workflow.
@@ -6171,6 +6373,13 @@ type OrgRoutesLeft struct {
 type OrgRoutesMine struct {
 	Routes []OrgRouteMine `json:"routes"`
 }
+
+// What the host says on a folder's pull request when it merges (#2352): nothing (off, the default), the tokens and time only, or the cost too. Kept in the folder's .agents/folder.json, so the repo's people choose what a public repo publishes.
+type PRCostComment string
+
+const PRCostCommentOff PRCostComment = "off"
+const PRCostCommentTokens PRCostComment = "tokens"
+const PRCostCommentCost PRCostComment = "cost"
 
 type PagesChangedNotification struct {
 	Folder URL `json:"folder"`
@@ -7558,6 +7767,7 @@ const ReportPageTime ReportPage = "time"
 const ReportPageRuntimes ReportPage = "runtimes"
 const ReportPageAdoption ReportPage = "adoption"
 const ReportPageWorkflows ReportPage = "workflows"
+const ReportPageValue ReportPage = "value"
 
 // Who sees what in Reports (#1804), set by an admin in Console ▸ Report Policy.
 type ReportPolicy struct {
@@ -7673,6 +7883,58 @@ type ReportScopes struct {
 	Scopes []ReportScopeOption `json:"scopes"`
 
 	Admin bool `json:"admin"`
+}
+
+// reports/value (#2351): what the work in a scope cost and what it delivered, from the lineage nodes that the scope's machines send (#2350). A node is in the range when it last changed in it, with its whole cost. total is the work on issues and PRs; waste is the PRs closed without a merge and merged reverts; unlinked is the turns with no issue or PR. perMergedPR is total by the PRs merged, by currency. leadTimeSeconds is the median of the issues' lead times. issues and milestones are the most costly first, at most 100 each; limited says there are more.
+type ReportValue struct {
+	Range ReportRange `json:"range"`
+
+	Scope ReportScope `json:"scope"`
+
+	Total LineageCost `json:"total"`
+
+	Waste LineageCost `json:"waste"`
+
+	Unlinked LineageCost `json:"unlinked"`
+
+	// By currency.
+	PerMergedPR map[string]float64 `json:"perMergedPR"`
+
+	PrsMerged int64 `json:"prsMerged"`
+
+	PrsClosed int64 `json:"prsClosed"`
+
+	PrsReverted int64 `json:"prsReverted"`
+
+	FailedChecks int64 `json:"failedChecks"`
+
+	LeadTimeSeconds *float64 `json:"leadTimeSeconds,omitzero"`
+
+	Issues []ReportValueRow `json:"issues"`
+
+	Milestones []ReportValueRow `json:"milestones"`
+
+	Limited *bool `json:"limited,omitzero"`
+}
+
+// One issue or milestone on Reports ▸ Value (#2351): its cost rolled up from every machine in the scope, as lineage/cost adds it up, and how its PRs ended.
+type ReportValueRow struct {
+	Node LineageNode `json:"node"`
+
+	Total LineageCost `json:"total"`
+
+	Waste LineageCost `json:"waste"`
+
+	PrsMerged int64 `json:"prsMerged"`
+
+	PrsClosed int64 `json:"prsClosed"`
+
+	PrsReverted int64 `json:"prsReverted"`
+
+	FailedChecks int64 `json:"failedChecks"`
+
+	// From the first work on it to its last PR merged; absent before a merge.
+	LeadTimeSeconds *float64 `json:"leadTimeSeconds,omitzero"`
 }
 
 // A saved view of Reports (#2019, R8): a page with its scope, range and way to add up, kept for the person who saved it.
@@ -8415,6 +8677,43 @@ type ServerReachabilityChange struct {
 	Online bool `json:"online"`
 }
 
+// agents/fromStarter (#2927): the agent that started a session from another machine reads, messages, stops or archives it, or asks how it stands. The host answers only when from is the session's StartedFrom. The control plane writes from.machine and from.who; the asking host writes from.agent.
+type SessionCall struct {
+	From StartedFrom `json:"from"`
+
+	Session UUID `json:"session"`
+
+	Op string `json:"op"`
+
+	// With op message: the words.
+	Message *string `json:"message,omitzero"`
+
+	// With op message: replace the message of the starter's that waits, as message_session's replace.
+	Replace *bool `json:"replace,omitzero"`
+}
+
+// What agents/fromStarter says (#2927): the words for the agent, the session's title, and how it ended, absent while it goes on.
+type SessionCallReply struct {
+	Said string `json:"said"`
+
+	Title *string `json:"title,omitzero"`
+
+	Ended *WaitEndingHow `json:"ended,omitzero"`
+}
+
+// machines/sessionEnded through host/machines, then agents/endedElsewhere (#2927): a session started from another machine has ended, so its starter's wait_for_agents can wake. The host sends machine as the starter's machine; the control plane sends it on as the ended session's.
+type SessionEnded struct {
+	Machine string `json:"machine"`
+
+	Session UUID `json:"session"`
+
+	Starter UUID `json:"starter"`
+
+	How WaitEndingHow `json:"how"`
+
+	Title *string `json:"title,omitzero"`
+}
+
 type SessionLabel struct {
 	Value string `json:"value"`
 
@@ -8513,6 +8812,12 @@ type SetOptionRequest struct {
 	OptionID string `json:"optionID"`
 
 	Value JSONValue `json:"value"`
+}
+
+type SetPRCostCommentRequest struct {
+	Folder URL `json:"folder"`
+
+	PrCostComment PRCostComment `json:"prCostComment"`
 }
 
 type SetPinnedRequest struct {
@@ -9289,6 +9594,18 @@ type StartRequest struct {
 
 	// Started from voice mode (#2375): its first prompt asks for a short spoken reply, as agents/prompt's voice does.
 	Voice *bool `json:"voice,omitzero"`
+
+	// An agent on another machine started it, through the control plane (#2887): its chat says who.
+	StartedFrom *StartedFrom `json:"startedFrom,omitzero"`
+}
+
+// The agent on another machine that started a session with start_session (#2887). The control plane writes machine and who; the asking host writes agent.
+type StartedFrom struct {
+	Machine string `json:"machine"`
+
+	Agent UUID `json:"agent"`
+
+	Who string `json:"who"`
 }
 
 // A started machine in people/removePreview: the branches and worktrees on it with work that is not pushed. `unknown` says why it could not be asked (offline, or it did not answer), and then `unpushed` is empty.
@@ -9977,6 +10294,9 @@ type UsageRollup struct {
 	Hours []UsageRollupPeriod `json:"hours"`
 
 	Days []UsageRollupPeriod `json:"days"`
+
+	// The lineage nodes whose banked cost or rollup links changed since the last send (#2350), each whole: the control plane keeps a machine's latest of each, 90 days.
+	Work []LineageCostNode `json:"work,omitzero"`
 }
 
 // An hour ("2026-10-21T15") or a day ("2026-10-21"), in UTC, and its rows: the whole of that period on this machine, which replaces what was sent before.
@@ -10345,6 +10665,20 @@ type WakeState struct {
 	GraceUntil *Date `json:"graceUntil,omitzero"`
 
 	OnPower bool `json:"onPower"`
+}
+
+// clients/webPushKey (#1486): the control plane's VAPID public key, X9.63, base64url without padding, as pushManager.subscribe takes it. None when this control plane sends no Web Push.
+type WebPushKey struct {
+	PublicKey *string `json:"publicKey,omitzero"`
+}
+
+// clients/setWebPush (#1486): a browser's push endpoint and its two keys, base64url, as PushSubscription.toJSON() gives them. No endpoint takes it away.
+type WebPushSubscription struct {
+	Endpoint *string `json:"endpoint,omitzero"`
+
+	P256dh *string `json:"p256dh,omitzero"`
+
+	Auth *string `json:"auth,omitzero"`
 }
 
 type WebRemoteStatus struct {

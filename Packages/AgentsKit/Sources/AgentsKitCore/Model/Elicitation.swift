@@ -18,6 +18,25 @@ public struct ElicitationRequest: Codable, Hashable, Sendable, Identifiable {
     public var mode: Mode
     public var scope: Scope
     public var askedAt: Date
+    /// An agent's `ask_secret` (#2885): the form's one field is drawn masked, and the host
+    /// saves what is typed to the person's secrets.env. Nil for every other form.
+    public var secret: Secret?
+
+    /// One named secret an agent asks for.
+    public struct Secret: Codable, Hashable, Sendable {
+        /// As an environment variable: `OPENAI_API_KEY`.
+        public var name: String
+        /// Where to get it, when the agent knows.
+        public var url: String?
+        /// One is saved already, and what is typed replaces it.
+        public var isSet: Bool
+
+        public init(name: String, url: String? = nil, isSet: Bool = false) {
+            self.name = name
+            self.url = url
+            self.isSet = isSet
+        }
+    }
 
     public enum Mode: Codable, Hashable, Sendable {
         case form(ElicitationSchema)
@@ -32,7 +51,7 @@ public struct ElicitationRequest: Codable, Hashable, Sendable, Identifiable {
 
     public init(id: UUID = UUID(), elicitationID: String? = nil, agentID: UUID,
                 message: String? = nil, mode: Mode, scope: Scope = .request,
-                askedAt: Date = Date()) {
+                askedAt: Date = Date(), secret: Secret? = nil) {
         self.id = id
         self.elicitationID = elicitationID
         self.agentID = agentID
@@ -40,6 +59,7 @@ public struct ElicitationRequest: Codable, Hashable, Sendable, Identifiable {
         self.mode = mode
         self.scope = scope
         self.askedAt = askedAt
+        self.secret = secret
     }
 
     /// Read a request off the wire. Nil when we cannot draw it, which is a decline
@@ -62,6 +82,15 @@ public struct ElicitationRequest: Codable, Hashable, Sendable, Identifiable {
                   // Tied to a session, unless it names the request it belongs to —
                   // which is how a runtime asks before there is a session at all.
                   scope: wire["requestId"] == nil ? .session : .request)
+    }
+
+    /// The one field of a secret's form, as the daemon names it.
+    public static let secretField = "value"
+
+    /// Why the agent asks for its secret: the one field's title.
+    public var secretReason: String? {
+        guard secret != nil, case .form(let schema) = mode else { return nil }
+        return schema.properties.first?.title
     }
 
     public var title: String {

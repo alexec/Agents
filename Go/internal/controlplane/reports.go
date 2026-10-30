@@ -55,6 +55,9 @@ func (s *Service) keepRollup(ctx context.Context, host string, rollup wire.Usage
 	if len(rollup.Hours)+len(rollup.Days) > mostRollupPeriods {
 		return fail(invalidParams, "Send at most %d hours and days at a time.", mostRollupPeriods)
 	}
+	if err := s.keepWork(ctx, host, rollup.Work, now); err != nil {
+		return err
+	}
 	type period struct {
 		prefix, layout string
 		kept           time.Duration
@@ -275,9 +278,9 @@ func (s *Service) reportProjects(ctx context.Context) map[string]map[string]*rec
 	return out
 }
 
-// reportMethod answers reports/usage and reports/export for a scope (#1804), and the
-// scopes and their policy. With no scope, a member sees their own machines and an admin
-// every person's.
+// reportMethod answers reports/usage, reports/export and reports/value (#2351) for a scope
+// (#1804), and the scopes and their policy. With no scope, a member sees their own machines
+// and an admin every person's.
 func (m *Methods) reportMethod(ctx context.Context, method string, params json.RawMessage, from Caller) (any, error) {
 	user := m.s.actorFor(from.Client).User
 	switch method {
@@ -301,6 +304,9 @@ func (m *Methods) reportMethod(ctx context.Context, method string, params json.R
 	request, err := require[wire.ReportQuery](params, "ReportQuery")
 	if err != nil {
 		return nil, err
+	}
+	if method == "reports/value" {
+		return m.s.valueReport(ctx, request.Range, request.Scope, user, time.Now())
 	}
 	report, err := m.s.scopedReport(ctx, request.Range, request.Scope, user)
 	if err != nil {

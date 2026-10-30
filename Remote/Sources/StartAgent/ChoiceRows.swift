@@ -10,6 +10,7 @@ import SwiftUI
 struct ChoiceRows: View {
     @Environment(RemoteModel.self) private var model
     @State private var confirmingAlwaysApprove = false
+    @State private var confirmingBypass = false
 
     var body: some View {
         Section {
@@ -92,7 +93,11 @@ struct ChoiceRows: View {
             ForEach(LevelWords.levels(.permission), id: \.self) { level in
                 let cell = mappedRuntime.flatMap { model.autoMappings.cell($0, .permission, level) }
                 Button {
-                    model.chooseStartLevel(.permission, level)
+                    if LevelWords.asksFirst(.permission, level), level != chosen {
+                        confirmingBypass = true
+                    } else {
+                        model.chooseStartLevel(.permission, level)
+                    }
                 } label: {
                     if level == chosen {
                         Label(LevelWords.level(.permission, level), systemImage: "checkmark")
@@ -111,6 +116,15 @@ struct ChoiceRows: View {
             .appText(.reading)
         }
         .accessibilityLabel("\(LevelWords.permissionField), \(chosen.map { LevelWords.level(.permission, $0) } ?? LevelWords.custom)")
+        // Bypass Permissions: one more tap, as the pill asks (#2892).
+        .confirmationDialog(LevelWords.bypassConfirmTitle, isPresented: $confirmingBypass, titleVisibility: .visible) {
+            Button(LevelWords.bypassConfirmButton, role: .destructive) {
+                model.chooseStartLevel(.permission, PermissionLevel.bypassPermissions.rawValue)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(LevelWords.bypassConfirmMessage)
+        }
     }
 
     /// "Sonnet on Claude" under the value, or Custom's meaning.

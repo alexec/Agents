@@ -205,6 +205,12 @@ func sweep(ctx context.Context, rs *records.Records, now time.Time, most int, ev
 	if err != nil {
 		return report, err
 	}
+	// A removed machine's cost on links (#2350), counted with them too.
+	work, err := sweepLineage(ctx, s, rs, now, left-report.usage)
+	report.usage += work
+	if err != nil {
+		return report, err
+	}
 
 	if folder, ok := s.(*store.Folder); ok {
 		report.leftovers = folder.RemoveLeftovers(now.Add(-leftoversKept))

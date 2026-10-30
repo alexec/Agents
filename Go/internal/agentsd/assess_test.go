@@ -67,7 +67,7 @@ func TestARuntimeAssessedFromTheRecord(t *testing.T) {
 	for _, ch := range score.Checks {
 		verdicts[ch.ID] = ch
 	}
-	if len(score.Checks) != 15 || verdicts["show_file"].Verdict != passed || verdicts["report"].Verdict != passed ||
+	if len(score.Checks) != 16 || verdicts["show_file"].Verdict != passed || verdicts["report"].Verdict != passed ||
 		verdicts["leases"].Verdict != passed || verdicts["ask_question"].Verdict != failedStep ||
 		verdicts["ask_question"].Evidence != "`ask_question` never called" {
 		t.Fatalf("%+v", score.Checks)
@@ -140,5 +140,40 @@ func TestEveryAppToolIsOneMethodNamedAfterIt(t *testing.T) {
 	}
 	if len(seen) != len(appToolMethods) {
 		t.Errorf("appToolMethods has %d tools, the host serves %d", len(appToolMethods), len(seen))
+	}
+}
+
+// should_ask passes only on a question the agent chose to ask before the brief told it to
+// (#2416); the brief's own form and the runtime's "running unattended" question are later
+// steps, and a question by the runtime's own tool counts once, for the step it came in.
+func TestShouldAskCountsOnlyTheQuestionsBeforeTheBriefSaysToAsk(t *testing.T) {
+	text := func(s string) *string { return &s }
+	asked := func(at wire.Date, message string) wire.TranscriptEntry {
+		return wire.TranscriptEntry{At: at, Kind: wire.TranscriptEntryKind{ElicitationAsked: &wire.TranscriptEntryKindElicitationAsked{
+			Value: wire.ElicitationRequest{Message: text(message)}}}}
+	}
+	form := appToolCall{At: 20, Method: "questions/ask", Ok: true, Arguments: map[string]json.RawMessage{
+		"questions": json.RawMessage(`[{"id":"pick","prompt":"Pick one","options":[{"id":"a"}]},{"id":"words","prompt":"Type any short phrase"}]`)}}
+	report := "# Codex assessment\nShelf: kept\n"
+	r := assessRecord{escalation: "request_user_input", calls: []appToolCall{form}, reportText: &report,
+		transcript: []wire.TranscriptEntry{asked(20, "Pick one"), asked(30, "Is this assessment running unattended?")}}
+	if v, why := r.shouldAsk(); v != failedStep || why != "chose without asking: \"Shelf: kept\"" {
+		t.Fatal(v, why)
+	}
+	if v, why := r.ownAsk(); v != passed || why != "1 question reached the app through `request_user_input`" {
+		t.Fatal(v, why)
+	}
+
+	r.transcript = append([]wire.TranscriptEntry{asked(10, "Which shelf?")}, r.transcript...)
+	if v, why := r.shouldAsk(); v != passed || why != "asked the person with `request_user_input`" {
+		t.Fatal(v, why)
+	}
+	if v, _ := r.ownAsk(); v != passed {
+		t.Fatal("the shelf question changed own_ask")
+	}
+
+	r.calls = append([]appToolCall{{At: 10, Method: "questions/ask", Ok: true}}, r.calls...)
+	if v, why := r.shouldAsk(); v != passed || why != "asked the person with the app's `ask_question`" {
+		t.Fatal(v, why)
 	}
 }

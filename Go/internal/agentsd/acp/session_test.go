@@ -60,6 +60,57 @@ func TestUnadvertisedSystemPromptIsNotSent(t *testing.T) {
 	}
 }
 
+// Antigravity 1.4.5 advertises its own route in agentCapabilities._meta (#2613): the brief
+// goes in _meta.antigravity.systemPrompt.append on every lifecycle request, beside the
+// _meta the daemon already sends, and never in the standard field it did not advertise.
+func TestAntigravitySystemPromptGoesInItsOwnMeta(t *testing.T) {
+	c := &client{}
+	response := `{"jsonrpc":"2.0","id":1,"result":{"agentCapabilities":{"loadSession":true,"sessionCapabilities":{"list":{},"resume":{}},"_meta":{"antigravity":{"tier":true,"systemPrompt":{"append":true}}}}}}` + "\n"
+	if _, err := io.ReadAll(&rawElicitations{r: bufio.NewReader(strings.NewReader(response)), c: c}); err != nil || !c.antigravitySystemPrompt || c.supportsSystemPrompt {
+		t.Fatalf("capability not read: %v %v %v", c.antigravitySystemPrompt, c.supportsSystemPrompt, err)
+	}
+	c.systemPrompt = "brief"
+	var output bytes.Buffer
+	w := &sessionPromptWriter{w: &output, c: c}
+	for _, method := range []string{"session/new", "session/load", "session/resume", "session/fork"} {
+		output.Reset()
+		request := `{"jsonrpc":"2.0","id":2,"method":"` + method + `","params":{"cwd":"/tmp","mcpServers":[],"_meta":{"other":1,"antigravity":{"enabledTools":["x"]}}}}` + "\n"
+		if _, err := w.Write([]byte(request)); err != nil {
+			t.Fatal(err)
+		}
+		var got struct {
+			Params map[string]json.RawMessage `json:"params"`
+		}
+		if err := json.Unmarshal(output.Bytes(), &got); err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := got.Params["systemPrompt"]; ok {
+			t.Fatalf("%s: standard field sent: %s", method, output.String())
+		}
+		var meta struct {
+			Other       int `json:"other"`
+			Antigravity struct {
+				EnabledTools []string `json:"enabledTools"`
+				SystemPrompt struct {
+					Append string `json:"append"`
+				} `json:"systemPrompt"`
+			} `json:"antigravity"`
+		}
+		if err := json.Unmarshal(got.Params["_meta"], &meta); err != nil {
+			t.Fatal(err)
+		}
+		if meta.Antigravity.SystemPrompt.Append != "brief" || meta.Other != 1 || len(meta.Antigravity.EnabledTools) != 1 {
+			t.Fatalf("%s: unexpected _meta: %s", method, output.String())
+		}
+	}
+	// Antigravity 1.2.1 advertises neither: nothing is added, so the brief stays in the prompt.
+	old := &client{}
+	response = `{"jsonrpc":"2.0","id":1,"result":{"agentCapabilities":{"loadSession":true,"sessionCapabilities":{"list":{},"resume":{}}}}}` + "\n"
+	if _, err := io.ReadAll(&rawElicitations{r: bufio.NewReader(strings.NewReader(response)), c: old}); err != nil || old.antigravitySystemPrompt {
+		t.Fatalf("capability read where none was advertised: %v", err)
+	}
+}
+
 // The runtime's own params reach the daemon, propertyOrder and all, though the SDK's typed
 // request has no place for it; what the SDK reads is unchanged.
 func TestTheRuntimesOwnElicitationParamsAreKept(t *testing.T) {

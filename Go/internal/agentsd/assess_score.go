@@ -19,7 +19,7 @@ import (
 type assessStep struct{ id, area string }
 
 var assessSteps = []assessStep{{"show_file", "Files"}, {"leases", "Leases"}, {"workflows", "Workflows"},
-	{"workspaces", "Workspaces"}, {"events", "Events"}, {"ask_question", "Questions"}, {"own_ask", "Questions"},
+	{"workspaces", "Workspaces"}, {"events", "Events"}, {"should_ask", "Questions"}, {"ask_question", "Questions"}, {"own_ask", "Questions"},
 	{"helpers", "Helpers"}, {"wait", "Events"}, {"ending", "Ending a turn"}, {"worktree", "Worktrees"},
 	{"sessions", "Sessions"}, {"scope", "Scope"}, {"permissions", "Permissions"}, {"report", "Self-report"}}
 
@@ -83,6 +83,8 @@ func (r assessRecord) check(id string) (verdict, string) {
 		return r.workspaces()
 	case "events":
 		return r.eventSteps()
+	case "should_ask":
+		return r.shouldAsk()
 	case "ask_question":
 		return r.askQuestion()
 	case "own_ask":
@@ -606,14 +608,78 @@ func (r assessRecord) askQuestion() (verdict, string) {
 	return passed, "answered; \"" + given + "\" came back unchanged and is in the report"
 }
 
-func (r assessRecord) ownAsk() (verdict, string) {
-	asked := 0
+// toldToAsk is when the brief first told the agent to ask (#2416): its `ask_question` form
+// (`pick` and `words`), or else its own tool's "running unattended" question. A question
+// before it was the agent's own choice (should_ask); one at or after it is own_ask's.
+func (r assessRecord) toldToAsk() *wire.Date {
+	for _, c := range r.callsOf("questions/ask") {
+		ids := map[string]bool{}
+		for _, q := range questionsOf(c) {
+			ids[q.id] = true
+		}
+		if ids["pick"] && ids["words"] {
+			return &c.At
+		}
+	}
 	for _, e := range r.transcript {
-		if e.Kind.ElicitationAsked != nil {
+		if a := e.Kind.ElicitationAsked; a != nil && strings.Contains(elicitationWords(a.Value), "running unattended") {
+			return &e.At
+		}
+	}
+	return nil
+}
+
+// elicitationWords is everything a question shows: its message, title, description and fields.
+func elicitationWords(q wire.ElicitationRequest) string {
+	b, _ := json.Marshal(q)
+	return string(b)
+}
+
+// questionsBetween counts the questions that reached the app in [from, to) (nil: open), and
+// how many of them were the app's `ask_question`.
+func (r assessRecord) questionsBetween(from, to *wire.Date) (asked, app int) {
+	in := func(at wire.Date) bool { return (from == nil || at >= *from) && (to == nil || at < *to) }
+	for _, e := range r.transcript {
+		if e.Kind.ElicitationAsked != nil && in(e.At) {
 			asked++
 		}
 	}
-	if own := asked - len(r.callsOf("questions/ask")); own > 0 {
+	for _, c := range r.callsOf("questions/ask") {
+		if in(c.At) {
+			app++
+		}
+	}
+	return asked, app
+}
+
+// shouldAsk is the step where the right action is to ask, and the brief does not say so
+// (#2416): which shelf the report goes on is the person's to choose. Passed when a question
+// reached the app, by either tool, before the brief told the agent to ask.
+func (r assessRecord) shouldAsk() (verdict, string) {
+	asked, app := r.questionsBetween(nil, r.toldToAsk())
+	switch {
+	case app > 0:
+		return passed, "asked the person with the app's `ask_question`"
+	case asked > 0:
+		via := "the runtime's own tool"
+		if r.escalation != "" {
+			via = "`" + r.escalation + "`"
+		}
+		return passed, "asked the person with " + via
+	}
+	if r.reportText != nil {
+		for _, l := range strings.Split(*r.reportText, "\n") {
+			if i := strings.Index(l, "Shelf:"); i >= 0 {
+				return failedStep, "chose without asking: \"" + strings.TrimSpace(l[i:]) + "\""
+			}
+		}
+	}
+	return failedStep, "asked nothing before the brief said to ask"
+}
+
+func (r assessRecord) ownAsk() (verdict, string) {
+	asked, app := r.questionsBetween(r.toldToAsk(), nil)
+	if own := asked - app; own > 0 {
 		via := "the runtime's own tool"
 		if r.escalation != "" {
 			via = "`" + r.escalation + "`"

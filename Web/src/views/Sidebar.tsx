@@ -18,6 +18,7 @@ import { signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import { ProjectAgentConfigModal } from "./AgentConfigEditor";
 import { ProjectModal } from "./ProjectPicker";
+import { PRCostCommentModal } from "./PRCostComment";
 import { actDoing, recentArchivedShown, type Store } from "../model/store";
 import { byStart, folderKey, recentlyArchived, folderPath as agentFolderPath, showsUnread } from "../model/groups";
 import { folds } from "../model/folds";
@@ -510,6 +511,7 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
   const showsAllMatches = useSignal(false);
   const configOpen = useSignal(false);
   const projectOpen = useSignal(false);
+  const prCostOpen = useSignal(false);
   useEffect(() => { showsAllMatches.value = false; }, [query]);
   const online = store.hostIsOnline(host.id);
   // A file dragged onto the row goes into the folder's drop box (#231). Before any early return:
@@ -583,6 +585,11 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
     // What people work on, across machines (#2317), as the window's Folder Settings ▸ Project.
     { label: "Project…", disabled: down, help: "Choose the project this folder is in",
       run: () => { projectOpen.value = true; } },
+    // What its merged pull requests say they cost (#2352), as the window's Folder Settings ▸ Cost on pull requests.
+    ...(store.has(host.id, Capability.lineageComment1) ? [
+      { label: "Cost on Pull Requests…", disabled: down, help: "Choose what a merged pull request says it cost",
+        run: () => { prCostOpen.value = true; } },
+    ] : []),
     ...showHiddenViewsItem(store, host.id, folder, down),
     // To the top of the sidebar, as the window's Pin.
     { label: folderPinned ? "Unpin" : "Pin", disabled: down,
@@ -622,6 +629,8 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
       data-host={host.id} data-folder={folder}>
       {projectOpen.value && <ProjectModal store={store} host={host.id} folder={folder} summary={summary}
         close={() => { projectOpen.value = false; }} />}
+      {prCostOpen.value && <PRCostCommentModal store={store} host={host.id} folder={folder} summary={summary}
+        close={() => { prCostOpen.value = false; }} />}
       {configOpen.value && <ProjectAgentConfigModal store={store} host={host.id} folder={folder} down={down}
         close={() => { configOpen.value = false; }} />}
       {isAlone ? (

@@ -400,7 +400,7 @@ type mergeRequest struct {
 }
 
 func (m mergeRequest) mr() MR {
-	return MR{Number: m.IID, Title: m.Title, Branch: m.SourceBranch, URL: m.WebURL}
+	return MR{Number: m.IID, Title: m.Title, Branch: m.SourceBranch, URL: m.WebURL, Fixes: closingRefs(m.Description)}
 }
 
 func (m mergeRequest) draft() bool { return m.Draft || m.WorkInProgress }

@@ -39,6 +39,7 @@ func (d *Daemon) register() {
 	d.registerEvents()
 	d.registerEventWaits()
 	d.registerCost()
+	d.registerLineage()
 	d.registerDevices()
 	d.registerAllowances()
 	d.registerAccounts()
@@ -131,7 +132,22 @@ func (d *Daemon) register() {
 		return d.listAgents(r), nil
 	})
 	On(d, wire.CallAgentsStart, func(ctx context.Context, c *Client, r wire.StartRequest) (wire.UUID, error) {
+		// An agent on another machine asked for it (#2887): its labels are an agent's.
+		if r.StartedFrom != nil {
+			id, err := d.startFor(r, startedBy{owner: wire.SessionLabelOwnerAgent, actor: c.actor})
+			if err == nil {
+				d.noteStartedHere(id, *r.StartedFrom)
+			}
+			return id, err
+		}
 		return d.startAs(r, c.actor)
+	})
+	// Sessions on another machine (#2927), from the control plane.
+	On(d, wire.CallAgentsFromStarter, func(ctx context.Context, c *Client, r wire.SessionCall) (wire.SessionCallReply, error) {
+		return d.fromStarter(r)
+	})
+	On(d, wire.CallAgentsEndedElsewhere, func(ctx context.Context, c *Client, r wire.SessionEnded) (wire.Empty, error) {
+		return wire.Empty{}, d.endedElsewhere(r)
 	})
 	On(d, wire.CallAgentsStop, func(ctx context.Context, c *Client, r wire.AgentStopRequest) (wire.Empty, error) {
 		if d.Store.Agent(r.AgentID) == nil {

@@ -270,8 +270,8 @@ func TestEveryAnswerCarriesTheHeaders(t *testing.T) {
 	csp, _ := headerValue(testGate.headers(), "Content-Security-Policy")
 	want := "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self'; " +
 		"connect-src ws://localhost:8899; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; " +
-		"frame-src http://127.0.0.1:8899; object-src 'none'; worker-src 'none'; manifest-src 'self'; " +
-		"require-trusted-types-for 'script'; trusted-types 'none'"
+		"frame-src http://127.0.0.1:8899; object-src 'none'; worker-src 'self'; manifest-src 'self'; " +
+		"require-trusted-types-for 'script'; trusted-types agents-sw"
 	if csp != want {
 		t.Errorf("CSP:\n%s\nwant\n%s", csp, want)
 	}

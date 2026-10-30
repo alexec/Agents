@@ -73,6 +73,7 @@ var hostActions = map[string]string{
 	"wake/set":                 "Changed the wake settings",
 	"folders/setDiskSpace":     "Changed a folder's disk space",
 	"folders/setHelperLimits":  "Changed a folder's helper limits",
+	"folders/setPRCostComment": "Changed what a folder's merged pull requests say of their cost",
 	"runtimes/setProvider":     "Changed a runtime's provider",
 	"runtimes/disableProvider": "Turned off a runtime's provider",
 	"runtimes/install":         "Installed a runtime",

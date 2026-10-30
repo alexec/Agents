@@ -15,7 +15,7 @@ import type {
   GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
-  PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, RemoveRequest, ClientPermissionSettings } from "../protocol/generated";
+  PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, RemoveRequest, ClientPermissionSettings, PRCostComment } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
@@ -2313,6 +2313,12 @@ export class Store extends Work {
   /** The folder joins a project (#2317), through its own machine. Throws a refusal. */
   async setFolderProject(host: string, folder: string, project: string): Promise<void> {
     const summary = await this.link.call("folders/setProject", { folder: folder as never, project }, host);
+    this.upsertFolder(summary, host);
+  }
+
+  /** What a folder's merged pull requests say of their cost (#2352). Throws a refusal. */
+  async setFolderPRCostComment(host: string, folder: string, prCostComment: PRCostComment): Promise<void> {
+    const summary = await this.link.call("folders/setPRCostComment", { folder: folder as never, prCostComment }, host);
     this.upsertFolder(summary, host);
   }
 

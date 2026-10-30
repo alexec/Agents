@@ -292,6 +292,9 @@ public extension DaemonAPI {
                 // A folder joins a project (#2317).
                 Row(Method.foldersSetProject, params: SetFolderProjectRequest.self, result: FolderSummary.self,
                     kind: .hostRequest),
+                // Cost on Pull Requests… on a folder's menu (#2352), as the window's Folder Settings has it.
+                Row(Method.foldersSetPRCostComment, params: SetPRCostCommentRequest.self, result: FolderSummary.self,
+                    kind: .hostRequest),
                 // A change to the folder's own files made outside the app (#531): read, Keep, Undo.
                 Row(Method.foldersReadGuardedChange, params: GuardedChangeRequest.self, result: GuardedChangeReading.self,
                     kind: .hostRequest),
@@ -313,6 +316,9 @@ public extension DaemonAPI {
                 Row(Method.controlStatus, params: Empty.self, result: ControlStatus.self, kind: .controlRequest),
                 Row(Method.hostsList, params: Empty.self, result: [ControlMachine].self, kind: .controlRequest),
                 Row(Method.clientsForgetSelf, params: Empty.self, result: Empty.self, kind: .controlRequest),
+                // Web Push to this browser (#1486): the control plane's key, and the page's subscription.
+                Row(Method.clientsWebPushKey, params: Empty.self, result: JSONValue.self, kind: .controlRequest),
+                Row(Method.clientsSetWebPush, params: JSONValue.self, result: Empty.self, kind: .controlRequest),
                 // A host using a Mac's git access (#1122): Allow, Don't Allow and Revoke.
                 Row(Method.hostsLendGit, params: LendGit.self, result: Empty.self, kind: .controlRequest),
                 // A linked host's workspace (#691): Start on the offline strip.
@@ -350,6 +356,8 @@ public extension DaemonAPI {
                 // Reports (#1811): usage, cost and time by person, folder and machine.
                 Row(Method.reportsUsage, params: ReportQuery.self, result: UsageReport.self, kind: .controlRequest),
                 Row(Method.reportsExport, params: ReportQuery.self, result: ReportExport.self, kind: .controlRequest),
+                // Reports ▸ Value (#2351).
+                Row(Method.reportsValue, params: ReportQuery.self, result: ReportValue.self, kind: .controlRequest),
                 Row(Method.reportsScopes, params: Empty.self, result: ReportScopes.self, kind: .controlRequest),
                 Row(Method.reportsPolicy, params: Empty.self, result: ReportPolicy.self, kind: .controlRequest),
                 Row(Method.reportsSetPolicy, params: ReportPolicy.self, result: ReportPolicy.self, kind: .controlRequest),

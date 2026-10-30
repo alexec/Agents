@@ -47,6 +47,13 @@ Whichever it is, the agent and its folder say **Needs you** until you answer.
      go back, and **Submit** on the last page. The Mac shows where you are as **2/3**;
      iPhone and iPad as **Question 2 of 3**. If **Submit** does not go, the line beside
      it names the question that still needs an answer (marked **needed**).
+   - **A secret.** An agent that needs an API key or a token asks for it by name, such as
+     `OPENAI_API_KEY`, with a lock beside it, why it needs it and, when it knows, a link to
+     where you get it. Paste it into the masked field and choose **Save securely**. It is
+     saved to your secrets on the machine that runs the agent (`~/.agents-secrets/secrets.env`),
+     and the agent gets its name, never the value; the chat shows only that it was saved.
+     **No thanks** tells the agent you did not give it. A notification of it has no **Reply**:
+     open the conversation to answer it.
    - **A link to open.** Some agents ask you to do something in the browser, such as
      sign in. Click **Open**, do it, then click **Done**, or **Gave up** if you could not.
 3. For a question in words (the agent's turn has ended and its summary says **Waiting on

@@ -458,6 +458,27 @@
       }
     },
     {
+      "name": "agents/endedElsewhere",
+      "x-capability": "sessions.elsewhere/1",
+      "description": "From the control plane only (#2927): a session an agent here started on another machine has ended, so the waits on it close. Refused unless that agent started a session of that id on that machine.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SessionEnded"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "agents/export",
       "x-capability": "agents.export/1",
       "tags": [
@@ -554,6 +575,27 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/UUID"
+        }
+      }
+    },
+    {
+      "name": "agents/fromStarter",
+      "x-capability": "sessions.elsewhere/1",
+      "description": "From the control plane only (#2927): the agent on another machine that started a session here reads, messages, stops or archives it, or asks how it stands. Refused unless it started it.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SessionCall"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SessionCallReply"
         }
       }
     },
@@ -3473,6 +3515,31 @@
       }
     },
     {
+      "name": "folders/setPRCostComment",
+      "x-capability": "lineage.comment/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SetPRCostCommentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
       "name": "folders/setPinned",
       "x-capability": "folders/1",
       "tags": [
@@ -3590,6 +3657,106 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/GitCredential"
+        }
+      }
+    },
+    {
+      "name": "lineage/cost",
+      "x-capability": "lineage/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LineageNodeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LineageCostRollup"
+        }
+      }
+    },
+    {
+      "name": "lineage/end",
+      "x-capability": "lineage/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LineageEndRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LineageLinks"
+        }
+      }
+    },
+    {
+      "name": "lineage/link",
+      "x-capability": "lineage/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LineageLinkRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LineageLink"
+        }
+      }
+    },
+    {
+      "name": "lineage/links",
+      "x-capability": "lineage/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LineageNodeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LineageLinks"
+        }
+      }
+    },
+    {
+      "name": "lineage/walk",
+      "x-capability": "lineage/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LineageNodeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LineageGraph"
         }
       }
     },

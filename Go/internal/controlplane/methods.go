@@ -1,7 +1,9 @@
 package controlplane
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"os"
@@ -18,6 +20,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/internal/controlplane/web"
+	"github.com/alexec/agents/Go/internal/controlplane/webpush"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -70,8 +73,10 @@ var own = methodSet(
 	"clients/setActivityToken",
 	"clients/setGrant",
 	"clients/setPushToken",
+	"clients/setWebPush",
 	"clients/startPairing",
 	"clients/stopPairing",
+	"clients/webPushKey",
 	"control/rotate",
 	"control/setAuditDays",
 	"control/setFolderDetection",
@@ -138,6 +143,7 @@ var own = methodSet(
 	"readApi/revoke",
 	"reports/export",
 	"reports/usage",
+	"reports/value",
 	"scim/set",
 	"scim/tokens/list",
 	"scim/tokens/make",
@@ -203,6 +209,7 @@ var writes = methodSet(
 	"clients/forget",
 	"clients/setActivityToken",
 	"clients/setPushToken",
+	"clients/setWebPush",
 	"clients/startPairing",
 	"control/rotate",
 	"control/setAuditDays",
@@ -334,7 +341,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		"signIn/domains/check", "signIn/domains/claim", "signIn/domains/list", "signIn/domains/preview",
 		"signIn/domains/remove", "signIn/domains/set":
 		return m.signInMethod(ctx, method, params, from)
-	case "reports/usage", "reports/export":
+	case "reports/usage", "reports/export", "reports/value":
 		return m.reportMethod(ctx, method, params, from)
 	case "user/settings", "user/setAgentConfigFile", "user/setSettings", "user/setSecret", "user/removeSecret", "user/secretNames":
 		return m.userMethod(ctx, method, params, from)
@@ -425,6 +432,22 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			return nil, err
 		}
 		return map[string]any{}, nil
+	case "clients/setWebPush":
+		request, err := require[wire.WebPushSubscription](params, "WebPushSubscription")
+		if err != nil {
+			return nil, err
+		}
+		if err := m.setWebPush(ctx, from.Client, request); err != nil {
+			return nil, err
+		}
+		return map[string]any{}, nil
+	case "clients/webPushKey":
+		key := wire.WebPushKey{}
+		if m.s.webPush != nil {
+			public := m.s.webPush.sender.PublicKey()
+			key.PublicKey = &public
+		}
+		return key, nil
 	case "clients/setActivityToken":
 		request, err := require[wire.ActivityToken](params, "ActivityToken")
 		if err != nil {
@@ -916,6 +939,63 @@ func withActivityToken(list []records.ActivityToken, agent string, token *record
 		out = out[len(out)-records.MostActivityTokens:]
 	}
 	return out
+}
+
+// setWebPush is clients/setWebPush (#1486): a browser's own Web Push subscription, kept
+// in its own record, as setPushToken keeps a device's APNs token. Only the browser itself
+// sets it, over its own session.
+func (m *Methods) setWebPush(ctx context.Context, client string, request wire.WebPushSubscription) error {
+	var subscription *records.WebPushSubscription
+	if request.Endpoint != nil && *request.Endpoint != "" {
+		if m.s.webPush == nil {
+			return fail(notSupported, "This control plane sends no Web Push: it has no VAPID key.")
+		}
+		if len(*request.Endpoint) > 2048 || !webpush.KnownService(*request.Endpoint) {
+			return fail(invalidParams, "A push endpoint is an https address at a browser's push service.")
+		}
+		var p256dh, auth []byte
+		if request.P256dh != nil {
+			p256dh, _ = base64.RawURLEncoding.DecodeString(strings.TrimRight(*request.P256dh, "="))
+		}
+		if request.Auth != nil {
+			auth, _ = base64.RawURLEncoding.DecodeString(strings.TrimRight(*request.Auth, "="))
+		}
+		subscription = &records.WebPushSubscription{Endpoint: *request.Endpoint, P256dh: p256dh, Auth: auth}
+		if _, err := webpush.Seal(webPushOf(subscription), nil); err != nil {
+			return fail(invalidParams, "Those are not a browser's push keys.")
+		}
+	}
+	for try := 0; ; try++ {
+		record := m.records.Client(client)
+		if record == nil {
+			return fail(invalidParams, "This client is not paired.")
+		}
+		if record.Kind != records.KindBrowser {
+			return fail(notSupported, "Only a browser gets Web Push.")
+		}
+		if sameWebPush(record.WebPush, subscription) {
+			return nil
+		}
+		err := m.records.ChangeClient(ctx, client, func(c *records.ClientRecord) bool {
+			c.WebPush = subscription
+			return true
+		})
+		var conflict *store.ConflictError
+		if !errors.As(err, &conflict) || try > 0 {
+			return err
+		}
+		// Another copy wrote it first: read it again and try once more.
+		if err := m.records.Load(ctx); err != nil {
+			return err
+		}
+	}
+}
+
+func sameWebPush(a, b *records.WebPushSubscription) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.Endpoint == b.Endpoint && bytes.Equal(a.P256dh, b.P256dh) && bytes.Equal(a.Auth, b.Auth)
 }
 
 func samePushToken(a, b *records.PushToken) bool {

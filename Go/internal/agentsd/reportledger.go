@@ -263,6 +263,16 @@ func (d *Daemon) reportTime(agent wire.UUID, runtime string, segments []timeSegm
 	}
 	a := d.Store.Agent(agent)
 	folder, workflow, route := reportFolder(a), reportWorkflow(a), reportRoute(a)
+	// The turn's time on the work the session is on now (#2350).
+	work := wire.LineageCost{Cost: map[string]float64{}}
+	for _, s := range segments {
+		if s.kind == "person" {
+			work.WaitingSeconds += s.end.Sub(s.start).Seconds()
+		} else {
+			work.WorkingSeconds += s.end.Sub(s.start).Seconds()
+		}
+	}
+	d.bankWork(a, work)
 	d.reportMu.Lock()
 	defer d.reportMu.Unlock()
 	for _, s := range segments {
@@ -367,12 +377,18 @@ func (d *Daemon) sendReport() {
 	d.reportSending.Lock()
 	defer d.reportSending.Unlock()
 	d.countReportEvents()
+	// The cost banked on links so far, so it goes with the hours it is in (#2350).
+	d.lineageSettle(5 * time.Second)
 	for d.ctx.Err() == nil {
 		d.reportMu.Lock()
 		rollup, sent := d.rollupLocked()
 		d.reportMu.Unlock()
-		if len(sent) == 0 {
+		work, workSent := d.unsentCost()
+		if len(sent) == 0 && len(work) == 0 {
 			return
+		}
+		if len(work) > 0 {
+			rollup.Work = work
 		}
 		ctx, cancel := context.WithTimeout(d.ctx, reportPatience)
 		_, err := (*ask)(ctx, wire.CallUsageRollup.Name, rollup)
@@ -391,6 +407,7 @@ func (d *Daemon) sendReport() {
 		}
 		d.saveReportLocked(time.Now())
 		d.reportMu.Unlock()
+		d.costSent(workSent)
 	}
 }
 

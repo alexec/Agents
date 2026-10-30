@@ -44,8 +44,8 @@ func (g *gate) headers() [][2]string {
 	return [][2]string{
 		{"Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; " +
 			fmt.Sprintf("font-src 'self'; connect-src ws://localhost:%d; base-uri 'none'; form-action 'none'; ", g.port) +
-			fmt.Sprintf("frame-ancestors 'none'; frame-src %s; object-src 'none'; worker-src 'none'; manifest-src 'self'; ", g.proxyOrigin()) +
-			"require-trusted-types-for 'script'; trusted-types 'none'"},
+			fmt.Sprintf("frame-ancestors 'none'; frame-src %s; object-src 'none'; worker-src 'self'; manifest-src 'self'; ", g.proxyOrigin()) +
+			"require-trusted-types-for 'script'; trusted-types agents-sw"},
 		{"X-Content-Type-Options", "nosniff"},
 		{"Referrer-Policy", "no-referrer"},
 		{"Cross-Origin-Opener-Policy", "same-origin"},

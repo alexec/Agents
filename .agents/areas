@@ -580,6 +580,12 @@ Web/test/reports.test.mjs                              reports
 docs/reference/reports.md                              reports
 specs/research/1804-*/                                 reports
 
+# lineage: the graph of the SDLC (#2347): its store, the links made without help, the cost
+# on them, and the views (#2348–#2352).
+Go/internal/lineage/                                   lineage
+Go/internal/agentsd/lineage*.go                        lineage
+specs/2348-lineage/                                    lineage
+
 # channels: a channel identity linked to a person (#1762), and Control plane ▸ Channels.
 Go/internal/controlplane/links*.go                     channels
 Packages/AgentsKit/Sources/AgentsKitCore/Model/ChannelLinks.swift  channels

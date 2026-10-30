@@ -563,7 +563,23 @@ export interface ChatTurn {
   range?: { start: number; end: number };
 }
 
-/** The page cut into turns, one at each thing the person typed. */
+/**
+ * startsTurn(after:): the person's ask starts a turn, and so does the app's prompt that brings the
+ * answer to a form left open (#1641), so the answer is drawn at the end of the turn that asked
+ * (#2934). `before` is the last item ahead that is not aside.
+ */
+export function startsTurn(item: Item, before: Item | undefined): boolean {
+  if (isPersonsAsk(item)) return true;
+  if (item.kind !== "entry" || fields(item.entry, "userMessage")?.from !== "app") return false;
+  return before?.kind === "entry" && kindOf(before.entry) === "elicitationAnswered";
+}
+
+/** A state change or a passing line: what lies between a form's answer and the prompt that brings it. */
+function isAside(item: Item): boolean {
+  return (item.kind === "entry" && kindOf(item.entry) === "stateChanged") || isPassing(item);
+}
+
+/** The page cut into turns, one at each thing the person typed and at a late form answer's prompt. */
 export function turns(items: readonly Item[]): ChatTurn[] {
   const result: ChatTurn[] = [];
   let current: Item[] = [];
@@ -573,13 +589,15 @@ export function turns(items: readonly Item[]): ChatTurn[] {
     const ask = isPersonsAsk(first) ? first : undefined;
     result.push({ id: first.id, ...(ask ? { ask } : {}), items: current.slice(ask ? 1 : 0) });
   };
+  let before: Item | undefined;
   for (const item of items) {
-    if (isPersonsAsk(item)) {
+    if (startsTurn(item, before)) {
       close();
       current = [item];
     } else {
       current.push(item);
     }
+    if (!isAside(item)) before = item;
   }
   close();
   return result;

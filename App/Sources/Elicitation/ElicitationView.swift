@@ -30,37 +30,49 @@ struct ElicitationView: View {
                 if let asker = model.work.askerLine(request.agentID) {
                     Text(asker).appText(.fine).foregroundStyle(.secondary)
                 }
-                Text(request.title).appText(.reading).fontWeight(.semibold)
-                if let message = request.message, message != request.title {
-                    Text(message).appText(.reading)
-                }
-
-                switch request.mode {
-                case .form(let schema) where schema.singleChoice != nil:
-                    if let description = schema.description {
-                        Text(description).appText(.supporting).foregroundStyle(.secondary)
-                    }
-                    oneClick(schema)
-
-                case .form(let schema):
-                    pages(schema)
-
-                case .url(let url):
-                    HStack(spacing: 8) {
-                        Button("Open") {
-                            if let link = URL(string: url) { NSWorkspace.shared.open(link) }  // store-ok: a link the agent sent, to the browser
+                if let secret = request.secret {
+                    // A masked field of its own (#2885), never the form's open one.
+                    SecretAskCard(secret: secret, reason: request.secretReason,
+                                  host: model.answerRecipient(request.agentID), sending: sending != nil) { typed in
+                        if let typed {
+                            send("save", .accept, content: [ElicitationRequest.secretField: .string(typed)])
+                        } else {
+                            send("no thanks", .decline)
                         }
-                        .buttonStyle(.paperProminent)
-                        .keyboardShortcut(.defaultAction)
-                        .modifier(Held(sending: sending))
-                        Button { send("done", .accept) } label: { pending("Done", "done") }
-                        .buttonStyle(.paper)
-                        .keyboardShortcut("1")
-                        .modifier(Held(sending: sending, key: "done"))
-                        Button { send("gave up", .decline) } label: { pending("Gave up", "gave up") }
-                        .buttonStyle(.paper)
-                        .keyboardShortcut("2")
-                        .modifier(Held(sending: sending, key: "gave up"))
+                    }
+                } else {
+                    Text(request.title).appText(.reading).fontWeight(.semibold)
+                    if let message = request.message, message != request.title {
+                        Text(message).appText(.reading)
+                    }
+
+                    switch request.mode {
+                    case .form(let schema) where schema.singleChoice != nil:
+                        if let description = schema.description {
+                            Text(description).appText(.supporting).foregroundStyle(.secondary)
+                        }
+                        oneClick(schema)
+
+                    case .form(let schema):
+                        pages(schema)
+
+                    case .url(let url):
+                        HStack(spacing: 8) {
+                            Button("Open") {
+                                if let link = URL(string: url) { NSWorkspace.shared.open(link) }  // store-ok: a link the agent sent, to the browser
+                            }
+                            .buttonStyle(.paperProminent)
+                            .keyboardShortcut(.defaultAction)
+                            .modifier(Held(sending: sending))
+                            Button { send("done", .accept) } label: { pending("Done", "done") }
+                            .buttonStyle(.paper)
+                            .keyboardShortcut("1")
+                            .modifier(Held(sending: sending, key: "done"))
+                            Button { send("gave up", .decline) } label: { pending("Gave up", "gave up") }
+                            .buttonStyle(.paper)
+                            .keyboardShortcut("2")
+                            .modifier(Held(sending: sending, key: "gave up"))
+                        }
                     }
                 }
             }
