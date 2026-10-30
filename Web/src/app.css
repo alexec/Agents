@@ -1205,10 +1205,47 @@ button.remove:hover { opacity: 1; }
 .report-policy .budget-field input { width: 7em; text-align: right; }
 .report-policy .sheet-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
 
-/* The control plane's three apps (#1804): Workspace | Console | Reports at the top, and the Console
-   and Reports as a list of pages beside the page open. */
-.app-switcher { display: flex; justify-content: center; padding: 6px 8px; border-bottom: 1px solid var(--paper-rule);
-  background: var(--paper-sidebar); }
+/* The bar of sections (#2141), in place of Workspace | Console | Reports (#1804), and each section but
+   the Overview and Agents as a list of pages beside the page open. The look is #2142's. */
+.nav-bar { display: flex; align-items: center; gap: 12px; padding: 6px 12px; border-bottom: 1px solid var(--paper-rule);
+  background: var(--paper-sidebar); position: relative; }
+.nav-home { border: 0; background: none; font: inherit; font-weight: 700; color: inherit; cursor: pointer; padding: 4px 6px; white-space: nowrap; }
+.nav-items { display: flex; flex-wrap: wrap; gap: 2px; }
+.nav-item { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 6px; background: none; font: inherit;
+  color: inherit; padding: 4px 10px; cursor: pointer; }
+.nav-item.on { background: var(--paper-selection); font-weight: 600; }
+.nav-menu { margin-left: auto; }
+.nav-menu-button { border: 1px solid var(--paper-rule); border-radius: 6px; background: var(--paper-raised); font: inherit; color: inherit;
+  padding: 4px 10px; display: inline-flex; gap: 6px; align-items: center; }
+.nav-menu-list { position: absolute; right: 8px; top: 100%; z-index: 20; display: flex; flex-direction: column; min-width: 200px;
+  padding: 4px; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card);
+  box-shadow: 0 6px 20px var(--paper-shadow); }
+.nav-menu-list .nav-item { justify-content: space-between; padding: 8px 10px; }
+.sub-app .back { display: none; }
+@media (max-width: 759px) { .nav-bar .nav-items { display: none; } }
+/* The Overview (#2141): five cards in a grid. */
+.columns.overview-columns { grid-template-columns: minmax(0, 1fr); }
+.overview-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); margin-top: 8px; }
+.overview-card { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card);
+  padding: 12px 14px; background: var(--paper-raised); min-height: 180px; }
+.overview-card h2 { font-size: 0.9375rem; margin: 0; }
+.overview-card p { margin: 0; }
+.overview-rows { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.overview-rows li { display: flex; flex-direction: column; gap: 1px; }
+.overview-rows .link, .overview-links .link { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-align: left; }
+.overview-links { display: flex; gap: 14px; margin-top: auto; }
+.overview-figure { font-size: 1.75rem; font-weight: 700; }
+.overview .attention { color: var(--tint-attention); }
+/* Agents' filters and its pages at the sidebar's foot (#2141). */
+.agent-filters { display: flex; gap: 6px; padding: 4px 10px 2px; }
+.agent-filters select { flex: 1; min-width: 0; font: inherit; font-size: 0.75rem; color: inherit; background: var(--paper-raised);
+  border: 1px solid var(--paper-rule); border-radius: var(--radius-control); padding: 2px 4px; }
+.agents-pages { border-top: 1px solid var(--paper-rule); margin-top: 8px; padding-top: 4px; }
+.all-workflows { margin-bottom: 12px; }
+/* Usage (#2141): Activity's Cost, Tokens and Time, under its own switch. */
+.usage-pane .column-head { display: none; }
+.usage-pane > .chat { display: block; border: 0; }
+.usage-pane > .chat .scroll { overflow: visible; }
 .columns.sub-app { grid-template-columns: 220px minmax(0, 1fr); }
 .sub-app-list { overflow-y: auto; padding: 4px 6px 8px; }
 .sub-app-group { display: flex; flex-direction: column; }

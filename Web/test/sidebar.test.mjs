@@ -287,14 +287,14 @@ test("the groups on round-trip through what this browser keeps: the groups off (
   }
 });
 
-test("Settings is in the address on its own (#846)", async () => {
+test("Settings is a section in the address on its own (#846, #2141)", async () => {
   globalThis.location = { hash: "" };
   globalThis.addEventListener = () => {};
   try {
     const { parseRoute, routeHash } = await load("src/route.ts");
-    assert.equal(routeHash({ settings: true, host: "mac", folder: "file:///w/a" }), "#/settings");
-    assert.deepEqual(parseRoute("#/settings"), { settings: true });
-    assert.deepEqual(parseRoute("#/a/settings"), {}, "not an Activity page");
+    assert.equal(routeHash({ nav: "settings", host: "mac", folder: "file:///w/a" }), "#/settings");
+    assert.deepEqual(parseRoute("#/settings"), { nav: "settings" });
+    assert.deepEqual(parseRoute("#/a/settings"), {}, "not an Activity page: the Overview");
   } finally {
     delete globalThis.location;
     delete globalThis.addEventListener;
@@ -344,16 +344,16 @@ test("folds stored badly, or a storage that refuses, leave everything folded", a
   assert.equal(held.isOpen("mac", "file:///w/a"), true, "held for this visit");
 });
 
-test("an Activity page is in the address on its own, and an unknown one is ignored", async () => {
+test("an Activity page is a page of Machines or Reports (#2141), and an unknown one is ignored", async () => {
   globalThis.location = { hash: "" };
   globalThis.addEventListener = () => {};
   try {
     const { parseRoute, routeHash } = await load("src/route.ts");
-    assert.equal(routeHash({ activity: "events", host: "mac", folder: "file:///w/a" }), "#/a/events");
-    assert.deepEqual(parseRoute("#/a/spending"), { activity: "spending" });
-    assert.deepEqual(parseRoute("#/a/time"), { activity: "time" });
-    assert.deepEqual(parseRoute("#/a/milestones"), { activity: "milestones" });
-    assert.deepEqual(parseRoute("#/a/mcp"), { activity: "mcp" }, "Connectors has a page of its own (#589)");
+    assert.equal(routeHash({ nav: "reports", section: "events", host: "mac", folder: "file:///w/a" }), "#/reports/events");
+    assert.deepEqual(parseRoute("#/a/spending"), { nav: "reports", section: "usage" });
+    assert.deepEqual(parseRoute("#/a/time"), { nav: "reports", section: "usage" });
+    assert.deepEqual(parseRoute("#/a/milestones"), { nav: "reports", section: "milestones" });
+    assert.deepEqual(parseRoute("#/a/mcp"), { nav: "machines", section: "mcp" }, "Connectors has a page of its own (#589)");
     assert.deepEqual(parseRoute("#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/m/1"), { host: "mac", folder: "file:///w/a", mcp: true },
       "a folder's Connectors has a page of its own (#753)");
     assert.equal(routeHash({ host: "mac", folder: "file:///w/a", mcp: true }), "#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/m/1");

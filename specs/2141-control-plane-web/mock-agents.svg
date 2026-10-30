@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="14">
+  <rect width="1440" height="900" fill="#ffffff"/>
+  <rect width="1440" height="52" fill="#ffffff" stroke="#e2e2e6"/>
+  <text x="24" y="32" font-weight="700" font-size="16">acme control plane</text>
+  <g>
+    <text x="236" y="31">Overview</text>
+    <rect x="318" y="12" width="96" height="28" rx="6" fill="#e8eefc"/>
+    <text x="332" y="31" font-weight="600" fill="#2453d4">Agents</text><rect x="384" y="17" width="22" height="18" rx="9" fill="#d93025"/><text x="390" y="31" fill="#fff" font-size="12">2</text>
+    <text x="428" y="31">Machines</text><text x="512" y="31">Workflows</text><text x="602" y="31">Reports</text>
+    <text x="680" y="31">Requests</text><rect x="744" y="17" width="22" height="18" rx="9" fill="#d93025"/><text x="750" y="31" fill="#fff" font-size="12">3</text>
+    <text x="788" y="31">People</text><text x="856" y="31">Settings</text>
+  </g>
+  <text x="1150" y="31" fill="#5f6368" font-size="13">● 2 of 3 machines online · bea@acme.dev</text>
+  <!-- The list -->
+  <rect x="0" y="52" width="320" height="848" fill="#f6f6f7" stroke="#e2e2e6"/>
+  <rect x="16" y="68" width="288" height="32" rx="6" fill="#2453d4"/><text x="110" y="89" fill="#fff" font-weight="600">+ New Session</text>
+  <rect x="16" y="110" width="288" height="28" rx="6" fill="#fff" stroke="#ddd"/><text x="28" y="129" fill="#9aa0a6">Search</text>
+  <g font-size="12">
+    <rect x="16" y="146" width="98" height="26" rx="13" fill="#fff" stroke="#ccc"/><text x="26" y="164">Machine: any ▾</text>
+    <rect x="118" y="146" width="88" height="26" rx="13" fill="#fff" stroke="#ccc"/><text x="126" y="164">Person: me ▾</text>
+    <rect x="210" y="146" width="94" height="26" rx="13" fill="#e8eefc" stroke="#2453d4"/><text x="218" y="164" fill="#2453d4">State: any ▾</text>
+  </g>
+  <text x="16" y="204" font-size="12" font-weight="700" fill="#5f6368">NEEDS YOU</text>
+  <text x="28" y="228">? fix login redirect</text><text x="250" y="228" fill="#5f6368" font-size="12">api</text>
+  <text x="28" y="254">✓ lineage pane</text><text x="250" y="254" fill="#5f6368" font-size="12">web</text>
+  <text x="16" y="290" font-size="12" font-weight="700" fill="#5f6368">WORKING</text>
+  <text x="28" y="314">◌ nightly deps</text><text x="250" y="314" fill="#5f6368" font-size="12">infra</text>
+  <text x="16" y="350" font-size="12" font-weight="700" fill="#5f6368">▾ api</text>
+  <rect x="16" y="360" width="288" height="26" rx="6" fill="#e8eefc"/>
+  <text x="28" y="378" font-weight="600">? fix login redirect</text>
+  <text x="28" y="404">● flaky test</text>
+  <text x="28" y="430" fill="#5f6368">Archived</text>
+  <text x="16" y="466" font-size="12" font-weight="700" fill="#5f6368">▸ web</text>
+  <text x="16" y="494" font-size="12" font-weight="700" fill="#5f6368">▸ infra</text>
+  <text x="16" y="522" font-size="12" font-weight="700" fill="#5f6368">▸ docs</text>
+  <line x1="16" y1="800" x2="304" y2="800" stroke="#ddd"/>
+  <text x="28" y="826">Live Now</text><text x="250" y="826" fill="#5f6368" font-size="12">6</text>
+  <text x="28" y="852">Projects</text>
+  <!-- The chat -->
+  <text x="352" y="92" font-size="18" font-weight="700">fix login redirect</text>
+  <text x="352" y="114" fill="#5f6368" font-size="13">Claude · api on bea-mbp · 12 min · $0.92</text>
+  <rect x="352" y="140" width="700" height="80" rx="10" fill="#f1f3f4"/>
+  <text x="372" y="172">The redirect drops the next= parameter after sign-in. I have a fix</text>
+  <text x="372" y="196">on two branches; which one should I push?</text>
+  <rect x="352" y="240" width="700" height="120" rx="10" fill="#fff" stroke="#2453d4"/>
+  <text x="372" y="270" font-weight="700">Which branch?</text>
+  <rect x="372" y="290" width="230" height="30" rx="6" fill="#e8eefc"/><text x="388" y="310">fix/login-next (Recommended)</text>
+  <rect x="614" y="290" width="160" height="30" rx="6" fill="#f1f3f4"/><text x="630" y="310">main-hotfix</text>
+  <rect x="352" y="820" width="1060" height="48" rx="10" fill="#fff" stroke="#ccc"/><text x="372" y="850" fill="#9aa0a6">Message…</text>
+  <text x="352" y="890" fill="#5f6368" font-size="12">Mock for #2141: Agents is today's sidebar and chat, one level down, with filters. Live Now and Projects open in the chat's place.</text>
+</svg>

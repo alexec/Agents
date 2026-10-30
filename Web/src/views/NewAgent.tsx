@@ -595,7 +595,7 @@ export function NewAgent({ store, host, folder, folderName, down }: {
           {autoRefusal.value && (
             <div class="sandbox-refusal" role="status">
               <p class="quiet small">{autoRefusal.value}</p>
-              <button onClick={() => go({ settings: true })}>Auto settings</button>
+              <button onClick={() => go({ nav: "settings" })}>Auto settings</button>
             </div>
           )}
           {isAuto ? (

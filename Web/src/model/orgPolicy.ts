@@ -12,10 +12,11 @@ import { Failure } from "../protocol/generated";
 export const setBy = "Set by your organisation";
 export const title = "Policy";
 export const none = "Your organisation sets no policy.";
-export const editInConsole = "Edit in Console";
+export const editPolicy = "Edit Policy";
+export const editInPeople = "Edit in People";
 /** Under the budgets on Cost, when no budget is reached and none caps a limit of the person's. */
 export const budgetFoot = "Your organisation’s budget. A lower limit of your own still applies.";
-export const foot = "Your organisation’s admins set these rules in Console ▸ Policy. Every machine follows them, also offline. A rule only caps your own settings: they come back when the rule does.";
+export const foot = "Your organisation’s admins set these rules in Settings ▸ Policy on the web page. Every machine follows them, also offline. A rule only caps your own settings: they come back when the rule does.";
 
 // The kill switch (spec 998 US5).
 export const stopAll = "Stop All Agent Work";
