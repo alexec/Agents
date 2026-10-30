@@ -29,7 +29,8 @@ page.
   project's id and name.
 - **Page** (the Mac and the Remote, #2183): Spend, or Outcomes, Time, Runtimes, Adoption or
   Workflows, which are the web page's Reports pages below at the Me scope. A segmented control
-  on the Mac, and a menu on the Remote. On the web page these pages are in Reports.
+  on the Mac, and a menu on the Remote. On the web page these pages are in Reports. Value
+  (#2351) is on the Mac only, not on the Remote (tier Mac + web, #2796).
 - **A control plane that keeps no reports** (one from before #1811) says so, and says to
   update it.
 
@@ -84,6 +85,24 @@ Three more pages of Reports (#2019), with the same scopes:
 - **Workflows** (R6): each workflow's runs (`workflow.ran`), its failed runs (its agent
   ended in an error), the cost of a run and the time working a run. By Workflow first. The
   most failed runs come first. By Person shows each bot's runs under its name.
+
+## Reports ▸ Value, on the web page and the Mac (#2351)
+
+What the work cost and what it delivered, from the cost on the links (#2350). The control
+plane adds up the nodes that the scope's machines send (`v1/lineage/<host>.json`); the
+machines' copies of one node add up, as each banked its own turns.
+
+- **The headline:** the cost of the work on issues and pull requests, the PRs merged, and
+  the cost per merged PR (that cost by the PRs merged, waste included).
+- **Waste:** the PRs closed without a merge and the merged reverts, and the failed CI rounds.
+- **Lead time:** the median of the issues' lead times, each from the first work on the issue
+  or its PRs (`firstAt`) to its last PR merged (`endedAt`).
+- **Unlinked:** the turns with no issue or PR.
+- **Issues and Milestones:** each one's cost (its own and its PRs'), how its PRs ended, its
+  waste and lead time, the most costly first, at most 100 each. On the Mac a GitHub one is a
+  link.
+- **The range:** a node counts when it last changed in the range, with all of its cost: a
+  node's total is not kept by the day.
 
 ## Reports ▸ Saved Views, on the web page
 
@@ -170,6 +189,7 @@ Three more pages of Reports (#2019), with the same scopes:
   `waits`, `workflowRuns`, `workflowFailures`; blank from a machine before #2019), then
   `groups`.
 
+- `reports/value` (#2351) with a range and a scope: Reports ▸ Value (`ReportValue`).
 - `reports/views`, `reports/saveView` (a view with no `id` is new) and `reports/deleteView`
   (#2019): the caller's saved views.
 

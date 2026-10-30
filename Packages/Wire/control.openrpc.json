@@ -4088,6 +4088,32 @@
       }
     },
     {
+      "name": "reports/value",
+      "x-capability": "reports.value/1",
+      "description": "What the work in a scope cost and delivered (#2351): cost per merged PR, per issue and per milestone, waste and lead time, from the machines' lineage nodes.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ReportQuery"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ReportValue"
+        }
+      }
+    },
+    {
       "name": "reports/views",
       "x-capability": "reports.views/1",
       "description": "The caller's saved views of Reports (#2019).",

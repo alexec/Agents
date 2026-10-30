@@ -353,6 +353,8 @@ public extension DaemonAPI {
                 // Reports (#1811): usage, cost and time by person, folder and machine.
                 Row(Method.reportsUsage, params: ReportQuery.self, result: UsageReport.self, kind: .controlRequest),
                 Row(Method.reportsExport, params: ReportQuery.self, result: ReportExport.self, kind: .controlRequest),
+                // Reports ▸ Value (#2351).
+                Row(Method.reportsValue, params: ReportQuery.self, result: ReportValue.self, kind: .controlRequest),
                 Row(Method.reportsScopes, params: Empty.self, result: ReportScopes.self, kind: .controlRequest),
                 Row(Method.reportsPolicy, params: Empty.self, result: ReportPolicy.self, kind: .controlRequest),
                 Row(Method.reportsSetPolicy, params: ReportPolicy.self, result: ReportPolicy.self, kind: .controlRequest),

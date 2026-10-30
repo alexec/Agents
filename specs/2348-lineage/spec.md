@@ -195,6 +195,26 @@ a node from this machine's totals. Each part counts once.
 - **Decided: the milestone rollup reads `part-of` links; the host does not make them from
   the forge yet** (#2935). A person can make one with `lineage/link`. Alex can overrule.
 
+## Reports ▸ Value (#2351)
+
+Slice 4 reads the cost on the links on the control plane, in
+`Go/internal/controlplane/reports_value.go` (`reports/value`, capability `reports.value/1`,
+`ReportQuery` → `ReportValue`), and draws it as Reports ▸ Value on the Mac window and the web
+page.
+
+- **The scope** is Reports': Me, a group or the organisation. The nodes of the scope's
+  machines add up: the cost adds, `fixes` and `partOf` join, the newest copy says how a PR
+  ended, and the failed checks are the most that any machine heard.
+- **The range:** a node counts when its `lastAt` is in it, with all of its cost.
+- **The answer:** the work on issues and PRs (`total`), `waste`, `unlinked`, the cost per
+  merged PR, the PRs merged, closed and reverted, the failed CI rounds, the median lead time,
+  and a row for each issue and milestone with a part in the range, the most costly first, at
+  most 100 each.
+- **Lead time:** each node now has `firstAt` (when the machine first banked or noted it) and a
+  PR `endedAt` (merged or closed). An issue's lead time is from the first `firstAt` of it and
+  its PRs to the last `endedAt` of its merged PRs.
+- **The Lineage view** (a session's links, and the issue and PR pages) is #2940 and #2941.
+
 ## Clients
 
-mac: no UI, remote: no UI, web: no UI (the view is #2351).
+mac: Reports ▸ Value (#2351), remote: tier mac+web, web: Reports ▸ Value (#2351).

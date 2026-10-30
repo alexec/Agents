@@ -10164,6 +10164,14 @@
           "type": "integer",
           "description": "A PR's failed CI rounds: checks.failed, once per run and attempt."
         },
+        "firstAt": {
+          "$ref": "#/definitions/WireDate",
+          "description": "When the machine first banked or noted the node (#2351): the start of the work on it, for lead time."
+        },
+        "endedAt": {
+          "$ref": "#/definitions/WireDate",
+          "description": "When a PR ended (#2351): merged, closed or reverted. Absent while open."
+        },
         "lastAt": {
           "$ref": "#/definitions/WireDate"
         }
@@ -17720,7 +17728,8 @@
         "time",
         "runtimes",
         "adoption",
-        "workflows"
+        "workflows",
+        "value"
       ],
       "description": "A page of Reports (#1804, #2019)."
     },
@@ -17955,6 +17964,120 @@
       "required": [
         "scopes",
         "admin"
+      ],
+      "additionalProperties": false
+    },
+    "ReportValue": {
+      "type": "object",
+      "description": "reports/value (#2351): what the work in a scope cost and what it delivered, from the lineage nodes that the scope's machines send (#2350). A node is in the range when it last changed in it, with its whole cost. total is the work on issues and PRs; waste is the PRs closed without a merge and merged reverts; unlinked is the turns with no issue or PR. perMergedPR is total by the PRs merged, by currency. leadTimeSeconds is the median of the issues' lead times. issues and milestones are the most costly first, at most 100 each; limited says there are more.",
+      "properties": {
+        "range": {
+          "$ref": "#/definitions/ReportRange"
+        },
+        "scope": {
+          "$ref": "#/definitions/ReportScope"
+        },
+        "total": {
+          "$ref": "#/definitions/LineageCost"
+        },
+        "waste": {
+          "$ref": "#/definitions/LineageCost"
+        },
+        "unlinked": {
+          "$ref": "#/definitions/LineageCost"
+        },
+        "perMergedPR": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "By currency."
+        },
+        "prsMerged": {
+          "type": "integer"
+        },
+        "prsClosed": {
+          "type": "integer"
+        },
+        "prsReverted": {
+          "type": "integer"
+        },
+        "failedChecks": {
+          "type": "integer"
+        },
+        "leadTimeSeconds": {
+          "type": "number"
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReportValueRow"
+          }
+        },
+        "milestones": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReportValueRow"
+          }
+        },
+        "limited": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "range",
+        "scope",
+        "total",
+        "waste",
+        "unlinked",
+        "perMergedPR",
+        "prsMerged",
+        "prsClosed",
+        "prsReverted",
+        "failedChecks",
+        "issues",
+        "milestones"
+      ],
+      "additionalProperties": false
+    },
+    "ReportValueRow": {
+      "type": "object",
+      "description": "One issue or milestone on Reports ▸ Value (#2351): its cost rolled up from every machine in the scope, as lineage/cost adds it up, and how its PRs ended.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "total": {
+          "$ref": "#/definitions/LineageCost"
+        },
+        "waste": {
+          "$ref": "#/definitions/LineageCost"
+        },
+        "prsMerged": {
+          "type": "integer"
+        },
+        "prsClosed": {
+          "type": "integer"
+        },
+        "prsReverted": {
+          "type": "integer"
+        },
+        "failedChecks": {
+          "type": "integer"
+        },
+        "leadTimeSeconds": {
+          "type": "number",
+          "description": "From the first work on it to its last PR merged; absent before a merge."
+        }
+      },
+      "required": [
+        "node",
+        "total",
+        "waste",
+        "prsMerged",
+        "prsClosed",
+        "prsReverted",
+        "failedChecks"
       ],
       "additionalProperties": false
     },

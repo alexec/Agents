@@ -7,7 +7,8 @@ import UniformTypeIdentifiers
 /// caller's own machines, an admin's too (the Me scope, #2071); a group's and everyone's are
 /// Reports on the web page. Export saves the rows as CSV or JSON lines. Page picks Spend or
 /// one of the pages of what the agents did (#2183): Outcomes, Time, Runtimes, Adoption and
-/// Workflows, from the same rows' counts.
+/// Workflows, from the same rows' counts. Value (#2351) is what the work cost and delivered, on
+/// the Mac only: the Remote's tier leaves it out (#2796).
 ///
 /// One view for the Mac's page and the Remote's (the web page's is `Web/src/views/Reports.tsx`).
 struct ReportsPane: View {
@@ -23,6 +24,8 @@ struct ReportsPane: View {
     /// The counts pages' figures, added up once per report, page or dimension (#2183).
     @State private var outcomes: ReportOutcomes?
     @State private var weeks: [ReportAdoptionWeek]?
+    /// Value's answer (#2351), asked for only on that page.
+    @State private var value: DaemonAPI.ReportValue?
     @State private var problem: String?
     /// Whether reports/scopes offers the caller more than Me (#2200).
     @State private var seesMore = false
@@ -38,7 +41,13 @@ struct ReportsPane: View {
                 }
             }
             .paperListRow()
-            if let report, report.range == range {
+            if page == .value {
+                if let value, value.range == range {
+                    valuePage(value)
+                } else if problem == nil {
+                    Text("Loading…").appText(.supporting).foregroundStyle(.secondary).paperListRow()
+                }
+            } else if let report, report.range == range {
                 switch page {
                 case .spend: spend
                 case .adoption: adoption
@@ -53,7 +62,7 @@ struct ReportsPane: View {
         #endif
         .scrollContentBackground(.hidden)
         .refreshable { await load() }
-        .task(id: Ask(range: range, connected: control != nil)) { await load() }
+        .task(id: Ask(range: range, connected: control != nil, isValue: page == .value)) { await load() }
         .onChange(of: dimension) { addUp() }
         .onChange(of: page) {
             if page == .adoption, range == .day { range = .week }
@@ -104,6 +113,40 @@ struct ReportsPane: View {
         }
     }
 
+    /// Value (#2351): cost per merged pull request, waste and lead time, then each issue and
+    /// milestone, the most costly first.
+    @ViewBuilder private func valuePage(_ value: DaemonAPI.ReportValue) -> some View {
+        Section {
+            if ReportValueWords.isEmpty(value) {
+                Text(ReportValueWords.none).appText(.supporting).foregroundStyle(.secondary)
+            } else {
+                ReportGroupRow(name: ReportValueWords.headline(value), line: ReportValueWords.waste(value), share: nil)
+                    .fontWeight(.semibold)
+                if let lead = ReportValueWords.lead(value) { Text(lead).appText(.supporting) }
+                if let unlinked = ReportValueWords.unlinked(value) {
+                    Text(unlinked).appText(.supporting).foregroundStyle(.secondary)
+                }
+            }
+        } footer: {
+            footer(ReportValueWords.note)
+        }
+        .paperListRow()
+        if !value.issues.isEmpty {
+            Section("Issues") { ForEach(value.issues) { ReportValueRowView(row: $0) } }
+                .paperListRow()
+        }
+        if !value.milestones.isEmpty {
+            Section {
+                ForEach(value.milestones) { ReportValueRowView(row: $0) }
+            } header: {
+                Text("Milestones")
+            } footer: {
+                if value.limited == true { Text("The 100 most costly of each.").appText(.fine).foregroundStyle(.secondary) }
+            }
+            .paperListRow()
+        }
+    }
+
     /// Adoption (#2183): each week's active people, sessions, runtimes and workflows.
     @ViewBuilder private var adoption: some View {
         if let weeks {
@@ -133,7 +176,7 @@ struct ReportsPane: View {
 
     /// The ways a page adds up: none for Adoption.
     private static func ways(_ page: DaemonAPI.ReportPage) -> [ReportTotals.Dimension] {
-        if page == .adoption { return [] }
+        if page == .adoption || page == .value { return [] }
         return ReportOutcomes.Page(page)?.ways ?? ReportTotals.Dimension.spend
     }
 
@@ -143,13 +186,23 @@ struct ReportsPane: View {
     private struct Ask: Equatable {
         var range: DaemonAPI.ReportRange
         var connected: Bool
+        var isValue: Bool
+    }
+
+    /// The pages this client draws: Value is the Mac's and the web page's (tier mac+web, #2796).
+    private static var pages: [DaemonAPI.ReportPage] {
+        #if os(macOS)
+        DaemonAPI.ReportPage.allCases
+        #else
+        DaemonAPI.ReportPage.allCases.filter { $0 != .value }
+        #endif
     }
 
     /// The range, what to add up by, and Export.
     private var controls: some View {
         VStack(alignment: .leading, spacing: 8) {
             Picker("Page", selection: $page) {
-                ForEach(DaemonAPI.ReportPage.allCases, id: \.self) { Text(ReportOutcomeWords.title($0)).tag($0) }
+                ForEach(Self.pages, id: \.self) { Text(ReportOutcomeWords.title($0)).tag($0) }
             }
             // Six pages fit a segmented control on the Mac, not on a phone (#2183).
             #if os(macOS)
@@ -170,14 +223,8 @@ struct ReportsPane: View {
                 .fixedSize()
                 .help(ReportWords.span(range))
                 Spacer(minLength: 0)
-                Menu("Export…") {
-                    Button("CSV") { Task { await exportRows(.csv) } }
-                    Button("JSON lines") { Task { await exportRows(.jsonl) } }
-                }
-                .fixedSize()
-                .appText(.fine)
-                .help("Save the rows of this range")
-                .disabled(control == nil)
+                // Value's numbers are not rows to export.
+                if page != .value { exportMenu }
             }
             if !Self.ways(page).isEmpty {
                 Picker("By", selection: $dimension) {
@@ -195,6 +242,17 @@ struct ReportsPane: View {
         }
     }
 
+    private var exportMenu: some View {
+        Menu("Export…") {
+            Button("CSV") { Task { await exportRows(.csv) } }
+            Button("JSON lines") { Task { await exportRows(.jsonl) } }
+        }
+        .fixedSize()
+        .appText(.fine)
+        .help("Save the rows of this range")
+        .disabled(control == nil)
+    }
+
     // MARK: Asking
 
     private func load() async {
@@ -202,13 +260,23 @@ struct ReportsPane: View {
             problem = "The control plane can’t be reached."
             return
         }
-        do {
-            report = try await control.call(DaemonAPI.Method.reportsUsage, DaemonAPI.ReportQuery(range: range, scope: Self.me),
-                                            returning: DaemonAPI.UsageReport.self)
-            addUp()
-            problem = nil
-        } catch {
-            problem = ReportWords.sentence(error)
+        if page == .value {
+            do {
+                value = try await control.call(DaemonAPI.Method.reportsValue, DaemonAPI.ReportQuery(range: range, scope: Self.me),
+                                               returning: DaemonAPI.ReportValue.self)
+                problem = nil
+            } catch {
+                problem = ReportValueWords.sentence(error)
+            }
+        } else {
+            do {
+                report = try await control.call(DaemonAPI.Method.reportsUsage, DaemonAPI.ReportQuery(range: range, scope: Self.me),
+                                                returning: DaemonAPI.UsageReport.self)
+                addUp()
+                problem = nil
+            } catch {
+                problem = ReportWords.sentence(error)
+            }
         }
         // A control plane before scopes offers Me only.
         let scopes = try? await control.call(DaemonAPI.Method.reportsScopes, DaemonAPI.Empty(), returning: DaemonAPI.ReportScopes.self)
@@ -236,6 +304,27 @@ struct ReportsPane: View {
         } catch {
             problem = ReportWords.sentence(error)
         }
+    }
+}
+
+/// An issue or a milestone on Value (#2351): its name, a link to it on GitHub, and its figures.
+private struct ReportValueRowView: View {
+    let row: DaemonAPI.ReportValueRow
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let url = ReportValueWords.url(row.node) {
+                Link(ReportValueWords.name(row.node), destination: url).appText(.reading).lineLimit(1)
+            } else {
+                Text(ReportValueWords.name(row.node)).appText(.reading).lineLimit(1)
+            }
+            Text(ReportValueWords.line(row))
+                .appText(.fine)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
     }
 }
 

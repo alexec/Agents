@@ -548,6 +548,7 @@ var CallReportsSaveView = Method[ReportView, ReportViews]{"reports/saveView"}
 var CallReportsScopes = Method[Empty, ReportScopes]{"reports/scopes"}
 var CallReportsSetPolicy = Method[ReportPolicy, ReportPolicy]{"reports/setPolicy"}
 var CallReportsUsage = Method[ReportQuery, UsageReport]{"reports/usage"}
+var CallReportsValue = Method[ReportQuery, ReportValue]{"reports/value"}
 var CallReportsViews = Method[Empty, ReportViews]{"reports/views"}
 var CallScimSet = Method[SCIMSet, OrgProviderKept]{"scim/set"}
 var CallScimTokensList = Method[SCIMTokensRequest, SCIMTokenList]{"scim/tokens/list"}

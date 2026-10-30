@@ -4521,6 +4521,12 @@ type LineageCostNode struct {
 	// A PR's failed CI rounds: checks.failed, once per run and attempt.
 	FailedChecks *int64 `json:"failedChecks,omitzero"`
 
+	// When the machine first banked or noted the node (#2351): the start of the work on it, for lead time.
+	FirstAt *Date `json:"firstAt,omitzero"`
+
+	// When a PR ended (#2351): merged, closed or reverted. Absent while open.
+	EndedAt *Date `json:"endedAt,omitzero"`
+
 	LastAt Date `json:"lastAt"`
 }
 
@@ -7748,6 +7754,7 @@ const ReportPageTime ReportPage = "time"
 const ReportPageRuntimes ReportPage = "runtimes"
 const ReportPageAdoption ReportPage = "adoption"
 const ReportPageWorkflows ReportPage = "workflows"
+const ReportPageValue ReportPage = "value"
 
 // Who sees what in Reports (#1804), set by an admin in Console ▸ Report Policy.
 type ReportPolicy struct {
@@ -7863,6 +7870,58 @@ type ReportScopes struct {
 	Scopes []ReportScopeOption `json:"scopes"`
 
 	Admin bool `json:"admin"`
+}
+
+// reports/value (#2351): what the work in a scope cost and what it delivered, from the lineage nodes that the scope's machines send (#2350). A node is in the range when it last changed in it, with its whole cost. total is the work on issues and PRs; waste is the PRs closed without a merge and merged reverts; unlinked is the turns with no issue or PR. perMergedPR is total by the PRs merged, by currency. leadTimeSeconds is the median of the issues' lead times. issues and milestones are the most costly first, at most 100 each; limited says there are more.
+type ReportValue struct {
+	Range ReportRange `json:"range"`
+
+	Scope ReportScope `json:"scope"`
+
+	Total LineageCost `json:"total"`
+
+	Waste LineageCost `json:"waste"`
+
+	Unlinked LineageCost `json:"unlinked"`
+
+	// By currency.
+	PerMergedPR map[string]float64 `json:"perMergedPR"`
+
+	PrsMerged int64 `json:"prsMerged"`
+
+	PrsClosed int64 `json:"prsClosed"`
+
+	PrsReverted int64 `json:"prsReverted"`
+
+	FailedChecks int64 `json:"failedChecks"`
+
+	LeadTimeSeconds *float64 `json:"leadTimeSeconds,omitzero"`
+
+	Issues []ReportValueRow `json:"issues"`
+
+	Milestones []ReportValueRow `json:"milestones"`
+
+	Limited *bool `json:"limited,omitzero"`
+}
+
+// One issue or milestone on Reports ▸ Value (#2351): its cost rolled up from every machine in the scope, as lineage/cost adds it up, and how its PRs ended.
+type ReportValueRow struct {
+	Node LineageNode `json:"node"`
+
+	Total LineageCost `json:"total"`
+
+	Waste LineageCost `json:"waste"`
+
+	PrsMerged int64 `json:"prsMerged"`
+
+	PrsClosed int64 `json:"prsClosed"`
+
+	PrsReverted int64 `json:"prsReverted"`
+
+	FailedChecks int64 `json:"failedChecks"`
+
+	// From the first work on it to its last PR merged; absent before a merge.
+	LeadTimeSeconds *float64 `json:"leadTimeSeconds,omitzero"`
 }
 
 // A saved view of Reports (#2019, R8): a page with its scope, range and way to add up, kept for the person who saved it.

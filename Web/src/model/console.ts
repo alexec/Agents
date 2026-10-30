@@ -47,6 +47,7 @@ export const reportSections: readonly Section[] = [
   { id: "spend", title: "Spend", about: "Cost, tokens and time by person, group, folder, machine and runtime.", group: "Reports", built: true },
   { id: "outcomes", title: "Outcomes", about: "What the agents shipped: pull requests opened, merged and reverted, and the cost of each.", group: "Reports", built: true },
   { id: "time", title: "Time", about: "Where the agents’ time goes: working, or waiting for a person.", group: "Reports", built: true },
+  { id: "value", title: "Value", about: "What the work cost and delivered: cost per merged pull request, per issue and per milestone, waste, and lead time.", group: "Reports", built: true },
   { id: "runtimes", title: "Runtimes", about: "Which runtime earns its cost: cost per merged pull request, and the sessions that failed.", group: "Reports", built: true },
   { id: "adoption", title: "Adoption", about: "Who uses the agents each week, and which runtimes and workflows.", group: "Reports", built: true },
   { id: "workflows", title: "Workflows", about: "Each workflow’s runs, its failed runs, and the cost of a run.", group: "Reports", built: true },
