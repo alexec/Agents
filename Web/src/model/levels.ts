@@ -57,6 +57,14 @@ export const noRuntimeWords = (skipped: AutoSkip[], name: (id: string) => string
   skipped.length ? skipped.map((s) => `${name(s.runtimeID)}: ${s.reason}`).join("; ") : "No runtime can take this session.";
 export const continueOn = (runtimeName: string): string => `Continue on ${runtimeName}`;
 
+/** A value's line in its menu: "Default on Codex", with the note when the runtime gives it
+ *  only by a safer one (#2893), or why the runtime cannot give it. */
+export function cellLine(cell: AutoMapping, runtimeName: string | undefined): string {
+  if (cell.mark === "notPossible" || cell.mark === "dropped") return [markWords[cell.mark], cell.note].filter(Boolean).join(": ");
+  const on = `${cell.words}${runtimeName ? ` on ${runtimeName}` : ""}`;
+  return cell.mark === "nearestSafer" ? `${on} · ${cell.note ?? markWords.nearestSafer}` : on;
+}
+
 export const markWords: Record<AutoMark, string> = {
   autoMapped: "auto-mapped", nearestSafer: "nearest safer", yours: "yours", notPossible: "Not possible", dropped: "no longer offered",
 };
@@ -83,10 +91,13 @@ export function mappedRuntimes(mappings: AutoMappings | undefined): string[] {
 }
 
 /** Which value of a field a runtime's own settings are: the first cell whose every option
- *  they have, Fast and Smart before Balanced, or undefined (Custom). */
+ *  they have, Fast and Smart before Balanced, or undefined (Custom). `preferring`, the value
+ *  the person chose, goes first: two values can set the same options, and the person's
+ *  choice stays ticked (#2893). */
 export function matchLevel(mappings: AutoMappings | undefined, runtimeID: string, field: "model" | "permission",
-  value: (optionID: string) => unknown): string | undefined {
-  const order = field === "model" ? ["fast", "smart", "balanced"] : levelsOf(field);
+  value: (optionID: string) => unknown, preferring?: string): string | undefined {
+  const base = field === "model" ? ["fast", "smart", "balanced"] : levelsOf(field);
+  const order = preferring && base.includes(preferring) ? [preferring, ...base.filter((l) => l !== preferring)] : base;
   for (const level of order) {
     const cell = cellOf(mappings, runtimeID, field, level);
     const options = cell?.native?.options;

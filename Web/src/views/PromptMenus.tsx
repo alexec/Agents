@@ -8,7 +8,7 @@ import { choiceGroups, closedTitle, isAboutPermission, same } from "../model/opt
 import { nothingToAdjust } from "../model/promptWords";
 import { line } from "../model/orgPolicy";
 import { optionLabel } from "./OrgPolicyLine";
-import { customWords, fieldWords, followsSettings, levelMeaning, levelWords, levelsOf, markWords, ownWords } from "../model/levels";
+import { cellLine, customWords, fieldWords, followsSettings, levelMeaning, levelWords, levelsOf, ownWords } from "../model/levels";
 
 type Mode = ClientPermissionSettings["cursor"];
 
@@ -50,8 +50,7 @@ export function LevelSelect({ field, levels, own, value, onChange, disabled }: {
         {levelsOf(field).map((level) => {
           const cell = levels.cell(field, level);
           const cannot = cell?.mark === "notPossible" || cell?.mark === "dropped";
-          const line = cell ? (cannot ? [markWords[cell.mark], cell.note].filter(Boolean).join(": ")
-            : `${cell.words}${levels.runtimeName ? ` on ${levels.runtimeName}` : ""}`) : levelMeaning(field, level);
+          const line = cell ? cellLine(cell, levels.runtimeName) : levelMeaning(field, level);
           return (
             <button type="button" key={level} class="client-permission-choice" disabled={disabled || cannot}
               aria-pressed={chosen === level} onClick={(e) => { levels.choose(field, level); close(e); }}>

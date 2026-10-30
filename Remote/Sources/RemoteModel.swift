@@ -1203,7 +1203,8 @@ final class RemoteModel {
     /// The value of a field the page's own options are now, or nil (Custom).
     func startLevel(_ field: AutoField) -> String? {
         guard let runtimeID = startRuntimeID else { return nil }
-        return LevelMatch.level(field, runtimeID: runtimeID, mappings: autoMappings) { id in
+        let chosen = field == .model ? startLevels.model?.rawValue : startLevels.permission?.rawValue
+        return LevelMatch.level(field, runtimeID: runtimeID, mappings: autoMappings, preferring: chosen) { id in
             self.startChosen[id] ?? self.startOptions.first { $0.id == id }?.currentValue
         }
     }

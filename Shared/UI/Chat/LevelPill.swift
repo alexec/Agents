@@ -82,13 +82,16 @@ struct LevelPill: View {
         .accessibilityValue(title)
     }
 
-    /// "Sonnet 5 on Claude", or why the runtime cannot give it.
+    /// "Sonnet 5 on Claude", or why the runtime cannot give it. A value the runtime gives
+    /// only by a safer one says so: "Default on Codex · nearest safer: …" (#2893).
     private func line(_ level: String, _ cell: AutoMapping?) -> String? {
         guard let cell else { return nil }
         let on = runtimeName.map { " on \($0)" } ?? ""
         switch cell.mark {
         case .notPossible, .dropped:
             return [LevelWords.mark(cell.mark), cell.note].compactMap { $0 }.joined(separator: ": ")
+        case .nearestSafer:
+            return cell.words + on + " · " + (cell.note ?? LevelWords.mark(cell.mark))
         default:
             return cell.words + on
         }
@@ -115,10 +118,14 @@ struct LevelPill: View {
 /// Which value of a field a runtime's own settings are, from the Mappings (#2658): the
 /// first cell whose every option the settings have, or nil (Custom).
 enum LevelMatch {
-    static func level(_ field: AutoField, runtimeID: String, mappings: AutoMappings,
+    /// `preferring` is the value the person chose, tried first: two values can set the same
+    /// options (Bypass Permissions, nearest safer, is Approve for me on Codex), and the
+    /// person's choice must stay ticked (#2893).
+    static func level(_ field: AutoField, runtimeID: String, mappings: AutoMappings, preferring: String? = nil,
                       value: (String) -> JSONValue?) -> String? {
         // The more particular first: Fast and Smart set a model; Balanced may set none.
-        let order: [String] = field == .model ? ["fast", "smart", "balanced"] : LevelWords.levels(field)
+        var order: [String] = field == .model ? ["fast", "smart", "balanced"] : LevelWords.levels(field)
+        if let preferring, let i = order.firstIndex(of: preferring) { order.insert(order.remove(at: i), at: 0) }
         for level in order {
             guard let cell = mappings.cell(runtimeID, field, level), let options = cell.native?.options,
                   cell.mark != .notPossible else { continue }
