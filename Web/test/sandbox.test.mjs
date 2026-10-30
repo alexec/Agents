@@ -23,3 +23,10 @@ for (const { name, input, expected } of cases("sandbox/choices.json")) {
     }, expected);
   });
 }
+
+// While the organisation requires the sandbox, only On can be chosen (#998), also on Auto's menu (#2891).
+test("sandbox: the policy refuses every choice but On", () => {
+  const mark = { name: "Acme" };
+  assert.deepEqual(each((c) => s.sandboxRefusedBy(c, mark)), { runtime: mark, on: undefined, off: mark });
+  assert.deepEqual(each((c) => s.sandboxRefusedBy(c, undefined)), { runtime: undefined, on: undefined, off: undefined });
+});

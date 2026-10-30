@@ -24,7 +24,7 @@ import { accountChoices, accountRows, choiceNote, defaultAccountName, formRuntim
 import { formFor, keepForm, keptForm } from "../model/startForm";
 import { personaChoices, withPersonaLabels } from "../model/personas";
 import { sandboxCardTitle, sandboxChoiceWords, sandboxChoices, sandboxExplanation, sandboxOverrideWords, sandboxState,
-  sandboxStateWords, sandboxWhy, startWithout, fixedSandbox } from "../model/sandbox";
+  sandboxStateWords, sandboxWhy, startWithout, fixedSandbox, sandboxRefusedBy } from "../model/sandbox";
 import { autoID, autoWords, cellOf, fieldWords, followsSettings, levelMeaning, levelWords, matchLevel, noneIncluded, picksWords, sandboxValues } from "../model/levels";
 import type { AutoPreview, ClientPermissionMode, Levels } from "../protocol/generated";
 import { accepted } from "../model/labels";
@@ -612,7 +612,10 @@ export function NewAgent({ store, host, folder, folderName, down }: {
                   }}>
                   {sandboxValues.map((v) => {
                     const cell = levelProps.cell("sandbox", v);
-                    return <option key={v} value={v}>{levelWords("sandbox", v)} — {cell ? `${cell.words} on ${levelProps.runtimeName}` : levelMeaning("sandbox", v)}</option>;
+                    // While the organisation requires the sandbox, each choice but On is shown, dimmed, not chosen (#998, #2891).
+                    const refusedBy = sandboxRefusedBy(v, store.sandboxSetBy.value[host]);
+                    return <option key={v} value={v} disabled={!!refusedBy} title={refusedBy ? line(refusedBy) : undefined}>
+                      {optionLabel(`${levelWords("sandbox", v)} — ${cell ? `${cell.words} on ${levelProps.runtimeName}` : levelMeaning("sandbox", v)}`, refusedBy)}</option>;
                   })}
                 </select>
               </label>
@@ -707,7 +710,7 @@ function SandboxPill({ runtimeID, name, override, runtimeDefault, codexMode, dis
   if (!choices.length) {
     return <span class="pill quiet" title={setBy ? line(setBy) : sandboxWhy(runtimeID) ?? state}>{sandboxChoiceWords(fixedSandbox(runtimeID), runtimeID)}</span>;
   }
-  const refused = (choice: SandboxChoice) => setBy !== undefined && choice !== "on";
+  const refused = (choice: SandboxChoice) => sandboxRefusedBy(choice, setBy) !== undefined;
   const asked = override ?? runtimeDefault;
   return (
     <label class="pill select" title={`${fieldWords.sandbox}: ${state}`}>
