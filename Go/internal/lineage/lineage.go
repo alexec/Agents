@@ -51,6 +51,8 @@ const (
 	SourceHelper = "helper"
 	SourceAgent  = "agent"
 	SourcePerson = "person"
+	// SourceForge is a link the forge says, such as an issue part-of its milestone (#2935).
+	SourceForge = "forge"
 )
 
 // The bounds (#2348; "Bound data, not concurrency"). An ended link is kept KeepEnded after
