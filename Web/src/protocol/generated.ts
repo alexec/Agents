@@ -2746,6 +2746,7 @@ export interface ElicitationRequest {
   mode: ElicitationRequestMode;
   scope: ElicitationRequestScope;
   askedAt: WireDate;
+  secret?: ElicitationSecret;
 }
 
 export type ElicitationRequestMode =
@@ -2789,6 +2790,16 @@ export type ElicitationSchemaPropertyKind =
   | { integer: { minimum?: number; maximum?: number } }
   | { boolean: Record<string, never> }
   | { multiSelect: { items: ElicitationSchemaPropertyChoice[]; minItems?: number; maxItems?: number } };
+
+/**
+ * An agent's ask_secret (#2885): one named secret, typed into a masked field. The value goes to the
+ * person's secrets.env on the host, never into the record.
+ */
+export interface ElicitationSecret {
+  name: string;
+  url?: string;
+  isSet: boolean;
+}
 
 export interface Empty {}
 
@@ -9636,10 +9647,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   EffectiveSandbox: { required: ["state", "requested"], optional: ["reason"] },
   ElicitationAnswer: { required: ["question", "answer"], optional: [] },
   ElicitationNotification: { required: ["agentID", "requestID"], optional: ["request"] },
-  ElicitationRequest: { required: ["id", "agentID", "mode", "scope", "askedAt"], optional: ["elicitationID", "message"] },
+  ElicitationRequest: { required: ["id", "agentID", "mode", "scope", "askedAt"], optional: ["elicitationID", "message", "secret"] },
   ElicitationSchema: { required: ["properties"], optional: ["title", "description"] },
   ElicitationSchemaProperty: { required: ["name", "isRequired", "kind"], optional: ["title", "description", "defaultValue"] },
   ElicitationSchemaPropertyChoice: { required: ["value", "title"], optional: ["description"] },
+  ElicitationSecret: { required: ["name", "isSet"], optional: ["url"] },
   Empty: { required: [], optional: [] },
   EntryNotification: { required: ["agentID", "entry"], optional: ["index", "oversized"] },
   Event: { required: ["position", "name", "at", "count", "scope", "sentence", "details", "chainDepth", "consequences"], optional: ["lastAt", "publisher", "message", "actor"] },

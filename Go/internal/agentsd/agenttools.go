@@ -142,6 +142,22 @@ func (d *Daemon) hangUp(id wire.UUID, _ map[string]json.RawMessage) (string, err
 	return "Voice mode ends once your reply has been said. Keep the goodbye short.", nil
 }
 
+// asker is the agent's live self, when it may ask the person: its conversation open, and a
+// turn of its own running. notWorking is what it is told when no turn is.
+func (d *Daemon) asker(id wire.UUID, notWorking string) (*live, error) {
+	if d.Store.Agent(id) == nil {
+		return nil, &Error{Code: CodeNoSuchAgent, Message: "That conversation is not open any more, so nobody was asked."}
+	}
+	l := d.live(id)
+	l.mu.Lock()
+	inTurn := l.inTurn
+	l.mu.Unlock()
+	if !inTurn {
+		return nil, &Error{Code: -32600, Message: notWorking}
+	}
+	return l, nil
+}
+
 // askQuestion is ask_question: the person asked, as a form held like the runtime's own, and the
 // call answered with what they said.
 func (d *Daemon) askQuestion(id wire.UUID, args map[string]json.RawMessage) (string, error) {
@@ -185,15 +201,9 @@ func (d *Daemon) askQuestion(id wire.UUID, args map[string]json.RawMessage) (str
 		}
 		props = append(props, p)
 	}
-	if d.Store.Agent(id) == nil {
-		return "", &Error{Code: CodeNoSuchAgent, Message: "That conversation is not open any more, so nobody was asked."}
-	}
-	l := d.live(id)
-	l.mu.Lock()
-	inTurn := l.inTurn
-	l.mu.Unlock()
-	if !inTurn {
-		return "", &Error{Code: -32600, Message: "A question can only be asked while this agent is working."}
+	l, err := d.asker(id, "A question can only be asked while this agent is working.")
+	if err != nil {
+		return "", err
 	}
 	schema := wire.ElicitationSchema{Properties: props}
 	var message *string

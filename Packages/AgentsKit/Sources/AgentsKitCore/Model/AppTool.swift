@@ -41,6 +41,10 @@ public enum AppTool {
     /// assessments score the app's by its own call log, not by the name.
     public static let askQuestion = "ask_question"
 
+    /// Ask the person for one named secret, typed into a masked card (#2885). The host saves
+    /// it to their secrets.env, and the agent gets its name and where it is, never the value.
+    public static let askSecret = "ask_secret"
+
     /// Offer one optional prompt for the person to send next.
     public static let suggestNextPrompt = "suggest_next_prompt"
     /// Ends voice mode once the reply is said: the person is done talking (#2375).
@@ -166,7 +170,7 @@ public enum AppTool {
 
     /// Every tool the app's MCP server serves.
     public static let all: [String] = [
-        finishTurn, showFile, notify, manageWorkflows, askQuestion, suggestNextPrompt, hangUp, startSession, stopSession, archiveSession,
+        finishTurn, showFile, notify, manageWorkflows, askQuestion, askSecret, suggestNextPrompt, hangUp, startSession, stopSession, archiveSession,
         leaseResource, releaseResource, listResources, waitForEvent, waitForAgents, checkAgain,
         cancelWait, listSessions, readSession,
         setSessionLabels, moveWorktree, messageSession, cancelMessage,

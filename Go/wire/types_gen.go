@@ -3328,6 +3328,8 @@ type ElicitationRequest struct {
 	Scope ElicitationRequestScope `json:"scope"`
 
 	AskedAt Date `json:"askedAt"`
+
+	Secret *ElicitationSecret `json:"secret,omitzero"`
 }
 
 type ElicitationRequestMode struct {
@@ -3426,6 +3428,15 @@ type ElicitationSchemaPropertyKindMultiSelect struct {
 	MinItems *int64 `json:"minItems,omitzero"`
 
 	MaxItems *int64 `json:"maxItems,omitzero"`
+}
+
+// An agent's ask_secret (#2885): one named secret, typed into a masked field. The value goes to the person's secrets.env on the host, never into the record.
+type ElicitationSecret struct {
+	Name string `json:"name"`
+
+	URL *string `json:"url,omitzero"`
+
+	IsSet bool `json:"isSet"`
 }
 
 type Empty struct {

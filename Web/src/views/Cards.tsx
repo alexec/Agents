@@ -9,7 +9,7 @@ import type { ComponentChildren } from "preact";
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type {
-  ElicitationRequest, ElicitationSchema, ElicitationSchemaProperty, ElicitationSchemaPropertyChoice, JSONValue,
+  ElicitationRequest, ElicitationSchema, ElicitationSchemaProperty, ElicitationSchemaPropertyChoice, ElicitationSecret, JSONValue,
   PermissionOption, PermissionRequest, UUID,
 } from "../protocol/generated";
 import type { Store } from "../model/store";
@@ -22,6 +22,7 @@ import { askerFor } from "../model/asker";
 import { planOf } from "../model/plan";
 import { Markdown } from "../render/markdown";
 import { inputType, momentFromInput, momentToInput, placeholder } from "../model/formInputs";
+import { getIt, keeping, secretField } from "../model/secretAsk";
 
 type Held = (
   | { kind: "permission"; request: PermissionRequest }
@@ -127,8 +128,9 @@ export function useWaitingCards({ store, host, session, down = false }: {
       held.value = held.value.filter((c) => c.request.id !== id);
     } catch (error) {
       // The host refusing means it was no longer waiting; the link dropping, or the host
-      // being away, means try again.
-      const away = !(error instanceof CallFailed) || error.code === Failure.hostOffline;
+      // being away, means try again. So does the host refusing the answer itself (JSON-RPC's
+      // invalid params), such as a secret it could not save (#2885): the card still waits.
+      const away = !(error instanceof CallFailed) || error.code === Failure.hostOffline || error.code === invalidParams;
       if (away) store.say(describe(error));
       mark(id, away ? null : "elsewhere");
     }
@@ -162,6 +164,9 @@ function AnsweredNote({ answered }: { answered: Answered }) {
   if (answered === "withdrawn") return <p class="answered" role="status">The session stopped before this was answered.</p>;
   return null;
 }
+
+/** JSON-RPC's own code for an answer the host would not take, the form still waiting. */
+const invalidParams = -32602;
 
 /** Where a card stands: its answer, and while one is on its way, which and to whom. */
 interface Hold { answered: Answered; chosen: string | undefined; recipient: string; down: boolean }
@@ -355,7 +360,13 @@ function ElicitationCard({ request, asker, hold, answer, active }: {
   const done = button("done"), gaveUp = button("gave-up"), none = button("none"), decline = button("decline");
 
   let body;
-  if ("url" in request.mode) {
+  if (request.secret) {
+    // A masked field of its own (#2885), never the form's open one.
+    const reason = "form" in request.mode ? request.mode.form._0.properties[0]?.title : undefined;
+    body = <SecretField secret={request.secret} reason={reason} recipient={hold.recipient} inert={inert}
+      save={button("save", "prominent")} decline={decline}
+      send={(typed) => (typed === null ? go("decline", "decline") : go("save", "accept", { [secretField]: typed }))} />;
+  } else if ("url" in request.mode) {
     const url = request.mode.url._0;
     body = (
       <div class="options row-options">
@@ -437,11 +448,54 @@ function ElicitationCard({ request, asker, hold, answer, active }: {
   return (
     <section ref={card} class={cardClass(hold)} aria-label="Question">
       {asker && <p class="quiet small asker">{asker}</p>}
-      <p class="strong">{title}</p>
-      {request.message && request.message !== title && <p>{request.message}</p>}
+      {!request.secret && <p class="strong">{title}</p>}
+      {!request.secret && request.message && request.message !== title && <p>{request.message}</p>}
       {body}
       <AnsweredNote answered={hold.answered} />
     </section>
+  );
+}
+
+/** One of a card's answers, as ElicitationCard's `button` gives it. */
+interface AnswerButton { class: string | undefined; disabled: boolean; telling: ComponentChildren }
+
+/**
+ * An agent's ask_secret (#2885): its name, why, where to get it, and a masked field. What is
+ * typed goes to the host, which saves it to the person's secrets.env; the chat, the agent and
+ * every other client get the name only. As the window's and the Remote's SecretAskCard.
+ */
+function SecretField({ secret, reason, recipient, inert, save, decline, send }: {
+  secret: ElicitationSecret; reason: string | undefined; recipient: string; inert: boolean;
+  save: AnswerButton; decline: AnswerButton;
+  send: (typed: string | null) => void;
+}) {
+  const text = useSignal("");
+  const typed = text.value.trim();
+  const link = getIt(secret.url);
+  return (
+    <>
+      <p class="strong"><span aria-hidden="true">🔒 </span><code>{secret.name}</code></p>
+      {reason && <p>{reason}</p>}
+      {link && secret.url && <p><a href={secret.url} target="_blank" rel="noopener noreferrer">{link}</a></p>}
+      <label class="field">
+        <input type="password" autocomplete="off" spellcheck={false} autofocus disabled={inert}
+          aria-label={secret.name} placeholder={`Paste ${secret.name}`} value={text.value}
+          onInput={(e) => (text.value = (e.currentTarget as HTMLInputElement).value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && typed) {
+              e.preventDefault();
+              send(typed);
+            }
+          }} />
+        <span class="quiet small">{keeping(secret, recipient)}</span>
+      </label>
+      <div class="form-row">
+        <span class="spacer" />
+        <button class={decline.class} aria-disabled={decline.disabled} onClick={() => send(null)}>No thanks{decline.telling}</button>
+        <button class={save.class} disabled={!typed} aria-disabled={save.disabled} data-default=""
+          onClick={() => send(typed)}>Save securely{save.telling}</button>
+      </div>
+    </>
   );
 }
 

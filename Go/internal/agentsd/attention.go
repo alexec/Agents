@@ -281,9 +281,10 @@ func permissionAnswers(r wire.PermissionRequest) []wire.QuickAnswer {
 }
 
 // formAnswers is QuickAnswer.answers(for:) for a form of one page whose question is a
-// string: its two to four choices, or one free reply.
+// string: its two to four choices, or one free reply. A secret has none (#2885): a
+// notification's reply is typed in clear, so it is answered on its masked card.
 func formAnswers(r wire.ElicitationRequest) []wire.QuickAnswer {
-	if r.Mode.Form == nil {
+	if r.Mode.Form == nil || r.Secret != nil {
 		return nil
 	}
 	ps := pages(r.Mode.Form.Value)
