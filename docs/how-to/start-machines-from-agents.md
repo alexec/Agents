@@ -183,8 +183,14 @@ it (#2887). `list_machines` gives the agent the names of all your machines.
    If the machine is stopped, Agents starts it, and the session starts when it connects.
    The session's chat says which agent started it, and on which machine.
 
-The folder must be on that machine already. To put it there, use **Send to ‹server›…**
-(see [Send a folder to a server](send-a-folder-to-a-machine.md)). The agent that asked
+The folder can be on that machine already. Or the agent can send it there first, with
+`send` (#2929): the branch the agent is on goes to the folder on that machine, with its
+uncommitted changes, as **Send to ‹server›…** does (see
+[Send a folder to a server](send-a-folder-to-a-machine.md)). The question card then says
+which branch goes where. Agents makes the folder if it is not there, and never overwrites
+work done there: a folder with changes or commits of its own on that machine stops the send
+before you are asked. For a send, the machine must be running; the agent can start it with
+`start_machine` first. To bring the work back, use **Bring Back from ‹server›…**. The agent that asked
 sees the new session in its own list of sessions, and can read it, message it, wait for it,
 stop it and archive it, as for a session in its own folder (#2927). No other agent can.
 The new session counts in the helper limits of the asking agent's folder until it is

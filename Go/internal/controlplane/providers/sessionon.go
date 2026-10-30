@@ -113,3 +113,62 @@ func (p *Providers) sessionEnded(fromName string, params json.RawMessage, caller
 	}
 	return map[string]any{}, nil
 }
+
+// sendFolder is machines/sendFolder (#2929): one step of an agent's start_session with
+// send, which sends the branch it is on to another machine first, as the window's Send to
+// ‹machine›… does: that machine's folders/receiveState, a part of a file with
+// folders/receiveUpload, or folders/receive, which makes the copy. Only an online machine
+// takes it; nothing of a send is kept.
+func (p *Providers) sendFolder(fromName, agent string, params json.RawMessage, caller Caller) (any, error) {
+	var request wire.MachineFolderSend
+	if err := requireParams(params, &request, "MachineFolderSend", "host"); err != nil {
+		return nil, err
+	}
+	host, name := request.Host, request.Host
+	if h := p.records.Host(host); h != nil {
+		name = h.Name
+	}
+	method, step, patience := "", any(nil), time.Minute
+	steps := 0
+	if request.State != nil {
+		method, step, steps = MethodReceiveState, request.State, steps+1
+	}
+	if request.Upload != nil {
+		method, step, steps = MethodReceiveUpload, request.Upload, steps+1
+	}
+	if request.Receive != nil {
+		// Fetching the bundle and checking out take a while on a large repository: as long
+		// as the asking host waits (controllink's askWait).
+		method, step, steps, patience = MethodReceive, request.Receive, steps+1, 2*time.Minute
+		p.log(fmt.Sprintf("workspace: agent %s on %s sends %s to %s", agent, fromName, request.Receive.Folder, name))
+	}
+	if steps != 1 {
+		return nil, invalid("Give exactly one of state, upload and receive.")
+	}
+	if !p.router.Online(host) {
+		return nil, fail(CodeHostOffline, "%s is offline.", name)
+	}
+	reply := p.router.DeliverKept(method, rawOf(step), caller.Client, caller.Kind, host, patience)
+	if reply == nil {
+		return nil, fail(CodeHostOffline, "%s did not answer.", name)
+	}
+	if reply.Error != nil {
+		return nil, reply.Error
+	}
+	var out wire.MachineFolderSent
+	switch method {
+	case MethodReceiveState:
+		var state wire.ReceiveState
+		if json.Unmarshal(reply.Result, &state) != nil {
+			return nil, fail(CodeHostOffline, "%s's answer could not be read.", name)
+		}
+		out.State = &state
+	case MethodReceive:
+		var folder wire.FolderSummary
+		if json.Unmarshal(reply.Result, &folder) != nil {
+			return nil, fail(CodeHostOffline, "%s's answer could not be read.", name)
+		}
+		out.Folder = &folder
+	}
+	return out, nil
+}

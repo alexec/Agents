@@ -5363,6 +5363,24 @@ type MachineEnroll struct {
 	As *string `json:"as,omitzero"`
 }
 
+// machines/sendFolder, through host/machines (#2929): one step of an agent's start_session with send, which sends this folder's branch to another of the person's machines first. Exactly one of state, upload and receive; the control plane sends that machine's folders/receiveState, folders/receiveUpload or folders/receive.
+type MachineFolderSend struct {
+	Host string `json:"host"`
+
+	State *ReceiveStateRequest `json:"state,omitzero"`
+
+	Upload *ReceiveUploadRequest `json:"upload,omitzero"`
+
+	Receive *ReceiveRequest `json:"receive,omitzero"`
+}
+
+// What machines/sendFolder's step answered (#2929): state for state, folder for receive, neither for upload.
+type MachineFolderSent struct {
+	State *ReceiveState `json:"state,omitzero"`
+
+	Folder *FolderSummary `json:"folder,omitzero"`
+}
+
 // host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).
 type MachineHello struct {
 	Host *MachineRef `json:"host,omitzero"`

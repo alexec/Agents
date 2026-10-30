@@ -51,6 +51,7 @@ public enum Capability {
     public static let filesDiagnostics1 = "files.diagnostics/1"
     public static let files1 = "files/1"
     public static let folder1 = "folder/1"
+    public static let foldersToMachine1 = "folders.to-machine/1"
     public static let folders1 = "folders/1"
     public static let git1 = "git/1"
     public static let governance1 = "governance/1"
@@ -553,6 +554,7 @@ public enum Capability {
         "links/remove": "links/1",
         "links/requests": "links/1",
         "machines/forAgent": "machines/1",
+        "machines/sendFolder": "folders.to-machine/1",
         "machines/sessionCall": "sessions.elsewhere/1",
         "machines/sessionEnded": "sessions.elsewhere/1",
         "machines/startSession": "sessions.on-machine/1",

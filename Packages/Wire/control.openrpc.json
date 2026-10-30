@@ -2802,6 +2802,27 @@
       }
     },
     {
+      "name": "machines/sendFolder",
+      "x-capability": "folders.to-machine/1",
+      "description": "Through host/machines only (#2929): one step of an agent's start_session with send, which sends this folder's branch to another of the person's machines, as Send to ‹machine›… does. The control plane sends that machine's folders/receiveState, folders/receiveUpload or folders/receive; the machine has to be online.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineFolderSend"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MachineFolderSent"
+        }
+      }
+    },
+    {
       "name": "machines/sessionCall",
       "x-capability": "sessions.elsewhere/1",
       "description": "Through host/machines only (#2927): an agent's call on a session it started on another of the person's machines. The control plane sends that machine's agents/fromStarter, saying which machine and agent ask.",

@@ -4211,6 +4211,28 @@ export interface MachineEnroll {
   as?: string;
 }
 
+/**
+ * machines/sendFolder, through host/machines (#2929): one step of an agent's start_session with
+ * send, which sends this folder's branch to another of the person's machines first. Exactly one of
+ * state, upload and receive; the control plane sends that machine's folders/receiveState,
+ * folders/receiveUpload or folders/receive.
+ */
+export interface MachineFolderSend {
+  host: string;
+  state?: ReceiveStateRequest;
+  upload?: ReceiveUploadRequest;
+  receive?: ReceiveRequest;
+}
+
+/**
+ * What machines/sendFolder's step answered (#2929): state for state, folder for receive, neither
+ * for upload.
+ */
+export interface MachineFolderSent {
+  state?: ReceiveState;
+  folder?: FolderSummary;
+}
+
 /** host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134). */
 export interface MachineHello {
   host?: MachineRef;
@@ -9807,6 +9829,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineClient: { required: ["id", "kind", "publicKey"], optional: ["person"] },
   MachineClients: { required: ["clients"], optional: ["user"] },
   MachineEnroll: { required: [], optional: ["as"] },
+  MachineFolderSend: { required: ["host"], optional: ["state", "upload", "receive"] },
+  MachineFolderSent: { required: [], optional: ["state", "folder"] },
   MachineHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "relay", "implementation", "capabilities"] },
   MachineInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host"] },
   MachineInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel"] },
