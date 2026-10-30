@@ -3569,6 +3569,74 @@ export interface LineMember {
 }
 
 /**
+ * What was banked under lineage nodes (#2350): a turn's cost, tokens and time, split evenly among
+ * the links active when it was banked. turns is a share of turns, so a turn on two nodes is half a
+ * turn on each.
+ */
+export interface LineageCost {
+  /** By currency. */
+  cost: Record<string, number>;
+  inputTokens: number;
+  outputTokens: number;
+  /** Fresh input and output, as a limit counts them (#998). */
+  limitTokens?: number;
+  turns: number;
+  /** The agent, its tools and others at work. */
+  workingSeconds: number;
+  /** Waiting for the person. */
+  waitingSeconds: number;
+}
+
+/**
+ * One node's banked cost on a machine (#2350), whole, with what its rollups need: the project its
+ * ref is in, the issues a PR fixes (ended links too: a PR closed without a merge still counts
+ * against its issue, as waste), the milestones it is part of, and how a PR ended. A session's own
+ * cost is its turns that had no active link.
+ */
+export interface LineageCostNode {
+  node: LineageNode;
+  /**
+   * The repo or tracker the node is in: github:alexec/agents, linear, or for a session its folder's
+   * repo (folder:<name> without one).
+   */
+  project?: string;
+  banked: LineageCost;
+  /** A PR's issues, by ref. */
+  fixes?: string[];
+  /** The milestones it is part of, by ref. */
+  partOf?: string[];
+  /**
+   * A PR's end: merged, closed (without a merge: waste) or reverted (a merged revert: waste).
+   * Absent while open. The list is open.
+   */
+  outcome?: string;
+  /** A PR's failed CI rounds: checks.failed, once per run and attempt. */
+  failedChecks?: number;
+  lastAt: WireDate;
+}
+
+/**
+ * lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total
+ * adds its parts: an issue's PRs (the PRs that fix it); a milestone's issues, their PRs and the PRs
+ * part of it; a project's every node (kind project, ref github:alexec/agents). waste is the parts'
+ * PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active
+ * link. parts is the nodes added up, newest first, at most 500; limited says there are more.
+ */
+export interface LineageCostRollup {
+  node: LineageNode;
+  own: LineageCost;
+  total: LineageCost;
+  waste: LineageCost;
+  unlinked: LineageCost;
+  prsMerged: number;
+  prsClosed: number;
+  prsReverted: number;
+  failedChecks: number;
+  parts: LineageCostNode[];
+  limited?: boolean;
+}
+
+/**
  * lineage/end (#2348): the link from one node to another by this relationship stops being active
  * now. Nothing is removed: the link keeps its start and gets an end.
  */
@@ -7974,6 +8042,11 @@ export interface UsageReport {
 export interface UsageRollup {
   hours: UsageRollupPeriod[];
   days: UsageRollupPeriod[];
+  /**
+   * The lineage nodes whose banked cost or rollup links changed since the last send (#2350), each
+   * whole: the control plane keeps a machine's latest of each, 90 days.
+   */
+  work?: LineageCostNode[];
 }
 
 /**
@@ -9583,6 +9656,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LendSignIn: { required: ["host", "from", "runtime", "allowed"], optional: [] },
   Levels: { required: [], optional: ["model", "permission", "permissionRequests"] },
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
+  LineageCost: { required: ["cost", "inputTokens", "outputTokens", "turns", "workingSeconds", "waitingSeconds"], optional: ["limitTokens"] },
+  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["project", "fixes", "partOf", "outcome", "failedChecks"] },
+  LineageCostRollup: { required: ["node", "own", "total", "waste", "unlinked", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "parts"], optional: ["limited"] },
   LineageEndRequest: { required: ["from", "to", "rel"], optional: [] },
   LineageGraph: { required: ["nodes", "links"], optional: ["limited"] },
   LineageLink: { required: ["from", "to", "rel", "source", "at"], optional: ["endedAt"] },
@@ -10026,7 +10102,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   UsageBucket: { required: ["cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns"], optional: [] },
   UsageHistory: { required: ["hours", "days", "now"], optional: ["timeZone"] },
   UsageReport: { required: ["range", "rows", "admin"], optional: ["scope", "personsHidden", "groupNames", "budgetUSD", "monthSpentUSD"] },
-  UsageRollup: { required: ["hours", "days"], optional: [] },
+  UsageRollup: { required: ["hours", "days"], optional: ["work"] },
   UsageRollupPeriod: { required: ["at", "rows"], optional: [] },
   UsageRollupRow: { required: ["runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds", "folder"], optional: ["workflow", "counts", "limitTokens", "route"] },
   UserAgentConfig: { required: [], optional: ["instructions", "personas", "skills"] },

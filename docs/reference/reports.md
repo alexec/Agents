@@ -103,8 +103,14 @@ Three more pages of Reports (#2019), with the same scopes:
 
 - **Each machine keeps a graph of the work** (#2348): links from a session to the issue it
   works on, the PRs it opens, and more, in `<root>/lineage.jsonl`. It keeps an ended link
-  90 days and at most 20,000 links. The machine does not send it yet: the cost on the links
-  (#2350) goes with the first send. `specs/2348-lineage/spec.md` says the rest.
+  90 days and at most 20,000 links. `specs/2348-lineage/spec.md` says the rest.
+- **Cost goes on the links** (#2350). When a turn's cost, tokens or time are banked, the
+  machine banks them under the issues and PRs the session works on then, split evenly. A
+  helper with no links of its own banks under its parent's. A turn with no link stays on
+  its session. Each node's total is in `<root>/lineage-cost.json`, at most 5,000 nodes, 90
+  days after the last change. `lineage/cost` adds them up to a PR, an issue (with the PRs
+  that fix it), a milestone or a project, with the waste: the PRs closed without a merge
+  and the merged reverts. The nodes that changed go with each `usage/rollup` (`work`).
 - **The machine makes most links itself** (#2349): a session's `#n`, `P#n` or Linear-key
   label, a helper's parent, a workflow's run, the sessions on a pull request's branch and
   the issues its body closes (`Fixes #n`). A merged or closed pull request, a label taken
@@ -139,6 +145,9 @@ Three more pages of Reports (#2019), with the same scopes:
   days.
 - **A send replaces the file** for that machine and period. Only that machine writes it.
 - **The hourly sweep** deletes older hours and days.
+- **The cost on links** (#2350): one file for each machine, `v1/lineage/<host>.json`. A
+  node sent replaces that machine's copy of it. It keeps 90 days after a node's last
+  change, at most 5,000 nodes. The sweep deletes the file of a removed machine.
 - **The person is the machine's owner** (#994). Each machine belongs to one user. A row of
   a machine that was removed has no person. Only an admin sees it.
 

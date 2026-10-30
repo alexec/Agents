@@ -10058,6 +10058,151 @@
       ],
       "additionalProperties": false
     },
+    "LineageCost": {
+      "type": "object",
+      "description": "What was banked under lineage nodes (#2350): a turn's cost, tokens and time, split evenly among the links active when it was banked. turns is a share of turns, so a turn on two nodes is half a turn on each.",
+      "properties": {
+        "cost": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "By currency."
+        },
+        "inputTokens": {
+          "type": "integer"
+        },
+        "outputTokens": {
+          "type": "integer"
+        },
+        "limitTokens": {
+          "type": "integer",
+          "description": "Fresh input and output, as a limit counts them (#998)."
+        },
+        "turns": {
+          "type": "number"
+        },
+        "workingSeconds": {
+          "type": "number",
+          "description": "The agent, its tools and others at work."
+        },
+        "waitingSeconds": {
+          "type": "number",
+          "description": "Waiting for the person."
+        }
+      },
+      "required": [
+        "cost",
+        "inputTokens",
+        "outputTokens",
+        "turns",
+        "workingSeconds",
+        "waitingSeconds"
+      ],
+      "additionalProperties": false
+    },
+    "LineageCostNode": {
+      "type": "object",
+      "description": "One node's banked cost on a machine (#2350), whole, with what its rollups need: the project its ref is in, the issues a PR fixes (ended links too: a PR closed without a merge still counts against its issue, as waste), the milestones it is part of, and how a PR ended. A session's own cost is its turns that had no active link.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "project": {
+          "type": "string",
+          "description": "The repo or tracker the node is in: github:alexec/agents, linear, or for a session its folder's repo (folder:<name> without one)."
+        },
+        "banked": {
+          "$ref": "#/definitions/LineageCost"
+        },
+        "fixes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "A PR's issues, by ref."
+        },
+        "partOf": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The milestones it is part of, by ref."
+        },
+        "outcome": {
+          "type": "string",
+          "description": "A PR's end: merged, closed (without a merge: waste) or reverted (a merged revert: waste). Absent while open. The list is open."
+        },
+        "failedChecks": {
+          "type": "integer",
+          "description": "A PR's failed CI rounds: checks.failed, once per run and attempt."
+        },
+        "lastAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "node",
+        "banked",
+        "lastAt"
+      ],
+      "additionalProperties": false
+    },
+    "LineageCostRollup": {
+      "type": "object",
+      "description": "lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a milestone's issues, their PRs and the PRs part of it; a project's every node (kind project, ref github:alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "own": {
+          "$ref": "#/definitions/LineageCost"
+        },
+        "total": {
+          "$ref": "#/definitions/LineageCost"
+        },
+        "waste": {
+          "$ref": "#/definitions/LineageCost"
+        },
+        "unlinked": {
+          "$ref": "#/definitions/LineageCost"
+        },
+        "prsMerged": {
+          "type": "integer"
+        },
+        "prsClosed": {
+          "type": "integer"
+        },
+        "prsReverted": {
+          "type": "integer"
+        },
+        "failedChecks": {
+          "type": "integer"
+        },
+        "parts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageCostNode"
+          }
+        },
+        "limited": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "node",
+        "own",
+        "total",
+        "waste",
+        "unlinked",
+        "prsMerged",
+        "prsClosed",
+        "prsReverted",
+        "failedChecks",
+        "parts"
+      ],
+      "additionalProperties": false
+    },
     "LineageEndRequest": {
       "type": "object",
       "description": "lineage/end (#2348): the link from one node to another by this relationship stops being active now. Nothing is removed: the link keeps its start and gets an end.",
@@ -23443,6 +23588,13 @@
           "items": {
             "$ref": "#/definitions/UsageRollupPeriod"
           }
+        },
+        "work": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageCostNode"
+          },
+          "description": "The lineage nodes whose banked cost or rollup links changed since the last send (#2350), each whole: the control plane keeps a machine's latest of each, 90 days."
         }
       },
       "required": [

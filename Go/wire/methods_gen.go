@@ -135,6 +135,7 @@ var CallFoldersSetProject = Method[SetFolderProjectRequest, FolderSummary]{"fold
 var CallFoldersUnarchive = Method[FolderRequest, FolderSummary]{"folders/unarchive"}
 var CallFoldersUndoGuardedChange = Method[GuardedChangeRequest, FolderSummary]{"folders/undoGuardedChange"}
 var CallGitFill = Method[GitCredentialRequest, GitCredential]{"git/fill"}
+var CallLineageCost = Method[LineageNodeRequest, LineageCostRollup]{"lineage/cost"}
 var CallLineageEnd = Method[LineageEndRequest, LineageLinks]{"lineage/end"}
 var CallLineageLink = Method[LineageLinkRequest, LineageLink]{"lineage/link"}
 var CallLineageLinks = Method[LineageNodeRequest, LineageLinks]{"lineage/links"}
