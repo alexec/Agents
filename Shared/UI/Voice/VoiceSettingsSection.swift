@@ -79,8 +79,15 @@ struct VoiceSettingsSection: View {
         if isOn { VoiceTuningSections() }
     }
 
+    /// Only iOS ends voice mode in the background or on a call (`VoiceModeControls`,
+    /// `VoiceMode`), so the Mac says only that leaving the chat ends it (#2898).
     private var footer: String {
-        "On, each chat has a voice button beside the prompt. Say what you want and hear the reply. The voice runs on this device. Voice mode ends when you leave the chat, or the app goes to the background or is interrupted by a call. Off, no voice is loaded."
+        #if os(iOS)
+        let ends = "Voice mode ends when you leave the chat, or the app goes to the background or is interrupted by a call."
+        #else
+        let ends = "Voice mode ends when you leave the chat."
+        #endif
+        return "On, each chat and New Session has a voice button beside the prompt. Say what you want and hear the reply. The voice runs on this device. \(ends) Off, no voice is loaded."
     }
 }
 
