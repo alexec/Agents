@@ -199,12 +199,25 @@ func (d *Daemon) thereAgents(folder string) []wire.Agent {
 	return out
 }
 
+// statusProbePatience bounds thereStatus's live ask (P20261030-1): list_sessions and
+// askThereWaits each ask every session on another machine, so one slow machine must not hold
+// up the rest — it falls back to "as last heard" instead, as it already does on any error.
+const statusProbePatience = 3 * time.Second
+
 // callThere is one agents/fromStarter on a session caller started on another machine,
-// through the control plane, and what it said is kept.
-func (d *Daemon) callThere(caller wire.UUID, s *startedThere, call wire.SessionCall) (wire.SessionCallReply, error) {
+// through the control plane, and what it said is kept. patience is 0 to wait as long as the
+// control plane's own patience for the op allows, or a shorter bound for a status probe.
+func (d *Daemon) callThere(caller wire.UUID, s *startedThere, call wire.SessionCall, patience time.Duration) (wire.SessionCallReply, error) {
 	var reply wire.SessionCallReply
 	call.From, call.Session = wire.StartedFrom{Agent: caller}, s.Session
-	out, err := d.askWorkspaces(caller, sessionCallMethod, wire.MachineSessionCall{Host: s.Machine, Call: call})
+	params := wire.MachineSessionCall{Host: s.Machine, Call: call}
+	var out json.RawMessage
+	var err error
+	if patience > 0 {
+		out, err = d.askWorkspacesPatient(caller, sessionCallMethod, params, patience)
+	} else {
+		out, err = d.askWorkspaces(caller, sessionCallMethod, params)
+	}
 	if err != nil {
 		return reply, err
 	}
@@ -217,17 +230,17 @@ func (d *Daemon) callThere(caller wire.UUID, s *startedThere, call wire.SessionC
 
 // thereOp is a call that says only its words: read, stop and archive.
 func (d *Daemon) thereOp(caller wire.UUID, s *startedThere, op string) (string, error) {
-	reply, err := d.callThere(caller, s, wire.SessionCall{Op: op})
+	reply, err := d.callThere(caller, s, wire.SessionCall{Op: op}, 0)
 	if err != nil {
 		return "", err
 	}
 	return reply.Said, nil
 }
 
-// thereStatus is how a session on another machine stands, asked now; what was last heard,
-// and why, when its machine can't say.
+// thereStatus is how a session on another machine stands, asked now, with a short patience
+// of its own (P20261030-1); what was last heard, and why, when its machine can't say quickly.
 func (d *Daemon) thereStatus(caller wire.UUID, s startedThere) string {
-	reply, err := d.callThere(caller, &s, wire.SessionCall{Op: "status"})
+	reply, err := d.callThere(caller, &s, wire.SessionCall{Op: "status"}, statusProbePatience)
 	if err == nil {
 		return reply.Said
 	}
@@ -244,26 +257,47 @@ func (d *Daemon) thereStatus(caller wire.UUID, s startedThere) string {
 }
 
 // askThereWaits asks how each session on another machine that an agent here waits on
-// stands, so a wait on one that ended while this host was away closes.
+// stands, so a wait on one that ended while this host was away closes. Asked at once
+// (P20261030-1), not one after another: one slow machine must not hold up every other
+// session's check.
 func (d *Daemon) askThereWaits() {
+	var wg sync.WaitGroup
 	for _, a := range d.Store.Agents() {
 		if !isOpenBlock(a.Report) || a.Report.Block == nil {
 			continue
 		}
 		for _, w := range a.Report.Block.Waits {
-			if s := d.thereNamed(a.ID, string(w.AgentID)); s != nil && w.Ending == nil && d.Store.Agent(w.AgentID) == nil {
-				d.thereStatus(a.ID, *s)
+			s := d.thereNamed(a.ID, string(w.AgentID))
+			if s == nil || w.Ending != nil || d.Store.Agent(w.AgentID) != nil {
+				continue
 			}
+			caller, there := a.ID, *s
+			wg.Add(1)
+			safe.Go("status of a waited-on session elsewhere", func() {
+				defer wg.Done()
+				d.thereStatus(caller, there)
+			})
 		}
 	}
+	wg.Wait()
 }
 
-// listThere is list_sessions started_by me's lines for the sessions on other machines.
+// listThere is list_sessions started_by me's lines for the sessions on other machines, each
+// asked at once (P20261030-1): one slow machine must not make list_sessions wait for every
+// other session in turn.
 func (d *Daemon) listThere(caller wire.UUID) []string {
-	var lines []string
-	for _, s := range d.startedThereBy(caller) {
-		lines = append(lines, "- "+string(s.Session)+": "+quotedTitle(&s.Title)+" on "+s.Machine+", in "+s.There+" — "+d.thereStatus(caller, s))
+	started := d.startedThereBy(caller)
+	lines := make([]string, len(started))
+	var wg sync.WaitGroup
+	for i, s := range started {
+		i, s := i, s
+		wg.Add(1)
+		safe.Go("status of a session elsewhere", func() {
+			defer wg.Done()
+			lines[i] = "- " + string(s.Session) + ": " + quotedTitle(&s.Title) + " on " + s.Machine + ", in " + s.There + " — " + d.thereStatus(caller, s)
+		})
 	}
+	wg.Wait()
 	return lines
 }
 
@@ -274,7 +308,7 @@ func (d *Daemon) waitThere(name string, caller wire.UUID) (*wire.Agent, error) {
 	if s == nil {
 		return nil, nil
 	}
-	reply, err := d.callThere(caller, s, wire.SessionCall{Op: "status"})
+	reply, err := d.callThere(caller, s, wire.SessionCall{Op: "status"}, 0)
 	ended := s.Ended
 	if err == nil {
 		ended = reply.Ended
@@ -299,7 +333,7 @@ func (d *Daemon) messageThere(me *wire.Agent, s *startedThere, text string, repl
 	if !replace && !d.spendMessage(me.ID) {
 		return "", refusedMessage(fmt.Sprintf("this session has sent %d messages in the last hour, the most it may.", messagesPerHour))
 	}
-	reply, err := d.callThere(me.ID, s, wire.SessionCall{Op: "message", Message: &text, Replace: &replace})
+	reply, err := d.callThere(me.ID, s, wire.SessionCall{Op: "message", Message: &text, Replace: &replace}, 0)
 	if err != nil {
 		if e, ok := err.(*Error); ok && !strings.HasPrefix(e.Message, "Nothing") {
 			return "", refusedMessage(e.Message)
