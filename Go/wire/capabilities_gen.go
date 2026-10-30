@@ -65,6 +65,7 @@ const CapHostWire1 = "host.wire/1"
 const CapHost1 = "host/1"
 const CapHostsJoin1 = "hosts.join/1"
 const CapHosts1 = "hosts/1"
+const CapLineageComment1 = "lineage.comment/1"
 const CapLineage1 = "lineage/1"
 const CapLinks1 = "links/1"
 const CapLiveactivity1 = "liveactivity/1"
@@ -257,6 +258,7 @@ var HostCapabilities = pairs([][2]string{
 	{"folders/sendRead", "folders/1"},
 	{"folders/setDiskSpace", "folders/1"},
 	{"folders/setHelperLimits", "folders/1"},
+	{"folders/setPRCostComment", "lineage.comment/1"},
 	{"folders/setPinned", "folders/1"},
 	{"folders/setProject", "projects/1"},
 	{"folders/unarchive", "folders/1"},

@@ -20,6 +20,7 @@ type lineageBook struct {
 	lineageStore lineage.Store
 	lineageLinker
 	costLedgerBook
+	prCommentBook
 }
 
 func (d *Daemon) lineagePath() string { return filepath.Join(d.Store.Loc.Root, "lineage.jsonl") }

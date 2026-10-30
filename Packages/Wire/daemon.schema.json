@@ -8614,6 +8614,10 @@
         },
         "pinned": {
           "type": "boolean"
+        },
+        "prCostComment": {
+          "$ref": "#/definitions/PRCostComment",
+          "description": "Absent is off (#2352)."
         }
       },
       "required": [
@@ -14481,6 +14485,15 @@
       ],
       "additionalProperties": false
     },
+    "PRCostComment": {
+      "type": "string",
+      "enum": [
+        "off",
+        "tokens",
+        "cost"
+      ],
+      "description": "What the host says on a folder's pull request when it merges (#2352): nothing (off, the default), the tokens and time only, or the cost too. Kept in the folder's .agents/folder.json, so the repo's people choose what a public repo publishes."
+    },
     "PagesChangedNotification": {
       "type": "object",
       "properties": {
@@ -19831,6 +19844,22 @@
         "agentID",
         "optionID",
         "value"
+      ],
+      "additionalProperties": false
+    },
+    "SetPRCostCommentRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "prCostComment": {
+          "$ref": "#/definitions/PRCostComment"
+        }
+      },
+      "required": [
+        "folder",
+        "prCostComment"
       ],
       "additionalProperties": false
     },

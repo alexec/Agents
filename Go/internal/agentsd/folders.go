@@ -386,6 +386,31 @@ func (d *Daemon) setDiskSpace(r wire.SetDiskSpaceRequest) (wire.FolderSummary, e
 	return s, err
 }
 
+// setPRCostComment is what the host says on the folder's pull requests when they merge
+// (#2352), in .agents/folder.json: off is no key at all.
+func (d *Daemon) setPRCostComment(r wire.SetPRCostCommentRequest) (wire.FolderSummary, error) {
+	folder := store.FolderPath(r.Folder)
+	if _, ok := d.summaryFor(folder); !ok || !isDir(folder) {
+		return wire.FolderSummary{}, noSuchFolder(folder + " is not a folder, or is not there.")
+	}
+	var v any
+	switch r.PrCostComment {
+	case wire.PRCostCommentOff:
+	case wire.PRCostCommentTokens, wire.PRCostCommentCost:
+		v = r.PrCostComment
+	default:
+		return wire.FolderSummary{}, Invalid("The cost on pull requests is off, tokens or cost, not %q.", r.PrCostComment)
+	}
+	if !d.settled(folder, ".agents/folder.json") {
+		return wire.FolderSummary{}, guardedRefusal(".agents/folder.json", "The cost on pull requests was not changed: ")
+	}
+	defer d.approveWrite(folder, ".agents/folder.json")
+	if err := setFolderConfig(folder, "prCostComment", v); err != nil {
+		return wire.FolderSummary{}, configWriteError(err)
+	}
+	return d.sendFolder(folder)
+}
+
 // MARK: finding folders (folders/find)
 
 func hasGit(dir string) bool {
@@ -663,6 +688,10 @@ func (d *Daemon) dress(s *wire.FolderSummary) {
 				s.Folder.DiskSpace = &t
 			}
 		}
+		if v, _ := m["prCostComment"].(string); v == string(wire.PRCostCommentTokens) || v == string(wire.PRCostCommentCost) {
+			c := wire.PRCostComment(v)
+			s.Folder.PrCostComment = &c
+		}
 	}
 }
 
@@ -695,6 +724,10 @@ func (d *Daemon) registerFolders() {
 	On(d, wire.CallFoldersSetDiskSpace, func(ctx context.Context, c *Client, r wire.SetDiskSpaceRequest) (wire.FolderSummary, error) {
 		r.Folder = store.FolderURL(folderOf(r.Folder))
 		return d.setDiskSpace(r)
+	})
+	On(d, wire.CallFoldersSetPRCostComment, func(ctx context.Context, c *Client, r wire.SetPRCostCommentRequest) (wire.FolderSummary, error) {
+		r.Folder = store.FolderURL(folderOf(r.Folder))
+		return d.setPRCostComment(r)
 	})
 	On(d, wire.CallFoldersSetProject, func(ctx context.Context, c *Client, r wire.SetFolderProjectRequest) (wire.FolderSummary, error) {
 		r.Folder = store.FolderURL(folderOf(r.Folder))

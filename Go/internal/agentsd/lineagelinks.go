@@ -344,6 +344,10 @@ func (d *Daemon) lineageEvent(e wire.Event) {
 		}
 		// How it ended, for its cost (#2350).
 		d.notePROutcome(pr, e.Name, p.PR.Title)
+		if e.Name == "pr.merged" {
+			// Its cost, on the PR (#2352).
+			d.prMerged(repo, n, pr)
+		}
 		if e.Name == "pr.opened" {
 			return
 		}

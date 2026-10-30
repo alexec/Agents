@@ -195,6 +195,49 @@ a node from this machine's totals. Each part counts once.
 - **Decided: the milestone rollup reads `part-of` links; the host does not make them from
   the forge yet** (#2935). A person can make one with `lineage/link`. Alex can overrule.
 
+## The cost on the pull request (#2352)
+
+Slice 5 comments on a pull request when it merges, in `Go/internal/agentsd/lineagecomment.go`.
+
+- **The setting** is the folder's: `prCostComment` in `.agents/folder.json`, `off` (no key,
+  the default), `tokens` (tokens and time) or `cost` (cost, tokens and time). The file is
+  in the repo, so the repo's people choose what a public repo publishes, and an agent's
+  change to it waits for the person (#502). `folders/setPRCostComment` (capability
+  `lineage.comment/1`) sets it: Folder Settings ▸ General ▸ Cost on pull requests on the Mac,
+  **Cost on Pull Requests…** in the folder's menu on the web page.
+- **When:** the host hears `pr.merged` (while a workflow or a wait listens, as for the
+  links) for a folder of the PR's repo whose setting is on. A minute later it posts.
+- **What it says:** a table of the cost (by currency), the tokens in and out, the sessions
+  (the sessions linked to the PR or its issues, and the helpers they started), the agent
+  time, the wait time and the failed CI rounds, of the PR **and the issues it fixes**: a
+  lane's `#n` label banks most of the work on the issue, not on the PR.
+- **One comment.** It starts with `<!-- agents-cost -->`. The host keeps its id in
+  `<root>/lineage-comments.json` (at most 500 PRs, 30 days after the merge) and edits it
+  when more is banked on the PR or its issues, at most once a minute. A host without the
+  id finds the comment by its first line, so it never adds a second one. Turned off, the
+  host edits it no more.
+- **Who posts:** the person's own `gh` (an issue comment) or `glab` (a merge request note),
+  run in the folder, as the Time page asks `gh` for merged PRs.
+
+### Decisions on slice 5's open questions
+
+- **Decided: a setting per folder, in `.agents/folder.json`, off by default, with off,
+  tokens only, and cost and tokens.** Because the file goes with the repo, so whoever
+  owns a public repo decides what it publishes, and helper limits and disk lines are
+  kept there already. Alex can overrule.
+- **Decided: GitLab merge requests too, in this slice.** Because the host links GitLab
+  merge requests already, and a note is the same comment. Alex can overrule.
+- **Decided: the numbers are this machine's.** Because the host that hears the merge has
+  only its own totals, and the control plane's sum is read by the view (#2351). A PR worked
+  on two machines shows the one that posted last. Alex can overrule.
+- **Decided: no link to the Lineage view yet.** Because the view of a PR is #2941, not
+  built, and a link on a public page cannot point at a person's own host. #2941 adds it.
+  Alex can overrule.
+- **Decided: the Remote has no setting.** Because Folder Settings is Mac + web (#2798).
+  Alex can overrule.
+
 ## Clients
 
-mac: no UI, remote: no UI, web: no UI (the view is #2351).
+mac: no UI, remote: no UI, web: no UI (the view is #2351). Slice 5 (#2352): mac: Folder
+Settings ▸ Cost on pull requests, remote: tier mac+web, web: Cost on Pull Requests… in the
+folder's menu.

@@ -130,6 +130,7 @@ var CallFoldersSendPack = Method[SendPackRequest, SendPack]{"folders/sendPack"}
 var CallFoldersSendRead = Method[SendReadRequest, SendRead]{"folders/sendRead"}
 var CallFoldersSetDiskSpace = Method[SetDiskSpaceRequest, FolderSummary]{"folders/setDiskSpace"}
 var CallFoldersSetHelperLimits = Method[SetHelperLimitsRequest, FolderSummary]{"folders/setHelperLimits"}
+var CallFoldersSetPRCostComment = Method[SetPRCostCommentRequest, FolderSummary]{"folders/setPRCostComment"}
 var CallFoldersSetPinned = Method[SetPinnedRequest, FolderSummary]{"folders/setPinned"}
 var CallFoldersSetProject = Method[SetFolderProjectRequest, FolderSummary]{"folders/setProject"}
 var CallFoldersUnarchive = Method[FolderRequest, FolderSummary]{"folders/unarchive"}

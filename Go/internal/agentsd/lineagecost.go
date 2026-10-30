@@ -85,6 +85,8 @@ func (d *Daemon) bankWork(a *wire.Agent, add wire.LineageCost) {
 			project = d.sessionProject(folder)
 		}
 		shares := lineage.Split(add, len(work))
+		// After the unlock: a merged PR's comment says the new total (#2352).
+		defer d.prCostChanged(work)
 		d.workMu.Lock()
 		defer d.workMu.Unlock()
 		for i, n := range work {
