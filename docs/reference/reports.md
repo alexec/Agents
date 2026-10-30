@@ -101,6 +101,10 @@ Three more pages of Reports (#2019), with the same scopes:
 
 ## What a machine sends
 
+- **Each machine keeps a graph of the work** (#2348): links from a session to the issue it
+  works on, the PRs it opens, and more, in `<root>/lineage.jsonl`. It keeps an ended link
+  90 days and at most 20,000 links. The machine does not send it yet: the cost on the links
+  (#2350) goes with the first send. `specs/2348-lineage/spec.md` says the rest.
 - **Each machine keeps its usage by the UTC hour**, by folder and runtime, in
   `<root>/report-hours.json`. It keeps 8 days.
 - **A row** has the cost (by currency), the tokens (input, output, thought, cache read and

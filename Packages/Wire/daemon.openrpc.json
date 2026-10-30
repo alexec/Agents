@@ -3594,6 +3594,86 @@
       }
     },
     {
+      "name": "lineage/end",
+      "x-capability": "lineage/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LineageEndRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LineageLinks"
+        }
+      }
+    },
+    {
+      "name": "lineage/link",
+      "x-capability": "lineage/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LineageLinkRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LineageLink"
+        }
+      }
+    },
+    {
+      "name": "lineage/links",
+      "x-capability": "lineage/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LineageNodeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LineageLinks"
+        }
+      }
+    },
+    {
+      "name": "lineage/walk",
+      "x-capability": "lineage/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LineageNodeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LineageGraph"
+        }
+      }
+    },
+    {
       "name": "mac/open",
       "x-capability": "mac/1",
       "paramStructure": "by-name",

@@ -4456,6 +4456,71 @@ type LineMember struct {
 	IsCallOpen bool `json:"isCallOpen"`
 }
 
+// lineage/end (#2348): the link from one node to another by this relationship stops being active now. Nothing is removed: the link keeps its start and gets an end.
+type LineageEndRequest struct {
+	From LineageNode `json:"from"`
+
+	To LineageNode `json:"to"`
+
+	Rel string `json:"rel"`
+}
+
+// lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more.
+type LineageGraph struct {
+	Nodes []LineageNode `json:"nodes"`
+
+	Links []LineageLink `json:"links"`
+
+	Limited *bool `json:"limited,omitzero"`
+}
+
+// A typed link in the lineage graph (#2348): from works-on, opens, fixes, started, reviews, closes or part-of to. source is how the host knows it: start, branch, pr-body, helper, agent or person. at is when it started; endedAt is set when it stops being active (a PR merged, a session archived). Both lists are open: a host keeps a relationship or a source it does not know.
+type LineageLink struct {
+	From LineageNode `json:"from"`
+
+	To LineageNode `json:"to"`
+
+	Rel string `json:"rel"`
+
+	Source string `json:"source"`
+
+	At Date `json:"at"`
+
+	EndedAt *Date `json:"endedAt,omitzero"`
+}
+
+// lineage/link (#2348): start a link. When the same link is active already, it is the answer, unchanged.
+type LineageLinkRequest struct {
+	From LineageNode `json:"from"`
+
+	To LineageNode `json:"to"`
+
+	Rel string `json:"rel"`
+
+	Source string `json:"source"`
+}
+
+// The links of a node, newest first (#2348), or the links lineage/end ended. limited says there are more than the answer holds.
+type LineageLinks struct {
+	Links []LineageLink `json:"links"`
+
+	Limited *bool `json:"limited,omitzero"`
+}
+
+// A node in the lineage graph (#2348). kind is what it is: issue, pr, session, workflow-run, commit, file, branch or milestone, and the list is open. ref names it apart from any tracker, as <scheme>:<id>: github:alexec/Agents#123, gitlab:group/repo!45, linear:ENG-4, jira:ABC-9, session:<agent id>.
+type LineageNode struct {
+	Kind string `json:"kind"`
+
+	Ref string `json:"ref"`
+}
+
+// lineage/links and lineage/walk (#2348): a node, and for a walk how many links away to go (1 to 4; 2 when not said: issue, sessions, PRs).
+type LineageNodeRequest struct {
+	Node LineageNode `json:"node"`
+
+	Depth *int64 `json:"depth,omitzero"`
+}
+
 type ListCursor struct {
 	LastActivityAt Date `json:"lastActivityAt"`
 
