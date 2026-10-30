@@ -516,23 +516,6 @@ final class RemoteModel {
 
     var folders: [DaemonAPI.FolderSummary] { work.liveFolders }
 
-    /// The client for `host` itself, for a call that names no folder there yet.
-    private func client(on host: MachineRef) throws -> DaemonClient {
-        if host == .mac { return client }
-        guard let other = otherHosts[host], reachableHosts.contains(host) else { throw HostAway(host: host) }
-        return other
-    }
-
-
-    /// A folder just added on `host`, listed and opened at once rather than when the
-    /// host next says so.
-    private func show(_ summary: DaemonAPI.FolderSummary, on host: MachineRef) {
-        var added = summary
-        added.host = host
-        work.upsert(added)
-        sidebarItem = .folder(added.key)
-    }
-
     /// One host's heading in the folder list. Several hosts, and the list is grouped
     /// under these; one host, and there is no heading, as on the Mac (058, frame H).
     struct HostSection: Identifiable {
@@ -747,8 +730,6 @@ final class RemoteModel {
         let entries = (height / Self.entryHeight) * Self.screensHeld
         firstPageSize = min(200, max(30, Int(entries.rounded())))
     }
-
-    func agents(group: AgentGroup) -> [Agent] { work.agents(in: selectedFolder, group: group) }
 
     // MARK: Starting an agent (029)
 
@@ -3657,19 +3638,6 @@ final class RemoteModel {
         work.replaceWorkflows(listed)
     }
 
-    func writeUserWorkflow(id: String, content: String) async -> String? {
-        do {
-            let request = DaemonAPI.WorkflowWriteRequest(workflowID: id, content: content)
-            _ = try await client(for: request).call(DaemonAPI.Method.workflowsWrite, request,
-                                                    returning: WorkflowSummary.self)
-            await refreshWorkflows()
-            return nil
-        } catch {
-            await refreshWorkflows()
-            return sentence(for: error)
-        }
-    }
-
     /// One of a view's calls (#187), to the Mac.
     func viewCall(_ method: String, _ params: JSONValue) async throws -> JSONValue {
         try await client.call(method, params)
@@ -3980,19 +3948,6 @@ final class RemoteModel {
                                                     Optional<String>.none,
                                                     returning: ClientPermissionSettings.self) else { return }
         clientPermissions = settings
-    }
-
-    func setClientPermissions(_ settings: ClientPermissionSettings) async {
-        guard !isStale else {
-            problem = "Your Mac is not answering, so that could not be changed."
-            return
-        }
-        do {
-            clientPermissions = try await client.call(DaemonAPI.Method.clientPermissionsSet, settings,
-                                                       returning: ClientPermissionSettings.self)
-        } catch {
-            problem = (error as? JSONRPCError)?.message ?? "That did not reach your Mac."
-        }
     }
 
     /// One agent's own sandbox choice from the phone (064); nil follows the default.
