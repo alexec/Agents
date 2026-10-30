@@ -137,6 +137,10 @@ public enum DaemonAPI {
         public static let filesComplete = "files/complete"
         /// The iOS simulators on a Mac host (#842): listed, booted and shut down on the
         /// person's press, and a booted one's screen as a JPEG.
+        /// The lineage graph from a node, and a node's cost rolled up (#2348, #2350): read by a
+        /// session's Lineage pane (#2940).
+        public static let lineageWalk = "lineage/walk"
+        public static let lineageCost = "lineage/cost"
         public static let simulatorsList = "simulators/list"
         public static let simulatorsBoot = "simulators/boot"
         public static let simulatorsShutdown = "simulators/shutdown"
