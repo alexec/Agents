@@ -3663,6 +3663,11 @@
     {
       "name": "lineage/cost",
       "x-capability": "lineage/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -3743,6 +3748,11 @@
     {
       "name": "lineage/walk",
       "x-capability": "lineage/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {

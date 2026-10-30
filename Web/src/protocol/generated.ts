@@ -9030,6 +9030,8 @@ export interface Methods {
   "hosts/startEnroll": { params: MachineEnroll; result: ControlCodeShown };
   "hosts/stop": { params: MachineStop; result: ControlMachine };
   "hosts/unlink": { params: MachineRequest; result: ControlMachine };
+  "lineage/cost": { params: LineageNodeRequest; result: LineageCostRollup };
+  "lineage/walk": { params: LineageNodeRequest; result: LineageGraph };
   "links/approve": { params: ChannelLinkDecide; result: Empty };
   "links/deny": { params: ChannelLinkDecide; result: Empty };
   "links/list": { params: Empty; result: ChannelLink[] };
@@ -9319,6 +9321,8 @@ export const MethodTarget = {
   "hosts/startEnroll": "control",
   "hosts/stop": "control",
   "hosts/unlink": "control",
+  "lineage/cost": "host",
+  "lineage/walk": "host",
   "links/approve": "control",
   "links/deny": "control",
   "links/list": "control",

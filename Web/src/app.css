@@ -766,7 +766,8 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 /* Send (or Stop) at the right of the action row, Attach at the left, as on the Mac and the Remote (#2751). */
 .prompt-actions .send { margin-left: auto; }
 
-.files .tabs { flex: 1; display: flex; gap: 4px; min-width: 0; overflow-x: auto; }
+/* Wrapped, not scrolled: a tab out of sight behind a scroll says nothing of itself (#2940). */
+.files .tabs { flex: 1; display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; padding: 6px 0; }
 .files .tab { padding: 3px 10px; border-radius: var(--radius-control); white-space: nowrap; }
 .files .tab.chosen { background: var(--paper-raised); }
 .files ul { list-style: none; }
@@ -1737,3 +1738,9 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .agent-config-sync { display: grid; gap: 3px; margin-bottom: 12px; }
 .agent-config-sync p { margin: 0; }
 .agent-config-project { min-width: min(760px, 90vw); max-height: 85vh; overflow: auto; }
+/* A session's Lineage tab (#2940): the nodes it is linked to, in groups by kind. */
+.lineage .crumbs .link { margin-left: auto; }
+.lineage-head { font-size: 0.65625rem; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.55; margin: 12px 8px 4px; }
+.row.lineage-row { grid-template-columns: 1fr; color: inherit; text-decoration: none; }
+.row.lineage-row .subtitle { white-space: normal; }
+.row.lineage-row .lineage-cost { opacity: 0.85; font-variant-numeric: tabular-nums; }

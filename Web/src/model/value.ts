@@ -14,7 +14,7 @@ export function costWords(c: LineageCost): string {
   return `${tokenWords(c.inputTokens + c.outputTokens)} tokens`;
 }
 
-const spent = (c: LineageCost) => Object.values(c.cost).some((v) => v > 0) || c.inputTokens + c.outputTokens > 0;
+export const spent = (c: LineageCost) => Object.values(c.cost).some((v) => v > 0) || c.inputTokens + c.outputTokens > 0;
 
 /** An issue's, a PR's or a milestone's name without its tracker: "alexec/agents#12", "ENG-4",
  * "alexec/agents milestone 15". */

@@ -5678,6 +5678,22 @@ final class AppModel {
                                                    returning: DaemonAPI.FindResult.self)
     }
 
+    // MARK: Lineage
+
+    /// What a session is linked to (#2940): `lineage/walk` from it, on its host.
+    func lineageWalk(of agentID: UUID) async throws -> DaemonAPI.LineageGraph {
+        try await client(forAgent: agentID).call(
+            DaemonAPI.Method.lineageWalk,
+            DaemonAPI.LineageNodeRequest(node: LineageList.node(ofSession: agentID), depth: LineageList.depth),
+            returning: DaemonAPI.LineageGraph.self)
+    }
+
+    /// An issue's or a PR's cost rolled up, from the session's host; nil when it will not say.
+    func lineageCost(_ node: DaemonAPI.LineageNode, of agentID: UUID) async -> DaemonAPI.LineageCostRollup? {
+        try? await client(forAgent: agentID).call(DaemonAPI.Method.lineageCost, DaemonAPI.LineageNodeRequest(node: node),
+                                                   returning: DaemonAPI.LineageCostRollup.self)
+    }
+
     /// Go to a match in the open chat: earlier pages come in until its turn is in hand
     /// (`AgentsModel.reveal`, bounded), then the chat goes to it, or as near as it can.
     func reveal(_ match: DaemonAPI.FindMatch) async {
