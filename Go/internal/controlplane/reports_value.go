@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -65,7 +66,7 @@ func (s *Service) scopeLineage(ctx context.Context, keep func(person string) boo
 	for _, h := range s.records.Hosts() {
 		known[strings.ToLower(h.ID)] = h.ID
 	}
-	byNode := map[wire.LineageNode]*wire.LineageCostNode{}
+	var read []store.Key
 	for _, k := range keys {
 		host := strings.TrimSuffix(strings.TrimPrefix(k.Key, lineagePrefix), ".json")
 		// A machine removed since: its person is not known, so only an admin sees it.
@@ -73,15 +74,19 @@ func (s *Service) scopeLineage(ctx context.Context, keep func(person string) boo
 		if id, ok := known[host]; ok {
 			person = s.ownerOf(id)
 		}
-		if !keep(person) {
-			continue
+		if keep(person) {
+			read = append(read, k)
 		}
-		object, err := s.cfg.Store.Get(ctx, k.Key)
-		if err != nil {
-			return nil, fail(storeUnavailable, "The reports could not be read: %v", err)
-		}
+	}
+	// By entity tag and storeReadsAtOnce at a time (#2975), not one machine after another.
+	objects, err := s.storeReads.read(ctx, s.cfg.Store, lineagePrefix, keys, read)
+	if err != nil {
+		return nil, fail(storeUnavailable, "The reports could not be read: %v", err)
+	}
+	byNode := map[wire.LineageNode]*wire.LineageCostNode{}
+	for _, data := range objects {
 		var kept storedLineage
-		if object == nil || json.Unmarshal(object.Data, &kept) != nil {
+		if data == nil || json.Unmarshal(data, &kept) != nil {
 			continue
 		}
 		for _, n := range kept.Nodes {
