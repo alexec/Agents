@@ -12,8 +12,6 @@ import { movedPage, navSections, type NavSection, type UsagePane } from "./model
 
 export type ActivityPage = "events" | "resources" | "runtimes" | "mcp" | "worktrees" | "spending" | "tokens" | "time" | "milestones";
 
-export const activityPages: readonly ActivityPage[] = ["events", "resources", "runtimes", "mcp", "worktrees", "spending", "tokens", "time", "milestones"];
-
 export interface Route {
   /** The section (#2141); none is the Overview, or Agents when a host is named. */
   nav?: Exclude<NavSection, "overview"> | undefined;

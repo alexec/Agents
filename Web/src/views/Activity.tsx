@@ -16,14 +16,14 @@ import { YourConnections } from "./ConnectorSetup";
 import { WorktreesList } from "./Worktrees";
 import { AuditPane } from "./Audit";
 import { ReportsPane } from "./Reports";
-import { forCleanup, pageLine, rowWords, tally as worktreeTally, worktreesIntro } from "../model/worktrees";
+import { forCleanup, pageLine, tally as worktreeTally, worktreesIntro } from "../model/worktrees";
 import { BackToList } from "./BackToList";
 import { Modal } from "./Modal";
 import { folderKey, folderPath } from "../model/groups";
-import { accountChoices, accountRows, accountState, agentsHolding, allowanceLine, defaultAccountName, isOrgRow, orgAllowanceLine, ownRow, ownSignInID, reachesFoot, reachesTheModelBy, removeMessage, rowTitle, runtimeTally, runtimeTime, signInOnTheMac } from "../model/runtimes";
+import { accountChoices, accountRows, accountState, agentsHolding, allowanceLine, defaultAccountName, isOrgRow, orgAllowanceLine, ownRow, ownSignInID, reachesFoot, reachesTheModelBy, removeMessage, rowTitle, runtimeTime, signInOnTheMac } from "../model/runtimes";
 import { fromOrganisation } from "../model/orgAccounts";
 import { setBy as setByWords } from "../model/orgPolicy";
-import { healthTally, personalEmpty, personalIntro, personalServers } from "../model/hostedMCP";
+import { personalEmpty, personalIntro, personalServers } from "../model/hostedMCP";
 import { refusalMessage } from "../model/workflows";
 import { describe } from "../model/errors";
 import { dayTokenLimitReached, money } from "../model/limits";
@@ -33,7 +33,6 @@ import { hostAnswers, hostNeedsUpdate } from "../model/capabilities";
 import { mergeTime } from "../model/time";
 import { TimeCharts } from "./TimeCharts";
 import { MilestonesSection, TimeMilestonesUnder } from "./Milestones";
-import { isComplete } from "../model/milestones";
 import { Capability } from "../protocol/capabilities.generated";
 import { OrgBudget, OrgPolicyLine, PassThroughList } from "./OrgPolicyLine";
 import { PageTitle } from "./TopBar";
@@ -205,91 +204,7 @@ export function availabilityWords(availability: RuntimeAvailability): string {
   return `Install failed: ${availability.installFailed.reason}`;
 }
 
-/** The newest event on any host. */
-function lastEvent(store: Store): Date | null {
-  const times = Object.values(store.events.value).flatMap((page) => page.events.map((e) => e.lastAt ?? e.at));
-  return times.length ? fromWireDate(Math.max(...times) as never) : null;
-}
-
 const onlineHosts = (store: Store): ControlMachine[] => store.hosts.value.filter((h) => hostAnswers(h.state));
-
-/** Asks each host for its events and its day again: on connecting, and every minute after. */
-function useActivity(store: Store): void {
-  const online = onlineHosts(store).map((h) => h.id).join(",");
-  useEffect(() => {
-    const load = () => {
-      for (const host of onlineHosts(store)) {
-        void store.loadEvents(host.id);
-        void store.loadCost(host.id);
-      }
-    };
-    load();
-    const every = setInterval(() => { if (document.visibilityState === "visible") load(); }, 60_000);
-    return () => clearInterval(every);
-  }, [online]);
-}
-
-/** Each Activity page's icon, the window's SF Symbol as near as text has it (#495). */
-const activityIcons: Record<ActivityPage, string> = { events: "☰\uFE0E", resources: "◫", runtimes: "⚙\uFE0E", mcp: "▤", worktrees: "⑂", spending: "$", tokens: "#", time: "◷", milestones: "✓" };
-
-/** The rows of one of the sidebar's two groups (#915): Status, what goes on now, or Usage, the past. */
-export function ActivityRows({ group, store, chosen, onPick }: {
-  group: "status" | "usage"; store: Store; chosen: ActivityPage | undefined; onPick: (page: ActivityPage) => void;
-}) {
-  useActivity(store);
-  const last = lastEvent(store);
-  const resources = Object.values(store.leases.value).flatMap((s) => s.resources);
-  const held = resources.reduce((n, r) => n + (r.holds ?? (r.lease ? [r.lease] : [])).length, 0);
-  const waiting = resources.reduce((n, r) => n + r.line.length, 0);
-  const tally = runtimeTally(Object.values(store.runtimes.value).flat());
-  const mcp = healthTally(store.hosts.value.flatMap((host) => personalServers(store.mcpHealthOf(host.id))));
-  const worktrees = rowWords(worktreeTally(store.hosts.value.flatMap((host) =>
-    forCleanup(store.worktreeLists.value[host.id] ?? [], store.worktreeSizes.value[host.id]).flatMap((g) => g.worktrees))));
-  const costs = store.costs.value;
-  const today = totalWords(todayTotals(costs));
-  const mac = costs[store.macHostID.value];
-  const milestones = store.milestones.value[milestonesHost(store) ?? ""];
-  const left = headroom(mac);
-  // The page's name in the folders' type, after its icon in the accent, as the window's rows
-  // have it (#155, #495). Nothing at its end, which is only a session's (#587): what it would say
-  // at a glance is its tooltip's, and the icon turns red when the page has something wrong to say.
-  const row = (page: ActivityPage, title: string, help: string, figures: string | null, warns = false) => (
-    <button class={`row activity-row${chosen === page ? " chosen" : ""}`} aria-current={chosen === page}
-      title={figures ? `${figures}. ${help}` : help} aria-description={figures ?? undefined} onClick={() => onPick(page)}>
-      <span class={`activity-icon${warns ? " warns" : ""}`} aria-hidden="true">{activityIcons[page]}</span>
-      <span class="title">{title}</span>
-    </button>
-  );
-  const spent = [today && `${today} today`, left].filter(Boolean).join(", ");
-  const tokensLeft = mac?.limits.dailyTokens !== undefined
-    ? `${Math.max(0, mac.limits.dailyTokens - (mac.tokensToday ?? 0)).toLocaleString()} left` : null;
-  const tokens = mac ? [`${(mac.tokensToday ?? 0).toLocaleString()} tokens today`, tokensLeft].filter(Boolean).join(", ") : null;
-  if (group === "usage") return (
-    <>
-      {row("spending", "Cost", "What all of the work has cost, and what it cost today", spent || null,
-        spendCloseToFull(mac))}
-      {row("tokens", "Tokens", "What the work used in tokens, and the token limits", tokens, tokensCloseToFull(mac))}
-      {row("time", "Time", "Where the time of running chats went: the agent, its tools, and waiting", null)}
-      {/* The newcomer's checklist (#1067), only while a milestone is still to earn, as an empty
-          smart group hides (#507). Then the list is under Time's charts. */}
-      {milestones && !isComplete(milestones)
-        && row("milestones", "Milestones", "The first steps taken in Agents, and the ones still to take", null)}
-    </>
-  );
-  return (
-    <>
-      {row("events", "Events", "What happened, what came of it, and who is waiting", last && `Last at ${clock(last)}`)}
-      {row("resources", "Resources", "Who holds the simulators, browsers and screen, and who is waiting",
-        held + waiting > 0 ? `${held} held, ${waiting} waiting` : null)}
-      {row("runtimes", "Runtimes", "What each runtime can be started on right now",
-        tally ? (tally.working === 0 ? `None of ${tally.total} working` : `${tally.working} of ${tally.total} working`) : null,
-        tally?.working === 0)}
-      {row("mcp", "Connectors", "Every connector in your own mcp.json, and how each is doing",
-        mcp?.words ?? null, mcp?.failing ?? false)}
-      {row("worktrees", "Worktrees", "Every folder's worktrees, and how much each holds", worktrees)}
-    </>
-  );
-}
 
 const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", mcp: "Connectors", worktrees: "Worktrees", spending: "Cost", tokens: "Tokens", time: "Time", milestones: "Milestones" };
 
