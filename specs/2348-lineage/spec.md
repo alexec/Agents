@@ -19,7 +19,7 @@ A graph that links the parts of the SDLC. The host keeps it. The other slices fi
   - `rel`: `works-on`, `opens`, `fixes`, `started`, `reviews`, `closes`, `part-of`. The
     list is open.
   - `source` (how the host knows it): `start`, `branch`, `pr-body`, `helper`, `agent`,
-    `person`. The list is open.
+    `person`, `forge`. The list is open.
   - At most one link from, to, rel is active at a time. To link it again while it is active
     changes nothing. An ended link can start again, as a new link.
   - Many-to-many needs nothing more: one session opens many PRs, and many sessions work on
@@ -104,6 +104,8 @@ goroutine writes them in order, away from the agent lock.
 | `pr.merged` or `pr.closed` | the sessions' links to the PR end | |
 | `pr.closed` (no merge) | the PR's `fixes` links end too: it fixed nothing | |
 | A session is archived | the links from it end | |
+| The host knows a forge issue (a session's `#n`, a PR's fixes) and the forge says its milestone (#2935) | issue `part-of` the milestone, `github:<owner>/<repo>/milestone/<number>` or `gitlab:<group>/<project>/milestone/<iid>` | `forge` |
+| The issue is named again, an hour or more after the host last asked, and its milestone is another one or none | the old `part-of` link ends; a new one starts | |
 
 - **Refs.** The folder's `origin` remote names the repo for `#n` and `P#n`:
   `github:<owner>/<repo>#n`, or on GitLab `gitlab:<group>/<project>#n` for an issue and
