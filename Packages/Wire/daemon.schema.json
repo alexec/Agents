@@ -709,10 +709,33 @@
           "items": {
             "$ref": "#/definitions/AgentMachinesProvider"
           }
+        },
+        "hosts": {
+          "description": "Every machine of the person's, by name, where start_session can start a session (#2887). Absent from an older control plane.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AgentMachinesHost"
+          }
         }
       },
       "required": [
         "providers"
+      ],
+      "additionalProperties": false
+    },
+    "AgentMachinesHost": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "state"
       ],
       "additionalProperties": false
     },
@@ -12598,6 +12621,23 @@
       },
       "additionalProperties": false
     },
+    "MachineSessionStart": {
+      "type": "object",
+      "description": "machines/startSession, through host/machines (#2887): an agent's start_session on another of the person's machines, by its name. The control plane sends that machine's agents/start.",
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "start": {
+          "$ref": "#/definitions/StartRequest"
+        }
+      },
+      "required": [
+        "host",
+        "start"
+      ],
+      "additionalProperties": false
+    },
     "MachineStatus": {
       "type": "object",
       "description": "host/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next scheduled workflow.",
@@ -21573,6 +21613,10 @@
         "voice": {
           "description": "Started from voice mode (#2375): its first prompt asks for a short spoken reply, as agents/prompt's voice does.",
           "type": "boolean"
+        },
+        "startedFrom": {
+          "$ref": "#/definitions/StartedFrom",
+          "description": "An agent on another machine started it, through the control plane (#2887): its chat says who."
         }
       },
       "required": [
@@ -21584,6 +21628,27 @@
         "additionalDirectories",
         "mcpServers",
         "labels"
+      ],
+      "additionalProperties": false
+    },
+    "StartedFrom": {
+      "type": "object",
+      "description": "The agent on another machine that started a session with start_session (#2887). The control plane writes machine and who; the asking host writes agent.",
+      "properties": {
+        "machine": {
+          "type": "string"
+        },
+        "agent": {
+          "$ref": "#/definitions/UUID"
+        },
+        "who": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "machine",
+        "agent",
+        "who"
       ],
       "additionalProperties": false
     },

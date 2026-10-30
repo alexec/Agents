@@ -286,6 +286,10 @@ func (d *Daemon) startSession(caller wire.UUID, args map[string]json.RawMessage)
 	if rt == nil {
 		return "", Invalid("Nothing was started: there is no runtime called \"%s\" — this version knows %s.", runtimeID, knownRuntimes())
 	}
+	// Another machine has runtimes, folders and limits of its own (#2887).
+	if onMachine(args) != "" {
+		return d.startOnMachine(me, args, helperRequest(runtimeID, "", prompt, model, mode, nil, labels))
+	}
 	if why := d.unavailableRuntime(rt); why != "" {
 		return "", Invalid("Nothing was started: %s.", why)
 	}
@@ -635,6 +639,11 @@ func (d *Daemon) startAutoHelper(me *wire.Agent, args map[string]json.RawMessage
 		}
 		return "", Invalid("Nothing was started: %s would let it do more without asking than you may (%s). Name no mode and it takes yours.",
 			permissionWord(*levels.Permission), ownWords)
+	}
+	if onMachine(args) != "" {
+		r := helperRequest(autoRuntimeID, "", prompt, "", nil, nil, labels)
+		r.Levels = levels
+		return d.startOnMachine(me, args, r)
 	}
 	folder := folderPath(me)
 	worktree, err := d.helperWorktree(argString(args, "worktree"), folder)

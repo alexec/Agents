@@ -130,6 +130,7 @@ const (
 	MethodHostsDropKept     = "hosts/dropKept"
 	MethodHostsRetryKept    = "hosts/retryKept"
 	MethodWorkspacesAgent   = "machines/forAgent"
+	MethodSessionOnMachine  = "machines/startSession"
 	MethodHostMachines      = "host/machines"
 	MethodHostProviderDraft = "host/providerDraft"
 	MethodHostStatus        = "host/status"
@@ -161,7 +162,7 @@ var WorkspaceMethods = map[string]bool{
 // through host/machines.
 var AgentWorkspaceMethods = map[string]bool{
 	MethodWorkspacesAgent: true, MethodHostsStart: true, MethodHostsStop: true, MethodProvidersOptions: true,
-	MethodProvidersCreate: true, MethodHostsDelete: true,
+	MethodProvidersCreate: true, MethodHostsDelete: true, MethodSessionOnMachine: true,
 }
 
 // KeptMethods is DaemonAPI.Method.keptMethods: the only requests that are kept.
@@ -300,6 +301,9 @@ type AgentProvider = wire.AgentMachinesProvider
 
 // AgentWorkspace is DaemonAPI.AgentMachines.Workspace.
 type AgentWorkspace = wire.AgentMachinesMachine
+
+// AgentHost is AgentMachinesHost: one of the person's machines, for start_session (#2887).
+type AgentHost = wire.AgentMachinesHost
 
 // MachineStatus is DaemonAPI.MachineStatus: host/status on channel 0 (#691 US4). Running is
 // "Claude (fix-login)" for each agent working or waiting on a person; Schedule is nil from

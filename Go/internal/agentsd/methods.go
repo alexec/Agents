@@ -132,6 +132,10 @@ func (d *Daemon) register() {
 		return d.listAgents(r), nil
 	})
 	On(d, wire.CallAgentsStart, func(ctx context.Context, c *Client, r wire.StartRequest) (wire.UUID, error) {
+		// An agent on another machine asked for it (#2887): its labels are an agent's.
+		if r.StartedFrom != nil {
+			return d.startFor(r, startedBy{owner: wire.SessionLabelOwnerAgent, actor: c.actor})
+		}
 		return d.startAs(r, c.actor)
 	})
 	On(d, wire.CallAgentsStop, func(ctx context.Context, c *Client, r wire.AgentStopRequest) (wire.Empty, error) {

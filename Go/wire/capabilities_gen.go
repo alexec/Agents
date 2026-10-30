@@ -108,6 +108,7 @@ const CapRuntime1 = "runtime/1"
 const CapRuntimesAccounts1 = "runtimes.accounts/1"
 const CapRuntimes1 = "runtimes/1"
 const CapSandbox1 = "sandbox/1"
+const CapSessionsOnMachine1 = "sessions.on-machine/1"
 const CapSessions1 = "sessions/1"
 const CapShell1 = "shell/1"
 const CapSigninAsk1 = "signin.ask/1"
@@ -596,6 +597,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"links/remove", "links/1"},
 	{"links/requests", "links/1"},
 	{"machines/forAgent", "machines/1"},
+	{"machines/startSession", "sessions.on-machine/1"},
 	{"notices/take", "notices/1"},
 	{"orgRoutes/check", "org-routes/1"},
 	{"orgRoutes/list", "org-routes/1"},

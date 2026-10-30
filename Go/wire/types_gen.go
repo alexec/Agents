@@ -368,6 +368,15 @@ const AgentGroupArchived AgentGroup = "archived"
 // machines/forAgent: what list_machines shows an agent.
 type AgentMachines struct {
 	Providers []AgentMachinesProvider `json:"providers"`
+
+	// Every machine of the person's, by name, where start_session can start a session (#2887). Absent from an older control plane.
+	Hosts []AgentMachinesHost `json:"hosts,omitzero"`
+}
+
+type AgentMachinesHost struct {
+	Name string `json:"name"`
+
+	State string `json:"state"`
 }
 
 type AgentMachinesMachine struct {
@@ -5456,6 +5465,13 @@ type MachineSchedule struct {
 	Workflow *string `json:"workflow,omitzero"`
 }
 
+// machines/startSession, through host/machines (#2887): an agent's start_session on another of the person's machines, by its name. The control plane sends that machine's agents/start.
+type MachineSessionStart struct {
+	Host string `json:"host"`
+
+	Start StartRequest `json:"start"`
+}
+
 // host/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next scheduled workflow.
 type MachineStatus struct {
 	Idle bool `json:"idle"`
@@ -9354,6 +9370,18 @@ type StartRequest struct {
 
 	// Started from voice mode (#2375): its first prompt asks for a short spoken reply, as agents/prompt's voice does.
 	Voice *bool `json:"voice,omitzero"`
+
+	// An agent on another machine started it, through the control plane (#2887): its chat says who.
+	StartedFrom *StartedFrom `json:"startedFrom,omitzero"`
+}
+
+// The agent on another machine that started a session with start_session (#2887). The control plane writes machine and who; the asking host writes agent.
+type StartedFrom struct {
+	Machine string `json:"machine"`
+
+	Agent UUID `json:"agent"`
+
+	Who string `json:"who"`
 }
 
 // A started machine in people/removePreview: the branches and worktrees on it with work that is not pushed. `unknown` says why it could not be asked (offline, or it did not answer), and then `unpushed` is empty.

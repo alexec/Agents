@@ -32,7 +32,7 @@ host/status (host)
 {}
 
 host/machines (host)
-{"providers":[{"id":"<provider>","name":"DigitalOcean","canMake":true,"canDelete":true,"options":{"properties":{"size":{"enum":["small","big"],"title":"Size","type":"string","x-costs":{"big":"$0.05/hour","small":"$0.01/hour"}}},"type":"object"},"workspaces":[{"id":"agents-devbox","name":"agents-devbox","state":"stopped"},{"id":"scratch-1","name":"scratch-1","state":"running"}]}]}
+{"providers":[{"id":"<provider>","name":"DigitalOcean","canMake":true,"canDelete":true,"options":{"properties":{"size":{"enum":["small","big"],"title":"Size","type":"string","x-costs":{"big":"$0.05/hour","small":"$0.01/hour"}}},"type":"object"},"workspaces":[{"id":"agents-devbox","name":"agents-devbox","state":"stopped"},{"id":"scratch-1","name":"scratch-1","state":"running"}]}],"hosts":[{"name":"devbox","state":"online"},{"name":"other","state":"offline"}]}
 
 host/machines (host) refused
 {"code":-32045,"message":"Agents can’t ask that of the control plane."}

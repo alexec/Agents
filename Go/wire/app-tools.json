@@ -228,11 +228,15 @@
     "title": "Hang up voice mode"
   },
   {
-    "description": "Start another session in this folder, with a prompt of its own, to do a part of the work that can run alongside the rest. It starts in this folder — there is no way to start one anywhere else — and appears in the person's list of sessions, marked as started by you. The person can open it, talk to it, stop it or archive it at any time.\n\nThis folder has two limits on sessions started by sessions, counting every one here, which only the person sets (in Folder Settings): how many may be running — working, waiting on a question, or waiting to carry on by itself — and how many may exist not yet archived, where stopped, finished and asking-to-be-archived ones still count. A start that would break either is queued instead, saying which: nothing runs yet, and it starts by itself, oldest first, once a running place and a not-archived place are both free, behind the working and waiting ones. So you can queue work up front rather than wait and try again; wait for a queued session with wait_for_agents as for any other. A third limit says how many may be queued; past it a start is refused. Use list_sessions with started_by me to see yours and how many places of each are in use. Stop one with stop_session when its part is no longer wanted: that frees its running place, and it keeps its other place until it is archived. Once its work is merged or abandoned, call archive_session on it to free that place too (at once where the person allows it, otherwise by asking them); archive a finished session rather than removing its worktree under it.\n\nStart one only when part of the work can genuinely run alongside the rest. Do not start one for work you could simply do yourself. The session you start cannot start sessions of its own.\n\nReturns the new session's id, which stop_session and archive_session take.",
+    "description": "Start another session in this folder, with a prompt of its own, to do a part of the work that can run alongside the rest. It starts in this folder, or, with machine and folder, on another of the person's machines, and appears in the person's list of sessions, marked as started by you. The person can open it, talk to it, stop it or archive it at any time.\n\nThis folder has two limits on sessions started by sessions, counting every one here, which only the person sets (in Folder Settings): how many may be running — working, waiting on a question, or waiting to carry on by itself — and how many may exist not yet archived, where stopped, finished and asking-to-be-archived ones still count. A start that would break either is queued instead, saying which: nothing runs yet, and it starts by itself, oldest first, once a running place and a not-archived place are both free, behind the working and waiting ones. So you can queue work up front rather than wait and try again; wait for a queued session with wait_for_agents as for any other. A third limit says how many may be queued; past it a start is refused. Use list_sessions with started_by me to see yours and how many places of each are in use. Stop one with stop_session when its part is no longer wanted: that frees its running place, and it keeps its other place until it is archived. Once its work is merged or abandoned, call archive_session on it to free that place too (at once where the person allows it, otherwise by asking them); archive a finished session rather than removing its worktree under it.\n\nOn another machine (list_machines names them), for work that has to run there, such as a bug only that machine shows: the person is asked first, on your question card, and nothing starts without their yes. folder is a path on that machine, which has the code already. A stopped machine is started, and the session starts when it connects. The session there is not in this folder: this folder's limits do not count it, and list_sessions, message_session, wait_for_agents, stop_session and archive_session do not reach it. Say in its prompt what to do with its result, such as push a branch or open a pull request; the person sees it under that machine.\n\nStart one only when part of the work can genuinely run alongside the rest. Do not start one for work you could simply do yourself. The session you start cannot start sessions of its own.\n\nReturns the new session's id, which stop_session and archive_session take.",
     "inputSchema": {
       "properties": {
         "description": {
           "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        },
+        "folder": {
+          "description": "With machine: the folder to work in on that machine, as an absolute path.",
           "type": "string"
         },
         "labels": {
@@ -241,6 +245,10 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "machine": {
+          "description": "Optional. Another of the person's machines, by name, as list_machines shows it, to start the session there instead of here. Needs folder.",
+          "type": "string"
         },
         "model": {
           "description": "Optional. The model, as a workflow's `model:`. One the runtime does not offer is refused, naming the ones it does.",
@@ -259,7 +267,7 @@
           "type": "string"
         },
         "worktree": {
-          "description": "Optional. Where the new session works. Leave out to work in the folder. \"new\" makes a fresh git worktree, on its own branch, named from the prompt — for parallel work that should not touch the same files. Or the name of a worktree of this repository that is already there, as `git worktree list` shows it. Or the name of a branch not checked out anywhere, local or on a remote, to make a fresh worktree on that branch.",
+          "description": "Optional. Where the new session works. Leave out to work in the folder. \"new\" makes a fresh git worktree, on its own branch, named from the prompt — for parallel work that should not touch the same files. Or the name of a worktree of this repository that is already there, as `git worktree list` shows it. Or the name of a branch not checked out anywhere, local or on a remote, to make a fresh worktree on that branch. On another machine, \"new\" or a branch name.",
           "type": "string"
         }
       },
@@ -269,7 +277,7 @@
       "type": "object"
     },
     "name": "start_session",
-    "title": "Start a session in this folder"
+    "title": "Start a session"
   },
   {
     "description": "Stop a session you started with start_session, as the person's own Stop would. It stays in the list with its conversation. Stopping frees its running place; it keeps its not-archived place until it is archived. Stopping a queued one takes it off the queue, and it never starts. Only sessions you started, and the ones they started, can be stopped this way; not yourself, and not anyone else's.",
@@ -633,7 +641,7 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "The machines this control plane's hosts run on, from every machine provider:             each machine's state, the host it is linked to and that host's state, and, for             a provider that can make machines, the choices a new one takes.",
+    "description": "The machines this control plane's hosts run on, from every machine provider: each machine's state, the host it is linked to and that host's state, and, for a provider that can make machines, the choices a new one takes. Then every machine of the person's by name and state, made by a provider or not, where start_session with machine can start a session.",
     "inputSchema": {
       "properties": {
         "description": {
