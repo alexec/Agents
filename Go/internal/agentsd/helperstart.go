@@ -120,6 +120,10 @@ func (d *Daemon) heldMessage(q wire.QueuedPrompt, target *wire.Agent) bool {
 	if q.Sender == nil {
 		return true
 	}
+	// Its starter on another machine: its words go at once (#2927).
+	if from := d.startedFromOf(target.ID); from != nil && from.Agent == q.Sender.AgentID {
+		return false
+	}
 	sender := d.Store.Agent(q.Sender.AgentID)
 	return sender == nil || d.holdsMessageFrom(target, sender) != ""
 }
@@ -523,6 +527,9 @@ func (d *Daemon) listHelpers(caller *wire.Agent) string {
 	places := "This folder has " + d.helperPlaces(folder) + "."
 	var mine []wire.Agent
 	for _, a := range append(d.helpersIn(folder), d.helperQueue(folder)...) {
+		if d.Store.Agent(a.ID) == nil {
+			continue
+		}
 		for _, s := range d.starters(&a) {
 			if s == caller.ID {
 				mine = append(mine, a)
@@ -531,7 +538,8 @@ func (d *Daemon) listHelpers(caller *wire.Agent) string {
 		}
 	}
 	runtimes := d.runtimeChoices(caller.RuntimeID)
-	if len(mine) == 0 {
+	there := d.listThere(caller.ID)
+	if len(mine) == 0 && len(there) == 0 {
 		return "You have not started any sessions that are still here. " + places + "\n" + runtimes
 	}
 	lines := []string{places}
@@ -543,7 +551,7 @@ func (d *Daemon) listHelpers(caller *wire.Agent) string {
 		}
 		lines = append(lines, "- "+string(a.ID)+": "+quotedTitle(a.Title)+below+" — "+helperStatus(&a, queue)+labelsLine(&a)+waitingLine(&a, caller.ID))
 	}
-	return strings.Join(append(lines, runtimes), "\n")
+	return strings.Join(append(append(lines, there...), runtimes), "\n")
 }
 
 func helperStatus(a *wire.Agent, queue []wire.Agent) string {

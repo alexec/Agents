@@ -113,7 +113,8 @@ func TestAnAgentStartsASessionOnAnotherMachine(t *testing.T) {
 	card(3)
 	c.call(t, 4, "elicitations/answer", map[string]any{"requestID": pending[0].ID, "action": "accept", "content": map[string]any{"go": "yes"}})
 	if text := <-answered; text != "Started “Check the Windows bug” on pc, in /home/me/app (id 11111111-2222-3333-4444-555555555555). "+
-		"It is not in this folder, so the tools for your sessions don’t reach it; the person sees it under pc." {
+		"list_sessions, read_session, message_session, wait_for_agents, stop_session and archive_session reach it by its id, "+
+		"and it counts in this folder's limits until it is archived; the person sees it under pc. This folder now has 1 of 3 running, 1 of 5 not archived." {
 		t.Fatal(text)
 	}
 	mu.Lock()
