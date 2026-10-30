@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Policy layers — mock-up</title>
+<style>
+:root {
+  color-scheme: light;
+  --paper-ground: #f7f8f9; --paper-sidebar: #f0f1f3; --paper-raised: #ffffff; --paper-well: #f0f2f4;
+  --paper-wash: #e7eaee; --paper-rule: #dde1e6; --paper-ink: #1c1d20; --paper-selection: #d8dee6;
+  --muted: #5f646b; --faint: #8a9098;
+  --accent: #1f5fc8; --accent-soft: #e3ecfa;
+  --tint-attention: #ba4a13; --tint-failure: #b4232b; --tint-vouched: #2d765c;
+  --org: #6b4bb5; --org-soft: #efeafb;
+  --folder: #2d765c; --folder-soft: #e5f2ec;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --paper-ground: #1c1d20; --paper-sidebar: #161719; --paper-raised: #26282c; --paper-well: #2a2d31;
+    --paper-wash: #33363b; --paper-rule: #3a3e44; --paper-ink: #e8eaed; --paper-selection: #3a3e44;
+    --muted: #a7adb5; --faint: #7c838c;
+    --accent: #7fb0ff; --accent-soft: #24324a;
+    --tint-attention: #f0a06b; --tint-failure: #f08086; --tint-vouched: #8bc6a7;
+    --org: #b9a2f2; --org-soft: #2e2840;
+    --folder: #8bc6a7; --folder-soft: #22332b;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper-ground); color: var(--paper-ink);
+  font: 14px/1.45 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+main { max-width: 1120px; margin: 0 auto; padding: 32px 24px 96px; }
+h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.01em; }
+h2 { font-size: 20px; margin: 56px 0 4px; padding-top: 18px; border-top: 1px solid var(--paper-rule); }
+.frame-id { font-size: 12px; font-weight: 700; color: var(--accent); letter-spacing: .04em; text-transform: uppercase; }
+p { margin: 6px 0; color: var(--muted); max-width: 800px; }
+.lede { font-size: 16px; }
+.byline { color: var(--faint); font-size: 12px; }
+.toc { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0 0; }
+.toc a { text-decoration: none; color: var(--accent); background: var(--paper-raised); border: 1px solid var(--paper-rule);
+  padding: 3px 10px; border-radius: 14px; font-size: 13px; }
+
+/* A Mac window */
+.win { margin-top: 16px; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: 12px;
+  box-shadow: 0 10px 30px rgb(32 36 42 / 12%); overflow: hidden; }
+.bar { height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 12px; background: var(--paper-sidebar);
+  border-bottom: 1px solid var(--paper-rule); font-size: 13px; font-weight: 600; color: var(--muted); }
+.dots { display: flex; gap: 7px; margin-right: 10px; }
+.dots i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; display: block; }
+.dots i:nth-child(2) { background: #febc2e; } .dots i:nth-child(3) { background: #28c840; }
+.body { display: grid; grid-template-columns: 210px 1fr; min-height: 560px; }
+.rail { background: var(--paper-sidebar); border-right: 1px solid var(--paper-rule); padding: 12px 8px; font-size: 13px; }
+.rail .grp { font-size: 11px; font-weight: 700; color: var(--faint); margin: 14px 8px 4px; }
+.rail .grp:first-child { margin-top: 2px; }
+.rail .row { padding: 4px 8px; border-radius: 6px; display: flex; gap: 8px; align-items: center; }
+.rail .row.sel { background: var(--paper-selection); font-weight: 600; }
+.rail .row .ic { width: 16px; text-align: center; opacity: .75; }
+.rail .row.new::after { content: "new"; margin-left: auto; font-size: 10px; font-weight: 700; color: var(--accent);
+  background: var(--accent-soft); padding: 0 6px; border-radius: 8px; }
+.rail .row.gone { text-decoration: line-through; color: var(--faint); }
+.pane { padding: 20px 28px 28px; overflow: hidden; }
+.pane h3 { font-size: 20px; margin: 0 0 2px; }
+.pane .sub { color: var(--muted); font-size: 13px; margin: 0 0 14px; max-width: 640px; }
+
+/* Grouped form */
+.sec { margin: 18px 0 6px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.form { background: var(--paper-well); border-radius: 10px; }
+.item { display: grid; grid-template-columns: 1fr auto; gap: 2px 16px; padding: 10px 14px; border-top: 1px solid var(--paper-rule); }
+.item:first-child { border-top: 0; }
+.item .lbl { font-weight: 500; }
+.item .help { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
+.item .ctl { align-self: center; }
+.pop { display: inline-flex; gap: 8px; align-items: center; background: var(--paper-raised); border: 1px solid var(--paper-rule);
+  border-radius: 6px; padding: 2px 8px; font-size: 13px; min-width: 120px; justify-content: space-between; }
+.pop::after { content: "⌃⌄"; font-size: 9px; color: var(--faint); letter-spacing: -2px; }
+.num { display: inline-block; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: 6px;
+  padding: 2px 8px; font-size: 13px; min-width: 70px; text-align: right; }
+.sw { display: inline-block; width: 32px; height: 19px; border-radius: 10px; background: var(--accent); position: relative; vertical-align: middle; }
+.sw::after { content: ""; position: absolute; right: 2px; top: 2px; width: 15px; height: 15px; border-radius: 50%; background: #fff; }
+.sw.off { background: var(--paper-wash); } .sw.off::after { right: auto; left: 2px; }
+
+/* The mark that says who sets the bound */
+.mark { grid-column: 1 / -1; font-size: 12px; display: flex; gap: 6px; align-items: center; margin-top: 2px; }
+.chip { font-size: 11px; font-weight: 600; padding: 0 7px; border-radius: 9px; white-space: nowrap; }
+.chip.org { color: var(--org); background: var(--org-soft); }
+.chip.you { color: var(--accent); background: var(--accent-soft); }
+.chip.folder { color: var(--folder); background: var(--folder-soft); }
+.chip.grp { color: var(--tint-attention); background: color-mix(in srgb, var(--tint-attention) 14%, transparent); }
+.mark .why { color: var(--muted); }
+.mark a, .link { color: var(--accent); text-decoration: none; }
+.capped .lbl::after { content: " 🔒"; font-size: 11px; }
+
+.banner { display: flex; gap: 10px; align-items: flex-start; background: var(--org-soft); color: var(--paper-ink);
+  border-radius: 10px; padding: 10px 14px; font-size: 13px; margin-bottom: 6px; }
+.banner.you { background: var(--accent-soft); }
+.banner.folder { background: var(--folder-soft); }
+.banner b { display: block; }
+
+/* Menu open over a control */
+.menuwrap { position: relative; }
+.menu { position: absolute; right: 0; top: 26px; z-index: 2; width: 300px; background: var(--paper-raised);
+  border: 1px solid var(--paper-rule); border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / 18%); padding: 4px; font-size: 13px; }
+.menu div { padding: 4px 10px 4px 24px; border-radius: 5px; position: relative; }
+.menu .on::before { content: "✓"; position: absolute; left: 8px; }
+.menu .hl { background: var(--accent); color: #fff; }
+.menu .no { color: var(--faint); }
+.menu .no small { display: block; font-size: 11px; }
+.menu hr { border: 0; border-top: 1px solid var(--paper-rule); margin: 4px 0; }
+
+/* Layer stack popover */
+.stack { margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+.popover { background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: 12px; padding: 14px 16px;
+  box-shadow: 0 10px 30px rgb(32 36 42 / 12%); }
+.popover h4 { margin: 0 0 2px; font-size: 15px; }
+.layer { display: grid; grid-template-columns: 110px 1fr auto; gap: 8px; align-items: center; padding: 8px 0;
+  border-top: 1px solid var(--paper-rule); font-size: 13px; }
+.layer:first-of-type { border-top: 0; }
+.layer .v { font-weight: 600; }
+.layer.decides { background: var(--accent-soft); margin: 0 -8px; padding: 8px; border-radius: 6px; border-top-color: transparent; }
+.layer .note { color: var(--faint); font-size: 12px; }
+.arrow { text-align: center; color: var(--faint); font-size: 11px; margin: -2px 0; }
+
+/* Chat */
+.chat { padding: 18px 28px; background: var(--paper-ground); }
+.msg { background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: 10px; padding: 10px 14px; margin: 8px 0; max-width: 620px; }
+.msg.me { margin-left: auto; background: var(--accent-soft); border-color: transparent; }
+.notice { border-left: 3px solid var(--tint-attention); background: var(--paper-raised); border-radius: 8px; padding: 10px 14px; max-width: 620px; margin: 10px 0; }
+.notice b { color: var(--tint-attention); }
+.btn { display: inline-block; border: 1px solid var(--paper-rule); background: var(--paper-raised); border-radius: 6px; padding: 2px 10px; font-size: 12px; margin-right: 6px; margin-top: 6px; }
+.btn.pri { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* Tables */
+table { border-collapse: collapse; width: 100%; margin-top: 12px; font-size: 13px; background: var(--paper-raised);
+  border: 1px solid var(--paper-rule); border-radius: 10px; overflow: hidden; }
+th, td { text-align: left; padding: 7px 12px; border-top: 1px solid var(--paper-rule); vertical-align: top; }
+th { background: var(--paper-well); font-size: 12px; color: var(--muted); border-top: 0; }
+td.new { color: var(--accent); font-weight: 600; }
+.q { background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: 10px; padding: 12px 16px; margin-top: 10px; }
+.q b { display: block; margin-bottom: 2px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 860px) { .two, .stack { grid-template-columns: 1fr; } .body { grid-template-columns: 1fr; } .rail { display: none; } }
+</style>
+</head>
+<body>
+<main>
+<div class="byline">Mock-up · 2026-10-29 · issue #2957 · spec <code>specs/2957-policy-layers</code> · follows #998 (org policy) and its empty <code>groups</code> slot</div>
+<p><b>Note (2026-10-30):</b> the first version has three layers: Organisation, You and Folder (frame G, item 1). The Group layer (“Platform team”) in frames A, B and E comes later.</p>
+<h1>Govern agents with policies</h1>
+<p class="lede">One policy says what agents may do. It has layers: <span class="chip org">Organisation</span> → <span class="chip grp">Group</span> → <span class="chip you">You</span> → <span class="chip folder">Folder</span>. Each layer can only make a rule tighter. The tightest value applies. Every value shows the layer that sets it.</p>
+<p>Settings gets a new group, <b>Agents</b>. Its <b>Policy</b> pane is the editor for your own layer. The rules that are settings in five places today move into it.</p>
+<div class="toc">
+  <a href="#a">A · Settings ▸ Agents ▸ Policy</a>
+  <a href="#b">B · A rule's layers</a>
+  <a href="#c">C · A person alone</a>
+  <a href="#d">D · A folder's layer</a>
+  <a href="#e">E · When a rule stops an agent</a>
+  <a href="#f">F · What moves</a>
+  <a href="#g">G · Open questions</a>
+</div>
+
+<!-- ───────────── A ───────────── -->
+<h2 id="a"><span class="frame-id">A</span><br>Settings ▸ Agents ▸ Policy, in an organisation</h2>
+<p>Your own layer. A rule that the organisation limits shows 🔒 and a line under it. In a menu, the values above the limit are dimmed and say why. Mac window shown. The web page draws the same pane under Settings ▸ Agents.</p>
+
+<div class="win">
+  <div class="bar"><span class="dots"><i></i><i></i><i></i></span>Policy</div>
+  <div class="body">
+    <div class="rail">
+      <div class="grp">This app</div>
+      <div class="row"><span class="ic">◐</span>Appearance</div>
+      <div class="row"><span class="ic">▤</span>Sidebar</div>
+      <div class="row gone"><span class="ic">🔔</span>Notifications</div>
+      <div class="row"><span class="ic">🎙</span>Voice</div>
+      <div class="grp">Agents</div>
+      <div class="row sel new"><span class="ic">⛨</span>Policy</div>
+      <div class="row"><span class="ic">$</span>Spending</div>
+      <div class="row"><span class="ic">⧉</span>Resources</div>
+      <div class="grp">Machines</div>
+      <div class="row"><span class="ic">▭</span>Machines</div>
+      <div class="row"><span class="ic">⚙</span>Agent Runtimes</div>
+      <div class="row"><span class="ic">☰</span>Agent Configuration</div>
+      <div class="row"><span class="ic">🔑</span>Secrets</div>
+      <div class="grp">Control plane</div>
+      <div class="row"><span class="ic">👤</span>Account</div>
+      <div class="row"><span class="ic">👥</span>People</div>
+      <div class="row"><span class="ic">🏛</span>Organisation Policy</div>
+      <div class="row"><span class="ic">…</span>…</div>
+    </div>
+    <div class="pane">
+      <h3>Policy</h3>
+      <p class="sub">What agents may do on every machine you use. Only you change this, here or on your other clients. Agents cannot change it.</p>
+
+      <div class="banner"><span>🏛</span><span><b>Acme sets limits above yours</b>Platform team adds two. The tightest value applies. <a class="link" href="#">See Organisation Policy</a></span></div>
+
+      <div class="sec">Permissions</div>
+      <div class="form">
+        <div class="item capped">
+          <div class="lbl">Permission mode</div>
+          <div class="ctl menuwrap"><span class="pop">Approve for me</span>
+            <div class="menu">
+              <div>Plan</div>
+              <div>Ask</div>
+              <div class="on hl">Approve for me</div>
+              <div class="no">Bypass Permissions<small>Acme allows at most Approve for me</small></div>
+            </div>
+          </div>
+          <div class="help">How much an agent does before it asks you.</div>
+          <div class="mark"><span class="chip org">Acme</span><span class="why">at most Approve for me</span> · <a href="#b">Where this comes from</a></div>
+        </div>
+        <div class="item">
+          <div class="lbl">Permission requests</div>
+          <div class="ctl"><span class="pop">Ask me</span></div>
+          <div class="help">When an agent asks to do one thing: ask you, or approve it for you.</div>
+        </div>
+        <div class="item capped">
+          <div class="lbl">Sandbox</div>
+          <div class="ctl"><span class="pop">On</span></div>
+          <div class="help">Agents run in the runtime's sandbox.</div>
+          <div class="mark"><span class="chip org">Acme</span><span class="why">requires it</span></div>
+        </div>
+      </div>
+
+      <div class="sec">Money</div>
+      <div class="form">
+        <div class="item capped">
+          <div class="lbl">The most one agent may spend</div>
+          <div class="ctl"><span class="num">$5.00</span> <span class="num">400k tokens</span></div>
+          <div class="mark"><span class="chip org">Acme</span><span class="why">at most $10.00 · 1M tokens</span></div>
+        </div>
+        <div class="item capped">
+          <div class="lbl">The most a day may spend</div>
+          <div class="ctl"><span class="num">$40.00</span> <span class="num">—</span></div>
+          <div class="mark"><span class="chip grp">Platform team</span><span class="why">at most $25.00, so $25.00 applies</span> · <a href="#b">Where this comes from</a></div>
+        </div>
+      </div>
+
+      <div class="sec">Work at once</div>
+      <div class="form">
+        <div class="item capped">
+          <div class="lbl">Helpers running in each folder</div>
+          <div class="ctl"><span class="pop">4</span></div>
+          <div class="mark"><span class="chip org">Acme</span><span class="why">at most 6</span></div>
+        </div>
+        <div class="item">
+          <div class="lbl">Workflows turned on in each folder</div>
+          <div class="ctl"><span class="pop">10 (default)</span></div>
+        </div>
+      </div>
+
+      <div class="sec">Your attention</div>
+      <div class="form">
+        <div class="item">
+          <div class="lbl">Notices in a burst</div>
+          <div class="ctl"><span class="pop">3</span></div>
+          <div class="help">How many notifications agents may send before they wait.</div>
+        </div>
+        <div class="item">
+          <div class="lbl">Wait after a burst</div>
+          <div class="ctl"><span class="pop">10 minutes</span></div>
+        </div>
+        <div class="item">
+          <div class="lbl">Agents may archive the chats I start</div>
+          <div class="ctl"><span class="sw"></span></div>
+        </div>
+      </div>
+
+      <div class="sec">Tools</div>
+      <div class="form">
+        <div class="item capped">
+          <div class="lbl">Runtimes and models</div>
+          <div class="ctl"><a class="link" href="#">4 of 6 runtimes ›</a></div>
+          <div class="mark"><span class="chip org">Acme</span><span class="why">allows Claude, Codex, Copilot, OpenCode</span></div>
+        </div>
+        <div class="item capped">
+          <div class="lbl">Connectors added by hand</div>
+          <div class="ctl"><span class="sw off"></span></div>
+          <div class="mark"><span class="chip org">Acme</span><span class="why">does not allow them</span> · <a href="#">Ask for one</a></div>
+        </div>
+        <div class="item">
+          <div class="lbl">Environment variables agents get</div>
+          <div class="ctl"><a class="link" href="#">3 names ›</a></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────── B ───────────── -->
+<h2 id="b"><span class="frame-id">B</span><br>Where a rule comes from</h2>
+<p><b>Where this comes from</b> opens the rule's layers, from the top down. The layer that decides is lit. Left: a daily budget that the group limits. Right: a permission mode that a folder makes tighter.</p>
+<div class="stack">
+  <div class="popover">
+    <h4>The most a day may spend</h4>
+    <p style="margin:0 0 8px;font-size:12px">$25.00 applies. The tightest layer decides.</p>
+    <div class="layer"><span class="chip org">Acme</span><span class="v">$100.00</span><span class="note">Organisation</span></div>
+    <div class="layer decides"><span class="chip grp">Platform team</span><span class="v">$25.00</span><span class="note">Decides</span></div>
+    <div class="layer"><span class="chip you">You</span><span class="v">$40.00</span><span class="note">Kept, not used</span></div>
+    <div class="layer"><span class="chip folder">Folder</span><span class="note">—</span><span class="note">Not set</span></div>
+    <p style="font-size:12px;margin-top:8px">If Platform team raises its limit, your $40.00 applies again. Nothing you set is lost.</p>
+  </div>
+  <div class="popover">
+    <h4>Permission mode in <i>payments-api</i></h4>
+    <p style="margin:0 0 8px;font-size:12px">Ask applies in this folder.</p>
+    <div class="layer"><span class="chip org">Acme</span><span class="v">at most Approve for me</span><span class="note"></span></div>
+    <div class="layer"><span class="chip grp">Platform team</span><span class="note">—</span><span class="note">Not set</span></div>
+    <div class="layer"><span class="chip you">You</span><span class="v">Approve for me</span><span class="note"></span></div>
+    <div class="layer decides"><span class="chip folder">payments-api</span><span class="v">Ask</span><span class="note">Decides</span></div>
+    <p style="font-size:12px;margin-top:8px">From <code>.agents/policy.json</code> in the folder, committed with its code.</p>
+  </div>
+</div>
+
+<!-- ───────────── C ───────────── -->
+<h2 id="c"><span class="frame-id">C</span><br>A person alone, with no organisation</h2>
+<p>The same pane. Your layer is the top layer, so there are no locks and no marks. This is the usual case today.</p>
+<div class="win">
+  <div class="bar"><span class="dots"><i></i><i></i><i></i></span>Policy</div>
+  <div class="body" style="min-height:0">
+    <div class="rail">
+      <div class="grp">This app</div>
+      <div class="row"><span class="ic">◐</span>Appearance</div>
+      <div class="row"><span class="ic">▤</span>Sidebar</div>
+      <div class="row"><span class="ic">🎙</span>Voice</div>
+      <div class="grp">Agents</div>
+      <div class="row sel"><span class="ic">⛨</span>Policy</div>
+      <div class="row"><span class="ic">$</span>Spending</div>
+      <div class="row"><span class="ic">⧉</span>Resources</div>
+      <div class="grp">Machines</div>
+      <div class="row"><span class="ic">▭</span>Machines</div>
+      <div class="row"><span class="ic">…</span>…</div>
+    </div>
+    <div class="pane">
+      <h3>Policy</h3>
+      <p class="sub">What agents may do on every machine you use. Only you change this, here or on your other clients. Agents cannot change it.</p>
+      <div class="banner you"><span>⛨</span><span><b>You set every limit</b>A folder can make a rule tighter for its own agents. <a class="link" href="#d">See folders with their own rules (2)</a></span></div>
+      <div class="sec">Permissions</div>
+      <div class="form">
+        <div class="item"><div class="lbl">Permission mode</div><div class="ctl"><span class="pop">Bypass Permissions</span></div></div>
+        <div class="item"><div class="lbl">Permission requests</div><div class="ctl"><span class="pop">Approve for me</span></div></div>
+        <div class="item"><div class="lbl">Sandbox</div><div class="ctl"><span class="pop">The runtime's</span></div></div>
+      </div>
+      <div class="sec">Money</div>
+      <div class="form">
+        <div class="item"><div class="lbl">The most one agent may spend</div><div class="ctl"><span class="num">No limit</span></div></div>
+        <div class="item"><div class="lbl">The most a day may spend</div><div class="ctl"><span class="num">$60.00</span> <span class="num">—</span></div></div>
+      </div>
+      <p style="font-size:12px;margin-top:10px;color:var(--faint)">Work at once, Your attention and Tools as in frame A.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────── D ───────────── -->
+<h2 id="d"><span class="frame-id">D</span><br>A folder's layer: Folder Settings ▸ Policy</h2>
+<p>A folder can only make your rules tighter. Each row starts at <b>Same as yours</b>. The layer is kept in <code>.agents/policy.json</code>, so the people who use the folder get the same rules. An agent can edit that file, so a change made outside the app waits for your OK, as a change to <code>.agents/folder.json</code> does today (#502).</p>
+<div class="two">
+  <div class="win">
+    <div class="bar"><span class="dots"><i></i><i></i><i></i></span>payments-api — Folder Settings</div>
+    <div class="pane">
+      <h3>Policy</h3>
+      <p class="sub">Rules for this folder's agents. They can only be tighter than yours.</p>
+      <div class="banner folder"><span>📁</span><span><b>Kept in .agents/policy.json</b>Commit it so the folder's other users get the same rules.</span></div>
+      <div class="form">
+        <div class="item">
+          <div class="lbl">Permission mode</div>
+          <div class="ctl menuwrap"><span class="pop">Ask</span>
+            <div class="menu">
+              <div>Same as yours (Approve for me)</div>
+              <hr>
+              <div>Plan</div>
+              <div class="on hl">Ask</div>
+              <div>Approve for me</div>
+              <div class="no">Bypass Permissions<small>Your policy allows at most Approve for me</small></div>
+            </div>
+          </div>
+          <div class="mark"><span class="chip folder">This folder</span><span class="why">tighter than yours</span></div>
+        </div>
+        <div class="item"><div class="lbl">Sandbox</div><div class="ctl"><span class="pop">Same as yours (On)</span></div></div>
+        <div class="item"><div class="lbl">The most one agent may spend</div><div class="ctl"><span class="pop">Same as yours ($5.00)</span></div></div>
+        <div class="item"><div class="lbl">Helpers running</div><div class="ctl"><span class="pop">2</span></div>
+          <div class="mark"><span class="chip folder">This folder</span><span class="why">yours is 4</span></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="win">
+    <div class="bar"><span class="dots"><i></i><i></i><i></i></span>Agents</div>
+    <div class="chat">
+      <div class="notice"><b>.agents/policy.json changed</b><br>
+        <span style="font-size:13px">An agent in <i>payments-api</i> changed the folder's rules. Permission mode: Ask → <b>Same as yours (Approve for me)</b>. This makes the rules looser, so it waits for your OK.</span><br>
+        <span class="btn pri">Allow</span><span class="btn">Keep Ask</span><span class="btn">Show Change</span>
+      </div>
+      <p style="font-size:12px">A change that only makes the rules tighter applies at once, and the notice says so.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────── E ───────────── -->
+<h2 id="e"><span class="frame-id">E</span><br>When a rule stops an agent</h2>
+<p>The chat says which rule stopped the agent, which layer set it, and where to change it. Only you see <b>Change</b> on a layer you can edit. Today Spending's "What the limits have stopped" says this. It stays on Spending, as a report.</p>
+<div class="win">
+  <div class="bar"><span class="dots"><i></i><i></i><i></i></span>Agents — payments-api</div>
+  <div class="chat">
+    <div class="msg me">Run the migration against staging and fix what fails.</div>
+    <div class="msg">I'll run <code>make migrate ENV=staging</code> first.</div>
+    <div class="notice"><b>Stopped by a policy</b><br>
+      <span style="font-size:13px">This folder allows <b>Ask</b>, so the agent asks before it runs a command. <span class="chip folder">payments-api</span></span><br>
+      <span class="btn pri">Allow Once</span><span class="btn">Deny</span><span class="btn">Change in Folder Settings ▸ Policy</span>
+    </div>
+    <div class="notice"><b>Stopped by a policy</b><br>
+      <span style="font-size:13px">Today's spending reached <b>$25.00</b>. No new turn starts until 00:00 UTC. <span class="chip grp">Platform team</span></span><br>
+      <span class="btn">Ask Platform team for More</span><span class="btn">Open Spending</span>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────── F ───────────── -->
+<h2 id="f"><span class="frame-id">F</span><br>What moves, and what stays</h2>
+<table>
+  <tr><th>Rule</th><th>Today</th><th>In the mock-up</th><th>Org policy today (#998)</th></tr>
+  <tr><td>Permission mode</td><td>Agent Runtimes ▸ Auto ▸ Mappings</td><td>Agents ▸ Policy. Auto keeps only what each runtime calls it.</td><td><code>modeCeiling</code></td></tr>
+  <tr><td>Permission requests</td><td>Agent Runtimes ▸ Auto ▸ Mappings</td><td>Agents ▸ Policy</td><td class="new">new rule</td></tr>
+  <tr><td>Sandbox</td><td>Agent Runtimes ▸ Auto ▸ Mappings</td><td>Agents ▸ Policy</td><td><code>sandbox</code></td></tr>
+  <tr><td>Per agent and per day: money, tokens</td><td>Spending</td><td>Agents ▸ Policy. Spending keeps today's use and what was stopped.</td><td><code>budgets</code></td></tr>
+  <tr><td>Helpers running, not archived</td><td>Folder Settings ▸ General</td><td>Agents ▸ Policy, and the folder's layer</td><td><code>helpers</code></td></tr>
+  <tr><td>Workflows turned on in each folder</td><td>Spending</td><td>Agents ▸ Policy</td><td class="new">new rule</td></tr>
+  <tr><td>Notices: burst, wait</td><td>This app ▸ Notifications</td><td>Agents ▸ Policy. The Notifications pane goes.</td><td class="new">new rule</td></tr>
+  <tr><td>Agents may archive my chats</td><td>This app ▸ Sidebar</td><td>Agents ▸ Policy</td><td class="new">new rule</td></tr>
+  <tr><td>Runtimes and models</td><td>Agent Runtimes (Include)</td><td>Agents ▸ Policy allows them. Agent Runtimes sets them up.</td><td><code>runtimes</code></td></tr>
+  <tr><td>Connectors and marketplaces</td><td>Folder ▸ Connectors</td><td>Agents ▸ Policy allows them. Folders add them.</td><td><code>marketplaces</code></td></tr>
+  <tr><td>Environment pass-through</td><td>A file (<code>runtime-environment.json</code>)</td><td>Agents ▸ Policy</td><td><code>environment</code></td></tr>
+  <tr><td>Stop All Agent Work</td><td>Control plane ▸ Policy (admin)</td><td>No change. Only the organisation layer has it.</td><td><code>stopAll</code></td></tr>
+  <tr><td>Resources (build, simulator, screen)</td><td>Resources</td><td><b>Stays a setting.</b> It says what a machine can take, not what an agent may do.</td><td>—</td></tr>
+</table>
+
+<!-- ───────────── G ───────────── -->
+<h2 id="g"><span class="frame-id">G</span><br>Settled (2026-10-30)</h2>
+<div class="q"><b>1. Three layers first.</b>Organisation, You and Folder (Alex). The <code>groups</code> slot stays, so a Group layer comes later with no change to the format.</div>
+<div class="q"><b>2. Your layer: on the Mac's host, signed.</b>Kept on the Mac's host as Spending's limits are now, signed with your key and sent to your other machines. No MCP tool or file in a folder can write it (Alex).</div>
+<div class="q"><b>3. Folder layer: a looser change waits for your OK.</b><code>.agents/policy.json</code>, committed. A change that only makes the rules tighter applies at once. A change that makes them looser waits for your OK, as <code>.agents/folder.json</code> does (#502) (Alex).</div>
+<div class="q"><b>4. Control plane ▸ Policy becomes Organisation Policy.</b>Decided by Claude, because there are now two policy panes and the names must not be mixed up. Alex can overrule.</div>
+<div class="q"><b>5. Tier: Core, and the Remote reads only at first.</b>Decided by Claude, because the Remote has Notifications today and a Mac + web tier would take that away from it. Alex can overrule.</div>
+</main>
+</body>
+</html>
