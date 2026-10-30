@@ -12,10 +12,11 @@ import (
 
 // start_session on another machine (#2887): the session goes to another of the person's
 // machines, by its name, through the control plane (machines/startSession), which sends
-// that machine's own agents/start. The person says yes first, every time. The session is
-// not in this folder, but this folder's limits count it, and the tools for an agent's own
-// sessions reach it through the control plane (elsewhere.go, #2927). With send, the
-// branch the agent is on goes to that folder first (sendthere.go, #2929).
+// that machine's own agents/start. The person says yes first, unless the folder's switch
+// says agents may start them without asking (#2928). The session is not in this folder,
+// but this folder's limits count it, and the tools for an agent's own sessions reach it
+// through the control plane (elsewhere.go, #2927). With send, the branch the agent is on
+// goes to that folder first (sendthere.go, #2929).
 
 // sessionOnMachine is the control plane's method for it, through host/machines.
 const sessionOnMachine = "machines/startSession"
@@ -74,17 +75,19 @@ func (d *Daemon) startOnMachine(me *wire.Agent, args map[string]json.RawMessage,
 	r.Cwd = store.PathURL(folder)
 	r.StartedFrom = &wire.StartedFrom{Agent: me.ID}
 	title := titleFrom(r.Prompt)
-	ask := fmt.Sprintf("Start a session on %s, in %s, to %s?", machine, folder, quotedTitle(&title))
-	if sending != nil {
-		ask = fmt.Sprintf("Send %s, with its uncommitted changes, to %s on %s, then start a session there to %s?",
-			sending.branch, folder, machine, quotedTitle(&title))
-	}
-	yes, err := d.personSaysYes(me.ID, d.agentWho(me.ID)+" wants to start a session on "+machine, ask, "Start it")
-	if err != nil {
-		return "", err
-	}
-	if !yes {
-		return "Nothing was started: the person said no, or didn’t answer.", nil
+	if !d.agentsMayStartOnMachines(here) {
+		ask := fmt.Sprintf("Start a session on %s, in %s, to %s?", machine, folder, quotedTitle(&title))
+		if sending != nil {
+			ask = fmt.Sprintf("Send %s, with its uncommitted changes, to %s on %s, then start a session there to %s?",
+				sending.branch, folder, machine, quotedTitle(&title))
+		}
+		yes, err := d.personSaysYes(me.ID, d.agentWho(me.ID)+" wants to start a session on "+machine, ask, "Start it")
+		if err != nil {
+			return "", err
+		}
+		if !yes {
+			return "Nothing was started: the person said no, or didn’t answer.", nil
+		}
 	}
 	sent := ""
 	if sending != nil {
@@ -113,6 +116,13 @@ func (d *Daemon) startOnMachine(me *wire.Agent, args map[string]json.RawMessage,
 	return sent + fmt.Sprintf("Started %s on %s, in %s (id %s). list_sessions, read_session, message_session, wait_for_agents, stop_session and archive_session "+
 		"reach it by its id, and it counts in this folder's limits until it is archived; the person sees it under %s. This folder now has %s.",
 		quotedTitle(&title), machine, folder, id, machine, d.helperPlaces(here)), nil
+}
+
+// agentsMayStartOnMachines is HelperLimits.agentsMayStartOnMachines (#2928): off unless the
+// person turned it on in Folder Settings.
+func (d *Daemon) agentsMayStartOnMachines(folder string) bool {
+	s, ok := d.summaryFor(folder)
+	return ok && s.Folder.HelperLimits != nil && s.Folder.HelperLimits.AgentsMayStartOnMachines != nil && *s.Folder.HelperLimits.AgentsMayStartOnMachines
 }
 
 // startedFromNote is what the chat of a session started from another machine says first.

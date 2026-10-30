@@ -3421,6 +3421,11 @@ export interface HelperLimits {
    * nothing uncommitted (#2886). On unless set.
    */
   archiveWhenMerged?: boolean;
+  /**
+   * start_session with a machine starts the session on another of the person's machines without
+   * asking first (#2928). Off unless set; only the person sets it, from Folder Settings.
+   */
+  agentsMayStartOnMachines?: boolean;
 }
 
 export interface HostedMCPSnapshot {
@@ -9745,7 +9750,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HandoverMember: { required: ["id", "name", "kind"], optional: ["knownEpoch", "version", "online", "lastSeen"] },
   HandoverStatus: { required: ["phase", "controlKey", "hasRecords", "endpoints", "members"], optional: ["epoch", "forwardingUntil"] },
   Headline: { required: ["h1", "h2", "h3"], optional: ["answers"] },
-  HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive", "continueWhenBack", "archiveWhenMerged"] },
+  HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive", "continueWhenBack", "archiveWhenMerged", "agentsMayStartOnMachines"] },
   HostedMCPSnapshot: { required: ["servers", "at"], optional: [] },
   HostedMCPStatus: { required: ["name", "state", "restarts", "users"], optional: ["since", "retryAt", "lastError", "folder"] },
   JoinApproved: { required: ["host"], optional: [] },

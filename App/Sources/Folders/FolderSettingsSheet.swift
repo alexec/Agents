@@ -339,6 +339,17 @@ private struct FolderGeneralPane: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
+                    row("Other machines") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            startOnMachines(in: summary)
+                            Text("On, a session here may start a session on another of your machines without "
+                                 + "asking you first. The new session's chat still says which session started it, "
+                                 + "and from which machine. Off, it asks you each time.")
+                                .appText(.fine)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
                     row("Low disk space") {
                         diskLine(\.lowGB, in: summary, default: DiskThresholds.defaultLowGB,
                                  choices: DiskThresholds.lowChoices)
@@ -463,6 +474,21 @@ private struct FolderGeneralPane: View {
         return Toggle("Helpers continue when the allowance is back", isOn: Binding(get: { kept.continueWhenBack == true }, set: { on in
             var limits = kept
             limits.continueWhenBack = on ? true : nil
+            Task { await model.setHelperLimits(limits, for: summary.key) }
+        }))
+        .toggleStyle(.switch)
+        .controlSize(.small)
+        .disabled(model.hosts.isOffline(summary.host))
+    }
+
+    /// Whether start_session with a machine skips the question to the person (#2928). Off is
+    /// the default, and back to nil. Only the person sets it, here.
+    private func startOnMachines(in summary: DaemonAPI.FolderSummary) -> some View {
+        let kept = summary.folder.helperLimits ?? HelperLimits()
+        return Toggle("Agents may start sessions on my other machines without asking",
+                      isOn: Binding(get: { kept.agentsMayStartOnMachines == true }, set: { on in
+            var limits = kept
+            limits.agentsMayStartOnMachines = on ? true : nil
             Task { await model.setHelperLimits(limits, for: summary.key) }
         }))
         .toggleStyle(.switch)

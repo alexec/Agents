@@ -4271,6 +4271,9 @@ type HelperLimits struct {
 
 	// A session whose pull request merges is archived, when its turn has ended and its worktree has nothing uncommitted (#2886). On unless set.
 	ArchiveWhenMerged *bool `json:"archiveWhenMerged,omitzero"`
+
+	// start_session with a machine starts the session on another of the person's machines without asking first (#2928). Off unless set; only the person sets it, from Folder Settings.
+	AgentsMayStartOnMachines *bool `json:"agentsMayStartOnMachines,omitzero"`
 }
 
 type HostedMCPSnapshot struct {

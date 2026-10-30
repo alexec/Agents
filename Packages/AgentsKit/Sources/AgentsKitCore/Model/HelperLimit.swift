@@ -141,16 +141,20 @@ public struct HelperLimits: Codable, Hashable, Sendable {
     /// its worktree has nothing uncommitted (#2886). Nil is the default,
     /// `HelperLimit.defaultArchiveWhenMerged`.
     public var archiveWhenMerged: Bool?
+    /// Whether `start_session` with a machine starts the session on another of the person's
+    /// machines without asking first (#2928). Nil is off.
+    public var agentsMayStartOnMachines: Bool?
 
     public init(running: Int? = nil, notArchived: Int? = nil, queued: Int? = nil,
                 agentsMayArchive: Bool? = nil, continueWhenBack: Bool? = nil,
-                archiveWhenMerged: Bool? = nil) {
+                archiveWhenMerged: Bool? = nil, agentsMayStartOnMachines: Bool? = nil) {
         self.running = running
         self.notArchived = notArchived
         self.queued = queued
         self.agentsMayArchive = agentsMayArchive
         self.continueWhenBack = continueWhenBack
         self.archiveWhenMerged = archiveWhenMerged
+        self.agentsMayStartOnMachines = agentsMayStartOnMachines
     }
 
     /// Whether agents may archive the helpers they started here: the person's
@@ -206,8 +210,9 @@ public struct HelperLimits: Codable, Hashable, Sendable {
         if kept.agentsMayArchive == HelperLimit.defaultAgentsMayArchive { kept.agentsMayArchive = nil }
         if kept.continueWhenBack == false { kept.continueWhenBack = nil }
         if kept.archiveWhenMerged == HelperLimit.defaultArchiveWhenMerged { kept.archiveWhenMerged = nil }
+        if kept.agentsMayStartOnMachines == false { kept.agentsMayStartOnMachines = nil }
         return kept.running == nil && kept.notArchived == nil && kept.queued == nil
             && kept.agentsMayArchive == nil && kept.continueWhenBack == nil
-            && kept.archiveWhenMerged == nil ? nil : kept
+            && kept.archiveWhenMerged == nil && kept.agentsMayStartOnMachines == nil ? nil : kept
     }
 }

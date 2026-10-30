@@ -317,9 +317,12 @@ func (d *Daemon) setHelperLimits(r wire.SetHelperLimitsRequest) (wire.FolderSumm
 	if l.ArchiveWhenMerged != nil && *l.ArchiveWhenMerged {
 		l.ArchiveWhenMerged = nil
 	}
+	if l.AgentsMayStartOnMachines != nil && !*l.AgentsMayStartOnMachines {
+		l.AgentsMayStartOnMachines = nil
+	}
 	var v any
 	if l.Running != nil || l.NotArchived != nil || l.Queued != nil || l.AgentsMayArchive != nil || l.ContinueWhenBack != nil ||
-		l.ArchiveWhenMerged != nil {
+		l.ArchiveWhenMerged != nil || l.AgentsMayStartOnMachines != nil {
 		v = l
 	}
 	if err := setFolderConfig(folder, "helperLimits", v); err != nil {
