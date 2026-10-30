@@ -124,6 +124,77 @@ goroutine writes them in order, away from the agent lock.
   work is on now: #2350 banks a turn's cost under the active links, and an ended link
   stays in the graph as history. Alex can overrule.
 
+## Cost on the link (#2350)
+
+Slice 3 banks each turn's cost under the links, in `Go/internal/agentsd/lineagecost.go`,
+and adds it up in `Go/internal/lineage/cost.go`.
+
+- **What is banked:** the cost of each `usage_update` (what the session's total rose by),
+  the tokens and the turn when the turn ends, and the time (the agent, its tools and
+  others at work; waiting for the person) when the time ledger banks it.
+- **Where it goes:** the session's **active** `works-on`, `opens` and `reviews` links to an
+  issue or a PR, split evenly (#2347). The tokens are whole: the first shares take what is
+  left over. `turns` is a share, so a turn on two nodes is half a turn on each.
+- **A helper** with no work of its own banks under its parent's work: the session that
+  `started` it, and so on up, at most 4 sessions. A helper with its own `#n` (a lane that
+  the Scrum Master started) banks under that.
+- **What is banked stays.** A label changed later moves nothing (#829).
+- **The order:** the banking runs on the linker's goroutine, after the links made before
+  it, so a turn sees the links made before it ended.
+- **The file:** `<root>/lineage-cost.json`, one total per node (`LineageCostNode`), saved
+  at most every 30 seconds and at shutdown. It keeps a node 90 days after its last change,
+  and at most 5,000 nodes; the oldest go first.
+- **A PR's end** is on its node (`outcome`): `merged`, `closed` (without a merge) or
+  `reverted` (a merged PR whose title starts `Revert`, as Reports counts `prsReverted`).
+  `checks.failed` counts its failed CI rounds (`failedChecks`). A PR closed without a merge
+  also links the issues its body closes, and those links end at once: it fixed nothing,
+  but its cost stays against them.
+
+### The rollups
+
+`lineage/cost` (`LineageNodeRequest` → `LineageCostRollup`, capability `lineage/1`) adds up
+a node from this machine's totals. Each part counts once.
+
+| Node | Its parts |
+| --- | --- |
+| A PR, a session, any other node | itself |
+| An issue | itself, and the PRs that fix it (ended `fixes` links too) |
+| A milestone | the issues and PRs `part-of` it, and the PRs that fix those issues |
+| A project (`kind` `project`, `ref` `github:alexec/agents`) | every node in that repo or tracker |
+
+- `own` is what was banked on the node itself, `total` adds its parts, `waste` is the
+  parts' PRs closed without a merge or reverted, and `unlinked` is the parts' sessions:
+  the turns with no active link.
+- `parts` is the nodes added up, newest first, at most 500.
+
+### The control plane
+
+- Each `usage/rollup` has `work`: the nodes whose total or rollup links changed since the
+  last send, each whole, at most 1,000 in one send.
+- The control plane keeps them in `v1/lineage/<host>.json`: a node sent replaces that
+  machine's copy. It keeps a node 90 days after its last change, at most 5,000 a machine.
+  The sweep deletes the file of a removed machine, when it is a day old.
+- The read of these on the control plane comes with the view (#2351): the machines'
+  copies of one node add up, as each banked its own turns.
+
+### Decisions on slice 3's open questions
+
+- **Decided: a turn with no active link goes under its session's own node, and the
+  project's rollup says the sum as `unlinked`.** Because then every turn is somewhere and
+  the totals add up to the real spend, and a report can show how much work had no issue.
+  Alex can overrule.
+- **Decided: a review session's cost is part of the PR's cost.** Because the PR page starts
+  a review with `P#n`, a `works-on` link to the PR, and a `reviews` link counts too. Alex
+  can overrule.
+- **Decided: a helper's own links come before its parent's.** Because the Scrum Master
+  starts each lane as its helper, and a lane's cost belongs to the lane's issue, not to
+  the Scrum Master's. Alex can overrule.
+- **Decided: a merged revert's own cost is waste, and failed CI rounds are a count, not a
+  cost.** Because a revert PR says only its title, not which PR it reverts, and no turn
+  belongs to a CI round. Alex can overrule.
+- **Decided: the milestone rollup reads `part-of` links; the host does not make them from
+  the forge yet** (#2935). A person can make one with `lineage/link`. Alex can overrule.
+
 ## Clients
 
 mac: no UI, remote: no UI, web: no UI (the view is #2351).

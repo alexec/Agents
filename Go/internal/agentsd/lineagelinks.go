@@ -23,7 +23,8 @@ import (
 //   - A helper is started by its parent session, a workflow's session by its run, and the
 //     run is part of its workflow.
 //   - pr.opened links the PR to every session that worked on its branch (opens), and the
-//     PR to the issues its body closes (fixes). pr.merged links what its body closes too.
+//     PR to the issues its body closes (fixes). pr.merged and pr.closed link what its body
+//     closes too, so a closed PR's cost stays against its issues (#2350).
 //   - pr.merged and pr.closed end the sessions' links to the PR; pr.closed also ends its
 //     fixes links, as a PR closed without a merge fixed nothing. An archived session's
 //     links end.
@@ -32,7 +33,7 @@ import (
 // the folder's git remote.
 
 // lineageJobsHeld bounds the work waiting; past it, a link is dropped and logged.
-const lineageJobsHeld = 256
+const lineageJobsHeld = 1024
 
 type lineageLinker struct {
 	linkerOnce sync.Once
@@ -292,6 +293,7 @@ func (d *Daemon) noteLineage(before *wire.Agent, a wire.Agent) {
 // prEventPayload is what a pr.* event of the GitHub and GitLab servers says of its PR.
 type prEventPayload struct {
 	PR struct {
+		Title  string   `json:"title"`
 		Branch string   `json:"branch"`
 		URL    string   `json:"url"`
 		Fixes  []string `json:"fixes"`
@@ -301,7 +303,7 @@ type prEventPayload struct {
 // lineageEvent makes the links a raised event says: pr.opened, pr.merged and pr.closed.
 func (d *Daemon) lineageEvent(e wire.Event) {
 	switch e.Name {
-	case "pr.opened", "pr.merged", "pr.closed":
+	case "pr.opened", "pr.merged", "pr.closed", "checks.failed":
 	default:
 		return
 	}
@@ -314,6 +316,10 @@ func (d *Daemon) lineageEvent(e wire.Event) {
 		return
 	}
 	pr := repo.pr(n)
+	if e.Name == "checks.failed" {
+		d.lineageDo(func() { d.notePROutcome(pr, e.Name, p.PR.Title) })
+		return
+	}
 	var sessions []wire.UUID
 	if e.Name == "pr.opened" && p.PR.Branch != "" {
 		for _, a := range d.Store.Agents() {
@@ -329,13 +335,15 @@ func (d *Daemon) lineageEvent(e wire.Event) {
 				d.link(sessionNode(id), pr, lineage.RelOpens, lineage.SourceBranch)
 			}
 		}
-		if e.Name != "pr.closed" {
-			for _, f := range p.PR.Fixes {
-				if issue, ok := fixedIssue(repo, f); ok {
-					d.link(pr, issue, lineage.RelFixes, lineage.SourcePRBody)
-				}
+		// A PR closed without a merge links its issues too, and the links end below: it fixed
+		// nothing, but its cost stays against them, as waste (#2350).
+		for _, f := range p.PR.Fixes {
+			if issue, ok := fixedIssue(repo, f); ok {
+				d.link(pr, issue, lineage.RelFixes, lineage.SourcePRBody)
 			}
 		}
+		// How it ended, for its cost (#2350).
+		d.notePROutcome(pr, e.Name, p.PR.Title)
 		if e.Name == "pr.opened" {
 			return
 		}

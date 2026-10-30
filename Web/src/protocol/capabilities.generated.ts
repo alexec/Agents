@@ -265,6 +265,7 @@ export const HostCapabilities: Readonly<Record<string, Capability>> = {
   "folders/unarchive": "folders/1",
   "folders/undoGuardedChange": "folders/1",
   "git/fill": "git/1",
+  "lineage/cost": "lineage/1",
   "lineage/end": "lineage/1",
   "lineage/link": "lineage/1",
   "lineage/links": "lineage/1",

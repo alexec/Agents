@@ -4456,6 +4456,76 @@ type LineMember struct {
 	IsCallOpen bool `json:"isCallOpen"`
 }
 
+// What was banked under lineage nodes (#2350): a turn's cost, tokens and time, split evenly among the links active when it was banked. turns is a share of turns, so a turn on two nodes is half a turn on each.
+type LineageCost struct {
+	// By currency.
+	Cost map[string]float64 `json:"cost"`
+
+	InputTokens int64 `json:"inputTokens"`
+
+	OutputTokens int64 `json:"outputTokens"`
+
+	// Fresh input and output, as a limit counts them (#998).
+	LimitTokens *int64 `json:"limitTokens,omitzero"`
+
+	Turns float64 `json:"turns"`
+
+	// The agent, its tools and others at work.
+	WorkingSeconds float64 `json:"workingSeconds"`
+
+	// Waiting for the person.
+	WaitingSeconds float64 `json:"waitingSeconds"`
+}
+
+// One node's banked cost on a machine (#2350), whole, with what its rollups need: the project its ref is in, the issues a PR fixes (ended links too: a PR closed without a merge still counts against its issue, as waste), the milestones it is part of, and how a PR ended. A session's own cost is its turns that had no active link.
+type LineageCostNode struct {
+	Node LineageNode `json:"node"`
+
+	// The repo or tracker the node is in: github:alexec/agents, linear, or for a session its folder's repo (folder:<name> without one).
+	Project *string `json:"project,omitzero"`
+
+	Banked LineageCost `json:"banked"`
+
+	// A PR's issues, by ref.
+	Fixes []string `json:"fixes,omitzero"`
+
+	// The milestones it is part of, by ref.
+	PartOf []string `json:"partOf,omitzero"`
+
+	// A PR's end: merged, closed (without a merge: waste) or reverted (a merged revert: waste). Absent while open. The list is open.
+	Outcome *string `json:"outcome,omitzero"`
+
+	// A PR's failed CI rounds: checks.failed, once per run and attempt.
+	FailedChecks *int64 `json:"failedChecks,omitzero"`
+
+	LastAt Date `json:"lastAt"`
+}
+
+// lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a milestone's issues, their PRs and the PRs part of it; a project's every node (kind project, ref github:alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.
+type LineageCostRollup struct {
+	Node LineageNode `json:"node"`
+
+	Own LineageCost `json:"own"`
+
+	Total LineageCost `json:"total"`
+
+	Waste LineageCost `json:"waste"`
+
+	Unlinked LineageCost `json:"unlinked"`
+
+	PrsMerged int64 `json:"prsMerged"`
+
+	PrsClosed int64 `json:"prsClosed"`
+
+	PrsReverted int64 `json:"prsReverted"`
+
+	FailedChecks int64 `json:"failedChecks"`
+
+	Parts []LineageCostNode `json:"parts"`
+
+	Limited *bool `json:"limited,omitzero"`
+}
+
 // lineage/end (#2348): the link from one node to another by this relationship stops being active now. Nothing is removed: the link keeps its start and gets an end.
 type LineageEndRequest struct {
 	From LineageNode `json:"from"`
@@ -10042,6 +10112,9 @@ type UsageRollup struct {
 	Hours []UsageRollupPeriod `json:"hours"`
 
 	Days []UsageRollupPeriod `json:"days"`
+
+	// The lineage nodes whose banked cost or rollup links changed since the last send (#2350), each whole: the control plane keeps a machine's latest of each, 90 days.
+	Work []LineageCostNode `json:"work,omitzero"`
 }
 
 // An hour ("2026-10-21T15") or a day ("2026-10-21"), in UTC, and its rows: the whole of that period on this machine, which replaces what was sent before.

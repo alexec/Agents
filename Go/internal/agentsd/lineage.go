@@ -19,6 +19,7 @@ type lineageBook struct {
 	lineageOnce  sync.Once
 	lineageStore lineage.Store
 	lineageLinker
+	costLedgerBook
 }
 
 func (d *Daemon) lineagePath() string { return filepath.Join(d.Store.Loc.Root, "lineage.jsonl") }
@@ -32,10 +33,12 @@ func (d *Daemon) lineage() lineage.Store {
 // closeLineage lets the file go at shutdown.
 func (d *Daemon) closeLineage() {
 	d.lineageSettle(2 * time.Second)
+	d.closeCost()
 	d.lineage().Close()
 }
 
 func (d *Daemon) registerLineage() {
+	d.registerLineageCost()
 	On(d, wire.CallLineageLink, func(_ context.Context, _ *Client, r wire.LineageLinkRequest) (wire.LineageLink, error) {
 		l, err := d.lineage().Link(r, nowFunc())
 		if err != nil {

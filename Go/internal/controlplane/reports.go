@@ -55,6 +55,9 @@ func (s *Service) keepRollup(ctx context.Context, host string, rollup wire.Usage
 	if len(rollup.Hours)+len(rollup.Days) > mostRollupPeriods {
 		return fail(invalidParams, "Send at most %d hours and days at a time.", mostRollupPeriods)
 	}
+	if err := s.keepWork(ctx, host, rollup.Work, now); err != nil {
+		return err
+	}
 	type period struct {
 		prefix, layout string
 		kept           time.Duration
