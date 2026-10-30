@@ -72,6 +72,7 @@ func appToolCalls() []appTool {
 		{"notify", (*Daemon).notify},
 		{"hang_up", (*Daemon).hangUp},
 		{"ask_question", (*Daemon).askQuestion},
+		{"ask_secret", (*Daemon).askSecret},
 		{"list_sessions", (*Daemon).listSessions},
 		{"read_session", (*Daemon).readSession},
 		{"message_session", (*Daemon).messageSession},
@@ -90,7 +91,7 @@ func appToolCalls() []appTool {
 }
 
 // askTools put a question to a person: none on a bot's machine (#1761, FR-032).
-var askTools = map[string]bool{"ask_question": true}
+var askTools = map[string]bool{"ask_question": true, "ask_secret": true}
 
 // startAppTools listens on loopback, once, for every session's tools.
 func (d *Daemon) startAppTools() (int, error) {

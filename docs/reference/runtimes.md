@@ -214,6 +214,15 @@ For Codex sessions that the app starts, the brief goes in Codex ACP's
 Codex as developer instructions. This keeps the person's first prompt free of the brief,
 including when the app loads or resumes the session.
 
+For Antigravity sessions that the app starts, the brief goes in
+`_meta.antigravity.systemPrompt.append`, but only when the server's `initialize` response
+advertises `agentCapabilities._meta.antigravity.systemPrompt.append`. Antigravity's ACP server
+1.4.5 does this, and gives the words to the model as system instructions for that session
+only. They do not go into the folder's shared rules. The server does not keep these words, so
+the app sends them again on each `session/new`, `session/load` and `session/resume`. Version
+1.2.1 does not advertise this capability. With that version, the brief stays before your words
+in the first prompt.
+
 For the conversations the app starts, each runtime's own tools for scheduling, starting
 other agents, sending notifications and saving documents elsewhere are taken away, so that
 the work stays where the app can see it. Reading, searching, editing, running commands,

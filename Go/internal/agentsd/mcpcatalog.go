@@ -702,17 +702,10 @@ func (d *Daemon) mcpSetSecret(r wire.MCPSetSecretRequest) (wire.MCPSetSecretAnsw
 	case r.Value == "":
 		return wire.MCPSetSecretAnswer{}, mcpRefusal(mcpcatalog.Failed("A secret needs a value."))
 	}
-	path := skillcatalog.SecretsPath(home)
-	env, err := skillcatalog.LoadSecretsForChange(path)
-	if err != nil {
+	if err := d.saveSecret(r.Name, r.Value); err != nil {
 		return wire.MCPSetSecretAnswer{}, mcpRefusal(mcpcatalog.Failed(err.Error()))
 	}
-	env.Set(r.Name, r.Value)
-	if err := env.Save(path); err != nil {
-		return wire.MCPSetSecretAnswer{}, mcpRefusal(mcpcatalog.Failed("secrets.env could not be written."))
-	}
 	log.Printf("mcp: set-secret %s", r.Name)
-	d.mcpChanged()
 	return wire.MCPSetSecretAnswer{Set: true}, nil
 }
 

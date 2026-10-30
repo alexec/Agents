@@ -29,6 +29,9 @@ public enum HelperLimit {
     /// setting. On: a lead that archives its finished helpers frees their places
     /// without waiting on the person, who can still bring any of them back.
     public static let defaultAgentsMayArchive = true
+    /// Whether a session whose pull request merges is archived (#2886) in a folder with
+    /// no setting. On: sessions whose work has landed do not pile up in the list.
+    public static let defaultArchiveWhenMerged = true
 
     /// The places in use in a folder: every agent another agent started there that
     /// has not been archived, plus starts that have taken a place and not yet made
@@ -134,19 +137,29 @@ public struct HelperLimits: Codable, Hashable, Sendable {
     /// Whether a helper's turn refused for a spent allowance waits for it at once, as if
     /// the person had chosen Continue (#1918). Nil is off.
     public var continueWhenBack: Bool?
+    /// Whether a session whose pull request merges is archived, once its turn has ended and
+    /// its worktree has nothing uncommitted (#2886). Nil is the default,
+    /// `HelperLimit.defaultArchiveWhenMerged`.
+    public var archiveWhenMerged: Bool?
 
     public init(running: Int? = nil, notArchived: Int? = nil, queued: Int? = nil,
-                agentsMayArchive: Bool? = nil, continueWhenBack: Bool? = nil) {
+                agentsMayArchive: Bool? = nil, continueWhenBack: Bool? = nil,
+                archiveWhenMerged: Bool? = nil) {
         self.running = running
         self.notArchived = notArchived
         self.queued = queued
         self.agentsMayArchive = agentsMayArchive
         self.continueWhenBack = continueWhenBack
+        self.archiveWhenMerged = archiveWhenMerged
     }
 
     /// Whether agents may archive the helpers they started here: the person's
     /// choice, or the default.
     public var mayArchive: Bool { agentsMayArchive ?? HelperLimit.defaultAgentsMayArchive }
+
+    /// Whether a session is archived when its pull request merges: the person's choice, or
+    /// the default.
+    public var archivesWhenMerged: Bool { archiveWhenMerged ?? HelperLimit.defaultArchiveWhenMerged }
 
     /// What is enforced: each limit, or its default, between 1 and its maximum.
     /// Running is never more than not archived, since every running helper is one not
@@ -192,7 +205,9 @@ public struct HelperLimits: Codable, Hashable, Sendable {
         var kept = self
         if kept.agentsMayArchive == HelperLimit.defaultAgentsMayArchive { kept.agentsMayArchive = nil }
         if kept.continueWhenBack == false { kept.continueWhenBack = nil }
+        if kept.archiveWhenMerged == HelperLimit.defaultArchiveWhenMerged { kept.archiveWhenMerged = nil }
         return kept.running == nil && kept.notArchived == nil && kept.queued == nil
-            && kept.agentsMayArchive == nil && kept.continueWhenBack == nil ? nil : kept
+            && kept.agentsMayArchive == nil && kept.continueWhenBack == nil
+            && kept.archiveWhenMerged == nil ? nil : kept
     }
 }
