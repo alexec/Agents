@@ -12766,6 +12766,23 @@
       },
       "additionalProperties": false
     },
+    "MachineSessionCall": {
+      "type": "object",
+      "description": "machines/sessionCall, through host/machines (#2927): an agent's read_session, message_session, stop_session, archive_session, or list_sessions and wait_for_agents status, on a session it started on another of the person's machines with start_session. The control plane sends that machine's agents/fromStarter, with call.from in its own words.",
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "call": {
+          "$ref": "#/definitions/SessionCall"
+        }
+      },
+      "required": [
+        "host",
+        "call"
+      ],
+      "additionalProperties": false
+    },
     "MachineSessionStart": {
       "type": "object",
       "description": "machines/startSession, through host/machines (#2887): an agent's start_session on another of the person's machines, by its name. The control plane sends that machine's agents/start.",
@@ -19569,6 +19586,89 @@
       "required": [
         "server",
         "online"
+      ],
+      "additionalProperties": false
+    },
+    "SessionCall": {
+      "type": "object",
+      "description": "agents/fromStarter (#2927): the agent that started a session from another machine reads, messages, stops or archives it, or asks how it stands. The host answers only when from is the session's StartedFrom. The control plane writes from.machine and from.who; the asking host writes from.agent.",
+      "properties": {
+        "from": {
+          "$ref": "#/definitions/StartedFrom"
+        },
+        "session": {
+          "$ref": "#/definitions/UUID"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "status",
+            "read",
+            "message",
+            "stop",
+            "archive"
+          ]
+        },
+        "message": {
+          "description": "With op message: the words.",
+          "type": "string"
+        },
+        "replace": {
+          "description": "With op message: replace the message of the starter's that waits, as message_session's replace.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "from",
+        "session",
+        "op"
+      ],
+      "additionalProperties": false
+    },
+    "SessionCallReply": {
+      "type": "object",
+      "description": "What agents/fromStarter says (#2927): the words for the agent, the session's title, and how it ended, absent while it goes on.",
+      "properties": {
+        "said": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "ended": {
+          "$ref": "#/definitions/WaitEndingHow"
+        }
+      },
+      "required": [
+        "said"
+      ],
+      "additionalProperties": false
+    },
+    "SessionEnded": {
+      "type": "object",
+      "description": "machines/sessionEnded through host/machines, then agents/endedElsewhere (#2927): a session started from another machine has ended, so its starter's wait_for_agents can wake. The host sends machine as the starter's machine; the control plane sends it on as the ended session's.",
+      "properties": {
+        "machine": {
+          "type": "string"
+        },
+        "session": {
+          "$ref": "#/definitions/UUID"
+        },
+        "starter": {
+          "$ref": "#/definitions/UUID"
+        },
+        "how": {
+          "$ref": "#/definitions/WaitEndingHow"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "machine",
+        "session",
+        "starter",
+        "how"
       ],
       "additionalProperties": false
     },

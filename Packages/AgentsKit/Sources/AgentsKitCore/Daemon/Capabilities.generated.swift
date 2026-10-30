@@ -109,6 +109,7 @@ public enum Capability {
     public static let runtimesAccounts1 = "runtimes.accounts/1"
     public static let runtimes1 = "runtimes/1"
     public static let sandbox1 = "sandbox/1"
+    public static let sessionsElsewhere1 = "sessions.elsewhere/1"
     public static let sessionsOnMachine1 = "sessions.on-machine/1"
     public static let sessions1 = "sessions/1"
     public static let shell1 = "shell/1"
@@ -143,10 +144,12 @@ public enum Capability {
         "agents/delete": "agents/1",
         "agents/discardDraft": "agents/1",
         "agents/editQueued": "agents.edit-queued/1",
+        "agents/endedElsewhere": "sessions.elsewhere/1",
         "agents/export": "agents.export/1",
         "agents/exportRead": "agents.export/1",
         "agents/find": "agents.find/1",
         "agents/fork": "agents/1",
+        "agents/fromStarter": "sessions.elsewhere/1",
         "agents/import": "agents.export/1",
         "agents/importUpload": "agents.export/1",
         "agents/labelVocabulary": "agents/1",
@@ -550,6 +553,8 @@ public enum Capability {
         "links/remove": "links/1",
         "links/requests": "links/1",
         "machines/forAgent": "machines/1",
+        "machines/sessionCall": "sessions.elsewhere/1",
+        "machines/sessionEnded": "sessions.elsewhere/1",
         "machines/startSession": "sessions.on-machine/1",
         "notices/take": "notices/1",
         "orgRoutes/check": "org-routes/1",

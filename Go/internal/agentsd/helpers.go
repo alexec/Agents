@@ -41,15 +41,15 @@ func (d *Daemon) helperLimitsIn(folder string) (running, notArchived, queued int
 }
 
 // helpersIn is HelperLimit.helpers: started by an agent, not archived, not queued, oldest first.
+// The ones its agents started on other machines count here too (#2927).
 func (d *Daemon) helpersIn(folder string) []wire.Agent {
-	var out []wire.Agent
+	out := d.thereAgents(folder)
 	for _, a := range d.Store.Agents() {
 		if a.StartedByAgent != nil && a.State != wire.AgentStateArchived && a.State != wire.AgentStateQueued && folderPath(&a) == folder {
 			out = append(out, a)
 		}
 	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].CreatedAt < out[j].CreatedAt })
-	return out
+	return sortedByAge(out)
 }
 
 // helperQueue is HelperLimit.queue: the queued, first in first.
@@ -168,7 +168,11 @@ func quotedTitle(t *string) string {
 
 // stopSession is stop_session: a helper stopped, freeing its running place.
 func (d *Daemon) stopSession(caller wire.UUID, args map[string]json.RawMessage) (string, error) {
-	t, err := d.helperTarget(caller, wire.UUID(strings.ToUpper(strings.TrimSpace(argString(args, "id")))), "stop")
+	id := wire.UUID(strings.ToUpper(strings.TrimSpace(argString(args, "id"))))
+	if s := d.thereNamed(caller, string(id)); s != nil && d.Store.Agent(id) == nil {
+		return d.thereOp(caller, s, "stop")
+	}
+	t, err := d.helperTarget(caller, id, "stop")
 	if err != nil {
 		return "", err
 	}
@@ -181,12 +185,23 @@ func (d *Daemon) stopSession(caller wire.UUID, args map[string]json.RawMessage) 
 		d.agentEnded(t.ID)
 		return "Took " + name + " off the queue; it will not start. This folder now has " + d.helperPlaces(folder) + ".", nil
 	}
+	if !d.stopHelper(t) {
+		return name + " had already stopped; nothing changed.", nil
+	}
+	d.checkQueueSoon(folder)
+	return "Stopped " + name + ", freeing its running place; it keeps its other place until it is archived. This folder now has " +
+		d.helperPlaces(folder) + ".", nil
+}
+
+// stopHelper stops a session that is running, and waits a moment for its turn to end;
+// false when it had already stopped.
+func (d *Daemon) stopHelper(t *wire.Agent) bool {
 	l := d.live(t.ID)
 	l.mu.Lock()
 	busy := l.running || l.inTurn
 	l.mu.Unlock()
 	if !inFlight(t.State) && !busy && (t.EventWait == nil || t.EventWait.Ending != nil) {
-		return name + " had already stopped; nothing changed.", nil
+		return false
 	}
 	l.cancel()
 	d.dropLeases(t.ID, "holderStopped")
@@ -199,14 +214,15 @@ func (d *Daemon) stopSession(caller wire.UUID, args map[string]json.RawMessage) 
 	for i := 0; i < 100 && !waitFor(); i++ {
 		time.Sleep(50 * time.Millisecond)
 	}
-	d.checkQueueSoon(folder)
-	return "Stopped " + name + ", freeing its running place; it keeps its other place until it is archived. This folder now has " +
-		d.helperPlaces(folder) + ".", nil
+	return true
 }
 
 // requestArchiveHelper is archive_session with a helper's id: archived now when agents may
 // archive it and it is not running, else it waits for the person's approval.
 func (d *Daemon) requestArchiveHelper(caller, target wire.UUID) (string, error) {
+	if s := d.thereNamed(caller, string(target)); s != nil && d.Store.Agent(target) == nil {
+		return d.thereOp(caller, s, "archive")
+	}
 	t, err := d.helperTarget(caller, target, "request")
 	if err != nil {
 		return "", err

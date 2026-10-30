@@ -4355,6 +4355,17 @@ export interface MachineSchedule {
 }
 
 /**
+ * machines/sessionCall, through host/machines (#2927): an agent's read_session, message_session,
+ * stop_session, archive_session, or list_sessions and wait_for_agents status, on a session it
+ * started on another of the person's machines with start_session. The control plane sends that
+ * machine's agents/fromStarter, with call.from in its own words.
+ */
+export interface MachineSessionCall {
+  host: string;
+  call: SessionCall;
+}
+
+/**
  * machines/startSession, through host/machines (#2887): an agent's start_session on another of the
  * person's machines, by its name. The control plane sends that machine's agents/start.
  */
@@ -6854,6 +6865,47 @@ export type ServedRequestOutcome =
 export interface ServerReachabilityChange {
   server: string;
   online: boolean;
+}
+
+/**
+ * agents/fromStarter (#2927): the agent that started a session from another machine reads,
+ * messages, stops or archives it, or asks how it stands. The host answers only when from is the
+ * session's StartedFrom. The control plane writes from.machine and from.who; the asking host writes
+ * from.agent.
+ */
+export interface SessionCall {
+  from: StartedFrom;
+  session: UUID;
+  op: "status" | "read" | "message" | "stop" | "archive";
+  /** With op message: the words. */
+  message?: string;
+  /**
+   * With op message: replace the message of the starter's that waits, as message_session's replace.
+   */
+  replace?: boolean;
+}
+
+/**
+ * What agents/fromStarter says (#2927): the words for the agent, the session's title, and how it
+ * ended, absent while it goes on.
+ */
+export interface SessionCallReply {
+  said: string;
+  title?: string;
+  ended?: WaitEndingHow;
+}
+
+/**
+ * machines/sessionEnded through host/machines, then agents/endedElsewhere (#2927): a session
+ * started from another machine has ended, so its starter's wait_for_agents can wake. The host sends
+ * machine as the starter's machine; the control plane sends it on as the ended session's.
+ */
+export interface SessionEnded {
+  machine: string;
+  session: UUID;
+  starter: UUID;
+  how: WaitEndingHow;
+  title?: string;
 }
 
 export interface SessionLabel {
@@ -9755,6 +9807,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineRelease: { required: ["version"], optional: [] },
   MachineRequest: { required: ["host"], optional: ["purge"] },
   MachineSchedule: { required: [], optional: ["at", "workflow"] },
+  MachineSessionCall: { required: ["host", "call"], optional: [] },
   MachineSessionStart: { required: ["host", "start"], optional: [] },
   MachineStatus: { required: ["idle", "running"], optional: ["schedule"] },
   MachineStop: { required: ["host"], optional: ["confirmRunning"] },
@@ -9999,6 +10052,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SentNotice: { required: ["title", "outcome"], optional: ["body", "nextAt", "to"] },
   ServedRequest: { required: ["kind", "outcome"], optional: [] },
   ServerReachabilityChange: { required: ["server", "online"], optional: [] },
+  SessionCall: { required: ["from", "session", "op"], optional: ["message", "replace"] },
+  SessionCallReply: { required: ["said"], optional: ["title", "ended"] },
+  SessionEnded: { required: ["machine", "session", "starter", "how"], optional: ["title"] },
   SessionLabel: { required: ["value", "owner", "addedAt"], optional: [] },
   SessionNotice: { required: ["severity", "title"], optional: ["detail"] },
   SessionsListRequest: { required: ["runtimeID", "cwd"], optional: [] },

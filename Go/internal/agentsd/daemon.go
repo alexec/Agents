@@ -68,6 +68,7 @@ type Daemon struct {
 	restartBook
 	machineBook
 	hostStatusBook
+	elsewhereBook
 	idleBook
 	turnBook
 	findBook

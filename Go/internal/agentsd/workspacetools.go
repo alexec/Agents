@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -37,6 +38,8 @@ func (d *Daemon) SetControlAsk(ask askControl) {
 		return
 	}
 	d.askControl.Store(&ask)
+	// What ended on other machines while this one was away (#2927).
+	safe.Go("ask how sessions elsewhere stand", d.askThereWaits)
 }
 
 // askWorkspaces is one host/machines call for an agent, named for the control plane's log.
