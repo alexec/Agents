@@ -39,13 +39,24 @@ export function AgentRuntimesSection({ store, down }: { store: Store; down: bool
     const overrides = settings.overrides.filter((o) => !(o.runtimeID === runtimeID && o.field === field && o.level === level));
     save({ ...settings, overrides: native ? [...overrides, { runtimeID, field, level, native }] : overrides });
   };
+  const heading = <h3 class="section-head" id="settings-auto">Agent Runtimes ▸ Auto</h3>;
   if (!mappings) {
-    if (host) void store.loadAuto(host);
-    return null;
+    // Shown while the cells load, and with why and Try again when they did not come (#2894).
+    const problem = store.autoProblems.value[host];
+    if (host && !problem) void store.loadAuto(host);
+    return (
+      <section aria-labelledby="settings-auto">
+        {heading}
+        {problem ? (
+          <p class="failure small" role="alert">{problem}{" "}
+            <button type="button" class="link" disabled={down} onClick={() => void store.loadAuto(host)}>Try again</button></p>
+        ) : <p class="hint">Loading…</p>}
+      </section>
+    );
   }
   return (
     <section aria-labelledby="settings-auto">
-      <h3 class="section-head" id="settings-auto">Agent Runtimes ▸ Auto</h3>
+      {heading}
       <h4 class="small">Runtimes</h4>
       <ol class="auto-runtimes">
         {order.map((id, i) => (
