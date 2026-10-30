@@ -4404,11 +4404,9 @@ final class RemoteModel {
         }
     }
 
-    /// A prompt went from here: its turn as a Live Activity (#1657).
+    /// A prompt went from here: its turn in the Live Activity (#1657, #2991).
     private func turnSent(to agentID: UUID) {
-        let agent = work.agent(agentID)
-        let folder = agent.map { work.folder($0.folderPath)?.name ?? $0.folderPath.lastPathComponent } ?? ""
-        liveActivities.sent(to: agent, id: agentID, folder: folder)
+        liveActivities.sent(to: agentID, in: work)
     }
 
     /// Back to the end of the conversation, as the Mac does when a prompt goes.

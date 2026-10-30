@@ -97,7 +97,7 @@ type AccountRequest struct {
 	AccountID string `json:"accountID"`
 }
 
-// clients/setActivityToken (#1744): the push token of one session's Live Activity on this device, in hex, for the control plane to update it by APNs while the Remote is not running. startedAt is when the turn began, where the activity's timer counts from. No token takes it away.
+// clients/setActivityToken (#1744): the push token of this device's Live Activity, in hex, for one session it speaks for (#2991: one activity for every turn sent from the device, so one token for several sessions), for the control plane to update it by APNs while the Remote is not running. startedAt is when the session's turn began. No token takes the session out of it.
 type ActivityToken struct {
 	AgentID UUID `json:"agentID"`
 
@@ -830,7 +830,7 @@ type AttentionPending struct {
 	Deliveries []AttentionDelivery `json:"deliveries"`
 }
 
-// attention/turn (#1744): a host says that a session's turn moved to a new phase, so the control plane can update that session's Live Activity on a device by APNs. No words: the phase, and when it ended.
+// attention/turn (#1744): a host says that a session's turn moved to a new phase, so the control plane can update each device's Live Activity that speaks for the session by APNs. No words: the phase, and when it ended.
 type AttentionTurn struct {
 	AgentID UUID `json:"agentID"`
 
