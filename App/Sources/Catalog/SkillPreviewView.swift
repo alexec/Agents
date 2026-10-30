@@ -165,6 +165,10 @@ struct SkillPreviewView: View {
     private var stateNotes: some View {
         if let failure {
             note(CatalogErrorWords.sentence(failure), attention: true)
+            // The organisation's policy refused the add: ask an admin for it (#2355).
+            if failure.policyWords != nil {
+                AskAdminButton(kind: .skills, name: preview.name, source: preview.result.source)
+            }
         }
         if update?.edited == true {
             note("You've edited this skill since it was added. Updating replaces your edits; the copy with them goes to the Trash.",

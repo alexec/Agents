@@ -3,7 +3,9 @@ import Foundation
 /// What an MCP catalogue refusal says, in words (moved to Core so the sandboxed window can say it, 058 S5).
 public enum MCPCatalogWords {
     public static func sentence(_ error: DaemonAPI.MCPCatalogError) -> String {
-        switch error {
+        // The organisation's policy says its own words, whole (#2355).
+        if let words = error.policyWords { return words }
+        return switch error {
         case .unreachable(let host): "Can't reach \(host)."
         case .timedOut(let host): "\(host) is slow: it did not answer within a minute. Try again."
         case .noPersonalHome: "This copy of the app has no personal ~/.agents."

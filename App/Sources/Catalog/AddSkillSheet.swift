@@ -31,6 +31,8 @@ struct AddSkillSheet: View {
     @State private var opening: DaemonAPI.CatalogResult?
     @State private var preview: DaemonAPI.SkillPreview?
     @State private var previewError: DaemonAPI.CatalogError?
+    /// The result whose preview was refused, for Ask an Admin (#2355).
+    @State private var refused: DaemonAPI.CatalogResult?
     @State private var marketplaces: [DaemonAPI.Marketplace] = []
     @State private var managing = false
     /// The marketplace last searched, kept across sheets (#687).
@@ -83,7 +85,7 @@ struct AddSkillSheet: View {
                     } else if let searchError {
                         CatalogProblemView(error: searchError, retry: { Task { await search(query) } })
                     } else if let previewError {
-                        CatalogProblemView(error: previewError, retry: nil)
+                        CatalogProblemView(error: previewError, retry: nil, refused: refused)
                     } else if results.isEmpty && searched {
                         Text("No skills match.").appText(.fine).foregroundStyle(.secondary).padding(.top, 8)
                     }
@@ -163,8 +165,10 @@ struct AddSkillSheet: View {
         opening = nil
         if let fresh = answer.preview {
             preview = fresh
+            refused = nil
         } else {
             previewError = answer.error ?? .failed("no answer")
+            refused = result
         }
     }
 
@@ -196,12 +200,17 @@ struct AddSkillSheet: View {
 struct CatalogProblemView: View {
     let error: DaemonAPI.CatalogError
     let retry: (() -> Void)?
+    /// The skill whose preview the organisation's policy refused: Ask an Admin for it (#2355).
+    var refused: DaemonAPI.CatalogResult?
 
     var body: some View {
         VStack(spacing: 8) {
             Text(title).appText(.reading).fontWeight(.semibold)
             Text(detail).appText(.supporting).foregroundStyle(.secondary).multilineTextAlignment(.center)
             if let retry { Button("Try again", action: retry).buttonStyle(.paper) }
+            if error.policyWords != nil, let refused {
+                AskAdminButton(kind: .skills, name: refused.name, source: refused.source)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 60)
@@ -212,6 +221,7 @@ struct CatalogProblemView: View {
         switch error {
         case .unreachable(let host): "Can't reach \(host)"
         case .rateLimited: "GitHub is limiting requests"
+        case _ where error.policyWords != nil: "Your organisation does not allow this skill"
         default: "This skill can't be shown"
         }
     }
@@ -231,7 +241,9 @@ struct CatalogProblemView: View {
 /// A catalogue refusal in the window's words.
 enum CatalogErrorWords {
     static func sentence(_ error: DaemonAPI.CatalogError) -> String {
-        switch error {
+        // The organisation's policy says its own words, whole (#2355).
+        if let words = error.policyWords { return words }
+        return switch error {
         case .unreachable(let host): "Can't reach \(host)."
         case .rateLimited: "GitHub is limiting requests. Try again in a few minutes."
         case .unmanaged(let path): "You already have a skill at \((path as NSString).abbreviatingWithTildeInPath). You made it, so the app won't replace it."

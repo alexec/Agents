@@ -25,6 +25,7 @@ import (
 //   - pr.opened links the PR to every session that worked on its branch (opens), and the
 //     PR to the issues its body closes (fixes). pr.merged and pr.closed link what its body
 //     closes too, so a closed PR's cost stays against its issues (#2350).
+//   - Each forge issue named here is part of its milestone (lineagemilestone.go, #2935).
 //   - pr.merged and pr.closed end the sessions' links to the PR; pr.closed also ends its
 //     fixes links, as a PR closed without a merge fixed nothing. An archived session's
 //     links end.
@@ -278,6 +279,9 @@ func (d *Daemon) noteLineage(before *wire.Agent, a wire.Agent) {
 				}
 			}
 			d.link(s, to, lineage.RelWorksOn, source)
+			if repo, n, ok := issueOfNode(to); ok {
+				d.noteIssueMilestone(folder, repo, n)
+			}
 		}
 		for _, v := range removed {
 			if to, ok := d.labelNode(folder, v); ok {
@@ -337,9 +341,16 @@ func (d *Daemon) lineageEvent(e wire.Event) {
 		}
 		// A PR closed without a merge links its issues too, and the links end below: it fixed
 		// nothing, but its cost stays against them, as waste (#2350).
+		folder := ""
+		if len(p.PR.Fixes) > 0 {
+			folder = d.repoFolder(repo)
+		}
 		for _, f := range p.PR.Fixes {
 			if issue, ok := fixedIssue(repo, f); ok {
 				d.link(pr, issue, lineage.RelFixes, lineage.SourcePRBody)
+				if r, n, ok := issueOfNode(issue); ok {
+					d.noteIssueMilestone(folder, r, n)
+				}
 			}
 		}
 		// How it ended, for its cost (#2350).
