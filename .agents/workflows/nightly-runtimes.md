@@ -2,6 +2,7 @@
 name: Runtime check
 on: manual
 agent: new
+runtime: claude
 runs-on: [8AB85821-9D24-59CE-9737-8FC556923733]
 labels: [release, runtimes]
 when-done: archive
@@ -17,6 +18,10 @@ or branch yourself: the script works in a tree of its own.
    only the runtimes with a new release since the last run: what changed is the scope
    (#1462). Never add `--assess` or `--force`.
    If it prints `Nothing changed.`, say nothing else, and call `archive_session` (no id).
+   If it fails instead (it could not even prepare its tree, for example `git fetch`
+   could not write `.git/FETCH_HEAD`), it has already filed or updated an issue for that
+   on its own (#2912): do not call it `done` as if nothing needed testing. Say in your
+   report that `plan` failed and name the issue, then stop; do not go on to `build`.
 2. Lease the resource `build` with `lease_resource` for 60 minutes (if you are in line, keep
    waiting with `lease_resource`), run `scripts/nightly-runtimes.py build`, and release
    `build` with `release_resource` the moment it ends, whether it passed or not.

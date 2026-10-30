@@ -221,15 +221,35 @@ def repin(tree, rid, version, env):
 
 # ---- plan -------------------------------------------------------------------------------
 
+def cannot_plan(step, out):
+    """plan could not even prepare its tree (#2912): file or update one issue, loudly, so a
+    runtime never tested is a failure the release reports, not a quiet `done`."""
+    prefix = "Nightly runtime check: could not plan"
+    title = f"{prefix}: {step} failed"
+    body = (f"`scripts/nightly-runtimes.py plan` could not prepare its tree at `{step}`, so no "
+            f"runtime was tested tonight.\n\n```\n{tail(out)}\n```\n\n"
+            f"Found by the nightly runtime check (#39).")
+    file_issue(prefix, title, body, False)
+    sys.exit(f"plan: {step} failed, issue filed:\n{out}")
+
+
 def prepare_tree(home, base):
     tree = os.path.join(home, "tree")
-    sh(["git", "-C", REPO, "fetch", "-q", "origin", "main"], check=True, timeout=300)
+    status, out = sh(["git", "-C", REPO, "fetch", "-q", "origin", "main"], timeout=300)
+    if status != 0:
+        cannot_plan("git fetch", out)
     if not os.path.exists(os.path.join(tree, ".git")):
-        sh(["git", "-C", REPO, "worktree", "add", "-q", "--detach", tree, base], check=True)
+        status, out = sh(["git", "-C", REPO, "worktree", "add", "-q", "--detach", tree, base])
+        if status != 0:
+            cannot_plan("git worktree add", out)
     else:
         # The tree is this script's own: put it back to the base, keeping build/ (ignored).
-        sh(["git", "-C", tree, "checkout", "-q", "--detach", "-f", base], check=True)
-        sh(["git", "-C", tree, "clean", "-qfd"], check=True)
+        status, out = sh(["git", "-C", tree, "checkout", "-q", "--detach", "-f", base])
+        if status != 0:
+            cannot_plan("git checkout", out)
+        status, out = sh(["git", "-C", tree, "clean", "-qfd"])
+        if status != 0:
+            cannot_plan("git clean", out)
     return tree
 
 
