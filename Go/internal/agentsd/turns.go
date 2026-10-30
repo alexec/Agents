@@ -972,8 +972,13 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 		a.IsUnread = &unread
 		if s == wire.AgentStateFinished && !(reported && a.Report != nil) {
 			outcome, message := wire.WorkOutcomeDone, firstSentence(last)
-			if strings.HasSuffix(strings.TrimSpace(last), "?") {
+			switch {
+			case strings.HasSuffix(strings.TrimSpace(last), "?"):
 				outcome = wire.WorkOutcomeNeedsAnswer
+			case waitingOnEvents(a):
+				// Ended in a lease's line or on wait_for_event's held call (#2911): it is
+				// started again when the wait ends, not done.
+				outcome = wire.WorkOutcomeWaiting
 			}
 			if message == "" {
 				message = "Finished."

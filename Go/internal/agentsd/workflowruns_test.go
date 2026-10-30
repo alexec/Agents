@@ -343,3 +343,40 @@ func TestAWorkflowPinnedHereRuns(t *testing.T) {
 		return len(d.recordsLocked().Runs) == 0
 	})
 }
+
+// A run that ends its turn in a lease's line is not done (#2911): the line's wait is the
+// same wait wait_for_event makes, and the agent is started again when it is granted. A
+// workflow that may archive a done run must not archive one still waiting on that.
+func TestAWorkflowRunQueuedForALeaseIsNotArchived(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := folder(t, c, 1)
+	folder := store.FolderURL(dir)
+	os.MkdirAll(workflowsFolder(dir), 0o755)
+	os.WriteFile(filepath.Join(workflowsFolder(dir), "drill.md"),
+		[]byte("---\nname: Drill\nwhen-done: archive\n---\nJoin the line for a lease.\n"), 0o644)
+	approveAll(t, c, folder)
+	var s wire.WorkflowSummary
+	json.Unmarshal(c.call(t, 2, "workflows/run", map[string]any{"folder": folder, "workflowID": "drill"}), &s)
+	if s.LastOutcome == nil || s.LastOutcome.Ran == nil {
+		t.Fatalf("%+v", s)
+	}
+	agent := s.LastOutcome.Ran.AgentID
+	// Joins build's line while its turn runs, as lease_resource does when another agent
+	// holds it: the turn ends on the fake runtime's own words a moment later (above).
+	d.leaseMu.Lock()
+	d.loadLeases()
+	d.leaseMu.Unlock()
+	d.openLineWait(agent, "build")
+	waitFor(t, "the run over", func() bool {
+		return strings.Contains(strings.Join(names(d), " "), "workflow.completed")
+	})
+	if got := d.Store.Agent(agent); got == nil || got.State == wire.AgentStateArchived {
+		t.Fatalf("archived while still in build's line: %+v", got)
+	} else if got.Report == nil || got.Report.Outcome != wire.WorkOutcomeWaiting {
+		t.Fatalf("report %+v", got.Report)
+	} else if got.EventWait == nil || got.EventWait.Ending != nil {
+		t.Fatalf("left the line: %+v", got.EventWait)
+	}
+}
