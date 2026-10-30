@@ -47,7 +47,7 @@ func page(name string) string {
 		return string(b)
 	}
 	return strings.NewReplacer("/*common.css*/", read("common.css"), "/*mrpage.css*/", read("mrpage.css"),
-		"/*bridge.js*/", read("bridge.js"), "/*mrpage.js*/", read("mrpage.js")).Replace(read(name))
+		"/*bridge.js*/", read("bridge.js"), "/*lineage.js*/", read("lineage.js"), "/*mrpage.js*/", read("mrpage.js")).Replace(read(name))
 }
 
 func uiMeta(uri string, visibility ...string) mcp.Meta {

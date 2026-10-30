@@ -17,7 +17,7 @@ import (
 // shape (Go/internal/githubmcp/views.go). It is fed by show_issues, a read-only tool, so it
 // can be pinned. It only reads: Linear's own MCP server (mcp.linear.app) changes issues.
 
-// pages/bridge.js and pages/common.css are the github server's, copied: a page has no
+// pages/bridge.js, pages/lineage.js and pages/common.css are the github server's, copied: a page has no
 // network, so it carries its own.
 //
 //go:embed pages
@@ -36,7 +36,7 @@ func page(name string) string {
 		}
 		return string(b)
 	}
-	return strings.NewReplacer("/*common.css*/", read("common.css"), "/*bridge.js*/", read("bridge.js")).Replace(read(name))
+	return strings.NewReplacer("/*common.css*/", read("common.css"), "/*bridge.js*/", read("bridge.js"), "/*lineage.js*/", read("lineage.js")).Replace(read(name))
 }
 
 func uiMeta(uri string, visibility ...string) mcp.Meta {

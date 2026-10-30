@@ -68,6 +68,7 @@ How each client enforces it:
 | `ui/message` | **Asks you first.** Under the view: "The view asks to send this as your message", with **Send** and **Don't Send**. Send sends it as your own prompt, exactly as if you had typed it. A view never speaks for you without you. |
 | `agents/start-agent` | **Our extension (#834).** Opens the new-agent form in the view's folder, filled in with the view's `prompt`, its `labels` and, when it names one, a new `worktree` of that name. You start the agent, or don't: a view never starts one. From a pinned view, it opens the form in the pin's folder. A `branch` instead puts the agent in a new worktree on that branch (#837). |
 | `agents/message-agent` | **Our extension (#837). Asks you first.** Sends the view's `text` to the session whose worktree is on the view's `branch`, in the view's folder (the latest active one not archived). Under the view: "The view asks to send this to "*session*" as your message", with **Send** and **Don't Send**. It works from a pinned view too. With no such session, the answer is error `-32001`, and the view can offer a new agent instead. |
+| `tools/call` of `agents_lineage` | **Our extension (#2941).** Answered by the host itself, from its own record (`lineage/walk` and `lineage/cost`), and never passed to the server. Only a view of the `github`, `gitlab` or `linear` server may ask, with an issue's or a pull request's `url`; another server's view is refused and logged, since the record names your sessions and what they cost. The answer is the Lineage section's words: who worked on it, each session's cost, tokens and time, and each pull request's end and cost. |
 | `agents/open-diff` | **Our extension (#1341).** Draws the view's `files`, each as its hunks of context, added and removed lines, in the app's own diff (the Review page's, #1472): over the view, as a sheet on the Mac, the iPhone and the iPad, and over the chat or the pin on the web page. Unified, or Side by Side on a wide one. Each file's path and counts, a break between hunks, long unchanged runs folded, and **Open on GitHub** for the view's `url`. At most 3000 files and 20,000 lines. It works from a pinned view too. |
 | `ui/update-model-context` | Keeps what the view said, and tells the agent with **your next message**: before your words, not in your bubble, in the same way the app tells an agent that a wait ended. Only the last context from each view is kept, and it is used once. A line under the view says what the agent will be told, with **Don't Tell** to take it back. It is kept in memory only, so a daemon restart forgets it. |
 | `ui/request-display-mode` | `inline` or `fullscreen`. Full screen draws the same view in the chat's place, as a pinned page opens, with **Back to the chat**. You can also go full screen from the button beside the view's name. |
@@ -200,6 +201,11 @@ Folder**.
 - **Issues** (`ui://github/issues`, from `show_issues`): the open issues, with their labels
   and assignees. A label narrows the list. Click a row to expand its rich-text description
   and linked pull requests. **Start Agent** opens the new-agent form for the issue.
+- **Lineage** (#2941): an issue's expanded row, and a pull request's **Lineage** tab, say
+  what worked on it: the sessions on it and on its pull requests, and the helpers they
+  started, each with its cost, tokens and time; each pull request with its end (merged,
+  closed, open) and cost; and the total and the waste. The gitlab server's Issues and merge
+  request page, and the linear server's Issues, have the same section (`lineage.js`, copied).
 - **A pull request's page** (`ui://github/pr`, from `show_pull_request`): the description
   and the conversation, the comments on lines of code, the files, and the checks, where a
   failed check shows the end of its log (`failed_log`). An app's words are marked *bot*;

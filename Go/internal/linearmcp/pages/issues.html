@@ -38,6 +38,7 @@ select { font: inherit; }
 </main>
 <script>
 /*bridge.js*/
+/*lineage.js*/
 (() => {
   let team = "", state = "", activeLabels = [];
   const ui = bridge("linear-issues", {
@@ -128,7 +129,8 @@ select { font: inherit; }
       const description = el("div", { className: "issue-body" });
       if (details.description) renderMarkdown(description, details.descriptionHTML || "", issue.url);
       else description.textContent = "No description.";
-      target.replaceChildren(el("span", { className: "muted", textContent: "Description" }), description);
+      target.replaceChildren(el("span", { className: "muted", textContent: "Description" }), description,
+        lineageSection(ui, issue.url));
       target.dataset.loaded = "true";
     } catch (e) {
       target.replaceChildren(el("span", { className: "error", textContent: "Couldn't load issue description: " + e.message }));
