@@ -3405,6 +3405,11 @@ export interface HelperLimits {
    * Continue (#1918). Off unless set.
    */
   continueWhenBack?: boolean;
+  /**
+   * A session whose pull request merges is archived, when its turn has ended and its worktree has
+   * nothing uncommitted (#2886). On unless set.
+   */
+  archiveWhenMerged?: boolean;
 }
 
 export interface HostedMCPSnapshot {
@@ -9706,7 +9711,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HandoverMember: { required: ["id", "name", "kind"], optional: ["knownEpoch", "version", "online", "lastSeen"] },
   HandoverStatus: { required: ["phase", "controlKey", "hasRecords", "endpoints", "members"], optional: ["epoch", "forwardingUntil"] },
   Headline: { required: ["h1", "h2", "h3"], optional: ["answers"] },
-  HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive", "continueWhenBack"] },
+  HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive", "continueWhenBack", "archiveWhenMerged"] },
   HostedMCPSnapshot: { required: ["servers", "at"], optional: [] },
   HostedMCPStatus: { required: ["name", "state", "restarts", "users"], optional: ["since", "retryAt", "lastError", "folder"] },
   JoinApproved: { required: ["host"], optional: [] },
