@@ -99,6 +99,7 @@ struct StartAgentView: View {
                     .frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
             }
+            personaHeading
             // Starts kept for this folder's stopped workspace (#691 US3, layouts.md L6a): the
             // agent each makes opens once the host is up.
             if case let starts = model.keptStarts(in: folder), !starts.isEmpty {
@@ -164,6 +165,79 @@ struct StartAgentView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { promptBar }
+    }
+
+    /// The kind of session to start (#760), at the top of the page as a heading-style menu
+    /// (#913), with what the picked one is for, and any persona file that cannot be read,
+    /// under it. The folder stays the title. Not drawn where there are none.
+    @ViewBuilder private var personaHeading: some View {
+        let usable = model.startPersonas.filter { $0.problem == nil }
+        let broken = model.startPersonas.filter { $0.problem != nil }
+        let picked = usable.first { $0.id == model.startPersona }
+        if !model.startPersonas.isEmpty {
+            Section {
+                VStack(spacing: 4) {
+                    if !usable.isEmpty {
+                        // Centred under the folder when it fits; a menu of them when it does not (#2795).
+                        ViewThatFits(in: .horizontal) {
+                            personaPicker(usable, picked: picked)
+                            personaPicker(usable, picked: picked, menu: true)
+                        }
+                    }
+                    if let description = picked?.description {
+                        Text(description)
+                            .appText(.supporting)
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(broken) { persona in
+                        Text("\(persona.id).md: \(persona.problem ?? "")")
+                            .appText(.supporting)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .listRowBackground(Color.clear)
+            }
+            .disabled(model.isStarting)
+        }
+    }
+
+    static let noPersona = "No persona"
+
+    /// Segments, or a menu: the picked one's name and a chevron, where they do not fit (#2795).
+    @ViewBuilder
+    private func personaPicker(_ usable: [Persona], picked: Persona?, menu: Bool = false) -> some View {
+        let picker = Picker("Persona", selection: Binding<String?>(
+            get: { model.startPersona },
+            set: { id in pickPersona(usable.first { $0.id == id }) }
+        )) {
+            Text(Self.noPersona).tag(String?.none)
+            ForEach(usable) { persona in
+                Text(persona.name).tag(Optional(persona.id))
+            }
+        }
+        if menu {
+            picker
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .fixedSize()
+                .accessibilityLabel("Persona: \(picked?.name ?? Self.noPersona)")
+        } else {
+            picker
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize(horizontal: true, vertical: false)
+                .accessibilityLabel("Persona: \(picked?.name ?? Self.noPersona)")
+        }
+    }
+
+    /// Every setting the persona names, and its labels beside any already there, in place
+    /// of the last one's (#2649).
+    private func pickPersona(_ persona: Persona?) {
+        let last = model.startPersonas.first { $0.id == model.startPersona }
+        draftLabels = Persona.labels(draftLabels, switchingFrom: last, to: persona)
+        Task { await model.choosePersona(persona) }
     }
 
     /// What a view filled the page with (#834): its prompt in the field, unsent, and its

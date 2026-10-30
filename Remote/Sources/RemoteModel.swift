@@ -944,6 +944,12 @@ final class RemoteModel {
     /// person has since moved off is recognised as that and let go.
     private var startGeneration = 0
 
+    /// The kinds of session the page's folder offers (#760), the folder's and the
+    /// home's as its host lists them, and the one picked, by id.
+    private(set) var startPersonas: [Persona] = []
+    private(set) var startPersona: String?
+    /// Picked while its runtime's choices were still to come: laid over them on arrival.
+    private var pendingStartPersona: Persona?
 
     var startRuntime: RuntimeStatus? { startRuntimes.first { $0.runtime.id == startRuntimeID } }
 
@@ -978,6 +984,10 @@ final class RemoteModel {
         startWorktree = nil
         startWorktrees = .notARepository
         Task { await loadStartWorktrees(in: folder) }
+        startPersona = nil
+        pendingStartPersona = nil
+        startPersonas = []
+        Task { await loadStartPersonas(in: folder) }
         // Each with a deadline, and waited on only when the page has no runtimes to pick
         // from yet (#1096): one lost reply here used to hold the page on "Asking…" before
         // it had asked anything, with nothing that would ask again.
@@ -1058,6 +1068,7 @@ final class RemoteModel {
         let again = startAsks.toAskAgain
         guard !again.isEmpty else { return }
         note("start: back in touch; asking again for \(again.map(\.rawValue).sorted().joined(separator: ", "))")
+        if again.contains(.personas) { Task { await loadStartPersonas(in: folder) } }
         if again.contains(.worktrees) { Task { await loadStartWorktrees(in: folder) } }
         guard again.contains(.choices) else { return }
         if startRuntimeID == nil { startRuntimeID = pickedStartRuntime }
@@ -1145,6 +1156,22 @@ final class RemoteModel {
 
     /// The folder's personas (#760). A host too old to know the method offers none; one
     /// that did not answer is asked again once it does (#1096).
+    private func loadStartPersonas(in folder: URL) async {
+        let request = DaemonAPI.PersonasListRequest(folder: folder)
+        startAsks.asking(.personas)
+        let listed: [Persona]
+        do {
+            listed = try await askForStart(DaemonAPI.Method.personasList, request, returning: [Persona].self)
+        } catch let error as JSONRPCError where error.isMethodNotFound {
+            listed = []
+        } catch {
+            return
+        }
+        guard startingIn == folder else { return }
+        startAsks.answered(.personas)
+        startPersonas = listed
+    }
+
     /// The branch an agent's folder is on, for the place over its prompt (#242).
     /// Nil outside a repository or when its host does not answer.
     func folderPathBranch(of agent: Agent) async -> String? {
@@ -1167,6 +1194,25 @@ final class RemoteModel {
         startWorktree = choice
         startRefusal = nil
         if startOptionsFolder != before { await loadStartChoices() }
+    }
+
+    /// Pick a kind of session (#760): every setting it names is set, every one it leaves
+    /// out stays as the page has it. Nil picks none and changes nothing else.
+    func choosePersona(_ persona: Persona?) async {
+        startPersona = persona?.id
+        pendingStartPersona = nil
+        guard let persona else { return }
+        if let runtimeID = persona.settings.runtimeID, runtimeID != startRuntimeID,
+           startAvailableRuntimeIDs.contains(runtimeID) {
+            pendingStartPersona = persona
+            await chooseRuntime(runtimeID)
+            return
+        }
+        if startChoicesState != .ready {
+            pendingStartPersona = persona
+        } else {
+            startChosen.merge(persona.choices(against: startOptions)) { _, new in new }
+        }
     }
 
     func chooseRuntime(_ runtimeID: String) async {
@@ -1314,6 +1360,11 @@ final class RemoteModel {
            let value = ModeMemory.startingValue(remembered: work.rememberedMode(for: runtimeID), for: mode) {
             kept[mode.id] = value
         }
+        // Over the mode remembered, because the persona was picked after it (#760).
+        if let persona = pendingStartPersona, !startOptions.isEmpty {
+            kept.merge(persona.choices(against: startOptions)) { _, new in new }
+            pendingStartPersona = nil
+        }
         startChosen = kept
         // The values chosen in the shared words, over the mode remembered (#2658).
         if opening {
@@ -1407,7 +1458,7 @@ final class RemoteModel {
             runtimeID: runtimeID, cwd: folder, prompt: words, attachments: attachments,
             startOptions: StartOptions(values: startChosen), draftID: startDraftID,
             additionalDirectories: startFolders, worktree: startWorktree, requestID: retrying ?? UUID(), sandbox: startSandbox,
-            labels: labels,
+            labels: labels, persona: startPersona,
             accountID: isAutoStart ? nil : startAccountChoices?.sent(startAccountID),
             voice: voice ? true : nil,
             levels: Levels(model: startLevels.model, permission: startLevels.permission,
