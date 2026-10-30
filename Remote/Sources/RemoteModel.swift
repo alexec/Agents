@@ -909,8 +909,8 @@ final class RemoteModel {
     /// What Auto would pick now for the page, for "Auto (Claude)".
     private(set) var startAutoPreview: AutoPreview?
     var isAutoStart: Bool { startRuntimeID == LevelWords.autoID }
-    /// Auto's settings and every cell (#2658), as the Mac's host has them.
-    private(set) var autoSettings = AutoSettings()
+    /// Every runtime's cells for the shared words (#2658), as the Mac's host has them. Auto's
+    /// own settings are Mac + web (#2923).
     private(set) var autoMappings = AutoMappings()
     /// Each runtime's sandbox default, read from the Mac, for "Use runtime default (Off)".
     private(set) var sandboxSettings = SandboxSettings()
@@ -1230,24 +1230,8 @@ final class RemoteModel {
     }
 
     func refreshAuto() async {
-        if let s = try? await client.call(DaemonAPI.Method.autoState, DaemonAPI.Empty(), returning: AutoSettings.self) {
-            autoSettings = s
-        }
         if let m = try? await client.call(DaemonAPI.Method.autoMappings, DaemonAPI.Empty(), returning: AutoMappings.self) {
             autoMappings = m
-        }
-    }
-
-    /// Save Auto's settings on the Mac, which sends them on to its machines (FR-017).
-    func setAutoSettings(_ wanted: AutoSettings) async {
-        let before = autoSettings
-        autoSettings = wanted
-        do {
-            autoSettings = try await client.call(DaemonAPI.Method.autoSet, wanted, returning: AutoSettings.self)
-            await refreshAuto()
-        } catch {
-            autoSettings = before
-            problem = (error as? JSONRPCError)?.message ?? "That did not reach your Mac."
         }
     }
 
@@ -2559,9 +2543,7 @@ final class RemoteModel {
            let settings = try? notification.params?.decode(SandboxSettings.self) {
             self.sandboxSettings = settings
         }
-        if notification.method == DaemonAPI.Notification.autoChanged,
-           let settings = try? notification.params?.decode(AutoSettings.self) {
-            self.autoSettings = settings
+        if notification.method == DaemonAPI.Notification.autoChanged {
             Task { await refreshAuto(); await refreshStartAutoPreview() }
         }
         if notification.method == DaemonAPI.Notification.clientPermissionsChanged,

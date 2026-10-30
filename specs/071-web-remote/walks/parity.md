@@ -24,12 +24,12 @@ Alex chose tiers on 2026-10-27 (#2796). Each row has a **Tier** cell after its F
 **Core** is:
 - the session list, chat, question and permission cards, the prompt bar, approvals, notices and the Brief (the first list in #2796);
 - the session and folder work the Remote keeps (#2798): terminals, reading and editing files, diffs and Changes, the Worktrees list and the Simulator pane;
-- runtimes' details (accounts, Reaches the Model By, Mark Available), the Auto runtime and its settings (Alex, 2026-10-29, #2923), the Events and Resources pages, and MCP app views and their pins;
+- runtimes' details (accounts, Reaches the Model By, Mark Available), the Auto runtime on the new-session form and in the chat (Alex, 2026-10-29, #2923), the Events and Resources pages, and MCP app views and their pins;
 - the workflow page's Activity, Run Now, Approve and Enabled; today's cost in Activity and the limit banners;
 - the join and sign-in approval cards, pairing and sign-in, and the strips that say a machine or the control plane is away;
-- the Remote's trimmed Settings: This app (Voice, Notifications, Sidebar), Agent Runtimes ▸ Auto and Help.
+- the Remote's trimmed Settings: This app (Voice, Notifications, Sidebar) and Help.
 
-**Mac + web** is: Console and Reports; every control plane management page (Sign-ins, People, Groups, Bots and their caps, Channels, Sign-in Providers, Policy and its kill switch, Secrets, Backups, Git access, Add a Browser); Add a Machine, machine providers, Start a Machine from a Repository and Versions; Connectors and connector set-up (Connect your tools, GitLab, Email); Agent Configuration (Skills, Personas and Workflows editors), and personas on the new-session form; the workflow page's Configuration pane, Edit File… and Delete…; folder management (Add Folder, Clone Git URL, a folder's Project, Archive, Archived folders, Export/Import and the Drop Box); the usage pages (Cost, Tokens, Time, Milestones and their charts); and Folder Settings (Alex, 2026-10-29, #2798).
+**Mac + web** is: Console and Reports; every control plane management page (Sign-ins, People, Groups, Bots and their caps, Channels, Sign-in Providers, Policy and its kill switch, Secrets, Backups, Git access, Add a Browser); Add a Machine, machine providers, Start a Machine from a Repository and Versions; Connectors and connector set-up (Connect your tools, GitLab, Email); Agent Configuration (Skills, Personas and Workflows editors), personas on the new-session form, and Auto's settings (#2923); the workflow page's Configuration pane, Edit File… and Delete…; folder management (Add Folder, Clone Git URL, a folder's Project, Archive, Archived folders, Export/Import and the Drop Box); the usage pages (Cost, Tokens, Time, Milestones and their charts); and Folder Settings (Alex, 2026-10-29, #2798).
 
 A new row gets its tier when it is added, from the lists above. When a new feature is on neither list, its tier is Mac + web, because the Remote keeps only Core by default (Alex, #2796). An issue that wants it on the Remote says why.
 
