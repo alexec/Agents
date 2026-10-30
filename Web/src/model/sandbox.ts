@@ -2,7 +2,7 @@
 // and states and SandboxWords' menu words (Runtimes/SandboxCatalog.swift, SandboxWords.swift),
 // ported by hand and held to Fixtures/web/sandbox. A runtime the catalog has no route for has no
 // choice: its state is said, with why.
-import type { SandboxChoice, SandboxState } from "../protocol/generated";
+import type { PolicySetBy, SandboxChoice, SandboxState } from "../protocol/generated";
 import { levelWords } from "./levels";
 
 type Route = "choices" | "offOnly" | "codexMode" | { fixed: SandboxState };
@@ -91,4 +91,10 @@ export const startWithout = "Start without sandbox";
 /** SandboxWords.cardTitle. */
 export function sandboxCardTitle(name: string): string {
   return `${name}’s sandbox could not start`;
+}
+
+/** The organisation's mark on a sandbox choice its policy refuses (#998): while it requires the
+ *  sandbox, every choice but On. Undefined for a choice that can be chosen. */
+export function sandboxRefusedBy(choice: SandboxChoice | undefined, setBy: PolicySetBy | undefined): PolicySetBy | undefined {
+  return choice === "on" ? undefined : setBy;
 }
