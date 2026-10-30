@@ -27,6 +27,8 @@ import UIKit
 ///     ink       #1C1D20   #E8EAED   text drawn as ink
 ///     accent    #1F5FC8   #7FB0FF   the icon's cobalt (#156, #695): links, focus, the prominent
 ///                                   button's fill; `Color.accentColor`, from the asset
+///     issue     #0E6B82   #6CC6DB   a session label naming an issue, `#12` (#2958)
+///     pull      #7442B8   #B79AF0   a session label naming a pull request, `P#12` (#2958)
 enum Paper {
     static let ground = Color(light: 0xF7F8F9, dark: 0x1C1D20)
     static let sidebar = Color(light: 0xF0F1F3, dark: 0x161719)
@@ -38,6 +40,10 @@ enum Paper {
     /// The cobalt, from the asset catalogue rather than a hex here, so a control and
     /// the system's own focus rings and selections agree. The one place a view reaches it.
     static let accent = Color.accentColor
+    /// A label chip's hue by what the label names (`SessionLabel.Kind`, #2958): not the
+    /// state tints, so a label never reads as a session needing someone or failing.
+    static let issue = Color(light: 0x0E6B82, dark: 0x6CC6DB)
+    static let pull = Color(light: 0x7442B8, dark: 0xB79AF0)
 
     /// Corner radii: control (chips, rail), card (rows, wells).
     enum Radius {

@@ -14,6 +14,29 @@ public struct SessionLabel: Codable, Hashable, Sendable {
 
     public var normalizedValue: String { SessionLabelPolicy.key(value) }
 
+    /// What a label names, by its text alone, so a chip can be coloured by it (#2958).
+    /// No tracker is asked: `#12` is an issue and `P#12` a pull request whatever they hold.
+    public enum Kind: String, Codable, Hashable, Sendable {
+        /// `#123`, or a tracker key such as `ENG-4`: the labels that link a session to an issue.
+        case issue
+        /// `P#123`: the label that links a session to a pull request.
+        case pullRequest
+        /// `merged`, `closed` or `archived`: the work is over.
+        case finished
+        /// Anything else.
+        case plain
+    }
+
+    public var kind: Kind { Self.kind(of: value) }
+
+    public static func kind(of value: String) -> Kind {
+        let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.wholeMatch(of: /#[0-9]+/) != nil || text.wholeMatch(of: /[A-Z][A-Z0-9]*-[0-9]+/) != nil { return .issue }
+        if text.wholeMatch(of: /[Pp]#[0-9]+/) != nil { return .pullRequest }
+        if ["merged", "closed", "archived"].contains(text.lowercased()) { return .finished }
+        return .plain
+    }
+
     public init(value: String, owner: Owner, addedAt: Date = Date()) {
         self.value = value
         self.owner = owner

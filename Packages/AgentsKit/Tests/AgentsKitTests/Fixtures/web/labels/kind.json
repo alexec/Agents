@@ -1,0 +1,72 @@
+[
+  {
+    "expected" : "issue",
+    "input" : "#2958",
+    "name" : "#2958"
+  },
+  {
+    "expected" : "pullRequest",
+    "input" : "P#2955",
+    "name" : "P#2955"
+  },
+  {
+    "expected" : "pullRequest",
+    "input" : "p#7",
+    "name" : "p#7"
+  },
+  {
+    "expected" : "issue",
+    "input" : "ENG-4",
+    "name" : "ENG-4"
+  },
+  {
+    "expected" : "issue",
+    "input" : " #12 ",
+    "name" : " #12 "
+  },
+  {
+    "expected" : "plain",
+    "input" : "#",
+    "name" : "#"
+  },
+  {
+    "expected" : "plain",
+    "input" : "#12a",
+    "name" : "#12a"
+  },
+  {
+    "expected" : "plain",
+    "input" : "P#",
+    "name" : "P#"
+  },
+  {
+    "expected" : "plain",
+    "input" : "eng-4",
+    "name" : "eng-4"
+  },
+  {
+    "expected" : "finished",
+    "input" : "merged",
+    "name" : "merged"
+  },
+  {
+    "expected" : "finished",
+    "input" : "Archived",
+    "name" : "Archived"
+  },
+  {
+    "expected" : "finished",
+    "input" : "closed",
+    "name" : "closed"
+  },
+  {
+    "expected" : "plain",
+    "input" : "bug",
+    "name" : "bug"
+  },
+  {
+    "expected" : "plain",
+    "input" : "web ui",
+    "name" : "web ui"
+  }
+]

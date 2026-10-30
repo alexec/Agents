@@ -40,6 +40,11 @@
   --tint-failure: #b4232b;
   --tint-vouched: #2d765c;
 
+  /* A session label's hue by what it names (#2958, Paper.issue and Paper.pull): an issue
+     and a pull request, not the tints, so a label never reads as a state. */
+  --label-issue: #0e6b82;
+  --label-pull: #7442b8;
+
   --radius-control: 7px;
   --radius-card: 10px;
   --radius-floating: 16px;
@@ -73,5 +78,7 @@
     --tint-attention: #f0a06b;
     --tint-failure: #f08086;
     --tint-vouched: #8bc6a7;
+    --label-issue: #6cc6db;
+    --label-pull: #b79af0;
   }
 }

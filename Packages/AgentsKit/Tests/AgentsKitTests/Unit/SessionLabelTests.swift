@@ -22,6 +22,17 @@ struct SessionLabelTests {
         #expect(SessionLabelPolicy.split(typed: "") == (finished: [], remainder: ""))
     }
 
+    @Test func kindComesFromTheTextAlone() {
+        #expect(SessionLabel.kind(of: "#2958") == .issue)
+        #expect(SessionLabel.kind(of: "ENG-4") == .issue)
+        #expect(SessionLabel.kind(of: "P#2955") == .pullRequest)
+        #expect(SessionLabel.kind(of: "Merged") == .finished)
+        #expect(SessionLabel.kind(of: "archived") == .finished)
+        #expect(SessionLabel.kind(of: "#12a") == .plain)
+        #expect(SessionLabel.kind(of: "eng-4") == .plain)
+        #expect(SessionLabel(value: "bug", owner: .person).kind == .plain)
+    }
+
     @Test func acceptsOnlyWhatFits() {
         #expect(SessionLabelPolicy.accepted([" ui ", "", "UI", "perf"], existing: ["Perf"]) == ["ui"])
         #expect(SessionLabelPolicy.accepted([String(repeating: "x", count: 25), "ok"], existing: []) == ["ok"])
