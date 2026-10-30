@@ -23,12 +23,17 @@ function Card({ title, line, children, links }: { title: string; line?: string |
   links: [string, Route][] }) {
   return (
     <section class="overview-card" aria-label={title}>
-      <h2>{title}</h2>
-      {line && <p class="quiet">{line}</p>}
-      {children}
-      <p class="overview-links">
-        {links.map(([words, to]) => <button key={words} type="button" class="link" onClick={() => go(to)}>{words} ›</button>)}
-      </p>
+      {/* The title on the left and where to see all of it on the right, over a hairline (#2142). */}
+      <header class="overview-card-head">
+        <h2>{title}</h2>
+        <span class="overview-links">
+          {links.map(([words, to]) => <button key={words} type="button" class="link" onClick={() => go(to)}>{words} ›</button>)}
+        </span>
+      </header>
+      <div class="overview-card-body">
+        {line && <p class="quiet">{line}</p>}
+        {children}
+      </div>
     </section>
   );
 }
@@ -84,7 +89,7 @@ export function Overview({ store, down }: { store: Store; down: boolean }) {
 
   return (
     <section class="chat activity-page overview" aria-label="Overview" aria-busy={down}>
-      <header class="column-head"><h1>Overview</h1></header>
+      <header class="column-head page-head"><div class="page-title"><h1>Overview</h1></div></header>
       <div class="scroll">
         <div class="activity-body">
           <p class="quiet">{overviewIntro}</p>

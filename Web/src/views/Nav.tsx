@@ -7,7 +7,7 @@ import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import type { Store } from "../model/store";
 import { go, route, sectionOf, usageAsked } from "../route";
-import { gated, groupedPages, navTitle, openPage, pagesShown, sectionKeys, sectionsShown, usagePaneTitle, usagePanes,
+import { gated, groupedPages, navPages, navTitle, openPage, pagesShown, sectionKeys, sectionsShown, usagePaneTitle, usagePanes,
   type NavPage, type NavSection } from "../model/nav";
 import { adminOf, adminsOnly } from "../model/console";
 import { hostAnswers, stateWords, versionWords } from "../model/capabilities";
@@ -21,6 +21,10 @@ import { ReportsPage } from "./Reports";
 import { SettingsPage } from "./Settings";
 import { WorkflowRow } from "./WorkflowRow";
 import { BackToList } from "./BackToList";
+import { DataTable } from "./DataTable";
+import { PageTitle, PersonMenu, SearchBox } from "./TopBar";
+import { pageCrumbs } from "../model/crumbs";
+import type { Session } from "../session";
 
 /** How many sessions need the person, across every folder: Agents' count in the bar. */
 export function needsYouCount(store: Store): number {
@@ -35,7 +39,7 @@ function countOf(store: Store, section: NavSection, admin: boolean | null): numb
 }
 
 /** The sections, at the top of every page. */
-export function NavBar({ store }: { store: Store }) {
+export function NavBar({ store, session }: { store: Store; session: Session }) {
   const r = route.value;
   const current = sectionOf(r);
   const admin = adminOf(store);
@@ -70,17 +74,21 @@ export function NavBar({ store }: { store: Store }) {
     );
   };
   return (
-    <nav class="nav-bar" aria-label="Sections">
-      <button type="button" class="nav-home" onClick={() => to("overview")}>{name}</button>
-      <div class="nav-items wide-only">{shown.map(item)}</div>
-      <div class="nav-menu narrow-only">
-        <button type="button" class="nav-menu-button" aria-expanded={menuOpen.value} onClick={() => { menuOpen.value = !menuOpen.value; }}>
-          {navTitle[current]} {menuOpen.value ? "▴" : "▾"}
-          {!menuOpen.value && shown.some((s) => countOf(store, s, admin) > 0) && <span class="sub-app-count" aria-hidden="true">•</span>}
-        </button>
-        {menuOpen.value && <div class="nav-menu-list">{shown.map(item)}</div>}
-      </div>
-    </nav>
+    <header class="top-bar">
+      <nav class="nav-bar" aria-label="Sections">
+        <button type="button" class="nav-home" onClick={() => to("overview")}>{name}</button>
+        <div class="nav-items wide-only">{shown.map(item)}</div>
+        <div class="nav-menu narrow-only">
+          <button type="button" class="nav-menu-button" aria-expanded={menuOpen.value} onClick={() => { menuOpen.value = !menuOpen.value; }}>
+            {navTitle[current]} {menuOpen.value ? "▴" : "▾"}
+            {!menuOpen.value && shown.some((s) => countOf(store, s, admin) > 0) && <span class="sub-app-count" aria-hidden="true">•</span>}
+          </button>
+          {menuOpen.value && <div class="nav-menu-list">{shown.map(item)}</div>}
+        </div>
+      </nav>
+      <SearchBox store={store} />
+      <PersonMenu store={store} session={session} />
+    </header>
   );
 }
 
@@ -99,7 +107,7 @@ export function SectionPage({ store, section, down }: { store: Store; section: E
   const open = openPage(section, r.section, admin);
   const list = pagesShown(section, admin, open?.id);
   return (
-    <div class="columns sub-app" aria-busy={down}>
+    <div class="columns sub-app console" aria-busy={down}>
       {list.length > 1 && (
         <nav class="folders sub-app-list" aria-label={navTitle[section]}>
           {groupedPages(list).map(([group, pages]) => (
@@ -123,11 +131,12 @@ export function SectionPage({ store, section, down }: { store: Store; section: E
 
 /** One page of a section, in the chat's place: Agents' Live Now and Projects too. */
 export function PageView({ store, page, down }: { store: Store; page: NavPage; down: boolean }) {
+  const section = sectionOfPage(page);
   const admin = adminOf(store);
   if (!gated(page, admin) && page.draw.kind === "activity") return <ActivityPageView store={store} page={page.draw.page} />;
   if (!gated(page, admin) && page.draw.kind === "settings") return <SettingsPage store={store} down={down} />;
   return (
-    <Framed title={page.title}>
+    <Framed title={page.title} section={section}>
       {gated(page, admin) ? <p class="hint">{admin === null ? "Loading…" : roleProblemOf(store) ?? adminsOnly}</p>
         : page.draw.kind === "console" ? <ConsoleSection store={store} id={page.draw.id} down={down} />
         : page.draw.kind === "report" ? <ReportsPage store={store} section={page.draw.section} down={down} />
@@ -138,10 +147,15 @@ export function PageView({ store, page, down }: { store: Store; page: NavPage; d
   );
 }
 
-function Framed({ title, children }: { title: string; children: ComponentChildren }) {
+/** The section a page is in, for its breadcrumb. */
+function sectionOfPage(page: NavPage): Exclude<NavSection, "overview"> {
+  return (Object.keys(navPages) as NavSection[]).find((s) => navPages[s].includes(page)) as Exclude<NavSection, "overview"> ?? "agents";
+}
+
+function Framed({ title, section, children }: { title: string; section: Exclude<NavSection, "overview">; children: ComponentChildren }) {
   return (
-    <section class="chat activity-page sub-app-page" aria-label={title}>
-      <header class="column-head"><BackToList /><h1>{title}</h1></header>
+    <section class="chat activity-page sub-app-page console" aria-label={title}>
+      <header class="column-head page-head"><BackToList /><PageTitle parts={pageCrumbs(section, title)}><h1>{title}</h1></PageTitle></header>
       <div class="scroll">
         <div class="activity-body settings-body">{children}</div>
       </div>
@@ -152,20 +166,14 @@ function Framed({ title, children }: { title: string; children: ComponentChildre
 /** A member's Machines: the machines this page knows, theirs and the ones shared with them. */
 function YourMachines({ store }: { store: Store }) {
   const hosts = store.hosts.value;
-  if (hosts.length === 0) return <p class="hint">No machines yet. Add one on your Mac, in Settings ▸ Machines.</p>;
   return (
-    <table class="console-table">
-      <thead><tr><th>Machine</th><th>State</th><th>Version</th></tr></thead>
-      <tbody>
-        {hosts.map((h) => (
-          <tr key={h.id}>
-            <td><span class="strong">{h.name}</span><br /><span class="quiet small">{h.workspace?.providerName || h.platform}</span></td>
-            <td><span class={`fleet-state ${h.state}`}>{stateWords(h)}</span></td>
-            <td>{versionWords(h)}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <DataTable id="yourMachines" label="Machines" rows={hosts} rowKey={(h) => h.id} order={{ column: "name", dir: "asc" }}
+      empty="No machines yet. Add one on your Mac, in Settings ▸ Machines." columns={[
+        { id: "name", title: "Machine", sort: (h) => h.name,
+          cell: (h) => <><span class="strong">{h.name}</span><br /><span class="quiet small">{h.workspace?.providerName || h.platform}</span></> },
+        { id: "state", title: "State", sort: stateWords, cell: (h) => <span class={`fleet-state ${h.state}`}>{stateWords(h)}</span> },
+        { id: "version", title: "Version", sort: (h) => h.version, cell: versionWords },
+      ]} />
   );
 }
 
@@ -206,9 +214,9 @@ function Usage({ store }: { store: Store }) {
   const pane = useSignal(usageAsked.peek() ?? "spending");
   return (
     <>
-      <div class="segmented" role="radiogroup" aria-label="Show">
+      <div class="tabs" role="tablist" aria-label="Show">
         {usagePanes.map((p) => (
-          <button key={p} role="radio" aria-checked={pane.value === p} class={pane.value === p ? "on" : ""}
+          <button key={p} role="tab" aria-selected={pane.value === p} class={pane.value === p ? "on" : ""}
             onClick={() => { pane.value = p; usageAsked.value = undefined; }}>{usagePaneTitle[p]}</button>
         ))}
       </div>

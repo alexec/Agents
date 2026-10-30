@@ -10,7 +10,7 @@ import type { FeatureUsage, ReportFormat, ReportPage, ReportRange, ReportRow, Re
   UsageReport } from "../protocol/generated";
 import { CallFailed } from "../wire/link";
 import { adoption, adoptionLine, barCaption, adoptionNote, budgetWords, dimensionTitle, empty, exportName, groupNote, hiddenNote, line, meNote,
-  memberNote, noOutcomes, noWorkflows, outcomeLine, outcomeTotals, outcomesNote, rangeShort, rangeSpan, rangeSpoken, ranges, reportTotals, runtimeLine,
+  memberNote, noOutcomes, noWorkflows, outcomeLine, outcomeTotals, outcomesNote, rangeSpan, ranges, reportTotals, runtimeLine,
   runtimesNote, sameScope, spendBarCaption, scopeKey, scopeNote, scopedDimensions, share, timeLine, timeNote, utcNote, waitingShare, weekTitle, workflowLine,
   workflowRows, workflowsNote, deleteViewWords, digestText, noCopy, noViews, noViewsHere, viewBy, viewWords, viewsNote } from "../model/reports";
 import type { OutcomeGroup, OutcomeOrder, ReportDimension, ReportGroup } from "../model/reports";
@@ -18,6 +18,7 @@ import { featureLine, featureUnused, featuresNote, mergeFeatures, noFeatures } f
 import { hostAnswers } from "../model/capabilities";
 import { leadLine, noValue, noValueHere, nodeName, rowLine, unlinkedLine, valueHeadline, valueNote, wasteLine } from "../model/value";
 import type { Section } from "../model/console";
+import { Choice } from "./Choice";
 
 function sentence(error: unknown): string {
   if (error instanceof CallFailed) {
@@ -98,24 +99,14 @@ export function ReportsPane({ store, runtimeName, scope, seesMore, initial }: { 
   return (
     <div class="reports-pane">
       <div class="reports-head">
-        <div class="segmented" role="radiogroup" aria-label="Range" title={rangeSpan[range.value]}>
-          {ranges.map((r) => (
-            <button key={r} role="radio" aria-checked={range.value === r} class={range.value === r ? "on" : ""}
-              aria-label={rangeSpoken[r]} onClick={() => { range.value = r; }}>{rangeShort[r]}</button>
-          ))}
-        </div>
+        <Choice label="Range" value={range.value} options={ranges.map((r) => [r, rangeSpan[r]] as const)} onPick={(r) => { range.value = r; }} />
         <span class="reports-export">
           <button title="Save the rows of this range as CSV" onClick={() => void exportRows("csv")}>Export CSV</button>
           <button title="Save the rows of this range as JSON lines" onClick={() => void exportRows("jsonl")}>Export JSON lines</button>
           {scope && <SaveView store={store} page="spend" scope={scope} range={range.value} by={way} />}
         </span>
       </div>
-      <div class="segmented" role="radiogroup" aria-label="By">
-        {ways.map((d) => (
-          <button key={d} role="radio" aria-checked={way === d} class={way === d ? "on" : ""}
-            onClick={() => { by.value = d; }}>{dimensionTitle[d]}</button>
-        ))}
-      </div>
+      <Choice label="By" value={way} options={ways.map((d) => [d, dimensionTitle[d]] as const)} onPick={(d) => { by.value = d; }} />
       <p class="quiet small">{rangeSpan[range.value]}</p>
       {scope && shown?.budgetUSD !== undefined && shown.monthSpentUSD !== undefined && <Budget spent={shown.monthSpentUSD} budget={shown.budgetUSD} />}
       {problem.value && <p class="hint">{problem.value}</p>}
@@ -275,12 +266,7 @@ function SavedPage({ store, scopes }: { store: Store; scopes: readonly ReportSco
 
 function RangePicker({ range, from = 0 }: { range: { value: ReportRange }; from?: number }) {
   return (
-    <div class="segmented" role="radiogroup" aria-label="Range" title={rangeSpan[range.value]}>
-      {ranges.slice(from).map((r) => (
-        <button key={r} role="radio" aria-checked={range.value === r} class={range.value === r ? "on" : ""}
-          aria-label={rangeSpoken[r]} onClick={() => { range.value = r; }}>{rangeShort[r]}</button>
-      ))}
-    </div>
+    <Choice label="Range" value={range.value} options={ranges.slice(from).map((r) => [r, rangeSpan[r]] as const)} onPick={(r) => { range.value = r; }} />
   );
 }
 
@@ -311,12 +297,7 @@ function CountsPane({ store, runtimeName, scope, kind, initial }: { store: Store
         <RangePicker range={range} />
         {scope && <SaveView store={store} page={kind} scope={scope} range={range.value} by={way} />}
       </div>
-      <div class="segmented" role="radiogroup" aria-label="By">
-        {ways.map((d) => (
-          <button key={d} role="radio" aria-checked={way === d} class={way === d ? "on" : ""}
-            onClick={() => { by.value = d; }}>{dimensionTitle[d]}</button>
-        ))}
-      </div>
+      <Choice label="By" value={way} options={ways.map((d) => [d, dimensionTitle[d]] as const)} onPick={(d) => { by.value = d; }} />
       <p class="quiet small">{rangeSpan[range.value]}</p>
       {problem.value && <p class="hint">{problem.value}</p>}
       {!totals && !problem.value && <p class="hint">Loading…</p>}
@@ -506,15 +487,8 @@ export function ReportsPage({ store, section, down }: { store: Store; section: S
   return (
     <>
       {list.length > 1 && section.id !== "saved" && section.id !== "features" && (
-        <div class="segmented report-scopes" role="radiogroup" aria-label="Scope">
-          {list.map((o) => {
-            const k = scopeKey(o.scope);
-            return (
-              <button key={k} role="radio" aria-checked={option === o} class={option === o ? "on" : ""}
-                onClick={() => { picked.value = k; }}>{o.name}</button>
-            );
-          })}
-        </div>
+        <Choice label="Scope" class="report-scopes" value={option ? scopeKey(option.scope) : picked.value}
+          options={list.map((o) => [scopeKey(o.scope), o.name] as const)} onPick={(k) => { picked.value = k; }} />
       )}
       {section.id === "features" ? <FeaturesPane store={store} />
         : scopes.value !== null && (section.id === "saved" ? <SavedPage store={store} scopes={list} />

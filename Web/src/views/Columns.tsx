@@ -64,8 +64,8 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
       {down && <Banner session={session} />}
       <Problem store={store} />
       <OrgPolicyStrip store={store} />
-      <NavBar store={store} />
-      {section === "overview" ? <div class="columns overview-columns" aria-busy={down}><Overview store={store} down={down} /></div>
+      <NavBar store={store} session={session} />
+      {section === "overview" ? <div class="columns overview-columns console" aria-busy={down}><Overview store={store} down={down} /></div>
         : section !== "agents" ? <SectionPage store={store} section={section} down={down} /> : <div class="columns with-sidebar" aria-busy={down}>
         <Sidebar session={session} store={store} linkDown={down} />
         {agentsPage ? <PageView store={store} page={agentsPage} down={down} />

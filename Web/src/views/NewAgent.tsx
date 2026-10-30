@@ -768,7 +768,7 @@ function PersonaSwitch({ personas, picked, down, choose }: {
   }, [personas]);
   return (
     <div ref={box} class={`persona-switch${name ? "" : " none"}${fits.value ? "" : " menu"}`} title="Start a kind of session: a persona sets what it names">
-      <div ref={segments} class="segmented persona-segments" role="group" aria-label="Persona" aria-hidden={!fits.value}>
+      <div ref={segments} class="button-group persona-segments" role="group" aria-label="Persona" aria-hidden={!fits.value}>
         <button type="button" aria-pressed={picked === undefined} class={picked === undefined ? "on" : ""}
           disabled={down} tabIndex={fits.value ? undefined : -1} onClick={() => choose("")}>No persona</button>
         {personas.map((persona) => (

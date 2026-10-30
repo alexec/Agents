@@ -154,6 +154,30 @@ No row's verdict changes: the look of the web page was by design already. The
 `console-and-reports.md` row for the bar names the top bar's search and person menu, web
 only, **by design** (#2142). Forget This Browser's row names the person menu.
 
+## What the build settled (2026-10-30)
+
+Alex approved the spec and the mocks (PR #2970). Building it settled these, each easy to undo:
+
+- Decided: **a sortable table where the rows are records of one kind**: Machines (an admin's and a
+  member's), Live Now, Projects and Team Workflows, because their columns are the same on every row.
+  Requests, People, Events, Audit, Worktrees and Connectors **take the table's row look** (hairlines,
+  dense rows, one bordered box) **without sorting**, because each row carries its own answers and sheets
+  and Events and Audit are grouped by day; a sortable table of them is a later issue if Alex wants one.
+- Decided: **Machines' All, Offline and Out of Date is a State select** over the table.
+- Decided: **a choice in a form** (Providers' Kind, a connector's Connect with) **and New Session's
+  persona are a button group**, a web control with the picked one in the accent's tint, in place of radio
+  buttons, so a pick still opens its form at once; the persona keeps its menu where the group does not fit.
+- Decided: **the person's menu shows the name and role**; the control plane gives the page no email.
+- Decided: **a page whose name is its section's has no breadcrumb** (Machines ▸ Machines, Settings), so the
+  title is not said twice; the Overview has none.
+- Decided: **search's machine result opens Machines**, as there is no page of one machine.
+- Decided: **the agents' list keeps its look as #2141 left it** (New Session, the filters, the rows), and
+  **each page's actions stay where the page has them**, because both are a change of each page's own
+  layout, not of the frame; a later issue can move them.
+- Decided: **the Overview's rows stay lists with hairlines**, not small tables, as their cards are narrow.
+- Decided: **Usage's range picker says Day, Week, Month and 3 months**, and Reports' Range says
+  "The last 7 days", in place of D, W, M and 3M.
+
 ## Build
 
 One PR, after Alex approves this spec and its mocks. It is a UI enhancement, so it waits

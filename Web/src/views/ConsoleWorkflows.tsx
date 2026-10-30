@@ -8,6 +8,7 @@ import type { TeamBotRun, TeamWorkflows } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import { ago } from "../model/connectorSetup";
 import { failedWords, machineWords, noBots, runsWords, spendWords, teamWorkflowsFoot } from "../model/console";
+import { DataTable } from "./DataTable";
 
 export function TeamWorkflowsPage({ store, down }: { store: Store; down: boolean }) {
   const board = useSignal<TeamWorkflows | null>(null);
@@ -49,18 +50,13 @@ export function TeamWorkflowsPage({ store, down }: { store: Store; down: boolean
           </h3>
           <p class="quiet small">{machineWords(bot)} · <span class={bot.capped ? "attention" : ""}>{spendWords(bot)}</span></p>
           {bot.workflows.length === 0 ? <p class="hint">No runs in the last 7 days.</p> : (
-            <table class="console-table">
-              <thead><tr><th>Workflow</th><th class="num">Last 7 days</th><th>Last run</th></tr></thead>
-              <tbody>
-                {bot.workflows.map((w) => (
-                  <tr key={w.workflow}>
-                    <td>{w.workflow}</td>
-                    <td class="num">{runsWords(w.runs)}</td>
-                    <td class="quiet">{w.lastRunAt === undefined ? "—" : ago(fromWireDate(w.lastRunAt))}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable id="teamWorkflows" label={`${bot.name}'s workflows`} rows={bot.workflows} rowKey={(w) => w.workflow}
+              order={{ column: "last", dir: "desc" }} empty="No runs in the last 7 days." columns={[
+                { id: "workflow", title: "Workflow", sort: (w) => w.workflow, cell: (w) => w.workflow },
+                { id: "runs", title: "Last 7 days", num: true, first: "desc", sort: (w) => w.runs, cell: (w) => runsWords(w.runs) },
+                { id: "last", title: "Last run", first: "desc", sort: (w) => w.lastRunAt,
+                  cell: (w) => <span class="quiet">{w.lastRunAt === undefined ? "—" : ago(fromWireDate(w.lastRunAt))}</span> },
+              ]} />
           )}
           {bot.live.length > 0 && (
             <ul class="request-list">
