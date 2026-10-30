@@ -21,6 +21,7 @@ starts lanes.
 5. Run the unit tests for what you touched. For a change that needs to be seen working,
    use the run-app skill on a scratch root for `App/`, `Host/`, `Go/`, `Remote/`, or
    `Packages/AgentsKit`. Close the scratch app before you commit.
+   Before a push that changes `Go/`, run `scripts/go-changed.sh` under the `build` lease.
 6. Commit, push, and open a pull request whose body says `Fixes #<n>`. Turn on squash
    auto-merge at once. **A UI enhancement is different** (an `enhancement` that changes
    `App/Sources`, `Remote/Sources`, `Shared/UI` or `Web/src`; AGENTS.md, "A UI
