@@ -27,14 +27,6 @@ final class VoiceSpeaker {
         engine.attach(player)
     }
 
-    /// Says `sentences`, calling `onSentence` as each one starts. Returns when the last has
-    /// been heard, or at once when stopped. Throws when the voice cannot be loaded or the
-    /// audio would not start.
-    func say(_ sentences: [String], onSentence: (String) -> Void = { _ in }) async throws {
-        var rest = sentences[...]
-        try await say(next: { rest.popFirst() }, onSentence: onSentence)
-    }
-
     /// Says each sentence `next` gives, until it gives none: a reply is spoken while it is
     /// still being written (#2375). `next` is asked again once a sentence has been heard,
     /// so one that came meanwhile is said too.

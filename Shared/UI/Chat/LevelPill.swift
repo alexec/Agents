@@ -148,9 +148,4 @@ enum LevelMatch {
         }
         return nil
     }
-
-    /// The options a value sets on a runtime, to put in a form.
-    static func options(_ field: AutoField, _ level: String, runtimeID: String, mappings: AutoMappings) -> [String: JSONValue] {
-        mappings.cell(runtimeID, field, level)?.native?.options ?? [:]
-    }
 }

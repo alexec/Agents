@@ -1474,20 +1474,6 @@ final class AppModel {
         }
     }
 
-    func writeUserWorkflow(id: String, content: String) async -> String? {
-        do {
-            _ = try await client.call(
-                DaemonAPI.Method.workflowsWrite,
-                DaemonAPI.WorkflowWriteRequest(workflowID: id, content: content),
-                returning: WorkflowSummary.self)
-            await refreshWorkflows()
-            return nil
-        } catch {
-            await refreshWorkflows()
-            return describe(error)
-        }
-    }
-
     /// The machine id of the host being looked at, for a workflow pinned to computers
     /// (#317). This Mac's is `MachineID` even before the control plane has listed it.
     func workflowMachineID(on host: MachineRef) -> String? {
@@ -3911,13 +3897,6 @@ final class AppModel {
         }
     }
 
-    func catalogDestinationState(_ previewID: UUID,
-                                 for destination: DaemonAPI.SkillDestination) async -> DaemonAPI.DestinationState? {
-        try? await macClient.call(DaemonAPI.Method.catalogDestinationState,
-                               DaemonAPI.DestinationStateRequest(previewID: previewID, destination: destination),
-                               returning: DaemonAPI.DestinationStateAnswer.self).destinationState
-    }
-
     func addSkill(_ previewID: UUID, to destination: DaemonAPI.SkillDestination,
                   replace: Bool) async -> Result<DaemonAPI.ManagedSkill, DaemonAPI.CatalogError> {
         do {
@@ -5053,25 +5032,6 @@ final class AppModel {
         await attempt(on: work.agent(id)?.host ?? .mac) {
             try await self.client(forAgent: id).call(DaemonAPI.Method.agentsPrompt,
                                        DaemonAPI.PromptRequest(agentID: id, text: Block.carryOnPrompt))
-        }
-    }
-
-    /// Start an agent on this, in this folder.
-    ///
-    /// What the prompt at the top of a folder does. There is no separate button for
-    /// it because there is nothing else the prompt could mean: you are looking at a
-    /// folder and saying what you want done in it.
-    func startAgent(in folder: URL, prompt: String, labels: [String] = []) async {
-        let words = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !words.isEmpty, let runtimeID = defaultRuntimeID else { return }
-        await attempt {
-            let id = try await self.selectedHostClient.call(
-                DaemonAPI.Method.agentsStart,
-                DaemonAPI.StartRequest(runtimeID: runtimeID, cwd: folder, prompt: words,
-                                       labels: labels),
-                returning: UUID.self)
-            self.justStarted = id
-            self.selection = id
         }
     }
 
