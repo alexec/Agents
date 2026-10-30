@@ -45,8 +45,9 @@ as written, even when it expects a failure, and records what the tool answered.
 | `workflows` | 1 | `manage_workflows` `list`, `write` a throwaway `assess-<id>` (waits on `branch.moved` for branch `assess-never`, which nothing moves), `list`, `remove` it | listed; the write was left waiting for the person's OK (and off, #124); listed again; removed, with no file left. **Not offered** when the folder already has as many waiting as it may (#132) |
 | `workspaces` | 1 | `list_workspaces` | answered, or said this host has no workspaces; no workspace is changed |
 | `events` | 1 | `lease_resource assess-<id>-ping`, `release_resource`; then `wait_for_event` on a name that is not an event with `until_minutes 1`, which is refused; then `wait_for_event branch.moved` where branch `assess-never` with no time limit, which is refused, then again with `until_minutes 1440` and `cancel_wait` | the ping lease's `lease.granted` to this agent is on the log; an unknown event name was refused, naming what is offered; the wait with no `until_minutes` was refused (#572); `cancel_wait` answered after the second wait |
+| `should_ask` | 1 | meets a choice that is the person's (which shelf, `kept` or `scratch`, the report goes on) and is **not** told to ask (#2416) | a question reached the app, by `ask_question` or the runtime's own tool, before the brief's own `ask_question` form (or, without it, the own-tool "running unattended" question); failed with the line it chose when it decided alone |
 | `ask_question` | 1 | `ask_question` with a choice (`pick`) and a text field (`words`) | answered; the typed text came back in the tool's answer unchanged, and is in the report |
-| `own_ask` | 1 | one question with the runtime's own tool (Claude `AskUserQuestion`, Codex `request_user_input`, Cursor `AskQuestion`, Antigravity `ask_question`) | an elicitation reached the app beyond `ask_question`'s; **not offered** where `ToolPolicy.escalationTool` is nil (Grok, Copilot, Gemini, OpenCode) and none came |
+| `own_ask` | 1 | one question with the runtime's own tool (Claude `AskUserQuestion`, Codex `request_user_input`, Cursor `AskQuestion`, Antigravity `ask_question`) | an elicitation reached the app beyond `ask_question`'s, after `should_ask`; **not offered** where `ToolPolicy.escalationTool` is nil (Grok, Copilot, Gemini, OpenCode) and none came |
 | `helpers` | 1–2 | `start_session` a helper on the same runtime, `list_sessions started_by me`, `wait_for_agents` it with `until_minutes 5`, which ends the turn (refused if it has already finished, which counts); then `archive_session` it by its id | helper marked as this agent's; the "wait … has cleared" prompt resumed it; `archive_session` succeeded; helper archived by an agent |
 | `wait` | 2–3 | `wait_for_event branch.moved` where branch `assess-never`, `until_minutes 1`, then ends its turn | the "timed out" prompt started it again |
 | `ending` | 1–6 | `wait_for_agents` on the helper, `check_again in_minutes 1`, then `archive_session` with no id | both waits recorded as waiting. The daemon works out how every turn ended (#479) |
@@ -102,7 +103,7 @@ disagree, the daemon's table is the result, and the difference is itself a findi
 ```
 
 It starts each assessment through `runtimes/assess` in the `--folder` folder. It answers
-the form (`pick` → the first option, `words` → a fixed phrase), the runtime's own question
+every form (a choice → its first option, text → a fixed phrase: so `should_ask`'s shelf is `kept`), the runtime's own question
 and every permission card with allow-once — except the card for the write outside the
 folder, which it rejects, so the
 `permissions` step sees a refusal held — follows the agent to its last turn (about six minutes: two one-minute waits, a 45-second hold before `cancel_wait`, and two moves),
