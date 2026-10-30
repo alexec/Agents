@@ -352,7 +352,12 @@ final class AppViewHost {
             if show {
                 await load(mine)
             } else {
+                #if os(iOS)
+                // The Remote has no Connectors page (#2798), so no line names one (#2899).
+                phase = .failed("Not shown.")
+                #else
                 phase = .failed("Not shown. Ask Again is on \(ask.server)'s row in the folder's Connectors.")
+                #endif
             }
         }
     }
