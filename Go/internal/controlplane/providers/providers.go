@@ -466,6 +466,9 @@ func (p *Providers) AgentCall(host, agent, method string, params json.RawMessage
 	if named, ok := str(given["host"]); ok && p.hooks.OwnerOf(named) != caller.Person {
 		return nil, fail(CodeNoSuchHost, "No machine is called %s.", named)
 	}
+	if method == MethodSessionOnMachine {
+		return p.startSessionOn(hostName, agent, rawOf(given), caller)
+	}
 	if named, ok := str(given["id"]); ok && (method == MethodProvidersCreate || method == MethodProvidersOptions) {
 		p.mu.Lock()
 		_, known := p.providers[named]
@@ -517,6 +520,13 @@ func (p *Providers) forAgent(person string) AgentMachines {
 		}
 		out.Providers = append(out.Providers, AgentProvider{ID: summary.ID, Name: summary.Name, CanMake: canMake,
 			CanDelete: canDelete, Options: jsonValue(options), Workspaces: workspaces})
+	}
+	// Every machine of the person's, made by a provider or not, for start_session (#2887).
+	out.Hosts = []AgentHost{}
+	for _, h := range hosts {
+		if p.hooks.OwnerOf(h.ID) == person {
+			out.Hosts = append(out.Hosts, AgentHost{Name: h.Name, State: p.router.HostState(h.ID)})
+		}
 	}
 	return out
 }

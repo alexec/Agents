@@ -2750,6 +2750,27 @@
       }
     },
     {
+      "name": "machines/startSession",
+      "x-capability": "sessions.on-machine/1",
+      "description": "Through host/machines only (#2887): an agent's start_session on another of the person's machines. The id of the session it started; kept (-32067) when the machine is stopped and is starting.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineSessionStart"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/UUID"
+        }
+      }
+    },
+    {
       "name": "notices/delivered",
       "x-capability": "notices/1",
       "description": "To the host whose notice it is, on its channel 0 (#2860): the control plane sent it to one of the person's devices, so the host records where on the notice's line.",

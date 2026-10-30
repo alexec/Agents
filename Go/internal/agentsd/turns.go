@@ -345,6 +345,9 @@ func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) 
 	d.actedOn(a.ID, by.actor)
 	d.tellChanged(a, nil)
 	d.folderChanged(folderPath(&a))
+	if r.StartedFrom != nil {
+		d.record(a.ID, runtimeNote(startedFromNote(r.StartedFrom)))
+	}
 	if wt != nil {
 		d.record(a.ID, runtimeNote(worktreeNote(*wt)))
 	}

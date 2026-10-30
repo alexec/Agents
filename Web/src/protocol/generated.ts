@@ -382,6 +382,16 @@ export type AgentGroup =
 /** machines/forAgent: what list_machines shows an agent. */
 export interface AgentMachines {
   providers: AgentMachinesProvider[];
+  /**
+   * Every machine of the person's, by name, where start_session can start a session (#2887). Absent
+   * from an older control plane.
+   */
+  hosts?: AgentMachinesHost[];
+}
+
+export interface AgentMachinesHost {
+  name: string;
+  state: string;
 }
 
 export interface AgentMachinesMachine {
@@ -4202,6 +4212,15 @@ export interface MachineSchedule {
 }
 
 /**
+ * machines/startSession, through host/machines (#2887): an agent's start_session on another of the
+ * person's machines, by its name. The control plane sends that machine's agents/start.
+ */
+export interface MachineSessionStart {
+  host: string;
+  start: StartRequest;
+}
+
+/**
  * host/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next
  * scheduled workflow.
  */
@@ -7453,6 +7472,20 @@ export interface StartRequest {
    * agents/prompt's voice does.
    */
   voice?: boolean;
+  /**
+   * An agent on another machine started it, through the control plane (#2887): its chat says who.
+   */
+  startedFrom?: StartedFrom;
+}
+
+/**
+ * The agent on another machine that started a session with start_session (#2887). The control plane
+ * writes machine and who; the asking host writes agent.
+ */
+export interface StartedFrom {
+  machine: string;
+  agent: UUID;
+  who: string;
 }
 
 /**
@@ -9169,7 +9202,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AgentConfigFile: { required: ["path", "time", "counter", "machine", "digest"], optional: ["contents", "deleted"] },
   AgentConfigFileRequest: { required: ["path", "time", "counter"], optional: ["contents", "deleted"] },
   AgentConfigFiles: { required: ["files"], optional: ["updated"] },
-  AgentMachines: { required: ["providers"], optional: [] },
+  AgentMachines: { required: ["providers"], optional: ["hosts"] },
+  AgentMachinesHost: { required: ["name", "state"], optional: [] },
   AgentMachinesMachine: { required: ["id", "name", "state"], optional: ["host", "hostState", "cost"] },
   AgentMachinesProvider: { required: ["id", "name", "canMake", "canDelete", "workspaces"], optional: ["options"] },
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
@@ -9541,6 +9575,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineRelease: { required: ["version"], optional: [] },
   MachineRequest: { required: ["host"], optional: ["purge"] },
   MachineSchedule: { required: [], optional: ["at", "workflow"] },
+  MachineSessionStart: { required: ["host", "start"], optional: [] },
   MachineStatus: { required: ["idle", "running"], optional: ["schedule"] },
   MachineStop: { required: ["host"], optional: ["confirmRunning"] },
   MachineTunnel: { required: ["up"], optional: ["problem"] },
@@ -9872,7 +9907,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SlashCommand: { required: ["name"], optional: ["description", "inputHint"] },
   SpendCaps: { required: [], optional: ["dailyUSD"] },
   StartOptions: { required: ["values", "extraArguments"], optional: [] },
-  StartRequest: { required: ["runtimeID", "cwd", "prompt", "attachments", "startOptions", "additionalDirectories", "mcpServers", "labels"], optional: ["draftID", "worktree", "requestID", "sandbox", "persona", "levels", "purpose", "accountID", "voice"] },
+  StartRequest: { required: ["runtimeID", "cwd", "prompt", "attachments", "startOptions", "additionalDirectories", "mcpServers", "labels"], optional: ["draftID", "worktree", "requestID", "sandbox", "persona", "levels", "purpose", "accountID", "voice", "startedFrom"] },
+  StartedFrom: { required: ["machine", "agent", "who"], optional: [] },
   StartedMachinePreview: { required: ["host", "name", "state", "unpushed"], optional: ["unknown"] },
   StartingPoint: { required: ["repository", "commit"], optional: [] },
   StopBackgroundRequest: { required: ["agentID", "itemID"], optional: [] },

@@ -172,6 +172,22 @@ To delete one, choose **Delete Machine…** in its server's `···` menu on Set
 Agents names what is lost first: the machine, everything on its disk, and the server with
 its agents.
 
+## Let an agent start a session on another machine
+
+Some work has to run on a particular machine, such as a bug that only shows on the PC. An
+agent can start a session there with `start_session`, naming the machine and a folder on
+it (#2887). `list_machines` gives the agent the names of all your machines.
+
+1. The agent asks first. Its question card says the machine, the folder and the task.
+2. Choose **Start it**. The session starts on that machine and shows in your list under it.
+   If the machine is stopped, Agents starts it, and the session starts when it connects.
+   The session's chat says which agent started it, and on which machine.
+
+The folder must be on that machine already. To put it there, use **Send to ‹server›…**
+(see [Send a folder to a server](send-a-folder-to-a-machine.md)). The agent that asked does
+not see the new session in its own list of sessions, and can't message it or wait for it.
+Its prompt says what to do with the result, for example push a branch.
+
 ## If it doesn't work
 
 - **The provider can't list.** Its card says why, and shows what it last listed. Check its

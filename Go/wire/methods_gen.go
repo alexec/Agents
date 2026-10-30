@@ -489,6 +489,7 @@ var CallLinksList = Method[Empty, []ChannelLink]{"links/list"}
 var CallLinksRemove = Method[ChannelLinkRemove, Empty]{"links/remove"}
 var CallLinksRequests = Method[Empty, []ChannelLinkRequest]{"links/requests"}
 var CallMachinesForAgent = Method[Empty, AgentMachines]{"machines/forAgent"}
+var CallMachinesStartSession = Method[MachineSessionStart, UUID]{"machines/startSession"}
 var CallNoticesTake = Method[NoticeLimits, NoticeTaken]{"notices/take"}
 var CallOrgRoutesCheck = Method[OrgRouteRequest, OrgRouteCheck]{"orgRoutes/check"}
 var CallOrgRoutesList = Method[Empty, OrgRouteList]{"orgRoutes/list"}

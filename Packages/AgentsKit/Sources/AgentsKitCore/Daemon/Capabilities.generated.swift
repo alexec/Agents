@@ -108,6 +108,7 @@ public enum Capability {
     public static let runtimesAccounts1 = "runtimes.accounts/1"
     public static let runtimes1 = "runtimes/1"
     public static let sandbox1 = "sandbox/1"
+    public static let sessionsOnMachine1 = "sessions.on-machine/1"
     public static let sessions1 = "sessions/1"
     public static let shell1 = "shell/1"
     public static let signinAsk1 = "signin.ask/1"
@@ -541,6 +542,7 @@ public enum Capability {
         "links/remove": "links/1",
         "links/requests": "links/1",
         "machines/forAgent": "machines/1",
+        "machines/startSession": "sessions.on-machine/1",
         "notices/take": "notices/1",
         "orgRoutes/check": "org-routes/1",
         "orgRoutes/list": "org-routes/1",
