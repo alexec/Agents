@@ -1,6 +1,16 @@
 [
   {
     "expected" : {
+      "asksFirst" : {
+        "balanced" : false,
+        "fast" : false,
+        "smart" : false
+      },
+      "bypassConfirm" : {
+        "button" : "Bypass Permissions",
+        "message" : "It will not ask before it edits files or runs commands, even outside its folder. Choose Ask to make it ask again.",
+        "title" : "Let this agent bypass every permission?"
+      },
       "continueOn" : "Continue on Codex",
       "custom" : "Custom",
       "field" : "Model",
@@ -46,6 +56,17 @@
   },
   {
     "expected" : {
+      "asksFirst" : {
+        "approveForMe" : false,
+        "ask" : false,
+        "bypassPermissions" : true,
+        "plan" : false
+      },
+      "bypassConfirm" : {
+        "button" : "Bypass Permissions",
+        "message" : "It will not ask before it edits files or runs commands, even outside its folder. Choose Ask to make it ask again.",
+        "title" : "Let this agent bypass every permission?"
+      },
       "continueOn" : "Continue on Codex",
       "custom" : "Custom",
       "field" : "Permission mode",
@@ -95,6 +116,15 @@
   },
   {
     "expected" : {
+      "asksFirst" : {
+        "alwaysApprove" : false,
+        "default" : false
+      },
+      "bypassConfirm" : {
+        "button" : "Bypass Permissions",
+        "message" : "It will not ask before it edits files or runs commands, even outside its folder. Choose Ask to make it ask again.",
+        "title" : "Let this agent bypass every permission?"
+      },
       "continueOn" : "Continue on Codex",
       "custom" : "Custom",
       "field" : "Permission requests",
@@ -136,6 +166,16 @@
   },
   {
     "expected" : {
+      "asksFirst" : {
+        "off" : false,
+        "on" : false,
+        "runtime" : false
+      },
+      "bypassConfirm" : {
+        "button" : "Bypass Permissions",
+        "message" : "It will not ask before it edits files or runs commands, even outside its folder. Choose Ask to make it ask again.",
+        "title" : "Let this agent bypass every permission?"
+      },
       "continueOn" : "Continue on Codex",
       "custom" : "Custom",
       "field" : "Sandbox",

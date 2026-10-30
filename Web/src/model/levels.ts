@@ -47,6 +47,13 @@ export const levelWords = (field: AutoField, level: string): string => words[fie
 export const levelMeaning = (field: AutoField, level: string): string => meanings[field][level] ?? "";
 
 export const customWords = "Custom";
+/** Bypass Permissions asks once more before it is set, as Yes to all does (#2892, #2746). */
+export const asksFirst = (field: AutoField, level: string): boolean => field === "permission" && level === "bypassPermissions";
+export const bypassConfirm = {
+  title: "Let this agent bypass every permission?",
+  message: "It will not ask before it edits files or runs commands, even outside its folder. Choose Ask to make it ask again.",
+  button: "Bypass Permissions",
+};
 export const followsSettings = "follows Settings";
 export const ownWords = (runtimeName: string): string => `⋯ ${runtimeName}’s own`;
 export const onRuntime = (value: string, native: string, runtimeName: string): string => `${value}: ${native} on ${runtimeName}`;
