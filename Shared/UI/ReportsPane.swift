@@ -399,7 +399,7 @@ private struct FeatureRow: View {
             HStack(spacing: 6) {
                 Text(feature.method).appText(.reading).monospaced().lineLimit(1)
                 if feature.quarter == 0 {
-                    Text(FeatureWords.unused).appText(.fine).foregroundStyle(.orange)
+                    Text(FeatureWords.unused).appText(.fine).tinted(.attention)
                 }
             }
             Text(FeatureWords.line(feature, days: days))
