@@ -96,3 +96,10 @@ there change with it.
 A send that stops before its end (a sheet closed, a window that quit, a lost connection)
 leaves its files on the hosts for a time. The next send removes each file that nothing
 touched for an hour. A send or a bring back that stops at a check removes its files at once.
+
+An agent can make the same send, with `start_session` and `send`, before it starts a
+session on the server (#2929; see
+[Start machines from Agents](start-machines-from-agents.md)). Then no window takes part:
+the agent's host makes the bundle and the patch, and sends them to the server in parts of
+4 MB, through the control plane (`machines/sendFolder`). You say yes on the agent's
+question card first.

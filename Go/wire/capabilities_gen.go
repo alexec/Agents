@@ -50,6 +50,7 @@ const CapFilesComplete1 = "files.complete/1"
 const CapFilesDiagnostics1 = "files.diagnostics/1"
 const CapFiles1 = "files/1"
 const CapFolder1 = "folder/1"
+const CapFoldersToMachine1 = "folders.to-machine/1"
 const CapFolders1 = "folders/1"
 const CapGit1 = "git/1"
 const CapGovernance1 = "governance/1"
@@ -603,6 +604,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"links/remove", "links/1"},
 	{"links/requests", "links/1"},
 	{"machines/forAgent", "machines/1"},
+	{"machines/sendFolder", "folders.to-machine/1"},
 	{"machines/sessionCall", "sessions.elsewhere/1"},
 	{"machines/sessionEnded", "sessions.elsewhere/1"},
 	{"machines/startSession", "sessions.on-machine/1"},

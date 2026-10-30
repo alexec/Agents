@@ -498,6 +498,7 @@ var CallLinksList = Method[Empty, []ChannelLink]{"links/list"}
 var CallLinksRemove = Method[ChannelLinkRemove, Empty]{"links/remove"}
 var CallLinksRequests = Method[Empty, []ChannelLinkRequest]{"links/requests"}
 var CallMachinesForAgent = Method[Empty, AgentMachines]{"machines/forAgent"}
+var CallMachinesSendFolder = Method[MachineFolderSend, MachineFolderSent]{"machines/sendFolder"}
 var CallMachinesSessionCall = Method[MachineSessionCall, SessionCallReply]{"machines/sessionCall"}
 var CallMachinesSessionEnded = Method[SessionEnded, Empty]{"machines/sessionEnded"}
 var CallMachinesStartSession = Method[MachineSessionStart, UUID]{"machines/startSession"}

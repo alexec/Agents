@@ -12366,6 +12366,41 @@
       "required": [],
       "additionalProperties": false
     },
+    "MachineFolderSend": {
+      "type": "object",
+      "description": "machines/sendFolder, through host/machines (#2929): one step of an agent's start_session with send, which sends this folder's branch to another of the person's machines first. Exactly one of state, upload and receive; the control plane sends that machine's folders/receiveState, folders/receiveUpload or folders/receive.",
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/ReceiveStateRequest"
+        },
+        "upload": {
+          "$ref": "#/definitions/ReceiveUploadRequest"
+        },
+        "receive": {
+          "$ref": "#/definitions/ReceiveRequest"
+        }
+      },
+      "required": [
+        "host"
+      ],
+      "additionalProperties": false
+    },
+    "MachineFolderSent": {
+      "type": "object",
+      "description": "What machines/sendFolder's step answered (#2929): state for state, folder for receive, neither for upload.",
+      "properties": {
+        "state": {
+          "$ref": "#/definitions/ReceiveState"
+        },
+        "folder": {
+          "$ref": "#/definitions/FolderSummary"
+        }
+      },
+      "additionalProperties": false
+    },
     "MachineHello": {
       "type": "object",
       "description": "host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).",
