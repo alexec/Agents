@@ -1,6 +1,7 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Issues</title>
-<!-- The github server's Issues (ui://github/issues, #1341): show_issues's result; labels
+<!-- The github server's Issues (ui://github/issues, #1341): show_issues's result, in sections by
+     how each relates to the viewer (#2453); labels
      and a search narrow it, in one call (#2686). Start Agent opens the app's new-agent form filled in for the issue
      (agents/start-agent, #834). It has no network: it speaks only the MCP Apps bridge. -->
 <style>
@@ -81,7 +82,7 @@ button.pill.colored:hover { filter: brightness(0.9); }
     const issues = Array.isArray(found.issues) ? found.issues : [];
     const options = [...new Set(issues.flatMap((issue) => issue.labels || []))].filter((name) => !activeLabels.includes(name));
     $("label-options").replaceChildren(...options.map((name) => el("option", { value: name })));
-    $("issues").replaceChildren(...issues.map(row));
+    $("issues").replaceChildren(...ui.sections(issues, row));
     drawLabel();
     const assigned = issues.filter((issue) => (issue.assignees || []).length).length;
     say(issues.length ? `${issues.length} open · ${assigned} assigned · as of ${new Date().toLocaleTimeString()}`
@@ -96,7 +97,7 @@ button.pill.colored:hover { filter: brightness(0.9); }
     // Who works on it (#905): an issue is taken by assigning it.
     const assignees = (issue.assignees || []).map((login) =>
       el("span", { className: "pill assigned", textContent: "@" + login, title: "Assigned to " + login }));
-    const comments = issue.comments ? ` · ${issue.comments} comment${issue.comments === 1 ? "" : "s"}` : "";
+    const comments = issue.comments ? `${issue.comments} comment${issue.comments === 1 ? "" : "s"}` : "";
     const start = button("Start Agent", () => startAgent(issue),
       { className: "start", title: `A new agent for #${issue.number}, in a worktree of its own` });
     const details = el("div", { className: "issue-details", hidden: true });
@@ -107,7 +108,8 @@ button.pill.colored:hover { filter: brightness(0.9); }
       start,
       el("span", { className: "meta" }, [
         ...assignees,
-        el("span", { textContent: `${issue.author || "someone"}${comments}${issue.updatedAt ? " · " + ui.ago(issue.updatedAt) : ""}` }),
+        ...ui.who(issue.author, issue.authorBot),
+        el("span", { textContent: [comments, issue.updatedAt ? ui.ago(issue.updatedAt) : ""].filter(Boolean).join(" · ") }),
         issue.milestone ? el("span", { className: "pill", textContent: issue.milestone, title: "Milestone" }) : null,
         ...issueLabels,
       ]),
