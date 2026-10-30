@@ -457,6 +457,10 @@ func (d *Daemon) readSession(caller wire.UUID, args map[string]json.RawMessage) 
 	}
 	a, refused := d.findSession(argString(args, "session"), folderPath(me))
 	if a == nil {
+		// One it started on another machine (#2927).
+		if s := d.thereNamed(caller, argString(args, "session")); s != nil {
+			return d.thereOp(caller, s, "read")
+		}
 		return refused, nil
 	}
 	entries, _, err := d.Store.Transcript(a.ID, 0)
@@ -571,6 +575,9 @@ func (d *Daemon) messageSession(caller wire.UUID, args map[string]json.RawMessag
 	folder := folderPath(me)
 	target, refused := d.findSession(argString(args, "to"), folder)
 	if target == nil {
+		if s := d.thereNamed(caller, argString(args, "to")); s != nil {
+			return d.messageThere(me, s, text, argBool(args, "replace"))
+		}
 		return "", refusedMessage(strings.ReplaceAll(refused, "Read one by id.", "Message one by id."))
 	}
 	name := quoted(target.Title)
@@ -585,16 +592,7 @@ func (d *Daemon) messageSession(caller wire.UUID, args map[string]json.RawMessag
 		if !replace {
 			return "", refusedMessage(fmt.Sprintf("you already have a message waiting for %s: “%s”. Replace it with message_session and replace: true, or take it back with cancel_message.", name, oneLine(waiting.Text)))
 		}
-		id := waiting.ID
-		d.change(target.ID, func(a *wire.Agent) {
-			queue := append([]wire.QueuedPrompt{}, a.QueuedPrompts...)
-			for i := range queue {
-				if queue[i].ID == id {
-					queue[i].Text = text
-				}
-			}
-			a.QueuedPrompts = queue
-		})
+		d.replaceWaiting(target.ID, waiting.ID, text)
 		return "Replaced the waiting message to " + name + ".", nil
 	}
 	if replace {
@@ -659,7 +657,7 @@ func (d *Daemon) messageSession(caller wire.UUID, args map[string]json.RawMessag
 			limit = *s.Folder.HelperLimits.Running
 		}
 		running := 0
-		for _, a := range d.folderSessions(folderPath(target)) {
+		for _, a := range append(d.thereAgents(folderPath(target)), d.folderSessions(folderPath(target))...) {
 			if a.StartedByAgent != nil && inFlight(a.State) {
 				running++
 			}
@@ -705,6 +703,19 @@ func (d *Daemon) messageSession(caller wire.UUID, args map[string]json.RawMessag
 		return "Sent to " + name + ". It is waiting on the person's answer, so it reads this once they answer." + queuedMessageNote, nil
 	}
 	return "Sent to " + name + ", which is working on it now. A reply, if it sends one, comes to this session as a message." + queuedMessageNote, nil
+}
+
+// replaceWaiting puts text in place of a queued message's words.
+func (d *Daemon) replaceWaiting(target, id wire.UUID, text string) {
+	d.change(target, func(a *wire.Agent) {
+		queue := append([]wire.QueuedPrompt{}, a.QueuedPrompts...)
+		for i := range queue {
+			if queue[i].ID == id {
+				queue[i].Text = text
+			}
+		}
+		a.QueuedPrompts = queue
+	})
 }
 
 // cancelMessage is cancel_message: take back this sender's queued message to a session (#2006).

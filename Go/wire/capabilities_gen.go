@@ -50,6 +50,7 @@ const CapFilesComplete1 = "files.complete/1"
 const CapFilesDiagnostics1 = "files.diagnostics/1"
 const CapFiles1 = "files/1"
 const CapFolder1 = "folder/1"
+const CapFoldersToMachine1 = "folders.to-machine/1"
 const CapFolders1 = "folders/1"
 const CapGit1 = "git/1"
 const CapGovernance1 = "governance/1"
@@ -109,6 +110,7 @@ const CapRuntime1 = "runtime/1"
 const CapRuntimesAccounts1 = "runtimes.accounts/1"
 const CapRuntimes1 = "runtimes/1"
 const CapSandbox1 = "sandbox/1"
+const CapSessionsElsewhere1 = "sessions.elsewhere/1"
 const CapSessionsOnMachine1 = "sessions.on-machine/1"
 const CapSessions1 = "sessions/1"
 const CapShell1 = "shell/1"
@@ -143,10 +145,12 @@ var HostCapabilities = pairs([][2]string{
 	{"agents/delete", "agents/1"},
 	{"agents/discardDraft", "agents/1"},
 	{"agents/editQueued", "agents.edit-queued/1"},
+	{"agents/endedElsewhere", "sessions.elsewhere/1"},
 	{"agents/export", "agents.export/1"},
 	{"agents/exportRead", "agents.export/1"},
 	{"agents/find", "agents.find/1"},
 	{"agents/fork", "agents/1"},
+	{"agents/fromStarter", "sessions.elsewhere/1"},
 	{"agents/import", "agents.export/1"},
 	{"agents/importUpload", "agents.export/1"},
 	{"agents/labelVocabulary", "agents/1"},
@@ -602,6 +606,9 @@ var ControlCapabilities = pairs([][2]string{
 	{"links/remove", "links/1"},
 	{"links/requests", "links/1"},
 	{"machines/forAgent", "machines/1"},
+	{"machines/sendFolder", "folders.to-machine/1"},
+	{"machines/sessionCall", "sessions.elsewhere/1"},
+	{"machines/sessionEnded", "sessions.elsewhere/1"},
 	{"machines/startSession", "sessions.on-machine/1"},
 	{"notices/take", "notices/1"},
 	{"orgRoutes/check", "org-routes/1"},

@@ -29,6 +29,8 @@ for (const { name, input, expected } of cases("levels/words.json")) {
       header: l.autoHeader("Claude"),
       noRuntime: l.noRuntimeWords([{ runtimeID: "claude", reason: "out" }, { runtimeID: "codex", reason: "not signed in" }], names.runtimeName),
       continueOn: l.continueOn("Codex"),
+      asksFirst: each((v) => l.asksFirst(field, v)),
+      bypassConfirm: l.bypassConfirm,
     }, expected);
   });
 }

@@ -2746,6 +2746,7 @@ export interface ElicitationRequest {
   mode: ElicitationRequestMode;
   scope: ElicitationRequestScope;
   askedAt: WireDate;
+  secret?: ElicitationSecret;
 }
 
 export type ElicitationRequestMode =
@@ -2789,6 +2790,16 @@ export type ElicitationSchemaPropertyKind =
   | { integer: { minimum?: number; maximum?: number } }
   | { boolean: Record<string, never> }
   | { multiSelect: { items: ElicitationSchemaPropertyChoice[]; minItems?: number; maxItems?: number } };
+
+/**
+ * An agent's ask_secret (#2885): one named secret, typed into a masked field. The value goes to the
+ * person's secrets.env on the host, never into the record.
+ */
+export interface ElicitationSecret {
+  name: string;
+  url?: string;
+  isSet: boolean;
+}
 
 export interface Empty {}
 
@@ -3407,6 +3418,11 @@ export interface HelperLimits {
    * Continue (#1918). Off unless set.
    */
   continueWhenBack?: boolean;
+  /**
+   * A session whose pull request merges is archived, when its turn has ended and its worktree has
+   * nothing uncommitted (#2886). On unless set.
+   */
+  archiveWhenMerged?: boolean;
 }
 
 export interface HostedMCPSnapshot {
@@ -4197,6 +4213,28 @@ export interface MachineEnroll {
   as?: string;
 }
 
+/**
+ * machines/sendFolder, through host/machines (#2929): one step of an agent's start_session with
+ * send, which sends this folder's branch to another of the person's machines first. Exactly one of
+ * state, upload and receive; the control plane sends that machine's folders/receiveState,
+ * folders/receiveUpload or folders/receive.
+ */
+export interface MachineFolderSend {
+  host: string;
+  state?: ReceiveStateRequest;
+  upload?: ReceiveUploadRequest;
+  receive?: ReceiveRequest;
+}
+
+/**
+ * What machines/sendFolder's step answered (#2929): state for state, folder for receive, neither
+ * for upload.
+ */
+export interface MachineFolderSent {
+  state?: ReceiveState;
+  folder?: FolderSummary;
+}
+
 /** host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134). */
 export interface MachineHello {
   host?: MachineRef;
@@ -4354,6 +4392,17 @@ export interface MachineRequest {
 export interface MachineSchedule {
   at?: WireDate;
   workflow?: string;
+}
+
+/**
+ * machines/sessionCall, through host/machines (#2927): an agent's read_session, message_session,
+ * stop_session, archive_session, or list_sessions and wait_for_agents status, on a session it
+ * started on another of the person's machines with start_session. The control plane sends that
+ * machine's agents/fromStarter, with call.from in its own words.
+ */
+export interface MachineSessionCall {
+  host: string;
+  call: SessionCall;
 }
 
 /**
@@ -6866,6 +6915,47 @@ export type ServedRequestOutcome =
 export interface ServerReachabilityChange {
   server: string;
   online: boolean;
+}
+
+/**
+ * agents/fromStarter (#2927): the agent that started a session from another machine reads,
+ * messages, stops or archives it, or asks how it stands. The host answers only when from is the
+ * session's StartedFrom. The control plane writes from.machine and from.who; the asking host writes
+ * from.agent.
+ */
+export interface SessionCall {
+  from: StartedFrom;
+  session: UUID;
+  op: "status" | "read" | "message" | "stop" | "archive";
+  /** With op message: the words. */
+  message?: string;
+  /**
+   * With op message: replace the message of the starter's that waits, as message_session's replace.
+   */
+  replace?: boolean;
+}
+
+/**
+ * What agents/fromStarter says (#2927): the words for the agent, the session's title, and how it
+ * ended, absent while it goes on.
+ */
+export interface SessionCallReply {
+  said: string;
+  title?: string;
+  ended?: WaitEndingHow;
+}
+
+/**
+ * machines/sessionEnded through host/machines, then agents/endedElsewhere (#2927): a session
+ * started from another machine has ended, so its starter's wait_for_agents can wake. The host sends
+ * machine as the starter's machine; the control plane sends it on as the ended session's.
+ */
+export interface SessionEnded {
+  machine: string;
+  session: UUID;
+  starter: UUID;
+  how: WaitEndingHow;
+  title?: string;
 }
 
 export interface SessionLabel {
@@ -9603,10 +9693,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   EffectiveSandbox: { required: ["state", "requested"], optional: ["reason"] },
   ElicitationAnswer: { required: ["question", "answer"], optional: [] },
   ElicitationNotification: { required: ["agentID", "requestID"], optional: ["request"] },
-  ElicitationRequest: { required: ["id", "agentID", "mode", "scope", "askedAt"], optional: ["elicitationID", "message"] },
+  ElicitationRequest: { required: ["id", "agentID", "mode", "scope", "askedAt"], optional: ["elicitationID", "message", "secret"] },
   ElicitationSchema: { required: ["properties"], optional: ["title", "description"] },
   ElicitationSchemaProperty: { required: ["name", "isRequired", "kind"], optional: ["title", "description", "defaultValue"] },
   ElicitationSchemaPropertyChoice: { required: ["value", "title"], optional: ["description"] },
+  ElicitationSecret: { required: ["name", "isSet"], optional: ["url"] },
   Empty: { required: [], optional: [] },
   EntryNotification: { required: ["agentID", "entry"], optional: ["index", "oversized"] },
   Event: { required: ["position", "name", "at", "count", "scope", "sentence", "details", "chainDepth", "consequences"], optional: ["lastAt", "publisher", "message", "actor"] },
@@ -9673,7 +9764,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HandoverMember: { required: ["id", "name", "kind"], optional: ["knownEpoch", "version", "online", "lastSeen"] },
   HandoverStatus: { required: ["phase", "controlKey", "hasRecords", "endpoints", "members"], optional: ["epoch", "forwardingUntil"] },
   Headline: { required: ["h1", "h2", "h3"], optional: ["answers"] },
-  HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive", "continueWhenBack"] },
+  HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive", "continueWhenBack", "archiveWhenMerged"] },
   HostedMCPSnapshot: { required: ["servers", "at"], optional: [] },
   HostedMCPStatus: { required: ["name", "state", "restarts", "users"], optional: ["since", "retryAt", "lastError", "folder"] },
   JoinApproved: { required: ["host"], optional: [] },
@@ -9757,6 +9848,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineClient: { required: ["id", "kind", "publicKey"], optional: ["person"] },
   MachineClients: { required: ["clients"], optional: ["user"] },
   MachineEnroll: { required: [], optional: ["as"] },
+  MachineFolderSend: { required: ["host"], optional: ["state", "upload", "receive"] },
+  MachineFolderSent: { required: [], optional: ["state", "folder"] },
   MachineHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "relay", "implementation", "capabilities"] },
   MachineInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host"] },
   MachineInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel"] },
@@ -9774,6 +9867,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineRelease: { required: ["version"], optional: [] },
   MachineRequest: { required: ["host"], optional: ["purge"] },
   MachineSchedule: { required: [], optional: ["at", "workflow"] },
+  MachineSessionCall: { required: ["host", "call"], optional: [] },
   MachineSessionStart: { required: ["host", "start"], optional: [] },
   MachineStatus: { required: ["idle", "running"], optional: ["schedule"] },
   MachineStop: { required: ["host"], optional: ["confirmRunning"] },
@@ -10018,6 +10112,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SentNotice: { required: ["title", "outcome"], optional: ["body", "nextAt", "to"] },
   ServedRequest: { required: ["kind", "outcome"], optional: [] },
   ServerReachabilityChange: { required: ["server", "online"], optional: [] },
+  SessionCall: { required: ["from", "session", "op"], optional: ["message", "replace"] },
+  SessionCallReply: { required: ["said"], optional: ["title", "ended"] },
+  SessionEnded: { required: ["machine", "session", "starter", "how"], optional: ["title"] },
   SessionLabel: { required: ["value", "owner", "addedAt"], optional: [] },
   SessionNotice: { required: ["severity", "title"], optional: ["detail"] },
   SessionsListRequest: { required: ["runtimeID", "cwd"], optional: [] },

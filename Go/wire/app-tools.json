@@ -98,7 +98,7 @@
     "title": "Manage this folder's workflows"
   },
   {
-    "description": "Ask me a question or a short form and wait for my answer. Use this when something is mine to decide — anything hard to undo, spending money or making an outside account, a restart or an install, a missing credential, a choice with no clear best answer — rather than guessing or ending the turn with the question in your reply. When you would mark one answer recommended and it is easy to undo, do not ask: take it, and write `Decided: <what>, because <why>.` where I will see it.\n\nYour question reaches me wherever I am, including on my phone. The call waits up to 45 seconds for my answer; if I have not answered by then, it says the form is still open and keeps your place: end your turn, and you are started again with my answer when I answer, skip or cancel. Do not ask again. Prefer your runtime's own question tool when you have one; use this when you do not, or when that tool is not in your catalogue.\n\nEach question may offer options to pick, or leave options out for free text. Set allow_multiple when more than one option may be chosen.",
+    "description": "Ask me a question or a short form and wait for my answer. Use this when something is mine to decide — anything hard to undo, spending money or making an outside account, a restart or an install, a missing credential, a choice with no clear best answer — rather than guessing or ending the turn with the question in your reply. When you would mark one answer recommended and it is easy to undo, do not ask: take it, and write `Decided: <what>, because <why>.` where I will see it.\n\nYour question reaches me wherever I am, including on my phone. The call waits up to 45 seconds for my answer; if I have not answered by then, it says the form is still open and keeps your place: end your turn, and you are started again with my answer when I answer, skip or cancel. Do not ask again. Prefer your runtime's own question tool when you have one; use this when you do not, or when that tool is not in your catalogue.\n\nEach question may offer options to pick, or leave options out for free text. Set allow_multiple when more than one option may be chosen. To ask for a secret (an API key, a token), use ask_secret, never this.",
     "inputSchema": {
       "properties": {
         "description": {
@@ -161,6 +161,36 @@
     },
     "name": "ask_question",
     "title": "Ask the person a question"
+  },
+  {
+    "description": "Ask me for one secret, such as an API key or a token, when you need it and it is not set. I type it into a masked field; it is saved to my secrets file on this machine, and you get its name and where it is, never the value. Never ask for a secret with ask_question or in your reply: what is typed there goes into the chat.\n\nThe call waits up to 45 seconds, as ask_question does; if I have not answered by then, end your turn, and you are started again when I save it or say no. Do not ask again.\n\nUse the secret without printing it: never echo, cat or log it, and never write it into a file in the folder.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The secret's name, as an environment variable: capital letters, digits and underscores, e.g. OPENAI_API_KEY.",
+          "type": "string"
+        },
+        "reason": {
+          "description": "What you need it for, in one sentence.",
+          "type": "string"
+        },
+        "url": {
+          "description": "Where to get it, if you know: the page that makes or shows the key.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "name": "ask_secret",
+    "title": "Ask the person for a secret"
   },
   {
     "description": "When your turn ends with a report or a done reply and leaves one clear next step for the person, offer it as a prompt before you end the turn; not with a question waiting, nor when you archive. Call at most once; a later call replaces it. Use a 2–5 word label and the full prompt text.",
@@ -228,7 +258,7 @@
     "title": "Hang up voice mode"
   },
   {
-    "description": "Start another session in this folder, with a prompt of its own, to do a part of the work that can run alongside the rest. It starts in this folder, or, with machine and folder, on another of the person's machines, and appears in the person's list of sessions, marked as started by you. The person can open it, talk to it, stop it or archive it at any time.\n\nThis folder has two limits on sessions started by sessions, counting every one here, which only the person sets (in Folder Settings): how many may be running — working, waiting on a question, or waiting to carry on by itself — and how many may exist not yet archived, where stopped, finished and asking-to-be-archived ones still count. A start that would break either is queued instead, saying which: nothing runs yet, and it starts by itself, oldest first, once a running place and a not-archived place are both free, behind the working and waiting ones. So you can queue work up front rather than wait and try again; wait for a queued session with wait_for_agents as for any other. A third limit says how many may be queued; past it a start is refused. Use list_sessions with started_by me to see yours and how many places of each are in use. Stop one with stop_session when its part is no longer wanted: that frees its running place, and it keeps its other place until it is archived. Once its work is merged or abandoned, call archive_session on it to free that place too (at once where the person allows it, otherwise by asking them); archive a finished session rather than removing its worktree under it.\n\nOn another machine (list_machines names them), for work that has to run there, such as a bug only that machine shows: the person is asked first, on your question card, and nothing starts without their yes. folder is a path on that machine, which has the code already. A stopped machine is started, and the session starts when it connects. The session there is not in this folder: this folder's limits do not count it, and list_sessions, message_session, wait_for_agents, stop_session and archive_session do not reach it. Say in its prompt what to do with its result, such as push a branch or open a pull request; the person sees it under that machine.\n\nStart one only when part of the work can genuinely run alongside the rest. Do not start one for work you could simply do yourself. The session you start cannot start sessions of its own.\n\nReturns the new session's id, which stop_session and archive_session take.",
+    "description": "Start another session in this folder, with a prompt of its own, to do a part of the work that can run alongside the rest. It starts in this folder, or, with machine and folder, on another of the person's machines, and appears in the person's list of sessions, marked as started by you. The person can open it, talk to it, stop it or archive it at any time.\n\nThis folder has two limits on sessions started by sessions, counting every one here, which only the person sets (in Folder Settings): how many may be running — working, waiting on a question, or waiting to carry on by itself — and how many may exist not yet archived, where stopped, finished and asking-to-be-archived ones still count. A start that would break either is queued instead, saying which: nothing runs yet, and it starts by itself, oldest first, once a running place and a not-archived place are both free, behind the working and waiting ones. So you can queue work up front rather than wait and try again; wait for a queued session with wait_for_agents as for any other. A third limit says how many may be queued; past it a start is refused. Use list_sessions with started_by me to see yours and how many places of each are in use. Stop one with stop_session when its part is no longer wanted: that frees its running place, and it keeps its other place until it is archived. Once its work is merged or abandoned, call archive_session on it to free that place too (at once where the person allows it, otherwise by asking them); archive a finished session rather than removing its worktree under it.\n\nOn another machine (list_machines names them), for work that has to run there, such as a bug only that machine shows: the person is asked first, on your question card, and nothing starts without their yes. folder is a path on that machine. It has the code already, or, with send, the branch you are on goes there first, with its uncommitted changes, as the person's Send to ‹machine›… does: the folder is made if it is not there, and a folder there with work of its own is never overwritten. A stopped machine is started, and the session starts when it connects. This folder's limits count it, and a start past them is refused there rather than queued. list_sessions with started_by me, read_session, message_session, wait_for_agents, stop_session and archive_session reach it by its id, through the control plane, and only you can; its end comes back to wait_for_agents. One started while its machine was stopped has no id yet, so they don't reach it. Say in its prompt what to do with its result, such as push a branch or open a pull request; the person sees it under that machine.\n\nStart one only when part of the work can genuinely run alongside the rest. Do not start one for work you could simply do yourself. The session you start cannot start sessions of its own.\n\nReturns the new session's id, which stop_session and archive_session take.",
     "inputSchema": {
       "properties": {
         "description": {
@@ -265,6 +295,10 @@
         "runtime": {
           "description": "Optional. The runtime to run it on, by id, as a workflow's `runtime:`; leave it out to use the most recently active runtime on the host that runs the workflow. list_sessions with started_by me ends with the ones available here and each one's model. One that is not available (not installed, not signed in, out of the pool) is refused before anything starts, naming the ones that are.",
           "type": "string"
+        },
+        "send": {
+          "description": "Optional, with machine. true sends the branch you are on, with its uncommitted changes, to folder on that machine before the session starts there. The machine has to be running.",
+          "type": "boolean"
         },
         "worktree": {
           "description": "Optional. Where the new session works. Leave out to work in the folder. \"new\" makes a fresh git worktree, on its own branch, named from the prompt — for parallel work that should not touch the same files. Or the name of a worktree of this repository that is already there, as `git worktree list` shows it. Or the name of a branch not checked out anywhere, local or on a remote, to make a fresh worktree on that branch. On another machine, \"new\" or a branch name.",

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/agentsd/skillcatalog"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -265,7 +266,16 @@ func (d *Daemon) answerElicitation(r wire.AnswerElicitationRequest) error {
 		content = map[string]wire.JSONValue{}
 	}
 	form := pe.req.Mode.Form
-	if action == wire.AnswerElicitationRequestActionAccept && form != nil {
+	secret := pe.req.Secret
+	switch {
+	case action != wire.AnswerElicitationRequestActionAccept:
+	case secret != nil:
+		// A secret is saved here (#2885), and from here on only its name goes anywhere.
+		if err := d.saveAskedSecret(*secret, content); err != nil {
+			return err
+		}
+		content = map[string]wire.JSONValue{}
+	case form != nil:
 		// An answer that does not fit is not sent, and the form is still waiting.
 		if why := problems(form.Value, content); len(why) > 0 {
 			return Invalid("%s", strings.Join(why, ". "))
@@ -275,7 +285,10 @@ func (d *Daemon) answerElicitation(r wire.AnswerElicitationRequest) error {
 		return &Error{Code: wire.FailureNoSuchAgent, Message: "That form has already been answered."}
 	}
 	var said []wire.ElicitationAnswer
-	if action == wire.AnswerElicitationRequestActionAccept && form != nil {
+	switch {
+	case secret != nil:
+		said = secretAnswered(*secret, action)
+	case action == wire.AnswerElicitationRequestActionAccept && form != nil:
 		said = answers(form.Value, content, pe.req.Message)
 	}
 	d.record(l.id, wire.TranscriptEntryKind{ElicitationAnswered: &wire.TranscriptEntryKindElicitationAnswered{ID: r.RequestID,
@@ -284,7 +297,7 @@ func (d *Daemon) answerElicitation(r wire.AnswerElicitationRequest) error {
 	d.formDown(l.id, r.RequestID)
 	// A form whose call came back already (#1641): the answer starts the agent again.
 	if pe.left {
-		if err := d.promptFromApp(l.id, formAnsweredWords(pe.req, action, said)); err != nil {
+		if err := d.promptFromApp(l.id, d.formAnsweredWords(pe.req, action, said)); err != nil {
 			log.Printf("agent %s: form answer: %v", l.id, err)
 		}
 		return nil
@@ -295,7 +308,11 @@ func (d *Daemon) answerElicitation(r wire.AnswerElicitationRequest) error {
 }
 
 // formAnsweredWords is the prompt that brings an answer to a form left open.
-func formAnsweredWords(req wire.ElicitationRequest, action wire.AnswerElicitationRequestAction, said []wire.ElicitationAnswer) string {
+func (d *Daemon) formAnsweredWords(req wire.ElicitationRequest, action wire.AnswerElicitationRequestAction, said []wire.ElicitationAnswer) string {
+	if req.Secret != nil {
+		return "The person replied to your ask_secret for " + req.Secret.Name + ". " +
+			secretNote(req.Secret.Name, skillcatalog.SecretsPath(d.personalHome()), action)
+	}
 	form := "your form"
 	if req.Message != nil && strings.TrimSpace(*req.Message) != "" {
 		form = "your form \"" + strings.TrimSpace(*req.Message) + "\""

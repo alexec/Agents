@@ -13,8 +13,9 @@ import (
 // start_session on another machine (#2887): the session goes to another of the person's
 // machines, by its name, through the control plane (machines/startSession), which sends
 // that machine's own agents/start. The person says yes first, every time. The session is
-// not in this folder, so this folder's limits do not count it and the tools for an agent's
-// own sessions do not reach it.
+// not in this folder, but this folder's limits count it, and the tools for an agent's own
+// sessions reach it through the control plane (elsewhere.go, #2927). With send, the
+// branch the agent is on goes to that folder first (sendthere.go, #2929).
 
 // sessionOnMachine is the control plane's method for it, through host/machines.
 const sessionOnMachine = "machines/startSession"
@@ -47,21 +48,55 @@ func (d *Daemon) startOnMachine(me *wire.Agent, args map[string]json.RawMessage,
 	if d.askControl.Load() == nil {
 		return "", &Error{Code: wire.FailureNotSupported, Message: "Nothing was started: this machine isn’t on a control plane, so it has no other machines."}
 	}
+	// This folder's limits count it (#2927); with no queue there, a full one refuses.
+	here := folderPath(me)
+	if why := d.helperLimitRefusal(here); why != "" {
+		return "", Invalid("Nothing was started on %s: %s", machine, why)
+	}
+	// With send (#2929), the branch this agent is on goes there first.
+	var sending *sendingBranch
+	if argBool(args, "send") {
+		b, err := d.branchToSend(me)
+		if err != nil {
+			_, msg := errMessage(err)
+			return "", Invalid("Nothing was sent or started: %s", msg)
+		}
+		sending = &b
+		if sending.heads, err = d.readyThere(me, machine, folder); err != nil {
+			code, msg := errMessage(err)
+			if code == wire.FailureHostOffline {
+				msg += " Start it with start_machine, then try again."
+			}
+			return "", &Error{Code: code, Message: "Nothing was sent or started on " + machine + ": " + msg}
+		}
+	}
 	// That machine's path: no link on this one is followed.
 	r.Cwd = store.PathURL(folder)
 	r.StartedFrom = &wire.StartedFrom{Agent: me.ID}
 	title := titleFrom(r.Prompt)
-	yes, err := d.personSaysYes(me.ID, d.agentWho(me.ID)+" wants to start a session on "+machine,
-		fmt.Sprintf("Start a session on %s, in %s, to %s?", machine, folder, quotedTitle(&title)), "Start it")
+	ask := fmt.Sprintf("Start a session on %s, in %s, to %s?", machine, folder, quotedTitle(&title))
+	if sending != nil {
+		ask = fmt.Sprintf("Send %s, with its uncommitted changes, to %s on %s, then start a session there to %s?",
+			sending.branch, folder, machine, quotedTitle(&title))
+	}
+	yes, err := d.personSaysYes(me.ID, d.agentWho(me.ID)+" wants to start a session on "+machine, ask, "Start it")
 	if err != nil {
 		return "", err
 	}
 	if !yes {
 		return "Nothing was started: the person said no, or didn’t answer.", nil
 	}
+	sent := ""
+	if sending != nil {
+		if err := d.sendThere(me, machine, folder, *sending); err != nil {
+			code, msg := errMessage(err)
+			return "", &Error{Code: code, Message: "Nothing was started: " + sending.branch + " was not sent to " + machine + ": " + msg}
+		}
+		sent = fmt.Sprintf("Sent %s, with its uncommitted changes, to %s on %s. ", sending.branch, folder, machine)
+	}
 	out, err := d.askWorkspaces(me.ID, sessionOnMachine, wire.MachineSessionStart{Host: machine, Start: r})
 	if e, ok := err.(*Error); ok && e.Code == wire.FailureKept {
-		return fmt.Sprintf("%s is starting: the session starts in %s when it connects. It is not in this folder, so the tools for your sessions don’t reach it; the person sees it under %s.",
+		return sent + fmt.Sprintf("%s is starting: the session starts in %s when it connects. Its id comes only then, so the tools for your sessions don’t reach it; the person sees it under %s.",
 			machine, folder, machine), nil
 	}
 	if e, ok := err.(*Error); ok && !strings.HasPrefix(e.Message, "Nothing") {
@@ -74,8 +109,10 @@ func (d *Daemon) startOnMachine(me *wire.Agent, args map[string]json.RawMessage,
 	if json.Unmarshal(out, &id) != nil {
 		return "", &Error{Code: wire.FailureNotSupported, Message: "Nothing was started: the control plane's answer could not be read."}
 	}
-	return fmt.Sprintf("Started %s on %s, in %s (id %s). It is not in this folder, so the tools for your sessions don’t reach it; the person sees it under %s.",
-		quotedTitle(&title), machine, folder, id, machine), nil
+	d.noteStartedThere(startedThere{Machine: machine, Session: id, Starter: me.ID, Folder: here, There: folder, Title: title, At: now()})
+	return sent + fmt.Sprintf("Started %s on %s, in %s (id %s). list_sessions, read_session, message_session, wait_for_agents, stop_session and archive_session "+
+		"reach it by its id, and it counts in this folder's limits until it is archived; the person sees it under %s. This folder now has %s.",
+		quotedTitle(&title), machine, folder, id, machine, d.helperPlaces(here)), nil
 }
 
 // startedFromNote is what the chat of a session started from another machine says first.

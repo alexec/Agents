@@ -29,20 +29,34 @@ struct ElicitationSheet: View {
                     Text(asker).appText(.fine).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Text(request.title)
-                    .appText(.reading).fontWeight(.semibold)
-                    .fixedSize(horizontal: false, vertical: true)
-                // The question itself often lives here rather than in the schema: a
-                // one-question form arrives with an untitled field and the whole
-                // question in `message`.
-                if let message = request.message, message != request.title {
-                    Text(message)
-                        .appText(.reading)
+                if request.secret == nil {
+                    Text(request.title)
+                        .appText(.reading).fontWeight(.semibold)
                         .fixedSize(horizontal: false, vertical: true)
+                    // The question itself often lives here rather than in the schema: a
+                    // one-question form arrives with an untitled field and the whole
+                    // question in `message`.
+                    if let message = request.message, message != request.title {
+                        Text(message)
+                            .appText(.reading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
 
-            if let chosen {
+            if let secret = request.secret {
+                // A masked field of its own (#2885), kept on screen while it goes, so
+                // what was typed is still there if it did not.
+                SecretAskCard(secret: secret, reason: request.secretReason,
+                              host: model.answerRecipient(request.agentID), sending: chosen != nil) { typed in
+                    if let typed {
+                        send("Save", action: .accept, content: [ElicitationRequest.secretField: .string(typed)])
+                    } else {
+                        send("No thanks", action: .decline)
+                    }
+                }
+                .disabled(isStale)
+            } else if let chosen {
                 Sending(what: chosen, host: model.answerRecipient(request.agentID))
             } else {
                 answers

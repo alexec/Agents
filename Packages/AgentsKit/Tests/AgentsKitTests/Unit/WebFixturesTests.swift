@@ -1097,6 +1097,10 @@ struct WebFixturesTests {
                     RuntimeCatalog.runtime(id: $0)?.name ?? $0
                 }),
                 "continueOn": .string(LevelWords.continueOn("Codex")),
+                "asksFirst": .object(Dictionary(uniqueKeysWithValues: levels.map { ($0, JSONValue.bool(LevelWords.asksFirst(field, $0))) })),
+                "bypassConfirm": .object(["title": .string(LevelWords.bypassConfirmTitle),
+                                          "message": .string(LevelWords.bypassConfirmMessage),
+                                          "button": .string(LevelWords.bypassConfirmButton)]),
             ])
         }
     }
