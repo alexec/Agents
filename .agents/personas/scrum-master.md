@@ -102,7 +102,8 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
   start nothing for the next minor milestone. Only bug fixes merge: when a `polish`,
   `competitor` or backlog enhancement PR is ready, turn its auto-merge off
   (`gh pr merge N --disable-auto`) and label it `hold:v<x.y.z>`; the release lifts the hold
-  when the patch ships. When no `priority:high` or `priority:medium` bug is open in the
+  when the patch ships. Never turn auto-merge on under a hold: the `hold` check fails
+  while the label is on (#2931). When no `priority:high` or `priority:medium` bug is open in the
   patch milestone, or two days after the last tag, tell Alex in your report that the patch
   is ready to release.
 - **Open questions get an agent.** An issue with open questions is not held back: start
