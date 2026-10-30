@@ -474,9 +474,9 @@ function SecretField({ secret, reason, recipient, inert, save, decline, send }: 
   const link = getIt(secret.url);
   return (
     <>
-      <p class="strong"><span aria-hidden="true">🔒 </span><code>{secret.name}</code></p>
-      {reason && <p>{reason}</p>}
-      {link && secret.url && <p><a href={secret.url} target="_blank" rel="noopener noreferrer">{link}</a></p>}
+      <p class="strong secret"><span aria-hidden="true">🔒 </span><code>{secret.name}</code></p>
+      {reason && <p class="secret">{reason}</p>}
+      {link && secret.url && <p class="secret"><a href={secret.url} target="_blank" rel="noopener noreferrer">{link}</a></p>}
       <label class="field">
         <input type="password" autocomplete="off" spellcheck={false} autofocus disabled={inert}
           aria-label={secret.name} placeholder={`Paste ${secret.name}`} value={text.value}
