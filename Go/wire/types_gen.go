@@ -4257,6 +4257,9 @@ type HelperLimits struct {
 
 	// A helper's turn refused for a spent allowance waits for it at once, as if the person had chosen Continue (#1918). Off unless set.
 	ContinueWhenBack *bool `json:"continueWhenBack,omitzero"`
+
+	// A session whose pull request merges is archived, when its turn has ended and its worktree has nothing uncommitted (#2886). On unless set.
+	ArchiveWhenMerged *bool `json:"archiveWhenMerged,omitzero"`
 }
 
 type HostedMCPSnapshot struct {
