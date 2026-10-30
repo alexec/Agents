@@ -35,6 +35,7 @@ const (
 	KindFile        = "file"
 	KindBranch      = "branch"
 	KindMilestone   = "milestone"
+	KindWorkflow    = "workflow"
 
 	RelWorksOn = "works-on"
 	RelOpens   = "opens"

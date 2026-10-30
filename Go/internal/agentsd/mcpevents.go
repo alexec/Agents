@@ -1271,6 +1271,7 @@ func (d *Daemon) raiseMCPEvent(e mcpPolled, s *mcpSubscription, checks senderChe
 	d.mcpEvMu.Unlock()
 	raised := d.raise(wire.EventDraft{Name: s.event, At: now(), Scope: folderScope(s.folder),
 		Sentence: sentence, Details: details})
+	d.lineageEvent(raised)
 	log.Printf("mcp events: %s %s evt %s raised (position %d, workflows: %s)", s.server, s.event, *e.EventID, raised.Position, strings.Join(s.workflows, ", "))
 	return raised
 }

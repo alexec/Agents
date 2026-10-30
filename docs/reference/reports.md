@@ -105,6 +105,10 @@ Three more pages of Reports (#2019), with the same scopes:
   works on, the PRs it opens, and more, in `<root>/lineage.jsonl`. It keeps an ended link
   90 days and at most 20,000 links. The machine does not send it yet: the cost on the links
   (#2350) goes with the first send. `specs/2348-lineage/spec.md` says the rest.
+- **The machine makes most links itself** (#2349): a session's `#n`, `P#n` or Linear-key
+  label, a helper's parent, a workflow's run, the sessions on a pull request's branch and
+  the issues its body closes (`Fixes #n`). A merged or closed pull request, a label taken
+  off and an archived session end their links.
 - **Each machine keeps its usage by the UTC hour**, by folder and runtime, in
   `<root>/report-hours.json`. It keeps 8 days.
 - **A row** has the cost (by currency), the tokens (input, output, thought, cache read and

@@ -72,6 +72,10 @@ func mrInput() schema {
 }
 
 // events are the events this server offers, in the github server's order.
+// fixesSchema is a merge request's fixes: the issues its description closes, "#12" or
+// "group/project#12" (#2349).
+var fixesSchema = map[string]any{"type": "array", "items": str}
+
 var events = append([]event{
 	{name: "checks.failed", title: "Pipeline failed",
 		description: "A merge request's pipeline finished failed: one event per pipeline and failure, so a pipeline retried that fails again is a new one. Jobs allowed to fail are not in failedJobs." + ownMRs,
@@ -84,13 +88,13 @@ var events = append([]event{
 	{name: "pr.opened", title: "Merge request opened",
 		description: "A merge request was opened, or a draft was marked ready: a merge request open and not a draft now that was not at the last poll. Drafts never count. Reopened, it is raised again." + ownMRs,
 		input:       mrInput(),
-		payload:     object(map[string]any{"pr": mrSchema(map[string]any{"author": str}), "openedAt": str})},
+		payload:     object(map[string]any{"pr": mrSchema(map[string]any{"author": str, "fixes": fixesSchema}), "openedAt": str})},
 	{name: "pr.merged", title: "Merge request merged", description: "A merge request was merged." + ownMRs,
 		input:   mrInput(),
-		payload: object(map[string]any{"pr": mrSchema(nil), "mergedAt": str, "mergeSha": str})},
+		payload: object(map[string]any{"pr": mrSchema(map[string]any{"fixes": fixesSchema}), "mergedAt": str, "mergeSha": str})},
 	{name: "pr.closed", title: "Merge request closed", description: "A merge request was closed without being merged." + ownMRs,
 		input:   mrInput(),
-		payload: object(map[string]any{"pr": mrSchema(nil), "closedAt": str})},
+		payload: object(map[string]any{"pr": mrSchema(map[string]any{"fixes": fixesSchema}), "closedAt": str})},
 	{name: "pr.conflicted", title: "Merge request in conflict",
 		description: "An open merge request began to conflict with its target branch, so it cannot merge until it is rebased. Once per conflict: it is raised again only after it merges cleanly and then conflicts anew." + ownMRs,
 		input:       append(mrInput(), mineProperty),

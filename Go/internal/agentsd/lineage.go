@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/wire"
@@ -11,11 +12,13 @@ import (
 
 // The lineage graph (#2348): typed links between issues, sessions, PRs and the rest, in
 // <root>/lineage.jsonl, through lineage.Store so a graph database can take its place.
-// A person's connection reads and writes it; what makes the links on its own is #2349.
+// A person's connection reads and writes it; lineagelinks.go makes the links on its own
+// (#2349).
 
 type lineageBook struct {
 	lineageOnce  sync.Once
 	lineageStore lineage.Store
+	lineageLinker
 }
 
 func (d *Daemon) lineagePath() string { return filepath.Join(d.Store.Loc.Root, "lineage.jsonl") }
@@ -27,7 +30,10 @@ func (d *Daemon) lineage() lineage.Store {
 }
 
 // closeLineage lets the file go at shutdown.
-func (d *Daemon) closeLineage() { d.lineage().Close() }
+func (d *Daemon) closeLineage() {
+	d.lineageSettle(2 * time.Second)
+	d.lineage().Close()
+}
 
 func (d *Daemon) registerLineage() {
 	On(d, wire.CallLineageLink, func(_ context.Context, _ *Client, r wire.LineageLinkRequest) (wire.LineageLink, error) {

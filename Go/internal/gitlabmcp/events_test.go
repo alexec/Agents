@@ -557,3 +557,11 @@ func TestMineIsOnlyTheOwnersMergeRequests(t *testing.T) {
 		t.Fatalf("mine: %v", ids)
 	}
 }
+
+// #2349: the issues a merge request's description closes, in a nested group too.
+func TestClosingRefs(t *testing.T) {
+	got := closingRefs("Closes #4 and implements group/sub/project#9; fixing #4 again.")
+	if len(got) != 2 || got[0] != "#4" || got[1] != "group/sub/project#9" {
+		t.Fatalf("got %v", got)
+	}
+}
