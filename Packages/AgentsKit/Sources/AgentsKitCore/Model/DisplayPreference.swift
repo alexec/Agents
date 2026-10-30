@@ -33,6 +33,10 @@ public enum DisplayPreference {
     public static let noticeCooldownMinutes = "noticeCooldownMinutes"
     public static let noticeCooldownDefault = 10
     public static let noticeCooldownRange = 1...1440
+    /// The cool-downs the Mac and the Remote offer in a menu (#2896): a Stepper took 50
+    /// presses from 10 to 60 minutes. The web keeps its number field, so a value set there
+    /// may be none of these; the menu then shows it as well.
+    public static let noticeCooldownPresets = [1, 5, 10, 15, 30, 60, 120, 240, 480, 1440]
 
     /// The ones kept as a plain value in a client's defaults, and the kind of each.
     public enum Kind: Sendable { case bool, string, int }
