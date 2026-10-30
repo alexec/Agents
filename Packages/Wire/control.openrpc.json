@@ -440,7 +440,7 @@
     {
       "name": "clients/setActivityToken",
       "x-capability": "liveactivity/1",
-      "description": "A device, over its own session (#1744): the push token of one session's Live Activity, kept in its own client record, which only it may set. Refused from a window or a browser.",
+      "description": "A device, over its own session (#1744): its Live Activity's push token for one session the activity speaks for (#2991), kept in its own client record, which only it may set. Refused from a window or a browser.",
       "paramStructure": "by-name",
       "params": [
         {

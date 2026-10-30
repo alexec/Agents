@@ -131,3 +131,67 @@ func TestLiveActivityTokensComeAndGo(t *testing.T) {
 		t.Fatal("not taken away:", tokens)
 	}
 }
+
+// A phone shows one activity for every turn sent from it (#2991): the same token for two
+// sessions. Each push says the summary: the session that asks, the count of the others,
+// and the timer from the oldest; a session that ends leaves, and the last end ends it.
+func TestOneLiveActivitySpeaksForEveryTurn(t *testing.T) {
+	t.Parallel()
+	const other = "A0000000-0000-4000-8000-000000000002"
+	pusher := &fakePusher{}
+	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.Push = pusher })
+	box := p.host("MACHINE-2")
+	m, phone := p.phoneWithToken()
+	for agent, started := range map[string]int{activityAgent: 800000000, other: 800000100} {
+		call(t, phone, "", "clients/setActivityToken", map[string]any{"agentID": agent, "token": activityToken,
+			"environment": "development", "startedAt": started})
+	}
+	if tokens := p.s.Records().Client(m.Client).ActivityTokens; len(tokens) != 2 {
+		t.Fatal(tokens)
+	}
+
+	say := func(turn string) {
+		if _, err := p.s.methods.HostSaid(box.member.Host, "attention/turn", json.RawMessage(turn)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	say(`{"agentID":"` + other + `","phase":"working"}`)
+	say(`{"agentID":"` + activityAgent + `","phase":"approval"}`)
+	say(`{"agentID":"` + activityAgent + `","phase":"done","endedAt":800000300}`)
+	say(`{"agentID":"` + other + `","phase":"failed","endedAt":800000400}`)
+	p.waitFor(func() bool { return len(pusher.sent()) == 4 }, "four pushes")
+	sent := pusher.sent()
+	for _, push := range sent {
+		if push.Token != activityToken {
+			t.Fatal(push)
+		}
+		if body := string(push.Payload()); strings.Contains(body, "title") || strings.Contains(body, "line") ||
+			strings.Contains(body, "place") {
+			t.Fatal("words in the clear:", body)
+		}
+	}
+	// Both work: the newest is shown, the other counted, the timer from the oldest.
+	if s := activityState(t, sent[0]); s.Phase != "working" || s.AgentID != other || s.OthersWorking != 1 ||
+		s.OthersAsking != 0 || s.StartedAt != 800000000 || sent[0].Activity.Urgent || sent[0].Activity.End {
+		t.Fatal(s, sent[0].Activity)
+	}
+	// The older one asks: it is shown, urgently.
+	if s := activityState(t, sent[1]); s.Phase != "approval" || s.AgentID != activityAgent || s.OthersWorking != 1 ||
+		!sent[1].Activity.Urgent {
+		t.Fatal(s)
+	}
+	// It ends while the other works: it leaves, and the activity goes on.
+	if s := activityState(t, sent[2]); s.Phase != "working" || s.AgentID != other || s.OthersWorking != 0 ||
+		s.StartedAt != 800000100 || s.EndedAt != nil || sent[2].Activity.End {
+		t.Fatal(s, sent[2].Activity)
+	}
+	// The last one ends it, with its own end.
+	end := sent[3].Activity
+	if s := activityState(t, sent[3]); s.Phase != "failed" || s.AgentID != other || s.EndedAt == nil ||
+		*s.EndedAt != 800000400 || !end.End {
+		t.Fatal(s, end)
+	}
+	if tokens := p.s.Records().Client(m.Client).ActivityTokens; len(tokens) != 0 {
+		t.Fatal("kept after the end:", tokens)
+	}
+}

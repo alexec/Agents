@@ -49,8 +49,8 @@ type ClientRecord struct {
 	// for the control plane to push to when no Mac host relays its notices. Never on the
 	// wire to another client.
 	PushToken *PushToken
-	// The push tokens of its Live Activities (#1744), one for each session it shows,
-	// newest last, held to MostActivityTokens. Set only by the device, as PushToken is.
+	// The push tokens of its Live Activity (#1744), one for each session it speaks for
+	// (#2991), newest last, held to MostActivityTokens. Set only by the device, as PushToken is.
 	ActivityTokens []ActivityToken
 	// A browser's own Web Push subscription (#1486), set only by that browser over its
 	// own session, as PushToken is: where the control plane posts its notices.
@@ -61,13 +61,17 @@ type ClientRecord struct {
 	Extra   Extra
 }
 
-// ActivityToken is one Live Activity's push token on a device: for which session, from
-// which APNs, and when its turn began, where the activity's timer counts from.
+// ActivityToken is a Live Activity's push token on a device for one session it speaks
+// for: from which APNs, and when the session's turn began, where the timer counts from. A
+// device shows one activity for every turn sent from it (#2991), so one token is here once
+// for each of those sessions.
 type ActivityToken struct {
 	Agent       string    `json:"agent"`
 	Token       string    `json:"token"`
 	Environment string    `json:"environment"`
 	StartedAt   wire.Date `json:"startedAt"`
+	// The session's phase as its host last said it (wire.TurnPhase); none is working.
+	Phase string `json:"phase,omitempty"`
 	// When the device gave it. A Live Activity lives at most 12 hours; one older is
 	// dropped.
 	SetAt Stamp `json:"setAt"`
