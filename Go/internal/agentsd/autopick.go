@@ -366,6 +366,13 @@ func (d *Daemon) setLevels(ctx context.Context, r wire.SetLevelsRequest) (wire.A
 		return wire.Agent{}, Invalid("%s has %s.", runtimeName(a.RuntimeID), why)
 	}
 	n := nativeOf(cells)
+	yes := a.Auto != nil && n.ClientPermission != nil && *n.ClientPermission == wire.ClientPermissionModeAlwaysApprove ||
+		r.Levels.PermissionRequests != nil && clientAnswered[a.RuntimeID] && *r.Levels.PermissionRequests == wire.ClientPermissionModeAlwaysApprove
+	if yes {
+		if err := d.alwaysApproveRefusal(); err != nil {
+			return wire.Agent{}, err
+		}
+	}
 	for _, k := range slices.Sorted(maps.Keys(n.Options)) {
 		if _, err := d.setOption(ctx, wire.SetOptionRequest{AgentID: a.ID, OptionID: k, Value: n.Options[k]}); err != nil {
 			return wire.Agent{}, err
@@ -481,9 +488,12 @@ func (d *Daemon) resolveLevels(r *wire.StartRequest, by startedBy) (*wire.AutoPi
 		levels = *r.Levels
 	}
 	var pick *wire.AutoPick
+	askOnly := false
 	if auto {
 		levels = autoLevels(r.Levels)
-		// On Auto, permission requests follow the permission mode (FR-010).
+		// On Auto, permission requests follow the permission mode (FR-010), but no further
+		// than a start that asks for Request cards (a helper whose starter asks).
+		askOnly = levels.PermissionRequests != nil && *levels.PermissionRequests == wire.ClientPermissionModeDefault
 		levels.PermissionRequests = nil
 		id, native, skipped := d.pickRuntime(levels, r.Sandbox)
 		if id == "" {
@@ -498,6 +508,9 @@ func (d *Daemon) resolveLevels(r *wire.StartRequest, by startedBy) (*wire.AutoPi
 	}
 	values, client := applyLevels(r.RuntimeID, levels, r.StartOptions.Values, auto, settings, d.runtimeOffers(r.RuntimeID))
 	r.StartOptions.Values = values
+	if askOnly && client != nil {
+		client = requestCards
+	}
 	return pick, client, nil
 }
 

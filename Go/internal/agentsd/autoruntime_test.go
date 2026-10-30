@@ -280,3 +280,37 @@ func TestContinueOnAuto(t *testing.T) {
 		t.Fatalf("%s %+v %s", a.RuntimeID, a.Auto, a.StartOptions.Values)
 	}
 }
+
+// A helper on Auto asks unless its starter approves every request itself: Grok's Approve
+// for me is Yes to all, which runs shell commands Claude's Accept edits asks about.
+func TestAnAutoHelperAsksLikeItsStarter(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	d.SettingsDir = t.TempDir()
+	dir := folder(t, c, 1)
+	var others []string
+	for _, id := range autoShippedOrder {
+		if id != "grok" {
+			others = append(others, id)
+		}
+	}
+	c.call(t, 2, "auto/set", map[string]any{"order": []string{"grok"}, "excluded": others, "overrides": []any{}})
+	helper := func(n int, level wire.PermissionLevel) *wire.Agent {
+		lead := seeded(t, d, dir, func(a *wire.Agent) { a.Levels = &wire.Levels{Permission: &level} })
+		m := appClient(t, d, lead.ID)
+		m.post("initialize", map[string]any{}, 1)
+		text, isErr := m.tool(n, "start_session", map[string]any{"prompt": "x", "runtime": "auto"})
+		if isErr {
+			t.Fatal(text)
+		}
+		return d.Store.Agent(helperID(text))
+	}
+	if a := helper(3, wire.PermissionLevelApproveForMe); a.RuntimeID != "grok" || a.ClientPermission == nil ||
+		*a.ClientPermission != wire.ClientPermissionModeDefault || d.agentAlwaysApproves(a) {
+		t.Fatalf("%s %v", a.RuntimeID, a.ClientPermission)
+	}
+	if a := helper(4, wire.PermissionLevelBypassPermissions); !d.agentAlwaysApproves(a) {
+		t.Fatalf("%v", a.ClientPermission)
+	}
+}
