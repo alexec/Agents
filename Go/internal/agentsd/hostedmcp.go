@@ -77,12 +77,12 @@ type hostedStart struct {
 }
 
 type hostedServer struct {
-	key     hostedKey
-	route   string
+	key    hostedKey
+	route  string
 	folder *string
-	server  sdk.McpServerStdio
-	cwd     string
-	users   map[string]bool
+	server sdk.McpServerStdio
+	cwd    string
+	users  map[string]bool
 	// MCP sessions opened by clients, kept across restarts.
 	sessions map[string]bool
 	state    wire.HostedMCPState

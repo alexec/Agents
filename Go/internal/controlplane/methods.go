@@ -138,6 +138,7 @@ var own = methodSet(
 	"readApi/revoke",
 	"reports/export",
 	"reports/usage",
+	"reports/value",
 	"scim/set",
 	"scim/tokens/list",
 	"scim/tokens/make",
@@ -334,7 +335,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		"signIn/domains/check", "signIn/domains/claim", "signIn/domains/list", "signIn/domains/preview",
 		"signIn/domains/remove", "signIn/domains/set":
 		return m.signInMethod(ctx, method, params, from)
-	case "reports/usage", "reports/export":
+	case "reports/usage", "reports/export", "reports/value":
 		return m.reportMethod(ctx, method, params, from)
 	case "user/settings", "user/setAgentConfigFile", "user/setSettings", "user/setSecret", "user/removeSecret", "user/secretNames":
 		return m.userMethod(ctx, method, params, from)

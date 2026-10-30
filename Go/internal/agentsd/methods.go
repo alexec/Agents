@@ -282,7 +282,7 @@ func summary(folder string, records map[string]wire.Folder, agents []wire.Agent)
 	}
 	fi, err := os.Stat(folder)
 	return wire.FolderSummary{
-		Folder:        p,
+		Folder:         p,
 		Name:           filepath.Base(folder),
 		Exists:         err == nil && fi.IsDir(),
 		LastActivityAt: newest,

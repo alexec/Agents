@@ -187,7 +187,7 @@ func (d *Daemon) recordSandboxFailure(id wire.UUID, detail string, completed int
 		return
 	}
 	rec := wire.SandboxFailureRecord{RuntimeID: a.RuntimeID, Detail: detail,
-		RecoveryOffered: slices.Contains(sandboxChoices(a.RuntimeID), wire.SandboxChoiceOff) && !sandboxRequired(d.orgPolicy()),
+		RecoveryOffered:    slices.Contains(sandboxChoices(a.RuntimeID), wire.SandboxChoiceOff) && !sandboxRequired(d.orgPolicy()),
 		CompletedToolCalls: completed}
 	d.change(id, func(a *wire.Agent) { r := rec; a.PendingSandboxFailure = &r })
 	d.record(id, wire.TranscriptEntryKind{SandboxFailure: &wire.TranscriptEntryKindSandboxFailure{Value: rec}})

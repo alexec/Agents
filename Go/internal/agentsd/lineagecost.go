@@ -153,6 +153,9 @@ func (d *Daemon) noteCostLocked(n wire.LineageNode, at time.Time, change func(*w
 		if p := lineage.ProjectOf(n); p != "" {
 			c.Project = &p
 		}
+		// The start of the work on it, for Reports ▸ Value's lead time (#2351).
+		first := wire.DateOf(at)
+		c.FirstAt = &first
 	}
 	change(&c)
 	c.LastAt = wire.DateOf(at)
@@ -165,7 +168,9 @@ func (d *Daemon) noteCostLocked(n wire.LineageNode, at time.Time, change func(*w
 func (d *Daemon) notePROutcome(pr wire.LineageNode, event, title string) {
 	d.workMu.Lock()
 	defer d.workMu.Unlock()
-	d.noteCostLocked(pr, nowFunc(), func(c *wire.LineageCostNode) {
+	now := nowFunc()
+	ended := wire.DateOf(now)
+	d.noteCostLocked(pr, now, func(c *wire.LineageCostNode) {
 		switch event {
 		case "pr.merged":
 			o := lineage.OutcomeMerged
@@ -173,13 +178,13 @@ func (d *Daemon) notePROutcome(pr wire.LineageNode, event, title string) {
 			if strings.HasPrefix(title, "Revert") {
 				o = lineage.OutcomeReverted
 			}
-			c.Outcome = &o
+			c.Outcome, c.EndedAt = &o, &ended
 		case "pr.closed":
 			o := lineage.OutcomeClosed
-			c.Outcome = &o
+			c.Outcome, c.EndedAt = &o, &ended
 		case "pr.opened":
 			// Reopened: open again.
-			c.Outcome = nil
+			c.Outcome, c.EndedAt = nil, nil
 		case "checks.failed":
 			n := int64(1)
 			if c.FailedChecks != nil {

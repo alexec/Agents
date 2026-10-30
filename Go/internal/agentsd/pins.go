@@ -24,7 +24,7 @@ import (
 // workflows, ten of each at most, in the order shown.
 
 const (
-	pinsPerFolder = 10
+	pinsPerFolder  = 10
 	pinTitleLength = 60
 	viewArguments  = 2048
 	pinsFilePath   = ".agents/pins.json"

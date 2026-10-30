@@ -130,11 +130,9 @@ func (s *Service) reportScopes(ctx context.Context, user string) (wire.ReportSco
 	return out, nil
 }
 
-// scopedReport is reports/usage for a scope: the rows the caller may see, each person's
-// groups for a group or the organisation, and nobody named for a group lead when the
-// policy says totals only.
-func (s *Service) scopedReport(ctx context.Context, r wire.ReportRange, scope *wire.ReportScope, user string) (wire.UsageReport, error) {
-	admin := s.isAdmin(user)
+// reportScope is whose rows a scope keeps, and the group it names, or why the caller may
+// not see it. With no scope, an admin's is the organisation and a member's their own.
+func (s *Service) reportScope(ctx context.Context, scope *wire.ReportScope, user string, admin bool) (*wire.ReportScope, func(person string) bool, *records.Group, error) {
 	if scope == nil {
 		// Before scopes (#1811): an admin every person, a member their own.
 		kind := wire.ReportScopeKindMe
@@ -143,36 +141,56 @@ func (s *Service) scopedReport(ctx context.Context, r wire.ReportRange, scope *w
 		}
 		scope = &wire.ReportScope{Kind: kind}
 	}
-	policy, err := s.reportPolicy(ctx)
-	if err != nil {
-		return wire.UsageReport{}, err
-	}
-	var keep func(person string) bool
-	var group *records.Group
-	hidden, budgetKey := false, ""
 	switch scope.Kind {
 	case wire.ReportScopeKindMe:
-		keep = func(person string) bool { return person == user }
+		return scope, func(person string) bool { return person == user }, nil, nil
 	case wire.ReportScopeKindOrg:
 		if !admin {
-			return wire.UsageReport{}, fail(notPermitted, "Only an admin sees the whole organisation's reports.")
+			return nil, nil, nil, fail(notPermitted, "Only an admin sees the whole organisation's reports.")
 		}
-		keep, budgetKey = func(string) bool { return true }, orgBudget
+		return scope, func(string) bool { return true }, nil, nil
 	case wire.ReportScopeKindGroup:
+		var group *records.Group
 		if scope.Group != nil {
 			group = s.records.Group(*scope.Group)
 		}
 		if group == nil {
-			return wire.UsageReport{}, fail(invalidParams, "Say a group that is there.")
+			return nil, nil, nil, fail(invalidParams, "Say a group that is there.")
 		}
-		if !admin && !leads(policy, group.ID, user) {
-			return wire.UsageReport{}, fail(notPermitted, "Only an admin or a lead of %s sees its reports.", group.Name)
+		if !admin {
+			policy, err := s.reportPolicy(ctx)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+			if !leads(policy, group.ID, user) {
+				return nil, nil, nil, fail(notPermitted, "Only an admin or a lead of %s sees its reports.", group.Name)
+			}
 		}
 		// A member, or a bot of the group (groups.go).
-		keep = func(person string) bool { return person != "" && s.inGroup(person, group.ID) }
+		return scope, func(person string) bool { return person != "" && s.inGroup(person, group.ID) }, group, nil
+	}
+	return nil, nil, nil, fail(invalidParams, "Say a scope: me, group or org.")
+}
+
+// scopedReport is reports/usage for a scope: the rows the caller may see, each person's
+// groups for a group or the organisation, and nobody named for a group lead when the
+// policy says totals only.
+func (s *Service) scopedReport(ctx context.Context, r wire.ReportRange, scope *wire.ReportScope, user string) (wire.UsageReport, error) {
+	admin := s.isAdmin(user)
+	scope, keep, group, err := s.reportScope(ctx, scope, user, admin)
+	if err != nil {
+		return wire.UsageReport{}, err
+	}
+	policy, err := s.reportPolicy(ctx)
+	if err != nil {
+		return wire.UsageReport{}, err
+	}
+	hidden, budgetKey := false, ""
+	switch scope.Kind {
+	case wire.ReportScopeKindOrg:
+		budgetKey = orgBudget
+	case wire.ReportScopeKindGroup:
 		hidden, budgetKey = !admin && policy.TotalsOnly, group.ID
-	default:
-		return wire.UsageReport{}, fail(invalidParams, "Say a scope: me, group or org.")
 	}
 	rows, err := s.report(ctx, r, keep, time.Now())
 	if err != nil {

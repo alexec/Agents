@@ -21,7 +21,7 @@ public struct ReportOutcomes: Sendable, Hashable {
             case .time: self = .time
             case .runtimes: self = .runtimes
             case .workflows: self = .workflows
-            case .spend, .adoption: return nil
+            case .spend, .adoption, .value: return nil
             }
         }
 
@@ -274,6 +274,7 @@ public enum ReportOutcomeWords {
         case .runtimes: "Runtimes"
         case .adoption: "Adoption"
         case .workflows: "Workflows"
+        case .value: "Value"
         }
     }
 
@@ -306,12 +307,12 @@ public enum ReportOutcomeWords {
         }
     }
 
-    static func plural(_ n: Int, _ one: String, _ many: String) -> String {
+    public static func plural(_ n: Int, _ one: String, _ many: String) -> String {
         "\(n) \(n == 1 ? one : many)"
     }
 
     /// An amount for each of something: to the cent, as an average is.
-    static func each(_ amount: Decimal, in currency: String) -> String {
+    public static func each(_ amount: Decimal, in currency: String) -> String {
         amount.formatted(.currency(code: currency).precision(.fractionLength(2)))
     }
 

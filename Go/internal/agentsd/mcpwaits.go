@@ -330,9 +330,9 @@ func (d *Daemon) startMCPWait(check mcpWaitCheck) {
 
 // waitingOnServers is every open wait's server events, by agent, for the subscriptions.
 type serverWait struct {
-	agent   wire.UUID
+	agent  wire.UUID
 	folder string
-	events  []wire.WaitServerEvent
+	events []wire.WaitServerEvent
 }
 
 func (d *Daemon) serverWaits() []serverWait {

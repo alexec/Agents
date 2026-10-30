@@ -443,9 +443,9 @@ func TestAnAllowedGoogleDomainJoinsWithNoInvite(t *testing.T) {
 	p, _, owner := signInPlane(t, f)
 	call(t, owner, "", "signIn/configure", wire.SignInConfigure{Provider: signin.Google, Domains: []string{"Example.com"}})
 	refused := map[string]signintest.Claims{
-		"other domain":   {"hd": "evil.example", "email": "x@evil.example", "email_verified": true},
-		"personal":       {"email": "x@gmail.com", "email_verified": true},
-		"not verified":   {"hd": "example.com", "email": "x@example.com", "email_verified": false},
+		"other domain": {"hd": "evil.example", "email": "x@evil.example", "email_verified": true},
+		"personal":     {"email": "x@gmail.com", "email_verified": true},
+		"not verified": {"hd": "example.com", "email": "x@example.com", "email_verified": false},
 	}
 	for name, claims := range refused {
 		if _, err := p.signInAs(signin.Google, func(n string) string { return f.mint(signin.Google, "x-"+name, n, claims) }, nil); err == nil ||

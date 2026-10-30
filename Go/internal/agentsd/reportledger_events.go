@@ -100,7 +100,7 @@ func (d *Daemon) countReportEvents() {
 	}
 	type add struct {
 		folder, runtime, workflow, hour string
-		counts                           *wire.ReportCounts
+		counts                          *wire.ReportCounts
 	}
 	var adds []add
 	var branches map[string]*wire.Agent
