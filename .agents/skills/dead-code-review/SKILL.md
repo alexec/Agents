@@ -25,7 +25,9 @@ the keyboard, that is true only of a workflow run.
   run that binary; do not install it. Verify its SHA-256 against the recorded value in
   `baseline.md` before use.
   Scan `AgentsHost`, `AgentsStore` (the Mac window: `App/Sources`), `Remote` and every
-  `Packages/*` Swift package. Build the three schemes with plain `xcodebuild`
+  `Packages/*` Swift package. Run `xcodegen generate` first (`Agents.xcodeproj` is not
+  checked in, and a copy older than the merge of `main` misses new files). Build the
+  three schemes one at a time with plain `xcodebuild`
   (`-derivedDataPath build/DD-periphery`, the build cache's package checkout through
   `-clonedSourcePackagesDirPath`, `COMPILER_INDEX_STORE_ENABLE=YES`), not through
   `scripts/build-cache.sh`: its prefix mapping writes `/^worktree` paths into the index,
