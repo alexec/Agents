@@ -157,7 +157,8 @@ func askToolWords(runtimeID string) string {
 // escalationBrief is Briefing.escalation: what is the person's to decide, asked with the
 // runtime's own question tool where the app keeps one, and decide-and-tell for the rest
 // (#601, #1083). Of 196 forms answered by 2026-10-15, 79% of questions took the
-// recommended option, and agents waited 65 hours on them.
+// recommended option, and agents waited 65 hours on them. A secret has a tool of its own,
+// so its value stays out of the chat (#2885).
 func escalationBrief(runtimeID string) string {
 	named := askToolWords(runtimeID)
 	return "When something is mine to decide (anything hard to undo, money or an outside " +
@@ -168,7 +169,8 @@ func escalationBrief(runtimeID string) string {
 		"recommended and is easy to undo: take it, write `Decided: <what>, because <why>.` (I can " +
 		"overrule it) in the issue or pull request and in your reply, and carry on. Do not ask " +
 		"about the next step of what I asked for, a report with nothing to choose, anything you " +
-		"can find out yourself, or the same thing twice."
+		"can find out yourself, or the same thing twice. Ask for a missing secret (an API key, a " +
+		"token) with ask_secret, never in a question or a reply, where what is typed goes into the chat."
 }
 
 // schedulingRemoved is the runtimes whose own scheduling tools the tool policy takes away

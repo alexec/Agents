@@ -7305,6 +7305,9 @@
         },
         "askedAt": {
           "$ref": "#/definitions/WireDate"
+        },
+        "secret": {
+          "$ref": "#/definitions/ElicitationSecret"
         }
       },
       "required": [
@@ -7567,6 +7570,26 @@
           "additionalProperties": false
         }
       ]
+    },
+    "ElicitationSecret": {
+      "description": "An agent's ask_secret (#2885): one named secret, typed into a masked field. The value goes to the person's secrets.env on the host, never into the record.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "isSet": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "isSet"
+      ],
+      "additionalProperties": false
     },
     "Empty": {
       "type": "object",
