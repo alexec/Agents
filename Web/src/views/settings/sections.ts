@@ -46,7 +46,8 @@ export const settingsSections: readonly SettingsSection[] = [
   // Groups own machine providers (#1761).
   { name: "groups", scope: "controlPlane", order: 20, Section: GroupsSection },
   { name: "machines", scope: "machines", order: 20, Section: VersionsSection },
-  // How many notices agents may send you (#2805), kept on the Mac's host, the same on every client.
+  // How many notices agents may send you (#2805), kept on the Mac's host, the same on every client;
+  // headed "What agents tell you", as the window's and the Remote's, with a hint that they are not this browser's (#2895).
   { name: "notifications", scope: "thisApp", order: 40, Section: NotificationsSection },
   // Who belongs to the control plane, and their machines and clients (#994).
   { name: "people", scope: "controlPlane", order: 10, Section: PeopleSection },

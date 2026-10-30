@@ -53,3 +53,8 @@ export const noticeLimitsFooter = "What agents tell you with a notification, whe
   + "Burst is how many can go at once; after that, one comes back each cool-down. "
   + "A notice that would go in the cool-down is not sent, and the agent is told when the next can go. "
   + "Questions and approvals are not limited.";
+
+/** Under the web's limits only (#2895): they sit under This browser, but are the Mac's host's, and the page gets
+ * no notices (#1486). */
+export const noticeLimitsWhere = "Kept on your Mac, the same on every client of yours. "
+  + "The notices go to your Mac, iPhone and iPad, not to this browser.";
