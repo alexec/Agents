@@ -334,10 +334,11 @@ type pull struct {
 	MergedAt    *string `json:"merged_at"`
 	ClosedAt    *string `json:"closed_at"`
 	MergeSHA    string  `json:"merge_commit_sha"`
+	Body        string  `json:"body"`
 }
 
 func (p pull) pr() PR {
-	return PR{Number: p.Number, Title: p.Title, Branch: p.Head.Ref, URL: p.HTMLURL}
+	return PR{Number: p.Number, Title: p.Title, Branch: p.Head.Ref, URL: p.HTMLURL, Fixes: closingRefs(p.Body)}
 }
 
 // trusted says whether the PR is the repo's own: its branch in repo, not a fork, and its

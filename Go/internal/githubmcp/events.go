@@ -62,6 +62,9 @@ func prSchema(extra map[string]any) map[string]any {
 	return object(props)
 }
 
+// fixesSchema is a PR's fixes: the issues its body closes, "#12" or "owner/repo#12" (#2349).
+var fixesSchema = map[string]any{"type": "array", "items": str}
+
 // events are the events this server offers, in CIWatcher's order.
 var events = append([]event{
 	{name: "checks.failed", title: "Checks failed",
@@ -75,13 +78,13 @@ var events = append([]event{
 	{name: "pr.opened", title: "Pull request opened",
 		description: "A pull request was opened, or a draft was marked ready for review: a PR open and not a draft now that was not at the last poll. Drafts never count. Reopened, it is raised again." + ownPRs,
 		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
-		payload:     object(map[string]any{"pr": prSchema(map[string]any{"author": str}), "openedAt": str})},
+		payload:     object(map[string]any{"pr": prSchema(map[string]any{"author": str, "fixes": fixesSchema}), "openedAt": str})},
 	{name: "pr.merged", title: "Pull request merged", description: "A pull request was merged." + ownPRs,
 		input:   schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
-		payload: object(map[string]any{"pr": prSchema(nil), "mergedAt": str, "mergeSha": str})},
+		payload: object(map[string]any{"pr": prSchema(map[string]any{"fixes": fixesSchema}), "mergedAt": str, "mergeSha": str})},
 	{name: "pr.closed", title: "Pull request closed", description: "A pull request was closed without being merged." + ownPRs,
 		input:   schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
-		payload: object(map[string]any{"pr": prSchema(nil), "closedAt": str})},
+		payload: object(map[string]any{"pr": prSchema(map[string]any{"fixes": fixesSchema}), "closedAt": str})},
 	{name: "pr.conflicted", title: "Pull request in conflict",
 		description: "An open pull request began to conflict with its base, so it cannot merge and its CI may not run until it is rebased. Once per conflict: it is raised again only after the PR merges cleanly and then conflicts anew." + ownPRs,
 		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty, mineProperty},

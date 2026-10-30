@@ -311,7 +311,7 @@
     "title": "Archive this session or one you started"
   },
   {
-    "description": "Add or remove your own labels on this session. The person's labels are theirs.",
+    "description": "Add or remove your own labels on this session. The person's labels are theirs. A label #n or P#n (or a Linear key, such as ENG-4) also links this session to that issue or pull request; removing the label ends the link.",
     "inputSchema": {
       "properties": {
         "add": {

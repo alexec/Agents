@@ -399,6 +399,7 @@ func (d *Daemon) queueHelper(caller *wire.Agent, prompt, runtimeID, model string
 		return "", &Error{Code: wire.FailureCouldNotSave, Message: "Nothing was started: the queued agent could not be saved: " + err.Error()}
 	}
 	d.tellChanged(a, nil)
+	d.noteLineage(nil, a)
 	d.folderChanged(folder)
 	d.record(a.ID, runtimeNote("Queued by "+d.holderName(caller.ID)+". It starts by itself when this folder has a place free."))
 	position := len(queue) + 1

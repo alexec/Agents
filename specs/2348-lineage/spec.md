@@ -87,6 +87,43 @@ the sessions to their PRs. The walk follows links in both directions.
 - **Decided: the file is `lineage.jsonl`, not `links.jsonl`.** Because "links" also means
   a file's hard links on the host (`links.go`). Alex can overrule.
 
+## The links the host makes (#2349)
+
+Slice 2 makes most links without help, in `Go/internal/agentsd/lineagelinks.go`. One
+goroutine writes them in order, away from the agent lock.
+
+| What happens | The link | `source` |
+| --- | --- | --- |
+| A session starts with the label `#n`, `P#n` or a Linear key (the Issues and PR pages give one) | session `works-on` the issue or PR | `start` |
+| The agent (`set_session_labels`) or the person adds such a label later | session `works-on` the issue or PR | `agent` or `person` |
+| The label is taken off | that link ends | |
+| A helper starts | parent session `started` helper | `helper` |
+| A workflow's session starts | run `started` session, run `part-of` workflow | `helper` |
+| `pr.opened` | **every** session on the PR's branch, in the PR's repo, `opens` the PR | `branch` |
+| `pr.opened`, `pr.merged`: the PR's body says `Fixes #n`, `Closes #n`, `Resolves o/r#n` | PR `fixes` the issue | `pr-body` |
+| `pr.merged` or `pr.closed` | the sessions' links to the PR end | |
+| `pr.closed` (no merge) | the PR's `fixes` links end too: it fixed nothing | |
+| A session is archived | the links from it end | |
+
+- **Refs.** The folder's `origin` remote names the repo for `#n` and `P#n`:
+  `github:<owner>/<repo>#n`, or on GitLab `gitlab:<group>/<project>#n` for an issue and
+  `…!n` for a merge request. The path is lower case. A Linear key is `linear:<KEY>`. A
+  workflow is `workflow:<folder>/<workflow id>`, a run `run:<run id>`.
+- **The GitHub and GitLab servers** add `pr.fixes` to `pr.opened`, `pr.merged` and
+  `pr.closed`: the issues the PR's body closes (`#12`, or `owner/repo#12` for another
+  repo's), at most 20.
+- **The host hears a PR event only while a workflow or a wait listens for it** (as for
+  Reports). A session's `P#n` label links it to its PR without one.
+
+### Decisions on slice 2's open questions
+
+- **Decided: no new tool; `set_session_labels` is the tool**, because agents label their
+  work with `#n` and `P#n` already (AGENTS.md), and each tool listed costs tokens in every
+  session. Its description says that a label links. Alex can overrule.
+- **Decided: taking a `#n` label off ends the link.** Because an active link is what the
+  work is on now: #2350 banks a turn's cost under the active links, and an ended link
+  stays in the graph as history. Alex can overrule.
+
 ## Clients
 
 mac: no UI, remote: no UI, web: no UI (the view is #2351).

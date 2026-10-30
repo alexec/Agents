@@ -175,6 +175,7 @@ func (d *Daemon) changeAgent(id wire.UUID, moveOn bool, edit func(a *wire.Agent)
 		return nil
 	}
 	d.tellChanged(*a, &before)
+	d.noteLineage(&before, *a)
 	d.folderChanged(folderPath(a))
 	// A folder quiet after working says folder.idle (#1368).
 	if before.State != a.State {
@@ -344,6 +345,7 @@ func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) 
 	}
 	d.actedOn(a.ID, by.actor)
 	d.tellChanged(a, nil)
+	d.noteLineage(nil, a)
 	d.folderChanged(folderPath(&a))
 	if wt != nil {
 		d.record(a.ID, runtimeNote(worktreeNote(*wt)))
