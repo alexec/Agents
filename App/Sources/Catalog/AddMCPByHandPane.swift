@@ -50,8 +50,15 @@ struct AddMCPByHandPane: View {
                 Text("Add a connector by hand").appText(.title)
                 Spacer()
             }
-            // Refused by the organisation's policy (#998): the form stays, Add does not.
-            if let mark = refusedBy { OrgPolicyLine(mark: mark) }
+            // Refused by the organisation's policy (#998): the form stays, Add does not, and the
+            // person can ask an admin for it by the name typed (#2355).
+            if let mark = refusedBy {
+                HStack(alignment: .firstTextBaseline) {
+                    OrgPolicyLine(mark: mark)
+                    Spacer()
+                    AskAdminButton(kind: .mcp, name: name)
+                }
+            }
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     form

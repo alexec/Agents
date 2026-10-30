@@ -18,6 +18,8 @@ struct AddMCPSheet: View {
     @State private var preview: DaemonAPI.MCPPreview?
     @State private var previewError: DaemonAPI.MCPCatalogError?
     @State private var opening: DaemonAPI.MCPCatalogResult?
+    /// The result whose preview was refused, for Ask an Admin (#2355).
+    @State private var refused: DaemonAPI.MCPCatalogResult?
     @State private var secretValues: [String: String] = [:]
     @State private var adding = false
     @State private var addError: String?
@@ -71,6 +73,8 @@ struct AddMCPSheet: View {
                             .appText(.fine).foregroundStyle(.secondary)
                     } else if let searchError {
                         Text(MCPCatalogWords.sentence(searchError)).appText(.fine).foregroundStyle(.secondary)
+                    } else if let previewError {
+                        previewProblem(previewError)
                     } else if results.isEmpty && searched {
                         Text("No connectors match.").appText(.fine).foregroundStyle(.secondary)
                     } else if !searched && marketplace?.format != .file {
@@ -88,6 +92,19 @@ struct AddMCPSheet: View {
             }
         }
         .padding(18)
+    }
+
+    /// Why the chosen connector cannot be shown; the organisation's refusal offers Ask an Admin.
+    private func previewProblem(_ error: DaemonAPI.MCPCatalogError) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(MCPCatalogWords.sentence(error)).appText(.fine)
+                .foregroundStyle(error.policyWords == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+            if error.policyWords != nil, let refused {
+                AskAdminButton(kind: .mcp, name: refused.title, source: refused.id)
+            }
+        }
     }
 
     private func resultRow(_ result: DaemonAPI.MCPCatalogResult) -> some View {
@@ -155,7 +172,15 @@ struct AddMCPSheet: View {
                 .padding(8)
                 .background(Paper.raised, in: RoundedRectangle(cornerRadius: 8))
             }
-            if let addError { Text(addError).appText(.fine).tinted(.failure) }
+            if let addError {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(addError).appText(.fine).tinted(.failure)
+                    Spacer()
+                    if GovernanceWords.refusedByPolicy(addError) {
+                        AskAdminButton(kind: .mcp, name: preview.result.title, source: preview.result.id)
+                    }
+                }
+            }
             Spacer()
             HStack {
                 Spacer()
@@ -197,6 +222,7 @@ struct AddMCPSheet: View {
         guard trimmed == query.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
         results = answer.results
         searchError = answer.error
+        previewError = nil
         searched = true
     }
 
@@ -215,8 +241,10 @@ struct AddMCPSheet: View {
         if let preview = answer.preview {
             self.preview = preview
             previewError = nil
+            refused = nil
         } else {
             previewError = answer.error
+            refused = result
         }
     }
 

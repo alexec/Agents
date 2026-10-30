@@ -901,13 +901,16 @@ final class RemoteModel {
         didSet { UserDefaults.standard.set(startFolders.map(\.path), forKey: "remote.startFolders") }
     }
     /// The new agent's own sandbox choice (064). Nil follows its runtime's default.
-    var startSandbox: SandboxChoice?
+    var startSandbox: SandboxChoice? { didSet { if isAutoStart { Task { await refreshStartAutoPreview() } } } }
     /// The new agent's values in the shared words (#2658), kept when the runtime changes.
     private(set) var startLevels = Levels(model: .balanced, permission: .ask)
     /// The new agent's own answer to permission requests (#2658); nil follows Settings.
     var startClientPermission: ClientPermissionMode?
-    /// Every runtime's cells for the shared words (#2658), as the Mac's host has them. The
-    /// Auto runtime itself is Mac + web (#2798).
+    /// What Auto would pick now for the page, for "Auto (Claude)".
+    private(set) var startAutoPreview: AutoPreview?
+    var isAutoStart: Bool { startRuntimeID == LevelWords.autoID }
+    /// Every runtime's cells for the shared words (#2658), as the Mac's host has them. Auto's
+    /// own settings are Mac + web (#2923).
     private(set) var autoMappings = AutoMappings()
     /// Each runtime's sandbox default, read from the Mac, for "Use runtime default (Off)".
     private(set) var sandboxSettings = SandboxSettings()
@@ -950,7 +953,8 @@ final class RemoteModel {
 
     private var startAvailableRuntimeIDs: [String] {
         let ids = startRuntimes.filter(\.canStart).map(\.runtime.id)
-        return ids
+        // Auto is a choice wherever a runtime is (#2658).
+        return ids.isEmpty ? ids : [LevelWords.autoID] + ids
     }
 
     /// What the page reads: the runtimes to choose from, and, for its runtime menu, what
@@ -1184,11 +1188,15 @@ final class RemoteModel {
         case .permissionRequests: startClientPermission = ClientPermissionMode(rawValue: level)
         case .sandbox: startSandbox = SandboxChoice(rawValue: level)
         }
-        applyStartLevel(field)
+        if isAutoStart {
+            Task { await refreshStartAutoPreview() }
+        } else {
+            applyStartLevel(field)
+        }
     }
 
     private func applyStartLevel(_ field: AutoField) {
-        guard let runtimeID = startRuntimeID else { return }
+        guard let runtimeID = startRuntimeID, !isAutoStart else { return }
         let level: String? = switch field {
         case .model: startLevels.model?.rawValue
         case .permission: startLevels.permission?.rawValue
@@ -1204,11 +1212,21 @@ final class RemoteModel {
 
     /// The value of a field the page's own options are now, or nil (Custom).
     func startLevel(_ field: AutoField) -> String? {
+        if isAutoStart {
+            return field == .model ? startLevels.model?.rawValue : startLevels.permission?.rawValue
+        }
         guard let runtimeID = startRuntimeID else { return nil }
         let chosen = field == .model ? startLevels.model?.rawValue : startLevels.permission?.rawValue
         return LevelMatch.level(field, runtimeID: runtimeID, mappings: autoMappings, preferring: chosen) { id in
             self.startChosen[id] ?? self.startOptions.first { $0.id == id }?.currentValue
         }
+    }
+
+    /// What Auto would pick now, on the page's machine.
+    func refreshStartAutoPreview() async {
+        guard isAutoStart, let folder = startOptionsFolder else { startAutoPreview = nil; return }
+        let request = AutoPreviewRequest(cwd: folder, levels: startLevels, sandbox: startSandbox)
+        startAutoPreview = try? await askForStart(DaemonAPI.Method.autoPreview, request, returning: AutoPreview.self)
     }
 
     func refreshAuto() async {
@@ -1228,6 +1246,17 @@ final class RemoteModel {
     /// choices on the page.
     func loadStartChoices() async {
         guard let folder = startOptionsFolder else { return }
+        // Auto has no runtime yet, so no options of its own: what it would pick (#2658).
+        if startRuntimeID == LevelWords.autoID {
+            startGeneration += 1
+            discardStartDraft()
+            startOptions = []
+            startChosen = [:]
+            startChoicesState = .ready
+            startAsks.answered(.choices)
+            await refreshStartAutoPreview()
+            return
+        }
         guard let runtimeID = startRuntimeID else {
             // Not "asking": there is nobody to ask.
             let host = startHost == .mac ? "the Mac" : hostName(startHost)
@@ -1379,10 +1408,10 @@ final class RemoteModel {
             startOptions: StartOptions(values: startChosen), draftID: startDraftID,
             additionalDirectories: startFolders, worktree: startWorktree, requestID: retrying ?? UUID(), sandbox: startSandbox,
             labels: labels,
-            accountID: startAccountChoices?.sent(startAccountID),
+            accountID: isAutoStart ? nil : startAccountChoices?.sent(startAccountID),
             voice: voice ? true : nil,
             levels: Levels(model: startLevels.model, permission: startLevels.permission,
-                           permissionRequests: startClientPermission))
+                           permissionRequests: isAutoStart ? nil : startClientPermission))
         startingPage = page
         defer { startingPage = nil }
         return await send(start: request, told: started)
@@ -1541,7 +1570,7 @@ final class RemoteModel {
     /// none for a server's folder. The picker shows only when there is one.
     var startAccounts: [AccountProfile] { startAccountChoices?.accounts ?? [] }
     var startAccountChoices: AccountChoices? {
-        guard startHost == .mac, let startRuntimeID else { return nil }
+        guard startHost == .mac, let startRuntimeID, startRuntimeID != LevelWords.autoID else { return nil }
         return AccountChoices(runtimeID: startRuntimeID, profiles: accountProfiles, policy: policyState?.policy)
     }
 
@@ -2515,7 +2544,7 @@ final class RemoteModel {
             self.sandboxSettings = settings
         }
         if notification.method == DaemonAPI.Notification.autoChanged {
-            Task { await refreshAuto() }
+            Task { await refreshAuto(); await refreshStartAutoPreview() }
         }
         if notification.method == DaemonAPI.Notification.clientPermissionsChanged,
            let settings = try? notification.params?.decode(ClientPermissionSettings.self) {
@@ -3943,6 +3972,14 @@ final class RemoteModel {
         }
     }
 
+    /// Where Auto would start an Auto session's successor now (FR-022).
+    func autoPreview(for agent: Agent) async -> AutoPreview? {
+        guard let pick = agent.auto else { return nil }
+        let request = AutoPreviewRequest(cwd: agent.cwd, levels: pick.levels, sandbox: agent.sandboxOverride)
+        guard let client = try? client(for: DaemonAPI.AgentRequest(agentID: agent.id)) else { return nil }
+        return try? await client.call(DaemonAPI.Method.autoPreview, request, returning: AutoPreview.self)
+    }
+
     /// A running agent's model level or permission mode, mapped on its own runtime (#2658).
     func setAgentLevel(_ agentID: UUID, _ field: AutoField, _ level: String) async {
         var levels = Levels()
@@ -4546,14 +4583,15 @@ final class RemoteModel {
     /// **Continue in New** (#999): a session in the same folder that reads this one and
     /// carries on, on the runtime's account for new sessions, and open it.
     @discardableResult
-    func continueInNew(_ agentID: UUID) async -> Bool {
+    func continueInNew(_ agentID: UUID, onAuto: Bool = false) async -> Bool {
         guard !isStale else {
             problem = "Your Mac is not answering, so that could not be sent."
             return false
         }
         do {
             let id = try await sendOnce(DaemonAPI.Method.agentsContinueInNew,
-                                        DaemonAPI.ContinueInNewRequest(agentID: agentID, requestID: UUID())).decode(UUID.self)
+                                        DaemonAPI.ContinueInNewRequest(agentID: agentID, requestID: UUID(),
+                                                                       auto: onAuto ? true : nil)).decode(UUID.self)
             await loadWholeAgent(id)
             selection = id
             return true

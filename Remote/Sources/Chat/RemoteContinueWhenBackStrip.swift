@@ -6,6 +6,8 @@ import SwiftUI
 struct RemoteContinueWhenBackStrip: View {
     @Environment(RemoteModel.self) private var model
     let agent: Agent
+    /// An Auto session's next runtime (#2658, FR-022): its button continues there, by tap only.
+    @State private var next: String?
 
     var body: some View {
         HStack(spacing: 8) {
@@ -17,6 +19,11 @@ struct RemoteContinueWhenBackStrip: View {
                     Task { await model.cancelContinue(agent.id) }
                 }
             } else {
+                if let next {
+                    Button(LevelWords.continueOn(PromptWords.runtimeName(next))) {
+                        Task { await model.continueInNew(agent.id, onAuto: true) }
+                    }
+                }
                 Button {
                     Task { await model.continueWhenBack(agent.id) }
                 } label: {
@@ -32,5 +39,8 @@ struct RemoteContinueWhenBackStrip: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
+        .task(id: agent.id) {
+            next = await model.autoPreview(for: agent)?.runtimeID.flatMap { $0 == agent.runtimeID ? nil : $0 }
+        }
     }
 }

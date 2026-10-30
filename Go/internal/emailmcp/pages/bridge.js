@@ -77,7 +77,23 @@ const bridge = (name, on) => {
         post({ id: m.id, result: {} }); break;
     }
   });
-  const ui = { $, request, notify, log, el, link, openLink, button, errorText, data, call, ago, size };
+  // The lists' sections for a team (#2453): each row's section, from the server, in this
+  // order, a heading over each that has rows. Rows from a server without sections: no headings.
+  const SECTIONS = [["needs_you", "Needs you"], ["yours", "Yours"], ["team", "Team"], ["others", "Others"]];
+  const sections = (items, row) => {
+    if (!items.some((item) => item.section)) return items.map(row);
+    return SECTIONS.flatMap(([key, title]) => {
+      const rows = items.filter((item) => (item.section || "others") === key);
+      if (!rows.length) return [];
+      const head = el("li", { className: "section " + key }, [el("span", { textContent: title }), el("span", { className: "muted", textContent: String(rows.length) })]);
+      head.setAttribute("role", "heading"); head.setAttribute("aria-level", "2");
+      return [head, ...rows.map(row)];
+    });
+  };
+  // Who opened it, with a bot pill for a bot.
+  const who = (login, bot) => [el("span", { textContent: login || "someone" }),
+    bot ? el("span", { className: "pill bot", textContent: "bot", title: login + " is a bot" }) : null];
+  const ui = { $, request, notify, log, el, link, openLink, button, errorText, data, call, ago, size, sections, who };
   ui.start = (waitingWords) => {
     new ResizeObserver(size).observe(document.querySelector("main"));
     request("ui/initialize", {

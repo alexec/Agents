@@ -38,6 +38,8 @@ func TestMain(m *testing.M) {
 	}
 	// No test asks the person's gh about merged pull requests unless it says so.
 	findGH = func() string { return "" }
+	// Nor asks the forge for an issue's milestone (#2935): a test sets issueLookup.
+	milestoneLookup = func(context.Context, string, forgeRepo, int) (int, error) { return 0, errNoForgeInTests }
 	// Nor erases a deleted agent's runtime copy (#1001): that starts the runtime.
 	erasing = false
 	os.Exit(m.Run())

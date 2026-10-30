@@ -24,6 +24,7 @@ type IssueReader func(ctx context.Context, owner, repo string, number int) (map[
 // Views is what the views ask of GitHub. RealGitHub is one; tests use a fake API under it.
 type Views interface {
 	DefaultRepo(ctx context.Context) (string, error)
+	Viewer(ctx context.Context) (string, error)
 	BoardPRs(ctx context.Context, repo string) (Board, error)
 	OpenIssues(ctx context.Context, repo string, filter IssueFilter) ([]ListedIssue, error)
 	IssueDetails(ctx context.Context, repo string, number int) (map[string]any, error)
@@ -57,12 +58,18 @@ type BoardPR struct {
 	Review string
 	// CodeRabbit is its status: reviewing, reviewed, failed or "" (#1344).
 	CodeRabbit string
+	// ReviewRequested is the logins a review is asked of (#2453).
+	ReviewRequested []string
+	authorInfo      author
 }
 
 func (p BoardPR) json() map[string]any {
 	j := p.PR.json()
 	j["base"], j["author"], j["updatedAt"], j["draft"], j["autoMerge"], j["checks"] =
 		p.Base, p.Author, p.UpdatedAt, p.Draft, p.AutoMerge, p.Checks
+	if p.authorInfo.Bot {
+		j["authorBot"] = true
+	}
 	if p.FailedRunID != 0 {
 		j["failedRunId"] = p.FailedRunID
 	}
@@ -93,11 +100,15 @@ type ListedIssue struct {
 	Milestone string
 	// LabelColors is each label's #rrggbb, for those GitHub gives a colour (#2686).
 	LabelColors map[string]string
+	authorInfo  author
 }
 
 func (i ListedIssue) json() map[string]any {
 	j := i.Issue.json()
 	j["comments"], j["updatedAt"] = i.Comments, i.UpdatedAt
+	if i.authorInfo.Bot {
+		j["authorBot"] = true
+	}
 	if i.Milestone != "" {
 		j["milestone"] = i.Milestone
 	}
@@ -284,8 +295,10 @@ func conflictsOf(mergeable string) *bool {
 
 const boardQuery = `query($owner: String!, $name: String!) { viewer { login } repository(owner: $owner, name: $name) {
   pullRequests(states: OPEN, first: 100, orderBy: {field: CREATED_AT, direction: DESC}) { nodes {
-    number title url headRefName baseRefName isDraft updatedAt mergeable reviewDecision
-    author { login __typename } autoMergeRequest { enabledAt } ` + rollupFields + ` } } } }`
+    number title url headRefName baseRefName isDraft updatedAt mergeable reviewDecision authorAssociation
+    author { login __typename } autoMergeRequest { enabledAt }
+    reviewRequests(first: 20) { nodes { requestedReviewer { ... on User { login } ... on Bot { login } } } }
+    ` + rollupFields + ` } } } }`
 
 func (g *RealGitHub) BoardPRs(ctx context.Context, repo string) (Board, error) {
 	owner, name, err := ownerName(repo)
@@ -306,9 +319,15 @@ func (g *RealGitHub) BoardPRs(ctx context.Context, repo string) (Board, error) {
 					UpdatedAt   string    `json:"updatedAt"`
 					Mergeable   string    `json:"mergeable"`
 					Review      string    `json:"reviewDecision"`
+					Association string    `json:"authorAssociation"`
 					Author      *gqlActor `json:"author"`
 					AutoMerge   *struct{} `json:"autoMergeRequest"`
-					Commits     gqlRollup `json:"commits"`
+					Requests    struct {
+						Nodes []struct {
+							Reviewer *gqlActor `json:"requestedReviewer"`
+						} `json:"nodes"`
+					} `json:"reviewRequests"`
+					Commits gqlRollup `json:"commits"`
 				} `json:"nodes"`
 			} `json:"pullRequests"`
 		} `json:"repository"`
@@ -322,17 +341,38 @@ func (g *RealGitHub) BoardPRs(ctx context.Context, repo string) (Board, error) {
 	b := Board{Viewer: data.Viewer.Login, PRs: []BoardPR{}}
 	for _, n := range data.Repository.PullRequests.Nodes {
 		checks, runID := rollup(n.Commits.items())
+		var requested []string
+		for _, r := range n.Requests.Nodes {
+			// A team asked for a review has no login here: not the viewer's yet.
+			if l := r.Reviewer.login(); l != "" {
+				requested = append(requested, l)
+			}
+		}
+		var typ string
+		if n.Author != nil {
+			typ = n.Author.Typename
+		}
 		b.PRs = append(b.PRs, BoardPR{
 			PR:   PR{Number: n.Number, Title: n.Title, Branch: n.HeadRefName, URL: n.URL},
 			Base: n.BaseRefName, Author: n.Author.login(), UpdatedAt: n.UpdatedAt, Draft: n.IsDraft,
 			AutoMerge: n.AutoMerge != nil, Checks: checks, FailedRunID: runID, Conflicts: conflictsOf(n.Mergeable),
 			Review: strings.ToLower(n.Review), CodeRabbit: codeRabbitState(n.Commits.items()),
+			ReviewRequested: requested, authorInfo: authorOf(n.Author.login(), n.Association, typ),
 		})
 	}
 	return b, nil
 }
 
 // MARK: Issues
+
+// Viewer is the login of the connection, the person the lists' sections are for (#2453).
+func (g *RealGitHub) Viewer(ctx context.Context) (string, error) {
+	var u user
+	if err := g.get(ctx, "user", true, &u); err != nil {
+		return "", err
+	}
+	return u.Login, nil
+}
 
 // OpenIssues are the open issues, newest created first, at most 100. With a query it is
 // GitHub search (#2686), which also finds issues older than the newest 100.
@@ -407,7 +447,7 @@ func (i issueJSON) listed() ListedIssue {
 		}
 	}
 	return ListedIssue{Issue: i.issue(), Comments: i.Comments, UpdatedAt: i.UpdatedAt, Milestone: i.Milestone.title(),
-		LabelColors: colors}
+		LabelColors: colors, authorInfo: authorOf(i.User.Login, i.Association, i.User.Type)}
 }
 
 func (i issueJSON) hasLabels(names []string) bool {
