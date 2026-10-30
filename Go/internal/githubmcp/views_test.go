@@ -318,7 +318,7 @@ func TestEachViewHasAToolThatFeedsItAndAPage(t *testing.T) {
 		}
 		html := r.Contents[0].Text
 		if r.Contents[0].MIMEType != viewMime || !strings.HasPrefix(html, "<!doctype html>") ||
-			strings.Contains(html, "/*common.css*/") || strings.Contains(html, "/*bridge.js*/") || !strings.Contains(html, "const bridge") {
+			strings.Contains(html, "/*common.css*/") || strings.Contains(html, "/*bridge.js*/") || strings.Contains(html, "/*lineage.js*/") || !strings.Contains(html, "const bridge") {
 			t.Errorf("%s is not a whole page", uri)
 		}
 		// One label pill for every page (#2956).

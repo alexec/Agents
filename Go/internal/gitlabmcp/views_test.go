@@ -176,7 +176,7 @@ func TestEachViewHasAToolThatFeedsItAndAPage(t *testing.T) {
 		}
 		html := r.Contents[0].Text
 		if r.Contents[0].MIMEType != viewMime || !strings.HasPrefix(html, "<!doctype html>") ||
-			strings.Contains(html, "/*common.css*/") || strings.Contains(html, "/*bridge.js*/") || !strings.Contains(html, "const bridge") {
+			strings.Contains(html, "/*common.css*/") || strings.Contains(html, "/*bridge.js*/") || strings.Contains(html, "/*lineage.js*/") || !strings.Contains(html, "const bridge") {
 			t.Errorf("%s is not a whole page", uri)
 		}
 		if uri != issuesURI && !strings.Contains(html, "const mrPage") {
@@ -207,7 +207,7 @@ func TestEachViewHasAToolThatFeedsItAndAPage(t *testing.T) {
 
 // The bridge and the styles are the github server's, word for word: one host draws both.
 func TestThePagesShareTheGitHubServersBridge(t *testing.T) {
-	for _, pair := range [][2]string{{"bridge.js", "bridge.js"}, {"common.css", "common.css"}, {"mrpage.css", "prpage.css"}} {
+	for _, pair := range [][2]string{{"bridge.js", "bridge.js"}, {"lineage.js", "lineage.js"}, {"common.css", "common.css"}, {"mrpage.css", "prpage.css"}} {
 		ours, err := pageFiles.ReadFile("pages/" + pair[0])
 		if err != nil {
 			t.Fatal(err)

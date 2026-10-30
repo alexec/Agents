@@ -43,6 +43,7 @@ button.pill.colored:hover { filter: brightness(0.9); }
 <script>
 /*bridge.js*/
 /*labels.js*/
+/*lineage.js*/
 (() => {
   let repo = "", activeLabels = [], query = "", searchTimer = 0;
   const labelColors = {};
@@ -163,7 +164,8 @@ button.pill.colored:hover { filter: brightness(0.9); }
     const description = el("div", { className: "issue-body" });
     if (body === "No description.") description.textContent = body;
     else renderMarkdown(description, details.bodyHTML || "", issue.url);
-    target.replaceChildren(el("span", { className: "muted", textContent: "Description" }), description, linked);
+    target.replaceChildren(el("span", { className: "muted", textContent: "Description" }), description, linked,
+      lineageSection(ui, issue.url));
   };
 
   const renderMarkdown = (target, html, base) => {
