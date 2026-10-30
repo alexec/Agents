@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="14" fill="#1c1d20">
+  <rect width="1440" height="900" fill="#f7f8f9"/>
+  <rect width="1440" height="54" fill="#ffffff"/><line x1="0" y1="54" x2="1440" y2="54" stroke="#dde1e6"/>
+  <text x="24" y="33" font-weight="700" font-size="16" fill="#1c1d20">acme control plane</text>
+  <g font-size="14" fill="#1c1d20">
+    <text x="216" y="33">Overview</text>
+    <text x="300" y="33">Agents</text><rect x="352" y="20" width="20" height="16" rx="8" fill="#b4232b"/><text x="358" y="32" fill="#fff" font-size="11">2</text>
+    <text x="392" y="33">Machines</text>
+    <text x="474" y="33">Workflows</text>
+    <text x="562" y="33">Reports</text>
+    <text x="636" y="33">Requests</text><rect x="700" y="20" width="20" height="16" rx="8" fill="#b4232b"/><text x="706" y="32" fill="#fff" font-size="11">3</text>
+    <text x="740" y="33">People</text>
+    <text x="804" y="33">Settings</text>
+  </g>
+  <rect x="294" y="51" width="76" height="3" fill="#1f5fc8"/>
+  <rect x="1040" y="13" width="320" height="28" rx="6" fill="#f0f2f4" stroke="#dde1e6"/>
+  <text x="1054" y="32" font-size="13" fill="#6b7078">Search or jump to…</text>
+  <rect x="1332" y="18" width="18" height="18" rx="4" fill="none" stroke="#dde1e6"/><text x="1338" y="31" font-size="11" fill="#6b7078">/</text>
+  <circle cx="1394" cy="27" r="14" fill="#1f5fc8"/><text x="1388" y="32" font-size="13" font-weight="700" fill="#ffffff">B</text>
+  <!-- The agents' list -->
+  <rect x="0" y="55" width="320" height="845" fill="#f0f1f3"/><line x1="320" y1="55" x2="320" y2="900" stroke="#dde1e6"/>
+  <rect x="16" y="72" width="288" height="32" rx="6" fill="#1f5fc8"/><text x="112" y="93" fill="#fff" font-weight="600">New Session</text>
+  <g font-size="12">
+    <rect x="16" y="114" width="140" height="28" rx="6" fill="#fff" stroke="#dde1e6"/><text x="26" y="132">Machine: Any ▾</text>
+    <rect x="164" y="114" width="140" height="28" rx="6" fill="#fff" stroke="#dde1e6"/><text x="174" y="132">State: Any ▾</text>
+  </g>
+  <rect x="16" y="150" width="288" height="28" rx="6" fill="#fff" stroke="#dde1e6"/><text x="28" y="169" font-size="12" fill="#6b7078">Search sessions</text>
+  <g font-size="13">
+    <text x="16" y="206" font-size="11" font-weight="600" fill="#6b7078" letter-spacing="0.6">NEEDS YOU</text>
+    <rect x="0" y="216" width="320" height="44" fill="#e7eaee"/><rect x="0" y="216" width="3" height="44" fill="#1f5fc8"/>
+    <text x="24" y="235" font-weight="700">Fix login redirect</text><text x="300" y="235" text-anchor="end" font-size="11" fill="#6b7078">2 m</text>
+    <text x="24" y="252" font-size="12" fill="#ba4a13">Asks which branch</text>
+    <text x="24" y="281">Lineage pane</text><text x="300" y="281" text-anchor="end" font-size="11" fill="#6b7078">9 m</text>
+    <text x="24" y="298" font-size="12" fill="#ba4a13">Wants an OK to push</text>
+    <text x="16" y="334" font-size="11" font-weight="600" fill="#6b7078" letter-spacing="0.6">API</text>
+    <text x="24" y="360">Flaky test in auth</text><text x="300" y="360" text-anchor="end" font-size="11" fill="#6b7078">8 m</text>
+    <text x="24" y="377" font-size="12" fill="#6b7078">Working · Claude · bea-mbp</text>
+    <text x="24" y="406">Rate limiter</text><text x="300" y="406" text-anchor="end" font-size="11" fill="#6b7078">1 d</text>
+    <text x="24" y="423" font-size="12" fill="#6b7078">Done · Codex · build-01</text>
+    <text x="16" y="458" font-size="11" font-weight="600" fill="#6b7078" letter-spacing="0.6">WEB</text>
+    <text x="24" y="484">Release notes</text><text x="300" y="484" text-anchor="end" font-size="11" fill="#6b7078">1 h</text>
+    <text x="24" y="501" font-size="12" fill="#6b7078">Working · Gemini · build-01</text>
+    <line x1="0" y1="800" x2="320" y2="800" stroke="#dde1e6"/>
+    <text x="24" y="826">Live Now</text><text x="24" y="852">Projects</text><text x="24" y="878">Archived</text>
+  </g>
+  <!-- The chat header: breadcrumb, title, actions -->
+  <rect x="321" y="55" width="1119" height="84" fill="#ffffff"/><line x1="321" y1="139" x2="1440" y2="139" stroke="#dde1e6"/>
+  <text x="352" y="84" font-size="12"><tspan fill="#1f5fc8">Agents</tspan><tspan fill="#6b7078">  ›  </tspan><tspan fill="#1f5fc8">api</tspan><tspan fill="#6b7078">  ›  Fix login redirect</tspan></text>
+  <text x="352" y="116" font-size="20" font-weight="700">Fix login redirect</text>
+  <text x="560" y="116" font-size="12" fill="#6b7078">Claude · bea-mbp · main · $0.92</text>
+  <rect x="1222" y="94" width="86" height="30" rx="6" fill="#fff" stroke="#dde1e6"/><text x="1244" y="114" font-size="13">Files</text>
+  <rect x="1316" y="94" width="100" height="30" rx="6" fill="#fff" stroke="#dde1e6"/><text x="1334" y="114" font-size="13">Session ▾</text>
+  <!-- The chat itself keeps Paper -->
+  <g font-size="15">
+    <rect x="860" y="170" width="520" height="64" rx="16" fill="#f0f2f4"/>
+    <text x="884" y="198">After sign-in the app sends people back to /home</text>
+    <text x="884" y="220">and not to the page they asked for. Fix it.</text>
+    <text x="400" y="276">I found it: the redirect drops the <tspan font-family="ui-monospace, Menlo, monospace" font-size="13">next</tspan> parameter in</text>
+    <text x="400" y="300">the callback. Two branches have a fix for it already.</text>
+    <rect x="400" y="326" width="720" height="210" rx="16" fill="#ffffff" stroke="#dde1e6"/>
+    <text x="428" y="362" font-weight="700" fill="#ba4a13">Which branch should I build on?</text>
+    <rect x="428" y="384" width="664" height="44" rx="10" fill="#f0f2f4"/><text x="448" y="412">fix/redirect-next (Bea, yesterday)</text>
+    <rect x="428" y="438" width="664" height="44" rx="10" fill="#f0f2f4"/><text x="448" y="466">main, a new branch</text>
+    <text x="428" y="516" font-size="13" fill="#6b7078">The chat, its cards and the prompt bar keep the Paper look.</text>
+  </g>
+  <rect x="380" y="800" width="1000" height="64" rx="16" fill="#fff" stroke="#dde1e6"/>
+  <text x="404" y="838" fill="#6b7078" font-size="15">Ask, or type / for commands</text>
+  <text x="24" y="20" fill="#6b7078" font-size="1"> </text>
+</svg>
