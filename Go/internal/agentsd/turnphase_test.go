@@ -123,9 +123,9 @@ func TestAHostTellsItsControlPlaneEachMoveOfATurn(t *testing.T) {
 }
 
 // #1916: an old record's stuck or partly_done (finish_turn's) reads as done, so it shows as
-// Complete, not Needs you.
+// Complete, not Needs you. #2981: so does an old blocked, through the x-fallback.
 func TestAnOldStuckOrPartlyDoneReadsAsDone(t *testing.T) {
-	for _, old := range []string{"stuck", "partly_done"} {
+	for _, old := range []string{"stuck", "partly_done", "blocked"} {
 		var a wire.Agent
 		b := []byte(`{"id":"A","runtimeID":"claude","cwd":"file:///w/","state":"finished","report":{"outcome":"` + old + `","message":"m","at":1}}`)
 		if err := json.Unmarshal(b, &a); err != nil {

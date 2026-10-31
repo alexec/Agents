@@ -51,13 +51,12 @@ struct WorkOutcomeTests {
     }
 
     /// #1916: an old record's stuck or partly_done (finish_turn's) reads as done.
-    /// #1915: an old wait recorded as blocked reads as waiting, never as done.
-    @Test("an old stuck or partly_done reads as done, and an old blocked as waiting")
+    /// #2981: so does an old wait recorded as blocked, as the wire's x-fallback reads it.
+    @Test("an old stuck, partly_done or blocked reads as done")
     func oldEndingsReadAsDone() throws {
-        for word in ["stuck", "partly_done"] {
+        for word in ["stuck", "partly_done", "blocked"] {
             #expect(try JSONDecoder().decode(WorkOutcome.self, from: Data("\"\(word)\"".utf8)) == .done)
         }
-        #expect(try JSONDecoder().decode(WorkOutcome.self, from: Data("\"blocked\"".utf8)) == .waiting)
         #expect(throws: DecodingError.self) { try JSONDecoder().decode(WorkOutcome.self, from: Data("\"later\"".utf8)) }
     }
 

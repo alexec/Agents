@@ -24880,12 +24880,7 @@
         "waiting"
       ],
       "x-fallback": "done",
-      "description": "How a turn ended (#1916): only a question needs the person. Old `blocked` reads as `waiting`; old `stuck` or `partly_done` reads as `done`.",
-      "x-legacy": {
-        "blocked": "waiting",
-        "stuck": "done",
-        "partly_done": "done"
-      }
+      "description": "How a turn ended (#1916): only a question needs the person. A value this build does not know, such as an old record's `blocked`, `stuck` or `partly_done`, reads as `done`."
     },
     "WorkReport": {
       "type": "object",

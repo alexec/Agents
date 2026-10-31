@@ -63,10 +63,11 @@ Added 2026-10-29 (`2026-10-29.md`, the first complete `GOOS=darwin -test` scan):
   `Remote/Sources/Link/ControlPlaneLink.swift` (the `control-client-key` comment, #1031):
   they delete a key that an older build kept where backups copied it. A secret clean-up,
   live; not migration code (added 2026-10-29).
-- A shim whose comment says the #58 cut-off keeps it (spec 051 or later, for example
-  "Kept while 056 is after the #58 cut-off", "before 069 (after the #58 cut-off)"): live
-  while #58's cut-off stands. Moving the cut-off is decision D2 in `2026-10-29.md`
-  (added 2026-10-29).
+- The #58 cut-off is v0.13.0 (Alex, 2026-10-30, #2981 D2: 1; it was spec 051). A shim
+  for a build older than v0.13.0 is dead: the shims that said "after the #58 cut-off
+  (051)" go in #3030 (the daemon's replies), #3031 (records on disk) and #3032 (the #111
+  grant). A shim for v0.13.0 or later is live. `WorkOutcome.x-legacy` (#2531) went in
+  #2981 (D1: 1).
 - `Go/wire/rename.go` `OldMethodName`, read in `Go/internal/agentsd/localpath.go` and
   `Go/internal/controlplane/rpc.go`: receivers accept `machine/*` and `machines/*` under
   their old `host/*` names, step 1 of the two-release rename that the open issue #2653
