@@ -1,4 +1,4 @@
-# The hand-back page for sign-ins (#1343) at AGENTS_SITE_DOMAIN (agentloops.dev). Only
+# The hand-back page for sign-ins (#1343) at AGENTS_SITE_DOMAIN (oauth.agentloops.dev). Only
 # /oauth/callback and its two files; every other address is 404. The page holds nothing, so it
 # keeps no log of its own, and the answer says: no referrer, no cache, no frames, no other
 # script. deploy/gcp/site.sh puts this file in deploy/site.d on the VM to turn it on.

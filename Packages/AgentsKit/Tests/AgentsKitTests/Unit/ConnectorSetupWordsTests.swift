@@ -60,7 +60,7 @@ struct ConnectorSetupWordsTests {
         #expect(r == .init(flowID: flow, state: "s1", code: "c1"))
         let denied = try #require(URL(string: "agents://oauth/callback?error=access_denied&state=s1"))
         #expect(DaemonAPI.ConnectionSignInCompleteRequest(flowID: flow, callback: denied)?.error == "access_denied")
-        for other in ["agents://oauth/callback?code=c1", "https://agentloops.dev/oauth/callback?code=c1&state=s1",
+        for other in ["agents://oauth/callback?code=c1", "https://oauth.agentloops.dev/oauth/callback?code=c1&state=s1",
                       "agents://other/callback?code=c1&state=s1"] {
             #expect(DaemonAPI.ConnectionSignInCompleteRequest(flowID: flow, callback: try #require(URL(string: other))) == nil)
         }

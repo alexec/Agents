@@ -16,7 +16,7 @@ it out:
 | `compose.public.yaml`, `Caddyfile.public` | One copy at a real domain, with a certificate from Let's Encrypt and no pin (#61). It pulls the release's image, `AGENTS_VERSION`; `--build` builds this checkout. |
 | `gcp/up.sh`, `gcp/down.sh` | The machine on Google Cloud (#1461): a VM, its firewall and address, and the Cloud KMS key, then `compose.public.yaml` on it, and the release's image pulled there (`--build` builds this checkout instead). `--dry-run` prints the commands only. |
 | `cloudflare/dns.sh` | The A records for both names at Cloudflare, with the token from the Keychain. `--names @` is the zone itself (agentloops.dev). |
-| `site/`, `gcp/site.sh` | The hand-back page for sign-ins at `https://agentloops.dev/oauth/callback` (#1343), served by the same Caddy. See below. |
+| `site/`, `gcp/site.sh` | The hand-back page for sign-ins at `https://oauth.agentloops.dev/oauth/callback` (#1343, moved off the apex by #3042), served by the same Caddy. See below. |
 | `compose.pebble.yaml`, `pebble/` | The same with Pebble, Let's Encrypt's test CA, standing in: no domain and no real CA. A local keeper stands in for Cloud KMS. |
 
 ## Bringing it up
@@ -104,7 +104,7 @@ The how-to is
 ### The hand-back page for sign-ins
 
 Linear's sign-in is the authorization code with PKCE, with no client secret (#1335, #1343). Linear
-sends the person back to one fixed address, `https://agentloops.dev/oauth/callback`, which the
+sends the person back to one fixed address, `https://oauth.agentloops.dev/oauth/callback`, which the
 Agents OAuth app on Linear names. That page is `site/www/oauth/`: static, it holds nothing and
 keeps nothing. It gives the code and the state back to the client that opened the browser:
 
@@ -118,12 +118,12 @@ someone else catches is of no use to them. A token never reaches a client or thi
 
 Caddy serves it at `AGENTS_SITE_DOMAIN` with `site/site.caddy`: only the page and its two files,
 no referrer, no cache, no frames, no other script. It is on only where `site.d/site.caddy` is.
-`deploy/gcp/site.sh` turns it on at agentloops.dev's VM: it copies `site/`, the Caddyfile and the
-compose file, sets `AGENTS_SITE_DOMAIN` and starts Caddy again. The control plane is not
+`deploy/gcp/site.sh` turns it on at the control plane's VM: it copies `site/`, the Caddyfile and
+the compose file, sets `AGENTS_SITE_DOMAIN` and starts Caddy again. The control plane is not
 touched. The name points at the VM first:
 
 ```sh
-deploy/cloudflare/dns.sh --names @ 34.169.154.90   # the VM's address
+deploy/cloudflare/dns.sh --names oauth 34.169.154.90   # the VM's address
 deploy/gcp/site.sh
 ```
 

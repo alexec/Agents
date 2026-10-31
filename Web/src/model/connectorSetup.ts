@@ -378,7 +378,7 @@ export function sheetStatus(s: ConnectionSignIn): string {
 }
 
 /** The origin of the hand-back page (deploy/site/www/oauth/callback.js). */
-export const oauthCallbackOrigin = "https://agentloops.dev";
+export const oauthCallbackOrigin = "https://oauth.agentloops.dev";
 
 /**
  * The hand-back page's message, as connections/sign-in/complete takes it. Undefined for each

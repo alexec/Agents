@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Our own site on the control plane's VM (#1343): the hand-back page for sign-ins at
-# https://agentloops.dev/oauth/callback (deploy/site). It copies deploy/site, Caddyfile.public and
-# compose.public.yaml to /opt/agents on the VM, turns the site on (deploy/site.d/site.caddy and
-# AGENTS_SITE_DOMAIN in deploy/.env), and starts Caddy again. The control plane is not built,
-# copied or restarted.
+# https://oauth.agentloops.dev/oauth/callback (deploy/site), not the apex, which is the
+# promotional site (#3042). It copies deploy/site, Caddyfile.public and compose.public.yaml to
+# /opt/agents on the VM, turns the site on (deploy/site.d/site.caddy and AGENTS_SITE_DOMAIN in
+# deploy/.env), and starts Caddy again. The control plane is not built, copied or restarted.
 #
-#   deploy/gcp/site.sh [--dry-run] [--site-domain agentloops.dev]
+#   deploy/gcp/site.sh [--dry-run] [--site-domain oauth.agentloops.dev]
 #
-# The name must point at the VM first: deploy/cloudflare/dns.sh --names @ IP. Caddy then gets
+# The name must point at the VM first: deploy/cloudflare/dns.sh --names oauth IP. Caddy then gets
 # its certificate from Let's Encrypt. --dry-run prints every command and runs none.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
@@ -15,7 +15,7 @@ root=$(cd "$here/../.." && pwd)
 # shellcheck source=deploy/gcp/common.sh
 . "$here/common.sh"
 
-site_domain=agentloops.dev
+site_domain=oauth.agentloops.dev
 while (($#)); do
 	case $1 in
 	--dry-run) dry_run=1; shift ;;
