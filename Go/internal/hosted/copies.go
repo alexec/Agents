@@ -433,6 +433,7 @@ func (s *Service) sweepIdleEvery(every time.Duration) {
 			s.sweepIdle()
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			s.sweepAccounts(ctx)
+			s.sweepStripeEvents(ctx)
 			cancel()
 		}
 	}
