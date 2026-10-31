@@ -54,7 +54,7 @@ func closingRefs(body string) []string {
 	return out
 }
 
-// RunRef is a failed run as listed, before its PR and jobs are looked up.
+// RunRef is a finished run as listed, before its PR and jobs are looked up.
 type RunRef struct {
 	ID        int
 	Attempt   int
@@ -69,8 +69,9 @@ type RunRef struct {
 // Job is a failed job of a run.
 type Job struct{ Name, URL string }
 
-// FailedRunData is a checks.failed event's data: the run's PR and its failed jobs.
-type FailedRunData struct {
+// RunData is a checks.failed or checks.passed event's data: the run's PR, and, for
+// checks.failed, its failed jobs.
+type RunData struct {
 	PR         PR
 	HeadSHA    string
 	Run        RunRef
@@ -79,17 +80,26 @@ type FailedRunData struct {
 	Trusted bool
 }
 
-func (d FailedRunData) json() map[string]any {
+func (d RunData) run() map[string]any {
+	return map[string]any{
+		"pr": d.PR.json(), "headSha": d.HeadSHA,
+		"run": map[string]any{"id": d.Run.ID, "attempt": d.Run.Attempt, "name": d.Run.Name, "url": d.Run.URL},
+	}
+}
+
+// json is checks.failed's payload: the run, and its failed jobs.
+func (d RunData) json() map[string]any {
 	jobs := make([]any, len(d.FailedJobs))
 	for i, j := range d.FailedJobs {
 		jobs[i] = map[string]any{"name": j.Name, "url": j.URL}
 	}
-	return map[string]any{
-		"pr": d.PR.json(), "headSha": d.HeadSHA,
-		"run":        map[string]any{"id": d.Run.ID, "attempt": d.Run.Attempt, "name": d.Run.Name, "url": d.Run.URL},
-		"failedJobs": jobs,
-	}
+	j := d.run()
+	j["failedJobs"] = jobs
+	return j
 }
+
+// passedJSON is checks.passed's payload: the run, with no failedJobs.
+func (d RunData) passedJSON() map[string]any { return d.run() }
 
 // OpenPR is an open pull request, drafts too, as pr.opened sees it (#833). Here and in the
 // PRs below, Trusted says whether the PR is the repo's own: its branch not in a fork, and its
@@ -190,8 +200,10 @@ func (a IssueActivity) data() map[string]any {
 type GitHub interface {
 	// FailedRuns are failed pull_request runs updated at or after since, in any order.
 	FailedRuns(ctx context.Context, repo, branch, since string) (runs []RunRef, truncated bool, err error)
-	// RunDetails is the run's PR and failed jobs, or nil when it belongs to no PR.
-	RunDetails(ctx context.Context, repo string, run RunRef) (*FailedRunData, error)
+	// PassedRuns are successful pull_request runs updated at or after since, in any order.
+	PassedRuns(ctx context.Context, repo, branch, since string) (runs []RunRef, truncated bool, err error)
+	// RunDetails is the run's PR and its failed jobs, or nil when it belongs to no PR.
+	RunDetails(ctx context.Context, repo string, run RunRef) (*RunData, error)
 	// DefaultRepo is the repo the server's folder pushes to, owner/name (#702).
 	DefaultRepo(ctx context.Context) (string, error)
 	// ClosedPRs are PRs merged, and PRs closed without merging, at or after since.
@@ -296,6 +308,8 @@ func isFailed(conclusion string) bool {
 	}
 	return false
 }
+
+func isSucceeded(conclusion string) bool { return strings.EqualFold(conclusion, "success") }
 
 // timeLayout is how the events draft carries a time: ISO 8601 in UTC with milliseconds, which
 // sorts as text in time order.

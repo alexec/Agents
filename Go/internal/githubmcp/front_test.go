@@ -84,10 +84,10 @@ func TestTheFrontAddsEventsToTheOfficialServer(t *testing.T) {
 	}
 
 	events := call(3, "events/list", map[string]any{})["result"].(map[string]any)["events"].([]any)
-	equal(t, len(events), 13, "events")
+	equal(t, len(events), 14, "events")
 	poll := call(4, "events/poll", map[string]any{"name": "pr.merged", "arguments": map[string]any{"repo": repo}, "cursor": nil})
 	equal(t, poll["result"].(map[string]any)["events"], []any{}, "first poll")
-	unknown := call(5, "events/poll", map[string]any{"name": "checks.passed", "arguments": map[string]any{}, "cursor": nil})
+	unknown := call(5, "events/poll", map[string]any{"name": "checks.unknown", "arguments": map[string]any{}, "cursor": nil})
 	equal(t, unknown["error"].(map[string]any)["code"], float64(-32011), "unknown event")
 	other := call(6, "events/nope", map[string]any{})
 	equal(t, other["error"].(map[string]any)["code"], float64(-32601), "unknown method")

@@ -21,7 +21,7 @@ import (
 
 // Instructions are the events' words, put before the official server's own.
 const Instructions = "This repo's pull requests, their CI, and its issues as events, polled as the person signed in to GitHub in Agents: " +
-	"checks.failed, pr.opened, pr.merged, pr.conflicted, pr.closed, issue.opened, issue.labelled, issue.commented, issue.closed, " +
+	"checks.failed, checks.passed, pr.opened, pr.merged, pr.conflicted, pr.closed, issue.opened, issue.labelled, issue.commented, issue.closed, " +
 	"and CodeRabbit's review.posted and review.comment. " +
 	"coderabbit_review, coderabbit_reply and coderabbit_resolve speak to CodeRabbit on a pull request, as the person. " +
 	"show_pull_requests, show_issues and show_pull_request show a page to the person. " +

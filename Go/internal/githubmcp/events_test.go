@@ -46,8 +46,9 @@ func (f *fakeGitHub) Yours(context.Context, string) (Yours, error) {
 }
 
 type fakeRun struct {
-	ref     RunRef
-	trusted bool
+	ref        RunRef
+	trusted    bool
+	conclusion string
 }
 
 type fakePR struct {
@@ -79,10 +80,18 @@ func (f *fakeGitHub) edit(number int, edit func(*fakePR)) {
 }
 
 func (f *fakeGitHub) addRun(id int, branch, at string, pr int, trusted bool) {
+	f.addRunWith(id, branch, at, pr, trusted, "failure")
+}
+
+func (f *fakeGitHub) addPassedRun(id int, branch, at string, pr int, trusted bool) {
+	f.addRunWith(id, branch, at, pr, trusted, "success")
+}
+
+func (f *fakeGitHub) addRunWith(id int, branch, at string, pr int, trusted bool, conclusion string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.runs = append(f.runs, fakeRun{RunRef{ID: id, Attempt: 1, Name: "CI", URL: fmt.Sprintf("https://github.com/%s/actions/runs/%d", repo, id),
-		HeadSHA: fmt.Sprintf("sha%d", id), Branch: branch, PRNumber: pr, UpdatedAt: at}, trusted})
+		HeadSHA: fmt.Sprintf("sha%d", id), Branch: branch, PRNumber: pr, UpdatedAt: at}, trusted, conclusion})
 }
 
 func (f *fakeGitHub) addActivity(a IssueActivity) {
@@ -99,6 +108,14 @@ func (f *fakeGitHub) DefaultRepo(context.Context) (string, error) {
 }
 
 func (f *fakeGitHub) FailedRuns(_ context.Context, _, branch, since string) ([]RunRef, bool, error) {
+	return f.runsWith(branch, since, "failure")
+}
+
+func (f *fakeGitHub) PassedRuns(_ context.Context, _, branch, since string) ([]RunRef, bool, error) {
+	return f.runsWith(branch, since, "success")
+}
+
+func (f *fakeGitHub) runsWith(branch, since, conclusion string) ([]RunRef, bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.err != nil {
@@ -106,14 +123,14 @@ func (f *fakeGitHub) FailedRuns(_ context.Context, _, branch, since string) ([]R
 	}
 	var out []RunRef
 	for _, r := range f.runs {
-		if (branch == "" || r.ref.Branch == branch) && !before(r.ref.UpdatedAt, since) {
+		if r.conclusion == conclusion && (branch == "" || r.ref.Branch == branch) && !before(r.ref.UpdatedAt, since) {
 			out = append(out, r.ref)
 		}
 	}
 	return out, false, nil
 }
 
-func (f *fakeGitHub) RunDetails(_ context.Context, _ string, run RunRef) (*FailedRunData, error) {
+func (f *fakeGitHub) RunDetails(_ context.Context, _ string, run RunRef) (*RunData, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	number := run.PRNumber
@@ -128,7 +145,7 @@ func (f *fakeGitHub) RunDetails(_ context.Context, _ string, run RunRef) (*Faile
 	if !ok {
 		return nil, nil
 	}
-	return &FailedRunData{PR: p.pr, HeadSHA: run.HeadSHA, Run: run,
+	return &RunData{PR: p.pr, HeadSHA: run.HeadSHA, Run: run,
 		FailedJobs: []Job{{Name: "test", URL: run.URL + "/job/1"}}, Trusted: p.trusted}, nil
 }
 
@@ -278,7 +295,7 @@ func TestEventsListGivesEveryEventPollOnlyWithTheirSchemas(t *testing.T) {
 		_, hasAnyone := props["anyone"]
 		equal(t, hasAnyone, !personal, name+" anyone")
 		_, hasMine := props["mine"]
-		equal(t, hasMine, name == "checks.failed" || name == "pr.conflicted", name+" mine")
+		equal(t, hasMine, name == "checks.failed" || name == "checks.passed" || name == "pr.conflicted", name+" mine")
 		if strings.HasPrefix(name, "issue.") {
 			_, hasIssue := props["issue"]
 			equal(t, hasIssue, name != "issue.opened", name+" issue")
@@ -287,7 +304,7 @@ func TestEventsListGivesEveryEventPollOnlyWithTheirSchemas(t *testing.T) {
 		}
 	}
 	sort.Strings(names)
-	equal(t, names, []string{"checks.failed", "issue.assigned", "issue.closed", "issue.commented", "issue.labelled", "issue.opened",
+	equal(t, names, []string{"checks.failed", "checks.passed", "issue.assigned", "issue.closed", "issue.commented", "issue.labelled", "issue.opened",
 		"pr.closed", "pr.conflicted", "pr.merged", "pr.opened", "review.comment", "review.posted", "review.requested"}, "names")
 }
 
@@ -326,6 +343,28 @@ func TestAFailedRunGivesOneChecksFailedAndASecondAttemptANewID(t *testing.T) {
 	h.fake.runs[0].ref.Attempt, h.fake.runs[0].ref.UpdatedAt = 2, h.at(1000)
 	h.fake.mu.Unlock()
 	equal(t, ids(h.poll("checks.failed", args, quiet["cursor"])), []string{"checks.failed:" + repo + ":9100:2"}, "attempt 2")
+}
+
+func TestAPassedRunGivesOneChecksPassedWithNoFailedJobsAndAFailedRunDoesNotLeakIn(t *testing.T) {
+	h := newHarness(t)
+	args := map[string]any{"repo": repo}
+	h.fake.addPR(405, "agents/queue-helpers-2", nil)
+	first := h.poll("checks.passed", args, nil)
+	h.fake.addRun(9105, "agents/queue-helpers-2", h.at(5), 0, true) // failed: must not raise checks.passed
+	h.fake.addPassedRun(9106, "agents/queue-helpers-2", h.at(5), 0, true)
+	raised := h.poll("checks.passed", args, first["cursor"])
+	equal(t, ids(raised), []string{"checks.passed:" + repo + ":9106:1"}, "ids")
+	e := eventsOf(raised)[0]
+	equal(t, e["name"], "checks.passed", "name")
+	equal(t, e["data"], map[string]any{
+		"pr": map[string]any{"number": float64(405), "title": "PR 405", "branch": "agents/queue-helpers-2",
+			"url": "https://github.com/" + repo + "/pull/405"},
+		"headSha": "sha9106",
+		"run":     map[string]any{"id": float64(9106), "attempt": float64(1), "name": "CI", "url": "https://github.com/" + repo + "/actions/runs/9106"},
+	}, "data")
+	// checks.failed still ignores the passed run.
+	firstFailed := h.poll("checks.failed", args, nil)
+	equal(t, ids(h.poll("checks.failed", args, firstFailed["cursor"])), []string{"checks.failed:" + repo + ":9105:1"}, "checks.failed ids")
 }
 
 func TestPRMergedAndClosed(t *testing.T) {
@@ -494,7 +533,7 @@ func TestBadArgumentsAreInvalidParamsAnUnknownEventIsItsOwnCode(t *testing.T) {
 	check(map[string]any{"name": "checks.failed", "arguments": map[string]any{"repo": "not a repo"}, "cursor": nil}, -32602,
 		"repo must look like owner/name")
 	check(map[string]any{"name": "checks.failed", "arguments": map[string]any{"repo": repo}, "cursor": "%%%"}, -32602, "")
-	check(map[string]any{"name": "checks.passed", "arguments": map[string]any{"repo": repo}, "cursor": nil}, -32011, "")
+	check(map[string]any{"name": "checks.unknown", "arguments": map[string]any{"repo": repo}, "cursor": nil}, -32011, "")
 }
 
 func TestPRConflictedRaisesAPROncePerConflictNewOnesOnly(t *testing.T) {

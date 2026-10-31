@@ -75,6 +75,13 @@ var events = append([]event{
 			"run":        object(map[string]any{"id": integer, "attempt": integer, "name": str, "url": str}),
 			"failedJobs": map[string]any{"type": "array", "items": object(map[string]any{"name": str, "url": str})},
 		})},
+	{name: "checks.passed", title: "Checks passed",
+		description: "A pull request's checks finished with a success: one event per run and attempt, so a lane waiting on CI going green wakes without polling." + ownPRs,
+		input:       schema{repoProperty, branchProperty("Only runs on this PR branch."), prProperty, anyoneProperty, mineProperty},
+		payload: object(map[string]any{
+			"pr": prSchema(nil), "headSha": str,
+			"run": object(map[string]any{"id": integer, "attempt": integer, "name": str, "url": str}),
+		})},
 	{name: "pr.opened", title: "Pull request opened",
 		description: "A pull request was opened, or a draft was marked ready for review: a PR open and not a draft now that was not at the last poll. Drafts never count. Reopened, it is raised again." + ownPRs,
 		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
@@ -582,38 +589,10 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 		return list, truncated, nil
 	}
 	if name == "checks.failed" {
-		runs, truncated, err := gh.FailedRuns(ctx, repo, a.branch, since)
-		if err != nil {
-			return nil, false, err
-		}
-		// A run that names another PR is skipped before its details are fetched; one that names
-		// none is checked against the PR its details find. The cursor still moves past both.
-		var list []candidate
-		for _, ref := range runs {
-			at := normalized(ref.UpdatedAt)
-			if at == "" {
-				continue
-			}
-			list = append(list, candidate{eventID: fmt.Sprintf("checks.failed:%s:%d:%d", repo, ref.ID, ref.Attempt), time: at,
-				data: func() (map[string]any, error) {
-					if (a.pr != 0 && ref.PRNumber != 0 && ref.PRNumber != a.pr) || (yours != nil && ref.PRNumber != 0 && !yours.owns(ref.PRNumber)) {
-						return nil, nil
-					}
-					details, err := gh.RunDetails(ctx, repo, ref)
-					if err != nil || details == nil {
-						return nil, err
-					}
-					if a.pr != 0 && details.PR.Number != a.pr {
-						return nil, nil
-					}
-					// mine: the owner's own PR, trusted or not; else the trust filter (#728).
-					if yours != nil && !yours.owns(details.PR.Number) || yours == nil && !a.anyone && !details.Trusted {
-						return nil, nil
-					}
-					return details.json(), nil
-				}})
-		}
-		return list, truncated, nil
+		return checkRunCandidates(ctx, gh, name, a, yours, since, gh.FailedRuns, RunData.json)
+	}
+	if name == "checks.passed" {
+		return checkRunCandidates(ctx, gh, name, a, yours, since, gh.PassedRuns, RunData.passedJSON)
 	}
 	merged, closed, truncated, err := gh.ClosedPRs(ctx, repo, since)
 	if err != nil {
@@ -642,6 +621,47 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 					return map[string]any{"pr": c.PR.json(), "closedAt": c.ClosedAt}, nil
 				}})
 		}
+	}
+	return list, truncated, nil
+}
+
+// checkRunCandidates is checks.failed's and checks.passed's candidates: listRuns finds the
+// finished runs, toJSON shapes each one's data (RunData.json keeps failedJobs, .passedJSON
+// drops it). A run that names another PR is skipped before its details are fetched; one that
+// names none is checked against the PR its details find. The cursor still moves past both.
+func checkRunCandidates(ctx context.Context, gh GitHub, name string, a args, yours *Yours, since string,
+	listRuns func(ctx context.Context, repo, branch, since string) ([]RunRef, bool, error),
+	toJSON func(RunData) map[string]any,
+) ([]candidate, bool, error) {
+	repo := a.repo
+	runs, truncated, err := listRuns(ctx, repo, a.branch, since)
+	if err != nil {
+		return nil, false, err
+	}
+	var list []candidate
+	for _, ref := range runs {
+		at := normalized(ref.UpdatedAt)
+		if at == "" {
+			continue
+		}
+		list = append(list, candidate{eventID: fmt.Sprintf("%s:%s:%d:%d", name, repo, ref.ID, ref.Attempt), time: at,
+			data: func() (map[string]any, error) {
+				if (a.pr != 0 && ref.PRNumber != 0 && ref.PRNumber != a.pr) || (yours != nil && ref.PRNumber != 0 && !yours.owns(ref.PRNumber)) {
+					return nil, nil
+				}
+				details, err := gh.RunDetails(ctx, repo, ref)
+				if err != nil || details == nil {
+					return nil, err
+				}
+				if a.pr != 0 && details.PR.Number != a.pr {
+					return nil, nil
+				}
+				// mine: the owner's own PR, trusted or not; else the trust filter (#728).
+				if yours != nil && !yours.owns(details.PR.Number) || yours == nil && !a.anyone && !details.Trusted {
+					return nil, nil
+				}
+				return toJSON(*details), nil
+			}})
 	}
 	return list, truncated, nil
 }
