@@ -494,9 +494,11 @@ button.link.reading:hover { text-decoration: underline; }
 .wait-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .wait-card-title { display: flex; align-items: center; gap: 7px; min-width: 0; }
 .wait-card-title { font-weight: 600; }
-/* The waiting mark's beacon (#2657), still, at the title's size, in the same colour. */
+/* The waiting mark's beacon (#2657), breathing as it does everywhere else, at the title's size,
+   in the same colour. `.waiting-beacon` sets the breath, `--well` undone so the title's size wins. */
 .wait-card-broadcast { color: var(--accent); display: inline-flex; }
 .wait-card-broadcast .beacon { width: 1.15em; height: 1.15em; }
+.wait-card-broadcast.waiting-beacon { width: auto; height: auto; }
 .wait-card-time { color: var(--paper-ink); opacity: .68; font-size: .9em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .wait-card-events { display: flex; flex-direction: column; gap: 8px; }
 .wait-card-event { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 5px; }
