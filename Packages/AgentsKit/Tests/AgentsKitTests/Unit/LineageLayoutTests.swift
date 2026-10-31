@@ -62,6 +62,17 @@ struct LineageLayoutTests {
         #expect(noPR.height == 16 + 52 + 40 + 16)
     }
 
+    @Test func aReleaseSitsInItsOwnTierBelowThePR() throws {
+        let release = Node(kind: "release", ref: "github:alexec/agents/release/v0.14.0")
+        let g = LineageLayout.graph(of: session, graph: .init(nodes: graph.nodes + [release], links: graph.links + [
+            .init(from: pr, to: release, rel: "part-of", source: "forge", at: at),
+        ]), costs: [:], title: title)
+        let at = { (n: Node) in g.node(n.ref)?.y }
+        try #require(at(pr) != nil && at(release) != nil)
+        #expect(at(release)! > at(pr)!)
+        #expect(g.node(release.ref)?.detail == "Release")
+    }
+
     @Test func aTierFollowsTheOrderOfTheBoxesAboveIt() {
         let other = Node(kind: "issue", ref: "github:alexec/agents#1")
         let otherPR = Node(kind: "pr", ref: "github:alexec/agents#2")

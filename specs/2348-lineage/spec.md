@@ -261,10 +261,25 @@ Slice 5 comments on a pull request when it merges, in `Go/internal/agentsd/linea
 ## Releases from tags (#3023)
 
 The graph stopped at "merged"; this adds a release node, so it reaches "got to people",
-and gives a milestone's and a release's cost the PRs that shipped in each. Part 1 (this):
-the host linker and the cost rollup, in `Go/internal/agentsd/lineagerelease.go`, no client.
-Part 2 (a later PR): Reports ▸ Value's release rows and the release node in the Lineage
-pane (#3019).
+and gives a milestone's and a release's cost the PRs that shipped in each. Part 1: the
+host linker and the cost rollup, in `Go/internal/agentsd/lineagerelease.go`, no client.
+Part 2 (this): Reports ▸ Value's release rows and the release node in the Lineage pane
+(#3019).
+
+- **Reports ▸ Value's release rows.** `reports/value`'s `releases` (`Go/internal/
+  controlplane/reports_value.go`) is a row per release, the most costly first, at most
+  100: its PRs (`part-of` it) and the issues those PRs fix, each once, the same shape as
+  a milestone row — total, waste, PRs merged/closed/reverted, failed CI rounds, and the
+  lead time from the first work on a part to its last PR merged (not the tag time: the
+  release's own node banks no cost, so there is nothing to time against but the parts
+  it has; a later node for the release itself, banked at the tag's commit time, could
+  give a truer "to the tag" lead time). Decided: reuse the existing lead-time shape
+  rather than add one. Alex can overrule.
+- **The release node in the Lineage pane and the graph (#3019).** A release reached by
+  a session's walk (a PR it worked on, part-of a release, is within two steps) shows as
+  a box named "<owner>/<repo> release <tag>", linking to the GitHub release page; its
+  tier is below the PR's, as the last step of the chain. Like a milestone, a release
+  banks no cost of its own, so the pane asks `lineage/cost` for neither.
 
 - **A release node.** Kind `release`, ref `github:<owner>/<repo>/release/<tag>` (GitLab:
   `gitlab:<group>/<project>/release/<tag>`), the tag with its `v`.
@@ -302,6 +317,8 @@ pane (#3019).
 
 ## Clients
 
-mac: Reports ▸ Value (#2351); Folder Settings ▸ Cost on pull requests (#2352).
-remote: tier mac+web for both.
-web: Reports ▸ Value (#2351); Cost on Pull Requests… in the folder's menu (#2352).
+mac: Reports ▸ Value (#2351), its release rows and the Lineage pane's release node
+(#3023); Folder Settings ▸ Cost on pull requests (#2352).
+remote: tier mac+web for all three.
+web: Reports ▸ Value (#2351), its release rows and the Lineage pane's release node
+(#3023); Cost on Pull Requests… in the folder's menu (#2352).

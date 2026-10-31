@@ -911,6 +911,41 @@
         "leadTimeSeconds": 3600
       }
     ],
+    "releases": [
+      {
+        "node": {
+          "kind": "release",
+          "ref": "github:alexec/agents/release/v0.14.0"
+        },
+        "total": {
+          "cost": {
+            "USD": 4.5
+          },
+          "inputTokens": 7,
+          "outputTokens": 7,
+          "limitTokens": 7,
+          "turns": 1.5,
+          "workingSeconds": 60,
+          "waitingSeconds": 30
+        },
+        "waste": {
+          "cost": {
+            "USD": 4.5
+          },
+          "inputTokens": 7,
+          "outputTokens": 7,
+          "limitTokens": 7,
+          "turns": 1.5,
+          "workingSeconds": 60,
+          "waitingSeconds": 30
+        },
+        "prsMerged": 1,
+        "prsClosed": 1,
+        "prsReverted": 0,
+        "failedChecks": 2,
+        "leadTimeSeconds": 3600
+      }
+    ],
     "limited": true
   },
   "UserSettings": {

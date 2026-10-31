@@ -38,6 +38,7 @@ func TestReportsValueAddsUpTheWork(t *testing.T) {
 	issue.PartOf = []string{"github:o/r/milestone/1"}
 	merged := node("pr", "github:o/r#2", 4)
 	merged.Fixes, merged.Outcome, merged.EndedAt, merged.FailedChecks = []string{"github:o/r#1"}, str("merged"), at(time.Hour), n64(2)
+	merged.PartOf = []string{"github:o/r/release/v1.0.0"}
 	closed := node("pr", "github:o/r#3", 3)
 	closed.Fixes, closed.Outcome, closed.EndedAt = []string{"github:o/r#1"}, str("closed"), at(2*time.Hour)
 	session := node("session", "session:a", 0.5)
@@ -84,6 +85,12 @@ func TestReportsValueAddsUpTheWork(t *testing.T) {
 	}
 	if len(org.Milestones) != 1 || org.Milestones[0].Total.Cost["USD"] != 10 || org.Milestones[0].PrsMerged != 1 {
 		t.Fatalf("%+v", org.Milestones)
+	}
+	// The release has only the merged PR and the issue it fixes: 4 (the PR) + 1 + 2 (the
+	// issue, from both machines), not the closed PR, which is not part-of it.
+	if len(org.Releases) != 1 || org.Releases[0].Node.Ref != "github:o/r/release/v1.0.0" ||
+		org.Releases[0].Total.Cost["USD"] != 7 || org.Releases[0].PrsMerged != 1 || org.Releases[0].PrsClosed != 0 {
+		t.Fatalf("%+v", org.Releases)
 	}
 	if all := value(admin, wire.ReportRangeThreeMonths, &wire.ReportScope{Kind: wire.ReportScopeKindOrg}); len(all.Issues) != 2 ||
 		all.Issues[0].Node.Ref != "github:o/r#9" {

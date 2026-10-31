@@ -119,6 +119,7 @@ export const box = { width: 180, height: 52, tierGap: 56, gap: 16, margin: 16, a
 
 const kindWords: Record<string, string> = {
   issue: "Issue", pr: "Pull request", session: "Session", "workflow-run": "Workflow run", workflow: "Workflow", milestone: "Milestone",
+  release: "Release",
 };
 
 /** "Issue", "Pull request": the first words of a box's second line. */
@@ -148,14 +149,16 @@ export function curve(g: LineageGraphLayout, edge: GraphEdge): Curve | undefined
   return { start, c1, c2, end, mid };
 }
 
-/** The graph's tier for a kind, so it reads top to bottom: milestone, issue, session, PR. */
+/** The graph's tier for a kind, so it reads top to bottom: milestone, issue, session, PR,
+ * release (#3023: what shipped it, last). */
 function tier(kind: string): number {
   switch (kind) {
     case "milestone": case "workflow": return 0;
     case "issue": case "workflow-run": return 1;
     case "session": return 2;
     case "pr": return 3;
-    default: return 4;
+    case "release": return 4;
+    default: return 5;
   }
 }
 

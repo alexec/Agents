@@ -129,8 +129,8 @@ struct ReportsPane: View {
         }
     }
 
-    /// Value (#2351): cost per merged pull request, waste and lead time, then each issue and
-    /// milestone, the most costly first.
+    /// Value (#2351): cost per merged pull request, waste and lead time, then each issue,
+    /// milestone and release (#3023), the most costly first.
     @ViewBuilder private func valuePage(_ value: DaemonAPI.ReportValue) -> some View {
         Section {
             if ReportValueWords.isEmpty(value) {
@@ -156,6 +156,18 @@ struct ReportsPane: View {
                 ForEach(value.milestones) { ReportValueRowView(row: $0) }
             } header: {
                 Text("Milestones")
+            } footer: {
+                if value.releases.isEmpty, value.limited == true {
+                    Text("The 100 most costly of each.").appText(.fine).foregroundStyle(.secondary)
+                }
+            }
+            .paperListRow()
+        }
+        if !value.releases.isEmpty {
+            Section {
+                ForEach(value.releases) { ReportValueRowView(row: $0) }
+            } header: {
+                Text("Releases")
             } footer: {
                 if value.limited == true { Text("The 100 most costly of each.").appText(.fine).foregroundStyle(.secondary) }
             }

@@ -72,7 +72,8 @@ public extension DaemonAPI {
     /// `reports/value`'s answer. `total` is the work on issues and PRs, `waste` the PRs closed
     /// without a merge and merged reverts, `unlinked` the turns with no issue or PR.
     /// `leadTimeSeconds` is the median of the issues'. The lists are the most costly first, at
-    /// most 100 each.
+    /// most 100 each. `releases` (#3023) is a row per release: the PRs part-of it and the
+    /// issues those PRs fix, the same way as a milestone.
     struct ReportValue: Codable, Sendable, Hashable {
         public var range: ReportRange
         public var scope: ReportScope
@@ -88,12 +89,14 @@ public extension DaemonAPI {
         public var leadTimeSeconds: Double?
         public var issues: [ReportValueRow]
         public var milestones: [ReportValueRow]
+        public var releases: [ReportValueRow]
         public var limited: Bool?
 
         public init(range: ReportRange, scope: ReportScope, total: LineageCost = .init(), waste: LineageCost = .init(),
                     unlinked: LineageCost = .init(), perMergedPR: [String: Decimal] = [:], prsMerged: Int = 0,
                     prsClosed: Int = 0, prsReverted: Int = 0, failedChecks: Int = 0, leadTimeSeconds: Double? = nil,
-                    issues: [ReportValueRow] = [], milestones: [ReportValueRow] = [], limited: Bool? = nil) {
+                    issues: [ReportValueRow] = [], milestones: [ReportValueRow] = [], releases: [ReportValueRow] = [],
+                    limited: Bool? = nil) {
             self.range = range
             self.scope = scope
             self.total = total
@@ -107,6 +110,7 @@ public extension DaemonAPI {
             self.leadTimeSeconds = leadTimeSeconds
             self.issues = issues
             self.milestones = milestones
+            self.releases = releases
             self.limited = limited
         }
     }
