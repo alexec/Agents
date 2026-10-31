@@ -14,6 +14,8 @@ public struct WaitEventLine: Identifiable, Hashable, Sendable {
     /// What the events mean, joined with "or".
     public var words: String
     public let arguments: [String]
+    /// The PR or issue its arguments name, as a link (#3077). `nil` when they don't.
+    public let url: URL?
 
     public static func lines(for wait: EventWait, names: (UUID) -> String?) -> [WaitEventLine] {
         var groups: [Group] = []
@@ -44,7 +46,7 @@ public struct WaitEventLine: Identifiable, Hashable, Sendable {
             }
             let id = source + "\u{0}" + arguments.joined(separator: "\u{0}")
             let index = groups.firstIndex { $0.id == id } ?? {
-                groups.append(Group(id: id, source: source, arguments: arguments))
+                groups.append(Group(id: id, source: source, arguments: arguments, url: server?.trigger.url))
                 return groups.count - 1
             }()
             if !groups[index].events.contains(pattern.name) { groups[index].events.append(pattern.name) }
@@ -64,7 +66,7 @@ public struct WaitEventLine: Identifiable, Hashable, Sendable {
                 }
             }
             return WaitEventLine(id: group.id, source: group.source, events: group.events,
-                                 words: phrases.joined(separator: " or "), arguments: group.arguments)
+                                 words: phrases.joined(separator: " or "), arguments: group.arguments, url: group.url)
         }
     }
 
@@ -72,6 +74,7 @@ public struct WaitEventLine: Identifiable, Hashable, Sendable {
         let id: String
         let source: String
         let arguments: [String]
+        let url: URL?
         var events: [String] = []
         var finishers: [String] = []
         var phrases: [Phrase] = []

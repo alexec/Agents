@@ -1,7 +1,7 @@
 // The lines a session's row has under its report, in the window's and the Remote's words (#251):
 // what it holds or waits for (LeaseStatus, 036), what events it waits on (WaitStatus, 042), who
 // started it (028), and its worktree's help (WorktreeBadge). Worked out here, so the row only draws them.
-import type { Agent, AgentWorktree, EventPattern, EventWait, LeaseSnapshot, ResourceKind } from "../protocol/generated";
+import type { Agent, AgentWorktree, EventPattern, EventWait, LeaseSnapshot, MCPEventTrigger, ResourceKind } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import { eventMeaning } from "./workflows";
 
@@ -199,6 +199,29 @@ export interface EventWaitSummaryLine {
   /** What the events mean, joined with "or". */
   words: string;
   arguments: string[];
+  /** MCPEventTrigger.url: the PR or issue its arguments name, as a link (#3077). */
+  url: string | undefined;
+}
+
+/**
+ * MCPEventTrigger.url (#3077): built from `repo` or `project` and `pr` or `issue`,
+ * assuming github.com or gitlab.com — the trigger carries no host, so a GitHub
+ * Enterprise or a self-managed GitLab's own base URL cannot be told from this alone.
+ */
+export function triggerURL(trigger: MCPEventTrigger): string | undefined {
+  const args = trigger.arguments;
+  const repo = typeof args.repo === "string" ? args.repo : undefined;
+  const project = typeof args.project === "string" ? args.project : undefined;
+  const pr = typeof args.pr === "number" ? args.pr : undefined;
+  const issue = typeof args.issue === "number" ? args.issue : undefined;
+  if (repo !== undefined) {
+    if (pr !== undefined) return `https://github.com/${repo}/pull/${pr}`;
+    if (issue !== undefined) return `https://github.com/${repo}/issues/${issue}`;
+  } else if (project !== undefined && project.includes("/")) {
+    if (pr !== undefined) return `https://gitlab.com/${project}/-/merge_requests/${pr}`;
+    if (issue !== undefined) return `https://gitlab.com/${project}/-/issues/${issue}`;
+  }
+  return undefined;
 }
 
 /**
@@ -207,7 +230,7 @@ export interface EventWaitSummaryLine {
  */
 export function eventWaitSummaryLines(wait: EventWait, title: (id: string) => string | undefined): EventWaitSummaryLine[] {
   type Phrase = { finishers: true } | { words: string };
-  const groups: { id: string; source: string; arguments: string[]; events: string[]; finishers: string[]; phrases: Phrase[] }[] = [];
+  const groups: { id: string; source: string; arguments: string[]; url: string | undefined; events: string[]; finishers: string[]; phrases: Phrase[] }[] = [];
   for (const pattern of wait.patterns) {
     const server = wait.serverEvents?.find((entry) => entry.trigger.event === pattern.name);
     const servers = server ? (server.servers.length > 0 ? server.servers : server.trigger.servers ?? []) : [];
@@ -228,7 +251,7 @@ export function eventWaitSummaryLines(wait: EventWait, title: (id: string) => st
     const id = `${source}\u0000${args.join("\u0000")}`;
     let group = groups.find((candidate) => candidate.id === id);
     if (!group) {
-      group = { id, source, arguments: args, events: [], finishers: [], phrases: [] };
+      group = { id, source, arguments: args, url: server ? triggerURL(server.trigger) : undefined, events: [], finishers: [], phrases: [] };
       groups.push(group);
     }
     if (!group.events.includes(pattern.name)) group.events.push(pattern.name);
@@ -247,6 +270,7 @@ export function eventWaitSummaryLines(wait: EventWait, title: (id: string) => st
     words: group.phrases.map((phrase, index) =>
       "finishers" in phrase ? finishing(group.finishers) : index === 0 ? phrase.words : lowered(phrase.words)).join(" or "),
     arguments: group.arguments,
+    url: group.url,
   }));
 }
 

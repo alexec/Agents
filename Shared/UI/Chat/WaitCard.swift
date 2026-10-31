@@ -81,18 +81,11 @@ struct WaitCard: View {
                     .appText(.fine).foregroundStyle(.secondary).monospacedDigit()
             }
             ForEach(lines) { line in
-                HStack(spacing: 5) {
-                    Text(line.source).foregroundStyle(.secondary)
-                    Text("·").foregroundStyle(.tertiary)
-                    Text(line.words).fontWeight(.medium)
-                    if !line.arguments.isEmpty {
-                        Text("(\(line.arguments.joined(separator: ", ")))").foregroundStyle(.secondary)
-                    }
-                }
-                .appText(.fine)
-                .fixedSize(horizontal: false, vertical: true)
-                // The events' own names, for whoever writes a wait or a workflow.
-                .help(line.events.joined(separator: ", "))
+                eventLine(line)
+                    .appText(.fine)
+                    .fixedSize(horizontal: false, vertical: true)
+                    // The events' own names, for whoever writes a wait or a workflow.
+                    .help(line.events.joined(separator: ", "))
             }
             if let deadline = wait.deadline {
                 ProgressView(value: min(1, max(0, now.timeIntervalSince(wait.since) / deadline.timeIntervalSince(wait.since))))
@@ -101,6 +94,26 @@ struct WaitCard: View {
             }
         }
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// One of the card's event lines (#2747): "GitHub · PR merged (repo alexec/Agents)",
+    /// the parenthesised arguments a link to the PR or issue they name, when they name
+    /// one (#3077).
+    @ViewBuilder
+    private func eventLine(_ line: WaitEventLine) -> some View {
+        HStack(spacing: 5) {
+            Text(line.source).foregroundStyle(.secondary)
+            Text("·").foregroundStyle(.tertiary)
+            Text(line.words).fontWeight(.medium)
+            if !line.arguments.isEmpty {
+                let words = "(\(line.arguments.joined(separator: ", ")))"
+                if let url = line.url {
+                    Link(destination: url) { Text(words).underline() }
+                } else {
+                    Text(words).foregroundStyle(.secondary)
+                }
+            }
+        }
     }
 }
 

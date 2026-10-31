@@ -87,6 +87,23 @@ public struct MCPEventTrigger: Codable, Hashable, Sendable {
         self.init(event: event, servers: servers, arguments: arguments)
     }
 
+    /// What this names, as a link (#3077): built from `repo` or `project` and `pr` or
+    /// `issue`, assuming github.com or gitlab.com — the trigger carries no host, so a
+    /// GitHub Enterprise or a self-managed GitLab's own base URL cannot be told from
+    /// this alone. `nil` when the arguments do not name one.
+    public var url: URL? {
+        if let repo = arguments["repo"]?.stringValue {
+            if let pr = arguments["pr"]?.intValue { return URL(string: "https://github.com/\(repo)/pull/\(pr)") }
+            if let issue = arguments["issue"]?.intValue { return URL(string: "https://github.com/\(repo)/issues/\(issue)") }
+        } else if let project = arguments["project"]?.stringValue, project.contains("/") {
+            if let pr = arguments["pr"]?.intValue {
+                return URL(string: "https://gitlab.com/\(project)/-/merge_requests/\(pr)")
+            }
+            if let issue = arguments["issue"]?.intValue { return URL(string: "https://gitlab.com/\(project)/-/issues/\(issue)") }
+        }
+        return nil
+    }
+
     /// "When ci reports checks.failed (repo alexec/Agents)".
     public var summary: String {
         let who = servers.map { $0.joined(separator: " or ") } ?? "a server here"

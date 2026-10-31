@@ -863,7 +863,9 @@ function WaitCard({ agent, title, disabled, continueNow, stop }: { agent: Agent;
             {eventWaitSummaryLines(wait, title).map((line) => <p class="wait-card-event" key={line.id} title={line.events.join(", ")}>
               <span class="wait-card-source">{line.source}</span><span class="wait-card-separator">·</span>
               <span class="wait-card-kind">{line.words}</span>
-              {line.arguments.length > 0 && <span class="wait-card-filters">({line.arguments.join(", ")})</span>}
+              {line.arguments.length > 0 && (line.url
+                ? <a class="wait-card-filters" href={line.url} target="_blank" rel="noopener noreferrer">({line.arguments.join(", ")})</a>
+                : <span class="wait-card-filters">({line.arguments.join(", ")})</span>)}
             </p>)}
           </div>
           {percent !== undefined && <div class="wait-card-progress" role="progressbar" aria-label="Event wait time"

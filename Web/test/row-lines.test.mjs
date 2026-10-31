@@ -90,9 +90,27 @@ test("the event wait card groups events with the same source and filters", () =>
     { trigger: { event: "pr.closed", servers: ["github"], arguments: { pr: 456 } }, servers: ["github"] },
   ] };
   assert.deepEqual(lines.eventWaitSummaryLines(wait, title), [
-    { id: "GitHub\u0000pr 123", source: "GitHub", events: ["checks.failed", "pr.merged"], words: "Checks failed or PR merged", arguments: ["pr 123"] },
-    { id: "GitHub\u0000pr 456", source: "GitHub", events: ["pr.closed"], words: "PR closed", arguments: ["pr 456"] },
+    { id: "GitHub\u0000pr 123", source: "GitHub", events: ["checks.failed", "pr.merged"], words: "Checks failed or PR merged", arguments: ["pr 123"], url: undefined },
+    { id: "GitHub\u0000pr 456", source: "GitHub", events: ["pr.closed"], words: "PR closed", arguments: ["pr 456"], url: undefined },
   ]);
+});
+
+test("the event wait card links to the PR or issue its arguments name (#3077)", () => {
+  const wait = { id: "w", from: 0, since: 0, patterns: [
+    { name: "pr.merged", filters: {} },
+    { name: "checks.failed", filters: {} },
+    { name: "issue.assigned", filters: {} },
+  ], serverEvents: [
+    { trigger: { event: "pr.merged", servers: ["github"], arguments: { repo: "alexec/Agents", pr: 123 } }, servers: ["github"] },
+    { trigger: { event: "checks.failed", servers: ["github"], arguments: { repo: "alexec/Agents", pr: 123 } }, servers: ["github"] },
+    { trigger: { event: "issue.assigned", servers: ["lab"], arguments: { project: "group/sub", issue: 9 } }, servers: ["lab"] },
+  ] };
+  assert.deepEqual(lines.eventWaitSummaryLines(wait, title).map((line) => [line.source, line.url]), [
+    ["GitHub", "https://github.com/alexec/Agents/pull/123"],
+    ["Lab", "https://gitlab.com/group/sub/-/issues/9"],
+  ]);
+  assert.equal(lines.triggerURL({ event: "checks.failed", arguments: { repo: "alexec/Agents" } }), undefined);
+  assert.equal(lines.triggerURL({ event: "pr.merged", arguments: { project: "42", pr: 7 } }), undefined);
 });
 
 test("the event wait card names a session by its title and an event by its meaning (#2747)", () => {

@@ -130,6 +130,28 @@ struct WaitStatusTests {
         #expect(lines[3].events == ["checks.failed", "pr.merged"]) // index-ok: required four above
     }
 
+    /// The card's event line links to the PR its arguments name (#3077), from the group's
+    /// own server event rather than guessed from its words.
+    @Test func theWaitCardLinksToWhatItsArgumentsName() throws {
+        let wait = EventWait(patterns: [EventPattern("pr.merged"), EventPattern("checks.failed")], from: 0, since: since,
+                             serverEvents: [
+            WaitServerEvent(trigger: MCPEventTrigger(event: "pr.merged",
+                                                      arguments: ["repo": .string("alexec/Agents"), "pr": .int(123)]), servers: ["github"]),
+            WaitServerEvent(trigger: MCPEventTrigger(event: "checks.failed",
+                                                      arguments: ["repo": .string("alexec/Agents"), "pr": .int(123)]), servers: ["github"]),
+        ])
+        let lines = WaitEventLine.lines(for: wait, names: { _ in nil })
+        try #require(lines.count == 1)
+        #expect(lines[0].url == URL(string: "https://github.com/alexec/Agents/pull/123"))
+    }
+
+    @Test func theWaitCardHasNoLinkWithoutAPROrAnIssue() throws {
+        let wait = EventWait(patterns: [EventPattern("mac.wake")], from: 0, since: since)
+        let lines = WaitEventLine.lines(for: wait, names: { _ in nil })
+        try #require(lines.count == 1)
+        #expect(lines[0].url == nil)
+    }
+
     @Test func aSessionTheWindowDoesNotKnowIsItsID() {
         let gone = UUID()
         let wait = EventWait(patterns: [EventPattern("agent.finished", filters: ["agent": DetailFilter(gone.uuidString)])],
