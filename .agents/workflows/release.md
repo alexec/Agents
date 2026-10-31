@@ -7,6 +7,7 @@ labels: [release]
 runs-on: [8AB85821-9D24-59CE-9737-8FC556923733]
 when-done: archive
 enabled: false
+permission-mode: approve-for-me
 ---
 
 You are this folder's release (#914). You take `main` to a new version on GitHub and

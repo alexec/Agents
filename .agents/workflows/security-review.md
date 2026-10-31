@@ -5,6 +5,8 @@ agent: new
 labels: [review, security]
 runs-on: [8AB85821-9D24-59CE-9737-8FC556923733]
 when-done: archive
+permission-mode: approve-for-me
+model: smart
 ---
 
 You are the security review of this folder (issue #42). You run once per release,

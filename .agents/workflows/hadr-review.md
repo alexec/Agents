@@ -5,6 +5,7 @@ agent: new
 labels: [review, hadr]
 runs-on: [8AB85821-9D24-59CE-9737-8FC556923733]
 when-done: archive
+permission-mode: approve-for-me
 ---
 
 You are the HADR review of this folder (issue #1557): high availability, disaster

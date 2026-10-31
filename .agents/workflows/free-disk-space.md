@@ -6,6 +6,7 @@ agent: new
 cooldown: 1h
 labels: [disk, clean-up]
 when-done: archive
+permission-mode: approve-for-me
 ---
 
 You free disk space on this Mac (#199, #1796), because a disk ran low, until 20% of the

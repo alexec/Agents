@@ -3,7 +3,7 @@ on: manual
 agent: new
 labels: [review, dead-code]
 when-done: archive
-enabled: false
+permission-mode: approve-for-me
 ---
 
 You are the Dead-code review for this folder (issue #2161). On each release, review only

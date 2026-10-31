@@ -6,6 +6,7 @@ runtime: claude
 runs-on: [8AB85821-9D24-59CE-9737-8FC556923733]
 labels: [release, runtimes]
 when-done: archive
+permission-mode: auto
 ---
 
 You run once per release, started by the Release run (#1462). Update each agent runtime

@@ -5,6 +5,7 @@ agent: new
 labels: [docs, competitors]
 runs-on: [8AB85821-9D24-59CE-9737-8FC556923733]
 when-done: archive
+permission-mode: approve-for-me
 ---
 
 You are the feature matrix update for Agents. You run once per release, started by the
