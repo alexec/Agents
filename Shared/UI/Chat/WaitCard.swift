@@ -2,22 +2,23 @@ import AgentsKitCore
 import SwiftUI
 
 /// What the open agent is waiting for (042), as a card at the end of the chat (#1995):
-/// "◷ Waiting for “Fix login” to finish · since 14:02 · until 15:00", with **Stop Waiting**.
-/// It was a capsule over the prompt, with a line saying that sending cancels the wait; a
-/// prompt ends a wait as it does everywhere else, so that line went.
+/// "◷ Waiting for “Fix login” to finish · since 14:02 · until 15:00", with **Continue**
+/// and **Cancel** (#3052). It was a capsule over the prompt, with a line saying that
+/// sending cancels the wait; a prompt ends a wait as it does everywhere else, so that
+/// line went. Continue sends that prompt itself (`EventWait.carryOnPrompt`), carrying
+/// the agent on now without the event; Cancel ends the wait with nothing to start it
+/// again.
 ///
 /// The question cards' shape, under them, since an agent waiting on an event is very like
 /// one waiting for an answer. Not tinted: nothing has gone wrong, and the chat is already
-/// under Waiting. One view for both apps; the web page's is `WaitCard` in `Chat.tsx`. The
-/// Mac and the Remote open Events, Waiting now at its top, from it (#2083); the Remote not
-/// from a chat in a scene of its own.
+/// under Waiting. One view for both apps; the web page's is `WaitCard` in `Chat.tsx`.
 struct WaitCard: View {
     let status: WaitStatus
     let eventWait: EventWait?
     let isLineWait: Bool
     /// `AgentsModel.waitEventLines`: its events in words, sessions by their titles (#2747).
     var lines: [WaitEventLine] = []
-    var open: (() -> Void)?
+    let continueNow: () async -> Void
     let stop: () async -> Void
     var isDisabled = false
 
@@ -36,12 +37,18 @@ struct WaitCard: View {
             }
             HStack(spacing: 10) {
                 Spacer()
-                if let open {
-                    Button("Show in Events", action: open)
-                        .buttonStyle(.paper)
-                }
                 if status.cancellable {
-                    Button("Stop Waiting") {
+                    Button("Continue") {
+                        busy = true
+                        Task {
+                            await continueNow()
+                            busy = false
+                        }
+                    }
+                    .buttonStyle(.paper)
+                    .help("Carry on now, without waiting for the event.")
+                    .disabled(busy || isDisabled)
+                    Button("Cancel") {
                         busy = true
                         Task {
                             await stop()
@@ -49,7 +56,7 @@ struct WaitCard: View {
                         }
                     }
                     .buttonStyle(.paper)
-                    .help("Stop waiting. Nothing will start it again for this wait.")
+                    .help("Cancel this wait. Nothing will start it again for this wait.")
                     .disabled(busy || isDisabled)
                 }
             }

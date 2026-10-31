@@ -87,7 +87,6 @@ struct EventsView: View {
                         if !model.work.waitingAgents.isEmpty {
                             WaitingNow(waiting: model.work.waitingAgents)
                                 .padding(.top, 20)
-                                .id(Self.waitingNow)
                         }
                         filters
                             .padding(.top, 20)
@@ -169,7 +168,6 @@ struct EventsView: View {
 
         var id: Self { self }
     }
-    private static let waitingNow = "waiting-now"
 
     private var emptyWords: String {
         scope == nil && groups.isEmpty
@@ -241,8 +239,6 @@ struct EventsView: View {
         guard let focus = model.eventsFocus else { return }
         model.eventsFocus = nil
         switch focus {
-        case .waitingNow:
-            proxy.scrollTo(Self.waitingNow, anchor: .top)
         case .event(let position):
             scope = nil
             groups = []

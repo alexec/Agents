@@ -1730,6 +1730,9 @@ final class RemoteModel {
     /// End a block by hand (039), as the person. See the Mac's `carryOn`.
     func carryOn(_ agentID: UUID) async { _ = await send(Block.carryOnPrompt, to: agentID) }
 
+    /// Continue, on an event wait (#3052). See the Mac's `continueWaiting`.
+    func continueWaiting(of agentID: UUID) async { _ = await send(EventWait.carryOnPrompt, to: agentID) }
+
     /// What a guarded file was and is (#502), for the person deciding.
     func readGuardedChange(_ change: GuardedChange, for key: FolderKey) async -> GuardedChangeReading? {
         let request = DaemonAPI.GuardedChangeRequest(folder: key.folder, path: change.path)

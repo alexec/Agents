@@ -83,6 +83,11 @@ public struct EventWait: Codable, Hashable, Sendable {
             serverEvents?.first { $0.trigger.event == pattern.name }?.label ?? pattern.label
         }
     }
+
+    /// What Continue sends, as the person: an ordinary prompt, which ends a wait as one
+    /// always does (`EventWaitEnding.Canceller.prompt`), carrying the agent on without
+    /// the event (#3052).
+    public static let carryOnPrompt = "I've stopped waiting for the event. Carry on."
 }
 
 /// One of a wait's servers' events (#577): the subscription it makes, as a trigger
