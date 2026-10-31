@@ -177,6 +177,37 @@ func TestIssueActivityLeavesPullRequestsOutAndJudgesWhoDidIt(t *testing.T) {
 	equal(t, comments[0].Issue.Title, "An issue", "the comment's issue")
 }
 
+func TestPRLabelActivityLeavesIssuesOutAndJudgesWhoDidIt(t *testing.T) {
+	api := newFakeAPI(t, map[string]string{
+		"repos/" + repo + "/issues/events": `[
+			{"id": 3, "event": "unlabeled", "actor": {"login": "alexec"}, "label": {"name": "needs-approval"}, "created_at": "2026-10-16T10:03:00Z",
+			 "issue": {"number": 61, "title": "A UI change", "html_url": "p61", "pull_request": {"url": "x"}}},
+			{"id": 2, "event": "labeled", "actor": {"login": "renovate[bot]", "type": "Bot"}, "label": {"name": "hold:v0.13.1"}, "created_at": "2026-10-16T10:02:00Z",
+			 "issue": {"number": 62, "pull_request": {"url": "x"}}},
+			{"id": 1, "event": "labeled", "actor": {"login": "alexec"}, "label": {"name": "needs-approval"}, "created_at": "2026-10-16T10:01:00Z",
+			 "issue": {"number": 60, "title": "A UI change", "html_url": "p60", "pull_request": {"url": "x"}}},
+			{"id": 4, "event": "labeled", "actor": {"login": "alexec"}, "label": {"name": "bug"}, "created_at": "2026-10-16T10:01:00Z",
+			 "issue": {"number": 10, "title": "An issue"}},
+			{"id": 0, "event": "labeled", "created_at": "2026-10-16T09:00:00Z", "issue": {"number": 1, "pull_request": {"url": "x"}}}]`,
+	})
+	g := api.github()
+	since := "2026-10-16T10:00:00.000Z"
+	labelled, _, err := g.PRLabelActivity(context.Background(), repo, PRLabelled, since)
+	if err != nil {
+		t.Fatal(err)
+	}
+	equal(t, len(labelled), 2, "an issue's label and one before since are left out")
+	equal(t, labelled[0].Trusted, false, "a bot")
+	equal(t, labelled[1].Trusted, true, "a person who can label")
+	equal(t, labelled[1].PR, PR{Number: 60, Title: "A UI change", URL: "p60"}, "pr")
+	unlabelled, _, err := g.PRLabelActivity(context.Background(), repo, PRUnlabelled, since)
+	if err != nil {
+		t.Fatal(err)
+	}
+	equal(t, len(unlabelled), 1, "unlabelled")
+	equal(t, unlabelled[0].Label, "needs-approval", "label")
+}
+
 func TestAnUnchangedListingIsSharedThenAskedWithItsETag(t *testing.T) {
 	path := "repos/" + repo + "/pulls"
 	api := newFakeAPI(t, map[string]string{path: `[{"number": 1, "state": "open", "user": {"login": "alexec"}, "author_association": "OWNER", "head": {"ref": "a", "repo": {"full_name": "` + repo + `"}}}]`})

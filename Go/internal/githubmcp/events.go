@@ -111,7 +111,32 @@ var events = append([]event{
 		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
 		payload: object(map[string]any{"pr": prSchema(nil), "commentedAt": str,
 			"comment": object(map[string]any{"id": integer, "path": str, "line": integer, "inReplyTo": integer, "body": str, "url": str})})},
-}, append(issueEvents(), assignedEvent)...)
+}, append(prLabelEvents(), append(issueEvents(), assignedEvent)...)...)
+
+// prLabelEvents are pr.labelled and pr.unlabelled: a label added to or removed from a pull
+// request, filtered by whatever label fires it, so a workflow can wait on one by name instead
+// of polling (#3036).
+func prLabelEvents() []event {
+	kinds := []struct {
+		kind                    PRLabelKind
+		title, description, who string
+		timeKey                 string
+	}{
+		{PRLabelled, "Pull request labelled", "A label was added to a pull request: one event per label added.",
+			"Only labels added by", "labelledAt"},
+		{PRUnlabelled, "Pull request unlabelled", "A label was removed from a pull request: one event per label removed.",
+			"Only labels removed by", "unlabelledAt"},
+	}
+	out := make([]event, len(kinds))
+	for i, k := range kinds {
+		label := property{name: "label", kind: "string", description: "Only when this label is the one changed."}
+		description := k.description + " " + k.who + " the repo's owner, members and collaborators, never a bot, unless anyone is true."
+		out[i] = event{name: "pr." + string(k.kind), title: k.title, description: description,
+			input:   schema{repoProperty, prProperty, label, anyoneProperty},
+			payload: object(map[string]any{"pr": prSchema(nil), "label": str, "by": str, k.timeKey: str})}
+	}
+	return out
+}
 
 // assignedEvent is for the person, not the repo (#2034): an issue given to the connection's owner.
 var assignedEvent = event{name: "issue.assigned", title: "Issue assigned to me",
@@ -562,6 +587,35 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 				if it.Kind != IssueLabelled && !contains(it.Issue.Labels, a.label) {
 					continue
 				}
+			}
+			at := normalized(it.At)
+			if at == "" {
+				continue
+			}
+			list = append(list, candidate{eventID: name + ":" + repo + ":" + it.ID, time: at,
+				data: func() (map[string]any, error) { return it.data(), nil }})
+		}
+		return list, truncated, nil
+	}
+	if name == "pr.labelled" || name == "pr.unlabelled" {
+		kind := PRLabelled
+		if name == "pr.unlabelled" {
+			kind = PRUnlabelled
+		}
+		items, truncated, err := gh.PRLabelActivity(ctx, repo, kind, since)
+		if err != nil {
+			return nil, false, err
+		}
+		var list []candidate
+		for _, it := range items {
+			if a.pr != 0 && it.PR.Number != a.pr {
+				continue
+			}
+			if !a.anyone && !it.Trusted {
+				continue
+			}
+			if a.label != "" && it.Label != a.label {
+				continue
 			}
 			at := normalized(it.At)
 			if at == "" {

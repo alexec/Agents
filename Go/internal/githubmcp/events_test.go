@@ -21,6 +21,7 @@ type fakeGitHub struct {
 	runs     []fakeRun
 	prs      map[int]*fakePR
 	activity []IssueActivity
+	prLabels []PRLabelActivity
 	reviewed []ReviewedPR
 	rabbit   []CodeRabbitComment
 	err      error
@@ -98,6 +99,12 @@ func (f *fakeGitHub) addActivity(a IssueActivity) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.activity = append(f.activity, a)
+}
+
+func (f *fakeGitHub) addPRLabel(a PRLabelActivity) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.prLabels = append(f.prLabels, a)
 }
 
 func (f *fakeGitHub) DefaultRepo(context.Context) (string, error) {
@@ -207,6 +214,21 @@ func (f *fakeGitHub) IssueActivity(_ context.Context, _ string, kind IssueKind, 
 	return out, false, nil
 }
 
+func (f *fakeGitHub) PRLabelActivity(_ context.Context, _ string, kind PRLabelKind, since string) ([]PRLabelActivity, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.err != nil {
+		return nil, false, f.err
+	}
+	var out []PRLabelActivity
+	for _, a := range f.prLabels {
+		if a.Kind == kind && !before(a.At, since) {
+			out = append(out, a)
+		}
+	}
+	return out, false, nil
+}
+
 // harness polls a fake through Events, with a clock that moves on by a second a poll, as
 // real polls are seconds apart.
 type harness struct {
@@ -305,7 +327,8 @@ func TestEventsListGivesEveryEventPollOnlyWithTheirSchemas(t *testing.T) {
 	}
 	sort.Strings(names)
 	equal(t, names, []string{"checks.failed", "checks.passed", "issue.assigned", "issue.closed", "issue.commented", "issue.labelled", "issue.opened",
-		"pr.closed", "pr.conflicted", "pr.merged", "pr.opened", "review.comment", "review.posted", "review.requested"}, "names")
+		"pr.closed", "pr.conflicted", "pr.labelled", "pr.merged", "pr.opened", "pr.unlabelled", "review.comment", "review.posted",
+		"review.requested"}, "names")
 }
 
 func TestCursorNullGivesNoEventsAndACursor(t *testing.T) {
@@ -446,6 +469,50 @@ func TestIssueEventsLabelsAndReasons(t *testing.T) {
 	if n := len([]rune(body)); n != 4001 || !strings.HasSuffix(body, "…") {
 		t.Fatalf("body is %d runes", n)
 	}
+}
+
+func TestPRLabelledAndUnlabelled(t *testing.T) {
+	h := newHarness(t)
+	pr := func(n int) PR {
+		return PR{Number: n, Title: fmt.Sprintf("PR %d", n), URL: fmt.Sprintf("https://github.com/%s/pull/%d", repo, n)}
+	}
+	all := map[string]any{"repo": repo}
+	expedite := map[string]any{"repo": repo, "label": "needs-approval"}
+	byPR := map[string]any{"repo": repo, "pr": 511}
+	labelled, labelledFiltered, labelledByPR := h.poll("pr.labelled", all, nil), h.poll("pr.labelled", expedite, nil), h.poll("pr.labelled", byPR, nil)
+	unlabelled := h.poll("pr.unlabelled", all, nil)
+	anyone := h.poll("pr.labelled", map[string]any{"repo": repo, "anyone": true, "pr": 512}, nil)
+
+	h.fake.addPRLabel(PRLabelActivity{ID: "9100", At: h.at(5), PR: pr(510), Kind: PRLabelled, Label: "needs-approval", By: "alexec", Trusted: true})
+	h.fake.addPRLabel(PRLabelActivity{ID: "9101", At: h.at(5), PR: pr(511), Kind: PRLabelled, Label: "approved", By: "alexec", Trusted: true})
+	h.fake.addPRLabel(PRLabelActivity{ID: "9102", At: h.at(5), PR: pr(510), Kind: PRUnlabelled, Label: "needs-approval", By: "alexec", Trusted: true})
+	// A bot's label change (dependabot's "hold:v0.13.1") doesn't count unless anyone is true.
+	h.fake.addPRLabel(PRLabelActivity{ID: "9103", At: h.at(5), PR: pr(512), Kind: PRLabelled, Label: "hold:v0.13.1", By: "renovate[bot]", Trusted: false})
+
+	raised := h.poll("pr.labelled", all, labelled["cursor"])
+	equal(t, ids(raised), []string{"pr.labelled:" + repo + ":9100", "pr.labelled:" + repo + ":9101"}, "labelled, a bot left out")
+	data := eventsOf(raised)[0]["data"].(map[string]any)
+	equal(t, data["label"], "needs-approval", "label")
+	equal(t, data["by"], "alexec", "by")
+	equal(t, data["pr"], map[string]any{"number": float64(510), "title": "PR 510", "branch": "", "url": "https://github.com/" + repo + "/pull/510"}, "pr")
+	if _, ok := data["labelledAt"].(string); !ok {
+		t.Fatal("no labelledAt")
+	}
+
+	equal(t, ids(h.poll("pr.labelled", expedite, labelledFiltered["cursor"])), []string{"pr.labelled:" + repo + ":9100"}, "filtered by label")
+	equal(t, ids(h.poll("pr.labelled", byPR, labelledByPR["cursor"])), []string{"pr.labelled:" + repo + ":9101"}, "filtered by pr")
+
+	un := h.poll("pr.unlabelled", all, unlabelled["cursor"])
+	equal(t, ids(un), []string{"pr.unlabelled:" + repo + ":9102"}, "unlabelled")
+	if _, ok := eventsOf(un)[0]["data"].(map[string]any)["unlabelledAt"].(string); !ok {
+		t.Fatal("no unlabelledAt")
+	}
+
+	gotAnyone := h.poll("pr.labelled", map[string]any{"repo": repo, "anyone": true, "pr": 512}, anyone["cursor"])
+	equal(t, ids(gotAnyone), []string{"pr.labelled:" + repo + ":9103"}, "anyone sees the bot too")
+	h.fake.addPRLabel(PRLabelActivity{ID: "9104", At: h.at(6), PR: pr(512), Kind: PRLabelled, Label: "hold:v0.13.1", By: "renovate[bot]", Trusted: false})
+	equal(t, ids(h.poll("pr.labelled", map[string]any{"repo": repo, "anyone": true, "pr": 512}, gotAnyone["cursor"])),
+		[]string{"pr.labelled:" + repo + ":9104"}, "anyone again")
 }
 
 // #728: a stranger's issue, comment or PR raises nothing unless the workflow asks for anyone.
