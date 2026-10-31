@@ -855,7 +855,7 @@ function WaitCard({ agent, title, disabled, stop }: { agent: Agent; title: (id: 
       <div class="card wait-card">
         {lineResource(agent) !== undefined ? <p class="strong">{line}</p> : <>
           <div class="wait-card-heading">
-            <span class="wait-card-title"><span class="wait-card-broadcast" aria-hidden="true"><Beacon /></span>Waiting for event</span>
+            <span class="wait-card-title"><span class="wait-card-broadcast waiting-beacon" aria-hidden="true"><Beacon /></span>Waiting for event</span>
             <span class="wait-card-time">{total === undefined ? `${elapsed} min` : `${elapsed} / ${total} min`}</span>
           </div>
           <div class="wait-card-events">
@@ -902,7 +902,7 @@ function BlockWaitCard({ store, host, agent, disabled }: { store: Store; host: s
     <div class="cards">
       <div class="card wait-card block-wait-card">
         <div class="wait-card-heading">
-          <span class="wait-card-title"><span class="wait-card-broadcast" aria-hidden="true"><Beacon /></span>{cardTitle(block)}</span>
+          <span class="wait-card-title"><span class="wait-card-broadcast waiting-beacon" aria-hidden="true"><Beacon /></span>{cardTitle(block)}</span>
           <span class="wait-card-time">{total === undefined ? `${elapsed} min` : `${elapsed} / ${total} min`}</span>
         </div>
         <div class="wait-card-events">
