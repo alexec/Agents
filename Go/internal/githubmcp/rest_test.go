@@ -208,6 +208,40 @@ func TestPRLabelActivityLeavesIssuesOutAndJudgesWhoDidIt(t *testing.T) {
 	equal(t, unlabelled[0].Label, "needs-approval", "label")
 }
 
+// #2838: pr.commented's reads: an issue's comment is left out, an agent's own (<!-- agent -->)
+// is left out, and what is left gets the pull's branch and the commenter's trust.
+func TestPRCommentsLeavesOutIssuesAndAgentsAndJudgesTheCommenter(t *testing.T) {
+	api := newFakeAPI(t, map[string]string{
+		"repos/" + repo + "/issues/comments": `[
+			{"id": 60, "html_url": "c60", "issue_url": "https://api.github.com/repos/` + repo + `/issues/60", "body": "<!-- agent --> waiting",
+			 "user": {"login": "alexec"}, "author_association": "OWNER", "created_at": "2026-10-28T10:05:00Z"},
+			{"id": 61, "html_url": "c61", "issue_url": "https://api.github.com/repos/` + repo + `/issues/61", "body": "I approve, ship it",
+			 "user": {"login": "alexec"}, "author_association": "OWNER", "created_at": "2026-10-28T10:04:00Z"},
+			{"id": 62, "html_url": "c62", "issue_url": "https://api.github.com/repos/` + repo + `/issues/62", "body": "looks off to me",
+			 "user": {"login": "stranger"}, "author_association": "NONE", "created_at": "2026-10-28T10:03:00Z"},
+			{"id": 63, "html_url": "c63", "issue_url": "https://api.github.com/repos/` + repo + `/issues/63", "body": "a plain issue, not a PR",
+			 "user": {"login": "alexec"}, "author_association": "OWNER", "created_at": "2026-10-28T10:02:00Z"}]`,
+		"repos/" + repo + "/issues/60": `{"number": 60, "pull_request": {"url": "x"}}`,
+		"repos/" + repo + "/issues/61": `{"number": 61, "pull_request": {"url": "x"}}`,
+		"repos/" + repo + "/issues/62": `{"number": 62, "pull_request": {"url": "x"}}`,
+		"repos/" + repo + "/issues/63": `{"number": 63}`,
+		"repos/" + repo + "/pulls/60":  `{"number": 60, "title": "Waiting", "html_url": "u60", "head": {"ref": "agents/60"}}`,
+		"repos/" + repo + "/pulls/61":  `{"number": 61, "title": "Approved", "html_url": "u61", "head": {"ref": "agents/61"}}`,
+		"repos/" + repo + "/pulls/62":  `{"number": 62, "title": "Off", "html_url": "u62", "head": {"ref": "agents/62"}}`,
+	})
+	g := api.github()
+	since := "2026-10-28T10:00:00.000Z"
+	comments, _, err := g.PRComments(context.Background(), repo, since)
+	if err != nil {
+		t.Fatal(err)
+	}
+	equal(t, len(comments), 2, "the agent's own and the plain issue's comment are left out")
+	equal(t, comments[0].PR.Branch, "agents/61", "its PR's branch")
+	equal(t, comments[0].Trusted, true, "alexec can approve")
+	equal(t, comments[1].Author, "stranger", "the stranger's comment")
+	equal(t, comments[1].Trusted, false, "a stranger is not trusted")
+}
+
 func TestAnUnchangedListingIsSharedThenAskedWithItsETag(t *testing.T) {
 	path := "repos/" + repo + "/pulls"
 	api := newFakeAPI(t, map[string]string{path: `[{"number": 1, "state": "open", "user": {"login": "alexec"}, "author_association": "OWNER", "head": {"ref": "a", "repo": {"full_name": "` + repo + `"}}}]`})

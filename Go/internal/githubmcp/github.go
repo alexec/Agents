@@ -224,6 +224,27 @@ func (a PRLabelActivity) data() map[string]any {
 	return map[string]any{"pr": a.PR.json(), "label": a.Label, "by": a.By, key: a.At}
 }
 
+// PRComment is a comment on a pull request's conversation (not a review comment on a line of
+// its diff, which review.comment covers).
+type PRComment struct {
+	ID      int
+	PR      PR
+	Author  string
+	Body    string
+	URL     string
+	At      string
+	Trusted bool
+}
+
+// agentCommentPrefix marks a comment the agents posted themselves, not a person (#2838): every
+// PR and comment is posted as alexec, so a comment's own words are the only way to tell them apart.
+const agentCommentPrefix = "<!-- agent -->"
+
+func (c PRComment) data() map[string]any {
+	return map[string]any{"pr": c.PR.json(),
+		"comment": map[string]any{"author": c.Author, "url": c.URL, "body": c.Body}, "commentedAt": c.At}
+}
+
 // GitHub is what the events ask of GitHub.
 type GitHub interface {
 	// FailedRuns are failed pull_request runs updated at or after since, in any order.
@@ -244,6 +265,9 @@ type GitHub interface {
 	IssueActivity(ctx context.Context, repo string, kind IssueKind, since string) (items []IssueActivity, truncated bool, err error)
 	// PRLabelActivity is a label added to or removed from a pull request at or after since.
 	PRLabelActivity(ctx context.Context, repo string, kind PRLabelKind, since string) (items []PRLabelActivity, truncated bool, err error)
+	// PRComments are comments left on pull requests' conversations (not CodeRabbitComments' review
+	// comments on a line) at or after since, an agent's own left out.
+	PRComments(ctx context.Context, repo, since string) (comments []PRComment, truncated bool, err error)
 	// CodeRabbitPRs are the open PRs and whether CodeRabbit has reviewed each one's head commit (#1344).
 	CodeRabbitPRs(ctx context.Context, repo string) ([]ReviewedPR, error)
 	// CodeRabbitComments are CodeRabbit's review comments made at or after since.

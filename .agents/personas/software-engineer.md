@@ -31,10 +31,11 @@ starts lanes.
      `## Screenshots`.
    - Open the PR with auto-merge **off** and the label `needs-approval`.
    - Fix nothing until Alex answers: no CI fixes, rebases or conflict fixes. Wait with
-     `wait_for_event` on `pr.closed` and `pr.merged` for your PR, with `until_minutes:
-     240`, and end your turn. Each time you are started again, read the comments
-     (`gh pr view <pr> --json comments,state`). Start every comment you write with
-     `<!-- agent -->`: a comment without it is Alex's.
+     `wait_for_event` on `pr.commented` and `pr.closed`, `where: {"pr": <n>}`, and end
+     your turn (#2838): `pr.commented` wakes you with the comment itself (author, url,
+     body, commentedAt), so there is no timer to re-check on and no need to re-read the
+     comments by hand. Start every comment you write with `<!-- agent -->`:
+     `pr.commented` already leaves those out, so a comment it raises is always Alex's.
    - Alex approves (for example "I approve these screenshots, ship it"): add
      `approved`, remove `needs-approval`, write `Alex approved (<comment link>)` in the
      PR body, fix the checks, rebase, turn on squash auto-merge and go on to step 7.

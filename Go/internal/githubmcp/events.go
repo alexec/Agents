@@ -96,6 +96,11 @@ var events = append([]event{
 		description: "An open pull request began to conflict with its base, so it cannot merge and its CI may not run until it is rebased. Once per conflict: it is raised again only after the PR merges cleanly and then conflicts anew." + ownPRs,
 		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty, mineProperty},
 		payload:     object(map[string]any{"pr": prSchema(nil), "conflictedAt": str})},
+	{name: "pr.commented", title: "Pull request commented on",
+		description: "A comment was left on a pull request's conversation (not a review comment on a line of its diff, which review.comment covers). Its body is the first 4000 characters. A comment whose body starts with <!-- agent --> is left out: an agent's, not a person's, since every PR and comment is posted as the same account. Only comments by the repo's owner, members and collaborators, never a bot, unless anyone is true.",
+		input:       schema{repoProperty, prProperty, anyoneProperty},
+		payload: object(map[string]any{"pr": prSchema(nil),
+			"comment": object(map[string]any{"author": str, "url": str, "body": str}), "commentedAt": str})},
 	// For the person, not the repo (#2034): what asks the connection's owner for something.
 	{name: "review.requested", title: "Review requested from me",
 		description: "A review was requested from the GitHub account this server is connected as, on an open pull request: once per request, so a request taken back and made again is a new one. Anyone's PR, a fork's too.",
@@ -638,6 +643,22 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 				continue
 			}
 			list = append(list, candidate{eventID: fmt.Sprintf("review.comment:%s:%d", repo, c.ID), time: at,
+				data: func() (map[string]any, error) { return c.data(), nil }})
+		}
+		return list, truncated, nil
+	}
+	if name == "pr.commented" {
+		comments, truncated, err := gh.PRComments(ctx, repo, since)
+		if err != nil {
+			return nil, false, err
+		}
+		var list []candidate
+		for _, c := range comments {
+			at := normalized(c.At)
+			if at == "" || (a.pr != 0 && c.PR.Number != a.pr) || !(a.anyone || c.Trusted) {
+				continue
+			}
+			list = append(list, candidate{eventID: fmt.Sprintf("pr.commented:%s:%d", repo, c.ID), time: at,
 				data: func() (map[string]any, error) { return c.data(), nil }})
 		}
 		return list, truncated, nil
