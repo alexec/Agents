@@ -64,9 +64,10 @@ public struct Toolset: Hashable, Sendable {
         /// anything is downloaded. Claude's toolset is about 484 MB once unpacked, Codex's
         /// about 520 MB.
         public var minFreeBytes: Int64
-        /// Whether the shim passes its own arguments on to the package (046: Gemini is
-        /// started with `--acp`). Absent from a manifest that has never needed it, so those
-        /// manifests' bytes, and so their toolset ids, stay what they were.
+        /// Whether the shim passes its own arguments on to the package (046: a runtime
+        /// started with an extra flag such as `--acp`). Absent from a manifest that has
+        /// never needed it, so those manifests' bytes, and so their toolset ids, stay what
+        /// they were.
         public var forwardsArguments: Bool?
 
         public struct Node: Codable, Hashable, Sendable {

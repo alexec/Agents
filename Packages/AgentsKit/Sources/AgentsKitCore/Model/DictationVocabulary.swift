@@ -13,8 +13,8 @@ public enum DictationVocabulary {
     public static let maxWords = 4
     public static let maxLength = 40
 
-    /// The product's words, then the runtimes this app can start. Gemini and Antigravity
-    /// are here with the ones Alex named, because a person says the runtime they start.
+    /// The product's words, then the runtimes this app can start, because a person says
+    /// the runtime they start.
     public static let productTerms: [String] = [
         "GitHub", "GitLab", "TestFlight", "worktree", "lane", "milestone",
         "merge wave", "Scrum Master", "control plane",
@@ -24,7 +24,6 @@ public enum DictationVocabulary {
         RuntimeCatalog.cursor.name,
         RuntimeCatalog.grok.name,
         RuntimeCatalog.opencode.name,
-        RuntimeCatalog.gemini.name,
         RuntimeCatalog.antigravity.name,
     ]
 

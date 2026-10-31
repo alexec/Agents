@@ -45,7 +45,6 @@ hook rewrites a shell command such as `git status` to `rtk git status`. It suppo
 | Codex | A `PreToolUse` hook and a note in `AGENTS.md` |
 | Copilot | A `PreToolUse` hook |
 | Cursor | An entry in `hooks.json` |
-| Gemini CLI | A `BeforeTool` hook |
 | OpenCode | A TypeScript plugin on `tool.execute.before` |
 
 Its configuration lives in `~/.config/rtk/config.toml`. Telemetry is off unless turned on.
@@ -140,7 +139,7 @@ has ways to pass each runtime its own environment and plugins.
 | Environment per runtime | `RuntimeLaunch.environment` in `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/RuntimeLaunch.swift`. Claude, Codex and Grok have no entries yet. | Headroom: point `ANTHROPIC_BASE_URL` (Claude) or Codex's base URL at the proxy |
 | The launch | `ProcessSessionLauncher.launch` in `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore.swift` merges the environment and starts the runtime. | Both |
 | `PATH` | `LoginShellPath.environment()` in `Packages/AgentsKit/Sources/AgentsKit/Runtimes/LoginShellPath.swift`. The app's terminals use it too. | rtk: a folder of wrapper commands placed first |
-| Personal plugins | `~/.agents/plugins`. They reach Claude, Grok, Codex and Gemini, but not Cursor or Copilot over ACP. | rtk: a plugin that carries its hook, with no change to the app |
+| Personal plugins | `~/.agents/plugins`. They reach Claude, Grok and Codex, but not Cursor or Copilot over ACP. | rtk: a plugin that carries its hook, with no change to the app |
 
 **On servers, `ANTHROPIC_BASE_URL` is already in use.** The sign-in relay sets it to point
 Claude at the Mac (`ToolPolicyCatalog.swift`), and Codex gets a base URL the same way. A

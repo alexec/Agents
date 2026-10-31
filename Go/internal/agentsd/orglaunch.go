@@ -12,8 +12,8 @@ import (
 // A runtime's launch on an org account (#999, FR-013, research R2): first every variable
 // the person's pass-through and login environment bring for the runtime is taken out, then
 // the relay's address, the stand-in, the gateway's switches and its settings that are not
-// secret are set. Where the runtime keeps its way to the model in a file (Codex, Gemini's
-// auth type, OpenCode), the file is in an account folder of the route's own under
+// secret are set. Where the runtime keeps its way to the model in a file (Codex, OpenCode),
+// the file is in an account folder of the route's own under
 // <root>/runtimes/org/<runtime>/<route id>, with the person's settings linked in (#840),
 // and the stand-in still comes from the environment, so the file holds no secret and is
 // the same for every session. Measured against each CLI with a fake provider, 2026-10-22.
@@ -22,13 +22,11 @@ import (
 const orgStandInVariable = "AGENTS_ORG_STAND_IN"
 
 // orgShared is what is linked into an org account's folder from the runtime's own, beside
-// #840's accountKinds: Gemini's instructions and extensions, never its settings or sign-in.
+// #840's accountKinds: never its settings or sign-in.
 var orgShared = map[string]struct {
 	folder string
 	names  []string
-}{
-	"gemini": {folder: ".gemini", names: []string{"GEMINI.md", "AGENTS.md", "commands", "extensions", "skills", "agents"}},
-}
+}{}
 
 // orgAccountFolder is an org account's folder for a runtime, made with the person's
 // settings linked in.
@@ -151,31 +149,6 @@ func (d *Daemon) withOrgAccount(env []string, runtimeID string, account *wire.Ac
 			return nil, err
 		}
 		set("CODEX_HOME="+folder, "CODEX_CA_CERTIFICATE="+rl.caFile, orgStandInVariable+"="+token)
-	case "gemini":
-		folder, err := d.orgAccountFolder(runtimeID, r.ID)
-		if err != nil {
-			return nil, err
-		}
-		auth := "gemini-api-key"
-		if r.Kind == wire.OrgRouteKindVertex {
-			auth = "vertex-ai"
-		}
-		settings, _ := json.Marshal(map[string]any{"security": map[string]any{"auth": map[string]any{"selectedType": auth}}})
-		if err := writeOrgFile(filepath.Join(folder, ".gemini", "settings.json"), settings); err != nil {
-			return nil, err
-		}
-		set("GEMINI_CLI_HOME="+folder, "NODE_EXTRA_CA_CERTS="+rl.caFile)
-		if r.Kind == wire.OrgRouteKindVertex {
-			set("GOOGLE_GENAI_USE_VERTEXAI=true", "GOOGLE_VERTEX_BASE_URL="+base, "GOOGLE_API_KEY="+token)
-			if p := str(st.Project); p != "" {
-				set("GOOGLE_CLOUD_PROJECT=" + p)
-			}
-			if l := str(st.Location); l != "" {
-				set("GOOGLE_CLOUD_LOCATION=" + l)
-			}
-		} else {
-			set("GEMINI_API_KEY="+token, "GOOGLE_GEMINI_BASE_URL="+base)
-		}
 	case "opencode":
 		folder, err := d.orgAccountFolder(runtimeID, r.ID)
 		if err != nil {

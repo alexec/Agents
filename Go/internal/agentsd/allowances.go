@@ -53,11 +53,8 @@ func (d *Daemon) saveAllowancesLocked() {
 	writeStore(d.allowancesPath(), list)
 }
 
-// ownKey is a runtime's own credential: its sign-in, or Gemini's key.
+// ownKey is a runtime's own credential: its sign-in.
 func ownKey(runtime string) string {
-	if runtime == "gemini" {
-		return "gemini:geminiAPIKey"
-	}
 	return runtime + ":sign-in"
 }
 

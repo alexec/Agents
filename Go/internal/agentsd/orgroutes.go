@@ -54,7 +54,6 @@ var orgRouteIDPattern = regexp.MustCompile(`^[a-z0-9-]{1,40}$`)
 var orgRouteRows = map[string][]wire.OrgRouteKind{
 	"claude":   {wire.OrgRouteKindKey, wire.OrgRouteKindBedrock, wire.OrgRouteKindVertex, wire.OrgRouteKindAzure, wire.OrgRouteKindBaseURL},
 	"codex":    {wire.OrgRouteKindKey, wire.OrgRouteKindAzure, wire.OrgRouteKindBaseURL},
-	"gemini":   {wire.OrgRouteKindKey, wire.OrgRouteKindVertex, wire.OrgRouteKindBaseURL},
 	"opencode": {wire.OrgRouteKindKey, wire.OrgRouteKindAzure, wire.OrgRouteKindBaseURL},
 }
 
@@ -62,7 +61,6 @@ var orgRouteRows = map[string][]wire.OrgRouteKind{
 var orgRouteVendors = map[string][]wire.OrgRouteVendor{
 	"claude":   {wire.OrgRouteVendorAnthropic},
 	"codex":    {wire.OrgRouteVendorOpenai},
-	"gemini":   {wire.OrgRouteVendorGemini},
 	"opencode": {wire.OrgRouteVendorAnthropic, wire.OrgRouteVendorOpenai},
 }
 

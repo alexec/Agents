@@ -28,7 +28,7 @@ import (
 )
 
 // Installing a runtime that is missing on this Mac (048, 047, 049), as DaemonCore+Install
-// and RuntimeInstaller: Claude, Codex and Gemini from the app's pinned Node toolsets,
+// and RuntimeInstaller: Claude and Codex from the app's pinned Node toolsets,
 // Antigravity and OpenCode from its pinned vendor archives, the rest with the vendor's own
 // script. runtimes/install answers at once with installing; the progress and the ending
 // go out on runtime/changed. Each lands in <cache>/tools/<runtime>/<id>/, built in
@@ -236,7 +236,6 @@ func vendorOf(t *macToolset) string {
 var installRecipes = map[string]wire.RuntimeInstall{
 	"claude":      {Toolset: &wire.RuntimeInstallToolset{RuntimeID: "claude"}},
 	"codex":       {Toolset: &wire.RuntimeInstallToolset{RuntimeID: "codex"}},
-	"gemini":      {Toolset: &wire.RuntimeInstallToolset{RuntimeID: "gemini"}},
 	"antigravity": {Toolset: &wire.RuntimeInstallToolset{RuntimeID: "antigravity"}},
 	"opencode":    {Toolset: &wire.RuntimeInstallToolset{RuntimeID: "opencode"}},
 	"grok":        {Script: &wire.RuntimeInstallScript{URL: "https://x.ai/cli/install.sh", Shell: "bash"}},

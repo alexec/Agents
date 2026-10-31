@@ -88,8 +88,6 @@ RUNTIMES = {
                "platform": "claude-agent-sdk-"},
     "codex": {"name": "Codex", "kind": "npm", "package": "@agentclientprotocol/codex-acp",
               "platform": "codex-", "shim": "codex-acp"},
-    "gemini": {"name": "Gemini", "kind": "npm", "package": "@google/gemini-cli", "shim": "gemini",
-               "script": "update-gemini-toolset.sh"},
     "antigravity": {"name": "Antigravity", "kind": "archive", "registry": "antigravity-acp",
                     "shim": "agy_acp_server"},
     "opencode": {"name": "OpenCode", "kind": "github", "repo": "anomalyco/opencode", "shim": "opencode"},

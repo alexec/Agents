@@ -16,8 +16,8 @@ Mermaid) are not on this page.
 
 - **Clients that show it:** Mac (the window), Remote (iPhone and iPad), web, server (a Linux
   host), control plane, or agents (only agents use it).
-- **State:** `planned`, `built`, `walked on scratch`, `tested on a real account`, `broken` or
-  `removed`.
+- **State:** `planned`, `built`, `walked on scratch`, `tested on a real account`, `broken`,
+  `retired` or `removed`.
 - **Last checked:** the date of the last assessment or walk, and where its record is. A dash
   means that no check is recorded.
 - **Where:** the file that defines it.
@@ -45,7 +45,7 @@ Open issues: `is:open label:integration runtime`.
 | Copilot | Mac, Remote, web, server | broken (fails at turn) | 2026-10-17, 1.0.93-1: failed at turn, in `.agents/reviews/runtimes/copilot-2026-10-17.md` (skipped 2026-10-30: Copilot its allowance is spent on this Mac) | `RuntimeCatalog.swift`, `runtimes.go` | |
 | Cursor | Mac, Remote, web, server | broken (fails at turn) | 2026-10-17, 2026.10.01-e373342: failed at turn, in `.agents/reviews/runtimes/cursor-2026-10-17.md` | `RuntimeCatalog.swift`, `runtimes.go` | |
 | Codex | Mac, Remote, web, server | tested on a real account | 2026-10-30, 2.5.0: a real turn passed, not assessed, in `.agents/reviews/runtimes/codex-2026-10-30.md` | `RuntimeCatalog.swift`, `runtimes.go`, `App/Resources/toolsets/codex/manifest.json`, `Go/internal/agentsd/brief.go` | `scope` and `permissions` fail on a root in `/tmp` (the nightly's): Codex's own `agent` mode (workspace-write) may write `/tmp` without asking, so no card comes (#1432). #1444, #1445 |
-| Gemini | Mac, Remote, web, server | broken (fails at turn) | 2026-10-17, 0.64.0: failed at turn, in `.agents/reviews/runtimes/gemini-2026-10-17.md` (skipped 2026-10-30: Gemini not signed in on this Mac) | `RuntimeCatalog.swift`, `runtimes.go` | |
+| Gemini | Mac, Remote, web, server | retired | 2026-10-31: the runtime was retired (#3043) | `RuntimeCatalog.swift`, `runtimes.go` | |
 | Antigravity | Mac, Remote, web (Mac host only) | broken (fails at turn) | 2026-10-17, 1.4.1: failed at turn, in `.agents/reviews/runtimes/antigravity-2026-10-17.md` (skipped 2026-10-27: Antigravity not signed in on this Mac) | `RuntimeCatalog.swift`, `acp/session.go`, `App/Resources/toolsets/antigravity/manifest.json` | Brief as a session system prompt from 1.4.5 (#2613): the handshake and `session/new` were tested live on 2026-10-29, but no model turn ran, because the account's quota was spent |
 | OpenCode | Mac, Remote, web, server | tested on a real account | 2026-10-30, 1.19.5: a real turn passed, not assessed, in `.agents/reviews/runtimes/opencode-2026-10-30.md` | `RuntimeCatalog.swift`, `runtimes.go` | |
 <!-- runtimes:end -->
@@ -63,9 +63,9 @@ Open issues: `is:open label:integration allowance`.
 | --- | --- | --- | --- | --- | --- |
 | Claude plan windows | Mac, Remote, web | built | — | `Go/internal/agentsd/limits.go` | |
 | Grok billing | Mac, Remote, web | built | — | `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/Allowance/AllowanceReading.swift` | |
-| Limits recognised from error text (Codex, Gemini, Copilot, Cursor) | Mac, Remote, web | built | — | `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/Allowance/LimitRecognition.swift`, `Go/internal/agentsd/limits.go` | |
+| Limits recognised from error text (Codex, Copilot, Cursor) | Mac, Remote, web | built | — | `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/Allowance/LimitRecognition.swift`, `Go/internal/agentsd/limits.go` | |
 | Codex token refresh (auth.openai.com) | Mac, server | built | — | `Go/internal/mac/signin/codex.go` | |
-| Gemini key check (generativelanguage.googleapis.com) | Mac | built | — | `Packages/AgentsKit/Sources/AgentsKitCore/Credentials/CredentialCheck.swift` | |
+| Gemini key check (generativelanguage.googleapis.com) | Mac | retired | 2026-10-31: the runtime was retired (#3043) | `Packages/AgentsKit/Sources/AgentsKitCore/Credentials/CredentialCheck.swift` | |
 | OpenCode borrows the Mac's provider keys | Mac, server | built | — | `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/LentFileSignIn.swift` | |
 | More than one Claude account (`CLAUDE_CONFIG_DIR`) | Mac, Remote, web | built (walked on a scratch set-up with an account not signed in; not tested on a real second account) | 2026-10-21 | `Go/internal/agentsd/accounts.go` | Alex to test with two real sign-ins (#840) |
 | More than one Codex account (`CODEX_HOME`) | Mac, Remote, web | built (not walked: no Codex on the walk's Mac) | 2026-10-21 | `Go/internal/agentsd/accounts.go` | Alex to test with two real sign-ins (#840) |
@@ -80,9 +80,9 @@ Open issues: `is:open label:integration gateway`.
 
 | Integration | Clients that show it | State | Last checked | Where | Gaps |
 | --- | --- | --- | --- | --- | --- |
-| Org key (Anthropic, OpenAI, Gemini, xAI) | control plane, machine; Mac, web | built | 2026-10-22, relay against a fake API; Claude, Codex, Gemini and OpenCode CLIs reach the relay | `Go/internal/controlplane/orgroutes.go`, `Go/internal/agentsd/modelrelay.go` | Alex to test with a real key (#2222) |
+| Org key (Anthropic, OpenAI, xAI) | control plane, machine; Mac, web | built | 2026-10-22, relay against a fake API; Claude, Codex and OpenCode CLIs reach the relay | `Go/internal/controlplane/orgroutes.go`, `Go/internal/agentsd/modelrelay.go` | Alex to test with a real key (#2222) |
 | Amazon Bedrock (API key, or access key and role by STS) | control plane, machine; Mac, web | built (Claude only) | 2026-10-22, STS, SigV4 and the event stream against fakes only | `Go/internal/controlplane/orgtokens.go`, `Go/internal/agentsd/modelrelay.go` | OpenCode not built; Alex to test with a real account (#2222) |
-| Google Vertex AI (service account by OAuth) | control plane, machine; Mac, web | built (Claude, Gemini) | 2026-10-22, OAuth and the relay against fakes only | `Go/internal/controlplane/orgtokens.go`, `Go/internal/agentsd/modelrelay.go` | OpenCode not built; Alex to test with a real account (#2222) |
+| Google Vertex AI (service account by OAuth) | control plane, machine; Mac, web | built (Claude) | 2026-10-22, OAuth and the relay against fakes only | `Go/internal/controlplane/orgtokens.go`, `Go/internal/agentsd/modelrelay.go` | OpenCode not built; Alex to test with a real account (#2222) |
 | Microsoft Azure (key, or Entra app) | control plane, machine; Mac, web | built | 2026-10-22, Entra and the relay against fakes only | `Go/internal/controlplane/orgtokens.go`, `Go/internal/agentsd/modelrelay.go` | Alex to test with a real account (#2222) |
 | Base URL (LiteLLM, Portkey, …) | control plane, machine; Mac, web | built | 2026-10-22, relay against a fake API only | `Go/internal/controlplane/orgroutes.go`, `Go/internal/agentsd/modelrelay.go` | Alex to test with a real gateway (#2222) |
 

@@ -196,7 +196,7 @@ var presets = map[string][2]string{
 
 // runtimeNames is RuntimeCatalog's names, for the words.
 var runtimeNames = map[string]string{"claude": "Claude", "grok": "Grok", "copilot": "Copilot", "cursor": "Cursor",
-	"codex": "Codex", "gemini": "Gemini", "antigravity": "Antigravity", "opencode": "OpenCode"}
+	"codex": "Codex", "antigravity": "Antigravity", "opencode": "OpenCode"}
 
 // WriterRuntimes is ToolPolicyCatalog.writerRuntimes: the runtimes whose own tools can be
 // turned off for one session, so they can write.

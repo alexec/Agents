@@ -30,7 +30,6 @@ traffic and does not copy it ([Privacy](../../privacy.md)).
 | --- | --- | --- |
 | Claude | Anthropic | Signs in with a Claude account, or uses a key or a gateway that you pass in its environment (Bedrock, Vertex, a base URL). On a server that borrows a Mac's sign-in, the gateway variables are cleared and its calls go out from that Mac ([Data flow](data-flow.md#a-borrowed-sign-in)). |
 | Codex | OpenAI | Refreshes its token at `auth.openai.com`. A server can borrow a Mac's sign-in, as for Claude. |
-| Gemini | Google | An API key from Google AI Studio. Agents checks the key at `generativelanguage.googleapis.com`. |
 | Antigravity | Google | A personal or business Google account. Mac machines only. |
 | Grok | xAI | Signs in with grok.com. |
 | Copilot | GitHub (Microsoft) | Signs in with GitHub. |

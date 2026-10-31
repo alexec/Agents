@@ -1,7 +1,7 @@
 // PoolWords' runtime name and time words, shared by sandboxWords.ts and continueWhenBack.ts.
 /** RuntimeCatalog's names, for a runtime the page may not be told about any more. */
 const runtimeNames: Record<string, string> = {
-  claude: "Claude", grok: "Grok", copilot: "Copilot", cursor: "Cursor", codex: "Codex", gemini: "Gemini",
+  claude: "Claude", grok: "Grok", copilot: "Copilot", cursor: "Cursor", codex: "Codex",
   antigravity: "Antigravity", opencode: "OpenCode",
 };
 

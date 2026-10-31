@@ -25,7 +25,7 @@ public struct CostLimits: Codable, Hashable, Sendable {
     /// The most tokens any one agent may use across its whole life (#838).
     ///
     /// Beside the money, not instead of it: only Claude reports a price, and Codex,
-    /// Copilot, OpenCode and Gemini report tokens. Whichever limit is reached first
+    /// Copilot and OpenCode report tokens. Whichever limit is reached first
     /// stops the agent. Counted as `TurnUsage.limitTokens`. `nil` is no limit.
     public var perAgentTokens: Int?
 

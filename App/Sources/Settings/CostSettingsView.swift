@@ -77,7 +77,7 @@ struct CostSettingsView: View {
             }
 
             Section {
-                Label("Only Claude reports a price. Codex, Gemini, OpenCode and Copilot report "
+                Label("Only Claude reports a price. Codex, OpenCode and Copilot report "
                       + "tokens, so only a token limit stops them. Cursor, Antigravity and Grok "
                       + "report neither, so no limit applies to them: an agent on one runs past "
                       + "every limit, and while it is running the day's totals are a floor rather "

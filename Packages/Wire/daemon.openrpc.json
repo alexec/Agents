@@ -2277,31 +2277,6 @@
       }
     },
     {
-      "name": "credentials/lend",
-      "x-capability": "credentials/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/CredentialsLend"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
       "name": "credentials/offer",
       "x-capability": "credentials/1",
       "tags": [

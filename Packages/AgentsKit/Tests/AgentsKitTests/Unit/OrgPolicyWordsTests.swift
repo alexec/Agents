@@ -79,11 +79,11 @@ struct OrgPolicyWordsTests {
     }
 
     @Test func aPolicyRefusalIsReadFromItsError() {
-        let error = JSONRPCError(code: -32076, message: "Set by your organisation. Your organisation does not allow Gemini.",
-                                 data: ["reason": "policy", "rule": "runtimes", "words": "Your organisation does not allow Gemini."])
+        let error = JSONRPCError(code: -32076, message: "Set by your organisation. Your organisation does not allow Codex.",
+                                 data: ["reason": "policy", "rule": "runtimes", "words": "Your organisation does not allow Codex."])
         let refusal = DaemonAPI.PolicyRefusal(error: error)
         #expect(refusal?.rule == "runtimes")
-        #expect(refusal?.line == "Set by your organisation. Your organisation does not allow Gemini.")
+        #expect(refusal?.line == "Set by your organisation. Your organisation does not allow Codex.")
         // noPolicy and mustJoin say what to do, with no title.
         let lost = JSONRPCError(code: -32076, message: "x",
                                 data: ["reason": "noPolicy", "words": "Agents Host has no policy from your organisation. Connect to the network."])
@@ -152,7 +152,7 @@ struct OrgPolicyWordsTests {
         #expect(OrgPolicyWords.customServersMark(refused)?.rule == "marketplaces.customServers")
         let state = try JSONDecoder().decode(DaemonAPI.PassThroughState.self, from: Data(#"""
         {"names":[{"name":"AWS_*"},{"name":"OPENAI_API_KEY","runtime":"codex",
-          "setBy":{"by":"organisation","rule":"environment.passThrough","words":"Not passed."}},{"name":"GEMINI_KEY","runtime":"gemini"}]}
+          "setBy":{"by":"organisation","rule":"environment.passThrough","words":"Not passed."}},{"name":"CURSOR_KEY","runtime":"cursor"}]}
         """#.utf8))
         #expect(state.names(for: "codex").map(\.name) == ["AWS_*", "OPENAI_API_KEY"])
         #expect(state.names(for: "codex").last?.setBy != nil)

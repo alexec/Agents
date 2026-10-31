@@ -73,7 +73,6 @@ var defaultOrgEndpoints = orgEndpoints{
 	Vendor: map[wire.OrgRouteVendor]string{
 		wire.OrgRouteVendorAnthropic: "https://api.anthropic.com",
 		wire.OrgRouteVendorOpenai:    "https://api.openai.com",
-		wire.OrgRouteVendorGemini:    "https://generativelanguage.googleapis.com",
 		wire.OrgRouteVendorXai:       "https://api.x.ai",
 	},
 	Client: &http.Client{Timeout: tokenCallTimeout},
@@ -458,9 +457,6 @@ func (s *Service) checkOrgRoute(ctx context.Context, r wire.OrgRoute, values map
 		return wire.OrgRouteCheck{Words: "This route can be checked only from a machine: start a session on it."}
 	}
 	models := "/v1/models"
-	if deref(r.Vendor) == wire.OrgRouteVendorGemini {
-		models = "/v1beta/models"
-	}
 	ctx, cancel := context.WithTimeout(ctx, tokenCallTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(address, "/")+models, nil)
@@ -497,8 +493,6 @@ func vendorKeyHeader(vendor wire.OrgRouteVendor, key string) (string, string) {
 	switch vendor {
 	case wire.OrgRouteVendorAnthropic:
 		return "x-api-key", key
-	case wire.OrgRouteVendorGemini:
-		return "x-goog-api-key", key
 	}
 	return "Authorization", "Bearer " + key
 }

@@ -253,7 +253,7 @@ func TestEveryRuleAtEveryPath(t *testing.T) {
 	}
 	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 1, rules))
 
-	gemini := seeded(t, d, dir, func(a *wire.Agent) { a.RuntimeID = "gemini"; a.RuntimeSessionID = new("s") })
+	notAllowed := seeded(t, d, dir, func(a *wire.Agent) { a.RuntimeID = "grok"; a.RuntimeSessionID = new("s") })
 	opts := []wire.ConfigOption{
 		{ID: "mode", Name: "Mode", Category: new("mode"), Type: "select", CurrentValue: json.RawMessage(`"default"`),
 			Options: json.RawMessage(`[{"value":"default","name":"Default"},{"value":"acceptEdits","name":"Accept Edits"},{"value":"bypassPermissions","name":"Bypass"}]`)},
@@ -273,7 +273,7 @@ func TestEveryRuleAtEveryPath(t *testing.T) {
 		path, rule string
 		err        func() *Error
 	}{
-		{"start: a runtime not allowed", "runtimes", func() *Error { return call("agents/start", startParams(dir, "gemini", nil)) }},
+		{"start: a runtime not allowed", "runtimes", func() *Error { return call("agents/start", startParams(dir, "grok", nil)) }},
 		{"start: a model not allowed", "runtimes.claude.models", func() *Error {
 			return call("agents/start", startParams(dir, "claude", map[string]any{"model": "claude-opus-5-5"}))
 		}},
@@ -301,26 +301,26 @@ func TestEveryRuleAtEveryPath(t *testing.T) {
 			return call("agents/answerSandbox", map[string]any{"agentID": failing.ID, "carryOn": true})
 		}},
 		{"prompt: a runtime not allowed", "runtimes", func() *Error {
-			return call("agents/prompt", map[string]any{"agentID": gemini.ID, "text": "go on"})
+			return call("agents/prompt", map[string]any{"agentID": notAllowed.ID, "text": "go on"})
 		}},
 		{"Continue in New: a runtime not allowed", "runtimes", func() *Error {
 			return asError(func() error {
-				_, err := d.continueInFolder(wire.ContinueInFolderRequest{AgentID: gemini.ID})
+				_, err := d.continueInFolder(wire.ContinueInFolderRequest{AgentID: notAllowed.ID})
 				return err
 			}())
 		}},
 		{"Branch: a runtime not allowed", "runtimes", func() *Error {
-			return asError(func() error { _, err := d.fork(d.ctx, gemini.ID); return err }())
+			return asError(func() error { _, err := d.fork(d.ctx, notAllowed.ID); return err }())
 		}},
 		{"Branch from here: a runtime not allowed", "runtimes", func() *Error {
-			return asError(func() error { _, err := d.branchFrom(wire.BranchFromRequest{AgentID: gemini.ID}); return err }())
+			return asError(func() error { _, err := d.branchFrom(wire.BranchFromRequest{AgentID: notAllowed.ID}); return err }())
 		}},
 		{"helper: a model not allowed", "runtimes.claude.models", func() *Error {
 			_, err := d.startFor(helperRequest("claude", dir, "help", "claude-opus-5-5", nil, nil, nil), startedBy{agent: &claude.ID, owner: wire.SessionLabelOwnerAgent})
 			return asError(err)
 		}},
 		{"workflow: a runtime not allowed", "runtimes", func() *Error {
-			_, err := d.startFor(helperRequest("gemini", dir, "run", "", nil, nil, nil), startedBy{owner: wire.SessionLabelOwnerAgent})
+			_, err := d.startFor(helperRequest("grok", dir, "run", "", nil, nil, nil), startedBy{owner: wire.SessionLabelOwnerAgent})
 			return asError(err)
 		}},
 		{"marketplaces/add: not allowed", "marketplaces", func() *Error {

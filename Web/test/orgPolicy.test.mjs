@@ -130,8 +130,8 @@ test("a rule taken out says so in the preview", () => {
 
 test("the warnings say what the policy refuses before it is saved", () => {
   assert.deepEqual(o.warnings(policy({ runtimes: {} }), []), ["No runtime is left: nobody can start an agent."]);
-  assert.deepEqual(o.warnings(policy({ sandbox: "required", runtimes: { claude: {}, gemini: {} } }), []),
-    ["A required sandbox refuses Gemini: it has no command sandbox the app can turn on."]);
+  assert.deepEqual(o.warnings(policy({ sandbox: "required", runtimes: { claude: {}, copilot: {} } }), []),
+    ["A required sandbox refuses Copilot: it has no command sandbox the app can turn on."]);
   assert.deepEqual(o.warnings(policy({ sandbox: "required", runtimes: { cursor: {} } }), []), [
     "A required sandbox refuses Cursor: it has no command sandbox the app can turn on.",
     "No runtime is left with a command sandbox: nobody can start an agent.",

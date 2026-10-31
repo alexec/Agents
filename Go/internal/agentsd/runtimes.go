@@ -47,7 +47,6 @@ var catalog = func() []runtimeDef {
 		runtime("copilot", "Copilot", "copilot", []string{"--acp"}, "https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli", false, "COPILOT_", "GH_TOKEN", "GITHUB_TOKEN"),
 		runtime("cursor", "Cursor", "cursor-agent", []string{"acp"}, "https://cursor.com/docs/cli/installation", false, "CURSOR_"),
 		runtime("codex", "Codex", "codex-acp", nil, "https://github.com/agentclientprotocol/codex-acp", true, "OPENAI_", "CODEX_HOME"),
-		runtime("gemini", "Gemini", "gemini", []string{"--acp", "--skip-trust"}, "https://github.com/google-gemini/gemini-cli", true, "GEMINI_", "GOOGLE_"),
 		runtime("antigravity", "Antigravity", "agy_acp_server", nil, "https://antigravity.google/docs/ide/extensions", true),
 		runtime("opencode", "OpenCode", "opencode", []string{"acp"}, "https://opencode.ai/docs/", true, "OPENCODE_"),
 	}
@@ -353,13 +352,6 @@ func (d *Daemon) launchOn(r *runtimeDef, dir string, account *wire.AccountProfil
 		env = append(env, "GEMINI_HOME="+d.appHomes()["antigravity"], "AGY_ACP_DISABLE_WORKSPACE_TRUST=1",
 			"AGY_ACP_FORCE_FILE_STORAGE=1")
 	}
-	// A Gemini key the window lent (043) wins over one already in the environment. An
-	// account of the runtime's own, and Antigravity, are left as they are.
-	if account == nil && r.ID == "gemini" {
-		if key := d.lentSecret("gemini"); key != "" {
-			env = append(without(env, "GEMINI_API_KEY", "GOOGLE_API_KEY"), "GEMINI_API_KEY="+key)
-		}
-	}
 	if isOrgAccount(account) {
 		var err error
 		if env, err = d.withOrgAccount(env, r.ID, account, agent); err != nil {
@@ -439,9 +431,9 @@ func (d *Daemon) needsSignIn(runtimeID string) error {
 // The tool policy is ToolPolicyCatalog.swift's levers, one per runtime, measured in 015
 // and kept up there since: what each runtime's own tools would do that the app does (its
 // standing arrangements, artefacts and the like) is taken away, and its question tool is
-// kept. Cursor has no lever (its permission vocabulary names no tool), and Antigravity and
-// Gemini have nothing to take away since sub-agents and task lists came back (2026-09-29):
-// an empty deny list or policy file is not sent, as Swift did not send one.
+// kept. Cursor has no lever (its permission vocabulary names no tool), and Antigravity has
+// nothing to take away since sub-agents and task lists came back (2026-09-29): an empty deny
+// list or policy file is not sent, as Swift did not send one.
 
 // toolPolicyEnv is the environmentJSON lever: JSON in a variable the runtime reads at
 // start, compact with sorted keys, the person's own replaced.
@@ -487,14 +479,9 @@ type policyFile struct {
 // toolPolicyFiles is each runtime's files (#1445).
 //   - Grok reads its feature switches only from a file of its own (GROK_CONFIG in line is
 //     ignored), never the person's ~/.grok/config.toml: no image or video generation.
-//   - Gemini's system defaults, the one settings file below the person's: it reads AGENTS.md
-//     after GEMINI.md (054). Its --policy file of deny rules is written only when a rule
-//     comes back; there are none.
 var toolPolicyFiles = map[string][]policyFile{
 	"grok": {{name: "grok-overlay.toml", variable: "GROK_CONFIG_PATH",
 		contents: "# Written by the Agents app. Do not edit: rebuilt on every launch.\n[features]\nimage_gen = false\nvideo_gen = false\n"}},
-	"gemini": {{name: "gemini-system-defaults.json", variable: "GEMINI_CLI_SYSTEM_DEFAULTS_PATH",
-		contents: "{\n  \"context\": {\n    \"fileName\": [\"GEMINI.md\", \"AGENTS.md\"]\n  }\n}\n"}},
 }
 
 // grokRemoved is Grok's deny list, a profile's disallowedTools: its scheduler, workflow,

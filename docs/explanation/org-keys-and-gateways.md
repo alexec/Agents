@@ -50,7 +50,7 @@ them. It makes a token from each one (AWS STS, Google OAuth, Entra) and sends th
 sealed, to each machine. The token ends within an hour. A new token goes out about 10
 minutes before the old one ends. An offline machine loses that gateway within an hour.
 
-A plain key (an Anthropic, OpenAI, Gemini or xAI key, a Bedrock API key, an Azure key, or a
+A plain key (an Anthropic, OpenAI or xAI key, a Bedrock API key, an Azure key, or a
 gateway's key) goes to the machine as it is, sealed. It works offline.
 
 ## What this does not protect against

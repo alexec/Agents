@@ -1,8 +1,10 @@
 #if canImport(Security)
 import Foundation
 
-/// Asking the provider whether a credential works, when it is saved (043, FR-011, R9):
-/// Google for Gemini's key (046), the only kind Settings still takes (056).
+/// Asking the provider whether a credential works, when it is saved (043, FR-011, R9).
+/// No `CredentialKind` case takes one now that Gemini, the only kind Settings offered
+/// (056), is retired (#3043); `check` can never be called with a real `Secret` (its kind
+/// is uninhabited), so this always falls through to the provider-agnostic request below.
 ///
 /// The window's, not a daemon's: the daemons have no network code. One free call, the
 /// list of models, answered 200 for a credential that works and 401 for one that does not.
@@ -15,10 +17,6 @@ public struct CredentialCheck: Sendable {
         case cannotCheck(String)
     }
 
-    /// Google's list of models: free, and 200 for a key that works. The key goes in a
-    /// header, never the URL, so no proxy log can keep it.
-    public static let geminiEndpoint = URL(string: "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1")!
-
     let session: URLSession
     let timeout: TimeInterval
 
@@ -29,18 +27,13 @@ public struct CredentialCheck: Sendable {
 
     public func check(_ secret: Secret) async -> Answer {
         let request = Self.request(for: secret, timeout: timeout)
-        let provider = switch secret.kind {
-        case .geminiAPIKey: "Google"
-        }
         do {
             let (data, response) = try await session.data(for: request)
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             switch status {
             case 200: return .works
-            case 401, 403: return .refused(Self.message(data) ?? "\(provider) refused it.")
-            // Google answers a key it does not know with 400 and `API_KEY_INVALID`.
-            case 400 where Self.isInvalidKey(data): return .refused(Self.message(data) ?? "Google refused it.")
-            default: return .cannotCheck("\(provider) answered \(status).")
+            case 401, 403: return .refused(Self.message(data) ?? "It refused it.")
+            default: return .cannotCheck("It answered \(status).")
             }
         } catch {
             return .cannotCheck(error.localizedDescription)
@@ -48,16 +41,7 @@ public struct CredentialCheck: Sendable {
     }
 
     static func request(for secret: Secret, timeout: TimeInterval = 10) -> URLRequest {
-        switch secret.kind {
-        case .geminiAPIKey:
-            var request = URLRequest(url: geminiEndpoint, timeoutInterval: timeout)
-            request.setValue(secret.reveal(), forHTTPHeaderField: "x-goog-api-key")
-            return request
-        }
-    }
-
-    static func isInvalidKey(_ data: Data) -> Bool {
-        String(decoding: data, as: UTF8.self).contains("API_KEY_INVALID")
+        switch secret.kind {}
     }
 
     /// The `error.message` of the provider's error body, which is a sentence.

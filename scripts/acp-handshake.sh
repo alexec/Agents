@@ -42,8 +42,6 @@ RUNTIMES = {
     # Never the person's npx or codex-acp (047, R1): the app's own toolset's shim, named by
     # AGENTS_CODEX_SHIM, e.g. <cache>/tools/codex/current/bin/codex-acp.
     "codex": [os.environ.get("AGENTS_CODEX_SHIM", "agents-codex-shim-not-set")],
-    # Never a gemini on the PATH (046, D1): the app's own toolset's shim.
-    "gemini": [os.environ.get("AGENTS_GEMINI_SHIM", "agents-gemini-shim-not-set"), "--acp", "--skip-trust"],
     # Google's ACP server, never the agy CLI (049, R1): the app's own copy's shim, named by
     # AGENTS_ANTIGRAVITY_SHIM, e.g. <cache>/tools/antigravity/current/bin/agy_acp_server.
     "antigravity": [os.environ.get("AGENTS_ANTIGRAVITY_SHIM", "agents-antigravity-shim-not-set")],
@@ -144,11 +142,6 @@ OPTIONS = {
     "grok": {
         "model": (None, UNDER_PROMPT),
         "reasoning_effort": (["xhigh", "high", "medium", "low"], UNDER_PROMPT),
-    },
-    # From the older `modes` and `models`: Gemini 0.61.0 sends no configOptions.
-    "gemini": {
-        "mode": (["default", "autoEdit", "yolo", "plan"], UNDER_PROMPT),
-        "model": (None, UNDER_PROMPT),
     },
     "antigravity": {
         "mode": (["default", "auto_edit", "yolo"], UNDER_PROMPT),
@@ -316,8 +309,8 @@ def check_options(name, session):
     known = OPTIONS.get(name, {})
     offered = session.get("configOptions") or []
     if not offered:
-        # Gemini sends no configOptions, only the older `modes` and `models`, which the
-        # app turns into the same two options. Read as those.
+        # A runtime that sends no configOptions, only the older `modes` and `models`,
+        # which the app turns into the same two options. Read as those.
         modes = (session.get("modes") or {}).get("availableModes") or []
         models = (session.get("models") or {}).get("availableModels") or []
         if modes:

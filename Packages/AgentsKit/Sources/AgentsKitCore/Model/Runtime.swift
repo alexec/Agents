@@ -18,9 +18,9 @@ public struct Runtime: Codable, Hashable, Sendable, Identifiable {
     /// leave the person somewhere better than an error.
     public var installPage: URL
     /// Started only from the app's own toolset, never from anything on the person's PATH
-    /// (047, 046). Claude goes through the person's `npx` when there is one; Codex and
-    /// Gemini do not, because what runs has to be the exact pinned lock, and because the
-    /// person's own `codex-acp` or `gemini` on the PATH would otherwise win.
+    /// (047). Claude goes through the person's `npx` when there is one; Codex does not,
+    /// because what runs has to be the exact pinned lock, and because the person's own
+    /// `codex-acp` on the PATH would otherwise win.
     public var usesAppCopyOnly: Bool
     /// The variable that names the folder its sign-in is kept in, for a runtime that can
     /// have more than one account (#840): `CLAUDE_CONFIG_DIR`, `CODEX_HOME`. Nil for one

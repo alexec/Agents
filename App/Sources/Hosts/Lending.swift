@@ -86,45 +86,25 @@ extension AppModel {
         return DaemonAPI.CredentialsOffer(runtimes: runtimes, ownSignInOnly: ownOnly, notRelayed: nil, signIns: nil)
     }
 
-    /// A server's daemon wants a credential to start a runtime (043, R6). Lends the one in
-    /// Settings; with none, asks the person first. True when it lent one, and the call
-    /// that was refused is then sent again.
+    /// A server's daemon wants a credential to start a runtime (043, R6): a sign-in this
+    /// Mac relays, to a server of the control plane (T091). No runtime takes a pasted key
+    /// now that Gemini, the last one that did, is retired (#3043), so there is no other way
+    /// to answer one.
     func answerCredentialWanted(_ wanted: DaemonAPI.CredentialWanted, on id: MachineRef) async -> Bool {
         guard id != .mac, !(hosts.host(id)?.ownSignInOnly ?? false) else { return false }
-        // A sign-in this Mac relays, to a server of the control plane (T091).
-        if let relayed = await relaySignInThroughControl(wanted, to: id) { return relayed }
-        if credentials.secretToLend(wanted.runtime) == nil {
-            let saved = await withCheckedContinuation { answer in
-                let label = hosts.label(id)
-                tokenAsk = TokenAsk(runtimeID: wanted.runtime, host: id, label: label,
-                                    keeping: "Paste a key and Agents keeps it in this Mac’s Keychain, and lends it to \(label) only while an agent runs there.",
-                                    whereToGet: CredentialKind.whereToGet(for: wanted.runtime),
-                                    action: "Save and start", answer: answer)
-            }
-            guard saved else { return false }
-        }
-        guard let secret = credentials.secretToLend(wanted.runtime) else { return false }
-        // A host the control plane reaches is lent on its channel (058, FR-020). One
-        // this window still reaches over its own ssh is lent the way it always was.
-        if let lent = await lendThroughControl(id, runtime: wanted.runtime, secret: secret, offered: wanted.offered) {
-            return lent
-        }
-        return false
+        return await relaySignInThroughControl(wanted, to: id) ?? false
     }
 
-    /// What this Mac's own agents are lent (046, D3): Gemini's key, which is the only way
-    /// into Gemini for an individual. Offered then lent on every connect and whenever a key
-    /// is saved or removed; an offer without it tells the daemon to stop lending it.
+    /// What this Mac's own agents are lent (046, D3): no runtime takes a pasted key now
+    /// that Gemini, the last one that did, is retired (#3043), so this always offers none.
+    /// Offered then lent on every connect and whenever a key is saved or removed; an offer
+    /// without it tells the daemon to stop lending it.
     func lendToThisMac() async {
         let runtimes = ServerCredentials.runtimes.filter { id in
             credentials.record(id) != nil && CredentialKind.kinds(for: id).contains(where: \.isLentOnTheMac)
         }
         _ = try? await client(for: .mac).call(DaemonAPI.Method.credentialsOffer,
                                    DaemonAPI.CredentialsOffer(runtimes: runtimes, ownSignInOnly: false))
-        for id in runtimes {
-            guard let secret = credentials.secretToLend(id) else { continue }
-            _ = try? await client(for: .mac).call(DaemonAPI.Method.credentialsLend, DaemonAPI.CredentialsLend(runtime: id, secret: secret))
-        }
     }
 
     /// This Mac's daemon wants a key it was not lent (a start raced the connect's lend, or
@@ -134,21 +114,5 @@ extension AppModel {
         guard credentials.secretToLend(wanted.runtime) != nil else { return false }
         await lendToThisMac()
         return true
-    }
-
-    /// The person answered the ask: pasted and saved (true), or cancelled.
-    func finishTokenAsk(saved: Bool) {
-        guard let ask = tokenAsk else { return }
-        tokenAsk = nil
-        ask.answer.resume(returning: saved)
-    }
-
-    /// A server spent money: a model answered, so whatever sign-in it was lent worked
-    /// (043, FR-011). Gemini's key is the only one lent since 056.
-    func noteServerSpent(_ id: MachineRef) {
-        guard id != .mac, !(hosts.host(id)?.ownSignInOnly ?? false),
-              let record = credentials.record(RuntimeCatalog.gemini.id),
-              (record.lastWorked ?? .distantPast) < Date().addingTimeInterval(-60) else { return }
-        credentials.markWorked(RuntimeCatalog.gemini.id)
     }
 }

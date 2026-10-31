@@ -8,7 +8,7 @@ import Testing
 struct RuntimeOrderTests {
     @Test func theCatalogIsAlphabeticalByName() {
         #expect(RuntimeCatalog.builtIn.map(\.name)
-                == ["Antigravity", "Claude", "Codex", "Copilot", "Cursor", "Gemini", "Grok", "OpenCode"])
+                == ["Antigravity", "Claude", "Codex", "Copilot", "Cursor", "Grok", "OpenCode"])
     }
 
     @Test func theDefaultIsClaudeWhereverItSorts() {

@@ -387,10 +387,6 @@ public enum DaemonAPI {
         /// socket was forwarded to on the server, the certificate it answers with, and the
         /// stand-in sign-in the runtime is given. Nothing secret; sent on every connect.
         public static let relayOffer = "relay/offer"
-        /// A credential for one runtime, for this connection only, sent only after the
-        /// daemon answered `credentialWanted`. Held in memory and dropped when the
-        /// connection closes; a daemon without `--serve` refuses it (043, D5).
-        public static let credentialsLend = "credentials/lend"
         /// A window lends this Mac's own file sign-in for one runtime (049: OpenCode's).
         public static let credentialsLendSignIn = "credentials/lendSignIn"
         /// The folders at a path, before there is any folder or agent to scope it to:
@@ -4004,23 +4000,6 @@ public extension DaemonAPI {
             self.socketPath = socketPath
             self.caCertificate = caCertificate
             self.standIn = standIn
-        }
-    }
-
-    /// `credentials/lend` (043). The one message that carries a credential's text. It is
-    /// never logged: the server prints only the method's name for it.
-    struct CredentialsLend: Codable, Hashable, Sendable, CustomStringConvertible, CustomReflectable {
-        public var runtime: String
-        public var kind: CredentialKind
-        public var secret: String
-
-        public var description: String { "CredentialsLend(\(runtime), \(kind.rawValue))" }
-        public var customMirror: Mirror { Mirror(self, children: ["runtime": runtime, "kind": kind]) }
-
-        public init(runtime: String, secret: Secret) {
-            self.runtime = runtime
-            self.kind = secret.kind
-            self.secret = secret.reveal()
         }
     }
 

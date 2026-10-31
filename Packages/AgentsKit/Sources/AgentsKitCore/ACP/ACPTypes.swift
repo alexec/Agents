@@ -6,7 +6,7 @@ import Foundation
 /// `JSONValue` and is either kept whole or ignored.
 ///
 /// `_meta` is read in a few named places and nowhere else: `authMethods[]._meta.terminal-auth`
-/// (the command that signs in), `PromptResponse._meta.quota` (Gemini's tokens),
+/// (the command that signs in), `PromptResponse._meta.quota` (a runtime's own usage figure),
 /// `initialize`'s `_meta.steering.supported` (the marker for `_session/steering`) and
 /// `agentCapabilities._meta.authStatus` (the marker for `_auth/status_update`). It is
 /// written on `session/new`, `load`, `resume` and `fork` for tool scoping and plugins,
@@ -41,7 +41,7 @@ public enum ACP {
         /// method-not-found; this spelling is the one that exists.
         public static let setConfigOption = "session/set_config_option"
         /// The older way to set a mode or a model, for a runtime that advertises
-        /// `modes` and `models` but no `configOptions`. Gemini CLI is one (046).
+        /// `modes` and `models` but no `configOptions`.
         /// `set_config_option` is used wherever the runtime offers it.
         public static let setSessionMode = "session/set_mode"
         public static let setSessionModel = "session/set_model"

@@ -294,7 +294,7 @@ func ToolsetFolder() string {
 // needs to install a Node toolset itself, for the runtimes hosts/install installs that way.
 var toolsetFileNames = func() map[string]bool {
 	names := map[string]bool{}
-	for _, runtime := range []string{"claude", "codex", "gemini"} {
+	for _, runtime := range []string{"claude", "codex"} {
 		for _, file := range []string{"manifest.json", "package.json", "package-lock.json"} {
 			names[runtime+"/"+file] = true
 		}

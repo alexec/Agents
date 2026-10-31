@@ -60,7 +60,7 @@ also asked that.
 Nothing uncommitted comes along: a new worktree starts from the last commit of the folder
 the agent is leaving, and what was not committed stays where it was.
 
-An agent on Grok, Gemini or Antigravity cannot move: those runtimes can't carry their
+An agent on Grok or Antigravity cannot move: those runtimes can't carry their
 conversation into another folder, or haven't been checked. The choice is greyed out and its
 tooltip says why. Start a new agent in a worktree instead.
 

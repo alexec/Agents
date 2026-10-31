@@ -79,7 +79,7 @@ When Cursor, Grok or OpenCode is set to **Always-approve** under its prompt, eve
 permission request from that runtime is answered for you: no card, no **Needs you**, and
 no notification. The value applies to every agent on that runtime, including workflow
 agents and agents in server folders. Questions that are not permission to act still wait
-as above, including Grok's questions in words. Claude, Codex, Gemini, Antigravity and
+as above, including Grok's questions in words. Claude, Codex, Antigravity and
 Copilot keep asking the way they always have.
 
 ### When a runtime's sandbox could not start
@@ -100,8 +100,7 @@ start**, with **Show error details** for the runtime's own words.
 Where the app cannot turn a runtime's sandbox off, the card says so and has no **Continue**.
 The same card, and the same choice, are on iPhone and iPad. A command refused *inside* a
 working sandbox, such as a write outside the folder, is an ordinary failed command and
-brings no card. Gemini that never answers when it starts gets the card too: its own
-sandbox, turned on in its settings, stops it answering the app.
+brings no card.
 
 ## If it doesn't work
 

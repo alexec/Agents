@@ -380,7 +380,6 @@ func TestTheModelRelay(t *testing.T) {
 	}{
 		{"anthropic-key", wire.OrgRouteKindKey, wire.OrgRouteVendorAnthropic, map[string]string{"apiKey": "ak"}, "X-Api-Key", "ak"},
 		{"openai-key", wire.OrgRouteKindKey, wire.OrgRouteVendorOpenai, map[string]string{"apiKey": "ok"}, "Authorization", "Bearer ok"},
-		{"gemini-key", wire.OrgRouteKindKey, wire.OrgRouteVendorGemini, map[string]string{"apiKey": "gk"}, "X-Goog-Api-Key", "gk"},
 		{"bedrock-key", wire.OrgRouteKindBedrock, "", map[string]string{"apiKey": "bk"}, "Authorization", "Bearer bk"},
 		{"vertex", wire.OrgRouteKindVertex, "", map[string]string{"googleToken": "ya29.t"}, "Authorization", "Bearer ya29.t"},
 		{"azure-openai", wire.OrgRouteKindAzure, wire.OrgRouteVendorOpenai, map[string]string{"apiKey": "zk"}, "Api-Key", "zk"},
@@ -670,7 +669,6 @@ func TestEachRuntimesOrgLaunch(t *testing.T) {
 	t.Setenv("ANTHROPIC_API_KEY", "sk-person")
 	t.Setenv("ANTHROPIC_BASE_URL", "https://person.example")
 	t.Setenv("OPENAI_API_KEY", "sk-person-openai")
-	t.Setenv("GEMINI_API_KEY", "person-gemini")
 	t.Setenv("AWS_PROFILE", "person")
 	d, _, public := orgMachine(t, root, newControlKeys(t))
 	d.mu.Lock()
@@ -679,10 +677,9 @@ func TestEachRuntimesOrgLaunch(t *testing.T) {
 	routes := []wire.DeliveredRoute{
 		testRoute(t, public, "ckey", 1, wire.OrgRouteKindKey, wire.OrgRouteVendorAnthropic, "", map[string]string{"apiKey": "k"}, "claude"),
 		testRoute(t, public, "cbed", 1, wire.OrgRouteKindBedrock, "", "", map[string]string{"apiKey": "k"}, "claude"),
-		testRoute(t, public, "cvtx", 1, wire.OrgRouteKindVertex, "", "", map[string]string{"googleToken": "k"}, "claude", "gemini"),
+		testRoute(t, public, "cvtx", 1, wire.OrgRouteKindVertex, "", "", map[string]string{"googleToken": "k"}, "claude"),
 		testRoute(t, public, "caz", 1, wire.OrgRouteKindAzure, wire.OrgRouteVendorAnthropic, "", map[string]string{"apiKey": "k"}, "claude"),
 		testRoute(t, public, "xkey", 1, wire.OrgRouteKindKey, wire.OrgRouteVendorOpenai, "", map[string]string{"apiKey": "k"}, "codex", "opencode"),
-		testRoute(t, public, "gkey", 1, wire.OrgRouteKindKey, wire.OrgRouteVendorGemini, "", map[string]string{"apiKey": "k"}, "gemini"),
 		// Not built here: OpenCode on Bedrock, and a vendor Claude does not speak.
 		testRoute(t, public, "obed", 1, wire.OrgRouteKindBedrock, "", "", map[string]string{"apiKey": "k"}, "opencode"),
 		testRoute(t, public, "cwrong", 1, wire.OrgRouteKindKey, wire.OrgRouteVendorOpenai, "", map[string]string{"apiKey": "k"}, "claude"),
@@ -704,7 +701,7 @@ func TestEachRuntimesOrgLaunch(t *testing.T) {
 	}
 	person := func(e map[string]string) {
 		t.Helper()
-		for _, v := range []string{"sk-person", "https://person.example", "sk-person-openai", "person-gemini"} {
+		for _, v := range []string{"sk-person", "https://person.example", "sk-person-openai"} {
 			for k, got := range e {
 				if got == v {
 					t.Fatalf("%s=%s from the person reached an org launch", k, v)
@@ -746,19 +743,6 @@ func TestEachRuntimesOrgLaunch(t *testing.T) {
 		e["CODEX_CA_CERTIFICATE"] != rl.caFile || !strings.HasPrefix(e[orgStandInVariable], "agents-relay-") ||
 		strings.Contains(string(config), e[orgStandInVariable]) {
 		t.Fatalf("%v %s", e, config)
-	}
-	e = launch("gemini", "org:gkey")
-	person(e)
-	settings, _ := os.ReadFile(filepath.Join(e["GEMINI_CLI_HOME"], ".gemini", "settings.json"))
-	if e["GOOGLE_GEMINI_BASE_URL"] != base+"/gkey" || !strings.HasPrefix(e["GEMINI_API_KEY"], "agents-relay-") ||
-		!strings.Contains(string(settings), `"gemini-api-key"`) {
-		t.Fatalf("%v %s", e, settings)
-	}
-	e = launch("gemini", "org:cvtx")
-	settings, _ = os.ReadFile(filepath.Join(e["GEMINI_CLI_HOME"], ".gemini", "settings.json"))
-	if e["GOOGLE_GENAI_USE_VERTEXAI"] != "true" || e["GOOGLE_VERTEX_BASE_URL"] != base+"/cvtx" || e["GOOGLE_CLOUD_PROJECT"] != "acme-proj" ||
-		!strings.Contains(string(settings), `"vertex-ai"`) {
-		t.Fatalf("%v %s", e, settings)
 	}
 	e = launch("opencode", "org:xkey")
 	person(e)
@@ -1146,8 +1130,6 @@ func TestTheRelayCountsTheProvidersTokens(t *testing.T) {
 			"/v1/responses", wire.RelayTokens{Input: 200, Output: 20, CacheRead: 100}},
 		{"chat completions stream", sse(`{"object":"chat.completion.chunk","choices":[]}`, `{"object":"chat.completion.chunk","choices":[],"usage":{"prompt_tokens":50,"completion_tokens":7,"prompt_tokens_details":{"cached_tokens":10}}}`, `[DONE]`),
 			"/v1/chat/completions", wire.RelayTokens{Input: 40, Output: 7, CacheRead: 10}},
-		{"gemini stream", sse(`{"candidates":[],"usageMetadata":{"promptTokenCount":80,"candidatesTokenCount":3}}`, `{"candidates":[],"usageMetadata":{"promptTokenCount":80,"candidatesTokenCount":9,"cachedContentTokenCount":30,"thoughtsTokenCount":4}}`),
-			"/v1beta/models/gemini:streamGenerateContent", wire.RelayTokens{Input: 50, Output: 13, CacheRead: 30}},
 		{"bedrock stream", bedrock(`{"type":"message_start","message":{"usage":{"input_tokens":70,"output_tokens":1}}}`, `{"type":"message_delta","usage":{"output_tokens":33}}`),
 			"/model/m/invoke-with-response-stream", wire.RelayTokens{Input: 70, Output: 33}},
 	}

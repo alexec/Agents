@@ -113,7 +113,7 @@ public struct ServerFacts: Codable, Hashable, Sendable {
     /// runtime id to the toolset id its `current` points at.
     public var toolsetIDs: [String: String] = [:]
     /// Runtimes with a sign-in of their own on the server, found in its login environment
-    /// (046: `GEMINI_API_KEY`). Only ever names; Claude's stays `hasOwnClaudeSignIn`.
+    /// (046: a runtime-named API key variable). Only ever names; Claude's stays `hasOwnClaudeSignIn`.
     public var ownSignIns: Set<String> = []
     /// The person's own `npx` on their login PATH (037's way to run Claude).
     public var hasNpx: Bool = false

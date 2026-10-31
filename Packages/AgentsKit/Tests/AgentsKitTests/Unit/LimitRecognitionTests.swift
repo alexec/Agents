@@ -80,15 +80,10 @@ struct LimitRecognitionTests {
         #expect(LimitRecognition.classify(error: (-32603, "You've hit your stride"), runtimeID: "grok") == .none)
     }
 
-    /// The rows of 046's `UsageLimitTests`, moved here and split in two.
-    @Test func geminisSpentFreeTierIsSpent() {
-        #expect(LimitRecognition.classify(error: (429, "You have exhausted your daily quota on this model."),
-                                          runtimeID: "gemini") == .spent(resetsAt: nil))
-    }
-
-    @Test func geminisOtherLimitsAreRateLimits() {
-        #expect(LimitRecognition.classify(error: (429, "Too many requests"), runtimeID: "gemini") == .rateLimited(retryAfter: nil))
-        #expect(LimitRecognition.classify(error: (-32603, "RESOURCE_EXHAUSTED: rate limit exceeded"), runtimeID: "gemini")
+    /// The generic rate-limit words, read off no runtime's own classification (layer 3).
+    @Test func uncapturedRateLimitWordsAreRateLimits() {
+        #expect(LimitRecognition.classify(error: (429, "Too many requests"), runtimeID: "opencode") == .rateLimited(retryAfter: nil))
+        #expect(LimitRecognition.classify(error: (-32603, "RESOURCE_EXHAUSTED: rate limit exceeded"), runtimeID: "opencode")
                 == .rateLimited(retryAfter: nil))
     }
 

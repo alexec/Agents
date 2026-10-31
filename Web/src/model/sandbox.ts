@@ -12,7 +12,6 @@ const catalog: Record<string, { route: Route; why?: string }> = {
   claude: { route: "choices" },
   codex: { route: "codexMode" },
   grok: { route: { fixed: "runtimeControlled" }, why: "Grok 1.0.67 does not accept --sandbox with agent stdio. The app cannot change Grok’s sandbox." },
-  gemini: { route: "offOnly", why: "Gemini’s own sandbox cannot start when the app runs it, so On is not offered." },
   cursor: { route: { fixed: "runtimeControlled" }, why: "Cursor’s own sandbox setting decides. The app cannot change it." },
   copilot: { route: { fixed: "runtimeControlled" }, why: "Copilot’s own sandbox setting decides. The app cannot change it yet." },
   antigravity: { route: { fixed: "none" },

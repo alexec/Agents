@@ -27,9 +27,9 @@ func TestAnAddedAccount(t *testing.T) {
 	d, c := start(t, root)
 	defer d.Shutdown()
 
-	if e := c.callError(t, 1, "runtimes/addAccount", map[string]any{"runtimeID": "gemini", "name": "Work"}); e == nil ||
+	if e := c.callError(t, 1, "runtimes/addAccount", map[string]any{"runtimeID": "grok", "name": "Work"}); e == nil ||
 		!strings.Contains(e.Message, "one account") {
-		t.Fatalf("Gemini took a second account: %+v", e)
+		t.Fatalf("Grok took a second account: %+v", e)
 	}
 	var p wire.AccountProfile
 	json.Unmarshal(c.call(t, 2, "runtimes/addAccount", map[string]any{"runtimeID": "claude", "name": " Work "}), &p)
@@ -137,7 +137,7 @@ func TestCodexAccountSignedInAs(t *testing.T) {
 
 func TestAccountKeys(t *testing.T) {
 	id := "abc"
-	if accountKey("claude", nil) != "claude:sign-in" || accountKey("gemini", nil) != "gemini:geminiAPIKey" ||
+	if accountKey("claude", nil) != "claude:sign-in" ||
 		accountKey("claude", &id) != "claude:account:abc" || keyAccount("claude:account:abc") != "abc" || keyAccount("claude:sign-in") != "" {
 		t.Fatal("keys")
 	}

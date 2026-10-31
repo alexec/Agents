@@ -5977,30 +5977,6 @@
       ],
       "additionalProperties": false
     },
-    "CredentialKind": {
-      "type": "string",
-      "const": "geminiAPIKey"
-    },
-    "CredentialsLend": {
-      "type": "object",
-      "properties": {
-        "runtime": {
-          "type": "string"
-        },
-        "kind": {
-          "$ref": "#/definitions/CredentialKind"
-        },
-        "secret": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "runtime",
-        "kind",
-        "secret"
-      ],
-      "additionalProperties": false
-    },
     "CredentialsOffer": {
       "type": "object",
       "properties": {
@@ -14296,7 +14272,6 @@
       "enum": [
         "anthropic",
         "openai",
-        "gemini",
         "xai"
       ],
       "description": "An org route's vendor (#999): whose key a key route holds, and the API shape of a base-URL or Azure route."

@@ -120,14 +120,14 @@ struct ControlUplinkTests {
         try control.open(2, device: phone)
         await eventually { uplink.openChannels == [1, 2] }
 
-        try control.ask(1, id: 1, DaemonAPI.Method.credentialsLend)
-        try control.ask(2, id: 1, DaemonAPI.Method.credentialsLend)
+        try control.ask(1, id: 1, DaemonAPI.Method.credentialsOffer)
+        try control.ask(2, id: 1, DaemonAPI.Method.credentialsOffer)
         try control.ask(2, id: 2, DaemonAPI.Method.agentsList)
         await eventually { control.lines(on: 1).count == 1 && control.lines(on: 2).count == 2 }
 
         #expect(control.lines(on: 1).first?.contains(#""ok":true"#) == true)
         #expect(control.lines(on: 2).allSatisfy { $0.contains(#""ok":true"#) })
-        let lends = heard.all.filter { $0.method == DaemonAPI.Method.credentialsLend }
+        let lends = heard.all.filter { $0.method == DaemonAPI.Method.credentialsOffer }
         #expect(Set(lends.map(\.role)) == [.control, .device])
         // The device's channel is that device, as the bridge would have made it.
         let list = heard.all.first { $0.method == DaemonAPI.Method.agentsList }

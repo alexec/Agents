@@ -20,7 +20,9 @@ public struct CredentialStore: Sendable {
         public var lastWorked: Date?
         public var lastRefused: Date?
 
-        public var mask: String { Secret.mask(kind: kind, lastFour: lastFour) }
+        public var mask: String {
+            switch kind {}
+        }
     }
 
     public struct Failure: Error, Equatable, Sendable {
@@ -117,8 +119,9 @@ public struct CredentialStore: Sendable {
         ]
         let status = SecItemAdd(item as CFDictionary, nil)
         guard status == errSecSuccess else { throw Failure(status: status) }
+        // No case to build a Record with, since nothing is ever a Secret.
         try update(runtimeID) { _ in
-            Record(kind: secret.kind, lastFour: secret.lastFour, addedAt: date)
+            switch secret.kind {}
         }
     }
 

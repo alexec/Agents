@@ -24,13 +24,10 @@ func TestEachRuntimesSandboxAsItTakesIt(t *testing.T) {
 	if l, _ := withSandbox(acp.Launch{Args: []string{"acp"}}, nil, "grok", wire.SandboxChoiceOn); !slices.Equal(l.Args, []string{"acp"}) {
 		t.Fatal(l.Args)
 	}
-	if l, _ := withSandbox(acp.Launch{Env: []string{"GEMINI_SANDBOX=true", "A=b"}}, nil, "gemini", wire.SandboxChoiceOff); !slices.Equal(l.Env, []string{"A=b", "GEMINI_SANDBOX=false"}) {
-		t.Fatal(l.Env)
-	}
 	if l, m := withSandbox(acp.Launch{Args: []string{"acp"}}, nil, "grok", wire.SandboxChoiceRuntime); len(l.Args) != 1 || m != nil {
 		t.Fatal(l.Args, m)
 	}
-	if c := sandboxChoices("gemini"); len(c) != 2 || sandboxChoices("cursor") != nil || sandboxChoices("grok") != nil || len(sandboxChoices("claude")) != 3 {
+	if c := sandboxChoices("cursor"); c != nil || sandboxChoices("grok") != nil || len(sandboxChoices("claude")) != 3 {
 		t.Fatal(c)
 	}
 	if m, ok := codexStartMode("codex", wire.SandboxChoiceOff, "auto"); !ok || m != codexFullAccess {

@@ -1,12 +1,10 @@
 import Foundation
 
-/// When a free tier's quota comes back (052). Gemini's daily quota resets at midnight
-/// Pacific; a free tier we know nothing about falls back to trying again in an hour.
+/// When a free tier's quota comes back (052): a daily reset at a fixed hour in a time
+/// zone, or a free tier we know nothing about, which falls back to trying again in an hour.
 public enum ResetRule: Codable, Hashable, Sendable {
     case dailyAt(hour: Int, timeZone: String)
     case unknown
-
-    public static let gemini = ResetRule.dailyAt(hour: 0, timeZone: "America/Los_Angeles")
 
     /// The first reset strictly after `date`. Worked in the rule's own time zone, so a
     /// daylight-saving change moves it with the clock rather than by an hour.

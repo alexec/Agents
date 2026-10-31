@@ -27,8 +27,7 @@ var sandboxFailurePatterns = map[string]struct {
 }{
 	"claude": {patterns: []string{"Sandbox required but unavailable", seatbelt}},
 	"codex":  {patterns: []string{seatbelt, "bwrap: No permissions to create a new namespace"}, readsReply: true},
-	"grok":   {patterns: []string{"Refusing to start with its protections missing", "sandbox initialization failed"}},
-	"gemini": {patterns: []string{"failed to determine command for sandbox", "Missing sandbox command", seatbelt}},
+	"grok": {patterns: []string{"Refusing to start with its protections missing", "sandbox initialization failed"}},
 }
 
 const carryOnWithoutSandbox = "The command sandbox is now off. Carry on with the task."

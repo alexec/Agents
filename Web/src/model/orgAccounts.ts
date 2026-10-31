@@ -18,7 +18,7 @@ export const kinds: readonly OrgRouteKind[] = ["key", "bedrock", "vertex", "azur
 export const kindNames: Record<OrgRouteKind, string> = {
   key: "Org key", bedrock: "Amazon Bedrock", vertex: "Google Vertex AI", azure: "Microsoft Azure", baseURL: "Gateway",
 };
-export const vendorNames: Record<OrgRouteVendor, string> = { anthropic: "Anthropic", openai: "OpenAI", gemini: "Google Gemini", xai: "xAI" };
+export const vendorNames: Record<OrgRouteVendor, string> = { anthropic: "Anthropic", openai: "OpenAI", xai: "xAI" };
 
 export function kindName(kind: string): string {
   return kindNames[kind as OrgRouteKind] ?? kind;
@@ -28,12 +28,11 @@ export function kindName(kind: string): string {
 export const runtimeKinds: Record<string, readonly OrgRouteKind[]> = {
   claude: ["key", "bedrock", "vertex", "azure", "baseURL"],
   codex: ["key", "azure", "baseURL"],
-  gemini: ["key", "vertex", "baseURL"],
   opencode: ["key", "bedrock", "vertex", "azure", "baseURL"],
 };
 /** The API each runtime speaks, for a key, Azure or base-URL route (orgRouteVendors). */
 export const runtimeVendors: Record<string, readonly OrgRouteVendor[]> = {
-  claude: ["anthropic"], codex: ["openai"], gemini: ["gemini"], opencode: ["anthropic", "openai"],
+  claude: ["anthropic"], codex: ["openai"], opencode: ["anthropic", "openai"],
 };
 /** The runtimes whose model traffic the machine's relay can carry. */
 export const routeRuntimes: readonly string[] = Object.keys(runtimeKinds).sort((a, b) => runtimeName(a).localeCompare(runtimeName(b)));

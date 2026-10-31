@@ -16,7 +16,7 @@ of, the components inside the host daemon, and how they run as processes on a Ma
 
 You use Agents to run coding agents on hosts you own, and follow and answer them from a
 Mac, an iPhone, an iPad or a browser. Agents does not talk to a model itself. It starts and
-drives an **agent runtime** (Claude Code, Codex, Copilot, OpenCode, Cursor, Grok or Gemini)
+drives an **agent runtime** (Claude Code, Codex, Copilot, OpenCode, Cursor or Grok)
 over ACP, and the runtime prompts its own provider. A runtime calls back into Agents for the
 app's own tools (`mcp__agents__*`) over MCP.
 

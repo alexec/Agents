@@ -76,7 +76,7 @@ type toolset struct {
 
 // toolsetExecutables is RuntimeCatalog's executable for each runtime the app installs as
 // a Node toolset: the shim's name in bin/, which discovery looks for (Toolset.shimName).
-var toolsetExecutables = map[string]string{"claude": "npx", "codex": "codex-acp", "gemini": "gemini"}
+var toolsetExecutables = map[string]string{"claude": "npx", "codex": "codex-acp"}
 
 func (t toolset) shimName() string {
 	if name, ok := toolsetExecutables[t.manifest.RuntimeID]; ok {
@@ -235,8 +235,6 @@ func runtimeName(id string) string {
 		return "Claude"
 	case "codex":
 		return "Codex"
-	case "gemini":
-		return "Gemini"
 	}
 	return id
 }

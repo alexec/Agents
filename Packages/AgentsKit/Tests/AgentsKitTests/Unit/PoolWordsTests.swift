@@ -24,7 +24,7 @@ struct PoolWordsTests {
 
     @Test func eachPaymentHasItsCapsule() {
         #expect(PoolWords.payment(.allowance(label: "ChatGPT plan")) == "Allowance · ChatGPT plan")
-        #expect(PoolWords.payment(.freeTier(reset: .gemini)) == "Free tier · resets daily")
+        #expect(PoolWords.payment(.freeTier(reset: .dailyAt(hour: 0, timeZone: "America/Los_Angeles"))) == "Free tier · resets daily")
         #expect(PoolWords.payment(.prepaid(amount: Cost(amount: 10, currency: "USD"), expires: nil),
                                   spent: .known(Cost(amount: Decimal(string: "3.2")!, currency: "USD")))
                 .hasPrefix("Prepaid credit · ≈ "))
@@ -41,6 +41,6 @@ struct PoolWordsTests {
         var told = AllowanceState(credentialKey: "codex:sign-in", entryID: UUID(), since: now)
         told.markOut(.allowanceSpent, until: now.addingTimeInterval(60), payment: .allowance(label: nil), now: now, from: .typedFailure)
         #expect(PoolWords.ranOut("codex", state: told, now: now).hasPrefix("Codex’s allowance ran out. Its provider says it resets at "))
-        #expect(PoolWords.creditGone("gemini") == "Gemini’s credit is used up.")
+        #expect(PoolWords.creditGone("cursor") == "Cursor’s credit is used up.")
     }
 }

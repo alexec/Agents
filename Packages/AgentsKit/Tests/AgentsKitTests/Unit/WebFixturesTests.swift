@@ -1153,12 +1153,12 @@ struct WebFixturesTests {
 
         let starts: [(String, String?, String?, [String])] = [
             ("last used wins over Claude and the kept choice", "codex", "grok", ["claude", "codex", "grok"]),
-            ("unavailable last used falls back to kept choice", "gemini", "grok", ["claude", "grok"]),
+            ("unavailable last used falls back to kept choice", "cursor", "grok", ["claude", "grok"]),
             ("kept and startable", nil, "grok", ["claude", "codex", "grok"]),
-            ("kept but gone", nil, "gemini", ["claude", "codex"]),
+            ("kept but gone", nil, "cursor", ["claude", "codex"]),
             ("nothing kept", nil, nil, ["codex", "claude"]),
-            ("no Claude", nil, nil, ["gemini", "codex"]),
-            ("kept, no Claude", nil, "opencode", ["codex", "gemini"]),
+            ("no Claude", nil, nil, ["cursor", "codex"]),
+            ("kept, no Claude", nil, "opencode", ["codex", "cursor"]),
             ("none can start", nil, "claude", []),
             ("kept Auto wins over last used", "claude", "auto", ["auto", "claude", "codex"]),
             ("kept Auto that cannot start falls back to last used", "claude", "auto", ["claude", "codex"]),
