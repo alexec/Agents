@@ -108,8 +108,8 @@ public extension DaemonAPI {
 }
 
 /// A session's Lineage pane (#2940), as `Web/src/model/lineage.ts` has it on the web page: the
-/// nodes the session is linked to, in groups by kind, each with its links and, for an issue or a
-/// PR, what was banked on it.
+/// nodes the session is linked to, each with its links and, for an issue or a PR, what was banked
+/// on it. `LineageLayout` lays them out as a tree or a graph (#3019).
 public enum LineageList {
     public typealias Node = DaemonAPI.LineageNode
 
@@ -137,43 +137,25 @@ public enum LineageList {
         public var id: String { node.ref }
     }
 
-    public struct Group: Sendable, Hashable, Identifiable {
-        public var title: String
-        public var rows: [Row]
-        public var id: String { title }
-    }
+    /// The kinds in the order the tree shows a node's children.
+    static let kinds = ["issue", "pr", "session", "workflow-run", "milestone"]
 
-    /// The kinds in the order the list shows them, and the title of each group.
-    static let kinds: [(kind: String, title: String)] = [
-        ("issue", "Issues"), ("pr", "Pull Requests"), ("session", "Sessions"), ("workflow-run", "Workflow Runs"),
-        ("milestone", "Milestones"),
-    ]
-
-    /// The groups, the session itself left out. `title` names a session node by its title when
-    /// this client has it.
-    public static func groups(of session: Node, graph: DaemonAPI.LineageGraph,
-                              costs: [Node: DaemonAPI.LineageCostRollup],
-                              title: @escaping (Node) -> String?) -> [Group] {
+    /// A row for each node the walk reached, once, in the walk's order, the session itself left out.
+    public static func rows(of session: Node, graph: DaemonAPI.LineageGraph,
+                            costs: [Node: DaemonAPI.LineageCostRollup],
+                            title: @escaping (Node) -> String?) -> [Row] {
         var seen = Set<Node>()
         let nodes = graph.nodes.filter { $0 != session && seen.insert($0).inserted }
         let name = { (n: Node) -> String in
             n == session ? "This session" : title(n) ?? ReportValueWords.name(n)
         }
-        let rows = nodes.map { n in
+        return nodes.map { n in
             Row(node: n, name: name(n),
                 links: graph.links.filter { $0.from == n || $0.to == n }.map { line($0, of: n, session: session, name: name) },
                 cost: costs[n].map { costLine($0) },
                 url: ReportValueWords.url(n).map { pullRequest(n, $0) },
                 session: n.kind == "session" ? UUID(uuidString: String(n.ref.dropFirst("session:".count))) : nil)
         }
-        var groups = kinds.compactMap { kind -> Group? in
-            let these = rows.filter { $0.node.kind == kind.kind }
-            return these.isEmpty ? nil : Group(title: kind.title, rows: these)
-        }
-        let known = Set(kinds.map(\.kind))
-        let rest = rows.filter { !known.contains($0.node.kind) }
-        if !rest.isEmpty { groups.append(Group(title: "Other", rows: rest)) }
-        return groups
     }
 
     /// A PR's page, not its issue's: GitHub sends /issues/ to /pull/ but not the other way.
