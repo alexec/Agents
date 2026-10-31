@@ -47,6 +47,7 @@ There's no tool for ending a turn. The app works out how each one ended: **Compl
 | `stop_machine` | Stops the machine a host runs on, and every agent there with it. While agents are working there it is refused, naming them, unless the agent says `confirm_running`. | The runtime decides. |
 | `make_machine` | Makes a new machine at a provider that can, with its choices; it joins as a host of the same name. It may cost money while it runs. | **Yes, always.** A question card on every client, and nothing is made without your **Make it**. |
 | `delete_machine` | Deletes the machine a host runs on, with everything on its disk, and removes the host with its agents. | **Yes, always.** A question card on every client, and nothing is deleted without your **Delete it**. |
+| `bring_back` | Brings a branch back from a folder on another of your machines into the repository the agent works in, as **Bring Back from ‹server›…** does (#2947): by default the branch checked out there, and with `changes` its uncommitted changes too. The branch moves forward only, and work done here is never overwritten. A machine that is not running, a branch it does not have, or uncommitted changes here when `changes` is on, refuse before you are asked. | **Yes, always.** A question card on every client, and nothing comes back without your **Bring it back**. |
 
 `set_session_labels` adds or removes labels owned by the agent. `start_session` can give
 the new session up to five labels, which it owns from its first moment. Labels are

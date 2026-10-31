@@ -117,8 +117,9 @@ public enum AppTool {
     /// Stop waiting.
     public static let cancelWait = "cancel_wait"
 
-    // Five for the control plane's workspaces (#691 US6). Offered to every agent. Making and
-    // deleting ask the person first; none ends with another tool's name.
+    // Six for the control plane's workspaces (#691 US6) and their folders (#2947). Offered to
+    // every agent. Making, deleting and bringing back ask the person first; none ends with
+    // another tool's name.
 
     /// Every provider's workspaces, their hosts, and what a new one takes.
     public static let listMachines = "list_machines"
@@ -130,7 +131,9 @@ public enum AppTool {
     public static let makeMachine = "make_machine"
     /// Delete a host's workspace and the host, once the person says yes.
     public static let deleteMachine = "delete_machine"
-    public static let machineTools = [listMachines, startMachine, stopMachine, makeMachine, deleteMachine]
+    /// Bring a branch back from a folder on another machine, once the person says yes.
+    public static let bringBack = "bring_back"
+    public static let machineTools = [listMachines, startMachine, stopMachine, makeMachine, deleteMachine, bringBack]
 
     // Seven for the agent that writes a provider's tool map or commands (#858). Offered to
     // that agent alone, and it is offered nothing else. None ends with another tool's name.

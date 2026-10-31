@@ -146,6 +146,9 @@ const (
 	MethodReceiveState      = "folders/receiveState"
 	MethodReceiveUpload     = "folders/receiveUpload"
 	MethodReceive           = "folders/receive"
+	MethodSendFacts         = "folders/sendFacts"
+	MethodSendPack          = "folders/sendPack"
+	MethodSendRead          = "folders/sendRead"
 )
 
 // Notification names (DaemonAPI.Notification).

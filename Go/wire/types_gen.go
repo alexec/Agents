@@ -5392,7 +5392,7 @@ type MachineEnroll struct {
 	As *string `json:"as,omitzero"`
 }
 
-// machines/sendFolder, through host/machines (#2929): one step of an agent's start_session with send, which sends this folder's branch to another of the person's machines first. Exactly one of state, upload and receive; the control plane sends that machine's folders/receiveState, folders/receiveUpload or folders/receive.
+// machines/sendFolder, through host/machines: one step of an agent's start_session with send (#2929), which sends this folder's branch to another of the person's machines first, or of its bring_back (#2947), which brings a branch back from there. Exactly one of state, upload, receive, facts, pack and read; the control plane sends that machine's folders/receiveState, folders/receiveUpload, folders/receive, folders/sendFacts, folders/sendPack or folders/sendRead.
 type MachineFolderSend struct {
 	Host string `json:"host"`
 
@@ -5401,13 +5401,25 @@ type MachineFolderSend struct {
 	Upload *ReceiveUploadRequest `json:"upload,omitzero"`
 
 	Receive *ReceiveRequest `json:"receive,omitzero"`
+
+	Facts *SendFactsRequest `json:"facts,omitzero"`
+
+	Pack *SendPackRequest `json:"pack,omitzero"`
+
+	Read *SendReadRequest `json:"read,omitzero"`
 }
 
-// What machines/sendFolder's step answered (#2929): state for state, folder for receive, neither for upload.
+// What machines/sendFolder's step answered (#2929, #2947): state for state, folder for receive, facts for facts, pack for pack, read for read, none for upload.
 type MachineFolderSent struct {
 	State *ReceiveState `json:"state,omitzero"`
 
 	Folder *FolderSummary `json:"folder,omitzero"`
+
+	Facts *SendFacts `json:"facts,omitzero"`
+
+	Pack *SendPack `json:"pack,omitzero"`
+
+	Read *SendRead `json:"read,omitzero"`
 }
 
 // host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).
