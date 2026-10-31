@@ -150,15 +150,15 @@ func mergeNode(have *wire.LineageCostNode, n wire.LineageCostNode) {
 }
 
 // valueOf adds up the nodes that changed since: the totals over each node once, and a row
-// for each issue and milestone with a part that changed since.
+// for each issue, milestone and release with a part that changed since.
 func valueOf(nodes []wire.LineageCostNode, since wire.Date) wire.ReportValue {
 	blank := func() wire.LineageCost { return wire.LineageCost{Cost: map[string]float64{}} }
 	out := wire.ReportValue{Total: blank(), Waste: blank(), Unlinked: blank(), PerMergedPR: map[string]float64{},
-		Issues: []wire.ReportValueRow{}, Milestones: []wire.ReportValueRow{}}
+		Issues: []wire.ReportValueRow{}, Milestones: []wire.ReportValueRow{}, Releases: []wire.ReportValueRow{}}
 	byRef := map[string]wire.LineageCostNode{}
 	fixers := map[string][]wire.LineageCostNode{}
 	members := map[string][]wire.LineageCostNode{}
-	var issues, milestones []string
+	var issues, milestones, releases []string
 	seen := map[string]bool{}
 	addIssue := func(ref string) {
 		if !seen[ref] {
@@ -179,7 +179,11 @@ func valueOf(nodes []wire.LineageCostNode, since wire.Date) wire.ReportValue {
 		}
 		for _, m := range n.PartOf {
 			if _, ok := members[m]; !ok {
-				milestones = append(milestones, m)
+				if lineage.PartOfKind(m) == lineage.KindRelease {
+					releases = append(releases, m)
+				} else {
+					milestones = append(milestones, m)
+				}
 			}
 			members[m] = append(members[m], n)
 		}
@@ -222,24 +226,30 @@ func valueOf(nodes []wire.LineageCostNode, since wire.Date) wire.ReportValue {
 	}
 	for _, ref := range milestones {
 		// Its issues and PRs, and the PRs that fix those issues, each once.
-		var parts []wire.LineageCostNode
-		in := map[wire.LineageNode]bool{}
-		add := func(n wire.LineageCostNode) {
-			if !in[n.Node] {
-				in[n.Node] = true
-				parts = append(parts, n)
+		parts := dedupParts(members[ref], func(n wire.LineageCostNode) []wire.LineageCostNode {
+			if n.Node.Kind != lineage.KindIssue {
+				return nil
 			}
-		}
-		for _, n := range members[ref] {
-			add(n)
-			if n.Node.Kind == lineage.KindIssue {
-				for _, pr := range fixers[n.Node.Ref] {
-					add(pr)
-				}
-			}
-		}
+			return fixers[n.Node.Ref]
+		})
 		if row, ok := valueRow(wire.LineageNode{Kind: lineage.KindMilestone, Ref: ref}, parts, since); ok {
 			out.Milestones = append(out.Milestones, row)
+		}
+	}
+	for _, ref := range releases {
+		// Its PRs, and the issues those PRs fix, each once (#3023; the same shape as
+		// lineage.Rollup's KindRelease case): only PRs are ever part-of a release.
+		parts := dedupParts(members[ref], func(n wire.LineageCostNode) []wire.LineageCostNode {
+			var fixed []wire.LineageCostNode
+			for _, f := range n.Fixes {
+				if issue, ok := byRef[f]; ok {
+					fixed = append(fixed, issue)
+				}
+			}
+			return fixed
+		})
+		if row, ok := valueRow(wire.LineageNode{Kind: lineage.KindRelease, Ref: ref}, parts, since); ok {
+			out.Releases = append(out.Releases, row)
 		}
 	}
 	if len(leads) > 0 {
@@ -254,11 +264,33 @@ func valueOf(nodes []wire.LineageCostNode, since wire.Date) wire.ReportValue {
 	out.Issues, limited = mostCostly(out.Issues)
 	var more bool
 	out.Milestones, more = mostCostly(out.Milestones)
+	limited = limited || more
+	out.Releases, more = mostCostly(out.Releases)
 	if limited || more {
 		t := true
 		out.Limited = &t
 	}
 	return out
+}
+
+// dedupParts is base's nodes, each once, plus each one's related nodes (also each once),
+// in base's order.
+func dedupParts(base []wire.LineageCostNode, related func(wire.LineageCostNode) []wire.LineageCostNode) []wire.LineageCostNode {
+	var parts []wire.LineageCostNode
+	in := map[wire.LineageNode]bool{}
+	add := func(n wire.LineageCostNode) {
+		if !in[n.Node] {
+			in[n.Node] = true
+			parts = append(parts, n)
+		}
+	}
+	for _, n := range base {
+		add(n)
+		for _, r := range related(n) {
+			add(r)
+		}
+	}
+	return parts
 }
 
 // valueRow adds up of's parts, or says no when none of them changed since. Its lead time

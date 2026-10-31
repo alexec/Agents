@@ -95,6 +95,16 @@ func ProjectOf(n wire.LineageNode) string {
 
 func blankCost() wire.LineageCost { return wire.LineageCost{Cost: map[string]float64{}} }
 
+// PartOfKind is the kind of a ref in a node's PartOf: milestone or release (#3023), by the
+// path segment a forge link gives it (.../milestone/<n> or .../release/<tag>). These are
+// the only two kinds a PartOf ref names.
+func PartOfKind(ref string) string {
+	if strings.Contains(ref, "/release/") {
+		return KindRelease
+	}
+	return KindMilestone
+}
+
 // Rollup adds up of's cost from nodes, which hold each node once:
 //
 //   - a PR, or any other node: itself;

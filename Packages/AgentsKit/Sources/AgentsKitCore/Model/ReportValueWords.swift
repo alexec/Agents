@@ -15,8 +15,9 @@ public enum ReportValueWords {
         c.cost.values.contains { $0 > 0 } || c.inputTokens + c.outputTokens > 0
     }
 
-    /// An issue's, a PR's or a milestone's name without its tracker: "alexec/agents#12", "ENG-4",
-    /// "alexec/agents milestone 15".
+    /// An issue's, a PR's, a milestone's or a release's name without its tracker:
+    /// "alexec/agents#12", "ENG-4", "alexec/agents milestone 15", "alexec/agents release v0.14.0"
+    /// (#3023).
     public static func name(_ node: DaemonAPI.LineageNode) -> String {
         var id = node.ref
         if let colon = id.firstIndex(of: ":"), id[..<colon].allSatisfy({ $0.isLowercase || $0.isNumber || $0 == "-" }) {
@@ -25,15 +26,22 @@ public enum ReportValueWords {
         if let range = id.range(of: "/milestone/", options: .backwards) {
             return "\(id[..<range.lowerBound]) milestone \(id[range.upperBound...])"
         }
+        if let range = id.range(of: "/release/", options: .backwards) {
+            return "\(id[..<range.lowerBound]) release \(id[range.upperBound...])"
+        }
         return id
     }
 
-    /// Where a GitHub issue, PR or milestone is; nil for a tracker whose address the ref does not say.
+    /// Where a GitHub issue, PR, milestone or release is; nil for a tracker whose address the
+    /// ref does not say.
     public static func url(_ node: DaemonAPI.LineageNode) -> URL? {
         guard node.ref.hasPrefix("github:") else { return nil }
         let id = node.ref.dropFirst("github:".count)
         if let range = id.range(of: "/milestone/") {
             return URL(string: "https://github.com/\(id[..<range.lowerBound])/milestone/\(id[range.upperBound...])")
+        }
+        if let range = id.range(of: "/release/") {
+            return URL(string: "https://github.com/\(id[..<range.lowerBound])/releases/tag/\(id[range.upperBound...])")
         }
         let parts = id.split(separator: "#", maxSplits: 1)
         guard parts.count == 2, Int(parts[1]) != nil else { return nil }
