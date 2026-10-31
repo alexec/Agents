@@ -17,15 +17,16 @@ import (
 const repo = "alexec/agents"
 
 type fakeGitHub struct {
-	mu       sync.Mutex
-	runs     []fakeRun
-	prs      map[int]*fakePR
-	activity []IssueActivity
-	prLabels []PRLabelActivity
-	reviewed []ReviewedPR
-	rabbit   []CodeRabbitComment
-	err      error
-	noRepo   bool
+	mu         sync.Mutex
+	runs       []fakeRun
+	prs        map[int]*fakePR
+	activity   []IssueActivity
+	prLabels   []PRLabelActivity
+	reviewed   []ReviewedPR
+	rabbit     []CodeRabbitComment
+	prComments []PRComment
+	err        error
+	noRepo     bool
 	// reviews and assigned are what ask the connection's owner, alexec (#2034).
 	reviews  []OpenPR
 	assigned []Issue
@@ -105,6 +106,12 @@ func (f *fakeGitHub) addPRLabel(a PRLabelActivity) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.prLabels = append(f.prLabels, a)
+}
+
+func (f *fakeGitHub) addPRComment(c PRComment) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.prComments = append(f.prComments, c)
 }
 
 func (f *fakeGitHub) DefaultRepo(context.Context) (string, error) {
@@ -229,6 +236,21 @@ func (f *fakeGitHub) PRLabelActivity(_ context.Context, _ string, kind PRLabelKi
 	return out, false, nil
 }
 
+func (f *fakeGitHub) PRComments(_ context.Context, _, since string) ([]PRComment, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.err != nil {
+		return nil, false, f.err
+	}
+	var out []PRComment
+	for _, c := range f.prComments {
+		if !before(c.At, since) && !strings.HasPrefix(c.Body, agentCommentPrefix) {
+			out = append(out, c)
+		}
+	}
+	return out, false, nil
+}
+
 // harness polls a fake through Events, with a clock that moves on by a second a poll, as
 // real polls are seconds apart.
 type harness struct {
@@ -327,7 +349,7 @@ func TestEventsListGivesEveryEventPollOnlyWithTheirSchemas(t *testing.T) {
 	}
 	sort.Strings(names)
 	equal(t, names, []string{"checks.failed", "checks.passed", "issue.assigned", "issue.closed", "issue.commented", "issue.labelled", "issue.opened",
-		"pr.closed", "pr.conflicted", "pr.labelled", "pr.merged", "pr.opened", "pr.unlabelled", "review.comment", "review.posted",
+		"pr.closed", "pr.commented", "pr.conflicted", "pr.labelled", "pr.merged", "pr.opened", "pr.unlabelled", "review.comment", "review.posted",
 		"review.requested"}, "names")
 }
 
@@ -738,4 +760,33 @@ func TestMineIsOnlyTheOwnersPRsAForksToo(t *testing.T) {
 	if len(got) != 1 || !strings.HasPrefix(got[0], "pr.conflicted:"+repo+":910:") {
 		t.Fatalf("conflicted %v", got)
 	}
+}
+
+// #2838: pr.commented wakes a lane waiting for Alex's comment on a PR, without a timer. An
+// agent's own comment (<!-- agent -->) and a stranger's are left out unless anyone is true.
+func TestPRCommentedLeavesOutAgentsAndStrangersUnlessAnyone(t *testing.T) {
+	h := newHarness(t)
+	pr := PR{Number: 950, Title: "A UI enhancement", Branch: "agents/950-ui", URL: "https://github.com/" + repo + "/pull/950"}
+	own, anyone := map[string]any{"repo": repo}, map[string]any{"repo": repo, "anyone": true}
+	a, b := h.poll("pr.commented", own, nil), h.poll("pr.commented", anyone, nil)
+	h.fake.addPRComment(PRComment{ID: 1, PR: pr, Author: "alexec", Body: "<!-- agent --> waiting for approval", At: h.at(5), Trusted: true})
+	h.fake.addPRComment(PRComment{ID: 2, PR: pr, Author: "stranger", Body: "looks fine to me", At: h.at(5), Trusted: false})
+	h.fake.addPRComment(PRComment{ID: 3, PR: pr, Author: "alexec", Body: "I approve these screenshots, ship it", At: h.at(5), Trusted: true})
+	equal(t, ids(h.poll("pr.commented", own, a["cursor"])), []string{"pr.commented:" + repo + ":3"}, "own")
+	raised := h.poll("pr.commented", anyone, b["cursor"])
+	equal(t, ids(raised), []string{"pr.commented:" + repo + ":2", "pr.commented:" + repo + ":3"}, "anyone still leaves the agent's own out")
+	e := eventsOf(raised)[0]
+	equal(t, e["data"].(map[string]any)["pr"].(map[string]any)["branch"], "agents/950-ui", "pr")
+	equal(t, e["data"].(map[string]any)["comment"].(map[string]any)["author"], "stranger", "author")
+}
+
+func TestPRCommentedNarrowsByPR(t *testing.T) {
+	h := newHarness(t)
+	pr950 := PR{Number: 950, URL: "u950"}
+	pr951 := PR{Number: 951, URL: "u951"}
+	byPR := map[string]any{"repo": repo, "pr": 950}
+	first := h.poll("pr.commented", byPR, nil)
+	h.fake.addPRComment(PRComment{ID: 4, PR: pr950, Author: "alexec", Body: "ship it", At: h.at(5), Trusted: true})
+	h.fake.addPRComment(PRComment{ID: 5, PR: pr951, Author: "alexec", Body: "ship it", At: h.at(5), Trusted: true})
+	equal(t, ids(h.poll("pr.commented", byPR, first["cursor"])), []string{"pr.commented:" + repo + ":4"}, "narrowed")
 }

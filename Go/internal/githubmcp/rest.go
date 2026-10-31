@@ -897,6 +897,58 @@ func (g *RealGitHub) PRLabelActivity(ctx context.Context, repo string, kind PRLa
 	return out, truncated, nil
 }
 
+// PRComments is the pr.commented event's reads: the repo's issues/comments endpoint carries a
+// pull request's conversation comments too (GitHub treats a PR as an issue underneath), so the
+// issue each one names (cached) says whether it is a pull request; the pull itself (cached too)
+// gives its branch and whether it is the repo's own.
+func (g *RealGitHub) PRComments(ctx context.Context, repo, since string) ([]PRComment, bool, error) {
+	type comment struct {
+		ID          int    `json:"id"`
+		HTMLURL     string `json:"html_url"`
+		IssueURL    string `json:"issue_url"`
+		Body        string `json:"body"`
+		User        user   `json:"user"`
+		Association string `json:"author_association"`
+		CreatedAt   string `json:"created_at"`
+	}
+	// since lists comments updated since; an edited old one is dropped by its created_at.
+	path := fmt.Sprintf("repos/%s/issues/comments?sort=created&direction=desc&since=%s", repo, url.QueryEscape(since))
+	items, truncated, err := newest(ctx, g, path, since, func(c comment) string { return c.CreatedAt })
+	if err != nil {
+		return nil, false, err
+	}
+	var out []PRComment
+	issues := map[string]issueJSON{}
+	pulls := map[string]pull{}
+	for _, c := range items {
+		if strings.HasPrefix(c.Body, agentCommentPrefix) {
+			continue
+		}
+		issuePath := strings.TrimPrefix(strings.TrimPrefix(c.IssueURL, g.API), "https://api.github.com/")
+		i, ok := issues[issuePath]
+		if !ok {
+			if err := g.get(ctx, issuePath, false, &i); err != nil {
+				return nil, false, err
+			}
+			issues[issuePath] = i
+		}
+		if !i.isPR() {
+			continue
+		}
+		pullPath := strings.Replace(issuePath, "/issues/", "/pulls/", 1)
+		p, ok := pulls[pullPath]
+		if !ok {
+			if err := g.get(ctx, pullPath, false, &p); err != nil {
+				return nil, false, err
+			}
+			pulls[pullPath] = p
+		}
+		out = append(out, PRComment{ID: c.ID, PR: p.pr(), Author: c.User.Login, Body: clip(c.Body), URL: c.HTMLURL, At: c.CreatedAt,
+			Trusted: isTrusted(c.Association, c.User.Login, c.User.Type)})
+	}
+	return out, truncated, nil
+}
+
 // MARK: The host's connection
 
 // NotConnected is what a call says with no token: the person connects GitHub in Agents.
