@@ -12,11 +12,22 @@ import {
 } from "../model/artifacts";
 import { absolutePath } from "../model/fileWatch";
 import { focusedEntry } from "../model/focus";
+import { folderPath } from "../model/groups";
 import { fromWireDate } from "../protocol/dates";
 import { Markdown } from "../render/markdown";
+import { routeHash } from "../route";
 import { isMenuKey, openContextMenu } from "./ContextMenu";
 import { pathOf, setPane } from "./files/paneState";
 import { ago } from "./SessionRow";
+
+/**
+ * The address of a tab landing straight on this file under Files (#3034): Open in New
+ * Window, from a row's menu, so the artifact is read without swapping the sidebar pane this
+ * tab had open, as the Mac's own window does.
+ */
+function artifactFileTabURL(host: string, session: string, folder: string, path: string): string {
+  return location.pathname + location.search + routeHash({ host, folder, session, files: true, artifactFile: path });
+}
 
 export function Exchanged({ store, host, session }: { store: Store; host: string; session: string }) {
   const agent = store.agent(host, session);
@@ -70,6 +81,22 @@ export function Exchanged({ store, host, session }: { store: Store; host: string
         <ul aria-label="Exchanged">
           {artifacts.map((artifact) => {
             const destination = destinationOf(artifact);
+            // Open in New Window (#3034), scoped to what a click already opens somewhere: a
+            // `.web` artifact straight to its address, an in-scope `.file` to a fresh tab on
+            // it under Files. `.inPlace`, `.nowhere` and an out-of-scope `.file` are read in
+            // place here, same as a click, and get no second way to open them.
+            const menuItems = [
+              { label: "Show the message it came from", run: () => { focusedEntry.value = artifact.entryID; } },
+              ...(destination.kind === "web" ? [{
+                label: "Open in New Window",
+                run: () => { window.open(destination.href, "_blank", "noopener,noreferrer"); },
+              }] : destination.kind === "file" && insideScope(destination.path, roots) ? [{
+                label: "Open in New Window",
+                run: () => {
+                  window.open(artifactFileTabURL(host, session, folderPath(agent!), destination.path), "_blank", "noopener");
+                },
+              }] : []),
+            ];
             return (
               <li key={artifact.id}>
                 <button class="row entry" title="Right-click to show the message it came from"
@@ -84,15 +111,9 @@ export function Exchanged({ store, host, session }: { store: Store; host: string
                     }
                     opened.value = artifact.id;
                   }}
-                  onContextMenu={(event) => openContextMenu(event, [{
-                    label: "Show the message it came from",
-                    run: () => { focusedEntry.value = artifact.entryID; },
-                  }])}
+                  onContextMenu={(event) => openContextMenu(event, menuItems)}
                   onKeyDown={(event) => {
-                    if (isMenuKey(event)) openContextMenu(event, [{
-                      label: "Show the message it came from",
-                      run: () => { focusedEntry.value = artifact.entryID; },
-                    }]);
+                    if (isMenuKey(event)) openContextMenu(event, menuItems);
                   }}>
                   <span class="title">{mark(destination.kind)} {artifact.name}</span>
                   <span class="subtitle">
