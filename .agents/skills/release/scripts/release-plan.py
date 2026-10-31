@@ -3,6 +3,8 @@
 
     release-plan.py            the last tag, the next version and every merged PR since
     release-plan.py --version  only the next version, e.g. 0.3.0 (nothing when nothing merged)
+    release-plan.py --ref <sha>  the same, up to the gate's commit instead of origin/main
+    release-plan.py --after <sha>  whether a PR merged after the gate's commit makes it start over
     release-plan.py --selftest
 
 The version (Alex, 2026-10-13): minor (0.x+1.0) when a merged pull request since the last
@@ -19,6 +21,10 @@ or a capability was removed, which a patch may not hold. The release skill then 
 
 The path (#2801) is the release skill's: `minor` (x.y.0) runs the reviews and checks, `patch`
 (x.y.z, z > 0) skips them. It follows the open milestone's version, or `next:` with none open.
+
+The gate's commit (#3045) stays the same while lanes land after it: `--after` names only the
+pull requests merged after it that fix a blocking issue (`priority:high`, and on the patch path
+`priority:medium` too). Only those make the gate start over on the newer main.
 
 It reads origin/main and the v* tags (fetched first) and asks GitHub through `gh` for the
 pull requests and their issues. It changes nothing.
@@ -83,12 +89,12 @@ def path(version):
     return "minor" if version.endswith(".0") else "patch"
 
 
-def removed_capabilities(tag):
+def removed_capabilities(tag, ref="origin/main"):
     path = pathlib.Path(__file__).with_name("capability-changes.py")
     spec = importlib.util.spec_from_file_location("capability_changes", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return sorted(module.at(tag)[0] - module.at("origin/main")[0])
+    return sorted(module.at(tag)[0] - module.at(ref)[0])
 
 
 def differs(version, planned, enhancements, removed):
@@ -103,6 +109,11 @@ def differs(version, planned, enhancements, removed):
     if not why:
         why.append("no enhancement merged" if key(version) < key(planned) else "the milestone is behind the tag")
     return f"plan v{version}, milestone v{planned} ({'; '.join(why)}); ask Alex which version"
+
+
+def blocking(labels, patch):
+    """Whether an issue with these labels holds the release, so its fix must be in the tag (#3045)."""
+    return "priority:high" in labels or (patch and "priority:medium" in labels and "bug" in labels)
 
 
 def selftest():
@@ -127,7 +138,52 @@ def selftest():
         "plan v0.12.0, milestone v0.11.2 (enhancements merged; capabilities removed: files/1); ask Alex which version")
     assert differs("0.11.2", "0.12.0", [], []) == (
         "plan v0.11.2, milestone v0.12.0 (no enhancement merged); ask Alex which version")
+    assert blocking({"bug", "priority:high"}, patch=False)
+    assert blocking({"priority:high"}, patch=True)
+    assert blocking({"bug", "priority:medium"}, patch=True)
+    assert not blocking({"bug", "priority:medium"}, patch=False)
+    assert not blocking({"enhancement", "priority:medium"}, patch=True)
+    assert not blocking({"bug", "priority:low"}, patch=True)
+    assert not blocking(set(), patch=True)
     print("release-plan selftest: ok")
+
+
+def option(name):
+    args = sys.argv[1:]
+    if name not in args:
+        return None
+    i = args.index(name)
+    if i + 1 >= len(args):
+        sys.exit(f"{name} needs a commit")
+    return run("git", "rev-parse", "--verify", f"{args[i + 1]}^{{commit}}").strip()
+
+
+def labels(item):
+    return {l["name"] for l in item.get("labels", [])}
+
+
+def after(pin):
+    """The PRs merged to origin/main after the gate's commit that fix a blocking issue (#3045)."""
+    if subprocess.run(["git", "merge-base", "--is-ancestor", pin, "origin/main"]).returncode != 0:
+        sys.exit(f"{pin[:12]} is not on origin/main")
+    subjects = run("git", "log", "--format=%s", f"{pin}..origin/main").splitlines()
+    prs = {int(n[-1]) for n in (re.findall(r"\(#(\d+)\)", s) for s in subjects) if n}
+    milestone = open_milestone(run("gh", "api", "repos/{owner}/{repo}/milestones?state=open", "--paginate",
+                                   "--jq", ".[].title").splitlines())
+    patch = bool(milestone) and path(milestone[1]) == "patch"
+    print(f"pin: {pin[:12]}; merged after it: {len(subjects)} commits, {len(prs)} pull requests; "
+          f"path: {'patch' if patch else 'minor'}")
+    restart = []
+    for pr in sorted(prs):
+        fixed = gh_json("pr", "view", str(pr), "--json", "closingIssuesReferences",
+                        "--jq", "[.closingIssuesReferences[].number]")
+        for n in fixed:
+            issue = gh_json("issue", "view", str(n), "--json", "labels")
+            if blocking(labels(issue), patch):
+                restart.append(f"#{pr} fixes #{n} ({', '.join(sorted(l for l in labels(issue) if l.startswith('priority:')))})")
+    for line in restart:
+        print(f"restart: {line}")
+    print("verdict: start over on origin/main" if restart else "verdict: keep the pin")
 
 
 def main():
@@ -136,12 +192,17 @@ def main():
         return
     only_version = "--version" in sys.argv[1:]
     run("git", "fetch", "--quiet", "--tags", "origin", "main")
+    pin = option("--after")
+    if pin:
+        after(pin)
+        return
+    ref = option("--ref") or "origin/main"
     tag = last_tag()
     if tag is None:
         sys.exit("No vX.Y.Z tag on origin/main to count from.")
     since = run("git", "log", "-1", "--format=%cI", tag).strip()
     log = [line.split("\0", 1) for line in
-           run("git", "log", "--format=%H%x00%s", f"{tag}..origin/main").splitlines()]
+           run("git", "log", "--format=%H%x00%s", f"{tag}..{ref}").splitlines()]
     subjects = [s for _, s in log]
     if not subjects:
         if not only_version:
@@ -163,9 +224,6 @@ def main():
     issues = {i["number"]: i for i in gh_json(
         "issue", "list", "--state", "all", "--limit", "1000",
         "--search", f"updated:>={since[:10]}", "--json", "number,labels")}
-
-    def labels(item):
-        return {l["name"] for l in item.get("labels", [])}
 
     rows, enhancements, tooling = [], [], []
     for pr in sorted(merged, key=lambda p: p["number"]):
@@ -196,7 +254,7 @@ def main():
     if milestone:
         title, planned = milestone
         print(f"next: v{version} ({why}); milestone: v{planned} ({title})")
-        mismatch = differs(version, planned, enhancements, removed_capabilities(tag))
+        mismatch = differs(version, planned, enhancements, removed_capabilities(tag, ref))
         if mismatch:
             print(f"differs: {mismatch}")
         print(f"path: {path(planned)} (the milestone's version)")
