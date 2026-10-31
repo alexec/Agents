@@ -3266,8 +3266,10 @@ final class AppModel {
                     self?.signIn.refused(error)
                     // The address itself refused (suspended, over a plan's limit, #2235):
                     // its words replace "can't reach", and trying again soon is pointless.
-                    if let refusal = error as? ControlRefusal {
-                        self?.controlPlaneRefusalLine = refusal.line
+                    // `DaemonClient` keeps only "could not connect", so `ControlLink` kept
+                    // the line on the side as it dialled.
+                    if let line = ControlLink.hostedRefusal.take() {
+                        self?.controlPlaneRefusalLine = line
                         backoff.holdOff()
                     }
                     answered = false

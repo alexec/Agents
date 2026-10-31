@@ -89,8 +89,23 @@ public final class ControlLink: @unchecked Sendable {
             }
         } catch {
             lock.withLock { if dialling == task { dialling = nil } }
+            // `DaemonClient` keeps only "could not connect" (#2235): the window asks what
+            // was said. The address itself refused (suspended, over a plan's limit) is not
+            // one to dial again soon.
+            if let refusal = error as? ControlRefusal { ControlLink.hostedRefusal.set(refusal.line) }
             throw error
         }
+    }
+
+    /// The last line the address itself answered with, refusing the connection outright
+    /// (suspended, over a plan's limit, #2235), taken once.
+    public static let hostedRefusal = HostedRefusal()
+
+    public final class HostedRefusal: @unchecked Sendable {
+        private let lock = NSLock()
+        private var line: String?
+        func set(_ line: String) { lock.withLock { self.line = line } }
+        public func take() -> String? { lock.withLock { defer { line = nil }; return line } }
     }
 
     private func pump(_ transport: any LineTransport, generation: Int) {
