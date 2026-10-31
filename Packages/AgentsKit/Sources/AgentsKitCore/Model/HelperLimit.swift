@@ -1,51 +1,54 @@
 import Foundation
 
-/// How many agents started by other agents a project may hold at once (028, #64).
+/// How many agents started by other agents a folder may hold at once (028, #64).
 ///
-/// Two limits, both counted across every agent in the project rather than per starter:
+/// Two limits, both counted across every agent in the folder rather than per starter:
 /// how many may be **running**, and how many may exist **not yet archived**. A start
 /// that would break either is **queued** (#362): saved, nothing spawned, and started by
 /// the daemon, oldest first, once both have a place. A third limit says how many may
 /// wait in that queue; a start past it is refused. Queued helpers count only against
 /// the queue, and take their other places when they start.
 ///
-/// The person sets both per project, in Project Settings ▸ General, and only the person:
-/// `projects/setHelperLimits` is not in the agent's allowlist, for the reason
+/// The person sets both per folder, in Folder Settings ▸ General, and only the person:
+/// `folders/setHelperLimits` is not in the agent's allowlist, for the reason
 /// `WorkflowLimit` gives — a ceiling something can raise for itself is not a ceiling.
-/// They are kept in the project's own `.agents/project.json` (#126), so they travel with
+/// They are kept in the folder's own `.agents/folder.json` (#126), so they travel with
 /// it. And the setting has a hard maximum, enforced whatever the file says, so neither a
-/// typo nor a hand edit can let a project fill.
+/// typo nor a hand edit can let a folder fill.
 public enum HelperLimit {
-    /// What a project with no setting gets.
+    /// What a folder with no setting gets.
     public static let defaultRunning = 3
     public static let defaultNotArchived = 5
     /// The most either can ever be set to, by anybody.
     public static let maximumRunning = 10
     public static let maximumNotArchived = 20
-    /// How many may wait in a project's queue (#362), by default and at most.
+    /// How many may wait in a folder's queue (#362), by default and at most.
     public static let defaultQueued = 5
     public static let maximumQueued = 20
-    /// Whether an agent may archive the agents it started (#120) in a project with no
+    /// Whether an agent may archive the agents it started (#120) in a folder with no
     /// setting. On: a lead that archives its finished helpers frees their places
     /// without waiting on the person, who can still bring any of them back.
     public static let defaultAgentsMayArchive = true
+    /// Whether a session whose pull request merges is archived (#2886) in a folder with
+    /// no setting. On: sessions whose work has landed do not pile up in the list.
+    public static let defaultArchiveWhenMerged = true
 
-    /// The places in use in a project: every agent another agent started there that
+    /// The places in use in a folder: every agent another agent started there that
     /// has not been archived, plus starts that have taken a place and not yet made
     /// their agent.
     ///
     /// Stopped, finished and asking-to-be-archived ones count. Only archiving gives this place back,
-    /// so a project cannot quietly fill with idle agents nobody sees.
-    public static func placesInUse(in project: URL, agents: some Sequence<Agent>,
+    /// so a folder cannot quietly fill with idle agents nobody sees.
+    public static func placesInUse(in folder: URL, agents: some Sequence<Agent>,
                                    reserved: Int = 0) -> Int {
-        helpers(in: project, agents: agents).count + reserved
+        helpers(in: folder, agents: agents).count + reserved
     }
 
-    /// How many of a project's helpers are running, plus starts that have taken a
+    /// How many of a folder's helpers are running, plus starts that have taken a
     /// place and not yet made their agent. See `isRunning`.
-    public static func running(in project: URL, agents: some Sequence<Agent>,
+    public static func running(in folder: URL, agents: some Sequence<Agent>,
                                reserved: Int = 0, comingBack: Set<UUID> = []) -> Int {
-        runningHelpers(in: project, agents: agents, comingBack: comingBack).count + reserved
+        runningHelpers(in: folder, agents: agents, comingBack: comingBack).count + reserved
     }
 
     /// Whether a helper holds a running place.
@@ -70,29 +73,29 @@ public enum HelperLimit {
         return agent.isWaiting || agent.allowanceWait != nil
     }
 
-    /// The agents holding a project's not-archived places, oldest first — what a
+    /// The agents holding a folder's not-archived places, oldest first — what a
     /// refusal names. Queued ones hold none yet.
-    public static func helpers(in project: URL, agents: some Sequence<Agent>) -> [Agent] {
-        let folder = Project.standardize(project)
+    public static func helpers(in folder: URL, agents: some Sequence<Agent>) -> [Agent] {
+        let folder = Folder.standardize(folder)
         return agents
             .filter { $0.startedByAgent != nil && $0.state != .archived && $0.state != .queued
-                      && $0.projectFolder == folder }
+                      && $0.folderPath == folder }
             .sorted { $0.createdAt < $1.createdAt }
     }
 
-    /// A project's queue (#362), first in first: the order they will start in.
-    public static func queue(in project: URL, agents: some Sequence<Agent>) -> [Agent] {
-        let folder = Project.standardize(project)
+    /// A folder's queue (#362), first in first: the order they will start in.
+    public static func queue(in folder: URL, agents: some Sequence<Agent>) -> [Agent] {
+        let folder = Folder.standardize(folder)
         return agents
-            .filter { $0.state == .queued && $0.projectFolder == folder }
+            .filter { $0.state == .queued && $0.folderPath == folder }
             .sorted { ($0.createdAt, $0.id.uuidString) < ($1.createdAt, $1.id.uuidString) }
     }
 
-    /// Where a queued agent stands in its project's queue, counting from 1; nil when it
+    /// Where a queued agent stands in its folder's queue, counting from 1; nil when it
     /// is not queued. What a row says ("Queued, 2nd") and what `list_sessions` with `started_by: me` says.
     public static func queuePosition(of agent: Agent, among agents: some Sequence<Agent>) -> Int? {
         guard agent.state == .queued else { return nil }
-        return queue(in: agent.projectFolder, agents: agents).firstIndex { $0.id == agent.id }.map { $0 + 1 }
+        return queue(in: agent.folderPath, agents: agents).firstIndex { $0.id == agent.id }.map { $0 + 1 }
     }
 
     /// What a row calls a queued agent, in all three clients: "Queued", or with its
@@ -109,44 +112,58 @@ public enum HelperLimit {
         return "\(n)\(suffix)"
     }
 
-    /// The agents holding a project's running places, oldest first.
-    public static func runningHelpers(in project: URL, agents: some Sequence<Agent>,
+    /// The agents holding a folder's running places, oldest first.
+    public static func runningHelpers(in folder: URL, agents: some Sequence<Agent>,
                                       comingBack: Set<UUID> = []) -> [Agent] {
-        helpers(in: project, agents: agents).filter { isRunning($0, comingBack: comingBack) }
+        helpers(in: folder, agents: agents).filter { isRunning($0, comingBack: comingBack) }
     }
 }
 
-/// One project's helper limits, as the person set them (#64, #362), and whether agents
-/// may archive the helpers they started (#120). Kept in `.agents/project.json` (#126).
+/// One folder's helper limits, as the person set them (#64, #362), and whether agents
+/// may archive the helpers they started (#120). Kept in `.agents/folder.json` (#126).
 ///
 /// Each is nil until the person sets it, which is the default; `effective` is what is
 /// enforced, clamped to the hard maximums whatever the file says, so a hand-edited
-/// `.agents/project.json` cannot raise a ceiling either.
+/// `.agents/folder.json` cannot raise a ceiling either.
 public struct HelperLimits: Codable, Hashable, Sendable {
     public var running: Int?
     public var notArchived: Int?
     /// How many may wait in the queue (#362). Nil is `HelperLimit.defaultQueued`.
     public var queued: Int?
     /// Whether `archive_session` archives a session the caller started at once in this
-    /// project, rather than asking the person (#120, #638). Nil is the default,
+    /// folder, rather than asking the person (#120, #638). Nil is the default,
     /// `HelperLimit.defaultAgentsMayArchive`.
     public var agentsMayArchive: Bool?
     /// Whether a helper's turn refused for a spent allowance waits for it at once, as if
     /// the person had chosen Continue (#1918). Nil is off.
     public var continueWhenBack: Bool?
+    /// Whether a session whose pull request merges is archived, once its turn has ended and
+    /// its worktree has nothing uncommitted (#2886). Nil is the default,
+    /// `HelperLimit.defaultArchiveWhenMerged`.
+    public var archiveWhenMerged: Bool?
+    /// Whether `start_session` with a machine starts the session on another of the person's
+    /// machines without asking first (#2928). Nil is off.
+    public var agentsMayStartOnMachines: Bool?
 
     public init(running: Int? = nil, notArchived: Int? = nil, queued: Int? = nil,
-                agentsMayArchive: Bool? = nil, continueWhenBack: Bool? = nil) {
+                agentsMayArchive: Bool? = nil, continueWhenBack: Bool? = nil,
+                archiveWhenMerged: Bool? = nil, agentsMayStartOnMachines: Bool? = nil) {
         self.running = running
         self.notArchived = notArchived
         self.queued = queued
         self.agentsMayArchive = agentsMayArchive
         self.continueWhenBack = continueWhenBack
+        self.archiveWhenMerged = archiveWhenMerged
+        self.agentsMayStartOnMachines = agentsMayStartOnMachines
     }
 
     /// Whether agents may archive the helpers they started here: the person's
     /// choice, or the default.
     public var mayArchive: Bool { agentsMayArchive ?? HelperLimit.defaultAgentsMayArchive }
+
+    /// Whether a session is archived when its pull request merges: the person's choice, or
+    /// the default.
+    public var archivesWhenMerged: Bool { archiveWhenMerged ?? HelperLimit.defaultArchiveWhenMerged }
 
     /// What is enforced: each limit, or its default, between 1 and its maximum.
     /// Running is never more than not archived, since every running helper is one not
@@ -186,13 +203,16 @@ public struct HelperLimits: Codable, Hashable, Sendable {
         return nil
     }
 
-    /// Nil when all are the defaults, so a project that never changed them keeps no
+    /// Nil when all are the defaults, so a folder that never changed them keeps no
     /// record of it. A switch set to its default is kept as no choice at all.
     public var orNilIfDefault: HelperLimits? {
         var kept = self
         if kept.agentsMayArchive == HelperLimit.defaultAgentsMayArchive { kept.agentsMayArchive = nil }
         if kept.continueWhenBack == false { kept.continueWhenBack = nil }
+        if kept.archiveWhenMerged == HelperLimit.defaultArchiveWhenMerged { kept.archiveWhenMerged = nil }
+        if kept.agentsMayStartOnMachines == false { kept.agentsMayStartOnMachines = nil }
         return kept.running == nil && kept.notArchived == nil && kept.queued == nil
-            && kept.agentsMayArchive == nil && kept.continueWhenBack == nil ? nil : kept
+            && kept.agentsMayArchive == nil && kept.continueWhenBack == nil
+            && kept.archiveWhenMerged == nil && kept.agentsMayStartOnMachines == nil ? nil : kept
     }
 }

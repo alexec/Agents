@@ -18,8 +18,10 @@ copies](run-several-copies.md).
 
 ## Before you start
 
-- A clone of the Agents repository on a Mac with Docker running, to build the Linux
-  programs: they are Go, built in a container.
+- Nothing to build or clone. Each release of Agents publishes the control plane as a
+  signed image, `ghcr.io/alexec/agents-control:<version>`, for x86-64 and ARM64. It
+  carries the Linux host that it hands to servers that join, and the files to run it
+  with. See [The image](#the-image).
 - A Linux machine you rent, on x86-64 or ARM64, with Docker and Docker Compose. The
   smallest size a provider offers is plenty: 1 CPU and 1 GB of memory. The control plane
   runs no agents itself.
@@ -35,7 +37,7 @@ copies](run-several-copies.md).
 
 On Google Cloud, three scripts do most of the steps below for you: they make the machine,
 its firewall, its address, the Cloud KMS key and the DNS records, then build and start the
-control plane. Each script looks first for what it makes, so you can run it again safely.
+control plane. They run from a clone of the Agents repository on your Mac. Each script looks first for what it makes, so you can run it again safely.
 Each takes `--dry-run`, which prints every command and runs none.
 
 ### What you make first
@@ -58,10 +60,12 @@ Each takes `--dry-run`, which prints every command and runs none.
    ```
 
 4. For notices on iPhone and iPad with no Mac host: the APNs `.p8` key, as in
-   [Build and copy what it runs](#build-and-copy-what-it-runs). Its name gives the Key ID.
-5. On your Mac: `gcloud` (`brew install --cask gcloud-cli`) and Docker, running, with the
-   `buildx` plugin. The image is for `linux/amd64`, and on an Apple silicon Mac only BuildKit
-   can build it. `docker buildx version` tells you if you have the plugin. If not:
+   [Get what it runs](#get-what-it-runs). Its name gives the Key ID.
+5. On your Mac: `gcloud` (`brew install --cask gcloud-cli`). Docker only to build a commit
+   that no release has
+   (`up.sh --build`): then Docker, running, with the `buildx` plugin. The image is for
+   `linux/amd64`, and on an Apple silicon Mac only BuildKit can build it.
+   `docker buildx version` tells you if you have the plugin. If not:
 
    ```sh
    brew install docker-buildx
@@ -115,9 +119,9 @@ In the repository on your Mac:
    deploy/gcp/up.sh --apns AuthKey_KEYID.p8
    ```
 
-   When both names point at the machine, it builds the Linux host and the control
-   plane's image on your Mac, copies them, `deploy/compose.public.yaml` and the secrets to
-   `/opt/agents` on the machine, and starts the control plane and Caddy. It waits until
+   When both names point at the machine, it copies `deploy/compose.public.yaml` and the
+   secrets to `/opt/agents` on the machine, has the machine pull the release's image, and
+   starts the control plane and Caddy. It waits until
    `https://control.agentloops.dev/healthz` answers. Let's Encrypt's address for notices is
    your git email, or give `--email`. Use `--domain` and `--views-domain` for other names.
 
@@ -127,10 +131,14 @@ In the repository on your Mac:
 5. Get the first code with the command that `up.sh` prints, then go on at
    [Pair your first window](#pair-your-first-window).
 
-To upgrade, run `up.sh` again: it builds and copies the new image, and keeps the store,
-the APNs key and the snapshot schedule. Set `AGENTS_VERSION` to the version to stamp on it, such as `0.9.0`;
-without it, `scripts/version.sh` says. At the end, `up.sh` checks that the control plane on
-the machine says that version, the one **Settings ▸ Control plane** shows.
+`up.sh` runs the release in `AGENTS_VERSION`, such as `0.11.0`. Without it,
+`scripts/version.sh` says, which is a release's version only in a checkout of its tag. For
+a commit that no release has, give `--build`: it builds the image on your Mac from the
+checkout, stamps that version on it, and copies it to the machine.
+
+To upgrade, run `up.sh` again with the new version: the machine pulls the new image, and
+keeps the store, the APNs key and the snapshot schedule. At the end, `up.sh` checks that the
+control plane on the machine says that version, the one **Settings ▸ Control plane** shows.
 
 Every release of Agents deploys control.agentloops.dev this way (#2100). After the tag,
 and after the GitHub release and both TestFlight builds pass, the release runs, in a
@@ -203,7 +211,7 @@ The control plane's key proves to every window, phone and host that it is your c
 plane. On the machine it is sealed in the store by a key in Cloud KMS, which never leaves
 Google Cloud. The machine gets only the right to use that key.
 
-On your Mac, with `gcloud` (put your project's id in place of `my-project`):
+On your Mac, with `gcloud` (put your Google Cloud project's id in place of `my-project`):
 
 1. Make a key ring and a key:
 
@@ -233,21 +241,22 @@ On your Mac, with `gcloud` (put your project's id in place of `my-project`):
    On a Compute Engine VM that runs as the service account, make no key file: the VM gets
    its right to use the key from Google Cloud, and no secret of any kind is on its disk.
 
-### Build and copy what it runs
+### Get what it runs
 
-On your Mac, in the repository:
+On the machine, in a folder of its own such as `~/agents`, take the files to run it with out
+of the release's image (here 0.11.0):
 
-1. Build the Linux host:
+```sh
+docker create --name agents-files ghcr.io/alexec/agents-control:0.11.0
+docker cp agents-files:/deploy ./deploy
+docker rm agents-files
+```
 
-   ```sh
-   scripts/build-linux-agentsd.sh
-   ```
+`deploy/` has the compose files, the Caddyfiles and `make-secrets.sh`. The image itself
+carries the rest: the Linux host, which the control plane hands to every Linux server that
+joins, and the runtimes' toolsets, so that the server installs Claude by itself.
 
-   It goes in `App/Resources/servers/`, from where the control plane hands it to every
-   Linux server that joins. The control plane also hands each server the runtimes'
-   toolsets in `App/Resources/toolsets/`, so the server installs Claude by itself. The control plane itself is built in its image, on the
-   machine, from `Go/` and `Web/`.
-2. Say which key seals the control plane's key, and give the service account's key file:
+1. Say which key seals the control plane's key, and give the service account's key file:
 
    ```sh
    deploy/make-secrets.sh --public \
@@ -272,37 +281,41 @@ On your Mac, in the repository:
    from the file's name) and `AGENTS_APNS_TEAM_ID` in `deploy/.env`. Give `--apns-key-id`
    when the file has another name. Without it, the control plane sends no pushes, and its
    log says so once when it starts. Never put the key in a code, the store or the repo.
-3. Copy the repository's `deploy/` folder (with `deploy/secrets`), `Go/`, `Web/`,
-   `App/Resources/servers/` and `App/Resources/toolsets/` to the machine, keeping the same layout. For example:
 
-   ```sh
-   rsync -a --relative --exclude node_modules --exclude Web/dist --exclude Go/out \
-       deploy Go Web App/Resources/servers App/Resources/toolsets you@agents.example.com:agents/
-   ```
+   `make-secrets.sh` is a zsh script: install `zsh` on the machine first
+   (`sudo apt-get install zsh` on Debian or Ubuntu). Copy `sa.json` and the `.p8` key to
+   the machine for it, and delete them there afterwards.
+
+To run a commit that no release has, build from source instead: copy the repository's
+`deploy/`, `Go/`, `Web/` and `App/Resources/toolsets/` to the machine with the same layout,
+and give `--build` to `docker compose up` below. The image is then built on the machine.
 
 ### Start it
 
 On the machine, in the folder you copied to:
 
-1. Say the two names and your email, in `deploy/.env`:
+1. Say the two names, your email and the release, in `deploy/.env`:
 
    ```sh
    AGENTS_DOMAIN=agents.example.com
    AGENTS_VIEWS_DOMAIN=views.example.com
    ACME_EMAIL=you@example.com
+   AGENTS_VERSION=0.11.0
    ```
 
-   Caddy gets a certificate for each name.
+   Caddy gets a certificate for each name. `AGENTS_VERSION` is the image's tag: a release
+   such as `0.11.0`, `0.11` for the newest 0.11 release, or `latest`. Without it, `latest`.
 
-2. Start the control plane and Caddy:
+2. Get the image, and start the control plane and Caddy:
 
    ```sh
-   docker compose -f deploy/compose.public.yaml up -d --build
+   docker compose -f deploy/compose.public.yaml pull
+   docker compose -f deploy/compose.public.yaml up -d
    ```
 
-   The control plane says its version in Settings ▸ Control plane. Put it in
-   `AGENTS_VERSION` (in `deploy/.env` or the environment), such as the output of
-   `git describe --tags --always`. Without it, the version is `dev`.
+   To upgrade, take the new release's `deploy/` folder out of its image as above (keep
+   `deploy/.env` and `deploy/secrets/`), set the new `AGENTS_VERSION`, and run both
+   commands again. The store and the certificate stay.
 
    At its first start the control plane makes its key and seals it in the store. To keep
    a key from elsewhere, seal it before this step: see
@@ -357,7 +370,7 @@ window can. To cut it off, click **Forget…** on its row. To serve no page, set
 ### Enrol a Linux server
 
 1. In the window, open **Settings ▸ Machines**, then
-   **Add a Server…**, and **Copy** the command.
+   **Add a Machine…**, and **Copy** the command.
 2. On the server, as the user your agents should run as, run it. It looks like this:
 
    ```sh
@@ -371,7 +384,7 @@ window can. To cut it off, click **Forget…** on its row. To serve no page, set
    The command says **devbox joined the control plane.** The server has a heading of its
    own in every window.
 
-See [Add a server](add-a-server.md) for the rest: installing over ssh, projects on the
+See [Add a machine](add-a-machine.md) for the rest: installing over ssh, folders on the
 server, and its Claude sign-in.
 
 ### Enrol your Mac
@@ -384,7 +397,7 @@ Your Mac becomes a host of the control plane in the cloud with Agents Host.
    **Join**.
 
    Agents Host says **This Mac runs its agents for a control plane elsewhere.** The Mac's
-   projects appear under its own heading in every window.
+   folders appear under its own heading in every window.
 
 If Agents Host already runs a control plane on this Mac with hosts and devices paired to
 it, joining one elsewhere starts afresh: those devices pair again. To move an existing
@@ -423,7 +436,7 @@ first.
    machine:
 
    ```sh
-   ssh you@agents.example.com 'cd agents && docker compose -f deploy/compose.public.yaml build control'
+   ssh you@agents.example.com 'cd agents && docker compose -f deploy/compose.public.yaml pull control'
    ssh you@agents.example.com 'cd agents && docker compose -f deploy/compose.public.yaml \
        run --rm -T control key seal --key-fd 0' < control-key
    ```
@@ -495,6 +508,14 @@ yet: with **Relay for my devices** off, a need from a host does not get to the l
 With only Linux hosts, devices reach the control plane at its address and get no
 notifications.
 
+The web page gets notifications by Web Push (#1486). `make-secrets.sh` makes the VAPID key
+once, in `deploy/secrets/vapid-key`, and `up.sh` makes it on the VM and never replaces it: a
+new key ends every browser's subscription. Allow notifications in the page's Settings ▸
+Notifications; when no iPhone gets a need, that browser shows it, also with the page closed.
+On an iPhone or iPad, Safari gives Web Push only to the page added to the Home Screen.
+`AGENTS_WEBPUSH_SUBJECT` in `deploy/.env` is the `mailto:` or `https:` address a push service
+may write to about it; without it, the project's page.
+
 ## What to know
 
 - **The certificate renews itself.** Caddy renews it about a month before it runs out.
@@ -519,9 +540,131 @@ notifications.
 - **If the machine or its disk is lost,** remove the service account's key in Google Cloud
   (**IAM ▸ Service accounts ▸ agents-control ▸ Keys**). A copy of the disk then can't
   open the control plane's key.
-- **Upgrading.** Build the Linux host again on your Mac, copy `deploy/`, `Go/`, `Web/`,
-  `App/Resources/servers/` and `App/Resources/toolsets/` across, and run the `up -d --build` line again. Hosts and clients reconnect within
+- **Upgrading.** Set the new release in `AGENTS_VERSION`, and run the `pull` and `up -d`
+  lines again (see [Start it](#start-it)). Hosts and clients reconnect within
   seconds. Linux servers update their host the next time they connect.
+
+## On a corporate network
+
+On a network where machines reach the internet through a proxy, and where the network may
+re-sign TLS with the organisation's own certificate authority (CA), every part of Agents
+can still reach the control plane:
+
+| What dials | Its proxy | The organisation's CA |
+| --- | --- | --- |
+| The Agents window on a Mac | The Mac's: System Settings ▸ Network ▸ Proxies, a PAC file too | The Mac's keychain |
+| Agents on iPhone and iPad | The device's | The device's trusted certificates |
+| A browser | The browser's | The browser's |
+| The Mac's host (agentsd) and relay (Agents Host) | `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` when set; otherwise the Mac's web proxies and their exceptions. A PAC file is not read | The Mac's keychain |
+| A Linux server's host | `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` | The system's roots, and the PEM file in `AGENTS_CA_FILE`, or else `/etc/agents/ca.pem` |
+
+The tunnel through a proxy is HTTP `CONNECT`, so TLS goes from end to end. A proxy that
+re-signs TLS breaks a pinned control plane: its codes carry a pin, which only the
+control plane's own certificate matches. Use a control plane with a publicly trusted
+certificate, as in this guide, or exempt its name from the re-signing. Whichever CA signs
+the certificate, each window, phone and host also checks the control plane's own key at
+each connection, so a proxy can't stand in for the control plane.
+
+On a Mac:
+
+1. If the network uses a PAC file and no fixed proxy, also set the **Secure web proxy
+   (HTTPS)** in System Settings ▸ Network ▸ Details ▸ Proxies. The window follows the PAC
+   file. The host and the relay follow the fixed proxy.
+2. To trust the organisation's CA, open its certificate in Keychain Access, add it to the
+   **System** keychain, and set **When using this certificate** to **Always Trust**. Most
+   organisations do this for you with a configuration profile.
+
+On a Linux server:
+
+1. Export the proxy in the shell where you run the install command:
+
+   ```sh
+   export HTTPS_PROXY=http://proxy.example.com:3128
+   export NO_PROXY=localhost,.internal.example.com
+   ```
+
+   The install command's `curl` follows them. The host started in the background (with no
+   systemd user session) has them too.
+2. Put the organisation's CA, as PEM, in `/etc/agents/ca.pem` (one or more certificates
+   in one file). To keep it elsewhere, set `AGENTS_CA_FILE` to its path. Add it to the
+   system's roots too (`update-ca-certificates` on Debian and Ubuntu), so that the install
+   command's `curl` trusts it.
+3. After the install command, if it started the host as the systemd user service
+   `agents-host`, give the service the same variables (and `AGENTS_CA_FILE`, if you set
+   it), as systemd does not read your shell's:
+
+   ```sh
+   mkdir -p ~/.config/systemd/user/agents-host.service.d
+   cat > ~/.config/systemd/user/agents-host.service.d/proxy.conf <<'EOF'
+   [Service]
+   Environment=HTTPS_PROXY=http://proxy.example.com:3128
+   Environment=NO_PROXY=localhost,.internal.example.com
+   EOF
+   systemctl --user daemon-reload
+   systemctl --user restart agents-host
+   ```
+
+   Running the install command again keeps this file.
+
+The control plane itself also dials: other copies of it, with several copies. If its
+machine has `HTTPS_PROXY` or `HTTP_PROXY` set, put the copies' names in `NO_PROXY`.
+
+## Metrics and logs
+
+To scrape the control plane with Prometheus and ship its logs, set these in `deploy/.env`,
+then run `docker compose -f deploy/compose.public.yaml up -d` again:
+
+```sh
+AGENTS_CONTROL_METRICS=0.0.0.0:9791
+AGENTS_CONTROL_METRICS_TOKEN=<a long random string, such as from openssl rand -hex 32>
+AGENTS_CONTROL_LOG_FORMAT=json
+AGENTS_CONTROL_LOG_LEVEL=info
+```
+
+**Metrics.** The control plane serves `/metrics`, in the Prometheus text format, on a port
+of its own, `9791`. It is off unless `AGENTS_CONTROL_METRICS` is set. Caddy does not serve
+it, and the compose file does not publish it, so only a container on the same Docker
+network reaches it, at `http://control:9791/metrics`. On an address other than loopback, a
+token is necessary: the control plane does not start without one. Prometheus sends it as a
+bearer token:
+
+```yaml
+scrape_configs:
+  - job_name: agents-control
+    authorization:
+      credentials_file: /etc/prometheus/agents-control-token
+    static_configs:
+      - targets: ["control:9791"]
+```
+
+The metrics are:
+
+| Metric | What it counts |
+| --- | --- |
+| `agents_control_requests_total{method,result}` | Requests from clients. `result` is `ok` or `error` for the control plane's own methods, `routed` for a call sent on to a machine, `refused` or `offline` for one that was not |
+| `agents_control_request_seconds{method}` | A histogram of the time that the control plane took for its own methods |
+| `agents_control_events_sent_total{method}` | Notifications sent to clients, one for each client |
+| `agents_control_store_operations_total{op}`, `agents_control_store_errors_total{op}`, `agents_control_store_seconds{op}` | Store reads, writes, deletes and lists, the ones that failed, and their times |
+| `agents_control_hosts_connected`, `agents_control_hosts_known` | Machines connected to this copy, and machines in the store |
+| `agents_control_clients_connected`, `agents_control_client_sessions` | Windows, phones and browsers connected, and their sessions |
+| `agents_control_relay_sessions` | Mac relays connected |
+| `agents_control_leases_held`, `agents_control_copies` | With several copies: machine leases that this copy holds, and the copies it knows |
+| `agents_control_phase{phase}` | 1 for this copy's phase: `serving`, `receiving`, `frozen` or `forwarding` |
+| `agents_control_up_seconds`, `agents_control_build_info{version}` | How long it has run, and its version |
+
+A method name gets a label of its own for the first 300 names only. After that, the count
+goes to `other`, so a client can't make the metrics grow without end.
+
+**Logs.** With `AGENTS_CONTROL_LOG_FORMAT=json`, each line of `docker compose logs control`
+is one JSON object, from Go's `log/slog`, with `time`, `level` and `msg`. A line also has
+`copy`, `method`, `client_id`, `person_id`, `host_id` and `request_id` when they apply.
+`AGENTS_CONTROL_LOG_LEVEL` is `debug`, `info`, `warn` or `error`. At `debug`, each request
+from a client gets a line `request`, with its method, result and time. A line never holds
+a request's parameters, a prompt, a code, a bearer token, or a `token=`, `secret=` or
+`password=` value: these are cut out before the line is written.
+
+`agents-control serve` takes the same settings as flags: `--metrics`, `--log-format` and
+`--log-level`.
 
 ## Restore the disk from a snapshot
 
@@ -580,7 +723,48 @@ Then make a machine there that starts from that disk, with the flags of `up.sh`'
 `--image-family`, `--image-project` and `--boot-disk-*` flags. Set `zone` in
 `deploy/gcp/common.sh` to the new zone before you run `up.sh` again.
 
+## The image
+
+Each release pushes `ghcr.io/alexec/agents-control` from the release workflow (#2140), for
+`linux/amd64` and `linux/arm64`, with three tags: `0.11.0`, `0.11` and `latest`. All in it is
+of the same version:
+
+| Path | What it is |
+| --- | --- |
+| `/agents-control`, `/workspace-commands`, `/agents-hosted` | The control plane, the command machine provider, and the hosted service |
+| `/web` | The web page |
+| `/servers` | The Linux host and the MCP servers beside it, for x86-64 and ARM64 servers |
+| `/toolsets` | The runtimes' toolsets, which a server that joins installs |
+| `/deploy` | The compose files, the Caddyfiles and `make-secrets.sh` |
+
+It is signed with cosign, keyless: the signature names the release workflow that pushed
+it. Check it before you run it:
+
+```sh
+cosign verify ghcr.io/alexec/agents-control:0.11.0 \
+    --certificate-identity-regexp '^https://github\.com/alexec/Agents/\.github/workflows/release\.yml@' \
+    --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+The image also carries an SBOM (SPDX) and its build's provenance (SLSA), as BuildKit
+attestations. To read them:
+
+```sh
+docker buildx imagetools inspect ghcr.io/alexec/agents-control:0.11.0 --format '{{ json .SBOM }}'
+docker buildx imagetools inspect ghcr.io/alexec/agents-control:0.11.0 --format '{{ json .Provenance }}'
+```
+
+The image is public, and pulling it needs no account. If the repository becomes private
+(#1064), the package stays public: its visibility is set on the package, apart from the
+repository's.
+
+To add the CLIs that your workspace commands call, make an image of your own `FROM` this
+one, and `apk add` them.
+
 ## If it doesn't work
+
+- **`docker compose pull` says `manifest unknown`.** No release has that
+  `AGENTS_VERSION`. Give a release's version, such as `0.11.0`, or `latest`.
 
 - **The control plane stops at start with `could not find default credentials`.** It has no
   right to use the Cloud KMS key: `deploy/secrets/gcp-service-account` is empty and the

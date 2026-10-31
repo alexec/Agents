@@ -12,7 +12,7 @@ import (
 )
 
 // Ports WorkspaceToolsTests (#1444): an agent's workspace tools go to the control plane as
-// host/workspaces, named for its log; off a control plane they say there are none; making
+// host/machines, named for its log; off a control plane they say there are none; making
 // one asks the person first, and nothing is made without their yes.
 
 func TestAnAgentsWorkspaceTools(t *testing.T) {
@@ -25,25 +25,25 @@ func TestAnAgentsWorkspaceTools(t *testing.T) {
 	m := appClient(t, d, a.ID)
 	m.post("initialize", map[string]any{}, 1)
 
-	if text, isErr := m.tool(2, "list_workspaces", map[string]any{}); !isErr || text != "This machine isn’t on a control plane, so it has no workspaces." {
+	if text, isErr := m.tool(2, "list_machines", map[string]any{}); !isErr || text != "This machine isn’t on a control plane, so it has no machines." {
 		t.Fatal(text)
 	}
 
 	host := "devbox"
-	listed := wire.AgentWorkspaces{Providers: []wire.AgentWorkspacesProvider{{ID: "do", Name: "DigitalOcean", CanMake: true, CanDelete: true,
-		Workspaces: []wire.AgentWorkspacesWorkspace{{ID: "w1", Name: "devbox", State: "running", Host: &host, HostState: new("online")}}}}}
+	listed := wire.AgentMachines{Providers: []wire.AgentMachinesProvider{{ID: "do", Name: "DigitalOcean", CanMake: true, CanDelete: true,
+		Workspaces: []wire.AgentMachinesMachine{{ID: "w1", Name: "devbox", State: "running", Host: &host, HostState: new("online")}}}}}
 	var mu sync.Mutex
-	var asked []wire.HostWorkspaceCall
+	var asked []wire.MachineWorkspaceCall
 	d.SetControlAsk(func(_ context.Context, method string, params any) (json.RawMessage, error) {
-		call := params.(wire.HostWorkspaceCall)
+		call := params.(wire.MachineWorkspaceCall)
 		mu.Lock()
 		asked = append(asked, call)
 		mu.Unlock()
-		if method != "host/workspaces" {
+		if method != "host/machines" {
 			t.Errorf("method %s", method)
 		}
 		switch call.Method {
-		case "workspaces/forAgent":
+		case "machines/forAgent":
 			b, _ := json.Marshal(listed)
 			return b, nil
 		case "hosts/start":
@@ -54,17 +54,17 @@ func TestAnAgentsWorkspaceTools(t *testing.T) {
 		return nil, &controllink.AskError{Code: -32010, Message: "Agents can’t ask that of the control plane."}
 	})
 
-	text, isErr := m.tool(3, "list_workspaces", map[string]any{})
-	if isErr || !strings.HasPrefix(text, "DigitalOcean (provider do): can make workspaces (make_workspace), can delete them\n  - devbox: running — host devbox, online") {
+	text, isErr := m.tool(3, "list_machines", map[string]any{})
+	if isErr || !strings.HasPrefix(text, "DigitalOcean (provider do): can make machines (make_machine), can delete them\n  - devbox: running — host devbox, online") {
 		t.Fatal(text)
 	}
-	if text, _ := m.tool(4, "start_workspace", map[string]any{"host": "devbox"}); text != "devbox is running already." {
+	if text, _ := m.tool(4, "start_machine", map[string]any{"host": "devbox"}); text != "devbox is running already." {
 		t.Fatal(text)
 	}
-	if text, isErr := m.tool(5, "stop_workspace", map[string]any{"host": "devbox"}); !isErr || text != "Agents can’t ask that of the control plane." {
+	if text, isErr := m.tool(5, "stop_machine", map[string]any{"host": "devbox"}); !isErr || text != "Agents can’t ask that of the control plane." {
 		t.Fatal(text)
 	}
-	if text, isErr := m.tool(6, "make_workspace", map[string]any{"provider": "Nobody", "name": "x"}); !isErr ||
+	if text, isErr := m.tool(6, "make_machine", map[string]any{"provider": "Nobody", "name": "x"}); !isErr ||
 		text != "Nothing was made: no provider is called Nobody. There are DigitalOcean." {
 		t.Fatal(text)
 	}
@@ -81,7 +81,7 @@ func TestAnAgentsWorkspaceTools(t *testing.T) {
 	l.mu.Unlock()
 	answered := make(chan string, 1)
 	go func() {
-		text, _ := m.tool(7, "make_workspace", map[string]any{"provider": "do", "name": "second"})
+		text, _ := m.tool(7, "make_machine", map[string]any{"provider": "do", "name": "second"})
 		answered <- text
 	}()
 	var pending []wire.ElicitationRequest
@@ -89,8 +89,8 @@ func TestAnAgentsWorkspaceTools(t *testing.T) {
 		json.Unmarshal(c.call(t, 1, "elicitations/pending", nil), &pending)
 		return len(pending) == 1
 	})
-	if f := pending[0].Mode.Form.Value; *pending[0].Message != "Claude (fix-login) wants to make a workspace" ||
-		*f.Properties[0].Title != "Make a new workspace, second, at DigitalOcean?" {
+	if f := pending[0].Mode.Form.Value; *pending[0].Message != "Claude (fix-login) wants to make a machine" ||
+		*f.Properties[0].Title != "Make a new machine, second, at DigitalOcean?" {
 		t.Fatalf("%+v", pending[0])
 	}
 	c.call(t, 2, "elicitations/answer", map[string]any{"requestID": pending[0].ID, "action": "accept", "content": map[string]any{"go": "yes"}})
@@ -98,7 +98,7 @@ func TestAnAgentsWorkspaceTools(t *testing.T) {
 		t.Fatal(text)
 	}
 
-	go func() { text, _ := m.tool(8, "delete_workspace", map[string]any{"host": "devbox"}); answered <- text }()
+	go func() { text, _ := m.tool(8, "delete_machine", map[string]any{"host": "devbox"}); answered <- text }()
 	waitFor(t, "the second card", func() bool {
 		json.Unmarshal(c.call(t, 3, "elicitations/pending", nil), &pending)
 		return len(pending) == 1
@@ -110,7 +110,7 @@ func TestAnAgentsWorkspaceTools(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	for _, call := range asked {
-		if call.Method == "hosts/deleteWorkspace" {
+		if call.Method == "hosts/deleteMachine" {
 			t.Fatal("deleted without a yes")
 		}
 	}

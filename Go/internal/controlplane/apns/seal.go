@@ -110,6 +110,9 @@ func Token(id wire.NeedID) string {
 			folder = u.Path
 		}
 		return "guarded:" + folder + ":" + id.GuardedChange.Path
+	case id.Notice != nil:
+		// What an agent told the person (#2805): the host's id, a string as Swift keeps it.
+		return "notice:" + *id.Notice
 	}
 	return ""
 }

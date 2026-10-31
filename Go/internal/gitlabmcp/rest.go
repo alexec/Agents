@@ -374,6 +374,7 @@ type mergeRequest struct {
 	TargetBranch        string `json:"target_branch"`
 	WebURL              string `json:"web_url"`
 	Author              user   `json:"author"`
+	Reviewers           []user `json:"reviewers"`
 	Draft               bool   `json:"draft"`
 	WorkInProgress      bool   `json:"work_in_progress"`
 	SourceProjectID     int    `json:"source_project_id"`
@@ -400,7 +401,7 @@ type mergeRequest struct {
 }
 
 func (m mergeRequest) mr() MR {
-	return MR{Number: m.IID, Title: m.Title, Branch: m.SourceBranch, URL: m.WebURL}
+	return MR{Number: m.IID, Title: m.Title, Branch: m.SourceBranch, URL: m.WebURL, Fixes: closingRefs(m.Description)}
 }
 
 func (m mergeRequest) draft() bool { return m.Draft || m.WorkInProgress }
@@ -525,6 +526,43 @@ func (g *RealGitLab) OpenMRs(ctx context.Context, project string) ([]OpenMR, err
 		}
 	}
 	return out, nil
+}
+
+// Yours is the connection's owner and, in one project, their open merge requests, the open ones
+// they are a reviewer of, and the open issues assigned to them (#2034): one page of each.
+func (g *RealGitLab) Yours(ctx context.Context, project string) (Yours, error) {
+	var me user
+	if err := g.get(ctx, "user", true, &me); err != nil {
+		return Yours{}, err
+	}
+	if me.Username == "" {
+		return Yours{}, &GitLabError{Kind: NotSignedIn, Message: "GitLab did not say who the connection is"}
+	}
+	y := Yours{Login: me.Username}
+	who := url.QueryEscape(me.Username)
+	mrs := fmt.Sprintf("projects/%s/merge_requests?state=opened&per_page=%d", pid(project), perPage)
+	var mine, reviews []mergeRequest
+	if err := g.get(ctx, mrs+"&author_username="+who, true, &mine); err != nil {
+		return Yours{}, err
+	}
+	if err := g.get(ctx, mrs+"&reviewer_username="+who, true, &reviews); err != nil {
+		return Yours{}, err
+	}
+	var assigned []issueJSON
+	issues := fmt.Sprintf("projects/%s/issues?state=opened&per_page=%d&assignee_username=%s", pid(project), perPage, who)
+	if err := g.get(ctx, issues, true, &assigned); err != nil {
+		return Yours{}, err
+	}
+	for _, m := range mine {
+		y.MRs = append(y.MRs, m.IID)
+	}
+	for _, m := range reviews {
+		y.Reviews = append(y.Reviews, OpenMR{MR: m.mr(), Author: m.Author.Username, Draft: m.draft()})
+	}
+	for _, i := range assigned {
+		y.Assigned = append(y.Assigned, i.issue())
+	}
+	return y, nil
 }
 
 // openPage is a page of open merge requests. It is asked for with the ETag of the last answer
@@ -909,8 +947,8 @@ func gitRemotes(ctx context.Context) []string {
 }
 
 // ProjectOfRemote is the project path (group/sub/name) of a remote of the GitLab at base:
-// https://host/group/name(.git), git@host:group/name(.git) or ssh://git@host(:port)/group/name(.git).
-// A GitLab under a path (https://host/gitlab/) keeps that path out of the project's.
+// https://machine/group/name(.git), git@host:group/name(.git) or ssh://git@host(:port)/group/name(.git).
+// A GitLab under a path (https://machine/gitlab/) keeps that path out of the project's.
 func ProjectOfRemote(base, remote string) (string, bool) {
 	u, err := url.Parse(BaseURL(base))
 	if err != nil || u.Host == "" {

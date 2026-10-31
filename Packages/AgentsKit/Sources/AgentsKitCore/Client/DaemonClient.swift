@@ -240,7 +240,10 @@ public actor DaemonClient {
 
     public func call<T: Decodable>(_ method: String, _ params: (some Encodable)? = Optional<String>.none,
                                    returning: T.Type) async throws -> T {
-        try await call(method, params).decode(T.self)
+        let result = try await call(method, params)
+        // One agent that does not decode costs that row, not the list (#2650).
+        if T.self == [Agent].self, let agents = try Agent.list(result) as? T { return agents }
+        return try result.decode(T.self)
     }
 
     /// Every agent `request` asks for, a page at a time (#164): the host answers at most

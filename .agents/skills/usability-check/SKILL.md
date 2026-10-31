@@ -12,7 +12,7 @@ at the keyboard, that is true only of a run of the workflow.
 
 ## Rules for the whole run
 
-- **Never touch the project folder you start in.** It is the shared checkout of `main`.
+- **Never touch the folder you start in.** It is the shared checkout of `main`.
   Do everything in the review worktree below.
 - **Never** merge, push, rebase `main`, open pull requests, ship or restart the app, or
   call the live app's `daemon.sock`. Walk only a scratch set-up of your own (the
@@ -71,7 +71,7 @@ For each screen the release's changes touched:
 
 1. **Read the code** of all three clients side by side, from the parity table's paths.
 2. **See it where you can.** Launch a scratch set-up with the `run-app` skill (under the
-   build lease), seeded enough to show the screen (projects, sessions in each state,
+   build lease), seeded enough to show the screen (folders, sessions in each state,
    a question card, a long chat; its seed scripts and `scripts/seed-*.py` help).
    - **Web:** walk it in headless Chrome with `Web/test/walk/cdp.mjs` and the scenes of
      `Web/test/walk/parity.mjs`, at desktop width and at phone width (390×844). This
@@ -94,8 +94,11 @@ For each screen the release's changes touched:
      keyboard and VoiceOver reach (labels, focus order).
    - **Consistency within a client:** the same thing named, iconed, ordered and placed
      the same way on every screen; the same words as `docs/` uses.
-   - **Parity between clients:** the same feature, states and words on all three, unless
-     the parity table says "by design" with a reason that still holds.
+   - **Parity between clients:** the same feature, states and words on every client its
+     tier names (the row's Tier cell, #2796): all three for Core, the Mac window and the
+     web page for Mac + web. A Mac + web feature that the Remote lacks is not a finding,
+     and nor is one that the Remote still has before #2798 removes it. A difference is
+     also not a finding when the parity table says "by design" with a reason that still holds.
    - **iOS design on the Remote:** Apple's Human Interface Guidelines and the system's
      own controls — navigation stacks and split views, toolbars, swipe actions, context
      menus, sheets and their detents, `List` styles, SF Symbols, Dynamic Type, Dark
@@ -121,7 +124,8 @@ In the review worktree:
 - Append one line per new finding to `.agents/reviews/usability/findings.md`:
   `- U…-n · severity · clients · title · status`, where status starts as `open`.
 - Correct the screen's file in `specs/071-web-remote/walks/parity/` where a row is wrong or
-  missing, citing the finding. `scripts/parity-counts.py` gives the counts.
+  missing, citing the finding. A new row gets its tier from the lists in `parity.md`.
+  `scripts/parity-counts.py` gives the counts by verdict and by tier.
 - Commit on `agents/reviews-usability` ("Usability check <date>: <n>
   findings").
 
@@ -131,7 +135,8 @@ In the review worktree:
   title in plain words, the body with the finding's fields (no screenshots of anything
   but the scratch set-up), label `bug` for high and for a parity delta, `enhancement`
   otherwise, and `priority:high` or `priority:medium` from its severity (the Release
-  workflow waits for these, #914). One issue per finding; a parity delta names the client to change.
+  workflow waits for these, #914). One issue per finding; a parity delta names the client to change. File no Remote parity
+  issue for a Mac + web row.
 - **At most 5 issues a run**, highest severity first. The rest stay `open` in
   `findings.md` and are filed next run.
 - Put each issue's number in the finding's status (`filed #NNN`) and in the parity

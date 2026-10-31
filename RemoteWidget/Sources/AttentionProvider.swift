@@ -18,7 +18,7 @@ struct AttentionProvider: TimelineProvider {
     /// view for "no snapshot" says it does not know yet (FR-009).
     func placeholder(in context: Context) -> AttentionEntry {
         AttentionEntry(date: Date(), snapshot: AttentionSnapshot(writtenAt: Date(), total: 3, sessions: [
-            AttentionSnapshotSession(id: UUID(), project: "api", title: "Fix the widget",
+            AttentionSnapshotSession(id: UUID(), folder: "api", title: "Fix the widget",
                                      wanted: "which branch should this go on",
                                      kind: .elicitation, since: Date()),
         ]), isPlaceholder: true)

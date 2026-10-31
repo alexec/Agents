@@ -1,287 +1,272 @@
 {
-  "kinds" : [
+  "kinds": [
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "An agent in this project started working.",
-      "name" : "agent.started",
-      "payloadSchema" : {
-        "properties" : {
-          "agent" : {
-            "type" : "string"
+      "macOnly": false,
+      "meaning": "An agent in this folder started working.",
+      "name": "agent.started",
+      "payloadSchema": {
+        "properties": {
+          "agent": {
+            "type": "string"
           },
-          "agent_title" : {
-            "type" : "string"
+          "agent_title": {
+            "type": "string"
           },
-          "labels" : {
-            "type" : "string"
+          "labels": {
+            "type": "string"
           },
-          "runtime" : {
-            "type" : "string"
+          "runtime": {
+            "type": "string"
           },
-          "started_by" : {
-            "enum" : [
+          "started_by": {
+            "enum": [
               "agent",
               "workflow",
               "person"
             ],
-            "type" : "string"
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "project"
+      "scope": "folder"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "An agent in this project ended a turn having done its work.",
-      "name" : "agent.finished",
-      "payloadSchema" : {
-        "properties" : {
-          "afterwards" : {
-            "enum" : [
+      "macOnly": false,
+      "meaning": "An agent in this folder ended a turn having done its work.",
+      "name": "agent.finished",
+      "payloadSchema": {
+        "properties": {
+          "afterwards": {
+            "enum": [
               "archive_requested",
               "archived",
               "stay"
             ],
-            "type" : "string"
+            "type": "string"
           },
-          "agent" : {
-            "type" : "string"
+          "agent": {
+            "type": "string"
           },
-          "agent_title" : {
-            "type" : "string"
+          "agent_title": {
+            "type": "string"
           },
-          "labels" : {
-            "type" : "string"
+          "labels": {
+            "type": "string"
           },
-          "outcome" : {
-            "enum" : [
+          "outcome": {
+            "enum": [
               "done",
               "nothing_to_do",
               "needs_answer",
-              "partly_done",
-              "stuck",
-              "blocked"
+              "waiting"
             ],
-            "type" : "string"
+            "type": "string"
           },
-          "runtime" : {
-            "type" : "string"
+          "runtime": {
+            "type": "string"
           },
-          "started_by" : {
-            "enum" : [
+          "started_by": {
+            "enum": [
               "agent",
               "workflow",
               "person"
             ],
-            "type" : "string"
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "project"
+      "scope": "folder"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "An agent in this project is asking for permission.",
-      "name" : "agent.asked_permission",
-      "payloadSchema" : {
-        "properties" : {
-          "agent" : {
-            "type" : "string"
+      "macOnly": false,
+      "meaning": "An agent in this folder is asking for permission.",
+      "name": "agent.asked_permission",
+      "payloadSchema": {
+        "properties": {
+          "agent": {
+            "type": "string"
           },
-          "agent_title" : {
-            "type" : "string"
+          "agent_title": {
+            "type": "string"
           },
-          "labels" : {
-            "type" : "string"
+          "labels": {
+            "type": "string"
           },
-          "runtime" : {
-            "type" : "string"
+          "runtime": {
+            "type": "string"
           },
-          "started_by" : {
-            "enum" : [
+          "started_by": {
+            "enum": [
               "agent",
               "workflow",
               "person"
             ],
-            "type" : "string"
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "project"
+      "scope": "folder"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "An agent in this project raised a form to fill in.",
-      "name" : "agent.asked_form",
-      "payloadSchema" : {
-        "properties" : {
-          "agent" : {
-            "type" : "string"
+      "macOnly": false,
+      "meaning": "An agent in this folder raised a form to fill in.",
+      "name": "agent.asked_form",
+      "payloadSchema": {
+        "properties": {
+          "agent": {
+            "type": "string"
           },
-          "agent_title" : {
-            "type" : "string"
+          "agent_title": {
+            "type": "string"
           },
-          "labels" : {
-            "type" : "string"
+          "labels": {
+            "type": "string"
           },
-          "runtime" : {
-            "type" : "string"
+          "runtime": {
+            "type": "string"
           },
-          "started_by" : {
-            "enum" : [
+          "started_by": {
+            "enum": [
               "agent",
               "workflow",
               "person"
             ],
-            "type" : "string"
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "project"
+      "scope": "folder"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "An agent in this project ended its turn waiting on something.",
-      "name" : "agent.blocked",
-      "payloadSchema" : {
-        "properties" : {
-          "agent" : {
-            "type" : "string"
+      "macOnly": false,
+      "meaning": "An agent in this folder ended its turn waiting on something.",
+      "name": "agent.waiting",
+      "payloadSchema": {
+        "properties": {
+          "agent": {
+            "type": "string"
           },
-          "agent_title" : {
-            "type" : "string"
+          "agent_title": {
+            "type": "string"
           },
-          "labels" : {
-            "type" : "string"
+          "labels": {
+            "type": "string"
           },
-          "runtime" : {
-            "type" : "string"
+          "runtime": {
+            "type": "string"
           },
-          "started_by" : {
-            "enum" : [
+          "started_by": {
+            "enum": [
               "agent",
               "workflow",
               "person"
             ],
-            "type" : "string"
+            "type": "string"
           },
-          "waiting_on" : {
-            "type" : "string"
+          "waiting_on": {
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "project"
+      "scope": "folder"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "An agent in this project was stopped before finishing.",
-      "name" : "agent.stopped",
-      "payloadSchema" : {
-        "properties" : {
-          "agent" : {
-            "type" : "string"
+      "macOnly": false,
+      "meaning": "An agent in this folder was stopped before finishing.",
+      "name": "agent.stopped",
+      "payloadSchema": {
+        "properties": {
+          "agent": {
+            "type": "string"
           },
-          "agent_title" : {
-            "type" : "string"
+          "agent_title": {
+            "type": "string"
           },
-          "by" : {
-            "enum" : [
+          "by": {
+            "enum": [
               "you",
+              "admin",
               "cost_limit",
               "unknown"
             ],
-            "type" : "string"
+            "type": "string"
           },
-          "labels" : {
-            "type" : "string"
+          "labels": {
+            "type": "string"
           },
-          "runtime" : {
-            "type" : "string"
+          "runtime": {
+            "type": "string"
           },
-          "started_by" : {
-            "enum" : [
+          "started_by": {
+            "enum": [
               "agent",
               "workflow",
               "person"
             ],
-            "type" : "string"
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "project"
+      "scope": "folder"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "An agent in this project ended in an error.",
-      "name" : "agent.failed",
-      "payloadSchema" : {
-        "properties" : {
-          "agent" : {
-            "type" : "string"
+      "macOnly": false,
+      "meaning": "An agent in this folder ended in an error.",
+      "name": "agent.failed",
+      "payloadSchema": {
+        "properties": {
+          "agent": {
+            "type": "string"
           },
-          "agent_title" : {
-            "type" : "string"
+          "agent_title": {
+            "type": "string"
           },
-          "labels" : {
-            "type" : "string"
+          "labels": {
+            "type": "string"
           },
-          "reason" : {
-            "enum" : [
+          "reason": {
+            "enum": [
               "end_turn",
               "max_tokens",
               "max_turn_requests",
@@ -297,342 +282,321 @@
               "allowance_spent",
               "rate_limited",
               "sandbox_failed",
-              "imported"
+              "imported",
+              "stopped_by_admin"
             ],
-            "type" : "string"
+            "type": "string"
           },
-          "runtime" : {
-            "type" : "string"
+          "runtime": {
+            "type": "string"
           },
-          "started_by" : {
-            "enum" : [
+          "started_by": {
+            "enum": [
               "agent",
               "workflow",
               "person"
             ],
-            "type" : "string"
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "project"
+      "scope": "folder"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "An agent in this project archived itself, and waits for the person to approve it.",
-      "name" : "agent.archive_requested",
-      "payloadSchema" : {
-        "properties" : {
-          "agent" : {
-            "type" : "string"
+      "macOnly": false,
+      "meaning": "An agent in this folder archived itself, and waits for the person to approve it.",
+      "name": "agent.archive_requested",
+      "payloadSchema": {
+        "properties": {
+          "agent": {
+            "type": "string"
           },
-          "agent_title" : {
-            "type" : "string"
+          "agent_title": {
+            "type": "string"
           },
-          "labels" : {
-            "type" : "string"
+          "labels": {
+            "type": "string"
           },
-          "outcome" : {
-            "enum" : [
+          "outcome": {
+            "enum": [
               "done",
               "nothing_to_do",
               "needs_answer",
-              "partly_done",
-              "stuck",
-              "blocked"
+              "waiting"
             ],
-            "type" : "string"
+            "type": "string"
           },
-          "runtime" : {
-            "type" : "string"
+          "runtime": {
+            "type": "string"
           },
-          "started_by" : {
-            "enum" : [
+          "started_by": {
+            "enum": [
               "agent",
               "workflow",
               "person"
             ],
-            "type" : "string"
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "project"
+      "scope": "folder"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "An agent in this project was sent a message by another, with message_session.",
-      "name" : "agent.messaged",
-      "payloadSchema" : {
-        "properties" : {
-          "agent" : {
-            "type" : "string"
+      "macOnly": false,
+      "meaning": "An agent in this folder was sent a message by another, with message_session.",
+      "name": "agent.messaged",
+      "payloadSchema": {
+        "properties": {
+          "agent": {
+            "type": "string"
           },
-          "agent_title" : {
-            "type" : "string"
+          "agent_title": {
+            "type": "string"
           },
-          "from" : {
-            "type" : "string"
+          "from": {
+            "type": "string"
           },
-          "from_title" : {
-            "type" : "string"
+          "from_title": {
+            "type": "string"
           },
-          "labels" : {
-            "type" : "string"
+          "labels": {
+            "type": "string"
           },
-          "runtime" : {
-            "type" : "string"
+          "runtime": {
+            "type": "string"
           },
-          "started_by" : {
-            "enum" : [
+          "started_by": {
+            "enum": [
               "agent",
               "workflow",
               "person"
             ],
-            "type" : "string"
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "project"
+      "scope": "folder"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "An agent in this project was archived.",
-      "name" : "agent.archived",
-      "payloadSchema" : {
-        "properties" : {
-          "agent" : {
-            "type" : "string"
+      "macOnly": false,
+      "meaning": "An agent in this folder was archived.",
+      "name": "agent.archived",
+      "payloadSchema": {
+        "properties": {
+          "agent": {
+            "type": "string"
           },
-          "agent_title" : {
-            "type" : "string"
+          "agent_title": {
+            "type": "string"
           },
-          "by" : {
-            "enum" : [
+          "by": {
+            "enum": [
               "agent",
               "you"
             ],
-            "type" : "string"
+            "type": "string"
           },
-          "labels" : {
-            "type" : "string"
+          "labels": {
+            "type": "string"
           },
-          "outcome" : {
-            "enum" : [
+          "outcome": {
+            "enum": [
               "done",
               "nothing_to_do",
               "needs_answer",
-              "partly_done",
-              "stuck",
-              "blocked"
+              "waiting"
             ],
-            "type" : "string"
+            "type": "string"
           },
-          "runtime" : {
-            "type" : "string"
+          "runtime": {
+            "type": "string"
           },
-          "started_by" : {
-            "enum" : [
+          "started_by": {
+            "enum": [
               "agent",
               "workflow",
               "person"
             ],
-            "type" : "string"
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "project"
+      "scope": "folder"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "An archived agent was deleted with its conversation.",
-      "name" : "agent.deleted",
-      "payloadSchema" : {
-        "properties" : {
-          "agent" : {
-            "type" : "string"
+      "macOnly": false,
+      "meaning": "An archived agent was deleted with its conversation.",
+      "name": "agent.deleted",
+      "payloadSchema": {
+        "properties": {
+          "agent": {
+            "type": "string"
           },
-          "agent_title" : {
-            "type" : "string"
+          "agent_title": {
+            "type": "string"
           },
-          "because" : {
-            "enum" : [
+          "because": {
+            "enum": [
               "age",
               "person"
             ],
-            "type" : "string"
+            "type": "string"
           },
-          "labels" : {
-            "type" : "string"
+          "labels": {
+            "type": "string"
           },
-          "runtime" : {
-            "type" : "string"
+          "runtime": {
+            "type": "string"
           },
-          "started_by" : {
-            "enum" : [
+          "started_by": {
+            "enum": [
               "agent",
               "workflow",
               "person"
             ],
-            "type" : "string"
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "project"
+      "scope": "folder"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "Every agent in this project has stopped working.",
-      "name" : "project.idle",
-      "payloadSchema" : {
-        "properties" : {
-          "agents" : {
-            "type" : "string"
+      "macOnly": false,
+      "meaning": "Every agent in this folder has stopped working.",
+      "name": "folder.idle",
+      "payloadSchema": {
+        "properties": {
+          "agents": {
+            "type": "string"
           },
-          "blocked" : {
-            "type" : "string"
+          "failed": {
+            "type": "string"
           },
-          "failed" : {
-            "type" : "string"
+          "finished": {
+            "type": "string"
           },
-          "finished" : {
-            "type" : "string"
+          "ids": {
+            "type": "string"
           },
-          "ids" : {
-            "type" : "string"
+          "since": {
+            "type": "string"
           },
-          "since" : {
-            "type" : "string"
+          "stopped": {
+            "type": "string"
           },
-          "stopped" : {
-            "type" : "string"
+          "waiting_on_you": {
+            "type": "string"
           },
-          "waiting_on_you" : {
-            "type" : "string"
+          "waiting": {
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "project"
+      "scope": "folder"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "A workflow in this project started an agent.",
-      "name" : "workflow.ran",
-      "payloadSchema" : {
-        "properties" : {
-          "agent" : {
-            "type" : "string"
+      "macOnly": false,
+      "meaning": "A workflow in this folder started an agent.",
+      "name": "workflow.ran",
+      "payloadSchema": {
+        "properties": {
+          "agent": {
+            "type": "string"
           },
-          "agent_title" : {
-            "type" : "string"
+          "agent_title": {
+            "type": "string"
           },
-          "workflow" : {
-            "type" : "string"
+          "workflow": {
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "project"
+      "scope": "folder"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "A workflow's run in this project finished.",
-      "name" : "workflow.completed",
-      "payloadSchema" : {
-        "properties" : {
-          "agent" : {
-            "type" : "string"
+      "macOnly": false,
+      "meaning": "A workflow's run in this folder finished.",
+      "name": "workflow.completed",
+      "payloadSchema": {
+        "properties": {
+          "agent": {
+            "type": "string"
           },
-          "agent_title" : {
-            "type" : "string"
+          "agent_title": {
+            "type": "string"
           },
-          "outcome" : {
-            "enum" : [
+          "outcome": {
+            "enum": [
               "done",
               "nothing_to_do",
               "needs_answer",
-              "partly_done",
-              "stuck",
-              "blocked"
+              "waiting"
             ],
-            "type" : "string"
+            "type": "string"
           },
-          "workflow" : {
-            "type" : "string"
+          "workflow": {
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "project"
+      "scope": "folder"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "A workflow in this project did not run, and why.",
-      "name" : "workflow.refused",
-      "payloadSchema" : {
-        "properties" : {
-          "reason" : {
-            "enum" : [
+      "macOnly": false,
+      "meaning": "A workflow in this folder did not run, and why.",
+      "name": "workflow.refused",
+      "payloadSchema": {
+        "properties": {
+          "reason": {
+            "enum": [
               "chain_too_deep",
               "run_in_flight",
               "queued",
@@ -652,360 +616,345 @@
               "denied_here",
               "cooling_down"
             ],
-            "type" : "string"
+            "type": "string"
           },
-          "workflow" : {
-            "type" : "string"
+          "workflow": {
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "project"
+      "scope": "folder"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-          "branch" : {
-            "type" : "string"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "branch": {
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "A branch an agent works on moved; never the default branch.",
-      "name" : "branch.moved",
-      "payloadSchema" : {
-        "properties" : {
-          "branch" : {
-            "type" : "string"
+      "macOnly": false,
+      "meaning": "A branch an agent works on moved; never the default branch.",
+      "name": "branch.moved",
+      "payloadSchema": {
+        "properties": {
+          "branch": {
+            "type": "string"
           },
-          "from" : {
-            "type" : "string"
+          "from": {
+            "type": "string"
           },
-          "to" : {
-            "type" : "string"
+          "to": {
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "project"
+      "scope": "folder"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "A file arrived in this project's drop box, .agents/dropbox/, or a folder in it.",
-      "name" : "dropbox.file_added",
-      "payloadSchema" : {
-        "properties" : {
-          "extension" : {
-            "type" : "string"
+      "macOnly": false,
+      "meaning": "A file arrived in this folder's drop box, .agents/dropbox/, or a folder in it.",
+      "name": "dropbox.file_added",
+      "payloadSchema": {
+        "properties": {
+          "extension": {
+            "type": "string"
           },
-          "folder" : {
-            "type" : "string"
+          "folder": {
+            "type": "string"
           },
-          "name" : {
-            "type" : "string"
+          "name": {
+            "type": "string"
           },
-          "path" : {
-            "type" : "string"
+          "path": {
+            "type": "string"
           },
-          "size" : {
-            "type" : "string"
+          "size": {
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "project"
+      "scope": "folder"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
-      },
-      "macOnly" : false,
-      "meaning" : "An agent was given a lease.",
-      "name" : "lease.granted",
-      "payloadSchema" : {
-        "properties" : {
-          "agent" : {
-            "type" : "string"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "agent": {
+            "type": "string"
           },
-          "agent_title" : {
-            "type" : "string"
-          },
-          "resource" : {
-            "type" : "string"
+          "resource": {
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "mac"
+      "macOnly": false,
+      "meaning": "An agent was given a lease.",
+      "name": "lease.granted",
+      "payloadSchema": {
+        "properties": {
+          "agent": {
+            "type": "string"
+          },
+          "agent_title": {
+            "type": "string"
+          },
+          "resource": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "scope": "mac"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "A lease was given back, ended or ran out.",
-      "name" : "lease.released",
-      "payloadSchema" : {
-        "properties" : {
-          "how" : {
-            "enum" : [
+      "macOnly": false,
+      "meaning": "A lease was given back, ended or ran out.",
+      "name": "lease.released",
+      "payloadSchema": {
+        "properties": {
+          "how": {
+            "enum": [
               "expired",
               "ended",
               "released"
             ],
-            "type" : "string"
+            "type": "string"
           },
-          "resource" : {
-            "type" : "string"
+          "resource": {
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "mac"
+      "scope": "mac"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : true,
-      "meaning" : "This Mac is going to sleep.",
-      "name" : "mac.sleep",
-      "payloadSchema" : {
-        "properties" : {
-
-        },
-        "type" : "object"
+      "macOnly": true,
+      "meaning": "This Mac is going to sleep.",
+      "name": "mac.sleep",
+      "payloadSchema": {
+        "properties": {},
+        "type": "object"
       },
-      "scope" : "mac"
+      "scope": "mac"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : true,
-      "meaning" : "This Mac woke up.",
-      "name" : "mac.wake",
-      "payloadSchema" : {
-        "properties" : {
-
-        },
-        "type" : "object"
+      "macOnly": true,
+      "meaning": "This Mac woke up.",
+      "name": "mac.wake",
+      "payloadSchema": {
+        "properties": {},
+        "type": "object"
       },
-      "scope" : "mac"
+      "scope": "mac"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "Free space on a volume holding the Agents root, a project or a worktree fell below its low or critical threshold.",
-      "name" : "machine.disk_low",
-      "payloadSchema" : {
-        "properties" : {
-          "free_bytes" : {
-            "type" : "string"
+      "macOnly": false,
+      "meaning": "Free space on a volume holding the Agents root, a folder or a worktree fell below its low or critical threshold.",
+      "name": "machine.disk_low",
+      "payloadSchema": {
+        "properties": {
+          "free_bytes": {
+            "type": "string"
           },
-          "free_percent" : {
-            "type" : "string"
+          "free_percent": {
+            "type": "string"
           },
-          "level" : {
-            "enum" : [
+          "level": {
+            "enum": [
               "low",
               "critical"
             ],
-            "type" : "string"
+            "type": "string"
           },
-          "threshold" : {
-            "type" : "string"
+          "threshold": {
+            "type": "string"
           },
-          "volume" : {
-            "type" : "string"
+          "volume": {
+            "type": "string"
           },
-          "worktrees" : {
-            "type" : "string"
+          "worktrees": {
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "mac"
+      "scope": "mac"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "Free space on a volume that was low climbed back above its threshold.",
-      "name" : "machine.disk_ok",
-      "payloadSchema" : {
-        "properties" : {
-          "free_bytes" : {
-            "type" : "string"
+      "macOnly": false,
+      "meaning": "Free space on a volume that was low climbed back above its threshold.",
+      "name": "machine.disk_ok",
+      "payloadSchema": {
+        "properties": {
+          "free_bytes": {
+            "type": "string"
           },
-          "free_percent" : {
-            "type" : "string"
+          "free_percent": {
+            "type": "string"
           },
-          "threshold" : {
-            "type" : "string"
+          "threshold": {
+            "type": "string"
           },
-          "volume" : {
-            "type" : "string"
+          "volume": {
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "mac"
+      "scope": "mac"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-          "why" : {
-            "enum" : [
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "why": {
+            "enum": [
               "locked",
               "idle"
             ],
-            "type" : "string"
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "macOnly" : true,
-      "meaning" : "You locked the screen or stepped away for 5 minutes.",
-      "name" : "person.away",
-      "payloadSchema" : {
-        "properties" : {
-          "why" : {
-            "enum" : [
+      "macOnly": true,
+      "meaning": "You locked the screen or stepped away for 5 minutes.",
+      "name": "person.away",
+      "payloadSchema": {
+        "properties": {
+          "why": {
+            "enum": [
               "locked",
               "idle"
             ],
-            "type" : "string"
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "mac"
+      "scope": "mac"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-          "why" : {
-            "enum" : [
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "why": {
+            "enum": [
               "locked",
               "idle"
             ],
-            "type" : "string"
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "macOnly" : true,
-      "meaning" : "You unlocked the screen or came back.",
-      "name" : "person.back",
-      "payloadSchema" : {
-        "properties" : {
-          "why" : {
-            "enum" : [
+      "macOnly": true,
+      "meaning": "You unlocked the screen or came back.",
+      "name": "person.back",
+      "payloadSchema": {
+        "properties": {
+          "why": {
+            "enum": [
               "locked",
               "idle"
             ],
-            "type" : "string"
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "mac"
+      "scope": "mac"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "A spending limit was reached.",
-      "name" : "cost.limit_reached",
-      "payloadSchema" : {
-        "properties" : {
-          "agent" : {
-            "type" : "string"
+      "macOnly": false,
+      "meaning": "A spending limit was reached.",
+      "name": "cost.limit_reached",
+      "payloadSchema": {
+        "properties": {
+          "agent": {
+            "type": "string"
           },
-          "agent_title" : {
-            "type" : "string"
+          "agent_title": {
+            "type": "string"
           },
-          "labels" : {
-            "type" : "string"
+          "labels": {
+            "type": "string"
           },
-          "limit" : {
-            "type" : "string"
+          "limit": {
+            "type": "string"
           },
-          "runtime" : {
-            "type" : "string"
+          "runtime": {
+            "type": "string"
           },
-          "started_by" : {
-            "enum" : [
+          "started_by": {
+            "enum": [
               "agent",
               "workflow",
               "person"
             ],
-            "type" : "string"
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "either"
+      "scope": "either"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "A runtime's allowance ran out.",
-      "name" : "cost.allowance_out",
-      "payloadSchema" : {
-        "properties" : {
-          "reason" : {
-            "enum" : [
+      "macOnly": false,
+      "meaning": "A runtime's allowance ran out.",
+      "name": "cost.allowance_out",
+      "payloadSchema": {
+        "properties": {
+          "reason": {
+            "enum": [
               "allowance spent",
               "credit used up",
               "paid extra usage began",
@@ -1013,37 +962,35 @@
               "runtime failed",
               "learned from another host"
             ],
-            "type" : "string"
+            "type": "string"
           },
-          "retry_after" : {
-            "type" : "string"
+          "retry_after": {
+            "type": "string"
           },
-          "runtime" : {
-            "type" : "string"
+          "runtime": {
+            "type": "string"
           },
-          "until" : {
-            "type" : "string"
+          "until": {
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "mac"
+      "scope": "mac"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "A runtime's allowance came back.",
-      "name" : "cost.allowance_back",
-      "payloadSchema" : {
-        "properties" : {
-          "how" : {
-            "enum" : [
+      "macOnly": false,
+      "meaning": "A runtime's allowance came back.",
+      "name": "cost.allowance_back",
+      "payloadSchema": {
+        "properties": {
+          "how": {
+            "enum": [
               "worked",
               "answering",
               "another host",
@@ -1051,93 +998,87 @@
               "time",
               "check"
             ],
-            "type" : "string"
+            "type": "string"
           },
-          "runtime" : {
-            "type" : "string"
+          "runtime": {
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "mac"
+      "scope": "mac"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "A server went offline.",
-      "name" : "server.offline",
-      "payloadSchema" : {
-        "properties" : {
-          "server" : {
-            "type" : "string"
+      "macOnly": false,
+      "meaning": "A server went offline.",
+      "name": "server.offline",
+      "payloadSchema": {
+        "properties": {
+          "server": {
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "mac"
+      "scope": "mac"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "A server came back.",
-      "name" : "server.online",
-      "payloadSchema" : {
-        "properties" : {
-          "server" : {
-            "type" : "string"
+      "macOnly": false,
+      "meaning": "A server came back.",
+      "name": "server.online",
+      "payloadSchema": {
+        "properties": {
+          "server": {
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "mac"
+      "scope": "mac"
     },
     {
-      "inputSchema" : {
-        "additionalProperties" : false,
-        "properties" : {
-
-        },
-        "type" : "object"
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
       },
-      "macOnly" : false,
-      "meaning" : "Agents started again, after a stop or a crash.",
-      "name" : "system.restarted",
-      "payloadSchema" : {
-        "properties" : {
-          "down_for" : {
-            "type" : "string"
+      "macOnly": false,
+      "meaning": "Agents started again, after a stop or a crash.",
+      "name": "system.restarted",
+      "payloadSchema": {
+        "properties": {
+          "down_for": {
+            "type": "string"
           },
-          "down_for_text" : {
-            "type" : "string"
+          "down_for_text": {
+            "type": "string"
           },
-          "down_since" : {
-            "type" : "string"
+          "down_since": {
+            "type": "string"
           },
-          "reason" : {
-            "enum" : [
+          "reason": {
+            "enum": [
               "stopped",
               "crashed",
               "first_start"
             ],
-            "type" : "string"
+            "type": "string"
           }
         },
-        "type" : "object"
+        "type": "object"
       },
-      "scope" : "mac"
+      "scope": "mac"
     }
   ],
-  "listText" : "Events (the same names work in wait_for_event and as workflow triggers under on:), one per line as MCP events/list describes them, each with its source: app, or the MCP server that offers it.\ninputSchema is what where (or the keys under a trigger) may narrow it by; payloadSchema is the details it carries when it happens, as a woken agent is told them.\n{\"name\":\"agent.started\",\"source\":\"app\",\"description\":\"An agent in this project started working.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.finished\",\"source\":\"app\",\"description\":\"An agent in this project ended a turn having done its work.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"afterwards\":{\"enum\":[\"archive_requested\",\"archived\",\"stay\"],\"type\":\"string\"},\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"outcome\":{\"enum\":[\"done\",\"nothing_to_do\",\"needs_answer\",\"partly_done\",\"stuck\",\"blocked\"],\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.asked_permission\",\"source\":\"app\",\"description\":\"An agent in this project is asking for permission.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.asked_form\",\"source\":\"app\",\"description\":\"An agent in this project raised a form to fill in.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.blocked\",\"source\":\"app\",\"description\":\"An agent in this project ended its turn waiting on something.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"},\"waiting_on\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.stopped\",\"source\":\"app\",\"description\":\"An agent in this project was stopped before finishing.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"by\":{\"enum\":[\"you\",\"cost_limit\",\"unknown\"],\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.failed\",\"source\":\"app\",\"description\":\"An agent in this project ended in an error.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"reason\":{\"enum\":[\"end_turn\",\"max_tokens\",\"max_turn_requests\",\"refusal\",\"cancelled\",\"process_died\",\"daemon_gone\",\"cost_limit\",\"unrecognised\",\"stopped_by_agent\",\"sign_in_refused\",\"runtime_error\",\"allowance_spent\",\"rate_limited\",\"sandbox_failed\",\"imported\"],\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.archive_requested\",\"source\":\"app\",\"description\":\"An agent in this project archived itself, and waits for the person to approve it.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"outcome\":{\"enum\":[\"done\",\"nothing_to_do\",\"needs_answer\",\"partly_done\",\"stuck\",\"blocked\"],\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.messaged\",\"source\":\"app\",\"description\":\"An agent in this project was sent a message by another, with message_session.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"from\":{\"type\":\"string\"},\"from_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.archived\",\"source\":\"app\",\"description\":\"An agent in this project was archived.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"by\":{\"enum\":[\"agent\",\"you\"],\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"outcome\":{\"enum\":[\"done\",\"nothing_to_do\",\"needs_answer\",\"partly_done\",\"stuck\",\"blocked\"],\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.deleted\",\"source\":\"app\",\"description\":\"An archived agent was deleted with its conversation.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"because\":{\"enum\":[\"age\",\"person\"],\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"project.idle\",\"source\":\"app\",\"description\":\"Every agent in this project has stopped working.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agents\":{\"type\":\"string\"},\"blocked\":{\"type\":\"string\"},\"failed\":{\"type\":\"string\"},\"finished\":{\"type\":\"string\"},\"ids\":{\"type\":\"string\"},\"since\":{\"type\":\"string\"},\"stopped\":{\"type\":\"string\"},\"waiting_on_you\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"workflow.ran\",\"source\":\"app\",\"description\":\"A workflow in this project started an agent.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"workflow\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"workflow.completed\",\"source\":\"app\",\"description\":\"A workflow's run in this project finished.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"outcome\":{\"enum\":[\"done\",\"nothing_to_do\",\"needs_answer\",\"partly_done\",\"stuck\",\"blocked\"],\"type\":\"string\"},\"workflow\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"workflow.refused\",\"source\":\"app\",\"description\":\"A workflow in this project did not run, and why.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"reason\":{\"enum\":[\"chain_too_deep\",\"run_in_flight\",\"queued\",\"queue_full\",\"archived\",\"disabled\",\"over_limit\",\"unreadable\",\"trigger_not_supported\",\"agent_unavailable\",\"no_triggering_agent\",\"missed_while_closed\",\"folder_gone\",\"day_limit_reached\",\"setting_refused\",\"awaiting_approval\",\"denied_here\",\"cooling_down\"],\"type\":\"string\"},\"workflow\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"branch.moved\",\"source\":\"app\",\"description\":\"A branch an agent works on moved; never the default branch.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{\"branch\":{\"type\":\"string\"}},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"branch\":{\"type\":\"string\"},\"from\":{\"type\":\"string\"},\"to\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"dropbox.file_added\",\"source\":\"app\",\"description\":\"A file arrived in this project's drop box, .agents/dropbox/, or a folder in it.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"extension\":{\"type\":\"string\"},\"folder\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"path\":{\"type\":\"string\"},\"size\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"lease.granted\",\"source\":\"app\",\"description\":\"An agent was given a lease.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"resource\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"lease.released\",\"source\":\"app\",\"description\":\"A lease was given back, ended or ran out.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"how\":{\"enum\":[\"expired\",\"ended\",\"released\"],\"type\":\"string\"},\"resource\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"mac.sleep\",\"source\":\"app\",\"description\":\"This Mac is going to sleep. Only a Mac raises it, never a Linux server.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{},\"type\":\"object\"}}\n{\"name\":\"mac.wake\",\"source\":\"app\",\"description\":\"This Mac woke up. Only a Mac raises it, never a Linux server.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{},\"type\":\"object\"}}\n{\"name\":\"machine.disk_low\",\"source\":\"app\",\"description\":\"Free space on a volume holding the Agents root, a project or a worktree fell below its low or critical threshold.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"free_bytes\":{\"type\":\"string\"},\"free_percent\":{\"type\":\"string\"},\"level\":{\"enum\":[\"low\",\"critical\"],\"type\":\"string\"},\"threshold\":{\"type\":\"string\"},\"volume\":{\"type\":\"string\"},\"worktrees\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"machine.disk_ok\",\"source\":\"app\",\"description\":\"Free space on a volume that was low climbed back above its threshold.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"free_bytes\":{\"type\":\"string\"},\"free_percent\":{\"type\":\"string\"},\"threshold\":{\"type\":\"string\"},\"volume\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"person.away\",\"source\":\"app\",\"description\":\"You locked the screen or stepped away for 5 minutes. Only a Mac raises it, never a Linux server.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{\"why\":{\"enum\":[\"locked\",\"idle\"],\"type\":\"string\"}},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"why\":{\"enum\":[\"locked\",\"idle\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"person.back\",\"source\":\"app\",\"description\":\"You unlocked the screen or came back. Only a Mac raises it, never a Linux server.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{\"why\":{\"enum\":[\"locked\",\"idle\"],\"type\":\"string\"}},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"why\":{\"enum\":[\"locked\",\"idle\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"cost.limit_reached\",\"source\":\"app\",\"description\":\"A spending limit was reached.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"limit\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"cost.allowance_out\",\"source\":\"app\",\"description\":\"A runtime's allowance ran out.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"reason\":{\"enum\":[\"allowance spent\",\"credit used up\",\"paid extra usage began\",\"still rate limited\",\"runtime failed\",\"learned from another host\"],\"type\":\"string\"},\"retry_after\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"until\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"cost.allowance_back\",\"source\":\"app\",\"description\":\"A runtime's allowance came back.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"how\":{\"enum\":[\"worked\",\"answering\",\"another host\",\"person\",\"time\",\"check\"],\"type\":\"string\"},\"runtime\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"server.offline\",\"source\":\"app\",\"description\":\"A server went offline.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"server\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"server.online\",\"source\":\"app\",\"description\":\"A server came back.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"server\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"system.restarted\",\"source\":\"app\",\"description\":\"Agents started again, after a stop or a crash.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"down_for\":{\"type\":\"string\"},\"down_for_text\":{\"type\":\"string\"},\"down_since\":{\"type\":\"string\"},\"reason\":{\"enum\":[\"stopped\",\"crashed\",\"first_start\"],\"type\":\"string\"}},\"type\":\"object\"}}\nA subject with .* matches all of its events, e.g. agent.*; for an MCP server's noun, all of that noun's events. A list in where matches any of its values, e.g. why: [locked, idle]. To wait for particular agents, use wait_for_event with agents."
+  "listText": "Events (the same names work in wait_for_event and as workflow triggers under on:), one per line as MCP events/list describes them, each with its source: app, or the MCP server that offers it.\ninputSchema is what where (or the keys under a trigger) may narrow it by; payloadSchema is the details it carries when it happens, as a woken agent is told them.\n{\"name\":\"agent.started\",\"source\":\"app\",\"description\":\"An agent in this folder started working.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.finished\",\"source\":\"app\",\"description\":\"An agent in this folder ended a turn having done its work.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"afterwards\":{\"enum\":[\"archive_requested\",\"archived\",\"stay\"],\"type\":\"string\"},\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"outcome\":{\"enum\":[\"done\",\"nothing_to_do\",\"needs_answer\",\"waiting\"],\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.asked_permission\",\"source\":\"app\",\"description\":\"An agent in this folder is asking for permission.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.asked_form\",\"source\":\"app\",\"description\":\"An agent in this folder raised a form to fill in.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.waiting\",\"source\":\"app\",\"description\":\"An agent in this folder ended its turn waiting on something.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"},\"waiting_on\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.stopped\",\"source\":\"app\",\"description\":\"An agent in this folder was stopped before finishing.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"by\":{\"enum\":[\"you\",\"admin\",\"cost_limit\",\"unknown\"],\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.failed\",\"source\":\"app\",\"description\":\"An agent in this folder ended in an error.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"reason\":{\"enum\":[\"end_turn\",\"max_tokens\",\"max_turn_requests\",\"refusal\",\"cancelled\",\"process_died\",\"daemon_gone\",\"cost_limit\",\"unrecognised\",\"stopped_by_agent\",\"sign_in_refused\",\"runtime_error\",\"allowance_spent\",\"rate_limited\",\"sandbox_failed\",\"imported\",\"stopped_by_admin\"],\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.archive_requested\",\"source\":\"app\",\"description\":\"An agent in this folder archived itself, and waits for the person to approve it.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"outcome\":{\"enum\":[\"done\",\"nothing_to_do\",\"needs_answer\",\"waiting\"],\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.messaged\",\"source\":\"app\",\"description\":\"An agent in this folder was sent a message by another, with message_session.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"from\":{\"type\":\"string\"},\"from_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.archived\",\"source\":\"app\",\"description\":\"An agent in this folder was archived.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"by\":{\"enum\":[\"agent\",\"you\"],\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"outcome\":{\"enum\":[\"done\",\"nothing_to_do\",\"needs_answer\",\"waiting\"],\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.deleted\",\"source\":\"app\",\"description\":\"An archived agent was deleted with its conversation.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"because\":{\"enum\":[\"age\",\"person\"],\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"folder.idle\",\"source\":\"app\",\"description\":\"Every agent in this folder has stopped working.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agents\":{\"type\":\"string\"},\"waiting\":{\"type\":\"string\"},\"failed\":{\"type\":\"string\"},\"finished\":{\"type\":\"string\"},\"ids\":{\"type\":\"string\"},\"since\":{\"type\":\"string\"},\"stopped\":{\"type\":\"string\"},\"waiting_on_you\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"workflow.ran\",\"source\":\"app\",\"description\":\"A workflow in this folder started an agent.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"workflow\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"workflow.completed\",\"source\":\"app\",\"description\":\"A workflow's run in this folder finished.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"outcome\":{\"enum\":[\"done\",\"nothing_to_do\",\"needs_answer\",\"waiting\"],\"type\":\"string\"},\"workflow\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"workflow.refused\",\"source\":\"app\",\"description\":\"A workflow in this folder did not run, and why.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"reason\":{\"enum\":[\"chain_too_deep\",\"run_in_flight\",\"queued\",\"queue_full\",\"archived\",\"disabled\",\"over_limit\",\"unreadable\",\"trigger_not_supported\",\"agent_unavailable\",\"no_triggering_agent\",\"missed_while_closed\",\"folder_gone\",\"day_limit_reached\",\"setting_refused\",\"awaiting_approval\",\"denied_here\",\"cooling_down\"],\"type\":\"string\"},\"workflow\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"branch.moved\",\"source\":\"app\",\"description\":\"A branch an agent works on moved; never the default branch.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{\"branch\":{\"type\":\"string\"}},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"branch\":{\"type\":\"string\"},\"from\":{\"type\":\"string\"},\"to\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"dropbox.file_added\",\"source\":\"app\",\"description\":\"A file arrived in this folder's drop box, .agents/dropbox/, or a folder in it.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"extension\":{\"type\":\"string\"},\"folder\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"path\":{\"type\":\"string\"},\"size\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"lease.granted\",\"source\":\"app\",\"description\":\"An agent was given a lease.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{\"agent\":{\"type\":\"string\"},\"resource\":{\"type\":\"string\"}},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"resource\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"lease.released\",\"source\":\"app\",\"description\":\"A lease was given back, ended or ran out.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"how\":{\"enum\":[\"expired\",\"ended\",\"released\"],\"type\":\"string\"},\"resource\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"mac.sleep\",\"source\":\"app\",\"description\":\"This Mac is going to sleep. Only a Mac raises it, never a Linux server.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{},\"type\":\"object\"}}\n{\"name\":\"mac.wake\",\"source\":\"app\",\"description\":\"This Mac woke up. Only a Mac raises it, never a Linux server.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{},\"type\":\"object\"}}\n{\"name\":\"machine.disk_low\",\"source\":\"app\",\"description\":\"Free space on a volume holding the Agents root, a folder or a worktree fell below its low or critical threshold.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"free_bytes\":{\"type\":\"string\"},\"free_percent\":{\"type\":\"string\"},\"level\":{\"enum\":[\"low\",\"critical\"],\"type\":\"string\"},\"threshold\":{\"type\":\"string\"},\"volume\":{\"type\":\"string\"},\"worktrees\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"machine.disk_ok\",\"source\":\"app\",\"description\":\"Free space on a volume that was low climbed back above its threshold.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"free_bytes\":{\"type\":\"string\"},\"free_percent\":{\"type\":\"string\"},\"threshold\":{\"type\":\"string\"},\"volume\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"person.away\",\"source\":\"app\",\"description\":\"You locked the screen or stepped away for 5 minutes. Only a Mac raises it, never a Linux server.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{\"why\":{\"enum\":[\"locked\",\"idle\"],\"type\":\"string\"}},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"why\":{\"enum\":[\"locked\",\"idle\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"person.back\",\"source\":\"app\",\"description\":\"You unlocked the screen or came back. Only a Mac raises it, never a Linux server.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{\"why\":{\"enum\":[\"locked\",\"idle\"],\"type\":\"string\"}},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"why\":{\"enum\":[\"locked\",\"idle\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"cost.limit_reached\",\"source\":\"app\",\"description\":\"A spending limit was reached.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"limit\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"cost.allowance_out\",\"source\":\"app\",\"description\":\"A runtime's allowance ran out.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"reason\":{\"enum\":[\"allowance spent\",\"credit used up\",\"paid extra usage began\",\"still rate limited\",\"runtime failed\",\"learned from another host\"],\"type\":\"string\"},\"retry_after\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"until\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"cost.allowance_back\",\"source\":\"app\",\"description\":\"A runtime's allowance came back.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"how\":{\"enum\":[\"worked\",\"answering\",\"another host\",\"person\",\"time\",\"check\"],\"type\":\"string\"},\"runtime\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"server.offline\",\"source\":\"app\",\"description\":\"A server went offline.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"server\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"server.online\",\"source\":\"app\",\"description\":\"A server came back.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"server\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"system.restarted\",\"source\":\"app\",\"description\":\"Agents started again, after a stop or a crash.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"down_for\":{\"type\":\"string\"},\"down_for_text\":{\"type\":\"string\"},\"down_since\":{\"type\":\"string\"},\"reason\":{\"enum\":[\"stopped\",\"crashed\",\"first_start\"],\"type\":\"string\"}},\"type\":\"object\"}}\nA subject with .* matches all of its events, e.g. agent.*; for an MCP server's noun, all of that noun's events. A list in where matches any of its values, e.g. why: [locked, idle]. To wait for particular agents, use wait_for_agents."
 }

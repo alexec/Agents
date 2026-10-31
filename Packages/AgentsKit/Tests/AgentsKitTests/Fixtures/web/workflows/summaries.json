@@ -14,8 +14,9 @@
 
       ],
       "queued" : 0,
+      "scope" : "folder",
       "workflow" : {
-        "folder" : "file:///fixture/project",
+        "folder" : "file:///fixture/folder",
         "mode" : "new",
         "name" : "Nightly",
         "prompt" : "Do it.",
@@ -76,8 +77,9 @@
 
       ],
       "queued" : 0,
+      "scope" : "folder",
       "workflow" : {
-        "folder" : "file:///fixture/project",
+        "folder" : "file:///fixture/folder",
         "mode" : "standing",
         "name" : "Office",
         "prompt" : "Do it.",
@@ -137,8 +139,9 @@
 
       ],
       "queued" : 0,
+      "scope" : "folder",
       "workflow" : {
-        "folder" : "file:///fixture/project",
+        "folder" : "file:///fixture/folder",
         "mode" : "new",
         "name" : "Days",
         "prompt" : "Do it.",
@@ -193,8 +196,9 @@
 
       ],
       "queued" : 0,
+      "scope" : "folder",
       "workflow" : {
-        "folder" : "file:///fixture/project",
+        "folder" : "file:///fixture/folder",
         "mode" : "new",
         "name" : "Review",
         "prompt" : "Do it.",
@@ -261,8 +265,9 @@
 
       ],
       "queued" : 0,
+      "scope" : "folder",
       "workflow" : {
-        "folder" : "file:///fixture/project",
+        "folder" : "file:///fixture/folder",
         "mode" : "triggering",
         "name" : "Answer",
         "prompt" : "Do it.",
@@ -324,8 +329,9 @@
 
       ],
       "queued" : 0,
+      "scope" : "folder",
       "workflow" : {
-        "folder" : "file:///fixture/project",
+        "folder" : "file:///fixture/folder",
         "mode" : "new",
         "name" : "Chain",
         "prompt" : "Do it.",
@@ -387,8 +393,9 @@
 
       ],
       "queued" : 0,
+      "scope" : "folder",
       "workflow" : {
-        "folder" : "file:///fixture/project",
+        "folder" : "file:///fixture/folder",
         "mode" : "new",
         "name" : "Future",
         "prompt" : "Do it.",
@@ -433,8 +440,9 @@
 
       ],
       "queued" : 0,
+      "scope" : "folder",
       "workflow" : {
-        "folder" : "file:///fixture/project",
+        "folder" : "file:///fixture/folder",
         "mode" : "new",
         "name" : "Legacy",
         "problem" : {
@@ -484,8 +492,9 @@
 
       ],
       "queued" : 0,
+      "scope" : "folder",
       "workflow" : {
-        "folder" : "file:///fixture/project",
+        "folder" : "file:///fixture/folder",
         "mode" : "new",
         "name" : "Handmade",
         "prompt" : "Do it.",
@@ -523,8 +532,9 @@
 
       ],
       "queued" : 0,
+      "scope" : "folder",
       "workflow" : {
-        "folder" : "file:///fixture/project",
+        "folder" : "file:///fixture/folder",
         "mode" : "new",
         "name" : "Broken",
         "problem" : {
@@ -567,8 +577,9 @@
 
       ],
       "queued" : 0,
+      "scope" : "folder",
       "workflow" : {
-        "folder" : "file:///fixture/project",
+        "folder" : "file:///fixture/folder",
         "mode" : "new",
         "name" : "Odd",
         "problem" : {
@@ -634,8 +645,9 @@
 
       ],
       "queued" : 0,
+      "scope" : "folder",
       "workflow" : {
-        "folder" : "file:///fixture/project",
+        "folder" : "file:///fixture/folder",
         "mode" : "new",
         "name" : "Old",
         "problem" : {
@@ -677,10 +689,11 @@
       "nextFireAtByTrigger" : [
 
       ],
-      "overLimit" : "project",
+      "overLimit" : "folder",
       "queued" : 0,
+      "scope" : "folder",
       "workflow" : {
-        "folder" : "file:///fixture/project",
+        "folder" : "file:///fixture/folder",
         "mode" : "new",
         "name" : "Many",
         "prompt" : "Do it.",
@@ -745,8 +758,9 @@
 
       ],
       "queued" : 0,
+      "scope" : "folder",
       "workflow" : {
-        "folder" : "file:///fixture/project",
+        "folder" : "file:///fixture/folder",
         "mode" : "new",
         "name" : "New",
         "prompt" : "Do it.",
@@ -818,8 +832,9 @@
 
       ],
       "queued" : 0,
+      "scope" : "folder",
       "workflow" : {
-        "folder" : "file:///fixture/project",
+        "folder" : "file:///fixture/folder",
         "mode" : "new",
         "name" : "Busy",
         "prompt" : "Do it.",
@@ -891,8 +906,9 @@
 
       ],
       "queued" : 2,
+      "scope" : "folder",
       "workflow" : {
-        "folder" : "file:///fixture/project",
+        "folder" : "file:///fixture/folder",
         "mode" : "new",
         "name" : "Fix checks",
         "prompt" : "Do it.",
@@ -964,8 +980,9 @@
 
       ],
       "queued" : 10,
+      "scope" : "folder",
       "workflow" : {
-        "folder" : "file:///fixture/project",
+        "folder" : "file:///fixture/folder",
         "mode" : "new",
         "name" : "Swamped",
         "prompt" : "Do it.",
@@ -1037,8 +1054,9 @@
 
       ],
       "queued" : 0,
+      "scope" : "folder",
       "workflow" : {
-        "folder" : "file:///fixture/project",
+        "folder" : "file:///fixture/folder",
         "mode" : "new",
         "name" : "Deep",
         "prompt" : "Do it.",
@@ -1099,8 +1117,9 @@
 
       ],
       "queued" : 0,
+      "scope" : "folder",
       "workflow" : {
-        "folder" : "file:///fixture/project",
+        "folder" : "file:///fixture/folder",
         "mode" : "new",
         "name" : "Quiet",
         "prompt" : "Do it.",
@@ -1172,8 +1191,9 @@
 
       ],
       "queued" : 0,
+      "scope" : "folder",
       "workflow" : {
-        "folder" : "file:///fixture/project",
+        "folder" : "file:///fixture/folder",
         "mode" : "new",
         "name" : "Hushed",
         "prompt" : "Do it.",
@@ -1234,9 +1254,10 @@
 
       ],
       "queued" : 0,
+      "scope" : "folder",
       "workflow" : {
         "cooldown" : 5400,
-        "folder" : "file:///fixture/project",
+        "folder" : "file:///fixture/folder",
         "mode" : "new",
         "name" : "Close landed",
         "prompt" : "Do it.",
@@ -1310,9 +1331,10 @@
 
       ],
       "queued" : 0,
+      "scope" : "folder",
       "workflow" : {
         "cooldown" : 86400,
-        "folder" : "file:///fixture/project",
+        "folder" : "file:///fixture/folder",
         "mode" : "triggering",
         "name" : "Steady",
         "prompt" : "Do it.",
@@ -1373,8 +1395,9 @@
 
       ],
       "queued" : 0,
+      "scope" : "folder",
       "workflow" : {
-        "folder" : "file:///fixture/project",
+        "folder" : "file:///fixture/folder",
         "mode" : "new",
         "name" : "Red",
         "prompt" : "Do it.",
@@ -1420,8 +1443,9 @@
 
       ],
       "queued" : 0,
+      "scope" : "folder",
       "workflow" : {
-        "folder" : "file:///fixture/project",
+        "folder" : "file:///fixture/folder",
         "mode" : "new",
         "name" : "Prs",
         "prompt" : "Do it.",

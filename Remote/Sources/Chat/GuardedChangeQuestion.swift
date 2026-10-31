@@ -1,13 +1,13 @@
 import AgentsKitCore
 import SwiftUI
 
-/// The Remote's `GuardedChangeCard` (#531): read and answered through the project's host.
+/// The Remote's `GuardedChangeCard` (#531): read and answered through the folder's host.
 /// Review… opens the change's page (#1472): pushed over the chat it is asked in, or the
-/// detail's own page from the project's.
+/// detail's own page from the folder's.
 struct GuardedChangeQuestion: View {
     @Environment(RemoteModel.self) private var model
     let change: GuardedChange
-    let key: ProjectKey
+    let key: FolderKey
 
     var body: some View {
         GuardedChangeCard(change: change,

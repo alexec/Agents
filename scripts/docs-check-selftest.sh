@@ -68,6 +68,12 @@ expect "missing picture" "reference/no-picture.md"
 fresh; page reference/private.md reference "It lives in /Users/someone/code."; in_nav reference/private.md
 expect "private path" "reference/private.md"
 
+fresh; page reference/gcloud.md reference "\`\`\`sh
+gcloud kms keyrings create agents \\
+    --folder my-project
+\`\`\`"; in_nav reference/gcloud.md
+expect "gcloud --folder (#2712)" "reference/gcloud.md"
+
 [ $failed -eq 0 ] && echo "docs-check-selftest: all breaks caught" || echo "docs-check-selftest: some breaks slipped through"
 [ -z "$(git -C "$root" status --porcelain -- docs mkdocs.yml)" ] ||
 	echo "note: docs/ or mkdocs.yml has uncommitted changes of your own (this test never writes there)"

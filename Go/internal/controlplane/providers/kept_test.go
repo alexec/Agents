@@ -10,9 +10,10 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controlplane/records"
+	"github.com/alexec/agents/Go/internal/controlplane/store"
 )
 
-// Start a workspace by using it (#691 US3): a prompt or an agent start for a stopped host
+// Start a machine by using it (#691 US3): a prompt or an agent start for a stopped host
 // is kept, starts it, and goes once the host connects. Ports KeptRequestsTests.swift; the
 // router's part (a client's line, a host's uplink) is the fake router's.
 
@@ -215,7 +216,7 @@ func TestWithStartWhenUsedOffAPromptIsRefusedAsToday(t *testing.T) {
 	h := newHarness(t)
 	h.link(h.add(), devbox, "agents-devbox")
 	off := false
-	h.must(MethodHostsSetOptions, HostWorkspaceOptions{Host: devbox, StartWhenUsed: &off})
+	h.must(MethodHostsSetOptions, MachineOptions{Host: devbox, StartWhenUsed: &off})
 	kept := h.keeper()
 	if f := kept.Keep(devbox, MethodAgentsPrompt, promptParams("hello"), h.caller); f != nil {
 		t.Errorf("%v", f)
@@ -309,5 +310,98 @@ func TestAKeptRecordIsStoredAsSwiftStoresIt(t *testing.T) {
 	}
 	if at, _ := stored["at"].(string); !strings.HasSuffix(at, "Z") {
 		t.Errorf("at %v", stored["at"])
+	}
+}
+
+// personRouter is the fake router that tells each person their own: what each was told.
+type personRouter struct {
+	*fakeRouter
+	toldTo map[string][]string
+}
+
+func (r *personRouter) BroadcastControlEach(method string, params func(person string) any) {
+	for _, person := range []string{"ann", "bob"} {
+		r.TellPerson(person, method, params(person))
+	}
+}
+
+func (r *personRouter) TellPerson(person, method string, params any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.toldTo[person] = append(r.toldTo[person], method+" "+string(rawOf(params)))
+}
+
+func (r *personRouter) told(person string) string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return strings.Join(r.toldTo[person], "\n")
+}
+
+// What is kept for a host is its owner's alone: no one else lists it, drops it, tries it
+// again or is told of it (FR-018, FR-019).
+func TestWhatIsKeptIsShownToTheHostsOwnerAlone(t *testing.T) {
+	h := newHarness(t)
+	for i, host := range []string{devbox, other} {
+		record := keptRecord{ID: records.NewUUID(), Host: host, Method: MethodAgentsPrompt,
+			Params: promptParams("secret of " + host), Client: records.NewUUID(), ClientKind: "mac",
+			At: records.Stamp{Time: time.Now()}}
+		data, err := records.Encode(record)
+		if err != nil {
+			t.Fatal(err)
+		}
+		key := KeptPrefix + host + "/" + sequence(time.Now().Add(time.Duration(i)*time.Millisecond)) + ".json"
+		if _, err := h.store.Put(context.Background(), key, data, store.Always); err != nil {
+			t.Fatal(err)
+		}
+	}
+	owners := map[string]string{devbox: "ann", other: "bob"}
+	router := &personRouter{fakeRouter: h.router, toldTo: map[string][]string{}}
+	kept := NewKept(h.store, router, KeptHooks{Start: func(string, string) {}, OwnerOf: func(host string) string { return owners[host] }}, nil)
+
+	list := func(person string) []KeptRequest {
+		t.Helper()
+		answer, err := kept.Answer(MethodHostsListKept, nil, person)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return answer.(KeptList).Kept
+	}
+	ann := list("ann")
+	if len(ann) != 1 || string(ann[0].Host) != devbox || ann[0].Text != "secret of "+devbox {
+		t.Fatalf("ann sees %+v", ann)
+	}
+	if bob := list("bob"); len(bob) != 1 || string(bob[0].Host) != other {
+		t.Fatalf("bob sees %+v", bob)
+	}
+	if eve := list("eve"); len(eve) != 0 {
+		t.Fatalf("eve sees %+v", eve)
+	}
+
+	which := rawOf(KeptRequestID{Host: ann[0].Host, ID: ann[0].ID})
+	for _, method := range []string{MethodHostsDropKept, MethodHostsRetryKept} {
+		if _, err := kept.Answer(method, which, "bob"); err == nil {
+			t.Errorf("bob's %s of ann's was not refused", method)
+		}
+	}
+	if len(list("ann")) != 1 {
+		t.Fatal("bob dropped ann's")
+	}
+
+	// Delivered: told to the owner alone, and so is what is left.
+	h.router.mu.Lock()
+	h.router.answer = (&keptHost{}).answer
+	h.router.mu.Unlock()
+	kept.Attached(devbox)
+	if len(list("ann")) != 0 {
+		t.Fatal("not delivered")
+	}
+	if !strings.Contains(router.told("ann"), NoticeKeptDelivered) || !strings.Contains(router.told("ann"), NoticeKeptChanged) {
+		t.Errorf("ann was told %q", router.told("ann"))
+	}
+	if told := router.told("bob"); strings.Contains(told, devbox) || strings.Contains(told, NoticeKeptDelivered) {
+		t.Errorf("bob was told %q", told)
+	}
+	if h.router.heard(NoticeKeptChanged) || h.router.heard(NoticeKeptDelivered) {
+		t.Error("told to everyone")
 	}
 }

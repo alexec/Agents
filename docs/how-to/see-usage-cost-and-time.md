@@ -49,8 +49,8 @@ the record began shows as **Earlier**.
 
 The chart shows money, in the currency that most was spent in. Under the chart:
 
-- **All time** is the total for all of the work. Under it, each project has its share,
-  largest first. Archived projects show **Archived** and stay in the list, so the total
+- **All time** is the total for all of the work. Under it, each folder has its share,
+  largest first. Archived folders show **Archived** and stay in the list, so the total
   always adds up.
 - **At least this much** means that some chats ran on a runtime that reports no price.
   The figure is then a floor, not the full cost.
@@ -83,7 +83,7 @@ each kind of time:
 - **Agent**: the agent thinks or writes.
 - **Tools**: a tool call is open.
 - **Waiting on others**: the agent waits on something it does not control, such as
-  `wait_for_event` or `lease_resource`.
+  `wait_for_event`, `wait_for_agents`, `check_again` or `lease_resource`.
 - **Waiting for you**: a question, a permission or a form waits for your answer.
 
 When kinds overlap, **Waiting for you** counts first, then **Waiting on others**, then

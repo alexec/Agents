@@ -141,7 +141,7 @@ func sshEnvironment(inherited []string) []string {
 	return env
 }
 
-// environment is HostInstall.environment: what ssh runs with. The agent stays only when
+// environment is MachineInstall.environment: what ssh runs with. The agent stays only when
 // no key was given, so a refused key is never followed by another identity.
 func environment(keepAgent bool, inherited []string) []string {
 	var env []string

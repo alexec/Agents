@@ -31,10 +31,7 @@ extension WorkflowSummary {
                                             tint: problem.needsAPerson ? .failure : .none))
         }
         lines += mcpArgumentLines
-        if waitsItsTurn, let limit = overLimit {
-            lines.append(WorkflowStatusLine(symbol: "hourglass", text: "Waiting its turn: \(limit.sentence(total: limitTotal))",
-                                            detail: limit.remedy, tint: .attention))
-        } else if let waiting = awaitingApproval {
+        if let waiting = awaitingApproval {
             lines.append(WorkflowStatusLine(symbol: "checkmark.shield",
                                             text: waiting.note.map { "Waiting for your OK — \($0)" }
                                                 ?? (waiting.isNew ? "New — waiting for your OK" : "Changed since you approved it — waiting for your OK"),
@@ -48,7 +45,7 @@ extension WorkflowSummary {
         if !isArchived {
             lines.append(enabledLine)
         }
-        if let limit = overLimit, !waitsItsTurn {
+        if let limit = overLimit {
             lines.append(WorkflowStatusLine(symbol: "exclamationmark.triangle", text: "Over the limit: \(limit.sentence(total: limitTotal))",
                                             detail: limit.remedy, tint: .attention))
         }
@@ -182,7 +179,7 @@ extension MCPTriggerStatus {
     /// from what the host last said, so "Checked 20 s ago" moves without the host
     /// sending anything. The web page's `workflows.ts` says the same words.
     func words(now: Date) -> (text: String, tint: StateTint) {
-        let who = server ?? "its server"
+        let who = server ?? "its machine"
         let body: String
         var tint = StateTint.none
         switch state {

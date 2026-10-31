@@ -19,7 +19,7 @@ func TestDeclaringAResource(t *testing.T) {
 	d, c := start(t, root)
 	defer d.Shutdown()
 	var snap wire.LeaseSnapshot
-	json.Unmarshal(c.call(t, 1, "leases/snapshot", nil), &snap)
+	json.Unmarshal(c.call(t, 1, "resources/snapshot", nil), &snap)
 	if len(snap.Resources) != 1 || snap.Resources[0].Name != "screen" || snap.Resources[0].DisplayName != "Screen, mouse and keyboard" {
 		t.Fatalf("%+v", snap)
 	}
@@ -52,13 +52,13 @@ func TestDeclaringAResource(t *testing.T) {
 	if e := c.callError(t, 21, "resources/remove", map[string]any{"name": "build"}); e.Message != "build is not declared." {
 		t.Fatal(e.Message)
 	}
-	if e := c.callError(t, 22, "leases/lease", map[string]any{"token": "t", "name": "build"}); e.Message != "That conversation is not open any more, so nothing was leased." {
+	if e := c.callError(t, 22, "resources/lease", map[string]any{"token": "t", "name": "build"}); e.Message != "That conversation is not open any more, so nothing was leased." {
 		t.Fatal(e.Message)
 	}
 }
 
 // A book the Swift host wrote is read, ended by the person, and handed on: the next in
-// line, whose call returned long ago, is started again with the news.
+// line, with no wait open for it, is started again with the event (#2361).
 func TestABookSwiftWroteIsHandedOn(t *testing.T) {
 	fakeRuntimes(t)
 	root := t.TempDir()
@@ -76,7 +76,7 @@ func TestABookSwiftWroteIsHandedOn(t *testing.T) {
 	b, _ := json.Marshal(book)
 	os.WriteFile(filepath.Join(root, "leases.json"), b, 0o644)
 	var snap wire.LeaseSnapshot
-	json.Unmarshal(c.call(t, 1, "leases/snapshot", nil), &snap)
+	json.Unmarshal(c.call(t, 1, "resources/snapshot", nil), &snap)
 	var sim wire.ResourceState
 	for _, r := range snap.Resources {
 		if r.Name == "simulator:abc" {
@@ -90,13 +90,13 @@ func TestABookSwiftWroteIsHandedOn(t *testing.T) {
 	if snap.Resources[0].Name != "screen" {
 		t.Fatalf("order %+v", snap.Resources)
 	}
-	if e := c.callError(t, 2, "leases/end", map[string]any{"name": "simulator:abc", "agentID": next.ID}); e.Message != "That agent does not hold simulator:abc." {
+	if e := c.callError(t, 2, "resources/end", map[string]any{"name": "simulator:abc", "agentID": next.ID}); e.Message != "That agent does not hold simulator:abc." {
 		t.Fatal(e.Message)
 	}
-	json.Unmarshal(c.call(t, 3, "leases/end", map[string]any{"name": "simulator:abc"}), &snap)
+	json.Unmarshal(c.call(t, 3, "resources/end", map[string]any{"name": "simulator:abc"}), &snap)
 	waitFor(t, "the next in line started", func() bool {
 		for _, m := range userMessages(d, next.ID) {
-			if strings.HasPrefix(m, "iPhone 17 is yours now. You hold it until ") {
+			if strings.HasPrefix(m, "The event you were waiting for happened.") && strings.Contains(m, "You hold iPhone 17 until ") {
 				return true
 			}
 		}

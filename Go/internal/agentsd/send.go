@@ -14,8 +14,8 @@ import (
 
 // The sending side of Send to ‹host›… (#1123), on this Mac's host: the window is
 // sandboxed and reads no repository itself, so this host makes the bundle and the patch
-// (projects/sendPack), and the window reads them in parts (projects/sendRead) and hands
-// them to the receiving host (projects/receiveUpload).
+// (folders/sendPack), and the window reads them in parts (folders/sendRead) and hands
+// them to the receiving host (folders/receiveUpload).
 
 const sendPartSize = 1 << 20
 
@@ -151,13 +151,19 @@ func (d *Daemon) sendPack(r wire.SendPackRequest) (wire.SendPack, error) {
 }
 
 func (d *Daemon) sendRead(r wire.SendReadRequest) (wire.SendRead, error) {
+	return d.readOutgoing(r, "That file is gone. Send again.")
+}
+
+// readOutgoing reads one part of a file in Outgoing (a send's, or an export's, #1001);
+// gone is what to say when the file is not there.
+func (d *Daemon) readOutgoing(r wire.SendReadRequest, gone string) (wire.SendRead, error) {
 	path, err := d.outgoingFile(r.ID)
 	if err != nil {
 		return wire.SendRead{}, err
 	}
 	f, err := os.Open(path)
 	if err != nil {
-		return wire.SendRead{}, Invalid("That file is gone. Send again.")
+		return wire.SendRead{}, Invalid("%s", gone)
 	}
 	defer f.Close()
 	buf := make([]byte, sendPartSize)
@@ -178,13 +184,13 @@ func (d *Daemon) sendRead(r wire.SendReadRequest) (wire.SendRead, error) {
 
 func (d *Daemon) registerSend() {
 	os.RemoveAll(d.outgoingFolder())
-	On(d, wire.CallProjectsSendFacts, func(ctx context.Context, c *Client, r wire.SendFactsRequest) (wire.SendFacts, error) {
+	On(d, wire.CallFoldersSendFacts, func(ctx context.Context, c *Client, r wire.SendFactsRequest) (wire.SendFacts, error) {
 		return d.sendFacts(r)
 	})
-	On(d, wire.CallProjectsSendPack, func(ctx context.Context, c *Client, r wire.SendPackRequest) (wire.SendPack, error) {
+	On(d, wire.CallFoldersSendPack, func(ctx context.Context, c *Client, r wire.SendPackRequest) (wire.SendPack, error) {
 		return d.sendPack(r)
 	})
-	On(d, wire.CallProjectsSendRead, func(ctx context.Context, c *Client, r wire.SendReadRequest) (wire.SendRead, error) {
+	On(d, wire.CallFoldersSendRead, func(ctx context.Context, c *Client, r wire.SendReadRequest) (wire.SendRead, error) {
 		return d.sendRead(r)
 	})
 }

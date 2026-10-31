@@ -14,6 +14,7 @@ import (
 // #997 (spec 736 US9): a key lives its lifetime from pairing, is renewed when it is used
 // near its end, and is refused as expired once it has passed.
 func TestAKeyInUseRenewsAndAnUnusedOneExpires(t *testing.T) {
+	t.Parallel()
 	life := 3 * time.Hour
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.KeyLifetime = life })
 	member, window := p.client("Window")
@@ -47,6 +48,7 @@ func TestAKeyInUseRenewsAndAnUnusedOneExpires(t *testing.T) {
 }
 
 func TestAMachinesKeyRenewsAndExpires(t *testing.T) {
+	t.Parallel()
 	life := 3 * time.Hour
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.KeyLifetime = life })
 	h := p.host("MACHINE-2")
@@ -70,6 +72,7 @@ func TestAMachinesKeyRenewsAndExpires(t *testing.T) {
 // A key paired before #997 has no expiry: it counts from when it was last used, and one
 // long unused gets a whole lifetime from now rather than being cut off by the upgrade.
 func TestAKeyPairedBeforeLifetimesCountsFromItsLastUse(t *testing.T) {
+	t.Parallel()
 	now := time.Now()
 	life := 90 * 24 * time.Hour
 	if e := renewing(nil, now.Add(-10*24*time.Hour), now, life); e.Sub(now) > 81*24*time.Hour || e.Sub(now) < 79*24*time.Hour {

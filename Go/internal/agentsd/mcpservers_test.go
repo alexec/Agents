@@ -11,21 +11,21 @@ import (
 )
 
 // Ports SessionServersTests and MCPApprovalTests: the person's servers given with their
-// secrets filled, one missing a secret left out, and a project's new server waiting.
+// secrets filled, one missing a secret left out, and a folder's new server waiting.
 
 func TestASessionsMCPServers(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
 	home := t.TempDir()
-	d.ChatHome = home
+	d.PersonalHome = home
 	os.MkdirAll(filepath.Join(home, ".agents"), 0o755)
 	os.MkdirAll(filepath.Join(home, ".agents-secrets"), 0o700)
 	os.WriteFile(filepath.Join(home, ".agents", "mcp.json"), []byte(`{"mcpServers":{
 		"github": {"command": "npx", "args": ["-y", "gh"], "env": {"GITHUB_TOKEN": "${GH}"}},
 		"docs": {"url": "https://docs/${MISSING}"}, "old": {"type": "sse", "url": "https://old"}}}`), 0o644)
 	os.WriteFile(filepath.Join(home, ".agents-secrets", "secrets.env"), []byte("# mine\nGH=abc\n"), 0o600)
-	dir := project(t, c, 1)
-	// The host's first look approved what the project had then (nothing); this one waits.
+	dir := folder(t, c, 1)
+	// The host's first look approved what the folder had then (nothing); this one waits.
 	os.MkdirAll(filepath.Join(dir, ".agents"), 0o755)
 	os.WriteFile(filepath.Join(dir, ".agents", "mcp.json"), []byte(`{"mcpServers":{"tool": {"command": "tool"}}}`), 0o644)
 	got := d.sessionMCP(dir)

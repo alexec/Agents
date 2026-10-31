@@ -12,7 +12,7 @@ host it.
 
 ## Mark it hosted
 
-In the project's `.agents/mcp.json`, or your own `~/.agents/mcp.json`, add
+In the folder's `.agents/mcp.json`, or your own `~/.agents/mcp.json`, add
 `"hosted": true` to a server with a `command`:
 
 ```json
@@ -26,8 +26,8 @@ app puts first on the PATH of every server it starts. Named by its bare name, th
 runs on any host, with nothing else installed there.
 
 Only a local server can be hosted: `"hosted"` on an entry with a `url` is a problem with
-the file, and the Agent Configuration page says so. A project's entry with `"hosted"` added or changed is
-approved again, in **Project Settings ▸ Agent Configuration ▸ Connectors**, as any changed entry is.
+the file, and the Agent Configuration page says so. A folder's entry with `"hosted"` added or changed is
+approved again, in **Folder Settings ▸ Agent Configuration ▸ Connectors**, as any changed entry is.
 
 ## What the app does with it
 
@@ -48,16 +48,16 @@ approved again, in **Project Settings ▸ Agent Configuration ▸ Connectors**, 
 ## See what it is doing
 
 **Connectors** under Activity lists every connector in your own `~/.agents/mcp.json`, and a
-project's own **Connectors** row, under it in the sidebar, lists the connectors in its
-`.agents/mcp.json`. Every project has the row, also one with no connectors. Both are on the Mac, the Remote and in
+folder's own **Connectors** row, under it in the sidebar, lists the connectors in its
+`.agents/mcp.json`. Every folder has the row, also one with no connectors. Both are on the Mac, the Remote and in
 a browser (#753). A hosted server's row says whether it is running, idle or starting
 again, and why it last stopped. Any other server is checked by the host as a session
 would reach it (`initialize`, then `tools/list`) when the app starts, when its entry
 changes, every four hours, and on **Check Now**; its row says whether it answered, when,
-and why not. A project's server waiting for approval, and one missing a secret, are never
+and why not. A folder's server waiting for approval, and one missing a secret, are never
 started to check them. The row's icon in the sidebar turns red when a server does not
 answer, or a hosted one stopped while in use.
 
 A hosted server's stderr goes to `mcp-logs/<name>-<digest>.log` in the app's log folder
 (`~/Library/Logs/Agents` on a Mac),
-rolled at 1 MB.
+rolled at 1 MB. The folder keeps the logs of the newest 32 servers.

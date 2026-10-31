@@ -110,7 +110,7 @@ func TestASessionIsUpWhenTheForwardIsOpenAndDownWithSSHsReasonWhenItIsRefused(t 
 	log := filepath.Join(folder, "argv")
 	up := fakeSSH(t, folder, "up", log, "exit 0", "exec sleep 30")
 	heard := &heardChanges{}
-	tunnels := newTunnels(store.NewMemory(), up, heard, []records.HostRecord{{ID: "ws", Name: "ws"}})
+	tunnels := newTunnels(store.NewMemory(), up, heard, []records.MachineRecord{{ID: "ws", Name: "ws"}})
 	if err := tunnels.Add(ctx, record("ws")); err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +137,7 @@ func TestASessionIsUpWhenTheForwardIsOpenAndDownWithSSHsReasonWhenItIsRefused(t 
 echo "muxclient: master forward request failed" >&2
 exit 255`, "exec sleep 30")
 	failing := &heardChanges{}
-	other := newTunnels(store.NewMemory(), refused, failing, []records.HostRecord{{ID: "ws", Name: "ws"}})
+	other := newTunnels(store.NewMemory(), refused, failing, []records.MachineRecord{{ID: "ws", Name: "ws"}})
 	if err := other.Add(ctx, record("ws")); err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +153,7 @@ exit 255`, "exec sleep 30")
 	denied := fakeSSH(t, folder, "denied", "", "exit 255", `echo "agents@ws: Permission denied (publickey)." >&2
 exit 255`)
 	refusing := &heardChanges{}
-	third := newTunnels(store.NewMemory(), denied, refusing, []records.HostRecord{{ID: "ws", Name: "ws"}})
+	third := newTunnels(store.NewMemory(), denied, refusing, []records.MachineRecord{{ID: "ws", Name: "ws"}})
 	if err := third.Add(ctx, record("ws")); err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +174,7 @@ func TestAMasterThatNeverAnswersIsEnded(t *testing.T) {
 	never := filepath.Join(folder, "never")
 	os.WriteFile(never, []byte("#!/bin/sh\nfor word in \"$@\"; do [ \"$word\" = check ] && exit 255; done\nexec sleep 30\n"), 0o755)
 	heard := &heardChanges{}
-	tunnels := newTunnels(store.NewMemory(), never, heard, []records.HostRecord{{ID: "ws", Name: "ws"}})
+	tunnels := newTunnels(store.NewMemory(), never, heard, []records.MachineRecord{{ID: "ws", Name: "ws"}})
 	defer tunnels.Stop()
 	if err := tunnels.Add(ctx, record("ws")); err != nil {
 		t.Fatal(err)
@@ -189,7 +189,7 @@ func TestAWakeStartsEverySessionAgain(t *testing.T) {
 	log := filepath.Join(folder, "argv")
 	ssh := fakeSSH(t, folder, "up", log, "exit 0", "exec sleep 30")
 	heard := &heardChanges{}
-	tunnels := newTunnels(store.NewMemory(), ssh, heard, []records.HostRecord{{ID: "ws", Name: "ws"}})
+	tunnels := newTunnels(store.NewMemory(), ssh, heard, []records.MachineRecord{{ID: "ws", Name: "ws"}})
 	defer tunnels.Stop()
 	if err := tunnels.Add(ctx, record("ws")); err != nil {
 		t.Fatal(err)
@@ -206,7 +206,7 @@ func TestATunnelLearnsItsHostFromTheCodeAndGoesWhenTheHostDoes(t *testing.T) {
 	folder := t.TempDir()
 	sleeper := fakeSSH(t, folder, "sleep", "", "exit 0", "exec sleep 30")
 	memory := store.NewMemory()
-	known := &knownHosts{hosts: []records.HostRecord{{ID: "ws", Name: "ws"}}}
+	known := &knownHosts{hosts: []records.MachineRecord{{ID: "ws", Name: "ws"}}}
 	tunnels := New(Config{Store: memory, SSH: sleeper, Env: []string{}, Port: 8791, Hosts: known.get})
 	defer tunnels.Stop()
 	r := record("")
@@ -255,7 +255,7 @@ func TestATunnelLearnsItsHostByNameWhenTheCodeIsSwept(t *testing.T) {
 	folder := t.TempDir()
 	sleeper := fakeSSH(t, folder, "sleep", "", "exit 0", "exec sleep 30")
 	memory := store.NewMemory()
-	tunnels := newTunnels(memory, sleeper, &heardChanges{}, []records.HostRecord{{ID: "h1", Name: "ws"}})
+	tunnels := newTunnels(memory, sleeper, &heardChanges{}, []records.MachineRecord{{ID: "h1", Name: "ws"}})
 	defer tunnels.Stop()
 	if err := tunnels.Add(ctx, record("")); err != nil {
 		t.Fatal(err)
@@ -327,7 +327,7 @@ func TestTheJSONIsSwifts(t *testing.T) {
 	if string(change) != `{"name":"ws","tunnel":{"up":false}}` {
 		t.Errorf("change %s", change)
 	}
-	change, _ = json.Marshal(Changed{Name: "ws", Host: new(wire.HostID("h")), Tunnel: Tunnel{Problem: ptr("p")}})
+	change, _ = json.Marshal(Changed{Name: "ws", Host: new(wire.MachineRef("h")), Tunnel: Tunnel{Problem: ptr("p")}})
 	if string(change) != `{"name":"ws","host":"h","tunnel":{"up":false,"problem":"p"}}` {
 		t.Errorf("change %s", change)
 	}
@@ -346,9 +346,9 @@ func record(host string) Record {
 	return r
 }
 
-func newTunnels(s store.Store, ssh string, heard *heardChanges, hosts []records.HostRecord) *Tunnels {
+func newTunnels(s store.Store, ssh string, heard *heardChanges, hosts []records.MachineRecord) *Tunnels {
 	return New(Config{Store: s, SSH: ssh, Env: []string{}, Port: 8791,
-		Hosts:   func(context.Context) []records.HostRecord { return hosts },
+		Hosts:   func(context.Context) []records.MachineRecord { return hosts },
 		Changed: heard.add})
 }
 
@@ -413,16 +413,16 @@ func (h *heardChanges) waitFor(t *testing.T, condition func(Changed) bool) {
 
 type knownHosts struct {
 	mu    sync.Mutex
-	hosts []records.HostRecord
+	hosts []records.MachineRecord
 }
 
-func (k *knownHosts) get(context.Context) []records.HostRecord {
+func (k *knownHosts) get(context.Context) []records.MachineRecord {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 	return k.hosts
 }
 
-func (k *knownHosts) set(hosts []records.HostRecord) {
+func (k *knownHosts) set(hosts []records.MachineRecord) {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 	k.hosts = hosts
@@ -441,7 +441,7 @@ func TestATunnelToAStoppedWorkspaceWaitsAndDoesNotDial(t *testing.T) {
 	var mu sync.Mutex
 	asleep := true
 	tunnels := New(Config{Store: store.NewMemory(), SSH: ssh, Env: []string{}, Port: 8791,
-		Hosts:   func(context.Context) []records.HostRecord { return []records.HostRecord{{ID: "ws", Name: "ws"}} },
+		Hosts:   func(context.Context) []records.MachineRecord { return []records.MachineRecord{{ID: "ws", Name: "ws"}} },
 		Changed: heard.add,
 		Asleep: func(host string) bool {
 			mu.Lock()
@@ -473,7 +473,7 @@ func TestATunnelDialsTheListedAddressWithTheInstallsKey(t *testing.T) {
 	ssh := fakeSSH(t, folder, "up", log, "exit 0", "exec sleep 30")
 	heard := &heardChanges{}
 	tunnels := New(Config{Store: store.NewMemory(), SSH: ssh, Env: []string{}, Port: 8791,
-		Hosts:   func(context.Context) []records.HostRecord { return []records.HostRecord{{ID: "vm", Name: "ws"}} },
+		Hosts:   func(context.Context) []records.MachineRecord { return []records.MachineRecord{{ID: "vm", Name: "ws"}} },
 		Changed: heard.add,
 		Listed: func(host string) string {
 			if host == "vm" {
@@ -514,7 +514,7 @@ func TestARepinnedKeyIsKeptAndItsSessionStartsAgain(t *testing.T) {
 	ssh := fakeSSH(t, folder, "up", log, "exit 0", "exec sleep 30")
 	heard := &heardChanges{}
 	s := store.NewMemory()
-	tunnels := newTunnels(s, ssh, heard, []records.HostRecord{{ID: "ws", Name: "ws"}})
+	tunnels := newTunnels(s, ssh, heard, []records.MachineRecord{{ID: "ws", Name: "ws"}})
 	defer tunnels.Stop()
 	r := record("ws")
 	if err := tunnels.Add(ctx, r); err != nil {

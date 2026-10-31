@@ -21,8 +21,8 @@ one grey line that says what it is, and a button that does it.
 | --- | --- | --- |
 | **Pair this window with Agents Host** | This window is paired with a control plane. Before that, the window shows only its first-run screen, so on the card this step is always ticked. | None |
 | **Install an agent runtime** | A runtime on this Mac is installed and is not known to be signed out. A runtime is known to be signed out only after a call to it is refused. | **Install**: opens the **Install your agents** sheet. |
-| **Add a project** | The window has a project. | **Add Project…** |
-| **Start your first agent** | An agent has run a turn to its end. | **New Agent**: opens the new session page of the project you last started in, ready to type. It is dimmed until there is a project. |
+| **Add a folder** | The window has a folder. | **Add Folder…** |
+| **Start your first agent** | An agent has run a turn to its end. | **New Agent**: opens the new session page of the folder you last started in, ready to type. It is dimmed until there is a folder. |
 | **Pair a phone or browser** | An iPhone, an iPad or a browser is paired. Another Mac window does not count. This step is optional. | **Pair a Device…** |
 
 While the card shows, the **Install your agents** sheet does not open by itself. The
@@ -58,7 +58,7 @@ all show the same list. The milestones you have not earned yet are the checklist
 | **First phone or browser paired** | Pair a phone or a browser with **Pair a Device…**. |
 | **First question answered away from the Mac** | Answer an agent's question from the Remote or the web page. |
 | **First workflow made** | Make a workflow that runs an agent on a schedule or an event. |
-| **First cloud host started** | Start a workspace on a cloud provider. |
+| **First cloud host started** | Start a machine on a cloud provider. |
 | **First pull request landed with nobody watching** | Let an agent open a pull request that merges by itself. |
 | **Five agents working at once** | Have five agents in a turn at the same time. |
 
@@ -68,7 +68,7 @@ The host ticks a milestone from the records it already keeps. On its first run i
 back, so steps you took before are ticked with their own date.
 
 - **First agent started**: the first agent that has run a turn to its end.
-- **First workflow made**: a project has a workflow that runs on this host.
+- **First workflow made**: a folder has a workflow that runs on this host.
 - **Five agents working at once**: the first day five or more agents were in a turn at
   the same time.
 - **First pull request landed with nobody watching**: the first day in the host's record

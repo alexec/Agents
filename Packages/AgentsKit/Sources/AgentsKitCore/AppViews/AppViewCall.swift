@@ -65,6 +65,12 @@ public struct AppViewCall: Codable, Hashable, Sendable, Identifiable {
         let texts = result?["content"]?.arrayValue?.compactMap { block -> String? in
             block["type"]?.stringValue == "text" ? block["text"]?.stringValue : nil
         } ?? []
-        return texts.isEmpty ? nil : texts.joined(separator: "\n")
+        if !texts.isEmpty { return texts.joined(separator: "\n") }
+        if let structured = result?["structuredContent"],
+           let data = try? JSONEncoder().encode(structured),
+           let text = String(data: data, encoding: .utf8) {
+            return text
+        }
+        return nil
     }
 }

@@ -1,0 +1,26 @@
+{
+  "path": [
+    "App",
+    "Remote",
+    "Shared",
+    "Packages/AgentsKit/Sources",
+    "Host",
+    "Go",
+    "Web/src"
+  ],
+  "format": ["swift", "go", "typescript"],
+  "minLines": 10,
+  "minTokens": 70,
+  "threshold": 100,
+  "reporters": ["console"],
+  "ignore": [
+    "**/Packages/CodeText/Grammars/**",
+    "**/.specify/**",
+    "**/Web/dist/**",
+    "**/.build/**",
+    "**/*_gen.go",
+    "**/*_test.go",
+    "**/generated.ts"
+  ],
+  "absolute": true
+}

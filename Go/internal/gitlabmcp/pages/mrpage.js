@@ -2,7 +2,7 @@
 // server's page shapes (#1341), in GitLab's words: a pipeline, not checks.
 const MR_CHECKS = { passing: "Pipeline passed", failing: "Pipeline failed", running: "Pipeline running", none: "No pipeline", skipped: "Skipped" };
 const MR_JOBS = { passing: "Passed", failing: "Failed", running: "Running", none: "Not run", skipped: "Skipped" };
-const MR_REVIEWS = { approved: "Approved", review_required: "Approval needed" };
+const MR_REVIEWS = { approved: "Approved", changes_requested: "Changes requested", review_required: "Approval needed" };
 const mrPills = (ui, mr) => {
   const pill = (kind, text, title) => ui.el("span", { className: "pill " + kind, textContent: text, title: title || "" });
   const out = [];
@@ -21,7 +21,7 @@ const mrPills = (ui, mr) => {
 const mrPage = (ui, project, back) => {
   const { el, link, button, request, log } = ui;
   const root = document.getElementById("page");
-  let mr = null, tab = "conversation", confirming = null, line = { text: "", error: false };
+  let mr = null, lineage = null, tab = "conversation", confirming = null, line = { text: "", error: false };
   // Kept across redraws, so a tab or a refresh doesn't lose what was typed, or a log shown.
   const text = el("textarea", { placeholder: "A comment, or what the agent is to do…", rows: 3 });
   const logs = new Map();
@@ -212,9 +212,9 @@ const mrPage = (ui, project, back) => {
     head.push(el("span", { className: "grow" }), link("GitLab ↗", mr.url), button("Refresh", refresh));
     const open = (mr.threads || []).filter((t) => !t.resolved).length;
     const tabs = [["conversation", "Conversation", (mr.comments || []).length], ["review", "Discussions on lines", open],
-      ["files", "Files", mr.filesTotal || (mr.files || []).length], ["pipeline", "Pipeline", (mr.checkRuns || []).length]]
+      ["files", "Files", mr.filesTotal || (mr.files || []).length], ["pipeline", "Pipeline", (mr.checkRuns || []).length], ["lineage", "Lineage", 0]]
       .map(([id, words, count]) => button(count ? `${words} ${count}` : words, () => { tab = id; draw(); }, { className: tab === id ? "chosen" : "" }));
-    const panel = tab === "files" ? files() : tab === "pipeline" ? pipeline() : tab === "review" ? threads() : conversation();
+    const panel = tab === "lineage" ? [lineage || (lineage = lineageSection(ui, mr.url))] : tab === "files" ? files() : tab === "pipeline" ? pipeline() : tab === "review" ? threads() : conversation();
     root.replaceChildren(
       el("div", { className: "bar" }, head),
       el("div", { className: "bar" }, [link(`!${mr.number}`, mr.url), el("h2", { className: "grow", textContent: mr.title })]),
@@ -229,12 +229,12 @@ const mrPage = (ui, project, back) => {
   };
   const refresh = async () => {
     if (!mr) return;
-    try { mr = await fetchMR(mr.number); draw(); }
+    try { mr = await fetchMR(mr.number); lineage = null; draw(); }
     catch (e) { say("Couldn't refresh: " + e.message, true); }
   };
   return {
     show: async (number) => {
-      mr = null; tab = "conversation"; confirming = null; line = { text: "", error: false }; text.value = ""; logs.clear(); opened.clear();
+      mr = null; lineage = null; tab = "conversation"; confirming = null; line = { text: "", error: false }; text.value = ""; logs.clear(); opened.clear();
       root.replaceChildren(el("div", { className: "muted", textContent: `Loading !${number}…` }));
       ui.size();
       try { mr = await fetchMR(number); draw(); }
@@ -250,7 +250,7 @@ const mrPage = (ui, project, back) => {
         ui.size();
         return;
       }
-      mr = detail; draw();
+      mr = detail; lineage = null; draw();
     },
   };
 };

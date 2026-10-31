@@ -94,7 +94,7 @@ func (u Updates) Check(ctx context.Context, managed map[string]wire.ManagedSkill
 				folder = strings.Trim(strings.TrimSuffix(*s.SkillPath, "SKILL.md"), "/")
 			}
 			// What the folder was when it was added: the lock's tree SHA for a personal
-			// skill, the sidecar's for a project one.
+			// skill, the sidecar's for a folder one.
 			var was *string
 			if place.LockKind == Personal {
 				was = s.RecordedHash

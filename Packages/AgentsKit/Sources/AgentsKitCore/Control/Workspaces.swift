@@ -1,6 +1,6 @@
 import Foundation
 
-// Workspace providers (#691, specs/691-workspace-providers): MCP servers on the control plane
+// Machine providers (#691, specs/691-workspace-providers): MCP servers on the control plane
 // that start and stop the machines hosts run on. What is here is records and the wire; the
 // MCP client and the starts are ControlPlaneKit's, handed in as `WorkspaceHandling`.
 
@@ -35,7 +35,7 @@ public struct WorkspaceLink: Codable, Hashable, Sendable {
     /// FR-009). Nil reads as on.
     public var startForSchedules: Bool?
     /// The host's next scheduled workflow as it last said it (FR-003), kept while it is stopped.
-    public var schedule: DaemonAPI.HostSchedule?
+    public var schedule: DaemonAPI.MachineSchedule?
     /// How long its last start took, from asking the provider to the host connecting (FR-004).
     public var measuredStartSeconds: Int?
     /// The due time it was last started for, so each starts it once (FR-006).
@@ -158,16 +158,16 @@ public struct ProviderRecord: Codable, Hashable, Sendable, Identifiable {
 public protocol WorkspaceHandling: Sendable {
     func answer(method: String, params: JSONValue?, from caller: ControlRouter.Caller) async throws -> JSONValue
     /// A host said whether it is idle (`host/status`, #691 US4).
-    func heard(_ host: HostID, status: DaemonAPI.HostStatus) async
+    func heard(_ host: MachineRef, status: DaemonAPI.MachineStatus) async
     /// An agent on `host` asked through its workspace tools (US6): one of
     /// `agentWorkspaceMethods`, logged as that agent's.
-    func agentCall(from host: HostID, agent: String, method: String, params: JSONValue) async throws -> JSONValue
+    func agentCall(from host: MachineRef, agent: String, method: String, params: JSONValue) async throws -> JSONValue
     /// A writing agent on `host` called one of the writer's tools (#858).
-    func draftCall(from host: HostID, call: DaemonAPI.HostProviderDraftCall) async throws -> JSONValue
+    func draftCall(from host: MachineRef, call: DaemonAPI.MachineProviderDraftCall) async throws -> JSONValue
 }
 
 public extension WorkspaceHandling {
-    func draftCall(from host: HostID, call: DaemonAPI.HostProviderDraftCall) async throws -> JSONValue {
+    func draftCall(from host: MachineRef, call: DaemonAPI.MachineProviderDraftCall) async throws -> JSONValue {
         throw JSONRPCError(code: DaemonAPI.Failure.notSupported, message: "This control plane has no drafts.")
     }
 }
@@ -184,29 +184,29 @@ public extension DaemonAPI.Method {
     static let providersRemove = "providers/remove"
     /// `{id?}`: list again, said as `control/providersChanged`.
     static let providersRefresh = "providers/refresh"
-    /// `HostLink` → `ControlHost`. A workspace linked to another host moves here.
+    /// `MachineLink` → `ControlMachine`. A workspace linked to another host moves here.
     static let hostsLink = "hosts/link"
-    /// `HostRequest` → `ControlHost`.
+    /// `MachineRequest` → `ControlMachine`.
     static let hostsUnlink = "hosts/unlink"
-    /// `HostWorkspaceOptions` → `ControlHost`.
-    static let hostsSetWorkspaceOptions = "hosts/setWorkspaceOptions"
-    /// `HostRequest` → `ControlHost`, at once; the start goes on, said as `control/hostChanged`.
+    /// `MachineOptions` → `ControlMachine`.
+    static let hostsSetMachineOptions = "hosts/setMachineOptions"
+    /// `MachineRequest` → `ControlMachine`, at once; the start goes on, said as `control/hostChanged`.
     static let hostsStart = "hosts/start"
-    /// `HostStop` → `ControlHost`, at once.
+    /// `MachineStop` → `ControlMachine`, at once.
     static let hostsStop = "hosts/stop"
-    /// `ProviderRequest` → `ProviderOptions`: the New Workspace form (US5).
+    /// `ProviderRequest` → `ProviderOptions`: the New Machine form (US5).
     static let providersOptions = "providers/options"
     /// `ProviderCreate` → `ProviderCreated`, once the provider has made it (US5).
     static let providersCreate = "providers/create"
-    /// `HostRequest` → `{}`: its workspace deleted, then the host removed (US5).
-    static let hostsDeleteWorkspace = "hosts/deleteWorkspace"
+    /// `MachineRequest` → `{}`: its workspace deleted, then the host removed (US5).
+    static let hostsDeleteMachine = "hosts/deleteMachine"
 
     /// Every method the control plane's workspace part answers.
     static let workspaceMethods: Set<String> = [
         providersList, providersAdd, providersUpdate, providersRemove, providersRefresh,
-        hostsLink, hostsUnlink, hostsSetWorkspaceOptions, hostsStart, hostsStop,
+        hostsLink, hostsUnlink, hostsSetMachineOptions, hostsStart, hostsStop,
         hostsKeep, hostsListKept, hostsDropKept, hostsRetryKept,
-        providersOptions, providersCreate, hostsDeleteWorkspace,
+        providersOptions, providersCreate, hostsDeleteMachine,
         providersDraftStart, providersDraftCancel, providersDraftAnswer, providersRuntimes,
     ]
 }
@@ -229,7 +229,7 @@ public extension DaemonAPI.Failure {
 
 public extension DaemonAPI {
     /// One workspace, as its provider last listed it (contracts/provider-contract.md).
-    struct WorkspaceInfo: Codable, Sendable, Hashable, Identifiable {
+    struct MachineInfo: Codable, Sendable, Hashable, Identifiable {
         public var id: String
         public var name: String
         /// `running`, `starting`, `stopping`, `stopped` or `unknown`.
@@ -240,10 +240,10 @@ public extension DaemonAPI {
         public var hostKeyRenews: Bool?
         public var cost: String?
         /// The host it is linked to, in `providers/list`.
-        public var host: HostID?
+        public var host: MachineRef?
 
         public init(id: String, name: String, state: String, ssh: String? = nil, tunnel: Bool? = nil,
-                    hostKeyRenews: Bool? = nil, cost: String? = nil, host: HostID? = nil) {
+                    hostKeyRenews: Bool? = nil, cost: String? = nil, host: MachineRef? = nil) {
             self.id = id
             self.name = name
             self.state = state
@@ -281,7 +281,7 @@ public extension DaemonAPI {
         public var mapped: Bool
         /// The command provider's preset, when it uses one.
         public var preset: String?
-        public var workspaces: [WorkspaceInfo]
+        public var workspaces: [MachineInfo]
         public var listedAt: Date?
         /// False once a list has failed after a good one: `workspaces` is what it last said.
         public var current: Bool
@@ -294,7 +294,7 @@ public extension DaemonAPI {
 
         public init(id: ProviderID, name: String, kind: String, secrets: [String: Bool] = [:],
                     capabilities: [String] = [], contract: Int = 1, mapped: Bool = false, preset: String? = nil,
-                    workspaces: [WorkspaceInfo] = [], listedAt: Date? = nil, current: Bool = true,
+                    workspaces: [MachineInfo] = [], listedAt: Date? = nil, current: Bool = true,
                     problem: String? = nil, group: String? = nil, mayUse: Bool? = nil) {
             self.id = id
             self.name = name
@@ -317,7 +317,7 @@ public extension DaemonAPI {
     }
 
     /// A linked host's workspace, on its `hosts/list` row and in `control/hostChanged`.
-    struct HostWorkspace: Codable, Sendable, Hashable {
+    struct MachineWorkspace: Codable, Sendable, Hashable {
         public var provider: ProviderID
         public var providerName: String
         public var workspace: String
@@ -430,14 +430,14 @@ public extension DaemonAPI {
     }
 
     /// `hosts/link`.
-    struct HostLink: Codable, Sendable, Hashable {
-        public var host: HostID
+    struct MachineLink: Codable, Sendable, Hashable {
+        public var host: MachineRef
         public var provider: ProviderID
         public var workspace: String
         public var startWhenUsed: Bool?
         public var stopWhenIdleMinutes: Int?
 
-        public init(host: HostID, provider: ProviderID, workspace: String, startWhenUsed: Bool? = nil,
+        public init(host: MachineRef, provider: ProviderID, workspace: String, startWhenUsed: Bool? = nil,
                     stopWhenIdleMinutes: Int? = nil) {
             self.host = host
             self.provider = provider
@@ -447,15 +447,15 @@ public extension DaemonAPI {
         }
     }
 
-    /// `hosts/setWorkspaceOptions`. `stopWhenIdleMinutes` 0 turns it off.
-    struct HostWorkspaceOptions: Codable, Sendable, Hashable {
-        public var host: HostID
+    /// `hosts/setMachineOptions`. `stopWhenIdleMinutes` 0 turns it off.
+    struct MachineOptions: Codable, Sendable, Hashable {
+        public var host: MachineRef
         public var startWhenUsed: Bool?
         public var stopWhenIdleMinutes: Int?
         /// Start for scheduled workflows (#1004 FR-009).
         public var startForSchedules: Bool?
 
-        public init(host: HostID, startWhenUsed: Bool? = nil, stopWhenIdleMinutes: Int? = nil,
+        public init(host: MachineRef, startWhenUsed: Bool? = nil, stopWhenIdleMinutes: Int? = nil,
                     startForSchedules: Bool? = nil) {
             self.startForSchedules = startForSchedules
             self.host = host
@@ -476,11 +476,11 @@ public extension DaemonAPI {
         public var id: ProviderID
         public var name: String
         public var options: JSONValue?
-        /// Git URLs the new host clones once it has joined (#1122), as File ▸ Clone Project
+        /// Git URLs the new host clones once it has joined (#1122), as File ▸ Clone Folder
         /// does, one after another. Nil or empty for none.
         public var clones: [String]?
         /// The repository to start it from (#1809), an https git address. A provider whose
-        /// New Workspace form has `repository`, such as Codespaces, makes the workspace from
+        /// New Machine form has `repository`, such as Codespaces, makes the workspace from
         /// it; any other has the host clone it once it joins, before `clones`.
         public var repository: String?
         public init(id: ProviderID, name: String, options: JSONValue? = nil, clones: [String]? = nil,
@@ -496,21 +496,21 @@ public extension DaemonAPI {
     /// What `providers/create` made. `joining`: it runs the install on its first boot, and is
     /// linked when it joins. Otherwise it is added over its `ssh`, as Add as Host… does.
     struct ProviderCreated: Codable, Sendable, Hashable {
-        public var workspace: WorkspaceInfo
+        public var workspace: MachineInfo
         public var joining: Bool
-        public init(workspace: WorkspaceInfo, joining: Bool) {
+        public init(workspace: MachineInfo, joining: Bool) {
             self.workspace = workspace
             self.joining = joining
         }
     }
 
     /// `hosts/stop`.
-    struct HostStop: Codable, Sendable, Hashable {
-        public var host: HostID
+    struct MachineStop: Codable, Sendable, Hashable {
+        public var host: MachineRef
         /// Stop even though turns are running there (US4).
         public var confirmRunning: Bool?
 
-        public init(host: HostID, confirmRunning: Bool? = nil) {
+        public init(host: MachineRef, confirmRunning: Bool? = nil) {
             self.host = host
             self.confirmRunning = confirmRunning
         }

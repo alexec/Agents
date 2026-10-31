@@ -157,11 +157,11 @@ public struct EventLog: Codable, Hashable, Sendable {
 
 /// What the Events page is narrowed to: one scope or all, some kinds or all (042).
 ///
-/// The window asks the daemon for pages already narrowed, so a quiet project is not
+/// The window asks the daemon for pages already narrowed, so a quiet folder is not
 /// hidden behind two hundred events from the busy ones, and takes a live event only
 /// when it passes the same test.
 public struct EventFilter: Hashable, Sendable {
-    /// Nil: every project and the Mac.
+    /// Nil: every folder and the Mac.
     public var scope: EventScope?
     /// Empty: every kind.
     public var groups: Set<EventGroup>

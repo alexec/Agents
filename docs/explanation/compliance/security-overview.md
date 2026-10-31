@@ -17,11 +17,11 @@ names its issue.
 - **The control plane routes and remembers little.** It knows who is paired and which
   machines there are. Agents, conversations, files and runtime sign-ins stay on the machine
   that runs them.
-- **Hosts never escalate.** Agents Host and `agentsd` run as the machine's user. On a Mac
+- **Machines never escalate.** Agents Host and `agentsd` run as the machine's user. On a Mac
   they are the user's own login items (`SMAppService.agent`). On Linux they are a
   `systemctl --user` service. Nothing asks for admin rights, and nothing installs a
-  privileged helper. A workspace provider's start script for Google Compute Engine runs as
-  root only to make an `agents` user, and the host runs as that user.
+  privileged helper. A machine provider's start script for Google Compute Engine runs as
+  root only to make an `agents` user, and the machine runs as that user.
 
 ## People and roles
 
@@ -32,7 +32,7 @@ names its issue.
   control plane always keeps one admin at least. A **bot** is a user that admins make for
   team workflows.
 - **What an admin sees.** People, their clients by name, and their machines by name and
-  state. Not another person's projects, agents or files.
+  state. Not another person's folders, agents or files.
 - **Removing a person** cuts off their clients and their machines on every copy of the
   control plane within 5 seconds.
 
@@ -54,7 +54,10 @@ names its issue.
 - **Pairing.** A code works once, for five minutes. An invite lasts 7 days. A machine that
   asks to join with no code waits at most 10 minutes for approval.
 - **Each connection proves its key.** A client or machine keeps a P-256 key of its own
-  (in the Secure Enclave on an iPhone or iPad that has one). At each connection, both
+  (in the Secure Enclave on an iPhone or iPad that has one). A Mac's machine key is in a
+  Keychain item that only agentsd's code signature can read. A Linux machine's key is the
+  file `control-host-key` in its root (0600): any process of that user can read it (spec 999,
+  "Limits"). At each connection, both
   sides prove their keys with HMAC-SHA256 over a nonce exchange, under a key from P-256
   ECDH and HKDF. The proof is bound to the address it was made for, and must arrive within
   15 seconds.
@@ -87,8 +90,14 @@ answering cards and changing settings are recorded. Reads and prompts are not.
   A member sees only their own entries. See [Events](../../reference/events.md#audit-who-did-what).
 - **How long:** 90 days by default. An admin sets 1 to 3,650 days.
 - **Export:** an admin exports the entries as CSV or JSON lines.
-- **Not yet:** the entries are not tamper-evident. A hash chain, and syslog and HTTP sinks,
-  are planned (T8, #1001).
+- **Tamper-evident:** each entry carries the hash of the one before it, in a chain for
+  each copy of the control plane, and a seal for each day holds each chain's head
+  (T8, #1001). `agents-control audit verify` says which entry was changed or removed. See
+  [Events](../../reference/events.md#the-hash-chain).
+- **Sinks:** an admin sends each entry, as it is written, to syslog (RFC 5424 over TCP or
+  TLS) or to HTTP (JSON lines), from Console ▸ Audit ▸ Sinks. A copy outside the control
+  plane's store is out of reach of a person who can change the store. See
+  [Events](../../reference/events.md#sinks).
 
 ## Sandboxes
 
@@ -112,7 +121,7 @@ An organisation will be able to require a sandbox by policy (T5, below).
 
 ## Access on the machine
 
-- **`daemon.sock`**, the host's local socket, is mode 0600. On a Mac, the caller must be the
+- **`daemon.sock`**, the machine's local socket, is mode 0600. On a Mac, the caller must be the
   same macOS user, and its role comes from its code signature, which the `agents-peer`
   helper checks against the team. On Linux, only the user's own ssh session gets the full
   role.
@@ -141,7 +150,7 @@ Keychain, on this device only.
 
 On the control plane, a person's secrets are sealed in the store (AES-256-GCM, with a data
 key wrapped by KMS or a local `secrets-key`). A control plane with neither refuses to keep
-them. Workspace providers' secrets stay in the control plane's own folder, mode 0600, and
+them. Machine providers' secrets stay in the control plane's own folder, mode 0600, and
 never go in the store.
 
 **Org keys** for runtimes, kept by the control plane and sealed to each machine, are
@@ -151,16 +160,30 @@ planned (T6, #999).
 
 | Log | Where | What it holds | Size |
 | --- | --- | --- | --- |
-| `daemon.log` | `~/Library/Logs/Agents` on a Mac, `$XDG_STATE_HOME/agents/logs` on Linux | What the host did | Rolls at 4 MB, keeps one older file |
+| `daemon.log` | `~/Library/Logs/Agents` on a Mac, `$XDG_STATE_HOME/agents/logs` on Linux | What the machine did | Rolls at 4 MB, keeps one older file |
 | `control.log` | Agents Host's log folder, or the container's output in the cloud | Joins, people, keys, sign-in changes, refused connections with their address | Rolls at 4 MB, keeps one older file |
-| `relay.log`, `host-relay.log` | The Mac's log folder | The phone relay; the sign-in relay (what was asked and how it was answered) | 1 MB |
+| `relay.log`, `machine-relay.log` | The Mac's log folder | The phone relay; the sign-in relay (what was asked and how it was answered) | 1 MB |
 | `app-tools.jsonl` | Each agent's folder | Every call to the app's own tools, with a `token` argument left out and answers cut to 2,000 characters | Deleted with the agent |
 
-The code does not write tokens to these logs. It does not redact them either: a token that
-an agent prints goes into its transcript as it is. **Redaction** of known token shapes in
-transcripts and `daemon.log` is planned (T8, #1001). Agents Host's diagnostics bundle is
-the one place that redacts today: it masks codes, secrets, tokens, passwords, keys, and long
-base64 and hex strings.
+The code does not write tokens to these logs. **Redaction** (T8, #1001) also cuts known
+token shapes out of each transcript line, each `app-tools.jsonl` line and each line that
+`agentsd` writes to `daemon.log`, before it is written. A match becomes
+`[redacted:<kind>]`, and the clients get the redacted line too. The shapes are GitHub,
+GitLab, Anthropic, OpenAI, Stripe, AWS access key, Google API key, Slack and npm tokens,
+JWTs, private key blocks, the token after `Bearer`, and the control plane's codes.
+Redaction is always on. A token that the runtime streams in two message chunks is caught
+too: the end of each chunk that could start a token waits for the next one (at most 256
+bytes). The report of a turn says its last message redacted as well.
+
+Redaction does not catch:
+
+- text that is not a known shape, such as a password in plain words;
+- what a runtime writes to its standard error, and what Agents Host writes to `daemon.log`;
+- the runtimes' own session files (see [Erasure](data-and-retention.md#erasure)).
+
+`control.log` cuts out codes, `Bearer` tokens, `token=`, `secret=` and `password=`
+values, and the same known token shapes (#1001). Agents Host's diagnostics bundle masks codes, secrets, tokens, passwords, keys, and
+long base64 and hex strings.
 
 ## The web page
 
@@ -187,11 +210,11 @@ A machine that cannot reach the control plane keeps the last policy it had. MDM 
 `/etc/agents/policy.json` on Linux only pin which control plane a machine must join.
 
 Policy stops mistakes and ordinary use. It is not a boundary against a machine's own user:
-the host runs as that user, who can change the program.
+the machine runs as that user, who can change the program.
 
 ## Report a vulnerability
 
-Report it privately on the project's GitHub page: **Security ▸ Report a vulnerability**.
+Report it privately on the folder's GitHub page: **Security ▸ Report a vulnerability**.
 Do not open a public issue for it. Each release has a security review of what changed
 since the last one.
 

@@ -1,4 +1,5 @@
 # scripts/lint.sh runs golangci-lint for bugs and security only (#1224).
+# unused and ineffassign fail that run (#2162). The other linters only report.
 version: "2"
 linters:
   default: none

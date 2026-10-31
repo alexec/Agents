@@ -2,11 +2,19 @@ package agentsd
 
 import "github.com/alexec/agents/Go/wire"
 
+// waitingOnEvents is whether the agent has an open wait on something the app watches: an
+// event (wait_for_event), or its place in a lease's line (#2361), which is the same wait.
+// A turn that ends while this is open is not done: it is started again when the wait ends,
+// so when-done: archive and a plain archive_session request must not archive it (#2911).
+func waitingOnEvents(a *wire.Agent) bool {
+	return a.EventWait != nil && a.EventWait.Ending == nil
+}
+
 // Group is the sidebar heading an agent is under (AgentGroup.init(for:…)), for a
-// project's counts.
+// folder's counts.
 func Group(a *wire.Agent) string {
 	outcomeAsked := a.OutcomeAsked != nil && *a.OutcomeAsked
-	waitingOnEvents := a.EventWait != nil && a.EventWait.Ending == nil
+	waiting := waitingOnEvents(a)
 	wantsAnswer := a.Report != nil && needsAPerson(a.Report.Outcome)
 	switch a.State {
 	case wire.AgentStateStarting:
@@ -15,15 +23,15 @@ func Group(a *wire.Agent) string {
 		return "needsAttention"
 	case wire.AgentStateRunning:
 		if outcomeAsked {
-			return settled(wantsAnswer || a.Report == nil, a.Report, waitingOnEvents)
+			return settled(wantsAnswer || a.Report == nil, a.Report, waiting)
 		}
 		return "running"
 	case wire.AgentStateFinished:
-		return settled(wantsAnswer || (outcomeAsked && a.Report == nil), a.Report, waitingOnEvents)
+		return settled(wantsAnswer || (outcomeAsked && a.Report == nil), a.Report, waiting)
 	case wire.AgentStateStopped:
 		if a.EndedReason != nil {
 			switch *a.EndedReason {
-			case wire.EndedReasonCancelled, wire.EndedReasonStoppedByAgent, wire.EndedReasonAllowanceSpent:
+			case wire.EndedReasonCancelled, wire.EndedReasonStoppedByAgent, wire.EndedReasonStoppedByAdmin, wire.EndedReasonAllowanceSpent:
 				return "stopped"
 			}
 		}
@@ -38,7 +46,8 @@ func Group(a *wire.Agent) string {
 
 func needsAPerson(o wire.WorkOutcome) bool {
 	switch o {
-	case wire.WorkOutcomeNeedsAnswer, wire.WorkOutcomePartlyDone, wire.WorkOutcomeStuck:
+	// Only a question (#1916): the app never assumes an agent needs the person.
+	case wire.WorkOutcomeNeedsAnswer:
 		return true
 	}
 	return false
@@ -48,12 +57,10 @@ func settled(wantsAPerson bool, r *wire.WorkReport, waitingOnEvents bool) string
 	if wantsAPerson {
 		return "needsAttention"
 	}
-	open := r != nil && r.Outcome == wire.WorkOutcomeBlocked && (r.Block == nil || r.Block.ClearedAt == nil)
+	open := r != nil && r.Outcome == wire.WorkOutcomeWaiting && (r.Block == nil || r.Block.ClearedAt == nil)
 	if open && r.Block != nil && (len(r.Block.Waits) > 0 || r.Block.CheckAgainAt != nil) || waitingOnEvents {
 		return "waiting"
 	}
-	if open {
-		return "needsAttention"
-	}
+	// A block with nothing the app watches (an old record's) is done, not Needs you (#1916).
 	return "finished"
 }

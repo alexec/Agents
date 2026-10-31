@@ -200,7 +200,11 @@ var events = func() []event {
 		out[i] = event{name: "issue." + string(k.kind), title: k.title, kind: k.kind, input: input, payload: object(payload),
 			description: k.description + " " + k.who + " the workspace's members, never a guest or an app, unless anyone is true."}
 	}
-	return out
+	// For the person, not the workspace (#2034).
+	return append(out, event{name: "issue.assigned", title: "Issue assigned to me", kind: Assigned,
+		description: "An issue was assigned to the Linear account this server is connected as, by anyone: once per assignment, so one unassigned and assigned again is a new one. Linear keeps no history of an issue's first few minutes, so an issue assigned as it is made is not an event.",
+		input:       schema{teamProperty, issueProperty},
+		payload:     object(map[string]any{"issue": issueSchema, "by": str, "assignedAt": str})})
 }()
 
 func eventNamed(name string) (event, bool) {
@@ -398,7 +402,8 @@ func (s *Events) candidates(ctx context.Context, e event, a args, since string) 
 		if a.issue != "" && !strings.EqualFold(it.Issue.Identifier, a.issue) {
 			continue
 		}
-		if !a.anyone && !it.trusted() {
+		// Assigned to the connection's owner is theirs, by anyone (#2034).
+		if !a.anyone && it.Kind != Assigned && !it.trusted() {
 			continue
 		}
 		if a.label != "" {

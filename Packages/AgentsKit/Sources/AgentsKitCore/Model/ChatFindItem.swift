@@ -3,7 +3,7 @@
 /// it keeps ⌘F while it is in the menu, so the key never goes to Find Session in a chat.
 /// The page has its own copy (`findInChatItem` in `Web/src/views/SessionMenu.tsx`).
 public enum ChatFindItem: Equatable, Sendable {
-    /// No chat open here (a project window, nothing chosen): ⌘F is Find Session's.
+    /// No chat open here (a folder window, nothing chosen): ⌘F is Find Session's.
     case hidden
     case enabled
     /// A chat on a host too old to find: in the menu, greyed, with the update help.

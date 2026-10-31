@@ -75,7 +75,7 @@ func TestACardReachesTheWindowAfterThePause(t *testing.T) {
 func TestEveryClientHearsANeedShownNowhereAndItsEnd(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.WriteFile(filepath.Join(dir, "a.md"), nil, 0o644)
 	c.call(t, 2, "pins/pin", map[string]any{"folder": folder, "path": "a.md"})
@@ -97,7 +97,7 @@ func TestEveryClientHearsANeedShownNowhereAndItsEnd(t *testing.T) {
 	d.reconsider()
 	// Kept: every client hears it is over, by its id alone.
 	var reading wire.GuardedChangeReading
-	json.Unmarshal(c.call(t, 3, "projects/readGuardedChange", map[string]any{"folder": folder, "path": ".agents/pins.json"}), &reading)
+	json.Unmarshal(c.call(t, 3, "folders/readGuardedChange", map[string]any{"folder": folder, "path": ".agents/pins.json"}), &reading)
 	c.in <- `{"jsonrpc":"2.0","id":4,"method":"approvals/answer","params":{"folder":"` + string(folder) +
 		`","kind":"file","key":".agents/pins.json","digest":"` + *reading.Digest + `","action":"approve"}}`
 	c.until(t, "the change over", attentionNote(func(n wire.AttentionNotification) bool {

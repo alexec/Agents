@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Across the top of the window when the control plane cannot be reached (058, frame H).
 ///
-/// Every host's projects stay listed under it, greyed. Agents keep working on their
+/// Every host's folders stay listed under it, greyed. Agents keep working on their
 /// hosts; the window catches up when the control plane is back.
 struct ControlAwayStrip: View {
     @Environment(AppModel.self) private var model

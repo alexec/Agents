@@ -18,8 +18,8 @@ struct RemoteMissingFolderStrip: View {
             .lineLimit(1)
             .truncationMode(.middle)
             HStack(spacing: 8) {
-                Button(MissingFolderWords.continueInProject) {
-                    Task { await model.continueInProject(agent.id) }
+                Button(MissingFolderWords.continueInFolder) {
+                    Task { await model.continueInFolder(agent.id) }
                 }
                 if agent.mayRecreateWorktree {
                     Button(MissingFolderWords.recreateWorktree) {

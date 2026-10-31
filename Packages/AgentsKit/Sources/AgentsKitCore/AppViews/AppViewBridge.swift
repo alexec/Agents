@@ -21,7 +21,7 @@ public enum AppViewBridge {
     /// Our extension of MCP Apps (#1341): a view asks the app to draw a diff, in its own diff
     /// (the Review page's, #1472), not in the view.
     public static let openDiffMethod = "agents/open-diff"
-    /// The error code of an `agents/message-agent` that no session in the view's project
+    /// The error code of an `agents/message-agent` that no session in the view's folder
     /// works on: the view may offer a new agent instead.
     public static let noAgentCode = -32001
 
@@ -197,7 +197,7 @@ public enum AppViewBridge {
 }
 
 /// What a view filled the new-agent form with (#834, `agents/start-agent`). The form opens
-/// in the view's project, and the person starts the agent, or doesn't.
+/// in the view's folder, and the person starts the agent, or doesn't.
 public struct AppViewStart: Equatable, Sendable {
     /// The prompt, as the person will see it in the field.
     public var prompt: String
@@ -293,12 +293,12 @@ public struct AppViewAgentMessage: Equatable, Sendable {
         return .success(AppViewAgentMessage(branch: branch, text: text))
     }
 
-    /// The session it goes to: one on `host` in `project` whose worktree is on the branch, not
+    /// The session it goes to: one on `host` in `folder` whose worktree is on the branch, not
     /// archived, the latest active first. Nil when there is none.
-    public func recipient(among agents: [Agent], host: HostID, project: URL) -> Agent? {
-        let project = Project.standardize(project)
+    public func recipient(among agents: [Agent], host: MachineRef, folder: URL) -> Agent? {
+        let folder = Folder.standardize(folder)
         return agents
-            .filter { $0.host == host && $0.archivedAt == nil && $0.worktree?.branch == branch && $0.projectFolder == project }
+            .filter { $0.host == host && $0.archivedAt == nil && $0.worktree?.branch == branch && $0.folderPath == folder }
             .max { $0.lastActivityAt < $1.lastActivityAt }
     }
 

@@ -44,28 +44,38 @@ enum PromptWords {
     static let atItsCostLimit = "This agent has reached its cost limit"
     static let draftLostSomething = "A picture you had pasted was too large to keep, so it did not come back with the rest."
     static let dictationPrimerTitle = "Say it instead of typing it"
+    static let dictationPrimer = "The phone listens while the button is on, and what you say becomes the words in the prompt. It is recognised on this phone where this phone can do it."
+    /// Before voice mode first listens (#2444).
+    static let voicePrimerTitle = "Talk to the agent"
+    static let voicePrimer = "The phone listens while voice mode is on, and what you say goes to the chat after a short pause. It is recognised on this phone where this phone can do it."
 
     /// The runtime's name as a person knows it.
     static func runtimeName(_ id: String) -> String {
-        RuntimeCatalog.runtime(id: id)?.name ?? id
+        if id == LevelWords.autoID { return LevelWords.auto }
+        return RuntimeCatalog.runtime(id: id)?.name ?? id
+    }
+
+    /// A started session's runtime, and the account it runs on when that is not the
+    /// runtime's own sign-in, as the Runtimes rows name it: "Claude · Work" (#2259).
+    static func runtimeName(_ agent: Agent, accounts: [AccountProfile]) -> String {
+        let runtime = runtimeName(agent.runtimeID)
+        let named = accounts.name(of: agent.accountID, on: agent.runtimeID).map { "\(runtime) · \($0)" } ?? runtime
+        // An Auto agent says so, with the runtime it picked (#2658, FR-009): "Auto · Claude".
+        return agent.auto == nil ? named : LevelWords.header(named)
     }
 }
 
 /// Where the agent is working, how full it is, and what runs it: the row above the
 /// field once an agent exists.
 ///
-/// What the agent holds and runs in the background, above the prompt. What it waits for
-/// on events is a card at the end of the chat (#1995).
+/// What the agent runs in the background, above the prompt. What it waits for on events
+/// is a card at the end of the chat (#1995), and what it holds and waits for in line is
+/// with the working line (#2344).
 /// Live, so shown only while it is so. The settled facts — its place, its runtime,
 /// what it has used — are not drawn here: the pills under the prompt are the settings.
 struct PromptHeader: View {
     let agent: Agent
-    /// What the agent holds and waits for (036), drawn as a row of its own above
-    /// this one. Nil draws nothing.
-    var leaseStatus: LeaseStatus? = nil
-    /// What a lease capsule does when pressed. See `LeaseRow`.
-    var openLease: ((ResourceName) -> Void)? = nil
-    /// What it has running in the background (057), drawn above the leases: a block of
+    /// What it has running in the background (057): a block of
     /// rows, or on a phone one line that opens them (`compactBackground`).
     var background: [BackgroundItem] = []
     var backgroundActions = BackgroundActions()
@@ -77,9 +87,6 @@ struct PromptHeader: View {
                 BackgroundLine(items: background, actions: backgroundActions)
             } else {
                 BackgroundBlock(items: background, actions: backgroundActions)
-            }
-            if let leaseStatus {
-                LeaseRow(status: leaseStatus, open: openLease)
             }
         }
     }

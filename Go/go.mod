@@ -6,6 +6,7 @@ require (
 	github.com/coder/acp-go-sdk v0.13.5
 	github.com/coder/websocket v1.8.15
 	github.com/creack/pty v1.1.24
+	github.com/ebitengine/purego v0.11.2
 	github.com/emersion/go-imap/v2 v2.0.0-beta.8
 	github.com/emersion/go-message v0.18.2
 	github.com/github/github-mcp-server/v2 v2.0.2
@@ -13,6 +14,7 @@ require (
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/shurcooL/githubv4 v0.0.0-20260209031235-2402fdf4a9ed
 	github.com/ulikunitz/xz v0.5.17
+	github.com/yuin/goldmark v1.8.5
 	gocloud.dev v0.46.0
 	gocloud.dev/secrets/hashivault v0.46.0
 	golang.org/x/crypto v0.57.0
@@ -34,7 +36,7 @@ require (
 	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.6 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect

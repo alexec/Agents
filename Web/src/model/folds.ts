@@ -1,9 +1,10 @@
-// Which projects in the sidebar are unfolded (#151) and which of its smart groups (#495) are
-// open, and which projects' Workflows folds (#885) are open, kept across visits in localStorage, as
-// the window keeps them in defaults (SidebarFolds.swift). A project's fold is named by host and
-// folder, so the same folder on two hosts folds apart; its Workflows fold the same, after
-// `workflows:`; a smart group's by its name. Archived projects (#343), Status (#915) and Usage
-// are the person's, kept on their Mac with the other display choices (#1033).
+// Which folders in the sidebar are unfolded (#151) and which of its smart groups (#495) are
+// open, and which folders' Workflows folds (#885) and Sessions folds (#2312) are open, kept across
+// visits in localStorage, as the window keeps them in defaults (SidebarFolds.swift). A folder's
+// fold is named by host and folder, so the same folder on two hosts folds apart; its Workflows fold
+// the same, after `workflows:`, and its Sessions fold after `sessions:`; a smart group's by its
+// name. Archived folders (#343), Status (#915), Usage and whether sessions go under a Sessions
+// row (#2312) are the person's, kept on their Mac with the other display choices (#1033).
 import { computed, signal } from "@preact/signals";
 import { boolPreference, preferenceKeys, setPreferences } from "./preferences";
 import { folderKey } from "./groups";
@@ -45,15 +46,14 @@ export class Folds {
     this.openSessions = signal([...read(storage, sessionsKey)]);
   }
 
-  // Archived projects, Status and Usage are the person's display choices, kept on their Mac
-  // (#1033) as the window's showsArchivedProjects, showsActivity and showsUsage.
-  readonly showsArchivedProjects = computed(() => boolPreference(preferenceKeys.showsArchivedProjects) ?? false);
+  // Archived folders, Status and Usage are the person's display choices, kept on their Mac
+  // (#1033) as the window's showsArchivedFolders, showsActivity and showsUsage.
+  readonly showsArchivedFolders = computed(() => boolPreference(preferenceKeys.showsArchivedFolders) ?? false);
   readonly showsStatus = computed(() => boolPreference(preferenceKeys.showsActivity) ?? true);
   readonly showsUsage = computed(() => boolPreference(preferenceKeys.showsUsage) ?? true);
-
-  setShowsArchivedProjects(isOpen: boolean): void {
-    if (this.showsArchivedProjects.peek() === isOpen) return;
-    setPreferences({ [preferenceKeys.showsArchivedProjects]: isOpen });
+  setShowsArchivedFolders(isOpen: boolean): void {
+    if (this.showsArchivedFolders.peek() === isOpen) return;
+    setPreferences({ [preferenceKeys.showsArchivedFolders]: isOpen });
   }
 
   setShowsStatus(isOpen: boolean): void {
@@ -74,13 +74,31 @@ export class Folds {
     this.change(this.open, storageKey, foldName(host, folder), isOpen);
   }
 
-  /** Whether a project's Workflows fold is open (#885): folded until opened. */
+  /** Whether a folder's Workflows fold is open (#885): folded until opened. */
   isWorkflowsOpen(host: string, folder: string): boolean {
     return this.open.value.has(`workflows:${foldName(host, folder)}`);
   }
 
   setWorkflows(host: string, folder: string, isOpen: boolean): void {
     this.change(this.open, storageKey, `workflows:${foldName(host, folder)}`, isOpen);
+  }
+
+  /** Whether a folder's Sessions fold is open (#2312): open until folded. */
+  isSessionsOpen(host: string, folder: string): boolean {
+    return !this.closed.value.has(`sessions:${foldName(host, folder)}`);
+  }
+
+  setSessions(host: string, folder: string, isOpen: boolean): void {
+    this.change(this.closed, closedKey, `sessions:${foldName(host, folder)}`, !isOpen);
+  }
+
+  /** Whether a project's Recently archived sessions fold is open: open until folded. */
+  isRecentArchivedSessionsOpen(host: string, folder: string): boolean {
+    return !this.closed.value.has(`recentArchivedSessions:${foldName(host, folder)}`);
+  }
+
+  setRecentArchivedSessions(host: string, folder: string, isOpen: boolean): void {
+    this.change(this.closed, closedKey, `recentArchivedSessions:${foldName(host, folder)}`, !isOpen);
   }
 
   /** Whether a session's children are shown under it (#835): folded until opened. */

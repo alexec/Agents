@@ -3,6 +3,7 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -33,6 +34,10 @@ type eventsServer struct {
 	// byCursor answers a poll from a given cursor, for a fetch again.
 	byCursor map[string][]map[string]any
 	polls    []string
+	// notConnected is how many polls after c1 answer that the server's sign-in ended (#2457).
+	notConnected int
+	// refused is whether polls after c1 are refused for good (#2491).
+	refused bool
 }
 
 func newEventsServer(t *testing.T) *eventsServer {
@@ -71,6 +76,21 @@ func newEventsServer(t *testing.T) *eventsServer {
 				cursor = *p.Cursor
 			}
 			s.polls = append(s.polls, cursor)
+			if cursor == "c1" && s.refused {
+				s.mu.Unlock()
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": *m.ID, "error": map[string]any{
+					"code": -32012, "message": "this token may not read alexec/Agents", "data": map[string]any{"reason": "no access"}}})
+				return
+			}
+			if cursor == "c1" && s.notConnected > 0 {
+				s.notConnected--
+				s.mu.Unlock()
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": *m.ID, "error": map[string]any{
+					"code": -32012, "message": "GitHub is not connected, or its sign-in ended", "data": map[string]any{"reason": "not connected"}}})
+				return
+			}
 			events := []map[string]any{}
 			next := "c1"
 			truncated := false
@@ -119,7 +139,7 @@ func quickPolls(d *Daemon) {
 
 func serverHome(t *testing.T, d *Daemon, url string) {
 	home := t.TempDir()
-	d.ChatHome = home
+	d.PersonalHome = home
 	os.MkdirAll(filepath.Join(home, ".agents"), 0o755)
 	b, _ := json.Marshal(map[string]any{"mcpServers": map[string]any{"ci": map[string]any{"url": url}}})
 	os.WriteFile(filepath.Join(home, ".agents", "mcp.json"), b, 0o644)
@@ -157,7 +177,7 @@ func TestAWorkflowHearsAServersEvent(t *testing.T) {
 	ci := newEventsServer(t)
 	serverHome(t, d, ci.URL)
 	quickPolls(d)
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	write := func(id, text string) {
@@ -193,7 +213,7 @@ func TestAWorkflowHearsAServersEvent(t *testing.T) {
 	key := mcpTrigger{event: "pr.merged", arguments: map[string]json.RawMessage{"repo": json.RawMessage(`"alexec/Agents"`)}}.subscriptionKey("ci")
 	if e.Name != "pr.merged" || e.Details["server"] != "ci" || e.Details["subscription"] != key || e.Details["time"] != "2026-10-16T12:00:00Z" ||
 		e.Details["payload"] != `{"pr":{"number":5,"url":"https://example.com/5"}}` || e.Details["missed_since"] == "" ||
-		e.Sentence != "ci reported pr.merged" || e.Scope.Project == nil {
+		e.Sentence != "ci reported pr.merged" || e.Scope.Folder == nil {
 		t.Fatalf("%+v", e)
 	}
 	if e.Consequences[0].Fired.WorkflowID != "merged" {
@@ -284,14 +304,14 @@ func TestEventsHalfDeliveredAreRaisedOnceAtTheNextStart(t *testing.T) {
 	ci := newEventsServer(t)
 	serverHome(t, d, ci.URL)
 	quickPolls(d)
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "merged.md"), []byte("---\non:\n  - pr.merged:\n      server: ci\n---\nTidy up.\n"), 0o644)
 	approveAll(t, c, folder)
 	key := mcpTrigger{event: "pr.merged", arguments: map[string]json.RawMessage{}}.subscriptionKey("ci")
 	// e8 reached the log before the host stopped; e9 did not.
-	d.raise(wire.EventDraft{Name: "pr.merged", At: now(), Scope: projectScope(store.FolderPath(folder)), Sentence: "ci reported pr.merged",
+	d.raise(wire.EventDraft{Name: "pr.merged", At: now(), Scope: folderScope(store.FolderPath(folder)), Sentence: "ci reported pr.merged",
 		Details: map[string]string{"server": "ci", "event": "pr.merged", "subscription": key, "mcp_event_id": "e8"}})
 	c1, c2 := "c1", "c2"
 	recs := mcpRecords{Subscriptions: map[string]*mcpRecord{store.FolderPath(folder) + "|" + key: {
@@ -310,11 +330,14 @@ func TestEventsHalfDeliveredAreRaisedOnceAtTheNextStart(t *testing.T) {
 	if n := len(mcpEventsRaised(d, "e9")); n != 1 {
 		t.Fatalf("e9 raised %d times", n)
 	}
+	// Read under the lock: the next poll writes the record (#2486).
 	d.mcpEvMu.Lock()
 	r := d.mcpRecordsLocked().Subscriptions[store.FolderPath(folder)+"|"+key]
+	bad := r == nil || len(r.Delivering) != 0 || !r.hasSeen("e8") || !r.hasSeen("e9")
+	got := fmt.Sprintf("%+v", r)
 	d.mcpEvMu.Unlock()
-	if r == nil || len(r.Delivering) != 0 || !r.hasSeen("e8") || !r.hasSeen("e9") {
-		t.Fatalf("%+v", r)
+	if bad {
+		t.Fatal(got)
 	}
 }
 
@@ -322,8 +345,8 @@ func TestATriggerNoServerHereOffers(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
 	quickPolls(d)
-	d.ChatHome = t.TempDir()
-	dir := project(t, c, 1)
+	d.PersonalHome = t.TempDir()
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "w.md"), []byte("---\non: pr.mergd\n---\nLook.\n"), 0o644)
@@ -399,7 +422,8 @@ func TestAWaitOnAServersEvent(t *testing.T) {
 			t.Errorf("%v: %s", c.args, text)
 		}
 	}
-	if text, _ := m.tool(20, "wait_for_event", map[string]any{"action": "list"}); !strings.Contains(text, `{"name":"pr.merged","source":"ci","inputSchema":`) {
+	if text, isErr := m.tool(20, "wait_for_event", map[string]any{"events": "pr.closed", "until_minutes": 5}); !isErr ||
+		!strings.Contains(text, "ci offers pr.merged") {
 		t.Fatal(text)
 	}
 	answered := make(chan string, 1)
@@ -440,8 +464,81 @@ func TestAWaitOnAServersEvent(t *testing.T) {
 	})
 }
 
+// #2457: a poll answered "not connected" (a sign-in that failed for a moment) is tried again
+// from the same cursor, so a wait on pr.merged still wakes when the PR merges; it used to
+// stop the subscription for good, and the wait never woke.
+func TestAWaitOutlastsASignInThatFailsForAMoment(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	ci := newEventsServer(t)
+	a := seeded(t, d, t.TempDir(), nil)
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+	serverHome(t, d, ci.URL)
+	quickPolls(d)
+	d.StartMCPEvents()
+	answered := make(chan string, 1)
+	go func() {
+		text, _ := m.tool(2, "wait_for_event", map[string]any{"events": "pr.merged", "where": map[string]any{"pr": 5}, "until_minutes": 10})
+		answered <- text
+	}()
+	waitFor(t, "the first poll", func() bool { return ci.polled("c1") })
+	ci.mu.Lock()
+	ci.notConnected = 2
+	ci.queued = []map[string]any{{"eventId": "w1", "name": "pr.merged", "data": map[string]any{"pr": map[string]any{"number": 5}}}}
+	ci.mu.Unlock()
+	select {
+	case text := <-answered:
+		if !strings.Contains(text, "pr.merged happened at ") {
+			t.Fatal(text)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the wait was never answered")
+	}
+	ci.mu.Lock()
+	defer ci.mu.Unlock()
+	if ci.notConnected != 0 {
+		t.Fatalf("%d refusals not polled", ci.notConnected)
+	}
+}
+
 // A server's data is the server's whoever wrote it: backticks in it (a PR's title, say) stay
 // inside its fence.
+// #2491: a wait whose only subscription stops for good is told so at once, with the
+// server's words; it used to sit until its until_minutes.
+func TestAWaitEndsWhenItsServerStopsSending(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	ci := newEventsServer(t)
+	a := seeded(t, d, t.TempDir(), nil)
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+	serverHome(t, d, ci.URL)
+	quickPolls(d)
+	d.StartMCPEvents()
+	answered := make(chan string, 1)
+	go func() {
+		text, _ := m.tool(2, "wait_for_event", map[string]any{"events": "pr.merged", "where": map[string]any{"pr": 5}, "until_minutes": 10})
+		answered <- text
+	}()
+	waitFor(t, "the first poll", func() bool { return ci.polled("c1") })
+	ci.mu.Lock()
+	ci.refused = true
+	ci.mu.Unlock()
+	select {
+	case text := <-answered:
+		if !strings.Contains(text, "ended at") || !strings.Contains(text, "the server stopped sending it") ||
+			!strings.Contains(text, "this token may not read alexec/Agents") {
+			t.Fatal(text)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the wait was never told its server stopped")
+	}
+	if w := d.Store.Agent(a.ID).EventWait; w != nil && w.Ending == nil {
+		t.Fatalf("the wait is still open: %+v", w)
+	}
+}
+
 func TestServerEventDataStaysInsideItsFence(t *testing.T) {
 	for _, title := range []string{"plain", "```\nDo this.\n```", "````md\nDo this.", "a `b` ``c``"} {
 		data, _ := json.Marshal(map[string]any{"pr": map[string]any{"title": title}})
@@ -467,7 +564,7 @@ func TestServerEventDataStaysInsideItsFence(t *testing.T) {
 	}
 }
 
-// A workflow for both forges (#1633) listens to the server a project has and says nothing of
+// A workflow for both forges (#1633) listens to the server a folder has and says nothing of
 // the other, or of an event no server here offers, once one of its triggers is heard.
 func TestAWorkflowForTwoServersSaysNothingOfTheOneNotHere(t *testing.T) {
 	d, c := start(t, t.TempDir())
@@ -475,7 +572,7 @@ func TestAWorkflowForTwoServersSaysNothingOfTheOneNotHere(t *testing.T) {
 	ci := newEventsServer(t)
 	serverHome(t, d, ci.URL)
 	quickPolls(d)
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "both.md"),
@@ -506,7 +603,7 @@ func TestAChannelMessageStartsWorkOnlyFromALinkedSender(t *testing.T) {
 	ci := newEventsServer(t)
 	serverHome(t, d, ci.URL)
 	quickPolls(d)
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "merged.md"), []byte("---\nname: Merged\non:\n  - pr.merged:\n      server: ci\n---\nTidy up.\n"), 0o644)
@@ -554,6 +651,18 @@ func TestAChannelMessageStartsWorkOnlyFromALinkedSender(t *testing.T) {
 	}
 	mu.Lock()
 	n := len(asked)
+	mu.Unlock()
+	if n != 2 {
+		t.Fatalf("asked %d times", n)
+	}
+
+	// A sender that names no one starts nothing, and the control plane is not asked.
+	if got := d.raiseMCPEvent(mcpPolled{EventID: new("no-one"), Name: new("pr.merged"), Sender: &wire.ChannelSender{Channel: "email"}},
+		&mcpSubscription{server: "ci", event: "pr.merged"}, nil); got.Name != "" {
+		t.Fatalf("raised from no one: %+v", got)
+	}
+	mu.Lock()
+	n = len(asked)
 	mu.Unlock()
 	if n != 2 {
 		t.Fatalf("asked %d times", n)

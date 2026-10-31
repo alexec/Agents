@@ -12,7 +12,7 @@ import (
 )
 
 // A workflow waiting for an OK is asked as a changed guarded file is (#569, #1322), as
-// DaemonCore+WorkflowQuestions asks it: in the project's guardedChanges by its file's path,
+// DaemonCore+WorkflowQuestions asks it: in the folder's guardedChanges by its file's path,
 // in its approvals as the workflow kind, and so in Needs You on every client. Keep is
 // Approve; Undo writes back the copy last approved, or removes a file never approved.
 
@@ -30,7 +30,7 @@ func workflowIDInPath(path string) (string, bool) {
 	return id, id != "" && !strings.Contains(id, "/")
 }
 
-// waitingWorkflowChanges is the project's workflows that run here, are not archived and
+// waitingWorkflowChanges is the folder's workflows that run here, are not archived and
 // wait for an OK, as changes. Since is when the file last changed.
 func (d *Daemon) waitingWorkflowChanges(folder string) []wire.GuardedChange {
 	d.workflowMu.Lock()
@@ -43,19 +43,23 @@ func (d *Daemon) waitingWorkflowChanges(folder string) []wire.GuardedChange {
 		if !d.listedHere(f.wf) || isArchived(f.wf) {
 			continue
 		}
+		// A user workflow asks only where it is on: it is shown, off, in every forge folder.
+		if f.scope == "user" && folder != d.personalHome() && isOff(f.wf) {
+			continue
+		}
 		awaiting, _ := d.approvalOf(folder, id, f)
 		if awaiting == nil {
 			continue
 		}
 		digest := awaiting.Digest
 		since := now()
-		if path, ok := workflowPath(folder, id); ok {
+		if path, ok := workflowSourcePath(folder, id, f); ok {
 			if fi, err := os.Stat(path); err == nil {
 				since = wire.DateOf(fi.ModTime())
 			}
 		}
 		for _, s := range f.skills {
-			if path, ok := skillPath(folder, s.name); ok {
+			if path, ok := skillPath(f.sourceFolder, s.name); ok {
 				if fi, err := os.Stat(path); err == nil && wire.DateOf(fi.ModTime()) > since {
 					since = wire.DateOf(fi.ModTime())
 				}
@@ -108,7 +112,7 @@ func (d *Daemon) readWorkflowChange(folder, id string) (wire.GuardedChangeReadin
 		return wire.GuardedChangeReading{}, noSuchWorkflow(id)
 	}
 	current, digest := shownWorkflow(f.text, f.skills), f.digest
-	approved, skills, hasApproved := d.approvedCopyLocked(folder, id)
+	approved, skills, hasApproved := d.approvedCopyLocked(approvalFolderOf(folder, f), id)
 	approved = shownWorkflow(approved, skills)
 	d.workflowMu.Unlock()
 	out := wire.GuardedChangeReading{Path: workflowChangePath(id), Digest: &digest, Current: &current}
@@ -144,9 +148,9 @@ func (d *Daemon) approvedCopyLocked(folder, id string) (string, []workflowSkill,
 
 // keepOrUndoWorkflow is Keep (Approve) or Undo of a waiting workflow, for the version the
 // person was shown.
-func (d *Daemon) keepOrUndoWorkflow(folder, id string, digest *string, keep bool) (wire.ProjectSummary, error) {
+func (d *Daemon) keepOrUndoWorkflow(folder, id string, digest *string, keep bool) (wire.FolderSummary, error) {
 	if digest == nil {
-		return wire.ProjectSummary{}, Invalid("Say which version you were shown.")
+		return wire.FolderSummary{}, Invalid("Say which version you were shown.")
 	}
 	if keep {
 		return d.answerWorkflow(folder, id, digest, true)
@@ -156,15 +160,15 @@ func (d *Daemon) keepOrUndoWorkflow(folder, id string, digest *string, keep bool
 	f := d.fileLocked(folder, id)
 	if f == nil {
 		d.workflowMu.Unlock()
-		return wire.ProjectSummary{}, noSuchWorkflow(id)
+		return wire.FolderSummary{}, noSuchWorkflow(id)
 	}
 	if f.digest != *digest {
 		d.workflowMu.Unlock()
-		return wire.ProjectSummary{}, &Error{Code: wire.FailureNotChanged, Message: f.wf.Name + " changed after you looked at it, so it was not undone. Look again."}
+		return wire.FolderSummary{}, &Error{Code: wire.FailureNotChanged, Message: f.wf.Name + " changed after you looked at it, so it was not undone. Look again."}
 	}
-	approved, skills, had := d.approvedCopyLocked(folder, id)
+	approved, skills, had := d.approvedCopyLocked(approvalFolderOf(folder, f), id)
 	d.workflowMu.Unlock()
-	path, ok := workflowPath(folder, id)
+	path, ok := workflowSourcePath(folder, id, f)
 	err := errors.New("that is not a workflow's name")
 	if ok {
 		if had {
@@ -173,33 +177,33 @@ func (d *Daemon) keepOrUndoWorkflow(folder, id string, digest *string, keep bool
 			err = nil
 		}
 	}
-	// The skills it named go back too, each only into a folder of the project's own.
+	// The skills it named go back too, in the same scope as the workflow.
 	for _, s := range skills {
 		if err != nil {
 			break
 		}
-		if p, ok := skillPath(folder, s.name); !ok {
-			err = errors.New(skillChangePath(s.name) + " is not a file of the project's own")
+		if p, ok := skillPath(f.sourceFolder, s.name); !ok {
+			err = errors.New(skillChangePath(s.name) + " is not a file in its workflow scope")
 		} else if cur, _, _ := readWorkflowFile(p); cur != s.text {
 			err = store.WriteAtomically(p, []byte(s.text), 0o644)
 		}
 	}
 	if err != nil {
-		return wire.ProjectSummary{}, &Error{Code: CodeInternal, Message: workflowChangePath(id) + " could not be put back: " + err.Error()}
+		return wire.FolderSummary{}, &Error{Code: CodeInternal, Message: workflowChangePath(id) + " could not be put back: " + err.Error()}
 	}
-	d.rescanWorkflows(folder) // tells the clients, the project's summary with them
+	d.rescanWorkflows(folder) // tells the clients, the folder's summary with them
 	s, _ := d.summaryFor(folder)
 	return s, nil
 }
 
 // answerWorkflow is Approve or Deny from Needs You: workflows/approve or workflows/deny,
-// which tell every client, then the project as it stands.
-func (d *Daemon) answerWorkflow(folder, id string, digest *string, approve bool) (wire.ProjectSummary, error) {
+// which tell every client, then the folder as it stands.
+func (d *Daemon) answerWorkflow(folder, id string, digest *string, approve bool) (wire.FolderSummary, error) {
 	if digest == nil {
-		return wire.ProjectSummary{}, Invalid("Say which version you were shown.")
+		return wire.FolderSummary{}, Invalid("Say which version you were shown.")
 	}
 	if _, err := d.approveWorkflow(wire.WorkflowApproveRequest{Folder: store.FolderURL(folder), WorkflowID: id, Digest: *digest}, approve); err != nil {
-		return wire.ProjectSummary{}, err
+		return wire.FolderSummary{}, err
 	}
 	s, _ := d.summaryFor(folder)
 	return s, nil

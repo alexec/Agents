@@ -1,18 +1,9 @@
-// You ▸ On Every Machine (#1760): the same words as UserScopeWords in Packages/AgentsKit.
+// Secrets follow the person across machines; fixed-scope settings have no switch here.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";
 
 const u = await load("src/model/userScope.ts");
-
-test("user scope: a part follows the person only when the control plane keeps it", () => {
-  assert.equal(u.follows(null, "costLimits"), false);
-  assert.equal(u.follows({ costLimits: null }, "costLimits"), false);
-  assert.equal(u.follows({ costLimits: { dailyTokens: 5 } }, "costLimits"), true);
-  assert.equal(u.partState({ resources: [] }, "resources"), "The same on every machine of yours.");
-  assert.equal(u.partState({}, "mcpServers"), "Each machine keeps its own.");
-  assert.deepEqual(u.parts, ["mcpServers", "agentConfig", "runtimes", "costLimits", "resources"]);
-});
 
 test("user scope: a secret's row says where it is, and a removed machine it was on", () => {
   assert.equal(u.machines({ machines: [] }), "On no machine yet");
@@ -31,7 +22,8 @@ test("user scope: a secret's name is an environment variable's", () => {
   assert.equal(u.isSecretName(""), false);
 });
 
-test("user scope: the footer says an edit in a Mac's pane goes to every machine (#2069)", () => {
-  assert.match(u.partsFoot, /the change goes to every machine of yours/);
-  assert.doesNotMatch(u.partsFoot, /not in its own pane/);
+test("user scope: the ~/.agents editors say they are this Mac's, and what goes to the other machines (#2704)", () => {
+  assert.equal(u.thisMacOnly, "This Mac's");
+  assert.match(u.agentConfigurationFollows, /^Your other machines get this Mac's instructions/);
+  assert.match(u.agentConfigurationFollows, /Workflows, plugins and a skill's other files stay on this Mac\.$/);
 });

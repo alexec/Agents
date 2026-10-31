@@ -262,3 +262,66 @@ test("a connection that lasted starts the waits again from the first (#172)", as
   assert.equal(net.made.length, 3);
   l.stop();
 });
+
+test("4403 with the reason suspended keeps the key, and tries again until it connects (#1002, FR-029)", async () => {
+  const net = sockets();
+  const keys = paired();
+  const l = link(keys, net, { suspendedRetry: 10 });
+  const states = await opened(l);
+  net.made[0].close(4403, "suspended");
+  await wait(40);
+  assert.equal(keys.record?.client, "C");
+  assert.deepEqual(states.slice(0, 4), ["connecting", "open", "suspended", "open"]);
+  assert.equal(net.made.length, 2);
+  l.stop();
+});
+
+test("control/cutOff then 4403 is a suspension whatever the reason says", async () => {
+  const net = sockets();
+  const keys = paired();
+  const l = link(keys, net, { suspendedRetry: 60_000 });
+  const states = await opened(l);
+  net.made[0].say({ m: { jsonrpc: "2.0", method: "control/cutOff", params: { why: "suspended", provider: "okta" } } });
+  net.made[0].close(4403, "");
+  await wait(20);
+  assert.equal(states.at(-1), "suspended");
+  assert.notEqual(keys.record, null);
+  assert.equal(net.made.length, 1);
+  l.stop();
+});
+
+test("refused as suspended keeps the key, stays suspended, and opens once it is let back", async () => {
+  const net = sockets();
+  const keys = paired();
+  let refusals = 2;
+  const l = link(keys, net, { suspendedRetry: 10, authenticate: async () => {
+    if (refusals-- > 0) throw new w.Refused("suspended");
+    return { name: "test" };
+  } });
+  const states = await opened(l);
+  await wait(60);
+  // Connecting is not said again while it is suspended: the page stays as it is.
+  assert.deepEqual(states, ["connecting", "suspended", "open"]);
+  assert.notEqual(keys.record, null);
+  assert.equal(net.made.length, 3);
+  l.stop();
+});
+
+test("refused as crowded is down, says so, keeps the key, and opens once a tab closes (#2194)", async () => {
+  const net = sockets();
+  const keys = paired();
+  let refusals = 2;
+  const seen = [];
+  const l = link(keys, net, { authenticate: async () => {
+    if (refusals-- > 0) throw new w.Refused("crowded");
+    return { name: "test" };
+  } });
+  l.onState((state) => seen.push(state));
+  const states = await opened(l);
+  await wait(60);
+  assert.deepEqual(states, ["connecting", "down", "open"]);
+  assert.equal(seen.find((s) => s.kind === "down").crowded, true);
+  assert.notEqual(keys.record, null);
+  assert.equal(net.made.length, 3);
+  l.stop();
+});

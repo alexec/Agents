@@ -31,8 +31,8 @@ work.
 
 1. Click **Cost** in the sidebar's **Usage** group, or press Option-Command-S.
 
-   The page shows **All time** at the top, then each project with what its agents cost,
-   in each currency the runtimes reported. Archived projects are shown greyed. A line
+   The page shows **All time** at the top, then each folder with what its agents cost,
+   in each currency the runtimes reported. Archived folders are shown greyed. A line
    saying **At least this much** means some chats ran on a runtime that reported no price.
 2. For one agent, look above its prompt: the figure beside its name is what it has cost so
    far.
@@ -50,7 +50,7 @@ work.
    it does not count what the model reads back from a cache.
 4. Under **Per day** and **Tokens per day** (*The most a day may spend*), do the same.
 
-   When a day reaches it, nothing new starts and no prompt is sent, in any project,
+   When a day reaches it, nothing new starts and no prompt is sent, in any folder,
    including scheduled workflows. What is working finishes its turn and holds. What you
    typed waits until the day rolls over. **Today** shows what is left, in money and in
    tokens.
@@ -65,6 +65,26 @@ stopped**, in the same pane, lists every agent a limit has stopped.
 Each server keeps to the per-day limit on its own. For every control in the pane, see
 [Settings and the Resources page](../reference/settings.md).
 
+**When your organisation sets a budget**
+
+An organisation's policy can give each person a budget per UTC day and per agent, in US
+dollars and in tokens (#998). It is a ceiling over your own limits: the lower one stops the
+work. A runtime on a subscription reports tokens and no price, so the token budget holds it.
+At the budget, new turns are refused until 00:00 UTC, and the chat says that your
+organisation set the budget. Your machines count together: the control plane adds what each
+one spent. While a budget is set, a runtime that reports neither a price nor tokens is
+refused, unless your organisation allows it. See
+[Organisation policy on a machine](../explanation/organisation-policy.md#budgets).
+
+**When a session uses your organisation's key or gateway**
+
+An org account (#999) has no plan, so the **Runtimes** page shows its row as **Organisation ·
+No plan limit**, with its tokens today. The tokens are the provider's own count, which the
+model relay on your machine reads from each answer. A token limit, yours or your
+organisation's, counts these tokens. A cost on an org account is the runtime's own figure at
+its list price ("list price, as Claude reports it"), not what your organisation pays. See
+[org keys and gateways](../reference/runtimes.md#org-keys-and-gateways).
+
 ## If it doesn't work
 
 - **An agent went over its limit.** A limit is checked between turns, so the turn that
@@ -73,7 +93,8 @@ Each server keeps to the per-day limit on its own. For every control in the pane
   reports no price; hover over the figure and it says so. Set a token limit: the figure
   then shows the tokens used against it.
 - **The figure says *Not measured* and no limit stops the agent.** Its runtime reports
-  neither a price nor tokens (Cursor, Antigravity, Grok). No limit applies to it.
+  neither a price nor tokens (Cursor, Antigravity, Grok). No limit applies to it. While
+  your organisation sets a budget, such a runtime does not start at all.
 
 ## See also
 

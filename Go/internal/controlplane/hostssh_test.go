@@ -16,6 +16,7 @@ import (
 // account's own, so only the local owner, whose ssh it is, uses it. Another person, a
 // member or an admin, is refused each method before it reaches ssh.
 func TestOnlyTheLocalOwnerUsesTheControlPlanesSSH(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	// The owner's ssh config has one server; this ssh never connects anywhere.
 	config := filepath.Join(t.TempDir(), "config")

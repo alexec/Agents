@@ -34,7 +34,7 @@ func (c *conn) In() <-chan string { return c.in }
 func (c *conn) Close()            {}
 func (c *conn) Device() string    { return "" }
 
-func (c *conn) call(t *testing.T, id int, method string, params any) json.RawMessage {
+func (c *conn) call(t testing.TB, id int, method string, params any) json.RawMessage {
 	t.Helper()
 	p, _ := json.Marshal(params)
 	b, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": json.RawMessage(p)})
@@ -60,13 +60,13 @@ func (c *conn) call(t *testing.T, id int, method string, params any) json.RawMes
 
 func mustJSON(v any) []byte { b, _ := json.Marshal(v); return b }
 
-func start(t *testing.T, root string) (*Daemon, *conn) {
+func start(t testing.TB, root string) (*Daemon, *conn) {
 	t.Helper()
 	return startWith(t, context.Background(), root)
 }
 
 // startWith is start on a context of the test's, as main's that a signal ends.
-func startWith(t *testing.T, ctx context.Context, root string) (*Daemon, *conn) {
+func startWith(t testing.TB, ctx context.Context, root string) (*Daemon, *conn) {
 	t.Helper()
 	d, err := New(ctx, root)
 	if err != nil {
@@ -79,7 +79,7 @@ func startWith(t *testing.T, ctx context.Context, root string) (*Daemon, *conn) 
 	c := newConn()
 	go d.Accept(c)
 	t.Cleanup(func() { close(c.in) })
-	t.Cleanup(d.stopProjectWatches)
+	t.Cleanup(d.stopFolderWatches)
 	// A stopped runtime's turn still records how it ended: wait for that before the
 	// root's TempDir goes, or the removal races a write into it.
 	t.Cleanup(func() {
@@ -136,7 +136,7 @@ func TestAPanickingHandlerAnswersAnError(t *testing.T) {
 	}
 }
 
-// A root the Swift host wrote: its agent is listed with its project, and its transcript
+// A root the Swift host wrote: its agent is listed with its folder, and its transcript
 // pages as Swift pages it.
 func TestASwiftRootIsServed(t *testing.T) {
 	root := t.TempDir()
@@ -145,7 +145,7 @@ func TestASwiftRootIsServed(t *testing.T) {
 	var head struct{ ID string }
 	json.Unmarshal(b, &head)
 	// The fixture's folder is a real one on the Mac it was made on: here, a folder of the
-	// test's own, so the host never reads (or runs the workflows of) a real project.
+	// test's own, so the host never reads (or runs the workflows of) a real folder.
 	b = []byte(strings.ReplaceAll(string(b), `"file:///Users/alexcollins/Agents/"`, `"`+string(store.FolderURL(t.TempDir()))+`/"`))
 	if strings.Contains(string(b), "/Users/alexcollins") {
 		t.Fatal("the fixture still names a real folder")
@@ -167,10 +167,10 @@ func TestASwiftRootIsServed(t *testing.T) {
 	if len(agents) != 1 || string(agents[0].ID) != strings.ToUpper(head.ID) {
 		t.Fatalf("agents %v", agents)
 	}
-	var projects []wire.ProjectSummary
-	json.Unmarshal(c.call(t, 2, "projects/list", map[string]any{"includeArchived": true}), &projects)
-	if len(projects) != 1 || projects[0].Name == "" {
-		t.Fatalf("projects %+v", projects)
+	var folders []wire.FolderSummary
+	json.Unmarshal(c.call(t, 2, "folders/list", map[string]any{"includeArchived": true}), &folders)
+	if len(folders) != 1 || folders[0].Name == "" {
+		t.Fatalf("folders %+v", folders)
 	}
 	var page wire.TranscriptPage
 	json.Unmarshal(c.call(t, 3, "agents/transcript", map[string]any{"agentID": head.ID, "limit": 10}), &page)
@@ -183,20 +183,20 @@ func TestASwiftRootIsServed(t *testing.T) {
 	}
 }
 
-func TestAddAProject(t *testing.T) {
+func TestAddAFolder(t *testing.T) {
 	root := t.TempDir()
 	work := filepath.Join(t.TempDir(), "hello")
 	os.Mkdir(work, 0o755)
 	d, c := start(t, root)
-	var s wire.ProjectSummary
-	json.Unmarshal(c.call(t, 1, "projects/add", map[string]any{"folder": "file://" + work}), &s)
+	var s wire.FolderSummary
+	json.Unmarshal(c.call(t, 1, "folders/add", map[string]any{"folder": "file://" + work}), &s)
 	if s.Name != "hello" || !s.Exists {
 		t.Fatalf("%+v", s)
 	}
-	if ps := d.Store.Projects(); len(ps) != 1 || store.FolderPath(ps[0].Folder) != mustResolve(work) {
+	if ps := d.Store.Folders(); len(ps) != 1 || store.FolderPath(ps[0].Folder) != mustResolve(work) {
 		t.Fatalf("records %+v", ps)
 	}
-	c.in <- `{"jsonrpc":"2.0","id":2,"method":"projects/add","params":{"folder":"file:///no/such/folder"}}`
+	c.in <- `{"jsonrpc":"2.0","id":2,"method":"folders/add","params":{"folder":"file:///no/such/folder"}}`
 	for line := range c.out {
 		if strings.Contains(line, `"id":2`) {
 			if !strings.Contains(line, "-32004") {

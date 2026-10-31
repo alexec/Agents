@@ -4,11 +4,17 @@
 # too (#1459), for a browser anywhere, and its MCP Apps views at a second name (#1484). The how-to is
 # docs/how-to/run-the-control-plane-in-the-cloud.md.
 #
-#   scripts/build-linux-agentsd.sh               # the Linux host, handed to servers that join
 #   deploy/make-secrets.sh --public --kms projects/P/locations/L/keyRings/R/cryptoKeys/K \
 #       [--service-account sa.json] [--apns AuthKey_KEYID.p8]
-#   AGENTS_DOMAIN=agents.example.com AGENTS_VIEWS_DOMAIN=views.example.com \
-#       ACME_EMAIL=you@example.com docker compose -f deploy/compose.public.yaml up -d --build
+#   export AGENTS_DOMAIN=agents.example.com AGENTS_VIEWS_DOMAIN=views.example.com \
+#       ACME_EMAIL=you@example.com AGENTS_VERSION=0.11.0
+#   docker compose -f deploy/compose.public.yaml pull
+#   docker compose -f deploy/compose.public.yaml up -d
+#
+# The image is the release's, from ghcr.io/alexec/agents-control (#2140): AGENTS_VERSION is
+# its tag (X.Y.Z, X.Y or latest). It carries this file, the Linux host it hands to servers that
+# join and the runtimes' toolsets, so nothing else is downloaded. To run a commit no release
+# has, build it from the repository instead: `up -d --build`.
 #
 # AGENTS_DOMAIN and AGENTS_VIEWS_DOMAIN must already point at this machine, with ports 80 and
 # 443 open to the internet. The variables may also go in deploy/.env.
@@ -21,18 +27,32 @@
 # The APNs key (#1460) is a secret here too, deploy/secrets/apns-key, never in the store or a
 # code: with it, the control plane pushes to a device itself when no Mac host relays its
 # notices. Empty (make-secrets.sh without --apns), it sends no pushes and says so in its log.
+#
+# So is the VAPID key for Web Push to a browser (#1486), deploy/secrets/vapid-key: make-secrets.sh
+# makes it once (deploy/gcp/up.sh, on the VM) and keeps it, since a new one ends every browser's
+# subscription. Empty, the control plane sends no Web Push and says so in its log.
 name: agents-control
+
+# Docker's json-file driver keeps every log line for ever on the one disk (#2290): each service
+# keeps at most 3 files of 10 MB in the local driver.
+x-logging: &logging
+  driver: local
+  options:
+    max-size: 10m
+    max-file: "3"
 
 services:
   control:
+    logging: *logging
     build:
       context: ..
       dockerfile: deploy/Containerfile
-      # The version Settings ▸ Control plane shows (#1498): git describe, as deploy/gcp/up.sh
-      # gives it. Unset, it is "dev".
+      # The version Settings ▸ Control plane shows (#1498), for a build from source:
+      # scripts/version.sh, as deploy/gcp/up.sh --build gives it. Unset, it is "dev".
       args:
         VERSION: ${AGENTS_VERSION:-dev}
-    image: agents-control:latest
+    # The release's image (#2140); `up --build` builds it here in its place.
+    image: ghcr.io/alexec/agents-control:${AGENTS_VERSION:-latest}
     restart: unless-stopped
     environment:
       # A folder in the data volume, or the bucket Agents Host already uses (s3://bucket/prefix),
@@ -66,16 +86,32 @@ services:
       AGENTS_APNS_KEY_FILE: /run/secrets/apns-key
       AGENTS_APNS_KEY_ID: ${AGENTS_APNS_KEY_ID:-}
       AGENTS_APNS_TEAM_ID: ${AGENTS_APNS_TEAM_ID:-}
-    secrets: [gcp-service-account, apns-key]
+      # The VAPID key's file (#1486), and the address a push service may write to about it.
+      AGENTS_WEBPUSH_KEY_FILE: /run/secrets/vapid-key
+      AGENTS_WEBPUSH_SUBJECT: ${AGENTS_WEBPUSH_SUBJECT:-}
+      # Prometheus /metrics (#2176), off unless set: an address in the container such as
+      # 0.0.0.0:9791, which Caddy does not serve, and then the token a scraper sends. A
+      # scraper on the same Docker network reaches http://control:9791/metrics.
+      AGENTS_CONTROL_METRICS: ${AGENTS_CONTROL_METRICS:-}
+      AGENTS_CONTROL_METRICS_TOKEN: ${AGENTS_CONTROL_METRICS_TOKEN:-}
+      # The report figures to an OpenTelemetry collector over OTLP/HTTP (#2019), off unless
+      # the endpoint is set: docs/reference/reports.md.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
+      OTEL_METRIC_EXPORT_INTERVAL: ${OTEL_METRIC_EXPORT_INTERVAL:-}
+      # Log lines as JSON for a log shipper (#2176), and the lowest level written (debug
+      # adds a line for each request).
+      AGENTS_CONTROL_LOG_FORMAT: ${AGENTS_CONTROL_LOG_FORMAT:-text}
+      AGENTS_CONTROL_LOG_LEVEL: ${AGENTS_CONTROL_LOG_LEVEL:-info}
+    secrets: [gcp-service-account, apns-key, vapid-key]
+    # The Linux host (/servers, served at /v1/servers/… to servers joining with the install
+    # command) and the runtimes' toolsets (/toolsets, at /v1/toolsets/…, so a server that joins
+    # installs Claude by itself, #1312) are in the image, of its version (#2140).
     volumes:
       - data:/data
-      # The Linux host, served at /v1/servers/… to servers joining with the install command.
-      - ../App/Resources/servers:/servers:ro
-      # The runtimes' toolsets, served at /v1/toolsets/…, so a server that joins installs
-      # Claude by itself (#1312). Without them it gets no Claude (#1461's walk).
-      - ../App/Resources/toolsets:/toolsets:ro
 
   caddy:
+    logging: *logging
     image: caddy:2
     restart: unless-stopped
     depends_on: [control]
@@ -110,6 +146,8 @@ secrets:
     file: ./secrets/gcp-service-account
   apns-key:
     file: ./secrets/apns-key
+  vapid-key:
+    file: ./secrets/vapid-key
 
 volumes:
   data:

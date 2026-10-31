@@ -1,13 +1,13 @@
 // The #1634 walk on a scratch root signed in to a real gitlab.com account: Connectors with
-// the GitLab connection, a GitLab project's Connectors page (#1632), and a session whose agent
+// the GitLab connection, a GitLab folder's Connectors page (#1632), and a session whose agent
 // opened the gitlab server's views (#1631), each Show pressed. Screenshots go to <out dir>.
 //
-//   node Web/test/walk/gitlab1634.mjs <WEB_URL> <browser code> <project name> <session title words> <out dir>
+//   node Web/test/walk/gitlab1634.mjs <WEB_URL> <browser code> <folder name> <session title words> <out dir>
 
 import { setTimeout as sleep } from "node:timers/promises";
 import { launch } from "./cdp.mjs";
 
-const [webURL, code, projectName, sessionWords, out] = process.argv.slice(2);
+const [webURL, code, folderName, sessionWords, out] = process.argv.slice(2);
 const js = JSON.stringify;
 let failed = 0;
 const check = (ok, line) => { if (!ok) failed += 1; console.log(`${ok ? "ok  " : "FAIL"} ${line}`); };
@@ -20,7 +20,7 @@ try {
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  await page.waitFor(has(projectName), 20_000);
+  await page.waitFor(has(folderName), 20_000);
 
   await page.goto(`${new URL(webURL).origin}/#/a/mcp`);
   await page.waitFor(has("Disconnect"), 15_000);
@@ -29,7 +29,7 @@ try {
   await page.shot(`${out}/web-1-your-connectors.png`);
 
   await page.eval(`location.hash = "#/h/mac/p/" + encodeURIComponent("file://" +
-    document.querySelector('button[data-fold=project]').title + "/") + "/m/1"`);
+    document.querySelector('button[data-fold=folder]').title + "/") + "/m/1"`);
   await page.waitFor(has("Set up · "), 20_000);
   await page.waitFor(`!document.body.textContent.includes("Reading…")`, 20_000).catch(() => null);
   const setup = (await page.text(".connector-setup")).replace(/\s+/g, " ");
@@ -37,7 +37,7 @@ try {
   await page.shot(`${out}/web-2-connectors.png`);
 
   await page.eval(`(() => {
-    const b = [...document.querySelectorAll(".sidebar .row.project .disclosure")].find((d) => d.getAttribute("aria-label").endsWith(" " + ${js(projectName)}));
+    const b = [...document.querySelectorAll(".sidebar .row.folder .disclosure")].find((d) => d.getAttribute("aria-label").endsWith(" " + ${js(folderName)}));
     if (b && b.getAttribute("aria-expanded") !== "true") b.click();
   })()`);
   await page.waitFor(`[...document.querySelectorAll(".sidebar .row.session")].some((r) => r.textContent.includes(${js(sessionWords)}))`, 20_000);

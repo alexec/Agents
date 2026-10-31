@@ -11,8 +11,8 @@ extension DaemonAPI.Method {
 }
 
 extension DaemonAPI {
-    /// `personal/shared` with no params reads `~/.agents`; with a project's folder, that
-    /// project's `.agents` (#754), which has no per-runtime reach.
+    /// `personal/shared` with no params reads `~/.agents`; with a folder, that
+    /// folder's `.agents` (#754), which has no per-runtime reach.
     public struct SharedRequest: Codable, Equatable, Sendable {
         public var folder: String?
 
@@ -24,7 +24,7 @@ extension DaemonAPI {
 
 extension DaemonAPI {
     public struct SharedSnapshot: Codable, Equatable, Sendable {
-        /// `~/.agents`, or a project's `.agents` (#754).
+        /// `~/.agents`, or a folder's `.agents` (#754).
         public var home: String
         /// False for a copy of the app with no personal home (a scratch root), when
         /// everything else is empty.
@@ -250,11 +250,11 @@ extension DaemonAPI {
     public struct OtherFile: Codable, Equatable, Sendable, Identifiable {
         public enum Kind: String, Codable, Sendable {
             case persona, git, managed, unused
-            /// The app's own, in a project's `.agents`: its settings, pins, workflows (#754).
+            /// The app's own, in a folder's `.agents`: its settings, pins, workflows (#754).
             case app
         }
 
-        /// Relative to `~/.agents`, or to a project's `.agents`.
+        /// Relative to `~/.agents`, or to a folder's `.agents`.
         public var path: String
         public var kind: Kind
 

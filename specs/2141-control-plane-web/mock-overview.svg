@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="14">
+  <rect width="1440" height="900" fill="#f6f6f7"/>
+  <!-- The bar of sections -->
+  <rect width="1440" height="52" fill="#ffffff" stroke="#e2e2e6"/>
+  <text x="24" y="32" font-weight="700" font-size="16">acme control plane</text>
+  <g font-size="14">
+    <rect x="220" y="12" width="88" height="28" rx="6" fill="#e8eefc"/>
+    <text x="236" y="31" font-weight="600" fill="#2453d4">Overview</text>
+    <text x="332" y="31">Agents</text><rect x="384" y="17" width="22" height="18" rx="9" fill="#d93025"/><text x="390" y="31" fill="#fff" font-size="12">2</text>
+    <text x="428" y="31">Machines</text>
+    <text x="512" y="31">Workflows</text>
+    <text x="602" y="31">Reports</text>
+    <text x="680" y="31">Requests</text><rect x="744" y="17" width="22" height="18" rx="9" fill="#d93025"/><text x="750" y="31" fill="#fff" font-size="12">3</text>
+    <text x="788" y="31">People</text>
+    <text x="856" y="31">Settings</text>
+  </g>
+  <text x="1150" y="31" fill="#5f6368" font-size="13">● 2 of 3 machines online · bea@acme.dev</text>
+  <text x="24" y="98" font-size="24" font-weight="700">Overview</text>
+  <text x="24" y="122" fill="#5f6368">What runs on this control plane now, and what waits for you.</text>
+
+  <!-- Machines -->
+  <g transform="translate(24,144)">
+    <rect width="440" height="300" rx="10" fill="#fff" stroke="#e2e2e6"/>
+    <text x="20" y="34" font-weight="700" font-size="16">Machines</text>
+    <text x="20" y="62" fill="#5f6368">3 machines · 2 online · 1 out of date</text>
+    <text x="20" y="104">● bea-mbp</text><text x="240" y="104" fill="#5f6368">macOS · v0.14.0 · 4 running</text>
+    <text x="20" y="136">● build-01</text><text x="240" y="136" fill="#5f6368">Linux · v0.14.0 · 2 running</text>
+    <text x="20" y="168" fill="#b3261e">○ sam-mini</text><text x="240" y="168" fill="#b3261e">Offline 2 h · out of date</text>
+    <text x="20" y="276" fill="#2453d4">All machines ›</text>
+  </g>
+  <!-- Running now -->
+  <g transform="translate(488,144)">
+    <rect width="440" height="300" rx="10" fill="#fff" stroke="#e2e2e6"/>
+    <text x="20" y="34" font-weight="700" font-size="16">Running now</text>
+    <text x="20" y="62" fill="#5f6368">6 agents on 2 machines · $3.84 so far</text>
+    <g fill="#202124">
+      <text x="20" y="104">Claude · api · fix login redirect</text><text x="340" y="104" fill="#5f6368">12 m · $0.92</text>
+      <text x="20" y="136">Codex · web · lineage pane</text><text x="340" y="136" fill="#5f6368">40 m · $1.10</text>
+      <text x="20" y="168">Claude · infra · nightly deps</text><text x="340" y="168" fill="#5f6368">3 m · $0.12</text>
+      <text x="20" y="200">Gemini · docs · release notes</text><text x="340" y="200" fill="#5f6368">1 h · $0.80</text>
+      <text x="20" y="232">OpenCode · api · flaky test</text><text x="340" y="232" fill="#5f6368">8 m · $0.20</text>
+    </g>
+    <text x="20" y="276" fill="#2453d4">Live Now ›</text>
+  </g>
+  <!-- Waiting for you -->
+  <g transform="translate(952,144)">
+    <rect width="464" height="300" rx="10" fill="#fff" stroke="#e2e2e6"/>
+    <text x="20" y="34" font-weight="700" font-size="16">Waiting for you</text>
+    <text x="20" y="62" fill="#5f6368">2 sessions · 3 requests</text>
+    <text x="20" y="104">? api · fix login redirect</text><text x="300" y="104" fill="#5f6368">asks which branch</text>
+    <text x="20" y="136">✓ web · lineage pane</text><text x="300" y="136" fill="#5f6368">wants an OK to push</text>
+    <line x1="20" y1="156" x2="444" y2="156" stroke="#eee"/>
+    <text x="20" y="184">1 machine asks to join</text>
+    <text x="20" y="212">1 bot stopped at its cap</text>
+    <text x="20" y="240">1 ask for an MCP server</text>
+    <text x="20" y="276" fill="#2453d4">Agents that need you ›</text><text x="240" y="276" fill="#2453d4">Requests ›</text>
+  </g>
+  <!-- Spend today -->
+  <g transform="translate(24,468)">
+    <rect width="440" height="300" rx="10" fill="#fff" stroke="#e2e2e6"/>
+    <text x="20" y="34" font-weight="700" font-size="16">Spend today</text>
+    <text x="20" y="84" font-size="34" font-weight="700">$41.20</text>
+    <text x="20" y="110" fill="#5f6368">Organisation · 9 people</text>
+    <text x="20" y="160">This month: $612 of $1,500</text>
+    <rect x="20" y="174" width="400" height="10" rx="5" fill="#eceef1"/>
+    <rect x="20" y="174" width="163" height="10" rx="5" fill="#2453d4"/>
+    <rect x="183" y="174" width="120" height="10" fill="#2453d4" opacity="0.3"/>
+    <text x="20" y="208" fill="#5f6368">Forecast $1,180 by 31 October</text>
+    <text x="20" y="276" fill="#2453d4">Reports ▸ Spend ›</text>
+  </g>
+  <!-- Recent activity -->
+  <g transform="translate(488,468)">
+    <rect width="928" height="300" rx="10" fill="#fff" stroke="#e2e2e6"/>
+    <text x="20" y="34" font-weight="700" font-size="16">Recent activity</text>
+    <g fill="#202124">
+      <text x="20" y="72">Bea started Claude in api</text><text x="520" y="72" fill="#5f6368">bea-mbp</text><text x="820" y="72" fill="#5f6368">2 min ago</text>
+      <text x="20" y="102">Nightly (bot) ran workflow “deps”</text><text x="520" y="102" fill="#5f6368">build-01</text><text x="820" y="102" fill="#5f6368">5 min ago</text>
+      <text x="20" y="132">Sam’s machine went offline</text><text x="520" y="132" fill="#5f6368">sam-mini</text><text x="820" y="132" fill="#5f6368">2 h ago</text>
+      <text x="20" y="162">Bea merged PR #412 (cost $2.10)</text><text x="520" y="162" fill="#5f6368">bea-mbp</text><text x="820" y="162" fill="#5f6368">3 h ago</text>
+      <text x="20" y="192">Policy v5 saved by Alex</text><text x="520" y="192" fill="#5f6368">control plane</text><text x="820" y="192" fill="#5f6368">yesterday</text>
+    </g>
+    <text x="20" y="276" fill="#2453d4">Reports ▸ Events ›</text>
+  </g>
+  <text x="24" y="810" fill="#5f6368" font-size="12">Mock for #2141 (structure only; the look is #2142). An admin, 1440 px. A member sees no Requests or People, Spend for Me, and only their own agents.</text>
+</svg>

@@ -63,6 +63,9 @@ public struct ToolCall: Codable, Hashable, Sendable {
     public var name: String?
     public var kind: String?
     public var status: String?
+    /// Still going, by its own status: `pending` or `in_progress` (#2338). A call with no
+    /// status, as from an old host, is not.
+    public var isUnderway: Bool { status == "pending" || status == "in_progress" }
     /// What it produced: diffs, output, blocks of content. Appended as updates arrive,
     /// because a tool call's content comes in pieces and the last piece is not the
     /// whole story.
@@ -170,9 +173,7 @@ public struct ToolCall: Codable, Hashable, Sendable {
         if called.hasSuffix(AppTool.archiveSession) || AppTool.retiredOwnArchive.contains(where: called.hasSuffix) {
             return rawInput?["id"]?.stringValue?.isEmpty ?? true
         }
-        if called.hasSuffix(AppTool.waitForEvent) {
-            return rawInput?["agents"] != nil || (rawInput?["events"] == nil && rawInput?["until_minutes"] != nil)
-        }
+        if called.hasSuffix(AppTool.waitForAgents) || called.hasSuffix(AppTool.checkAgain) { return true }
         return false
     }
 
@@ -201,7 +202,7 @@ public struct ToolCall: Codable, Hashable, Sendable {
     ///
     /// Every one of the app's own tools, because none of them is a question worth
     /// putting to somebody. Suggestions and a read-only pane carry no information to
-    /// decide on; a workflow is answerable *after* it exists, on the project page,
+    /// decide on; a workflow is answerable *after* it exists, on the folder page,
     /// where it can be paused or archived by somebody who has seen what it does. A
     /// sheet in front of the writing would only make the uninformed answer the quick
     /// one — and, under a runtime that asks before every call, would stop the writing

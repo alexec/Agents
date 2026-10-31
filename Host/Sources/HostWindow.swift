@@ -35,6 +35,10 @@ struct HostWindow: View {
                     }
                     relay
                 }
+                if let note = model.mustJoinNote {
+                    Label(note, systemImage: OrgPolicyWords.symbol)
+                        .foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                }
                 if let problem = model.problem {
                     Label(problem, systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
@@ -203,7 +207,7 @@ struct HostWindow: View {
         }
         var parts = ["Running your agents"]
         if let working = model.working { parts.append("\(working) working") }
-        if let projects = model.projects { parts.append("\(projects) project\(projects == 1 ? "" : "s")") }
+        if let folders = model.folders { parts.append("\(folders) folder\(folders == 1 ? "" : "s")") }
         parts.append("Agents Host \(model.version)")
         return parts.joined(separator: " · ")
     }
@@ -375,7 +379,7 @@ struct HostWindow: View {
     private func returnLine(_ name: String) -> String {
         guard let left = model.returnForwarding?.stillToHear, !left.isEmpty else { return "Then you can take that machine down." }
         let names = left.map { member in
-            var said = member.id == HostID.mac.rawValue ? "This Mac" : member.name
+            var said = member.id == MachineRef.mac.rawValue ? "This Mac" : member.name
             if member.online != true, let seen = member.lastSeen {
                 said += ", last connected \(seen.formatted(.relative(presentation: .named)))"
             }
@@ -403,7 +407,7 @@ struct HostWindow: View {
         let left = status.stillToHear
         guard !left.isEmpty else { return "\(date) · everyone has heard" }
         let names = left.map { member in
-            var name = member.id == HostID.mac.rawValue ? "This Mac" : member.name
+            var name = member.id == MachineRef.mac.rawValue ? "This Mac" : member.name
             if member.online != true, let seen = member.lastSeen {
                 name += ", last connected \(seen.formatted(.relative(presentation: .named)))"
             }

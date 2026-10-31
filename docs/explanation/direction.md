@@ -21,9 +21,9 @@ The path a new person takes must be short, and must need only a browser. These a
 
 - Sign up on the web.
 - Get a control plane of their own. They type no command and hold no key.
-- Connect a workspace provider, such as DigitalOcean, Codespaces, Coder or Docker.
+- Connect a machine provider, such as DigitalOcean, Codespaces, Coder or Docker.
 - Pick a repository. A machine starts, clones it with a short-lived token and shows it as
-  a project.
+  a folder.
 - Work in the web page. Add the Mac app, the phone or a desktop machine later, by signing
   in on each.
 
@@ -49,16 +49,33 @@ organisations it serves, changes.
 
 ## Tenancy: what belongs to what
 
-Every record and every folder belongs to exactly one place in this tree:
+Every record and every folder belongs to one organisation and one person:
 
 ```text
 organisation           one control plane store prefix (hosted: one per account)
 └── person             signed in with Google, Apple or GitHub; keyed by (issuer, subject)
     ├── client         a window, phone, iPad or browser; belongs to one person
-    └── machine        started by a provider, or registered; belongs to one person (#1117)
-        └── project    one folder on that machine
-            └── worktree   one checkout of the project, for one agent
+    ├── machine        started by a machine provider, or registered; belongs to one person
+    │                  (#1117)
+    │   └── folder     a place to work on this machine
+    │       └── worktree   one Git checkout of the folder, for one agent
+    └── project        the record that folders join
 ```
+
+A project can include folders on more than one machine. A folder joins a project by naming
+the project's id in its `.agents/folder.json` (#2317). Each folder is in exactly one project.
+The control plane adopts an id that it does not know, so a clone joins with nothing to set.
+
+### Glossary
+
+- **Machine:** a computer that runs agents, such as a Mac, a Linux box or a computer a
+  provider starts.
+- **Machine provider:** an MCP server that makes, starts and stops machines.
+- **Folder:** a folder on one machine where agents work. A folder is not always a Git
+  repository.
+- **Worktree:** one Git checkout of a folder, for one agent.
+- **Project:** the thing people work on. It joins folders across machines and has a
+  tracker, code review, CI and reporting.
 
 - **Organisation.** The control plane's records live under one store prefix,
   `<prefix>/v1/`. One organisation is one prefix. Nothing inside the prefix names the
@@ -68,8 +85,8 @@ organisation           one control plane store prefix (hosted: one per account)
 - **Machine.** A machine belongs to one person. The Unix account is the security boundary:
   two people never share one account or one `agentsd`. A team build server is one person's
   machine, or a bot's.
-- **Project.** A project is a folder on one machine. It is not copied anywhere else.
-  Project settings live in the repository, in `.agents/`.
+- **Folder.** A folder belongs to one machine. Its settings live in the folder's
+  repository, in `.agents/`, when it has a repository.
 
 ### Isolation
 
@@ -87,11 +104,11 @@ organisation           one control plane store prefix (hosted: one per account)
 
 | Data | Where | System of record |
 |---|---|---|
-| People, clients, machines, codes, providers, policy | Control plane store: a folder or an S3 bucket | The store |
+| People, clients, machines, codes, machine providers, policy | Control plane store: a folder or an S3 bucket | The store |
 | Agents, transcripts, usage, time | The machine's data folder | The machine |
 | Person's settings, skills, MCP servers | `~/.agents` on each machine | The machine, synced from the control plane later |
 | Secrets | `~/.agents-secrets`, the Keychain | The machine |
-| Project settings, workflows, pins | `<repo>/.agents/` | Git |
+| Folder settings, workflows, pins | `<repo>/.agents/` | Git |
 
 The store is a key/object store with conditional writes. It is the database. A folder is
 enough for one person, and a bucket is enough for many copies and for hosted. We add no

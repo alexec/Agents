@@ -100,7 +100,7 @@ type Router struct {
 	presenceHeard func(client string, device bool, report json.RawMessage)
 	// A linked host's workspace (#691), laid over its state: a host whose workspace is
 	// stopped is shown stopped, not offline.
-	workspaces map[string]*providers.HostWorkspace
+	workspaces map[string]*providers.MachineWorkspace
 	// Keeps a prompt or agent start for a stopped host (#691 US3); nil where nothing is.
 	keeper keeper
 	// Kept requests asked, in the order they came.
@@ -110,6 +110,10 @@ type Router struct {
 	copier func(host, method, reply string)
 	// The organisation's policy's check of a call to a machine (#998): it reads only memory.
 	policyGate func(host, method string) error
+	// Told of each request a client made, for the metrics and the log (#2176), and of each
+	// notification sent to clients.
+	requested func(caller Caller, host, method string, id json.RawMessage, result string, took time.Duration)
+	sent      func(method string, clients int)
 	// Who a client is (#996): written on each channel it opens, and on each entry the
 	// audit keeps. Told each call passed on or answered here, for the audit. Nil where
 	// there is no audit.
@@ -145,6 +149,9 @@ type clientSession struct {
 	// The capabilities the client said in its auth line (#1748); nil from one older than
 	// that. Each request of a client too old for this control plane is refused.
 	capabilities []string
+	// The host that answers this page's calls itself (#1970), or "": the session ends when
+	// the host is no longer its person's.
+	carriedBy string
 }
 
 // target is who a channel on a host's uplink is for: a client session here, or the other
@@ -207,7 +214,7 @@ func NewRouter(h Handler, log func(string)) *Router {
 		known: map[string]bool{}, relays: map[string]bool{}, states: map[string]hostState{},
 		toldLinks: map[string]bool{}, asks: map[string]*hostAsk{}, keptWaits: map[string]chan *message{}, presence: map[string]notedPresence{}, log: log,
 		peers: map[string]func(string){}, peerLinks: map[string]map[string]bool{},
-		workspaces: map[string]*providers.HostWorkspace{}, rates: newClientRates(), refusals: newRefusalLog(log)}
+		workspaces: map[string]*providers.MachineWorkspace{}, rates: newClientRates(), refusals: newRefusalLog(log)}
 }
 
 // MARK: What it knows
@@ -301,7 +308,7 @@ func (r *Router) SetKeeper(k keeper) {
 }
 
 // Workspace is a linked host's workspace, or nil.
-func (r *Router) Workspace(host string) *providers.HostWorkspace {
+func (r *Router) Workspace(host string) *providers.MachineWorkspace {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.workspaces[host]
@@ -309,7 +316,7 @@ func (r *Router) Workspace(host string) *providers.HostWorkspace {
 
 // SetWorkspace is ControlRouter.setWorkspace: a linked host's workspace changed (its
 // state, a start's phase), or the link went; said to every client when it differs.
-func (r *Router) SetWorkspace(host string, ws *providers.HostWorkspace) {
+func (r *Router) SetWorkspace(host string, ws *providers.MachineWorkspace) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	old := r.workspaces[host]
@@ -421,7 +428,7 @@ func (r *Router) CloseMembers() {
 	}
 }
 
-// SetRelay says whether a host only relays (HostRecord.relay): nil for a host that runs
+// SetRelay says whether a host only relays (MachineRecord.relay): nil for a host that runs
 // agents, false for a relay switched off, true for one relaying. A host found to be a
 // relay has its client channels closed.
 func (r *Router) SetRelay(host string, relay *bool) {
@@ -1224,6 +1231,10 @@ const ForgottenCloseCode = 4403
 
 // detachLocked ends a session: its channels are closed on every host, then its socket.
 func (r *Router) detachLocked(id string, code websocket.StatusCode) {
+	r.detachReasonLocked(id, code, "forgotten")
+}
+
+func (r *Router) detachReasonLocked(id string, code websocket.StatusCode, reason string) {
 	s := r.clients[id]
 	if s == nil {
 		return
@@ -1237,11 +1248,23 @@ func (r *Router) detachLocked(id string, code websocket.StatusCode) {
 		}
 	}
 	if code != 0 {
-		s.conn.CloseWith(code, "forgotten")
+		s.conn.CloseWith(code, reason)
 	} else {
 		s.conn.Close()
 	}
 	r.noteLinkLocked(s.caller.Client)
+}
+
+// CutOffPerson ends every session of a suspended person here, each told why with 4403
+// suspended (#1002, D13). Their clients keep their records and keys.
+func (r *Router) CutOffPerson(person string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for id, s := range r.clients {
+		if s.caller.Person == person {
+			r.detachReasonLocked(id, ForgottenCloseCode, "suspended")
+		}
+	}
 }
 
 // ForgetClient ends every session of a forgotten client, each told why with 4403.
@@ -1486,11 +1509,13 @@ func (r *Router) toHostLocked(host, msg, sessionID string) {
 	// (#1761, FR-031); bots/stopRun is the one way to act on it.
 	if bots, ok := r.owners.(botOwners); ok && r.known[host] && bots.BotMachineFor(s.caller.Person, host) {
 		r.writeLocked(sessionID, s.wrap(host, replyError(m.ID, fail(botMachine, "That machine is a bot's: only its workflows start work there. An admin can stop a run."))))
+		r.noteLocked(s.caller, host, m, "refused")
 		return
 	}
 	// Another user's machine is not found, as one that is not there (FR-018).
 	if !r.known[host] || !r.mayReachLocked(s.caller, host) {
 		r.writeLocked(sessionID, s.wrap(host, replyError(m.ID, fail(noSuchHost, "No machine is called %s.", host))))
+		r.noteLocked(s.caller, host, m, "refused")
 		return
 	}
 	// A host from before the team tier, on a team, would act for every person (R14).
@@ -1504,6 +1529,7 @@ func (r *Router) toHostLocked(host, msg, sessionID string) {
 	if r.policyGate != nil {
 		if refusal := r.policyGate(host, m.Method); refusal != nil {
 			r.writeLocked(sessionID, s.wrap(host, replyError(m.ID, refusal)))
+			r.noteLocked(s.caller, host, m, "refused")
 			return
 		}
 	}
@@ -1539,8 +1565,10 @@ func (r *Router) toHostLocked(host, msg, sessionID string) {
 	if !h.conn.Send(channelFrame(c, msg)) {
 		// An uplink that has ended but is not yet dropped takes nothing: said, not lost (#62).
 		r.writeLocked(sessionID, s.wrap(host, replyError(m.ID, fail(hostOffline, "That machine is offline."))))
+		r.noteLocked(s.caller, host, m, "offline")
 		return
 	}
+	r.noteLocked(s.caller, host, m, "routed")
 	if s.inFlight[host] == nil {
 		s.inFlight[host] = map[string]bool{}
 	}
@@ -1574,6 +1602,30 @@ func (r *Router) MayReach(from Caller, host string) bool {
 
 func (r *Router) mayReachLocked(from Caller, host string) bool {
 	return r.owners == nil || r.owners.OwnerOf(host) == from.Person
+}
+
+// ServesItself says whether a host may answer a person's page itself (#1970): one this
+// router knows, and the person's own (FR-018).
+func (r *Router) ServesItself(person, host string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.known[host] && r.mayReachLocked(Caller{Person: person}, host)
+}
+
+// NoteCarried says a host answers a session's calls itself (#1970), so the session ends
+// once the host is not its person's: at once, if it changed hands meanwhile.
+func (r *Router) NoteCarried(session, host string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	s := r.clients[session]
+	if s == nil {
+		return
+	}
+	if !r.mayReachLocked(s.caller, host) {
+		r.detachLocked(session, 0)
+		return
+	}
+	s.carriedBy = host
 }
 
 // HoldToOwners opens a channel to each machine a session's person owns now, and closes
@@ -1612,6 +1664,11 @@ func (r *Router) HoldToOwners() {
 		if owners == nil {
 			person = ""
 		}
+		// A page its host answers itself is that host's person's alone (#1970).
+		if owner, read := ownerOf[s.carriedBy]; s.carriedBy != "" && read && owner != person {
+			r.detachLocked(id, 0)
+			continue
+		}
 		for host, c := range s.channels {
 			owner, read := ownerOf[host]
 			if !read {
@@ -1639,20 +1696,30 @@ func (r *Router) TellPerson(person, method string, params any) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	line := wrap("", notification(method, params))
+	sent := 0
 	for id, s := range r.clients {
 		if s.wrapped && s.caller.Person == person {
 			r.writeLocked(id, line)
+			sent++
 		}
+	}
+	if r.sent != nil {
+		r.sent(method, sent)
 	}
 }
 
 // broadcastHostLocked tells a machine's change only to the sessions that reach it.
 func (r *Router) broadcastHostLocked(host, method string, params any) {
 	line := wrap("", notification(method, params))
+	sent := 0
 	for id, s := range r.clients {
 		if s.wrapped && r.mayReachLocked(s.caller, host) {
 			r.writeLocked(id, line)
+			sent++
 		}
+	}
+	if r.sent != nil {
+		r.sent(method, sent)
 	}
 }
 
@@ -1669,6 +1736,27 @@ func (r *Router) SetAudit(actorOf func(Caller) *wire.AuditActor, audited func(fr
 	r.mu.Lock()
 	r.actorOf, r.audited = actorOf, audited
 	r.mu.Unlock()
+}
+
+// SetRequested says what is told of each request a client made, and how it ended (#2176).
+func (r *Router) SetRequested(f func(caller Caller, host, method string, id json.RawMessage, result string, took time.Duration)) {
+	r.mu.Lock()
+	r.requested = f
+	r.mu.Unlock()
+}
+
+// SetSent says what is told of each notification sent to clients (#2176).
+func (r *Router) SetSent(f func(method string, clients int)) {
+	r.mu.Lock()
+	r.sent = f
+	r.mu.Unlock()
+}
+
+// noteLocked tells requested of a request to a machine, if it is one.
+func (r *Router) noteLocked(caller Caller, host string, m *message, result string) {
+	if r.requested != nil && m.isRequest() {
+		r.requested(caller, host, m.Method, m.ID, result, 0)
+	}
 }
 
 // SetPolicyGate says what checks each call to a machine against the policy (#998).
@@ -1700,8 +1788,17 @@ func (r *Router) toControl(msg, sessionID string, wrapped bool) {
 		return
 	}
 	caller := s.caller
+	requested := r.requested
 	go func() {
+		start := time.Now()
 		result, err := r.handler.Handle(m.Method, m.Params, caller)
+		if requested != nil {
+			outcome := "ok"
+			if err != nil {
+				outcome = "error"
+			}
+			requested(caller, "", m.Method, m.ID, outcome, max(time.Since(start), time.Nanosecond))
+		}
 		line := ""
 		if err != nil {
 			line = replyError(m.ID, err)
@@ -1755,19 +1852,29 @@ func (r *Router) BroadcastControlEach(method string, params func(person string) 
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	sent := 0
 	for id, s := range r.clients {
 		if line, ok := lines[s.caller.Person]; ok && s.wrapped {
 			r.writeLocked(id, line)
+			sent++
 		}
+	}
+	if r.sent != nil {
+		r.sent(method, sent)
 	}
 }
 
 func (r *Router) broadcastControlLocked(method string, params any) {
 	line := wrap("", notification(method, params))
+	sent := 0
 	for id, s := range r.clients {
 		if s.wrapped {
 			r.writeLocked(id, line)
+			sent++
 		}
+	}
+	if r.sent != nil {
+		r.sent(method, sent)
 	}
 }
 

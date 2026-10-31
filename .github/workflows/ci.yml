@@ -19,9 +19,13 @@ on:
 permissions:
   contents: read
 
+# A newer push cancels a pull request's run, but never a run on main (#2218). When each
+# merge cancelled the one before it, a busy main finished no run for six hours and the
+# release could not tag. GitHub keeps one running and at most one pending run per group,
+# and a newer push replaces the pending one, so a burst of merges costs one extra run.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   # Which macOS jobs this run needs (#594), on a runner that is never short. Most of a
@@ -32,10 +36,8 @@ jobs:
   # selection steps still choose the suites; this only decides whether they start, and
   # if it fails they start anyway.
   #
-  # On a push to main it waits first (#595): every merge starts a run, the next merge
-  # cancels it (the concurrency group above), and each cancelled run used to hold two
-  # macOS runners until then. Waiting here lets a burst of merges cancel each other on
-  # this runner, so only the last takes macOS runners.
+  # A push to main no longer waits here first (#595, removed by #2218): a run on main is
+  # not cancelled now, so the wait only made every main run five minutes slower.
   select:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -45,10 +47,6 @@ jobs:
       codetext: ${{ steps.test-selection.outputs.codetext }}
       go: ${{ steps.test-selection.outputs.go }}
     steps:
-      - name: Let a burst of merges settle
-        if: github.event_name == 'push'
-        run: sleep 300
-
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
@@ -212,6 +210,11 @@ jobs:
           }
           clean_retry "$RESTORED" build/DD -- build
 
+      # arm64 only. A generic simulator destination builds every simulator arch, so the
+      # Remote, its widget and AgentsKitCore were compiled a second time for x86_64, a
+      # slice nothing runs on these Apple Silicon runners and nothing ships: in October
+      # 2026 that was about half of this step's 3–6.5 minutes, the longest pole of a
+      # pull request's run. The sources compiled are the same either way.
       - name: Build Remote (iOS Simulator)
         id: build-remote
         env:
@@ -221,7 +224,7 @@ jobs:
           clean_retry "$RESTORED" build/DD -- \
             xcodebuild build -project Agents.xcodeproj -scheme Remote \
             -destination 'generic/platform=iOS Simulator' -derivedDataPath build/DD \
-            -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO
+            -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO ARCHS=arm64
 
       # Only when both app builds actually ran. They are skipped whenever an earlier
       # step fails, and a skipped step used to read as "not successful", so a job that
@@ -534,21 +537,93 @@ jobs:
     if: ${{ always() && !cancelled() && (needs.select.result != 'success' || needs.select.outputs.go != 'skip') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: write
     defaults:
       run:
         working-directory: Go
     steps:
       - uses: actions/checkout@v6
+      # The build cache is our own below, not setup-go's (#2512). setup-go keys it on go.mod
+      # alone, so it held whatever the first run after a go.mod change compiled: by the
+      # afternoon `go test -race` spent 98 s compiling before its first result (run
+      # 39980533674), the job's second-longest part after the controlplane tests.
       - uses: actions/setup-go@v6
         with:
           go-version-file: Go/go.mod
-          cache-dependency-path: Go/go.mod
+          cache: false
+      # Keyed on the Go sources, so each run that changes them saves a key of its own, and a
+      # pull request starts from its own newest, else main's (it can read main's caches, not
+      # another PR's). Go's build cache is content-addressed: an old entry is never used
+      # for new sources, so a restore from an older tree is only less warm, never wrong.
+      # go.mod names the toolchain, so a new Go misses the first prefix.
+      - name: Restore Go build cache
+        id: go-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-race-${{ runner.os }}-${{ hashFiles('Go/go.mod', 'Go/go.sum') }}-${{ hashFiles('Go/**/*.go') }}
+          restore-keys: |
+            go-race-${{ runner.os }}-${{ hashFiles('Go/go.mod', 'Go/go.sum') }}-
+            go-race-${{ runner.os }}-
       - name: Build
         run: go build ./...
       - name: Vet
         run: go vet ./...
       - name: Test
-        run: go test -race ./...
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF" == refs/heads/main ]]; then
+            go test -race -coverprofile=coverage.out ./... | tee "$RUNNER_TEMP/go-coverage-tests.txt"
+          else
+            go test -race ./...
+          fi
+      - name: Report Go coverage
+        if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          {
+            echo '### Go coverage by package'
+            echo '| Package | Coverage |'
+            echo '|---|---:|'
+            awk '/coverage:/ { print "| " $2 " | " $(NF - 2) " |" }' \
+              "$RUNNER_TEMP/go-coverage-tests.txt"
+            if [[ -f coverage.out ]]; then
+              echo
+              echo '### Go coverage total'
+              go tool cover -func=coverage.out | tail -n 1
+            else
+              echo 'Coverage profile not available (tests may have been skipped or failed before producing one).'
+            fi
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload Go coverage profile
+        if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v5
+        with:
+          name: go-coverage
+          path: Go/coverage.out
+          if-no-files-found: ignore
+          retention-days: 14
+      # A failed test still leaves good compiled packages; a cancelled run may not finish
+      # writing, so it saves nothing. Each ref keeps only its newest, as the Xcode caches do.
+      - name: Save Go build cache
+        if: ${{ always() && !cancelled() && steps.go-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-race-${{ runner.os }}-${{ hashFiles('Go/go.mod', 'Go/go.sum') }}-${{ hashFiles('Go/**/*.go') }}
+      - name: Prune old Go build caches for this ref
+        if: ${{ always() && !cancelled() && steps.go-cache.outputs.cache-hit != 'true' }}
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/prune-ci-caches.sh "go-race-${{ runner.os }}-" "go-race-${{ runner.os }}-${{ hashFiles('Go/go.mod', 'Go/go.sum') }}-${{ hashFiles('Go/**/*.go') }}" "$GITHUB_REF"
 
   # Mixed versions (#1767): the last release's agentsd joined to this tree's control plane,
   # and the last release's control plane with this tree's client, as a person meets them
@@ -609,13 +684,40 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run build
       - run: npm run check
-      - run: npm test
+      - name: Test with coverage
+        run: |
+          mkdir -p coverage/v8
+          NODE_V8_COVERAGE=coverage/v8 node --experimental-test-coverage \
+            --test test/*.test.mjs 2>&1 | tee "$RUNNER_TEMP/web-coverage.txt"
+      - name: Report web coverage
+        if: always()
+        continue-on-error: true
+        run: |
+          {
+            echo '### Web coverage'
+            if [[ -f "$RUNNER_TEMP/web-coverage.txt" ]]; then
+              sed -n '/^ℹ file /,$p' "$RUNNER_TEMP/web-coverage.txt" || cat "$RUNNER_TEMP/web-coverage.txt"
+            else
+              echo 'Coverage report not available (tests did not start).'
+            fi
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload web coverage profiles
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v5
+        with:
+          name: web-coverage
+          path: Web/coverage/v8/*.json
+          if-no-files-found: ignore
+          retention-days: 14
 
-  # The linters (#1224), through scripts/lint.sh, on every change: shellcheck, zsh -n and our
-  # own text checks are required (a finding fails the job); ruff, Biome and SwiftLint report
-  # their findings in the job's summary, and which are in this change's files, without failing,
-  # as do golangci-lint and govulncheck. Their old findings are listed in
-  # .agents/reviews/lint-2026-10-17.md. The pinned binaries are cached, and golangci-lint's
+  # The linters (#1224), through scripts/lint.sh, on every change: shellcheck, zsh -n, our
+  # own text checks, and golangci-lint's unused and ineffassign (#2162) are required (a
+  # finding fails the job). ruff, Biome, SwiftLint, jscpd, govulncheck and the other
+  # golangci-lint rules report findings in the job's summary, and which are in this
+  # change's files, without failing. Their old findings are listed in
+  # .agents/reviews/lint-2026-10-17.md; jscpd's first report is in
+  # .agents/reviews/lint-dupes-2026-10-23.md. The pinned binaries are cached, and golangci-lint's
   # analysis with them. It runs beside the macOS jobs, which take longer, so it does not make a
   # merge wait.
   #
@@ -646,7 +748,7 @@ jobs:
           restore-keys: golangci-lint-
       - name: Tools
         run: |
-          scripts/lint.sh --tools ~/.cache/lint-tools shellcheck ruff biome swiftlint golangci-lint govulncheck
+          scripts/lint.sh --tools ~/.cache/lint-tools shellcheck ruff biome swiftlint jscpd golangci-lint govulncheck
           echo ~/.cache/lint-tools >> "$GITHUB_PATH"
       - name: Lint
         env:

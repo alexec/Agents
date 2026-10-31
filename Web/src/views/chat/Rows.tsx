@@ -7,7 +7,7 @@ import { createContext } from "preact";
 import { useContext, useEffect, useRef } from "preact/hooks";
 import type {
   AgentState, BackgroundItem, ContentBlock, EndedReason, FileReading, JSONValue, Plan, ToolCall, ToolCallContent, ToolCallLocation,
-  SandboxFailureRecord, SwitchRecord, TranscriptEntry, WorkReport,
+  PolicySetBy, SandboxFailureRecord, SwitchRecord, TranscriptEntry, WorkReport,
 } from "../../protocol/generated";
 import { lineDiff } from "../../model/diff";
 import { Lines } from "../Changes";
@@ -20,9 +20,12 @@ import {
 import { fileLinkPath, Markdown } from "../../render/markdown";
 import { AppView } from "./AppView";
 import { FileCard } from "./FileCard";
+import { noticeClock, noticeOutcome } from "../../model/notified";
+import { fromWireDate } from "../../protocol/dates";
 import type { Shown } from "../../model/shownFile";
 import { switchNote } from "../../model/switchNote";
 import { continueWithout, keepStopped, sandboxCard } from "../../model/sandboxWords";
+import { OrgPolicyLine } from "../OrgPolicyLine";
 import { memo } from "../../render/memo";
 
 /** The text of a message's blocks: text blocks as Markdown, anything else named. */
@@ -55,6 +58,7 @@ export function Blocks({ blocks, text }: { blocks: ContentBlock[] | undefined; t
 const stopWords: Partial<Record<EndedReason, string>> = {
   cancelled: "You stopped it",
   stoppedByAgent: "The agent that started it stopped it",
+  stoppedByAdmin: "An admin stopped it in the Console",
   processDied: "The runtime crashed",
   signInRefused: "Its sign-in was refused",
   runtimeError: "The runtime reported an error",
@@ -131,6 +135,8 @@ export interface CallActions {
   showEdit: (diff: Extract<ToolCallContent, { type: "diff" }>, toolCallID: string | undefined) => void;
   /** The sandbox failure the open agent waits on an answer to (Agent.pendingSandboxFailure, #253). */
   waitingSandbox?: SandboxFailureRecord | undefined;
+  /** The organisation's mark while its policy requires the sandbox (#998): no Continue without sandbox. */
+  sandboxSetBy?: PolicySetBy | undefined;
   answerSandbox?: ((carryOn: boolean) => Promise<void>) | undefined;
   /** Open a subagent's own steps (ChatActions.subagentSteps, #544). */
   subagentSteps?: ((item: BackgroundItem) => void) | undefined;
@@ -173,7 +179,7 @@ export function ToolCallLine({ call, text, focused = false, background, onClick 
     ? " · running in the background" : "";
   const hasDetail = (call.content ?? []).length > 0 || (call.locations ?? []).length > 0
     || call.rawInput !== undefined || call.rawOutput !== undefined;
-  const line = (text ?? callLine(call)) + runsOn;
+  const words = (text ?? callLine(call)) + runsOn;
   const showsDetail = expanded.value;
   return (
     <div class="call">
@@ -181,9 +187,9 @@ export function ToolCallLine({ call, text, focused = false, background, onClick 
         <button class="call-line" aria-expanded={onClick ? undefined : showsDetail}
           title={onClick ? "Show the whole run" : showsDetail ? "Hide the argument and the return" : "Show the argument and the return"}
           onClick={onClick ?? (() => (expanded.value = !expanded.value))}>
-          {line}
+          {words}
         </button>
-      ) : <p class="call-line">{line}</p>}
+      ) : <p class="call-line">{words}</p>}
       {showsDetail && !onClick && (
         <div class="call-detail">
           {(call.content ?? []).map((piece, index) => {
@@ -267,10 +273,11 @@ function SandboxFailureCard({ record }: { record: SandboxFailureRecord }) {
       <p>{words.body}</p>
       {record.detail && <details><summary class="quiet">Show error details</summary><pre>{record.detail}</pre></details>}
       {(waiting || !record.recoveryOffered) && <p class="quiet">{words.offer}</p>}
+      <OrgPolicyLine mark={actions?.sandboxSetBy} />
       {waiting && (
         <p class="answers">
           <button disabled={sending.value} onClick={() => answer(false)}>{keepStopped}</button>
-          {record.recoveryOffered && (
+          {record.recoveryOffered && !actions?.sandboxSetBy && (
             <button class="prominent" disabled={sending.value} onClick={() => answer(true)}>{continueWithout}</button>
           )}
         </p>
@@ -356,7 +363,7 @@ function entryBody(entry: TranscriptEntry) {
     case "userMessage": {
       const message = fields(entry, "userMessage")!;
       if (message.from === "app") {
-        return <div class="note copyable"><p class="faint">Agents asked</p><div class="quiet"><Blocks blocks={message.blocks} text={message._0} /></div><CopyMessage entry={entry} /></div>;
+        return <div class="note copyable"><p class="faint">From the app</p><div class="quiet"><Blocks blocks={message.blocks} text={message._0} /></div><CopyMessage entry={entry} /></div>;
       }
       if (message.from === "agent") {
         // Another agent's message (#560): the person's bubble, named as the sender's.
@@ -453,6 +460,20 @@ function entryBody(entry: TranscriptEntry) {
       return <AppView call={fields(entry, "appView")!._0} />;
     case "fileShown":
       return <FileCard file={fields(entry, "fileShown")!._0} />;
+    case "notified": {
+      // What the agent told the person (#2805): Shared/UI/Chat/NotifiedLine.swift.
+      const notice = fields(entry, "notified")!._0;
+      return (
+        <div class="notice-line">
+          <span class="notice-bell" aria-hidden="true">🔔︎</span>
+          <div>
+            <p class="notice-title">{notice.title}</p>
+            {notice.body !== undefined && <p class="notice-body">{notice.body}</p>}
+            <p class="quiet-line">{noticeClock(fromWireDate(entry.at))} · {noticeOutcome(notice)}</p>
+          </div>
+        </div>
+      );
+    }
     case "background": {
       // As the window's line: how it started or ended, a failure in the failure tint (#253).
       return <BackgroundEntryLine item={fields(entry, "background")!._0} />;
@@ -499,12 +520,19 @@ function ThoughtLine({ text }: { text: string }) {
   );
 }
 
+/** A running turn's latest call, in one line, until the turn has its outcome (LiveLine). */
+function LiveRunLine({ call }: { call: ToolCall }) {
+  return <p class="live quiet">{turnLine(call)}</p>;
+}
+
 /**
  * An item of a turn: a call a line of its own, anything else as it is drawn (StepRow). A run of
  * calls is its last until it is clicked (#759); gone to from elsewhere, it is opened with its
  * first call (#1315).
  */
-function StepRow({ item, focused = false, background }: { item: Item; focused?: boolean; background: readonly BackgroundItem[] }) {
+function StepRow({ item, focused = false, background }: {
+  item: Item; focused?: boolean; background: readonly BackgroundItem[];
+}) {
   const unrolled = useSignal(false);
   useEffect(() => {
     if (focused) unrolled.value = true;
@@ -518,6 +546,8 @@ function StepRow({ item, focused = false, background }: { item: Item; focused?: 
   }
   const call = fields(item.entry, "toolCall");
   if (call) return <ToolCallLine call={call._0} text={turnLine(call._0)} focused={focused} background={background} />;
+  const thought = fields(item.entry, "agentThought");
+  if (thought) return <div class="entry-mark" data-entry={item.entry.id}><ThoughtLine text={thought.text} /></div>;
   return <EntryRow entry={item.entry} />;
 }
 
@@ -581,7 +611,7 @@ export const TurnView = memo(function TurnView({ turn, focusedRun, fetched, fetc
       ) : (
         <>
           {parts?.live && (parts.live.kind === "run"
-            ? <p class="live quiet">{turnLine(parts.live.calls[parts.live.calls.length - 1]!)}</p>
+            ? <LiveRunLine call={parts.live.calls[parts.live.calls.length - 1]!} />
             : <StepRow item={parts.live} background={background} />)}
           {outcome.map((item) => <StepRow key={item.id} item={item} background={background} />)}
         </>

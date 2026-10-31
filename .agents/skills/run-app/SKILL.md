@@ -1,6 +1,6 @@
 ---
 name: run-app
-description: Build, launch and drive this Mac app (Agents) on a scratch set-up of its own (a control plane, this Mac's host and the window), so a change can be seen working without touching the real ones or asking the user to click anything. Use whenever asked to run, start, screenshot, walk or manually verify the app, or whenever a change to App/, Host/, Go/, Remote/ or Packages/AgentsKit needs proving beyond `swift test`. Close everything it started when done ("When you are done"), also when the walk failed.
+description: Build, launch and drive this Mac app (Agents) on a scratch set-up of its own (a control plane, this Mac's host and the window), so a change can be seen working without touching the real ones or asking the user to click anything. Use whenever asked to run, start, screenshot, walk or manually verify the app, or whenever a change to App/, Host/, Go/, Remote/ or Packages/AgentsKit needs proving beyond `swift test`. Close everything it started and delete the scratch app and its files when done ("When you are done"), also when the walk failed.
 ---
 
 # Run and test this app
@@ -31,9 +31,9 @@ S=.claude/skills/run-app/scripts
 # 1. build and launch on a fresh root (prints ROOT, APP_PID, WINDOW_ID, WINDOW_ON, DAEMON_PID, CONTROL_PID, CONTROL_URL)
 eval "$($S/launch.sh --slug mychange)"        # /tmp/run-mychange
 
-# 2. give it something to work in — you may create scratch projects freely
+# 2. give it something to work in — you may create scratch folders freely
 mkdir -p $ROOT/work && git -C $ROOT/work init -q
-$S/rpc.py $ROOT call projects/add "{\"folder\":\"file://$ROOT/work\"}"
+$S/rpc.py $ROOT call folders/add "{\"folder\":\"file://$ROOT/work\"}"
 
 # 3. drive it and read what came back
 $S/rpc.py $ROOT call agents/list '{"includeArchived":false}'
@@ -61,9 +61,12 @@ worktree's own `build/` and `.build` is still the clean-up, and leaves the cache
 `scripts/build-cache.sh du` shows its size and `prune` bounds it.
 
 Verify only what you touched: the schemes and tests for the paths your branch changes, as
-`merge-wave.sh plan` lists them (an `App/` change needs `AgentsHost` and `AgentsStore`,
-not the Remote or the web page; a `Packages/AgentsKit` change needs its tests filtered
-by `scripts/select-test-suites.sh`). The full suite and every scheme run once, in the wave.
+`.agents/skills/merge-wave/scripts/merge-wave.sh plan <your branch>`, run in your
+worktree, lists them with their commands (#2685): an `App/` or `Host/` change needs
+`AgentsHost` and `AgentsStore`, not the Remote or the web page, so no iOS simulator
+build; a `Remote/` change needs only the Remote; a `Shared/`, `Packages/` or `project.yml`
+change needs both; a `Packages/AgentsKit` change needs its tests filtered by
+`scripts/select-test-suites.sh`. The full suite and every scheme run once, in the wave.
 
 Then it:
 1. starts `agents-control serve --home $ROOT/control` on a free loopback port, with
@@ -105,8 +108,9 @@ Host.app`.
    `control/control.pid`, which is what `stop.sh` does.
 2. **Always stop what you started**, including when the test failed or you are
    about to hand back. A left-behind window and daemon are the user's problem to
-   find. `stop.sh $ROOT` removes the root too; `stop.sh $ROOT --keep` leaves it
-   for reading and still stops the processes.
+   find. `stop.sh $ROOT` removes the root and its side files too; `stop.sh $ROOT --keep`
+   leaves them for reading and still stops the processes. Run `stop.sh $ROOT` again once
+   you have read a kept root: nothing else deletes it (#2400).
 3. **Keep this session out of what you start** — `launch.sh` does. `open` hands
    this session's environment to the app, and the `CLAUDE_*` variables in it reach
    every runtime the daemon starts; an agent started that way stops authenticating
@@ -120,7 +124,7 @@ Host.app`.
    when nobody is at the keyboard:
    `ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF/1e9)}'`.
 6. **Never seed a root from the real one** (`~/Library/Application Support/Agents`), not
-   its `agents/`, not one record, not `projects.json` or `workflows.json` (#228). A copied
+   its `agents/`, not one record, not `folders.json` or `workflows.json` (#228). A copied
    record carries a real runtime session, worktree and folder: a scratch host that resumed
    copies of live agents once had them merge, archive and start agents in the real repo.
    Seed synthetic agents under the scratch root instead:
@@ -131,7 +135,7 @@ Host.app`.
    runs it.
 7. **A scratch host runs agents only inside its root.** Started on a root that is not the
    real one, `agentsd` refuses a folder outside it (`--allow-outside-root` lifts that), so
-   keep projects under `$ROOT`, as `$ROOT/work` below. It also claims each runtime session
+   keep folders under `$ROOT`, as `$ROOT/work` below. It also claims each runtime session
    it runs in `~/Library/Application Support/Agents Session Locks/`, which every daemon on
    this Mac shares, and will not resume a conversation another daemon holds.
 8. **Never install.** Do not copy the app into `~/Applications`, `/Applications` or
@@ -149,7 +153,7 @@ same protocol the window speaks through the control plane. Every method is in
 
 ```sh
 $S/rpc.py $ROOT call daemon/ping
-$S/rpc.py $ROOT call projects/list
+$S/rpc.py $ROOT call folders/list
 $S/rpc.py $ROOT call agents/transcript '{"agentID":"…"}'
 $S/rpc.py $ROOT watch 60 agent/changed agent/entry --showing <agentID>
 #   notifications as they arrive; an agent's entries and terminal output go only to a
@@ -178,7 +182,7 @@ For anything longer than one call, import it:
 import sys; sys.path.insert(0, ".claude/skills/run-app/scripts")
 from rpc import Client
 c = Client("/tmp/run-mychange")
-c.call("projects/add", {"folder": "file:///tmp/run-mychange/work"})
+c.call("folders/add", {"folder": "file:///tmp/run-mychange/work"})
 agent = c.call("agents/start", {"runtimeID": "claude",
                                 "cwd": "file:///tmp/run-mychange/work",
                                 "prompt": "…"})
@@ -211,7 +215,7 @@ $S/walk.py $ROOT shot /tmp/run-mychange-1.png   # the window, its sheet over it;
 $S/walk.py $ROOT tree 20                        # the accessibility tree, frames as in the shot
 $S/walk.py $ROOT find "Not now"                 # every element whose label holds the text
 $S/walk.py $ROOT press "=Not now"               # AXPress the innermost match (=: whole label)
-$S/walk.py $ROOT unfold proj00                  # a sidebar project, as its chevron does
+$S/walk.py $ROOT unfold proj00                  # a sidebar folder, as its chevron does
 $S/walk.py $ROOT select "Fix the build"         # a sidebar row, as a click selects it
 $S/walk.py $ROOT set "What do you want to do" "Write hello.txt"   # a field, by label or placeholder
 $S/walk.py $ROOT click proj00                   # a click on a label's middle, for a tap gesture
@@ -248,7 +252,7 @@ swift $S/ui.swift dump <APP_PID> 14 # the accessibility tree through the AX serv
 swift $S/ui.swift find <APP_PID> "Start"
 swift $S/ui.swift press <APP_PID> "Start"   # AXPress, no pointer, no focus stolen
 swift $S/ui.swift select <APP_PID> "Agents"  # AXSelected on a list row: picks it
-swift $S/ui.swift unfold <APP_PID> "Agents"  # AXDisclosing on a sidebar project (or fold)
+swift $S/ui.swift unfold <APP_PID> "Agents"  # AXDisclosing on a sidebar folder (or fold)
 ```
 
 `ui.swift` needs Accessibility permission for whatever process runs it, and the AX server
@@ -257,6 +261,36 @@ itself, so `press` (here and in `walk.py`) walks up from a matching label to the
 pressable ancestor. Typing is its weak spot: keystrokes go
 wherever focus is, so use `walk.py set` or `walk.py key`, never `cliclick`-style synthetic
 keys.
+
+### A question card takes a click (#2374)
+
+A view drawn over the transcript took every click once, and no question card could be
+answered; AXPress went round it, so only a click shows it. After a change to the chat pane
+(`ChatTranscript`, `SwipeToShowPane`, a card), walk a card:
+
+```sh
+$S/rpc.py $ROOT start claude $ROOT/work "Call ask_question once with two questions: id 'pick', \
+  prompt 'Which colour?', options Red and Blue; and id 'words', prompt 'Any other words?', \
+  with no options." 300 &
+$S/walk.py $ROOT select "Call ask_question"
+$S/walk.py $ROOT click "=Blue"   # must say "clicked …HostingScrollView…", never "…SwipeAnchorView…"
+```
+
+The click must land in the transcript's scroll view. A SwiftUI Button fires only in a
+key window, and a walk never makes its window key: the walk socket's click reaches the
+Button but does not press it while another app is in front, as on a locked screen. While
+the scratch window is key, the same clicks answer the card: Blue turns the page, a click
+in the box and `key` letters type into it, and Submit's answer is in the transcript as
+`elicitationAnswered`.
+
+A swipe on a session row is the row's, not the chat's (#2459). The detail column, and the
+transcript in it, is laid out under the floating sidebar, so `SwipeAnchor.holds` takes a
+swipe only when what the window hits is in the anchor's own split view column. With the
+screen lease and the scratch window in front, two fingers right to left on another
+session's row must show its Archive action and leave the Exchanged pane shut; the same
+swipe over the transcript must still open it. `walk.py views 60` shows the two columns:
+the `SwipeAnchorView` under one `_NSSplitViewItemViewWrapper`, the sidebar's
+`ListCoreScrollView` under the other.
 
 ### When a full-screen app is in front
 
@@ -322,15 +356,16 @@ $S/walk.py remote key escape                     # put the keyboard away
 $S/walk.py remote scroll --by -600               # as a drag: a following transcript lets go
 $S/walk.py remote press "#BackButton"
 $S/walk.py remote shot /tmp/remote.png
-$S/remote.sh down                                # quits it and shuts the simulator down
+$S/remote.sh down                                # quits and uninstalls it, shuts the simulator down
 ```
 
 `AGENTS_WALK_SIM="iPad Pro 13-inch (M5) (16GB)"` gives a kept iPad simulator of its own.
 Without `--fake` the Remote is not paired: pair it with a scratch control plane's code
 (`code --client`) at launch, `remote.sh up APP -- -pair "$CODE"` (#1287; the sheet's Paste takes
-no press but a finger's). A Remote still paired with an earlier root keeps that pairing: take the
-app out first with `xcrun simctl uninstall "$(remote.sh udid)" com.alexecollins.agents.remote` (terminate it first: a running
-app is not taken out). To open a banner's or widget row's link as a tap would, launch with `-- -open
+no press but a finger's). With `-pair` it takes the app out first, so no pairing with an earlier root
+is kept. APP is the `build/DD-sim` build above, made from this tree: an older Remote may not pair
+with this control plane. When the phone says the code was not taken, `remote.sh log` shows the
+Remote's own log, whose `pairing: failed:` line says why (#2272). To open a banner's or widget row's link as a tap would, launch with `-- -open
 'agents://need?token=…'` (#1367): `simctl openurl` raises "Open in Agents?", which no walk can press. What the walk socket cannot do: the keyboard
 runs in another process, so it is drawn white (`key escape` first, for a full picture);
 `click` at a point, `menu`, `size` and `fold` are the Mac's only; swipes, long presses,
@@ -356,20 +391,73 @@ opens it in headless Chrome. Run it once per press, on the same profile.
    your root's control plane (its `control/control.pid`) with the arguments `launch.sh` used.
 2. Add or update the change's row in its screen's file, `specs/071-web-remote/walks/parity/<screen>.md`: the page's shot, the
    window's shot, and has, partly, lacks or by design.
-3. A gap you don't close in the same branch gets a parity issue, named in the commit.
+3. A gap you don't close in the same branch gets a parity issue, named in the commit, when the row's
+   tier names that client (#2796). A Mac + web row gets no Remote issue: its line is `remote: tier mac+web`.
+
+## Screenshots for Alex (#2811)
+
+A UI enhancement merges only after Alex approves its screenshots on the PR (AGENTS.md,
+"A UI enhancement waits for Alex"). Alex reviews the pictures, not the walk, so take a set
+that shows the change as a person meets it:
+
+- **One shot per state and per client.** The states are the ones the change draws: for
+  example empty, filled, while it works, an error, and a sheet or a card open. Take each
+  state on every client that draws it: the Mac window (`$S/walk.py $ROOT shot`, or
+  `$S/shot.sh $ROOT`), the Remote in the walk simulator (`$S/walk.py remote shot`, with
+  `key escape` first) and the web page in headless Chrome (`cdp.mjs`'s screenshot). The
+  iPad (`AGENTS_WALK_SIM`) only when the change draws differently there. A client that
+  does not have the change gets no shot; the PR says why, as its parity line does.
+- **Name each file `<client>-<state>.png`**, with `mac`, `remote`, `ipad` or `web` and a
+  short state: `mac-empty.png`, `web-error.png`, `remote-question.png`.
+- **Only scratch data.** The repo is public: a scratch root and the fake runtime, never a
+  real name, path, token, session or Alex's own windows. Read each PNG before you push it.
+- **Not a video.** Screenshots are easier to review. Voice mode is the exception: Alex
+  tests it on the installed Mac app, because a scratch app has no microphone or speech.
+
+Put them on the PR with `pr-shots.sh`. It commits them to the orphan branch `screenshots`
+as `pr-<n>/<file>` (so `main` gets no images and you need no worktree), takes away that
+PR's earlier set, and prints a Markdown image line per file:
+
+```sh
+$S/pr-shots.sh 2850 /tmp/run-mychange-shots/*.png > /tmp/run-mychange-shots/body.md
+```
+
+Put the lines under `## Screenshots` in the PR body (`gh pr edit <n> --body-file`). When Alex
+asks for changes, take the whole set again and run it again: Alex sees only the new set.
+The shots go with the root in "When you are done"; keep them under `/tmp/run-<slug>-*`.
 
 ## When you are done
 
-Before you commit, hand back or end your turn, close everything you started. Do this
-also when the walk failed. A scratch app left running is a bug in the lane: a headless
-Chrome from one web walk ran for 20 hours after its PR merged (#1624).
+Before you commit, hand back or end your turn, close everything you started and delete
+the scratch app and its files. Do this also when the walk failed, and as soon as you have
+finished with the app: not when the lane ends. A scratch app left running is a bug in the
+lane: a headless Chrome from one web walk ran for 20 hours after its PR merged (#1624). A
+scratch app left on disk is one too: 264 `/tmp/run-*` items and four worktrees' builds of
+0.7–7 GB each were found waiting on CI and review (#2400).
 
-1. For every root you launched: `$S/stop.sh $ROOT`. It must print `clean`.
-2. If you started the walk simulator: `$S/remote.sh down`.
-3. For every headless Chrome from `Web/test/walk/cdp.mjs`: `await chrome.close()`, then
-   remove its profile, `rm -rf /tmp/run-<slug>-chrome*`.
-4. Check that nothing is left. This must print nothing:
+1. For every headless Chrome from `Web/test/walk/cdp.mjs`: `await chrome.close()`. Its
+   profile, `/tmp/run-<slug>-chrome*`, goes in step 3.
+2. If you started the walk simulator: `$S/remote.sh down`. It uninstalls the Remote too.
+3. For every root you launched: `$S/stop.sh $ROOT`. It must print `clean`. It removes the
+   root and its side files (`/tmp/run-<slug>-*`, `/tmp/run-<slug>.*`: the build log, the
+   shots, the Chrome profiles). A root you kept with `--keep`: run `$S/stop.sh $ROOT` again
+   the moment you have read it.
+4. Check that nothing is left, running or on disk. Both must print nothing:
 
    ```sh
    pgrep -fl -- "--walk run-<slug>|/tmp/run-<slug>"
+   ls -d /tmp/run-<slug>* 2>/dev/null
+   ```
+
+5. After the last walk or screenshot you need, unless you will launch again in this turn,
+   delete the worktree's own build output: the scratch `Agents.app` and Agents Host in
+   `build/DD`, about 2 GB a worktree, and 17 lanes' of it filled the disk (#2346). Do not
+   wait for the lane to end: a rebuild from the shared cache is fast (#234), and a lane
+   that must walk again after review rebuilds. Never in the main checkout, whose
+   `build/DD` the live app may run from. The shared cache in
+   `~/Library/Caches/Agents-build/` stays.
+
+   ```sh
+   [ "$(git rev-parse --git-dir)" != "$(git rev-parse --git-common-dir)" ] &&  # a linked worktree
+     rm -rf build .build Packages/*/.build
    ```

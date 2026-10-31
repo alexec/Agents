@@ -6,7 +6,7 @@ import Foundation
 /// The same file on a Mac and on Linux (058, T044). Nothing in it needs CryptoKit.
 public struct ControlMembership: Codable, Sendable, Hashable {
     public var client: UUID?
-    public var host: HostID?
+    public var host: MachineRef?
     public var controlKey: Data
     public var addresses: [String]
     public var name: String
@@ -20,7 +20,7 @@ public struct ControlMembership: Codable, Sendable, Hashable {
     public var endpoints: [ControlEndpoint]?
     public var epoch: Int?
 
-    public init(client: UUID? = nil, host: HostID? = nil, controlKey: Data, addresses: [String], name: String,
+    public init(client: UUID? = nil, host: MachineRef? = nil, controlKey: Data, addresses: [String], name: String,
                 url: String? = nil, pin: String? = nil, endpoints: [ControlEndpoint]? = nil, epoch: Int? = nil) {
         self.client = client
         self.host = host

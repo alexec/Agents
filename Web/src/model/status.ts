@@ -1,7 +1,8 @@
 // The shape and words beside a session's title: StatusShape (UI/StatusShape.swift) as the Mac's
 // sessions list draws it, ported by hand and held to Fixtures/web/status (research R7).
 import type { Agent, AgentState, EndedReason, WorkOutcome } from "../protocol/generated";
-import { endingIsUnaccountedFor, isWaiting, outcomeNeedsAPerson, projectFolder } from "./groups";
+import { endingIsUnaccountedFor, isWaiting, outcomeNeedsAPerson, folderPath } from "./groups";
+import { runningToolLabel } from "./sidebar";
 
 /** Working is a spinner; the rest are drawn. Only needsYou is ever in colour. */
 export type StatusShape = "working" | "needsYou" | "waiting" | "done" | "stopped";
@@ -10,9 +11,7 @@ export const outcomeHeadings: Record<WorkOutcome, string> = {
   done: "Complete",
   nothing_to_do: "Nothing to do",
   needs_answer: "Waiting on your answer",
-  partly_done: "Partly done",
-  stuck: "Stuck",
-  blocked: "Blocked",
+  waiting: "Waiting",
 };
 
 /** EndedReason.summary: why it stopped, in the window's words. */
@@ -33,13 +32,14 @@ export const endingSummaries: Record<EndedReason, string | null> = {
   rateLimited: "Rate limited, and still limited after retrying",
   sandboxFailed: "Its sandbox could not start",
   imported: "Imported from another set-up, so not run here",
+  stoppedByAdmin: "Stopped by an admin in the Console",
 };
 
 export const comingBackDescription = "Coming back after a restart";
 export const waitingLabel = "Waiting";
 export const startingLabel = "Starting";
 
-const pausedEndings: readonly (EndedReason | undefined)[] = ["cancelled", "stoppedByAgent", "allowanceSpent"];
+const pausedEndings: readonly (EndedReason | undefined)[] = ["cancelled", "stoppedByAgent", "stoppedByAdmin"];
 
 /** StatusShape(row:isComingBack:). */
 export function shapeOf(agent: Agent, isComingBack = false): StatusShape {
@@ -54,7 +54,7 @@ export function shapeOf(agent: Agent, isComingBack = false): StatusShape {
       if (endingIsUnaccountedFor(agent)) return "needsYou";
       if (outcome !== undefined && outcomeNeedsAPerson(outcome)) return "needsYou";
       if (isWaiting(agent)) return "waiting";
-      if (outcome === "blocked") return "needsYou";
+      // Only a question needs the person (#1916).
       return "done";
     case "stopped":
       if (agent.continueWhenBack) return "waiting";
@@ -82,13 +82,23 @@ export function statusWords(agent: Agent, isComingBack = false): string {
   if (state === "finished" && outcome) return outcomeHeadings[outcome];
   if (endingIsUnaccountedFor(agent)) return "Finished without saying how it went";
   switch (state) {
-    case "running": return "Working";
+    // A running tool is named, as the cog draws it (#2261).
+    case "running": return agent.runningTool ? runningToolLabel(agent.runningTool) : "Working";
     case "starting": return startingLabel;
     case "waitingOnUser": return "Waiting on you";
     case "finished": return "Finished";
     case "stopped": return (agent.endedReason && endingSummaries[agent.endedReason]) ?? "Stopped";
     case "archived": return "Archived";
   }
+}
+
+/** What the chat's foot says to a screen reader (#2391): the words of the working line, as text in
+ * one status node that stays put. Empty when idle. */
+export function footStatusWords(agent: Agent, isComingBack = false): string {
+  if (isComingBack) return comingBackDescription;
+  if (agent.state === "running") return agent.runningTool ? runningToolLabel(agent.runningTool) : "Working";
+  if (agent.state === "starting") return "Working";
+  return "";
 }
 
 /** HelperLimit.ordinal: 1st, 2nd, 3rd, 4th, 11th, 21st. */
@@ -104,13 +114,13 @@ export function queuedLabel(position: number | null): string {
 }
 
 /**
- * AgentsModel.queuedLine: a queued helper's place in its project's queue, first in first
+ * AgentsModel.queuedLine: a queued helper's place in its folder's queue, first in first
  * (HelperLimit.queue: oldest started, then by id), among the agents of its host. Null otherwise.
  */
 export function queuedLine(agent: Agent, among: readonly Agent[]): string | null {
   if (agent.state !== "queued") return null;
-  const folder = projectFolder(agent);
-  const queue = among.filter((a) => a.state === "queued" && projectFolder(a) === folder)
+  const folder = folderPath(agent);
+  const queue = among.filter((a) => a.state === "queued" && folderPath(a) === folder)
     .sort((a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const index = queue.findIndex((a) => a.id === agent.id);
   return queuedLabel(index < 0 ? null : index + 1);
@@ -120,4 +130,16 @@ export function queuedLine(agent: Agent, among: readonly Agent[]): string | null
 export function rowStatus(agent: Agent, isComingBack = false): { shape: StatusShape; tinted: boolean; words: string } {
   const shape = shapeOf(agent, isComingBack);
   return { shape, tinted: isTinted(shape), words: statusWords(agent, isComingBack) };
+}
+
+/** The sidebar's one grey line while a session needs you (#1324). */
+export function needsYouLine(agent: Agent, question?: string | null, isComingBack = false): string | null {
+  if (shapeOf(agent, isComingBack) !== "needsYou") return null;
+  if ((agent.state === "waitingOnUser" || agent.report?.outcome === "needs_answer") && question) {
+    const first = question.split(/\r?\n/, 1)[0]?.trim();
+    if (first) return first;
+  }
+  if (agent.state === "stopped" && agent.endedReason) return endingSummaries[agent.endedReason];
+  if (endingIsUnaccountedFor(agent)) return "Finished without saying how it went";
+  return null;
 }

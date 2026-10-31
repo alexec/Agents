@@ -29,7 +29,7 @@ await page.waitFor(`document.querySelector("textarea")`);
 await page.focus("textarea");
 await page.type((await op.call("clients/startPairing", { kind: "browser" })).text);
 await page.press("Connect");
-await page.waitFor(`document.querySelector(".projects .row")`);
+await page.waitFor(`document.querySelector(".folders .row")`);
 
 // What the chat says and how many cards it shows, at every change, on the page's clock, which is
 // the same wall clock as this script's.
@@ -56,7 +56,7 @@ const clickText = (selector, text) => page.eval(`(() => {
   return !!el;
 })()`);
 
-if (!(await clickText(".projects .row", "work"))) throw new Error("no work project");
+if (!(await clickText(".folders .row", "work"))) throw new Error("no work folder");
 await page.waitFor(`document.querySelector(".sessions .section-head")`);
 
 const prompt = [

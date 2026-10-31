@@ -14,15 +14,13 @@ struct AgentRuntimesSettingsView: View {
         Form {
             if let status {
                 Section {
+                    // A runtime the organisation does not allow here: shown, with why (#998).
+                    if let mark = status.setBy { OrgPolicyLine(mark: mark) }
                     RuntimeInstallRow(status: status)
                     // A runtime whose only way in is a key from Settings (Gemini, 046) takes
                     // it here, beside where it is installed. The same key is lent to servers.
                     if CredentialKind.kinds(for: status.id).contains(where: \.isLentOnTheMac) {
                         CredentialRow(runtimeID: status.id, name: status.runtime.name)
-                    }
-                    // Cursor and Grok: permission mode lives here, not under the prompt (061).
-                    if ClientPermissionSettings.supports(status.id) {
-                        ClientPermissionModeRow(runtimeID: status.id, name: status.runtime.name)
                     }
                 } footer: {
                     // Where its allowance stands is on the Runtimes page under Activity, not
@@ -34,18 +32,40 @@ struct AgentRuntimesSettingsView: View {
                     }
                 }
                 .paperListRow()
-                // Assess it (#47): an agent on it works through every group of the app's
-                // tools, and the daemon scores what it did from its own record.
-                Section("Assessment") {
-                    AssessRuntimeRow(runtimeID: status.id, name: status.runtime.name)
-                }
-                .paperListRow()
                 // Its command sandbox (064): a default every agent on it follows, or why
                 // the app has no say.
-                Section("Command sandbox") {
+                Section(LevelWords.sandboxField) {
                     SandboxDefaultRow(runtimeID: status.id, name: status.runtime.name)
                 }
                 .paperListRow()
+                // The answer to permission requests every new agent on it starts with; an
+                // agent can have its own under the prompt (#2658, FR-019).
+                if ClientPermissionSettings.supports(status.id) {
+                    Section(LevelWords.requestsField) {
+                        Picker(LevelWords.requestsField, selection: Binding(
+                            get: { model.clientPermissions.mode(for: status.id) },
+                            set: { mode in
+                                let settings = model.clientPermissions.setting(mode, for: status.id)
+                                Task { await model.setClientPermissions(settings) }
+                            })) {
+                            ForEach([ClientPermissionMode.default, .alwaysApprove], id: \.self) { mode in
+                                Text(LevelWords.requests(mode)).tag(mode)
+                            }
+                        }
+                        .disabled(model.clientPermissions.setBy != nil)
+                        if let mark = model.clientPermissions.setBy { OrgPolicyLine(mark: mark) }
+                        Text("New \(status.runtime.name) agents, workflows and server folders follow this unless one is set otherwise under the prompt.")
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                    }
+                    .paperListRow()
+                }
+                // The person's own pass-through names, a name the policy does not allow dimmed (#998).
+                let names = model.passThrough.names(for: status.id)
+                if !names.isEmpty {
+                    Section(OrgPolicyWords.passThroughTitle) { PassThroughRows(names: names) }
+                        .paperListRow()
+                }
             }
         }
         .paperForm()
@@ -53,6 +73,7 @@ struct AgentRuntimesSettingsView: View {
             await model.refreshRuntimes()
             await model.refreshClientPermissions()
             await model.refreshSandboxSettings()
+            await model.refreshPassThrough()
         }
     }
 
@@ -73,44 +94,6 @@ struct AgentRuntimesSettingsView: View {
     }
 }
 
-/// One permission-mode picker for Cursor or Grok (061). Present even when that runtime
-/// is not installed; it takes effect the next time an agent on it asks.
-private struct ClientPermissionModeRow: View {
-    @Environment(AppModel.self) private var model
-    let runtimeID: String
-    let name: String
-
-    var body: some View {
-        Picker("\(name) permission mode", selection: binding) {
-            Text("Default").tag(ClientPermissionMode.default)
-            Text("Always-approve").tag(ClientPermissionMode.alwaysApprove)
-        }
-        Text(description)
-            .appText(.supporting)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private var binding: Binding<ClientPermissionMode> {
-        Binding(
-            get: { model.clientPermissions.mode(for: runtimeID) },
-            set: { mode in
-                guard ClientPermissionSettings.supports(runtimeID) else { return }
-                let settings = model.clientPermissions.setting(mode, for: runtimeID)
-                Task { await model.setClientPermissions(settings) }
-            })
-    }
-
-    private var description: String {
-        switch model.clientPermissions.mode(for: runtimeID) {
-        case .default:
-            return "Asks before \(name) does something that needs permission."
-        case .alwaysApprove:
-            return "Answers every permission request for you. Questions that are not permission still wait."
-        }
-    }
-}
-
 /// A runtime's command sandbox default (064, FR-001, FR-014). A runtime the app cannot reach
 /// shows its state and the reason instead of a control.
 private struct SandboxDefaultRow: View {
@@ -123,13 +106,18 @@ private struct SandboxDefaultRow: View {
         let entry = SandboxCatalog.entry(for: runtimeID)
         if choices.isEmpty {
             LabeledContent("Default", value: stateWords(entry))
+            // No sandbox the app can vouch for, so the organisation's rule refuses it (#998).
+            if let mark = model.sandboxSettings.setBy { OrgPolicyLine(mark: mark) }
             if let why = entry?.why { supporting(why) }
         } else {
             Picker("Default", selection: binding) {
                 ForEach(choices, id: \.self) { choice in
+                    // While the organisation requires the sandbox, only On is in force (#998): the rest shown, not chosen.
                     Text(SandboxWords.choice(choice, runtimeID: runtimeID)).tag(choice)
+                        .disabled(isRefused(choice))
                 }
             }
+            if let mark = model.sandboxSettings.setBy { OrgPolicyLine(mark: mark) }
             supporting(SandboxWords.explanation(model.sandboxSettings.choice(for: runtimeID),
                                                 runtimeID: runtimeID, name: name))
             if let why = entry?.why { supporting(why) }
@@ -137,11 +125,15 @@ private struct SandboxDefaultRow: View {
         }
     }
 
+    private func isRefused(_ choice: SandboxChoice) -> Bool {
+        model.sandboxSettings.setBy != nil && choice != .on
+    }
+
     private func stateWords(_ entry: SandboxCatalog.Entry?) -> String {
         if case .fixed(let state) = entry?.route {
-            return state == .none ? "No sandbox" : "Runtime controlled"
+            return LevelWords.sandbox(state == .none ? .off : .runtime)
         }
-        return "Runtime controlled"
+        return LevelWords.sandbox(.runtime)
     }
 
     private func supporting(_ text: String) -> some View {
@@ -155,57 +147,5 @@ private struct SandboxDefaultRow: View {
         Binding(
             get: { model.sandboxSettings.choice(for: runtimeID) },
             set: { choice in Task { await model.setSandboxDefault(choice, for: runtimeID) } })
-    }
-}
-
-/// "Assess…" (#47): pick a project on this Mac, and an agent on this runtime is started there
-/// with the assessment's steps, on the cheapest model the runtime offers. Its report
-/// goes to `.agents/reviews/runtimes/` in that project, and the app's own score into its
-/// conversation when it ends.
-private struct AssessRuntimeRow: View {
-    @Environment(AppModel.self) private var model
-    let runtimeID: String
-    let name: String
-    @State private var refusal: String?
-    @State private var starting = false
-
-    private var projects: [DaemonAPI.ProjectSummary] {
-        model.projects.filter { $0.host == .mac && $0.exists && $0.project.archivedAt == nil }
-    }
-
-    var body: some View {
-        LabeledContent {
-            Menu("Assess…") {
-                ForEach(projects) { summary in
-                    Button(summary.name) { assess(in: summary.project.folder) }
-                }
-            }
-            .menuStyle(.button)
-            .fixedSize()
-            .disabled(projects.isEmpty || starting)
-        } label: {
-            Text("Check \(name) with the app’s tools")
-        }
-        Text("Starts an agent on \(name) that works through the app’s tools — ending a turn, questions, "
-             + "files, helpers, leases, events and workflows — and writes a report. The app "
-             + "scores it from its own record. It asks you two short questions.")
-            .appText(.supporting)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-        if let refusal {
-            Text(refusal)
-                .appText(.supporting)
-                .foregroundStyle(StateTint.failure.style(or: .primary))
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    private func assess(in folder: URL) {
-        starting = true
-        refusal = nil
-        Task {
-            refusal = await model.assessRuntime(runtimeID, in: folder)
-            starting = false
-        }
     }
 }

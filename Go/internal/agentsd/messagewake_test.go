@@ -59,7 +59,7 @@ func TestMessageWakesOnlyAnAgentNoLooser(t *testing.T) {
 	held := func(c *mcpClient, n int, to string, why string, target wire.UUID) {
 		t.Helper()
 		text, isErr := c.tool(n, "message_session", map[string]any{"to": to, "message": "do the work"})
-		if isErr || text != "Sent to “"+to+"”, but it waits in that chat until the person speaks to it: "+why+"." {
+		if isErr || text != "Sent to “"+to+"”, but it waits in that chat until the person speaks to it: "+why+"."+queuedMessageNote {
 			t.Fatal(text)
 		}
 		a := d.Store.Agent(target)
@@ -70,7 +70,7 @@ func TestMessageWakesOnlyAnAgentNoLooser(t *testing.T) {
 	woken := func(c *mcpClient, n int, to string, target wire.UUID) {
 		t.Helper()
 		text, isErr := c.tool(n, "message_session", map[string]any{"to": to, "message": "do the work"})
-		if isErr || text != "Sent to “"+to+"”, which is working on it now. A reply, if it sends one, comes to this session as a message." {
+		if isErr || text != "Sent to “"+to+"”, which is working on it now. A reply, if it sends one, comes to this session as a message."+queuedMessageNote {
 			t.Fatal(text)
 		}
 		waitFor(t, "the message in "+to+"'s chat", func() bool {
@@ -181,7 +181,7 @@ func TestMessageWakesTheSessionThatSetTheSenderGoing(t *testing.T) {
 	}
 	delivered := func(from wire.UUID, to string, target wire.UUID) {
 		t.Helper()
-		if text := send(from, to); text != "Sent to “"+to+"”, which is working on it now. A reply, if it sends one, comes to this session as a message." {
+		if text := send(from, to); text != "Sent to “"+to+"”, which is working on it now. A reply, if it sends one, comes to this session as a message."+queuedMessageNote {
 			t.Fatal(text)
 		}
 		waitFor(t, "the message in "+to+"'s chat", func() bool {
@@ -192,7 +192,7 @@ func TestMessageWakesTheSessionThatSetTheSenderGoing(t *testing.T) {
 	}
 	held := func(from wire.UUID, to string, target wire.UUID, why string) {
 		t.Helper()
-		if text := send(from, to); text != "Sent to “"+to+"”, but it waits in that chat until the person speaks to it: "+why+"." {
+		if text := send(from, to); text != "Sent to “"+to+"”, but it waits in that chat until the person speaks to it: "+why+"."+queuedMessageNote {
 			t.Fatal(text)
 		}
 		a := d.Store.Agent(target)

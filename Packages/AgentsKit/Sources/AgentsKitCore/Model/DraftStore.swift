@@ -2,7 +2,7 @@ import Foundation
 
 /// Where half-typed prompts are kept across a relaunch (025 US5).
 ///
-/// In `UserDefaults`, where the window already keeps the selected project and the
+/// In `UserDefaults`, where the window already keeps the selected folder and the
 /// sidebar's width — not under the daemon's root, which promises the daemon is its only
 /// writer. A draft is not the work: it is what one person has half-typed in front of one
 /// app, and the daemon is never told about it.

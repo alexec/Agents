@@ -3,7 +3,7 @@
 import type { Agent, Attachment } from "../protocol/generated";
 
 export const missingFolderLabel = "Folder is missing";
-export const continueInProjectLabel = "Continue in the project folder";
+export const continueInFolderLabel = "Continue in the folder";
 export const recreateWorktreeLabel = "Recreate the worktree";
 
 /** Marked by the host, which looks on its heartbeat and before every send. */

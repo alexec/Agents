@@ -24,7 +24,7 @@ import (
 // Every MCP server in the host's mcp.json files and how each is doing (#753). A server not
 // hosted is checked as a session would reach it (mcpclient.go): as the host starts, when
 // its entry changes (the files are read once a minute), every four hours, and on Check
-// Now. A project's server not approved here, and one missing a secret, are never started.
+// Now. A folder's server not approved here, and one missing a secret, are never started.
 // A hosted server's state is its one copy's; a short check of it only learns what it
 // declares, for its levels (#1428), when its entry changes and every four hours.
 //
@@ -69,14 +69,11 @@ type mcpDue struct {
 	server          sdk.McpServer
 }
 
-// mcpLevels is a row's five levels from what its check found, and whether Agents made it.
+// mcpLevels is a row's five levels from what its check found; Tested is known for ours.
 func mcpLevels(h *wire.MCPServerHealth, e mcpEntry, kept *mcpHealthResult) {
 	ours, made := mcpcatalog.Ours{}, false
 	if e.server.Stdio != nil {
 		ours, made = mcpcatalog.OursByCommand(e.server.Stdio.Command)
-	}
-	if made {
-		h.MadeByAgents = &made
 	}
 	if kept != nil && kept.check == wire.MCPCheckStateAnswered {
 		levels := mcpcatalog.Levels(kept.declared, made && ours.Tested != "")
@@ -84,11 +81,11 @@ func mcpLevels(h *wire.MCPServerHealth, e mcpEntry, kept *mcpHealthResult) {
 	}
 }
 
-func healthID(project *string, name string) string {
-	if project == nil {
+func healthID(folder *string, name string) string {
+	if folder == nil {
 		return "~|" + name
 	}
-	return *project + "|" + name
+	return *folder + "|" + name
 }
 
 // StartMCPHealth checks the servers now, then looks again every minute: once, after the
@@ -117,18 +114,18 @@ func (d *Daemon) mcpHealthSnapshot() wire.MCPHealthSnapshot {
 }
 
 // mcpHealthCheck is mcp/health/check: Check Now on one file's servers.
-func (d *Daemon) mcpHealthCheck(project *string) wire.MCPHealthSnapshot {
+func (d *Daemon) mcpHealthCheck(folder *string) wire.MCPHealthSnapshot {
 	snap, _ := d.mcpHealthPass()
 	d.healthMu.Lock()
 	for _, s := range snap.Servers {
-		if !s.Hosted && ((project == nil && s.Project == nil) || (project != nil && s.Project != nil && *s.Project == *project)) {
-			d.forced[healthID(s.Project, s.Name)] = true
+		if !s.Hosted && ((folder == nil && s.Folder == nil) || (folder != nil && s.Folder != nil && *s.Folder == *folder)) {
+			d.forced[healthID(s.Folder, s.Name)] = true
 		}
 	}
 	d.healthMu.Unlock()
 	which := "personal"
-	if project != nil {
-		which = "project"
+	if folder != nil {
+		which = "folder"
 	}
 	log.Printf("mcp health: check now (%s)", which)
 	d.reconcileMCPHealth()
@@ -160,7 +157,7 @@ func (d *Daemon) reconcileMCPHealth() {
 			d.running[item.id] = true
 			delete(d.forced, item.id)
 			for i := range snap.Servers {
-				if healthID(snap.Servers[i].Project, snap.Servers[i].Name) == item.id && !snap.Servers[i].Hosted {
+				if healthID(snap.Servers[i].Folder, snap.Servers[i].Name) == item.id && !snap.Servers[i].Hosted {
 					snap.Servers[i].Check = wire.MCPCheckStateChecking
 				}
 			}
@@ -235,7 +232,7 @@ func serverDigest(s sdk.McpServer) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// mcpHealthPass is one look at every file: the person's servers, then each project's, by
+// mcpHealthPass is one look at every file: the person's servers, then each folder's, by
 // path; with what each last check found, and the checks that are due.
 func (d *Daemon) mcpHealthPass() (wire.MCPHealthSnapshot, []mcpDue) {
 	snap := wire.MCPHealthSnapshot{Servers: []wire.MCPServerHealth{}, Problems: []wire.MCPHealthFileProblem{}, At: now()}
@@ -248,15 +245,15 @@ func (d *Daemon) mcpHealthPass() (wire.MCPHealthSnapshot, []mcpDue) {
 		d.results, d.running, d.forced = map[string]mcpHealthResult{}, map[string]bool{}, map[string]bool{}
 	}
 	listed := map[string]bool{}
-	row := func(e mcpEntry, project *string, cwd string, waiting bool) {
-		h := wire.MCPServerHealth{Name: e.name, Project: project, Transport: e.kind, Hosted: e.hosted, Check: wire.MCPCheckStateUnchecked}
-		id := healthID(project, e.name)
+	row := func(e mcpEntry, folder *string, cwd string, waiting bool) {
+		h := wire.MCPServerHealth{Name: e.name, Folder: folder, Transport: e.kind, Hosted: e.hosted, Check: wire.MCPCheckStateUnchecked}
+		id := healthID(folder, e.name)
 		listed[id] = true
 		mcpLevels(&h, e, nil)
 		filled, gone := filledServer(e.server, secrets)
 		switch {
 		case e.hosted:
-			h.Live = d.hostedStatus(project, e.name)
+			h.Live = d.hostedStatus(folder, e.name)
 			if waiting || len(gone) > 0 {
 				break
 			}
@@ -311,9 +308,9 @@ func (d *Daemon) mcpHealthPass() (wire.MCPHealthSnapshot, []mcpDue) {
 		}
 	}
 	var folders []string
-	for _, p := range d.projects(false) {
-		if p.Project.ArchivedAt == nil {
-			folders = append(folders, store.FolderPath(p.Project.Folder))
+	for _, p := range d.folders(false) {
+		if p.Folder.ArchivedAt == nil {
+			folders = append(folders, store.FolderPath(p.Folder.Folder))
 		}
 	}
 	sort.Strings(folders)
@@ -324,7 +321,7 @@ func (d *Daemon) mcpHealthPass() (wire.MCPHealthSnapshot, []mcpDue) {
 		entries, problem := readMCPFile(filepath.Join(folder, ".agents", "mcp.json"))
 		f := folder
 		if problem != "" {
-			snap.Problems = append(snap.Problems, wire.MCPHealthFileProblem{Project: &f, Message: problem})
+			snap.Problems = append(snap.Problems, wire.MCPHealthFileProblem{Folder: &f, Message: problem})
 		}
 		for _, e := range entries {
 			row(e, &f, folder, approved == nil || approved[mcpApprovalKey(folder, e.name)] != entryDigest(e.raw))
@@ -349,6 +346,6 @@ func (d *Daemon) registerMCP() {
 		return d.mcpHealthSnapshot(), nil
 	}
 	On(d, wire.CallMCPHealthCheck, func(ctx context.Context, c *Client, r wire.MCPHealthCheckRequest) (wire.MCPHealthSnapshot, error) {
-		return d.mcpHealthCheck(r.Project), nil
+		return d.mcpHealthCheck(r.Folder), nil
 	})
 }

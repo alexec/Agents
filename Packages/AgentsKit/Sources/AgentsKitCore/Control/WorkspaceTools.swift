@@ -4,15 +4,13 @@ import Foundation
 /// delete, relayed by the agent's daemon to its control plane on channel 0, which answers
 /// them as a client's would. Making and deleting ask the person first, on the daemon.
 public extension DaemonAPI.Method {
-    /// `WorkspaceToolRequest` → `{note}` or `{result}`: an agent's call, by its token.
-    static let agentsWorkspaces = "agents/workspaces"
-    /// `HostWorkspaceCall`, a host to its control plane on channel 0.
-    static let hostWorkspaces = "host/workspaces"
-    /// `{}` → `AgentWorkspaces`: what an agent is shown, never a secret's name.
-    static let workspacesForAgent = "workspaces/forAgent"
-    /// What an agent may ask of the control plane through `host/workspaces`.
+    /// `MachineWorkspaceCall`, a host to its control plane on channel 0.
+    static let hostMachines = "host/machines"
+    /// `{}` → `AgentMachines`: what an agent is shown, never a secret's name.
+    static let machinesForAgent = "machines/forAgent"
+    /// What an agent may ask of the control plane through `host/machines`.
     static let agentWorkspaceMethods: Set<String> = [
-        workspacesForAgent, hostsStart, hostsStop, providersOptions, providersCreate, hostsDeleteWorkspace,
+        machinesForAgent, hostsStart, hostsStop, providersOptions, providersCreate, hostsDeleteMachine,
     ]
 }
 
@@ -24,7 +22,7 @@ public extension DaemonAPI {
         public var action: Action
         /// For start, stop and delete: the host, by its name or id.
         public var host: String?
-        /// For make: the provider, by its name or id; the new workspace's name and choices.
+        /// For make: the provider, by its name or id; the new machine's name and choices.
         public var provider: String?
         public var name: String?
         public var options: JSONValue?
@@ -43,8 +41,8 @@ public extension DaemonAPI {
         }
     }
 
-    /// `host/workspaces`: a control plane method, for an agent on this host.
-    struct HostWorkspaceCall: Codable, Sendable, Hashable {
+    /// `host/machines`: a control plane method, for an agent on this host.
+    struct MachineWorkspaceCall: Codable, Sendable, Hashable {
         /// Who asked, for the control plane's log: "Claude (fix-login)".
         public var agent: String
         public var method: String
@@ -56,8 +54,8 @@ public extension DaemonAPI {
         }
     }
 
-    /// What `list_workspaces` shows an agent (US6 AS1).
-    struct AgentWorkspaces: Codable, Sendable, Hashable {
+    /// What `list_machines` shows an agent (US6 AS1).
+    struct AgentMachines: Codable, Sendable, Hashable {
         public struct Workspace: Codable, Sendable, Hashable {
             public var id: String
             public var name: String
@@ -82,7 +80,7 @@ public extension DaemonAPI {
             public var name: String
             public var canMake: Bool
             public var canDelete: Bool
-            /// The New Workspace choices, when it can make one.
+            /// The New Machine choices, when it can make one.
             public var options: JSONValue?
             public var workspaces: [Workspace]
             public init(id: ProviderID, name: String, canMake: Bool, canDelete: Bool, options: JSONValue? = nil,

@@ -22,7 +22,7 @@ public enum AgentState: String, Codable, Hashable, Sendable, CaseIterable {
     case finished
     case stopped
     case archived
-    /// A helper waiting in its project's queue for a running place (#362): saved with
+    /// A helper waiting in its folder's queue for a running place (#362): saved with
     /// the start it asked for, no runtime made and nothing spent. The daemon starts it,
     /// oldest first, when a place frees; it then becomes `starting` under the same id.
     case queued

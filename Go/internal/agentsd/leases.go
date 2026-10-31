@@ -20,7 +20,7 @@ import (
 
 // Resource leases (036), as the Swift host keeps them (LeaseBook, DaemonCore+Leases): one
 // book in <root>/leases.json of who holds what and who waits, the person's declared
-// resources in <root>/resources.json, and leases/changed whenever either moves.
+// resources in <root>/resources.json, and resources/changed whenever either moves.
 
 const (
 	leaseDefaultMinutes = 30
@@ -59,6 +59,8 @@ func (r leaseRules) length(minutes *int64) (time.Duration, bool) {
 	return time.Duration(given) * time.Minute, asked > given
 }
 
+// waiter is a place in line. Its wait is the agent's event wait (#2361); a book from
+// before that has a waitID, which is read and dropped.
 type waiter struct {
 	AgentID wire.UUID  `json:"agentID"`
 	AskedAt wire.Date  `json:"askedAt"`
@@ -111,8 +113,6 @@ type leaseState struct {
 	book      *leaseBook
 	declared  []wire.DeclaredResource
 	leaseTick *time.Timer
-	// openLeaseCalls is the lease calls waiting in line, by their wait id.
-	openLeaseCalls map[wire.UUID]*openLeaseCall
 }
 
 func resourceName(given string) (wire.ResourceName, bool) {
@@ -123,8 +123,8 @@ func resourceName(given string) (wire.ResourceName, bool) {
 func (d *Daemon) leasesFile() string    { return filepath.Join(d.Store.Loc.Root, "leases.json") }
 func (d *Daemon) resourcesFile() string { return filepath.Join(d.Store.Loc.Root, "resources.json") }
 
-// loadLeases reads the book and the declarations once; no call survives a restart, so
-// every waiter's call is closed.
+// loadLeases reads the book and the declarations once. A place in line keeps its place;
+// its wait is on the agent's record (reconcileLineWaits).
 func (d *Daemon) loadLeases() []leaseEvent {
 	if d.book != nil {
 		return nil
@@ -267,12 +267,12 @@ func (d *Daemon) nextDeadline() (time.Time, bool) {
 	return next, !next.IsZero()
 }
 
-// leasesChanged saves the book, says leases/changed and aims the timer at what is next.
+// leasesChanged saves the book, says resources/changed and aims the timer at what is next.
 // Called with leaseMu held.
 func (d *Daemon) leasesChanged() {
 	d.saveLeases()
 	snap := d.leaseSnapshot()
-	safe.Go("leases/changed", func() { Broadcast(d, wire.NotifyLeasesChanged, snap) })
+	safe.Go("resources/changed", func() { Broadcast(d, wire.NotifyResourcesChanged, snap) })
 	if d.leaseTick != nil {
 		d.leaseTick.Stop()
 		d.leaseTick = nil
@@ -294,19 +294,20 @@ func leaseMinutes(from, to wire.Date) int {
 	return max(1, int(math.Round(to.Time().Sub(from.Time()).Minutes())))
 }
 
-// settle is DaemonCore.settle: notes in the holders' records, and an agent whose lease
-// came while it was not waiting on a call started again with the news (LeaseWords.wake).
+// settle is DaemonCore.settle: notes in the holders' records, and lease.granted for each
+// grant, which wakes the agent's wait for it (#2361). One whose turn came while nothing
+// waited for it (its wait replaced, or open over a restart without it) is started again
+// with the event all the same, so a lease never sits unused until it runs out.
 func (d *Daemon) settle(events []leaseEvent) {
 	for _, e := range events {
-		d.raiseLeaseEvent(e)
 		l := e.lease
+		waited := e.granted && e.waiter != nil && d.waitsForGrant(l.Holder, l.Resource)
+		raised := d.raiseLeaseEvent(e)
 		switch {
-		case e.granted && e.waiter != nil && d.answerLeaseCall(e.waiter, l, false):
-			// Its call was still open, and has its answer.
+		case e.granted && e.waiter != nil && !waited && raised != nil:
 			d.record(l.Holder, runtimeNote("Leased "+l.DisplayName+" until "+clock(l.ExpiresAt)+"."))
-		case e.granted && e.waiter != nil:
-			// Its call has returned: started again, not in this call.
-			safe.Go("lease wake", func() { d.wake(l, e.waiter.AskedAt) })
+			ev := *raised
+			safe.Go("lease wake", func() { d.wake(l, ev) })
 		case e.extended:
 			d.record(l.Holder, runtimeNote("Extended the lease on "+l.DisplayName+" to "+clock(l.ExpiresAt)+"."))
 		case e.granted:
@@ -332,12 +333,16 @@ func (d *Daemon) settle(events []leaseEvent) {
 	}
 }
 
-func (d *Daemon) wake(l wire.Lease, askedAt wire.Date) {
-	d.record(l.Holder, runtimeNote("Leased "+l.DisplayName+" until "+clock(l.ExpiresAt)+"."))
-	text := fmt.Sprintf("%s is yours now. You hold it until %s (%d minutes). You asked for it at %s and were waiting in line. "+
-		"Carry on with what you needed it for, and release it with release_resource when you are done.",
-		l.DisplayName, clock(l.ExpiresAt), leaseMinutes(l.GrantedAt, l.ExpiresAt), clock(askedAt))
-	err := d.promptFromApp(l.Holder, text)
+// heldNowWords is what a woken holder is told after the event: how long it is its.
+func heldNowWords(l wire.Lease) string {
+	return fmt.Sprintf("You hold %s until %s (%d minutes). Carry on with what you needed it for, and release it with "+
+		"release_resource when you are done.", l.DisplayName, clock(l.ExpiresAt), leaseMinutes(l.GrantedAt, l.ExpiresAt))
+}
+
+// wake starts an agent whose turn came while nothing waited for it, with the event as a
+// wait's wake says it. One that cannot be started passes the lease on.
+func (d *Daemon) wake(l wire.Lease, e wire.Event) {
+	err := d.promptFromApp(l.Holder, wakeWords(e, 0)+"\n\n"+heldNowWords(l))
 	if err == nil {
 		return
 	}
@@ -421,7 +426,12 @@ func (d *Daemon) leaseSnapshot() wire.LeaseSnapshot {
 			r.Holds = append([]wire.Lease{}, e.Leases...)
 			places = max(1, e.Rules.Holders)
 			for _, w := range e.Line {
-				open := w.WaitID != nil && d.openLeaseCalls[*w.WaitID] != nil
+				// Open: its wait for lease.granted is open, so the event starts it (#2361).
+				open := false
+				if a := d.Store.Agent(w.AgentID); a != nil && a.EventWait != nil && a.EventWait.Ending == nil {
+					res, ok := lineWaitResource(a.EventWait, w.AgentID)
+					open = ok && res == name
+				}
 				r.Line = append(r.Line, wire.LineMember{AgentID: w.AgentID, AskedAt: w.AskedAt, IsCallOpen: open})
 			}
 			for _, l := range e.Leases {
@@ -509,13 +519,13 @@ func (d *Daemon) registerLeases() {
 	noConversation := func() error {
 		return &Error{Code: CodeNoSuchAgent, Message: "That conversation is not open any more, so nothing was leased."}
 	}
-	On(d, wire.CallLeasesLease, func(ctx context.Context, c *Client, _ wire.LeaseRequest) (wire.LeaseNote, error) {
+	On(d, wire.CallResourcesLease, func(ctx context.Context, c *Client, _ wire.LeaseRequest) (wire.LeaseNote, error) {
 		return wire.LeaseNote{}, noConversation()
 	})
-	On(d, wire.CallLeasesRelease, func(ctx context.Context, c *Client, _ wire.LeaseNameRequest) (wire.LeaseNote, error) {
+	On(d, wire.CallResourcesRelease, func(ctx context.Context, c *Client, _ wire.LeaseNameRequest) (wire.LeaseNote, error) {
 		return wire.LeaseNote{}, noConversation()
 	})
-	On(d, wire.CallLeasesList, func(ctx context.Context, c *Client, _ wire.LeaseTokenRequest) (wire.LeaseNote, error) {
+	On(d, wire.CallResourcesList, func(ctx context.Context, c *Client, _ wire.LeaseTokenRequest) (wire.LeaseNote, error) {
 		return wire.LeaseNote{}, noConversation()
 	})
 	person := func(f func() ([]leaseEvent, error)) (wire.LeaseSnapshot, error) {
@@ -530,7 +540,7 @@ func (d *Daemon) registerLeases() {
 		d.settle(append(loaded, events...))
 		return snap, err
 	}
-	On(d, wire.CallLeasesSnapshot, func(ctx context.Context, c *Client, _ wire.Empty) (wire.LeaseSnapshot, error) {
+	On(d, wire.CallResourcesSnapshot, func(ctx context.Context, c *Client, _ wire.Empty) (wire.LeaseSnapshot, error) {
 		d.leaseMu.Lock()
 		loaded := d.loadLeases()
 		if len(loaded) > 0 {
@@ -541,7 +551,7 @@ func (d *Daemon) registerLeases() {
 		d.settle(loaded)
 		return snap, nil
 	})
-	On(d, wire.CallLeasesEnd, func(ctx context.Context, c *Client, r wire.PersonEndRequest) (wire.LeaseSnapshot, error) {
+	On(d, wire.CallResourcesEnd, func(ctx context.Context, c *Client, r wire.PersonEndRequest) (wire.LeaseSnapshot, error) {
 		return person(func() ([]leaseEvent, error) {
 			name, ok := resourceName(r.Name)
 			if !ok {
@@ -581,7 +591,17 @@ func (d *Daemon) registerLeases() {
 			return events, nil
 		})
 	})
-	On(d, wire.CallLeasesRemoveWaiter, func(ctx context.Context, c *Client, r wire.PersonRemoveRequest) (wire.LeaseSnapshot, error) {
+	On(d, wire.CallResourcesRemoveWaiter, func(ctx context.Context, c *Client, r wire.PersonRemoveRequest) (wire.LeaseSnapshot, error) {
+		// Out of the line, its wait for its turn ends too, as Stop Waiting's does (#2361).
+		defer func() {
+			name, _ := resourceName(r.Name)
+			agent := wire.UUID(strings.ToUpper(strings.TrimSpace(r.AgentID)))
+			if a := d.Store.Agent(agent); a != nil {
+				if res, ok := lineWaitResource(a.EventWait, agent); ok && res == name && a.EventWait.Ending == nil {
+					d.endWait(agent, "person", true)
+				}
+			}
+		}()
 		return person(func() ([]leaseEvent, error) {
 			name, ok := resourceName(r.Name)
 			agent := strings.ToUpper(strings.TrimSpace(r.AgentID))
@@ -677,7 +697,7 @@ func (d *Daemon) registerLeases() {
 				}
 				d.leaseMu.Unlock()
 				if held {
-					Broadcast(d, wire.NotifyLeasesChanged, snap)
+					Broadcast(d, wire.NotifyResourcesChanged, snap)
 				}
 			}
 		}

@@ -5,12 +5,18 @@ import SwiftUI
 /// FR-010): its name, the GitHub account, the code it shows, and Approve / Deny. A GitHub
 /// token carries no nonce, so only the person's own client says the new one is theirs. At the
 /// top of the sidebar on the Mac and the Remote, beside the machine cards; the web page's is
-/// `Web/src/views/SignInRequests.tsx`.
+/// `Web/src/views/SignInRequests.tsx`. A browser that asked by an account (#2097) has no code on
+/// the card: the person types the one the browser shows, so nobody approves it by habit.
 struct SignInRequestCard: View {
     let request: DaemonAPI.SignInRequest
     /// Answered from here and not decided yet.
     let isAnswering: Bool
-    let answer: (_ approve: Bool) -> Void
+    /// Approve or Deny, with the code typed for a browser.
+    let answer: (_ approve: Bool, _ code: String?) -> Void
+
+    @State private var typed = ""
+
+    private var typedCode: String { typed.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -25,17 +31,32 @@ struct SignInRequestCard: View {
                 Text(SignInWords.account(request))
                     .appText(.fine)
                     .foregroundStyle(.secondary)
-                // The code once, in the code face, as the new client shows it.
-                Text("Check that it shows \(Text(request.code).monospaced().fontWeight(.semibold)).")
-                    .fixedSize(horizontal: false, vertical: true)
-                    .textSelection(.enabled)
-                    // One element, so the label does not stack on the selectable Text's (#1724).
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(SignInWords.code(request))
+                if request.needsCode {
+                    Text(SignInWords.typeCode)
+                        .fixedSize(horizontal: false, vertical: true)
+                    TextField(SignInWords.codePlaceholder, text: $typed)
+                        .textFieldStyle(.roundedBorder)
+                        .monospaced()
+                        .autocorrectionDisabled()
+                        #if os(iOS)
+                        .textInputAutocapitalization(.characters)
+                        #endif
+                        .frame(maxWidth: 160)
+                        .onSubmit { if !typedCode.isEmpty { answer(true, typedCode) } }
+                } else {
+                    // The code once, in the code face, as the new client shows it.
+                    Text("Check that it shows \(Text(request.code).monospaced().fontWeight(.semibold)).")
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                        // One element, so the label does not stack on the selectable Text's (#1724).
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(SignInWords.code(request))
+                }
                 HStack(spacing: 8) {
-                    Button("Approve") { answer(true) }
+                    Button("Approve") { answer(true, request.needsCode ? typedCode : nil) }
                         .buttonStyle(.borderedProminent)
-                    Button("Deny") { answer(false) }
+                        .disabled(request.needsCode && typedCode.isEmpty)
+                    Button("Deny") { answer(false, nil) }
                         .buttonStyle(.bordered)
                     if isAnswering { ProgressView().controlSize(.small) }
                 }

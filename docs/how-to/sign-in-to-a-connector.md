@@ -13,12 +13,12 @@ describes, in your own browser. The next agent you start has the connector, with
 
 ## See which connectors want it
 
-Open **Settings ▸ Agent Configuration ▸ Connectors**, or **Project Settings ▸ Agent Configuration ▸ Connectors**. A remote
+Open **Settings ▸ Agent Configuration ▸ Connectors**, or **Folder Settings ▸ Agent Configuration ▸ Connectors**. A remote
 server that asked for a sign-in says **needs sign-in** on its row, the way a missing secret
 says **NAME not set**. Agents start without it until you sign in.
 
 The app asks each remote server once, the first time the list is shown, with nothing sent
-but the MCP greeting. A server you have not approved yet in a project is not asked. A
+but the MCP greeting. A server you have not approved yet in a folder is not asked. A
 server whose entry sends its own `Authorization` header is not signed in to: the header is
 its sign-in.
 
@@ -60,13 +60,13 @@ server offers that, and forgets it itself. The row says **needs sign-in** again.
 
 In `~/.agents-secrets/mcp-sign-ins.json`, beside `secrets.env`, and like it readable only
 by you. The folder is apart from `~/.agents` because `~/.agents` is settings that you can
-copy, sync or commit, and secrets are not settings. Never in `mcp.json`, so a project's
+copy, sync or commit, and secrets are not settings. Never in `mcp.json`, so a folder's
 committed entry carries no one's sign-in. The app logs the server's name and what
 happened, never an address, a code or a token, and it never sends a sign-in to your
 iPhone, iPad or the web page. Do not copy, sync or commit `~/.agents-secrets`.
 
 A sign-in is for the server's address, so a server in both your own `mcp.json` and a
-project's is signed in to once.
+folder's is signed in to once.
 
 ## When an agent starts
 
@@ -74,5 +74,5 @@ The app gives the agent the server with your sign-in as its `Authorization` head
 sign-in that is about to end is renewed first. If the server no longer takes it, the row
 says **needs sign-in** again, and agents start without the server until you sign in.
 
-Signing in runs on this Mac's own host. A project on a server host can't sign in to a
+Signing in runs on this Mac's own host. A folder on a server host can't sign in to a
 connector yet.

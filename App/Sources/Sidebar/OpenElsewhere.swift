@@ -18,7 +18,7 @@ struct OpenElsewhere: View {
     /// Mac's host's, which opens and reveals it.
     var server: String? = nil
     /// This Mac's host, whose files these buttons open and reveal.
-    var host: HostID = .mac
+    var host: MachineRef = .mac
     @Environment(AppModel.self) private var model
 
     var body: some View {

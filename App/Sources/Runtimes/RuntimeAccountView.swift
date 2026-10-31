@@ -23,6 +23,21 @@ struct RuntimeAccountView: View {
         model.runtimes.first { $0.runtime.id == runtimeID }?.runtime.accountFolderVariable != nil
     }
     private var notice: RuntimeLaunch.SignInNotice? { launch.signInNotice }
+    /// The organisation's word on the vendor's notice (#999, FR-017): under `accepted` it has
+    /// reviewed the terms, so the line takes the notice's place; under `refuse` it says why.
+    private var noticeTerms: String? {
+        guard notice != nil else { return nil }
+        switch model.policyState?.policy?.notices?.antigravityTerms {
+        case "accepted": return OrgAccountWords.antigravityAccepted
+        case "refuse": return OrgAccountWords.antigravityRefused
+        default: return nil
+        }
+    }
+    /// Whether the sheet lists accounts: the runtime can take more (#840), or the
+    /// organisation gives it one (#999).
+    private var listsAccounts: Bool {
+        takesMoreAccounts || !model.accountProfiles.organisation(runtimeID).isEmpty
+    }
 
     /// Ready or not, a runtime that signs in one provider at a time (049: OpenCode) keeps
     /// offering the next one.
@@ -85,9 +100,14 @@ struct RuntimeAccountView: View {
                     // of choosing (049: Antigravity's terms on third-party tools). Once, under
                     // the choices, when any of them is one it is about.
                     if let notice, account.orderedAuthMethods.contains(where: { notice.methods.contains($0.id) }) {
-                        Text(notice.text).appText(.fine).foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Link(notice.linkTitle, destination: notice.link).appText(.fine)
+                        if let noticeTerms {
+                            Text(noticeTerms).appText(.fine).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        } else {
+                            Text(notice.text).appText(.fine).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Link(notice.linkTitle, destination: notice.link).appText(.fine)
+                        }
                     }
                     if let providerSignOut {
                         Text("To sign a provider out, run \(providerSignOut) in a terminal.")
@@ -166,9 +186,9 @@ struct RuntimeAccountView: View {
                 }
             }
 
-            if takesMoreAccounts {
+            if listsAccounts {
                 RuntimeAccountsSection(runtimeID: runtimeID, name: name, methods: account.orderedAuthMethods,
-                                       terminalCommand: $terminalCommand)
+                                       takesMore: takesMoreAccounts, terminalCommand: $terminalCommand)
             }
 
             HStack {

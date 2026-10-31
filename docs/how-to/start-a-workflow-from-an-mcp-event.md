@@ -8,7 +8,7 @@ description: Start an agent when a connector reports an event, such as a pull re
 
 A connector (an MCP server) can offer events as well as tools and views: "a pull request's checks
 failed", "a message arrived". A workflow can run on one of them. This guide uses this
-project's `github` server, GitHub's official MCP server with events added (it turns
+folder's `github` server, GitHub's official MCP server with events added (it turns
 GitHub Actions failures into `checks.failed` events, among others), and the **Fix failed checks** workflow that starts an agent on each
 one.
 
@@ -18,27 +18,27 @@ is shown as not supported yet.
 
 ## Before you start
 
-- A project with a connector that offers events. The github server (`github-mcp`) ships
+- A folder with a connector that offers events. The github server (`github-mcp`) ships
   with Agents Host and the Linux host, and needs the host's GitHub connection: the GitHub
   App `agents-loops`, signed in with a code on github.com (#1335), and installed on the
-  repository. On the project's **Connectors** page, press **Connect GitHub…** and type the
+  repository. On the folder's **Connectors** page, press **Connect GitHub…** and type the
   code on github.com (#1336). Once a slot has read from GitHub, the page adds the github
-  connector to the project's `.agents/mcp.json`, so its events reach the project. It does
+  connector to the folder's `.agents/mcp.json`, so its events reach the folder. It does
   not use `gh`.
 - For every setting, see [Workflow triggers and actions](../reference/workflows.md), and for
   what the event carries, [Events from MCP servers](../reference/events.md#events-from-mcp-servers).
 
 ## Start the server
 
-Server events come from servers the project can already use: the project's
+Server events come from servers the folder can already use: the folder's
 `.agents/mcp.json`, your own `~/.agents/mcp.json`, or a plugin. The github server is in
-this project's `.agents/mcp.json` as `github`, a local server the app hosts:
+this folder's `.agents/mcp.json` as `github`, a local server the app hosts:
 
 ```json
 { "mcpServers": { "github": { "command": "github-mcp", "hosted": true } } }
 ```
 
-1. In **Project Settings ▸ Agent Configuration ▸ Connectors**, `github` arrived with the project, so it is
+1. In **Folder Settings ▸ Agent Configuration ▸ Connectors**, `github` arrived with the folder, so it is
    **waiting for your OK**: choose **Approve**. Until you do, it is asked for nothing, and
    the workflow's page says it is waiting for approval. See
    [Add a connector from the registry](add-a-connector-from-the-registry.md).
@@ -54,7 +54,7 @@ another for its tools.
 ## Turn on a ready-made workflow
 
 Agents has ready-made workflows for the dev loop on GitHub (#1342) and GitLab (#1633). Each
-project that pushes to GitHub or GitLab shows them on its **Workflows** page, off. One
+folder that pushes to GitHub or GitLab shows them on its **Workflows** page, off. One
 workflow works on both forges: it listens to the `github` and the `gitlab` servers, and its
 agent uses the tools of the server that the event came from.
 
@@ -66,16 +66,16 @@ agent uses the tools of the server that the event came from.
 
 1. Open the workflow and turn on its **Enabled** switch.
 2. The app writes the workflow to `.agents/workflows/<id>.md` and its method to
-   `.agents/skills/<id>/SKILL.md`, approved. From then on they are your project's own
-   files: change them as you like. A skill of the same name that the project has already
+   `.agents/skills/<id>/SKILL.md`, approved. From then on they are your folder's own
+   files: change them as you like. A skill of the same name that the folder has already
    is kept.
-3. For **Work an issue**, make an `agent` label in the repository or project, if it has none.
+3. For **Work an issue**, make an `agent` label in the repository or folder, if it has none.
    Its agent asks before each tool it uses (`permission-mode: default`), because anyone
    can write an issue. It reads the issue as data, and uses only the comments of the
    repository's own people.
 
 Nothing runs before you turn a workflow on, and a workflow that an agent turns on waits
-for your OK. Without `repo:` they listen to the repository that the project's folder
+for your OK. Without `repo:` they listen to the repository that the folder
 pushes to, and only to the repository's own people (`anyone: true` opens them to anyone).
 To hide one that you do not want, archive it.
 
@@ -106,7 +106,7 @@ and use `add_issue_comment` on the PR to say what you changed.
   Add `server: github` to listen to that one only, or `server: [github, gitlab]` for a list.
 - The `github` server's `checks.failed`, `pr.merged`, `pr.closed` (closed without merging) and
   `pr.conflicted` (began to conflict with its base, #712) all take `repo`, `branch` (only that PR branch) and `pr` (only that pull request, by
-  number). Left out, `repo` is the one the project's folder pushes to (#702). Given
+  number). Left out, `repo` is the one the folder pushes to (#702). Given
   together, each must hold: `{pr: 551}` hears only PR 551's failures and merge.
 - Its `pr.opened` (#833) is raised when a pull request opens, or when a draft is marked
   ready for review. It takes the same filters and `anyone`. Drafts never raise it. The
@@ -131,7 +131,7 @@ and use `add_issue_comment` on the PR to say what you changed.
   each issue as it is marked a bug.
 - A filter the server's event doesn't take, or a value of the wrong type, shows on the
   workflow's page as an error, naming the filters it does take.
-- This project's copy of the workflow arrives with `enabled: false`. Turn it on with its
+- This folder's copy of the workflow arrives with `enabled: false`. Turn it on with its
   **Enabled** switch, and approve it.
 
 Each event starts the workflow once, after its prompt. The agent is told the event's

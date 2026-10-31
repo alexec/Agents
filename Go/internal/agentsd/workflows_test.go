@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,81 @@ import (
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/wire"
 )
+
+func TestWorkflowLimitsArePerFolderAndDoNotLimitApprovals(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	first := folder(t, c, 1)
+	second := folder(t, c, 2)
+	for _, dir := range []string{first, second} {
+		if err := os.MkdirAll(workflowsFolder(dir), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		for i := 0; i < 21; i++ {
+			id := fmt.Sprintf("workflow-%02d", i)
+			text := "---\non: agent.finished\n---\nReview.\n"
+			if err := os.WriteFile(filepath.Join(workflowsFolder(dir), id+".md"), []byte(text), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	// On first start, these existing files are approved as they stand. Each folder
+	// gets its own default of twenty, so both twenty-first workflows are over limit.
+	approveAll(t, c, store.FolderURL(first))
+	approveAll(t, c, store.FolderURL(second))
+	for _, item := range []struct {
+		dir string
+		id  int
+	}{{first, 200}, {second, 201}} {
+		var summaries []wire.WorkflowSummary
+		json.Unmarshal(c.call(t, item.id, "workflows/list", map[string]any{"folder": store.FolderURL(item.dir)}), &summaries)
+		if len(summaries) != 21 {
+			t.Fatalf("got %d workflows", len(summaries))
+		}
+		over := 0
+		for _, s := range summaries {
+			if s.OverLimit != nil {
+				if *s.OverLimit != wire.WorkflowLimitFolder || s.TotalLimit == nil || *s.TotalLimit != 20 {
+					t.Fatalf("unexpected limit: %+v", s)
+				}
+				over++
+			}
+		}
+		if over != 1 {
+			t.Fatalf("folder %s has %d workflows over limit", item.dir, over)
+		}
+	}
+
+	// More than three additional workflows can wait, and approval still succeeds.
+	for i := 0; i < 5; i++ {
+		id := fmt.Sprintf("pending-%02d", i)
+		if err := os.WriteFile(filepath.Join(workflowsFolder(first), id+".md"), []byte("---\non: agent.finished\n---\nReview.\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var summaries []wire.WorkflowSummary
+	json.Unmarshal(c.call(t, 202, "workflows/list", map[string]any{"folder": store.FolderURL(first)}), &summaries)
+	waiting := 0
+	for _, s := range summaries {
+		if s.AwaitingApproval != nil {
+			waiting++
+			if s.OverLimit != nil {
+				t.Fatalf("pending workflow was marked over limit: %+v", s)
+			}
+			var approved wire.WorkflowSummary
+			json.Unmarshal(c.call(t, 203+waiting, "workflows/approve", map[string]any{
+				"folder": store.FolderURL(first), "workflowID": s.Workflow.WorkflowID, "digest": s.AwaitingApproval.Digest,
+			}), &approved)
+			if approved.AwaitingApproval != nil {
+				t.Fatalf("approval did not apply: %+v", approved)
+			}
+		}
+	}
+	if waiting != 5 {
+		t.Fatalf("got %d waiting approvals", waiting)
+	}
+}
 
 // Ports WorkflowFileTests, FrontMatterEditTests and WorkflowApprovalTests: a file read as
 // the Swift host reads it, the problems it says, one key changed and nothing else, and a
@@ -82,7 +158,7 @@ func TestOneKeyChangedAndNothingElse(t *testing.T) {
 func TestWorkflowsWaitForThePersonsOK(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "nightly.md"), []byte("---\non:\n  - schedule:\n      at: \":00\"\n---\nTidy up.\n"), 0o644)
@@ -146,7 +222,7 @@ func TestWorkflowsWaitForThePersonsOK(t *testing.T) {
 func TestClearingMissedEventsLeavesTheWorkflow(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "watch.md"), []byte("---\non: agent.finished\n---\nLook.\n"), 0o644)
@@ -166,7 +242,7 @@ func TestClearingMissedEventsLeavesTheWorkflow(t *testing.T) {
 func TestAWorkflowThatIsALinkNeverRuns(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	must := func(err error) {
 		t.Helper()
@@ -245,7 +321,7 @@ func TestAWorkflowThatIsALinkNeverRuns(t *testing.T) {
 func TestAWorkflowWaitsWhenTheSkillItFollowsChanges(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	must := func(err error) {
 		t.Helper()
@@ -287,8 +363,8 @@ func TestAWorkflowWaitsWhenTheSkillItFollowsChanges(t *testing.T) {
 	if o := ran.LastOutcome; o == nil || o.Refused == nil || o.Refused.Value.AwaitingApproval == nil {
 		t.Fatalf("ran: %+v", ran)
 	}
-	// The project's watch hears a skill's change as it hears a workflow's.
-	d.projectFilesChanged(dir, []string{skill})
+	// The folder's watch hears a skill's change as it hears a workflow's.
+	d.folderFilesChanged(dir, []string{skill})
 	s, _ := d.summaryFor(dir)
 	if len(s.Approvals) != 1 || s.Approvals[0].Key != "nightly" || s.Approvals[0].Line != "Changed since you approved it" {
 		t.Fatalf("%+v", s.Approvals)
@@ -302,7 +378,7 @@ func TestAWorkflowWaitsWhenTheSkillItFollowsChanges(t *testing.T) {
 		t.Fatalf("%+v", reading)
 	}
 	// Undo puts the approved skill back, and it runs again.
-	c.call(t, 4, "projects/undoGuardedChange", map[string]any{"folder": folder, "path": ".agents/workflows/nightly.md", "digest": *reading.Digest})
+	c.call(t, 4, "folders/undoGuardedChange", map[string]any{"folder": folder, "path": ".agents/workflows/nightly.md", "digest": *reading.Digest})
 	if !fileHas(t, skill, "Tidy the tree.\n") || !fileHas(t, path, workflow) {
 		t.Fatal("not undone")
 	}

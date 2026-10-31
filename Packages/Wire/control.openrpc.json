@@ -15,6 +15,11 @@
       "name": "client.team/1",
       "by": "client",
       "description": "A client knows it belongs to one person of a team (#994, #1763). On a control plane with more than one person, the control plane answers a client without it -32074 updateToJoinTeam (R14)."
+    },
+    {
+      "name": "machine/1",
+      "by": "control",
+      "description": "The control plane answers each host/* method as machine/* too, and a hosts/* method as machines/*, which machines/1 names (#2653). A step of the rename over three releases: the names in this document stay host/* and hosts/* until the senders move."
     }
   ],
   "methods": [
@@ -107,6 +112,56 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/AuditList"
+        }
+      }
+    },
+    {
+      "name": "audit/setSinks",
+      "x-capability": "audit.sinks/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AuditSinks"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/AuditSinksState"
+        }
+      }
+    },
+    {
+      "name": "audit/sinks",
+      "x-capability": "audit.sinks/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/AuditSinksState"
         }
       }
     },
@@ -385,7 +440,7 @@
     {
       "name": "clients/setActivityToken",
       "x-capability": "liveactivity/1",
-      "description": "A device, over its own session (#1744): the push token of one session's Live Activity, kept in its own client record, which only it may set. Refused from a window or a browser.",
+      "description": "A device, over its own session (#1744): its Live Activity's push token for one session the activity speaks for (#2991), kept in its own client record, which only it may set. Refused from a window or a browser.",
       "paramStructure": "by-name",
       "params": [
         {
@@ -446,6 +501,32 @@
       }
     },
     {
+      "name": "clients/setWebPush",
+      "x-capability": "clients/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "A browser, over its own session (#1486): its Web Push subscription, kept in its own client record, which only it may set. No endpoint takes it away. Refused from a phone, an iPad or a window, and when this control plane has no VAPID key.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/WebPushSubscription"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "clients/startPairing",
       "x-capability": "clients/1",
       "paramStructure": "by-name",
@@ -486,6 +567,32 @@
       }
     },
     {
+      "name": "clients/webPushKey",
+      "x-capability": "clients/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "The control plane's VAPID public key (#1486), for a browser to subscribe with; none when it sends no Web Push.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/WebPushKey"
+        }
+      }
+    },
+    {
       "name": "console/fleet",
       "x-capability": "console/1",
       "description": "Console ▸ Machines (#1804, M1): every machine, its owner and state. Admins only.",
@@ -508,6 +615,58 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/FleetBoard"
+        }
+      }
+    },
+    {
+      "name": "console/live",
+      "x-capability": "console/1",
+      "description": "Console ▸ Live Now (#2019, M9): every agent running now on every machine, with its cost so far. Admins only.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LiveBoard"
+        }
+      }
+    },
+    {
+      "name": "console/stopAgent",
+      "x-capability": "console/1",
+      "description": "Console ▸ Live Now (#2019, M9): an admin stops one agent on any machine. Admins only.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ConsoleStopAgent"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
         }
       }
     },
@@ -568,6 +727,43 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/ControlClientChanged"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/cutOff",
+      "x-capability": "org-identity/1",
+      "description": "To every client of a person their org provider suspended (#1002, D13), then their sockets close with 4403 suspended.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ControlCutOff"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/governanceRequested",
+      "x-capability": "governance/1",
+      "description": "To admins (#2019, M5): a request for an MCP server or skill waits, or was decided.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/CatalogRequest"
           }
         }
       ]
@@ -783,6 +979,59 @@
       ]
     },
     {
+      "name": "control/notice",
+      "x-capability": "org-identity/1",
+      "description": "To admins (#1002): what changed with no click: the last admin kept, a SCIM group's shares left, a Remove request.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ControlNotice"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/orgRoutesChanged",
+      "x-capability": "org-routes/1",
+      "description": "To every person's clients when an org route is added, changed or removed (#999).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/orgRoutesLeft",
+      "x-capability": "org-routes/1",
+      "description": "To a removed machine's person and to every admin: the org routes it held (#999).",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgRoutesLeft"
+          }
+        }
+      ]
+    },
+    {
       "name": "control/peopleChanged",
       "x-capability": "people/1",
       "tags": [
@@ -827,6 +1076,11 @@
       "name": "control/policyChanged",
       "x-capability": "policy/1",
       "description": "To every person's clients when the policy changes (#998).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -835,6 +1089,26 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/PolicyView"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/projectsChanged",
+      "x-capability": "projects/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ProjectsChanged"
           }
         }
       ]
@@ -946,7 +1220,7 @@
       }
     },
     {
-      "name": "control/setProjectDetection",
+      "name": "control/setFolderDetection",
       "x-capability": "control/1",
       "paramStructure": "by-name",
       "params": [
@@ -954,14 +1228,14 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/ProjectDetection"
+            "$ref": "daemon.schema.json#/definitions/FolderDetection"
           }
         }
       ],
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/ProjectDetection"
+          "$ref": "daemon.schema.json#/definitions/FolderDetection"
         }
       }
     },
@@ -1052,6 +1326,11 @@
       "name": "control/stopAll",
       "x-capability": "policy/1",
       "description": "To every person's clients when the kill switch is turned on or off (#998), so a client draws the strip at once.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -1074,7 +1353,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostJoinStatus"
+            "$ref": "daemon.schema.json#/definitions/MachineJoinStatus"
           }
         }
       ]
@@ -1089,7 +1368,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostTunnelChanged"
+            "$ref": "daemon.schema.json#/definitions/MachineTunnelChanged"
           }
         }
       ]
@@ -1130,6 +1409,43 @@
       ]
     },
     {
+      "name": "folders/detect",
+      "x-capability": "folders/1",
+      "description": "To a host just added, from a control plane before #656.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/FolderDetection"
+          }
+        }
+      ]
+    },
+    {
+      "name": "folders/detected",
+      "x-capability": "folders/1",
+      "description": "A host, on its channel 0 (#429): its answer to folders/detect.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/JSONValue"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "git/credential",
       "x-capability": "git/1",
       "description": "A host, on its channel 0, for its own git (#1122).",
@@ -1147,6 +1463,183 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/GitCredential"
+        }
+      }
+    },
+    {
+      "name": "governance/approvals",
+      "x-capability": "governance/1",
+      "description": "An admin's (#2019, M5): every approval.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/CatalogApprovalList"
+        }
+      }
+    },
+    {
+      "name": "governance/decide",
+      "x-capability": "governance/1",
+      "description": "An admin's (#2019, M5): approve a request, for a group or the person, or refuse it.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/CatalogDecide"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/CatalogRequest"
+        }
+      }
+    },
+    {
+      "name": "governance/report",
+      "x-capability": "governance/1",
+      "description": "A host, on its channel 0 (#2019, M5): the MCP servers and skills it has from a catalogue.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineCatalog"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "governance/request",
+      "x-capability": "governance/1",
+      "description": "Anyone's (#2019, M5): ask for an MCP server or skill. Approved at once when a group of theirs, or they, already have it approved.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/CatalogAsk"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/CatalogRequest"
+        }
+      }
+    },
+    {
+      "name": "governance/requests",
+      "x-capability": "governance/1",
+      "description": "To an admin, the requests waiting; to anyone, their own (#2019, M5).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/CatalogRequestList"
+        }
+      }
+    },
+    {
+      "name": "governance/revoke",
+      "x-capability": "governance/1",
+      "description": "An admin's (#2019, M5): take back an approval.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/CatalogRevoke"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/CatalogApprovalList"
+        }
+      }
+    },
+    {
+      "name": "governance/usage",
+      "x-capability": "governance/1",
+      "description": "An admin's (#2019, M5): who uses each MCP server and skill, and at which version.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/CatalogUsage"
         }
       }
     },
@@ -1226,6 +1719,32 @@
       }
     },
     {
+      "name": "groups/setRole",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, FR-020, FR-021): a SCIM group gives the admin role, or not. The roles of its members follow, never leaving no admin.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/GroupRoleSet"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Group"
+        }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
+    },
+    {
       "name": "handover/status",
       "x-capability": "handover/1",
       "description": "On a copy's session (x:handover-…) only: what this copy says of itself (R16).",
@@ -1257,7 +1776,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostClients"
+            "$ref": "daemon.schema.json#/definitions/MachineClients"
           }
         }
       ]
@@ -1272,7 +1791,86 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostHello"
+            "$ref": "daemon.schema.json#/definitions/MachineHello"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "host/machines",
+      "x-capability": "host/1",
+      "description": "A host, on its channel 0, for an agent there (#691 US6).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineWorkspaceCall"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/JSONValue"
+        }
+      }
+    },
+    {
+      "name": "host/orgRoutes",
+      "x-capability": "host.org-routes/1",
+      "description": "To a machine that says host.org-routes/1, on its channel 0, at each join and within 5 seconds of a change to what it may use (#999, FR-005): every route its person may use, each secret sealed to the machine's key. A machine without it is sent nothing.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgRouteDelivery"
+          }
+        }
+      ]
+    },
+    {
+      "name": "host/orgRoutesAgain",
+      "x-capability": "host.org-routes/1",
+      "description": "A machine, on its channel 0: a sealed route did not open; send its delivery again (#999).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "host/orgRoutesApplied",
+      "x-capability": "host.org-routes/1",
+      "description": "A machine, on its channel 0, after it keeps a delivery of org routes (#999).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgRoutesApplied"
           }
         }
       ],
@@ -1294,7 +1892,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostPolicy"
+            "$ref": "daemon.schema.json#/definitions/MachinePolicy"
           }
         }
       ]
@@ -1321,6 +1919,22 @@
       }
     },
     {
+      "name": "host/projects",
+      "x-capability": "projects/1",
+      "description": "To a machine, on its channel 0, when a project its folders name changes its slots or name (#2669): the projects its folders name, with their slots.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineProjects"
+          }
+        }
+      ]
+    },
+    {
       "name": "host/providerDraft",
       "x-capability": "host/1",
       "description": "A host, on its channel 0, for a writing agent there (#858).",
@@ -1330,7 +1944,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostProviderDraftCall"
+            "$ref": "daemon.schema.json#/definitions/MachineProviderDraftCall"
           }
         }
       ],
@@ -1342,6 +1956,22 @@
       }
     },
     {
+      "name": "host/release",
+      "x-capability": "host.update/1",
+      "description": "To a machine that says host.update/1, on its channel 0, at each join: the release this control plane names, its own version, when that is a release (#2178). The machine updates Agents Host to it, if it is newer, between turns.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineRelease"
+          }
+        }
+      ]
+    },
+    {
       "name": "host/status",
       "x-capability": "host/1",
       "description": "A host, on its channel 0 (#691 US4).",
@@ -1351,7 +1981,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostStatus"
+            "$ref": "daemon.schema.json#/definitions/MachineStatus"
           }
         }
       ],
@@ -1373,7 +2003,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostUser"
+            "$ref": "daemon.schema.json#/definitions/MachineUser"
           }
         }
       ]
@@ -1389,31 +2019,10 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostUserSettings"
+            "$ref": "daemon.schema.json#/definitions/MachineUserSettings"
           }
         }
       ]
-    },
-    {
-      "name": "host/workspaces",
-      "x-capability": "host/1",
-      "description": "A host, on its channel 0, for an agent there (#691 US6).",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostWorkspaceCall"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/JSONValue"
-        }
-      }
     },
     {
       "name": "hosts/announce",
@@ -1425,7 +2034,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostAnnounce"
+            "$ref": "daemon.schema.json#/definitions/MachineAnnounce"
           }
         }
       ],
@@ -1470,7 +2079,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostRequest"
+            "$ref": "daemon.schema.json#/definitions/MachineRequest"
           }
         }
       ],
@@ -1482,7 +2091,7 @@
       }
     },
     {
-      "name": "hosts/deleteWorkspace",
+      "name": "hosts/deleteMachine",
       "x-capability": "hosts/1",
       "paramStructure": "by-name",
       "params": [
@@ -1490,7 +2099,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostRequest"
+            "$ref": "daemon.schema.json#/definitions/MachineRequest"
           }
         }
       ],
@@ -1583,7 +2192,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostInstall"
+            "$ref": "daemon.schema.json#/definitions/MachineInstall"
           }
         }
       ],
@@ -1656,14 +2265,14 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostRequest"
+            "$ref": "daemon.schema.json#/definitions/MachineRequest"
           }
         }
       ],
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/HostLastHeard"
+          "$ref": "daemon.schema.json#/definitions/MachineLastHeard"
         }
       }
     },
@@ -1726,14 +2335,14 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostLink"
+            "$ref": "daemon.schema.json#/definitions/MachineLink"
           }
         }
       ],
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/ControlHost"
+          "$ref": "daemon.schema.json#/definitions/ControlMachine"
         }
       }
     },
@@ -1760,7 +2369,7 @@
         "schema": {
           "type": "array",
           "items": {
-            "$ref": "daemon.schema.json#/definitions/ControlHost"
+            "$ref": "daemon.schema.json#/definitions/ControlMachine"
           }
         }
       }
@@ -1799,7 +2408,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostRequest"
+            "$ref": "daemon.schema.json#/definitions/MachineRequest"
           }
         }
       ],
@@ -1836,27 +2445,7 @@
       }
     },
     {
-      "name": "hosts/setRelay",
-      "x-capability": "hosts/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostRelayRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "hosts/setWorkspaceOptions",
+      "name": "hosts/setMachineOptions",
       "x-capability": "hosts/1",
       "tags": [
         {
@@ -1869,14 +2458,34 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostWorkspaceOptions"
+            "$ref": "daemon.schema.json#/definitions/MachineOptions"
           }
         }
       ],
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/ControlHost"
+          "$ref": "daemon.schema.json#/definitions/ControlMachine"
+        }
+      }
+    },
+    {
+      "name": "hosts/setRelay",
+      "x-capability": "hosts/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineRelayRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
         }
       }
     },
@@ -1917,14 +2526,14 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostRequest"
+            "$ref": "daemon.schema.json#/definitions/MachineRequest"
           }
         }
       ],
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/ControlHost"
+          "$ref": "daemon.schema.json#/definitions/ControlMachine"
         }
       }
     },
@@ -1942,7 +2551,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostEnroll"
+            "$ref": "daemon.schema.json#/definitions/MachineEnroll"
           }
         }
       ],
@@ -1967,14 +2576,14 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostStop"
+            "$ref": "daemon.schema.json#/definitions/MachineStop"
           }
         }
       ],
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/ControlHost"
+          "$ref": "daemon.schema.json#/definitions/ControlMachine"
         }
       }
     },
@@ -1992,14 +2601,14 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostRequest"
+            "$ref": "daemon.schema.json#/definitions/MachineRequest"
           }
         }
       ],
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/ControlHost"
+          "$ref": "daemon.schema.json#/definitions/ControlMachine"
         }
       }
     },
@@ -2012,7 +2621,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostUpdate"
+            "$ref": "daemon.schema.json#/definitions/MachineUpdate"
           }
         }
       ],
@@ -2177,6 +2786,304 @@
       }
     },
     {
+      "name": "machines/forAgent",
+      "x-capability": "machines/1",
+      "description": "Through host/machines only.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/AgentMachines"
+        }
+      }
+    },
+    {
+      "name": "machines/sendFolder",
+      "x-capability": "folders.to-machine/1",
+      "description": "Through host/machines only: one step of an agent's start_session with send (#2929), which sends this folder's branch to another of the person's machines, as Send to ‹machine›… does, or of its bring_back (#2947), which brings a branch back from there, as Bring Back from ‹machine›… does. The control plane sends that machine's folders/receiveState, folders/receiveUpload, folders/receive, folders/sendFacts, folders/sendPack or folders/sendRead; the machine has to be online.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineFolderSend"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MachineFolderSent"
+        }
+      }
+    },
+    {
+      "name": "machines/sessionCall",
+      "x-capability": "sessions.elsewhere/1",
+      "description": "Through host/machines only (#2927): an agent's call on a session it started on another of the person's machines. The control plane sends that machine's agents/fromStarter, saying which machine and agent ask.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineSessionCall"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SessionCallReply"
+        }
+      }
+    },
+    {
+      "name": "machines/sessionEnded",
+      "x-capability": "sessions.elsewhere/1",
+      "description": "Through host/machines only (#2927): a session started from another machine ended. The control plane sends that machine's agents/endedElsewhere, naming this one; an offline one is not told, and finds out when it next asks.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SessionEnded"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "machines/startSession",
+      "x-capability": "sessions.on-machine/1",
+      "description": "Through host/machines only (#2887): an agent's start_session on another of the person's machines. The id of the session it started; kept (-32067) when the machine is stopped and is starting.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineSessionStart"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/UUID"
+        }
+      }
+    },
+    {
+      "name": "notices/delivered",
+      "x-capability": "notices/1",
+      "description": "To the host whose notice it is, on its channel 0 (#2860): the control plane sent it to one of the person's devices, so the host records where on the notice's line.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/NoticeDelivered"
+          }
+        }
+      ]
+    },
+    {
+      "name": "notices/take",
+      "x-capability": "notices/1",
+      "description": "A host, on its channel 0 (#2859): may a notice go now? One bucket for the person, shared by every machine of theirs, with the limits the host has.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/NoticeLimits"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/NoticeTaken"
+        }
+      }
+    },
+    {
+      "name": "orgRoutes/check",
+      "x-capability": "org-routes/1",
+      "description": "An admin's: one small request from the control plane with the route's credential, where it can make one (#999).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgRouteRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/OrgRouteCheck"
+        }
+      }
+    },
+    {
+      "name": "orgRoutes/list",
+      "x-capability": "org-routes/1",
+      "description": "An admin's: every org route with its rev and how many machines hold it; no secret value (#999).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/OrgRouteList"
+        }
+      }
+    },
+    {
+      "name": "orgRoutes/mine",
+      "x-capability": "org-routes/1",
+      "description": "Any person's: the org routes they may use (#999).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/OrgRoutesMine"
+        }
+      }
+    },
+    {
+      "name": "orgRoutes/remove",
+      "x-capability": "org-routes/1",
+      "description": "An admin's: delete a route and its secrets, conditional on its rev; every machine that held it is sent its routes without it (#999).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgRouteRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "orgRoutes/replaceKey",
+      "x-capability": "org-routes/1",
+      "description": "An admin's: new values for a route's secret fields, one version higher (#999).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgRouteReplaceKey"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/OrgRouteKept"
+        }
+      }
+    },
+    {
+      "name": "orgRoutes/set",
+      "x-capability": "org-routes/1",
+      "description": "An admin's: add or change an org route, conditional on its rev; its secrets sealed with the keeper; audited and sent to the machines that may use it (#999).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgRouteSet"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/OrgRouteKept"
+        }
+      }
+    },
+    {
       "name": "people/invite",
       "x-capability": "people/1",
       "tags": [
@@ -2277,6 +3184,32 @@
       }
     },
     {
+      "name": "people/removeRequests",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, D13): the people an org provider deleted by SCIM, suspended and waiting for people/remove.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/RemoveRequestList"
+        }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
+    },
+    {
       "name": "people/setRole",
       "x-capability": "people/1",
       "tags": [
@@ -2305,6 +3238,11 @@
       "name": "policy/get",
       "x-capability": "policy/1",
       "description": "An admin's: the whole policy, its rev, and each machine's applied version (#998).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -2326,6 +3264,11 @@
       "name": "policy/mine",
       "x-capability": "policy/1",
       "description": "Any person's: the policy in force (#998).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -2347,6 +3290,11 @@
       "name": "policy/raise",
       "x-capability": "policy/1",
       "description": "An admin's: raise a person's budget for today, UTC (#998, FR-019).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -2368,6 +3316,11 @@
       "name": "policy/set",
       "x-capability": "policy/1",
       "description": "An admin's: keep the rules, one version higher, signed, audited and sent to every machine (#998).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -2389,6 +3342,11 @@
       "name": "policy/stopAll",
       "x-capability": "policy/1",
       "description": "An admin's: the kill switch on or off (#998, FR-015).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -2407,32 +3365,66 @@
       }
     },
     {
-      "name": "projects/detect",
+      "name": "projects/joined",
       "x-capability": "projects/1",
-      "description": "To a host just added, from a control plane before #656.",
-      "x-notification": true,
+      "description": "A host, on its channel 0 (#2317): every folder it has and the project id each names. The control plane adopts the ids it does not know, and answers with those projects' slots (#2669).",
       "paramStructure": "by-name",
       "params": [
         {
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/ProjectDetection"
+            "$ref": "daemon.schema.json#/definitions/ProjectsJoined"
           }
         }
-      ]
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MachineProjects"
+        }
+      }
     },
     {
-      "name": "projects/detected",
+      "name": "projects/list",
       "x-capability": "projects/1",
-      "description": "A host, on its channel 0 (#429): its answer to projects/detect.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/JSONValue"
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ProjectList"
+        }
+      }
+    },
+    {
+      "name": "projects/remove",
+      "x-capability": "projects/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ProjectRequest"
           }
         }
       ],
@@ -2440,6 +3432,56 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "projects/set",
+      "x-capability": "projects/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ProjectSet"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Project"
+        }
+      }
+    },
+    {
+      "name": "projects/setSlot",
+      "x-capability": "projects/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ProjectSlotSet"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Project"
         }
       }
     },
@@ -2724,6 +3766,84 @@
       }
     },
     {
+      "name": "readApi/list",
+      "x-capability": "readapi/1",
+      "description": "An admin's (#2019): the read API's tokens and URL, and the OTLP exporter.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ReadAPI"
+        }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
+    },
+    {
+      "name": "readApi/make",
+      "x-capability": "readapi/1",
+      "description": "An admin's (#2019): a new read API token, its value shown once. At most 10 live.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ReadTokenMake"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ReadTokenMade"
+        }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
+    },
+    {
+      "name": "readApi/revoke",
+      "x-capability": "readapi/1",
+      "description": "An admin's (#2019): a read API token stops working at once.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ReadTokenRevoke"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ReadAPI"
+        }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
+    },
+    {
       "name": "relay/count",
       "x-capability": "relay/1",
       "description": "To a relay host, on its channel 0 (#1163).",
@@ -2793,6 +3913,32 @@
       }
     },
     {
+      "name": "reports/deleteView",
+      "x-capability": "reports.views/1",
+      "description": "Deletes one of the caller's saved views of Reports (#2019).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ReportViewID"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ReportViews"
+        }
+      }
+    },
+    {
       "name": "reports/export",
       "x-capability": "reports/1",
       "tags": [
@@ -2840,6 +3986,32 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/ReportPolicy"
+        }
+      }
+    },
+    {
+      "name": "reports/saveView",
+      "x-capability": "reports.views/1",
+      "description": "Keeps a view of Reports for the caller (#2019): a new one with no id, or changes the one with its id. At most 50; a scope the caller may see.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ReportView"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ReportViews"
         }
       }
     },
@@ -2921,6 +4093,162 @@
       }
     },
     {
+      "name": "reports/value",
+      "x-capability": "reports.value/1",
+      "description": "What the work in a scope cost and delivered (#2351): cost per merged PR, per issue and per milestone, waste and lead time, from the machines' lineage nodes.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ReportQuery"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ReportValue"
+        }
+      }
+    },
+    {
+      "name": "reports/views",
+      "x-capability": "reports.views/1",
+      "description": "The caller's saved views of Reports (#2019).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ReportViews"
+        }
+      }
+    },
+    {
+      "name": "scim/set",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, FR-013): SCIM on or off for an org provider, and its match attribute.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SCIMSet"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/OrgProviderKept"
+        }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
+    },
+    {
+      "name": "scim/tokens/list",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, FR-014): a provider's SCIM tokens, with no value.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SCIMTokensRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SCIMTokenList"
+        }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
+    },
+    {
+      "name": "scim/tokens/make",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, D12): a new SCIM token, its value shown once. Refused while two are live.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SCIMTokenMake"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SCIMTokenMade"
+        }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
+    },
+    {
+      "name": "scim/tokens/revoke",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, D12): the token stops working at once.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SCIMTokenRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
+    },
+    {
       "name": "signIn/addToMe",
       "x-capability": "signin/1",
       "paramStructure": "by-name",
@@ -2965,7 +4293,28 @@
           "$ref": "daemon.schema.json#/definitions/Empty"
         }
       },
-      "description": "Approve a waiting GitHub sign-in: the new client pairs as the caller's person (#995)."
+      "description": "Approve a waiting GitHub sign-in: the new client pairs as the caller's person (#995). A browser's needs the code it shows (#2097)."
+    },
+    {
+      "name": "signIn/ask",
+      "x-capability": "signin.ask/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInAsk"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Admitted"
+        }
+      },
+      "description": "On an `s:` connection only (#2097): a browser asks to pair as the person with this sign-in's email or GitHub login. It gets control/signInWaiting with a code, and is answered when the person types that code and approves on one of their clients. The same for an account nobody has: it waits, and nothing approves it."
     },
     {
       "name": "signIn/configure",
@@ -3018,6 +4367,308 @@
         }
       },
       "description": "Deny a waiting GitHub sign-in (#995)."
+    },
+    {
+      "name": "signIn/discover",
+      "x-capability": "org-identity/1",
+      "description": "On a sign-in or a paired connection (#1002, FR-011): the org provider an email's claimed domain sends people to.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInDiscover"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SignInDiscovered"
+        }
+      }
+    },
+    {
+      "name": "signIn/domains/check",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, D8): look for the domain's TXT record now.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInDomainRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/DomainClaim"
+        }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
+    },
+    {
+      "name": "signIn/domains/claim",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, D8): claim a domain for one org provider; answers the TXT record to add. One domain has one provider.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInDomainClaim"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/DomainClaim"
+        }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
+    },
+    {
+      "name": "signIn/domains/list",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002): every claimed domain.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SignInDomainList"
+        }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
+    },
+    {
+      "name": "signIn/domains/preview",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, FR-012): who Require would refuse, before it is turned on.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInDomainRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SignInDomainPreview"
+        }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
+    },
+    {
+      "name": "signIn/domains/remove",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002): take a domain claim back.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInDomainRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
+    },
+    {
+      "name": "signIn/domains/set",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, D8, D9): turn Send people here and Require this provider on or off; either needs a proved domain.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInDomainSet"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/DomainClaim"
+        }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
+    },
+    {
+      "name": "signIn/orgProviders/check",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, FR-004): read the issuer's discovery document and JWKS again, and say what is missing.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgProviderRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/OrgProviderCheck"
+        }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
+    },
+    {
+      "name": "signIn/orgProviders/list",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002): every org provider, with no secret.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/OrgProviderList"
+        }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
+    },
+    {
+      "name": "signIn/orgProviders/remove",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, FR-009): remove an org provider and its sealed secret; its id is never used again.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgProviderRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
+    },
+    {
+      "name": "signIn/orgProviders/set",
+      "x-capability": "org-identity/1",
+      "description": "An admin's (#1002, FR-001 to FR-004): add or change an org provider, conditional on its rev; its client secret sealed with the keeper. Refused -32082 orgProviderUnavailable with no keeper, no https address, or a discovery document that lacks the code flow with PKCE S256.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgProviderSet"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/OrgProviderKept"
+        }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
+    },
+    {
+      "name": "signIn/orgStart",
+      "x-capability": "org-identity/1",
+      "description": "On a sign-in or a paired connection (#1002, D2): the /v1/oidc/start address for an org provider's flow, bound to this connection.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInOrgStart"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SignInOrgStarted"
+        }
+      }
     },
     {
       "name": "signIn/pair",
@@ -3122,6 +4773,27 @@
       "description": "The GitHub sign-ins waiting for the caller's Approve (#995, FR-010)."
     },
     {
+      "name": "signIn/ticket",
+      "x-capability": "org-identity/1",
+      "description": "On the connection that started the flow (#1002, D3, FR-006): the ticket from the callback pairs it, or adds the sign-in to the caller's person. Used once, within 2 minutes. Refused -32077 orgSignInRequired, and when the provider's Who may join does not let a new person in.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInTicket"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SignInTicketResult"
+        }
+      }
+    },
+    {
       "name": "tunnel/open",
       "x-capability": "tunnel/1",
       "description": "The borrowing host, on its channel 0 (T091).",
@@ -3214,6 +4886,48 @@
       }
     },
     {
+      "name": "user/setAgentConfigFile",
+      "x-capability": "user/1",
+      "description": "A machine reports one local agent configuration file edit or deletion (#2129).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AgentConfigFileRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "user/setNoticeLimits",
+      "x-capability": "notices/1",
+      "description": "A host, on its channel 0 (#2859): the person changed Burst or Cool-down in one of its clients, so the notifications part of their user settings takes it. A machine may set this part and no other.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/NoticeLimits"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "user/setSecret",
       "x-capability": "user/1",
       "tags": [
@@ -3289,6 +5003,22 @@
       }
     },
     {
+      "name": "user/suspended",
+      "x-capability": "host.suspend/1",
+      "description": "To each machine of a suspended person, on its channel 0 (#1002, FR-018): at hello before its settings, and within 5 seconds of a change, on every copy. A machine without host.suspend/1 whose person is suspended is refused at hello -32078 personSuspended.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/UserSuspended"
+          }
+        }
+      ]
+    },
+    {
       "name": "workflows/claimRun",
       "x-capability": "bots/1",
       "description": "A machine, on its channel 0 (#1761): asks to run a runs-on: workflow for one trigger; the first machine to ask runs it.",
@@ -3348,27 +5078,6 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/TeamTriggerSent"
-        }
-      }
-    },
-    {
-      "name": "workspaces/forAgent",
-      "x-capability": "workspaces/1",
-      "description": "Through host/workspaces only.",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/AgentWorkspaces"
         }
       }
     }

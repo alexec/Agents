@@ -6,7 +6,7 @@ description: Publish Agents Host on GitHub and the app on TestFlight by tagging 
 
 # Release Agents Host
 
-Agents Host is downloaded from the project's GitHub releases, outside the App Store. That
+Agents Host is downloaded from the folder's GitHub releases, outside the App Store. That
 is the page the Agents window's **Get Agents Host…** opens. Pushing a version tag on main
 publishes a release. The tag starts the `release` workflow, which:
 
@@ -15,7 +15,16 @@ publishes a release. The tag starts the `release` workflow, which:
 - staples the same app and zips it as `Agents-Host-<version>.zip`, for Macs that may not
   mount a disk image;
 - builds the static Linux agentsd (Go) as `agentsd-linux-<arch>-<version>.tar.gz`;
-- creates the release with these files and a `SHA256SUMS`;
+- creates the release with these files and a `SHA256SUMS`. Agents Host on a Mac updates
+  itself from these (#2178): it downloads `v<version>/SHA256SUMS` and
+  `v<version>/Agents-Host-<version>.zip`, checks the sum, then the app's signature (the same
+  team and identifier), its notarisation and its `CFBundleShortVersionString`. Keep these
+  names, and keep the app in the zip stapled and named `Agents Host.app`;
+- in its `image` job, builds the control plane's image for `linux/amd64` and `linux/arm64`
+  and pushes it to `ghcr.io/alexec/agents-control` as `<version>`, `<major>.<minor>` and
+  `latest`, with an SBOM and provenance, and signs it with cosign, keyless (#2140). It uses
+  the workflow's own token: no secret to set. The release is not published unless the image
+  pushed;
 - in its `testflight` job, archives the Mac window and the Remote (one Universal app),
   checks both archives with `scripts/check-store-archive.sh`, uploads them to TestFlight
   and waits until App Store Connect has processed both. Nothing goes to App Review.
@@ -69,6 +78,19 @@ You set this up once, as the Apple Developer account's Account Holder.
    Without them the GitHub release still goes out, and the `testflight` job fails at its
    first step, naming the secrets that are missing.
 
+   Before it archives, the job runs `scripts/check-store-profiles.py` on the four decoded
+   profiles (#2781). Each must allow every entitlement in the `.entitlements` file its target
+   signs with in Release. The check names a missing entitlement and the secret, never a
+   secret's value. `release-secrets.sh --store` runs the same check on the installed profiles
+   before it sets anything.
+
+   **A change that adds an entitlement makes the profiles again.** When a pull request adds a
+   capability to an App Store target (Sign in with Apple did, #2507), make that target's
+   profile again in the developer site, install it, and update the `release` environment in
+   the same change: `scripts/release-secrets.sh --store …`, or
+   `base64 -i <profile> | gh secret set PROFILE_… --env release`. Say so in the pull request.
+   Setting the secrets is Alex's to approve.
+
 ## Steps
 
 1. Choose the version, for example `0.2.0`: minor when an enhancement merged since the
@@ -108,6 +130,11 @@ two identities and the four profiles, and the App Store Connect key in `~/.priva
 `--no-upload` stops before the upload. `--dry-run` needs no certificate: it proves both
 archives build and pass `check-store-archive.sh`.
 
+The `release-dry-run` workflow runs both dry runs on a runner with an empty build cache
+(#2780). It starts on a pull request that changes `scripts/build-cache.sh`,
+`scripts/release-*.sh`, `release.yml` or `project.yml`, and the release skill's gate runs it on
+the commit it will tag: `gh workflow run release-dry-run.yml -f ref=<sha>`.
+
 ## If something goes wrong
 
 - **"is not on main":** the tag points at a commit main doesn't have. Delete the tag
@@ -119,3 +146,6 @@ archives build and pass `check-store-archive.sh`.
   `scripts/release-secrets.sh --store …`, then run the **release** workflow again with the tag.
 - **An upload is refused as a duplicate:** that build number is taken for the version. Run
   the workflow again: the new run number is a new build.
+- **"PROFILE_… has no …, which ….entitlements asks for":** the profile in that secret was
+  made before the entitlement was added. Make it again in the developer site, install it, run
+  `scripts/release-secrets.sh --store …`, then run the **release** workflow again with the tag.

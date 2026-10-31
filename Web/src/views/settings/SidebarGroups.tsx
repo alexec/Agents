@@ -5,7 +5,7 @@ import { setSmartGroup, smartGroupsOn } from "../../model/smartGroups";
 
 /** The words under the Sidebar section, as the window's and the Remote's (#846). */
 export const sidebarSettingsFooter = "A group that is off is not shown. Its sessions go to the next group they fit, "
-  + "or under their project. With Needs You off, approvals are not listed in the sidebar. The same on every client of yours.";
+  + "or under their folder. With Needs You off, approvals are not listed in the sidebar. The same on every client of yours.";
 
 export function SidebarGroupsSection() {
   const on = smartGroupsOn.value;

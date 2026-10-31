@@ -10,6 +10,9 @@ import UniformTypeIdentifiers
 @Observable
 final class HostModel {
     let paths = HostPaths.current
+    /// The control plane the organisation pins this Mac to, from its configuration profile
+    /// (#998, US7); read once, as agentsd reads it at each start.
+    let pin = MachinePin.managed()
     private(set) var settings: HostSettings
     private var services: LocalServices { LocalServices(paths: paths) }
 
@@ -19,12 +22,12 @@ final class HostModel {
     private(set) var daemonRunning = false
     private var daemonPID: Int32?
     /// How this Mac's host's join stands, as it wrote it (#113); nil until it has.
-    private(set) var hostJoin: DaemonAPI.HostJoinStatus?
+    private(set) var hostJoin: DaemonAPI.MachineJoinStatus?
     private(set) var runningSince: Date?
     private var controlPID: Int32?
     private(set) var clients: Int?
     private(set) var hosts: Int?
-    private(set) var projects: Int?
+    private(set) var folders: Int?
     private(set) var working: Int?
     /// macOS wants the person to allow Agents Host under Login Items.
     private(set) var needsApproval = false
@@ -91,6 +94,7 @@ final class HostModel {
             secretDraft = keys.secretKey
         }
         Task { await registerOutdatedJobsAgain() }
+        if !paths.scratch { SelfUpdateRelaunch.watch() }
     }
 
     /// Once a launch (#1379): a login item registered from an older copy's plist is
@@ -217,7 +221,7 @@ final class HostModel {
     private func countWork() async {
         guard daemonRunning else {
             await dropHostClient()
-            projects = nil
+            folders = nil
             working = nil
             return
         }
@@ -243,17 +247,17 @@ final class HostModel {
         }
         guard !hostRefused else { return }
         do {
-            let listed = try await client.call(DaemonAPI.Method.projectsList, [String: String](), returning: JSONValue.self)
+            let listed = try await client.call(DaemonAPI.Method.foldersList, [String: String](), returning: JSONValue.self)
             // Every live agent, a page at a time (#164).
             let agents = try await client.listAgents(DaemonAPI.ListRequest(includeArchived: false, lean: true))
-            if case .array(let all) = listed { projects = all.count }
+            if case .array(let all) = listed { folders = all.count }
             working = agents.filter { $0.state == .running }.count
         } catch {
             switch HostLinkPolicy.failure(error) {
             case .refused:
                 // An older host that doesn't know Agents Host: no counts, and no redialling.
                 hostRefused = true
-                projects = nil
+                folders = nil
                 working = nil
             case .gone:
                 await lostHost()
@@ -398,6 +402,11 @@ final class HostModel {
     /// The control plane and this Mac's host, both here, and the host enrolled with it.
     func runHere() async {
         guard busy == nil else { return }
+        // A control plane of its own is another than the one the organisation pins (FR-027).
+        if let pin, pin.namesAControlPlane {
+            problem = pin.refusal
+            return
+        }
         problem = nil
         if storeDraft == .bucket {
             guard await saveBucket() else { return }
@@ -447,6 +456,14 @@ final class HostModel {
 
     static let ownHostCodeMinutes = 24 * 60
 
+    /// "Your organisation requires this Mac to join …" while its pin says must join and it
+    /// has not joined the pinned control plane (#998, US7); agentsd runs nothing until then.
+    var mustJoinNote: String? {
+        guard let pin, pin.mustJoin else { return nil }
+        if let member = ControlMembership.load(paths.hostLocations.controlHostMembership), pin.admits(member) { return nil }
+        return pin.mustJoinWords
+    }
+
     /// This Mac's host couldn't join or reach its control plane, and is trying again.
     var hostJoinFailed: Bool { daemonRunning && hostJoin?.failed == true }
 
@@ -468,8 +485,13 @@ final class HostModel {
     /// Only this Mac's host, for a control plane elsewhere: a host code from it (US9).
     func joinElsewhere(code: String) async {
         let code = code.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard ControlCode(text: code)?.purpose == .host else {
+        guard let parsed = ControlCode(text: code), parsed.purpose == .host else {
             problem = "That isn't a machine code. Ask the other control plane for one: Settings ▸ Machines ▸ Add a Mac."
+            return
+        }
+        // A code for another control plane than the pinned one (#998, US7 AS2).
+        if let pin, !pin.admits(parsed) {
+            problem = pin.refusal
             return
         }
         busy = "Joining…"
@@ -874,7 +896,7 @@ final class HostModel {
     }
 
     /// `hosts/setRelay`, over the session the control plane's key proves.
-    private func tellRelay(_ host: HostID, on: Bool) async -> ControlTool.Result {
+    private func tellRelay(_ host: MachineRef, on: Bool) async -> ControlTool.Result {
         await ControlTool.run(["handover", "relay", "--at", "self", "--host", host.rawValue, on ? "--on" : "--off",
                                "--home", paths.controlHome.path, "--port", String(paths.port)],
                               paths: paths, settings: settings)

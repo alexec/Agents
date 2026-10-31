@@ -1,9 +1,13 @@
 package main
 
 import (
+	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/alexec/agents/Go/internal/rolllog"
 )
 
 // The flags the install script's systemd unit and its detached start pass.
@@ -50,5 +54,26 @@ func TestDevNullIsNotATerminal(t *testing.T) {
 	}
 	if isTerminalFile(file) {
 		t.Fatal("a file counted as a terminal")
+	}
+}
+
+// A log line with a token in it goes to daemon.log redacted (#1001, SC-001).
+func TestALogLineIsRedacted(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "daemon.log")
+	f, err := rolllog.Open(file, rolllog.Limit, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	defer setLog(os.Stderr)
+	setLog(f)
+	token := "ghp_" + strings.Repeat("a1B2", 9)
+	log.Printf("clone failed: https://x-access-token:%s@github.com/o/r", token)
+	b, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), token) || !strings.Contains(string(b), "x-access-token:[redacted:github]@github.com") {
+		t.Fatalf("daemon.log: %q", b)
 	}
 }

@@ -5,7 +5,14 @@
 #   docker build -f deploy/Containerfile -t agents-control .
 #   docker buildx build --platform linux/amd64 -f deploy/Containerfile -t agents-control .
 #
-# from the repository's root; deploy/Containerfile.dockerignore sends only Go/ and Web/.
+# from the repository's root; deploy/Containerfile.dockerignore sends only Go/, Web/, the
+# runtimes' toolsets and the deploy files.
+#
+# The image carries all a control plane on a server needs (#2140), so a release's image is the
+# only download: the Linux host it hands to servers that join (/servers, both architectures, as
+# scripts/build-linux-agentsd.sh makes them), the runtimes' toolsets (/toolsets), and the
+# files to run it with (/deploy: the compose files, the Caddyfiles and make-secrets.sh), which
+# `docker cp` takes out.
 #
 # Configured by the environment (contracts/store.md "Configuration"): AGENTS_STORE,
 # AGENTS_CONTROL_URL, AGENTS_CONTROL_PEER_URL, AGENTS_CONTROL_KEY_FILE, and for a bucket
@@ -23,18 +30,34 @@ ARG NODE_IMAGE=node:26.8.2-alpine
 # Go runs on the machine that builds and cross-compiles for the target (#1461): under qemu
 # (linux/amd64 on an Apple silicon Mac) go mod download crashes. BuildKit sets BUILDPLATFORM,
 # TARGETOS and TARGETARCH; empty, Go builds for the machine it runs on.
-FROM --platform=$BUILDPLATFORM ${GO_IMAGE} AS go
-ARG TARGETOS TARGETARCH
+FROM --platform=$BUILDPLATFORM ${GO_IMAGE} AS gosrc
 WORKDIR /src/Go
 COPY Go/go.mod Go/go.sum ./
 RUN go mod download
 COPY Go/ ./
+
+FROM gosrc AS go
+ARG TARGETOS TARGETARCH
 ARG VERSION=dev
 RUN for cmd in agents-control workspace-commands agents-hosted; do \
       CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
         -ldflags "-s -w -X github.com/alexec/agents/Go/internal/buildinfo.Version=$VERSION" \
         -o /out/$cmd ./cmd/$cmd || exit 1; \
     done
+
+# The Linux host and the MCP servers beside it, for both of a server's architectures, the same
+# in every platform's image: no TARGETARCH here, so BuildKit builds them once.
+FROM gosrc AS servers
+ARG VERSION=dev
+RUN mkdir -p /out/servers && for arch in x86_64:amd64 aarch64:arm64; do \
+      for cmd in agentsd github-mcp linear-mcp gitlab-mcp email-mcp; do \
+        out=/out/servers/$cmd-linux-${arch%%:*}; \
+        CGO_ENABLED=0 GOOS=linux GOARCH=${arch##*:} go build -trimpath \
+          -ldflags "-s -w -X github.com/alexec/agents/Go/internal/buildinfo.Version=$VERSION" \
+          -o $out ./cmd/$cmd || exit 1; \
+        sha256sum $out | cut -d' ' -f1 > $out.sha256; \
+      done; \
+    done && printf '%s' "$VERSION" > /out/servers/VERSION
 
 # The web remote, built here as it is not checked in (#473), as scripts/web.sh build makes it
 # (npm ci, then build.mjs, which writes the MANIFEST the control plane checks), so the page and
@@ -56,6 +79,10 @@ RUN apk add --no-cache ca-certificates && adduser -D -H -u 10001 control \
 # workspace-commands sits beside agents-control, where it looks first.
 COPY --from=go /out/agents-control /out/workspace-commands /out/agents-hosted /
 COPY --from=web /src/Web/dist/ /web/
+COPY --from=servers /out/servers/ /servers/
+COPY App/Resources/toolsets/ /toolsets/
+COPY deploy/compose.public.yaml deploy/compose.hosted.yaml deploy/Caddyfile.public \
+     deploy/Caddyfile.hosted deploy/make-secrets.sh /deploy/
 USER control
 EXPOSE 8791
 ENTRYPOINT ["/agents-control"]

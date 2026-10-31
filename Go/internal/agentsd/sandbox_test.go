@@ -21,7 +21,7 @@ func TestEachRuntimesSandboxAsItTakesIt(t *testing.T) {
 	if string(b) != `{"claudeCode":{"options":{"disallowedTools":["Workflow","CronCreate","CronList","CronDelete","ScheduleWakeup","Monitor","RemoteTrigger","PushNotification","EnterWorktree","ExitWorktree"],"sandbox":{"enabled":false}}}}` || len(l.Args) != 1 {
 		t.Fatalf("%s %v", b, l.Args)
 	}
-	if l, _ := withSandbox(acp.Launch{Args: []string{"acp"}}, nil, "grok", wire.SandboxChoiceOn); !slices.Equal(l.Args, []string{"acp", "--sandbox", "workspace"}) {
+	if l, _ := withSandbox(acp.Launch{Args: []string{"acp"}}, nil, "grok", wire.SandboxChoiceOn); !slices.Equal(l.Args, []string{"acp"}) {
 		t.Fatal(l.Args)
 	}
 	if l, _ := withSandbox(acp.Launch{Env: []string{"GEMINI_SANDBOX=true", "A=b"}}, nil, "gemini", wire.SandboxChoiceOff); !slices.Equal(l.Env, []string{"A=b", "GEMINI_SANDBOX=false"}) {
@@ -30,7 +30,7 @@ func TestEachRuntimesSandboxAsItTakesIt(t *testing.T) {
 	if l, m := withSandbox(acp.Launch{Args: []string{"acp"}}, nil, "grok", wire.SandboxChoiceRuntime); len(l.Args) != 1 || m != nil {
 		t.Fatal(l.Args, m)
 	}
-	if c := sandboxChoices("gemini"); len(c) != 2 || sandboxChoices("cursor") != nil || len(sandboxChoices("claude")) != 3 {
+	if c := sandboxChoices("gemini"); len(c) != 2 || sandboxChoices("cursor") != nil || sandboxChoices("grok") != nil || len(sandboxChoices("claude")) != 3 {
 		t.Fatal(c)
 	}
 	if m, ok := codexStartMode("codex", wire.SandboxChoiceOff, "auto"); !ok || m != codexFullAccess {

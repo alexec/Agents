@@ -3,7 +3,7 @@ import Foundation
 /// What the New session page asks its host as it opens (#1096), and which of those asks
 /// still has no answer.
 ///
-/// The page asks for its runtime's choices, the project's personas and its worktrees.
+/// The page asks for its runtime's choices, the folder's personas and its worktrees.
 /// An ask whose reply was lost with the link has no answer, the same as one that failed:
 /// once the host answers again, each ask with no answer is asked again. The page used to
 /// ask again only for choices that failed, so a reply lost on the way kept it on "Asking…"

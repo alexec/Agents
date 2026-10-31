@@ -7,7 +7,10 @@
 #   deploy/make-secrets.sh --public --kms projects/P/locations/L/keyRings/R/cryptoKeys/K
 #   AGENTS_HOSTED_DOMAIN=agentloops.dev AGENTS_HOSTED_ACCOUNTS_DOMAIN=cp.agentloops.dev \
 #       AGENTS_HOSTED_GITHUB_SECRET=… ACME_EMAIL=you@example.com \
-#       docker compose -f deploy/compose.hosted.yaml up -d --build
+#       docker compose -f deploy/compose.hosted.yaml up -d
+#
+# The image is the release's, ghcr.io/alexec/agents-control:${AGENTS_VERSION:-latest} (#2140);
+# `docker compose … pull` gets a new one, and `up -d --build` builds it from this checkout.
 #
 # DNS: AGENTS_HOSTED_DOMAIN and *.AGENTS_HOSTED_ACCOUNTS_DOMAIN point at this machine, with
 # ports 80 and 443 open. The GitHub App's callback URL is
@@ -16,14 +19,23 @@
 # not open.
 name: agents-hosted
 
+# Docker's json-file driver keeps every log line for ever on the one disk (#2290): each service
+# keeps at most 3 files of 10 MB in the local driver.
+x-logging: &logging
+  driver: local
+  options:
+    max-size: 10m
+    max-file: "3"
+
 services:
   hosted:
+    logging: *logging
     build:
       context: ..
       dockerfile: deploy/Containerfile
       args:
         VERSION: ${AGENTS_VERSION:-dev}
-    image: agents-control:latest
+    image: ghcr.io/alexec/agents-control:${AGENTS_VERSION:-latest}
     restart: unless-stopped
     entrypoint: ["/agents-hosted"]
     command: ["serve"]
@@ -62,6 +74,7 @@ services:
       - data:/data
 
   caddy:
+    logging: *logging
     image: caddy:2
     restart: unless-stopped
     depends_on: [hosted]

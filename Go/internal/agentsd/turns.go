@@ -16,6 +16,7 @@ import (
 	sdk "github.com/coder/acp-go-sdk"
 
 	"github.com/alexec/agents/Go/internal/agentsd/acp"
+	"github.com/alexec/agents/Go/internal/agentsd/redact"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
@@ -49,6 +50,10 @@ type live struct {
 	// messageText is the text of the agent's last message this turn, for its report.
 	lastMessageID string
 	lastMessage   strings.Builder
+	// held is the end of the last message chunk, held back for the next (chunkseam.go),
+	// and heldID its message.
+	held   string
+	heldID *string
 	// toolCalls is the tool calls recorded, by id, so a card waits for the call it names:
 	// the SDK hands a request over on a goroutine of its own, ahead of the notifications
 	// that came before it on the wire.
@@ -109,8 +114,14 @@ func (d *Daemon) record(id wire.UUID, kind wire.TranscriptEntryKind) {
 
 // recordFrom is record with the agent that sent the words, for a message between agents.
 func (d *Daemon) recordFrom(id wire.UUID, kind wire.TranscriptEntryKind, sender *wire.MessageSender) {
-	e := wire.TranscriptEntry{ID: store.NewUUID(), At: now(), Kind: kind, Sender: sender}
-	n, err := d.Store.Append(id, e)
+	d.recordEntry(id, store.NewUUID(), kind, sender)
+}
+
+// recordEntry is record with the entry's id chosen first, for one named before it is
+// written: a notice's need is its entry, so a tap on its banner goes to its line (#2860).
+func (d *Daemon) recordEntry(id, entryID wire.UUID, kind wire.TranscriptEntryKind, sender *wire.MessageSender) {
+	e := wire.TranscriptEntry{ID: entryID, At: now(), Kind: kind, Sender: sender}
+	n, e, err := d.Store.AppendOne(id, e)
 	if err != nil {
 		log.Printf("agent %s: could not record an entry: %v", id, err)
 		return
@@ -140,7 +151,7 @@ func stateChanged(s wire.AgentState, reason *wire.EndedReason) wire.TranscriptEn
 	return wire.TranscriptEntryKind{StateChanged: &wire.TranscriptEntryKindStateChanged{Value: s, Reason: reason}}
 }
 
-// change saves an agent's record, moved on to now, and tells every client and its project.
+// change saves an agent's record, moved on to now, and tells every client and its folder.
 func (d *Daemon) change(id wire.UUID, edit func(a *wire.Agent)) *wire.Agent {
 	return d.changeAgent(id, true, edit)
 }
@@ -164,21 +175,22 @@ func (d *Daemon) changeAgent(id wire.UUID, moveOn bool, edit func(a *wire.Agent)
 		return nil
 	}
 	d.tellChanged(*a, &before)
-	d.projectChanged(projectFolder(a))
-	// A project quiet after working says project.idle (#1368).
+	d.noteLineage(&before, *a)
+	d.folderChanged(folderPath(a))
+	// A folder quiet after working says folder.idle (#1368).
 	if before.State != a.State {
-		folder := projectFolder(a)
-		safe.Go("project idle", func() { d.watchForIdle(folder) })
+		folder := folderPath(a)
+		safe.Go("folder idle", func() { d.watchForIdle(folder) })
 	}
 	// Every place a need begins or ends moves the record (DaemonCore.move's reconsider).
 	safe.Go("reconsider", d.reconsider)
 	return a
 }
 
-func (d *Daemon) projectChanged(folder string) {
-	for _, s := range d.projects(true) {
-		if store.FolderPath(s.Project.Folder) == folder {
-			Broadcast(d, wire.NotifyProjectChanged, s)
+func (d *Daemon) folderChanged(folder string) {
+	for _, s := range d.folders(true) {
+		if store.FolderPath(s.Folder.Folder) == folder {
+			Broadcast(d, wire.NotifyFolderChanged, s)
 			return
 		}
 	}
@@ -207,6 +219,20 @@ type startedBy struct {
 }
 
 func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) {
+	// Auto picks the runtime, and the shared words become the runtime's own settings
+	// (#2658), before anything else reads them.
+	if by.agent != nil {
+		d.helperRequests(&r, d.Store.Agent(*by.agent))
+	}
+	pick, client, err := d.resolveLevels(&r, by)
+	if err != nil {
+		return "", err
+	}
+	// The organisation's policy first (#998): its refusal says why, in its own words.
+	policyNote, client, err := d.policyStart(&r, by, client)
+	if err != nil {
+		return "", err
+	}
 	if err := d.startRefusal(); err != nil {
 		return "", err
 	}
@@ -219,22 +245,43 @@ func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) 
 		return "", &Error{Code: CodeFolderGone, Message: path + " is not there any more."}
 	}
 	// An added account has its own sign-in (#840): the host's is not wanted for it.
-	if r.AccountID != nil && *r.AccountID == "" {
+	// "default" names the runtime's own sign-in (#999).
+	ownNamed := r.AccountID != nil && *r.AccountID == ownSignIn
+	if r.AccountID != nil && (*r.AccountID == "" || ownNamed) {
 		r.AccountID = nil
 	}
-	// A helper on its starter's runtime uses its starter's account.
+	// A helper on its starter's runtime uses its starter's account, where the policy lets it.
 	if r.AccountID == nil && by.agent != nil {
-		if c := d.Store.Agent(*by.agent); c != nil && c.RuntimeID == r.RuntimeID && c.AccountID != nil &&
-			d.accountProfile(c.RuntimeID, *c.AccountID) != nil {
-			r.AccountID = c.AccountID
+		if c := d.Store.Agent(*by.agent); c != nil && c.RuntimeID == r.RuntimeID && c.AccountID != nil {
+			if p := d.accountProfile(c.RuntimeID, *c.AccountID); p != nil && reachRefusal(d.orgPolicy(), r.RuntimeID, p, nil) == nil {
+				r.AccountID = c.AccountID
+			}
 		}
 	}
+	// A session that names no account takes the runtime's default (#999, FR-016); a helper
+	// or a workflow says so in its chat.
+	if r.AccountID == nil && !ownNamed {
+		if def := d.defaultAccount(r.RuntimeID); def != nil {
+			r.AccountID = &def.ID
+			if by.agent != nil || by.owner != wire.SessionLabelOwnerPerson {
+				policyNote = strings.TrimSpace(policyNote + " It runs on " + def.Name + ", " + rt.Name + "'s default account.")
+			}
+		}
+	}
+	var account *wire.AccountProfile
 	if r.AccountID != nil {
-		if d.accountProfile(r.RuntimeID, *r.AccountID) == nil {
+		if account = d.accountProfile(r.RuntimeID, *r.AccountID); account == nil {
 			return "", Invalid("%s has no such account. It may have been removed.", rt.Name)
 		}
-	} else if err := d.needsSignIn(r.RuntimeID); err != nil {
+	}
+	// The organisation's policy may require the org path (#999, FR-015).
+	if err := d.accountRefusal(r.RuntimeID, account); err != nil {
 		return "", err
+	}
+	if account == nil {
+		if err := d.needsSignIn(r.RuntimeID); err != nil {
+			return "", err
+		}
 	}
 	// The same start sent again (a window retrying) is the agent it made.
 	if r.RequestID != nil {
@@ -277,7 +324,9 @@ func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) 
 		AdvertisedOptions: []wire.ConfigOption{}, AvailableCommands: []wire.SlashCommand{},
 		CreatedAt: t, LastActivityAt: t, MadeInRoot: &d.Store.RootID, StartRequestID: r.RequestID,
 		StartedByAgent: by.agent, SandboxOverride: r.Sandbox, Persona: r.Persona, AccountID: r.AccountID,
+		Auto: pick, ClientPermission: client,
 	}
+	a.Levels = d.matchLevels(&a)
 	if q := by.queued; q != nil {
 		// Out of the queue, the same agent: its id, its title and when it was asked for.
 		a.ID, a.CreatedAt, a.Title, a.Labels = q.ID, q.CreatedAt, q.Title, q.Labels
@@ -299,15 +348,31 @@ func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) 
 	}
 	d.actedOn(a.ID, by.actor)
 	d.tellChanged(a, nil)
-	d.projectChanged(projectFolder(&a))
+	d.noteLineage(nil, a)
+	d.folderChanged(folderPath(&a))
+	if r.StartedFrom != nil {
+		d.record(a.ID, runtimeNote(startedFromNote(r.StartedFrom)))
+	}
 	if wt != nil {
 		d.record(a.ID, runtimeNote(worktreeNote(*wt)))
+	}
+	if pick != nil {
+		d.record(a.ID, runtimeNote(autoNote(*pick)))
+	}
+	if policyNote != "" {
+		d.record(a.ID, runtimeNote(policyNote))
 	}
 	if r.Purpose == nil {
 		safe.Go("starting point", func() { d.takeStartingPoint(a.ID, path) })
 	}
+	// Started from voice mode (#2375): its first reply is heard, as a voice prompt's is.
+	var preface *string
+	if r.Voice != nil && *r.Voice {
+		p := voicePreface
+		preface = &p
+	}
 	if err := d.enqueue(a.ID, wire.QueuedPrompt{ID: store.NewUUID(), Text: r.Prompt, Attachments: r.Attachments,
-		QueuedAt: t, From: wire.PromptOriginPerson}, false); err != nil {
+		QueuedAt: t, From: wire.PromptOriginPerson, Preface: preface}, false); err != nil {
 		return "", err
 	}
 	return a.ID, nil
@@ -427,8 +492,9 @@ func (l *live) run() {
 			return
 		}
 		l.mu.Unlock()
-		// What is queued waits while the agent or the day is at its limit.
-		if l.d.holdsForLimit(l.id) {
+		// What is queued waits while the organisation's policy refuses the turn (#998),
+		// and while the agent or the day is at its limit.
+		if l.d.holdsForPolicy(l) || l.d.holdsForLimit(l.id) {
 			l.mu.Lock()
 			l.running = false
 			l.mu.Unlock()
@@ -477,7 +543,7 @@ func (l *live) turn() bool {
 		account, err := d.accountFor(a)
 		var launch acp.Launch
 		if err == nil {
-			launch, err = d.launchAs(rt, dir, account)
+			launch, err = d.launchOn(rt, dir, account, l.id)
 		}
 		if err != nil {
 			d.record(l.id, notice("error", rt.Name+" did not start", err.Error()))
@@ -492,10 +558,11 @@ func (l *live) turn() bool {
 		sandbox, why := d.resolveSandbox(a.RuntimeID, a.SandboxOverride, a.StartedByAgent)
 		launch, meta := withSandbox(launch, agentSessionMeta(a), a.RuntimeID, sandbox)
 		brief := d.briefFor(a)
-		meta = withSystemPrompt(meta, a.RuntimeID, brief)
-		s, err := acp.Start(ctx, launch, l, d.mcpServersFor(l.id), meta, continuing)
+		compatibilityMeta := withSystemPrompt(meta, a.RuntimeID, brief)
+		s, err := acp.Start(ctx, launch, l, d.mcpServersFor(l.id), meta, compatibilityMeta, continuing, brief)
 		if err != nil {
 			d.dropAppTokens(l.id)
+			d.dropStandIn(l.id)
 		}
 		if err != nil && ctx.Err() != nil {
 			d.end(l, wire.AgentStateStopped, wire.EndedReasonCancelled)
@@ -528,7 +595,7 @@ func (l *live) turn() bool {
 		l.session = s
 		// A conversation begun, or begun again because the runtime lost it: the brief it
 		// had lived in the history that is gone.
-		l.briefDue = !s.Continued && brief != "" && systemPromptDelivery[a.RuntimeID] == ""
+		l.briefDue = !s.Continued && brief != "" && !s.SupportsSystemPrompt() && compatibilitySystemPromptDelivery[a.RuntimeID] == ""
 		l.mu.Unlock()
 		// Started as the host goes, after stopAll looked (#1272): it would be left running.
 		if d.going() {
@@ -551,7 +618,8 @@ func (l *live) turn() bool {
 		d.change(l.id, func(a *wire.Agent) {
 			a.RuntimeSessionID = &sessionID
 			if opts := configOptions(s.NewResult.ConfigOptions); opts != nil {
-				a.AdvertisedOptions = withAppOptions(a.RuntimeID, a.StartOptions.Values, opts)
+				a.AdvertisedOptions = d.markOptions(a.RuntimeID, withAppOptions(a.RuntimeID, a.StartOptions.Values, opts))
+				a.Levels = d.matchLevels(a)
 			}
 		})
 		safe.Go("session watch", func() {
@@ -560,6 +628,8 @@ func (l *live) turn() bool {
 			ours := l.session == s
 			if ours {
 				l.session = nil
+				// Before the next runtime can start, so its stand-in is a new one.
+				d.dropStandIn(l.id)
 			}
 			l.mu.Unlock()
 			// A new process is a new MCP server, with a token of its own.
@@ -576,6 +646,12 @@ func (l *live) turn() bool {
 				}
 			}
 		}
+		// The policy again, now the runtime has said its options: an agent with no model
+		// or mode chosen runs on the runtime's own, which the check before it started
+		// could not see. A refused one waits, as at the start of a turn.
+		if d.holdsForPolicy(l) {
+			return false
+		}
 	}
 	// The words, off the queue now the runtime is there to take them.
 	var q wire.QueuedPrompt
@@ -584,10 +660,6 @@ func (l *live) turn() bool {
 	if a := d.Store.Agent(l.id); a != nil {
 		held = d.heldMessages(a)
 	}
-	// Read while the prompt is still queued, so promptFromTrigger cannot forget its mark.
-	d.messageMu.Lock()
-	triggers := maps.Clone(d.triggerPrompts)
-	d.messageMu.Unlock()
 	d.change(l.id, func(a *wire.Agent) { q, a.QueuedPrompts, taken = nextTurn(a.QueuedPrompts, held) })
 	if !taken {
 		return false
@@ -620,26 +692,6 @@ func (l *live) turn() bool {
 	if !resent {
 		d.recordFrom(l.id, wire.TranscriptEntryKind{UserMessage: um}, q.Sender)
 	}
-	// The loop guard's count: the person starts it again, another agent's message carries
-	// it on, and the app's own words leave it where it was; except a wake by wait_for_event
-	// or a workflow's trigger, which start it again as the person does (#1728).
-	woken := false
-	if a := d.Store.Agent(l.id); a != nil && a.EventWait != nil && a.EventWait.ResumePromptID != nil {
-		woken = *a.EventWait.ResumePromptID == q.ID
-	}
-	d.messageMu.Lock()
-	if d.messageHops == nil {
-		d.messageHops = map[wire.UUID]int{}
-	}
-	triggered := triggers[q.ID] != ""
-	delete(d.triggerPrompts, q.ID)
-	switch {
-	case from == wire.PromptOriginPerson, woken, triggered:
-		delete(d.messageHops, l.id)
-	case from == wire.PromptOriginAgent && q.Hops != nil:
-		d.messageHops[l.id] = int(*q.Hops)
-	}
-	d.messageMu.Unlock()
 	// What was suggested has been answered, taken or typed past; only by the person.
 	if from == wire.PromptOriginPerson {
 		d.change(l.id, func(a *wire.Agent) {
@@ -707,6 +759,8 @@ func (l *live) turn() bool {
 		return false
 	}
 	r, err := s.Prompt(ctx, acpBlocks(bs))
+	// The turn is over: what a message chunk held back goes now (#1001).
+	l.flushHeld()
 	if err != nil {
 		if ctx.Err() != nil {
 			d.end(l, wire.AgentStateStopped, wire.EndedReasonCancelled)
@@ -747,16 +801,28 @@ func (l *live) turn() bool {
 		}
 		return true
 	}
-	if r.Usage != nil {
-		u := wire.TurnUsage{TotalTokens: int64(r.Usage.TotalTokens), InputTokens: int64(r.Usage.InputTokens), OutputTokens: int64(r.Usage.OutputTokens)}
-		optional := func(n *int) *int64 {
-			if n == nil {
-				return nil
+	// On an org account, the relay's count of the provider's answers goes beside what the
+	// runtime says (#999, FR-019), also from a runtime that says nothing.
+	relayed, route := d.takeRelayTokens(l.id)
+	if r.Usage != nil || relayed != nil {
+		u := wire.TurnUsage{}
+		if r.Usage != nil {
+			u = wire.TurnUsage{TotalTokens: int64(r.Usage.TotalTokens), InputTokens: int64(r.Usage.InputTokens), OutputTokens: int64(r.Usage.OutputTokens)}
+			optional := func(n *int) *int64 {
+				if n == nil {
+					return nil
+				}
+				v := int64(*n)
+				return &v
 			}
-			v := int64(*n)
-			return &v
+			u.ThoughtTokens, u.CachedReadTokens, u.CachedWriteTokens = optional(r.Usage.ThoughtTokens), optional(r.Usage.CachedReadTokens), optional(r.Usage.CachedWriteTokens)
 		}
-		u.ThoughtTokens, u.CachedReadTokens, u.CachedWriteTokens = optional(r.Usage.ThoughtTokens), optional(r.Usage.CachedReadTokens), optional(r.Usage.CachedWriteTokens)
+		if relayed != nil {
+			u.RelayTokens = relayed
+			if route != "" {
+				u.Route = &route
+			}
+		}
 		d.record(l.id, wire.TranscriptEntryKind{UsageRecorded: &wire.TranscriptEntryKindUsageRecorded{Value: u}})
 		// The turn's tokens on the agent, the day and the charts (finishTurn's banking).
 		d.bankTurnUsage(l.id, u)
@@ -884,13 +950,16 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 	l.mu.Lock()
 	last, reported, showedFile := l.lastMessage.String(), l.reported, l.showedFile
 	l.mu.Unlock()
+	// The report says the last message as the transcript does: whole, so a token in it,
+	// or split across its chunks, is cut out (#1001).
+	last = redact.Text(last)
 	// A turn its archive cut off (#1611): the session stays archived, and the ending is not
 	// said, as a stop or a crash, nor picked up after a restart.
 	if a := d.Store.Agent(l.id); a != nil && a.State == wire.AgentStateArchived {
 		l.forgetTools()
 		d.workflowRunFinished(l.id)
 		d.guardedTurnEnded(l.id)
-		d.checkQueueSoon(projectFolder(a))
+		d.checkQueueSoon(folderPath(a))
 		d.agentEnded(l.id)
 		return
 	}
@@ -901,6 +970,10 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 		if a := d.Store.Agent(l.id); a != nil {
 			d.noteCutOff(l.id, a.State)
 		}
+	}
+	// An admin's stop from the Console (#2435) says so to the owner, not "Stopped by you".
+	if adminStopped := d.takeAdminStop(l.id); adminStopped && s == wire.AgentStateStopped && why == wire.EndedReasonCancelled {
+		why = wire.EndedReasonStoppedByAdmin
 	}
 	var requested, archiveNow bool
 	l.forgetTools()
@@ -913,8 +986,13 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 		a.IsUnread = &unread
 		if s == wire.AgentStateFinished && !(reported && a.Report != nil) {
 			outcome, message := wire.WorkOutcomeDone, firstSentence(last)
-			if strings.HasSuffix(strings.TrimSpace(last), "?") {
+			switch {
+			case strings.HasSuffix(strings.TrimSpace(last), "?"):
 				outcome = wire.WorkOutcomeNeedsAnswer
+			case waitingOnEvents(a):
+				// Ended in a lease's line or on wait_for_event's held call (#2911): it is
+				// started again when the wait ends, not done.
+				outcome = wire.WorkOutcomeWaiting
 			}
 			if message == "" {
 				message = "Finished."
@@ -926,16 +1004,23 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 	d.record(l.id, stateChanged(s, reason(why)))
 	// A move asked for in this turn is made now, before the ending is heard and before an
 	// archive, so the worktree left is removed either way (053).
-	d.afterTurnMove(l.id, s, requested || archiveNow)
+	// An agent that moved itself and goes on in the new folder has not finished (#1955):
+	// no agent.finished, its workflow run goes on, and those waiting on it wait on.
+	goesOn := d.afterTurnMove(l.id, s, requested || archiveNow)
 	// The event after the record (042): what a waiting agent hears and what the log keeps.
-	d.raiseAgentEnding(l.id, s, reason(why), archiveNow)
-	d.workflowRunFinished(l.id)
+	if !goesOn {
+		d.raiseAgentEnding(l.id, s, reason(why), archiveNow)
+		d.workflowRunFinished(l.id)
+	}
 	d.afterArchiveRequest(l.id, requested, archiveNow)
 	// What the turn did to the app's own files is looked at as it ends (guardedTurnEnded).
 	d.guardedTurnEnded(l.id)
 	// A place may have come free for a queued helper, and those waiting on it may go on.
 	if a := d.Store.Agent(l.id); a != nil {
-		d.checkQueueSoon(projectFolder(a))
+		d.checkQueueSoon(folderPath(a))
+	}
+	if goesOn {
+		return
 	}
 	d.agentEnded(l.id)
 	if s == wire.AgentStateFinished {
@@ -1045,6 +1130,10 @@ func configOptions(v any) []wire.ConfigOption {
 func (l *live) Update(n sdk.SessionNotification) {
 	d := l.d
 	u := n.Update
+	// What a message chunk held back goes before any other update (#1001).
+	if u.AgentMessageChunk == nil {
+		l.flushHeld()
+	}
 	switch {
 	case u.AgentMessageChunk != nil || u.AgentThoughtChunk != nil:
 		var c sdk.ContentBlock
@@ -1075,7 +1164,14 @@ func (l *live) Update(n sdk.SessionNotification) {
 		l.lastMessage.WriteString(text)
 		l.evidence.takeReply(text)
 		l.mu.Unlock()
-		d.record(l.id, wire.TranscriptEntryKind{AgentMessage: &wire.TranscriptEntryKindAgentMessage{MessageID: id, Text: text}})
+		// The end that could start a token waits for the next chunk (#1001).
+		earlier, now := l.holdChunk(id, text)
+		if earlier != nil {
+			d.record(l.id, wire.TranscriptEntryKind{AgentMessage: earlier})
+		}
+		if now != "" {
+			d.record(l.id, wire.TranscriptEntryKind{AgentMessage: &wire.TranscriptEntryKindAgentMessage{MessageID: id, Text: now}})
+		}
 	case u.ToolCall != nil:
 		call := toolCall(u.ToolCall)
 		d.record(l.id, wire.TranscriptEntryKind{ToolCall: &wire.TranscriptEntryKindToolCall{Value: call}})
@@ -1123,7 +1219,8 @@ func (l *live) Update(n sdk.SessionNotification) {
 				if was != nil && now != nil && was.ID == now.ID && len(now.CurrentValue) > 0 && !bytes.Equal(was.CurrentValue, now.CurrentValue) {
 					keepMode(a, now.ID, now.CurrentValue)
 				}
-				a.AdvertisedOptions = withAppOptions(a.RuntimeID, a.StartOptions.Values, opts)
+				a.AdvertisedOptions = d.markOptions(a.RuntimeID, withAppOptions(a.RuntimeID, a.StartOptions.Values, opts))
+				a.Levels = d.matchLevels(a)
 			})
 		}
 	case u.AvailableCommandsUpdate != nil:
@@ -1161,6 +1258,10 @@ func (l *live) Update(n sdk.SessionNotification) {
 			if a := d.Store.Agent(l.id); !inTurn && a != nil {
 				d.noteFailure(l.id, a.RuntimeID, f)
 			}
+		}
+		// The goal it keeps working towards (#2742), drawn as a card over the plan's.
+		if g, said := goalIn(u.SessionInfoUpdate.Meta, now()); said {
+			d.change(l.id, func(a *wire.Agent) { a.Goal = g })
 		}
 		// The runtime names the conversation (#492), unless the person named it.
 		if t := u.SessionInfoUpdate.Title; t != nil && *t != "" {
@@ -1206,6 +1307,17 @@ func (l *live) Permission(ctx context.Context, p sdk.RequestPermissionRequest) s
 	// already is refused, and the agent carries on.
 	if d.isBot() {
 		return l.refuseForBot(req)
+	}
+	// Always-approve answers before a card, for Cursor, Grok and OpenCode (061). A request
+	// with no allow option still waits for the person.
+	if a := d.Store.Agent(l.id); a != nil && d.agentAlwaysApproves(a) {
+		for _, kind := range []wire.PermissionOptionKind{wire.PermissionOptionKindAllowOnce, wire.PermissionOptionKindAllowAlways} {
+			for _, o := range req.Options {
+				if o.Kind == kind {
+					return o.OptionID
+				}
+			}
+		}
 	}
 	pp := &pendingPermission{req: req, answer: make(chan string, 1)}
 	l.mu.Lock()

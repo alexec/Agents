@@ -20,18 +20,18 @@ something particular done.
   client with no code, and turn those sign-ins on for your control plane.
 - [Set up Google, Apple and GitHub sign-in for your own build](set-up-sign-in-for-your-own-build.md):
   make your own ids for a build from source, and check that sign-in works.
-- [Add a server](add-a-server.md): make a Linux server, or another Mac, a host of your
+- [Add a machine](add-a-machine.md): make a Linux server, or another Mac, a host of your
   control plane.
 - [Invite someone](invite-someone.md): add another person to your control plane, change
   their role, approve a machine that asks to join, and remove a person.
-- [Send a project to a server](send-a-project-to-a-server.md): a repository on this Mac,
-  with its unpushed branches and uncommitted changes, made a project on the server, and
+- [Send a folder to a server](send-a-folder-to-a-machine.md): a repository on this Mac,
+  with its unpushed branches and uncommitted changes, made a folder on the server, and
   the server's work brought back.
-- [Start workspaces from Agents](start-workspaces-from-agents.md): let the control plane
+- [Start machines from Agents](start-machines-from-agents.md): let the control plane
   start and stop the machines your servers run on, and press Start on a stopped one.
-- [Add a workspace provider](add-a-workspace-provider.md): a preset, your own commands, a
+- [Add a machine provider](add-a-machine-provider.md): a preset, your own commands, a
   tool map, or a provider of your own.
-- [Set up a cloud workspace provider](set-up-a-cloud-workspace-provider.md): add AWS EC2,
+- [Set up a cloud machine provider](set-up-a-cloud-machine-provider.md): add AWS EC2,
   Compute Engine, Cloud Workstations, DigitalOcean, Codespaces or Coder, with the credentials
   each one needs.
 - [Turn the relay on or off](turn-the-relay-on-or-off.md): let your iPhone and iPad reach
@@ -51,12 +51,10 @@ something particular done.
 - [Fix Agents Host when it won't start](fix-agents-host-not-starting.md): see why a login
   item isn't running, Repair it, and send diagnostics with a report.
 
-### Projects
+### Folders
 
-- [Chat without a project](chat-without-a-project.md): start a chat with no folder to
-  pick, and keep a file for a later chat.
-- [Add a project](add-a-project.md): add a folder or clone a Git URL, and archive a
-  project you are done with.
+- [Add a folder](add-a-folder.md): add a folder or clone a Git URL, and archive a
+  folder you are done with.
 - [Start an agent in its own worktree](start-in-a-worktree.md): give an agent its own
   checkout and branch.
 - [Give an agent more folders and connectors](give-an-agent-more-folders.md): let one
@@ -66,6 +64,8 @@ something particular done.
 
 - [Choose a runtime, model and mode](choose-runtime-model-mode.md): what an agent runs
   on, and the meter for its context and cost.
+- [Use Auto](use-auto.md): start a session on Auto, choose which runtimes it uses and in
+  what order, and read or change what each value is on each runtime.
 - [Pick up a conversation started somewhere else](pick-up-a-conversation.md): carry on
   in Agents with one you began in Terminal, or delete one.
 - [Answer a question or a permission request](answer-a-question.md): from the Mac, the
@@ -98,7 +98,7 @@ something particular done.
   itself), and see the problems and completions from the file's language server.
 - [Use the Simulator pane](use-the-simulator-pane.md): see an iOS simulator on the
   session's Mac, boot it or shut it down, and tap on its screen, from any client.
-- [Open a session or a project in its own window](open-in-its-own-window.md): a window of
+- [Open a session or a folder in its own window](open-in-its-own-window.md): a window of
   its own on the Mac, a scene of its own on an iPad, or a tab of its own on the web page.
 - [Stop and archive agents](archive-and-stop.md): what each does, and what each
   keeps.
@@ -109,13 +109,13 @@ something particular done.
 - [Assess a runtime](assess-a-runtime.md): have an agent on a runtime work through the app's
   tools, and read the app's own score of it.
 - [Share skills, instructions and connectors with every agent](share-skills-across-agents.md):
-  put them in `~/.agents` once, for every runtime and project.
+  put them in `~/.agents` once, for every runtime and folder.
 - [Add a skill from a catalogue](add-a-skill-from-a-catalogue.md): search skills.sh, look
-  before it goes in, and add it for yourself or to a project.
+  before it goes in, and add it for yourself or to a folder.
 - [Choose marketplaces](choose-marketplaces.md): which marketplaces Add Connector… and Add
   skill… search, and adding your own, such as your company's MCP registry.
 - [Add a connector from the registry](add-a-connector-from-the-registry.md): search
-  GitHub's MCP registry or another, see what would run, and add it for yourself or to a project. Secrets stay
+  GitHub's MCP registry or another, see what would run, and add it for yourself or to a folder. Secrets stay
   in your own `secrets.env`.
 - [Add a connector by hand](add-a-connector-by-hand.md): a local command or a remote
   URL that is not on the registry, verified to answer before anything is written.
@@ -132,9 +132,9 @@ something particular done.
 
 ### Servers
 
-- [Add a server](add-a-server.md): make a Linux server a host of your control plane.
-- [Send a project to a server](send-a-project-to-a-server.md): a repository on this Mac,
-  with its unpushed branches and uncommitted changes, made a project on the server, and
+- [Add a machine](add-a-machine.md): make a Linux server a host of your control plane.
+- [Send a folder to a server](send-a-folder-to-a-machine.md): a repository on this Mac,
+  with its unpushed branches and uncommitted changes, made a folder on the server, and
   the server's work brought back.
 
 ### Automation
@@ -145,17 +145,17 @@ something particular done.
   not, what each run did and why it started, and run it now.
 - [Start a workflow from an MCP event](start-a-workflow-from-an-mcp-event.md): an agent
   each time a connector reports something, such as a pull request's checks failing.
-- [Use GitHub](use-github.md): connect GitHub once, set up a project's Tasks, Code review
+- [Use GitHub](use-github.md): connect GitHub once, set up a folder's Tasks, Code review
   and CI, work with pull requests and issues on their pages, and use CodeRabbit.
 - [Use GitLab](use-gitlab.md): connect GitLab with the gitlab.com sign-in or an access
-  token, set up a project from it, and work with merge requests, issues and pipelines.
+  token, set up a folder from it, and work with merge requests, issues and pipelines.
 - [Use Linear issues](use-linear-issues.md): Linear's own tools, and an agent when an
   issue is opened, labelled, commented on or closed.
 - [Wait for mail](wait-for-mail.md): a mailbox for agents, the Mail page, and sign-up codes
   given to the session that waits for them.
-- [Pin a page to a project](pin-a-page-to-a-project.md): a document or an HTML page
-  under its project in the sidebar, live as it changes.
-- [Hand files to a workflow](hand-files-to-a-workflow.md): drop a file into a project's
+- [Pin a page to a folder](pin-a-page-to-a-folder.md): a document or an HTML page
+  under its folder in the sidebar, live as it changes.
+- [Hand files to a workflow](hand-files-to-a-workflow.md): drop a file into a folder's
   drop box and have a workflow work on it.
 - [Have an agent wait for something](wait-for-something.md): checks passing, another
   agent finishing or the Mac waking, and agents telling each other.

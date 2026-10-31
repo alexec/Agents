@@ -11,6 +11,9 @@ import UIKit
 /// a member sees only themselves, read only. With one person it shows them as
 /// "You · Local owner · Admin", with Invite a Person….
 ///
+/// With `kind: .bot` it is Settings ▸ Bots (#2132), a pane of its own: each bot's group, cap
+/// and machines, Make a Bot…, and the bots stopped at a cap.
+///
 /// One view for the Mac's Settings pane and the Remote's Settings page (the web page's is
 /// `Web/src/views/People.tsx`).
 struct PeoplePane: View {
@@ -18,6 +21,8 @@ struct PeoplePane: View {
     let control: DaemonClient?
     /// The people and groups this client keeps, loaded once per change (#2055).
     let people: PeopleState
+    /// People, or bots (#2132).
+    var kind: DaemonAPI.PersonRow.Kind = .person
 
     @State private var problem: String?
     @State private var isInviting = false
@@ -29,6 +34,11 @@ struct PeoplePane: View {
     /// Make a Bot… (nil bot) and Group and Cap… (#1761).
     @State private var botSheet: BotSheetItem?
     @State private var machineFor: DaemonAPI.PersonRow?
+    /// Console ▸ People on the web page, for an admin's Edit in Console (#1002, D17).
+    @State private var console: URL?
+    /// Console ▸ Sign-In on the web page, for the providers' Edit in Console (#1002, D17).
+    @State private var signInConsole: URL?
+    @Environment(\.openURL) private var openURL
 
     struct BotSheetItem: Identifiable {
         var bot: DaemonAPI.PersonRow?
@@ -36,6 +46,8 @@ struct PeoplePane: View {
     }
 
     private var list: DaemonAPI.PeopleList? { people.list }
+    /// The rows of this pane's kind.
+    private var shown: [DaemonAPI.PersonRow] { list?.people.filter { $0.kind == kind } ?? [] }
     /// The groups a bot may be in (#1761).
     private var groups: [DaemonAPI.Group] { people.groups }
 
@@ -49,7 +61,7 @@ struct PeoplePane: View {
                 .paperListRow()
             }
             // Each bot stopped at a cap, for an admin (#1761, #2073).
-            if list?.admin == true, !people.capped.isEmpty {
+            if kind == .bot, list?.admin == true, !people.capped.isEmpty {
                 Section {
                     ForEach(people.capped, id: \.user) { reached in
                         Text(BotWords.capReached(reached)).appText(.supporting).tinted(.attention)
@@ -59,8 +71,15 @@ struct PeoplePane: View {
                 .paperListRow()
             }
             if let list {
-                ForEach(list.people) { person in
-                    PersonSection(person: person, admin: list.admin, groups: groups,
+                if shown.isEmpty {
+                    Text(kind == .bot ? BotWords.empty : "No people yet.")
+                        .appText(.supporting).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .paperListRow()
+                }
+                ForEach(shown) { person in
+                    PersonSection(person: person, admin: list.admin, groups: groups, providerName: people.providerName,
+                                  console: console,
                                   setRole: { role in Task { await setRole(person, role) } },
                                   remove: { removing = person },
                                   setCap: { botSheet = BotSheetItem(bot: person) },
@@ -71,17 +90,38 @@ struct PeoplePane: View {
                 }
                 Section {
                     if list.admin {
-                        Button("Invite a Person…") { isInviting = true }
-                        // A bot runs the team's workflows (#1761).
-                        Button(BotWords.make) { botSheet = BotSheetItem(bot: nil) }
+                        if kind == .bot {
+                            // A bot runs the team's workflows (#1761).
+                            Button(BotWords.make) { botSheet = BotSheetItem(bot: nil) }
+                        } else {
+                            Button("Invite a Person…") { isInviting = true }
+                        }
                     }
                 } footer: {
-                    Text(PeopleWords.foot(admin: list.admin))
+                    Text(kind == .bot ? BotWords.foot : PeopleWords.foot(admin: list.admin))
                         .appText(.fine)
                         .foregroundStyle(.secondary)
                 }
                 .paperListRow()
-                if list.admin {
+                // The organisation's providers, read only: the Console is web only (#1002, D17).
+                if kind == .person, !people.orgProviders.isEmpty {
+                    Section {
+                        ForEach(people.orgProviders) { provider in
+                            Text(provider.name).appText(.reading)
+                        }
+                        if list.admin, let signInConsole {
+                            Button(PeopleWords.editInConsole) { openURL(signInConsole) }
+                        }
+                    } header: {
+                        Text(PeopleWords.orgProvidersTitle)
+                    } footer: {
+                        Text(PeopleWords.orgProvidersFoot(admin: list.admin))
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                    }
+                    .paperListRow()
+                }
+                if list.admin, kind == .person {
                     Section {
                         Button("Rotate Control Key…") { isRotating = true }
                         if rotated {
@@ -105,6 +145,11 @@ struct PeoplePane: View {
             // connection to it is up. Once loaded, the model keeps the list true.
             while people.list == nil, !(await load()), !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(3))
+            }
+            if let control, people.list?.admin == true {
+                let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
+                console = PeopleWords.consoleURL(status)
+                signInConsole = PeopleWords.signInConsoleURL(status)
             }
         }
         .refreshable { await load() }
@@ -177,10 +222,15 @@ private struct PersonSection: View {
     let person: DaemonAPI.PersonRow
     let admin: Bool
     let groups: [DaemonAPI.Group]
+    let providerName: (String) -> String
+    /// Edit in Console, for an admin when the web page is served (#1002, D17).
+    let console: URL?
     let setRole: (DaemonAPI.UserRole) -> Void
     let remove: () -> Void
     let setCap: () -> Void
     let addMachine: () -> Void
+
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         Section {
@@ -189,6 +239,10 @@ private struct PersonSection: View {
                 Text(PeopleWords.badges(person))
                     .appText(.fine)
                     .foregroundStyle(.secondary)
+                // Managed by, Waiting for first sign-in, Suspended by (#1002, FR-028).
+                ForEach(PeopleWords.orgLines(person, name: providerName), id: \.self) { line in
+                    Text(line).appText(.fine).foregroundStyle(.secondary)
+                }
             }
             .accessibilityElement(children: .combine)
             if person.kind == .bot {
@@ -200,7 +254,13 @@ private struct PersonSection: View {
                     Button(BotWords.addMachine, action: addMachine)
                 }
             } else {
-                if admin {
+                if let provider = person.roleSetBy {
+                    // The provider's group gives the role: read only (FR-020).
+                    ListLine(title: "Role", words: "\(person.role.title) · \(PeopleWords.setBy(providerName(provider)))")
+                    if admin, let console {
+                        Button(PeopleWords.editInConsole) { openURL(console) }
+                    }
+                } else if admin {
                     Picker("Role", selection: Binding(get: { person.role }, set: setRole)) {
                         ForEach(DaemonAPI.UserRole.allCases) { Text($0.title).tag($0) }
                     }
@@ -262,7 +322,8 @@ private struct ListLine: View {
 /// Remove… (FR-029, #1763, #2077): opens at once, asks the control plane what would go (the
 /// person's started machines with their work that is not pushed) while it shows, then says
 /// it a line each, as the web page's sheet does. An older control plane does not know
-/// `people/removePreview`: the sheet then says what it did before.
+/// `people/removePreview`: the sheet then says what it did before. A check that failed
+/// otherwise keeps Remove off, says what is at stake, and offers Try Again (#2193).
 struct RemovePersonSheet: View {
     @Environment(\.dismiss) private var dismiss
     let control: DaemonClient?
@@ -272,6 +333,7 @@ struct RemovePersonSheet: View {
     @State private var isAsking = true
     @State private var isRemoving = false
     @State private var problem: String?
+    @State private var checkProblem: String?
 
     var body: some View {
         #if os(macOS)
@@ -283,7 +345,7 @@ struct RemovePersonSheet: View {
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Remove", role: .destructive) { Task { await remove() } }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(isAsking || isRemoving)
+                    .disabled(isAsking || isRemoving || checkProblem != nil)
             }
         }
         .padding(24)
@@ -298,7 +360,7 @@ struct RemovePersonSheet: View {
                     ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Remove", role: .destructive) { Task { await remove() } }
-                            .disabled(isAsking || isRemoving)
+                            .disabled(isAsking || isRemoving || checkProblem != nil)
                     }
                 }
         }
@@ -323,6 +385,14 @@ struct RemovePersonSheet: View {
                 }
             }
             .paperListRow()
+            if let checkProblem, !isAsking {
+                Section {
+                    Text(checkProblem).appText(.supporting).tinted(.failure)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button("Try Again") { Task { await ask() } }
+                }
+                .paperListRow()
+            }
             if let problem {
                 Text(problem).appText(.supporting).tinted(.failure)
                     .fixedSize(horizontal: false, vertical: true)
@@ -333,19 +403,20 @@ struct RemovePersonSheet: View {
     }
 
     private func ask() async {
+        isAsking = true
+        checkProblem = nil
+        defer { isAsking = false }
         guard let control else {
-            problem = "The control plane can’t be reached."
-            isAsking = false
+            checkProblem = PeopleWords.checkFailed(person, why: "The control plane can’t be reached.")
             return
         }
-        defer { isAsking = false }
         do {
             preview = try await control.call(DaemonAPI.Method.peopleRemovePreview, DaemonAPI.PersonRequest(user: person.id),
                                              returning: DaemonAPI.PersonRemovePreview.self)
         } catch let error as JSONRPCError where error.code == JSONRPCError.methodNotFound {
             preview = nil
         } catch {
-            problem = PeopleWords.refusal(error)
+            checkProblem = PeopleWords.checkFailed(person, why: PeopleWords.refusal(error))
         }
     }
 

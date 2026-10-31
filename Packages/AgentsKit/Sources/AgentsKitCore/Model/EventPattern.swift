@@ -123,19 +123,20 @@ public struct EventPattern: Hashable, Sendable {
 
     // MARK: Words
 
-    /// The kind's meaning, narrowed by what it is filtered on, for the project page:
+    /// The kind's meaning, narrowed by what it is filtered on, for the folder page:
     /// "A branch an agent works on moved; never the default branch (branch agents/fix)".
     public var summary: String {
-        let meaning: String
-        if let subject = wholeSubject {
-            meaning = "Anything about \(subject.rawValue)s"
-        } else {
-            meaning = EventCatalogue.kind(named: name).map { String($0.meaning.dropLast()) } ?? name
-        }
         guard !filters.isEmpty else { return meaning }
         let narrowed = filters.sorted { $0.key < $1.key }
             .map { "\($0.key) \($0.value.values.joined(separator: " or "))" }
         return "\(meaning) (\(narrowed.joined(separator: ", ")))"
+    }
+
+    /// The kind's meaning without its full stop, "This Mac woke up"; for `subject.*`,
+    /// "Anything about agents"; a name the catalogue does not know, as it is.
+    public var meaning: String {
+        if let subject = wholeSubject { return "Anything about \(subject.rawValue)s" }
+        return EventCatalogue.kind(named: name).map { String($0.meaning.dropLast()) } ?? name
     }
 
     /// The name with its filters, as the status line writes it:
@@ -208,10 +209,10 @@ public enum EventPatternProblem: Error, Hashable, Sendable {
         case .retiredCustom(let name):
             return "\"\(name)\" is never raised: agents no longer publish events, so there are no custom.* "
                 + "events to wait or trigger on. Use one the app raises, such as agent.finished or "
-                + "branch.moved; to wait for particular agents, use wait_for_event with agents."
+                + "branch.moved; to wait for particular agents, use wait_for_agents."
         case .badArguments(let name, let message):
             let agents = EventSubject(name: name) == .agent
-                ? " To wait for particular agents, use wait_for_event with agents." : ""
+                ? " To wait for particular agents, use wait_for_agents." : ""
             return message + agents
         }
     }

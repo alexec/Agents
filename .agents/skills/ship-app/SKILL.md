@@ -1,13 +1,12 @@
 ---
 name: ship-app
-description: Build main and install the Remote on Alex's paired iPhone and iPad. Copying the Mac app into Applications and restarting its login items happens only with --install-mac, and only when Alex asks to install on this Mac. A merge wave does not run this. Not for testing a change. That is run-app, on a scratch root.
+description: Build main and install Agents Host, the Mac window, and the Remote on Alex's paired iPhone and iPad. The Mac install runs by default; use --no-mac to skip it. A merge wave does not run this. Not for testing a change. That is run-app, on a scratch root.
 ---
 
 # Ship main to the real app and devices
 
-Run the one script. It builds, and installs the Remote. It does not copy the Mac app
-into Applications or restart login items. Do not reimplement its checks or write a
-watcher around it.
+Run the one script. It builds and installs Agents Host, the Mac window and the Remote.
+Do not reimplement its checks or write a watcher around it.
 
 ```sh
 .claude/skills/ship-app/scripts/ship.sh
@@ -17,16 +16,16 @@ Run it from a worktree of your own at origin/main (#797): the worktree's copy bu
 installs that worktree, and refuses unless it is clean and at origin/main. Run from the
 main checkout, it builds there instead, which a lane's build can write over.
 
-Pass `--install-mac` only when Alex has asked to install on this Mac. That copies
-Agents Host and the window into `~/Applications` and `launchctl kickstart`s the
-login-item jobs. A development run, a test, and a merge wave never pass it.
+The script installs the Mac app by default. That copies Agents Host and the window into
+`~/Applications` and `launchctl kickstart`s the login-item jobs. Pass `--no-mac` to skip
+the Mac install. `--install-mac` remains accepted as an alias for the default.
 
 `--no-linux` skips rebuilding the Linux hosts (`scripts/build-linux-agentsd.sh`, into
 `App/Resources/servers`), which the build otherwise does first, since Agents Host
 carries them and a stale one cannot join. It is Go (#1314) and takes seconds.
 `--no-devices` skips the iPhone and iPad.
 `--device <UDID>` (repeatable) picks one device. `--now` relaunches the Mac after 3s
-instead of 20s, and only with `--install-mac`. `--build-only` builds in the checkout
+instead of 20s. `--build-only` builds in the checkout
 the script is in (run a worktree's copy to build that worktree), checks the products,
 and stops: nothing is installed or relaunched. Use it to prove a change to this script.
 
@@ -45,7 +44,7 @@ walks (run-app), merge-wave's checks and the tests stay on Debug.
 
 ## What runs on the Mac
 
-This section is `--install-mac` only. Without that flag, none of it happens.
+This section runs by default. Use `--no-mac` to skip it.
 
 Since 058 the Mac runs:
 - **Agents Host**, at `~/Applications/Agents Host.app`. Its two launch agents
@@ -84,17 +83,24 @@ under Login Items.
 
 ## Devices
 
-The script says, for each device devicectl lists, whether it will install on it and
-why, or why it skips it (a simulator, not paired, not an iPhone or iPad). A paired device
-that devicectl gives no hardware details for (a locked iPhone did this on 2026-10-17,
-#1310) is still installed on, and the line says what was missing. `--list-devices` prints
-those lines and stops, with nothing built or installed: use it to check which devices a
-ship will reach. The choice is `scripts/devices.py`, tested by `scripts/test_devices.py`
-against saved listings in `scripts/testdata/` (run in `scripts/lint.sh`'s checks).
+The script checks which devices are available before it builds anything: for each device
+devicectl lists, it says whether it will install on it and why, or why it skips it (a
+simulator, not paired, not an iPhone or iPad). A paired device that devicectl gives no
+hardware details for (a locked iPhone did this on 2026-10-17, #1310) is still installed
+on, and the line says what was missing. When neither iPhone nor iPad is available, the
+script skips building the Remote too: there is nothing to put it on. `--list-devices`
+prints those lines and stops, with nothing built or installed: use it to check which
+devices a ship will reach. The choice is `scripts/devices.py`, tested by
+`scripts/test_devices.py` against saved listings in `scripts/testdata/` (run in
+`scripts/lint.sh`'s checks).
 
 A device that is not listed is asleep, off Wi-Fi, or unplugged. `xcrun devicectl
-list devices` shows it. Ask Alex to wake it. Do not retry in a loop. A launch
-fails on a locked device, but the install still counts.
+list devices` shows it. Ask Alex to wake it.
+
+Each device's install runs detached (`--install-device`), the same way the Mac relaunch
+does, so it never waits on or delays the Mac. A failed install (a locked phone, a flaky
+connection) retries every 2 minutes for up to an hour on its own; `/tmp/ship-install-<udid>-<sha>.log`
+says how it went.
 
 Record the new pids in the `agents-app-hosts-this-session` memory, as earlier
 restarts did.

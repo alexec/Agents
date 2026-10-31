@@ -102,7 +102,7 @@ func (d *Daemon) setChrome(a *wire.Agent, l *live, value wire.JSONValue) []wire.
 		}
 		values[chromeOptionID] = value
 		a.StartOptions.Values = values
-		a.AdvertisedOptions = withAppOptions(a.RuntimeID, values, a.AdvertisedOptions)
+		a.AdvertisedOptions = d.markOptions(a.RuntimeID, withAppOptions(a.RuntimeID, values, a.AdvertisedOptions))
 		options = a.AdvertisedOptions
 	})
 	l.mu.Lock()

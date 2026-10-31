@@ -19,36 +19,37 @@ import (
 // The rest of the old Briefing.swift, its standing words and AppToolPreface came back
 // with #1806.
 //
-// It is said once per conversation: it stays in the runtime's own history, which the
-// runtime replays when the conversation is picked back up. A runtime in
-// systemPromptDelivery has it as its system prompt, on session/new, load and resume (#1080),
-// so its first prompt, and the title it makes from it, is the person's words alone. The
-// others have it before the person's words in the first prompt of a new conversation
-// (#763). A writer (purpose, #858) has none: its prompt is its whole brief.
+// The runtime keeps the brief in the conversation and replays it when the person picks up
+// that conversation. If the runtime advertises the ACP session system-prompt capability,
+// the daemon sends the brief outside the first user prompt on new, load, resume and fork.
+// Otherwise, a compatibility adapter may do this. Other runtimes get it before the
+// person's words in the first prompt of a new conversation (#763). A writer (purpose,
+// #858) has no brief: its prompt is its whole brief.
 
 // eventsBrief is EventWords.briefing (042): wait rather than poll.
-const eventsBrief = "Wait for something to happen (checks passing, an agent finishing, this Mac waking) " +
-	"with wait_for_event, not repeated checks. If told you are still waiting, you may " +
-	"end your turn; you will be started again when it happens."
+const eventsBrief = "Wait for an event (checks passing, this Mac waking) with wait_for_event, for sessions " +
+	"with wait_for_agents, and to resume at a time with check_again, not repeated checks. " +
+	"If told you are still waiting, you may end your turn; you will be started again when it happens."
 
 // leasesBrief is LeaseWords.briefing (036 FR-015).
 const leasesBrief = "Lease a shared resource with lease_resource before using it and release_resource " +
 	"the moment you are done. Keep leases short and extend them, and take several in the " +
 	"same order every time. A simulator, a browser and the screen (mouse, keyboard, front " +
-	"window) are for one agent at a time. If told you are in line, you may end your turn; " +
-	"you will be started again when it is yours."
+	"window) are for one agent at a time. If told you are in line, end your turn: a " +
+	"lease.granted event starts you again when it is yours."
 
 // endingBrief names the three ways a turn ends (#1801). Without it an agent learnt about
 // archiving only from archive_session's description, and one that had finished with
 // nothing for the person stopped and left an unread row. suggest_next_prompt is named here
 // too (#2171): Claude defers MCP tools, so its description alone was never read.
 func endingBrief(runtimeID string) string {
-	ask := "ask_form"
-	if own := escalationTools[runtimeID]; own != "" {
-		ask = own + " (or ask_form if you lack it)"
-	}
-	return "End each turn in one of three ways. If you cannot continue without me, ask me with " +
-		ask + ", or end the turn stuck or blocked. If you are done and have something for me " +
+	ask := askToolWords(runtimeID)
+	// Only a question puts a turn in Needs you (#1916), so one that needs the person asks; and
+	// a question quoted in a report goes before its last paragraph, or it reads as asked.
+	return "End each turn in one of three ways. If you cannot continue without me, ask me: say " +
+		"what you need, as a question, with " + ask + ". End your last message with a question " +
+		"only when you ask me one; put any other question, such as an issue's open questions, " +
+		"before your last paragraph. If you are done and have something for me " +
 		"(a report, a document, a diagram), call show_file on it once and end the turn; do not " +
 		"archive. When such a turn, or a done reply, leaves one clear next step for me, call " +
 		"suggest_next_prompt with it before you end the turn; not with a question waiting, nor " +
@@ -56,12 +57,12 @@ func endingBrief(runtimeID string) string {
 		"archive_session with no id."
 }
 
-// systemPromptDelivery is RuntimeCatalog's: how a runtime takes words of ours as its system
-// prompt. "append" is _meta.systemPrompt.append (Claude's adapter gives it to the Agent
-// SDK's preset prompt); "rules" is _meta.rules (Grok). Cursor and Gemini have no append
-// (Gemini's GEMINI_SYSTEM_MD replaces its own prompt), so they have it in the first prompt.
-// A runtime that gains an append comes here.
-var systemPromptDelivery = map[string]string{"claude": "append", "grok": "rules"}
+// compatibilitySystemPromptDelivery describes runtime-specific fallback routes, used only
+// when initialize does not advertise ACP's session system-prompt capability. Codex ACP 2.2.2
+// reads customInstructions from JetBrains AIR metadata. Antigravity 1.4.5 advertises its own
+// route in initialize, which acp reads like the standard one (#2613). Cursor and Gemini have
+// no fallback.
+var compatibilitySystemPromptDelivery = map[string]string{"claude": "append", "grok": "rules", "codex": "customInstructions"}
 
 // brief is the whole of it for an agent, in the order it is said: who is who first, since
 // the paragraphs after it say "I" and "me" and that is the person it names; then the three
@@ -139,15 +140,27 @@ func personName(set *string) string {
 const liveDocumentBrief = "Before first writing a Markdown report, plan or spec I asked for, call " +
 	"show_file on it once."
 
+// askToolWords names the tool to ask the person with: the runtime's own where the app keeps
+// one, and the app's ask_question for the rest. Antigravity's own tool has the app's name
+// too (#2298), so the two are told apart by whose they are, not by the name.
+func askToolWords(runtimeID string) string {
+	own := escalationTools[runtimeID]
+	switch {
+	case own == "":
+		return "ask_question"
+	case own == "ask_question":
+		return "your runtime's own ask_question (or the app's ask_question, from the agents server, if yours is missing)"
+	}
+	return own + " (or ask_question if you lack it)"
+}
+
 // escalationBrief is Briefing.escalation: what is the person's to decide, asked with the
 // runtime's own question tool where the app keeps one, and decide-and-tell for the rest
 // (#601, #1083). Of 196 forms answered by 2026-10-15, 79% of questions took the
-// recommended option, and agents waited 65 hours on them.
+// recommended option, and agents waited 65 hours on them. A secret has a tool of its own,
+// so its value stays out of the chat (#2885).
 func escalationBrief(runtimeID string) string {
-	named := "ask_form"
-	if own := escalationTools[runtimeID]; own != "" {
-		named = own + " (or ask_form if you lack it)"
-	}
+	named := askToolWords(runtimeID)
 	return "When something is mine to decide (anything hard to undo, money or an outside " +
 		"account, a restart or an install on my devices, a missing credential, a choice with " +
 		"no clear best answer), ask me with " + named + " rather than guessing or asking in your " +
@@ -156,7 +169,8 @@ func escalationBrief(runtimeID string) string {
 		"recommended and is easy to undo: take it, write `Decided: <what>, because <why>.` (I can " +
 		"overrule it) in the issue or pull request and in your reply, and carry on. Do not ask " +
 		"about the next step of what I asked for, a report with nothing to choose, anything you " +
-		"can find out yourself, or the same thing twice."
+		"can find out yourself, or the same thing twice. Ask for a missing secret (an API key, a " +
+		"token) with ask_secret, never in a question or a reply, where what is typed goes into the chat."
 }
 
 // schedulingRemoved is the runtimes whose own scheduling tools the tool policy takes away
@@ -184,7 +198,7 @@ const helpersBrief = "For work that can run alongside yours, use start_session w
 
 // sessionsBrief is Briefing.sessions (065): the person says "continue Login redirect" to
 // whichever chat they opened. Archiving this session is in endingBrief now.
-const sessionsBrief = "To continue another session in this project, read it with read_session " +
+const sessionsBrief = "To continue another session in this folder, read it with read_session " +
 	"(by id or exact title; reading changes nothing). list_sessions lists them."
 
 // worktreesBrief is Briefing.worktrees (#615): with move_worktree only described, agents
@@ -215,7 +229,7 @@ func appToolServed(name string) bool {
 	return false
 }
 
-// personaPrompt is the prompt of the persona the agent was started as (#760): the project's
+// personaPrompt is the prompt of the persona the agent was started as (#760): the folder's
 // .agents/personas/<id>.md, else the person's, read now so an edit reaches the next
 // conversation. None for a persona that is not there or will not parse.
 func personaPrompt(a *wire.Agent) string {
@@ -226,7 +240,7 @@ func personaPrompt(a *wire.Agent) string {
 	if id == "" || strings.Contains(id, "/") || strings.HasPrefix(id, ".") {
 		return ""
 	}
-	for _, from := range []struct{ base, origin string }{{projectFolder(a), "project"}, {personaHome(), "personal"}} {
+	for _, from := range []struct{ base, origin string }{{folderPath(a), "folder"}, {personaHome(), "personal"}} {
 		if from.base == "" {
 			continue
 		}
@@ -386,7 +400,7 @@ func leasesWithDeclared(declared []wire.DeclaredResource) string {
 
 // withSystemPrompt is meta with words as the system prompt, where runtimeID takes one.
 func withSystemPrompt(meta map[string]any, runtimeID, words string) map[string]any {
-	how := systemPromptDelivery[runtimeID]
+	how := compatibilitySystemPromptDelivery[runtimeID]
 	if words == "" || how == "" {
 		return meta
 	}
@@ -402,6 +416,23 @@ func withSystemPrompt(meta map[string]any, runtimeID, words string) map[string]a
 			words += "\n\n" + rules
 		}
 		out["rules"] = words
+	case "customInstructions":
+		jetbrains, _ := out["jetbrains"].(map[string]any)
+		jetbrains = cloneMeta(jetbrains)
+		air, _ := jetbrains["air"].(map[string]any)
+		air = cloneMeta(air)
+		air["version"] = 1
+		air["customInstructions"] = words
+		jetbrains["air"] = air
+		out["jetbrains"] = jetbrains
 	}
 	return out
+}
+
+func cloneMeta(meta map[string]any) map[string]any {
+	copy := make(map[string]any, len(meta)+1)
+	for key, value := range meta {
+		copy[key] = value
+	}
+	return copy
 }

@@ -1,25 +1,25 @@
 import Foundation
 
-/// A file in a project's `.agents` that only the app is meant to write (#502).
+/// A file in a folder's `.agents` that only the app is meant to write (#502).
 ///
 /// An agent can edit one by a shell command as easily as by an edit tool, and both of
-/// these took effect at once: helper limits and disk lines from `project.json`, pins
+/// these took effect at once: helper limits and disk lines from `folder.json`, pins
 /// from `pins.json`. So each is held as workflows are: the app keeps the last approved
-/// copy outside the project, a file that differs from it is not used, and the person
+/// copy outside the folder, a file that differs from it is not used, and the person
 /// keeps the change or undoes it. The app's own writes are approved as they are made.
 public enum GuardedFile: String, Codable, CaseIterable, Sendable {
-    case projectConfig = ".agents/project.json"
+    case folderConfig = ".agents/folder.json"
     case pins = ".agents/pins.json"
 
-    /// Relative to the project folder.
+    /// Relative to the folder.
     public var path: String { rawValue }
 
-    public func url(in project: URL) -> URL { project.appending(path: path) }
+    public func url(in folder: URL) -> URL { folder.appending(path: path) }
 
     /// What the file holds, in a person's words.
     public var holds: String {
         switch self {
-        case .projectConfig: "the helper limits and disk space lines"
+        case .folderConfig: "the helper limits, disk space lines and cost on pull requests"
         case .pins: "the pins"
         }
     }
@@ -29,22 +29,22 @@ public enum GuardedFile: String, Codable, CaseIterable, Sendable {
 ///
 /// A workflow waiting for an OK is asked the same way (#569), by its file's path.
 public struct GuardedChange: Codable, Hashable, Sendable, Identifiable {
-    /// The file, relative to the project folder.
+    /// The file, relative to the folder.
     public var path: String
     /// SHA-256 of the file as it is now; nil when it was removed.
     public var digest: String?
-    /// The agents whose turns were running in the project when the change was seen, by
+    /// The agents whose turns were running in the folder when the change was seen, by
     /// title. Empty when none was: then it came by git, or from somewhere the app cannot name.
     public var changedBy: [String]
     /// The same agents, by id, for a client that links to them.
     public var changedByIDs: [UUID]
-    /// What was on disk is what the project's last commit holds: a merge, pull or branch
+    /// What was on disk is what the folder's last commit holds: a merge, pull or branch
     /// switch brought it, which waits for an OK however it arrived.
     public var byGit: Bool
     /// When the change was first seen.
     public var since: Date
     /// The session the question is asked in (#531): the first agent named that is still
-    /// there, unarchived. nil asks it of the project, on its own page: a change git
+    /// there, unarchived. nil asks it of the folder, on its own page: a change git
     /// brought, or one whose agents are gone.
     public var askedIn: UUID?
 
@@ -67,7 +67,7 @@ public struct GuardedChange: Codable, Hashable, Sendable, Identifiable {
     }
 
     /// The path a workflow's waiting change is asked by (#569): its file, relative to
-    /// the project folder.
+    /// the folder.
     public static func workflowPath(_ workflowID: String) -> String {
         "\(WorkflowPaths.folderName)/\(workflowID).\(WorkflowPaths.fileExtension)"
     }
@@ -83,7 +83,7 @@ public struct GuardedChange: Codable, Hashable, Sendable, Identifiable {
     /// A workflow waiting for an OK, rather than one of the `GuardedFile`s.
     public var isWorkflow: Bool { Self.workflowID(inPath: path) != nil }
 
-    /// The id of the item in the project's `approvals` that asks the same thing (#773):
+    /// The id of the item in the folder's `approvals` that asks the same thing (#773):
     /// its Review page opens by it (#1472).
     public var approvalID: String {
         Self.workflowID(inPath: path).map { "\(Approval.Kind.workflow.rawValue):\($0)" }
@@ -101,7 +101,7 @@ public struct GuardedChange: Codable, Hashable, Sendable, Identifiable {
             + "Keep uses the change from now on; Undo puts the approved copy back in the file."
     }
 
-    /// Who changed what, as a sentence's start: "Lead changed .agents/project.json".
+    /// Who changed what, as a sentence's start: "Lead changed .agents/folder.json".
     public var headline: String {
         let what = digest == nil ? "removed \(path)" : "changed \(path)"
         if !changedBy.isEmpty { return "\(GuardedChange.names(changedBy)) \(what)" }

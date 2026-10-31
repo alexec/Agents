@@ -1,17 +1,21 @@
-// A project's Connectors set-up (#1336, frames A, C, F and G), the one Connect sheet for GitHub
+// A folder's Connectors set-up (#1336, frames A, C, F and G), the one Connect sheet for GitHub
 // (frame B) and Linear (#1343, frame H), and Connectors ▸ Connections (frame E), as the
 // window's ConnectorSetupView, ConnectGitHubSheet and YourConnectionsView. The state is the host's, so all three clients
-// show the same ticks. The page draws the Mac's grid; Where agents run says the other
-// providers are set up on the Mac, since Providers is a Mac-only page by design.
+// show the same ticks. The page draws the Mac's grid; Where agents run says the machine the
+// folder is on, and has Add a Machine… and Add Provider… in place (#2131).
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { Store } from "../model/store";
 import type {
   Connection, ConnectionProvider, ConnectionSignIn, ConnectorSetup, ConnectorSetupReading, ConnectorSlot, ConnectorSlotKind, UUID,
 } from "../protocol/generated";
-import { projectPath } from "../model/hostedMCP";
+import { folderPath } from "../model/hostedMCP";
 import { Capability } from "../protocol/capabilities.generated";
 import * as words from "../model/connectorSetup";
+import { projectSlotFrom, projectsNotRead, projectWords, setByProject, slotLine, slotsOwner } from "../model/projects";
+import type { Project } from "../protocol/generated";
+import { addMachineWords, whereAgentsRun } from "../model/addMachine";
 import { Modal } from "./Modal";
+import { AddMachineDialog } from "./AddMachineDialog";
 
 function why(e: unknown): string {
   if (e && typeof e === "object" && "message" in e) return String((e as { message: unknown }).message);
@@ -22,10 +26,10 @@ function openOut(address: string) {
   window.open(address, "_blank", "noopener");
 }
 
-/** The set-up at the top of a project's Connectors page. */
-export function ConnectorSetupSection({ store, host, folder, projectName, go }: {
-  store: Store; host: string; folder: string; projectName: string;
-  /** Opens a workflow of this project. */
+/** The set-up at the top of a folder's Connectors page. */
+export function ConnectorSetupSection({ store, host, folder, folderName, go }: {
+  store: Store; host: string; folder: string; folderName: string;
+  /** Opens a workflow of this folder. */
   go: (workflowID: string) => void;
 }) {
   const [setup, setSetup] = useState<ConnectorSetup>();
@@ -34,7 +38,17 @@ export function ConnectorSetupSection({ store, host, folder, projectName, go }: 
   const [connecting, setConnecting] = useState<ConnectionProvider>();
   /** Whether the person's Linear connection is there, for the Tasks slot (#1682); unknown until read. */
   const [linearConnected, setLinearConnected] = useState<boolean>();
-  const path = projectPath(folder);
+  const path = folderPath(folder);
+  /** Add a Machine… or Add Provider…, in place (#2131). */
+  const [adding, setAdding] = useState<"machine" | "provider">();
+  useEffect(() => { if (store.providers.list.peek() === null) void store.providers.load(); }, []);
+  // Where agents run (#2131): the machine the folder is on, and what else is yours.
+  const hosts = store.hosts.value.filter((h) => h.relay == null);
+  const place = {
+    title: whereAgentsRun.title(false, hosts.find((h) => h.id === host)?.name),
+    line: whereAgentsRun.line(hosts.filter((h) => h.id !== host).map((h) => h.name),
+      (store.providers.list.value ?? []).map((p) => p.name)),
+  };
 
   const readLinear = async () => {
     try {
@@ -75,7 +89,7 @@ export function ConnectorSetupSection({ store, host, folder, projectName, go }: 
 
   return (
     <div class="connector-setup">
-      <p class="hint">{words.intro(projectName, setup?.repository, setup?.site)}</p>
+      <p class="hint">{words.intro(folderName, setup?.repository, setup?.site)}</p>
       {problem && <p class="small failure">{problem}</p>}
       {setup && (
         <>
@@ -83,11 +97,13 @@ export function ConnectorSetupSection({ store, host, folder, projectName, go }: 
           <h2 class="setup-heading">{words.setUpHeading(setup)}</h2>
           <div class="slot-grid">
             {setup.slots.map((slot) => (
-              <SlotCard key={slot.slot} slot={slot} setup={setup} projectName={projectName} reading={reading}
+              <SlotCard key={slot.slot} slot={slot} setup={setup} folderName={folderName} reading={reading}
                 tryAgain={() => void load("fresh")} skip={(s) => void skip(slot.slot, s)}
-                linearConnected={linearConnected} connectLinear={() => setConnecting("linear")} />
+                linearConnected={linearConnected} connectLinear={() => setConnecting("linear")}
+                place={place} admin={store.person.value?.role !== "member"} add={setAdding} />
             ))}
           </div>
+          {setup.project && <ProjectSlots store={store} setup={setup} changed={() => void load("cached")} />}
           {(setup.connection || setup.events.state !== "off") && (
             <>
               <h2 class="setup-heading">Events</h2>
@@ -117,6 +133,10 @@ export function ConnectorSetupSection({ store, host, folder, projectName, go }: 
         <ConnectDialog store={store} host={host} provider={connecting} folder={path}
           connected={() => void (connecting === "linear" ? readLinear() : load("fresh"))}
           close={() => setConnecting(undefined)} />
+      )}
+      {adding && (
+        <AddMachineDialog store={store} start={adding === "provider" ? { kind: "addProvider" } : { kind: "choose" }}
+          close={() => setAdding(undefined)} />
       )}
     </div>
   );
@@ -166,23 +186,28 @@ function SlotMark({ slot, reading }: { slot: ConnectorSlot; reading: boolean }) 
   return <span class={`slot-mark ${slot.state}`} role="img" aria-label={label}>{mark}</span>;
 }
 
-function SlotCard({ slot, setup, projectName, reading, tryAgain, skip, linearConnected, connectLinear }: {
-  slot: ConnectorSlot; setup: ConnectorSetup; projectName: string; reading: boolean;
+function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConnected, connectLinear, place, admin, add }: {
+  slot: ConnectorSlot; setup: ConnectorSetup; folderName: string; reading: boolean;
   tryAgain: () => void; skip: (skipped: boolean) => void;
   /** Tasks only: whether Linear is connected, unknown until read (#1682). */
   linearConnected: boolean | undefined; connectLinear: () => void;
+  /** Where agents run only (#2131): its machine and line, and Add a Machine… or Add Provider…. */
+  place: { title: string; line: string }; admin: boolean; add: (what: "machine" | "provider") => void;
 }) {
   const [changing, setChanging] = useState(false);
-  const canChange = slot.slot !== "workspace" && ["read", "refused", "failed"].includes(slot.state);
+  const workspace = slot.slot === "workspace";
+  const fromProject = slot.fromProject === true;
+  const canChange = workspace || (!fromProject && ["read", "refused", "failed"].includes(slot.state));
   const proof = slot.proof;
+  const title = workspace ? place.title : words.title(slot);
   return (
-    <div class={`setup-card slot ${changing ? "changing" : ""}`} aria-label={`${words.heading(slot.slot)}: ${words.title(slot)}`}>
+    <div class={`setup-card slot ${changing ? "changing" : ""}`} aria-label={`${words.heading(slot.slot)}: ${title}`}>
       <p class="slot-head">
         <SlotMark slot={slot} reading={reading} />
         <span class="slot-kind">{words.heading(slot.slot)}</span>
         {canChange && !changing && <button class="link small" onClick={() => setChanging(true)}>Change…</button>}
       </p>
-      <p class="strong">{words.title(slot)}</p>
+      <p class="strong">{title}</p>
       {proof ? (
         <p class="quiet small">
           {words.proofLead(slot.slot)}:{" "}
@@ -193,9 +218,10 @@ function SlotCard({ slot, setup, projectName, reading, tryAgain, skip, linearCon
         </p>
       ) : (
         <p class={`small ${["failed", "refused", "noRemote"].includes(slot.state) ? "attention" : "quiet"}`}>
-          {words.line(slot, projectName, setup.repository, false, words.forgeOf(setup))}
+          {workspace ? place.line : words.line(slot, folderName, setup.repository, false, words.forgeOf(setup))}
         </p>
       )}
+      {fromProject && <p class="quiet small">{setByProject(setup.projectName ?? projectWords.title)}</p>}
       <p class="slot-actions small">
         {(slot.state === "notConnected" || slot.state === "noRemote") && slot.slot === "tasks" && (
           <>
@@ -203,7 +229,7 @@ function SlotCard({ slot, setup, projectName, reading, tryAgain, skip, linearCon
             <span class="quiet">{words.otherTrackers(linearConnected !== false)}</span>
           </>
         )}
-        {(slot.state === "notConnected" || slot.state === "noRemote") && <button class="link" onClick={() => skip(true)}>Skip</button>}
+        {!fromProject && (slot.state === "notConnected" || slot.state === "noRemote") && <button class="link" onClick={() => skip(true)}>Skip</button>}
         {slot.state === "failed" && <button onClick={tryAgain}>Try Again</button>}
         {slot.state === "refused" && (
           <>
@@ -211,9 +237,23 @@ function SlotCard({ slot, setup, projectName, reading, tryAgain, skip, linearCon
             <button onClick={tryAgain}>Try Again</button>
           </>
         )}
-        {slot.state === "skipped" && <button class="link" onClick={() => skip(false)}>Set Up</button>}
+        {!fromProject && slot.state === "skipped" && <button class="link" onClick={() => skip(false)}>Set Up</button>}
       </p>
-      {changing && (
+      {changing && workspace && (
+        <div class="slot-change">
+          <button title={whereAgentsRun.hereNote} onClick={() => setChanging(false)}>{place.title}</button>
+          <button title={whereAgentsRun.addMachineNote} onClick={() => { add("machine"); setChanging(false); }}>{addMachineWords.menuItem}</button>
+          {admin && (
+            <button title={whereAgentsRun.addProviderNote} onClick={() => { add("provider"); setChanging(false); }}>{addMachineWords.addProvider}</button>
+          )}
+          {words.forgeOf(setup) === "github" && setup.repository && setup.connection?.state === "connected" && (
+            <p class="quiet small">GitHub Codespaces: Set up on the Mac.</p>
+          )}
+          <button class="link" onClick={() => setChanging(false)}>Cancel</button>
+          <p class="quiet small">{addMachineWords.providersYours}</p>
+        </div>
+      )}
+      {changing && !workspace && (
         <div class="slot-change">
           <button onClick={() => setChanging(false)}>{slot.choice}</button>
           {slot.slot === "tasks" && linearConnected === false && (
@@ -223,6 +263,69 @@ function SlotCard({ slot, setup, projectName, reading, tryAgain, skip, linearCon
           <button class="link" onClick={() => setChanging(false)}>Cancel</button>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * The folder's project's tools (#2669), as the window's ProjectSlotsCard: Tasks, Code review and
+ * CI are the project's, and its owner or an admin makes a folder's own slot the project's, or
+ * gives one back to each folder.
+ */
+function ProjectSlots({ store, setup, changed }: { store: Store; setup: ConnectorSetup; changed: () => void }) {
+  const [project, setProject] = useState<Project>();
+  const [problem, setProblem] = useState<string>();
+  // Why the project could not be read (#2756): its rows wait on it, so say so.
+  const [notRead, setNotRead] = useState<string>();
+  const [asking, setAsking] = useState(false);
+  const load = () => {
+    void store.link.call("projects/list", {}).then((l) => {
+      setProject(l.projects.find((p) => p.id === setup.project));
+      setNotRead(undefined);
+    }).catch((e) => {
+      const said = projectsNotRead(e);
+      setNotRead(said);
+      if (said === undefined) setProject(undefined);
+    });
+  };
+  useEffect(load, [setup.project]);
+  const name = project?.name ?? setup.projectName ?? projectWords.title;
+  const set = async (slot: ConnectorSlotKind, value: ReturnType<typeof projectSlotFrom>) => {
+    if (!setup.project) return;
+    setAsking(true);
+    try {
+      setProject(await store.link.call("projects/setSlot", { id: setup.project, slot, ...(value ? { value } : {}) }));
+      setProblem(undefined);
+      // The machine hears it from the control plane (host/projects): give it a moment.
+      setTimeout(changed, 400);
+    } catch (e) {
+      setProblem(why(e));
+    } finally {
+      setAsking(false);
+    }
+  };
+  return (
+    <div class="setup-card project-slots">
+      <p class="quiet small">{slotsOwner(name)}</p>
+      {project?.mayChange && setup.slots.filter((s) => s.slot !== "workspace").map((slot) => {
+        const value = projectSlotFrom(setup, slot);
+        return (
+          <p key={slot.slot} class="small project-slot">
+            <span class="slot-kind">{words.heading(slot.slot)}</span>{" "}
+            <span>{slotLine(slot, name)}</span>{" "}
+            {slot.fromProject
+              ? <button class="link" disabled={asking} onClick={() => void set(slot.slot, undefined)}>{projectWords.useFolderOwn}</button>
+              : value && <button class="link" disabled={asking} onClick={() => void set(slot.slot, value)}>{projectWords.useForProject}</button>}
+          </p>
+        );
+      })}
+      {notRead && (
+        <p class="small failure">
+          {notRead}{" "}
+          <button class="link" onClick={load}>{projectWords.tryAgain}</button>
+        </p>
+      )}
+      {problem && <p class="small failure">{problem}</p>}
     </div>
   );
 }
@@ -404,7 +507,7 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
           </div>
         </div>
         {provider === "gitlab" && (
-          <div class="segmented" role="radiogroup" aria-label="Connect with">
+          <div class="button-group" role="radiogroup" aria-label="Connect with">
             {([false, true] as const).map((t) => (
               <button key={String(t)} type="button" role="radio" aria-checked={withToken === t} class={withToken === t ? "on" : ""}
                 disabled={busy} onClick={() => { setWithToken(t); if (step.kind === "failed") setStep({ kind: "asking" }); }}>

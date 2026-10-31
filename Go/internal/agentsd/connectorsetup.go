@@ -19,14 +19,14 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// A project's Connectors set-up (#1336): its GitHub repository (from its git remote), the
+// A folder's Connectors set-up (#1336): its GitHub repository (from its git remote), the
 // person's GitHub connection (#1335), and four slots. Tasks, Code review and CI come with the
 // connection, and each proves itself with one real read: the newest issue, the newest pull
 // request, the last workflow run. Where agents run is This Mac. A tick is a read: once a slot
 // has read, a read that does not reach GitHub keeps the tick, and only GitHub's refusal takes
-// it away. Skips are the project's (.agents/project.json "connectors"); the reads are this
-// host's (<root>/connector-setup.json, one record per project, only projects kept). Once a slot
-// can read, the set-up turns on the github connector's events for the project, once: a person
+// it away. Skips are the folder's (.agents/folder.json "connectors"); the reads are this
+// host's (<root>/connector-setup.json, one record per folder, only folders kept). Once a slot
+// can read, the set-up turns on the github connector's events for the folder, once: a person
 // who takes the entry out again is not overruled.
 //
 // GitLab (#1632): with no GitHub remote, a GitLab remote (gitlab.com, the connected GitLab, or
@@ -69,8 +69,8 @@ var gitlabSlotThing = map[wire.ConnectorSlotKind]string{
 	wire.ConnectorSlotKindCi:         "pipelines",
 }
 
-// forge is what a project's remote picked: the provider, its root (GitLab's), the repository
-// or project, and its host as the page says it.
+// forge is what a folder's remote picked: the provider, its root (GitLab's), the repository
+// or folder, and its host as the page says it.
 type forge struct {
 	provider wire.ConnectionProvider
 	root     string
@@ -109,9 +109,9 @@ func (f forge) ours() string {
 
 // gitlabSetupReader is the reads a GitLab set-up makes; a test gives a fake GitLab.
 type gitlabSetupReader interface {
-	NewestIssue(ctx context.Context, project string) (*gitlabmcp.Newest, error)
-	NewestMergeRequest(ctx context.Context, project string) (*gitlabmcp.Newest, error)
-	LastPipeline(ctx context.Context, project string) (*gitlabmcp.Newest, error)
+	NewestIssue(ctx context.Context, folder string) (*gitlabmcp.Newest, error)
+	NewestMergeRequest(ctx context.Context, folder string) (*gitlabmcp.Newest, error)
+	LastPipeline(ctx context.Context, folder string) (*gitlabmcp.Newest, error)
 }
 
 // setupReader is the reads a set-up makes; a test gives a fake GitHub.
@@ -129,12 +129,14 @@ type setupBook struct {
 	newSetupReader func(token string) setupReader
 	// newGitLabSetupReader is the GitLab at root as the token's owner; a test gives a fake.
 	newGitLabSetupReader func(root, token string) gitlabSetupReader
+	// newCodespacesClient reads and changes Codespaces as the GitHub connection owner.
+	newCodespacesClient func(token string) codespacesClient
 }
 
-// setupRecord is what this host last read for one project.
+// setupRecord is what this host last read for one folder.
 type setupRecord struct {
 	Repo string `json:"repo"`
-	// Forge is gitlab for a GitLab project; empty is GitHub.
+	// Forge is gitlab for a GitLab folder; empty is GitHub.
 	Forge        string                                 `json:"forge,omitempty"`
 	ReadAt       time.Time                              `json:"readAt"`
 	Installed    *bool                                  `json:"installed,omitempty"`
@@ -151,6 +153,42 @@ type slotRecord struct {
 	ReadAt  time.Time            `json:"readAt,omitzero"`
 	Refused bool                 `json:"refused,omitempty"`
 	Failure string               `json:"failure,omitempty"`
+	// Repo and Forge are what was read when it was not the folder's own (a project's
+	// slot, #2669); empty is the record's.
+	Repo  string `json:"repo,omitempty"`
+	Forge string `json:"forge,omitempty"`
+}
+
+// forgeName is the record's name for f's forge: gitlab, or empty for GitHub.
+func forgeName(f forge) string {
+	if f.provider == wire.ConnectionProviderGitlab {
+		return string(f.provider)
+	}
+	return ""
+}
+
+// readOf is what s read, when it read f's repository: a slot's source can change (#2669).
+func (r *setupRecord) readOf(kind wire.ConnectorSlotKind, f forge) *slotRecord {
+	s := r.Slots[kind]
+	if s == nil {
+		return nil
+	}
+	repo, name := s.Repo, s.Forge
+	if repo == "" {
+		repo, name = r.Repo, r.Forge
+	}
+	if repo != f.repo || name != forgeName(f) {
+		return nil
+	}
+	return s
+}
+
+// slotSource is what fills one slot: the folder's own forge, or its project's (#2669).
+type slotSource struct {
+	f           forge
+	conn        connections.Connection
+	usable      bool
+	fromProject bool
 }
 
 func (d *Daemon) registerConnectorSetup() {
@@ -163,6 +201,9 @@ func (d *Daemon) registerConnectorSetup() {
 	})
 	On(d, wire.CallConnectorsSetupSkip, func(ctx context.Context, c *Client, r wire.ConnectorSkipRequest) (wire.ConnectorSetup, error) {
 		return d.skipConnectorSlot(ctx, r)
+	})
+	On(d, wire.CallConnectorsCodespaces, func(ctx context.Context, c *Client, r wire.ConnectorCodespacesRequest) (wire.ConnectorCodespaces, error) {
+		return d.connectorCodespaces(ctx, r)
 	})
 }
 
@@ -183,7 +224,7 @@ func (d *Daemon) setupRecordsLocked() map[string]*setupRecord {
 	return d.setupRecords
 }
 
-// saveSetupLocked writes the records of projects this host still has. setupMu is held.
+// saveSetupLocked writes the records of folders this host still has. setupMu is held.
 func (d *Daemon) saveSetupLocked() {
 	for folder := range d.setupRecords {
 		if _, ok := d.summaryFor(folder); !ok {
@@ -199,7 +240,7 @@ func (d *Daemon) saveSetupLocked() {
 	}
 }
 
-// skippedSlots is the project's skips, from .agents/project.json as last approved.
+// skippedSlots is the folder's skips, from .agents/folder.json as last approved.
 func (d *Daemon) skippedSlots(folder string) map[wire.ConnectorSlotKind]bool {
 	out := map[wire.ConnectorSlotKind]bool{}
 	m, err := d.approvedConfig(folder)
@@ -216,24 +257,27 @@ func (d *Daemon) skippedSlots(folder string) map[wire.ConnectorSlotKind]bool {
 	return out
 }
 
-func (d *Daemon) setupProject(folder string) (string, error) {
+func (d *Daemon) setupFolder(folder string) (string, error) {
 	folder = filepath.Clean(folder)
 	if _, ok := d.summaryFor(folder); !ok || !isDir(folder) {
-		return "", noSuchProject(folder + " is not a project, or is not there.")
+		return "", noSuchFolder(folder + " is not a folder, or is not there.")
 	}
 	return folder, nil
 }
 
 func (d *Daemon) skipConnectorSlot(ctx context.Context, r wire.ConnectorSkipRequest) (wire.ConnectorSetup, error) {
-	folder, err := d.setupProject(r.Folder)
+	folder, err := d.setupFolder(r.Folder)
 	if err != nil {
 		return wire.ConnectorSetup{}, err
 	}
 	if _, known := slotChoice[r.Slot]; !known || r.Slot == wire.ConnectorSlotKindWorkspace {
 		return wire.ConnectorSetup{}, invalid("That slot cannot be skipped.")
 	}
-	if !d.settled(folder, ".agents/project.json") {
-		return wire.ConnectorSetup{}, guardedRefusal(".agents/project.json", "The slot was not changed: ")
+	if _, set := d.projectSlot(folder, r.Slot); set {
+		return wire.ConnectorSetup{}, &Error{Code: wire.FailureNotPermitted, Message: "The folder's project sets this slot for every folder in it. Its owner or an admin changes it."}
+	}
+	if !d.settled(folder, ".agents/folder.json") {
+		return wire.ConnectorSetup{}, guardedRefusal(".agents/folder.json", "The slot was not changed: ")
 	}
 	skipped := d.skippedSlots(folder)
 	skipped[r.Slot] = r.Skipped
@@ -248,8 +292,8 @@ func (d *Daemon) skipConnectorSlot(ctx context.Context, r wire.ConnectorSkipRequ
 		v = map[string]any{"skipped": list}
 	}
 	func() {
-		defer d.approveWrite(folder, ".agents/project.json")
-		err = setProjectConfig(folder, "connectors", v)
+		defer d.approveWrite(folder, ".agents/folder.json")
+		err = setFolderConfig(folder, "connectors", v)
 	}()
 	if err != nil {
 		return wire.ConnectorSetup{}, configWriteError(err)
@@ -292,8 +336,43 @@ func (d *Daemon) gitlabConnection() (connections.Connection, bool) {
 	return c, ok && err == nil
 }
 
-// forgeAt is what the project's git remote names: a GitHub repository first, else a GitLab
-// project on the connected GitLab, gitlab.com, or a host named gitlab. Its connection, and
+// connectionFor is the person's connection to f's forge, and whether it counts there: a
+// GitLab connection counts only on its own GitLab.
+func (d *Daemon) connectionFor(f forge) (connections.Connection, bool) {
+	if f.provider != wire.ConnectionProviderGitlab {
+		return d.githubConnection()
+	}
+	c, connected := d.gitlabConnection()
+	if !connected || gitlabmcp.BaseURL(c.URL) != f.root {
+		return connections.Connection{}, false
+	}
+	return c, true
+}
+
+// slotSources is what fills each of the forge's slots: the project's setting where its
+// project sets one (#2669), else the folder's own forge. A project's skip is the folder's
+// skip; a slot the project fills is not skipped by the folder's own.
+func (d *Daemon) slotSources(folder string, own forge, conn connections.Connection, connected bool, skipped map[wire.ConnectorSlotKind]bool) map[wire.ConnectorSlotKind]slotSource {
+	now := time.Now()
+	out := map[wire.ConnectorSlotKind]slotSource{}
+	for _, kind := range forgeSlots {
+		src := slotSource{f: own, conn: conn, usable: connected && conn.Usable(now)}
+		if ps, set := d.projectSlot(folder, kind); set {
+			src.fromProject = true
+			skipped[kind] = ps.Skipped != nil && *ps.Skipped
+			if !skipped[kind] {
+				src.f = projectForge(ps)
+				c, ok := d.connectionFor(src.f)
+				src.conn, src.usable = c, ok && c.Usable(now)
+			}
+		}
+		out[kind] = src
+	}
+	return out
+}
+
+// forgeAt is what the folder's git remote names: a GitHub repository first, else a GitLab
+// folder on the connected GitLab, gitlab.com, or a host named gitlab. Its connection, and
 // whether there is one, come with it: a GitLab connection counts only on its own GitLab.
 func (d *Daemon) forgeAt(ctx context.Context, folder string) (forge, connections.Connection, bool) {
 	gitCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -326,7 +405,7 @@ func (d *Daemon) forgeAt(ctx context.Context, folder string) (forge, connections
 }
 
 func (d *Daemon) connectorSetup(ctx context.Context, folder string, reading wire.ConnectorSetupReading) (wire.ConnectorSetup, error) {
-	folder, err := d.setupProject(folder)
+	folder, err := d.setupFolder(folder)
 	if err != nil {
 		return wire.ConnectorSetup{}, err
 	}
@@ -338,6 +417,11 @@ func (d *Daemon) connectorSetup(ctx context.Context, folder string, reading wire
 	}
 	skipped := d.skippedSlots(folder)
 	usable := connected && conn.Usable(time.Now())
+	sources := d.slotSources(folder, f, conn, connected, skipped)
+	readable := false
+	for kind, src := range sources {
+		readable = readable || (src.usable && src.f.repo != "" && !skipped[kind])
+	}
 
 	d.setupMu.Lock()
 	rec := d.setupRecordsLocked()[folder]
@@ -349,8 +433,8 @@ func (d *Daemon) connectorSetup(ctx context.Context, folder string, reading wire
 	rec = cloneRecord(rec)
 	d.setupMu.Unlock()
 
-	if due && usable && repo != "" {
-		d.readSetup(ctx, f, rec, conn.Access, skipped)
+	if due && readable {
+		d.readSetup(ctx, f, usable, conn.Access, rec, sources, skipped)
 		d.setupMu.Lock()
 		d.setupRecordsLocked()[folder] = rec
 		d.saveSetupLocked()
@@ -378,7 +462,23 @@ func (d *Daemon) connectorSetup(ctx context.Context, folder string, reading wire
 		}
 	}
 	for _, s := range forgeSlots {
-		out.Slots = append(out.Slots, forgeSlot(f, s, connected && usable, skipped[s], rec.Slots[s]))
+		src := sources[s]
+		slot := forgeSlot(src.f, s, src.usable, skipped[s], rec.readOf(s, src.f))
+		if src.f.repo != "" && !skipped[s] {
+			r := src.f.repo
+			slot.Repository = &r
+		}
+		if src.fromProject {
+			yes := true
+			slot.FromProject = &yes
+		}
+		out.Slots = append(out.Slots, slot)
+	}
+	if id, tools, known := d.folderProject(folder); id != "" {
+		out.Project = &id
+		if known {
+			out.ProjectName = &tools.Name
+		}
 	}
 	out.Slots = append(out.Slots, wire.ConnectorSlot{Slot: wire.ConnectorSlotKindWorkspace,
 		Choice: slotChoice[wire.ConnectorSlotKindWorkspace], State: wire.ConnectorSlotStateRead})
@@ -404,43 +504,32 @@ func cloneRecord(r *setupRecord) *setupRecord {
 // slotRead is one slot's read, whichever the forge.
 type slotRead func(ctx context.Context, repo string) (*githubmcp.Newest, error)
 
-// readSetup makes the reads, side by side, into rec.
-func (d *Daemon) readSetup(ctx context.Context, f forge, rec *setupRecord, token string, skipped map[wire.ConnectorSlotKind]bool) {
+// readSetup makes the reads, side by side, into rec: each slot from its own source, and
+// whether the Agents App is on the folder's own GitHub repository.
+func (d *Daemon) readSetup(ctx context.Context, own forge, ownUsable bool, ownToken string, rec *setupRecord, sources map[wire.ConnectorSlotKind]slotSource, skipped map[wire.ConnectorSlotKind]bool) {
 	ctx, cancel := context.WithTimeout(ctx, setupReadLimit)
 	defer cancel()
-	var reads map[wire.ConnectorSlotKind]slotRead
-	var gh setupReader
-	if f.provider == wire.ConnectionProviderGitlab {
-		gl := d.gitlabSetupReader(f.root, token)
-		reads = map[wire.ConnectorSlotKind]slotRead{
-			wire.ConnectorSlotKindTasks: fromGitLab(gl.NewestIssue), wire.ConnectorSlotKindCodeReview: fromGitLab(gl.NewestMergeRequest),
-			wire.ConnectorSlotKindCi: fromGitLab(gl.LastPipeline),
-		}
-	} else {
-		gh = d.setupReader(token)
-		reads = map[wire.ConnectorSlotKind]slotRead{
-			wire.ConnectorSlotKindTasks: gh.NewestIssue, wire.ConnectorSlotKindCodeReview: gh.NewestPull, wire.ConnectorSlotKindCi: gh.LastRun,
-		}
-	}
 	type answer struct {
 		slot   wire.ConnectorSlotKind
+		f      forge
 		newest *githubmcp.Newest
 		err    error
 	}
-	answers := make(chan answer, len(reads))
+	answers := make(chan answer, len(sources))
 	n := 0
-	for slot, read := range reads {
-		if skipped[slot] {
+	for slot, src := range sources {
+		if skipped[slot] || !src.usable || src.f.repo == "" {
 			continue
 		}
+		read := d.slotReader(src.f, src.conn.Access, slot)
 		n++
 		go func() {
-			newest, err := read(ctx, rec.Repo)
-			answers <- answer{slot, newest, err}
+			newest, err := read(ctx, src.f.repo)
+			answers <- answer{slot, src.f, newest, err}
 		}()
 	}
-	if gh != nil {
-		installed, repositories, reachErr := gh.AppReach(ctx, rec.Repo, connections.GitHubAppSlug)
+	if ownUsable && own.provider == wire.ConnectionProviderGithub && own.repo != "" {
+		installed, repositories, reachErr := d.setupReader(ownToken).AppReach(ctx, own.repo, connections.GitHubAppSlug)
 		if reachErr == nil {
 			count := int64(repositories)
 			rec.Installed, rec.Repositories = &installed, &count
@@ -449,30 +538,50 @@ func (d *Daemon) readSetup(ctx context.Context, f forge, rec *setupRecord, token
 	now := time.Now()
 	for range n {
 		a := <-answers
-		s := rec.Slots[a.slot]
-		if s == nil {
-			s = &slotRecord{}
-			rec.Slots[a.slot] = s
+		s := &slotRecord{}
+		if had := rec.readOf(a.slot, a.f); had != nil {
+			s = had
 		}
-		switch refused, failure := readFailure(f, a.err); {
+		switch refused, failure := readFailure(a.f, a.err); {
 		case a.err == nil:
 			*s = slotRecord{Read: true, Proof: proofOf(a.newest), ReadAt: now}
 		case refused:
 			*s = slotRecord{Refused: true, ReadAt: now}
-			log.Printf("connectors: %s refused the %s read", f.name(), a.slot)
+			log.Printf("connectors: %s refused the %s read", a.f.name(), a.slot)
 		default:
 			// Not reached, or the connection was not taken: a slot that read keeps its tick.
 			s.Failure = failure
 			log.Printf("connectors: the %s read failed", a.slot)
 		}
+		if a.f.repo != rec.Repo || forgeName(a.f) != rec.Forge {
+			s.Repo, s.Forge = a.f.repo, forgeName(a.f)
+		} else {
+			s.Repo, s.Forge = "", ""
+		}
+		rec.Slots[a.slot] = s
 	}
 	rec.ReadAt = now
 }
 
+// slotReader is the read that proves one slot on f's forge.
+func (d *Daemon) slotReader(f forge, token string, slot wire.ConnectorSlotKind) slotRead {
+	if f.provider == wire.ConnectionProviderGitlab {
+		gl := d.gitlabSetupReader(f.root, token)
+		return map[wire.ConnectorSlotKind]slotRead{
+			wire.ConnectorSlotKindTasks: fromGitLab(gl.NewestIssue), wire.ConnectorSlotKindCodeReview: fromGitLab(gl.NewestMergeRequest),
+			wire.ConnectorSlotKindCi: fromGitLab(gl.LastPipeline),
+		}[slot]
+	}
+	gh := d.setupReader(token)
+	return map[wire.ConnectorSlotKind]slotRead{
+		wire.ConnectorSlotKindTasks: gh.NewestIssue, wire.ConnectorSlotKindCodeReview: gh.NewestPull, wire.ConnectorSlotKindCi: gh.LastRun,
+	}[slot]
+}
+
 // fromGitLab is a GitLab read as a slot's read.
 func fromGitLab(read func(context.Context, string) (*gitlabmcp.Newest, error)) slotRead {
-	return func(ctx context.Context, project string) (*githubmcp.Newest, error) {
-		n, err := read(ctx, project)
+	return func(ctx context.Context, folder string) (*githubmcp.Newest, error) {
+		n, err := read(ctx, folder)
 		if n == nil || err != nil {
 			return nil, err
 		}
@@ -560,9 +669,9 @@ func forgeSlot(f forge, kind wire.ConnectorSlotKind, connected, skipped bool, re
 	return s
 }
 
-// setupEvents is the forge's connector's events for the project (github's or gitlab's). With
+// setupEvents is the forge's connector's events for the folder (github's or gitlab's). With
 // turnOn, a set-up that can read turns them on: the made-by-Agents entry goes in the
-// project's .agents/mcp.json, approved, once.
+// folder's .agents/mcp.json, approved, once.
 func (d *Daemon) setupEvents(ctx context.Context, f forge, folder string, rec *setupRecord, slots []wire.ConnectorSlot, turnOn bool) wire.ConnectorEvents {
 	ours, _ := mcpcatalog.OursByID(f.ours())
 	ev := wire.ConnectorEvents{State: wire.ConnectorEventsStateOff, Names: ours.Declares.Events, Workflows: []wire.ConnectorWorkflow{}}
@@ -635,14 +744,14 @@ func hearsAny(w wire.Workflow, server string, names []string) bool {
 }
 
 // ourServerFor is the name of the made-by-Agents connector ours (github's, gitlab's) that
-// reaches the project (its own, then the person's), and whether its name is taken by another.
+// reaches the folder (its own, then the person's), and whether its name is taken by another.
 func (d *Daemon) ourServerFor(folder string, ours mcpcatalog.Ours) (server string, taken bool) {
-	project, _ := readMCPFile(filepath.Join(folder, ".agents", "mcp.json"))
+	entries, _ := readMCPFile(filepath.Join(folder, ".agents", "mcp.json"))
 	var personal []mcpEntry
 	if home := d.personalHome(); home != "" {
 		personal, _ = readMCPFile(filepath.Join(home, ".agents", "mcp.json"))
 	}
-	for _, list := range [][]mcpEntry{project, personal} {
+	for _, list := range [][]mcpEntry{entries, personal} {
 		for _, e := range list {
 			if e.server.Stdio == nil {
 				continue
@@ -652,16 +761,16 @@ func (d *Daemon) ourServerFor(folder string, ours mcpcatalog.Ours) (server strin
 			}
 		}
 	}
-	for _, e := range project {
+	for _, e := range entries {
 		taken = taken || e.name == ours.NameHere()
 	}
 	return "", taken
 }
 
-// addOurConnector adds the made-by-Agents connector ours to the project, as Add Connector…
+// addOurConnector adds the made-by-Agents connector ours to the folder, as Add Connector…
 // does: previewed, then added and approved as written.
 func (d *Daemon) addOurConnector(ctx context.Context, folder string, ours mcpcatalog.Ours) error {
-	dest := wire.SkillDestination{Kind: wire.SkillDestinationKindProject, Folder: &folder}
+	dest := wire.SkillDestination{Kind: wire.SkillDestinationKindFolder, Folder: &folder}
 	result := mcpcatalog.OursResult(ours, d.declaredBy(ours))
 	preview := d.mcpPreview(ctx, wire.MCPPreviewRequest{Result: result, Destination: dest})
 	if preview.Preview == nil {
@@ -670,6 +779,6 @@ func (d *Daemon) addOurConnector(ctx context.Context, folder string, ours mcpcat
 	if _, err := d.mcpAdd(wire.MCPAddRequest{PreviewID: preview.Preview.PreviewID, Destination: dest}); err != nil {
 		return err
 	}
-	log.Printf("connectors: the %s connector was added to a project for its events", ours.NameHere())
+	log.Printf("connectors: the %s connector was added to a folder for its events", ours.NameHere())
 	return nil
 }

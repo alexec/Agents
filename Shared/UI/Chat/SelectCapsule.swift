@@ -1,3 +1,4 @@
+import AgentsKitCore
 import SwiftUI
 
 /// A select, drawn as a raised paper capsule.
@@ -110,6 +111,12 @@ struct SelectChoice: View {
     let title: String
     let description: String?
     let isChosen: Bool
+    /// The organisation's mark on a choice its policy refuses (#998): shown, dimmed, not chosen.
+    var setBy: DaemonAPI.PolicySetBy?
+    /// The description's lines, cut short with "…" past them; nil wraps it (#2659).
+    var descriptionLines: Int?
+    /// A short mark after the title, such as **follows Settings** (#2658).
+    var mark: String?
     let choose: () -> Void
 
     @State private var isHovered = false
@@ -121,11 +128,21 @@ struct SelectChoice: View {
                     .appText(.code)
                     .foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(title).appText(.fine)
-                    if let description, !description.isEmpty {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(title).appText(.fine)
+                            .foregroundStyle(setBy == nil ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+                        if let mark {
+                            Text(mark).appText(.fine).foregroundStyle(.tertiary)
+                        }
+                    }
+                    if let setBy {
+                        OrgPolicyLine(mark: setBy)
+                    } else if let description, !description.isEmpty {
                         Text(description)
                             .appText(.fine)
                             .foregroundStyle(.secondary)
+                            .lineLimit(descriptionLines)
+                            .truncationMode(.tail)
                     }
                 }
                 Spacer(minLength: 12)
@@ -137,7 +154,8 @@ struct SelectChoice: View {
                         in: RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(.plain)
-        .onHover { isHovered = $0 }
+        .disabled(setBy != nil)
+        .onHover { isHovered = $0 && setBy == nil }
     }
 }
 

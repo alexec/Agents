@@ -1,32 +1,13 @@
-// The control plane's three apps (#1804): the Console's and Reports' routes and pages.
+// What was the Console and Reports (#1804), each page in its section since #2141: their words and figures.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";
 
 const c = await load("src/model/console.ts");
 
-test("#/console and #/reports open their apps, with a page or without", async () => {
-  const { parseRoute, routeHash } = await load("src/route.ts");
-  assert.deepEqual(parseRoute("#/console"), { app: "console" });
-  assert.deepEqual(parseRoute("#/console/audit"), { app: "console", section: "audit" });
-  assert.deepEqual(parseRoute("#/reports/spend"), { app: "reports", section: "spend" });
-  assert.equal(routeHash({ app: "reports", section: "spend" }, undefined), "#/reports/spend");
-  assert.equal(routeHash({ app: "console" }, undefined), "#/console");
-  assert.deepEqual(parseRoute(routeHash({ app: "console", section: "a b" }, undefined)), { app: "console", section: "a b" });
-});
-
-test("a page not built yet, or not known, opens the app's first", () => {
-  assert.equal(c.openSection("console", undefined).id, "overview");
-  assert.equal(c.openSection("console", "nowhere").id, "overview");
-  assert.equal(c.openSection("reports", undefined).id, "spend");
-  for (const s of c.consoleSections.filter((x) => !x.built)) assert.equal(c.openSection("console", s.id).id, "overview");
-  assert.equal(c.openSection("console", "machines").id, "machines");
-});
-
-test("the Console's pages go under their headings in order", () => {
-  const groups = c.grouped(c.consoleSections).map(([g]) => g);
-  assert.deepEqual(groups, ["Organisation", "Rules", "Records"]);
-  assert.deepEqual(c.apps.map((a) => c.appTitle[a]), ["Workspace", "Console", "Reports"]);
+test("Reports' pages are listed in Reports, in their order", async () => {
+  const n = await load("src/model/nav.ts");
+  assert.deepEqual(n.navPages.reports.slice(0, c.reportSections.length).map((p) => p.id), c.reportSections.map((s) => s.id));
 });
 
 const machine = (over = {}, host = {}) => ({
@@ -86,4 +67,36 @@ test("Team Workflows: a bot's machines, spend and runs in words", () => {
   assert.equal(c.spendWords(bot({ capped: true })), "At its cap until midnight UTC");
   assert.equal(c.runsWords(1), "1 run");
   assert.equal(c.runsWords(3), "3 runs");
+  const run = { host: "h", hostName: "Bot Mac", agent: "a" };
+  assert.equal(c.teamStopQuestion(bot(), { ...run, workflow: "review" }),
+    "Stop review-bot's review on Bot Mac? It stops now; the workflow runs again at its next trigger.");
+  assert.match(c.teamStopQuestion(bot(), run), /^Stop review-bot's agent on Bot Mac\? /);
+});
+
+test("Live Now (#2019, M9) says each agent's state and cost, and adds up the board", () => {
+  const a = (agent, host, state, cost, extra = {}) => ({ host, hostName: host, owner: "p", ownerName: "Bea", bot: false, agent, runtime: "claude", state,
+    costToDate: cost, ...extra });
+  assert.equal(c.liveStateWords(a("A", "H", "waitingOnUser")), "Waiting for its person");
+  assert.equal(c.liveStateWords(a("A", "H", "running", undefined, { waitsOnOthers: true })), "Waiting on others");
+  assert.equal(c.liveStateWords(a("A", "H", "starting")), "Starting");
+  assert.equal(c.liveStateWords(a("A", "H", "running")), "Working");
+  assert.equal(c.liveCostWords(undefined), "Nothing yet");
+  assert.match(c.liveCostWords({ USD: 4.2 }), /4\.20/);
+  const board = { agents: [a("A", "H1", "running", { USD: 5 }), a("B", "H1", "running", { USD: 2.5 }), a("C", "H2", "running")] };
+  assert.match(c.liveSummary(board), /^3 agents on 2 machines · .*7\.50 so far$/);
+  assert.equal(c.liveSummary({ agents: [a("C", "H2", "running")] }), "1 agent on 1 machine");
+  assert.deepEqual(c.liveMachines(board).map((m) => [m.host, m.agents.length]), [["H1", 2], ["H2", 1]]);
+});
+
+test("the Requests count has the people SCIM removed (#2436)", () => {
+  assert.equal(c.waitingCount({ joins: 0, links: 0, capped: 0, governance: 0, removals: 2 }), 2);
+  assert.equal(c.waitingCount({ joins: 1, links: 1, capped: 1, governance: 1, removals: 1 }), 5);
+});
+
+test("Live Now tells two agents apart by a short id, and Stop… names the one it stops (#2435)", () => {
+  const a = { host: "H1", hostName: "Bea's Mac", owner: "p", ownerName: "Bea", bot: false, agent: "0f3c9a21-7d4e-4b8a-9c1d-2e5f6a7b8c9d",
+    runtime: "claude", state: "running" };
+  assert.equal(c.liveShortID(a), "0f3c9a21");
+  assert.equal(c.liveStopLabel(a, "Claude"), "Stop Claude 0f3c9a21 on Bea's Mac");
+  assert.match(c.liveStopQuestion(a, "Claude"), /^Stop Claude 0f3c9a21 on Bea's Mac \(Bea\)\? .*Bea reads that an admin stopped it\.$/);
 });

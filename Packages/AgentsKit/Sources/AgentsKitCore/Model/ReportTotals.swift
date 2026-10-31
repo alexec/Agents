@@ -1,19 +1,26 @@
 import Foundation
 
-/// The Reports pane (#1811): a report's rows added up by person, project, machine or
-/// runtime, largest first. The window, the Remote and the web page (`Web/src/model/reports.ts`)
+/// The Reports pane (#1811): a report's rows added up by person, project, folder, machine
+/// or runtime, largest first. The window, the Remote and the web page (`Web/src/model/reports.ts`)
 /// add up the same way.
 public struct ReportTotals: Sendable, Hashable {
     public enum Dimension: String, CaseIterable, Identifiable, Sendable {
         case person = "Person"
+        /// The project the folder is in, across machines (#2670).
         case project = "Project"
+        case folder = "Folder"
         case machine = "Machine"
         case runtime = "Runtime"
+        /// The workflow that started the agents: Reports ▸ Workflows' (#2019).
+        case workflow = "Workflow"
 
         public var id: Self { self }
+
+        /// The ways Spend adds up, and every page's after its own first.
+        public static let spend: [Dimension] = [.person, .project, .folder, .machine, .runtime]
     }
 
-    /// One person's, project's, machine's or runtime's share.
+    /// One person's, project's, folder's, machine's or runtime's share.
     public struct Group: Identifiable, Sendable, Hashable {
         public var id: String
         public var name: String
@@ -82,18 +89,24 @@ public struct ReportTotals: Sendable, Hashable {
         return Double(group.tokens) / most
     }
 
-    private static func key(_ row: DaemonAPI.ReportRow, _ dimension: Dimension,
-                            _ runtimeName: (String) -> String) -> (String, String) {
+    static func key(_ row: DaemonAPI.ReportRow, _ dimension: Dimension,
+                    _ runtimeName: (String) -> String) -> (String, String) {
         switch dimension {
         case .person:
             return (row.person, row.person.isEmpty ? ReportWords.removedOwner
                     : (row.personName.isEmpty ? row.person : row.personName))
         case .project:
-            return (row.project, row.project.isEmpty ? ReportWords.noProject : row.project)
+            let project = row.project ?? ""
+            return (project, project.isEmpty ? ReportWords.noProject : (row.projectName ?? project))
+        case .folder:
+            return (row.folder, row.folder.isEmpty ? ReportWords.noFolder : row.folder)
         case .machine:
             return (row.host, row.hostName.isEmpty ? row.host : row.hostName)
         case .runtime:
             return (row.runtime, row.runtime.isEmpty ? ReportWords.noRuntime : runtimeName(row.runtime))
+        case .workflow:
+            let workflow = row.workflow ?? ""
+            return (workflow, workflow.isEmpty ? ReportOutcomeWords.noWorkflow : workflow)
         }
     }
 }
@@ -101,6 +114,7 @@ public struct ReportTotals: Sendable, Hashable {
 /// The Reports pane's words, on all three clients.
 public enum ReportWords {
     public static let removedOwner = "A removed machine"
+    public static let noFolder = "No folder"
     public static let noProject = "No project"
     public static let noRuntime = "No runtime"
     public static let empty = "Nothing was used in this time. Each machine sends what it used once an hour."
@@ -122,6 +136,19 @@ public enum ReportWords {
         case .threeMonths: "3M"
         }
     }
+
+    /// The range's name as VoiceOver says it: "D" alone means nothing (#2440).
+    public static func spoken(_ range: DaemonAPI.ReportRange) -> String {
+        switch range {
+        case .day: "Day"
+        case .week: "Week"
+        case .month: "Month"
+        case .threeMonths: "3 months"
+        }
+    }
+
+    /// What Spend's bars measure (#2440).
+    public static let barCaption = "Each bar is the cost against the largest, or the tokens when nothing has a price."
 
     /// What the range covers, in words.
     public static func span(_ range: DaemonAPI.ReportRange) -> String {

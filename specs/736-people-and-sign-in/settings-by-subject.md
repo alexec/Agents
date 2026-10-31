@@ -11,7 +11,7 @@ the same on all three clients.
 | Group | Its subject | Mac | Remote | Web |
 |---|---|---|---|---|
 | **This app** (web: **This browser**) | how this client draws | Appearance, Sidebar | Appearance, Notifications, Sidebar | Appearance, Sidebar, Finished chats |
-| **Machines** | the machines that run agents | Machines, Agent Runtimes, Agent Configuration, Cost, Resources, On Every Machine | Machines, On Every Machine | Git access, Machines, Backups, Servers' backups, On Every Machine |
+| **Machines** | the machines that run agents | Machines, Agent Runtimes, Agent Configuration, Cost, Resources, Secrets | Machines, Secrets | Git access, Machines, Backups, Servers' backups, Secrets |
 | **Control plane** | what the control plane keeps | Account, Sign-ins, People, Groups, Channels, Sign-In, Workspace Providers, Clients, Overview | Sign-ins, People, Channels, Sign-In, Groups, Workspace providers | Sign-ins, People, Groups, Channels, Sign-In, Workspace providers |
 
 Sidebar and Finished chats are kept on the Mac's host so that every client draws the same
@@ -31,7 +31,7 @@ Machines
   Agent Configuration
   Cost
   Resources
-  On Every Machine
+  Secrets
 Control plane
   Account
   Sign-ins
@@ -58,6 +58,25 @@ With no control plane paired, the Mac's Control plane group shows Account only.
 - Decided: Account and Sign-ins go first under Control plane, because the person's record is
   kept there. Alex can overrule.
 - Decided: project settings stay in the project's own sheet (FR-022's fourth scope), as now.
-- Decided: in two steps. This change moves the panes. The next one puts the "same on every
-  machine" switch at the top of Agent Runtimes, Agent Configuration, Cost and Resources, and
-  removes On Every Machine (#2069). Alex can overrule.
+## Fixed setting scopes (#2410)
+
+Each setting has one scope. There is no switch and no list of scope states under Machines.
+Agent configuration, MCP servers, runtime choices and cost limits belong to the person and
+sync to all their machines. Runtime sign-ins stay on each machine. Resources belong to each
+machine because they describe its capacity. The organisation's policy remains the ceiling
+for cost limits.
+
+On the Mac, Agent Runtimes and Cost say **Yours, on every machine**. Agent Configuration
+already says this in its sync header. Resources says **This Mac's**. The Remote and web
+Machines pages list machine settings and secrets, but no scope-state list. Secrets remain a
+separate page under Machines.
+
+`user/settings` carries settings data. It has no per-setting scope state. The person can
+edit settings locally, and the app syncs those changes through the user's settings API and
+the two-way configuration sync (#2129). The former
+`from-control-plane.json` scope marker is removed; the daemon keeps only sync metadata it
+needs for file clocks, old configuration cleanup and secret removal.
+
+Decided: fixed scope per setting, with resources per machine and the other four settings per
+person, because each setting needs one clear owner and the existing two-way sync supports
+person settings. Alex can overrule.

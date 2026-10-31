@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac, server]
-description: Back up a control plane with everything a restore needs (its store, key, secrets key and certificate), and restore it on a new Mac or machine so that every device and host stays paired.
+description: Back up a control plane with everything a restore needs (its store, key, secrets key and certificate), and restore it on a new Mac or machine so that every device and machine stays paired.
 ---
 
 # Back up and restore a control plane
@@ -11,9 +11,9 @@ store. A copy of the store alone does not restore it:
 
 - **Without the control key,** the restored control plane does not start. It says
   `this store belongs to a control plane with another key`.
-- **Without the certificate,** it makes a new one. Every window, phone and host refuses the
+- **Without the certificate,** it makes a new one. Every window, phone and machine refuses the
   new certificate (`the certificate is not the pinned one`), and each one must pair again.
-- **Without the secrets key,** your secrets and the workspace providers' secrets do not
+- **Without the secrets key,** your secrets and the machine providers' secrets do not
   open.
 
 `agents-control backup` puts all of these into one folder. `agents-control restore` puts
@@ -24,15 +24,23 @@ machine, see [Back up and restore a machine](back-up-and-restore.md).
 
 | In the backup | What it is |
 | --- | --- |
-| `store/` | Every record: clients, hosts, people, settings, and your and the providers' secrets, sealed. On a cloud machine, the control key sealed by its KMS too. |
+| `store/` | Every record: clients, machines, people, settings, and your and the providers' secrets, sealed. Machine records are under `v1/machines/`. On a cloud machine, the control key sealed by its KMS too. |
 | `control-key` | The control key, when it is in a file or handed in (a Mac). |
 | `secrets-key` | The key that seals secrets on a Mac. A cloud machine uses its KMS instead. |
-| `tls/cert.pem`, `tls/key.pem` | The certificate that every device and host is pinned to, when the control plane makes its own. |
+| `tls/cert.pem`, `tls/key.pem` | The certificate that every device and machine is pinned to, when the control plane makes its own. |
 | `apns.p8` | The APNs key, when there is one. |
 | `backup.json` | When the backup was made, and what is in it. |
 
 The backup holds keys in clear. Keep it as safe as the control plane's own folder: on an
 encrypted disk, or in an encrypted archive. Never put it in a shared or public place.
+
+The 0.11.2 store uses `v1/machines/` for machine records. Older builds used
+`v1/hosts/`. You do not move it: each time the control plane opens a store, a folder
+or a bucket, it moves each record in `v1/hosts/` to `v1/machines/` and logs one line. A
+machine that is in both keeps its `v1/machines/` record. It does this on each open, so it
+also moves a record that an older copy writes during a handover. A folder store that has
+only `v1/hosts/` gets the folder renamed. A restore of an older backup puts its
+`v1/hosts/` records in `v1/machines/` too (#2662).
 
 A change made while the backup runs can be missed. A change made after the backup is lost
 with the restore.
@@ -79,7 +87,7 @@ Mac that has run one already, quit Agents Host and move its `Agents Control` fol
 3. Open Agents Host. When it starts, it puts the restored `control-key` into the keychain
    and deletes the file.
 
-Your windows, phones, iPads and servers connect again with the pairings they have. They
+Your windows, phones, iPads and machines connect again with the pairings they have. They
 dial the old Mac's address, `<name>.local`. Give the new Mac the old Mac's local host name
 in **System Settings ▸ General ▸ Sharing** (**Local hostname**, **Edit…**).
 
@@ -121,8 +129,8 @@ With the same KMS key, start it.
 
 With a new KMS key, add `--new-kms` to `restore`, which leaves out the key the old KMS
 sealed. Then seal the exported key with the new one (`key seal --key-fd 0 < control-key`,
-as in the cloud how-to), and start it. Devices and hosts stay paired. The secrets that the
-old KMS sealed (people's and the workspace providers') do not open: give them again.
+as in the cloud how-to), and start it. Devices and machines stay paired. The secrets that the
+old KMS sealed (people's and the machine providers') do not open: give them again.
 
 ## Check a restore
 
@@ -131,7 +139,7 @@ After a restore, check that:
 - the control plane starts, and its log says the same `pin` as before (a Mac's
   `control.log`);
 - **Settings ▸ Machines** lists every machine, and they come online;
-- a workspace provider lists its workspaces without asking for its secrets again.
+- a machine provider lists its workspaces without asking for its secrets again.
 
 ## Related
 

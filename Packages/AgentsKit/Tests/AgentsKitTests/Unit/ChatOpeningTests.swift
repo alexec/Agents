@@ -165,4 +165,13 @@ struct ChatOpeningTests {
                                            transcript: { _, _ in throw Lost() })
         }
     }
+
+    /// Only the host saying it has no such session is an answer that it has gone; a
+    /// failure to reach it, or an answer late, is not (#2743).
+    @Test func onlyNoSuchAgentSaysGone() {
+        struct Lost: Error {}
+        #expect(ChatOpening.saysGone(JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "no agent")))
+        #expect(!ChatOpening.saysGone(JSONRPCError(code: DaemonAPI.Failure.hostOffline, message: "offline")))
+        #expect(!ChatOpening.saysGone(Lost()))
+    }
 }

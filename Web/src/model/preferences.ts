@@ -8,12 +8,14 @@ import type { JSONValue } from "../protocol/generated";
 
 export const preferenceKeys = {
   smartGroupsOff: "sidebarSmartGroupsOff",
-  showsArchivedProjects: "showsArchivedProjects",
+  showsArchivedFolders: "showsArchivedFolders",
   showsActivity: "showsActivity",
   showsUsage: "showsUsage",
   startRuntimeID: "startRuntimeID",
   startChoices: "startChoices",
   agentsMayArchiveMyChats: "agentsMayArchiveMyChats",
+  noticeBurst: "noticeBurst",
+  noticeCooldownMinutes: "noticeCooldownMinutes",
 } as const;
 
 /** The Mac's map, as last heard; empty until it is, which is every choice at its default. */
@@ -45,6 +47,11 @@ export function setPreferences(changes: Record<string, JSONValue | null>): void 
 export function stringPreference(key: string): string | undefined {
   const value = preferences.value[key];
   return typeof value === "string" ? value : undefined;
+}
+
+export function numberPreference(key: string): number | undefined {
+  const value = preferences.value[key];
+  return typeof value === "number" ? value : undefined;
 }
 
 export function boolPreference(key: string): boolean | undefined {

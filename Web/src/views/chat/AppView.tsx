@@ -1,6 +1,6 @@
 // A tool's view, inline in the chat where its call began (#187). The row holds the view's place,
 // its name and what it asks of the person; the frame itself is the chat's ViewLayer's. Pin, when
-// the host says the call can feed one, puts the view under the chat's project (#189).
+// the host says the call can feed one, puts the view under the chat's folder (#189).
 import { createContext } from "preact";
 import { useContext, useLayoutEffect, useRef } from "preact/hooks";
 import type { AppViewCall } from "../../protocol/generated";
@@ -30,6 +30,7 @@ export function AppView({ call }: { call: AppViewCall }) {
     return <div class="note"><p class="faint">{viewTitle(call.tool, call.server)}</p>{text && <p class="quiet">{text}</p>}</div>;
   }
   const full = hosting.layer.fullscreen.value === call.id;
+  const result = resultText(call);
   return (
     <div class="app-view">
       <p class="view-caption">
@@ -38,7 +39,7 @@ export function AppView({ call }: { call: AppViewCall }) {
         <span class="view-actions">
           {hosting.actions.pin && canPin(call) && (view.pinned.value
             ? <span class="faint">Pinned</span>
-            : <button class="plain" title="Pin this view under the project" onClick={() => void view.pin()}>Pin</button>)}
+            : <button class="plain" title="Pin this view under the folder" onClick={() => void view.pin()}>Pin</button>)}
           {view.phase.value === "ready" && !full && (
             <button class="plain" title="Show this view in the chat's place" onClick={() => hosting.layer.setFullscreen(call.id)}>
               Full screen
@@ -48,9 +49,12 @@ export function AppView({ call }: { call: AppViewCall }) {
       </p>
       {view.phase.value === "loading" && <p class="quiet">Loading {view.title}…</p>}
       {view.phase.value === "failed" && (
-        <p class="quiet">{view.failure.value}{" "}
-          {view.canRetry.value && <button onClick={() => view.retry()}>Try Again</button>}
-        </p>
+        <>
+          <p class="quiet">{view.failure.value}{" "}
+            {view.canRetry.value && <button onClick={() => view.retry()}>Try Again</button>}
+          </p>
+          {result && <pre class="view-result">{result}</pre>}
+        </>
       )}
       {view.phase.value === "asking" && view.ask.value && (
         <div class="view-ask">
@@ -88,4 +92,11 @@ export function AppView({ call }: { call: AppViewCall }) {
       )}
     </div>
   );
+}
+
+function resultText(call: AppViewCall): string | null {
+  const result = call.result as { content?: { type?: string; text?: string }[]; structuredContent?: unknown } | undefined;
+  const content = result?.content?.flatMap((block) => block.type === "text" && block.text ? [block.text] : []).join("\n");
+  if (content) return content;
+  return result?.structuredContent === undefined ? null : JSON.stringify(result.structuredContent, null, 2) ?? null;
 }

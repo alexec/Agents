@@ -7,12 +7,11 @@ import Foundation
 /// done*, which is a different sentence, and the gap between the two is where a
 /// question written into the transcript and then abandoned used to hide under a tick.
 ///
-/// So this is not derived — the agent is the only thing that knows, and it says. Six
-/// values, and the set is total over *what does the person do next* rather than over
-/// *what happened*. That is why there is no `failed` distinct from `stuck`, and no
-/// `succeeded with warnings`: a warning is either something a person must act on, in
-/// which case it is `partlyDone` or `stuck`, or it is not, in which case it belongs in
-/// the agent's message and nowhere else.
+/// Only a question needs the person (#1916): the app never assumes an agent needs them
+/// unless it asks. An agent that waits on other agents or a time is `waiting`. So there
+/// is no `stuck`, `partlyDone` or `blocked` any more; an old record's (finish_turn's,
+/// before #494, or a wait before #1915) reads as `done`, as the wire's `x-fallback` does
+/// (#2981).
 ///
 /// The wording lives here and not in any view, for the reason `EndedReason.summary`
 /// gives: the phone and the window have to say the same words about the same agent,
@@ -24,15 +23,11 @@ public enum WorkOutcome: String, Codable, Hashable, Sendable, CaseIterable {
     case nothingToDo = "nothing_to_do"
     /// Cannot go further until a person answers something.
     case needsAnswer = "needs_answer"
-    /// Some of it done; the rest needs a decision that is not the agent's.
-    case partlyDone = "partly_done"
-    /// Could not do it, and says why.
-    case stuck
     /// Waiting on something other than the person: agents it started, another agent's
-    /// change, a CI run (039). Nobody has to do anything — the app resumes it when what
-    /// it named has finished, or at the time it asked — so it is not `needsAPerson`,
+    /// change, a CI run (039, #1915). Nobody has to do anything — the app resumes it when
+    /// what it named has finished, or at the time it asked — so it is not `needsAPerson`,
     /// and it has a group of its own rather than a place under Needs attention.
-    case blocked
+    case waiting
 
     /// Whether somebody has to do something about this, or whether it is settled.
     ///
@@ -42,8 +37,8 @@ public enum WorkOutcome: String, Codable, Hashable, Sendable, CaseIterable {
     /// and earns colour on the same page for the same reason.
     public var needsAPerson: Bool {
         switch self {
-        case .needsAnswer, .partlyDone, .stuck: return true
-        case .done, .nothingToDo, .blocked: return false
+        case .needsAnswer: return true
+        case .done, .nothingToDo, .waiting: return false
         }
     }
 
@@ -58,9 +53,7 @@ public enum WorkOutcome: String, Codable, Hashable, Sendable, CaseIterable {
         case .done: return "Complete"
         case .nothingToDo: return "Nothing to do"
         case .needsAnswer: return "Waiting on your answer"
-        case .partlyDone: return "Partly done"
-        case .stuck: return "Stuck"
-        case .blocked: return "Blocked"
+        case .waiting: return "Waiting"
         }
     }
 
@@ -72,6 +65,22 @@ public enum WorkOutcome: String, Codable, Hashable, Sendable, CaseIterable {
     /// this feature exists to remove.
     public init?(wire: String) {
         self.init(rawValue: wire.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    /// The words an old record may hold that read as `done` (#1916, #2981): finish_turn's,
+    /// and a wait recorded before #1915.
+    static let readAsDone: Set<String> = ["stuck", "partly_done", "blocked"]
+
+    public init(from decoder: Decoder) throws {
+        let word = try decoder.singleValueContainer().decode(String.self)
+        if let known = WorkOutcome(rawValue: word) {
+            self = known
+        } else if Self.readAsDone.contains(word) {
+            self = .done
+        } else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
+                                                    debugDescription: "unknown outcome \(word)"))
+        }
     }
 }
 
@@ -89,8 +98,8 @@ public struct WorkReport: Codable, Hashable, Sendable {
     /// limit came down keeps its longer words: the limit is on what arrives.
     public var message: String
     public var at: Date
-    /// What a `blocked` report waits on, and whether that has cleared (039). Nil on
-    /// every other outcome, and on a blocked report that named nothing and gave no time.
+    /// What a `waiting` report waits on, and whether that has cleared (039). Nil on
+    /// every other outcome, and on a waiting report that named nothing and gave no time.
     public var block: Block?
 
     /// The most an agent's message may be (#184). The row it is read on gives it one
@@ -117,7 +126,7 @@ public struct WorkReport: Codable, Hashable, Sendable {
         }
         return """
             Nothing was recorded: keep the question to one sentence under \(messageLimit) \
-            characters. If it needs more than that, ask it with ask_form, which shows the \
+            characters. If it needs more than that, ask it with ask_question, which shows the \
             person a question card and waits for the answer; otherwise call this again \
             with a shorter one.
             """
@@ -142,7 +151,10 @@ public struct WorkReport: Codable, Hashable, Sendable {
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let word = try c.decode(String.self, forKey: .outcome)
-        guard let outcome = WorkOutcome(rawValue: word) else { throw UnknownOutcome(word: word) }
+        // An old record's stuck, partly_done or blocked reads as done (#1916, #2981).
+        guard let outcome = WorkOutcome(rawValue: word)
+                ?? (WorkOutcome.readAsDone.contains(word) ? .done : nil)
+        else { throw UnknownOutcome(word: word) }
         self.outcome = outcome
         message = try c.decode(String.self, forKey: .message)
         at = try c.decode(Date.self, forKey: .at)
@@ -169,15 +181,15 @@ public struct WorkReport: Codable, Hashable, Sendable {
         self.init(outcome: outcome, message: trimmed, at: at, block: block)
     }
 
-    /// A blocked report whose block has not yet cleared: under Waiting when the app will
-    /// resume it (`resumesByItself`), and under Blocked when only the person can.
+    /// A waiting report whose block has not yet cleared: under Waiting when the app will
+    /// resume it (`resumesByItself`); one that will not (an old record's) is done (#1916).
     public var isOpenBlock: Bool {
-        outcome == .blocked && block?.isOpen != false
+        outcome == .waiting && block?.isOpen != false
     }
 
     /// An open block the app will clear by itself: it names agents to wait for, or a
-    /// time to check again. The rest — a block that named nothing and gave no time —
-    /// waits for the person, and is the only kind still called Blocked.
+    /// time to check again. The rest — a block that named nothing and gave no time, which
+    /// only an old record has — is done (#1916).
     public var resumesByItself: Bool {
         guard isOpenBlock, let block else { return false }
         return !block.waits.isEmpty || block.checkAgainAt != nil

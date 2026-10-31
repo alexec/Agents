@@ -42,7 +42,9 @@ type hostLease struct {
 	Expires records.Stamp `json:"expires"`
 }
 
-func leaseKey(host string) string      { return "v1/leases/" + host + ".json" }
+const leasesPrefix = "v1/leases/"
+
+func leaseKey(host string) string      { return leasesPrefix + host + ".json" }
 func copyRecordKey(copy string) string { return "v1/copies/" + copy + ".json" }
 
 type heldLease struct {
@@ -463,7 +465,7 @@ func (m *mesh) received(line string, link *peerLink) {
 		var owner string
 		json.Unmarshal(o["owner"], &owner)
 		if json.Unmarshal(o["need"], &need) == nil {
-			m.s.deliver(need, true, owner)
+			m.s.deliver(need, true, owner, "")
 		}
 	}
 }
@@ -578,6 +580,15 @@ func (m *mesh) holding(host string, epoch int) {
 }
 
 func (m *mesh) released(host string, epoch int) { m.broadcast(goneLine(host, epoch)) }
+
+// counts is how many leases this copy holds, and how many copies it knows, itself too:
+// for the metrics (#2176).
+func (m *mesh) counts() (leases, copies int) {
+	m.leases.mu.Lock()
+	leases = len(m.leases.held)
+	m.leases.mu.Unlock()
+	return leases, len(m.peers()) + 1
+}
 
 func (m *mesh) peers() []string {
 	m.mu.Lock()
@@ -703,6 +714,9 @@ func (s *Service) apply(e controlEvent) {
 	case "userSettingsChanged":
 		// A person's settings or secrets changed at another copy (#1760).
 		s.userChangedHere(e.Subject, nil, true)
+	case "orgRoutesChanged":
+		// An org route changed at another copy (#999): its machines and clients here.
+		s.orgRoutesChangedHere()
 	case "policyChanged", "policyStopAll":
 		// The policy changed at another copy (#998): its machines and clients here.
 		s.policyChangedHere(e.Kind == "policyStopAll")
@@ -714,10 +728,25 @@ func (s *Service) apply(e controlEvent) {
 	case "groupsChanged":
 		// A group made, changed or removed at another copy (#1761).
 		s.tellGroupsChanged(e.Subject, s.records.Group(e.Subject) == nil)
+	case "projectsChanged":
+		// A project made, renamed, adopted or removed at another copy (#2317).
+		s.tellProjectsChanged(e.Subject, e.Subject != "" && s.records.Project(e.Subject) == nil)
+	case "personSuspended":
+		// A person suspended, or no longer, at another copy (#1002, D13): within 5 seconds here.
+		s.suspendedHere(e.Subject)
+	case "scimTokenRevoked":
+		s.scimTokens.forget()
+	case "notice":
+		var n wire.ControlNotice
+		if json.Unmarshal([]byte(e.Subject), &n) == nil {
+			s.noticeAdminsHere(n)
+		}
 	case "peopleChanged":
 		// Another copy's invite or removal makes this one a team, or not (#1763).
 		s.noteTeam()
 		s.tellPeoplesMachines()
+		// Who may use which org route (#999).
+		s.resendOrgRoutes()
 	case "clientPaired", "hostEnrolled", "hostMoved":
 		for _, h := range s.records.Hosts() {
 			s.router.Know(h.ID)

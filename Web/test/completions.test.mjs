@@ -16,11 +16,11 @@ for (const { name, input, expected } of cases("completions/typed.json")) {
       matching: matching.map((m) => m.name),
       completedCommand: command && matching[0] ? c.completeCommand(input.text, command, matching[0]) : null,
       mention: mention?.term ?? null,
-      completedMention: mention ? c.completeMention(input.text, mention, c.fileName("/fixture/project/Web/src/Prompt.tsx")) : null,
+      completedMention: mention ? c.completeMention(input.text, mention, c.fileName("/fixture/folder/Web/src/Prompt.tsx")) : null,
     }, expected);
   });
 }
 
 test("completions: a mentioned file goes as the host's file URL", () => {
-  assert.equal(c.fileURL("/Users/a/My Project/a#b.md"), "file:///Users/a/My%20Project/a%23b.md");
+  assert.equal(c.fileURL("/Users/a/My Folder/a#b.md"), "file:///Users/a/My%20Folder/a%23b.md");
 });

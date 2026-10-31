@@ -1,6 +1,6 @@
 import Foundation
 
-/// The line under a project's archived sessions on its Archived page (#664), which the
+/// The line under a folder's archived sessions on its Archived page (#664), which the
 /// Mac's window and the Remote both draw, as the web does: never "none" until the host
 /// has said so, and never a capped page passed off as the whole archive.
 public enum ArchivedSessionsNote: Equatable, Sendable {
@@ -14,13 +14,13 @@ public enum ArchivedSessionsNote: Equatable, Sendable {
     case capped(shown: Int, total: Int)
 
     /// Nil when the list says it all. `answered` is nil while the ask is on its way;
-    /// `total` is the host's count of the project's archived sessions.
+    /// `total` is the host's count of the folder's archived sessions.
     public static func note(shown: Int, total: Int, answered: Bool?, hostOffline: Bool) -> Self? {
         if shown == 0 {
             if hostOffline || answered == false { return .hostSilent }
             return answered == nil ? .loading : ArchivedSessionsNote.none
         }
-        if shown >= SidebarProjectFold.archivedShown, total > shown { return .capped(shown: shown, total: total) }
+        if shown >= SidebarFolderFold.archivedShown, total > shown { return .capped(shown: shown, total: total) }
         return nil
     }
 

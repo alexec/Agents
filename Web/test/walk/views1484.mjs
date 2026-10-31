@@ -1,10 +1,10 @@
 // The #1484 walk: an MCP Apps view on the page at the control plane's own domain, drawn through
-// the sandbox proxy at the views name. Pairs by a browser code, opens the project's first
+// the sandbox proxy at the views name. Pairs by a browser code, opens the folder's first
 // session, says Show, waits for the view, and checks that its frame is the views name's
 // /sandbox.html; then opens /sandbox.html at the page's own name, which is refused. Fails on any
 // error the page throws.
 //
-//   SPKI="<pin> <pin>" node Web/test/walk/views1484.mjs <page URL> <browser code> <project name> <out dir>
+//   SPKI="<pin> <pin>" node Web/test/walk/views1484.mjs <page URL> <browser code> <folder name> <out dir>
 //
 // SPKI is the base64 SHA-256 of each certificate's key (the page's name and the views name), for
 // a test CA such as Pebble's. Expects a session whose agent called a server's tool with a view.
@@ -28,9 +28,9 @@ try {
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  await page.waitFor(`document.querySelectorAll(".sidebar .row.project").length >= 1`, 20_000);
+  await page.waitFor(`document.querySelectorAll(".sidebar .row.folder").length >= 1`, 20_000);
   await page.eval(`(() => {
-    const b = [...document.querySelectorAll(".sidebar .row.project .disclosure")].find((d) => d.getAttribute("aria-label").endsWith(" " + ${js(name)}));
+    const b = [...document.querySelectorAll(".sidebar .row.folder .disclosure")].find((d) => d.getAttribute("aria-label").endsWith(" " + ${js(name)}));
     if (b && b.getAttribute("aria-expanded") !== "true") b.click();
   })()`);
   await page.waitFor(`document.querySelector(".sidebar .row.session")`, 20_000);

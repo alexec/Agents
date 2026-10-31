@@ -2,7 +2,7 @@
 import Foundation
 import Testing
 
-/// You ▸ On Every Machine (#1760): the same words as `Web/src/model/userScope.ts`.
+/// The user scope (#1760, #2157): the same words as `Web/src/model/userScope.ts`.
 struct UserScopeWordsTests {
     @Test func aSecretsRowSaysWhereItIs() {
         let row = DaemonAPI.UserSecretRow(name: "A", updated: "", machines: ["mac", "box"],
@@ -19,18 +19,19 @@ struct UserScopeWordsTests {
         #expect(!UserScopeWords.isSecretName("../X"))
     }
 
-    @Test func aPartFollowsWhenKept() throws {
+    @Test func aSettingHasOneFixedScope() {
+        #expect(UserScopeWords.yoursOnEveryMachine == "Yours, on every machine")
+        #expect(UserScopeWords.thisMacOnly == "This Mac's")
+    }
+
+    @Test func theAgentsEditorsSayWhatGoesToTheOtherMachines() {
+        #expect(UserScopeWords.agentConfigurationFollows.hasPrefix("Your other machines get this Mac's instructions"))
+        #expect(UserScopeWords.agentConfigurationFollows.hasSuffix("Workflows, plugins and a skill's other files stay on this Mac."))
+    }
+
+    @Test func aPersonSettingCanBeKept() throws {
         let settings = try JSONValue.parse(Data(#"{"costLimits":{"dailyTokens":5}}"#.utf8)).decode(DaemonAPI.UserSettings.self)
         #expect(settings[.costLimits] != nil)
         #expect(settings[.mcpServers] == nil)
-        #expect(UserScopeWords.partState(settings[.costLimits], updated: nil) == "The same on every machine of yours.")
-    }
-
-    /// #2069: an edit in a followed pane goes to every machine, and the words say so.
-    @Test func aFollowedPaneSaysAnEditGoesToEveryMachine() {
-        #expect(UserScopeWords.partsFoot.contains("the change goes to every machine of yours"))
-        #expect(!UserScopeWords.partsFoot.contains("not in its own pane"))
-        #expect(UserScopeWords.followedNote(.costLimits) == "Cost limits: a change here goes to every machine of yours, not only to this Mac.")
-        #expect(UserScopeWords.replaceTitle(.resources, machine: "This Mac") == "Use This Mac’s Resources?")
     }
 }

@@ -1,6 +1,7 @@
 // The files pane (071 US4; frame B): a fourth column from 1440, over the chat below that. Four
 // tabs: Files (the session's folder, browsed, a file opened), Changes (what the agent changed),
-// Page (a live page the agent shows), and Exchanged (what the conversation handed over, #258).
+// Page (a live page the agent shows), Exchanged (what the conversation handed over, #258), Simulator,
+// and Lineage (what the session is linked to, #2940).
 import { signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { Agent, DirectoryEntry } from "../protocol/generated";
@@ -17,12 +18,13 @@ import { fileToPin, nameOf, paneOf, pathOf, setPane, textShownAs, type Tab } fro
 import { LiveDocument } from "./LiveDocument";
 import { Exchanged } from "./Exchanged";
 import { SimulatorPane } from "./SimulatorPane";
+import { Lineage } from "./Lineage";
 import { Capability } from "../protocol/capabilities.generated";
 import { hostNeedsUpdate } from "../model/capabilities";
 
 const tabs: { tab: Tab; label: string }[] = [
   { tab: "files", label: "Files" }, { tab: "changes", label: "Changes" }, { tab: "page", label: "Page" },
-  { tab: "exchanged", label: "Exchanged" }, { tab: "simulator", label: "Simulator" },
+  { tab: "exchanged", label: "Exchanged" }, { tab: "simulator", label: "Simulator" }, { tab: "lineage", label: "Lineage" },
 ];
 
 /** Below 760 the page is the phone's one column at a time, and Files lists one folder at a time, as the Remote does. */
@@ -155,29 +157,32 @@ export function FilesPane({ store, host, session }: { store: Store; host: string
         {pane.tab === "simulator" && (store.has(host, Capability.simulators1)
           ? <SimulatorPane store={store} host={host} />
           : <p class="hint">{hostNeedsUpdate}</p>)}
+        {pane.tab === "lineage" && (store.has(host, Capability.lineage1)
+          ? <Lineage key={session} store={store} host={host} session={session} />
+          : <p class="hint">{hostNeedsUpdate}</p>)}
       </div>
     </aside>
   );
 }
 
 /**
- * Pin to Project, or Unpin when it is pinned (#159): the page under the project in the sidebar.
- * From a worktree, the same path in the project folder, where the pin opens it.
+ * Pin to Folder, or Unpin when it is pinned (#159): the page under the folder in the sidebar.
+ * From a worktree, the same path in the folder, where the pin opens it.
  */
 function PinButton({ store, host, agent, file }: { store: Store; host: string; agent: Agent; file: string }) {
-  const folder = agent.worktree?.project ?? agent.cwd;
+  const folder = agent.worktree?.folder || agent.cwd;
   const base = pathOf(agent.worktree ? agent.cwd : folder) + "/";
   const absolute = file.startsWith("/") ? file : pathOf(file);
   if (!absolute.startsWith(base) || !/\.(md|markdown|mdown|mkd|html?)$/i.test(absolute)) return null;
   const path = absolute.slice(base.length);
   const pins = store.pinsIn(host, folder);
   if (pins.some((p) => p.path === path)) {
-    return <button class="icon" aria-label="Unpin" title="Pinned under the project. Click to unpin it."
+    return <button class="icon" aria-label="Unpin" title="Pinned under the folder. Click to unpin it."
       onClick={() => void store.unpin(host, folder, path)}>📌</button>;
   }
   const full = pins.length >= 10;
-  return <button class="icon" aria-label="Pin to Project" disabled={full}
-    title={full ? "This project already has 10 pinned pages, the most it can have. Unpin one first."
-      : "Pin to Project: under the project in the sidebar."}
+  return <button class="icon" aria-label="Pin to Folder" disabled={full}
+    title={full ? "This folder already has 10 pinned pages, the most it can have. Unpin one first."
+      : "Pin to Folder: under the folder in the sidebar."}
     onClick={() => void store.pin(host, folder, path)}>📍</button>;
 }

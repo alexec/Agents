@@ -9,10 +9,12 @@ import (
 	"path/filepath"
 	"regexp"
 	goruntime "runtime"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
+	"github.com/alexec/agents/Go/internal/agentsd/redact"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -55,51 +57,46 @@ type appToolCall struct {
 	Seconds   *float64                   `json:"seconds,omitempty"`
 }
 
-// appToolMethod is the daemon method a tool is, as the Swift host keeps it.
-func appToolMethod(tool string, args map[string]json.RawMessage) string {
-	switch tool {
-	case "show_file":
-		return "agents/showFile"
-	case "lease_resource":
-		return "leases/lease"
-	case "release_resource":
-		return "leases/release"
-	case "list_resources":
-		return "leases/list"
-	case "wait_for_event":
-		if _, ok := args["agents"]; ok {
-			return "agents/waitOn"
-		}
-		return "events/wait"
-	case "cancel_wait":
-		return "events/cancel"
-	case "ask_form":
-		return "agents/askForm"
-	case "list_sessions":
-		if strings.EqualFold(strings.TrimSpace(argString(args, "started_by")), "me") {
-			return "agents/listHelpers"
-		}
-		return "agents/listSessions"
-	case "read_session":
-		return "agents/readSession"
-	case "archive_session":
-		return "agents/requestArchiveHelper"
-	case "start_session":
-		return "agents/startHelper"
-	case "stop_session":
-		return "agents/stopHelper"
-	case "manage_workflows":
-		return "agents/manageWorkflows"
-	case "list_workspaces":
-		return "agents/workspaces"
-	case "move_worktree":
-		return "agents/moveSelf"
-	case "set_session_labels":
-		return "agents/setOwnLabels"
-	case "message_session":
-		return "agents/messageAgent"
-	case "suggest_next_prompt":
-		return "agents/suggestPrompts"
+// appToolMethods is the method each app tool is (#2172), as app-tools.jsonl, the audit and
+// Events name it: `<the tool's noun, plural>/<its verb>`, in camelCase, one a tool. A tool
+// with two ways (list_sessions with started_by, wait_for_agents) is still one
+// method, told apart by its arguments. ask_question is a question (#2298), so `questions/ask`.
+var appToolMethods = map[string]string{
+	"start_session":       "sessions/start",
+	"stop_session":        "sessions/stop",
+	"archive_session":     "sessions/archive",
+	"list_sessions":       "sessions/list",
+	"read_session":        "sessions/read",
+	"message_session":     "sessions/message",
+	"cancel_message":      "sessions/cancelMessage",
+	"set_session_labels":  "sessions/setLabels",
+	"move_worktree":       "worktrees/move",
+	"show_file":           "files/show",
+	"ask_question":        "questions/ask",
+	"ask_secret":          "secrets/ask",
+	"suggest_next_prompt": "prompts/suggest",
+	"notify":              "people/notify",
+	"hang_up":             "calls/hangUp",
+	"manage_workflows":    "workflows/manage",
+	"lease_resource":      "resources/lease",
+	"release_resource":    "resources/release",
+	"list_resources":      "resources/list",
+	"wait_for_event":      "events/wait",
+	"wait_for_agents":     "agents/wait",
+	"check_again":         "waits/checkAgain",
+	"cancel_wait":         "events/cancel",
+	"list_machines":       "machines/list",
+	"start_machine":       "machines/start",
+	"stop_machine":        "machines/stop",
+	"make_machine":        "machines/make",
+	"delete_machine":      "machines/delete",
+	"bring_back":          "branches/bringBack",
+}
+
+// appToolMethod is the method a tool is, or the tool's own name for one not in the table.
+func appToolMethod(tool string) string {
+	if m, ok := appToolMethods[tool]; ok {
+		return m
 	}
 	return tool
 }
@@ -108,7 +105,7 @@ var uuidIn = regexp.MustCompile(`[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0
 
 // keepAppToolCall keeps one call, as answered: a line a call, the token never in it.
 func (d *Daemon) keepAppToolCall(agent wire.UUID, tool string, args map[string]json.RawMessage, note string, err error, began time.Time) {
-	call := appToolCall{At: wire.DateOf(began), Method: appToolMethod(tool, args), Ok: err == nil, Arguments: map[string]json.RawMessage{}}
+	call := appToolCall{At: wire.DateOf(began), Method: appToolMethod(tool), Ok: err == nil, Arguments: map[string]json.RawMessage{}}
 	for k, v := range args {
 		if k != "token" {
 			call.Arguments[k] = v
@@ -144,6 +141,7 @@ func (d *Daemon) keepAppToolCall(agent wire.UUID, tool string, args map[string]j
 		log.Printf("could not keep a record of an app tool call: %v", oErr)
 		return
 	}
+	b, _ = redact.Bytes(b) // a call's arguments or answer can hold a token (#1001)
 	f.Write(append(b, '\n'))
 	f.Close()
 }
@@ -181,6 +179,41 @@ type assessStart struct {
 }
 
 func (d *Daemon) assessmentsPath() string { return filepath.Join(d.Store.Loc.Root, "assessments") }
+
+// assessmentsKept is how many runtime assessments the daemon keeps (#2292).
+const assessmentsKept = 50
+
+// dropOldAssessments deletes all but the newest assessmentsKept assessments, each its
+// <agentID>.start.json, its <agentID>.json score and its scope-<id>.txt (#2292). The
+// reports are in the folders, and stay.
+func (d *Daemon) dropOldAssessments() {
+	dir := d.assessmentsPath()
+	starts, _ := filepath.Glob(filepath.Join(dir, "*.start.json"))
+	if len(starts) <= assessmentsKept {
+		return
+	}
+	at := map[string]time.Time{}
+	for _, p := range starts {
+		if fi, err := os.Stat(p); err == nil {
+			at[p] = fi.ModTime()
+		}
+	}
+	sort.SliceStable(starts, func(i, j int) bool {
+		if !at[starts[i]].Equal(at[starts[j]]) {
+			return at[starts[i]].After(at[starts[j]])
+		}
+		return starts[i] > starts[j]
+	})
+	for _, p := range starts[assessmentsKept:] {
+		var start assessStart
+		if b, err := os.ReadFile(p); err == nil && diskjson.Unmarshal(b, &start) == nil &&
+			start.ScopePath != "" && filepath.Dir(start.ScopePath) == dir {
+			os.Remove(start.ScopePath)
+		}
+		os.Remove(strings.TrimSuffix(p, ".start.json") + ".json")
+		os.Remove(p)
+	}
+}
 
 // escalationTools is each runtime's own question tool the app carries (ToolPolicyCatalog).
 var escalationTools = map[string]string{"claude": "AskUserQuestion", "cursor": "AskQuestion", "codex": "request_user_input",
@@ -254,9 +287,9 @@ func assessModel(asked *string, options []wire.ConfigOption) *string {
 
 // freshReportPath is .agents/reviews/runtimes/<runtime>-<date>.md, or the first -2, -3 …
 // not taken: a second assessment the same day opens its report empty, as the first did.
-func freshReportPath(project, runtimeID string, at time.Time) string {
+func freshReportPath(folder, runtimeID string, at time.Time) string {
 	stem := runtimeID + "-" + at.Format("2006-01-02")
-	dir := filepath.Join(project, ".agents", "reviews", "runtimes")
+	dir := filepath.Join(folder, ".agents", "reviews", "runtimes")
 	path := filepath.Join(dir, stem+".md")
 	for n := 2; ; n++ {
 		if _, err := os.Stat(path); err != nil {
@@ -312,11 +345,12 @@ func (d *Daemon) assessRuntime(r wire.AssessRuntimeRequest) (wire.AssessRuntimeR
 	if err := writeStore(filepath.Join(d.assessmentsPath(), string(id)+".start.json"), kept); err != nil {
 		log.Printf("could not keep a runtime assessment's start: %v", err)
 	}
+	d.dropOldAssessments()
 	return wire.AssessRuntimeResult{AgentID: id, Model: model, ReportPath: report}, nil
 }
 
-func freshReportPathFirst(project, runtimeID string, at time.Time) string {
-	return filepath.Join(project, ".agents", "reviews", "runtimes", runtimeID+"-"+at.Format("2006-01-02")+".md")
+func freshReportPathFirst(folder, runtimeID string, at time.Time) string {
+	return filepath.Join(folder, ".agents", "reviews", "runtimes", runtimeID+"-"+at.Format("2006-01-02")+".md")
 }
 
 // MARK: Scoring
@@ -334,7 +368,7 @@ func (d *Daemon) scoreAssessmentIfDue(id wire.UUID) {
 			labelled = true
 		}
 	}
-	if !labelled || a.Report != nil && (a.Report.Outcome == wire.WorkOutcomeBlocked || a.Report.Outcome == wire.WorkOutcomePartlyDone) {
+	if !labelled || a.Report != nil && a.Report.Outcome == wire.WorkOutcomeWaiting {
 		return
 	}
 	// A turn that ends on a wait still open (wait_for_event, "your place is kept") is not
@@ -397,7 +431,7 @@ func (d *Daemon) assessment(id wire.UUID) (wire.RuntimeAssessmentScore, error) {
 	var start assessStart
 	if b, err := os.ReadFile(filepath.Join(d.assessmentsPath(), string(id)+".start.json")); err == nil && diskjson.Unmarshal(b, &start) == nil {
 		rec.start = &start
-		_, err := os.Stat(filepath.Join(projectFolder(a), ".agents", "workflows", "assess-"+start.ShortID+".md"))
+		_, err := os.Stat(filepath.Join(folderPath(a), ".agents", "workflows", "assess-"+start.ShortID+".md"))
 		rec.workflowLeft = err == nil
 		_, err = os.Stat(start.ScopePath)
 		rec.scopeWritten = err == nil
@@ -414,7 +448,7 @@ func (d *Daemon) assessment(id wire.UUID) (wire.RuntimeAssessmentScore, error) {
 // .agents/reviews/runtimes/.
 func shownReport(calls []appToolCall) string {
 	for _, c := range calls {
-		if c.Method != "agents/showFile" || !c.Ok {
+		if c.Method != "files/show" || !c.Ok {
 			continue
 		}
 		if p := callPath(c); strings.Contains(p, ".agents/reviews/runtimes/") && strings.HasSuffix(p, ".md") {

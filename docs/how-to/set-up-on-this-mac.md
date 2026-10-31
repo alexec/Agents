@@ -33,6 +33,11 @@ this Mac, with **Agents Host**.
    which you can always write to. `/Applications` asks for an admin's password. If
    your Mac won't open a disk image, a company policy for example, download the
    `.zip` instead, double-click it, and move the app it makes into `~/Applications`.
+
+   In `~/Applications`, Agents Host updates itself to the release your control plane
+   runs, with no admin password (#2178). It restarts only when no agent is in a turn.
+   **Settings ▸ Machines ▸ This Mac ▸ Updates** in the window shows where the update is,
+   and turns it off.
 3. Agents Host asks **Where should this Mac's agents report?** Under **Run the control
    plane here**, click **Run It Here**.
 
@@ -52,8 +57,8 @@ this Mac, with **Agents Host**.
 3. In the window, paste the code under **CODE** and click **Connect**.
 
    The window is paired, may do everything, and shows this Mac under
-   **THIS MAC** in the projects list. Add a project to start; see
-   [Add a project](add-a-project.md).
+   **THIS MAC** in the folders list. Add a folder to start; see
+   [Add a folder](add-a-folder.md).
 
 The code works once, for five minutes. If it runs out, close the sheet and click **Pair**
 again. You can also open the sheet from the Agents Host menu bar item, with **Pair a
@@ -92,7 +97,7 @@ To go back, set **Keeps its store** to **On this Mac** and click **Switch Store�
   Again** to try now. The window shows the same line in **Settings ▸ Control plane**.
 - If you already run a control plane elsewhere, choose **Join one elsewhere** in Agents
   Host instead, and paste a machine code from it. See
-  [Add a server](add-a-server.md#add-another-mac).
+  [Add a machine](add-a-machine.md#add-another-mac).
 - If you used the earlier Agents app on this Mac, Agents Host offers to move your agents,
   devices and servers across. See [Move an existing set-up across](move-an-existing-set-up.md).
 - To reach your agents from your iPhone and iPad away from home, and to be notified on

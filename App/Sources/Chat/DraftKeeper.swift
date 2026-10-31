@@ -113,7 +113,7 @@ final class DraftKeeper {
     /// Put the start form back as it was left.
     ///
     /// In two parts, because they become possible at different moments. The folders and
-    /// servers go back at once, and the folder only if nothing has chosen one — a project
+    /// servers go back at once, and the folder only if nothing has chosen one — a folder
     /// page choosing its own folder is the page being right about where it is. The
     /// runtime has to wait until the runtimes are known, and goes back only if it is still
     /// one of them; until then this keeps asking.

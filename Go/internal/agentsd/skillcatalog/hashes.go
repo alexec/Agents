@@ -18,7 +18,7 @@ import (
 // The three hashes a skill is known by (SkillHashes):
 //   - BlobSHA: git's SHA-1 of one file, which GitHub's tree lists for every file.
 //   - TreeSHA: git's SHA-1 of a folder, which the `skills` CLI records for a personal skill.
-//   - ComputedHash: the CLI's own SHA-256 of a folder, which it records for a project skill.
+//   - ComputedHash: the CLI's own SHA-256 of a folder, which it records for a folder skill.
 
 // BlobSHA is git's blob id: SHA-1 of "blob <length>\0" and the bytes.
 func BlobSHA(data []byte) string {

@@ -25,6 +25,10 @@ snapshot_start=10:00
 dry_run=0
 project=''
 vm_account=''
+# The control plane's image (#2140): a release pushes ghcr.io/alexec/agents-control:X.Y.Z, and
+# up.sh --build tags its own build the same way.
+image=ghcr.io/alexec/agents-control
+build=0
 
 say() { printf '%s\n' "$*"; }
 die() {
@@ -98,4 +102,14 @@ setup() {
 # ~/.ssh/google_compute_engine). Standard input goes to COMMAND.
 vm_ssh() {
 	run gcloud compute ssh "$name" --zone "$zone" --quiet --command "$1"
+}
+
+# pick_version: the version up.sh runs, in $version, and its image tag, in $tag: AGENTS_VERSION,
+# or scripts/version.sh. Without --build it must be a release's, X.Y.Z, whose image and Linux
+# host up.sh pulls; move.sh asks before it stops anything. A tag has no "+" (Docker's rule).
+pick_version() {
+	version=${AGENTS_VERSION:-$("$(dirname "${BASH_SOURCE[0]}")/../../scripts/version.sh")}
+	tag=${version//+/-}
+	((build)) || [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
+		die "no release is $version, so there is no image to pull: give --build to build this checkout, or AGENTS_VERSION=X.Y.Z for a release"
 }

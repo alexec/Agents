@@ -49,31 +49,29 @@ agent event, nor a drop box arrival's, a lease's, the disk's, a cost's or a serv
   event's, so the sentences read alike. Any other key is an error naming what the event
   takes: *branch.moved takes branch; "to" is not one of its arguments.* For an agent event
   it says how to wait for particular agents instead: *agent.finished takes no arguments;
-  "outcome" is not one of its arguments. To wait for particular agents, use wait_for_event
-  with agents.* A workflow file with one is unreadable, and says so, rather than firing for
+  "outcome" is not one of its arguments. To wait for particular agents, use wait_for_agents.* A workflow file with one is unreadable, and says so, rather than firing for
   every event of its kind.
 - **A wrong value is an error too**: *person.away: why is one of locked, idle, not asleep.*
   `branch` takes any value.
 - **A wait already waiting** when this changed keeps matching as it was written.
 
-### The one list
+### What an agent can wait on
 
-`wait_for_event` with action `list` gives every event an agent can wait on, in one list: the
-app's, then each of the project's MCP servers' that it offers by poll. Each is one line of
-JSON with its `name`, `source` (`app`, or the server's name in `mcp.json`), `description`,
-`inputSchema` and `payloadSchema`. A server that could not be asked is named on a line of
-its own. The workflow tool's description carries the app's part of the same list.
+An unknown event name is refused, and the refusal names the events that are offered: the
+app's, then each of the folder's MCP servers' that it offers by poll. The workflow tool's
+description carries the app's part of the same list.
 
 Serving the app's own events over `events/poll` from the app's MCP endpoint, so any MCP
 client could subscribe to them, would be possible in this shape; it is not done.
 
-An agent can wait for its own project's events and for this Mac's. It cannot wait for
-another project's events.
+An agent can wait for its own folder's events and for this Mac's. It cannot wait for
+another folder's events. To wait for particular sessions, it calls `wait_for_agents`. To
+resume at a time, it calls `check_again`.
 
 ## Agents
 
-All are about agents in the same project. None takes a filter: to wait for particular
-agents, use `wait_for_event` with `agents`. Each shows:
+All are about agents in the same folder. None takes a filter: to wait for particular
+agents, use `wait_for_agents`. Each shows:
 
 - `agent`, the agent's id;
 - `labels`, the agent's labels;
@@ -87,27 +85,27 @@ an event already on the log.
 | Event | Filter by | Details | What it means |
 | --- | --- | --- | --- |
 | `agent.started` | — | agent | An agent started working. |
-| `agent.finished` | — | agent, outcome, afterwards | An agent ended a turn having done its work. `afterwards` is `archive_requested` when the turn ends waiting for you to approve archiving it, `archived` when the session is archived as the turn ends, else `stay`. `outcome` is `done`, `nothing_to_do`, `needs_answer`, `partly_done`, `stuck` or `blocked`. |
+| `agent.finished` | — | agent, outcome, afterwards | An agent ended a turn having done its work. `afterwards` is `archive_requested` when the turn ends waiting for you to approve archiving it, `archived` when the session is archived as the turn ends, else `stay`. `outcome` is `done`, `nothing_to_do`, `needs_answer` or `waiting` (#1916 removed `partly_done` and `stuck`). |
 | `agent.asked_permission` | — | agent | An agent is asking for permission. |
 | `agent.asked_form` | — | agent | An agent raised a form to fill in. |
-| `agent.blocked` | — | agent, waiting_on | An agent ended its turn waiting on something. When `waiting_on` names agents or a time to check again, the agent resumes by itself; otherwise it needs you to carry it on. See [Statuses and groups](statuses.md). |
-| `agent.stopped` | — | agent, by | An agent was stopped before finishing. `by` is `you`, `cost_limit` or `unknown`. |
+| `agent.waiting` | — | agent, waiting_on | An agent ended its turn waiting on something. When `waiting_on` names agents or a time to check again, the agent resumes by itself. See [Statuses and groups](statuses.md). |
+| `agent.stopped` | — | agent, by | An agent was stopped before finishing. `by` is `you`, `admin` (an admin in the Console, #2435), `cost_limit` or `unknown`. |
 | `agent.failed` | — | agent, reason | An agent ended in an error. `reason` is `allowance_spent`, `rate_limited`, `process_died`, `sign_in_refused`, `runtime_error`, `sandbox_failed`, `max_tokens`, `max_turn_requests`, `refusal`, `daemon_gone`, `stopped_by_agent` or `unrecognised`. |
 | `agent.archive_requested` | — | agent, outcome | An agent's turn ended after `archive_session`, and its session waits for you to approve archiving it. `outcome` is its last report's, when it made one. |
 | `agent.messaged` | — | agent, from, from_title | An agent was sent a message by another agent with `message_session`. `agent` is the one it was sent to; `from` is the sender's id and `from_title` its title. |
 | `agent.archived` | — | agent, by, outcome | An agent was archived. `by` is `you`, or `agent` when the agent that started it archived it with `archive_session`. `outcome` is its last report's, when it made one. |
 | `agent.deleted` | — | agent, because | An archived agent was deleted with its conversation. `because` is `age` or `person`. |
 
-## Projects
+## Folders
 
 | Event | Filter by | Details | What it means |
 | --- | --- | --- | --- |
-| `project.idle` | — | agents, finished, blocked, waiting_on_you, stopped, failed, since, ids | Every agent in this project has stopped working. Raised once, a minute after the last agent stops, when none has started since. `agents` is how many worked since the project was last quiet, and `ids` their ids, comma-separated. `finished`, `blocked`, `waiting_on_you`, `stopped` and `failed` count how each of those stands now. `since` is when the first of them started. |
+| `folder.idle` | — | agents, finished, waiting, waiting_on_you, stopped, failed, since, ids | Every agent in this folder has stopped working. Raised once, a minute after the last agent stops, when none has started since. `agents` is how many worked since the folder was last quiet, and `ids` their ids, comma-separated. `finished`, `waiting`, `waiting_on_you`, `stopped` and `failed` count how each of those stands now. `since` is when the first of them started. |
 
-An agent asking for permission is not working, so it does not hold `project.idle` back: it
-is counted under `waiting_on_you`. The agent a workflow on `project.idle` (or `project.*`)
+An agent asking for permission is not working, so it does not hold `folder.idle` back: it
+is counted under `waiting_on_you`. The agent a workflow on `folder.idle` (or `folder.*`)
 runs, and any helper it starts, is not counted as work, so the clean-up finishing does not
-raise `project.idle` again. A busy period is kept in memory: a restart of the app starts
+raise `folder.idle` again. A busy period is kept in memory: a restart of the app starts
 counting again from the next agent that works.
 
 ## Workflows
@@ -126,16 +124,16 @@ counting again from the next agent that works.
 
 ## Drop box
 
-Each project has a drop box, the folder `.agents/dropbox/` in it. See
+Each folder has a drop box, the folder `.agents/dropbox/` in it. See
 [Hand files to a workflow](../how-to/hand-files-to-a-workflow.md).
 
 | Event | Filter by | Details | What it means |
 | --- | --- | --- | --- |
-| `dropbox.file_added` | — | path, name, folder, extension, size | A file arrived in this project's drop box, or a folder in it. `path` is the file's full path on the project's host. `name` is its name. `folder` is where it is inside `.agents/dropbox/`, such as `review` or `review/2026`, and empty at the top. `extension` is in lower case without the dot, and empty when there is none. `size` is in bytes. Raised once, when the file has stopped changing. A file replaced under the same name, or changed where it lies, is raised again. Files there when the app starts, and names starting with a dot, are not. |
+| `dropbox.file_added` | — | path, name, folder, extension, size | A file arrived in this folder's drop box, or a folder in it. `path` is the file's full path on the folder's host. `name` is its name. `folder` is where it is inside `.agents/dropbox/`, such as `review` or `review/2026`, and empty at the top. `extension` is in lower case without the dot, and empty when there is none. `size` is in bytes. Raised once, when the file has stopped changing. A file replaced under the same name, or changed where it lies, is raised again. Files there when the app starts, and names starting with a dot, are not. |
 
 ## This Mac
 
-These belong to the machine the host runs on, not to a project. Any agent can wait for them.
+These belong to the machine the host runs on, not to a folder. Any agent can wait for them.
 
 `mac.sleep`, `mac.wake`, `person.away` and `person.back` are raised only on a Mac: a Linux
 server has nothing that hears them. On a server, a `wait_for_event` naming only these is
@@ -149,7 +147,7 @@ they are `machine.`.
 | `lease.released` | — | resource, how | A lease was given back, ended or ran out. `how` is `released`, `ended` or `expired`. |
 | `mac.sleep` | — | | The Mac is going to sleep. Mac only. |
 | `mac.wake` | — | | The Mac woke up. Mac only. |
-| `machine.disk_low` | — | volume, free_bytes, free_percent, level, threshold, worktrees | Free space on a volume holding the Agents root, a project or a worktree fell below its threshold. `level` is `low` (below 20 GB or 5% of the disk, whichever is more) or `critical` (below 2 GB, where commands start failing). `threshold` is the line it fell below, in bytes. `worktrees` names the largest worktrees on the volume and their sizes, measured within a budget, so `over` means at least. Raised once per crossing; falling further from low to critical is a second crossing. The window shows a strip across the top while it lasts. On a Linux server the volume is called "This server’s disk". |
+| `machine.disk_low` | — | volume, free_bytes, free_percent, level, threshold, worktrees | Free space on a volume holding the Agents root, a folder or a worktree fell below its threshold. `level` is `low` (below 20 GB or 5% of the disk, whichever is more) or `critical` (below 2 GB, where commands start failing). `threshold` is the line it fell below, in bytes. `worktrees` names the largest worktrees on the volume and their sizes, measured within a budget, so `over` means at least. Raised once per crossing; falling further from low to critical is a second crossing. The window shows a strip across the top while it lasts. On a Linux server the volume is called "This server’s disk". |
 | `machine.disk_ok` | — | volume, free_bytes, free_percent, threshold | Free space on a volume that was low climbed back above its threshold, by a margin of a tenth of it (at least 1 GB) so it does not flap. |
 | `person.away` | why | why | You locked the screen or stepped away for 5 minutes. `why` is `locked` or `idle`. Mac only. |
 | `person.back` | why | why | You unlocked the screen or came back. `why` is `locked` or `idle`. Mac only. |
@@ -185,8 +183,8 @@ by the Agents window, and a change while the daemon was down is not told again.
 
 An agent whose wait was open over a restart is not woken only to be told. At its next wake,
 by its event or its time limit, the wake says when Agents restarted, for how long it was down,
-and which of the events it waits on may be missing, so it can check with `wait_for_event`
-action `recent` and look at the state itself. A wait only on events that are had again says
+and which of the events it waits on may be missing, so it can check the state itself (the
+branch or the pull request). A wait only on events that are had again says
 that they were caught up. To be woken by the restart itself, wait on `system.restarted`.
 
 ## No custom events
@@ -194,7 +192,7 @@ that they were caught up. To be woken by the restart itself, wait on `system.res
 Agents do not raise events of their own. The `publish_event` tool and the `custom.` events it
 raised were removed (#639). A wait on a `custom.` name is refused, saying why, and a workflow
 whose `on:` names one does not run: its page says what is wrong. To wait for another agent,
-use `wait_for_event` with `agents`. A `custom.` event already on the log still shows, with the
+use `wait_for_agents`. A `custom.` event already on the log still shows, with the
 agent that published it.
 
 ## Events from MCP servers
@@ -206,10 +204,10 @@ in poll mode, and only for servers whose `initialize` declares the `events` capa
 
 - **Names.** A server's event is `noun.verbed`, lowercase, with no prefix, the same shape as
   the app's own. A name in the app's catalogue is always the app's. A server's event whose
-  noun is one of the app's subjects (`agent`, `project`, `workflow`, `branch`, `lease`,
+  noun is one of the app's subjects (`agent`, `folder`, `workflow`, `branch`, `lease`,
   `mac`, `machine`, `person`, `cost`, `server`, `custom`) is refused, so a server can never
   pose as the app.
-- **Which servers.** The servers a project's agents get: the project's `.agents/mcp.json`
+- **Which servers.** The servers a folder's agents get: the folder's `.agents/mcp.json`
   once approved, your `~/.agents/mcp.json`, and plugins. A trigger without `server:` hears
   every one that offers the name; `server:` narrows it. A local (stdio) server is run by the
   app, as its own copy, to ask for events.
@@ -259,7 +257,7 @@ sender is linked to a person, and an email only with an aligned DKIM pass. See
 A wait on a server's event, such as `checks.failed` or `checks.*`, is a subscription, as a
 trigger is:
 
-- **Checked when it is made.** The name is checked against what the project's servers offer
+- **Checked when it is made.** The name is checked against what the folder's servers offer
   (`events/list`). If none offers it, the wait is refused, saying what each one does offer:
   *No server here offers pr.merge. github offers checks.failed, pr.merged.*
 - **`where` is the server's.** Its keys are the subscription's arguments, sent to the server
@@ -285,7 +283,7 @@ take the filters).
 On the Mac, **Events** is a row at the foot of the sidebar, above **Resources** and
 **Spending**. It shows every event, newest first, grouped by day.
 
-- **Filters**: a menu for all projects, this Mac or one project, and a capsule for each
+- **Filters**: a menu for all folders, this Mac or one folder, and a capsule for each
   subject: **Agents**, **Workflows**, **Branches**, **Drop box** and **This Mac**.
 - **Each row** shows the time, what happened, and the event's name. Under it, what it led
   to: **Woke** an agent, **Fired** a workflow, **Refused by** a workflow with the reason,
@@ -297,7 +295,7 @@ On the Mac, **Events** is a row at the foot of the sidebar, above **Resources** 
 - **Waiting now**, at the top, lists every agent that is waiting for an event, what for
   and until when, with ✕ to end the wait. It is not shown when nobody is waiting.
 
-On the iPhone and iPad, **Events** is a row under the project list. It shows the same rows
+On the iPhone and iPad, **Events** is a row under the folder list. It shows the same rows
 and details, filtered by one menu. It has no subject capsules, no **Copy as trigger** and
 no **Waiting now**.
 
@@ -322,11 +320,11 @@ It is read only.
   Answering a card raises no event, so it is only in the audit. The same event from two
   people is two events, not one with a count.
 - **What is kept**: start, stop, archive or delete an agent or session; answer an approval,
-  permission, question or sandbox card; change a setting, a cost limit or a project's
+  permission, question or sandbox card; change a setting, a cost limit or a folder's
   limits; approve, deny, run, turn on or off, or delete a workflow; approve a plugin; add,
-  approve or remove an MCP server, a skill or a marketplace; add or delete a project;
+  approve or remove an MCP server, a skill or a marketplace; add or delete a folder;
   pair, forget or remove a client or a machine; lend a sign-in or git access; change a
-  workspace provider. Reads, prompts and presence are not kept. An entry is written when
+  machine provider. Reads, prompts and presence are not kept. An entry is written when
   the control plane passes the call on, so a call that the host refuses is kept too.
 - **How long**: 90 days by default. An admin picks 30, 90, 180 or 365 days in the pane
   (`control/setAuditDays`, 1 to 3,650); the menu marks the time set now. The control
@@ -345,6 +343,44 @@ It is read only.
 
 Entries are stored in the control plane's store under `v1/events/<day>/`, one file each.
 The methods are `audit/list`, `audit/export` and `control/setAuditDays`.
+
+### The hash chain
+
+Each entry is in a **chain** (#1001). Each copy of the control plane links the entries it
+writes. An entry carries `chain` (the copy), `seq` (its place, from 1 when the copy
+starts) and `prev` (the SHA-256 of the stored entry before it). Each hour, and when a day
+ends, the copy writes a **seal** for the day under `v1/audit-seals/<day>/<copy>.json`: the
+chain's last place and its hash. Seals go with their day's entries.
+
+`agents-control audit verify` reads every entry and seal in the store. It says which
+entry was changed and which were removed, and exits 1 when it finds any. A day that the
+sweep deleted is not a removal. Entries written before the chain are counted, not checked.
+
+The chain shows a change. It does not stop one: a person who can write the store can also
+write a new chain. To keep a copy out of their reach, send the entries to a sink.
+
+### Sinks
+
+An admin sends each entry to a **sink** as it is written, in Console ▸ Audit ▸ Sinks on the
+web page (#1001). Up to 4 sinks:
+
+- **Syslog:** `tcp://host:port` or `tls://host:port`. Each entry is an RFC 5424 message
+  (facility 13, log audit; severity 6; app `agents-control`; the copy's id as its process;
+  message id `audit`), framed by its length as RFC 6587 says.
+- **HTTP:** an `https://` address (`http://` only on the same machine). Each POST carries up
+  to 500 entries as JSON lines (`application/x-ndjson`), with an optional bearer token.
+  The control plane keeps the token sealed, as it keeps an org route's key, and never shows
+  it again: leave it empty to keep it.
+
+Each line is `{"key": …, "hash": …, "entry": …}`: the entry, its key in the store, and the
+hash it has in its chain, so the SIEM can follow each chain by itself. Each copy of the
+control plane sends the entries it writes. Each sink has a queue of 10,000 entries: when a
+sink is down, entries wait there and go when it is back. When the queue is full, the oldest
+go, and the next line says how many (`"dropped": N`). The pane shows, for each sink, when it
+last sent, how many wait, how many were dropped and the last failure.
+
+The methods are `audit/sinks` and `audit/setSinks`, an admin's only. The sinks are kept in
+the store under `v1/audit-sinks.json`.
 
 ## See also
 

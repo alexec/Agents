@@ -5,7 +5,7 @@
 //   node Web/test/walk/parity.mjs <WEB_URL> <browser code> <ROOT> <out dir> <prefix> [scene…]
 //
 // The code is a browser's (`agents-control code --client --browser`). The root is a
-// run-app scratch root seeded as parity.md says: a git project `work`, three workflows (one
+// run-app scratch root seeded as parity.md says: a git folder `work`, three workflows (one
 // turned off), a finished unread session "Repo notes", one in a worktree with two labels, and
 // one asking to be archived (#584). Scenes that need the host away pause the root's own agentsd (its daemon.lock pid)
 // with SIGSTOP and always resume it. The disk scene writes the root's disk-free-override (#195,
@@ -23,13 +23,13 @@ const say = (line) => { notes.push(line); console.log(line); };
 const daemon = readFileSync(`${root}/daemon.lock`, "utf8").trim();
 const signal = (name) => execFileSync("kill", [`-${name}`, daemon]);
 
-const chrome = await launch({ profile: `/tmp/110-parity-chrome-${process.pid}` });
+const chrome = await launch({ profile: `${root}-chrome-${process.pid}` });
 const page = await chrome.page(webURL, { width: 1440, height: 900 });
 await page.waitFor(`document.querySelector("textarea")`);
 await page.focus("textarea");
 await page.type(code);
 await page.press("Connect");
-await page.waitFor(`document.querySelector(".projects .row, .sidebar .row.project")`, 20_000);
+await page.waitFor(`document.querySelector(".folders .row, .sidebar .row.folder")`, 20_000);
 
 const shot = async (name) => {
   await sleep(300);
@@ -42,9 +42,9 @@ const clickRow = (scope, text) => page.eval(`(() => {
   (row?.querySelector(".pick") ?? row)?.click();
   return !!row;
 })()`);
-// One sidebar since #145: a project unfolds to its sessions.
-const openProject = async () => {
-  if (!(await page.eval(`!!document.querySelector(".row.session")`))) await page.eval(`document.querySelector(".row.project .disclosure")?.click()`);
+// One sidebar since #145: a folder unfolds to its sessions.
+const openFolder = async () => {
+  if (!(await page.eval(`!!document.querySelector(".row.session")`))) await page.eval(`document.querySelector(".row.folder .disclosure")?.click()`);
   await page.waitFor(`document.querySelector(".row.session")`, 30_000);
 };
 const openSession = async (title) => {
@@ -73,18 +73,18 @@ for (const scene of scenes) {
       await shot("usage-tokens-3m");
     } else if (scene === "sessions") {
       // #70 unread, #68 worktree beside labels, sessions column, Archived folds, #100 off in place.
-      await openProject();
+      await openFolder();
       await page.waitFor(`document.querySelector(".workflows .row")`, 30_000);
       say(`rows: ${JSON.stringify(await visible(".sessions .row.session"))}`);
       say(`headings: ${JSON.stringify(await visible(".sessions .subhead"))}`);
       say(`workflows: ${JSON.stringify(await visible(".workflows .row"))}`);
-      say(`project row: ${JSON.stringify(await visible(".projects .row.project"))}`);
-      say(`project row height: ${await page.eval(`document.querySelector(".projects .row.project").getBoundingClientRect().height`)}`);
+      say(`folder row: ${JSON.stringify(await visible(".folders .row.folder"))}`);
+      say(`folder row height: ${await page.eval(`document.querySelector(".folders .row.folder").getBoundingClientRect().height`)}`);
       await shot("sessions");
     } else if (scene === "asker") {
       // #121: a question or permission card names who asks, by title and runtime. Takes the
       // first session waiting on a card, so a root with one agent asking is enough.
-      await openProject();
+      await openFolder();
       await page.eval(`document.querySelector(".row.session .pick, .row.session")?.click()`);
       await page.waitFor(`document.querySelector(".cards .card")`, 30_000);
       say(`asker: ${JSON.stringify(await visible(".cards .card .asker"))}`);
@@ -92,16 +92,22 @@ for (const scene of scenes) {
       await shot("asker");
     } else if (scene === "chat") {
       // 069 turn detail, concise turns, trailing reply; #108 bar.
-      await openProject();
+      await openFolder();
       await openSession("Repo notes");
       say(`turns: ${JSON.stringify(await visible(".chat .turn"))}`);
       await shot("chat");
+    } else if (scene === "wait-card") {
+      // Shared source and filters keep related events on one line in the chat card.
+      await openFolder();
+      await openSession("Wait for the checks");
+      say(`event lines: ${JSON.stringify(await visible(".wait-card-event"))}`);
+      await shot("wait-card");
     } else if (scene === "plan") {
       // #776: the plan strip is a card with the step, the count and a bar. Opens the session
       // "Fix the sidebar row", so a root seeded with that one agent holding a plan is enough.
       const pick = `[...document.querySelectorAll(".sidebar button, .sidebar .pick")]
         .find((b) => b.textContent.includes("Fix the sidebar row") && b.offsetParent !== null)`;
-      if (!(await page.eval(`!!(${pick})`))) await page.eval(`document.querySelector(".row.project .pick, .row.project button")?.click()`);
+      if (!(await page.eval(`!!(${pick})`))) await page.eval(`document.querySelector(".row.folder .pick, .row.folder button")?.click()`);
       await page.waitFor(`!!(${pick})`, 30_000);
       await page.eval(`(${pick}).click()`);
       await page.waitFor(`document.querySelector(".plan-strip .plan-card")`, 30_000);
@@ -114,7 +120,7 @@ for (const scene of scenes) {
     } else if (scene === "margin") {
       // #112: a turn's steps are a run of lines with no chevron; a step still opens. Takes the
       // first session, so a root with one finished turn is enough.
-      await openProject();
+      await openFolder();
       await page.eval(`document.querySelector(".row.session .pick, .row.session")?.click()`);
       await page.waitFor(`document.querySelector(".chat .transcript")`, 30_000);
       await sleep(300);
@@ -129,7 +135,7 @@ for (const scene of scenes) {
       // #148, #1315, #2170: the last turn, and a thought opened in its place, beside the window:
       // the ask, the steps (no control over them, no chevron, no rule, no indent), each thought
       // one folded line, and the outcome. Takes the first session.
-      await openProject();
+      await openFolder();
       await page.eval(`document.querySelector(".row.session .pick, .row.session")?.click()`);
       await page.waitFor(`document.querySelector(".chat .turn")`, 30_000);
       for (const state of ["open", "thought"]) {
@@ -158,7 +164,7 @@ for (const scene of scenes) {
       // #153: an open call's detail as the window's: an edit's diff with + and − lines, Show in
       // Changes under it, and each location a link that opens the file. Takes the first session,
       // so a root with one turn that read a file and edited another is enough.
-      await openProject();
+      await openFolder();
       await page.eval(`document.querySelector(".row.session .pick, .row.session")?.click()`);
       await page.waitFor(`document.querySelector(".chat .turn")`, 30_000);
       // No Details level (#1315): open the first edit's run, then the call itself.
@@ -213,7 +219,7 @@ for (const scene of scenes) {
       }
     } else if (scene === "workflow") {
       // #98 triggers, next run, last fired; #100 Enabled switch and Turn Off/On.
-      await openProject();
+      await openFolder();
       await page.waitFor(`document.querySelector(".workflows .row")`, 30_000);
       const opened = await clickRow(".workflows", "After the build");
       await sleep(500);
@@ -256,7 +262,7 @@ for (const scene of scenes) {
       }
     } else if (scene === "filters") {
       // 073: a trigger's filters in words, lists as capsules joined by |, a wrong value named.
-      await openProject();
+      await openFolder();
       await page.waitFor(`document.querySelector(".workflows .row")`, 30_000);
       for (const [title, name] of [["Bug write-up", "filters-t1"], ["Done or nothing", "filters-list"],
         ["Failures and archives", "filters-codes"], ["Typo", "filters-typo"]]) {
@@ -267,7 +273,7 @@ for (const scene of scenes) {
       }
     } else if (scene === "startsoff") {
       // #124: a workflow that started off says why, an agent's and a file's.
-      await openProject();
+      await openFolder();
       await page.waitFor(`document.querySelector(".workflows .row")`, 30_000);
       for (const [title, name] of [["Nightly check", "startsoff-agent"], ["Weekly review", "startsoff-file"]]) {
         await clickRow(".workflows", title);
@@ -277,7 +283,7 @@ for (const scene of scenes) {
       }
     } else if (scene === "changes") {
       // #63 Changes as a tree with status colours; Files as the same rows; #66 Back with the file marked.
-      await openProject();
+      await openFolder();
       await openSession("Repo notes");
       await page.press("Files");
       await page.waitFor(`document.querySelector("aside.files")`);
@@ -299,7 +305,7 @@ for (const scene of scenes) {
       await page.eval(`document.querySelector("[aria-label='Close Files']")?.click()`);
     } else if (scene === "acting") {
       // #87: in-flight marks, one action at a time, with the host paused so they last.
-      await openProject();
+      await openFolder();
       await openSession("Repo notes");
       signal("STOP");
       try {
@@ -326,7 +332,7 @@ for (const scene of scenes) {
       await page.press("Unarchive").catch(() => {});
     } else if (scene === "starting") {
       // #87: a new session's words stay, held, under "Starting — telling your Mac".
-      await openProject();
+      await openFolder();
       await page.eval(`document.querySelector(".sessions [aria-label='New session']").click()`);
       await page.waitFor(`document.querySelector(".new-agent .menus")`, 60_000);
       signal("STOP");
@@ -345,7 +351,7 @@ for (const scene of scenes) {
     } else if (scene === "runtimes") {
       // #154: the new session's runtime menu, alphabetical by name. Drawn open (size = its
       // options) for the shot, since a closed select shows only the chosen one.
-      await clickRow(".projects", "work");
+      await clickRow(".folders", "work");
       await page.waitFor(`document.querySelector(".sessions [aria-label='New session']")`, 30_000);
       await page.eval(`document.querySelector(".sessions [aria-label='New session']").click()`);
       await page.waitFor(`document.querySelector(".new-agent select[aria-label='Runtime'] option")`, 60_000);
@@ -353,10 +359,10 @@ for (const scene of scenes) {
         s.size = s.options.length; return { options: [...s.options].map((o) => o.textContent), chosen: s.value }; })()`))}`);
       await shot("runtimes");
     } else if (scene === "connectors") {
-      // #1428: a project's Connectors page, each row with its five levels and ours with Made by
-      // Agents. The walker writes the project's mcp.json and approves it first.
+      // #1428: a folder's Connectors page, each row with its five levels and ours with Made by
+      // Agents. The walker writes the folder's mcp.json and approves it first.
       if (!(await page.eval(`!!document.querySelector("[aria-label^='Connectors, ']")`))) {
-        await page.eval(`document.querySelector(".row.project .disclosure")?.click()`);
+        await page.eval(`document.querySelector(".row.folder .disclosure")?.click()`);
       }
       await page.waitFor(`document.querySelector("[aria-label^='Connectors, ']")`, 30_000);
       await page.eval(`document.querySelector("[aria-label^='Connectors, ']").click()`);
@@ -388,8 +394,8 @@ for (const scene of scenes) {
       await shot("identity");
     } else if (scene === "disk") {
       // #196: the low disk space strip, as the window's DiskStrip (#195); since #1329 on the
-      // host's own screens (here a new session in its project), not across every page.
-      await openProject();
+      // host's own screens (here a new session in its folder), not across every page.
+      await openFolder();
       const override = `${root}/disk-free-override`;
       const strip = (want) => page.waitFor(`[...document.querySelectorAll(".disk-strip")].some((el) => el.innerText.includes(${JSON.stringify(want)}))`, 150_000);
       try {
@@ -411,8 +417,8 @@ for (const scene of scenes) {
       try {
         await strip("running low");
         await page.goto(webURL);
-        await page.waitFor(`document.querySelector(".projects .row, .sidebar .row.project")`, 30_000);
-        await openProject();
+        await page.waitFor(`document.querySelector(".folders .row, .sidebar .row.folder")`, 30_000);
+        await openFolder();
         await page.waitFor(`document.querySelector(".disk-strip")`, 10_000).catch(() => {});
         say(`on a fresh load: ${JSON.stringify(await visible(".disk-strip"))}`);
       } finally {
@@ -420,13 +426,13 @@ for (const scene of scenes) {
       }
     } else if (scene === "hostdown") {
       // #83: the host down is plain and said at once.
-      await openProject();
+      await openFolder();
       await openSession("Repo notes");
       signal("STOP");
       const pausedAt = Date.now();
       try {
         await page.waitFor(`document.querySelector(".offline-strip")`, 90_000).catch(() => {});
-        say(`said after ${((Date.now() - pausedAt) / 1000).toFixed(1)} s: ${JSON.stringify(await visible(".offline-strip, .projects .offline, .projects .host-down"))}`);
+        say(`said after ${((Date.now() - pausedAt) / 1000).toFixed(1)} s: ${JSON.stringify(await visible(".offline-strip, .folders .offline, .folders .host-down"))}`);
         await shot("hostdown-chat");
         await page.eval(`document.querySelector(".sessions [aria-label='New session']").click()`);
         await sleep(600);
@@ -442,7 +448,7 @@ for (const scene of scenes) {
     say(`${scene} failed: ${error.message}`);
   }
   await page.goto(webURL);
-  await page.waitFor(`document.querySelector(".projects .row, .sidebar .row.project")`, 30_000);
+  await page.waitFor(`document.querySelector(".folders .row, .sidebar .row.folder")`, 30_000);
 }
 
 say(`errors: ${JSON.stringify(page.errors)}`);

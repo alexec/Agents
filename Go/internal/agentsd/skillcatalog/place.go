@@ -15,7 +15,7 @@ type Place struct {
 	Skills   string
 	LockKind LockKind
 	Lock     string
-	// Folder is the project or worktree folder, for a project destination.
+	// Folder is the folder or worktree folder, for a folder destination.
 	Folder string
 	// Trash is where a replaced or removed skill goes; "" is the person's real Trash,
 	// which only the ordinary daemon on a Mac uses.
@@ -23,9 +23,9 @@ type Place struct {
 }
 
 // Resolve finds a destination. personalHome is "" for a scratch root with none named;
-// isProject says whether a folder is a project here, or a worktree of one.
+// isFolder says whether a folder is a directory here, or a worktree of one.
 func Resolve(d wire.SkillDestination, personalHome, root string, realTrash bool, env func(string) string,
-	isProject func(string) bool) (Place, error) {
+	isFolder func(string) bool) (Place, error) {
 	trash := ""
 	if !realTrash {
 		trash = filepath.Join(root, "trash")
@@ -37,18 +37,18 @@ func Resolve(d wire.SkillDestination, personalHome, root string, realTrash bool,
 		}
 		return Place{Destination: d, Skills: filepath.Join(personalHome, ".agents", "skills"), LockKind: Personal,
 			Lock: PersonalLockPath(personalHome, env), Trash: trash}, nil
-	case wire.SkillDestinationKindProject:
+	case wire.SkillDestinationKindFolder:
 		path := ""
 		if d.Folder != nil {
 			path = *d.Folder
 		}
 		folder := filepath.Clean(path)
 		info, err := os.Stat(folder)
-		if path == "" || err != nil || !info.IsDir() || !isProject(folder) {
-			return Place{}, NotAProject(path)
+		if path == "" || err != nil || !info.IsDir() || !isFolder(folder) {
+			return Place{}, NotAFolder(path)
 		}
-		return Place{Destination: wire.SkillDestination{Kind: wire.SkillDestinationKindProject, Folder: &folder},
-			Skills: filepath.Join(folder, ".agents", "skills"), LockKind: Project, Lock: ProjectLockPath(folder),
+		return Place{Destination: wire.SkillDestination{Kind: wire.SkillDestinationKindFolder, Folder: &folder},
+			Skills: filepath.Join(folder, ".agents", "skills"), LockKind: FolderScope, Lock: FolderLockPath(folder),
 			Folder: folder, Trash: trash}, nil
 	}
 	return Place{}, Failed("no destination " + string(d.Kind))

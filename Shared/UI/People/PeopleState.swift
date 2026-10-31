@@ -16,6 +16,12 @@ final class PeopleState {
     private(set) var links = ChannelLinkRequestQueue()
     /// Goes up on `control/linksChanged`, so an open Control plane ▸ Channels loads again.
     private(set) var linksRevision = 0
+    /// Goes up on `control/governanceRequested` (#2335), so Settings ▸ Policy loads the person's
+    /// own requests again.
+    private(set) var governanceRevision = 0
+    /// Goes up on `control/policyChanged`, `control/stopAll` and `control/orgRoutesChanged`
+    /// (#2392), so an open Settings ▸ Policy loads the rules, the kill switch and the routes again.
+    private(set) var policyRevision = 0
     /// The people an admin can send a link request on to (#1762); empty for a member.
     private(set) var linkPeople: [DaemonAPI.PersonRow] = []
     /// Who this client belongs to, as `control/status` said. Nil from an older control plane.
@@ -27,6 +33,10 @@ final class PeopleState {
     private(set) var list: DaemonAPI.PeopleList?
     /// Why `list` could not be loaded, in the control plane's words.
     private(set) var listProblem: String?
+    /// The org providers' names by id (#1002), for Managed by and Set by. Loaded with `list`.
+    private(set) var orgNames: [String: String] = [:]
+    /// The org providers in sign-in order (#1002, D17), shown read only. Loaded with `list`.
+    private(set) var orgProviders: [DaemonAPI.SignInOrgProvider] = []
     /// The groups (#1761), loaded with `list`. Empty from a control plane before groups.
     private(set) var groups: [DaemonAPI.Group] = []
     /// Goes up on `control/peopleChanged` and `control/groupsChanged` (#1761), for what a
@@ -73,9 +83,18 @@ final class PeopleState {
             return error is JSONRPCError
         }
         if withGroups { await loadGroups(control) }
+        // The providers for People's lines and its read-only list (D17); a control plane before
+        // org providers names none.
+        let providers = try? await control.call(DaemonAPI.Method.signInProviders, DaemonAPI.Empty(),
+                                                returning: DaemonAPI.SignInProviders.self)
+        orgProviders = providers?.orgs ?? []
+        orgNames = Dictionary(orgProviders.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
         keepCapsTrue()
         return true
     }
+
+    /// An org provider's name; its id when it is not on.
+    func providerName(_ id: String) -> String { orgNames[id] ?? id }
 
     /// A control plane before groups has none: no bot can be made.
     private func loadGroups(_ control: DaemonClient) async {
@@ -133,6 +152,11 @@ final class PeopleState {
             }
         case DaemonAPI.Notification.controlLinksChanged:
             linksRevision += 1
+        case DaemonAPI.Notification.controlGovernanceRequested:
+            governanceRevision += 1
+        case DaemonAPI.Notification.controlPolicyChanged, DaemonAPI.Notification.controlStopAll,
+             DaemonAPI.Notification.controlOrgRoutesChanged:
+            policyRevision += 1
         case DaemonAPI.Notification.controlPeopleChanged:
             // A role changed or a person went: who this is, what they may approve, and the list.
             await connected(control)

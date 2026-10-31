@@ -1,49 +1,26 @@
 import Foundation
 
-/// A ceiling on how many workflows may run, and which one has been reached.
-///
-/// Two of them, and they are different worries. The per-project one is about a queue
-/// nobody reviewed: an agent can write a workflow without asking anybody, so at most
-/// three may wait for the person's OK in one project (#132). Approved ones do not count
-/// towards it — somebody has read those. The total one is about the machine: ten
-/// approved workflows is already more unattended agents than a person can read after a
-/// weekend away, and it holds across every project. Only the ones turned on count
-/// towards it (#506): one turned off runs nothing, so it takes no place.
-///
-/// The per-project one is fixed, as the chain depth limit is. The total is the
-/// person's to set (#506), in Settings, from ten by default up to `maximumTotal`, and
-/// only the person's: `workflows/setLimit` is not in an agent's allowlist, for the
-/// reason the chain limit is fixed — a ceiling something can raise for itself is not a
-/// ceiling.
+/// The limit on approved workflows that may run in each folder.
 public enum WorkflowLimit: String, Codable, Hashable, Sendable {
-    /// Three workflows waiting for approval in one project.
-    case project
-    /// The approved workflows turned on, across every project: ten unless the person
-    /// set another number.
-    case total
+    /// Approved workflows running in one folder.
+    case folder
 
-    /// How many may wait for approval in one project.
-    public static let projectAllowed = 3
     /// The total when the person has set none.
-    public static let defaultTotal = 10
+    public static let defaultTotal = 20
     /// The most the total can be set to, whatever a request or a hand-edited file says.
-    public static let maximumTotal = 50
+    public static let maximumTotal = 100
     /// The numbers the setting offers, in all three clients.
     public static let totalRange = 1...maximumTotal
 
     /// How many this ceiling allows, given the total in force.
     public func allowed(total: Int) -> Int {
-        switch self {
-        case .project: return Self.projectAllowed
-        case .total: return total
-        }
+        total
     }
 
     /// What a person is told on the row, and an agent in a refusal.
     public func message(total: Int) -> String {
         switch self {
-        case .project: return "this project already has \(allowed(total: total)) workflows waiting for approval"
-        case .total: return "\(allowed(total: total)) workflows are already running, across every project"
+        case .folder: return "this folder already has \(allowed(total: total)) workflows running"
         }
     }
 
@@ -51,8 +28,7 @@ public enum WorkflowLimit: String, Codable, Hashable, Sendable {
     /// anybody reaches for.
     public var remedy: String {
         switch self {
-        case .project: return "Approve or remove one of the \(Self.projectAllowed) workflows waiting for approval first"
-        case .total: return "Turn one off or archive one, in any project, to let it run"
+        case .folder: return "Turn one off or archive one in this folder to let it run"
         }
     }
 
@@ -61,8 +37,7 @@ public enum WorkflowLimit: String, Codable, Hashable, Sendable {
     /// come to describe the same ceiling differently.
     public func sentence(total: Int) -> String {
         switch self {
-        case .project: return "This project already has \(allowed(total: total)) workflows waiting for approval"
-        case .total: return "\(allowed(total: total)) workflows are already running, across every project"
+        case .folder: return "This folder already has \(allowed(total: total)) workflows running"
         }
     }
 }
@@ -117,9 +92,8 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
     /// circumstance; unlike it, the workflow keeps its place on the list, and Run now
     /// still runs it. Like archiving, it takes no place under the total (#506).
     case disabled
-    /// A ceiling has been reached — this project's, or every project's together.
-    /// `allowed` is the number that ceiling stood at then (#506), since the total can
-    /// be changed after; nil from a host before it, which ran the ten.
+    /// This folder's active workflow limit has been reached (#506).
+    /// `allowed` is the limit in force then, since it can change afterwards.
     case overLimit(WorkflowLimit, allowed: Int? = nil)
     /// The file could not be read.
     case unreadable(String)
@@ -131,7 +105,7 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
     case noTriggeringAgent
     /// The time came and went while nothing was running to notice.
     case missedWhileClosed
-    /// The project folder is not there any more.
+    /// The folder is not there any more.
     case folderGone
     /// The day's spending limit has been reached, so nothing new may start.
     case dayLimitReached
@@ -173,7 +147,7 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         case .agentUnavailable: return "the agent it would have resumed is gone"
         case .noTriggeringAgent: return "nothing triggered it, so there was no agent to resume"
         case .missedWhileClosed: return "the app was closed"
-        case .folderGone: return "the project folder is not there"
+        case .folderGone: return "the folder is not there"
         case .dayLimitReached: return "the day's spending limit has been reached"
         case .settingRefused(_, let detail): return detail
         case .awaitingApproval: return "it is waiting for your OK"
@@ -219,7 +193,7 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
 
     /// Whether somebody has to do something, or whether this sorts itself out.
     ///
-    /// Only the first kind earns colour on the project page. Colouring every refusal
+    /// Only the first kind earns colour on the folder page. Colouring every refusal
     /// would make the page shout about a workflow skipping one fire, and would spend
     /// the one signal this app reserves for an agent waiting on an answer.
     public var needsAPerson: Bool {
@@ -296,7 +270,7 @@ public enum WorkflowOutcome: Codable, Hashable, Sendable {
         return .refused(refusal, at: at, repeats: count + 1)
     }
 
-    /// The line the project page puts under a workflow's name.
+    /// The line the folder page puts under a workflow's name.
     public var summary: String {
         switch self {
         case .ran: return "Ran"
@@ -324,7 +298,7 @@ public enum WorkflowOutcome: Codable, Hashable, Sendable {
 extension Workflow {
     /// How deep a chain is allowed to get before a fire is refused.
     ///
-    /// A fixed three, and deliberately not settable per workflow or per project. The
+    /// A fixed three, and deliberately not settable per workflow or per folder. The
     /// limit exists to stop a runaway, and a runaway able to raise its own limit is not
     /// stopped by it.
     public static let chainDepthLimit = 3
@@ -434,7 +408,7 @@ public struct WorkflowRun: Codable, Hashable, Sendable, Identifiable {
                 depth: Int = 0, agentID: UUID? = nil, startedAt: Date = Date()) {
         self.id = id
         self.workflowID = workflowID
-        self.folder = Project.standardize(folder)
+        self.folder = Folder.standardize(folder)
         self.trigger = trigger
         self.triggeringAgentID = triggeringAgentID
         self.depth = depth
@@ -442,4 +416,3 @@ public struct WorkflowRun: Codable, Hashable, Sendable, Identifiable {
         self.startedAt = startedAt
     }
 }
-

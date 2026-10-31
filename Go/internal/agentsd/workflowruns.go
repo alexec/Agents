@@ -61,10 +61,7 @@ func refusalWords(r wire.WorkflowRefusal) string {
 		if r.OverLimit.Allowed != nil {
 			n = *r.OverLimit.Allowed
 		}
-		if r.OverLimit.Value == wire.WorkflowLimitProject {
-			return fmt.Sprintf("this project already has %d workflows waiting for approval", n)
-		}
-		return fmt.Sprintf("%d workflows are already running, across every project", n)
+		return fmt.Sprintf("%d workflows are already running in this folder", n)
 	case r.Unreadable != nil:
 		return r.Unreadable.Value
 	case r.TriggerNotSupported != nil:
@@ -76,7 +73,7 @@ func refusalWords(r wire.WorkflowRefusal) string {
 	case r.MissedWhileClosed != nil:
 		return "the app was closed"
 	case r.FolderGone != nil:
-		return "the project folder is not there"
+		return "the folder is not there"
 	case r.DayLimitReached != nil:
 		return "the day's spending limit has been reached"
 	case r.SettingRefused != nil:
@@ -137,8 +134,8 @@ func (d *Daemon) fireWorkflows(e wire.Event) {
 		d.scanLocked()
 	}
 	var folders []string
-	if e.Scope.Project != nil {
-		folders = []string{store.FolderPath(e.Scope.Project.Value)}
+	if e.Scope.Folder != nil {
+		folders = []string{store.FolderPath(e.Scope.Folder.Value)}
 	} else {
 		for f := range d.workflowFiles {
 			folders = append(folders, f)
@@ -212,7 +209,7 @@ func (d *Daemon) isOwnAgentLocked(agent wire.UUID, folder string, w wire.Workflo
 	a := d.Store.Agent(agent)
 	for seen := map[wire.UUID]bool{}; a != nil && !seen[a.ID]; {
 		seen[a.ID] = true
-		if a.StartedByWorkflow != nil && *a.StartedByWorkflow == w.WorkflowID && projectFolder(a) == folder && w.Mode != wire.WorkflowModeTriggering {
+		if a.StartedByWorkflow != nil && *a.StartedByWorkflow == w.WorkflowID && folderPath(a) == folder && w.Mode != wire.WorkflowModeTriggering {
 			return true
 		}
 		if a.StartedByAgent == nil {
@@ -228,6 +225,9 @@ func (d *Daemon) refusalLocked(fr fireRequest, f *workflowFile) *wire.WorkflowRe
 	w := f.wf
 	st := d.stateLocked(fr.folder, fr.id, false)
 	running := d.runningLocked(fr.folder, fr.id)
+	if fr.byHand && fr.byAgent == nil && w.Settings.RuntimeID != nil {
+		running = d.runOnRuntimeLocked(fr.folder, fr.id, *w.Settings.RuntimeID)
+	}
 	queued := 0
 	if st != nil {
 		queued = len(st.QueuedFires)
@@ -259,10 +259,7 @@ func (d *Daemon) refusalLocked(fr fireRequest, f *workflowFile) *wire.WorkflowRe
 		return r(func(x *wire.WorkflowRefusal) { x.FolderGone = &struct{}{} })
 	}
 	if l, ok := d.ceilingsLocked()[workflowKey(fr.folder, fr.id)]; ok {
-		n := int64(workflowsWaitingPerProject)
-		if l == wire.WorkflowLimitTotal {
-			n = d.workflowTotal()
-		}
+		n := d.workflowTotal()
 		return r(func(x *wire.WorkflowRefusal) { x.OverLimit = &wire.WorkflowRefusalOverLimit{Value: l, Allowed: &n} })
 	}
 	if w.Cooldown != nil && !fr.byHand {
@@ -321,11 +318,35 @@ func (d *Daemon) refusalLocked(fr fireRequest, f *workflowFile) *wire.WorkflowRe
 	return nil
 }
 
+// runOnRuntimeLocked protects a Run now on the selected runtime. An unattached run
+// still blocks it: its agent may be starting, and its runtime is not known yet.
+func (d *Daemon) runOnRuntimeLocked(folder, id, runtimeID string) bool {
+	for _, run := range d.recordsLocked().Runs {
+		if store.FolderPath(run.Folder) != folder || run.WorkflowID != id {
+			continue
+		}
+		if run.AgentID == nil {
+			return true
+		}
+		if a := d.Store.Agent(*run.AgentID); a == nil || a.RuntimeID == runtimeID {
+			return true
+		}
+	}
+	return false
+}
+
 // fire is DaemonCore.fire: weighed, then a run or a refusal recorded.
 func (d *Daemon) fire(fr fireRequest) {
 	d.workflowMu.Lock()
 	f := d.fileLocked(fr.folder, fr.id)
 	if f == nil || !d.runsHere(f.wf) {
+		d.workflowMu.Unlock()
+		return
+	}
+	// A suspended person's workflows are paused (#1002, FR-018), and so are a machine's that
+	// must join its control plane and has not (#998, FR-028): a trigger is let go, not kept,
+	// so nothing runs by itself when that ends.
+	if d.suspension() != nil || d.pinRefusal() != nil {
 		d.workflowMu.Unlock()
 		return
 	}
@@ -348,6 +369,12 @@ func (d *Daemon) fire(fr fireRequest) {
 			d.workflowMu.Unlock()
 			return
 		}
+	}
+	if fr.byHand && fr.byAgent == nil {
+		// An agent can end before fire attaches its ID to the run. Only a person's
+		// next Run now clears the orphan; an agent still starting or working keeps
+		// the usual duplicate-run protection.
+		d.clearStoppedRunLocked(fr.folder, fr.id)
 	}
 	if refused := d.refusalLocked(fr, f); refused != nil {
 		st := d.stateLocked(fr.folder, fr.id, true)
@@ -372,6 +399,10 @@ func (d *Daemon) fire(fr fireRequest) {
 		TriggeringAgentID: fr.triggeringAgent, Depth: fr.depth, StartedAt: now()}
 	rec := d.recordsLocked()
 	rec.Runs = append(rec.Runs, run)
+	if d.workflowStarting == nil {
+		d.workflowStarting = make(map[wire.UUID]bool)
+	}
+	d.workflowStarting[run.ID] = true
 	d.saveRecordsLocked(false)
 	w := f.wf
 	d.workflowMu.Unlock()
@@ -383,7 +414,14 @@ func (d *Daemon) fire(fr fireRequest) {
 		d.recordOutcome(fr, w.Name, wire.WorkflowOutcome{Refused: &wire.WorkflowOutcomeRefused{Value: *refusedSetting, At: now()}}, nil)
 		return
 	}
+	d.attachRunAgent(fr, run, w, agent)
+}
+
+// attachRunAgent closes the gap between starting an agent and identifying its run.
+// If the turn ended in that gap, the ending could not find this record.
+func (d *Daemon) attachRunAgent(fr fireRequest, run workflowRun, w wire.Workflow, agent wire.UUID) {
 	d.workflowMu.Lock()
+	delete(d.workflowStarting, run.ID)
 	for i := range d.recordsLocked().Runs {
 		if d.workflowRecs.Runs[i].ID == run.ID {
 			d.workflowRecs.Runs[i].AgentID = &agent
@@ -395,6 +433,34 @@ func (d *Daemon) fire(fr fireRequest) {
 	d.saveRecordsLocked(false)
 	d.workflowMu.Unlock()
 	d.recordOutcome(fr, w.Name, wire.WorkflowOutcome{Ran: &wire.WorkflowOutcomeRan{AgentID: agent, At: now()}}, &agent)
+	// An agent removed in the gap is also finished for this run.
+	if a := d.Store.Agent(agent); a == nil || !inFlight(a.State) && a.RestartPickUps == nil {
+		d.workflowRunFinished(agent)
+	}
+}
+
+// clearStoppedRunLocked removes only orphaned records for an explicit retry.
+// workflowMu protects both the records and the short startFor window.
+func (d *Daemon) clearStoppedRunLocked(folder, id string) {
+	rec := d.recordsLocked()
+	kept := rec.Runs[:0]
+	for _, run := range rec.Runs {
+		stale := false
+		if store.FolderPath(run.Folder) == folder && run.WorkflowID == id && !d.workflowStarting[run.ID] {
+			if run.AgentID == nil {
+				stale = true
+			} else if a := d.Store.Agent(*run.AgentID); a == nil || !inFlight(a.State) && a.RestartPickUps == nil {
+				stale = true
+			}
+		}
+		if !stale {
+			kept = append(kept, run)
+		}
+	}
+	if len(kept) != len(rec.Runs) {
+		rec.Runs = kept
+		d.saveRecordsLocked(false)
+	}
 }
 
 // noteRanByLocked records that ran started agent with manage_workflows run, and forgets
@@ -435,7 +501,7 @@ func (d *Daemon) runAgent(w wire.Workflow, run workflowRun, fr fireRequest) (wir
 		if fr.triggeringAgent == nil {
 			return "", &wire.WorkflowRefusal{Unreadable: &wire.WorkflowRefusalUnreadable{Value: "Nothing triggered it, so there was no agent to resume."}}
 		}
-		if err := d.promptFromTrigger(*fr.triggeringAgent, prompt); err != nil {
+		if err := d.promptFromApp(*fr.triggeringAgent, prompt); err != nil {
 			_, msg := errMessage(err)
 			return "", &wire.WorkflowRefusal{Unreadable: &wire.WorkflowRefusalUnreadable{Value: msg}}
 		}
@@ -448,24 +514,54 @@ func (d *Daemon) runAgent(w wire.Workflow, run workflowRun, fr fireRequest) (wir
 		d.workflowMu.Unlock()
 		if standing != nil {
 			if a := d.Store.Agent(*standing); a != nil && a.State != wire.AgentStateArchived {
-				if err := d.promptFromTrigger(a.ID, prompt); err == nil {
+				if err := d.promptFromApp(a.ID, prompt); err == nil {
 					return a.ID, nil
 				}
 			}
 		}
 	}
-	runtimeID := defaultRuntimeID
+	// The runtime the file names, else Auto (#2873). Never the runtime another agent used
+	// last: what the run may do must not depend on which agent was active.
+	runtimeID := autoRuntimeID
 	if w.Settings.RuntimeID != nil {
 		runtimeID = *w.Settings.RuntimeID
 	}
-	if runtimeByID(runtimeID) == nil {
+	if runtimeByID(runtimeID) == nil && runtimeID != autoRuntimeID {
 		return "", settingRefused("runtime", "There is no runtime called \""+runtimeID+"\" — this version knows "+knownRuntimes())
 	}
-	model := ""
-	if w.Settings.Model != nil {
-		model = *w.Settings.Model
+	model, requests, box := "", "", ""
+	for to, from := range map[*string]*string{&model: w.Settings.Model, &requests: w.Settings.PermissionRequests, &box: w.Settings.Sandbox} {
+		if from != nil {
+			*to = *from
+		}
 	}
-	r := helperRequest(runtimeID, fr.folder, prompt, model, w.Settings.PermissionMode, nil, w.Settings.Labels)
+	levels, nativeModel, nativeMode, sandbox, err := fileLevels(runtimeID, model, w.Settings.PermissionMode, requests, box)
+	if err != nil {
+		return "", settingRefused("runtime", err.(*Error).Message)
+	}
+	modeID := "mode"
+	if nativeMode != nil {
+		id, refusal := d.offeredMode(runtimeID, *nativeMode)
+		if refusal != "" {
+			return "", settingRefused("permission-mode", refusal)
+		}
+		modeID = id
+	}
+	r := helperRequest(runtimeID, fr.folder, prompt, nativeModel, nativeMode, nil, w.Settings.Labels)
+	if v, ok := r.StartOptions.Values["mode"]; ok && modeID != "mode" {
+		delete(r.StartOptions.Values, "mode")
+		r.StartOptions.Values[modeID] = v
+	}
+	if levels != nil {
+		r.Levels = levels
+	}
+	r.Sandbox = sandbox
+	// Effort, as the file says, on a named runtime; on Auto it follows the model (FR-003).
+	if w.Settings.Effort != nil && runtimeID != autoRuntimeID {
+		if id := effortOptionID(d.runtimeOffers(runtimeID)); id != "" {
+			r.StartOptions.Values[id] = jsonString(*w.Settings.Effort)
+		}
+	}
 	for id, v := range w.Settings.Options {
 		b := []byte(`"` + strings.ReplaceAll(v, `"`, `\"`) + `"`)
 		r.StartOptions.Values[id] = b
@@ -493,51 +589,36 @@ func (d *Daemon) runAgent(w wire.Workflow, run workflowRun, fr fireRequest) (wir
 	return id, nil
 }
 
-// promptFromTrigger is promptFromApp for a run that prompts a session it did not start:
-// that turn starts the loop guard's count again (#1728). It forgets the marks of prompts
-// that left their queues without a turn.
-func (d *Daemon) promptFromTrigger(id wire.UUID, text string) error {
-	if d.Store.Agent(id) == nil {
-		return noSuchAgent()
+// offeredMode is the id of the runtime's mode option, when it offered mode last time, or
+// why the run must not start: a mode the runtime does not offer would leave the agent in
+// the runtime's own default, which may ask less than the file says. With nothing offered
+// yet, the mode is taken as offered, as on the workflow's page.
+func (d *Daemon) offeredMode(runtimeID, mode string) (string, string) {
+	offers := d.runtimeOffers(runtimeID)
+	if len(offers) == 0 {
+		return "mode", ""
 	}
-	q := wire.QueuedPrompt{ID: store.NewUUID(), Text: text, QueuedAt: now(), From: wire.PromptOriginApp}
-	d.messageMu.Lock()
-	for p, agent := range d.triggerPrompts {
-		if !queued(d.Store.Agent(agent), p) {
-			delete(d.triggerPrompts, p)
-		}
+	name := runtimeName(runtimeID)
+	o := modeOption(offers)
+	if o == nil {
+		return "", name + " offers no modes, so it cannot run in " + mode + " mode."
 	}
-	if d.triggerPrompts == nil {
-		d.triggerPrompts = map[wire.UUID]wire.UUID{}
+	if _, ok := offeredName(offers, o.ID, mode); ok {
+		return o.ID, ""
 	}
-	d.triggerPrompts[q.ID] = id
-	d.messageMu.Unlock()
-	if err := d.enqueue(id, q, false); err != nil {
-		d.messageMu.Lock()
-		delete(d.triggerPrompts, q.ID)
-		d.messageMu.Unlock()
-		return err
+	choices, _ := optionChoices(offers, o.ID)
+	values := make([]string, 0, len(choices))
+	for _, c := range choices {
+		values = append(values, c.Value)
 	}
-	return nil
+	return "", name + " does not offer the mode " + mode + ". It offers: " + strings.Join(values, ", ") + "."
 }
 
-func queued(a *wire.Agent, prompt wire.UUID) bool {
-	if a == nil {
-		return false
-	}
-	for _, q := range a.QueuedPrompts {
-		if q.ID == prompt {
-			return true
-		}
-	}
-	return false
-}
-
-// runPrompt is the file's prompt, and a note at its end that says why the run started
-// (#1562): the event and its details, the agent behind it, the schedule, or a run by hand.
+// runPrompt is the file's prompt, after a note that says why the run started (#1562,
+// #2407): the event and its details, the agent behind it, the schedule, or a run by hand.
 func (d *Daemon) runPrompt(w wire.Workflow, fr fireRequest) string {
-	text := w.Prompt
-	started := "\n\n(You were started by the workflow \"" + w.Name + "\" because "
+	text := ""
+	started := "(You were started by the workflow \"" + w.Name + "\" because "
 	var e *wire.Event
 	if fr.causingEvent != nil {
 		e = d.event(*fr.causingEvent)
@@ -563,7 +644,7 @@ func (d *Daemon) runPrompt(w wire.Workflow, fr fireRequest) string {
 		}
 		text += ")"
 	case e != nil && e.Details["subscription"] != "" && e.Details["server"] != "":
-		text = serverEventPrompt(w, *e, e.Details["server"])
+		return serverEventPrompt(w, *e, e.Details["server"])
 	case e != nil:
 		text += started + "of the event " + e.Name + ": " + e.Sentence + eventDetails(*e) + ")"
 	case fr.byAgent != nil:
@@ -575,7 +656,10 @@ func (d *Daemon) runPrompt(w wire.Workflow, fr fireRequest) string {
 	case fr.trigger.Schedule != nil:
 		text += started + "of its schedule.)"
 	}
-	return text
+	if text == "" {
+		return w.Prompt
+	}
+	return text + "\n\n" + w.Prompt
 }
 
 // agentWords is an agent's title in quotes, or "an untitled agent".
@@ -630,7 +714,7 @@ func (d *Daemon) recordOutcome(fr fireRequest, name string, o wire.WorkflowOutco
 	}
 	d.saveRecordsLocked(false)
 	d.workflowMu.Unlock()
-	scope := projectScope(fr.folder)
+	scope := folderScope(fr.folder)
 	if o.Ran != nil {
 		title := "Untitled"
 		var t *string
@@ -662,6 +746,7 @@ func (d *Daemon) releaseRun(id wire.UUID) *workflowRun {
 	for i, r := range rec.Runs {
 		if r.ID == id {
 			rec.Runs = append(rec.Runs[:i], rec.Runs[i+1:]...)
+			delete(d.workflowStarting, id)
 			d.saveRecordsLocked(false)
 			return &r
 		}
@@ -709,7 +794,7 @@ func (d *Daemon) workflowRunFinished(agent wire.UUID) {
 			details["outcome"] = string(a.Report.Outcome)
 		}
 	}
-	d.raise(wire.EventDraft{Name: "workflow.completed", At: now(), Scope: projectScope(folder), Sentence: "Workflow " + name + " finished.",
+	d.raise(wire.EventDraft{Name: "workflow.completed", At: now(), Scope: folderScope(folder), Sentence: "Workflow " + name + " finished.",
 		Details: details, ChainDepth: run.Depth + 1})
 	// when-done: a run its workflow lets archive itself, ended done or with nothing to do.
 	if a != nil && whenDone != nil && mode != wire.WorkflowModeTriggering && a.StartedByWorkflow != nil && *a.StartedByWorkflow == run.WorkflowID &&
@@ -795,6 +880,12 @@ func (d *Daemon) runWorkflow(r wire.WorkflowRequest) (wire.WorkflowSummary, erro
 		return wire.WorkflowSummary{}, &Error{Code: wire.FailureNoSuchWorkflow, Message: f.wf.Name + " runs on another computer."}
 	}
 	d.workflowMu.Unlock()
+	if err := d.suspensionRefusal(); err != nil {
+		return wire.WorkflowSummary{}, err
+	}
+	if err := d.pinRefusal(); err != nil {
+		return wire.WorkflowSummary{}, err
+	}
 	d.fire(fireRequest{folder: folder, id: r.WorkflowID, byHand: true, trigger: byHandTrigger()})
 	return d.oneWorkflow(folder, r.WorkflowID)
 }
@@ -805,14 +896,35 @@ func byHandTrigger() wire.WorkflowTrigger {
 		Hours: [2]int64{0, 23}, EndMinute: 30, Days: []wire.Weekday{"sun", "mon", "tue", "wed", "thu", "fri", "sat"}}}}
 }
 
+// startWorkflowClock ticks the workflows until stopWorkflowClock.
+func (d *Daemon) startWorkflowClock() {
+	stop := make(chan struct{})
+	d.clockStop = stop
+	d.clockRunning.Add(1)
+	safe.Go("workflow clock", func() { defer d.clockRunning.Done(); d.workflowClock(stop) })
+}
+
+// stopWorkflowClock ends the clock and waits for a tick still going, which scans and so
+// writes the ready-made workflows into the personal home (#2823). Once only.
+func (d *Daemon) stopWorkflowClock() {
+	d.clockStopOnce.Do(func() {
+		if d.clockStop != nil {
+			close(d.clockStop)
+		}
+	})
+	d.clockRunning.Wait()
+}
+
 // workflowClock ticks every 15 seconds: a schedule due since the last tick fires, or is
 // missed when the host was away longer than two minutes.
-func (d *Daemon) workflowClock() {
+func (d *Daemon) workflowClock(stop <-chan struct{}) {
 	t := time.NewTicker(workflowTick)
 	defer t.Stop()
 	for {
 		select {
 		case <-d.ctx.Done():
+			return
+		case <-stop:
 			return
 		case <-t.C:
 			d.workflowTickOnce(time.Now())

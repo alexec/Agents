@@ -51,7 +51,7 @@ struct WebFixturesTests {
     // MARK: Making things
 
     static let base = Date(timeIntervalSinceReferenceDate: 812_500_000)
-    static let folderURL = URL(filePath: "/fixture/project/")
+    static let folderURL = URL(filePath: "/fixture/folder/")
 
     static func at(_ minutes: Double) -> Date { base.addingTimeInterval(minutes * 60) }
 
@@ -96,12 +96,10 @@ struct WebFixturesTests {
             ("finished, nothing said, read", agent(7, .finished, endedReason: .endTurn)),
             ("finished, unread", agent(8, .finished, isUnread: true, endedReason: .endTurn)),
             ("finished, needs an answer", agent(9, .finished, report: report(.needsAnswer))),
-            ("finished, partly done", agent(10, .finished, report: report(.partlyDone))),
-            ("finished, stuck", agent(11, .finished, report: report(.stuck))),
-            ("blocked on agents", agent(12, .finished, report: report(.blocked, block: waits))),
-            ("blocked until a time", agent(13, .finished, report: report(.blocked, block: later))),
-            ("blocked on nothing named", agent(14, .finished, report: report(.blocked))),
-            ("blocked, cleared", agent(15, .finished, report: report(.blocked, block: cleared))),
+            ("blocked on agents", agent(12, .finished, report: report(.waiting, block: waits))),
+            ("blocked until a time", agent(13, .finished, report: report(.waiting, block: later))),
+            ("blocked on nothing named", agent(14, .finished, report: report(.waiting))),
+            ("blocked, cleared", agent(15, .finished, report: report(.waiting, block: cleared))),
             ("finished, waiting on events", agent(16, .finished, endedReason: .endTurn, eventWait: openWait)),
             ("finished, wait on events ended", agent(17, .finished, endedReason: .endTurn, eventWait: endedWait)),
             ("asked how it went, said nothing", agent(18, .finished, endedReason: .endTurn, outcomeAsked: true)),
@@ -117,7 +115,7 @@ struct WebFixturesTests {
             ("stopped, no reason", agent(29, .stopped)),
             ("stopped, a needs-answer report kept", agent(30, .stopped, endedReason: .cancelled, report: report(.needsAnswer))),
             ("asks to archive, done", agent(31, .finished, report: report(.done), archiveRequest: .requested(at: at(5)))),
-            ("asks to archive, partly done, unread", agent(32, .finished, isUnread: true, report: report(.partlyDone),
+            ("asks to archive, nothing to do, unread", agent(32, .finished, isUnread: true, report: report(.nothingToDo),
                                                            archiveRequest: .requested(at: at(6)))),
             ("asks to archive, stopped", agent(33, .stopped, endedReason: .cancelled, archiveRequest: .requested(at: at(5)))),
             ("asks to archive when the turn ends, running", agent(34, .running, archiveRequest: .whenTurnEnds(since: at(4)))),
@@ -129,8 +127,8 @@ struct WebFixturesTests {
 
     // MARK: queue/ (#362)
 
-    /// A queued helper's place in its project's queue, as its row says it: first in first,
-    /// ties by id, another project's queue apart.
+    /// A queued helper's place in its folder's queue, as its row says it: first in first,
+    /// ties by id, another folder's queue apart.
     @Test func queue() throws {
         func queued(_ n: Int, minutes: Double, cwd: URL = Self.folderURL) -> Agent {
             var agent = Self.agent(n, .queued, cwd: cwd)
@@ -162,7 +160,7 @@ struct WebFixturesTests {
     /// Who is asking at the head of a card: titled, untitled, a helper whose starter is
     /// here or gone, and a subagent.
     @Test func asker() throws {
-        let lead = Self.agent(50, .running, title: "Project lead")
+        let lead = Self.agent(50, .running, title: "Folder lead")
         var helper = Self.agent(51, .waitingOnUser, title: "#116 helper")
         helper.startedByAgent = lead.id
         helper.runtimeID = "grok"
@@ -242,7 +240,7 @@ struct WebFixturesTests {
             ("only a time", Block(checkAgainAt: Self.at(90))),
             ("every way to end", Block(waits: [
                 Wait(agentID: Self.id(70), nameAtReport: "No outcome", ending: ended(.finished(outcome: nil, message: nil))),
-                Wait(agentID: Self.id(71), nameAtReport: "Stuck", ending: ended(.finished(outcome: .stuck, message: nil))),
+                Wait(agentID: Self.id(71), nameAtReport: "Asked", ending: ended(.finished(outcome: .needsAnswer, message: nil))),
                 Wait(agentID: Self.id(72), nameAtReport: "Stopped", ending: ended(.stopped(.rateLimited))),
                 Wait(agentID: Self.id(73), nameAtReport: "Stopped, no reason", ending: ended(.stopped(nil))),
                 Wait(agentID: Self.id(74), nameAtReport: "Stopped, ended its turn", ending: ended(.stopped(.endTurn))),
@@ -252,11 +250,11 @@ struct WebFixturesTests {
             ("cleared", Block(waits: [one, two], clearedAt: Self.at(4), clearedBy: .waits)),
         ]
         var blocked = blocks.map { name, block in
-            (name, Self.agent(62, .finished, title: "Lead", report: Self.report(.blocked, "Waiting on the haikus.", block: block)))
+            (name, Self.agent(62, .finished, title: "Lead", report: Self.report(.waiting, "Waiting on the haikus.", block: block)))
         }
-        blocked.append(("blocked on nothing named", Self.agent(62, .finished, title: "Lead", report: Self.report(.blocked))))
+        blocked.append(("blocked on nothing named", Self.agent(62, .finished, title: "Lead", report: Self.report(.waiting))))
         blocked.append(("blocked, still running", Self.agent(62, .running, title: "Lead",
-                                                             report: Self.report(.blocked, block: Block(waits: [one])))))
+                                                             report: Self.report(.waiting, block: Block(waits: [one])))))
         let cases = try blocked.map { name, agent in
             Case(name: name, input: .object([
                 "agents": .array(try [running, done, agent].map(Self.encode)), "agentID": .string(agent.id.uuidString)]))
@@ -274,7 +272,8 @@ struct WebFixturesTests {
             return .object(["isBlocked": .bool(model.openBlock(agent) != nil),
                             "lines": .array(lines.map(JSONValue.string)), "checksAgain": .bool(checksAgain),
                             "waitLine": names ? .string(model.waitMark(of: agent)?.line ?? "") : .null,
-                            "carryOnHelp": .string(AgentsModel.carryOnHelp(for: agent))])
+                            "carryOnHelp": .string(AgentsModel.carryOnHelp(for: agent)),
+                            "cardTitle": model.openBlock(agent).map { .string($0.block.cardTitle()) } ?? .null])
         }
     }
 
@@ -293,8 +292,8 @@ struct WebFixturesTests {
         }
     }
 
-    /// A project's whole column: the headings in order, who is under each, archived apart,
-    /// and the counts the project row shows.
+    /// A folder's whole column: the headings in order, who is under each, archived apart,
+    /// and the counts the folder row shows.
     @Test func panels() throws {
         let everyone = Self.agents.enumerated().map { index, entry in
             var agent = entry.1
@@ -307,17 +306,17 @@ struct WebFixturesTests {
         let elsewhere = Self.agent(99, .running, cwd: URL(filePath: "/fixture/other/"))
         let inWorktree: Agent = {
             var agent = Self.agent(98, .running, minutes: 30)
-            agent.cwd = URL(filePath: "/fixture/project/.agents/worktrees/x/")
-            agent.worktree = AgentWorktree(name: "x", root: URL(filePath: "/fixture/project/.agents/worktrees/x/"),
-                                           branch: "agents/x", project: Self.folderURL, base: "main", madeByApp: true)
+            agent.cwd = URL(filePath: "/fixture/folder/.agents/worktrees/x/")
+            agent.worktree = AgentWorktree(name: "x", root: URL(filePath: "/fixture/folder/.agents/worktrees/x/"),
+                                           branch: "agents/x", folder: Self.folderURL, base: "main", madeByApp: true)
             return agent
         }()
         let cases = [
-            Case(name: "every kind of session in one project", input: .object([
+            Case(name: "every kind of session in one folder", input: .object([
                 "folder": .string(Self.folderURL.absoluteString),
                 "agents": .array(try (everyone + [elsewhere, inWorktree]).map(Self.encode)),
             ])),
-            Case(name: "an empty project", input: .object([
+            Case(name: "an empty folder", input: .object([
                 "folder": .string(Self.folderURL.absoluteString), "agents": .array([try Self.encode(elsewhere)]),
             ])),
             // Archived newest archived first (#2153): 71 was active a day ago and archived
@@ -363,6 +362,11 @@ struct WebFixturesTests {
         }
         cases.append(Case(name: "coming back after a restart", input: .object([
             "agent": try Self.encode(Self.agent(40, .stopped, endedReason: .daemonGone)), "isComingBack": .bool(true)])))
+        // A running tool is named, not "Working" (#2261).
+        var tooling = Self.agent(41, .running)
+        tooling.runningTool = "swift test"
+        cases.append(Case(name: "running a tool", input: .object([
+            "agent": try Self.encode(tooling), "isComingBack": .bool(false)])))
         try pin("status/rows.json", cases) { input in
             let agent = try input["agent"]!.decode(Agent.self)
             let back = input["isComingBack"]?.boolValue ?? false
@@ -493,6 +497,21 @@ struct WebFixturesTests {
                                           at: at(1)))),
                 entry(10, .agentMessage(messageID: "z", text: "Fine.")),
                 finished,
+            ], false),
+            ("a form left open is answered at the end of the turn that asked (#2934)", [
+                ask(1, "Get the key"),
+                entry(2, .toolCall(call("t1", "ask_secret", name: "mcp__agents__ask_secret", status: "completed"))),
+                entry(3, .agentMessage(messageID: "a", text: "Waiting for the key.")),
+                finished,
+                entry(4, .elicitationAnswered(id: id(5), summary: "Saved to your secrets")),
+                entry(5, .runtimeNote("Starting Claude\u{2026}")),
+                entry(12, .stateChanged(.running, reason: nil)),
+                entry(6, .userMessage("The person replied to your ask_secret.", from: .app)),
+                entry(7, .toolCall(call("t2", "ask_question", name: "mcp__agents__ask_question", status: "completed"))),
+                entry(8, .elicitationAnswered(id: id(6), summary: "Answered")),
+                entry(9, .userMessage("The person replied to your form.", from: .app)),
+                entry(10, .agentMessage(messageID: "b", text: "Thanks.")),
+                entry(11, .userMessage("How did it go?", from: .app)),
             ], false),
             ("retried errors the agent got past (#394)", [
                 ask(1, "Fix it"),
@@ -704,6 +723,12 @@ struct WebFixturesTests {
             return .object(["label": query.label.map(JSONValue.string) ?? .null, "text": .string(query.text),
                             "matches": .bool(query.matches(try input["agent"]!.decode(Agent.self)))])
         }
+
+        let kinds = ["#2958", "P#2955", "p#7", "ENG-4", " #12 ", "#", "#12a", "P#", "eng-4", "merged", "Archived",
+                     "closed", "bug", "web ui"]
+        try pin("labels/kind.json", kinds.map { Case(name: $0, input: .string($0)) }) { input in
+            .string(SessionLabel.kind(of: input.stringValue!).rawValue)
+        }
     }
 
     // MARK: completions/
@@ -722,7 +747,7 @@ struct WebFixturesTests {
             let command = SlashCommand.query(in: text)
             let mention = FileMention.query(in: text)
             let matching = command.map { SlashCommand.matching($0.term, in: offered) } ?? []
-            let file = FileMention(url: URL(filePath: "/fixture/project/Web/src/Prompt.tsx"), relativePath: "Web/src/Prompt.tsx")
+            let file = FileMention(url: URL(filePath: "/fixture/folder/Web/src/Prompt.tsx"), relativePath: "Web/src/Prompt.tsx")
             return .object([
                 "command": command.map { .string($0.term) } ?? .null,
                 "matching": .array(matching.map { .string($0.name) }),
@@ -791,6 +816,40 @@ struct WebFixturesTests {
             return agent.planInForce.map { plan in
                 .object(["line": .string(plan.stripSummary), "step": .string(plan.stripStep),
                          "done": .int(plan.stripDone), "total": .int(plan.entries.count)])
+            } ?? .null
+        }
+    }
+
+    /// The goal card over the plan's (#2742): its status word, the reason it stopped, how far
+    /// along, the budget's bar and the line read aloud. The input is the whole agent, so the
+    /// wire schema test checks the goal's shape too.
+    @Test func goalCard() throws {
+        let goals: [(String, Goal?)] = [
+            ("no goal", nil),
+            ("active, nothing counted", Goal(objective: "Ship the change", status: .active, at: Self.at(1))),
+            ("Claude's turns and reason", Goal(objective: "Tests pass", status: .paused, iterations: 3,
+                                               reason: "Waiting on review", at: Self.at(1))),
+            ("one turn", Goal(objective: "Tests pass", status: .active, iterations: 1, at: Self.at(1))),
+            ("Codex's budget", Goal(objective: "Port the parser", status: .limited, tokensUsed: 950,
+                                    tokenBudget: 1_000, timeUsedSeconds: 3_900, at: Self.at(1))),
+            ("tokens with no budget", Goal(objective: "Port the parser", status: .active, tokensUsed: 52_000,
+                                           timeUsedSeconds: 30, at: Self.at(1))),
+            ("blocked", Goal(objective: "Deploy", status: .blocked, reason: "No credentials", timeUsedSeconds: 720,
+                             at: Self.at(1))),
+            ("met", Goal(objective: "Deploy", status: .complete, iterations: 5, timeUsedSeconds: 7_200, at: Self.at(1))),
+        ]
+        let cases = try goals.map { name, goal in
+            var agent = Self.agent(1, .running)
+            agent.goal = goal
+            return Case(name: name, input: .object(["agent": try Self.encode(agent)]))
+        }
+        try pin("goal/card.json", cases) { input in
+            let agent = try (input["agent"] ?? .null).decode(Agent.self)
+            return agent.goal.map { goal in
+                .object(["status": .string(goal.statusWord), "stopped": .bool(goal.isStopped),
+                         "progress": goal.progressLine.map(JSONValue.string) ?? .null,
+                         "fraction": goal.budgetFraction.map(JSONValue.double) ?? .null,
+                         "summary": .string(goal.summary)])
             } ?? .null
         }
     }
@@ -1020,6 +1079,53 @@ struct WebFixturesTests {
         }
     }
 
+    // MARK: levels/
+
+    /// The words every runtime shares (#2658), field by field.
+    @Test func levelWords() throws {
+        let cases = AutoField.allCases.map { field in
+            Case(name: field.rawValue, input: .object(["field": .string(field.rawValue)]))
+        }
+        try pin("levels/words.json", cases) { input in
+            let field = AutoField(rawValue: input["field"]!.stringValue!)!
+            let levels = LevelWords.levels(field)
+            return .object([
+                "field": .string(LevelWords.field(field)),
+                "levels": .array(levels.map(JSONValue.string)),
+                "words": .object(Dictionary(uniqueKeysWithValues: levels.map { ($0, JSONValue.string(LevelWords.level(field, $0))) })),
+                "files": .object(Dictionary(uniqueKeysWithValues: levels.map { ($0, JSONValue.string(LevelWords.fileWord(field, $0))) })),
+                "meanings": .object(Dictionary(uniqueKeysWithValues: levels.map { level in
+                    let meaning: String = switch field {
+                    case .model: LevelWords.meaning(model: ModelLevel(rawValue: level)!)
+                    case .permission: LevelWords.meaning(permission: PermissionLevel(rawValue: level)!)
+                    case .permissionRequests: LevelWords.meaning(requests: ClientPermissionMode(rawValue: level)!)
+                    case .sandbox: LevelWords.meaning(sandbox: SandboxChoice(rawValue: level)!)
+                    }
+                    return (level, JSONValue.string(meaning))
+                })),
+                "marks": .object(Dictionary(uniqueKeysWithValues: [AutoMark.autoMapped, .nearestSafer, .yours, .notPossible, .dropped].map {
+                    ($0.rawValue, JSONValue.string(LevelWords.mark($0)))
+                })),
+                "custom": .string(LevelWords.custom),
+                "followsSettings": .string(LevelWords.followsSettings),
+                "own": .string(LevelWords.own("Claude")),
+                "on": .string(LevelWords.on("Balanced", native: "Sonnet 5", runtimeName: "Claude")),
+                "picks": .string(LevelWords.picks("Claude")),
+                "picksNone": .string(LevelWords.picks(nil)),
+                "header": .string(LevelWords.header("Claude")),
+                "noRuntime": .string(LevelWords.noRuntime([AutoSkip(runtimeID: "claude", reason: "out"),
+                                                            AutoSkip(runtimeID: "codex", reason: "not signed in")]) {
+                    RuntimeCatalog.runtime(id: $0)?.name ?? $0
+                }),
+                "continueOn": .string(LevelWords.continueOn("Codex")),
+                "asksFirst": .object(Dictionary(uniqueKeysWithValues: levels.map { ($0, JSONValue.bool(LevelWords.asksFirst(field, $0))) })),
+                "bypassConfirm": .object(["title": .string(LevelWords.bypassConfirmTitle),
+                                          "message": .string(LevelWords.bypassConfirmMessage),
+                                          "button": .string(LevelWords.bypassConfirmButton)]),
+            ])
+        }
+    }
+
     // MARK: runtimes/
 
     @Test func runtimeReasons() throws {
@@ -1040,21 +1146,32 @@ struct WebFixturesTests {
         try pin("runtimes/reasons.json", cases) { input in
             try input.decode(RuntimeStatus.self).unavailableReason.map(JSONValue.string) ?? .null
         }
+        // The Auto page's state words for each availability (#2890).
+        try pin("runtimes/auto-state.json", cases) { input in
+            .string(LevelWords.state(try input.decode(RuntimeStatus.self), allowances: nil))
+        }
 
-        let starts: [(String, String?, [String])] = [
-            ("kept and startable", "grok", ["claude", "codex", "grok"]),
-            ("kept but gone", "gemini", ["claude", "codex"]),
-            ("nothing kept", nil, ["codex", "claude"]),
-            ("no Claude", nil, ["gemini", "codex"]),
-            ("kept, no Claude", "opencode", ["codex", "gemini"]),
-            ("none can start", "claude", []),
+        let starts: [(String, String?, String?, [String])] = [
+            ("last used wins over Claude and the kept choice", "codex", "grok", ["claude", "codex", "grok"]),
+            ("unavailable last used falls back to kept choice", "gemini", "grok", ["claude", "grok"]),
+            ("kept and startable", nil, "grok", ["claude", "codex", "grok"]),
+            ("kept but gone", nil, "gemini", ["claude", "codex"]),
+            ("nothing kept", nil, nil, ["codex", "claude"]),
+            ("no Claude", nil, nil, ["gemini", "codex"]),
+            ("kept, no Claude", nil, "opencode", ["codex", "gemini"]),
+            ("none can start", nil, "claude", []),
+            ("kept Auto wins over last used", "claude", "auto", ["auto", "claude", "codex"]),
+            ("kept Auto that cannot start falls back to last used", "claude", "auto", ["claude", "codex"]),
+            ("last used Auto wins over a kept runtime", "auto", "codex", ["auto", "claude", "codex"]),
         ]
-        let startCases = starts.map { name, kept, available in
-            Case(name: name, input: .object(["kept": kept.map(JSONValue.string) ?? .null,
+        let startCases = starts.map { name, lastUsed, kept, available in
+            Case(name: name, input: .object(["lastUsed": lastUsed.map(JSONValue.string) ?? .null,
+                                             "kept": kept.map(JSONValue.string) ?? .null,
                                              "available": .array(available.map(JSONValue.string))]))
         }
         try pin("runtimes/new-session.json", startCases) { input in
-            RuntimeCatalog.newSessionRuntime(kept: input["kept"]?.stringValue,
+            RuntimeCatalog.newSessionRuntime(lastUsed: input["lastUsed"]?.stringValue,
+                                             kept: input["kept"]?.stringValue,
                                              available: (input["available"]?.arrayValue ?? []).compactMap(\.stringValue))
                 .map(JSONValue.string) ?? .null
         }
@@ -1312,7 +1429,7 @@ struct WebFixturesTests {
             ("unreadable", WorkflowSummary(workflow: flow("broken", [], problem: .unreadable("Line 3: no closing ---")))),
             ("an unknown mode", WorkflowSummary(workflow: flow("odd", [.schedule(nightly)], problem: .unsupportedMode("swarm")))),
             ("archived and unreadable", WorkflowSummary(workflow: flow("old", [], problem: .unreadable("bad")), isArchived: true)),
-            ("over the limit", WorkflowSummary(workflow: flow("many", [.schedule(nightly)]), overLimit: .project)),
+            ("over the limit", WorkflowSummary(workflow: flow("many", [.schedule(nightly)]), overLimit: .folder)),
             ("waiting for approval", WorkflowSummary(workflow: flow("new", [.schedule(nightly)]),
                                                      awaitingApproval: WorkflowApproval(digest: "abc", isNew: true))),
             ("refused, sorting itself out", WorkflowSummary(workflow: flow("busy", [.schedule(nightly)]),

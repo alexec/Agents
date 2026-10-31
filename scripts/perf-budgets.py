@@ -5,7 +5,7 @@
 
 ROOT is a scratch root started by the run-app skill (`launch.sh`), seeded first:
 
-  mkdir -p ROOT/work && git -C ROOT/work init -q            # a project, added with projects/add
+  mkdir -p ROOT/work && git -C ROOT/work init -q            # a project, added with folders/add
   scripts/seed-big-repo.py ROOT/big                           # 40,000 files, 1,800 changed
   swift scripts/seed-archived.swift --root ROOT --live --count 40 --project ROOT/work --transcript-bytes 200000
   swift scripts/seed-archived.swift --root ROOT --live --count 1 --project ROOT/big
@@ -35,7 +35,7 @@ BUDGETS = {
     "daemon/ping": 20,
     "agents/list": 250,
     "agents/list, lean": 100,
-    "projects/list": 100,
+    "folders/list": 100,
     "open a long chat (turns + open turn)": 500,
     "a long chat, Remote's last 500": 500,
     "files/list, big repo root": 250,
@@ -114,7 +114,7 @@ def main(argv):
         f"{len(agents)} agents")
     # What the window, the Remote and the page ask for (#107): no option or command lists.
     row("agents/list, lean", lambda: host.call("agents/list", {"includeArchived": False, "lean": True})[1])
-    row("projects/list", lambda: host.call("projects/list", {})[1])
+    row("folders/list", lambda: host.call("folders/list", {})[1])
     if longest:
         lines = sum(1 for _ in open(os.path.join(root, "agents", longest["id"], "transcript.jsonl")))
         def open_chat():

@@ -6,19 +6,19 @@ import Testing
 /// A move asked for and not yet made, on the agent's record (053).
 @Suite("A waiting move, on the record")
 struct AgentMoveRecordTests {
-    private let project = URL(filePath: "/tmp/repo")
+    private let folder = URL(filePath: "/tmp/repo")
     private let asked = Date(timeIntervalSince1970: 1_790_000_000)
     private let targets: [MoveTarget] = [
         .newWorktree(name: nil),
         .newWorktree(name: "fix-login"),
         .existing(URL(filePath: "/tmp/repo/.agents/worktrees/x")),
-        .projectFolder,
+        .folderPath,
     ]
 
     @Test func aWaitingMoveSurvivesBeingSaved() throws {
         for target in targets {
-            var agent = Agent(runtimeID: "claude", cwd: project)
-            agent.pendingMove = PendingMove(target: target, removeLeft: target == .projectFolder,
+            var agent = Agent(runtimeID: "claude", cwd: folder)
+            agent.pendingMove = PendingMove(target: target, removeLeft: target == .folderPath,
                                             discardChanges: false, askedBy: .agent, askedAt: asked)
             let read = try StoreCoding.decoder.decode(Agent.self, from: StoreCoding.encoder.encode(agent))
             #expect(read.pendingMove == agent.pendingMove)
@@ -26,7 +26,7 @@ struct AgentMoveRecordTests {
     }
 
     @Test func aRecordWithoutOneHasNone() throws {
-        let agent = Agent(runtimeID: "claude", cwd: project)
+        let agent = Agent(runtimeID: "claude", cwd: folder)
         let written = try StoreCoding.encoder.encode(agent)
         let json = try #require(try JSONSerialization.jsonObject(with: written) as? [String: Any])
         #expect(json["pendingMove"] == nil, "written only when there is one")
@@ -36,7 +36,7 @@ struct AgentMoveRecordTests {
     /// A record written before 053, with a worktree from 030, still reads.
     @Test func aRecordFromBeforeThisFeatureStillReads() throws {
         var agent = Agent(runtimeID: "claude", cwd: URL(filePath: "/tmp/repo/.agents/worktrees/a"))
-        agent.worktree = AgentWorktree(name: "a", root: agent.cwd, branch: "agents/a", project: project,
+        agent.worktree = AgentWorktree(name: "a", root: agent.cwd, branch: "agents/a", folder: folder,
                                        base: "main", madeByApp: true)
         var json = try #require(try JSONSerialization.jsonObject(with: StoreCoding.encoder.encode(agent)) as? [String: Any])
         json.removeValue(forKey: "pendingMove")
@@ -47,7 +47,7 @@ struct AgentMoveRecordTests {
 
     /// One that cannot be read is dropped rather than losing the agent.
     @Test func anUnreadableOneIsDroppedNotTheAgent() throws {
-        let agent = Agent(runtimeID: "claude", cwd: project)
+        let agent = Agent(runtimeID: "claude", cwd: folder)
         var json = try #require(try JSONSerialization.jsonObject(with: StoreCoding.encoder.encode(agent)) as? [String: Any])
         json["pendingMove"] = ["target": "somewhere new"]
         let read = try StoreCoding.decoder.decode(Agent.self, from: JSONSerialization.data(withJSONObject: json))

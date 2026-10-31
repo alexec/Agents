@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/wire"
@@ -77,9 +78,9 @@ func TestAViewsPolicyKeepsOnlyPlainOrigins(t *testing.T) {
 	}
 }
 
-// fakeViewServer is a streamable-http MCP server with one tool that has a view, one only a
-// view may call, and the view itself.
-func fakeViewServer(t *testing.T, calls *atomic.Int32) *httptest.Server {
+// fakeViewServer is a streamable-http MCP server with tools a view may call, a tool only
+// the model may call, and a view.
+func fakeViewServer(t *testing.T, calls *atomic.Int32, catalogReadCounts ...*atomic.Int32) *httptest.Server {
 	html := "<!doctype html><p>board</p>"
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -103,10 +104,14 @@ func fakeViewServer(t *testing.T, calls *atomic.Int32) *httptest.Server {
 		case "initialize":
 			result = map[string]any{"protocolVersion": "2025-06-18", "capabilities": map[string]any{}, "serverInfo": map[string]any{"name": "ci"}}
 		case "tools/list":
+			if len(catalogReadCounts) > 0 {
+				catalogReadCounts[0].Add(1)
+			}
 			result = map[string]any{"tools": []any{
 				map[string]any{"name": "board", "_meta": map[string]any{"ui": map[string]any{"resourceUri": "ui://ci/board"}},
 					"annotations": map[string]any{"readOnlyHint": true}},
 				map[string]any{"name": "refresh", "_meta": map[string]any{"ui": map[string]any{"visibility": []string{"app"}}}},
+				map[string]any{"name": "details", "_meta": map[string]any{"ui": map[string]any{"visibility": []string{"model", "app"}}}},
 				map[string]any{"name": "deploy", "_meta": map[string]any{"ui": map[string]any{"visibility": []string{"model"}}}},
 			}}
 		case "resources/list":
@@ -126,8 +131,8 @@ func fakeViewServer(t *testing.T, calls *atomic.Int32) *httptest.Server {
 }
 
 func TestAPersonsServersViewIsDrawnOnceShownAndCallsOnlyItsOwnServer(t *testing.T) {
-	var calls atomic.Int32
-	server := fakeViewServer(t, &calls)
+	var calls, catalogReads atomic.Int32
+	server := fakeViewServer(t, &calls, &catalogReads)
 	home := t.TempDir()
 	t.Setenv("AGENTS_PERSONAL_HOME", home)
 	os.MkdirAll(filepath.Join(home, ".agents"), 0o755)
@@ -135,7 +140,7 @@ func TestAPersonsServersViewIsDrawnOnceShownAndCallsOnlyItsOwnServer(t *testing.
 		"local":{"command":"local-server"}}}`), 0o644)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	agent := wire.Agent{ID: store.NewUUID(), RuntimeID: "claude", Cwd: store.FolderURL(dir), State: wire.AgentStateFinished, EndedReason: ptr(wire.EndedReasonEndTurn),
 		Title: ptr("Board"), AdvertisedOptions: []wire.ConfigOption{}, AvailableCommands: []wire.SlashCommand{}}
 	if err := d.Store.Save(agent); err != nil {
@@ -191,26 +196,36 @@ func TestAPersonsServersViewIsDrawnOnceShownAndCallsOnlyItsOwnServer(t *testing.
 
 	call := func(id int, name string, server string) (json.RawMessage, *Error) {
 		p := map[string]any{"agentID": agent.ID, "viewID": v[0].ID, "name": name, "server": server}
-		if name == "refresh" && server == "ci" {
+		if (name == "refresh" || name == "details") && server == "ci" {
 			return c.call(t, id, "views/call", p), nil
 		}
 		return nil, c.callError(t, id, "views/call", p)
 	}
-	if r, _ := call(5, "refresh", "ci"); !strings.Contains(string(r), `"called":"refresh"`) || calls.Load() != 1 {
+	// A fresh but stale catalog may not know about a tool the server added after it was read.
+	s, err := d.readyViewServer("ci", dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d.keepViewCatalog(s.entry, viewCatalog{Version: viewCatalogVersion, Server: "ci", MadeAt: nowFunc().Add(-time.Hour), AppTools: []string{"refresh"}})
+	readsBeforeRefresh := catalogReads.Load()
+	if r, _ := call(5, "details", "ci"); !strings.Contains(string(r), `"called":"details"`) || calls.Load() != 1 || catalogReads.Load() != readsBeforeRefresh+1 {
+		t.Fatalf("%s: %d call(s), %d catalog read(s) after %d", r, calls.Load(), catalogReads.Load(), readsBeforeRefresh)
+	}
+	if _, e := call(6, "deploy", "ci"); e.Code != wire.FailureViewRefused || calls.Load() != 1 || catalogReads.Load() != readsBeforeRefresh+1 {
+		t.Fatalf("a view called a tool only the model may after the refresh: %+v", e)
+	}
+	if r, _ := call(7, "refresh", "ci"); !strings.Contains(string(r), `"called":"refresh"`) || calls.Load() != 2 {
 		t.Fatalf("%s", r)
 	}
-	if _, e := call(6, "deploy", "ci"); e.Code != wire.FailureViewRefused || calls.Load() != 1 {
-		t.Fatalf("a view called a tool only the model may: %+v", e)
-	}
-	if _, e := call(7, "refresh", "local"); e.Code != wire.FailureViewRefused || !strings.Contains(e.Message, "own server's") {
+	if _, e := call(8, "refresh", "local"); e.Code != wire.FailureViewRefused || !strings.Contains(e.Message, "own server's") {
 		t.Fatalf("%+v", e)
 	}
-	if e := c.callError(t, 8, "views/read", map[string]any{"agentID": agent.ID, "uri": "ui://x", "server": "local"}); !strings.Contains(e.Message, "local servers") {
+	if e := c.callError(t, 9, "views/read", map[string]any{"agentID": agent.ID, "uri": "ui://x", "server": "local"}); !strings.Contains(e.Message, "local servers") {
 		t.Fatalf("%+v", e)
 	}
 
 	// What the view asks the agent to know goes before the person's next words, once.
-	c.call(t, 9, "views/context", map[string]any{"agentID": agent.ID, "viewID": v[0].ID,
+	c.call(t, 10, "views/context", map[string]any{"agentID": agent.ID, "viewID": v[0].ID,
 		"content": []any{map[string]any{"type": "text", "text": "PR 7 is picked"}}})
 	q := d.withViewContext(agent.ID, wire.QueuedPrompt{Text: "go on", From: wire.PromptOriginPerson})
 	if q.Preface == nil || !strings.HasSuffix(*q.Preface, "PR 7 is picked") {
@@ -219,21 +234,21 @@ func TestAPersonsServersViewIsDrawnOnceShownAndCallsOnlyItsOwnServer(t *testing.
 	if q := d.withViewContext(agent.ID, wire.QueuedPrompt{Text: "again", From: wire.PromptOriginPerson}); q.Preface != nil {
 		t.Fatal("the context was told twice")
 	}
-	c.call(t, 10, "views/log", map[string]any{"agentID": agent.ID, "viewID": v[0].ID, "level": "info", "data": "drawn"})
+	c.call(t, 11, "views/log", map[string]any{"agentID": agent.ID, "viewID": v[0].ID, "level": "info", "data": "drawn"})
 
-	// Pinned, with the server's own title, and drawn on the project's page.
+	// Pinned, with the server's own title, and drawn on the folder's page.
 	var pins []wire.PinView
-	json.Unmarshal(c.call(t, 11, "pins/pin", map[string]any{"folder": store.FolderURL(dir), "path": "ui://ci/board",
+	json.Unmarshal(c.call(t, 12, "pins/pin", map[string]any{"folder": store.FolderURL(dir), "path": "ui://ci/board",
 		"view": map[string]any{"server": "ci", "uri": "ui://ci/board", "tool": "board"}}), &pins)
 	if len(pins) != 1 || pins[0].Title != "Pull requests" || pins[0].Missing || pins[0].Kind != wire.PinKindView {
 		t.Fatalf("%+v", pins)
 	}
-	if e := c.callError(t, 12, "pins/pin", map[string]any{"folder": store.FolderURL(dir), "path": "ui://ci/board",
+	if e := c.callError(t, 13, "pins/pin", map[string]any{"folder": store.FolderURL(dir), "path": "ui://ci/board",
 		"view": map[string]any{"server": "ci", "uri": "ui://ci/board", "tool": "refresh"}}); !strings.Contains(e.Message, "does not feed") {
 		t.Fatalf("%+v", e)
 	}
-	// A pin's call names no agent: its project's pins say which server it is of.
-	if r := c.call(t, 13, "views/call", map[string]any{"agentID": store.NewUUID(), "project": store.FolderURL(dir), "viewID": store.NewUUID(),
+	// A pin's call names no agent: its folder's pins say which server it is of.
+	if r := c.call(t, 14, "views/call", map[string]any{"agentID": store.NewUUID(), "folder": store.FolderURL(dir), "viewID": store.NewUUID(),
 		"name": "board", "server": "ci", "feed": true}); !strings.Contains(string(r), `"called":"board"`) {
 		t.Fatalf("%s", r)
 	}

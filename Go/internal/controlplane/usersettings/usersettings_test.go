@@ -7,10 +7,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/kms"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/wire"
@@ -146,19 +149,48 @@ func TestPartsAreKeptWithoutBeingRead(t *testing.T) {
 	if changed, _ := b.SetPart(ctx, "sam", wire.UserSettingsPartNameMcpServers, servers); changed {
 		t.Fatal("the same part again is a change")
 	}
-	if _, err := b.SetPart(ctx, "sam", wire.UserSettingsPartNameResources, json.RawMessage(`{}`)); !errors.Is(err, ErrInvalid) {
+	if _, err := b.SetPart(ctx, "sam", wire.UserSettingsPartName("resources"), json.RawMessage(`[]`)); !errors.Is(err, ErrInvalid) {
 		t.Fatal(err)
 	}
 	if _, err := b.SetPart(ctx, "sam", "theme", json.RawMessage(`{}`)); !errors.Is(err, ErrInvalid) {
 		t.Fatal(err)
 	}
 	got, _ := b.Settings(ctx, "sam")
-	if got.McpServers == nil || got.Updated == nil || got.Resources != nil {
+	if got.McpServers == nil || got.Updated == nil {
 		t.Fatalf("%+v", got)
 	}
 	b.SetPart(ctx, "sam", wire.UserSettingsPartNameMcpServers, json.RawMessage(`null`))
 	if got, _ := b.Settings(ctx, "sam"); got.McpServers != nil {
 		t.Fatalf("%+v", got)
+	}
+}
+
+// The largest delivery the bounds on parts and secrets allow fits one frame on a machine's
+// link, with room to spare (#2730): each part and each secret as long as it may be, of
+// what JSON writes longest.
+func TestTheLargestDeliveryFitsAMachinesLink(t *testing.T) {
+	ctx := context.Background()
+	b := localBook(t, store.NewMemory())
+	long := func(n int) string { return strings.Repeat("<", n) }
+	for _, part := range []wire.UserSettingsPartName{wire.UserSettingsPartNameMcpServers, wire.UserSettingsPartNameAgentConfig,
+		wire.UserSettingsPartNameRuntimes, wire.UserSettingsPartNameCostLimits} {
+		value := json.RawMessage(`{"x":"` + long(MaxPart-8) + `"}`)
+		if _, err := b.SetPart(ctx, "sam", part, value); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := range MaxSecrets {
+		if err := b.SetSecret(ctx, "sam", fmt.Sprintf("SECRET_%d", i), long(MaxSecret)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	delivery, skipped, err := b.Delivery(ctx, "sam")
+	if err != nil || len(skipped) > 0 || len(delivery.Secrets) != MaxSecrets {
+		t.Fatal(len(delivery.Secrets), skipped, err)
+	}
+	encoded, _ := json.Marshal(delivery)
+	if len(encoded) > controllink.MaxMessage/2 {
+		t.Fatalf("the largest delivery is %d MB, too near the %d MB a machine's link takes", len(encoded)>>20, controllink.MaxMessage>>20)
 	}
 }
 
@@ -223,7 +255,46 @@ func TestCopiesWithOneSecretsKeyOpenEachOthersSecrets(t *testing.T) {
 	if err != nil || len(skipped) != 0 || len(got.Secrets) != 1 || got.Secrets[0].Value != "lin_api_s3cret" {
 		t.Fatalf("another copy got %+v, skipped %v, %v", got.Secrets, skipped, err)
 	}
-	if _, skipped, _ := book(t.TempDir() + "/secrets-key").Delivery(ctx, "sam"); len(skipped) != 1 {
+	if _, skipped, _ := book(t.TempDir()+"/secrets-key").Delivery(ctx, "sam"); len(skipped) != 1 {
 		t.Fatalf("a copy with its own key skipped %v", skipped)
+	}
+}
+
+// One bucket for the person (#2859): two machines take from the same notices, with the
+// limits of the person's notifications part, kept in the store so a restart keeps it.
+func TestEveryMachineTakesFromThePersonsOneBucket(t *testing.T) {
+	ctx := context.Background()
+	s := store.NewMemory()
+	b := localBook(t, s)
+	at := time.Unix(1_000_000, 0)
+	b.now = func() time.Time { return at }
+	if changed, err := b.SetNoticeLimits(ctx, "sam", wire.NoticeLimits{Burst: 2, CooldownMinutes: 10}); err != nil || !changed {
+		t.Fatal(changed, err)
+	}
+	// The machine says 5, from before the part came to it: the part decides.
+	machine := wire.NoticeLimits{Burst: 5, CooldownMinutes: 1}
+	// The third is another copy of the control plane, or this one after a restart.
+	other := New(s, nil, "")
+	other.now = b.now
+	for i, book := range []*Book{b, b, other} {
+		got, err := book.TakeNotice(ctx, "sam", machine)
+		if want := i < 2; err != nil || got.Sent != want {
+			t.Fatalf("notice %d: %+v %v", i, got, err)
+		}
+	}
+	got, _ := b.TakeNotice(ctx, "sam", machine)
+	if got.Sent || !got.NextAt.Time().Equal(at.Add(10*time.Minute)) {
+		t.Fatalf("in the cool-down: %+v", got)
+	}
+	// Another person has a bucket of their own.
+	if got, _ := b.TakeNotice(ctx, "kim", machine); !got.Sent || got.Left != 4 {
+		t.Fatalf("kim: %+v", got)
+	}
+	// A machine's limits are kept within the bounds.
+	b.SetNoticeLimits(ctx, "sam", wire.NoticeLimits{Burst: 500, CooldownMinutes: 0})
+	settings, _ := b.Settings(ctx, "sam")
+	var kept wire.NoticeLimits
+	if json.Unmarshal(settings.Notifications, &kept); kept != (wire.NoticeLimits{Burst: 20, CooldownMinutes: 10}) {
+		t.Fatal(string(settings.Notifications))
 	}
 }

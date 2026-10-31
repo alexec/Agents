@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controlplane/audit"
@@ -19,7 +20,7 @@ import (
 
 // consoleMethods are the Console's: an admin's each, naming no machine, so another
 // person's machine is never named by one (#994).
-var consoleMethods = map[string]bool{"console/fleet": true, "console/teamWorkflows": true}
+var consoleMethods = map[string]bool{"console/fleet": true, "console/live": true, "console/stopAgent": true, "console/teamWorkflows": true}
 
 // consoleMethod answers the Console's own calls. Each is an admin's.
 func (m *Methods) consoleMethod(ctx context.Context, method string, params json.RawMessage, from Caller) (any, error) {
@@ -31,6 +32,24 @@ func (m *Methods) consoleMethod(ctx context.Context, method string, params json.
 		return m.fleet(ctx), nil
 	case "console/teamWorkflows":
 		return m.teamWorkflows(ctx, time.Now())
+	case "console/live":
+		m.refreshLive(ctx, from)
+		return m.live(ctx), nil
+	case "console/stopAgent":
+		request, err := require[wire.ConsoleStopAgent](params, "ConsoleStopAgent")
+		if err != nil {
+			return nil, err
+		}
+		if m.records.Host(string(request.Host)) == nil {
+			return nil, fail(noSuchHost, "No machine is called %s.", request.Host)
+		}
+		if err := m.stopAgentOn(string(request.Host), request.Agent, from); err != nil {
+			return nil, err
+		}
+		m.s.log("an admin stopped " + string(request.Agent) + " on " + string(request.Host) + " (Console ▸ Live Now)")
+		// So the board that asks next shows it stopped.
+		m.listAgain(string(request.Host), from)
+		return wire.Empty{}, nil
 	}
 	return nil, fail(methodNotFound, "No method %s.", method)
 }
@@ -78,6 +97,150 @@ func (m *Methods) fleet(ctx context.Context) wire.FleetBoard {
 		return strings.ToLower(a.Host.Name) < strings.ToLower(b.Host.Name)
 	})
 	return wire.FleetBoard{Machines: out}
+}
+
+const (
+	// liveStale is how old a machine's list may be before console/live asks it again: more
+	// than the page's 15 s poll (#2432), so one open tab asks each machine at most every
+	// other poll, not at each.
+	liveStale = 20 * time.Second
+	// mostLiveAsks bounds the machines one console/live asks again, each for at most
+	// liveAskPatience, at once.
+	mostLiveAsks    = 50
+	liveAskPatience = 3 * time.Second
+)
+
+// liveCandidate is an online machine and when its list was last heard; zero for never.
+type liveCandidate struct {
+	host  string
+	heard time.Time
+}
+
+// liveAsks is which machines console/live asks again (#2432): those whose list is older
+// than liveStale, the stalest first, at most mostLiveAsks. Stalest first is a round: the
+// machines past the first 50 are asked on the next call, not never.
+func liveAsks(candidates []liveCandidate, now time.Time) []string {
+	stale := []liveCandidate{}
+	for _, c := range candidates {
+		if c.heard.IsZero() || now.Sub(c.heard) >= liveStale {
+			stale = append(stale, c)
+		}
+	}
+	sort.SliceStable(stale, func(i, j int) bool { return stale[i].heard.Before(stale[j].heard) })
+	if len(stale) > mostLiveAsks {
+		stale = stale[:mostLiveAsks]
+	}
+	asks := make([]string, len(stale))
+	for i, c := range stale {
+		asks[i] = c.host
+	}
+	return asks
+}
+
+// refreshLive asks the online machines liveAsks names for their lists again (agents/list,
+// lean): a machine's list is kept only when a window asks for it, and Live Now is about now.
+func (m *Methods) refreshLive(ctx context.Context, from Caller) {
+	var candidates []liveCandidate
+	for _, h := range m.records.Hosts() {
+		if state, _ := m.router.Described(h.ID)["state"].(string); state != "online" && state != "needsUpdate" {
+			continue
+		}
+		c := liveCandidate{host: h.ID}
+		if copy := m.s.copies.current(ctx, h.ID); copy != nil {
+			c.heard = copy.HeardAt.Time
+		}
+		candidates = append(candidates, c)
+	}
+	stale := liveAsks(candidates, time.Now())
+	var wg sync.WaitGroup
+	for _, host := range stale {
+		wg.Go(func() { m.listAgain(host, from) })
+	}
+	wg.Wait()
+}
+
+// listAgain asks a machine for its whole agents list, as a window does, and keeps the answer.
+func (m *Methods) listAgain(host string, from Caller) {
+	answer := m.router.DeliverKept(wire.CallAgentsList.Name, map[string]any{"lean": true}, from.Client, from.Kind, host, liveAskPatience)
+	if answer == nil || len(answer.Error) > 0 || len(answer.Result) == 0 {
+		return
+	}
+	reply, err := json.Marshal(map[string]json.RawMessage{"result": answer.Result})
+	if err == nil {
+		m.s.copies.take(host, wire.CallAgentsList.Name, string(reply))
+	}
+}
+
+// live is console/live (#2019, M9): every agent running now on every machine, as each
+// machine last listed it, with whose machine it is, its runtime, state and cost so far. No
+// title and nothing it said. The most costly first (by its first currency), then the oldest.
+func (m *Methods) live(ctx context.Context) wire.LiveBoard {
+	out := []wire.LiveAgent{}
+	for _, h := range m.records.Hosts() {
+		copy := m.s.copies.current(ctx, h.ID)
+		if copy == nil || copy.Agents == nil {
+			continue
+		}
+		var agents []struct {
+			ID                string             `json:"id"`
+			RuntimeID         string             `json:"runtimeID"`
+			State             string             `json:"state"`
+			StartedByWorkflow string             `json:"startedByWorkflow"`
+			CreatedAt         *wire.Date         `json:"createdAt"`
+			CostToDate        map[string]float64 `json:"costToDate"`
+			EventWait         json.RawMessage    `json:"eventWait"`
+		}
+		if json.Unmarshal(copy.Agents, &agents) != nil {
+			continue
+		}
+		owner := m.s.ownerOf(h.ID)
+		ownerName := m.s.personName(owner)
+		// As the audit names them (actorFor).
+		if owner == m.s.localOwner() {
+			ownerName = audit.LocalOwnerName
+		}
+		heard := dateOf(copy.HeardAt.Time)
+		for _, a := range agents {
+			if !liveStates[a.State] {
+				continue
+			}
+			row := wire.LiveAgent{Host: wire.MachineRef(h.ID), HostName: h.Name, Owner: owner, OwnerName: ownerName,
+				Bot: m.s.isBot(owner), Agent: wire.UUID(a.ID), Runtime: a.RuntimeID, State: wire.AgentState(a.State),
+				Since: a.CreatedAt, CostToDate: a.CostToDate, HeardAt: &heard}
+			if a.StartedByWorkflow != "" {
+				workflow := a.StartedByWorkflow
+				row.Workflow = &workflow
+			}
+			if len(a.EventWait) > 0 && string(a.EventWait) != "null" {
+				row.WaitsOnOthers = new(true)
+			}
+			out = append(out, row)
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		a, b := firstCost(out[i].CostToDate), firstCost(out[j].CostToDate)
+		if a != b {
+			return a > b
+		}
+		return string(out[i].Agent) < string(out[j].Agent)
+	})
+	return wire.LiveBoard{Agents: out}
+}
+
+// firstCost is a cost in US dollars, or else in the first currency by name, for sorting.
+func firstCost(cost map[string]float64) float64 {
+	if v, ok := cost["USD"]; ok {
+		return v
+	}
+	names := make([]string, 0, len(cost))
+	for c := range cost {
+		names = append(names, c)
+	}
+	sort.Strings(names)
+	if len(names) == 0 {
+		return 0
+	}
+	return cost[names[0]]
 }
 
 // mostRunsRead bounds the claims console/teamWorkflows reads: a week of triggers, the
@@ -130,7 +293,7 @@ func (m *Methods) teamWorkflows(ctx context.Context, now time.Time) (wire.TeamWo
 			if !liveStates[a.State] {
 				continue
 			}
-			run := wire.TeamBotRun{Host: wire.HostID(h.ID), HostName: h.Name, Agent: wire.UUID(a.ID), Since: a.CreatedAt}
+			run := wire.TeamBotRun{Host: wire.MachineRef(h.ID), HostName: h.Name, Agent: wire.UUID(a.ID), Since: a.CreatedAt}
 			if a.StartedByWorkflow != "" {
 				workflow := a.StartedByWorkflow
 				run.Workflow = &workflow

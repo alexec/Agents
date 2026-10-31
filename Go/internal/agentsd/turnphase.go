@@ -19,6 +19,7 @@ const turnWindow = 12 * time.Hour
 var pausingReasons = map[wire.EndedReason]bool{
 	wire.EndedReasonCancelled:      true,
 	wire.EndedReasonStoppedByAgent: true,
+	wire.EndedReasonStoppedByAdmin: true,
 	wire.EndedReasonAllowanceSpent: true,
 }
 

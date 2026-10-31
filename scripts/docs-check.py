@@ -49,6 +49,13 @@ HTML_IMAGE = re.compile(r"<img\b[^>]*\bsrc=[\"']([^\"']+)[\"'][^>]*>", re.I)
 HTML_ALT = re.compile(r"\balt=[\"']([^\"']*)[\"']", re.I)
 ORDERED = re.compile(r"^\s{0,3}\d+[.)]\s")
 WHERE_NEXT = re.compile(r"^##\s+Where next\s*$", re.I)
+# The folder rename (#2313) must not reach gcloud: it names a Google Cloud project (#2712).
+GCLOUD_RENAMED = [
+    (re.compile(r"--image-folder\b"), "`--image-folder` is `--image-project`"),
+    (re.compile(r"@[\w-]*folder[\w-]*\.iam\.gserviceaccount\.com"),
+     "a service account's address names the Google Cloud project"),
+]
+GCLOUD_FOLDER = re.compile(r"--folder\b")
 
 
 class Problems:
@@ -161,8 +168,16 @@ def check_page(problems, docs, path, used_images):
                          f"docs/{folder}/")
 
     has_where_next = False
+    in_gcloud = False
     for number, text, in_code in body_lines(lines, end):
         check_private(problems, path, number, text)
+        in_gcloud = in_code and (in_gcloud or text.lstrip().startswith("gcloud "))
+        for pattern, what in GCLOUD_RENAMED:
+            if pattern.search(text):
+                problems.add(path, number, f"gcloud-project: {what}")
+        if in_gcloud and GCLOUD_FOLDER.search(text):
+            problems.add(path, number, "gcloud-project: gcloud takes `--project`, not `--folder`")
+        in_gcloud = in_gcloud and text.rstrip().endswith("\\")
         if in_code:
             continue
         if kind[0] == "explanation" and ORDERED.match(text):

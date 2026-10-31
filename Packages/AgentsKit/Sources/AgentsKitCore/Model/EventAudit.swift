@@ -36,11 +36,11 @@ public extension DaemonAPI {
         public var at: Date
         public var action: String
         public var method: String
-        public var host: HostID?
+        public var host: MachineRef?
         public var target: String?
         public var actor: AuditActor
 
-        public init(id: String, at: Date, action: String, method: String, host: HostID? = nil, target: String? = nil,
+        public init(id: String, at: Date, action: String, method: String, host: MachineRef? = nil, target: String? = nil,
                     actor: AuditActor) {
             self.id = id
             self.at = at
@@ -118,7 +118,7 @@ public enum AuditWords {
     }
 
     /// "on box-1", or "on the control plane" for its own methods.
-    public static func place(_ entry: DaemonAPI.AuditEntry, hostName: (HostID) -> String) -> String {
+    public static func place(_ entry: DaemonAPI.AuditEntry, hostName: (MachineRef) -> String) -> String {
         entry.host.map { "on \(hostName($0))" } ?? "on the control plane"
     }
 
@@ -150,11 +150,13 @@ public enum AuditWords {
         "Keep the audit for \(days == 1 ? "1 day" : "\(days) days")?"
     }
 
-    /// What a shorter time deletes, and how to keep it: the sweep waits a day.
+    /// What a shorter time deletes, and how to keep it: the sweep waits a day. Everyone's
+    /// entries, also while Whose names one person, whose list cannot count them: the caller
+    /// passes no count then (#2192).
     public static func shorterMessage(from: Int, to: Int, older: Int?) -> String {
         let span = from - to == 1 ? "1 day" : "\(from - to) days"
         let count = older.map { $0 == 1 ? ", 1 entry now" : ", \($0) entries now" } ?? ""
-        return "Entries older than \(to == 1 ? "1 day" : "\(to) days") are deleted in a day (up to \(span) of them\(count)). "
+        return "Everyone's entries older than \(to == 1 ? "1 day" : "\(to) days") are deleted in a day (up to \(span) of them\(count)). "
             + "To keep them, choose \(from) days again before then."
     }
 
@@ -190,7 +192,7 @@ public enum AuditWords {
 
     /// `audit/export`'s JSON lines as CSV, a row per entry, oldest first, for a spreadsheet;
     /// a line that is not an entry is left out. The web page's `auditCSV` makes the same.
-    public static func csv(_ lines: String, hostName: (HostID) -> String) -> String {
+    public static func csv(_ lines: String, hostName: (MachineRef) -> String) -> String {
         let header = ["at", "action", "method", "host", "hostName", "target", "user", "userName", "client", "clientName", "event"]
         var rows = [header.joined(separator: ",")]
         let iso = ISO8601DateFormatter()

@@ -7,16 +7,16 @@ import Testing
 @MainActor
 @Suite("The model across hosts")
 struct AgentsModelHostTests {
-    private let devbox = HostID(rawValue: "devbox01")
-    private let gpu = HostID(rawValue: "gpu00001")
+    private let devbox = MachineRef(rawValue: "devbox01")
+    private let gpu = MachineRef(rawValue: "gpu00001")
     private let path = URL(filePath: "/home/alex/src/api")
 
     private func agent(_ cwd: URL, title: String = "t") -> Agent {
         Agent(runtimeID: "claude", cwd: cwd, title: title, state: .finished, endedReason: .endTurn)
     }
 
-    private func summary(_ folder: URL) -> DaemonAPI.ProjectSummary {
-        DaemonAPI.ProjectSummary(project: Project(folder: folder), name: folder.lastPathComponent, exists: true,
+    private func summary(_ folder: URL) -> DaemonAPI.FolderSummary {
+        DaemonAPI.FolderSummary(folder: Folder(folder: folder), name: folder.lastPathComponent, exists: true,
                                  lastActivityAt: Date(), counts: [:])
     }
 
@@ -24,35 +24,35 @@ struct AgentsModelHostTests {
         let model = AgentsModel()
         let one = agent(path)
         model.apply(DaemonAPI.Notification.agentChanged, try JSONValue.encoding(one), from: devbox)
-        model.apply(DaemonAPI.Notification.projectChanged, try JSONValue.encoding(summary(path)), from: devbox)
+        model.apply(DaemonAPI.Notification.folderChanged, try JSONValue.encoding(summary(path)), from: devbox)
         #expect(model.agent(one.id)?.host == devbox)
-        #expect(model.project(ProjectKey(host: devbox, folder: path)) != nil)
-        #expect(model.project(ProjectKey(host: .mac, folder: path)) == nil)
+        #expect(model.folder(FolderKey(host: devbox, folder: path)) != nil)
+        #expect(model.folder(FolderKey(host: .mac, folder: path)) == nil)
     }
 
-    /// A project added brings workflows no notification carries, so the client lists them (#1798).
-    @Test func aProjectNotHeldYetIsAnAddition() {
+    /// A folder added brings workflows no notification carries, so the client lists them (#1798).
+    @Test func aFolderNotHeldYetIsAnAddition() {
         let model = AgentsModel()
-        let added = AgentsModel.Update.projectChanged(summary(path))
-        #expect(model.addsProject(added))
-        #expect(model.addsProject(added, from: devbox))
+        let added = AgentsModel.Update.folderChanged(summary(path))
+        #expect(model.addsFolder(added))
+        #expect(model.addsFolder(added, from: devbox))
         model.apply(added, from: devbox)
-        #expect(!model.addsProject(added, from: devbox), "a change to a held project is not an addition")
-        #expect(model.addsProject(added), "the same folder on the Mac is another project")
-        #expect(!model.addsProject(.projectRemoved(ProjectKey(host: .mac, folder: path))))
+        #expect(!model.addsFolder(added, from: devbox), "a change to a held folder is not an addition")
+        #expect(model.addsFolder(added), "the same folder on the Mac is another folder")
+        #expect(!model.addsFolder(.folderRemoved(FolderKey(host: .mac, folder: path))))
     }
 
     @Test func aHostIsNeverWrittenIntoTheRecord() throws {
         var one = agent(path)
         one.host = devbox
-        var project = summary(path)
-        project.host = devbox
+        var folder = summary(path)
+        folder.host = devbox
         let agentJSON = String(decoding: try JSONEncoder().encode(one), as: UTF8.self)
-        let projectJSON = String(decoding: try JSONEncoder().encode(project), as: UTF8.self)
+        let folderJSON = String(decoding: try JSONEncoder().encode(folder), as: UTF8.self)
         #expect(!agentJSON.contains("devbox01"))
-        #expect(!projectJSON.contains("devbox01"))
+        #expect(!folderJSON.contains("devbox01"))
         #expect(try JSONDecoder().decode(Agent.self, from: Data(agentJSON.utf8)).host == .mac)
-        #expect(try JSONDecoder().decode(DaemonAPI.ProjectSummary.self, from: Data(projectJSON.utf8)).host == .mac)
+        #expect(try JSONDecoder().decode(DaemonAPI.FolderSummary.self, from: Data(folderJSON.utf8)).host == .mac)
     }
 
     @Test func aHostReListingReplacesOnlyItsOwn() {
@@ -60,52 +60,52 @@ struct AgentsModelHostTests {
         let mine = agent(URL(filePath: "/Users/alex/app"))
         let theirs = agent(path)
         model.replaceAgents([mine], from: .mac)
-        model.replaceProjects([summary(URL(filePath: "/Users/alex/app"))], from: .mac)
+        model.replaceFolders([summary(URL(filePath: "/Users/alex/app"))], from: .mac)
         model.replaceAgents([theirs], from: devbox)
-        model.replaceProjects([summary(path)], from: devbox)
+        model.replaceFolders([summary(path)], from: devbox)
         #expect(model.agents.count == 2)
-        #expect(model.projects.count == 2)
+        #expect(model.folders.count == 2)
 
         model.replaceAgents([], from: devbox)
-        model.replaceProjects([], from: devbox)
+        model.replaceFolders([], from: devbox)
         #expect(model.agents.map(\.id) == [mine.id], "the Mac's are untouched by a server re-listing")
-        #expect(model.projects.count == 1)
+        #expect(model.folders.count == 1)
     }
 
-    @Test func theSamePathOnTwoHostsIsTwoProjectsWithTheirOwnAgents() {
+    @Test func theSamePathOnTwoHostsIsTwoFoldersWithTheirOwnAgents() {
         let model = AgentsModel()
         let a = agent(path, title: "on devbox")
         let b = agent(path, title: "on gpu")
-        model.replaceProjects([summary(path)], from: devbox)
-        model.replaceProjects([summary(path)], from: gpu)
+        model.replaceFolders([summary(path)], from: devbox)
+        model.replaceFolders([summary(path)], from: gpu)
         model.replaceAgents([a], from: devbox)
         model.replaceAgents([b], from: gpu)
-        #expect(model.projects.count == 2)
-        let onDevbox = ProjectKey(host: devbox, folder: path)
+        #expect(model.folders.count == 2)
+        let onDevbox = FolderKey(host: devbox, folder: path)
         #expect(model.agents(in: onDevbox, group: .finished).map(\.id) == [a.id])
         #expect(model.counts(in: onDevbox)[.finished] == 1)
-        #expect(model.counts(in: ProjectKey(host: gpu, folder: path))[.finished] == 1)
+        #expect(model.counts(in: FolderKey(host: gpu, folder: path))[.finished] == 1)
     }
 
-    @Test func aProjectChangeUpdatesOnlyItsHostsCopy() throws {
+    @Test func aFolderChangeUpdatesOnlyItsHostsCopy() throws {
         let model = AgentsModel()
-        model.replaceProjects([summary(path)], from: devbox)
-        model.replaceProjects([summary(path)], from: gpu)
+        model.replaceFolders([summary(path)], from: devbox)
+        model.replaceFolders([summary(path)], from: gpu)
         var renamed = summary(path)
         renamed.name = "renamed"
-        model.apply(DaemonAPI.Notification.projectChanged, try JSONValue.encoding(renamed), from: gpu)
-        #expect(model.project(ProjectKey(host: gpu, folder: path))?.name == "renamed")
-        #expect(model.project(ProjectKey(host: devbox, folder: path))?.name == "api")
+        model.apply(DaemonAPI.Notification.folderChanged, try JSONValue.encoding(renamed), from: gpu)
+        #expect(model.folder(FolderKey(host: gpu, folder: path))?.name == "renamed")
+        #expect(model.folder(FolderKey(host: devbox, folder: path))?.name == "api")
     }
 
     @Test func withoutAHostEverythingIsTheMacs() throws {
         let model = AgentsModel()
         let one = agent(path)
         model.apply(DaemonAPI.Notification.agentChanged, try JSONValue.encoding(one))
-        model.replaceProjects([summary(path)])
+        model.replaceFolders([summary(path)])
         #expect(model.agent(one.id)?.host == .mac)
-        #expect(model.project(ProjectKey(folder: path)) != nil)
-        #expect(model.project(path) != nil, "the phone's calls read as they always did")
+        #expect(model.folder(FolderKey(folder: path)) != nil)
+        #expect(model.folder(path) != nil, "the phone's calls read as they always did")
     }
 
     /// A lean list (#107) does not empty the open chat's menus, read whole a moment before.

@@ -7,10 +7,10 @@ import Testing
 @Suite("An event wait")
 struct EventWaitModelTests {
     private let t0 = Date(timeIntervalSince1970: 1_000_000)
-    private let dir = URL(fileURLWithPath: "/tmp/project")
+    private let dir = URL(fileURLWithPath: "/tmp/folder")
 
     private func event(_ name: String, position: EventPosition, _ details: [String: String] = [:]) -> Event {
-        Event(position: position, name: name, at: t0, scope: .project(folder: dir), sentence: "", details: details)
+        Event(position: position, name: name, at: t0, scope: .folder(folder: dir), sentence: "", details: details)
     }
 
     @Test func itMatchesOnlyAfterItsPosition() {

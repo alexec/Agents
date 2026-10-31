@@ -158,7 +158,7 @@ def main(root):
         run("git", "-C", folder, "init", "-q", "-b", "main")
         run("git", "-C", folder, "add", "-A")
         run("git", "-C", folder, "-c", "user.name=Sam", "-c", "user.email=sam@example.com", "commit", "-qm", "First version")
-        client.call("projects/add", {"folder": f"file://{folder}"})
+        client.call("folders/add", {"folder": f"file://{folder}"})
         folders[name] = folder
     for project, prompt, title in AGENTS:
         agent = client.call("agents/start", {"runtimeID": "claude", "cwd": f"file://{folders[project]}", "prompt": prompt})

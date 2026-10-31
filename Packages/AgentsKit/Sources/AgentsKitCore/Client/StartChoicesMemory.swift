@@ -12,7 +12,7 @@ import Foundation
 /// hosts' runtimes.
 public struct StartChoicesMemory: Sendable {
     private struct Key: Hashable, Sendable {
-        var host: HostID
+        var host: MachineRef
         var runtimeID: String
     }
 
@@ -21,12 +21,12 @@ public struct StartChoicesMemory: Sendable {
     public init() {}
 
     /// What `runtimeID` on `host` offered last time, or nil when it has not been heard.
-    public func options(for runtimeID: String, on host: HostID) -> [ConfigOption]? {
+    public func options(for runtimeID: String, on host: MachineRef) -> [ConfigOption]? {
         offered[Key(host: host, runtimeID: runtimeID)]
     }
 
     /// What `runtimeID` on `host` offers now, in place of what it offered before.
-    public mutating func remember(_ options: [ConfigOption], for runtimeID: String, on host: HostID) {
+    public mutating func remember(_ options: [ConfigOption], for runtimeID: String, on host: MachineRef) {
         offered[Key(host: host, runtimeID: runtimeID)] = options
     }
 

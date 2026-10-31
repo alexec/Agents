@@ -1,14 +1,14 @@
 import Foundation
 
-/// The person's connections to tools (#1335), and each project's Connectors set-up (#1336).
+/// The person's connections to tools (#1335), and each folder's Connectors set-up (#1336).
 ///
-/// A connection is the person's: one GitHub sign-in on a host covers every project there. The
+/// A connection is the person's: one GitHub sign-in on a host covers every folder there. The
 /// host does the device flow and keeps the tokens; a client shows the code and the links, and
 /// waits. Linear (#1343) is the authorization code with PKCE: the host keeps the verifier, the
 /// client opens the address in an authentication session, and gives back the code that the
 /// hand-back page sends to agents://oauth/callback. GitLab (#1630) is the device flow on
 /// gitlab.com, or a personal access token on any GitLab. Email (#1780) is one IMAP mailbox and
-/// its app password, which the host checks once and keeps. A project's set-up is the project's: its repository, four slots that each prove
+/// its app password, which the host checks once and keeps. A folder's set-up is the folder's: its repository, four slots that each prove
 /// themselves with one real read, and the github events it turned on.
 extension DaemonAPI.Method {
     public static let connectionsList = "connections/list"
@@ -26,6 +26,7 @@ extension DaemonAPI.Method {
     public static let connectionsDisconnect = "connections/disconnect"
     public static let connectorsSetup = "connectors/setup"
     public static let connectorsSetupSkip = "connectors/setup/skip"
+    public static let connectorsCodespaces = "connectors/codespaces"
 }
 
 extension DaemonAPI {
@@ -178,7 +179,7 @@ extension DaemonAPI {
         public init(error: String? = nil) { self.error = error }
     }
 
-    /// One slot of a project's set-up, in the page's order.
+    /// One slot of a folder's set-up, in the page's order.
     public enum ConnectorSlotKind: String, Codable, Sendable, Hashable, CaseIterable {
         case tasks, codeReview, ci, workspace
     }
@@ -194,7 +195,7 @@ extension DaemonAPI {
         case failed
         /// The provider refused the read: the person grants it on the provider's site.
         case refused
-        /// The project has no GitHub or GitLab remote.
+        /// The folder has no GitHub or GitLab remote.
         case noRemote
         /// Skipped: it counts as done.
         case skipped
@@ -226,13 +227,19 @@ extension DaemonAPI {
         public var proof: ConnectorProof?
         public var readAt: Date?
         public var message: String?
+        /// The repository that fills it: the project's when `fromProject`, else the folder's
+        /// own (#2669).
+        public var repository: String?
+        /// The folder's project sets it, for every folder in the project (#2669).
+        public var fromProject: Bool?
 
         public var id: ConnectorSlotKind { slot }
+        public var isFromProject: Bool { fromProject == true }
 
         public init(slot: ConnectorSlotKind, choice: String, state: ConnectorSlotState, proof: ConnectorProof? = nil,
-                    readAt: Date? = nil, message: String? = nil) {
+                    readAt: Date? = nil, message: String? = nil, repository: String? = nil, fromProject: Bool? = nil) {
             self.slot = slot; self.choice = choice; self.state = state; self.proof = proof
-            self.readAt = readAt; self.message = message
+            self.readAt = readAt; self.message = message; self.repository = repository; self.fromProject = fromProject
         }
     }
 
@@ -260,10 +267,10 @@ extension DaemonAPI {
         }
     }
 
-    /// A project's Connectors set-up (#1336), on GitHub or GitLab (#1632).
+    /// A folder's Connectors set-up (#1336), on GitHub or GitLab (#1632).
     public struct ConnectorSetup: Codable, Sendable, Hashable {
         public var folder: String
-        /// owner/name on GitHub, group/project on GitLab, from the project's git remote. Nil
+        /// owner/name on GitHub, group/folder on GitLab, from the folder's git remote. Nil
         /// with no GitHub or GitLab remote.
         public var repository: String?
         /// The forge that fills Tasks, Code review and CI; nil is GitHub.
@@ -282,16 +289,21 @@ extension DaemonAPI {
         public var events: ConnectorEvents
         /// Slots that read or were skipped, of the four.
         public var done: Int
+        /// The folder's project id (#2669), whose owner or an admin sets Tasks, Code review
+        /// and CI for every folder in it; nil when the folder is in no project.
+        public var project: String?
+        /// The project's name, as the machine last heard it.
+        public var projectName: String?
 
         public init(folder: String, repository: String? = nil, forge: ConnectionProvider? = nil, site: String? = nil,
                     repositoryURL: String? = nil, connection: Connection? = nil, installed: Bool? = nil,
                     installURL: String? = nil, repositories: Int? = nil, slots: [ConnectorSlot],
-                    events: ConnectorEvents, done: Int) {
+                    events: ConnectorEvents, done: Int, project: String? = nil, projectName: String? = nil) {
             self.folder = folder; self.repository = repository; self.forge = forge; self.site = site
             self.repositoryURL = repositoryURL
             self.connection = connection; self.installed = installed
             self.installURL = installURL; self.repositories = repositories; self.slots = slots; self.events = events
-            self.done = done
+            self.done = done; self.project = project; self.projectName = projectName
         }
 
         public func slot(_ kind: ConnectorSlotKind) -> ConnectorSlot? { slots.first { $0.slot == kind } }
@@ -316,6 +328,39 @@ extension DaemonAPI {
         public var folder: String
         public var reading: ConnectorSetupReading?
         public init(folder: String, reading: ConnectorSetupReading? = nil) { self.folder = folder; self.reading = reading }
+    }
+
+    public struct ConnectorCodespace: Codable, Sendable, Hashable, Identifiable {
+        public var id: String
+        public var name: String
+        public var repository: String
+        public var state: String
+        public var ref: String?
+        public var ssh: String
+
+        public init(id: String, name: String, repository: String, state: String, ref: String? = nil, ssh: String) {
+            self.id = id; self.name = name; self.repository = repository; self.state = state; self.ref = ref; self.ssh = ssh
+        }
+    }
+
+    public struct ConnectorCodespacesRequest: Codable, Sendable, Hashable {
+        public enum Action: String, Codable, Sendable, Hashable { case list, create, start, stop, prepareSSH }
+        public var folder: String
+        public var action: Action
+        public var id: String?
+        public var name: String?
+        public init(folder: String, action: Action, id: String? = nil, name: String? = nil) {
+            self.folder = folder; self.action = action; self.id = id; self.name = name
+        }
+    }
+
+    public struct ConnectorCodespaces: Codable, Sendable, Hashable {
+        public var repository: String?
+        public var codespaces: [ConnectorCodespace]
+        public var message: String?
+        public init(repository: String? = nil, codespaces: [ConnectorCodespace] = [], message: String? = nil) {
+            self.repository = repository; self.codespaces = codespaces; self.message = message
+        }
     }
 
     public struct ConnectorSkipRequest: Codable, Sendable, Hashable {

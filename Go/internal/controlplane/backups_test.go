@@ -25,7 +25,7 @@ func backupPlane(t *testing.T) (*backupStore, *store.Memory, string) {
 		t.Fatal(err)
 	}
 	for _, id := range []string{"a", "b"} {
-		if err := r.SaveHost(ctx, records.HostRecord{ID: id, Name: id}); err != nil {
+		if err := r.SaveHost(ctx, records.MachineRecord{ID: id, Name: id}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -74,6 +74,7 @@ func storedList(t *testing.T, b *backupStore, host string) []wire.Backup {
 }
 
 func TestBackupsGoUpInPartsAndComeBackOnAnotherHost(t *testing.T) {
+	t.Parallel()
 	b, st, owner := backupPlane(t)
 	one, two := bytes.Repeat([]byte("transcript "), 1000), []byte("the last part")
 	made, err := putBackup(t, b, "a", "20261020T120000Z", [][]byte{one, two}, 3)
@@ -122,6 +123,7 @@ func TestBackupsGoUpInPartsAndComeBackOnAnotherHost(t *testing.T) {
 }
 
 func TestBackupsRefuseWhatIsNotAHostsOwn(t *testing.T) {
+	t.Parallel()
 	b, _, _ := backupPlane(t)
 	for _, bad := range []wire.BackupStorePart{
 		{Name: "../b/20261020T120000Z", Part: 0, Data: []byte("x")},
@@ -158,6 +160,7 @@ func TestBackupsRefuseWhatIsNotAHostsOwn(t *testing.T) {
 }
 
 func TestBackupsKeepTheNewestOfEachHost(t *testing.T) {
+	t.Parallel()
 	b, st, owner := backupPlane(t)
 	b.now = func() time.Time { return time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC) }
 	for _, name := range []string{"20261018T120000Z", "20261019T120000Z"} {
@@ -206,5 +209,34 @@ func TestBackupsKeepTheNewestOfEachHost(t *testing.T) {
 		if !l.ThisMachine {
 			t.Fatalf("removed b's old backup %s is kept", l.ID)
 		}
+	}
+}
+
+// #2293: when no host of an owner is left to back up, the sweep's daily pass still prunes
+// their removed hosts' old backups and a cut-off backup's parts.
+func TestTheSweepPrunesBackupsNoHostPrunes(t *testing.T) {
+	t.Parallel()
+	b, st, owner := backupPlane(t)
+	b.now = func() time.Time { return time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC) }
+	if _, err := putBackup(t, b, "b", "20261019T120000Z", [][]byte{[]byte("b")}, 3); err != nil {
+		t.Fatal(err)
+	}
+	b.said("backups/upload", "a", raw(t, wire.BackupStorePart{Name: "20261018T000000Z", Part: 0, Data: []byte("cut off")}))
+	b.records.RemoveHost(context.Background(), "a")
+	b.records.RemoveHost(context.Background(), "b")
+	// Recent: kept, for a new server to restore.
+	if err := b.pruneOrphans(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if keys, _ := st.List(context.Background(), b.hostFolder(owner, "b")); len(keys) != 2 {
+		t.Fatalf("b's recent backup went: %v", keys)
+	}
+	if keys, _ := st.List(context.Background(), b.hostFolder(owner, "a")); len(keys) != 0 {
+		t.Fatalf("a's cut-off part stayed: %v", keys)
+	}
+	b.now = func() time.Time { return time.Date(2027, 2, 1, 0, 0, 0, 0, time.UTC) }
+	b.pruneOrphans(context.Background())
+	if keys, _ := st.List(context.Background(), backupsPrefix); len(keys) != 0 {
+		t.Fatalf("left %v", keys)
 	}
 }

@@ -61,11 +61,18 @@ waits, and gets the first place to come free. Any other resource has one holder.
 If another agent holds the resource, the asking agent joins a line and waits. When the
 lease is released or runs out, the resource goes to whoever asked first.
 
-An agent does not have to wait with its turn open. If the lease has not come to it after
-45 seconds, it is told it is still in line and can end its turn, keeping its place. When
-the resource comes free, the app starts that agent again with the lease already in its
-hands, and a message saying so appears in its conversation. If you have sent it something
-in the meantime, the app's message waits until that turn is over.
+An agent does not wait with its turn open. The app tells it its place in line at once, and
+that it will get a `lease.granted` event when the resource is its (#2361). Its place in line
+is a wait for that event, the same wait that `wait_for_event` makes, so the agent ends its
+turn. When the resource comes free, the event starts the agent again with the lease already
+in its hands. If you have sent it something in the meantime, the event's message waits until
+that turn is over.
+
+The wait shows as the wait card at the end of the agent's chat: "Waiting for build · held by
+“Fix login” until 14:12 · 2nd in line". **Stop Waiting** on the card, or `cancel_wait`, takes
+the agent out of the line. If the agent waits for something else instead, it keeps its place,
+and the app starts it again when its turn comes. The line and the wait both outlive a restart
+of Agents.
 
 An agent that needs two resources asks for them one at a time, always in the same order,
 so that two agents cannot each hold one and wait forever for the other. If that happens
@@ -75,12 +82,14 @@ anyway, both leases still run out in time, and you can see both waits and end on
 
 In the Mac window, the **Resources** row at the bottom of the sidebar opens a page listing
 every resource, whether it is free, who holds it and since when, when the lease runs out,
-and who is waiting, in order. Each agent's chat has a line saying what it holds and what
-it is waiting for, and its card on the project page says the same briefly.
+and who is waiting, in order. At the end of each agent's chat, with the line that says it
+is working, a line says what it holds and what it is waiting for. Click it to open
+**Resources** at that resource. The agent's card on the folder page says the same briefly.
 
-On iPhone and iPad, the chat and the card show the same leases and waits, and
-**Resources** under **Activity** lists the declared resources and anything held, read-only.
-The web page lists them under each host. Declaring, and ending leases, are on the Mac.
+On iPhone and iPad, the chat and the card show the same leases and waits. Tap the line to
+open **Resources** under **Activity**, which lists the declared resources and anything
+held, read-only. On the web page the line opens **Resources**, which lists them under each
+host. Declaring, and ending leases, are on the Mac.
 
 ## What you can end
 
@@ -100,7 +109,7 @@ asked, in their briefing, to lease these things before they use them.
 
 Leases belong to one daemon. A scratch copy of the app running on a folder of its own has
 leases of its own, not shared with your everyday app. Agents in different worktrees of the
-same project share one line, because they share one Mac.
+same folder share one line, because they share one Mac.
 
 ## Related
 

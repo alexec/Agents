@@ -76,7 +76,7 @@ final class PresenceReporter {
         sampler = nil
     }
 
-    /// Which conversation is on screen now. Nil for a project page, a workflow, or
+    /// Which conversation is on screen now. Nil for a folder page, a workflow, or
     /// nothing.
     func watching(_ agentID: UUID?) {
         watching = agentID

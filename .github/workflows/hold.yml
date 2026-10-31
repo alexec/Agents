@@ -1,0 +1,56 @@
+# Fails while a pull request has a `hold:v*` label (#2931), so a held PR cannot merge.
+#
+# While a patch milestone is open, only bug fixes merge: an enhancement PR gets
+# `hold:v<x.y.z>` with auto-merge off, and the release lifts the hold when the patch ships
+# (AGENTS.md, "A minor release is followed by a patch"; release skill, step 9, item 4).
+# Nothing checked the label: in v0.13.1, #2888 had auto-merge turned on again under its
+# hold and merged during the patch.
+#
+# The `hold` job fails while the label is on and passes when it comes off; `main`'s
+# ruleset requires it. When auto-merge is turned on under a hold, the job also turns it
+# off again and says why on the PR.
+name: hold
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled, auto_merge_enabled]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: hold-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hold:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: No hold label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          ACTION: ${{ github.event.action }}
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          # A manual run (on a branch, to give an open PR its first `hold` check) has no
+          # pull request in its event: there is nothing to hold.
+          [ -n "$PR" ] || { echo "No pull request: nothing to hold."; exit 0; }
+          held=$(jq -r '.[] | select(startswith("hold:v"))' <<<"$LABELS" | paste -sd, -)
+          if [ -z "$held" ]; then
+            echo "No hold:v* label."
+            exit 0
+          fi
+          if [ "$ACTION" = auto_merge_enabled ]; then
+            gh pr merge "$PR" --disable-auto \
+              || echo "::warning::could not turn auto-merge off on #$PR"
+            gh pr comment "$PR" --body "<!-- agent -->
+          Auto-merge turned off: this PR is labelled \`$held\`, so it waits for that release to ship (#2931). The release takes the label off and turns auto-merge on." \
+              || echo "::warning::could not comment on #$PR"
+          fi
+          echo "::error::#$PR is labelled $held: it waits for that release to ship, and only the release takes the hold off (#2931)."
+          exit 1

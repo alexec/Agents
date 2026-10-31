@@ -12,7 +12,7 @@ keyboard, that is true only of a run of the workflow.
 
 ## Rules for the whole run
 
-- **Never touch the project folder you start in.** It is the shared checkout of `main`.
+- **Never touch the folder you start in.** It is the shared checkout of `main`.
   Do any edits in a worktree of your own (step 3).
 - One optimisation pull request per night at most. If an earlier one from this workflow
   (branch `agents/ci-speed-*`) is still open, do not open another: say so and call

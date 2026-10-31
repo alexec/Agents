@@ -29,7 +29,7 @@ type sandboxRoute struct {
 var sandboxCatalog = map[string]sandboxRoute{
 	"claude": {claudeMeta: true},
 	"codex":  {codexMode: true},
-	"grok":   {onArgs: []string{"--sandbox", "workspace"}, offArgs: []string{"--sandbox", "off"}},
+	"grok":   {fixed: wire.SandboxStateRuntimeControlled, why: "Grok 1.0.67 does not accept --sandbox with agent stdio. The app cannot change Grok’s sandbox."},
 	"gemini": {offEnv: map[string]string{"GEMINI_SANDBOX": "false"},
 		why: "Gemini’s own sandbox cannot start when the app runs it, so On is not offered."},
 	"cursor":      {fixed: wire.SandboxStateRuntimeControlled, why: "Cursor’s own sandbox setting decides. The app cannot change it."},
@@ -76,6 +76,14 @@ func (d *Daemon) resolveSandbox(runtimeID string, override *wire.SandboxChoice, 
 		if s := d.Store.Agent(*starter); s != nil && s.EffectiveSandbox != nil && s.EffectiveSandbox.State == wire.SandboxStateOn {
 			why := "Limited by the agent that started it"
 			return wire.SandboxChoiceRuntime, &why
+		}
+	}
+	// The organisation's required sandbox caps the person's choice (#998): on where the
+	// app can set it. The person's own default is kept as they wrote it.
+	if sandboxRequired(d.orgPolicy()) && choice != wire.SandboxChoiceOn {
+		if on, ok := requiredSandbox(runtimeID); ok {
+			why := orgSetBy + " " + sandboxRequiredWords
+			return on, &why
 		}
 	}
 	return choice, nil
@@ -181,6 +189,9 @@ func (d *Daemon) setSandbox(ctx context.Context, r wire.SetSandboxRequest) (wire
 	if a == nil {
 		return wire.Agent{}, &Error{Code: CodeNoSuchAgent, Message: "That agent is not here."}
 	}
+	if r.Choice != nil && *r.Choice == wire.SandboxChoiceOff && sandboxRequired(d.orgPolicy()) {
+		return wire.Agent{}, policyRefusal("policy", "sandbox", sandboxRequiredWords, nil)
+	}
 	if r.Choice != nil && !slices.Contains(sandboxChoices(a.RuntimeID), *r.Choice) {
 		why := sandboxCatalog[a.RuntimeID].why
 		if why == "" {
@@ -211,10 +222,7 @@ func (d *Daemon) setSandbox(ctx context.Context, r wire.SetSandboxRequest) (wire
 		}
 	}
 	if a.RuntimeID == "codex" {
-		choice := d.defaultSandbox(a.RuntimeID)
-		if r.Choice != nil {
-			choice = *r.Choice
-		}
+		choice, _ := d.resolveSandbox(a.RuntimeID, r.Choice, a.StartedByAgent)
 		if mode, ok := codexStartMode(a.RuntimeID, choice, stringValue(a.StartOptions.Values["mode"])); ok {
 			v, _ := json.Marshal(mode)
 			if _, err := d.setOption(ctx, wire.SetOptionRequest{AgentID: a.ID, OptionID: "mode", Value: v}); err != nil {
@@ -225,7 +233,28 @@ func (d *Daemon) setSandbox(ctx context.Context, r wire.SetSandboxRequest) (wire
 	return *d.Store.Agent(a.ID), nil
 }
 
+// setSandboxDefaults is sandbox/set (064). A choice the catalog does not offer is dropped.
+// "runtime" is said by leaving the runtime out. An agent's own choice is not touched.
+func (d *Daemon) setSandboxDefaults(in wire.SandboxSettings) (wire.SandboxSettings, error) {
+	kept := map[string]wire.SandboxChoice{}
+	for runtime, choice := range in.Defaults {
+		if choice == wire.SandboxChoiceRuntime || !slices.Contains(sandboxChoices(runtime), choice) {
+			continue
+		}
+		kept[runtime] = choice
+	}
+	if err := d.writeSetting("sandbox.json", wire.SandboxSettings{Defaults: kept}); err != nil {
+		return wire.SandboxSettings{}, &Error{Code: wire.FailureCouldNotSave, Message: "sandbox.json: " + err.Error()}
+	}
+	st := d.sandboxState()
+	Broadcast(d, wire.NotifySandboxChanged, st)
+	return st, nil
+}
+
 func (d *Daemon) registerSandbox() {
+	On(d, wire.CallSandboxSet, func(ctx context.Context, c *Client, s wire.SandboxSettings) (wire.SandboxSettings, error) {
+		return d.setSandboxDefaults(s)
+	})
 	On(d, wire.CallAgentsSetSandbox, func(ctx context.Context, c *Client, r wire.SetSandboxRequest) (wire.Agent, error) {
 		return d.setSandbox(ctx, r)
 	})

@@ -20,12 +20,12 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// The person's and the project's MCP servers, as SessionServers hands them to a session on
-// the Swift host: <home>/.agents/mcp.json and <project>/.agents/mcp.json, read afresh each
+// The person's and the folder's MCP servers, as SessionServers hands them to a session on
+// the Swift host: <home>/.agents/mcp.json and <folder>/.agents/mcp.json, read afresh each
 // session; ${NAME} filled from <home>/.agents-secrets/secrets.env, a server still missing
-// one left out; a project's server only once the person approved it as it stands
+// one left out; a folder's server only once the person approved it as it stands
 // (<root>/mcp-approvals.json), every entry there at the first start approved. The app's
-// own server goes first, then the project's, then the person's; the first of a name wins.
+// own server goes first, then the folder's, then the person's; the first of a name wins.
 
 type mcpEntry struct {
 	name   string
@@ -47,7 +47,7 @@ func (d *Daemon) personalHome() string {
 	if h := os.Getenv("AGENTS_PERSONAL_HOME"); h != "" {
 		return h
 	}
-	return d.ChatHome
+	return d.PersonalHome
 }
 
 // orderedKeys is the keys of a JSON object in the file's own order.
@@ -262,7 +262,7 @@ func entryDigest(raw json.RawMessage) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// approvalFolder is the project a folder's approvals are kept under: a worktree's project.
+// approvalFolder is the folder a folder's approvals are kept under: a worktree's folder.
 func approvalFolder(folder string) string {
 	if i := strings.Index(folder, "/.agents/worktrees/"); i >= 0 {
 		return folder[:i]
@@ -278,7 +278,7 @@ func (d *Daemon) mcpApprovalsPath() string {
 	return filepath.Join(d.Store.Loc.Root, "mcp-approvals.json")
 }
 
-// mcpApprovalsLocked is mcp-approvals.json, begun once: every project entry there at the
+// mcpApprovalsLocked is mcp-approvals.json, begun once: every folder entry there at the
 // first start is approved as it stands.
 func (d *Daemon) mcpApprovalsLocked() (approved map[string]string, begun, unreadable bool) {
 	if !d.mcpLoaded {
@@ -292,8 +292,8 @@ func (d *Daemon) mcpApprovalsLocked() (approved map[string]string, begun, unread
 		if d.mcpApprovals != nil {
 			if _, ok := d.mcpApprovals["approvalsBegan"]; !ok {
 				all := map[string]string{}
-				for _, p := range d.projects(false) {
-					folder := store.FolderPath(p.Project.Folder)
+				for _, p := range d.folders(false) {
+					folder := store.FolderPath(p.Folder.Folder)
 					entries, _ := readMCPFile(filepath.Join(folder, ".agents", "mcp.json"))
 					for _, e := range entries {
 						all[mcpApprovalKey(folder, e.name)] = entryDigest(e.raw)
@@ -317,9 +317,9 @@ func (d *Daemon) mcpApprovalsLocked() (approved map[string]string, begun, unread
 	return approved, true, false
 }
 
-// projectServers is projectContribution: approved entries, with secrets filled; the names
+// folderServers is folderContribution: approved entries, with secrets filled; the names
 // waiting and those missing a secret.
-func (d *Daemon) projectMCP(folder string, secrets map[string]string) (servers []mcpEntry, waiting, missing []string, problem string) {
+func (d *Daemon) folderMCP(folder string, secrets map[string]string) (servers []mcpEntry, waiting, missing []string, problem string) {
 	entries, problem := readMCPFile(filepath.Join(folder, ".agents", "mcp.json"))
 	d.mcpMu.Lock()
 	approved, _, _ := d.mcpApprovalsLocked()
@@ -360,15 +360,15 @@ func (d *Daemon) personalMCP(secrets map[string]string) (servers []mcpEntry, mis
 	return
 }
 
-// sessionEntry is one server a session is given, with where its file is: project is nil
+// sessionEntry is one server a session is given, with where its file is: folder is nil
 // for the person's own.
 type sessionEntry struct {
 	mcpEntry
-	project *string
+	folder *string
 	cwd     string
 }
 
-// sessionMCP is the person's and the project's servers a session is given, after the app's.
+// sessionMCP is the person's and the folder's servers a session is given, after the app's.
 func (d *Daemon) sessionMCP(folder string) []sdk.McpServer {
 	entries := d.sessionEntries(folder)
 	out := make([]sdk.McpServer, 0, len(entries))
@@ -381,18 +381,18 @@ func (d *Daemon) sessionMCP(folder string) []sdk.McpServer {
 // sessionEntries is sessionMCP's servers, signed in, with the file each came from.
 func (d *Daemon) sessionEntries(folder string) []sessionEntry {
 	secrets := d.secrets()
-	project, _, _, _ := d.projectMCP(folder, secrets)
+	folderEntries, _, _, _ := d.folderMCP(folder, secrets)
 	personal, _, _ := d.personalMCP(secrets)
 	var out []sessionEntry
 	seen := map[string]bool{appServerName: true}
 	f := folder
-	for i, e := range append(project, personal...) {
+	for i, e := range append(folderEntries, personal...) {
 		if seen[e.name] {
 			continue
 		}
 		seen[e.name] = true
-		if i < len(project) {
-			out = append(out, sessionEntry{mcpEntry: e, project: &f, cwd: folder})
+		if i < len(folderEntries) {
+			out = append(out, sessionEntry{mcpEntry: e, folder: &f, cwd: folder})
 		} else {
 			out = append(out, sessionEntry{mcpEntry: e, cwd: d.personalHome()})
 		}

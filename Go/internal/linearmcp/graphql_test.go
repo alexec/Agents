@@ -10,6 +10,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -136,6 +137,17 @@ func TestOneAnswerIsSharedForAPoll(t *testing.T) {
 	}
 }
 
+func TestIssueDetailsRenderMarkdown(t *testing.T) {
+	r, l := newRecorded(t)
+	details, err := l.IssueDetails(context.Background(), "ENG-5")
+	if err != nil || details["identifier"] != "ENG-5" || !strings.Contains(details["descriptionHTML"].(string), "<strong>Inspect</strong>") {
+		t.Fatalf("details %v, %v", details, err)
+	}
+	if len(r.names) != 1 || r.names[0] != "IssueDetails" || r.asked[0]["id"] != "ENG-5" {
+		t.Fatalf("query: %v %v", r.names, r.asked)
+	}
+}
+
 func TestLinearsRefusals(t *testing.T) {
 	for _, c := range []struct {
 		status int
@@ -164,5 +176,17 @@ func TestLinearsRefusals(t *testing.T) {
 	var le *LinearError
 	if _, _, err := l.Activity(context.Background(), Opened, "", "2026-10-16T12:00:00.000Z"); !errors.As(err, &le) || le.Kind != NotSignedIn {
 		t.Fatalf("no key: %v", err)
+	}
+}
+
+// issue.assigned (#2034): an assignment to the connection's owner, by anyone, from the same history.
+func TestAssignedIsToTheViewerFromTheSameHistory(t *testing.T) {
+	_, l := newRecorded(t)
+	got, _, err := l.Activity(context.Background(), Assigned, "", "2026-10-16T12:00:00.000Z")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].ID != "h5" || got[0].data()["by"] != "bob" || got[0].data()["assignedAt"] == nil {
+		t.Fatalf("assigned %+v", got)
 	}
 }

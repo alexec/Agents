@@ -21,7 +21,7 @@ func TestABotsMachineAsksNobodyAndClaimsItsRuns(t *testing.T) {
 	if d.isBot() || !d.runsOnHere(nil) || d.runsOnHere([]string{"review-bot"}) {
 		t.Fatal("a person's machine as it starts")
 	}
-	told, _ := json.Marshal(wire.HostUser{User: "b1", Kind: "bot", Name: "review-bot", Labels: []string{"do-1"}})
+	told, _ := json.Marshal(wire.MachineUser{User: "b1", Kind: "bot", Name: "review-bot", Labels: []string{"do-1"}})
 	d.toldHostUser(told)
 	if !d.isBot() || !d.runsOnHere([]string{"Review-Bot", osLabel(), "do-1"}) || d.runsOnHere([]string{"review-bot", "windows"}) {
 		t.Fatalf("labels %v", d.machineLabels())
@@ -41,16 +41,16 @@ func TestABotsMachineAsksNobodyAndClaimsItsRuns(t *testing.T) {
 		t.Fatalf("%s %v", b, err)
 	}
 	for _, raw := range offeredTools(false, true) {
-		if strings.Contains(string(raw), `"ask_form"`) {
-			t.Fatal("ask_form offered on a bot's machine")
+		if strings.Contains(string(raw), `"ask_question"`) {
+			t.Fatal("ask_question offered on a bot's machine")
 		}
 	}
 	found := false
 	for _, raw := range offeredTools(false, false) {
-		found = found || strings.Contains(string(raw), `"ask_form"`)
+		found = found || strings.Contains(string(raw), `"ask_question"`)
 	}
 	if !found {
-		t.Fatal("ask_form not offered on a person's machine")
+		t.Fatal("ask_question not offered on a person's machine")
 	}
 
 	// Claimed first: a lost claim runs nothing; a won one, or Run now, runs.
@@ -83,7 +83,7 @@ func TestABotsMachineAsksNobodyAndClaimsItsRuns(t *testing.T) {
 
 	// At its cap, until the end of the day.
 	until := wire.DateOf(time.Now().Add(time.Hour))
-	told, _ = json.Marshal(wire.HostUser{User: "b1", Kind: "bot", Name: "review-bot", Labels: []string{}, CapReachedUntil: &until})
+	told, _ = json.Marshal(wire.MachineUser{User: "b1", Kind: "bot", Name: "review-bot", Labels: []string{}, CapReachedUntil: &until})
 	d.toldHostUser(told)
 	if _, capped := d.capped(time.Now()); !capped {
 		t.Fatal("not capped")

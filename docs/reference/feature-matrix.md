@@ -38,14 +38,15 @@ down for a runtime that has none. [Overall score](#overall-score), after the
 tables, adds every feature up.
 
 The matrix was filled in on 2026-10-12 from each app's own docs, changelog, README,
-releases and, where open, source. Agents' row was last brought up to date on 2026-10-21. Every app is held to the same bar, Agents included: a ●
+releases and, where open, source. Agents' row was last brought up to date on 2026-10-30. Every app is held to the same bar, Agents included: a ●
 needs the whole feature, documented by the app itself, and a ○ needs evidence, such as an
 app that ships for macOS alone having no Android app. Once per release, after the
 Competitor check, the Feature matrix workflow (`.agents/workflows/feature-matrix.md`)
 brings it up to date from the merged changes since its last update and the Competitor check's report.
 The reports in `~/.agents/reviews/competitors/` give the sources, and
 [Sources for leases, waits, workflows in the repository and live documents](#sources-for-leases-waits-workflows-in-the-repository-and-live-documents)
-gives them for the four features added on 2026-10-15. Apps change every week, so check a row against the app before relying
+gives them for the four features added on 2026-10-15, and
+[Sources for session goals](#sources-for-session-goals) for the one added on 2026-10-29. Apps change every week, so check a row against the app before relying
 on it.
 
 ## Where Agents falls short
@@ -58,11 +59,13 @@ Agents' ◐ cells, and why:
 - **A browser the agent drives:** through the Playwright server from the MCP marketplace,
   with nothing shown in the app, or with **Use Chrome** (#1837), which drives the person's
   own Chrome for Claude alone, once its extension is installed.
+- **Several accounts per runtime:** for Claude and Codex alone (#840). The person picks
+  the account when a session starts. See
+  [More than one account](runtimes.md#more-than-one-account).
 
 Agents has none of these at all:
 
 - Android app (#810), Windows or Linux desktop (#811).
-- Several accounts per runtime.
 - Open source: the source is visible on GitHub, but all rights are reserved (#2110).
 
 ## What each feature means
@@ -86,6 +89,7 @@ Agents has none of these at all:
 - **Voice or dictation:** Prompts can be spoken.
 - **Rich cards in replies:** Agent replies can hold interactive cards, tables or charts, beyond Markdown.
 - **Live documents:** A document the agent writes opens beside the chat and fills in as it is written, with each change marked. A file pane that only reloads the file has part of it.
+- **Session goal:** A session's goal, an objective the agent works toward over many turns (such as `/goal` in Claude Code or Codex), is shown in the app with its state or progress. A goal shown for only some of the runtimes that have one, only in a beta, or only as a command with no view, is part of it.
 
 **Reviewing work**
 
@@ -145,8 +149,8 @@ Agents has none of these at all:
 | Warp | ● | ● | ● | ?⃝ | ● | ● | 83% |
 | Conductor | ● | ● | ● | ?⃝ | ● | ◐ | 75% |
 | Orca | ● | ● | ● | ◐ | ◐ | ◐ | 75% |
+| Paradev (was Superset) | ● | ● | ● | ?⃝ | ● | ◐ | 75% |
 | Pragma | ● | ● | ● | ◐ | ● | ?⃝ | 75% |
-| Superset | ● | ● | ● | ?⃝ | ● | ◐ | 75% |
 | Claude Code | ● | ● | ○ | ?⃝ | ● | ● | 67% |
 | CodeAgentSwarm | ● | ● | ● | ◐ | ○ | ◐ | 67% |
 | OpenAI Codex | ● | ● | ○ | ?⃝ | ● | ● | 67% |
@@ -181,16 +185,16 @@ Agents has none of these at all:
 | Codeg | ● | ◐ | ◐ | ● | ○ | ● | 67% |
 | Cursor | ● | ● | ○ | ● | ○ | ● | 67% |
 | Orca | ● | ◐ | ◐ | ◐ | ◐ | ● | 67% |
+| Threadlines | ● | ○ | ○ | ● | ● | ● | 67% |
 | CodeAgentSwarm | ● | ◐ | ◐ | ◐ | ?⃝ | ● | 58% |
 | Nuphos | ● | ● | ◐ | ?⃝ | ○ | ● | 58% |
 | Warp | ● | ○ | ○ | ● | ◐ | ● | 58% |
 | Maestro | ● | ○ | ○ | ● | ○ | ● | 50% |
 | Roamgate | ◐ | ○ | ○ | ● | ◐ | ● | 50% |
-| Threadlines | ● | ○ | ○ | ● | ● | ?⃝ | 50% |
 | Vibe Kanban | ● | ○ | ○ | ● | ?⃝ | ● | 50% |
 | VibeiDE | ● | ○ | ○ | ● | ● | ?⃝ | 50% |
 | Agentastic | ○ | ◐ | ○ | ○ | ● | ● | 42% |
-| Superset | ◐ | ● | ○ | ○ | ?⃝ | ● | 42% |
+| Paradev (was Superset) | ◐ | ● | ○ | ○ | ?⃝ | ● | 42% |
 | DockTerm | ● | ○ | ○ | ○ | ○ | ● | 33% |
 | Emdash | ● | ○ | ○ | ○ | ○ | ● | 33% |
 | Helicon | ● | ○ | ○ | ● | ○ | ?⃝ | 33% |
@@ -205,42 +209,42 @@ Agents has none of these at all:
 
 ## Following and answering
 
-| App | Shows who needs you | Sessions side by side | Sessions as a tree | Send while it works | Voice or dictation | Rich cards in replies | Live documents | Score |
-|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|--:|
-| **Agents** | ● | ● | ● | ● | ● | ● | ● | 100% |
-| GitHub Copilot | ● | ● | ● | ● | ● | ● | ● | 100% |
-| Cursor | ● | ● | ?⃝ | ● | ● | ● | ● | 86% |
-| Nimbalyst | ● | ?⃝ | ● | ● | ● | ● | ● | 86% |
-| Warp | ● | ● | ◐ | ● | ● | ● | ◐ | 86% |
-| Agentastic | ● | ● | ● | ● | ◐ | ● | ?⃝ | 79% |
-| Claude Code | ● | ● | ● | ● | ● | ◐ | ?⃝ | 79% |
-| Nuphos | ● | ● | ● | ● | ◐ | ● | ?⃝ | 79% |
-| Parallel Code | ● | ● | ● | ● | ◐ | ○ | ● | 79% |
-| Atelier (was Acepe) | ● | ● | ◐ | ● | ● | ○ | ◐ | 71% |
-| OpenAI Codex | ● | ● | ◐ | ● | ● | ◐ | ?⃝ | 71% |
-| Orca | ● | ● | ◐ | ◐ | ● | ◐ | ◐ | 71% |
-| Paseo | ● | ● | ◐ | ● | ● | ◐ | ?⃝ | 71% |
-| Superset | ● | ● | ◐ | ● | ● | ◐ | ?⃝ | 71% |
-| Threadlines | ● | ?⃝ | ● | ● | ● | ● | ?⃝ | 71% |
-| Codeg | ● | ● | ◐ | ● | ?⃝ | ● | ?⃝ | 64% |
-| Happy | ● | ?⃝ | ◐ | ● | ● | ● | ?⃝ | 64% |
-| T3 Code | ● | ?⃝ | ◐ | ● | ◐ | ● | ◐ | 64% |
-| Emdash | ● | ● | ?⃝ | ● | ◐ | ◐ | ?⃝ | 57% |
-| Maestro | ● | ● | ◐ | ● | ?⃝ | ◐ | ?⃝ | 57% |
-| Pragma | ● | ● | ◐ | ● | ?⃝ | ◐ | ?⃝ | 57% |
-| DockTerm | ● | ● | ◐ | ?⃝ | ● | ?⃝ | ?⃝ | 50% |
-| tuios | ● | ● | ◐ | ● | ?⃝ | ○ | ○ | 50% |
-| Ace | ● | ?⃝ | ● | ?⃝ | ● | ?⃝ | ?⃝ | 43% |
-| Conductor | ● | ?⃝ | ?⃝ | ● | ◐ | ◐ | ?⃝ | 43% |
-| CodeAgentSwarm | ● | ● | ◐ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 36% |
-| Helicon | ● | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 29% |
-| ReevesAgents | ?⃝ | ● | ?⃝ | ● | ○ | ○ | ○ | 29% |
-| Roamgate | ● | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ○ | 29% |
-| Rove | ● | ?⃝ | ?⃝ | ● | ?⃝ | ○ | ○ | 29% |
-| Sculptor | ● | ?⃝ | ◐ | ?⃝ | ?⃝ | ◐ | ?⃝ | 29% |
-| Vibe Kanban | ● | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 29% |
-| VibeiDE | ?⃝ | ● | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | 29% |
-| Claude Squad | ● | ?⃝ | ○ | ?⃝ | ?⃝ | ○ | ○ | 14% |
+| App | Shows who needs you | Sessions side by side | Sessions as a tree | Send while it works | Voice or dictation | Rich cards in replies | Live documents | Session goal | Score |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|--:|
+| **Agents** | ● | ● | ● | ● | ● | ● | ● | ● | 100% |
+| GitHub Copilot | ● | ● | ● | ● | ● | ● | ● | ● | 100% |
+| Claude Code | ● | ● | ● | ● | ● | ◐ | ?⃝ | ● | 81% |
+| Cursor | ● | ● | ?⃝ | ● | ● | ● | ● | ◐ | 81% |
+| Ace | ● | ?⃝ | ● | ● | ● | ● | ?⃝ | ● | 75% |
+| Nimbalyst | ● | ?⃝ | ● | ● | ● | ● | ● | ○ | 75% |
+| OpenAI Codex | ● | ● | ◐ | ● | ● | ◐ | ?⃝ | ● | 75% |
+| Threadlines | ● | ?⃝ | ● | ● | ● | ● | ?⃝ | ● | 75% |
+| Warp | ● | ● | ◐ | ● | ● | ● | ◐ | ○ | 75% |
+| Agentastic | ● | ● | ● | ● | ◐ | ● | ?⃝ | ?⃝ | 69% |
+| Codeg | ● | ● | ◐ | ● | ?⃝ | ● | ?⃝ | ● | 69% |
+| Happy | ● | ?⃝ | ◐ | ● | ● | ● | ?⃝ | ● | 69% |
+| Nuphos | ● | ● | ● | ● | ◐ | ● | ?⃝ | ○ | 69% |
+| Orca | ● | ● | ◐ | ◐ | ● | ◐ | ◐ | ◐ | 69% |
+| Parallel Code | ● | ● | ● | ● | ◐ | ○ | ● | ○ | 69% |
+| Paseo | ● | ● | ◐ | ● | ● | ◐ | ?⃝ | ◐ | 69% |
+| T3 Code | ● | ?⃝ | ◐ | ● | ◐ | ● | ◐ | ● | 69% |
+| Atelier (was Acepe) | ● | ● | ◐ | ● | ● | ○ | ◐ | ?⃝ | 63% |
+| Maestro | ● | ● | ◐ | ● | ?⃝ | ◐ | ?⃝ | ● | 63% |
+| Paradev (was Superset) | ● | ● | ◐ | ● | ● | ◐ | ?⃝ | ○ | 63% |
+| Pragma | ● | ● | ◐ | ● | ?⃝ | ◐ | ?⃝ | ◐ | 56% |
+| Emdash | ● | ● | ?⃝ | ● | ◐ | ◐ | ?⃝ | ○ | 50% |
+| Conductor | ● | ?⃝ | ?⃝ | ● | ◐ | ◐ | ?⃝ | ◐ | 44% |
+| DockTerm | ● | ● | ◐ | ?⃝ | ● | ?⃝ | ?⃝ | ○ | 44% |
+| tuios | ● | ● | ◐ | ● | ?⃝ | ○ | ○ | ○ | 44% |
+| Helicon | ● | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | ● | 38% |
+| CodeAgentSwarm | ● | ● | ◐ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 31% |
+| ReevesAgents | ?⃝ | ● | ?⃝ | ● | ○ | ○ | ○ | ○ | 25% |
+| Roamgate | ● | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ○ | ○ | 25% |
+| Rove | ● | ?⃝ | ?⃝ | ● | ?⃝ | ○ | ○ | ○ | 25% |
+| Sculptor | ● | ?⃝ | ◐ | ?⃝ | ?⃝ | ◐ | ?⃝ | ○ | 25% |
+| Vibe Kanban | ● | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | ○ | 25% |
+| VibeiDE | ?⃝ | ● | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 25% |
+| Claude Squad | ● | ?⃝ | ○ | ?⃝ | ?⃝ | ○ | ○ | ○ | 13% |
 
 ## Reviewing work
 
@@ -263,7 +267,7 @@ Agents has none of these at all:
 | Nimbalyst | ● | ● | ◐ | ● | ?⃝ | 70% |
 | Nuphos | ◐ | ● | ● | ● | ?⃝ | 70% |
 | OpenAI Codex | ● | ● | ◐ | ?⃝ | ● | 70% |
-| Superset | ● | ● | ○ | ● | ◐ | 70% |
+| Paradev (was Superset) | ● | ● | ○ | ● | ◐ | 70% |
 | Atelier (was Acepe) | ● | ● | ○ | ● | ?⃝ | 60% |
 | Parallel Code | ● | ● | ?⃝ | ● | ?⃝ | 60% |
 | Pragma | ● | ● | ?⃝ | ● | ?⃝ | 60% |
@@ -289,7 +293,6 @@ Agents has none of these at all:
 | Agentastic | ● | ● | ● | ?⃝ | ● | ● | 80% |
 | Cursor | ● | ● | ● | ?⃝ | ● | ● | 80% |
 | GitHub Copilot | ● | ● | ● | ?⃝ | ● | ● | 80% |
-| Superset | ● | ● | ● | ● | ● | ?⃝ | 80% |
 | T3 Code | ● | ● | ● | ● | ● | ○ | 80% |
 | Claude Code | ● | ● | ● | ◐ | ● | ?⃝ | 70% |
 | Emdash | ● | ● | ◐ | ?⃝ | ● | ● | 70% |
@@ -299,6 +302,7 @@ Agents has none of these at all:
 | Atelier (was Acepe) | ?⃝ | ● | ● | ?⃝ | ● | ● | 60% |
 | Codeg | ● | ● | ● | ?⃝ | ● | ?⃝ | 60% |
 | Maestro | ● | ● | ● | ?⃝ | ● | ?⃝ | 60% |
+| Paradev (was Superset) | ● | ● | ● | ○ | ● | ?⃝ | 60% |
 | Paseo | ● | ● | ● | ?⃝ | ● | ○ | 60% |
 | Pragma | ● | ● | ● | ?⃝ | ● | ?⃝ | 60% |
 | Ace | ● | ○ | ○ | ?⃝ | ● | ?⃝ | 40% |
@@ -326,7 +330,7 @@ Agents has none of these at all:
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|--:|
 | **Agents** | ● | ● | ● | ● | ● | ● | ● | ● | ● | 100% |
 | Orca | ● | ● | ● | ● | ● | ● | ○ | ◐ | ○ | 72% |
-| Superset | ● | ● | ● | ● | ● | ● | ?⃝ | ◐ | ?⃝ | 72% |
+| Paradev (was Superset) | ● | ● | ● | ● | ● | ● | ?⃝ | ◐ | ?⃝ | 72% |
 | Agentastic | ● | ● | ● | ● | ● | ● | ?⃝ | ?⃝ | ○ | 67% |
 | Claude Code | ?⃝ | ● | ◐ | ● | ● | ● | ?⃝ | ◐ | ● | 67% |
 | Codeg | ● | ● | ● | ● | ● | ● | ○ | ○ | ○ | 67% |
@@ -337,11 +341,12 @@ Agents has none of these at all:
 | Paseo | ?⃝ | ● | ○ | ● | ● | ● | ○ | ◐ | ● | 61% |
 | Rove | ● | ● | ◐ | ● | ● | ● | ○ | ○ | ○ | 61% |
 | Maestro | ?⃝ | ● | ?⃝ | ● | ● | ● | ○ | ○ | ● | 56% |
+| Parallel Code | ● | ● | ◐ | ?⃝ | ● | ● | ○ | ◐ | ○ | 56% |
 | Conductor | ?⃝ | ● | ● | ● | ◐ | ● | ?⃝ | ?⃝ | ?⃝ | 50% |
 | Nimbalyst | ● | ?⃝ | ◐ | ● | ● | ● | ?⃝ | ?⃝ | ?⃝ | 50% |
 | Pragma | ● | ◐ | ?⃝ | ● | ● | ● | ?⃝ | ?⃝ | ?⃝ | 50% |
+| Threadlines | ?⃝ | ● | ?⃝ | ● | ● | ● | ○ | ◐ | ○ | 50% |
 | Nuphos | ?⃝ | ?⃝ | ● | ● | ● | ● | ○ | ○ | ○ | 44% |
-| Parallel Code | ?⃝ | ● | ◐ | ?⃝ | ● | ● | ○ | ◐ | ○ | 44% |
 | CodeAgentSwarm | ● | ?⃝ | ◐ | ?⃝ | ● | ● | ?⃝ | ?⃝ | ?⃝ | 39% |
 | T3 Code | ?⃝ | ?⃝ | ○ | ● | ● | ● | ○ | ◐ | ○ | 39% |
 | Atelier (was Acepe) | ● | ?⃝ | ● | ?⃝ | ?⃝ | ● | ○ | ○ | ○ | 33% |
@@ -349,7 +354,6 @@ Agents has none of these at all:
 | Happy | ?⃝ | ?⃝ | ?⃝ | ● | ● | ● | ○ | ○ | ○ | 33% |
 | Sculptor | ?⃝ | ?⃝ | ● | ◐ | ?⃝ | ● | ○ | ◐ | ○ | 33% |
 | tuios | ?⃝ | ?⃝ | ?⃝ | ◐ | ● | ● | ○ | ◐ | ○ | 33% |
-| Threadlines | ?⃝ | ?⃝ | ?⃝ | ◐ | ● | ● | ○ | ○ | ○ | 28% |
 | Vibe Kanban | ○ | ?⃝ | ◐ | ?⃝ | ● | ● | ○ | ○ | ○ | 28% |
 | ReevesAgents | ?⃝ | ○ | ?⃝ | ○ | ● | ● | ○ | ○ | ○ | 22% |
 | Ace | ○ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 11% |
@@ -365,27 +369,27 @@ Agents has none of these at all:
 |---|:-:|:-:|:-:|:-:|:-:|:-:|--:|
 | GitHub Copilot | ● | ● | ● | ● | ● | ?⃝ | 100% |
 | Agentastic | ● | ● | ● | ?⃝ | ● | ?⃝ | 80% |
+| **Agents** | ● | ● | ● | ◐ | ◐ | ◐ | 80% |
 | Claude Code | ● | ● | ● | ● | ?⃝ | ?⃝ | 80% |
 | CodeAgentSwarm | ● | ?⃝ | ● | ● | ● | ◐ | 80% |
 | Cursor | ● | ● | ● | ● | ?⃝ | ?⃝ | 80% |
 | OpenAI Codex | ● | ● | ● | ● | ?⃝ | ?⃝ | 80% |
-| **Agents** | ● | ● | ● | ◐ | ○ | ◐ | 70% |
+| Paradev (was Superset) | ● | ● | ● | ?⃝ | ● | ?⃝ | 80% |
 | Nimbalyst | ● | ● | ● | ◐ | ?⃝ | ?⃝ | 70% |
+| Orca | ◐ | ● | ● | ○ | ● | ○ | 70% |
 | Warp | ● | ?⃝ | ● | ● | ◐ | ?⃝ | 70% |
 | Maestro | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ | 60% |
-| Orca | ◐ | ◐ | ● | ○ | ● | ○ | 60% |
 | Paseo | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ | 60% |
 | Pragma | ?⃝ | ● | ● | ?⃝ | ● | ● | 60% |
 | Threadlines | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ | 60% |
+| Ace | ?⃝ | ?⃝ | ● | ?⃝ | ● | ◐ | 40% |
 | Codeg | ● | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 40% |
 | Emdash | ● | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 40% |
 | Happy | ?⃝ | ?⃝ | ● | ?⃝ | ● | ● | 40% |
 | Helicon | ?⃝ | ?⃝ | ● | ?⃝ | ● | ?⃝ | 40% |
 | Rove | ?⃝ | ● | ● | ?⃝ | ?⃝ | ◐ | 40% |
-| Superset | ?⃝ | ?⃝ | ● | ?⃝ | ● | ?⃝ | 40% |
 | T3 Code | ?⃝ | ?⃝ | ● | ?⃝ | ● | ◐ | 40% |
 | tuios | ?⃝ | ● | ◐ | ?⃝ | ?⃝ | ?⃝ | 30% |
-| Ace | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ● | ◐ | 20% |
 | Atelier (was Acepe) | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 20% |
 | DockTerm | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 20% |
 | Nuphos | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 20% |
@@ -407,7 +411,7 @@ Agents has none of these at all:
 | Codeg | ● | ● | ?⃝ | ● | ● | ● | 83% |
 | Nimbalyst | ● | ● | ● | ◐ | ● | ◐ | 83% |
 | Nuphos | ?⃝ | ● | ● | ● | ● | ● | 83% |
-| Superset | ● | ● | ● | ● | ○ | ● | 83% |
+| Paradev (was Superset) | ● | ● | ● | ● | ○ | ● | 83% |
 | Orca | ○ | ● | ● | ◐ | ● | ● | 75% |
 | Claude Code | ?⃝ | ● | ● | ● | ○ | ● | 67% |
 | Conductor | ?⃝ | ● | ● | ● | ○ | ● | 67% |
@@ -439,44 +443,44 @@ Agents has none of these at all:
 
 ## Overall score
 
-Each app's score in every table, and overall: its points over the 49 scored features. Sorted by the overall score.
+Each app's score in every table, and overall: its points over the 50 scored features. Sorted by the overall score.
 
 | Rank | App | Running | Reach | Following | Reviewing | Tools | Tasks | Extensions | Organising | Overall |
 |--:|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
-| 1 | **Agents** | 100% | 67% | 100% | 100% | 90% | 100% | 70% | 83% | **90%** |
+| 1 | **Agents** | 100% | 67% | 100% | 100% | 90% | 100% | 80% | 83% | **91%** |
 | 2 | GitHub Copilot | 92% | 83% | 100% | 100% | 80% | 61% | 100% | 50% | **82%** |
-| 3 | Paseo | 100% | 100% | 71% | 90% | 60% | 61% | 60% | 100% | **80%** |
-| 4 | Cursor | 83% | 67% | 86% | 100% | 80% | 67% | 80% | 50% | **76%** |
-| 5 | Claude Code | 67% | 83% | 79% | 80% | 70% | 67% | 80% | 67% | **73%** |
-| 5 | Nimbalyst | 83% | 83% | 86% | 70% | 70% | 50% | 70% | 83% | **73%** |
-| 7 | Codeg | 100% | 67% | 64% | 90% | 60% | 67% | 40% | 83% | **71%** |
-| 7 | Orca | 75% | 67% | 71% | 80% | 70% | 72% | 60% | 75% | **71%** |
-| 9 | Agentastic | 100% | 42% | 79% | 90% | 80% | 67% | 80% | 33% | **70%** |
-| 10 | OpenAI Codex | 67% | 83% | 71% | 70% | 40% | 67% | 80% | 67% | **68%** |
-| 10 | Warp | 83% | 58% | 86% | 60% | 70% | 67% | 70% | 50% | **68%** |
-| 12 | Superset | 75% | 42% | 71% | 70% | 80% | 72% | 40% | 83% | **67%** |
-| 13 | T3 Code | 83% | 92% | 64% | 80% | 80% | 39% | 40% | 67% | **66%** |
-| 14 | Pragma | 75% | 83% | 57% | 60% | 60% | 50% | 60% | 50% | **61%** |
-| 15 | Nuphos | 83% | 58% | 79% | 70% | 40% | 44% | 20% | 83% | **60%** |
-| 15 | Threadlines | 83% | 50% | 71% | 100% | 40% | 28% | 60% | 67% | **60%** |
-| 17 | Happy | 92% | 100% | 64% | 30% | 20% | 33% | 40% | 67% | **56%** |
-| 18 | Emdash | 83% | 33% | 57% | 70% | 70% | 33% | 40% | 67% | **55%** |
-| 19 | Maestro | 50% | 50% | 57% | 50% | 60% | 56% | 60% | 50% | **54%** |
-| 20 | Parallel Code | 67% | 75% | 79% | 60% | 20% | 44% | 20% | 33% | **51%** |
-| 21 | Conductor | 75% | 25% | 43% | 80% | 40% | 50% | 10% | 67% | **49%** |
-| 22 | Rove | 67% | 33% | 29% | 60% | 20% | 61% | 40% | 50% | **46%** |
-| 23 | Atelier (was Acepe) | 50% | 8% | 71% | 60% | 60% | 33% | 20% | 50% | **44%** |
-| 23 | CodeAgentSwarm | 67% | 58% | 36% | 30% | 30% | 39% | 80% | 17% | **44%** |
-| 25 | tuios | 83% | 33% | 50% | 60% | 20% | 33% | 30% | 33% | **43%** |
-| 25 | Vibe Kanban | 67% | 50% | 29% | 60% | 30% | 28% | 20% | 67% | **43%** |
-| 27 | Sculptor | 58% | 33% | 29% | 80% | 20% | 33% | 20% | 33% | **38%** |
-| 28 | Roamgate | 67% | 50% | 29% | 80% | 20% | 11% | 0% | 50% | **37%** |
-| 29 | Helicon | 42% | 33% | 29% | 20% | 0% | 6% | 40% | 67% | **29%** |
-| 29 | VibeiDE | 50% | 50% | 29% | 40% | 30% | 11% | 20% | 8% | **29%** |
-| 31 | Ace | 33% | 17% | 43% | 20% | 40% | 11% | 20% | 33% | **27%** |
-| 32 | DockTerm | 17% | 33% | 50% | 20% | 40% | 0% | 20% | 33% | **26%** |
-| 33 | ReevesAgents | 33% | 17% | 29% | 0% | 20% | 22% | 0% | 50% | **22%** |
-| 34 | Claude Squad | 50% | 0% | 14% | 20% | 20% | 0% | 0% | 33% | **16%** |
+| 3 | Paseo | 100% | 100% | 69% | 90% | 60% | 61% | 60% | 100% | **79%** |
+| 4 | Cursor | 83% | 67% | 81% | 100% | 80% | 67% | 80% | 50% | **75%** |
+| 5 | Claude Code | 67% | 83% | 81% | 80% | 70% | 67% | 80% | 67% | **74%** |
+| 6 | Codeg | 100% | 67% | 69% | 90% | 60% | 67% | 40% | 83% | **72%** |
+| 6 | Nimbalyst | 83% | 83% | 75% | 70% | 70% | 50% | 70% | 83% | **72%** |
+| 6 | Orca | 75% | 67% | 69% | 80% | 70% | 72% | 70% | 75% | **72%** |
+| 9 | Agentastic | 100% | 42% | 69% | 90% | 80% | 67% | 80% | 33% | **69%** |
+| 9 | OpenAI Codex | 67% | 83% | 75% | 70% | 40% | 67% | 80% | 67% | **69%** |
+| 11 | Paradev (was Superset) | 75% | 42% | 63% | 70% | 60% | 72% | 80% | 83% | **68%** |
+| 12 | T3 Code | 83% | 92% | 69% | 80% | 80% | 39% | 40% | 67% | **67%** |
+| 12 | Threadlines | 83% | 67% | 75% | 100% | 40% | 50% | 60% | 67% | **67%** |
+| 12 | Warp | 83% | 58% | 75% | 60% | 70% | 67% | 70% | 50% | **67%** |
+| 15 | Pragma | 75% | 83% | 56% | 60% | 60% | 50% | 60% | 50% | **61%** |
+| 16 | Nuphos | 83% | 58% | 69% | 70% | 40% | 44% | 20% | 83% | **59%** |
+| 17 | Happy | 92% | 100% | 69% | 30% | 20% | 33% | 40% | 67% | **57%** |
+| 18 | Maestro | 50% | 50% | 63% | 50% | 60% | 56% | 60% | 50% | **55%** |
+| 19 | Emdash | 83% | 33% | 50% | 70% | 70% | 33% | 40% | 67% | **54%** |
+| 20 | Parallel Code | 67% | 75% | 69% | 60% | 20% | 56% | 20% | 33% | **52%** |
+| 21 | Conductor | 75% | 25% | 44% | 80% | 40% | 50% | 10% | 67% | **49%** |
+| 22 | Rove | 67% | 33% | 25% | 60% | 20% | 61% | 40% | 50% | **45%** |
+| 23 | Atelier (was Acepe) | 50% | 8% | 63% | 60% | 60% | 33% | 20% | 50% | **43%** |
+| 23 | CodeAgentSwarm | 67% | 58% | 31% | 30% | 30% | 39% | 80% | 17% | **43%** |
+| 25 | tuios | 83% | 33% | 44% | 60% | 20% | 33% | 30% | 33% | **42%** |
+| 25 | Vibe Kanban | 67% | 50% | 25% | 60% | 30% | 28% | 20% | 67% | **42%** |
+| 27 | Sculptor | 58% | 33% | 25% | 80% | 20% | 33% | 20% | 33% | **37%** |
+| 28 | Roamgate | 67% | 50% | 25% | 80% | 20% | 11% | 0% | 50% | **36%** |
+| 29 | Ace | 33% | 17% | 75% | 20% | 40% | 11% | 40% | 33% | **34%** |
+| 30 | Helicon | 42% | 33% | 38% | 20% | 0% | 6% | 40% | 67% | **30%** |
+| 31 | VibeiDE | 50% | 50% | 25% | 40% | 30% | 11% | 20% | 8% | **28%** |
+| 32 | DockTerm | 17% | 33% | 44% | 20% | 40% | 0% | 20% | 33% | **25%** |
+| 33 | ReevesAgents | 33% | 17% | 25% | 0% | 20% | 22% | 0% | 50% | **22%** |
+| 34 | Claude Squad | 50% | 0% | 13% | 20% | 20% | 0% | 0% | 33% | **16%** |
 
 ## Sources for leases, waits, workflows in the repository and live documents
 
@@ -505,6 +509,7 @@ thing. A ?⃝ has no link: the app's docs did not say.
 - **Nuphos:** Leases ○ ([source](https://github.com/nuphos/nuphos)); Waits ○ ([source](https://github.com/nuphos/nuphos)); Workflows in the repository ○ ([source](https://github.com/nuphos/nuphos)); Live documents ?⃝.
 - **Orca:** Leases ○ ([source](https://github.com/stablyai/orca)); Waits ◐ ([source](https://www.onorca.dev/docs/cli/orchestration)); Workflows in the repository ○ ([source](https://www.onorca.dev/docs/model/orca-yaml)); Live documents ◐ ([source](https://www.onorca.dev/docs/editing/file-explorer)).
 - **OpenAI Codex:** Leases ?⃝; Waits ?⃝; Workflows in the repository ● ([source](https://developers.openai.com/codex/github-action)); Live documents ?⃝.
+- **Paradev (was Superset):** Leases ?⃝; Waits ?⃝; Workflows in the repository ?⃝; Live documents ?⃝.
 - **Parallel Code:** Leases ○ ([source](https://github.com/johannesjo/parallel-code)); Waits ◐ ([source](https://github.com/johannesjo/parallel-code/blob/HEAD/docs/design-doc.md)); Workflows in the repository ○ ([source](https://github.com/johannesjo/parallel-code)); Live documents ● ([source](https://github.com/johannesjo/parallel-code/blob/HEAD/docs/document-workspaces.md)).
 - **Paseo:** Leases ○ ([source](https://github.com/getpaseo/paseo)); Waits ◐ ([source](https://github.com/getpaseo/paseo/blob/HEAD/public-docs/mcp.md)); Workflows in the repository ● ([source](https://github.com/getpaseo/paseo/blob/HEAD/public-docs/hub/configuration/hub-yml.md)); Live documents ?⃝.
 - **Pragma:** Leases ?⃝; Waits ?⃝; Workflows in the repository ?⃝; Live documents ?⃝.
@@ -512,13 +517,53 @@ thing. A ?⃝ has no link: the app's docs did not say.
 - **Roamgate:** Leases ○ ([source](https://github.com/powerfooI/roamgate)); Waits ○ ([source](https://github.com/powerfooI/roamgate)); Workflows in the repository ○ ([source](https://github.com/powerfooI/roamgate)); Live documents ○ ([source](https://github.com/powerfooI/roamgate)).
 - **Rove:** Leases ○ ([source](https://github.com/Sma1lboy/rove)); Waits ○ ([source](https://github.com/Sma1lboy/rove)); Workflows in the repository ○ ([source](https://github.com/Sma1lboy/rove)); Live documents ○ ([source](https://github.com/Sma1lboy/rove)).
 - **Sculptor:** Leases ○ ([source](https://github.com/imbue-ai/sculptor)); Waits ◐ ([source](https://github.com/imbue-ai/sculptor/blob/HEAD/agent_docs/scu-1776-pi-wake-serialization/design.md)); Workflows in the repository ○ ([source](https://github.com/imbue-ai/sculptor)); Live documents ?⃝.
-- **Superset:** Leases ?⃝; Waits ?⃝; Workflows in the repository ?⃝; Live documents ?⃝.
 - **T3 Code:** Leases ○ ([source](https://github.com/pingdotgg/t3code)); Waits ◐ ([source](https://github.com/pingdotgg/t3code/blob/HEAD/docs/user/source-control.md)); Workflows in the repository ○ ([source](https://github.com/pingdotgg/t3code/blob/HEAD/docs/user/project-settings.md)); Live documents ◐ ([source](https://github.com/pingdotgg/t3code/blob/HEAD/apps/web/src/components/files/FilePreviewPanel.tsx)).
-- **Threadlines:** Leases ○ ([source](https://github.com/Threadlines/threadlines)); Waits ○ ([source](https://github.com/Threadlines/threadlines)); Workflows in the repository ○ ([source](https://github.com/Threadlines/threadlines)); Live documents ?⃝.
+- **Threadlines:** Leases ○ ([source](https://github.com/Threadlines/threadlines)); Waits ◐, Claude's own check-backs alone ([source](https://github.com/Threadlines/threadlines/releases/tag/v0.7.1)); Workflows in the repository ○ ([source](https://github.com/Threadlines/threadlines)); Live documents ?⃝.
 - **tuios:** Leases ○ ([source](https://github.com/Gaurav-Gosain/tuios)); Waits ◐ ([source](https://github.com/Gaurav-Gosain/tuios/blob/HEAD/docs/AGENT_STATE.md)); Workflows in the repository ○ ([source](https://github.com/Gaurav-Gosain/tuios)); Live documents ○ ([source](https://github.com/Gaurav-Gosain/tuios)).
 - **Vibe Kanban:** Leases ○ ([source](https://github.com/BloopAI/vibe-kanban)); Waits ○ ([source](https://github.com/BloopAI/vibe-kanban)); Workflows in the repository ○ ([source](https://github.com/BloopAI/vibe-kanban)); Live documents ?⃝.
 - **VibeiDE:** Leases ?⃝; Waits ?⃝; Workflows in the repository ?⃝; Live documents ?⃝.
 - **Warp:** Leases ?⃝; Waits ?⃝; Workflows in the repository ● ([source](https://docs.warp.dev/agent-platform/cloud-agents/integrations/github-actions)); Live documents ◐ ([source](https://docs.warp.dev/agent-platform/capabilities/planning)).
+
+## Sources for session goals
+
+This feature was added on 2026-10-29, at Alex's request, from each app's own docs,
+changelog, releases and, where open, code (a shallow clone of the default branch). A ?⃝
+has the page that did not say.
+
+- **Agents:** ● for Codex and Claude, the runtimes that report a goal (#2861; [source](runtimes.md)).
+- **Ace:** ● `/goal` with a progress card, and the goal on the session row ([source](https://github.com/flazouh/ace-releases/releases/tag/v0.1.67)).
+- **Agentastic:** ?⃝ ([source](https://www.agentastic.dev/whats-new)).
+- **Atelier (was Acepe):** ?⃝; its repository is gone ([source](https://github.com/flazouh/atelier)).
+- **Claude Code:** ● ([source](https://code.claude.com/docs/en/goal)).
+- **Claude Squad:** ○ ([source](https://github.com/smtg-ai/claude-squad)).
+- **CodeAgentSwarm:** ?⃝ ([source](https://www.codeagentswarm.com/en)).
+- **Codeg:** ● a goal card for Claude Code and Codex ([source](https://github.com/xintaofei/codeg/releases/tag/v0.26.0)).
+- **Conductor:** ◐ Codex goals only, and the Goal button removed in 0.77.0 ([source](https://www.conductor.build/changelog/0.65.0-codex-goal-support)).
+- **Cursor:** ◐ durable goals in the CLI, in a gated rollout ([source](https://cursor.com/docs/cli/changelog)).
+- **DockTerm:** ○ ([source](https://github.com/munvard/dockterm)).
+- **Emdash:** ○ ([source](https://github.com/generalaction/emdash)).
+- **GitHub Copilot:** ● a pinned goal panel in the CLI ([source](https://github.com/github/copilot-cli/blob/main/changelog.md)).
+- **Happy:** ● a goal bar for Claude and Codex ([source](https://github.com/slopus/happy/releases/tag/cli-1.1.10)).
+- **Helicon:** ● a goal panel and progress on the sidebar row ([source](https://github.com/HarjjotSinghh/helicon/releases/tag/v0.6.0)).
+- **Maestro:** ● its own goal-driven Auto Run, with progress each pass ([source](https://github.com/RunMaestro/Maestro/releases/tag/v1.0.0)).
+- **Nimbalyst:** ○ its goals are tracker fields ([source](https://github.com/nimbalyst/nimbalyst/releases/tag/v0.73.2)).
+- **Nuphos:** ○ ([source](https://github.com/nuphos/nuphos)).
+- **OpenAI Codex:** ● goal state and budget in the status line ([source](https://github.com/openai/codex/tree/main/codex-rs/tui/src)).
+- **Orca:** ◐ Claude goals only in the experimental chat ([source](https://github.com/stablyai/orca/releases/tag/v1.4.229)).
+- **Paradev (was Superset):** ○ ([source](https://github.com/superset-sh/superset)).
+- **Parallel Code:** ○ ([source](https://github.com/johannesjo/parallel-code)).
+- **Paseo:** ◐ Codex `/goal` as a command, with no view ([source](https://github.com/getpaseo/paseo/blob/main/CHANGELOG.md)).
+- **Pragma:** ◐ Cursor `/goal` as a command, with no view ([source](https://github.com/pragma-sh/pragma/blob/main/packages/cursor-plugin/AGENTS.md)).
+- **ReevesAgents:** ○ ([source](https://github.com/mertkayacs/reevesagents)).
+- **Roamgate:** ○ ([source](https://github.com/powerfooI/roamgate)).
+- **Rove:** ○ ([source](https://github.com/Sma1lboy/rove)).
+- **Sculptor:** ○ ([source](https://github.com/imbue-ai/sculptor)).
+- **T3 Code:** ● a goal banner ([source](https://github.com/pingdotgg/t3code/releases/tag/v0.1.2)).
+- **Threadlines:** ● a goal bar for Claude ([source](https://github.com/Threadlines/threadlines/releases/tag/v0.7.0)).
+- **tuios:** ○ ([source](https://github.com/Gaurav-Gosain/tuios)).
+- **Vibe Kanban:** ○ ([source](https://github.com/BloopAI/vibe-kanban)).
+- **VibeiDE:** ?⃝ ([source](https://vibeide.dev/changelog/)).
+- **Warp:** ○ `/goal` is an open feature request ([source](https://github.com/warpdotdev/warp/issues/12611)).
 
 ## The apps
 
@@ -542,6 +587,7 @@ thing. A ?⃝ has no link: the app's docs did not say.
 - **[Nuphos](https://github.com/nuphos/nuphos):** A team workspace over ACP, local, remote or in cloud containers.
 - **[OpenAI Codex](https://developers.openai.com/codex):** OpenAI's agent in the ChatGPT apps, the cloud and a CLI; open source and self-hosted apply to the CLI only.
 - **[Orca](https://github.com/stablyai/orca):** An open-source (MIT) desktop app for Mac, Windows and Linux running many CLI agents side by side, a worktree each, with terminals, a browser the agents drive, pull requests, SSH and self-hosted Orca servers, and a beta phone companion.
+- **[Paradev (was Superset)](https://paradev.com):** A desktop app for parallel agents with its own task tracker, cloud workspaces, plugins and an iPhone app; renamed from Superset on 2026-10-26 ([changelog](https://paradev.com/changelog)). Its Mobile pane for simulators and emulators is off "for now" since desktop 1.40.
 - **[Parallel Code](https://github.com/johannesjo/parallel-code):** A desktop app with tiled tasks, Docker sandboxes and an Android app.
 - **[Paseo](https://github.com/getpaseo/paseo):** An open-source daemon with desktop, iOS, Android, web and CLI clients.
 - **[Pragma](https://pragma-app.sh):** A desktop app with a task board, SSH remote projects and the Pragma Go mobile client.
@@ -549,7 +595,6 @@ thing. A ?⃝ has no link: the app's docs did not say.
 - **[Roamgate](https://github.com/powerfooI/roamgate):** A web/PWA client for a Herdr terminal-multiplexer server.
 - **[Rove](https://github.com/Sma1lboy/rove):** A terminal app with a worktree per task, a daemon, a local kanban and iOS/Android bridges.
 - **[Sculptor](https://github.com/imbue-ai/sculptor):** Imbue's desktop app for parallel agents, with a container backend and a CI babysitter.
-- **[Superset](https://superset.sh):** A desktop app for parallel agents with its own task tracker, cloud workspaces and an iPhone app.
 - **[T3 Code](https://github.com/pingdotgg/t3code):** A local server driven from desktop, web, iOS and Android apps.
 - **[Threadlines](https://github.com/Threadlines/threadlines):** A T3 Code fork: desktop and Docker-server workspace, a worktree per thread.
 - **[tuios](https://github.com/Gaurav-Gosain/tuios):** A terminal multiplexer and tiling window manager with an agent-state rail and Inbox.

@@ -8,7 +8,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -38,6 +40,8 @@ type fakeGitLab struct {
 	issues   []obj
 	activity []obj
 	members  map[int]int // user id → access level
+	// memberLists counts the calls that list members by user_ids[] (#2952).
+	memberLists int
 	requests []string
 	posted   []obj         // what was POSTed or PUT, with its path
 	diffs    map[int][]obj // merge request → its files
@@ -213,7 +217,7 @@ func (f *fakeGitLab) serve(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.Atoi(parts[1])
 		answer(200, orEmpty(f.labelled[id]))
 	case len(parts) == 1 && parts[0] == "merge_requests":
-		answer(200, stated(f.mrs, "state", q.Get("state")))
+		answer(200, whose(stated(f.mrs, "state", q.Get("state")), q))
 	case len(parts) == 2 && parts[0] == "merge_requests":
 		if o, ok := byIID(f.mrs, "iid", parts[1]); ok {
 			answer(200, o)
@@ -266,7 +270,7 @@ func (f *fakeGitLab) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		answer(200, list)
 	case len(parts) == 1 && parts[0] == "issues":
-		answer(200, stated(f.issues, "state", q.Get("state")))
+		answer(200, whose(stated(f.issues, "state", q.Get("state")), q))
 	case len(parts) == 2 && parts[0] == "issues":
 		if o, ok := byIID(f.issues, "iid", parts[1]); ok {
 			answer(200, o)
@@ -275,6 +279,16 @@ func (f *fakeGitLab) serve(w http.ResponseWriter, r *http.Request) {
 		answer(404, obj{"message": "404 Not found"})
 	case len(parts) == 1 && parts[0] == "events":
 		answer(200, f.activity)
+	case len(parts) == 2 && parts[0] == "members" && parts[1] == "all":
+		f.memberLists++
+		out := []obj{}
+		for _, v := range q["user_ids[]"] {
+			id, _ := strconv.Atoi(v)
+			if level, ok := f.members[id]; ok {
+				out = append(out, obj{"id": id, "access_level": level})
+			}
+		}
+		answer(200, out)
 	case len(parts) == 3 && parts[0] == "members" && parts[1] == "all":
 		id, _ := strconv.Atoi(parts[2])
 		if level, ok := f.members[id]; ok {
@@ -292,4 +306,33 @@ func orEmpty(list []obj) []obj {
 		return []obj{}
 	}
 	return list
+}
+
+// whose narrows a list as GitLab's author_username, reviewer_username and assignee_username do (#2034).
+func whose(list []obj, q url.Values) []obj {
+	named := func(o obj, key string) []string {
+		var out []string
+		switch v := o[key].(type) {
+		case obj:
+			out = append(out, fmt.Sprint(v["username"]))
+		case []obj:
+			for _, u := range v {
+				out = append(out, fmt.Sprint(u["username"]))
+			}
+		}
+		return out
+	}
+	out := []obj{}
+	for _, o := range list {
+		keep := true
+		for param, key := range map[string]string{"author_username": "author", "reviewer_username": "reviewers", "assignee_username": "assignees"} {
+			if want := q.Get(param); want != "" && !slices.Contains(named(o, key), want) {
+				keep = false
+			}
+		}
+		if keep {
+			out = append(out, o)
+		}
+	}
+	return out
 }

@@ -17,6 +17,7 @@ import (
 )
 
 func TestTheSweepRemovesTheDeadAndKeepsTheLive(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	root := t.TempDir()
 	s := store.NewFolder(root)
@@ -111,7 +112,45 @@ func TestTheSweepRemovesTheDeadAndKeepsTheLive(t *testing.T) {
 	}
 }
 
+// #2711: a removed project's record goes a week on, as a forgotten client's does; a live
+// one stays.
+func TestTheSweepRemovesRemovedProjects(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	s := store.NewMemory()
+	rs := records.New(s)
+	rs.SettingsOrMake(ctx, func() records.Settings { return records.Settings{Name: "test", MachineID: "m"} })
+	for _, id := range []string{"p-live", "p-gone"} {
+		rs.ChangeProject(ctx, id, func(*records.Project) (*records.Project, error) {
+			return &records.Project{ID: id, Name: id, Owner: "u", MadeAt: records.Now()}, nil
+		})
+	}
+	rs.ChangeProject(ctx, "p-gone", func(p *records.Project) (*records.Project, error) {
+		yes, now := true, records.Now()
+		next := *p
+		next.Removed, next.RemovedAt = &yes, &now
+		return &next, nil
+	})
+	if got := rs.ProjectsOwnedBy("u"); got != 2 {
+		t.Fatal(got)
+	}
+	now := time.Now()
+	if report, err := sweep(ctx, rs, now, mostPerSweep, nil); err != nil || report.tombstones != 0 {
+		t.Fatalf("%+v %v", report, err)
+	}
+	if report, err := sweep(ctx, rs, now.Add(8*24*time.Hour), mostPerSweep, nil); err != nil || report.tombstones != 1 {
+		t.Fatalf("%+v %v", report, err)
+	}
+	if o, _ := s.Get(ctx, records.ProjectKey("p-gone")); o != nil {
+		t.Fatal("the removed project stayed")
+	}
+	if rs.Project("p-live") == nil || rs.ProjectsOwnedBy("u") != 1 {
+		t.Fatal("the records did not follow")
+	}
+}
+
 func TestTheSweepStopsAtItsBound(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	s := store.NewMemory()
 	for n := range 12 {
@@ -120,6 +159,95 @@ func TestTheSweepStopsAtItsBound(t *testing.T) {
 	report, _ := sweep(ctx, records.New(s), time.Now(), 5, nil)
 	if left, _ := s.List(ctx, "v1/events/"); report.events != 5 || len(left) != 7 {
 		t.Fatal(report, len(left))
+	}
+}
+
+// #2291: more expired than one round deletes goes within a bounded number of rounds of the
+// same hour, not a round an hour for ever.
+func TestTheSweepCatchesUpWithinTheHour(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	s := store.NewMemory()
+	now := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
+	for _, day := range []string{"2000-01-01", "2000-01-02", "2000-01-03"} {
+		for n := range 17 {
+			s.Put(ctx, "v1/events/"+day+"/"+itoa(n)+".json", []byte("{}"), store.Absent)
+		}
+	}
+	kept := now.Format(sweptDayLayout)
+	s.Put(ctx, "v1/events/"+kept+"/0.json", []byte("{}"), store.Absent)
+	pauses := 0
+	report, rounds, err := sweepRounds(ctx, records.New(s), func() time.Time { return now }, 10, &eventSweep{},
+		time.Second, func(time.Duration) bool { pauses++; return true })
+	left, _ := s.List(ctx, eventsPrefix)
+	// 51 expired, 10 a round: 6 rounds, the last one not full.
+	if err != nil || report.events != 51 || rounds != 6 || pauses != 5 || len(left) != 1 || left[0].Key != "v1/events/"+kept+"/0.json" {
+		t.Fatalf("%+v rounds %d pauses %d left %v %v", report, rounds, pauses, left, err)
+	}
+}
+
+// The rounds stop when told to (the copy stops serving, or the service stops), and when
+// the next hour's sweep is due: the rest is the next hour's.
+func TestTheSweepRoundsStop(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	fill := func() store.Store {
+		s := store.NewMemory()
+		for n := range 50 {
+			s.Put(ctx, "v1/events/2000-01-01/"+itoa(n)+".json", []byte("{}"), store.Absent)
+		}
+		return s
+	}
+	start := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
+
+	s := fill()
+	report, rounds, _ := sweepRounds(ctx, records.New(s), func() time.Time { return start }, 10, &eventSweep{},
+		time.Second, func(time.Duration) bool { return false })
+	if report.events != 10 || rounds != 1 {
+		t.Fatalf("told to stop: %+v %d", report, rounds)
+	}
+
+	s = fill()
+	clock := start
+	report, rounds, _ = sweepRounds(ctx, records.New(s), func() time.Time { return clock }, 10, &eventSweep{},
+		25*time.Minute, func(pause time.Duration) bool { clock = clock.Add(pause); return true })
+	// Rounds at :00, :25 and :50; a fourth would start after the hour.
+	if report.events != 30 || rounds != 3 {
+		t.Fatalf("the hour: %+v %d", report, rounds)
+	}
+}
+
+// #2293: an expired lease of a host with no record goes, a live one or a known host's
+// stays; an org route's tombstone goes with its secret.
+func TestTheSweepRemovesOrphans(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	s := store.NewMemory()
+	rs := records.New(s)
+	now := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
+	if err := rs.SaveHost(ctx, records.MachineRecord{ID: "KNOWN", Name: "known"}); err != nil {
+		t.Fatal(err)
+	}
+	lease := func(host string, expires time.Time) {
+		data, _ := records.Encode(hostLease{Host: host, Copy: "c", Epoch: 3, Expires: records.At(expires)})
+		s.Put(ctx, leaseKey(host), data, store.Always)
+	}
+	lease("KNOWN", now.Add(-time.Hour))
+	lease("GONE", now.Add(-time.Hour))
+	lease("GOING", now.Add(time.Minute))
+	s.Put(ctx, orgRouteKey("r1"), []byte(`{"removed":true}`), store.Always)
+	s.Put(ctx, orgSecretKey("r1"), []byte(`{}`), store.Always)
+	s.Put(ctx, orgRouteKey("r2"), []byte(`{"id":"r2","name":"live"}`), store.Always)
+	s.Put(ctx, orgSecretKey("r2"), []byte(`{}`), store.Always)
+	report, err := sweep(ctx, rs, now, mostPerSweep, nil)
+	if err != nil || report.orphans != 2 {
+		t.Fatalf("%+v %v", report, err)
+	}
+	for key, kept := range map[string]bool{leaseKey("KNOWN"): true, leaseKey("GONE"): false, leaseKey("GOING"): true,
+		orgRouteKey("r1"): false, orgSecretKey("r1"): false, orgRouteKey("r2"): true, orgSecretKey("r2"): true} {
+		if o, _ := s.Get(ctx, key); (o != nil) != kept {
+			t.Errorf("%s kept %v", key, o != nil)
+		}
 	}
 }
 
@@ -137,6 +265,7 @@ func (l *listCounter) List(ctx context.Context, prefix string) ([]store.Key, err
 // #2053: the hourly sweep lists the audit's events once, at its first sweep. After that it
 // lists only each day that has expired since, not the 90 days kept.
 func TestTheSweepListsOnlyTheExpiredDays(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	s := &listCounter{Store: store.NewMemory()}
 	now := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
@@ -186,6 +315,7 @@ func TestTheSweepListsOnlyTheExpiredDays(t *testing.T) {
 // A window's whole lists of a host are kept, and said by hosts/lastHeard while the host
 // is offline (#962); a narrowed list is not.
 func TestWhatAHostLastListedIsKept(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	box := p.host("MACHINE-2")
 	_, window := p.client("Window")
@@ -198,10 +328,10 @@ func TestWhatAHostLastListedIsKept(t *testing.T) {
 	box.stop()
 	var heard map[string]json.RawMessage
 	json.Unmarshal(call(t, window, "", "hosts/lastHeard", map[string]string{"host": box.member.Host}), &heard)
-	if string(heard["agents"]) != "[]" || heard["heardAt"] == nil || heard["projects"] != nil {
+	if string(heard["agents"]) != "[]" || heard["heardAt"] == nil || heard["folders"] != nil {
 		t.Fatalf("%s", heard)
 	}
-	if !keepsList("projects/list", nil) || keepsList("agents/list", json.RawMessage(`{"lean":true,"includeArchived":true}`)) {
+	if !keepsList("folders/list", nil) || keepsList("agents/list", json.RawMessage(`{"lean":true,"includeArchived":true}`)) {
 		t.Fatal("keeps the wrong lists")
 	}
 	// A removed host's copy goes.

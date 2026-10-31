@@ -79,7 +79,7 @@ type hostedStart struct {
 type hostedServer struct {
 	key     hostedKey
 	route   string
-	project *string
+	folder *string
 	server  sdk.McpServerStdio
 	cwd     string
 	users   map[string]bool
@@ -147,7 +147,7 @@ func (d *Daemon) hostedChangedLocked() {
 }
 
 func (h *hostedServer) status() wire.HostedMCPStatus {
-	s := wire.HostedMCPStatus{Name: h.key.name, Project: h.project, State: h.state,
+	s := wire.HostedMCPStatus{Name: h.key.name, Folder: h.folder, State: h.state,
 		Restarts: int64(h.restarts), Users: int64(len(h.users))}
 	if h.state == "" {
 		s.State = wire.HostedMCPStateIdle
@@ -176,11 +176,11 @@ func (d *Daemon) hostedSnapshot() wire.HostedMCPSnapshot {
 	d.hostedMu.Unlock()
 	sort.Slice(servers, func(i, j int) bool {
 		pi, pj := "", ""
-		if servers[i].Project != nil {
-			pi = *servers[i].Project
+		if servers[i].Folder != nil {
+			pi = *servers[i].Folder
 		}
-		if servers[j].Project != nil {
-			pj = *servers[j].Project
+		if servers[j].Folder != nil {
+			pj = *servers[j].Folder
 		}
 		if pi != pj {
 			return pi < pj
@@ -191,10 +191,10 @@ func (d *Daemon) hostedSnapshot() wire.HostedMCPSnapshot {
 }
 
 // hostedStatus is the health row's live state: the one in use, else any.
-func (d *Daemon) hostedStatus(project *string, name string) *wire.HostedMCPStatus {
+func (d *Daemon) hostedStatus(folder *string, name string) *wire.HostedMCPStatus {
 	scope := "~"
-	if project != nil {
-		scope = *project
+	if folder != nil {
+		scope = *folder
 	}
 	d.hostedMu.Lock()
 	defer d.hostedMu.Unlock()
@@ -215,10 +215,10 @@ func (d *Daemon) hostedStatus(project *string, name string) *wire.HostedMCPStatu
 
 // hostedUse is HostedMCPServers.use: user (a session's token) uses server; the path it is
 // served at. Nothing starts until the first call.
-func (d *Daemon) hostedUse(server sdk.McpServerStdio, project *string, cwd, user string) (string, error) {
+func (d *Daemon) hostedUse(server sdk.McpServerStdio, folder *string, cwd, user string) (string, error) {
 	scope := "~"
-	if project != nil {
-		scope = *project
+	if folder != nil {
+		scope = *folder
 	}
 	key := hostedKey{scope: scope, name: server.Name, entry: serverDigest(sdk.McpServer{Stdio: &server})}
 	d.hostedMu.Lock()
@@ -248,7 +248,7 @@ func (d *Daemon) hostedUse(server sdk.McpServerStdio, project *string, cwd, user
 		}
 	}
 	route := strings.ToLower(strings.ReplaceAll(string(store.NewUUID()), "-", ""))
-	h := &hostedServer{key: key, route: route, project: project, server: server, cwd: cwd,
+	h := &hostedServer{key: key, route: route, folder: folder, server: server, cwd: cwd,
 		users: map[string]bool{user: true}, sessions: map[string]bool{}, state: wire.HostedMCPStateIdle,
 		waiting: map[string]chan json.RawMessage{}}
 	d.hostedByKey[key] = h
@@ -304,7 +304,7 @@ func (d *Daemon) hostedSwapped(entries []sessionEntry, port int, token, runtimeI
 			out = append(out, withoutHostedEnv(e.server))
 			continue
 		}
-		path, err := d.hostedUse(*e.server.Stdio, e.project, e.cwd, token)
+		path, err := d.hostedUse(*e.server.Stdio, e.folder, e.cwd, token)
 		if err != nil {
 			log.Printf("hosted mcp: %s runs in the %s session itself, without its view-only tools: %d hosted servers are in use", e.name, runtimeID, hostedLimit)
 			out = append(out, withoutHostedEnv(e.server))
@@ -815,8 +815,42 @@ func hostedLogName(k hostedKey) string {
 func (d *Daemon) hostedLogLocked(h *hostedServer) *hostedLog {
 	if h.log == nil && d.Store != nil && d.Store.Loc.Logs != "" {
 		h.log = &hostedLog{path: filepath.Join(d.Store.Loc.Logs, "mcp-logs", hostedLogName(h.key))}
+		dropOldHostedLogs(filepath.Dir(h.log.path), filepath.Base(h.log.path))
 	}
 	return h.log
+}
+
+// hostedLogsKept is how many servers' logs mcp-logs keeps, each with its rolled .1 (#2292).
+const hostedLogsKept = 32
+
+// dropOldHostedLogs deletes all but the newest hostedLogsKept logs in mcp-logs, never
+// keep's (#2292): a server that is gone, or moved to another scope, leaves its log.
+func dropOldHostedLogs(dir, keep string) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	type logFile struct {
+		name string
+		at   time.Time
+	}
+	var logs []logFile
+	for _, e := range entries {
+		if name := e.Name(); strings.HasSuffix(name, ".log") && name != keep {
+			if fi, err := e.Info(); err == nil {
+				logs = append(logs, logFile{name, fi.ModTime()})
+			}
+		}
+	}
+	if len(logs) < hostedLogsKept {
+		return
+	}
+	sort.Slice(logs, func(i, j int) bool { return logs[i].at.After(logs[j].at) })
+	// One place is keep's.
+	for _, l := range logs[hostedLogsKept-1:] {
+		os.Remove(filepath.Join(dir, l.name))
+		os.Remove(filepath.Join(dir, l.name+".1"))
+	}
 }
 
 // hostedLog is a file of a server's own, started again past hostedLogLimit.

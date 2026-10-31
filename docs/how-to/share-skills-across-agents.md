@@ -8,7 +8,7 @@ description: Put your skills, instructions, connectors and plugins in ~/.agents 
 
 `~/.agents` in your home folder is your own set of things every agent should have: how you
 like to work, your skills, your connectors and your plugins. Put each one there once, and
-every agent the app starts gets it, whichever runtime it runs on and whichever project it is
+every agent the app starts gets it, whichever runtime it runs on and whichever folder it is
 in. You do not set anything up per runtime.
 
 | Put this | Here | Every agent then |
@@ -18,7 +18,7 @@ in. You do not set anything up per runtime.
 | Connectors (MCP servers) | `~/.agents/mcp.json` | has the connectors' tools |
 | A plugin | `~/.agents/plugins/<name>/` | gets its skills, commands and servers, where the runtime can take a plugin |
 
-A project's own `.agents` folder still applies inside that project, as well as these.
+A folder's own `.agents` folder still applies inside that folder, as well as these.
 
 ## Before you start
 
@@ -98,9 +98,9 @@ its `.claude-plugin/plugin.json`, and `.mcp.json` if it has servers.
 - Codex keeps a copy of each plugin. The app writes `~/.agents/plugins/marketplace.json`
   and adds the plugin to Codex, and adds it again whenever anything in its folder changes,
   before the next Codex agent starts. An index you wrote yourself is left alone.
-- Gemini gets a link in `~/.gemini/extensions`. Gemini has no folder for a project's own
-  plugins, so before a Gemini agent starts, each plugin in the project's `.agents/plugins`
-  gets a link there too, switched on only inside that project in
+- Gemini gets a link in `~/.gemini/extensions`. Gemini has no folder for a folder's own
+  plugins, so before a Gemini agent starts, each plugin in the folder's `.agents/plugins`
+  gets a link there too, switched on only inside that folder in
   `~/.gemini/extensions/extension-enablement.json`. A name Gemini already has is left to
   whoever has it: two extensions with one name stop Gemini loading any.
 - Cursor, Copilot and Antigravity cannot take a plugin from the app.
@@ -108,14 +108,14 @@ its `.claude-plugin/plugin.json`, and `.mcp.json` if it has servers.
 To remove a plugin, delete its folder. The next agent starts without it, and the app takes
 it out of Codex and removes its Gemini link.
 
-## A project's own plugins
+## A folder's own plugins
 
-A project can also keep plugins in `.agents/plugins` inside the project folder. Those
-apply only in that project. Because a plugin can run hooks and start connectors when a
-session begins, a new or changed project plugin does not reach any agent until you approve
-it on the project's page — the same idea as [a workflow waiting for your OK](set-up-a-workflow.md).
+A folder can also keep plugins in `.agents/plugins` inside the folder. Those
+apply only in that folder. Because a plugin can run hooks and start connectors when a
+session begins, a new or changed folder plugin does not reach any agent until you approve
+it on the folder's page — the same idea as [a workflow waiting for your OK](set-up-a-workflow.md).
 
-On the Mac, open the project. Under **Plugins**, each plugin lists what it carries. One
+On the Mac, open the folder. Under **Plugins**, each plugin lists what it carries. One
 that is new or has changed since you approved it says it is waiting; click **Approve**
 (or **Show in Finder** first if you want to look). Plugins that were already there when
 this version began were approved as they stood. Your own plugins in `~/.agents/plugins`
@@ -147,4 +147,4 @@ file in your editor and **Reveal in Finder**.
 
 - [Settings](../reference/settings.md)
 - [Runtimes](../reference/runtimes.md)
-- [Projects, hosts and worktrees](../explanation/projects-hosts-worktrees.md)
+- [Folders, hosts and worktrees](../explanation/folders-machines-worktrees.md)

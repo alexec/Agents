@@ -30,6 +30,9 @@ import (
 type Folder struct {
 	Root  string
 	index *folderIndex
+	// folders keeps a Delete's removal of empty folders apart from a Put making its folder
+	// and opening its lock (#2676): a Put holds it shared, a removal alone.
+	folders sync.RWMutex
 }
 
 func NewFolder(root string) *Folder { return &Folder{Root: root, index: newFolderIndex()} }
@@ -77,10 +80,9 @@ func (f *Folder) Put(_ context.Context, key string, data []byte, when Condition)
 		return "", err
 	}
 	dir := filepath.Dir(p)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", Unavailable("cannot make %s: %v", dir, err)
-	}
-	lock, err := os.OpenFile(p+".lock", os.O_CREATE|os.O_RDWR, 0o600)
+	f.folders.RLock()
+	lock, err := makeLock(dir, p)
+	f.folders.RUnlock()
 	if err != nil {
 		return "", Unavailable("cannot lock %s: %v", key, err)
 	}
@@ -131,6 +133,26 @@ func (f *Folder) Put(_ context.Context, key string, data []byte, when Condition)
 	return tag, nil
 }
 
+// makeLock makes the key's folder and opens its lock. Another copy's Delete of the
+// folder's last other key may remove the folder, or one above it, while it is made or
+// before the lock is opened (#2293, #2676): then it is made again. That fails as not
+// there, as there already (MkdirAll's check after its mkdir) or, on macOS, as an invalid
+// argument (a file opened in a folder being removed). Once the lock is there, the folder
+// is not empty, and stays.
+func makeLock(dir, p string) (*os.File, error) {
+	for try := 0; ; try++ {
+		err := os.MkdirAll(dir, 0o700)
+		var lock *os.File
+		if err == nil {
+			lock, err = os.OpenFile(p+".lock", os.O_CREATE|os.O_RDWR, 0o600)
+		}
+		gone := errors.Is(err, fs.ErrNotExist) || errors.Is(err, fs.ErrExist) || errors.Is(err, syscall.EINVAL)
+		if err == nil || !gone || try == 4 {
+			return lock, err
+		}
+	}
+}
+
 func flock(f *os.File, how int) error {
 	for {
 		err := syscall.Flock(int(f.Fd()), how)
@@ -164,7 +186,23 @@ func (f *Folder) Delete(_ context.Context, key string) error {
 	os.Remove(p)
 	os.Remove(p + ".lock")
 	f.index.forget(key)
+	f.folders.Lock()
+	f.removeEmptyFolders(filepath.Dir(p))
+	f.folders.Unlock()
 	return nil
+}
+
+// removeEmptyFolders removes dir and each folder above it that is empty, up to the root
+// (#2293): a key's folder, such as an hour's of v1/usage/hours/, goes with its last key, so
+// a List does not walk a folder for each hour there ever was.
+func (f *Folder) removeEmptyFolders(dir string) {
+	root := filepath.Clean(f.Root)
+	for dir = filepath.Clean(dir); strings.HasPrefix(dir, root+string(filepath.Separator)); dir = filepath.Dir(dir) {
+		// Only an empty folder goes: one with a key, or a write's lock, stays.
+		if os.Remove(dir) != nil {
+			return
+		}
+	}
 }
 
 // List walks the folder the prefix names, or the one it ends in: v1/clients/ walks

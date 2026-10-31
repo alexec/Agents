@@ -23,7 +23,7 @@ import (
 
 // Workflows on MCP servers' events (#383), as DaemonCore+MCPEvents does it on the Swift
 // host. Every workflow's server-event triggers make subscriptions: one server, event and
-// set of arguments in one project, shared by every workflow that names the same three.
+// set of arguments in one folder, shared by every workflow that names the same three.
 // Each is polled (events/poll) at the server's pace, between 10 s and 5 min. What a poll
 // brings is raised as an event on the log, which fires the workflows whose triggers it
 // matches. Where each subscription has got to is <root>/mcp-events.json, the Swift host's
@@ -58,12 +58,14 @@ const (
 
 // mcpSubscription is one server's event, as the workflows' triggers ask for it.
 type mcpSubscription struct {
-	id, key, project, server, event string
+	id, key, folder, server, event string
 	arguments                       map[string]json.RawMessage
 	// workflows are the ids of the workflows whose triggers make it, sorted.
 	workflows []string
 	// waits are the agents whose open waits hold it (#577), sorted.
-	waits  []wire.UUID
+	waits []wire.UUID
+	// archives is whether Archive a session when its pull request merges holds it (#2886).
+	archives bool
 	pool   string
 	filled sdk.McpServer
 	cwd    string
@@ -80,7 +82,7 @@ type mcpLine struct {
 	subscription string
 	fixed        *wire.MCPTriggerStatus
 	// notHere is a line that says only that no server here is the one it names, or offers its
-	// event: a workflow for two forges (#1633) has one in every project.
+	// event: a workflow for two forges (#1633) has one in every folder.
 	notHere bool
 }
 
@@ -154,7 +156,7 @@ func (r *mcpRecord) see(ids []string, at time.Time) {
 	r.Seen = kept
 }
 
-// mcpRecords is mcp-events.json: every record, keyed "<project path>|<subscription key>".
+// mcpRecords is mcp-events.json: every record, keyed "<folder>|<subscription key>".
 type mcpRecords struct {
 	Subscriptions map[string]*mcpRecord `json:"subscriptions"`
 }
@@ -185,7 +187,7 @@ type mcpEventsBook struct {
 
 func (d *Daemon) mcpEventsPath() string { return filepath.Join(d.Store.Loc.Root, "mcp-events.json") }
 
-func mcpRecordKey(project, key string) string { return project + "|" + key }
+func mcpRecordKey(folder, key string) string { return folder + "|" + key }
 
 // StartMCPEvents begins hearing servers' events: once, after the host knows its personal
 // home.
@@ -338,7 +340,7 @@ type found struct {
 // server that could not be asked when the wait was made is subscribed to once it can be.
 func (d *Daemon) addMCPWaits(wanted map[string]*mcpSubscription, servers func(folder string) map[string]found) {
 	for _, sw := range d.serverWaits() {
-		here := servers(sw.project)
+		here := servers(sw.folder)
 		names := make([]string, 0, len(here))
 		for n := range here {
 			names = append(names, n)
@@ -366,7 +368,7 @@ func (d *Daemon) addMCPWaits(wanted map[string]*mcpSubscription, servers func(fo
 						continue
 					}
 					key := nt.subscriptionKey(name)
-					id := mcpRecordKey(sw.project, key)
+					id := mcpRecordKey(sw.folder, key)
 					if s := wanted[id]; s != nil {
 						if !containsUUID(s.waits, sw.agent) {
 							s.waits = append(s.waits, sw.agent)
@@ -374,7 +376,7 @@ func (d *Daemon) addMCPWaits(wanted map[string]*mcpSubscription, servers func(fo
 						}
 						continue
 					}
-					wanted[id] = &mcpSubscription{id: id, key: key, project: sw.project, server: name, event: def.Name,
+					wanted[id] = &mcpSubscription{id: id, key: key, folder: sw.folder, server: name, event: def.Name,
 						arguments: nt.arguments, waits: []wire.UUID{sw.agent}, pool: f.server.pool(), filled: f.server.filled,
 						cwd: f.server.cwd, fingerprint: def.wireText() + "\n" + f.server.entry}
 				}
@@ -392,7 +394,7 @@ func containsUUID(l []wire.UUID, v wire.UUID) bool {
 	return false
 }
 
-// eventServer is a server as a session in a project is given it, secrets filled.
+// eventServer is a server as a session in a folder is given it, secrets filled.
 type eventServer struct {
 	name, scope, cwd, entry string
 	filled                  sdk.McpServer
@@ -400,11 +402,11 @@ type eventServer struct {
 
 func (s eventServer) pool() string { return s.scope + "|" + s.name + "|" + s.entry }
 
-// mcpServerNames is every server name a session in project could be given, but the app's.
-func (d *Daemon) mcpServerNames(project string) []string {
+// mcpServerNames is every server name a session in folder could be given, but the app's.
+func (d *Daemon) mcpServerNames(folder string) []string {
 	var names []string
 	seen := map[string]bool{appServerName: true}
-	entries, _ := readMCPFile(filepath.Join(project, ".agents", "mcp.json"))
+	entries, _ := readMCPFile(filepath.Join(folder, ".agents", "mcp.json"))
 	if home := d.personalHome(); home != "" {
 		personal, _ := readMCPFile(filepath.Join(home, ".agents", "mcp.json"))
 		entries = append(entries, personal...)
@@ -418,11 +420,11 @@ func (d *Daemon) mcpServerNames(project string) []string {
 	return names
 }
 
-// eventServerNamed is name as a session in project is given it: the project's approved
+// eventServerNamed is name as a session in folder is given it: the folder's approved
 // entry, then the person's. Problem is notSetUp, waiting, oldTransport or missingSecret. A
 // hosted server's events come from a copy of the host's own, since this host does not host
 // servers.
-func (d *Daemon) eventServerNamed(name, project string, secrets map[string]string) (eventServer, string) {
+func (d *Daemon) eventServerNamed(name, folder string, secrets map[string]string) (eventServer, string) {
 	if name == appServerName {
 		return eventServer{}, "notSetUp"
 	}
@@ -436,7 +438,7 @@ func (d *Daemon) eventServerNamed(name, project string, secrets map[string]strin
 		}
 		return eventServer{name: name, scope: scope, cwd: cwd, entry: serverDigest(filled), filled: filled}, ""
 	}
-	entries, _ := readMCPFile(filepath.Join(project, ".agents", "mcp.json"))
+	entries, _ := readMCPFile(filepath.Join(folder, ".agents", "mcp.json"))
 	for _, e := range entries {
 		if e.name != name {
 			continue
@@ -444,10 +446,10 @@ func (d *Daemon) eventServerNamed(name, project string, secrets map[string]strin
 		d.mcpMu.Lock()
 		approved, _, _ := d.mcpApprovalsLocked()
 		d.mcpMu.Unlock()
-		if approved == nil || approved[mcpApprovalKey(project, name)] != entryDigest(e.raw) {
+		if approved == nil || approved[mcpApprovalKey(folder, name)] != entryDigest(e.raw) {
 			return eventServer{}, "waiting"
 		}
-		return ready(e, project, project)
+		return ready(e, folder, folder)
 	}
 	if home := d.personalHome(); home != "" {
 		personal, _ := readMCPFile(filepath.Join(home, ".agents", "mcp.json"))
@@ -542,7 +544,7 @@ func mcpFixed(event string, server *string, state wire.MCPTriggerStatusState, co
 
 // heardLines is a workflow's lines without those that say only that a server is not here,
 // once one of its triggers is heard: a workflow for both forges (#1633) listens to the forge
-// a project has, and says nothing about the other. With none heard, every line stays.
+// a folder has, and says nothing about the other. With none heard, every line stays.
 func heardLines(lines []mcpLine) []mcpLine {
 	heard := false
 	for _, l := range lines {
@@ -612,7 +614,7 @@ func (d *Daemon) reconcileMCPEvents(ctx context.Context) {
 				case "":
 				case "waiting":
 					waiting = append(waiting, name)
-					fixed(wire.MCPTriggerFailureCodeWaitingForApproval, name+" is waiting for approval in this project's Connectors.", wire.MCPTriggerStatusStateStopped)
+					fixed(wire.MCPTriggerFailureCodeWaitingForApproval, name+" is waiting for approval in this folder's Connectors.", wire.MCPTriggerStatusStateStopped)
 					continue
 				case "missingSecret":
 					fixed(wire.MCPTriggerFailureCodeSecretMissing, name+" needs a secret that isn't set here.", wire.MCPTriggerStatusStateStopped)
@@ -673,7 +675,7 @@ func (d *Daemon) reconcileMCPEvents(ctx context.Context) {
 						sort.Strings(s.workflows)
 					}
 				} else {
-					wanted[id] = &mcpSubscription{id: id, key: key, project: w.folder, server: name, event: t.event,
+					wanted[id] = &mcpSubscription{id: id, key: key, folder: w.folder, server: name, event: t.event,
 						arguments: t.arguments, workflows: []string{w.id}, pool: f.server.pool(), filled: f.server.filled, cwd: f.server.cwd}
 				}
 				wanted[id].fingerprint = def.wireText() + "\n" + f.server.entry
@@ -687,7 +689,7 @@ func (d *Daemon) reconcileMCPEvents(ctx context.Context) {
 					verb = "are"
 				}
 				tl = append(tl, mcpFixed(t.event, nil, wire.MCPTriggerStatusStateStopped, wire.MCPTriggerFailureCodeWaitingForApproval,
-					strings.Join(waiting, ", ")+" "+verb+" waiting for approval in this project's Connectors, so "+t.event+" is not asked for yet.", at))
+					strings.Join(waiting, ", ")+" "+verb+" waiting for approval in this folder's Connectors, so "+t.event+" is not asked for yet.", at))
 			}
 			if len(tl) == 0 {
 				guess := ""
@@ -719,6 +721,17 @@ func (d *Daemon) reconcileMCPEvents(ctx context.Context) {
 		}
 		return resolved[folder]
 	})
+	d.addMergeArchives(wanted, func(folder string) map[string]found {
+		if resolved[folder] == nil {
+			m := map[string]found{}
+			for _, n := range d.mcpServerNames(folder) {
+				s, problem := d.eventServerNamed(n, folder, secrets)
+				m[n] = found{s, problem}
+			}
+			resolved[folder] = m
+		}
+		return resolved[folder]
+	})
 	// A workflow's file is part of what a stopped subscription waits on.
 	digests := map[string]string{}
 	for _, w := range hearing {
@@ -727,7 +740,7 @@ func (d *Daemon) reconcileMCPEvents(ctx context.Context) {
 	for _, s := range wanted {
 		var each []string
 		for _, id := range s.workflows {
-			if dg := digests[workflowKey(s.project, id)]; dg != "" {
+			if dg := digests[workflowKey(s.folder, id)]; dg != "" {
 				each = append(each, dg)
 			} else {
 				each = append(each, id)
@@ -874,6 +887,9 @@ func (d *Daemon) applyMCPSubscriptionsLocked(ctx context.Context, wanted map[str
 		holders := append([]string(nil), s.workflows...)
 		for _, w := range s.waits {
 			holders = append(holders, "wait of "+string(w))
+		}
+		if s.archives {
+			holders = append(holders, "archive when merged")
 		}
 		log.Printf("mcp events: %s %s subscribed for %s (key %s)", s.server, s.event, strings.Join(holders, ", "), s.key)
 		subCtx, cancel := context.WithCancel(ctx)
@@ -1053,6 +1069,66 @@ func (d *Daemon) stopMCP(id string, s *mcpSubscription, code wire.MCPTriggerFail
 	d.setMCPLive(id, mcpLive{state: wire.MCPTriggerStatusStateStopped, stoppedFor: s.fingerprint,
 		failure: &wire.MCPTriggerFailure{Code: code, Message: message, Since: now()}})
 	log.Printf("mcp events: %s %s stopped (%s)", s.server, s.event, code)
+	d.endWaitsOnStoppedServers(s)
+}
+
+// endWaitsOnStoppedServers ends each wait that s holds once every subscription the wait
+// holds has stopped, with their reasons (#2491): nothing can wake it any more, and it
+// would sit until its until_minutes. A wait that also hears the app's own events stays.
+func (d *Daemon) endWaitsOnStoppedServers(s *mcpSubscription) {
+	ended := false
+	for _, agent := range s.waits {
+		a := d.Store.Agent(agent)
+		if a == nil || a.EventWait == nil || a.EventWait.Ending != nil || len(a.EventWait.ServerEvents) == 0 {
+			continue
+		}
+		w := a.EventWait
+		hearsOwn := false
+		for _, p := range waitPatterns(w) {
+			hearsOwn = hearsOwn || !isServerPattern(p.name)
+		}
+		if hearsOwn {
+			continue
+		}
+		var why []string
+		allStopped := true
+		d.mcpEvMu.Lock()
+		ids := make([]string, 0, len(d.mcpSubs))
+		for id, other := range d.mcpSubs {
+			if containsUUID(other.waits, agent) {
+				ids = append(ids, id)
+			}
+		}
+		sort.Strings(ids)
+		for _, id := range ids {
+			l := d.mcpLives[id]
+			if l.state != wire.MCPTriggerStatusStateStopped {
+				allStopped = false
+				break
+			}
+			if l.failure != nil {
+				why = append(why, l.failure.Message)
+			}
+		}
+		d.mcpEvMu.Unlock()
+		if !allStopped || len(ids) == 0 {
+			continue
+		}
+		d.endWaitWithNoMatch(agent, w, serverStoppedWords(w, now(), why))
+		ended = true
+	}
+	if ended {
+		d.tellEvents(nil)
+		d.armWaitTimer()
+	}
+}
+
+func serverStoppedWords(w *wire.EventWait, at wire.Date, why []string) string {
+	words := "Your wait for " + waitLabel(w) + " ended at " + clock(at) + " with no match: the server stopped sending it."
+	for _, m := range why {
+		words += " " + strings.TrimSpace(m)
+	}
+	return words + " Nothing would have woken you. Check by hand, or wait again once the server is fixed."
 }
 
 // setMCPLive keeps a subscription's state, in its record too, and tells the clients when it
@@ -1209,9 +1285,11 @@ func (d *Daemon) raiseMCPEvent(e mcpPolled, s *mcpSubscription, checks senderChe
 		}
 	}
 	d.mcpEvMu.Unlock()
-	raised := d.raise(wire.EventDraft{Name: s.event, At: now(), Scope: projectScope(s.project),
+	raised := d.raise(wire.EventDraft{Name: s.event, At: now(), Scope: folderScope(s.folder),
 		Sentence: sentence, Details: details})
+	d.lineageEvent(raised)
 	log.Printf("mcp events: %s %s evt %s raised (position %d, workflows: %s)", s.server, s.event, *e.EventID, raised.Position, strings.Join(s.workflows, ", "))
+	d.archiveMergedSessions(raised)
 	return raised
 }
 
@@ -1395,10 +1473,10 @@ func (d *Daemon) announceMCPSubscription(id string) {
 		return
 	}
 	d.mcpTold[id] = time.Now()
-	project, workflows := s.project, append([]string(nil), s.workflows...)
+	folder, workflows := s.folder, append([]string(nil), s.workflows...)
 	d.mcpEvMu.Unlock()
 	for _, w := range workflows {
-		d.tellWorkflow(project, w)
+		d.tellWorkflow(folder, w)
 	}
 }
 

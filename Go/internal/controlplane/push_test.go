@@ -76,6 +76,7 @@ const pushNeed = `{"need":{"id":{"permission":"E0000000-0000-4000-8000-000000000
 // With no Mac host relaying, the control plane pushes the need itself: sealed to the
 // phone that gave its token, then a background push that takes it back (#1460).
 func TestANeedIsPushedThroughAPNsWithNoRelay(t *testing.T) {
+	t.Parallel()
 	pusher := &fakePusher{}
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.Push = pusher })
 	box := p.host("MACHINE-2")
@@ -127,6 +128,7 @@ func TestANeedIsPushedThroughAPNsWithNoRelay(t *testing.T) {
 // With a relay host online, it carries the need as before, and nothing is pushed: one
 // way, so one banner.
 func TestARelayHostMeansNoPush(t *testing.T) {
+	t.Parallel()
 	pusher := &fakePusher{}
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.Push = pusher })
 	_, relay := p.rawHost("relay mac", true)
@@ -149,6 +151,7 @@ func TestARelayHostMeansNoPush(t *testing.T) {
 // Only a device sets a token, only its own, and only a token; a token Apple says is gone
 // is forgotten.
 func TestOnlyADeviceSetsItsOwnToken(t *testing.T) {
+	t.Parallel()
 	pusher := &fakePusher{answer: apns.ErrGone}
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.Push = pusher })
 	_, window := p.client("window")
@@ -175,6 +178,7 @@ func TestOnlyADeviceSetsItsOwnToken(t *testing.T) {
 
 // With no key, nothing is pushed, and the log says so once.
 func TestNoKeyMeansNoPushesAndSaysSo(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	box := p.host("MACHINE-2")
 	p.phoneWithToken()
@@ -201,6 +205,7 @@ func TestNoKeyMeansNoPushesAndSaysSo(t *testing.T) {
 
 // A push too big for APNs loses its buttons before it loses its words.
 func TestAPushTooBigLosesItsButtonsFirst(t *testing.T) {
+	t.Parallel()
 	key, _ := ecdh.P256().GenerateKey(rand.Reader)
 	id := wire.UUID("E0000000-0000-4000-8000-000000000005")
 	var answers []wire.QuickAnswer
@@ -252,6 +257,7 @@ func (p *plane) lockedPhone(host string) *controllink.ClientMembership {
 // locked: pushed once with no relay host, taken back once, and with a relay host online
 // carried by the relay, with nothing pushed.
 func TestAfterAMoveANeedReachesALockedPhone(t *testing.T) {
+	t.Parallel()
 	key := controllink.NewPrivateKey()
 	old := startPlane(t, store.NewMemory(), key)
 	host := old.host("MACHINE-H")
@@ -302,6 +308,7 @@ func TestAfterAMoveANeedReachesALockedPhone(t *testing.T) {
 
 // A need with no device to go to says so in the log, so a need is never lost in silence.
 func TestANeedWithNoDeviceSaysSo(t *testing.T) {
+	t.Parallel()
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.Push = &fakePusher{} })
 	box := p.host("MACHINE-2")
 	p.s.methods.HostSaid(box.member.Host, "attention/need", json.RawMessage(pushNeed))
@@ -314,5 +321,24 @@ func TestANeedWithNoDeviceSaysSo(t *testing.T) {
 		case <-time.After(2 * time.Second):
 			t.Fatal("nothing said")
 		}
+	}
+}
+
+// A notice pushed to a phone is told back to its host, with the kind of device, so its
+// line in the chat says where it went (#2860).
+func TestANoticeTellsItsHostWhereItWent(t *testing.T) {
+	t.Parallel()
+	pusher := &fakePusher{}
+	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.Push = pusher })
+	host, lines := p.rawHost("mac", false)
+	p.phoneWithToken()
+	notice := `{"need":{"id":{"notice":"E0000000-0000-4000-8000-000000000007"},"agentID":"A0000000-0000-4000-8000-000000000001",` +
+		`"folder":"file:///work","kind":"notice","raisedAt":800000000,"headline":{"h1":"work","h2":"Fix the gallery","h3":"The deploy finished"}},"buzz":true}`
+	if _, err := p.s.methods.HostSaid(host, "attention/need", json.RawMessage(notice)); err != nil {
+		t.Fatal(err)
+	}
+	line := readUntil(t, lines, "notices/delivered")
+	if !strings.Contains(line, `"notice":"E0000000-0000-4000-8000-000000000007"`) || !strings.Contains(line, `"to":"iPhone"`) {
+		t.Fatal(line)
 	}
 }

@@ -14,27 +14,27 @@ iPhone, and on a narrow web page, it is the first screen, and what you open goes
 
 | Part | What it is |
 | --- | --- |
-| **New Session** | Starts a session in the project you last started one in. The page it opens can change the project. |
+| **New Session** | Starts a session in the folder you last started one in. The page it opens can change the folder. |
 | **Status** | Pages about the work going on now: **Events**, **Resources**, **Runtimes**, **Connectors** and **Worktrees**. |
 | **Usage** | Pages about past work: **Cost**, **Tokens**, **Time**, and **Milestones** until you have done every first step. |
-| Smart groups | **Pinned**, **Needs You**, **Working** and **Unread**, each across every project and host. See [Smart groups](#smart-groups). |
-| One group per project | Each project's own sessions and workflows. See [A project's group](#a-projects-group). |
-| **Archived projects** | Projects you put away. The heading stays folded until you open it. Each has **Unarchive**. |
+| Smart groups | **Pinned**, **Needs You**, **Working** and **Unread**, each across every folder and host. See [Smart groups](#smart-groups). |
+| One group per folder | Each folder's own sessions and workflows. See [A folder's group](#a-folders-group). |
+| **Archived folders** | Folders you put away. The heading stays folded until you open it. Each has **Unarchive**. |
 | The foot | Lines about this Mac's host and the servers, when there is something to say. On iPhone and iPad, **Settings…**. On the web page, **Settings** and **Help**. |
 
-There is no heading for each host. Pinned projects come first, then the rest. In each of
-the two, this Mac's projects come first, then each server's, in the order you added them.
-A server's project shows the server's name before its own, such as `devbox:api`. A row
-stays in its place however busy its project is.
+There is no heading for each host. Pinned folders come first, then the rest. In each of
+the two, this Mac's folders come first, then each server's, in the order you added them.
+A server's folder shows the server's name before its own, such as `devbox:api`. A row
+stays in its place however busy its folder is.
 
-**Status** and **Usage** each fold, as a project does. Both start open. A row in **Status**
+**Status** and **Usage** each fold, as a folder does. Both start open. A row in **Status**
 shows its icon in red when something is wrong: **Runtimes** when no runtime can start,
 and **Connectors** when a connector does not answer.
 
 ## Smart groups
 
-The smart groups gather sessions from every project and host, so you can see what wants
-you without opening each project.
+The smart groups gather sessions from every folder and host, so you can see what wants
+you without opening each folder.
 
 | Group | What it lists | At first |
 | --- | --- | --- |
@@ -46,44 +46,45 @@ you without opening each project.
 **Working** and **Unread** start off, so the sidebar first shows only what needs you.
 
 - **Each session is listed once.** It goes in the first group it fits, in the order of the
-  table. A session in no smart group is under its project only. An archived session is in
+  table. A session in no smart group is under its folder only. An archived session is in
   no smart group.
 - **A group with nothing in it is not shown.** While you search, a group shows only when
   something in it matches.
-- **A row in a smart group shows its project's name** after its title, in grey.
+- **A row in a smart group shows its folder's name** after its title, in grey.
 - **A session you open from Unread stays there,** read, until you open another one. This
   keeps the row from moving away under the pointer.
 
 ### Turn a smart group on or off
 
-Turn each group on or off under **Smart groups** in **Settings ▸ You ▸ Sidebar** on the Mac,
-in **Settings…** at the foot of the sidebar on iPhone and iPad (under **You**), and under
-**Sidebar** in **Settings ▸ You** on the web page. The choice is kept on your Mac, so every
+Turn each group on or off under **Smart groups** in **Settings ▸ This app ▸ Sidebar** on the Mac,
+in **Settings…** at the foot of the sidebar on iPhone and iPad (under **This app**), and under
+**Sidebar** in **Settings ▸ This browser** on the web page. The choice is kept on your Mac, so every
 client shows the same groups. A group that is off is not shown. Its sessions go to the next
-group they fit, or under their project. With **Needs You** off, approvals are not listed
+group they fit, or under their folder. With **Needs You** off, approvals are not listed
 in the sidebar.
 
 The choice is kept on your Mac, with your other display choices, so every client shows
 the same groups.
 
-## A project's group
+## A folder's group
 
-The project's name is the group's heading. A project starts folded. Click or tap its
-heading to open it. In order, an open project holds:
+The folder's name is the group's heading. The heading has no count: the **Sessions**
+fold counts the sessions. A folder starts folded. Click or tap its
+heading to open it. In order, an open folder holds:
 
 - **Its pinned pages,** when it has some.
 - **Its sessions,** newest started first. Its pinned sessions are in **Pinned** instead.
   Each row's mark says its state. See [Statuses and groups](statuses.md).
-- **Workflows,** a fold with a grey count of the project's workflows. It is closed at
-  first, and each project keeps its own fold. A search opens it to show what matched. It
-  shows only when the project has a workflow that is not archived and not pinned. Pinned
+- **Workflows,** a fold with a grey count of the folder's workflows. It is closed at
+  first, and each folder keeps its own fold. A search opens it to show what matched. It
+  shows only when the folder has a workflow that is not archived and not pinned. Pinned
   workflows are in **Pinned**.
-- **Connectors,** a row that opens the project's connectors, with how many it has. It is
+- **Connectors,** a row that opens the folder's connectors, with how many it has. It is
   red when one does not answer.
-- **Archived,** a row that opens a page of the project's archived sessions and
+- **Archived,** a row that opens a page of the folder's archived sessions and
   workflows. It shows only when there is something archived.
 
-While you search, the archived sessions and workflows that match show in the project's
+While you search, the archived sessions and workflows that match show in the folder's
 group instead, the first 10 with **Show all** for the rest.
 
 ## Sessions under the session that started them
@@ -108,11 +109,11 @@ lead, oldest first. This keeps the sidebar to a fixed depth however deep the cha
 ## Read and unread
 
 A session that finishes while you are not looking at it is unread. Its row stays where
-it is in its project, or goes to **Unread** when that group is on.
+it is in its folder, or goes to **Unread** when that group is on.
 
 - **In the sidebar, the mark is a bold title.** A finished session has the same empty
   ring as its mark, read or unread. Only an unread one has a bold title, and a screen
-  reader reads it as "unread". The dot before the title is on the project's page, not in
+  reader reads it as "unread". The dot before the title is on the folder's page, not in
   the sidebar.
 - **Only a finished session is bold.** A session that asked you something, is blocked or
   ended without a report is never bold, read or not, because its hand mark already asks

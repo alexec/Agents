@@ -5,10 +5,10 @@ import Testing
 /// A host's capabilities on its hosts/list row (#1748).
 @Suite("A host's capabilities")
 struct ControlHostCapabilitiesTests {
-    private func row(_ extra: String) throws -> DaemonAPI.ControlHost {
+    private func row(_ extra: String) throws -> DaemonAPI.ControlMachine {
         let json = #"{"id":"box","name":"Box","platform":"linux","version":"0.7.0","state":"online","reach":"dialOut""#
             + extra + "}"
-        return try JSONDecoder().decode(DaemonAPI.ControlHost.self, from: Data(json.utf8))
+        return try JSONDecoder().decode(DaemonAPI.ControlMachine.self, from: Data(json.utf8))
     }
 
     @Test func aHostHasWhatItsListNames() throws {
@@ -36,7 +36,7 @@ struct ControlHostCapabilitiesTests {
             old.state = state
             #expect(!old.answers)
         }
-        #expect(!DaemonAPI.ControlHost.answers(nil))
+        #expect(!DaemonAPI.ControlMachine.answers(nil))
     }
 
     @Test func theStatusSaysWhatItRequires() throws {

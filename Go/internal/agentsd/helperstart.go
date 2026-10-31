@@ -11,8 +11,8 @@ import (
 )
 
 // start_session and the helper queue (#362), as DaemonCore+Helpers and +HelperQueue answer
-// them on the Swift host: an agent starts a session in its own project, within the
-// project's helper limits; past them, or behind others already waiting, it queues, first
+// them on the Swift host: an agent starts a session in its own folder, within the
+// folder's helper limits; past them, or behind others already waiting, it queues, first
 // in first out, and starts by itself once a running place and a not-archived place are
 // both free.
 
@@ -120,6 +120,10 @@ func (d *Daemon) heldMessage(q wire.QueuedPrompt, target *wire.Agent) bool {
 	if q.Sender == nil {
 		return true
 	}
+	// Its starter on another machine: its words go at once (#2927).
+	if from := d.startedFromOf(target.ID); from != nil && from.Agent == q.Sender.AgentID {
+		return false
+	}
 	sender := d.Store.Agent(q.Sender.AgentID)
 	return sender == nil || d.holdsMessageFrom(target, sender) != ""
 }
@@ -166,7 +170,7 @@ func (d *Daemon) helperWorktree(written, folder string) (*wire.WorktreeChoice, e
 		return &wire.WorktreeChoice{New: &struct{}{}}, nil
 	}
 	if _, ok := repositoryOf(folder); !ok {
-		return nil, &Error{Code: wire.FailureNotAWorktree, Message: "this project is not a git repository, so it has no worktrees"}
+		return nil, &Error{Code: wire.FailureNotAWorktree, Message: "this folder is not a git repository, so it has no worktrees"}
 	}
 	list, _ := worktreeList(folder)
 	var names []string
@@ -205,7 +209,7 @@ func errMessage(err error) (int, string) {
 	return CodeInternal, err.Error()
 }
 
-// helperLimitRefusal is why the project has no place for another helper now, or "".
+// helperLimitRefusal is why the folder has no place for another helper now, or "".
 func (d *Daemon) helperLimitRefusal(folder string) string {
 	running, notArchived, _ := d.helperLimitsIn(folder)
 	d.queueMu.Lock()
@@ -232,12 +236,12 @@ func (d *Daemon) helperLimitRefusal(folder string) string {
 		if d.agentsMayArchive(folder) {
 			then = "Archive one of yours with archive_session once its work is merged or abandoned, or let the person approve archiving one, to free that place."
 		}
-		full = append(full, fmt.Sprintf("this project already has %d of %d sessions started by sessions not yet archived%s%s. %s",
+		full = append(full, fmt.Sprintf("this folder already has %d of %d sessions started by sessions not yet archived%s%s. %s",
 			len(kept)+reserved, notArchived, quotedList(kept), starting, then))
 	}
 	r := d.runningHelpers(folder)
 	if int64(len(r)+reserved) >= running {
-		full = append(full, fmt.Sprintf("this project already has %d of %d sessions started by sessions running%s%s. "+
+		full = append(full, fmt.Sprintf("this folder already has %d of %d sessions started by sessions running%s%s. "+
 			"Archive or stop one of yours with archive_session or stop_session when its part is done, or wait for one to finish.",
 			len(r)+reserved, running, quotedList(r), starting))
 	}
@@ -255,12 +259,22 @@ func (d *Daemon) startSession(caller wire.UUID, args map[string]json.RawMessage)
 		return "", Invalid("Nothing was started: say what the agent is to do.")
 	}
 	runtimeID := strings.TrimSpace(argString(args, "runtime"))
+	if runtimeID == "" {
+		runtimeID = me.RuntimeID
+		// A helper of an Auto agent is on Auto too, and Auto picks again (FR-012).
+		if me.Auto != nil {
+			runtimeID = autoRuntimeID
+		}
+	}
 	model := strings.TrimSpace(argString(args, "model"))
 	labels, err := stringList(args, "labels")
 	if err != nil {
 		return "", err
 	}
 	mode := inheritedMode(me, runtimeID)
+	if runtimeID == autoRuntimeID {
+		return d.startAutoHelper(me, args, prompt, model, labels)
+	}
 	if wanted := strings.TrimSpace(argString(args, "permission_mode")); wanted != "" {
 		own := inheritedMode(me, me.RuntimeID)
 		if own == nil || !noLooser(wanted, *own) {
@@ -272,17 +286,18 @@ func (d *Daemon) startSession(caller wire.UUID, args map[string]json.RawMessage)
 		}
 		mode = &wanted
 	}
-	if runtimeID == "" {
-		runtimeID = defaultRuntimeID
-	}
 	rt := runtimeByID(runtimeID)
 	if rt == nil {
 		return "", Invalid("Nothing was started: there is no runtime called \"%s\" — this version knows %s.", runtimeID, knownRuntimes())
 	}
+	// Another machine has runtimes, folders and limits of its own (#2887).
+	if onMachine(args) != "" {
+		return d.startOnMachine(me, args, helperRequest(runtimeID, "", prompt, model, mode, nil, labels))
+	}
 	if why := d.unavailableRuntime(rt); why != "" {
 		return "", Invalid("Nothing was started: %s.", why)
 	}
-	folder := projectFolder(me)
+	folder := folderPath(me)
 	worktree, err := d.helperWorktree(argString(args, "worktree"), folder)
 	if err != nil {
 		code, msg := errMessage(err)
@@ -308,7 +323,7 @@ func (d *Daemon) startSession(caller wire.UUID, args map[string]json.RawMessage)
 		return "", &Error{Code: code, Message: "Nothing was started: " + msg}
 	}
 	a := d.Store.Agent(id)
-	note := fmt.Sprintf("Started %s (id %s). This project now has %s.", quotedTitle(a.Title), id, d.helperPlaces(folder))
+	note := fmt.Sprintf("Started %s (id %s). This folder now has %s.", quotedTitle(a.Title), id, d.helperPlaces(folder))
 	if w := a.Worktree; w != nil {
 		note += " It is working in worktree " + w.Name
 		if w.Branch != nil {
@@ -322,6 +337,12 @@ func (d *Daemon) startSession(caller wire.UUID, args map[string]json.RawMessage)
 
 func helperRequest(runtimeID, folder, prompt, model string, mode *string, worktree *wire.WorktreeChoice, labels []string) wire.StartRequest {
 	values := map[string]wire.JSONValue{}
+	// On Auto the model and mode are the shared words (#2658); on a named runtime they are its
+	// own, and a workflow has made its words levels already (runAgent).
+	var levels *wire.Levels
+	if runtimeID == autoRuntimeID {
+		levels, model, mode, _, _ = fileLevels(runtimeID, model, mode, "", "")
+	}
 	if mode != nil {
 		values["mode"], _ = json.Marshal(*mode)
 	}
@@ -333,13 +354,13 @@ func helperRequest(runtimeID, folder, prompt, model string, mode *string, worktr
 	}
 	return wire.StartRequest{RuntimeID: runtimeID, Cwd: store.FolderURL(folder), Prompt: prompt, Attachments: []wire.Attachment{},
 		StartOptions: wire.StartOptions{Values: values, ExtraArguments: []string{}}, AdditionalDirectories: []wire.URL{},
-		McpServers: []wire.MCPServer{}, Worktree: worktree, Labels: labels}
+		McpServers: []wire.MCPServer{}, Worktree: worktree, Labels: labels, Levels: levels}
 }
 
 // queueHelper is queueHelper: a queued record, started by itself when there is a place.
 func (d *Daemon) queueHelper(caller *wire.Agent, prompt, runtimeID, model string, mode *string, worktree *wire.WorktreeChoice,
 	labels []string, full string) (string, error) {
-	folder := projectFolder(caller)
+	folder := folderPath(caller)
 	queue := d.helperQueue(folder)
 	_, _, limit := d.helperLimitsIn(folder)
 	if int64(len(queue)) >= limit {
@@ -351,13 +372,13 @@ func (d *Daemon) queueHelper(caller *wire.Agent, prompt, runtimeID, model string
 			}
 			names = " — " + strings.Join(each, ", ")
 		}
-		behind := "This project's"
+		behind := "This folder's"
 		if full != "" {
 			behind = full + " And its"
 		}
 		return "", &Error{Code: wire.FailureNotYours, Message: fmt.Sprintf("Nothing was started: %s queue is full too: %d of %d sessions queued%s. "+
 			"Stop one of yours that is queued with stop_session if it is no longer wanted, or wait for the queue to move. "+
-			"The person sets these limits in Project Settings.", behind, len(queue), limit, names)}
+			"The person sets these limits in Folder Settings.", behind, len(queue), limit, names)}
 	}
 	given, err := changeLabelsAs(wire.SessionLabelOwnerAgent, nil, labels, nil, vocabulary(folder, d.Store.Agents()))
 	if err != nil {
@@ -386,8 +407,9 @@ func (d *Daemon) queueHelper(caller *wire.Agent, prompt, runtimeID, model string
 		return "", &Error{Code: wire.FailureCouldNotSave, Message: "Nothing was started: the queued agent could not be saved: " + err.Error()}
 	}
 	d.tellChanged(a, nil)
-	d.projectChanged(folder)
-	d.record(a.ID, runtimeNote("Queued by "+d.holderName(caller.ID)+". It starts by itself when this project has a place free."))
+	d.noteLineage(nil, a)
+	d.folderChanged(folder)
+	d.record(a.ID, runtimeNote("Queued by "+d.holderName(caller.ID)+". It starts by itself when this folder has a place free."))
 	position := len(queue) + 1
 	for i, q := range d.helperQueue(folder) {
 		if q.ID == a.ID {
@@ -398,25 +420,25 @@ func (d *Daemon) queueHelper(caller *wire.Agent, prompt, runtimeID, model string
 	if full != "" {
 		ahead = strings.ToUpper(full[:1]) + full[1:] + " "
 	}
-	note := fmt.Sprintf("Queued %s (id %s), %s in this project's queue: %sIt starts by itself, oldest first, once a running place and a "+
-		"not-archived place are both free. Wait for it with wait_for_event as for any session, or take it off the queue with stop_session. "+
-		"This project now has %s.", quotedTitle(a.Title), a.ID, ordinal(position), ahead, d.helperPlaces(folder))
+	note := fmt.Sprintf("Queued %s (id %s), %s in this folder's queue: %sIt starts by itself, oldest first, once a running place and a "+
+		"not-archived place are both free. Wait for it with wait_for_agents as for any session, or take it off the queue with stop_session. "+
+		"This folder now has %s.", quotedTitle(a.Title), a.ID, ordinal(position), ahead, d.helperPlaces(folder))
 	d.checkQueueSoon(folder)
 	return note, nil
 }
 
-// checkEveryQueue looks at every project with a queue, as a restart does.
+// checkEveryQueue looks at every folder with a queue, as a restart does.
 func (d *Daemon) checkEveryQueue() {
 	seen := map[string]bool{}
 	for _, a := range d.Store.Agents() {
-		if f := projectFolder(&a); a.State == wire.AgentStateQueued && !seen[f] {
+		if f := folderPath(&a); a.State == wire.AgentStateQueued && !seen[f] {
 			seen[f] = true
 			d.checkQueueSoon(f)
 		}
 	}
 }
 
-// checkQueueSoon starts what the project's queue may start now, off this call.
+// checkQueueSoon starts what the folder's queue may start now, off this call.
 func (d *Daemon) checkQueueSoon(folder string) {
 	d.goAfterTurn("helper queue", func() { d.startFromQueue(folder) })
 }
@@ -501,10 +523,13 @@ func (d *Daemon) startQueued(q wire.Agent, folder string) {
 
 // listHelpers is list_sessions with started_by me: its own, and every one below them.
 func (d *Daemon) listHelpers(caller *wire.Agent) string {
-	folder := projectFolder(caller)
-	places := "This project has " + d.helperPlaces(folder) + "."
+	folder := folderPath(caller)
+	places := "This folder has " + d.helperPlaces(folder) + "."
 	var mine []wire.Agent
 	for _, a := range append(d.helpersIn(folder), d.helperQueue(folder)...) {
+		if d.Store.Agent(a.ID) == nil {
+			continue
+		}
 		for _, s := range d.starters(&a) {
 			if s == caller.ID {
 				mine = append(mine, a)
@@ -512,8 +537,9 @@ func (d *Daemon) listHelpers(caller *wire.Agent) string {
 			}
 		}
 	}
-	runtimes := d.runtimeChoices()
-	if len(mine) == 0 {
+	runtimes := d.runtimeChoices(caller.RuntimeID)
+	there := d.listThere(caller.ID)
+	if len(mine) == 0 && len(there) == 0 {
 		return "You have not started any sessions that are still here. " + places + "\n" + runtimes
 	}
 	lines := []string{places}
@@ -523,9 +549,9 @@ func (d *Daemon) listHelpers(caller *wire.Agent) string {
 		if a.StartedByAgent != nil && *a.StartedByAgent != caller.ID {
 			below = ", started by " + d.holderName(*a.StartedByAgent)
 		}
-		lines = append(lines, "- "+string(a.ID)+": "+quotedTitle(a.Title)+below+" — "+helperStatus(&a, queue)+labelsLine(&a))
+		lines = append(lines, "- "+string(a.ID)+": "+quotedTitle(a.Title)+below+" — "+helperStatus(&a, queue)+labelsLine(&a)+waitingLine(&a, caller.ID))
 	}
-	return strings.Join(append(lines, runtimes), "\n")
+	return strings.Join(append(append(lines, there...), runtimes), "\n")
 }
 
 func helperStatus(a *wire.Agent, queue []wire.Agent) string {
@@ -567,7 +593,7 @@ func helperStatus(a *wire.Agent, queue []wire.Agent) string {
 }
 
 // runtimeChoices is which runtimes an agent may name, as this host has them now.
-func (d *Daemon) runtimeChoices() string {
+func (d *Daemon) runtimeChoices(callerRuntime string) string {
 	var available, not []string
 	for i := range catalog {
 		rt := &catalog[i]
@@ -579,10 +605,101 @@ func (d *Daemon) runtimeChoices() string {
 	}
 	lines := []string{"No runtime can take a new agent on this machine right now."}
 	if len(available) > 0 {
-		lines = []string{"Runtimes you can start agents on (" + defaultRuntimeID + " if you name none): " + strings.Join(available, ", ") + "."}
+		lines = []string{"Runtimes you can start agents on (your own runtime, " + callerRuntime + ", if you name none): " + strings.Join(available, ", ") + "."}
 	}
 	if len(not) > 0 {
 		lines = append(lines, "Not available on this machine: "+strings.Join(not, ", ")+".")
 	}
 	return strings.Join(lines, "\n")
+}
+
+// startAutoHelper is start_session on Auto (#2658, FR-012): the levels in the shared words,
+// none looser than the caller's own permission mode, which it takes when it names none.
+func (d *Daemon) startAutoHelper(me *wire.Agent, args map[string]json.RawMessage, prompt, model string, labels []string) (string, error) {
+	var own *wire.PermissionLevel
+	if me.Levels != nil {
+		own = me.Levels.Permission
+	}
+	if own == nil && me.Auto != nil {
+		own = me.Auto.Levels.Permission
+	}
+	var mode *string
+	if wanted := strings.TrimSpace(argString(args, "permission_mode")); wanted != "" {
+		mode = &wanted
+	} else if own != nil {
+		w := permissionWord(*own)
+		mode = &w
+	}
+	levels, _, _, _, err := fileLevels(autoRuntimeID, model, mode, "", "")
+	if err != nil {
+		return "", &Error{Code: CodeInvalidParams, Message: "Nothing was started: " + err.(*Error).Message}
+	}
+	// With no mode of the caller's to take, the helper plans: the least it may do.
+	if levels.Permission == nil {
+		p := wire.PermissionLevelPlan
+		levels.Permission = &p
+	}
+	rank := levelRank[wire.AutoFieldPermission]
+	if wanted := rank[string(*levels.Permission)]; own == nil && wanted > 0 || own != nil && wanted > rank[string(*own)] {
+		ownWords := "your runtime's own mode"
+		if own != nil {
+			ownWords = permissionWord(*own)
+		}
+		return "", Invalid("Nothing was started: %s would let it do more without asking than you may (%s). Name no mode and it takes yours.",
+			permissionWord(*levels.Permission), ownWords)
+	}
+	if onMachine(args) != "" {
+		r := helperRequest(autoRuntimeID, "", prompt, "", nil, nil, labels)
+		r.Levels = levels
+		d.helperRequests(&r, me)
+		return d.startOnMachine(me, args, r)
+	}
+	folder := folderPath(me)
+	worktree, err := d.helperWorktree(argString(args, "worktree"), folder)
+	if err != nil {
+		code, msg := errMessage(err)
+		return "", &Error{Code: code, Message: "Nothing was started: " + msg}
+	}
+	if full := d.helperLimitRefusal(folder); full != "" || len(d.helperQueue(folder)) > 0 {
+		w := permissionWord(*levels.Permission)
+		m := ""
+		if levels.Model != nil {
+			m = string(*levels.Model)
+		}
+		return d.queueHelper(me, prompt, autoRuntimeID, m, &w, worktree, labels, full)
+	}
+	r := helperRequest(autoRuntimeID, folder, prompt, "", nil, worktree, labels)
+	r.Levels = levels
+	id, err := d.startFor(r, startedBy{agent: &me.ID, owner: wire.SessionLabelOwnerAgent})
+	if err != nil {
+		code, msg := errMessage(err)
+		return "", &Error{Code: code, Message: "Nothing was started: " + msg}
+	}
+	a := d.Store.Agent(id)
+	return fmt.Sprintf("Started %s (id %s) on Auto, which picked %s. This folder now has %s.", quotedTitle(a.Title), id,
+		runtimeName(a.RuntimeID), d.helperPlaces(folder)), nil
+}
+
+// helperRequests keeps a helper on Auto to Request cards unless its starter approves every
+// request itself: Yes to all, the Approve for me cell on Cursor, Grok and OpenCode, answers
+// shell commands too, which Approve for me on Claude still asks about.
+func (d *Daemon) helperRequests(r *wire.StartRequest, starter *wire.Agent) {
+	if r.RuntimeID != autoRuntimeID || starter != nil && d.approvesEverything(starter) {
+		return
+	}
+	l := wire.Levels{}
+	if r.Levels != nil {
+		l = *r.Levels
+	}
+	l.PermissionRequests = requestCards
+	r.Levels = &l
+}
+
+// approvesEverything is an agent that runs every command without asking: in Bypass
+// permissions, or answering its requests with Yes to all.
+func (d *Daemon) approvesEverything(a *wire.Agent) bool {
+	bypass := func(l *wire.Levels) bool {
+		return l != nil && l.Permission != nil && *l.Permission == wire.PermissionLevelBypassPermissions
+	}
+	return bypass(a.Levels) || a.Auto != nil && bypass(&a.Auto.Levels) || d.agentAlwaysApproves(a)
 }

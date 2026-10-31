@@ -3,11 +3,11 @@ import Foundation
 /// What an event is about: the part of its name before the dot.
 public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
     case agent
-    /// The project as a whole: every agent in it at once (#360).
-    case project
+    /// The folder as a whole: every agent in it at once (#360).
+    case folder
     case workflow
     case branch
-    /// A file arriving in a project's drop box, `.agents/dropbox/` (#231).
+    /// A file arriving in a folder's drop box, `.agents/dropbox/` (#231).
     case dropbox
     case lease
     case mac
@@ -27,7 +27,7 @@ public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
     /// Monochrome, and never tinted: an event is a fact, not a state (042 wireframes §5).
     public var glyph: String {
         switch self {
-        case .agent, .project: return "●"
+        case .agent, .folder: return "●"
         case .workflow: return "⟳"
         case .branch: return "⎇"
         case .dropbox: return "⇣"
@@ -38,7 +38,7 @@ public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
     /// The capsule on the events page that shows it.
     public var group: EventGroup {
         switch self {
-        case .agent, .project: return .agents
+        case .agent, .folder: return .agents
         case .workflow: return .workflows
         case .branch: return .branches
         case .dropbox: return .dropbox
@@ -69,10 +69,10 @@ public enum EventGroup: String, Codable, Hashable, Sendable, CaseIterable {
     public var subjects: [EventSubject] { EventSubject.allCases.filter { $0.group == self } }
 }
 
-/// Whose events of a kind are: the Mac's, a project's, or either.
+/// Whose events of a kind are: the Mac's, a folder's, or either.
 public enum EventScopeKind: String, Codable, Hashable, Sendable {
     case mac
-    case project
+    case folder
     case either
 }
 
@@ -139,41 +139,44 @@ public struct EventKind: Hashable, Sendable {
 /// raise events (#639).
 public enum EventCatalogue {
     public static let all: [EventKind] = [
-        EventKind("agent.started", .project, about(), "An agent in this project started working."),
-        EventKind("agent.finished", .project, about(outcome, EventDetail("afterwards", values: ["archive_requested", "archived", "stay"])),
-                  "An agent in this project ended a turn having done its work."),
-        EventKind("agent.asked_permission", .project, about(),
-                  "An agent in this project is asking for permission."),
-        EventKind("agent.asked_form", .project, about(),
-                  "An agent in this project raised a form to fill in."),
-        EventKind("agent.blocked", .project, about(EventDetail("waiting_on")),
-                  "An agent in this project ended its turn waiting on something."),
-        EventKind("agent.stopped", .project, about(EventDetail("by", values: ["you", "cost_limit", "unknown"])),
-                  "An agent in this project was stopped before finishing."),
-        EventKind("agent.failed", .project, about(EventDetail("reason", values: EndedReason.allCases.map(\.code))),
-                  "An agent in this project ended in an error."),
-        EventKind("agent.archive_requested", .project, about(outcome),
-                  "An agent in this project archived itself, and waits for the person to approve it."),
-        EventKind("agent.messaged", .project, about(EventDetail("from"), EventDetail("from_title")),
-                  "An agent in this project was sent a message by another, with message_session."),
-        EventKind("agent.archived", .project, about(EventDetail("by", values: ["agent", "you"]), outcome),
-                  "An agent in this project was archived."),
-        EventKind("agent.deleted", .project, about(EventDetail("because", values: ["age", "person"])),
+        EventKind("agent.started", .folder, about(), "An agent in this folder started working."),
+        EventKind("agent.finished", .folder, about(outcome, EventDetail("afterwards", values: ["archive_requested", "archived", "stay"])),
+                  "An agent in this folder ended a turn having done its work."),
+        EventKind("agent.asked_permission", .folder, about(),
+                  "An agent in this folder is asking for permission."),
+        EventKind("agent.asked_form", .folder, about(),
+                  "An agent in this folder raised a form to fill in."),
+        EventKind("agent.waiting", .folder, about(EventDetail("waiting_on")),
+                  "An agent in this folder ended its turn waiting on something."),
+        EventKind("agent.stopped", .folder, about(EventDetail("by", values: ["you", "admin", "cost_limit", "unknown"])),
+                  "An agent in this folder was stopped before finishing."),
+        EventKind("agent.failed", .folder, about(EventDetail("reason", values: EndedReason.allCases.map(\.code))),
+                  "An agent in this folder ended in an error."),
+        EventKind("agent.archive_requested", .folder, about(outcome),
+                  "An agent in this folder archived itself, and waits for the person to approve it."),
+        EventKind("agent.messaged", .folder, about(EventDetail("from"), EventDetail("from_title")),
+                  "An agent in this folder was sent a message by another, with message_session."),
+        EventKind("agent.archived", .folder, about(EventDetail("by", values: ["agent", "you"]), outcome),
+                  "An agent in this folder was archived."),
+        EventKind("agent.deleted", .folder, about(EventDetail("because", values: ["age", "person"])),
                   "An archived agent was deleted with its conversation."),
-        EventKind("project.idle", .project,
-                  shown("agents", "finished", "blocked", "waiting_on_you", "stopped", "failed", "since", "ids"),
-                  "Every agent in this project has stopped working."),
-        EventKind("workflow.ran", .project, shown("workflow", "agent"), "A workflow in this project started an agent."),
-        EventKind("workflow.completed", .project, shown("workflow", "agent") + [outcome],
-                  "A workflow's run in this project finished."),
-        EventKind("workflow.refused", .project,
+        EventKind("folder.idle", .folder,
+                  shown("agents", "finished", "waiting", "waiting_on_you", "stopped", "failed", "since", "ids"),
+                  "Every agent in this folder has stopped working."),
+        EventKind("workflow.ran", .folder, shown("workflow", "agent"), "A workflow in this folder started an agent."),
+        EventKind("workflow.completed", .folder, shown("workflow", "agent") + [outcome],
+                  "A workflow's run in this folder finished."),
+        EventKind("workflow.refused", .folder,
                   shown("workflow") + [EventDetail("reason", values: WorkflowRefusal.codes)],
-                  "A workflow in this project did not run, and why."),
-        EventKind("branch.moved", .project, [EventDetail("branch", isFilter: true)] + shown("from", "to"),
+                  "A workflow in this folder did not run, and why."),
+        EventKind("branch.moved", .folder, [EventDetail("branch", isFilter: true)] + shown("from", "to"),
                   "A branch an agent works on moved; never the default branch."),
-        EventKind("dropbox.file_added", .project, shown("path", "name", "folder", "extension", "size"),
-                  "A file arrived in this project's drop box, .agents/dropbox/, or a folder in it."),
-        EventKind("lease.granted", .mac, shown("resource", "agent"), "An agent was given a lease."),
+        EventKind("dropbox.file_added", .folder, shown("path", "name", "folder", "extension", "size"),
+                  "A file arrived in this folder's drop box, .agents/dropbox/, or a folder in it."),
+        // Narrowed by agent and resource: a place in a lease's line is a wait on its own
+        // grant (#2361).
+        EventKind("lease.granted", .mac, [EventDetail("resource", isFilter: true), EventDetail("agent", isFilter: true)],
+                  "An agent was given a lease."),
         EventKind("lease.released", .mac,
                   shown("resource") + [EventDetail("how", values: ["expired", "ended", "released"])],
                   "A lease was given back, ended or ran out."),
@@ -183,7 +186,7 @@ public enum EventCatalogue {
                   shown("volume", "free_bytes", "free_percent")
                       + [EventDetail("level", values: DiskLevel.allCases.filter { $0 != .ok }.map(\.rawValue))]
                       + shown("threshold", "worktrees"),
-                  "Free space on a volume holding the Agents root, a project or a worktree fell below its low or critical threshold."),
+                  "Free space on a volume holding the Agents root, a folder or a worktree fell below its low or critical threshold."),
         EventKind("machine.disk_ok", .mac, shown("volume", "free_bytes", "free_percent", "threshold"),
                   "Free space on a volume that was low climbed back above its threshold."),
         EventKind("person.away", .mac, [why], "You locked the screen or stepped away for 5 minutes.", macOnly: true),
@@ -324,7 +327,7 @@ public enum EventList {
         lines += unlisted
         lines.append("A subject with .* matches all of its events, e.g. agent.*; for an MCP server's noun, all of "
                      + "that noun's events. A list in where matches any of its values, e.g. why: [locked, idle]. "
-                     + "To wait for particular agents, use wait_for_event with agents.")
+                     + "To wait for particular agents, use wait_for_agents.")
         return lines.joined(separator: "\n")
     }
 

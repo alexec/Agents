@@ -13,6 +13,16 @@ every turn, from `<its folder>/<its name>.behaviour`:
   stream <chunks> <ms>
           a long Markdown reply, in that many chunks, that many milliseconds apart:
           for watching a reply arrive in a long chat (#90).
+  work <seconds>
+          a thought, a call held `in_progress` that long, another thought held that long,
+          then a reply: for seeing where the working mark is in each (#2831).
+  tool <name> <json arguments>
+          the turn calls the app's own tool by that name on the agents server it was given,
+          as a model would, shows the call, and says what the tool answered: for seeing a
+          card an app tool raises, such as ask_secret's (#2885).
+  goal    the turn sends the goal in `<its folder>/<its name>.goal` (JSON: a snapshot, or
+          null to clear it) on a session_info_update, as Codex's and Claude's adapters do
+          for an AIR client, then answers: for seeing the goal card (#2742).
   ok      (or no file) it answers, saying what it was handed.
 
 So a walk can make a runtime run out, and later come back, by rewriting one file.
@@ -21,6 +31,7 @@ import json
 import os
 import sys
 import time
+import urllib.request
 import uuid
 
 NAME = os.path.basename(sys.argv[0])
@@ -59,6 +70,31 @@ SPENT = {"jetbrains": {"air": {"version": 1, "sessionFailure": {
     "title": "You've used your plan's allowance for now", "actions": []}}}}
 
 
+# The app's own MCP server, as session/new hands it over: its address and headers.
+servers = {}
+
+
+def call_tool(session_id, name, arguments):
+    """One tools/call on the session's agents server, after its initialize."""
+    server = servers.get(session_id)
+    if not server:
+        return "No agents server was given to this session."
+    headers = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"}
+    headers.update({h["name"]: h["value"] for h in server.get("headers", [])})
+
+    def post(body):
+        req = urllib.request.Request(server["url"], data=json.dumps(body).encode(), headers=headers)
+        with urllib.request.urlopen(req, timeout=120) as r:
+            if r.headers.get("Mcp-Session-Id"):
+                headers["Mcp-Session-Id"] = r.headers["Mcp-Session-Id"]
+            return json.loads(r.read() or b"{}")
+
+    post({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}})
+    answer = post({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": name, "arguments": arguments}})
+    content = answer.get("result", {}).get("content") or [{"text": json.dumps(answer.get("error"))}]
+    return content[0].get("text", "")
+
+
 def prompt(request_id, params):
     session_id = params.get("sessionId", "")
     blocks = params.get("prompt", [])
@@ -87,6 +123,47 @@ def prompt(request_id, params):
                 piece += "\n\n- a point\n- another point\n\n"
             say(session_id, piece)
             time.sleep(pause)
+        reply(request_id, {"stopReason": "end_turn"})
+        return
+    if how and how[0] == "work":
+        hold = float(how[1]) if len(how) > 1 else 20
+
+        def update(body):
+            send({"jsonrpc": "2.0", "method": "session/update", "params": {"sessionId": session_id, "update": body}})
+
+        def think(text):
+            update({"sessionUpdate": "agent_thought_chunk", "content": {"type": "text", "text": text}})
+
+        think("Reading the project's notes first, to see how it is laid out.")
+        update({"sessionUpdate": "tool_call", "toolCallId": "work-1", "title": "Read notes.md",
+                "kind": "read", "status": "in_progress"})
+        time.sleep(hold)
+        update({"sessionUpdate": "tool_call_update", "toolCallId": "work-1", "status": "completed"})
+        think("The notes say what to change. Planning the edit now.")
+        time.sleep(hold)
+        say(session_id, "Done: the notes are read and the edit is planned.")
+        reply(request_id, {"stopReason": "end_turn"})
+        return
+    if how and how[0] == "tool":
+        _, name, arguments = behaviour().split(maxsplit=2)
+
+        def update(body):
+            send({"jsonrpc": "2.0", "method": "session/update", "params": {"sessionId": session_id, "update": body}})
+
+        update({"sessionUpdate": "tool_call", "toolCallId": "tool-1", "title": f"mcp__agents__{name}",
+                "kind": "other", "status": "in_progress", "rawInput": json.loads(arguments)})
+        text = call_tool(session_id, name, json.loads(arguments))
+        update({"sessionUpdate": "tool_call_update", "toolCallId": "tool-1", "status": "completed",
+                "content": [{"type": "content", "content": {"type": "text", "text": text}}]})
+        say(session_id, text)
+        reply(request_id, {"stopReason": "end_turn"})
+        return
+    if how and how[0] == "goal":
+        with open(os.path.join(HERE, f"{NAME}.goal")) as f:
+            goal = json.load(f)
+        send({"jsonrpc": "2.0", "method": "session/update", "params": {"sessionId": session_id, "update": {
+            "sessionUpdate": "session_info_update", "_meta": {"jetbrains": {"air": {"version": 1, "goal": goal}}}}}})
+        say(session_id, "Working towards the goal." if goal else "The goal is cleared.")
         reply(request_id, {"stopReason": "end_turn"})
         return
     handoff = next((b["resource"]["text"] for b in blocks
@@ -134,9 +211,14 @@ def main():
         if method == "initialize":
             reply(request_id, {"protocolVersion": 1, "authMethods": [],
                                "agentCapabilities": {"loadSession": False,
-                                                     "promptCapabilities": {"embeddedContext": True}}})
+                                                     "promptCapabilities": {"embeddedContext": True},
+                                                     "mcpCapabilities": {"http": True}}})
         elif method == "session/new":
-            reply(request_id, {"sessionId": f"{NAME}-{uuid.uuid4()}", "configOptions": options()})
+            session_id = f"{NAME}-{uuid.uuid4()}"
+            for server in params.get("mcpServers", []):
+                if server.get("name") == "agents" and server.get("url"):
+                    servers[session_id] = server
+            reply(request_id, {"sessionId": session_id, "configOptions": options()})
         elif method == "session/set_config_option":
             chosen[params.get("configId", "")] = params.get("value")
             reply(request_id, {"configOptions": options()})

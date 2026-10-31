@@ -14,10 +14,17 @@ Nothing here needs doing; it is for understanding.
   editor you already use, and when something else is better.
 - [The control plane](control-plane.md): hosts, clients, copies and the store, where to
   run it, and what happens when it is down.
+- [Org keys and gateways](org-keys-and-gateways.md): where an organisation's keys and
+  gateways are kept, how each machine gets them sealed to its own key, and what that does
+  not protect against.
+- [Org identity](org-identity.md): how an organisation's own sign-in provider, its
+  tickets and its claimed domains work, and what they do not protect against.
 - [People and machines](people-and-machines.md): why each client is a person's and each
   machine one user's, what an admin sees, and why machines are not shared.
 - [Compliance pack](compliance/index.md): for an organisation's IT and security team: the
   data flow, the sub-processors, a security overview, and data and retention.
+- [Organisation policy on a machine](organisation-policy.md): how each machine follows the
+  organisation's policy as a ceiling, offline too, and what it does not protect against.
 - [The window and the host](window-and-daemon.md): why agents keep working when the
   window is closed, what Agents Host does, and what happens when the Mac restarts.
 - [Why agents' own tools are taken away](scoped-tools.md): what a runtime loses in the
@@ -27,8 +34,8 @@ Nothing here needs doing; it is for understanding.
 - [Versions and capabilities](versions.md): how the clients, the hosts and the control
   plane work together at different versions, and what a version number means.
 - [Connector levels](connector-levels.md): what Tools, Events, Views, Workflows and Tested
-  mean, why they exist, and what "Made by Agents" says.
-- [Projects, hosts and worktrees](projects-hosts-worktrees.md): a project is a folder on
+  mean, why they exist, and where the connectors that Agents makes come from.
+- [Folders, hosts and worktrees](folders-machines-worktrees.md): a folder is a directory on
   one machine, and an agent can have a worktree of its own.
 - [Leases on shared resources](leases.md): how agents take turns with the screen, a
   browser or a simulator, and what you can end.

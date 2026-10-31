@@ -1,14 +1,15 @@
 ---
 diataxis: reference
 devices: [mac, iphone, ipad]
-description: The settings and secrets the control plane keeps for you and sends to each machine of yours.
+description: The secrets and settings that follow you across your machines.
 ---
 
-# On Every Machine
+# Secrets and what follows you
 
-**Settings ▸ You ▸ On Every Machine** holds what the control plane keeps for you, and sends
-to each machine of yours when it joins and when it changes (#1760). Nobody else's machine
-gets it.
+The control plane keeps your secrets and the settings that follow you, and sends them to
+each machine of yours when it joins and when they change
+(#1760, #2410). Nobody else's machine gets them. Your secrets are in **Settings ▸ Machines ▸
+Secrets**.
 
 ## Secrets
 
@@ -30,24 +31,20 @@ beside the control key and outside the store. The store holds no readable secret
 
 ## Settings
 
-Each of these parts is either the same on every machine of yours or each machine's own:
+Each setting has one scope:
 
-| Part | On each machine |
-|---|---|
-| MCP servers | `~/.agents/mcp.json`'s `mcpServers` |
-| Agent configuration | `~/.agents/AGENTS.md`, `personas/<name>.md`, `skills/<name>/SKILL.md` |
-| Agent runtime choices | `sandbox.json` and `client-permissions.json` in the settings folder |
-| Cost limits | `limits.json` |
-| Resources | `resources.json` |
+| Part | Its pane on the Mac | On each machine |
+|---|---|---|
+| MCP servers | Agent Configuration ▸ Connectors | `~/.agents/mcp.json`'s `mcpServers` |
+| Agent configuration | Agent Configuration, its other pages | `~/.agents/AGENTS.md`, `personas/<name>.md`, `skills/<name>/SKILL.md` |
+| Agent runtime choices | Chat prompt (permission); Agent Runtimes (sandbox) | `sandbox.json` and `client-permissions.json` in the settings folder |
+| Cost limits | Cost | `limits.json` |
+| Resources | Resources | `resources.json` |
 
-- On the Mac, **Use This Mac's** takes a part from this Mac and sends it to every machine of
-  yours. An MCP server with a token written in clear is refused: put the token in a secret
-  first. A skill with other files beside its `SKILL.md` is left out.
-- **Each Machine Its Own** gives a part back to each machine. Each machine keeps what it has
-  now.
-- While a part is the same on every machine, a machine's own pane does not change it. On the
-  Mac, the Cost and Resources panes change it here.
+- Agent configuration, MCP servers, runtime choices and cost limits are **Yours, on every
+  machine**. Their panes have no scope switch. An edit is sent to every machine of yours.
+- Resources are **This Mac's**. Each machine keeps and edits its own `resources.json`.
 - Runtime sign-ins stay on each machine.
 
-The Remote and the web page show the same pane. They have no **Use This Mac's**, because the
-settings are a machine's files.
+The Remote and web pages do not list these scopes under Machines. **Secrets** is a row of
+its own under Machines, as on the Mac.

@@ -107,6 +107,7 @@ func (d *Daemon) loadDevices() {
 	var raws []json.RawMessage
 	if json.Unmarshal(b, &raws) != nil {
 		os.Rename(d.devicesFile(), fmt.Sprintf("%s.corrupt-%d", d.devicesFile(), time.Now().Unix()))
+		store.TrimSetAsides(d.devicesFile())
 		log.Print("devices.json: could not read it; starting with no paired devices")
 		return
 	}

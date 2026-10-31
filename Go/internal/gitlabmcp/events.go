@@ -41,6 +41,9 @@ var (
 	// anyoneProperty opts into anyone's issue, comment or merge request (#728); left out, only the project's own people.
 	anyoneProperty = property{name: "anyone", kind: "boolean",
 		description: "true: from anyone, bots, forks and people outside the project too. Left out, only the project's members with Reporter access or more, never a bot, and for a merge request never one from a fork."}
+	// mineProperty is only the connection's owner's own merge requests (#2034), a fork's too.
+	mineProperty = property{name: "mine", kind: "boolean",
+		description: "true: only merge requests by the GitLab account this server is connected as, whatever anyone says."}
 )
 
 // ownMRs is what every merge request event says of whose merge requests it raises.
@@ -69,10 +72,14 @@ func mrInput() schema {
 }
 
 // events are the events this server offers, in the github server's order.
+// fixesSchema is a merge request's fixes: the issues its description closes, "#12" or
+// "group/project#12" (#2349).
+var fixesSchema = map[string]any{"type": "array", "items": str}
+
 var events = append([]event{
 	{name: "checks.failed", title: "Pipeline failed",
 		description: "A merge request's pipeline finished failed: one event per pipeline and failure, so a pipeline retried that fails again is a new one. Jobs allowed to fail are not in failedJobs." + ownMRs,
-		input:       schema{projectProperty, branchProperty("Only pipelines of the merge request from this branch."), prProperty, anyoneProperty},
+		input:       schema{projectProperty, branchProperty("Only pipelines of the merge request from this branch."), prProperty, anyoneProperty, mineProperty},
 		payload: object(map[string]any{
 			"pr": mrSchema(nil), "headSha": str,
 			"run":        object(map[string]any{"id": integer, "name": str, "url": str}),
@@ -81,23 +88,37 @@ var events = append([]event{
 	{name: "pr.opened", title: "Merge request opened",
 		description: "A merge request was opened, or a draft was marked ready: a merge request open and not a draft now that was not at the last poll. Drafts never count. Reopened, it is raised again." + ownMRs,
 		input:       mrInput(),
-		payload:     object(map[string]any{"pr": mrSchema(map[string]any{"author": str}), "openedAt": str})},
+		payload:     object(map[string]any{"pr": mrSchema(map[string]any{"author": str, "fixes": fixesSchema}), "openedAt": str})},
 	{name: "pr.merged", title: "Merge request merged", description: "A merge request was merged." + ownMRs,
 		input:   mrInput(),
-		payload: object(map[string]any{"pr": mrSchema(nil), "mergedAt": str, "mergeSha": str})},
+		payload: object(map[string]any{"pr": mrSchema(map[string]any{"fixes": fixesSchema}), "mergedAt": str, "mergeSha": str})},
 	{name: "pr.closed", title: "Merge request closed", description: "A merge request was closed without being merged." + ownMRs,
 		input:   mrInput(),
-		payload: object(map[string]any{"pr": mrSchema(nil), "closedAt": str})},
+		payload: object(map[string]any{"pr": mrSchema(map[string]any{"fixes": fixesSchema}), "closedAt": str})},
 	{name: "pr.conflicted", title: "Merge request in conflict",
 		description: "An open merge request began to conflict with its target branch, so it cannot merge until it is rebased. Once per conflict: it is raised again only after it merges cleanly and then conflicts anew." + ownMRs,
-		input:       mrInput(),
+		input:       append(mrInput(), mineProperty),
 		payload:     object(map[string]any{"pr": mrSchema(nil), "conflictedAt": str})},
+	// For the person, not the project (#2034): what asks the connection's owner for something.
+	{name: "review.requested", title: "Review requested from me",
+		description: "The GitLab account this server is connected as was made a reviewer of an open merge request: once per request, so one taken off and put back is a new one. Anyone's merge request, a fork's too.",
+		input:       schema{projectProperty, prProperty},
+		payload:     object(map[string]any{"pr": mrSchema(map[string]any{"author": str}), "requestedAt": str})},
 	{name: "review.comment", title: "Merge request line commented on",
 		description: "Someone left a comment on a line of a merge request's diff, or answered in its thread. Its body is the first 4000 characters. Only comments by the project's members with Reporter access or more, never a bot, unless anyone is true; and only on the project's own merge requests.",
 		input:       mrInput(),
 		payload: object(map[string]any{"pr": mrSchema(nil), "commentedAt": str,
 			"comment": object(map[string]any{"id": integer, "author": str, "path": str, "line": integer, "body": str, "url": str})})},
-}, issueEvents()...)
+}, append(issueEvents(), assignedEvent)...)
+
+// assignedEvent is for the person, not the project (#2034): an issue given to the connection's owner.
+var assignedEvent = event{name: "issue.assigned", title: "Issue assigned to me",
+	description: "An open issue was assigned to the GitLab account this server is connected as: once per assignment, so one unassigned and assigned again is a new one. Anyone's issue.",
+	input:       schema{projectProperty, property{name: "issue", kind: "integer", description: "Only this issue, by number (its iid, as #12)."}},
+	payload: object(map[string]any{"issue": object(map[string]any{
+		"number": integer, "title": str, "author": str, "labels": map[string]any{"type": "array", "items": str}, "url": str,
+		"assignees": map[string]any{"type": "array", "items": str},
+	}), "assignedAt": str})}
 
 func issueEvents() []event {
 	issueSchema := object(map[string]any{
@@ -265,13 +286,46 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 		}
 		a.project = project
 	}
+	// mine: the connection's owner's own open merge requests, asked once a poll (#2034).
+	var yours *Yours
+	if a.mine || e.name == "review.requested" || e.name == "issue.assigned" {
+		y, err := s.GitLab.Yours(ctx, a.project)
+		if err != nil {
+			return nil, eventsError(err)
+		}
+		yours = &y
+	}
 	switch e.name {
+	case "review.requested":
+		return s.pollDiff(e.name, "requestedAt", a, p, func() ([]state, error) {
+			var out []state
+			for _, r := range yours.Reviews {
+				j := r.MR.json()
+				j["author"] = r.Author
+				out = append(out, state{mr: r.MR, on: new(true), json: j})
+			}
+			return out, nil
+		})
+	case "issue.assigned":
+		return s.pollDiff(e.name, "assignedAt", a, p, func() ([]state, error) {
+			var out []state
+			for _, i := range yours.Assigned {
+				if a.issue == 0 || i.Number == a.issue {
+					out = append(out, state{mr: MR{Number: i.Number, Title: i.Title, URL: i.URL}, on: new(true), json: i.json()})
+				}
+			}
+			return out, nil
+		})
 	case "pr.conflicted":
 		return s.pollDiff(e.name, "conflictedAt", a, p, func() ([]state, error) {
 			mrs, err := s.GitLab.OpenMRs(ctx, a.project)
 			var out []state
 			for _, m := range mrs {
-				if a.anyone || m.Trusted {
+				if yours != nil {
+					if yours.owns(m.MR.Number) {
+						out = append(out, state{mr: m.MR, on: m.Conflicts, json: m.MR.json()})
+					}
+				} else if a.anyone || m.Trusted {
 					out = append(out, state{mr: m.MR, on: m.Conflicts, json: m.MR.json()})
 				}
 			}
@@ -293,7 +347,9 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 			return out, err
 		})
 	}
-	return s.poll(e, p, func(since string) ([]candidate, Listed, error) { return candidates(ctx, s.GitLab, e.name, a, since) })
+	return s.poll(e, p, func(since string) ([]candidate, Listed, error) {
+		return candidates(ctx, s.GitLab, e.name, a, yours, since)
+	})
 }
 
 // poll is events/poll over a cursor: the first poll (no cursor) gives none and starts from
@@ -434,10 +490,14 @@ func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() 
 		ids = append(ids, id(st))
 	}
 	out := []any{}
+	root := "pr"
+	if strings.HasPrefix(name, "issue.") {
+		root = "issue" // issue.assigned (#2034)
+	}
 	if !first {
 		for _, t := range taken {
 			out = append(out, map[string]any{"eventId": id(t) + ":" + now, "name": name, "timestamp": now,
-				"data": map[string]any{"pr": t.json, key: now}})
+				"data": map[string]any{root: t.json, key: now}})
 		}
 	}
 	return map[string]any{"events": out, "cursor": cursor{Since: now, IDs: ids}.encoded(), "truncated": false,
@@ -445,10 +505,15 @@ func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() 
 }
 
 // candidates finds what an event may raise at or after since.
-func candidates(ctx context.Context, gl GitLab, name string, a args, since string) ([]candidate, Listed, error) {
+func candidates(ctx context.Context, gl GitLab, name string, a args, yours *Yours, since string) ([]candidate, Listed, error) {
 	project := a.project
+	// mine: the owner's own merge request, trusted or not; else the trust filter (#728).
 	wanted := func(m MR, trusted bool) bool {
-		return (a.pr == 0 || m.Number == a.pr) && (a.branch == "" || m.Branch == a.branch) && (a.anyone || trusted)
+		who := a.anyone || trusted
+		if yours != nil {
+			who = yours.owns(m.Number)
+		}
+		return (a.pr == 0 || m.Number == a.pr) && (a.branch == "" || m.Branch == a.branch) && who
 	}
 	if kind, ok := strings.CutPrefix(name, "issue."); ok {
 		items, listed, err := gl.IssueActivity(ctx, project, IssueKind(kind), since)

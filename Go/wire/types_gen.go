@@ -54,16 +54,41 @@ type AccountProfile struct {
 
 	// The command that signs it in, in a terminal on the host, for a runtime the app cannot sign in itself (Claude). Absent for one that signs in with runtimes/authenticate.
 	SignInCommand *string `json:"signInCommand,omitzero"`
+
+	// Who gave the account (#999): absent or person for one the person added, organisation for an org route, which the person cannot remove.
+	Source *string `json:"source,omitzero"`
+
+	// The runtime's default account for new sessions (Reaches the Model By, #999). When no account says so, the runtime's own sign-in is the default.
+	IsDefault *bool `json:"isDefault,omitzero"`
+
+	// The organisation's policy refuses this account (#999, runtimes.<id>.reach).
+	SetBy *PolicySetBy `json:"setBy,omitzero"`
 }
 
-// How an account reaches the model (#840). Today only a sign-in kept in a folder of its own; an org key and a gateway (T6, #999) are other cases of this.
+// How an account reaches the model (#840): a sign-in kept in a folder of its own, or (#999) an organisation's route: an org key or a gateway, through the machine's model relay.
 type AccountReach struct {
 	SignIn *AccountReachSignIn `json:"signIn,omitzero"`
+
+	OrgKey *AccountReachOrgKey `json:"orgKey,omitzero"`
+
+	Gateway *AccountReachGateway `json:"gateway,omitzero"`
 }
 
 type AccountReachSignIn struct {
 	// The folder the runtime is given in its account variable (Runtime.accountFolderVariable).
 	Folder string `json:"folder"`
+}
+
+type AccountReachOrgKey struct {
+	// The org route's id.
+	Route string `json:"route"`
+}
+
+type AccountReachGateway struct {
+	// The org route's id.
+	Route string `json:"route"`
+
+	Kind OrgRouteKind `json:"kind"`
 }
 
 type AccountRequest struct {
@@ -72,7 +97,7 @@ type AccountRequest struct {
 	AccountID string `json:"accountID"`
 }
 
-// clients/setActivityToken (#1744): the push token of one session's Live Activity on this device, in hex, for the control plane to update it by APNs while the Remote is not running. startedAt is when the turn began, where the activity's timer counts from. No token takes it away.
+// clients/setActivityToken (#1744): the push token of this device's Live Activity, in hex, for one session it speaks for (#2991: one activity for every turn sent from the device, so one token for several sessions), for the control plane to update it by APNs while the Remote is not running. startedAt is when the session's turn began. No token takes the session out of it.
 type ActivityToken struct {
 	AgentID UUID `json:"agentID"`
 
@@ -89,11 +114,18 @@ type AddAccountRequest struct {
 	Name string `json:"name"`
 }
 
+// folders/add: the folder, and the project to put it in (#2671). With no project, a folder that names none gets one of its own.
+type AddFolderRequest struct {
+	Folder URL `json:"folder"`
+
+	Project *string `json:"project,omitzero"`
+}
+
 // What either announce is answered with: who the new party now is.
 type Admitted struct {
 	Client *UUID `json:"client,omitzero"`
 
-	Host *HostID `json:"host,omitzero"`
+	Host *MachineRef `json:"host,omitzero"`
 
 	Grant *string `json:"grant,omitzero"`
 }
@@ -237,12 +269,91 @@ type Agent struct {
 
 	// The added account its runtime runs with (#840); absent for the runtime's own sign-in.
 	AccountID *string `json:"accountID,omitzero"`
+
+	// Set when the agent started on Auto (#2658, FR-007).
+	Auto *AutoPick `json:"auto,omitzero"`
+
+	// The agent's own answer to permission requests (#2658, FR-019); absent follows Settings.
+	ClientPermission *ClientPermissionMode `json:"clientPermission,omitzero"`
+
+	// The shared values the agent runs with now (#2658), where its own settings match one; a field that is absent shows Custom.
+	Levels *Levels `json:"levels,omitzero"`
+
+	// When the agent last ended voice mode with hang_up (#2375): the person said they were done talking. A client in voice mode on this chat says the reply, then turns voice mode off.
+	VoiceHungUpAt *Date `json:"voiceHungUpAt,omitzero"`
+
+	// The standing aim its runtime keeps working towards over many turns (#2742), as Codex's and Claude's adapters report it on a session_info_update under _meta.jetbrains.air.goal. Absent when the runtime reports none, or cleared it.
+	Goal *Goal `json:"goal,omitzero"`
 }
 
 type AgentArchivedReason string
 
 const AgentArchivedReasonByUser AgentArchivedReason = "byUser"
 const AgentArchivedReasonByAgent AgentArchivedReason = "byAgent"
+
+// A Markdown file under skills, personas or workflows in Agent Configuration.
+type AgentConfigEditorFile struct {
+	Path string `json:"path"`
+
+	Content string `json:"content"`
+}
+
+type AgentConfigEditorFiles []AgentConfigEditorFile
+
+type AgentConfigEditorRequest struct {
+	Folder *URL `json:"folder,omitzero"`
+
+	Kind string `json:"kind"`
+}
+
+type AgentConfigEditorSaveRequest struct {
+	Folder *URL `json:"folder,omitzero"`
+
+	Kind string `json:"kind"`
+
+	Path string `json:"path"`
+
+	Content string `json:"content"`
+
+	Delete *bool `json:"delete,omitzero"`
+}
+
+// One agent configuration file (#2129), or a deletion tombstone. contents is base64 encoded. Logical time and machine ID resolve concurrent offline edits.
+type AgentConfigFile struct {
+	Path string `json:"path"`
+
+	Contents *string `json:"contents,omitzero"`
+
+	Deleted *bool `json:"deleted,omitzero"`
+
+	Time int64 `json:"time"`
+
+	Counter int64 `json:"counter"`
+
+	Machine string `json:"machine"`
+
+	Digest string `json:"digest"`
+}
+
+// One local edit or deletion of an agent configuration file (#2129).
+type AgentConfigFileRequest struct {
+	Path string `json:"path"`
+
+	Contents *string `json:"contents,omitzero"`
+
+	Deleted *bool `json:"deleted,omitzero"`
+
+	Time int64 `json:"time"`
+
+	Counter int64 `json:"counter"`
+}
+
+// The per-path configuration files and tombstones for a person (#2129).
+type AgentConfigFiles struct {
+	Files []AgentConfigFile `json:"files"`
+
+	Updated *string `json:"updated,omitzero"`
+}
 
 type AgentGroup string
 
@@ -253,6 +364,48 @@ const AgentGroupRunning AgentGroup = "running"
 const AgentGroupFinished AgentGroup = "finished"
 const AgentGroupStopped AgentGroup = "stopped"
 const AgentGroupArchived AgentGroup = "archived"
+
+// machines/forAgent: what list_machines shows an agent.
+type AgentMachines struct {
+	Providers []AgentMachinesProvider `json:"providers"`
+
+	// Every machine of the person's, by name, where start_session can start a session (#2887). Absent from an older control plane.
+	Hosts []AgentMachinesHost `json:"hosts,omitzero"`
+}
+
+type AgentMachinesHost struct {
+	Name string `json:"name"`
+
+	State string `json:"state"`
+}
+
+type AgentMachinesMachine struct {
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	State string `json:"state"`
+
+	Host *string `json:"host,omitzero"`
+
+	HostState *string `json:"hostState,omitzero"`
+
+	Cost *string `json:"cost,omitzero"`
+}
+
+type AgentMachinesProvider struct {
+	ID ProviderID `json:"id"`
+
+	Name string `json:"name"`
+
+	CanMake bool `json:"canMake"`
+
+	CanDelete bool `json:"canDelete"`
+
+	Options JSONValue `json:"options,omitzero"`
+
+	Workspaces []AgentMachinesMachine `json:"workspaces"`
+}
 
 type AgentPurpose struct {
 	ProviderDraft *AgentPurposeProviderDraft `json:"providerDraft,omitzero"`
@@ -302,37 +455,11 @@ func (v *AgentState) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// workspaces/forAgent: what list_workspaces shows an agent.
-type AgentWorkspaces struct {
-	Providers []AgentWorkspacesProvider `json:"providers"`
-}
+// agents/stop (#2435): the agent, and whether an admin stopped it from the Console, so its owner reads who stopped it. Only a label on the owner's own transcript: whoever sends it could already stop the agent.
+type AgentStopRequest struct {
+	AgentID UUID `json:"agentID"`
 
-type AgentWorkspacesProvider struct {
-	ID ProviderID `json:"id"`
-
-	Name string `json:"name"`
-
-	CanMake bool `json:"canMake"`
-
-	CanDelete bool `json:"canDelete"`
-
-	Options JSONValue `json:"options,omitzero"`
-
-	Workspaces []AgentWorkspacesWorkspace `json:"workspaces"`
-}
-
-type AgentWorkspacesWorkspace struct {
-	ID string `json:"id"`
-
-	Name string `json:"name"`
-
-	State string `json:"state"`
-
-	Host *string `json:"host,omitzero"`
-
-	HostState *string `json:"hostState,omitzero"`
-
-	Cost *string `json:"cost,omitzero"`
+	ByAdmin *bool `json:"byAdmin,omitzero"`
 }
 
 type AgentWorktree struct {
@@ -342,11 +469,34 @@ type AgentWorktree struct {
 
 	Branch *string `json:"branch,omitzero"`
 
-	Project URL `json:"project"`
-
 	Base *string `json:"base,omitzero"`
 
 	MadeByApp bool `json:"madeByApp"`
+
+	Folder URL `json:"folder"`
+}
+
+// What agents/export made (#1001): a .tar.gz in the backup format, read in parts with agents/exportRead. `name` is a file name to save it as.
+type AgentsExport struct {
+	File SendFile `json:"file"`
+
+	Agents int64 `json:"agents"`
+
+	Name string `json:"name"`
+}
+
+// agents/export (#1001): one agent (`agentID`) or every agent of one folder (`folder`). Give one of the two.
+type AgentsExportRequest struct {
+	AgentID *UUID `json:"agentID,omitzero"`
+
+	Folder *URL `json:"folder,omitzero"`
+}
+
+// What agents/import takes (#1001): the export sent with agents/importUpload. Its agents come back archived, as a restore brings them; one this machine has, or deleted, is skipped. With `folder`, a folder on this machine (the one whose menu was used, #2389), every agent comes back in that folder; without it, each in the folder it had where it was exported.
+type AgentsImportRequest struct {
+	Upload UUID `json:"upload"`
+
+	Folder *URL `json:"folder,omitzero"`
 }
 
 type AllowanceReading struct {
@@ -679,7 +829,7 @@ type AttentionPending struct {
 	Deliveries []AttentionDelivery `json:"deliveries"`
 }
 
-// attention/turn (#1744): a host says that a session's turn moved to a new phase, so the control plane can update that session's Live Activity on a device by APNs. No words: the phase, and when it ended.
+// attention/turn (#1744): a host says that a session's turn moved to a new phase, so the control plane can update each device's Live Activity that speaks for the session by APNs. No words: the phase, and when it ended.
 type AttentionTurn struct {
 	AgentID UUID `json:"agentID"`
 
@@ -700,6 +850,12 @@ type AuditActor struct {
 	ClientName *string `json:"clientName,omitzero"`
 
 	Event *AuditCause `json:"event,omitzero"`
+
+	// A SCIM write: the user is scim:<provider> (#1002).
+	Scim *AuditSCIM `json:"scim,omitzero"`
+
+	// A suspension by a refused refresh: the user is the suspended person (#1002).
+	Refresh *AuditRefresh `json:"refresh,omitzero"`
 }
 
 // The event that started a bot's action (#996).
@@ -724,7 +880,7 @@ type AuditEntry struct {
 
 	Method string `json:"method"`
 
-	Host *HostID `json:"host,omitzero"`
+	Host *MachineRef `json:"host,omitzero"`
 
 	Target *string `json:"target,omitzero"`
 
@@ -762,6 +918,58 @@ type AuditQuery struct {
 	Limit *int64 `json:"limit,omitzero"`
 }
 
+// A suspension by a refused refresh (#1002, Q1 A): the provider that refused.
+type AuditRefresh struct {
+	Provider string `json:"provider"`
+}
+
+// A SCIM write's actor (#1002, D16): the provider and the id of the token it used, never its value.
+type AuditSCIM struct {
+	Provider string `json:"provider"`
+
+	Token string `json:"token"`
+}
+
+// One audit sink (#1001). `address` is tcp://host:port or tls://host:port for syslog, an https:// URL for HTTP. `token`, for HTTP, is sent as a bearer token; it is only ever sent to the control plane, which answers `hasToken` instead.
+type AuditSink struct {
+	Kind AuditSinkKind `json:"kind"`
+
+	Address string `json:"address"`
+
+	Token *string `json:"token,omitzero"`
+
+	HasToken *bool `json:"hasToken,omitzero"`
+}
+
+// Where an audit sink sends (#1001): syslog (RFC 5424 over TCP or TLS) or HTTP (a POST of JSON lines).
+type AuditSinkKind string
+
+const AuditSinkKindSyslog AuditSinkKind = "syslog"
+const AuditSinkKindHttp AuditSinkKind = "http"
+
+// A sink and how this copy of the control plane is sending to it (#1001): entries waiting (at most 10,000), dropped since it started because the queue was full, the last sent, and the last failure.
+type AuditSinkStatus struct {
+	Sink AuditSink `json:"sink"`
+
+	Queued int64 `json:"queued"`
+
+	Dropped int64 `json:"dropped"`
+
+	SentAt *Date `json:"sentAt,omitzero"`
+
+	LastError *string `json:"lastError,omitzero"`
+}
+
+// audit/sinks and audit/setSinks (#1001): the sinks, at most 4. In audit/setSinks, a sink with no `token` keeps the token it had at the same address.
+type AuditSinks struct {
+	Sinks []AuditSink `json:"sinks"`
+}
+
+// What audit/sinks and audit/setSinks answer (#1001): each sink and how it is sending.
+type AuditSinksState struct {
+	Sinks []AuditSinkStatus `json:"sinks"`
+}
+
 type AuthStatus struct {
 	Kind string `json:"kind"`
 
@@ -775,6 +983,137 @@ type AuthenticateRequest struct {
 
 	// An added account to sign in (#840); absent for the runtime's own sign-in.
 	AccountID *string `json:"accountID,omitzero"`
+}
+
+// A field Auto maps (#2658): the model level, the permission mode, the permission requests and the sandbox.
+type AutoField string
+
+const AutoFieldModel AutoField = "model"
+const AutoFieldPermission AutoField = "permission"
+const AutoFieldPermissionRequests AutoField = "permissionRequests"
+const AutoFieldSandbox AutoField = "sandbox"
+
+// One cell of Settings ▸ Agent Runtimes ▸ Auto ▸ Mappings (#2658): what a level is on one runtime. native is absent when the runtime cannot honour the level.
+type AutoMapping struct {
+	RuntimeID string `json:"runtimeID"`
+
+	Field AutoField `json:"field"`
+
+	// A ModelLevel, PermissionLevel, ClientPermissionMode or SandboxChoice, by field.
+	Level string `json:"level"`
+
+	Native *NativeSetting `json:"native,omitzero"`
+
+	// The runtime's own words for native, such as Sonnet 5 or Accept edits.
+	Words string `json:"words"`
+
+	Mark AutoMark `json:"mark"`
+
+	// One line, such as nearest safer: no plan mode.
+	Note *string `json:"note,omitzero"`
+}
+
+// auto/mappings: every cell, and each runtime's own choices a cell can be set to.
+type AutoMappings struct {
+	Cells []AutoMapping `json:"cells"`
+
+	Choices []AutoNativeChoice `json:"choices"`
+}
+
+// How a cell got its value: the shipped map, the nearest value with less access, the person's own, none possible, or a value the runtime no longer offers.
+type AutoMark string
+
+const AutoMarkAutoMapped AutoMark = "autoMapped"
+const AutoMarkNearestSafer AutoMark = "nearestSafer"
+const AutoMarkYours AutoMark = "yours"
+const AutoMarkNotPossible AutoMark = "notPossible"
+const AutoMarkDropped AutoMark = "dropped"
+
+// UnmarshalJSON reads a value this build does not know as "autoMapped".
+func (v *AutoMark) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	switch AutoMark(s) {
+	case AutoMarkAutoMapped,
+		AutoMarkNearestSafer,
+		AutoMarkYours,
+		AutoMarkNotPossible,
+		AutoMarkDropped:
+		*v = AutoMark(s)
+	default:
+		*v = AutoMarkAutoMapped
+	}
+	return nil
+}
+
+// One of a runtime's own settings that a cell of a field can be set to.
+type AutoNativeChoice struct {
+	RuntimeID string `json:"runtimeID"`
+
+	Field AutoField `json:"field"`
+
+	Native NativeSetting `json:"native"`
+
+	Words string `json:"words"`
+}
+
+// The person's own value for one cell (#2658, FR-016).
+type AutoOverride struct {
+	RuntimeID string `json:"runtimeID"`
+
+	Field AutoField `json:"field"`
+
+	Level string `json:"level"`
+
+	Native NativeSetting `json:"native"`
+}
+
+// On an Auto agent (#2658, FR-007): the runtime Auto picked, the levels asked for, the native settings given, and why each runtime before it was not used. The runtime never changes in the session.
+type AutoPick struct {
+	RuntimeID string `json:"runtimeID"`
+
+	Levels Levels `json:"levels"`
+
+	Native NativeSetting `json:"native"`
+
+	Skipped []AutoSkip `json:"skipped"`
+}
+
+// auto/preview: the runtime Auto would pick now and what it would give, or why none can.
+type AutoPreview struct {
+	RuntimeID *string `json:"runtimeID,omitzero"`
+
+	Native *NativeSetting `json:"native,omitzero"`
+
+	Skipped []AutoSkip `json:"skipped"`
+}
+
+type AutoPreviewRequest struct {
+	Cwd URL `json:"cwd"`
+
+	Levels *Levels `json:"levels,omitzero"`
+
+	Sandbox *SandboxChoice `json:"sandbox,omitzero"`
+}
+
+// The person's Auto settings (#2658, FR-017), in <settings>/auto.json: the order Auto tries the runtimes in (one not named goes last, in the shipped order), the runtimes it never uses, and their own values for cells.
+type AutoSettings struct {
+	Order []string `json:"order"`
+
+	Excluded []string `json:"excluded"`
+
+	Overrides []AutoOverride `json:"overrides"`
+
+	SetBy *PolicySetBy `json:"setBy,omitzero"`
+}
+
+// Why Auto did not use a runtime, in short: out, not signed in, not installed, excluded, no Runtime sandbox.
+type AutoSkip struct {
+	RuntimeID string `json:"runtimeID"`
+
+	Reason string `json:"reason"`
 }
 
 type BackgroundItem struct {
@@ -1017,7 +1356,7 @@ type BotMake struct {
 
 // bots/stopRun (#1761, FR-031): an admin stops an agent on a bot's machine, the one way a client acts there.
 type BotStopRun struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
 	Agent UUID `json:"agent"`
 }
@@ -1035,7 +1374,7 @@ type BranchSummary struct {
 	Remote *string `json:"remote,omitzero"`
 }
 
-// What projects/bringBack did (#1473): the branches that moved forward or were made, and whether the uncommitted changes were applied.
+// What folders/bringBack did (#1473): the branches that moved forward or were made, and whether the uncommitted changes were applied.
 type BringBack struct {
 	Moved []string `json:"moved"`
 
@@ -1131,6 +1470,52 @@ type CarriedSettingSourceLevel struct {
 	Value string `json:"_0"`
 }
 
+// An approval of an MCP server or skill (#2019, M5): for a group, or for one person.
+type CatalogApproval struct {
+	Kind CatalogKind `json:"kind"`
+
+	Name string `json:"name"`
+
+	Source *string `json:"source,omitzero"`
+
+	Group *string `json:"group,omitzero"`
+
+	GroupName *string `json:"groupName,omitzero"`
+
+	User *string `json:"user,omitzero"`
+
+	UserName *string `json:"userName,omitzero"`
+
+	By string `json:"by"`
+
+	At Date `json:"at"`
+}
+
+// governance/approvals (#2019, M5), an admin's: every approval, by item.
+type CatalogApprovalList struct {
+	Approvals []CatalogApproval `json:"approvals"`
+}
+
+// governance/request (#2019, M5): a person asks for an MCP server or skill, with why.
+type CatalogAsk struct {
+	Kind CatalogKind `json:"kind"`
+
+	Name string `json:"name"`
+
+	Source *string `json:"source,omitzero"`
+
+	Why *string `json:"why,omitzero"`
+}
+
+// governance/decide (#2019, M5), an admin's: approve or refuse a request. Approved with a group, the approval holds for each of its members; with none, for the person who asked.
+type CatalogDecide struct {
+	Request string `json:"request"`
+
+	Approve bool `json:"approve"`
+
+	Group *string `json:"group,omitzero"`
+}
+
 type CatalogError struct {
 	Unreachable *CatalogErrorUnreachable `json:"unreachable,omitzero"`
 
@@ -1144,7 +1529,7 @@ type CatalogError struct {
 
 	PreviewExpired *struct{} `json:"previewExpired,omitzero"`
 
-	NotAProject *CatalogErrorNotAProject `json:"notAProject,omitzero"`
+	NotAFolder *CatalogErrorNotAFolder `json:"notAFolder,omitzero"`
 
 	ReplaceMismatch *struct{} `json:"replaceMismatch,omitzero"`
 
@@ -1171,7 +1556,7 @@ type CatalogErrorLockUnreadable struct {
 	Path string `json:"path"`
 }
 
-type CatalogErrorNotAProject struct {
+type CatalogErrorNotAFolder struct {
 	Path string `json:"path"`
 }
 
@@ -1187,10 +1572,30 @@ type CatalogErrorFailed struct {
 	Value string `json:"_0"`
 }
 
+// One MCP server or skill a machine has from a catalogue (#2019, M5): its name, the registry name or catalogue it came from, and its version (a server's version, a skill's commit).
+type CatalogItem struct {
+	Kind CatalogKind `json:"kind"`
+
+	Name string `json:"name"`
+
+	Source *string `json:"source,omitzero"`
+
+	Version *string `json:"version,omitzero"`
+
+	ByHand *bool `json:"byHand,omitzero"`
+}
+
 type CatalogKind string
 
 const CatalogKindSkills CatalogKind = "skills"
 const CatalogKindMCP CatalogKind = "mcp"
+
+// A person in the catalogue's rows: their id and name.
+type CatalogPerson struct {
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+}
 
 type CatalogPreviewAnswer struct {
 	Preview *SkillPreview `json:"preview,omitzero"`
@@ -1203,6 +1608,46 @@ type CatalogPreviewRequest struct {
 
 	Destination SkillDestination `json:"destination"`
 }
+
+// A request for an MCP server or skill (#2019, M5). Approved for a group, it is approved at once for every member who asks again.
+type CatalogRequest struct {
+	ID string `json:"id"`
+
+	Kind CatalogKind `json:"kind"`
+
+	Name string `json:"name"`
+
+	Source *string `json:"source,omitzero"`
+
+	Why *string `json:"why,omitzero"`
+
+	User string `json:"user"`
+
+	UserName string `json:"userName"`
+
+	At Date `json:"at"`
+
+	State CatalogRequestState `json:"state"`
+
+	Group *string `json:"group,omitzero"`
+
+	GroupName *string `json:"groupName,omitzero"`
+
+	DecidedBy *string `json:"decidedBy,omitzero"`
+
+	DecidedAt *Date `json:"decidedAt,omitzero"`
+}
+
+// governance/requests (#2019, M5): every request waiting to an admin, and to anyone their own of the last 30 days, oldest first.
+type CatalogRequestList struct {
+	Requests []CatalogRequest `json:"requests"`
+}
+
+type CatalogRequestState string
+
+const CatalogRequestStateWaiting CatalogRequestState = "waiting"
+const CatalogRequestStateApproved CatalogRequestState = "approved"
+const CatalogRequestStateRefused CatalogRequestState = "refused"
 
 type CatalogResult struct {
 	ID string `json:"id"`
@@ -1224,6 +1669,17 @@ type CatalogResult struct {
 	SkillPath *string `json:"skillPath,omitzero"`
 }
 
+// governance/revoke (#2019, M5), an admin's: take back one approval, for a group or for a person.
+type CatalogRevoke struct {
+	Kind CatalogKind `json:"kind"`
+
+	Name string `json:"name"`
+
+	Group *string `json:"group,omitzero"`
+
+	User *string `json:"user,omitzero"`
+}
+
 type CatalogSearchAnswer struct {
 	Results []CatalogResult `json:"results"`
 
@@ -1238,6 +1694,29 @@ type CatalogSearchRequest struct {
 	Marketplace *string `json:"marketplace,omitzero"`
 
 	Destination *SkillDestination `json:"destination,omitzero"`
+}
+
+// governance/usage (#2019, M5), an admin's: who uses each MCP server and skill, at each version, from what each machine last reported.
+type CatalogUsage struct {
+	Rows []CatalogUseRow `json:"rows"`
+
+	// How many machines have reported.
+	Machines int64 `json:"machines"`
+}
+
+// One item at one version in governance/usage: on how many machines, and whose (at most 50 people named).
+type CatalogUseRow struct {
+	Kind CatalogKind `json:"kind"`
+
+	Name string `json:"name"`
+
+	Source *string `json:"source,omitzero"`
+
+	Version string `json:"version"`
+
+	Machines int64 `json:"machines"`
+
+	People []CatalogPerson `json:"people"`
 }
 
 type CatchUpLeases struct {
@@ -1267,8 +1746,6 @@ type CatchUpRequest struct {
 }
 
 type CatchUpSnapshot struct {
-	Projects []ProjectSummary `json:"projects"`
-
 	Agents []Agent `json:"agents"`
 
 	Permissions []PermissionRequest `json:"permissions"`
@@ -1287,9 +1764,11 @@ type CatchUpSnapshot struct {
 
 	Workflows []WorkflowSummary `json:"workflows,omitzero"`
 
-	Pins []ProjectPins `json:"pins,omitzero"`
+	Pins []FolderPins `json:"pins,omitzero"`
 
 	Leases *CatchUpLeases `json:"leases,omitzero"`
+
+	Folders []FolderSummary `json:"folders"`
 }
 
 type ChangeSource string
@@ -1506,28 +1985,6 @@ const ChartMarkLine ChartMark = "line"
 const ChartMarkPoint ChartMark = "point"
 const ChartMarkArea ChartMark = "area"
 
-type ChatProjectState struct {
-	Ready *ChatProjectStateReady `json:"ready,omitzero"`
-
-	Archived *ChatProjectStateArchived `json:"archived,omitzero"`
-
-	NoPersonalHome *struct{} `json:"noPersonalHome,omitzero"`
-
-	Failed *ChatProjectStateFailed `json:"failed,omitzero"`
-}
-
-type ChatProjectStateReady struct {
-	Folder URL `json:"folder"`
-}
-
-type ChatProjectStateArchived struct {
-	Folder URL `json:"folder"`
-}
-
-type ChatProjectStateFailed struct {
-	Message string `json:"message"`
-}
-
 // clients/announce, on a pairing connection.
 type ClientAnnounce struct {
 	ID UUID `json:"id"`
@@ -1611,6 +2068,9 @@ type ClientPermissionSettings struct {
 	Grok ClientPermissionMode `json:"grok"`
 
 	Opencode ClientPermissionMode `json:"opencode"`
+
+	// Set when the organisation's mode ceiling is below approving every request: Always-approve is refused, and no agent's requests are answered for the person.
+	SetBy *PolicySetBy `json:"setBy,omitzero"`
 }
 
 // A paired screen, as clients/list says it (ClientRecord). `grant` is always `operator`, for an older build (#111).
@@ -1673,6 +2133,9 @@ type ConfigChoice struct {
 	Name string `json:"name"`
 
 	Description *string `json:"description,omitzero"`
+
+	// Set when the organisation's policy refuses this choice (#998, FR-010): a mode above the ceiling, or a model it does not allow.
+	SetBy *PolicySetBy `json:"setBy,omitzero"`
 }
 
 type ConfigChoiceGroup struct {
@@ -1838,7 +2301,41 @@ type ConnectionsList struct {
 	Connections []Connection `json:"connections"`
 }
 
-// The github events the set-up turned on, and the project's workflows that start on one of them.
+// A GitHub Codespace for a folder's repository (#1591).
+type ConnectorCodespace struct {
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Repository string `json:"repository"`
+
+	State string `json:"state"`
+
+	Ref *string `json:"ref,omitzero"`
+
+	SSH string `json:"ssh"`
+}
+
+type ConnectorCodespaces struct {
+	Repository *string `json:"repository,omitzero"`
+
+	Codespaces []ConnectorCodespace `json:"codespaces"`
+
+	Message *string `json:"message,omitzero"`
+}
+
+// Lists or changes the folder's GitHub Codespaces (#1591).
+type ConnectorCodespacesRequest struct {
+	Folder URL `json:"folder"`
+
+	Action string `json:"action"`
+
+	ID *string `json:"id,omitzero"`
+
+	Name *string `json:"name,omitzero"`
+}
+
+// The github events the set-up turned on, and the folder's workflows that start on one of them.
 type ConnectorEvents struct {
 	State ConnectorEventsState `json:"state"`
 
@@ -1853,7 +2350,7 @@ type ConnectorEvents struct {
 	Message *string `json:"message,omitzero"`
 }
 
-// on: the github connector is in the project's or the person's mcp.json, so its events reach this project. off: not yet (nothing connected, or every GitHub slot skipped). taken: an mcp.json entry not made by Agents already has the name github, and it is left alone. failed: the entry could not be written; message says why.
+// on: the github connector is in the folder's or the person's mcp.json, so its events reach this folder. off: not yet (nothing connected, or every GitHub slot skipped). taken: an mcp.json entry not made by Agents already has the name github, and it is left alone. failed: the entry could not be written; message says why.
 type ConnectorEventsState string
 
 const ConnectorEventsStateOn ConnectorEventsState = "on"
@@ -1877,11 +2374,11 @@ type ConnectorProof struct {
 	At *Date `json:"at,omitzero"`
 }
 
-// A project's Connectors set-up (#1336): its GitHub or GitLab repository (#1632), the person's connection to that forge, four slots that each prove themselves with one read, and the events.
+// A folder's Connectors set-up (#1336): its GitHub or GitLab repository (#1632), the person's connection to that forge, four slots that each prove themselves with one read, and the events.
 type ConnectorSetup struct {
 	Folder string `json:"folder"`
 
-	// owner/name on GitHub, or group/project on GitLab, from the project's git remote (origin first). Absent with no GitHub or GitLab remote.
+	// owner/name on GitHub, or group/project on GitLab, from the folder's git remote (origin first). Absent with no GitHub or GitLab remote.
 	Repository *string `json:"repository,omitzero"`
 
 	// The forge the repository is on, which fills Tasks, Code review and CI: github or gitlab (#1632). Absent is github.
@@ -1909,9 +2406,15 @@ type ConnectorSetup struct {
 
 	// Slots that read or were skipped, of the four.
 	Done int64 `json:"done"`
+
+	// The folder's project id (#2669), whose owner or an admin sets Tasks, Code review and CI for every folder in it. Absent when the folder is in no project.
+	Project *string `json:"project,omitzero"`
+
+	// The project's name, as this machine last heard it from the control plane.
+	ProjectName *string `json:"projectName,omitzero"`
 }
 
-// stored: no call to the provider, only what was read before (for a list of every project). cached: a read at most five minutes old is used again. fresh: read now (Try Again).
+// stored: no call to the provider, only what was read before (for a list of every folder). cached: a read at most five minutes old is used again. fresh: read now (Try Again).
 type ConnectorSetupReading string
 
 const ConnectorSetupReadingStored ConnectorSetupReading = "stored"
@@ -1924,7 +2427,7 @@ type ConnectorSetupRequest struct {
 	Reading *ConnectorSetupReading `json:"reading,omitzero"`
 }
 
-// Skip a slot, or set it up again. Kept in the project's .agents/project.json.
+// Skip a slot, or set it up again. Kept in the folder's .agents/folder.json.
 type ConnectorSkipRequest struct {
 	Folder string `json:"folder"`
 
@@ -1948,9 +2451,15 @@ type ConnectorSlot struct {
 
 	// Why a read failed or was refused, in words. Never a token.
 	Message *string `json:"message,omitzero"`
+
+	// The repository that fills this slot (#2669): the project's when fromProject, else the folder's own. Absent for workspace and with no remote.
+	Repository *string `json:"repository,omitzero"`
+
+	// The folder's project sets this slot (#2669), so it is the same in every folder of the project.
+	FromProject *bool `json:"fromProject,omitzero"`
 }
 
-// One slot of a project's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci, and workspace (where agents run).
+// One slot of a folder's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci, and workspace (where agents run).
 type ConnectorSlotKind string
 
 const ConnectorSlotKindTasks ConnectorSlotKind = "tasks"
@@ -1958,7 +2467,7 @@ const ConnectorSlotKindCodeReview ConnectorSlotKind = "codeReview"
 const ConnectorSlotKindCi ConnectorSlotKind = "ci"
 const ConnectorSlotKindWorkspace ConnectorSlotKind = "workspace"
 
-// notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the project has no GitHub or GitLab remote. skipped: the person skipped it; it counts as done.
+// notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the folder has no GitHub or GitLab remote. skipped: the person skipped it; it counts as done.
 type ConnectorSlotState string
 
 const ConnectorSlotStateNotConnected ConnectorSlotState = "notConnected"
@@ -2015,6 +2524,13 @@ type ConsequenceCouldNotWake struct {
 	Reason string `json:"reason"`
 }
 
+// console/stopAgent (#2019, M9): an admin stops one agent on any machine of the organisation, as Console ▸ Live Now does.
+type ConsoleStopAgent struct {
+	Host MachineRef `json:"host"`
+
+	Agent UUID `json:"agent"`
+}
+
 // ContentBlock (ACP/ContentBlock.swift): the protocol's own block shapes, as sent. A block of a kind this build doesn't know is written back as it came, so any other `type` may arrive.
 type ContentBlock struct {
 	// Type is one of "text", "image", "audio", "resource_link", "resource".
@@ -2053,7 +2569,7 @@ type ContentBlockAnnotations struct {
 	Priority *float64 `json:"priority,omitzero"`
 }
 
-type ContinueInProjectRequest struct {
+type ContinueInFolderRequest struct {
 	AgentID UUID `json:"agentID"`
 
 	Text string `json:"text"`
@@ -2061,6 +2577,19 @@ type ContinueInProjectRequest struct {
 	Attachments []Attachment `json:"attachments"`
 
 	RequestID *UUID `json:"requestID,omitzero"`
+}
+
+// agents/continueInNew (#999): a new session in the same folder that reads this one and carries on, on another account of its runtime.
+type ContinueInNewRequest struct {
+	AgentID UUID `json:"agentID"`
+
+	// The account the new session uses: an added account, an org account (org:<route id>) or default for the runtime's own sign-in. Absent: the runtime's account for new sessions (Reaches the Model By).
+	AccountID *string `json:"accountID,omitzero"`
+
+	RequestID *UUID `json:"requestID,omitzero"`
+
+	// Continue on Auto (#2658, FR-022): the successor starts on the runtime Auto would pick now, with the session's values. Only for an Auto session.
+	Auto *bool `json:"auto,omitzero"`
 }
 
 // When a chat paused by a spent allowance carries on by itself (#1859).
@@ -2112,6 +2641,13 @@ type ControlCodeShown struct {
 	Command *string `json:"command,omitzero"`
 }
 
+// control/cutOff (#1002, D13): to every client of a suspended person, just before the control plane closes their sockets with 4403 suspended.
+type ControlCutOff struct {
+	Why string `json:"why"`
+
+	Provider *string `json:"provider,omitzero"`
+}
+
 // One place a control plane answers (R16).
 type ControlEndpoint struct {
 	URL string `json:"url"`
@@ -2135,8 +2671,15 @@ type ControlHello struct {
 	Previous *string `json:"previous,omitzero"`
 }
 
-type ControlHost struct {
-	ID HostID `json:"id"`
+// control/installProgress: a step of Add a Machine.
+type ControlInstallProgress struct {
+	Name string `json:"name"`
+
+	Step string `json:"step"`
+}
+
+type ControlMachine struct {
+	ID MachineRef `json:"id"`
 
 	Name string `json:"name"`
 
@@ -2152,15 +2695,15 @@ type ControlHost struct {
 
 	Relay *bool `json:"relay,omitzero"`
 
-	SignInFrom map[string]HostID `json:"signInFrom,omitzero"`
+	SignInFrom map[string]MachineRef `json:"signInFrom,omitzero"`
 
-	GitFrom map[string]HostID `json:"gitFrom,omitzero"`
+	GitFrom map[string]MachineRef `json:"gitFrom,omitzero"`
 
 	GitAsks []GitAsk `json:"gitAsks,omitzero"`
 
-	Tunnel *HostTunnel `json:"tunnel,omitzero"`
+	Tunnel *MachineTunnel `json:"tunnel,omitzero"`
 
-	Workspace *HostWorkspace `json:"workspace,omitzero"`
+	Workspace *MachineWorkspace `json:"workspace,omitzero"`
 
 	Implementation *string `json:"implementation,omitzero"`
 
@@ -2172,13 +2715,6 @@ type ControlHost struct {
 
 	// The user who owns the machine (#994).
 	Owner *string `json:"owner,omitzero"`
-}
-
-// control/installProgress: a step of Add a Server.
-type ControlInstallProgress struct {
-	Name string `json:"name"`
-
-	Step string `json:"step"`
 }
 
 // control/moved: where the control plane is now (T085).
@@ -2199,13 +2735,24 @@ type ControlNewKey struct {
 	Proof string `json:"proof"`
 }
 
+// control/notice (#1002): something an admin should know, that no click caused: lastAdminKept, groupSharesOrphaned or removeRequested; words to show, and whom it is about.
+type ControlNotice struct {
+	Kind string `json:"kind"`
+
+	Words string `json:"words"`
+
+	User *string `json:"user,omitzero"`
+
+	Group *string `json:"group,omitzero"`
+}
+
 // The control plane's proof back: {"ok":…} (ControlAuth.OK).
 type ControlOK struct {
 	Mac string `json:"mac"`
 
 	Grant *string `json:"grant,omitzero"`
 
-	Host *HostID `json:"host,omitzero"`
+	Host *MachineRef `json:"host,omitzero"`
 
 	Relayed *bool `json:"relayed,omitzero"`
 
@@ -2246,7 +2793,7 @@ type ControlStatus struct {
 
 	Version string `json:"version"`
 
-	HomeHost *HostID `json:"homeHost,omitzero"`
+	HomeHost *MachineRef `json:"homeHost,omitzero"`
 
 	MachineID string `json:"machineID"`
 
@@ -2268,11 +2815,11 @@ type ControlStatus struct {
 	// The origin of the sandbox proxy that draws MCP Apps views on the page at publicWeb (#1484): a second name in front of the same control plane. None when it draws no views there.
 	PublicViews *string `json:"publicViews,omitzero"`
 
-	ThisMacHost *HostJoinStatus `json:"thisMacHost,omitzero"`
+	ThisMacHost *MachineJoinStatus `json:"thisMacHost,omitzero"`
 
-	ProjectDetection *ProjectDetection `json:"projectDetection,omitzero"`
+	FolderDetection *FolderDetection `json:"folderDetection,omitzero"`
 
-	UnjoinedTunnels []HostTunnelChanged `json:"unjoinedTunnels,omitzero"`
+	UnjoinedTunnels []MachineTunnelChanged `json:"unjoinedTunnels,omitzero"`
 
 	// The capabilities the control plane has (#1748).
 	Capabilities []string `json:"capabilities,omitzero"`
@@ -2312,6 +2859,12 @@ type CostState struct {
 	Note *string `json:"note,omitzero"`
 
 	TokensToday int64 `json:"tokensToday"`
+
+	// The organisation's budgets for this person today, in US dollars and tokens, with any raise (#998, FR-016). Each limit in force is the lower of this and limits.
+	Organisation *CostLimits `json:"organisation,omitzero"`
+
+	// Set when the organisation's budgets cap this person's own limits, or this person is at a budget today (#998).
+	SetBy *PolicySetBy `json:"setBy,omitzero"`
 }
 
 type CredentialKind string
@@ -2370,12 +2923,54 @@ type DeclaredResource struct {
 	MaximumMinutes *int64 `json:"maximumMinutes,omitzero"`
 }
 
+// runtimes/setDefaultAccount (#999): a runtime's account for new sessions. accountID default (or absent) is the runtime's own sign-in.
+type DefaultAccountRequest struct {
+	RuntimeID string `json:"runtimeID"`
+
+	AccountID *string `json:"accountID,omitzero"`
+}
+
+// How many archived agents a retention change would delete at once, and the bytes that frees.
+type DeletePreview struct {
+	Count int64 `json:"count"`
+
+	Bytes int64 `json:"bytes"`
+}
+
 type DeleteSessionRequest struct {
 	RuntimeID string `json:"runtimeID"`
 
 	SessionID string `json:"sessionID"`
 
 	Confirmed *bool `json:"confirmed,omitzero"`
+}
+
+// One org route as a machine gets it (#999, FR-005): the route without its groups, fingerprint and stamps, and each secret sealed with HPKE to the machine's key (SealedEnvelope), info com.alexecollins.agents.orgroute.v2, associated data <route id>|<host id>|<version>|<hex SHA-256 of the route as JSON without sealed>, so a route whose settings changed after delivery does not open. A cloud credential is sent only as a token that ends at expires (Q1 A): awsSession, googleToken or entraToken.
+type DeliveredRoute struct {
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Kind OrgRouteKind `json:"kind"`
+
+	Vendor *OrgRouteVendor `json:"vendor,omitzero"`
+
+	Runtimes []string `json:"runtimes"`
+
+	Settings *OrgRouteSettings `json:"settings,omitzero"`
+
+	Models map[string]string `json:"models,omitzero"`
+
+	DefaultFor []string `json:"defaultFor"`
+
+	SecretFields []string `json:"secretFields"`
+
+	Version int64 `json:"version"`
+
+	// Each secret value, or token, by field.
+	Sealed map[string]SealedEnvelope `json:"sealed"`
+
+	Expires *Date `json:"expires,omitzero"`
 }
 
 type DestinationState struct {
@@ -2564,10 +3159,39 @@ type DiskWorktree struct {
 	Partial bool `json:"partial"`
 }
 
+// A claimed email domain (#1002, D8, FR-010): proved by the TXT record `txtValue` at `txtName`, for one org provider. The control plane keeps it at v1/signin/domains/<domain>.json and checks it each day; 7 days of failures take it back to notProved. `sendHere` sends an email at the domain to the provider (signIn/discover); `require` refuses a built-in sign-in at the domain to join, pair or renew (D9).
+type DomainClaim struct {
+	Domain string `json:"domain"`
+
+	Provider string `json:"provider"`
+
+	State DomainClaimState `json:"state"`
+
+	TxtName string `json:"txtName"`
+
+	TxtValue string `json:"txtValue"`
+
+	LastGood *Date `json:"lastGood,omitzero"`
+
+	FailingSince *Date `json:"failingSince,omitzero"`
+
+	SendHere bool `json:"sendHere"`
+
+	Require bool `json:"require"`
+
+	Claimed *OrgRouteStamp `json:"claimed,omitzero"`
+}
+
+// Whether a claimed domain's TXT record was found (#1002).
+type DomainClaimState string
+
+const DomainClaimStateNotProved DomainClaimState = "notProved"
+const DomainClaimStateProved DomainClaimState = "proved"
+
 type DraftCheck struct {
 	Passed bool `json:"passed"`
 
-	Workspaces []WorkspaceInfo `json:"workspaces,omitzero"`
+	Workspaces []MachineInfo `json:"workspaces,omitzero"`
 
 	Problem *string `json:"problem,omitzero"`
 
@@ -2698,6 +3322,8 @@ type ElicitationRequest struct {
 	Scope ElicitationRequestScope `json:"scope"`
 
 	AskedAt Date `json:"askedAt"`
+
+	Secret *ElicitationSecret `json:"secret,omitzero"`
 }
 
 type ElicitationRequestMode struct {
@@ -2798,6 +3424,15 @@ type ElicitationSchemaPropertyKindMultiSelect struct {
 	MaxItems *int64 `json:"maxItems,omitzero"`
 }
 
+// An agent's ask_secret (#2885): one named secret, typed into a masked field. The value goes to the person's secrets.env on the host, never into the record.
+type ElicitationSecret struct {
+	Name string `json:"name"`
+
+	URL *string `json:"url,omitzero"`
+
+	IsSet bool `json:"isSet"`
+}
+
 type Empty struct {
 }
 
@@ -2820,6 +3455,7 @@ const EndedReasonAllowanceSpent EndedReason = "allowanceSpent"
 const EndedReasonRateLimited EndedReason = "rateLimited"
 const EndedReasonSandboxFailed EndedReason = "sandboxFailed"
 const EndedReasonImported EndedReason = "imported"
+const EndedReasonStoppedByAdmin EndedReason = "stoppedByAdmin"
 
 // UnmarshalJSON reads a value this build does not know as "unrecognised".
 func (v *EndedReason) UnmarshalJSON(b []byte) error {
@@ -2843,7 +3479,8 @@ func (v *EndedReason) UnmarshalJSON(b []byte) error {
 		EndedReasonAllowanceSpent,
 		EndedReasonRateLimited,
 		EndedReasonSandboxFailed,
-		EndedReasonImported:
+		EndedReasonImported,
+		EndedReasonStoppedByAdmin:
 		*v = EndedReason(s)
 	default:
 		*v = EndedReasonUnrecognised
@@ -2938,10 +3575,10 @@ type EventRaiseRequest struct {
 type EventScope struct {
 	Mac *struct{} `json:"mac,omitzero"`
 
-	Project *EventScopeProject `json:"project,omitzero"`
+	Folder *EventScopeFolder `json:"folder,omitzero"`
 }
 
-type EventScopeProject struct {
+type EventScopeFolder struct {
 	Value URL `json:"_0"`
 }
 
@@ -3018,6 +3655,30 @@ type EventsPage struct {
 	Waiting []WaitingAgent `json:"waiting"`
 
 	HasMore bool `json:"hasMore"`
+}
+
+// reports/features (#2165): each feature this host counted, a method it serves or an app tool, with its uses in the last 7 and the last `days` days, the least used first. A feature with no use is in it too. Counts only, never what a call said; they stay on the machine. since is the first day counted in the range.
+type FeatureUsage struct {
+	Days int64 `json:"days"`
+
+	// YYYY-MM-DD in the host's zone.
+	Since *string `json:"since,omitzero"`
+
+	Features []FeatureUse `json:"features"`
+}
+
+// One feature's uses (#2165). clients is who used it: mac, remote, web, agent or workflow.
+type FeatureUse struct {
+	Method string `json:"method"`
+
+	Week int64 `json:"week"`
+
+	Quarter int64 `json:"quarter"`
+
+	Clients []string `json:"clients"`
+
+	// YYYY-MM-DD in the host's zone.
+	LastUsed *string `json:"lastUsed,omitzero"`
 }
 
 // One thing to write: what the list shows, what goes in the text (the label when left out), and a line about it.
@@ -3208,7 +3869,7 @@ type FleetBoard struct {
 
 // One machine on Console ▸ Machines (#1804): its hosts/list row, whose it is, and how many of its agents were running when it last listed them. Numbers only, never what the agents said.
 type FleetMachine struct {
-	Host ControlHost `json:"host"`
+	Host ControlMachine `json:"host"`
 
 	// Its person's or bot's name; empty when nobody owns it.
 	OwnerName string `json:"ownerName"`
@@ -3223,6 +3884,33 @@ type FleetMachine struct {
 	HeardAt *Date `json:"heardAt,omitzero"`
 }
 
+type Folder struct {
+	Folder URL `json:"folder"`
+
+	ArchivedAt *Date `json:"archivedAt,omitzero"`
+
+	AddedAt Date `json:"addedAt"`
+
+	LaidOutAt *Date `json:"laidOutAt,omitzero"`
+
+	LayoutVersion *int64 `json:"layoutVersion,omitzero"`
+
+	HelperLimits *HelperLimits `json:"helperLimits,omitzero"`
+
+	DiskSpace *DiskThresholds `json:"diskSpace,omitzero"`
+
+	Pinned *bool `json:"pinned,omitzero"`
+
+	// Absent is off (#2352).
+	PrCostComment *PRCostComment `json:"prCostComment,omitzero"`
+}
+
+type FolderDetection struct {
+	Enabled bool `json:"enabled"`
+
+	Paths []string `json:"paths"`
+}
+
 type FolderHunk struct {
 	OldStart int64 `json:"oldStart"`
 
@@ -3231,6 +3919,121 @@ type FolderHunk struct {
 	NoNewlineAtEnd bool `json:"noNewlineAtEnd"`
 
 	Lines []DiffLine `json:"lines"`
+}
+
+type FolderMCPServer struct {
+	Name string `json:"name"`
+
+	Summary string `json:"summary"`
+
+	Managed *ManagedMCPServer `json:"managed,omitzero"`
+
+	Approval MCPApprovalState `json:"approval"`
+
+	MissingSecrets []string `json:"missingSecrets"`
+
+	SecretNames []string `json:"secretNames"`
+
+	EntryDigest string `json:"entryDigest"`
+
+	SignIn *MCPSignInState `json:"signIn,omitzero"`
+
+	Views *string `json:"views,omitzero"`
+}
+
+type FolderPins struct {
+	Folder URL `json:"folder"`
+
+	Pins []PinView `json:"pins"`
+
+	Sessions []UUID `json:"sessions,omitzero"`
+
+	Workflows []string `json:"workflows,omitzero"`
+
+	Views []PinView `json:"views,omitzero"`
+}
+
+type FolderPlugin struct {
+	Folder URL `json:"folder"`
+
+	Name string `json:"name"`
+
+	Carries []string `json:"carries"`
+
+	AwaitingApproval *WorkflowApproval `json:"awaitingApproval,omitzero"`
+
+	FolderPath URL `json:"folderPath"`
+}
+
+type FolderRemovedNotification struct {
+	Folder URL `json:"folder"`
+}
+
+type FolderRequest struct {
+	Folder URL `json:"folder"`
+}
+
+type FolderSummary struct {
+	Name string `json:"name"`
+
+	Exists bool `json:"exists"`
+
+	LastActivityAt Date `json:"lastActivityAt"`
+
+	Counts FolderSummaryCounts `json:"counts"`
+
+	CostToDate map[string]float64 `json:"costToDate"`
+
+	UnmeasuredAgents int64 `json:"unmeasuredAgents"`
+
+	RetiredCount int64 `json:"retiredCount"`
+
+	GuardedChanges []GuardedChange `json:"guardedChanges,omitzero"`
+
+	Approvals []Approval `json:"approvals,omitzero"`
+
+	// The project id that .agents/folder.json names (#2317). Absent when it names none or one that is not valid.
+	Project *string `json:"project,omitzero"`
+
+	// Why the folder is in no project (#2317): .agents/folder.json is not an object, names an id that is not valid, or .agents is a link.
+	ProjectProblem *string `json:"projectProblem,omitzero"`
+
+	// Set when the organisation's policy caps this folder's helper limits (#998, #64): the lower number is used.
+	HelperLimitsSetBy *PolicySetBy `json:"helperLimitsSetBy,omitzero"`
+
+	Folder Folder `json:"folder"`
+}
+
+type FolderSummaryCounts struct {
+	NeedsAttention *int64 `json:"needsAttention,omitzero"`
+
+	Blocked *int64 `json:"blocked,omitzero"`
+
+	Waiting *int64 `json:"waiting,omitzero"`
+
+	Running *int64 `json:"running,omitzero"`
+
+	Finished *int64 `json:"finished,omitzero"`
+
+	Stopped *int64 `json:"stopped,omitzero"`
+
+	Archived *int64 `json:"archived,omitzero"`
+}
+
+type FolderWorktrees struct {
+	Worktrees []WorktreeSummary `json:"worktrees"`
+
+	Folder URL `json:"folder"`
+}
+
+type FoldersFindRequest struct {
+	Paths []string `json:"paths,omitzero"`
+
+	Folders []string `json:"folders,omitzero"`
+}
+
+type FoldersListRequest struct {
+	IncludeArchived bool `json:"includeArchived"`
 }
 
 type FoundFolder struct {
@@ -3242,13 +4045,13 @@ type FoundFolder struct {
 
 	IsRepository bool `json:"isRepository"`
 
-	IsProject bool `json:"isProject"`
+	IsFolder bool `json:"isFolder"`
 }
 
 type GitAsk struct {
 	Server string `json:"server"`
 
-	From HostID `json:"from"`
+	From MachineRef `json:"from"`
 }
 
 // A credential for one git command. Never printed, logged or kept.
@@ -3286,7 +4089,38 @@ type GitViewShared struct {
 	Since string `json:"since"`
 }
 
-// A group (#1761, spec 736 FR-027): everyone, or named users. It owns workspace providers: only its users see them and start machines from them (FR-028).
+type Goal struct {
+	Objective string `json:"objective"`
+
+	Status GoalStatus `json:"status"`
+
+	// How many turns it took towards the goal, where the runtime counts them.
+	Iterations *int64 `json:"iterations,omitzero"`
+
+	// Why it last stopped or paused, in the runtime's words.
+	Reason *string `json:"reason,omitzero"`
+
+	TokensUsed *int64 `json:"tokensUsed,omitzero"`
+
+	// The tokens it can use on the goal, when it has a budget.
+	TokenBudget *int64 `json:"tokenBudget,omitzero"`
+
+	TimeUsedSeconds *float64 `json:"timeUsedSeconds,omitzero"`
+
+	// When the host last heard of it.
+	At Date `json:"at"`
+}
+
+// Where a goal stands (#2742): active (it can drive more work, whether or not a turn runs now), paused, blocked, limited (a usage or token budget ran out) or complete.
+type GoalStatus string
+
+const GoalStatusActive GoalStatus = "active"
+const GoalStatusPaused GoalStatus = "paused"
+const GoalStatusBlocked GoalStatus = "blocked"
+const GoalStatusLimited GoalStatus = "limited"
+const GoalStatusComplete GoalStatus = "complete"
+
+// A group (#1761, spec 736 FR-027): everyone, or named users. It owns machine providers: only its users see them and start machines from them (FR-028).
 type Group struct {
 	ID string `json:"id"`
 
@@ -3297,6 +4131,12 @@ type Group struct {
 	Members []string `json:"members"`
 
 	Caps *SpendCaps `json:"caps,omitzero"`
+
+	// A SCIM group's provider (#1002). Absent for a group an admin made.
+	Source *GroupSource `json:"source,omitzero"`
+
+	// Gives the admin role (#1002, FR-020): its members are admins.
+	Role *string `json:"role,omitzero"`
 }
 
 // groups/list (#1761): every group for an admin; for a member, the groups they are in.
@@ -3304,9 +4144,16 @@ type GroupList struct {
 	Groups []Group `json:"groups"`
 }
 
-// groups/remove (#1761): the group. Refused while a workspace provider or a bot has it.
+// groups/remove (#1761): the group. Refused while a machine provider or a bot has it.
 type GroupRequest struct {
 	ID string `json:"id"`
+}
+
+// groups/setRole (#1002, FR-020): mark a SCIM group as giving the admin role, or not (no role).
+type GroupRoleSet struct {
+	Group string `json:"group"`
+
+	Role *string `json:"role,omitzero"`
 }
 
 // groups/set (#1761): makes a group, or with id changes one. One user is a list of one.
@@ -3320,6 +4167,15 @@ type GroupSet struct {
 	Members []string `json:"members,omitzero"`
 
 	Caps *SpendCaps `json:"caps,omitzero"`
+}
+
+// Where a group comes from (#1002, FR-019): an org provider's SCIM. Only SCIM changes its members.
+type GroupSource struct {
+	Scim string `json:"scim"`
+
+	ExternalId *string `json:"externalId,omitzero"`
+
+	DisplayName string `json:"displayName"`
 }
 
 // control/groupsChanged (#1761): a group was made, changed or removed.
@@ -3432,322 +4288,12 @@ type HelperLimits struct {
 
 	// A helper's turn refused for a spent allowance waits for it at once, as if the person had chosen Continue (#1918). Off unless set.
 	ContinueWhenBack *bool `json:"continueWhenBack,omitzero"`
-}
 
-// hosts/announce, on an enrolment connection.
-type HostAnnounce struct {
-	PublicKey Data `json:"publicKey"`
+	// A session whose pull request merges is archived, when its turn has ended and its worktree has nothing uncommitted (#2886). On unless set.
+	ArchiveWhenMerged *bool `json:"archiveWhenMerged,omitzero"`
 
-	Name string `json:"name"`
-
-	Platform string `json:"platform"`
-
-	Version string `json:"version"`
-
-	MachineID string `json:"machineID"`
-
-	Relay *bool `json:"relay,omitzero"`
-
-	Implementation *string `json:"implementation,omitzero"`
-}
-
-// A paired window a host may let in on its local socket (#1118), with the key it proves itself with.
-type HostClient struct {
-	ID UUID `json:"id"`
-
-	Kind string `json:"kind"`
-
-	PublicKey Data `json:"publicKey"`
-
-	// The person the window belongs to (#994). The host lets it in only when it is the host's own user (FR-020).
-	Person *string `json:"person,omitzero"`
-}
-
-// host/clients: every window paired with the control plane, which a host checks its local socket against (#1118).
-type HostClients struct {
-	Clients []HostClient `json:"clients"`
-
-	// The user the host belongs to (#994). With it, the host lets in only a window whose person is that user (FR-020); without it (an older control plane), every window listed.
-	User *string `json:"user,omitzero"`
-}
-
-// hosts/startEnroll (#1761): with as, a bot's machine code, an admin's only. Without, the caller's own, as before.
-type HostEnroll struct {
-	As *string `json:"as,omitzero"`
-}
-
-// host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).
-type HostHello struct {
-	Host *HostID `json:"host,omitzero"`
-
-	Version string `json:"version"`
-
-	Platform string `json:"platform"`
-
-	MachineID string `json:"machineID"`
-
-	Name *string `json:"name,omitzero"`
-
-	Relay *bool `json:"relay,omitzero"`
-
-	Implementation *string `json:"implementation,omitzero"`
-
-	// The capabilities this host has (#1748): each one whose methods it all serves, and the ones it declares. None from a host older than #1748.
-	Capabilities []string `json:"capabilities,omitzero"`
-}
-
-type HostID string
-
-// hosts/install (HostInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel.
-type HostInstall struct {
-	Destination string `json:"destination"`
-
-	Name *string `json:"name,omitzero"`
-
-	Key *string `json:"key,omitzero"`
-
-	Trust *string `json:"trust,omitzero"`
-
-	Tunnel *bool `json:"tunnel,omitzero"`
-}
-
-// POST /v1/join (#994, spec 736 FR-017): a machine with no code asks to join. `person` names whose it is to be, by name or id; with none, an admin approves it.
-type HostJoinAsk struct {
-	Name string `json:"name"`
-
-	Platform string `json:"platform"`
-
-	Version *string `json:"version,omitzero"`
-
-	PublicKey Data `json:"publicKey"`
-
-	MachineID *string `json:"machineID,omitzero"`
-
-	Person *string `json:"person,omitzero"`
-}
-
-// GET /v1/join/<request> (#994): waiting, or how it ended; `host` once approved.
-type HostJoinDecision struct {
-	Result string `json:"result"`
-
-	Host *HostID `json:"host,omitzero"`
-
-	// Once approved: the control plane's public key, which the machine keeps as a code's would give it.
-	ControlKey Data `json:"controlKey,omitzero"`
-
-	// Once approved: the control plane's name.
-	Name *string `json:"name,omitzero"`
-}
-
-type HostJoinStatus struct {
-	Member bool `json:"member"`
-
-	Connected bool `json:"connected"`
-
-	Problem *string `json:"problem,omitzero"`
-
-	At Date `json:"at"`
-}
-
-// POST /v1/join: the request, the short code the machine shows, and when it ends (10 minutes).
-type HostJoinTicket struct {
-	Request string `json:"request"`
-
-	Code string `json:"code"`
-
-	Expires Date `json:"expires"`
-}
-
-type HostLastHeard struct {
-	Host HostID `json:"host"`
-
-	Projects []ProjectSummary `json:"projects,omitzero"`
-
-	Agents []Agent `json:"agents,omitzero"`
-
-	HeardAt *Date `json:"heardAt,omitzero"`
-}
-
-// hosts/link.
-type HostLink struct {
-	Host HostID `json:"host"`
-
-	Provider ProviderID `json:"provider"`
-
-	Workspace string `json:"workspace"`
-
-	StartWhenUsed *bool `json:"startWhenUsed,omitzero"`
-
-	StopWhenIdleMinutes *int64 `json:"stopWhenIdleMinutes,omitzero"`
-}
-
-// host/policy (#998, FR-006): to a machine that says host.policy/1, on its channel 0, at each join and within 5 seconds of each change. A signed policy, or none when no policy was ever set.
-type HostPolicy struct {
-	Policy *OrgPolicy `json:"policy,omitzero"`
-
-	Signature *PolicySignature `json:"signature,omitzero"`
-
-	None *bool `json:"none,omitzero"`
-}
-
-// host/providerDraft: a writing agent called one of the writer's tools (#858).
-type HostProviderDraftCall struct {
-	AgentID UUID `json:"agentID"`
-
-	Draft UUID `json:"draft"`
-
-	Tool string `json:"tool"`
-
-	Arguments JSONValue `json:"arguments,omitzero"`
-}
-
-// hosts/setRelay.
-type HostRelayRequest struct {
-	Host HostID `json:"host"`
-
-	Relay bool `json:"relay"`
-}
-
-type HostRequest struct {
-	Host HostID `json:"host"`
-
-	Purge *bool `json:"purge,omitzero"`
-}
-
-// A host's next scheduled workflow (#1004).
-type HostSchedule struct {
-	At *Date `json:"at,omitzero"`
-
-	Workflow *string `json:"workflow,omitzero"`
-}
-
-// host/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next scheduled workflow.
-type HostStatus struct {
-	Idle bool `json:"idle"`
-
-	Running []string `json:"running"`
-
-	Schedule *HostSchedule `json:"schedule,omitzero"`
-}
-
-type HostStop struct {
-	Host HostID `json:"host"`
-
-	ConfirmRunning *bool `json:"confirmRunning,omitzero"`
-}
-
-type HostTunnel struct {
-	Up bool `json:"up"`
-
-	Problem *string `json:"problem,omitzero"`
-}
-
-type HostTunnelChanged struct {
-	Name string `json:"name"`
-
-	Host *HostID `json:"host,omitzero"`
-
-	Tunnel HostTunnel `json:"tunnel"`
-}
-
-// hosts/update (#1766): a host the control plane installed over ssh, updated the same way. The server and its key are given again, as at the install, because the control plane keeps neither; the host's own root and membership stay.
-type HostUpdate struct {
-	Host HostID `json:"host"`
-
-	Destination string `json:"destination"`
-
-	Key *string `json:"key,omitzero"`
-
-	Trust *string `json:"trust,omitzero"`
-}
-
-// host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it starts no work (FR-033).
-type HostUser struct {
-	User string `json:"user"`
-
-	Kind string `json:"kind"`
-
-	Name string `json:"name"`
-
-	Labels []string `json:"labels"`
-
-	CapReachedUntil *Date `json:"capReachedUntil,omitzero"`
-
-	// For a person: the names of the bots in their groups (#2027). A runs-on: workflow that names one is heard here, once approved here, and its matches are sent to the control plane, never run here.
-	Bots []string `json:"bots,omitzero"`
-}
-
-// host/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and when its user's settings or secrets change. Sent only on the links of that user's own machines. secrets is every secret the user has: a name missing from it was removed.
-type HostUserSettings struct {
-	User string `json:"user"`
-
-	Settings UserSettings `json:"settings"`
-
-	Secrets []UserSecret `json:"secrets"`
-}
-
-type HostWorkspace struct {
-	Provider ProviderID `json:"provider"`
-
-	ProviderName string `json:"providerName"`
-
-	Workspace string `json:"workspace"`
-
-	WorkspaceName string `json:"workspaceName"`
-
-	WorkspaceState string `json:"workspaceState"`
-
-	HostState *string `json:"hostState,omitzero"`
-
-	Phase *string `json:"phase,omitzero"`
-
-	Since *Date `json:"since,omitzero"`
-
-	Problem *string `json:"problem,omitzero"`
-
-	StoppedBy *string `json:"stoppedBy,omitzero"`
-
-	CanStart bool `json:"canStart"`
-
-	CanStop bool `json:"canStop"`
-
-	StartWhenUsed bool `json:"startWhenUsed"`
-
-	StopWhenIdleMinutes *int64 `json:"stopWhenIdleMinutes,omitzero"`
-
-	Cost *string `json:"cost,omitzero"`
-
-	Current bool `json:"current"`
-
-	StartForSchedules *bool `json:"startForSchedules,omitzero"`
-
-	TellsSchedule *bool `json:"tellsSchedule,omitzero"`
-
-	NextWorkflow *string `json:"nextWorkflow,omitzero"`
-
-	NextWorkflowAt *Date `json:"nextWorkflowAt,omitzero"`
-
-	WakeAt *Date `json:"wakeAt,omitzero"`
-}
-
-// host/workspaces, for an agent there: who asked, for the log, and its call.
-type HostWorkspaceCall struct {
-	Agent string `json:"agent"`
-
-	Method string `json:"method"`
-
-	Params JSONValue `json:"params"`
-}
-
-// hosts/setWorkspaceOptions. stopWhenIdleMinutes 0 turns it off.
-type HostWorkspaceOptions struct {
-	Host HostID `json:"host"`
-
-	StartWhenUsed *bool `json:"startWhenUsed,omitzero"`
-
-	StopWhenIdleMinutes *int64 `json:"stopWhenIdleMinutes,omitzero"`
-
-	StartForSchedules *bool `json:"startForSchedules,omitzero"`
+	// start_session with a machine starts the session on another of the person's machines without asking first (#2928). Off unless set; only the person sets it, from Folder Settings.
+	AgentsMayStartOnMachines *bool `json:"agentsMayStartOnMachines,omitzero"`
 }
 
 type HostedMCPSnapshot struct {
@@ -3766,8 +4312,6 @@ const HostedMCPStateRestarting HostedMCPState = "restarting"
 type HostedMCPStatus struct {
 	Name string `json:"name"`
 
-	Project *string `json:"project,omitzero"`
-
 	State HostedMCPState `json:"state"`
 
 	Since *Date `json:"since,omitzero"`
@@ -3779,10 +4323,12 @@ type HostedMCPStatus struct {
 	Restarts int64 `json:"restarts"`
 
 	Users int64 `json:"users"`
+
+	Folder *string `json:"folder,omitzero"`
 }
 
 type JoinApproved struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 }
 
 // control/joinDecided (#994): a request ended, approved or not, so every card for it goes.
@@ -3814,9 +4360,18 @@ type JoinRequestDecide struct {
 	Request string `json:"request"`
 }
 
+// One folder of projects/joined (#2317).
+type JoinedFolder struct {
+	Folder URL `json:"folder"`
+
+	Name string `json:"name"`
+
+	Project string `json:"project"`
+}
+
 // hosts/keep: a request for a stopped host, kept until it is up.
 type KeepRequest struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
 	Method string `json:"method"`
 
@@ -3824,7 +4379,7 @@ type KeepRequest struct {
 }
 
 type KeptDelivered struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
 	ID UUID `json:"id"`
 
@@ -3838,7 +4393,7 @@ type KeptList struct {
 type KeptRequest struct {
 	ID UUID `json:"id"`
 
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
 	Kind string `json:"kind"`
 
@@ -3856,7 +4411,7 @@ type KeptRequest struct {
 }
 
 type KeptRequestID struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
 	ID UUID `json:"id"`
 }
@@ -3910,9 +4465,9 @@ type LeaseTokenRequest struct {
 }
 
 type LendGit struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
-	From HostID `json:"from"`
+	From MachineRef `json:"from"`
 
 	Server string `json:"server"`
 
@@ -3921,13 +4476,22 @@ type LendGit struct {
 
 // hosts/lendSignIn (T091).
 type LendSignIn struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
-	From HostID `json:"from"`
+	From MachineRef `json:"from"`
 
 	Runtime string `json:"runtime"`
 
 	Allowed bool `json:"allowed"`
+}
+
+// The values a session asks for in the words every runtime shares (#2658). Each is mapped to the runtime's own setting; a native value in startOptions for the same option wins.
+type Levels struct {
+	Model *ModelLevel `json:"model,omitzero"`
+
+	Permission *PermissionLevel `json:"permission,omitzero"`
+
+	PermissionRequests *ClientPermissionMode `json:"permissionRequests,omitzero"`
 }
 
 type LineMember struct {
@@ -3936,6 +4500,147 @@ type LineMember struct {
 	AskedAt Date `json:"askedAt"`
 
 	IsCallOpen bool `json:"isCallOpen"`
+}
+
+// What was banked under lineage nodes (#2350): a turn's cost, tokens and time, split evenly among the links active when it was banked. turns is a share of turns, so a turn on two nodes is half a turn on each.
+type LineageCost struct {
+	// By currency.
+	Cost map[string]float64 `json:"cost"`
+
+	InputTokens int64 `json:"inputTokens"`
+
+	OutputTokens int64 `json:"outputTokens"`
+
+	// Fresh input and output, as a limit counts them (#998).
+	LimitTokens *int64 `json:"limitTokens,omitzero"`
+
+	Turns float64 `json:"turns"`
+
+	// The agent, its tools and others at work.
+	WorkingSeconds float64 `json:"workingSeconds"`
+
+	// Waiting for the person.
+	WaitingSeconds float64 `json:"waitingSeconds"`
+}
+
+// One node's banked cost on a machine (#2350), whole, with what its rollups need: the project its ref is in, the issues a PR fixes (ended links too: a PR closed without a merge still counts against its issue, as waste), the milestones it is part of, and how a PR ended. A session's own cost is its turns that had no active link.
+type LineageCostNode struct {
+	Node LineageNode `json:"node"`
+
+	// The repo or tracker the node is in: github:alexec/agents, linear, or for a session its folder's repo (folder:<name> without one).
+	Project *string `json:"project,omitzero"`
+
+	Banked LineageCost `json:"banked"`
+
+	// A PR's issues, by ref.
+	Fixes []string `json:"fixes,omitzero"`
+
+	// The milestones it is part of, by ref.
+	PartOf []string `json:"partOf,omitzero"`
+
+	// A PR's end: merged, closed (without a merge: waste) or reverted (a merged revert: waste). Absent while open. The list is open.
+	Outcome *string `json:"outcome,omitzero"`
+
+	// A PR's failed CI rounds: checks.failed, once per run and attempt.
+	FailedChecks *int64 `json:"failedChecks,omitzero"`
+
+	// When the machine first banked or noted the node (#2351): the start of the work on it, for lead time.
+	FirstAt *Date `json:"firstAt,omitzero"`
+
+	// When a PR ended (#2351): merged, closed or reverted. Absent while open.
+	EndedAt *Date `json:"endedAt,omitzero"`
+
+	LastAt Date `json:"lastAt"`
+}
+
+// lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a milestone's issues, their PRs and the PRs part of it; a project's every node (kind project, ref github:alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.
+type LineageCostRollup struct {
+	Node LineageNode `json:"node"`
+
+	Own LineageCost `json:"own"`
+
+	Total LineageCost `json:"total"`
+
+	Waste LineageCost `json:"waste"`
+
+	Unlinked LineageCost `json:"unlinked"`
+
+	PrsMerged int64 `json:"prsMerged"`
+
+	PrsClosed int64 `json:"prsClosed"`
+
+	PrsReverted int64 `json:"prsReverted"`
+
+	FailedChecks int64 `json:"failedChecks"`
+
+	Parts []LineageCostNode `json:"parts"`
+
+	Limited *bool `json:"limited,omitzero"`
+}
+
+// lineage/end (#2348): the link from one node to another by this relationship stops being active now. Nothing is removed: the link keeps its start and gets an end.
+type LineageEndRequest struct {
+	From LineageNode `json:"from"`
+
+	To LineageNode `json:"to"`
+
+	Rel string `json:"rel"`
+}
+
+// lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more.
+type LineageGraph struct {
+	Nodes []LineageNode `json:"nodes"`
+
+	Links []LineageLink `json:"links"`
+
+	Limited *bool `json:"limited,omitzero"`
+}
+
+// A typed link in the lineage graph (#2348): from works-on, opens, fixes, started, reviews, closes or part-of to. source is how the host knows it: start, branch, pr-body, helper, agent, person or forge. at is when it started; endedAt is set when it stops being active (a PR merged, a session archived). Both lists are open: a host keeps a relationship or a source it does not know.
+type LineageLink struct {
+	From LineageNode `json:"from"`
+
+	To LineageNode `json:"to"`
+
+	Rel string `json:"rel"`
+
+	Source string `json:"source"`
+
+	At Date `json:"at"`
+
+	EndedAt *Date `json:"endedAt,omitzero"`
+}
+
+// lineage/link (#2348): start a link. When the same link is active already, it is the answer, unchanged.
+type LineageLinkRequest struct {
+	From LineageNode `json:"from"`
+
+	To LineageNode `json:"to"`
+
+	Rel string `json:"rel"`
+
+	Source string `json:"source"`
+}
+
+// The links of a node, newest first (#2348), or the links lineage/end ended. limited says there are more than the answer holds.
+type LineageLinks struct {
+	Links []LineageLink `json:"links"`
+
+	Limited *bool `json:"limited,omitzero"`
+}
+
+// A node in the lineage graph (#2348). kind is what it is: issue, pr, session, workflow-run, commit, file, branch or milestone, and the list is open. ref names it apart from any tracker, as <scheme>:<id>: github:alexec/Agents#123, gitlab:group/repo!45, linear:ENG-4, jira:ABC-9, session:<agent id>.
+type LineageNode struct {
+	Kind string `json:"kind"`
+
+	Ref string `json:"ref"`
+}
+
+// lineage/links and lineage/walk (#2348): a node, and for a walk how many links away to go (1 to 4; 2 when not said: issue, sessions, PRs).
+type LineageNodeRequest struct {
+	Node LineageNode `json:"node"`
+
+	Depth *int64 `json:"depth,omitzero"`
 }
 
 type ListCursor struct {
@@ -3976,6 +4681,46 @@ type ListedSkill struct {
 	Folder string `json:"folder"`
 
 	Managed *ManagedSkill `json:"managed,omitzero"`
+}
+
+// One agent on Console ▸ Live Now (#2019, M9): whose machine, which runtime, its state, since when and its cost so far. No title and nothing it said.
+type LiveAgent struct {
+	Host MachineRef `json:"host"`
+
+	HostName string `json:"hostName"`
+
+	// The person or bot whose machine it is, by id.
+	Owner string `json:"owner"`
+
+	OwnerName string `json:"ownerName"`
+
+	// Whether the machine is a bot's.
+	Bot bool `json:"bot"`
+
+	Agent UUID `json:"agent"`
+
+	Runtime string `json:"runtime"`
+
+	State AgentState `json:"state"`
+
+	// It waits for an event or another agent (eventWait), not for its person.
+	WaitsOnOthers *bool `json:"waitsOnOthers,omitzero"`
+
+	// The workflow that started it.
+	Workflow *string `json:"workflow,omitzero"`
+
+	Since *Date `json:"since,omitzero"`
+
+	// Its cost so far, by currency.
+	CostToDate map[string]float64 `json:"costToDate,omitzero"`
+
+	// When the machine last listed its agents.
+	HeardAt *Date `json:"heardAt,omitzero"`
+}
+
+// console/live's answer (#2019, M9): every agent running now on every machine, as each machine last listed them, for an admin. The most costly first.
+type LiveBoard struct {
+	Agents []LiveAgent `json:"agents"`
 }
 
 type MCPAddAnswer struct {
@@ -4045,7 +4790,7 @@ type MCPCatalogError struct {
 
 	ReplaceMismatch *struct{} `json:"replaceMismatch,omitzero"`
 
-	NotAProject *MCPCatalogErrorNotAProject `json:"notAProject,omitzero"`
+	NotAFolder *MCPCatalogErrorNotAFolder `json:"notAFolder,omitzero"`
 
 	NameTaken *MCPCatalogErrorNameTaken `json:"nameTaken,omitzero"`
 
@@ -4078,7 +4823,7 @@ type MCPCatalogErrorSecretStillInUse struct {
 	Name string `json:"name"`
 }
 
-type MCPCatalogErrorNotAProject struct {
+type MCPCatalogErrorNotAFolder struct {
 	Path string `json:"path"`
 }
 
@@ -4114,8 +4859,6 @@ type MCPCatalogResult struct {
 	Marketplace *string `json:"marketplace,omitzero"`
 
 	Levels *MCPLevels `json:"levels,omitzero"`
-
-	MadeByAgents *bool `json:"madeByAgents,omitzero"`
 }
 
 type MCPCheckState string
@@ -4193,13 +4936,13 @@ type MCPHandValue struct {
 }
 
 type MCPHealthCheckRequest struct {
-	Project *string `json:"project,omitzero"`
+	Folder *string `json:"folder,omitzero"`
 }
 
 type MCPHealthFileProblem struct {
-	Project *string `json:"project,omitzero"`
-
 	Message string `json:"message"`
+
+	Folder *string `json:"folder,omitzero"`
 }
 
 type MCPHealthSnapshot struct {
@@ -4224,7 +4967,7 @@ type MCPLevels struct {
 }
 
 type MCPListAnswer struct {
-	Servers []ProjectMCPServer `json:"servers"`
+	Servers []FolderMCPServer `json:"servers"`
 
 	Problem *string `json:"problem,omitzero"`
 
@@ -4336,8 +5079,6 @@ type MCPServer struct {
 type MCPServerHealth struct {
 	Name string `json:"name"`
 
-	Project *string `json:"project,omitzero"`
-
 	Transport MCPTransportName `json:"transport"`
 
 	Hosted bool `json:"hosted"`
@@ -4354,7 +5095,7 @@ type MCPServerHealth struct {
 
 	Levels *MCPLevels `json:"levels,omitzero"`
 
-	MadeByAgents *bool `json:"madeByAgents,omitzero"`
+	Folder *string `json:"folder,omitzero"`
 }
 
 type MCPServerTransport struct {
@@ -4604,6 +5345,401 @@ type MacTerminalRequest struct {
 	Path *string `json:"path,omitzero"`
 }
 
+// hosts/announce, on an enrolment connection.
+type MachineAnnounce struct {
+	PublicKey Data `json:"publicKey"`
+
+	Name string `json:"name"`
+
+	Platform string `json:"platform"`
+
+	Version string `json:"version"`
+
+	MachineID string `json:"machineID"`
+
+	Relay *bool `json:"relay,omitzero"`
+
+	Implementation *string `json:"implementation,omitzero"`
+}
+
+// governance/report (#2019, M5): the MCP servers and skills a machine has from a catalogue, personal and in its folders, at most 500. Sent at start and each hour; each replaces the last.
+type MachineCatalog struct {
+	Items []CatalogItem `json:"items"`
+}
+
+// A paired window a host may let in on its local socket (#1118), with the key it proves itself with.
+type MachineClient struct {
+	ID UUID `json:"id"`
+
+	Kind string `json:"kind"`
+
+	PublicKey Data `json:"publicKey"`
+
+	// The person the window belongs to (#994). The host lets it in only when it is the host's own user (FR-020).
+	Person *string `json:"person,omitzero"`
+}
+
+// host/clients: every window paired with the control plane, which a host checks its local socket against (#1118).
+type MachineClients struct {
+	Clients []MachineClient `json:"clients"`
+
+	// The user the host belongs to (#994). With it, the host lets in only a window whose person is that user (FR-020); without it (an older control plane), every window listed.
+	User *string `json:"user,omitzero"`
+}
+
+// hosts/startEnroll (#1761): with as, a bot's machine code, an admin's only. Without, the caller's own, as before.
+type MachineEnroll struct {
+	As *string `json:"as,omitzero"`
+}
+
+// machines/sendFolder, through host/machines: one step of an agent's start_session with send (#2929), which sends this folder's branch to another of the person's machines first, or of its bring_back (#2947), which brings a branch back from there. Exactly one of state, upload, receive, facts, pack and read; the control plane sends that machine's folders/receiveState, folders/receiveUpload, folders/receive, folders/sendFacts, folders/sendPack or folders/sendRead.
+type MachineFolderSend struct {
+	Host string `json:"host"`
+
+	State *ReceiveStateRequest `json:"state,omitzero"`
+
+	Upload *ReceiveUploadRequest `json:"upload,omitzero"`
+
+	Receive *ReceiveRequest `json:"receive,omitzero"`
+
+	Facts *SendFactsRequest `json:"facts,omitzero"`
+
+	Pack *SendPackRequest `json:"pack,omitzero"`
+
+	Read *SendReadRequest `json:"read,omitzero"`
+}
+
+// What machines/sendFolder's step answered (#2929, #2947): state for state, folder for receive, facts for facts, pack for pack, read for read, none for upload.
+type MachineFolderSent struct {
+	State *ReceiveState `json:"state,omitzero"`
+
+	Folder *FolderSummary `json:"folder,omitzero"`
+
+	Facts *SendFacts `json:"facts,omitzero"`
+
+	Pack *SendPack `json:"pack,omitzero"`
+
+	Read *SendRead `json:"read,omitzero"`
+}
+
+// host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).
+type MachineHello struct {
+	Host *MachineRef `json:"host,omitzero"`
+
+	Version string `json:"version"`
+
+	Platform string `json:"platform"`
+
+	MachineID string `json:"machineID"`
+
+	Name *string `json:"name,omitzero"`
+
+	Relay *bool `json:"relay,omitzero"`
+
+	Implementation *string `json:"implementation,omitzero"`
+
+	// The capabilities this host has (#1748): each one whose methods it all serves, and the ones it declares. None from a host older than #1748.
+	Capabilities []string `json:"capabilities,omitzero"`
+}
+
+// One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or unknown.
+type MachineInfo struct {
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	State string `json:"state"`
+
+	SSH *string `json:"ssh,omitzero"`
+
+	Tunnel *bool `json:"tunnel,omitzero"`
+
+	// Its ssh host key is made again at each start, as a Google Cloud workstation's is (#1701): after a Start the control plane made, the first ssh takes the key it is offered and pins it again.
+	HostKeyRenews *bool `json:"hostKeyRenews,omitzero"`
+
+	Cost *string `json:"cost,omitzero"`
+
+	Host *MachineRef `json:"host,omitzero"`
+}
+
+// hosts/install (MachineInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel.
+type MachineInstall struct {
+	Destination string `json:"destination"`
+
+	Name *string `json:"name,omitzero"`
+
+	Key *string `json:"key,omitzero"`
+
+	Trust *string `json:"trust,omitzero"`
+
+	Tunnel *bool `json:"tunnel,omitzero"`
+}
+
+// POST /v1/join (#994, spec 736 FR-017): a machine with no code asks to join. `person` names whose it is to be, by name or id; with none, an admin approves it.
+type MachineJoinAsk struct {
+	Name string `json:"name"`
+
+	Platform string `json:"platform"`
+
+	Version *string `json:"version,omitzero"`
+
+	PublicKey Data `json:"publicKey"`
+
+	MachineID *string `json:"machineID,omitzero"`
+
+	Person *string `json:"person,omitzero"`
+}
+
+// GET /v1/join/<request> (#994): waiting, or how it ended; `host` once approved.
+type MachineJoinDecision struct {
+	Result string `json:"result"`
+
+	Host *MachineRef `json:"host,omitzero"`
+
+	// Once approved: the control plane's public key, which the machine keeps as a code's would give it.
+	ControlKey Data `json:"controlKey,omitzero"`
+
+	// Once approved: the control plane's name.
+	Name *string `json:"name,omitzero"`
+}
+
+type MachineJoinStatus struct {
+	Member bool `json:"member"`
+
+	Connected bool `json:"connected"`
+
+	Problem *string `json:"problem,omitzero"`
+
+	At Date `json:"at"`
+}
+
+// POST /v1/join: the request, the short code the machine shows, and when it ends (10 minutes).
+type MachineJoinTicket struct {
+	Request string `json:"request"`
+
+	Code string `json:"code"`
+
+	Expires Date `json:"expires"`
+}
+
+type MachineLastHeard struct {
+	Host MachineRef `json:"host"`
+
+	Folders []FolderSummary `json:"folders,omitzero"`
+
+	Agents []Agent `json:"agents,omitzero"`
+
+	HeardAt *Date `json:"heardAt,omitzero"`
+}
+
+// hosts/link.
+type MachineLink struct {
+	Host MachineRef `json:"host"`
+
+	Provider ProviderID `json:"provider"`
+
+	Workspace string `json:"workspace"`
+
+	StartWhenUsed *bool `json:"startWhenUsed,omitzero"`
+
+	StopWhenIdleMinutes *int64 `json:"stopWhenIdleMinutes,omitzero"`
+}
+
+// hosts/setMachineOptions. stopWhenIdleMinutes 0 turns it off.
+type MachineOptions struct {
+	Host MachineRef `json:"host"`
+
+	StartWhenUsed *bool `json:"startWhenUsed,omitzero"`
+
+	StopWhenIdleMinutes *int64 `json:"stopWhenIdleMinutes,omitzero"`
+
+	StartForSchedules *bool `json:"startForSchedules,omitzero"`
+}
+
+// host/policy (#998, FR-006): to a machine that says host.policy/1, on its channel 0, at each join and within 5 seconds of each change. A signed policy, or none when no policy was ever set.
+type MachinePolicy struct {
+	Policy *OrgPolicy `json:"policy,omitzero"`
+
+	Signature *PolicySignature `json:"signature,omitzero"`
+
+	None *bool `json:"none,omitzero"`
+}
+
+// projects/joined's answer and host/projects (#2669): the projects that this machine's folders name, with their slots, all of them each time.
+type MachineProjects struct {
+	Projects []ProjectTools `json:"projects"`
+}
+
+// host/providerDraft: a writing agent called one of the writer's tools (#858).
+type MachineProviderDraftCall struct {
+	AgentID UUID `json:"agentID"`
+
+	Draft UUID `json:"draft"`
+
+	Tool string `json:"tool"`
+
+	Arguments JSONValue `json:"arguments,omitzero"`
+}
+
+type MachineRef string
+
+// hosts/setRelay.
+type MachineRelayRequest struct {
+	Host MachineRef `json:"host"`
+
+	Relay bool `json:"relay"`
+}
+
+// host/release (#2178): the release the control plane names, as X.Y.Z.
+type MachineRelease struct {
+	Version string `json:"version"`
+}
+
+type MachineRequest struct {
+	Host MachineRef `json:"host"`
+
+	Purge *bool `json:"purge,omitzero"`
+}
+
+// A host's next scheduled workflow (#1004).
+type MachineSchedule struct {
+	At *Date `json:"at,omitzero"`
+
+	Workflow *string `json:"workflow,omitzero"`
+}
+
+// machines/sessionCall, through host/machines (#2927): an agent's read_session, message_session, stop_session, archive_session, or list_sessions and wait_for_agents status, on a session it started on another of the person's machines with start_session. The control plane sends that machine's agents/fromStarter, with call.from in its own words.
+type MachineSessionCall struct {
+	Host string `json:"host"`
+
+	Call SessionCall `json:"call"`
+}
+
+// machines/startSession, through host/machines (#2887): an agent's start_session on another of the person's machines, by its name. The control plane sends that machine's agents/start.
+type MachineSessionStart struct {
+	Host string `json:"host"`
+
+	Start StartRequest `json:"start"`
+}
+
+// host/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next scheduled workflow.
+type MachineStatus struct {
+	Idle bool `json:"idle"`
+
+	Running []string `json:"running"`
+
+	Schedule *MachineSchedule `json:"schedule,omitzero"`
+}
+
+type MachineStop struct {
+	Host MachineRef `json:"host"`
+
+	ConfirmRunning *bool `json:"confirmRunning,omitzero"`
+}
+
+type MachineTunnel struct {
+	Up bool `json:"up"`
+
+	Problem *string `json:"problem,omitzero"`
+}
+
+type MachineTunnelChanged struct {
+	Name string `json:"name"`
+
+	Host *MachineRef `json:"host,omitzero"`
+
+	Tunnel MachineTunnel `json:"tunnel"`
+}
+
+// hosts/update (#1766): a host the control plane installed over ssh, updated the same way. The server and its key are given again, as at the install, because the control plane keeps neither; the host's own root and membership stay.
+type MachineUpdate struct {
+	Host MachineRef `json:"host"`
+
+	Destination string `json:"destination"`
+
+	Key *string `json:"key,omitzero"`
+
+	Trust *string `json:"trust,omitzero"`
+}
+
+// host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it starts no work (FR-033).
+type MachineUser struct {
+	User string `json:"user"`
+
+	Kind string `json:"kind"`
+
+	Name string `json:"name"`
+
+	Labels []string `json:"labels"`
+
+	CapReachedUntil *Date `json:"capReachedUntil,omitzero"`
+
+	// For a person: the names of the bots in their groups (#2027). A runs-on: workflow that names one is heard here, once approved here, and its matches are sent to the control plane, never run here.
+	Bots []string `json:"bots,omitzero"`
+}
+
+// host/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and when its user's settings or secrets change. Sent only on the links of that user's own machines. secrets is every secret the user has: a name missing from it was removed.
+type MachineUserSettings struct {
+	User string `json:"user"`
+
+	Settings UserSettings `json:"settings"`
+
+	Secrets []UserSecret `json:"secrets"`
+}
+
+type MachineWorkspace struct {
+	Provider ProviderID `json:"provider"`
+
+	ProviderName string `json:"providerName"`
+
+	Workspace string `json:"workspace"`
+
+	WorkspaceName string `json:"workspaceName"`
+
+	WorkspaceState string `json:"workspaceState"`
+
+	HostState *string `json:"hostState,omitzero"`
+
+	Phase *string `json:"phase,omitzero"`
+
+	Since *Date `json:"since,omitzero"`
+
+	Problem *string `json:"problem,omitzero"`
+
+	StoppedBy *string `json:"stoppedBy,omitzero"`
+
+	CanStart bool `json:"canStart"`
+
+	CanStop bool `json:"canStop"`
+
+	StartWhenUsed bool `json:"startWhenUsed"`
+
+	StopWhenIdleMinutes *int64 `json:"stopWhenIdleMinutes,omitzero"`
+
+	Cost *string `json:"cost,omitzero"`
+
+	Current bool `json:"current"`
+
+	StartForSchedules *bool `json:"startForSchedules,omitzero"`
+
+	TellsSchedule *bool `json:"tellsSchedule,omitzero"`
+
+	NextWorkflow *string `json:"nextWorkflow,omitzero"`
+
+	NextWorkflowAt *Date `json:"nextWorkflowAt,omitzero"`
+
+	WakeAt *Date `json:"wakeAt,omitzero"`
+}
+
+// host/machines, for an agent there: who asked, for the log, and its call.
+type MachineWorkspaceCall struct {
+	Agent string `json:"agent"`
+
+	Method string `json:"method"`
+
+	Params JSONValue `json:"params"`
+}
+
 type ManagedMCPServer struct {
 	Name string `json:"name"`
 
@@ -4683,6 +5819,7 @@ type MarketplaceFormat string
 const MarketplaceFormatMCPRegistry MarketplaceFormat = "mcp-registry"
 const MarketplaceFormatSkillsSh MarketplaceFormat = "skills.sh"
 const MarketplaceFormatGithubSkills MarketplaceFormat = "github-skills"
+const MarketplaceFormatFile MarketplaceFormat = "file"
 
 type MarketplaceIDRequest struct {
 	ID string `json:"id"`
@@ -4692,7 +5829,7 @@ type MarketplaceOrigin string
 
 const MarketplaceOriginProvided MarketplaceOrigin = "provided"
 const MarketplaceOriginPersonal MarketplaceOrigin = "personal"
-const MarketplaceOriginProject MarketplaceOrigin = "project"
+const MarketplaceOriginFolder MarketplaceOrigin = "folder"
 
 type MarketplaceSetEnabledRequest struct {
 	ID string `json:"id"`
@@ -4726,17 +5863,61 @@ type MissingFolder struct {
 	BranchKept bool `json:"branchKept"`
 }
 
+// Fast: the runtime's smallest quick model; Balanced: its usual model; Smart: its most capable model (#2658).
+type ModelLevel string
+
+const ModelLevelFast ModelLevel = "fast"
+const ModelLevelBalanced ModelLevel = "balanced"
+const ModelLevelSmart ModelLevel = "smart"
+
+// UnmarshalJSON reads a value this build does not know as "balanced".
+func (v *ModelLevel) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	switch ModelLevel(s) {
+	case ModelLevelFast,
+		ModelLevelBalanced,
+		ModelLevelSmart:
+		*v = ModelLevel(s)
+	default:
+		*v = ModelLevelBalanced
+	}
+	return nil
+}
+
+// What a person's move came to. The message is what the window may show.
+type MoveAnswer struct {
+	When MoveWhen `json:"when"`
+
+	Message string `json:"message"`
+
+	Agent *Agent `json:"agent,omitzero"`
+}
+
 type MoveAsker string
 
 const MoveAskerAgent MoveAsker = "agent"
 const MoveAskerPerson MoveAsker = "person"
+
+// The person moving an agent (053). No target takes back the person's move that is waiting.
+type MoveRequest struct {
+	AgentID UUID `json:"agentID"`
+
+	Target *MoveTarget `json:"target,omitzero"`
+
+	RemoveLeft bool `json:"removeLeft"`
+
+	DiscardChanges bool `json:"discardChanges"`
+}
 
 type MoveTarget struct {
 	NewWorktree *MoveTargetNewWorktree `json:"newWorktree,omitzero"`
 
 	Existing *MoveTargetExisting `json:"existing,omitzero"`
 
-	ProjectFolder *struct{} `json:"projectFolder,omitzero"`
+	FolderPath *struct{} `json:"folderPath,omitzero"`
 }
 
 type MoveTargetNewWorktree struct {
@@ -4745,6 +5926,21 @@ type MoveTargetNewWorktree struct {
 
 type MoveTargetExisting struct {
 	Value URL `json:"_0"`
+}
+
+type MoveWhen string
+
+const MoveWhenNow MoveWhen = "now"
+const MoveWhenAfterTurn MoveWhen = "afterTurn"
+const MoveWhenNothing MoveWhen = "nothing"
+
+// A runtime's own setting for one level: config option values (mode, model, effort), a sandbox choice, or the answer to permission requests.
+type NativeSetting struct {
+	Options map[string]JSONValue `json:"options,omitzero"`
+
+	Sandbox *SandboxChoice `json:"sandbox,omitzero"`
+
+	ClientPermission *ClientPermissionMode `json:"clientPermission,omitzero"`
 }
 
 type Need struct {
@@ -4761,7 +5957,7 @@ type Need struct {
 	Headline Headline `json:"headline"`
 }
 
-// NeedID (Attention/Need.swift): what is being answered, one key per kind.
+// NeedID (Attention/Need.swift): what is being answered, one key per kind. A notice (#2805) is what an agent told the person with `notify`: posted, never a Needs you row.
 type NeedID struct {
 	Permission *UUID `json:"permission,omitzero"`
 
@@ -4770,6 +5966,8 @@ type NeedID struct {
 	Report *NeedIDReport `json:"report,omitzero"`
 
 	GuardedChange *NeedIDGuardedChange `json:"guardedChange,omitzero"`
+
+	Notice *string `json:"notice,omitzero"`
 }
 
 type NeedIDReport struct {
@@ -4790,6 +5988,67 @@ const NeedKindPermission NeedKind = "permission"
 const NeedKindElicitation NeedKind = "elicitation"
 const NeedKindReport NeedKind = "report"
 const NeedKindGuardedChange NeedKind = "guardedChange"
+const NeedKindNotice NeedKind = "notice"
+
+// notices/delivered (#2860): the control plane sent a host's notice to one of the person's devices.
+type NoticeDelivered struct {
+	Need NeedID `json:"need"`
+
+	To NoticeDevice `json:"to"`
+}
+
+// Where the notice recorded as entry `notice` went (#2860), recorded after it once the host knows: when it sends it to the computer, or when the control plane says which device it sent it to. A client draws it on that notice's line.
+type NoticeDelivery struct {
+	Notice UUID `json:"notice"`
+
+	To NoticeDevice `json:"to"`
+}
+
+// Where a notice went (#2860): the computer (the Mac window or the web page, the "mac" surface), an iPhone, an iPad, or a device of a kind the control plane does not know.
+type NoticeDevice string
+
+const NoticeDeviceComputer NoticeDevice = "computer"
+const NoticeDeviceIPhone NoticeDevice = "iPhone"
+const NoticeDeviceIPad NoticeDevice = "iPad"
+const NoticeDeviceDevice NoticeDevice = "device"
+
+// The person's attention (#2805, #2859): how many notices agents may send at once (burst, 1–20), and the minutes until one comes back (cooldownMinutes, 1–1440). The notifications part of the user settings, user/setNoticeLimits, and notices/take, which a host asks on its channel 0 before it posts a notice.
+type NoticeLimits struct {
+	Burst int64 `json:"burst"`
+
+	CooldownMinutes float64 `json:"cooldownMinutes"`
+}
+
+// What became of a notice an agent sent with `notify` (#2805): sent to where the person is, shown here (the person was looking at that chat), muted (#2003), or held in the cool-down.
+type NoticeOutcome string
+
+const NoticeOutcomeSent NoticeOutcome = "sent"
+const NoticeOutcomeShownHere NoticeOutcome = "shownHere"
+const NoticeOutcomeMuted NoticeOutcome = "muted"
+const NoticeOutcomeCoolingDown NoticeOutcome = "coolingDown"
+
+// notices/take (#2859): whether a notice may go now, from the one bucket the control plane keeps for the person and every machine of theirs: how many more can go now, and when the next comes back.
+type NoticeTaken struct {
+	Sent bool `json:"sent"`
+
+	Left int64 `json:"left"`
+
+	NextAt Date `json:"nextAt"`
+}
+
+// The OTLP exporter of the report figures (#2019, #1804 decision 4), set on agents-control by OTEL_EXPORTER_OTLP_ENDPOINT, as this copy runs it: where it sends, the last send and the last failure.
+type OTLPExport struct {
+	Endpoint string `json:"endpoint"`
+
+	// Seconds between sends.
+	Every int64 `json:"every"`
+
+	LastSent *Date `json:"lastSent,omitzero"`
+
+	LastFailure *string `json:"lastFailure,omitzero"`
+
+	FailedAt *Date `json:"failedAt,omitzero"`
+}
 
 type OptionsRequest struct {
 	RuntimeID string `json:"runtimeID"`
@@ -4843,7 +6102,312 @@ type OrgPolicy struct {
 
 	// Empty. A place for later layers that only make a rule tighter.
 	Groups *Empty `json:"groups,omitzero"`
+
+	Notices *PolicyNotices `json:"notices,omitzero"`
 }
+
+// An org sign-in provider (#1002, D1, FR-001): an OIDC issuer that an organisation registered for this control plane. Kept at v1/signin/providers/<id>.json; its client secret is sealed beside it and never returned. The control plane sets version, secret, created, changed and redirectURI.
+type OrgProvider struct {
+	// [a-z0-9-]{2,32}, made from the name when absent at add, never changed: the provider of each sign-in it makes.
+	ID string `json:"id"`
+
+	// On the button: Sign in with <name>. 1 to 40 characters.
+	Name string `json:"name"`
+
+	Preset OrgProviderPreset `json:"preset"`
+
+	// An https URL. Its discovery document must name it as issuer.
+	Issuer string `json:"issuer"`
+
+	ClientID string `json:"clientID"`
+
+	// The claim that names a person for life (D5): sub, or oid for Entra.
+	AccountClaim *string `json:"accountClaim,omitzero"`
+
+	// Entra: the tid an ID token must have.
+	Tenant *string `json:"tenant,omitzero"`
+
+	Scopes []string `json:"scopes,omitzero"`
+
+	Join *OrgProviderJoin `json:"join,omitzero"`
+
+	On *bool `json:"on,omitzero"`
+
+	Order *int64 `json:"order,omitzero"`
+
+	Secret *OrgProviderSecret `json:"secret,omitzero"`
+
+	Version *int64 `json:"version,omitzero"`
+
+	Created *OrgRouteStamp `json:"created,omitzero"`
+
+	Changed *OrgRouteStamp `json:"changed,omitzero"`
+
+	// The callback to register at the provider: this control plane's https address and /v1/oidc/callback. Only in answers.
+	RedirectURI *string `json:"redirectURI,omitzero"`
+
+	// SCIM for this provider (slice 2a). Set by scim/set only.
+	Scim *OrgProviderSCIM `json:"scim,omitzero"`
+}
+
+// signIn/orgProviders/check (#1002, FR-004): what the issuer's discovery document lacks, and how many keys its JWKS has.
+type OrgProviderCheck struct {
+	Ok bool `json:"ok"`
+
+	Missing []string `json:"missing"`
+
+	JwksKeys int64 `json:"jwksKeys"`
+
+	RedirectURI string `json:"redirectURI"`
+}
+
+// Who may join through an org provider (D10): only people from SCIM, anyone the provider signs in, or only by invite.
+type OrgProviderJoin string
+
+const OrgProviderJoinScim OrgProviderJoin = "scim"
+const OrgProviderJoinAnyone OrgProviderJoin = "anyone"
+const OrgProviderJoinInvite OrgProviderJoin = "invite"
+
+// An org provider with its store tag, for an admin (#1002).
+type OrgProviderKept struct {
+	Provider OrgProvider `json:"provider"`
+
+	Rev string `json:"rev"`
+}
+
+// signIn/orgProviders/list (#1002): every org provider, for an admin. No secret.
+type OrgProviderList struct {
+	Providers []OrgProviderKept `json:"providers"`
+}
+
+// Which form filled an org provider (#1002, research R3). Only googleWorkspace changes a check: hd must be a claimed domain.
+type OrgProviderPreset string
+
+const OrgProviderPresetOkta OrgProviderPreset = "okta"
+const OrgProviderPresetEntra OrgProviderPreset = "entra"
+const OrgProviderPresetGoogleWorkspace OrgProviderPreset = "googleWorkspace"
+const OrgProviderPresetOidc OrgProviderPreset = "oidc"
+
+// signIn/orgProviders/check and remove (#1002).
+type OrgProviderRequest struct {
+	ID string `json:"id"`
+
+	Rev *string `json:"rev,omitzero"`
+}
+
+// An org provider's SCIM (#1002, FR-013, FR-016): on or off, and the attribute that matches a provisioned person to a sign-in.
+type OrgProviderSCIM struct {
+	On bool `json:"on"`
+
+	Match SCIMMatch `json:"match"`
+}
+
+// Who set an org provider's client secret, when, and its fingerprint: the first 8 hex of its SHA-256 (#1002, D4). Never the value.
+type OrgProviderSecret struct {
+	Fingerprint string `json:"fingerprint"`
+
+	SetBy *AuditActor `json:"setBy,omitzero"`
+
+	SetAt Date `json:"setAt"`
+}
+
+// signIn/orgProviders/set (#1002, FR-001 to FR-004): add or change an org provider. secret is written only, never read back; needed to add. rev is the tag the admin read; none to add.
+type OrgProviderSet struct {
+	Provider OrgProvider `json:"provider"`
+
+	Secret *string `json:"secret,omitzero"`
+
+	Rev *string `json:"rev,omitzero"`
+}
+
+// An organisation's way to the model for one or more runtimes (#999, spec FR-001): an org key or a gateway. The control plane keeps it at v1/org/routes/<id>.json; its secrets are in an envelope beside it, never in this record. The control plane sets version, secretFields, fingerprint, created and changed; machines is how many machines hold its version, for an admin.
+type OrgRoute struct {
+	// [a-z0-9-]{1,40}, made from the name when absent at add, never changed.
+	ID string `json:"id"`
+
+	// What members see, such as Acme Bedrock. 1 to 60 characters.
+	Name string `json:"name"`
+
+	Kind OrgRouteKind `json:"kind"`
+
+	Vendor *OrgRouteVendor `json:"vendor,omitzero"`
+
+	// The runtimes it serves: only those whose row of the spec's table allows the kind.
+	Runtimes []string `json:"runtimes"`
+
+	Settings *OrgRouteSettings `json:"settings,omitzero"`
+
+	// The runtime's model ids to the gateway's. Absent: the runtime's ids as they are.
+	Models map[string]string `json:"models,omitzero"`
+
+	// The groups whose people may use it (T1). Empty: everyone.
+	Groups []string `json:"groups,omitzero"`
+
+	// The runtimes whose default account it is.
+	DefaultFor []string `json:"defaultFor,omitzero"`
+
+	// The names of the secret fields that are set (apiKey, awsAccessKeyId, serviceAccount, entraClientSecret, …), never a value.
+	SecretFields []string `json:"secretFields,omitzero"`
+
+	// The first 8 hex of SHA-256 of each secret value (spec D14), by field.
+	Fingerprint map[string]string `json:"fingerprint,omitzero"`
+
+	// One more at each change, a replaced key included.
+	Version *int64 `json:"version,omitzero"`
+
+	Created *OrgRouteStamp `json:"created,omitzero"`
+
+	Changed *OrgRouteStamp `json:"changed,omitzero"`
+
+	// How many machines said they keep this version (host/orgRoutesApplied). Only in orgRoutes/list.
+	Machines *int64 `json:"machines,omitzero"`
+}
+
+// orgRoutes/check (#999): what one small request from the control plane found, in words.
+type OrgRouteCheck struct {
+	Ok bool `json:"ok"`
+
+	Words string `json:"words"`
+}
+
+// host/orgRoutes (#999): every route the machine's person (or bot) may use. An empty list removes every route.
+type OrgRouteDelivery struct {
+	Routes []DeliveredRoute `json:"routes"`
+
+	At Date `json:"at"`
+}
+
+// An org route with its store tag, for an admin (#999).
+type OrgRouteKept struct {
+	Route OrgRoute `json:"route"`
+
+	Rev string `json:"rev"`
+}
+
+// How an org route reaches the model (#999): an org key of the runtime's own vendor, or a gateway: Amazon Bedrock, Google Vertex AI, Microsoft Azure, or the organisation's own base URL.
+type OrgRouteKind string
+
+const OrgRouteKindKey OrgRouteKind = "key"
+const OrgRouteKindBedrock OrgRouteKind = "bedrock"
+const OrgRouteKindVertex OrgRouteKind = "vertex"
+const OrgRouteKindAzure OrgRouteKind = "azure"
+const OrgRouteKindBaseURL OrgRouteKind = "baseURL"
+
+// orgRoutes/list (#999), an admin's: every route, and whether this control plane can seal a secret.
+type OrgRouteList struct {
+	Routes []OrgRouteKept `json:"routes"`
+
+	Sealing bool `json:"sealing"`
+}
+
+// A route the caller may use (#999): no settings, no fingerprint.
+type OrgRouteMine struct {
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Kind OrgRouteKind `json:"kind"`
+
+	Runtimes []string `json:"runtimes"`
+
+	DefaultFor []string `json:"defaultFor"`
+}
+
+// orgRoutes/replaceKey (#999): new values for a route's secret fields.
+type OrgRouteReplaceKey struct {
+	ID string `json:"id"`
+
+	Secrets map[string]string `json:"secrets"`
+
+	Rev string `json:"rev"`
+}
+
+// orgRoutes/check and orgRoutes/remove (#999): a route, and for remove the tag the admin read.
+type OrgRouteRequest struct {
+	ID string `json:"id"`
+
+	Rev *string `json:"rev,omitzero"`
+}
+
+// orgRoutes/set (#999): add a route, or change one. secrets are written only, never read back; an absent field keeps its value. rev is the tag the admin read; none to add.
+type OrgRouteSet struct {
+	Route OrgRoute `json:"route"`
+
+	Secrets map[string]string `json:"secrets,omitzero"`
+
+	Rev *string `json:"rev,omitzero"`
+}
+
+// An org route's settings that are not secret (#999, data-model.md). bedrock: region. vertex: folder, location. azure: resource or address, apiVersion, and tenant and clientID for an Entra app. baseURL: address, and header, the header the key goes in.
+type OrgRouteSettings struct {
+	Address *string `json:"address,omitzero"`
+
+	ApiVersion *string `json:"apiVersion,omitzero"`
+
+	ClientID *string `json:"clientID,omitzero"`
+
+	Header *string `json:"header,omitzero"`
+
+	Location *string `json:"location,omitzero"`
+
+	Region *string `json:"region,omitzero"`
+
+	Resource *string `json:"resource,omitzero"`
+
+	Tenant *string `json:"tenant,omitzero"`
+
+	Project *string `json:"project,omitzero"`
+}
+
+// Who changed an org route, and when (#999).
+type OrgRouteStamp struct {
+	By AuditActor `json:"by"`
+
+	At Date `json:"at"`
+}
+
+// An org route's vendor (#999): whose key a key route holds, and the API shape of a base-URL or Azure route.
+type OrgRouteVendor string
+
+const OrgRouteVendorAnthropic OrgRouteVendor = "anthropic"
+const OrgRouteVendorOpenai OrgRouteVendor = "openai"
+const OrgRouteVendorGemini OrgRouteVendor = "gemini"
+const OrgRouteVendorXai OrgRouteVendor = "xai"
+
+// A route a machine keeps, and its version (#999).
+type OrgRouteVersion struct {
+	ID string `json:"id"`
+
+	Version int64 `json:"version"`
+}
+
+// host/orgRoutesApplied (#999): the routes a machine keeps, after a delivery.
+type OrgRoutesApplied struct {
+	Routes []OrgRouteVersion `json:"routes"`
+}
+
+// control/orgRoutesLeft (#999): a machine was removed with these routes on it. To its person and to every admin.
+type OrgRoutesLeft struct {
+	Host MachineRef `json:"host"`
+
+	Name string `json:"name"`
+
+	User string `json:"user"`
+
+	Routes []string `json:"routes"`
+}
+
+// orgRoutes/mine (#999).
+type OrgRoutesMine struct {
+	Routes []OrgRouteMine `json:"routes"`
+}
+
+// What the host says on a folder's pull request when it merges (#2352): nothing (off, the default), the tokens and time only, or the cost too. Kept in the folder's .agents/folder.json, so the repo's people choose what a public repo publishes.
+type PRCostComment string
+
+const PRCostCommentOff PRCostComment = "off"
+const PRCostCommentTokens PRCostComment = "tokens"
+const PRCostCommentCost PRCostComment = "cost"
 
 type PagesChangedNotification struct {
 	Folder URL `json:"folder"`
@@ -4867,6 +6431,23 @@ type PairingSecret struct {
 	Secret Data `json:"secret,omitzero"`
 
 	Expires *Date `json:"expires,omitzero"`
+}
+
+// One name in the person's own pass-through list (#998, FR-011a), as runtime-environment.json has it.
+type PassThroughName struct {
+	// A variable's name, or a prefix ending in *.
+	Name string `json:"name"`
+
+	// The runtime it is passed to; absent for every runtime.
+	Runtime *string `json:"runtime,omitzero"`
+
+	// Set when the organisation's policy does not allow the name: it is not passed.
+	SetBy *PolicySetBy `json:"setBy,omitzero"`
+}
+
+// settings/passThrough (#998): the person's own pass-through names, each marked when the policy refuses it.
+type PassThroughState struct {
+	Names []PassThroughName `json:"names"`
 }
 
 type Payment struct {
@@ -4923,6 +6504,32 @@ type PeopleList struct {
 	People []PersonRow `json:"people"`
 
 	Admin bool `json:"admin"`
+}
+
+// Plan: reads and plans, changes nothing; Ask: asks before it changes things; Approve for me: does not ask for normal changes in its folder; Bypass Permissions: never asks, even for a change outside its folder (#2658, #2864).
+type PermissionLevel string
+
+const PermissionLevelPlan PermissionLevel = "plan"
+const PermissionLevelAsk PermissionLevel = "ask"
+const PermissionLevelApproveForMe PermissionLevel = "approveForMe"
+const PermissionLevelBypassPermissions PermissionLevel = "bypassPermissions"
+
+// UnmarshalJSON reads a value this build does not know as "ask".
+func (v *PermissionLevel) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	switch PermissionLevel(s) {
+	case PermissionLevelPlan,
+		PermissionLevelAsk,
+		PermissionLevelApproveForMe,
+		PermissionLevelBypassPermissions:
+		*v = PermissionLevel(s)
+	default:
+		*v = PermissionLevelAsk
+	}
+	return nil
 }
 
 type PermissionNotification struct {
@@ -4997,7 +6604,7 @@ type PersonInvited struct {
 
 // A machine in People: its name, its state and nothing inside it (FR-019).
 type PersonMachine struct {
-	ID HostID `json:"id"`
+	ID MachineRef `json:"id"`
 
 	Name string `json:"name"`
 
@@ -5059,6 +6666,35 @@ type PersonRow struct {
 
 	// A bot's spend today, UTC, as its machines reported it (#1761).
 	SpentTodayUSD *float64 `json:"spentTodayUSD,omitzero"`
+
+	// What SCIM says of the person, for one SCIM made (#1002). Shown as Managed by <provider>.
+	Scim *PersonSCIM `json:"scim,omitzero"`
+
+	// Made by SCIM and not signed in yet: Waiting for first sign-in (#1002).
+	Provisioned *bool `json:"provisioned,omitzero"`
+
+	// Suspended by their org provider (#1002, D13).
+	Suspended *PersonSuspended `json:"suspended,omitzero"`
+
+	// The SCIM groups that give the person their role (#1002, FR-020): Set by <provider>. Absent: set by hand.
+	RoleFrom []string `json:"roleFrom,omitzero"`
+}
+
+// What an org provider's SCIM says of a person (#1002, FR-015). The match is only inside its provider.
+type PersonSCIM struct {
+	Provider string `json:"provider"`
+
+	ExternalId *string `json:"externalId,omitzero"`
+
+	UserName string `json:"userName"`
+
+	Name *SCIMName `json:"name,omitzero"`
+
+	DisplayName *string `json:"displayName,omitzero"`
+
+	Emails []SCIMEmail `json:"emails,omitzero"`
+
+	Active bool `json:"active"`
 }
 
 // What agents call the person, and their pronouns (#121), as given: person.json in the person's settings.
@@ -5066,6 +6702,17 @@ type PersonSettings struct {
 	Name *string `json:"name,omitzero"`
 
 	Pronouns *string `json:"pronouns,omitzero"`
+}
+
+// Why a person is suspended (#1002, D13): by SCIM, by a refresh the provider refused (Q1 A), or by an admin's id; with the provider and when.
+type PersonSuspended struct {
+	By string `json:"by"`
+
+	Provider string `json:"provider"`
+
+	At Date `json:"at"`
+
+	Why *string `json:"why,omitzero"`
 }
 
 type Persona struct {
@@ -5082,10 +6729,38 @@ type Persona struct {
 	Problem *string `json:"problem,omitzero"`
 }
 
+type PersonaFile struct {
+	ID string `json:"id"`
+
+	Origin PersonaOrigin `json:"origin"`
+
+	Content string `json:"content"`
+}
+
+type PersonaFileSaveRequest struct {
+	Folder *URL `json:"folder,omitzero"`
+
+	Origin PersonaOrigin `json:"origin"`
+
+	ID string `json:"id"`
+
+	Content string `json:"content"`
+
+	Delete *bool `json:"delete,omitzero"`
+}
+
+type PersonaFilesAnswer []PersonaFile
+
 type PersonaOrigin string
 
-const PersonaOriginProject PersonaOrigin = "project"
+const PersonaOriginFolder PersonaOrigin = "folder"
 const PersonaOriginPersonal PersonaOrigin = "personal"
+
+type PersonasFilesRequest struct {
+	Folder *URL `json:"folder,omitzero"`
+
+	Origin PersonaOrigin `json:"origin"`
+}
 
 type PersonasListRequest struct {
 	Folder URL `json:"folder"`
@@ -5107,6 +6782,14 @@ type PinArrangeWorkflowsRequest struct {
 	Folder URL `json:"folder"`
 
 	WorkflowIDs []string `json:"workflowIDs"`
+}
+
+type PinHideViewRequest struct {
+	Folder URL `json:"folder"`
+
+	URI string `json:"uri"`
+
+	Hidden bool `json:"hidden"`
 }
 
 type PinKind string
@@ -5159,6 +6842,16 @@ type PinView struct {
 	View *ViewPin `json:"view,omitzero"`
 
 	MissingReason *string `json:"missingReason,omitzero"`
+
+	Hidden *bool `json:"hidden,omitzero"`
+
+	Count *int64 `json:"count,omitzero"`
+
+	Attention *int64 `json:"attention,omitzero"`
+
+	CountAt *Date `json:"countAt,omitzero"`
+
+	CountStale *bool `json:"countStale,omitzero"`
 }
 
 type PinWriteRequest struct {
@@ -5178,6 +6871,7 @@ type PinnerKind string
 const PinnerKindPerson PinnerKind = "person"
 const PinnerKindAgent PinnerKind = "agent"
 const PinnerKindWorkflow PinnerKind = "workflow"
+const PinnerKindServer PinnerKind = "server"
 
 type PinnerView struct {
 	Kind PinnerKind `json:"kind"`
@@ -5195,6 +6889,8 @@ type PinsChangedNotification struct {
 	Sessions []UUID `json:"sessions,omitzero"`
 
 	Workflows []string `json:"workflows,omitzero"`
+
+	Views []PinView `json:"views,omitzero"`
 }
 
 type Plan struct {
@@ -5241,7 +6937,7 @@ type PluginApproveRequest struct {
 type PluginsList struct {
 	Folder URL `json:"folder"`
 
-	Plugins []ProjectPlugin `json:"plugins"`
+	Plugins []FolderPlugin `json:"plugins"`
 }
 
 type PluginsListRequest struct {
@@ -5275,7 +6971,7 @@ type PolicyEnvironment struct {
 	PassThrough []string `json:"passThrough"`
 }
 
-// The ceiling over each project's helper limits (#998, #64).
+// The ceiling over each folder's helper limits (#998, #64).
 type PolicyHelpers struct {
 	MostRunning *int64 `json:"mostRunning,omitzero"`
 
@@ -5298,6 +6994,12 @@ type PolicyMarketplaces struct {
 	CustomServers string `json:"customServers"`
 }
 
+// The notices a policy decides for every member (#999, FR-008).
+type PolicyNotices struct {
+	// Google's terms notice for Antigravity: show (as absent), accepted (the organisation reviewed them; no notice), refuse (Antigravity is refused).
+	AntigravityTerms *string `json:"antigravityTerms,omitzero"`
+}
+
 // policy/raise (#998): an admin raises a person's budget for today (UTC).
 type PolicyRaiseRequest struct {
 	User string `json:"user"`
@@ -5308,6 +7010,13 @@ type PolicyRaiseRequest struct {
 
 	Request *string `json:"request,omitzero"`
 }
+
+// A way a runtime reaches the model (#999): the person's own sign-in, an org key, or a gateway.
+type PolicyReach string
+
+const PolicyReachSignIn PolicyReach = "signIn"
+const PolicyReachOrgKey PolicyReach = "orgKey"
+const PolicyReachGateway PolicyReach = "gateway"
 
 // The data of a policyRefused error (#998, FR-010): why, the rule, and the words for the client.
 type PolicyRefusal struct {
@@ -5324,6 +7033,9 @@ type PolicyRefusal struct {
 type PolicyRuntimeRule struct {
 	// The model ids allowed, with * at the end allowed (claude-sonnet-*). Absent allows every model.
 	Models []string `json:"models,omitzero"`
+
+	// The ways this runtime may reach the model (#999). Absent: every way. [orgKey, gateway] is the org path only.
+	Reach []PolicyReach `json:"reach,omitzero"`
 }
 
 // policy/set (#998): the rules, and the rev the admin read. No rev when there was no policy. Refused changedElsewhere when another admin saved first.
@@ -5352,6 +7064,26 @@ type PolicySignature struct {
 	Alg string `json:"alg"`
 
 	Sig Data `json:"sig"`
+}
+
+// daemon/policyState and daemon/policyStateChanged (#998, T027): the organisation's policy as this machine follows it, so a client on the direct path draws the strip and the Policy pane. No version when this machine has no policy.
+type PolicyState struct {
+	Version *int64 `json:"version,omitzero"`
+
+	// The rules in force here, with only this machine's person's raises.
+	Policy *OrgPolicy `json:"policy,omitzero"`
+
+	// The kill switch is on: this machine stops its turns and starts no work.
+	StopAll bool `json:"stopAll"`
+
+	// This machine had a policy from its organisation and has none it can trust now (missing, or it fails the signature check). It starts no work until it gets one.
+	NoPolicy bool `json:"noPolicy"`
+
+	// The capabilities the policy requires that this machine lacks (FR-014). It starts no work.
+	Update []string `json:"update,omitzero"`
+
+	// Why this machine starts no work now, when it starts none.
+	Refusal *PolicyRefusal `json:"refusal,omitzero"`
 }
 
 // The kill switch (#998, FR-015): while on, every machine stops its turns and starts no work.
@@ -5430,134 +7162,92 @@ type PrewarmRequestWhy string
 const PrewarmRequestWhyOpened PrewarmRequestWhy = "opened"
 const PrewarmRequestWhyTyping PrewarmRequestWhy = "typing"
 
+// A project (#2317): what people work on, the record that folders join. folders is what the machines last reported.
 type Project struct {
-	Folder URL `json:"folder"`
+	ID string `json:"id"`
 
-	ArchivedAt *Date `json:"archivedAt,omitzero"`
-
-	AddedAt Date `json:"addedAt"`
-
-	LaidOutAt *Date `json:"laidOutAt,omitzero"`
-
-	LayoutVersion *int64 `json:"layoutVersion,omitzero"`
-
-	HelperLimits *HelperLimits `json:"helperLimits,omitzero"`
-
-	DiskSpace *DiskThresholds `json:"diskSpace,omitzero"`
-
-	Pinned *bool `json:"pinned,omitzero"`
-}
-
-type ProjectDetection struct {
-	Enabled bool `json:"enabled"`
-
-	Paths []string `json:"paths"`
-}
-
-type ProjectMCPServer struct {
 	Name string `json:"name"`
 
-	Summary string `json:"summary"`
+	Owner string `json:"owner"`
 
-	Managed *ManagedMCPServer `json:"managed,omitzero"`
+	Folders []ProjectFolder `json:"folders"`
 
-	Approval MCPApprovalState `json:"approval"`
+	// The caller is the owner or an admin, so may rename and remove it, and set its slots.
+	MayChange bool `json:"mayChange"`
 
-	MissingSecrets []string `json:"missingSecrets"`
-
-	SecretNames []string `json:"secretNames"`
-
-	EntryDigest string `json:"entryDigest"`
-
-	SignIn *MCPSignInState `json:"signIn,omitzero"`
-
-	Views *string `json:"views,omitzero"`
+	// The project's Tasks, Code review and CI (#2669), one per slot: every folder in the project uses them. A slot that is not here is each folder's own.
+	Slots []ProjectSlot `json:"slots,omitzero"`
 }
 
-type ProjectPins struct {
-	Folder URL `json:"folder"`
-
-	Pins []PinView `json:"pins"`
-
-	Sessions []UUID `json:"sessions,omitzero"`
-
-	Workflows []string `json:"workflows,omitzero"`
-}
-
-type ProjectPlugin struct {
-	Project URL `json:"project"`
+// A folder in a project (#2317), as its machine last reported it.
+type ProjectFolder struct {
+	Machine MachineRef `json:"machine"`
 
 	Folder URL `json:"folder"`
 
 	Name string `json:"name"`
-
-	Carries []string `json:"carries"`
-
-	AwaitingApproval *WorkflowApproval `json:"awaitingApproval,omitzero"`
 }
 
-type ProjectRemovedNotification struct {
-	Folder URL `json:"folder"`
+// projects/list (#2317): the organisation's projects, by name.
+type ProjectList struct {
+	Projects []Project `json:"projects"`
 }
 
+// projects/remove (#2317): the project. Refused while a folder names it.
 type ProjectRequest struct {
-	Folder URL `json:"folder"`
+	ID string `json:"id"`
 }
 
-type ProjectSummary struct {
-	Project Project `json:"project"`
+// projects/set (#2317): makes a project, or with id renames one.
+type ProjectSet struct {
+	ID *string `json:"id,omitzero"`
+
+	Name string `json:"name"`
+}
+
+// A project's Tasks, Code review or CI slot (#2669): the forge and the repository (GitHub owner/name, GitLab group/project) that fill it for every folder in the project, or skipped.
+type ProjectSlot struct {
+	Slot ConnectorSlotKind `json:"slot"`
+
+	Forge *ConnectionProvider `json:"forge,omitzero"`
+
+	Repository *string `json:"repository,omitzero"`
+
+	// The repository's host: github.com, gitlab.com, or a self-managed GitLab's host.
+	Site *string `json:"site,omitzero"`
+
+	// Skipped for every folder in the project. forge, repository and site are then absent.
+	Skipped *bool `json:"skipped,omitzero"`
+}
+
+// projects/setSlot (#2669): sets one of the project's slots, or with no value gives it back to each folder. Only the owner or an admin.
+type ProjectSlotSet struct {
+	ID string `json:"id"`
+
+	Slot ConnectorSlotKind `json:"slot"`
+
+	Value *ProjectSlot `json:"value,omitzero"`
+}
+
+// One project's slots, as a machine gets them (#2669).
+type ProjectTools struct {
+	ID string `json:"id"`
 
 	Name string `json:"name"`
 
-	Exists bool `json:"exists"`
-
-	LastActivityAt Date `json:"lastActivityAt"`
-
-	Counts ProjectSummaryCounts `json:"counts"`
-
-	CostToDate map[string]float64 `json:"costToDate"`
-
-	UnmeasuredAgents int64 `json:"unmeasuredAgents"`
-
-	RetiredCount int64 `json:"retiredCount"`
-
-	IsChat *bool `json:"isChat,omitzero"`
-
-	GuardedChanges []GuardedChange `json:"guardedChanges,omitzero"`
-
-	Approvals []Approval `json:"approvals,omitzero"`
+	Slots []ProjectSlot `json:"slots"`
 }
 
-type ProjectSummaryCounts struct {
-	NeedsAttention *int64 `json:"needsAttention,omitzero"`
+// control/projectsChanged (#2317): a project was made, renamed, adopted or removed, or a folder joined one.
+type ProjectsChanged struct {
+	ID *string `json:"id,omitzero"`
 
-	Blocked *int64 `json:"blocked,omitzero"`
-
-	Waiting *int64 `json:"waiting,omitzero"`
-
-	Running *int64 `json:"running,omitzero"`
-
-	Finished *int64 `json:"finished,omitzero"`
-
-	Stopped *int64 `json:"stopped,omitzero"`
-
-	Archived *int64 `json:"archived,omitzero"`
+	Removed *bool `json:"removed,omitzero"`
 }
 
-type ProjectWorktrees struct {
-	Project URL `json:"project"`
-
-	Worktrees []WorktreeSummary `json:"worktrees"`
-}
-
-type ProjectsFindRequest struct {
-	Paths []string `json:"paths,omitzero"`
-
-	Folders []string `json:"folders,omitzero"`
-}
-
-type ProjectsListRequest struct {
-	IncludeArchived bool `json:"includeArchived"`
+// projects/joined (#2317): a machine's folders and the project each names, all of them each time.
+type ProjectsJoined struct {
+	Folders []JoinedFolder `json:"folders"`
 }
 
 type PromptOrigin string
@@ -5576,6 +7266,9 @@ type PromptRequest struct {
 	From PromptOrigin `json:"from"`
 
 	SendID *UUID `json:"sendID,omitzero"`
+
+	// Sent from voice mode (#2322): the daemon puts the voice-mode text in front of the words, as the prompt's preface.
+	Voice *bool `json:"voice,omitzero"`
 }
 
 // providers/add and providers/update. `secrets` only ever goes to the control plane; `cli` is not kept; `draft` is the draft this accepts (#858).
@@ -5615,13 +7308,13 @@ type ProviderCreate struct {
 
 	Clones []string `json:"clones,omitzero"`
 
-	// The repository to start it from (#1809), an https git address. A provider whose New Workspace form has `repository`, such as Codespaces, makes the workspace from it; any other has the host clone it once it joins, before `clones`.
+	// The repository to start it from (#1809), an https git address. A provider whose New Machine form has `repository`, such as Codespaces, makes the workspace from it; any other has the host clone it once it joins, before `clones`.
 	Repository *string `json:"repository,omitzero"`
 }
 
 // What providers/create made.
 type ProviderCreated struct {
-	Workspace WorkspaceInfo `json:"workspace"`
+	Workspace MachineInfo `json:"workspace"`
 
 	Joining bool `json:"joining"`
 }
@@ -5701,7 +7394,7 @@ type ProviderList struct {
 	Providers []ProviderSummary `json:"providers"`
 }
 
-// providers/options: the New Workspace form, a JSON Schema.
+// providers/options: the New Machine form, a JSON Schema.
 type ProviderOptions struct {
 	Schema JSONValue `json:"schema"`
 }
@@ -5746,7 +7439,7 @@ type ProviderSummary struct {
 
 	Preset *string `json:"preset,omitzero"`
 
-	Workspaces []WorkspaceInfo `json:"workspaces"`
+	Workspaces []MachineInfo `json:"workspaces"`
 
 	ListedAt *Date `json:"listedAt,omitzero"`
 
@@ -5788,8 +7481,6 @@ type QueuedPrompt struct {
 	Preface *string `json:"preface,omitzero"`
 
 	Sender *MessageSender `json:"sender,omitzero"`
-
-	Hops *int64 `json:"hops,omitzero"`
 }
 
 type QueuedStart struct {
@@ -5845,7 +7536,48 @@ type RateLimitInfo struct {
 	OverageDisabledReason *string `json:"overageDisabledReason,omitzero"`
 }
 
-// Makes or brings up to date a host's copy of a Mac's repository (#1123): fetches the `bundle` upload, moves `branches` forward only, checks out `checkout`, sets `origin`, applies the `patch` upload (uncommitted changes), and adds the folder as a project. It stops, and changes nothing, when the host has changes or commits of its own.
+// readApi/list (#2019), an admin's: the read API's tokens, newest first, revoked ones too; its URL; and the OTLP exporter when one is set.
+type ReadAPI struct {
+	Tokens []ReadToken `json:"tokens"`
+
+	URL string `json:"url"`
+
+	Otlp *OTLPExport `json:"otlp,omitzero"`
+}
+
+// A read API token (#2019, #1804 decision 4), with no value: the control plane keeps only its SHA-256. It reads the organisation's reports at /v1/read/reports, and nothing else.
+type ReadToken struct {
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Made OrgRouteStamp `json:"made"`
+
+	LastUse *SCIMTokenUse `json:"lastUse,omitzero"`
+
+	Revoked *OrgRouteStamp `json:"revoked,omitzero"`
+}
+
+// readApi/make (#2019): the token, its value once (never shown again), and the URL to read.
+type ReadTokenMade struct {
+	Token ReadToken `json:"token"`
+
+	Value string `json:"value"`
+
+	URL string `json:"url"`
+}
+
+// readApi/make (#2019): a name for the token, such as the BI tool that uses it.
+type ReadTokenMake struct {
+	Name string `json:"name"`
+}
+
+// readApi/revoke (#2019): the token to stop at once.
+type ReadTokenRevoke struct {
+	ID string `json:"id"`
+}
+
+// Makes or brings up to date a host's copy of a Mac's repository (#1123): fetches the `bundle` upload, moves `branches` forward only, checks out `checkout`, sets `origin`, applies the `patch` upload (uncommitted changes), and adds the folder as a folder. It stops, and changes nothing, when the host has changes or commits of its own.
 type ReceiveRequest struct {
 	Folder string `json:"folder"`
 
@@ -5878,7 +7610,7 @@ type ReceiveStateRequest struct {
 	Folder string `json:"folder"`
 }
 
-// One part of a file a Mac sends (#1123), at `offset` in the upload. A part is at most 16 MB; the host keeps the upload until projects/receive uses it.
+// One part of a file a Mac sends (#1123), at `offset` in the upload. A part is at most 16 MB; the host keeps the upload until folders/receive uses it.
 type ReceiveUploadRequest struct {
 	Upload UUID `json:"upload"`
 
@@ -5955,6 +7687,17 @@ type RelaySwitch struct {
 	Relay bool `json:"relay"`
 }
 
+// The tokens the machine's model relay counted from the provider's own answers (#999, FR-019): fresh input, output, and cache reads and writes.
+type RelayTokens struct {
+	Input int64 `json:"input"`
+
+	Output int64 `json:"output"`
+
+	CacheRead int64 `json:"cacheRead"`
+
+	CacheWrite int64 `json:"cacheWrite"`
+}
+
 type RememberedOptionsRequest struct {
 	RuntimeID string `json:"runtimeID"`
 
@@ -5969,6 +7712,22 @@ type RemovalCheck struct {
 	Unmerged bool `json:"unmerged"`
 }
 
+// A Remove request (#1002, D13, FR-017): an org provider deleted a person by SCIM; the person is suspended, and an admin confirms the removal with people/remove.
+type RemoveRequest struct {
+	User string `json:"user"`
+
+	Name string `json:"name"`
+
+	Provider string `json:"provider"`
+
+	At Date `json:"at"`
+}
+
+// people/removeRequests (#1002): the Remove requests waiting for an admin, oldest first.
+type RemoveRequestList struct {
+	Requests []RemoveRequest `json:"requests"`
+}
+
 type RemoveResourceRequest struct {
 	Name string `json:"name"`
 }
@@ -5977,6 +7736,39 @@ type RenameRequest struct {
 	AgentID UUID `json:"agentID"`
 
 	Title string `json:"title"`
+}
+
+// What a machine's agents did in an hour or a day (#2019, R2 to R6), counted from its own event log and its time ledger: never a conversation's words. Absent from a machine before #2019.
+type ReportCounts struct {
+	// Agents that began their first turn (agent.started).
+	Sessions int64 `json:"sessions"`
+
+	// Agents that ended in an error that nobody chose (agent.failed).
+	FailedSessions int64 `json:"failedSessions"`
+
+	// Pull and merge requests opened from an agent's branch on this machine (pr.opened).
+	PrsOpened int64 `json:"prsOpened"`
+
+	// Those merged (pr.merged).
+	PrsMerged int64 `json:"prsMerged"`
+
+	// Of those merged, the ones that revert another: a title that starts with "Revert".
+	PrsReverted int64 `json:"prsReverted"`
+
+	// The merged ones' time from their agent's start to the merge, added up: divide by prsMerged for the mean.
+	MergeSeconds float64 `json:"mergeSeconds"`
+
+	// The times an agent waited for its person in a turn (a question, a form, a permission).
+	Waits int64 `json:"waits"`
+
+	// The waits by how long each was: under 1 minute, 5, 15, 60, 240, and longer. Six numbers.
+	WaitBuckets []int64 `json:"waitBuckets"`
+
+	// Runs a workflow started (workflow.ran).
+	WorkflowRuns int64 `json:"workflowRuns"`
+
+	// Runs whose agent ended in an error (agent.failed of an agent a workflow started).
+	WorkflowFailures int64 `json:"workflowFailures"`
 }
 
 // reports/export's answer (#1811): the rows as CSV or JSON lines.
@@ -5992,6 +7784,17 @@ type ReportFormat string
 
 const ReportFormatCsv ReportFormat = "csv"
 const ReportFormatJsonl ReportFormat = "jsonl"
+
+// A page of Reports (#1804, #2019).
+type ReportPage string
+
+const ReportPageSpend ReportPage = "spend"
+const ReportPageOutcomes ReportPage = "outcomes"
+const ReportPageTime ReportPage = "time"
+const ReportPageRuntimes ReportPage = "runtimes"
+const ReportPageAdoption ReportPage = "adoption"
+const ReportPageWorkflows ReportPage = "workflows"
+const ReportPageValue ReportPage = "value"
 
 // Who sees what in Reports (#1804), set by an admin in Console ▸ Report Policy.
 type ReportPolicy struct {
@@ -6024,7 +7827,7 @@ const ReportRangeWeek ReportRange = "week"
 const ReportRangeMonth ReportRange = "month"
 const ReportRangeThreeMonths ReportRange = "threeMonths"
 
-// One hour or day of one machine's project and runtime, with its person (#1811).
+// One hour or day of one machine's folder and runtime, with its person (#1811).
 type ReportRow struct {
 	// The UTC hour ("2026-10-21T15") or day ("2026-10-21").
 	At string `json:"at"`
@@ -6033,13 +7836,14 @@ type ReportRow struct {
 
 	PersonName string `json:"personName"`
 
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
 	HostName string `json:"hostName"`
 
-	Project string `json:"project"`
-
 	Runtime string `json:"runtime"`
+
+	// The workflow that started the agents of this row (#2019), by its id; absent for agents a person or another agent started.
+	Workflow *string `json:"workflow,omitzero"`
 
 	// By currency.
 	Cost map[string]float64 `json:"cost"`
@@ -6066,6 +7870,17 @@ type ReportRow struct {
 
 	// The groups the person is in (#1804), by id, for a group or organisation scope; absent when the person is hidden.
 	Groups []string `json:"groups,omitzero"`
+
+	// What the agents did (#2019): sessions, pull requests and waits.
+	Counts *ReportCounts `json:"counts,omitzero"`
+
+	Folder string `json:"folder"`
+
+	// The project the folder is in (#2670), by id, as its machine last reported it (projects/joined); absent for a folder in no project.
+	Project *string `json:"project,omitzero"`
+
+	// The project's name, absent with project.
+	ProjectName *string `json:"projectName,omitzero"`
 }
 
 // Whose rows a report adds up (#1804).
@@ -6095,6 +7910,85 @@ type ReportScopes struct {
 	Scopes []ReportScopeOption `json:"scopes"`
 
 	Admin bool `json:"admin"`
+}
+
+// reports/value (#2351): what the work in a scope cost and what it delivered, from the lineage nodes that the scope's machines send (#2350). A node is in the range when it last changed in it, with its whole cost. total is the work on issues and PRs; waste is the PRs closed without a merge and merged reverts; unlinked is the turns with no issue or PR. perMergedPR is total by the PRs merged, by currency. leadTimeSeconds is the median of the issues' lead times. issues and milestones are the most costly first, at most 100 each; limited says there are more.
+type ReportValue struct {
+	Range ReportRange `json:"range"`
+
+	Scope ReportScope `json:"scope"`
+
+	Total LineageCost `json:"total"`
+
+	Waste LineageCost `json:"waste"`
+
+	Unlinked LineageCost `json:"unlinked"`
+
+	// By currency.
+	PerMergedPR map[string]float64 `json:"perMergedPR"`
+
+	PrsMerged int64 `json:"prsMerged"`
+
+	PrsClosed int64 `json:"prsClosed"`
+
+	PrsReverted int64 `json:"prsReverted"`
+
+	FailedChecks int64 `json:"failedChecks"`
+
+	LeadTimeSeconds *float64 `json:"leadTimeSeconds,omitzero"`
+
+	Issues []ReportValueRow `json:"issues"`
+
+	Milestones []ReportValueRow `json:"milestones"`
+
+	Limited *bool `json:"limited,omitzero"`
+}
+
+// One issue or milestone on Reports ▸ Value (#2351): its cost rolled up from every machine in the scope, as lineage/cost adds it up, and how its PRs ended.
+type ReportValueRow struct {
+	Node LineageNode `json:"node"`
+
+	Total LineageCost `json:"total"`
+
+	Waste LineageCost `json:"waste"`
+
+	PrsMerged int64 `json:"prsMerged"`
+
+	PrsClosed int64 `json:"prsClosed"`
+
+	PrsReverted int64 `json:"prsReverted"`
+
+	FailedChecks int64 `json:"failedChecks"`
+
+	// From the first work on it to its last PR merged; absent before a merge.
+	LeadTimeSeconds *float64 `json:"leadTimeSeconds,omitzero"`
+}
+
+// A saved view of Reports (#2019, R8): a page with its scope, range and way to add up, kept for the person who saved it.
+type ReportView struct {
+	// Given by the control plane; empty to save a new view.
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Page ReportPage `json:"page"`
+
+	Scope ReportScope `json:"scope"`
+
+	Range ReportRange `json:"range"`
+
+	// The way the page adds up: person, folder, machine, runtime, group or workflow.
+	By *string `json:"by,omitzero"`
+}
+
+// reports/deleteView (#2019).
+type ReportViewID struct {
+	ID string `json:"id"`
+}
+
+// The caller's saved views of Reports (#2019), in the order they were saved.
+type ReportViews struct {
+	Views []ReportView `json:"views"`
 }
 
 type ReportedEdit struct {
@@ -6204,6 +8098,21 @@ func (v *RetentionKeepFor) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// retention/set. Without confirmed, a change that would delete agents at once is only described.
+type RetentionSetRequest struct {
+	Settings RetentionSettings `json:"settings"`
+
+	Confirmed bool `json:"confirmed"`
+}
+
+type RetentionSetResult struct {
+	Applied bool `json:"applied"`
+
+	WouldDelete *DeletePreview `json:"wouldDelete,omitzero"`
+
+	State *RetentionState `json:"state,omitzero"`
+}
+
 type RetentionSettings struct {
 	KeepFor RetentionKeepFor `json:"keepFor"`
 }
@@ -6281,11 +8190,14 @@ type RuntimeAllowancesRow struct {
 	// Something one of the runtime's features needs on this host and lacks, with the step that fixes it (#1946). Only on the runtime's own sign-in row.
 	SetupNote *string `json:"setupNote,omitzero"`
 
-	// The added account this row is for (#840); absent for the runtime's own sign-in.
+	// The added account this row is for (#840), or an org account (org:<route id>, #999); absent for the runtime's own sign-in.
 	AccountID *string `json:"accountID,omitzero"`
 
 	// That account's name.
 	AccountName *string `json:"accountName,omitzero"`
+
+	// An org account's tokens today on this host, as its model relay counted them from the provider's answers (#999, D12): fresh input, cache writes and output. Only on an org account's row.
+	TokensToday *int64 `json:"tokensToday,omitzero"`
 }
 
 type RuntimeAssessmentCheck struct {
@@ -6416,9 +8328,102 @@ type RuntimeStatus struct {
 	PoolNote *string `json:"poolNote,omitzero"`
 
 	IsOut *bool `json:"isOut,omitzero"`
+
+	// Set when the organisation's policy does not allow this runtime here (#998, FR-010).
+	SetBy *PolicySetBy `json:"setBy,omitzero"`
 }
 
-// A server ssh knows by a name, for Add a Server's server box (#610).
+// A SCIM user's email (RFC 7643 §4.1.2), to show only: never a sign-in.
+type SCIMEmail struct {
+	Value string `json:"value"`
+
+	Type *string `json:"type,omitzero"`
+
+	Primary *bool `json:"primary,omitzero"`
+}
+
+// Which SCIM attribute must equal an org sign-in's account claim for the two to be one person (#1002, D5, R5).
+type SCIMMatch string
+
+const SCIMMatchExternalId SCIMMatch = "externalId"
+const SCIMMatchUserName SCIMMatch = "userName"
+
+// A SCIM user's name parts (RFC 7643 §4.1.1), kept as they came.
+type SCIMName struct {
+	GivenName *string `json:"givenName,omitzero"`
+
+	FamilyName *string `json:"familyName,omitzero"`
+
+	Formatted *string `json:"formatted,omitzero"`
+}
+
+// scim/set (#1002): turn SCIM on or off for an org provider, and say which attribute matches a sign-in (externalId by default).
+type SCIMSet struct {
+	Provider string `json:"provider"`
+
+	On bool `json:"on"`
+
+	Match *SCIMMatch `json:"match,omitzero"`
+}
+
+// A SCIM bearer token of one org provider (#1002, D12, FR-014), with no value: the control plane keeps only its SHA-256.
+type SCIMToken struct {
+	ID string `json:"id"`
+
+	Provider string `json:"provider"`
+
+	Name string `json:"name"`
+
+	Made OrgRouteStamp `json:"made"`
+
+	Ends *Date `json:"ends,omitzero"`
+
+	LastUse *SCIMTokenUse `json:"lastUse,omitzero"`
+
+	Revoked *OrgRouteStamp `json:"revoked,omitzero"`
+}
+
+// scim/tokens/list (#1002): one provider's tokens, newest first, revoked ones too.
+type SCIMTokenList struct {
+	Tokens []SCIMToken `json:"tokens"`
+}
+
+// scim/tokens/make (#1002): the token, its value once (never shown again), and the SCIM base URL to give the provider.
+type SCIMTokenMade struct {
+	Token SCIMToken `json:"token"`
+
+	Value string `json:"value"`
+
+	URL string `json:"url"`
+}
+
+// scim/tokens/make (#1002): a name for the token, and when it ends, if ever. Refused while two are live.
+type SCIMTokenMake struct {
+	Provider string `json:"provider"`
+
+	Name string `json:"name"`
+
+	Ends *Date `json:"ends,omitzero"`
+}
+
+// scim/tokens/revoke (#1002): the token's id.
+type SCIMTokenRequest struct {
+	ID string `json:"id"`
+}
+
+// When and from where a SCIM token was last used (#1002, D12), written at most once a minute.
+type SCIMTokenUse struct {
+	At Date `json:"at"`
+
+	Address *string `json:"address,omitzero"`
+}
+
+// scim/tokens/list (#1002): the provider.
+type SCIMTokensRequest struct {
+	Provider string `json:"provider"`
+}
+
+// A server ssh knows by a name, for Add a Machine's server box (#610).
 type SSHHost struct {
 	Alias string `json:"alias"`
 
@@ -6443,7 +8448,7 @@ type SaidMatch struct {
 	Line string `json:"line"`
 }
 
-// agents/said (#1585): the sessions whose prompts or replies hold the text, any case, in one project when folder says.
+// agents/said (#1585): the sessions whose prompts or replies hold the text, any case, in one folder when folder says.
 type SaidSearchRequest struct {
 	Text string `json:"text"`
 
@@ -6477,6 +8482,9 @@ type SandboxFailureRecord struct {
 
 type SandboxSettings struct {
 	Defaults map[string]SandboxChoice `json:"defaults"`
+
+	// Set when the organisation's policy requires the command sandbox (#998): off is refused, and a runtime that cannot be put in a sandbox does not start.
+	SetBy *PolicySetBy `json:"setBy,omitzero"`
 }
 
 type SandboxState string
@@ -6495,7 +8503,7 @@ type SealedEnvelope struct {
 
 // A machine that was removed with a secret on it (#1760, FR-026): change the secret where it was issued.
 type SecretLeftOn struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
 	// The machine's name when it was removed.
 	Name string `json:"name"`
@@ -6505,11 +8513,64 @@ type SecretLeftOn struct {
 
 // control/secretsLeft (#1760, FR-026): to the person's own clients, when one of their machines was removed with secrets on it.
 type SecretsLeft struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
 	Name string `json:"name"`
 
 	Secrets []UserSecretName `json:"secrets"`
+}
+
+// How a Mac's host updates Agents Host to the release the control plane names, with no administrator (#2178).
+type SelfUpdate struct {
+	AutoUpdate bool `json:"autoUpdate"`
+
+	State SelfUpdateState `json:"state"`
+
+	// The version this copy is.
+	Running string `json:"running"`
+
+	// The release the control plane named last; none until it names one.
+	Release *string `json:"release,omitzero"`
+
+	// Why it failed or cannot, in a sentence for the person.
+	Message *string `json:"message,omitzero"`
+}
+
+// selfUpdate/set (#2178).
+type SelfUpdateSet struct {
+	AutoUpdate bool `json:"autoUpdate"`
+}
+
+// Where updating Agents Host is (#2178): upToDate, off (the person turned it off), downloading, waiting (ready; it waits for the last turn to end), restarting, failed (the next release named tries again), cannot (this copy cannot update itself, such as one in a folder only an administrator changes).
+type SelfUpdateState string
+
+const SelfUpdateStateUpToDate SelfUpdateState = "upToDate"
+const SelfUpdateStateOff SelfUpdateState = "off"
+const SelfUpdateStateDownloading SelfUpdateState = "downloading"
+const SelfUpdateStateWaiting SelfUpdateState = "waiting"
+const SelfUpdateStateRestarting SelfUpdateState = "restarting"
+const SelfUpdateStateFailed SelfUpdateState = "failed"
+const SelfUpdateStateCannot SelfUpdateState = "cannot"
+
+// UnmarshalJSON reads a value this build does not know as "upToDate".
+func (v *SelfUpdateState) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	switch SelfUpdateState(s) {
+	case SelfUpdateStateUpToDate,
+		SelfUpdateStateOff,
+		SelfUpdateStateDownloading,
+		SelfUpdateStateWaiting,
+		SelfUpdateStateRestarting,
+		SelfUpdateStateFailed,
+		SelfUpdateStateCannot:
+		*v = SelfUpdateState(s)
+	default:
+		*v = SelfUpdateStateUpToDate
+	}
+	return nil
 }
 
 // What the Send sheet shows (#1123): the local branches, the one checked out (none when detached), the origin, and whether anything is uncommitted.
@@ -6528,14 +8589,14 @@ type SendFactsRequest struct {
 	Folder URL `json:"folder"`
 }
 
-// A file the host made for a send, read with projects/sendRead (#1123).
+// A file the host made for a send, read with folders/sendRead (#1123).
 type SendFile struct {
 	ID UUID `json:"id"`
 
 	Size int64 `json:"size"`
 }
 
-// What projects/sendPack made (#1123): each branch at its commit, the bundle (none when the receiving host has every commit) and the patch (none when nothing is uncommitted).
+// What folders/sendPack made (#1123): each branch at its commit, the bundle (none when the receiving host has every commit) and the patch (none when nothing is uncommitted).
 type SendPack struct {
 	Commits []SentBranch `json:"commits"`
 
@@ -6562,7 +8623,7 @@ type SendRead struct {
 	End bool `json:"end"`
 }
 
-// One part of a file projects/sendPack made, from `offset` (#1123).
+// One part of a file folders/sendPack made, from `offset` (#1123).
 type SendReadRequest struct {
 	ID UUID `json:"id"`
 
@@ -6574,6 +8635,19 @@ type SentBranch struct {
 	Name string `json:"name"`
 
 	Commit string `json:"commit"`
+}
+
+// What an agent told the person with `notify` (#2805), on the record where it called it: the notification's words, what became of it, and, in the cool-down, when the next can go.
+type SentNotice struct {
+	Title string `json:"title"`
+
+	Body *string `json:"body,omitzero"`
+
+	Outcome NoticeOutcome `json:"outcome"`
+
+	NextAt *Date `json:"nextAt,omitzero"`
+
+	To *NoticeDevice `json:"to,omitzero"`
 }
 
 type ServedRequest struct {
@@ -6628,6 +8702,43 @@ type ServerReachabilityChange struct {
 	Online bool `json:"online"`
 }
 
+// agents/fromStarter (#2927): the agent that started a session from another machine reads, messages, stops or archives it, or asks how it stands. The host answers only when from is the session's StartedFrom. The control plane writes from.machine and from.who; the asking host writes from.agent.
+type SessionCall struct {
+	From StartedFrom `json:"from"`
+
+	Session UUID `json:"session"`
+
+	Op string `json:"op"`
+
+	// With op message: the words.
+	Message *string `json:"message,omitzero"`
+
+	// With op message: replace the message of the starter's that waits, as message_session's replace.
+	Replace *bool `json:"replace,omitzero"`
+}
+
+// What agents/fromStarter says (#2927): the words for the agent, the session's title, and how it ended, absent while it goes on.
+type SessionCallReply struct {
+	Said string `json:"said"`
+
+	Title *string `json:"title,omitzero"`
+
+	Ended *WaitEndingHow `json:"ended,omitzero"`
+}
+
+// machines/sessionEnded through host/machines, then agents/endedElsewhere (#2927): a session started from another machine has ended, so its starter's wait_for_agents can wake. The host sends machine as the starter's machine; the control plane sends it on as the ended session's.
+type SessionEnded struct {
+	Machine string `json:"machine"`
+
+	Session UUID `json:"session"`
+
+	Starter UUID `json:"starter"`
+
+	How WaitEndingHow `json:"how"`
+
+	Title *string `json:"title,omitzero"`
+}
+
 type SessionLabel struct {
 	Value string `json:"value"`
 
@@ -6663,10 +8774,24 @@ type SetCeilingRequest struct {
 	TokenCeiling *int64 `json:"tokenCeiling,omitzero"`
 }
 
+// An agent's own answer to permission requests (#2658, FR-019); no mode follows Settings.
+type SetClientPermissionRequest struct {
+	AgentID UUID `json:"agentID"`
+
+	Mode *ClientPermissionMode `json:"mode,omitzero"`
+}
+
 type SetDiskSpaceRequest struct {
 	Folder URL `json:"folder"`
 
 	DiskSpace DiskThresholds `json:"diskSpace"`
+}
+
+// folders/setProject (#2317): the project id to write into the folder's .agents/folder.json.
+type SetFolderProjectRequest struct {
+	Folder URL `json:"folder"`
+
+	Project string `json:"project"`
 }
 
 type SetHelperLimitsRequest struct {
@@ -6681,6 +8806,13 @@ type SetLabelsRequest struct {
 	Add []string `json:"add"`
 
 	Remove []string `json:"remove"`
+}
+
+// Change a running agent's model level or permission mode on its own runtime (#2658): each is mapped as at its start. An Auto agent keeps its runtime.
+type SetLevelsRequest struct {
+	AgentID UUID `json:"agentID"`
+
+	Levels Levels `json:"levels"`
 }
 
 type SetLimitsRequest struct {
@@ -6705,6 +8837,12 @@ type SetOptionRequest struct {
 	OptionID string `json:"optionID"`
 
 	Value JSONValue `json:"value"`
+}
+
+type SetPRCostCommentRequest struct {
+	Folder URL `json:"folder"`
+
+	PrCostComment PRCostComment `json:"prCostComment"`
 }
 
 type SetPinnedRequest struct {
@@ -6783,7 +8921,7 @@ type SharedMCP struct {
 }
 
 type SharedOtherFile struct {
-	// Relative to `~/.agents`, or to a project's `.agents`.
+	// Relative to `~/.agents`, or to a folder's `.agents`.
 	Path string `json:"path"`
 
 	Kind SharedOtherFileKind `json:"kind"`
@@ -6837,7 +8975,7 @@ type SharedProblem struct {
 // What one runtime does with one thing: it gets it (how), uses its own copy at a path, is left out (why), has no way to take it, or is not measured yet (`"unchecked"`, or with a note).
 type SharedReach = JSONValue
 
-// `personal/shared`'s params: none reads the person's `~/.agents`; `folder` reads that project's `.agents` (#754), which has no per-runtime reach.
+// `personal/shared`'s params: none reads the person's `~/.agents`; `folder` reads that folder's `.agents` (#754), which has no per-runtime reach.
 type SharedRequest struct {
 	Folder *string `json:"folder,omitzero"`
 }
@@ -6898,7 +9036,7 @@ type SharedSkillSource = JSONValue
 
 // `personal/shared` (054): what is in the person's `~/.agents` and which runtime gets each thing, for Settings ▸ Agent Configuration. Read from disk on every call. Nothing in it is a value from `mcp.json`: env and headers go by name only (FR-023).
 type SharedSnapshot struct {
-	// `~/.agents`, or a project's `.agents` (#754).
+	// `~/.agents`, or a folder's `.agents` (#754).
 	Home string `json:"home"`
 
 	// False for a copy of the app with no personal home (a scratch root), when everything else is empty.
@@ -7068,6 +9206,13 @@ type SignInAdd struct {
 	Token string `json:"token"`
 }
 
+// signIn/ask, on an `s:` connection (#2097): a browser pairs by approval. `account` is the email or GitHub login of one of the person's sign-ins; `name` is the browser's.
+type SignInAsk struct {
+	Account string `json:"account"`
+
+	Name string `json:"name"`
+}
+
 // signIn/configure (#995, admins): turn a provider on or off, and set Google's allowed Workspace domains or GitHub's allowed organisations. What is left out stays as it was.
 type SignInConfigure struct {
 	Provider string `json:"provider"`
@@ -7079,9 +9224,11 @@ type SignInConfigure struct {
 	Organisations []string `json:"organisations,omitzero"`
 }
 
-// signIn/approve, signIn/deny (#995).
+// signIn/approve, signIn/deny (#995). `code` is the code a browser shows, typed by the person: signIn/approve of a browser's request needs it (#2097).
 type SignInDecide struct {
 	Request string `json:"request"`
+
+	Code *string `json:"code,omitzero"`
 }
 
 // control/signInDecided (#995): how a request ended: approved, denied or expired.
@@ -7089,6 +9236,93 @@ type SignInDecided struct {
 	Request string `json:"request"`
 
 	Result string `json:"result"`
+}
+
+// signIn/discover (#1002, FR-011): the email a person typed.
+type SignInDiscover struct {
+	Email string `json:"email"`
+}
+
+// signIn/discover's answer: the org provider of a claimed domain that sends people there, or none. The same for an unknown domain and a domain with no switch.
+type SignInDiscovered struct {
+	Provider *string `json:"provider,omitzero"`
+
+	Name *string `json:"name,omitzero"`
+}
+
+// signIn/domains/claim (#1002): a domain for one org provider.
+type SignInDomainClaim struct {
+	Domain string `json:"domain"`
+
+	Provider string `json:"provider"`
+}
+
+// signIn/domains/list (#1002): every claimed domain, for an admin.
+type SignInDomainList struct {
+	Domains []DomainClaim `json:"domains"`
+}
+
+// signIn/domains/preview (#1002, FR-012): the people and the built-in sign-ins that Require would refuse.
+type SignInDomainPreview struct {
+	People []SignInDomainPreviewPerson `json:"people"`
+}
+
+// A person that Require changes, with their sign-ins at the domain.
+type SignInDomainPreviewPerson struct {
+	User string `json:"user"`
+
+	Name string `json:"name"`
+
+	SignIns []SignIn `json:"signIns"`
+}
+
+// signIn/domains/check, preview and remove (#1002).
+type SignInDomainRequest struct {
+	Domain string `json:"domain"`
+}
+
+// signIn/domains/set (#1002, D8): a claimed domain's switches; an absent one stays. Either needs a proved domain.
+type SignInDomainSet struct {
+	Domain string `json:"domain"`
+
+	SendHere *bool `json:"sendHere,omitzero"`
+
+	Require *bool `json:"require,omitzero"`
+}
+
+// An org provider on the sign-in screen (#1002, FR-003): its id, name and order, and nothing more.
+type SignInOrgProvider struct {
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Order int64 `json:"order"`
+}
+
+type SignInOrgPurpose string
+
+const SignInOrgPurposePair SignInOrgPurpose = "pair"
+const SignInOrgPurposeAddToMe SignInOrgPurpose = "addToMe"
+
+type SignInOrgReturn string
+
+const SignInOrgReturnApp SignInOrgReturn = "app"
+const SignInOrgReturnWeb SignInOrgReturn = "web"
+
+// signIn/orgStart (#1002, D2): start an org provider's flow for this connection: pair (an `s:` connection) or addToMe (a paired client's). returnTo says where the browser comes back: agents://oidc (app) or the web page (web).
+type SignInOrgStart struct {
+	Provider string `json:"provider"`
+
+	Purpose SignInOrgPurpose `json:"purpose"`
+
+	ReturnTo SignInOrgReturn `json:"returnTo"`
+
+	LoginHint *string `json:"loginHint,omitzero"`
+}
+
+// signIn/orgStart's answer: the /v1/oidc/start address to open in the browser. It ends after 10 minutes.
+type SignInOrgStarted struct {
+	URL string `json:"url"`
 }
 
 // signIn/pair, on an `s:` connection (#995): the client's name and kind, and its provider's token: an ID token for google and apple, a user access token for github. The control plane checks it and forgets it (FR-008, FR-010).
@@ -7115,7 +9349,7 @@ type SignInProvider struct {
 	Why *string `json:"why,omitzero"`
 }
 
-// signIn/providers, signIn/configure (#995): the providers. `challenge` (base64url) is what a client's nonce is made from on this connection: the hello's nonce on an `s:` connection, or a fresh one used once on a paired client's. The client makes the nonce itself, from the control key it trusts and the challenge (R2), so a token cannot be passed on to another control plane (FR-008, FR-011). `domains` (Google Workspace) and `organisations` (GitHub) are for admins only (FR-006).
+// signIn/providers, signIn/configure (#995): the providers. `challenge` (base64url) is what a client's nonce is made from on this connection: the hello's nonce on an `s:` connection, or a fresh one used once on a paired client's. The client makes the nonce itself, from the control key it trusts and the challenge (R2), so a token cannot be passed on to another control plane (FR-008, FR-011). `domains` (Google Workspace) and `organisations` (GitHub) are for admins only (FR-006). `orgProviders` are the org providers turned on, in order (#1002), first on every sign-in screen.
 type SignInProviders struct {
 	Providers []SignInProvider `json:"providers"`
 
@@ -7124,6 +9358,11 @@ type SignInProviders struct {
 	Domains []string `json:"domains,omitzero"`
 
 	Organisations []string `json:"organisations,omitzero"`
+
+	OrgProviders []SignInOrgProvider `json:"orgProviders,omitzero"`
+
+	// A claimed domain sends people to its org provider: a client offers Use an Email (#1002, FR-011).
+	Discover *bool `json:"discover,omitzero"`
 }
 
 // signIn/removeFromMe (#995): an outside sign-in to take off the caller's person. The local owner's stays.
@@ -7133,7 +9372,7 @@ type SignInRemove struct {
 	Account string `json:"account"`
 }
 
-// signIn/requests, control/signInRequested (#995, FR-010): a new client that signed in with GitHub, waiting for Approve on one of the person's clients, with the code it shows.
+// signIn/requests, control/signInRequested (#995, FR-010): a new client that signed in with GitHub, waiting for Approve on one of the person's clients, with the code it shows. A browser's (provider `browser`, #2097) has the account typed as `login` and an empty `code`: the person types the code the browser shows.
 type SignInRequest struct {
 	Request string `json:"request"`
 
@@ -7148,6 +9387,22 @@ type SignInRequest struct {
 	Code string `json:"code"`
 
 	Expires Date `json:"expires"`
+}
+
+// signIn/ticket (#1002, D3, FR-006): the ticket the callback gave, on the connection that started the flow, within 2 minutes, once. To pair, the client's name and kind too.
+type SignInTicket struct {
+	Ticket string `json:"ticket"`
+
+	Name *string `json:"name,omitzero"`
+
+	Kind *ClientKind `json:"kind,omitzero"`
+}
+
+// signIn/ticket's answer: the client paired, or the sign-in added to the caller's person.
+type SignInTicketResult struct {
+	Client *UUID `json:"client,omitzero"`
+
+	SignIn *SignIn `json:"signIn,omitzero"`
 }
 
 // control/signInWaiting, on an `s:` connection (#995, FR-010): a GitHub sign-in waits for Approve on another client of the person, which shows the same code.
@@ -7246,7 +9501,7 @@ type SkillDestination struct {
 type SkillDestinationKind string
 
 const SkillDestinationKindPersonal SkillDestinationKind = "personal"
-const SkillDestinationKindProject SkillDestinationKind = "project"
+const SkillDestinationKindFolder SkillDestinationKind = "folder"
 
 type SkillNameRequest struct {
 	Destination SkillDestination `json:"destination"`
@@ -7354,15 +9609,33 @@ type StartRequest struct {
 
 	Persona *string `json:"persona,omitzero"`
 
+	// The values in the shared words (#2658). With runtimeID auto, the daemon picks the runtime (FR-006).
+	Levels *Levels `json:"levels,omitzero"`
+
 	Purpose *AgentPurpose `json:"purpose,omitzero"`
 
 	// The added account the session uses (#840); absent for the runtime's own sign-in.
 	AccountID *string `json:"accountID,omitzero"`
+
+	// Started from voice mode (#2375): its first prompt asks for a short spoken reply, as agents/prompt's voice does.
+	Voice *bool `json:"voice,omitzero"`
+
+	// An agent on another machine started it, through the control plane (#2887): its chat says who.
+	StartedFrom *StartedFrom `json:"startedFrom,omitzero"`
+}
+
+// The agent on another machine that started a session with start_session (#2887). The control plane writes machine and who; the asking host writes agent.
+type StartedFrom struct {
+	Machine string `json:"machine"`
+
+	Agent UUID `json:"agent"`
+
+	Who string `json:"who"`
 }
 
 // A started machine in people/removePreview: the branches and worktrees on it with work that is not pushed. `unknown` says why it could not be asked (offline, or it did not answer), and then `unpushed` is empty.
 type StartedMachinePreview struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
 	Name string `json:"name"`
 
@@ -7484,7 +9757,7 @@ type TeamBot struct {
 
 // An agent running on a bot's machine (#1804, M6), as the machine last listed it, for bots/stopRun. No title, nothing it said.
 type TeamBotRun struct {
-	Host HostID `json:"host"`
+	Host MachineRef `json:"host"`
 
 	HostName string `json:"hostName"`
 
@@ -7496,7 +9769,7 @@ type TeamBotRun struct {
 	Since *Date `json:"since,omitzero"`
 }
 
-// workflows/trigger and workflows/fire (#2011, spec 736 FR-035): a project or control-plane event (a server's, such as github or a channel's) or a schedule that a runs-on: workflow's trigger matched. A machine sends it to the control plane, which sends it once to one of the bot's machines. workflow is the project folder's name and the workflow's id; trigger, the same words on every machine that heard it; event, the event (none for a schedule); dueAt, a schedule's due time.
+// workflows/trigger and workflows/fire (#2011, spec 736 FR-035): a folder or control-plane event (a server's, such as github or a channel's) or a schedule that a runs-on: workflow's trigger matched. A machine sends it to the control plane, which sends it once to one of the bot's machines. workflow is the folder's name and the workflow's id; trigger, the same words on every machine that heard it; event, the event (none for a schedule); dueAt, a schedule's due time.
 type TeamTrigger struct {
 	Workflow string `json:"workflow"`
 
@@ -7682,6 +9955,10 @@ type TranscriptEntryKind struct {
 
 	FileShown *TranscriptEntryKindFileShown `json:"fileShown,omitzero"`
 
+	Notified *TranscriptEntryKindNotified `json:"notified,omitzero"`
+
+	NoticeDelivered *TranscriptEntryKindNoticeDelivered `json:"noticeDelivered,omitzero"`
+
 	// Unrecognised is a case this build does not know, written back as it was read.
 	Unrecognised JSONValue `json:"-"`
 }
@@ -7699,7 +9976,7 @@ func (v TranscriptEntryKind) MarshalJSON() ([]byte, error) {
 func (v *TranscriptEntryKind) UnmarshalJSON(b []byte) error {
 	type plain TranscriptEntryKind
 	var p plain
-	if err := json.Unmarshal(b, &p); err != nil || (p.UserMessage == nil && p.AgentMessage == nil && p.AgentThought == nil && p.ToolCall == nil && p.ToolCallUpdate == nil && p.PlanUpdated == nil && p.UsageRecorded == nil && p.ServedRequest == nil && p.ElicitationAsked == nil && p.ElicitationAnswered == nil && p.Compaction == nil && p.Notice == nil && p.PermissionAsked == nil && p.PermissionAnswered == nil && p.OptionChanged == nil && p.StateChanged == nil && p.Background == nil && p.WorkReported == nil && p.RuntimeNote == nil && p.PoolSwitch == nil && p.SandboxFailure == nil && p.Handoff == nil && p.SettingsChanged == nil && p.AppView == nil && p.FileShown == nil) {
+	if err := json.Unmarshal(b, &p); err != nil || (p.UserMessage == nil && p.AgentMessage == nil && p.AgentThought == nil && p.ToolCall == nil && p.ToolCallUpdate == nil && p.PlanUpdated == nil && p.UsageRecorded == nil && p.ServedRequest == nil && p.ElicitationAsked == nil && p.ElicitationAnswered == nil && p.Compaction == nil && p.Notice == nil && p.PermissionAsked == nil && p.PermissionAnswered == nil && p.OptionChanged == nil && p.StateChanged == nil && p.Background == nil && p.WorkReported == nil && p.RuntimeNote == nil && p.PoolSwitch == nil && p.SandboxFailure == nil && p.Handoff == nil && p.SettingsChanged == nil && p.AppView == nil && p.FileShown == nil && p.Notified == nil && p.NoticeDelivered == nil) {
 		*v = TranscriptEntryKind{Unrecognised: append(JSONValue(nil), b...)}
 		return nil
 	}
@@ -7835,6 +10112,14 @@ type TranscriptEntryKindFileShown struct {
 	Value ShownFile `json:"_0"`
 }
 
+type TranscriptEntryKindNotified struct {
+	Value SentNotice `json:"_0"`
+}
+
+type TranscriptEntryKindNoticeDelivered struct {
+	Value NoticeDelivery `json:"_0"`
+}
+
 type TranscriptPage struct {
 	FirstIndex int64 `json:"firstIndex"`
 
@@ -7860,7 +10145,7 @@ type TunnelOpen struct {
 	Ref string `json:"ref"`
 }
 
-// Where a session's turn is, as its Live Activity says it (#1744): working; a question or an approval waiting on the person; done; ended cleanly but wanting the person, as Needs you in the sidebars (#1861); stopped on purpose or out of allowance, as Paused in the sidebars (#1869); ended for another reason; or gone (archived or deleted).
+// Where a session's turn is, as its Live Activity says it (#1744): working; a question or an approval waiting on the person; done; ended cleanly but wanting the person, as Needs you in the sidebars (#1861); stopped on purpose, as Paused in the sidebars (#1869); or ended in error, as Unexpected stop; or gone (archived or deleted).
 type TurnPhase string
 
 const TurnPhaseWorking TurnPhase = "working"
@@ -7906,6 +10191,12 @@ type TurnUsage struct {
 	CachedWriteTokens *int64 `json:"cachedWriteTokens,omitzero"`
 
 	Cost *Cost `json:"cost,omitzero"`
+
+	// The org route the turn went through (#999).
+	Route *string `json:"route,omitzero"`
+
+	// The relay's count for an org account's turn, beside what the runtime reported (#999).
+	RelayTokens *RelayTokens `json:"relayTokens,omitzero"`
 }
 
 type TurnsPage struct {
@@ -7928,8 +10219,6 @@ type TurnsRequest struct {
 
 // A worktree with work that is not pushed: commits ahead of its upstream (`ahead`), or on a branch with no upstream (`unmerged`, commits not on the base), and changes not committed (`uncommitted`).
 type UnpushedWork struct {
-	Project URL `json:"project"`
-
 	Worktree URL `json:"worktree"`
 
 	Branch *string `json:"branch,omitzero"`
@@ -7939,6 +10228,8 @@ type UnpushedWork struct {
 	Unmerged *int64 `json:"unmerged,omitzero"`
 
 	Uncommitted *int64 `json:"uncommitted,omitzero"`
+
+	Folder URL `json:"folder"`
 }
 
 type UnqueueRequest struct {
@@ -8028,6 +10319,9 @@ type UsageRollup struct {
 	Hours []UsageRollupPeriod `json:"hours"`
 
 	Days []UsageRollupPeriod `json:"days"`
+
+	// The lineage nodes whose banked cost or rollup links changed since the last send (#2350), each whole: the control plane keeps a machine's latest of each, 90 days.
+	Work []LineageCostNode `json:"work,omitzero"`
 }
 
 // An hour ("2026-10-21T15") or a day ("2026-10-21"), in UTC, and its rows: the whole of that period on this machine, which replaces what was sent before.
@@ -8037,12 +10331,12 @@ type UsageRollupPeriod struct {
 	Rows []UsageRollupRow `json:"rows"`
 }
 
-// One project and runtime's usage in an hour or a day (#1811), as a machine adds it up.
+// One folder and runtime's usage in an hour or a day (#1811), as a machine adds it up.
 type UsageRollupRow struct {
-	// The project's folder name, so the same repository on two machines adds up.
-	Project string `json:"project"`
-
 	Runtime string `json:"runtime"`
+
+	// The workflow that started the agents of this row (#2019), by its id; absent for agents a person or another agent started.
+	Workflow *string `json:"workflow,omitzero"`
 
 	// By currency.
 	Cost map[string]float64 `json:"cost"`
@@ -8066,9 +10360,21 @@ type UsageRollupRow struct {
 
 	// Waiting for the person: TimeBucket's person.
 	WaitingSeconds float64 `json:"waitingSeconds"`
+
+	// What the agents did (#2019): sessions, pull requests and waits.
+	Counts *ReportCounts `json:"counts,omitzero"`
+
+	// The row's tokens as the machine counts them for a limit (#998, FR-017): fresh input and output, no cache reads and no thoughts. Absent from an older machine, whose rows count as inputTokens + outputTokens.
+	LimitTokens *int64 `json:"limitTokens,omitzero"`
+
+	// The org route of this row's turns (#999, FR-021); absent for the person's own sign-in and accounts.
+	Route *string `json:"route,omitzero"`
+
+	// The folder name, so the same repository on two machines adds up.
+	Folder string `json:"folder"`
 }
 
-// The agentConfig part (#1760): the person's own instructions, personas and skills, as ~/.agents keeps them on each machine.
+// Legacy agentConfig snapshot (#1760); new agent configuration uses per-file state in AgentConfigFiles (#2129).
 type UserAgentConfig struct {
 	// ~/.agents/AGENTS.md.
 	Instructions *string `json:"instructions,omitzero"`
@@ -8131,23 +10437,27 @@ type UserSecretRow struct {
 	Updated string `json:"updated"`
 
 	// The machines it was sent to.
-	Machines []HostID `json:"machines"`
+	Machines []MachineRef `json:"machines"`
 
 	// Machines removed with it on them, since it was last set.
 	LeftOn []SecretLeftOn `json:"leftOn,omitzero"`
 }
 
-// user/settings (#1760, spec 736 FR-023, FR-024): what the control plane keeps for a person and sends to each of that person's machines. A part that is absent is not set at the user scope, and each machine keeps its own. The control plane does not read inside a part.
+// user/settings (#1760, #2410): the person's settings that follow them to each of their machines. An omitted part has no value yet, but does not make that setting machine-local. The control plane does not read inside a part.
 type UserSettings struct {
 	McpServers JSONValue `json:"mcpServers,omitzero"`
 
 	AgentConfig JSONValue `json:"agentConfig,omitzero"`
 
+	// Per-file agent configuration state (#2129), with tombstones and logical timestamps.
+	AgentConfigFiles *AgentConfigFiles `json:"agentConfigFiles,omitzero"`
+
 	Runtimes JSONValue `json:"runtimes,omitzero"`
 
 	CostLimits JSONValue `json:"costLimits,omitzero"`
 
-	Resources JSONValue `json:"resources,omitzero"`
+	// The person's notice limits (#2859), as a NoticeLimits.
+	Notifications JSONValue `json:"notifications,omitzero"`
 
 	// When a part last changed.
 	Updated *string `json:"updated,omitzero"`
@@ -8156,6 +10466,9 @@ type UserSettings struct {
 // control/userSettingsChanged (#1760): to the person's own clients, when a part or a secret changed, so a pane reads again.
 type UserSettingsChanged struct {
 	Parts []UserSettingsPartName `json:"parts,omitzero"`
+
+	// A per-file agent configuration change (#2129).
+	AgentConfigFiles *bool `json:"agentConfigFiles,omitzero"`
 
 	Secrets *bool `json:"secrets,omitzero"`
 }
@@ -8167,14 +10480,25 @@ type UserSettingsPart struct {
 	Value JSONValue `json:"value"`
 }
 
-// A part of a person's user settings (#1760, spec 736 FR-023). Each keeps the shape its file has on a machine today: mcpServers is mcp.json's mcpServers, agentConfig is UserAgentConfig, runtimes is each runtime's choices, costLimits is CostLimits, resources is a list of DeclaredResource.
+// A part of a person's user settings (#1760, #2410). Each part has one fixed scope: MCP servers, agent configuration, runtimes, cost limits and notices (#2859) follow the person. Resources belong to each machine.
 type UserSettingsPartName string
 
 const UserSettingsPartNameMcpServers UserSettingsPartName = "mcpServers"
 const UserSettingsPartNameAgentConfig UserSettingsPartName = "agentConfig"
 const UserSettingsPartNameRuntimes UserSettingsPartName = "runtimes"
 const UserSettingsPartNameCostLimits UserSettingsPartName = "costLimits"
-const UserSettingsPartNameResources UserSettingsPartName = "resources"
+const UserSettingsPartNameNotifications UserSettingsPartName = "notifications"
+
+// user/suspended (#1002, FR-018): to each machine of a suspended person, at hello before its settings and within 5 seconds of a change; off: true ends it.
+type UserSuspended struct {
+	User string `json:"user"`
+
+	Off *bool `json:"off,omitzero"`
+
+	Provider string `json:"provider"`
+
+	At Date `json:"at"`
+}
 
 // What a third-party server's view waits on before it is drawn: the person's Show (#191). The data of a viewNeedsShow failure.
 type ViewAsk struct {
@@ -8190,8 +10514,6 @@ type ViewAsk struct {
 type ViewCallRequest struct {
 	AgentID UUID `json:"agentID"`
 
-	Project *URL `json:"project,omitzero"`
-
 	ViewID UUID `json:"viewID"`
 
 	Name string `json:"name"`
@@ -8201,6 +10523,8 @@ type ViewCallRequest struct {
 	Feed *bool `json:"feed,omitzero"`
 
 	Server *string `json:"server,omitzero"`
+
+	Folder *URL `json:"folder,omitzero"`
 }
 
 type ViewContextRequest struct {
@@ -8242,7 +10566,7 @@ type ViewReadRequest struct {
 
 	Server *string `json:"server,omitzero"`
 
-	Project *URL `json:"project,omitzero"`
+	Folder *URL `json:"folder,omitzero"`
 }
 
 type ViewResource struct {
@@ -8262,8 +10586,6 @@ type ViewResource struct {
 type ViewShowRequest struct {
 	AgentID UUID `json:"agentID"`
 
-	Project *URL `json:"project,omitzero"`
-
 	Server string `json:"server"`
 
 	URI string `json:"uri"`
@@ -8271,6 +10593,8 @@ type ViewShowRequest struct {
 	Hash string `json:"hash"`
 
 	Show bool `json:"show"`
+
+	Folder *URL `json:"folder,omitzero"`
 }
 
 // An agent's call of one of the agents server's tools that has a view, relayed with its token.
@@ -8368,6 +10692,20 @@ type WakeState struct {
 	OnPower bool `json:"onPower"`
 }
 
+// clients/webPushKey (#1486): the control plane's VAPID public key, X9.63, base64url without padding, as pushManager.subscribe takes it. None when this control plane sends no Web Push.
+type WebPushKey struct {
+	PublicKey *string `json:"publicKey,omitzero"`
+}
+
+// clients/setWebPush (#1486): a browser's push endpoint and its two keys, base64url, as PushSubscription.toJSON() gives them. No endpoint takes it away.
+type WebPushSubscription struct {
+	Endpoint *string `json:"endpoint,omitzero"`
+
+	P256dh *string `json:"p256dh,omitzero"`
+
+	Auth *string `json:"auth,omitzero"`
+}
+
 type WebRemoteStatus struct {
 	Port int64 `json:"port"`
 
@@ -8388,14 +10726,31 @@ const WeekdayThu Weekday = "thu"
 const WeekdayFri Weekday = "fri"
 const WeekdaySat Weekday = "sat"
 
+// How a turn ended (#1916): only a question needs the person. A value this build does not know, such as an old record's `blocked`, `stuck` or `partly_done`, reads as `done`.
 type WorkOutcome string
 
 const WorkOutcomeDone WorkOutcome = "done"
 const WorkOutcomeNothingToDo WorkOutcome = "nothing_to_do"
 const WorkOutcomeNeedsAnswer WorkOutcome = "needs_answer"
-const WorkOutcomePartlyDone WorkOutcome = "partly_done"
-const WorkOutcomeStuck WorkOutcome = "stuck"
-const WorkOutcomeBlocked WorkOutcome = "blocked"
+const WorkOutcomeWaiting WorkOutcome = "waiting"
+
+// UnmarshalJSON reads a value this build does not know as "done".
+func (v *WorkOutcome) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	switch WorkOutcome(s) {
+	case WorkOutcomeDone,
+		WorkOutcomeNothingToDo,
+		WorkOutcomeNeedsAnswer,
+		WorkOutcomeWaiting:
+		*v = WorkOutcome(s)
+	default:
+		*v = WorkOutcomeDone
+	}
+	return nil
+}
 
 type WorkReport struct {
 	Outcome WorkOutcome `json:"outcome"`
@@ -8500,8 +10855,12 @@ type WorkflowEnableRequest struct {
 
 type WorkflowLimit string
 
-const WorkflowLimitProject WorkflowLimit = "project"
-const WorkflowLimitTotal WorkflowLimit = "total"
+const WorkflowLimitFolder WorkflowLimit = "folder"
+
+// How many approved workflows may be turned on in each folder. An unset value means 20. The range is 1 to 100. Kept in workflow-limit.json.
+type WorkflowLimitSettings struct {
+	Total *int64 `json:"total,omitzero"`
+}
 
 type WorkflowMCPClearMissedRequest struct {
 	Folder URL `json:"folder"`
@@ -8677,6 +11036,12 @@ type WorkflowSettings struct {
 
 	Effort *string `json:"effort,omitzero"`
 
+	// permission-requests: request-cards or yes-to-all (#2658).
+	PermissionRequests *string `json:"permissionRequests,omitzero"`
+
+	// sandbox: default, runtime or none (#2658).
+	Sandbox *string `json:"sandbox,omitzero"`
+
 	Options map[string]string `json:"options"`
 
 	Labels []string `json:"labels"`
@@ -8703,6 +11068,10 @@ type WorkflowSettingsRequest struct {
 
 // Read forgivingly (Workflow.swift's init(from:)): a field that is missing or does not read takes its default (`isEnabled` true; false, 0, [] or absent for the rest).
 type WorkflowSummary struct {
+	Scope *string `json:"scope,omitzero"`
+
+	Content *string `json:"content,omitzero"`
+
 	Workflow Workflow `json:"workflow"`
 
 	IsArchived bool `json:"isArchived"`
@@ -8784,28 +11153,16 @@ const WorkflowWhenDoneKeep WorkflowWhenDone = "keep"
 const WorkflowWhenDoneArchiveAllowed WorkflowWhenDone = "archive-allowed"
 const WorkflowWhenDoneArchive WorkflowWhenDone = "archive"
 
-type WorkflowsListRequest struct {
-	Folder *URL `json:"folder,omitzero"`
+type WorkflowWriteRequest struct {
+	WorkflowID string `json:"workflowID"`
+
+	Content string `json:"content"`
 }
 
-// One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or unknown.
-type WorkspaceInfo struct {
-	ID string `json:"id"`
+type WorkflowsListRequest struct {
+	Folder *URL `json:"folder,omitzero"`
 
-	Name string `json:"name"`
-
-	State string `json:"state"`
-
-	SSH *string `json:"ssh,omitzero"`
-
-	Tunnel *bool `json:"tunnel,omitzero"`
-
-	// Its ssh host key is made again at each start, as a Google Cloud workstation's is (#1701): after a Start the control plane made, the first ssh takes the key it is offered and pins it again.
-	HostKeyRenews *bool `json:"hostKeyRenews,omitzero"`
-
-	Cost *string `json:"cost,omitzero"`
-
-	Host *HostID `json:"host,omitzero"`
+	Scope *string `json:"scope,omitzero"`
 }
 
 type WorktreeChoice struct {
@@ -8831,11 +11188,11 @@ type WorktreeChoiceBranch struct {
 }
 
 type WorktreeRemovalRequest struct {
-	Project URL `json:"project"`
-
 	Root URL `json:"root"`
 
 	Confirmed bool `json:"confirmed"`
+
+	Folder URL `json:"folder"`
 }
 
 type WorktreeRemoved struct {
@@ -8871,8 +11228,6 @@ type WorktreeSummary struct {
 
 	Branch *string `json:"branch,omitzero"`
 
-	IsProjectFolder bool `json:"isProjectFolder"`
-
 	Exists bool `json:"exists"`
 
 	MadeByApp bool `json:"madeByApp"`
@@ -8882,6 +11237,8 @@ type WorktreeSummary struct {
 	Status *WorktreeStatus `json:"status,omitzero"`
 
 	Size *WorktreeSize `json:"size,omitzero"`
+
+	IsFolder bool `json:"isFolder"`
 }
 
 type WorktreesListRequest struct {

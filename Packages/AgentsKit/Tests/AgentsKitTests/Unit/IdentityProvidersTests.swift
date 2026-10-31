@@ -61,6 +61,40 @@ struct IdentityProvidersTests {
         #expect(SignInWords.row(.init(provider: "local", account: "k")) == "This control plane")
     }
 
+    /// The words name the group and pane the Mac and the Remote list Sign-ins in (#2157,
+    /// #2256): Control plane, as `SettingsScope.controlPlane.title` says it.
+    @Test func signInWordsNameTheirPane() {
+        #expect(SignInWords.signInsPlace == "Control plane ▸ Sign-ins")
+        #expect(SignInWords.paneFoot.contains(SignInWords.signInsPlace))
+        #expect(!SignInWords.paneFoot.contains("You ▸"))
+    }
+
+    /// Org providers (#1002, FR-026): first, by order, then the built-in ones on.
+    @Test func orgProvidersComeFirstByOrder() throws {
+        let json = #"{"providers":[{"provider":"google","on":true,"available":true},{"provider":"github","on":false,"available":true}],"#
+            + #""orgProviders":[{"id":"b","name":"Acme Entra","order":2},{"id":"a","name":"Acme Okta","order":1}],"discover":true}"#
+        let providers = try JSONDecoder().decode(DaemonAPI.SignInProviders.self, from: Data(json.utf8))
+        #expect(providers.orgs.map(\.name) == ["Acme Okta", "Acme Entra"])
+        #expect(providers.forScreen.providers.map(\.provider) == ["google"])
+        #expect(providers.discover == true && providers.anyOn)
+        #expect(providers.name(of: "a") == "Acme Okta" && providers.name(of: "gone") == "gone")
+        #expect(DaemonAPI.SignInProviders(providers: []).anyOn == false)
+        #expect(DaemonAPI.SignInProviders(providers: [], orgProviders: [.init(id: "a", name: "Acme Okta")]).anyOn)
+        #expect(SignInWords.orgButton("Acme Okta") == "Sign in with Acme Okta")
+        #expect(SignInWords.required("Acme Okta") == "Your organisation asks you to sign in with Acme Okta.")
+    }
+
+    /// The refusals in plain words (FR-029).
+    @Test func refusalsNameWhatToDo() {
+        let required = JSONRPCError(code: -32077, message: "Your organisation asks you to sign in with Acme Okta.",
+                                    data: ["provider": "acme-okta", "name": "Acme Okta"])
+        #expect(SignInWords.requiredProvider(required) == .init(id: "acme-okta", name: "Acme Okta"))
+        #expect(SignInWords.requiredProvider(JSONRPCError(code: -32078, message: "x")) == nil)
+        #expect(SignInWords.isSuspended(JSONRPCError(code: -32078, message: "x")))
+        #expect(!SignInWords.isSuspended(ControlAuth.Refusal(.forgotten)))
+        #expect(ControlAuth.Message(line: #"{"refused":{"reason":"suspended"}}"#) == .refused(.suspended))
+    }
+
     final class Answers: @unchecked Sendable {
         private let lock = NSLock()
         private var left: [String]

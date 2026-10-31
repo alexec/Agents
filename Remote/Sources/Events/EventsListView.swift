@@ -8,19 +8,9 @@ import SwiftUI
 /// trigger and no subject filters here, only one menu for where.
 struct EventsListView: View {
     @Environment(RemoteModel.self) private var model
-    /// Nil: every project and the Mac.
+    /// Nil: every folder and the Mac.
     @State private var scope: EventScope?
     @State private var picked: Event?
-    /// Events, or Audit: who did what through the control plane (#996).
-    @State private var pane: Pane = .events
-
-    enum Pane: String, CaseIterable, Identifiable {
-        case events = "Events"
-        case audit = "Audit"
-
-        var id: Self { self }
-    }
-
     private struct Ask: Equatable {
         var filter: EventFilter
         var connected: Bool
@@ -35,29 +25,8 @@ struct EventsListView: View {
         model.work.shownEvents(filter)
     }
 
+    /// Audit is Mac + web (#2798).
     var body: some View {
-        Group {
-            switch pane {
-            case .events: events
-            case .audit:
-                AuditPane(control: model.controlPlane) { model.hostName($0) }
-                    .paperGround()
-                    .navigationTitle("Audit")
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Picker("Show", selection: $pane) {
-                    ForEach(Pane.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
-            }
-        }
-    }
-
-    private var events: some View {
         let shown = self.shown
         return List {
             if !model.work.waitingAgents.isEmpty {
@@ -106,7 +75,7 @@ struct EventsListView: View {
                         EventRow(event: event, scopeName: scopeName(event.scope),
                                  openAgent: { model.open($0) },
                                  openWorkflow: { folder, workflow in
-                                     model.openWorkflow = Project.standardize(folder).path + "/" + workflow
+                                     model.openWorkflow = Folder.standardize(folder).path + "/" + workflow
                                  })
                             .contentShape(Rectangle())
                             .onTapGesture { picked = event }
@@ -130,8 +99,8 @@ struct EventsListView: View {
                     Button("All") { scope = nil }
                     Button("This Mac") { scope = .mac }
                     Divider()
-                    ForEach(model.projects, id: \.project.folder) { summary in
-                        Button(summary.name) { scope = .project(folder: summary.project.folder) }
+                    ForEach(model.folders, id: \.folder.folder) { summary in
+                        Button(summary.name) { scope = .folder(folder: summary.folder.folder) }
                     }
                 } label: {
                     Text(scope.map(scopeName) ?? "All").appText(.supporting)
@@ -153,8 +122,8 @@ struct EventsListView: View {
     private func scopeName(_ scope: EventScope) -> String {
         switch scope {
         case .mac: return "This Mac"
-        case .project(let folder):
-            return model.projects.first { Project.standardize($0.project.folder) == folder }?.name
+        case .folder(let folder):
+            return model.folders.first { Folder.standardize($0.folder.folder) == folder }?.name
                 ?? folder.lastPathComponent
         }
     }

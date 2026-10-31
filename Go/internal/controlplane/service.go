@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/netip"
@@ -25,11 +26,13 @@ import (
 
 	"github.com/alexec/agents/Go/internal/buildinfo"
 	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/alexec/agents/Go/internal/controlplane/audit"
 	"github.com/alexec/agents/Go/internal/controlplane/hostinstall"
 	"github.com/alexec/agents/Go/internal/controlplane/hosttunnels"
 	"github.com/alexec/agents/Go/internal/controlplane/notices"
 	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
+	"github.com/alexec/agents/Go/internal/controlplane/scim"
 	"github.com/alexec/agents/Go/internal/controlplane/signin"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/internal/controlplane/usersettings"
@@ -89,7 +92,7 @@ type Config struct {
 	// How often a copy beats, looks for the others and renews its leases; shorter in
 	// tests. 0 is 10 s.
 	CopyBeat time.Duration
-	// The workspace providers' home (#691): their connections' files, and their secrets
+	// The machine providers' home (#691): their connections' files, and their secrets
 	// when there is no SecretKeeper; with one, the secrets are sealed in the store (#2138).
 	// "" for none, and no providers.
 	ProviderHome string
@@ -113,12 +116,21 @@ type Config struct {
 	// Where each log line goes, already marked with this copy. No line may hold a code,
 	// a key, a MAC or a message (071 FR-033).
 	Log func(string)
+	// Logger takes a line for each request, at debug, with its fields (#2176): method,
+	// client, person, host and request id. Nil drops them.
+	Logger *slog.Logger
 	// Posts this copy's own pushes through APNs (#1460) when no Mac host relays a notice.
 	// Nil, with no key on the machine, sends none.
 	Push Pusher
+	// Posts this copy's own Web Push to a browser (#1486), relay or none: a browser has
+	// neither. Nil, with no VAPID key on the machine, sends none.
+	WebPush WebPusher
 	// The sign-in providers this copy can check, and where it asks them (#995); nil is the
 	// app's own client ids, or AGENTS_SIGNIN_* over them.
 	SignIn *signin.Config
+	// Where the org routes' token and check calls go (#999); nil is the providers' own.
+	// Tests point them at fakes.
+	orgEndpoints *orgEndpoints
 }
 
 // WebConfig is ControlService.Configuration.Web.
@@ -139,6 +151,11 @@ type Service struct {
 	records *records.Records
 	codes   *Codes
 	router  *Router
+	// auditChain links the audit entries this copy writes, and auditSinks sends them (#1001).
+	auditChain *audit.Chain
+	// auditWriter keeps the entries, one goroutine for all (#2433).
+	auditWriter *audit.Writer
+	auditSinks  *auditSinkState
 	// Servers' backups (#1815).
 	backups *backupStore
 	methods *Methods
@@ -147,12 +164,14 @@ type Service struct {
 	desk *notices.Desk
 	// This copy's own pushes, when no relay host is online (#1460); nil with no key.
 	pushes *pushes
+	// This copy's Web Push to browsers (#1486); nil with no VAPID key.
+	webPush *webPushes
 	// What each host last listed (#962), for hosts/lastHeard.
 	copies *hostCopies
 	// The reverse tunnels this copy holds for servers behind a bastion (#435): a single
 	// copy's, whose ssh is the person's on this machine.
 	tunnels *hosttunnels.Tunnels
-	// Workspace providers (#691): only on a single copy with a home for their secrets.
+	// Machine providers (#691): only on a single copy with a home for their secrets.
 	providers *providers.Providers
 	// The other copies over this store, and the leases (US3); nil for a single copy.
 	mesh *mesh
@@ -179,7 +198,13 @@ type Service struct {
 	joins *joins
 	links *links
 	// Sign-in with Google, Apple and GitHub (#995), and the GitHub sign-ins waiting.
-	signIns         *signIns
+	signIns *signIns
+	// SCIM at /scim/v2/ (#1002, slice 2a).
+	scimTokens *scimTokens
+	scimServer *scim.Server
+	// The read API's tokens, and the OTLP exporter when one is set (#2019).
+	readAPI         *readTokens
+	otlp            *otlpExporter
 	signInApprovals *signInApprovals
 	// Each person's settings and secrets (#1760), and what each machine here was sent.
 	users     *usersettings.Book
@@ -188,10 +213,15 @@ type Service struct {
 	caps botCaps
 	// The organisation's policy as this copy knows it, and what each machine was sent (#998).
 	policies policyBook
+	// The organisation's routes to the model (#999): opened secrets, tokens, and what each
+	// machine here was sent.
+	orgRoutes orgRouteBook
 	// A bot's machine started for its triggers (#2011, FR-034).
 	starts botStarts
 	// What Reports and the Console read from the store, by entity tag (#2054, #2056).
 	storeReads readCache
+	// What each machine here was last sent of its projects (#2735).
+	toldProjects toldProjects
 
 	mu       sync.Mutex
 	servers  []*http.Server
@@ -201,6 +231,8 @@ type Service struct {
 	loopback *web.Listener
 	// The page at this copy's own origin (#1459), or nil.
 	page *web.Public
+	// What an operations team scrapes (#2176): always counted, served only by ServeMetrics.
+	metrics *Metrics
 }
 
 // New makes a service; Start opens the store and listens.
@@ -222,17 +254,29 @@ func New(cfg Config) (*Service, error) {
 	if cfg.Bind == "" {
 		cfg.Bind = "0.0.0.0"
 	}
+	if cfg.Logger == nil {
+		cfg.Logger = slog.New(slog.DiscardHandler)
+	}
+	metrics := newMetrics()
+	cfg.Store = countedStore{Store: cfg.Store, m: metrics}
 	s := &Service{cfg: cfg, keyBook: keyBook{keys: controlKeys{private: cfg.PrivateKey, public: public}}, origin: origin, copyID: strings.ToLower(records.NewUUID()[:8]),
 		records: records.New(cfg.Store), started: time.Now(), desk: notices.NewDesk(), phase: &phaseBox{phase: phaseServing}, sockets: map[*Conn]bool{}, stop: make(chan struct{}),
-		reads: readGate{every: readAgainEvery}}
+		reads: readGate{every: readAgainEvery}, metrics: metrics}
 	s.sources = newSources(cfg.TrustedProxies, s.log)
+	s.auditChain, s.auditSinks = audit.NewChain(s.copyID), newAuditSinkState(cfg.Name, s.copyID)
+	s.auditWriter = audit.NewWriter(s.auditLog(), s.log)
 	s.downloads, s.socketsMost, s.refusals = newAddressRates(), socketsMost, newRefusalLog(s.log)
 	if cfg.Push != nil {
 		s.pushes = newPushes(s, cfg.Push)
 	}
+	if cfg.WebPush != nil {
+		s.webPush = newWebPushes(s, cfg.WebPush)
+	}
 	s.codes = &Codes{Store: cfg.Store, Private: cfg.PrivateKey, Public: public, URL: cfg.URL, Pin: cfg.Pin, Name: cfg.Name,
 		Keys: func() ([]byte, []byte) { k := s.currentKeys(); return k.private, k.public }}
 	s.router = NewRouter(nil, s.log)
+	s.router.SetRequested(s.requested)
+	s.router.SetSent(metrics.Event)
 	s.router.OnPresence(s.presenceHeard)
 	s.methods = newMethods(s)
 	s.router.handler = s.methods
@@ -242,6 +286,12 @@ func New(cfg Config) (*Service, error) {
 	s.joins = newJoins(s)
 	s.links = newLinks(s)
 	s.signIns = newSignIns(s, cfg.SignIn)
+	s.scimTokens = &scimTokens{s: s}
+	s.readAPI = &readTokens{s: s}
+	s.scimServer = &scim.Server{Directory: scimDirectory{s}, Tokens: s.scimTokens, Log: s.log, URL: func() string {
+		base, _ := s.signIns.httpsBase()
+		return base + scim.Base
+	}}
 	s.signInApprovals = newSignInApprovals(s)
 	s.copies = newHostCopies(cfg.Store)
 	if s.users, err = openUserBook(cfg); err != nil {
@@ -259,7 +309,7 @@ func New(cfg Config) (*Service, error) {
 	// Tunnels belong to a single copy: its ssh is the person's on this machine.
 	if cfg.PeerURL == "" && !cfg.Hosted {
 		s.tunnels = hosttunnels.New(hosttunnels.Config{Store: cfg.Store, Port: cfg.Port, Log: s.log,
-			Hosts:   func(context.Context) []records.HostRecord { return s.records.Hosts() },
+			Hosts:   func(context.Context) []records.MachineRecord { return s.records.Hosts() },
 			Changed: func(change hosttunnels.Changed) { s.router.BroadcastControl("control/tunnelChanged", change) },
 			// Made after the tunnels: read when a tunnel asks.
 			Asleep: func(host string) bool { return s.providers != nil && s.providers.Asleep(host) },
@@ -326,6 +376,9 @@ func (s *Service) Start(ctx context.Context) (int, error) {
 	if s.pushes == nil {
 		s.log("notice: no APNs key, so this control plane sends no pushes; a Mac host that relays still does")
 	}
+	if s.webPush == nil {
+		s.log("notice: no VAPID key, so this control plane sends no Web Push to a browser")
+	}
 	if err := store.Probe(ctx, s.cfg.Store, s.copyID); err != nil {
 		return 0, fmt.Errorf("the store can't be used: %w", err)
 	}
@@ -385,6 +438,8 @@ func (s *Service) Start(ctx context.Context) (int, error) {
 	}
 	go s.refreshEvery(15 * time.Second)
 	go s.sweepEveryHour()
+	go s.renewTokensEvery(time.Minute)
+	go s.signIns.checkEvery(time.Hour, s.stop)
 	if s.tunnels != nil {
 		s.tunnels.Start(0)
 	}
@@ -509,7 +564,14 @@ func (s *Service) Stop() {
 	if s.mesh != nil {
 		s.mesh.stop()
 	}
+	// The entries still queued are kept, for a while (#2433).
+	ctx, cancel := context.WithTimeout(context.Background(), auditDrain)
+	s.auditWriter.Close(ctx)
+	cancel()
 }
+
+// auditDrain is how long Stop waits for the audit's queued entries.
+const auditDrain = 10 * time.Second
 
 func (s *Service) setReady(ready bool) {
 	s.mu.Lock()
@@ -577,7 +639,7 @@ func (s *Service) reconcile() {
 }
 
 // thisMacHost is how this Mac's host's join stands, or nil (#113).
-func (s *Service) thisMacHost() *HostJoinStatus {
+func (s *Service) thisMacHost() *MachineJoinStatus {
 	if s.cfg.HostJoinFile == "" {
 		return nil
 	}
@@ -620,25 +682,25 @@ func (s *Service) syncRelays() {
 // hostClients is host/clients: every paired window of the host's owner and its key,
 // which a host checks its local socket against (#1118). Only a Mac's window is on the
 // same machine as a host, and only its own person's reaches it there (FR-020).
-func (s *Service) hostClients(host string) wire.HostClients {
+func (s *Service) hostClients(host string) wire.MachineClients {
 	return s.hostClientsFrom(host, s.macWindows())
 }
 
 // hostClientsFrom is hostClients from the windows macWindows read once for every host
 // told, not once per host (#2059).
-func (s *Service) hostClientsFrom(host string, windows map[string][]wire.HostClient) wire.HostClients {
+func (s *Service) hostClientsFrom(host string, windows map[string][]wire.MachineClient) wire.MachineClients {
 	owner := s.ownerOf(host)
-	out := wire.HostClients{Clients: windows[owner], User: &owner}
+	out := wire.MachineClients{Clients: windows[owner], User: &owner}
 	if out.Clients == nil {
-		out.Clients = []wire.HostClient{}
+		out.Clients = []wire.MachineClient{}
 	}
 	return out
 }
 
 // macWindows is every paired Mac window with a key, by its person, in the order paired.
-func (s *Service) macWindows() map[string][]wire.HostClient {
+func (s *Service) macWindows() map[string][]wire.MachineClient {
 	local := s.localOwner()
-	out := map[string][]wire.HostClient{}
+	out := map[string][]wire.MachineClient{}
 	for _, c := range s.records.Clients() {
 		if c.Kind != records.KindMac || len(c.PublicKey) == 0 {
 			continue
@@ -648,7 +710,7 @@ func (s *Service) macWindows() map[string][]wire.HostClient {
 		if c.Owner != nil && *c.Owner != "" {
 			person = *c.Owner
 		}
-		out[person] = append(out[person], wire.HostClient{ID: wire.UUID(c.ID), Kind: c.Kind, PublicKey: c.PublicKey,
+		out[person] = append(out[person], wire.MachineClient{ID: wire.UUID(c.ID), Kind: c.Kind, PublicKey: c.PublicKey,
 			Person: &person})
 	}
 	return out
@@ -796,12 +858,12 @@ func (s *Service) heard(host string, params json.RawMessage) {
 	if owner := s.ownerOf(host); s.isBot(owner) {
 		for _, p := range s.records.People() {
 			if p.IsAdmin() {
-				s.deliver(need, false, p.ID)
+				s.deliver(need, false, p.ID, host)
 			}
 		}
 		return
 	}
-	s.deliver(need, false, s.ownerOf(host))
+	s.deliver(need, false, s.ownerOf(host), host)
 }
 
 // deliver posts a need through the relay host if it is held here. With none here but one
@@ -810,7 +872,8 @@ func (s *Service) heard(host string, params json.RawMessage) {
 // no other copy does, so a notice goes one way and arrives once.
 //
 // owner is the person whose devices it goes to; "" (from an older copy) is every device.
-func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool, owner string) {
+// host is the machine whose need it is, told where a notice went (#2860); "" from a peer.
+func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool, owner, host string) {
 	relays := []string{}
 	for _, r := range s.router.RelaysHeldHere() {
 		if owner == "" || s.ownerOf(r) == owner {
@@ -825,7 +888,7 @@ func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool, owner strin
 		if fromPeer {
 			return
 		}
-		if s.pushes == nil || s.router.RelayOnline() {
+		if s.pushes == nil && s.webPush == nil || s.router.RelayOnline() {
 			if s.mesh != nil {
 				s.mesh.broadcast(encodeNeed(need, owner))
 			}
@@ -847,11 +910,28 @@ func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool, owner strin
 	flags := s.router.NotifyFlags()
 	var devices []notices.Device
 	for _, c := range s.records.Clients() {
-		if !c.IsDevice() || len(c.PublicKey) == 0 || owner != "" && s.PersonOf(c.ID) != owner {
+		if owner != "" && s.PersonOf(c.ID) != owner {
+			continue
+		}
+		// A browser goes by Web Push from here, relay or none (#1486): only one that
+		// subscribed, which says it may be notified.
+		if c.Kind == records.KindBrowser {
+			if s.webPush == nil || c.WebPush == nil {
+				continue
+			}
+			may := true
+			d := notices.Device{ID: c.ID, Kind: notices.Browser, MayNotify: &may}
+			if c.LastSeen != nil {
+				d.LastSeen = c.LastSeen.Time
+			}
+			devices = append(devices, d)
+			continue
+		}
+		if !c.IsDevice() || len(c.PublicKey) == 0 {
 			continue
 		}
 		// Pushed from here, only a device that gave its token can be chosen.
-		if relay == "" && c.PushToken == nil {
+		if relay == "" && (s.pushes == nil || c.PushToken == nil) {
 			continue
 		}
 		kind := notices.Unknown
@@ -866,6 +946,10 @@ func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool, owner strin
 			d.MayNotify = &may
 		}
 		devices = append(devices, d)
+	}
+	kinds := map[string]string{}
+	for _, d := range devices {
+		kinds[d.ID] = d.Kind
 	}
 	noDevice := need.Need != nil && !slices.ContainsFunc(devices, func(d notices.Device) bool { return d.MayNotify != nil && *d.MayNotify })
 	if noDevice {
@@ -883,7 +967,24 @@ func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool, owner strin
 			did = "withdrew"
 		}
 		needID, _ := json.Marshal(delivery.NeedID)
+		if delivery.Headline != nil && delivery.NeedID.Notice != nil && host != "" {
+			s.router.Tell(host, wire.NotifyNoticesDelivered.Name, wire.NoticeDelivered{Need: delivery.NeedID, To: noticeDevice(kinds[string(delivery.Device)])})
+		}
+		// A browser gets no withdrawal: a push that shows nothing costs a browser its
+		// subscription (Safari) or shows one of its own (Chrome). The page takes its
+		// notices back when it comes into view.
+		if s.isBrowser(string(delivery.Device)) {
+			if s.webPush != nil && delivery.Headline != nil {
+				s.webPush.deliver(delivery)
+				s.log(fmt.Sprintf("notice: %s %s for %s by Web Push", did, needID, delivery.Device))
+			}
+			continue
+		}
 		// A withdrawal goes the way its post went.
+		if relay == "" && s.pushes == nil {
+			s.log(fmt.Sprintf("notice: could not withdraw %s from %s: this copy has no APNs key", needID, delivery.Device))
+			continue
+		}
 		if relay == "" || s.pushes != nil && delivery.Headline == nil && s.pushes.pushedHere(delivery) {
 			s.pushes.deliver(delivery)
 			s.log(fmt.Sprintf("notice: %s %s for %s through APNs", did, needID, delivery.Device))
@@ -892,6 +993,26 @@ func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool, owner strin
 		s.router.Tell(relay, "relay/deliver", delivery)
 		s.log(fmt.Sprintf("notice: %s %s for %s to relay %s", did, needID, delivery.Device, relay))
 	}
+}
+
+// isBrowser says whether a client is a browser, for a withdrawal from one the ladder no
+// longer lists.
+func (s *Service) isBrowser(client string) bool {
+	c := s.records.Client(client)
+	return c != nil && c.Kind == records.KindBrowser
+}
+
+// noticeDevice is a device's kind as a notice's line says it (#2860).
+func noticeDevice(kind string) wire.NoticeDevice {
+	switch kind {
+	case records.KindIPhone:
+		return wire.NoticeDeviceIPhone
+	case records.KindIPad:
+		return wire.NoticeDeviceIPad
+	case notices.Browser:
+		return wire.NoticeDeviceComputer
+	}
+	return wire.NoticeDeviceDevice
 }
 
 // serveHTTP answers the TLS listener: the WebSocket at /v1/connect, the probes, and what
@@ -932,6 +1053,12 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(data)
+	case strings.HasPrefix(path, "/v1/oidc/"):
+		s.signIns.serveOIDC(w, r)
+	case path == scim.Base || strings.HasPrefix(path, scim.Base+"/"):
+		s.scimServer.ServeHTTP(w, r)
+	case path == readAPIPath:
+		s.readAPI.serve(w, r)
 	case path == "/v1/join" || strings.HasPrefix(path, "/v1/join/"):
 		s.joins.serve(w, r)
 	case path == "/v1/connect":
@@ -1120,8 +1247,11 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 		bound = []string{s.peerOrigin}
 	}
 	if webOrigin != "" {
-		// On the loopback listener only a browser or its code may prove anything (071).
-		if !strings.HasPrefix(auth.ID, "c:") && !strings.HasPrefix(auth.ID, "p:") {
+		// On the loopback listener only a browser or its code may prove anything (071). The
+		// page on this domain also signs in with an org provider (#1002, FR-027): an s:
+		// whose ticket comes back to it.
+		signingIn := strings.HasPrefix(auth.ID, "s:") && s.page != nil && webOrigin == s.page.Origin()
+		if !strings.HasPrefix(auth.ID, "c:") && !strings.HasPrefix(auth.ID, "p:") && !signingIn {
 			refuse(controllink.Refuse(controllink.Unknown))
 			return
 		}
@@ -1187,10 +1317,11 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 		return
 	}
 	// A client key, or a person, holding as many sockets as it may (#2150): not a verdict
-	// on it, so it tries again later, and logged once a minute.
+	// on it, so it tries again later, and logged once a minute. Said as crowded, not
+	// unavailable, so a page can tell its person to close a tab (#2194).
 	if client != nil && s.router.Crowded(client.ID) {
 		settle(false)
-		conn.SendNow(controllink.Message{Refused: controllink.Unavailable}.Line())
+		conn.SendNow(controllink.Message{Refused: controllink.Crowded}.Line())
 		s.refusals.note("crowded", client.ID, fmt.Sprintf("refused a connection from %s: client %s holds as many sockets as it may", conn.Remote, client.ID))
 		conn.Close()
 		return
@@ -1231,7 +1362,7 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 	}
 	// Once a list has been announced, every member is given it (R16).
 	settings := s.records.Settings()
-	ok2 := controllink.OK{Mac: controllink.B64URL(mac), Host: optional(wire.HostID(host)), NewKey: offer}
+	ok2 := controllink.OK{Mac: controllink.B64URL(mac), Host: optional(wire.MachineRef(host)), NewKey: offer}
 	if client != nil {
 		ok2.Grant = new(records.LegacyGrant)
 	}
@@ -1269,7 +1400,22 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 	}
 	switch id.Kind {
 	case 'c':
-		s.router.AttachClient(client, conn, relayed, auth.Capabilities)
+		// A page a host carries, of the host's own person: the host may answer its calls
+		// itself (#1970). It is told so on the line right after the ok, and never otherwise.
+		var carried *controllink.Carried
+		if via != "" {
+			carried = s.carriedBy(client, via)
+		}
+		if carried != nil {
+			if err := conn.SendNow(carried.Line()); err != nil {
+				conn.Close()
+				return
+			}
+		}
+		session := s.router.AttachClient(client, conn, relayed, auth.Capabilities)
+		if carried != nil {
+			s.router.NoteCarried(session, via)
+		}
 		// Forgotten while it joined (#1229): the forget's sweep of sessions may have come
 		// before this one was attached, and admitting it would write it back over its
 		// tombstone. It is closed as any forgotten client is.
@@ -1310,6 +1456,25 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 		}
 		s.mesh.accepted(id.ID, conn)
 	}
+}
+
+// carriedBy is what a host that carries a client's page is told (#1970), or nil when the
+// host must answer none of its calls itself: only a browser of the host's own person has
+// them answered there. Its calls that the audit keeps or the policy gates still come here.
+func (s *Service) carriedBy(client *records.ClientRecord, host string) *controllink.Carried {
+	if client.Kind != records.KindBrowser || !s.router.ServesItself(s.PersonOf(client.ID), host) {
+		return nil
+	}
+	up := audit.HostMethods()
+	for _, set := range []map[string]bool{policyGated, providers.KeptMethods} {
+		for method := range set {
+			if !slices.Contains(up, method) {
+				up = append(up, method)
+			}
+		}
+	}
+	slices.Sort(up)
+	return &controllink.Carried{Actor: s.actorFor(client.ID), Up: up}
 }
 
 // origins is every origin a member may have dialled: this copy's own, and each endpoint
@@ -1392,6 +1557,10 @@ func (s *Service) keyWith(id controllink.Identity, private []byte) ([]byte, *rec
 		// Not used for its whole lifetime (#997): it pairs again.
 		if keyExpired(c.Expires, time.Now()) {
 			return nil, nil, "", controllink.Refuse(controllink.Expired)
+		}
+		// Its person's org provider suspended them (#1002, D13): it keeps its key.
+		if c.Owner != nil && s.suspended(*c.Owner) {
+			return nil, nil, "", controllink.Refuse(controllink.Suspended)
 		}
 		key, err := controllink.ClientKey(private, c.PublicKey, c.ID)
 		if err != nil {
@@ -1657,7 +1826,7 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin
 		s.announce("clientPaired", client, "code")
 		return result, nil
 	case stored.Purpose == "host" && method == "hosts/announce":
-		var a wire.HostAnnounce
+		var a wire.MachineAnnounce
 		if json.Unmarshal(params, &a) != nil {
 			return nil, fail(invalidParams, "Say which host you are.")
 		}
@@ -1677,7 +1846,7 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin
 			return nil, controllink.Refuse(controllink.Spent)
 		}
 		host := *sp.Host
-		result := &wire.Admitted{Host: new(wire.HostID(host))}
+		result := &wire.Admitted{Host: new(wire.MachineRef(host))}
 		// The same join again (#212): it enrolled, and could not keep it.
 		if old := s.records.Host(host); sp.replayed && old != nil && bytes.Equal(old.PublicKey, a.PublicKey) {
 			s.log("host " + a.Name + " enrolled again as " + host + " with the code it spent")
@@ -1685,7 +1854,7 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin
 		}
 		mid := a.MachineID
 		// The machine is the person's who made the code (FR-017).
-		record := records.HostRecord{ID: host, Name: a.Name, PublicKey: a.PublicKey, Platform: a.Platform,
+		record := records.MachineRecord{ID: host, Name: a.Name, PublicKey: a.PublicKey, Platform: a.Platform,
 			Version: a.Version, MachineID: &mid, Owner: stored.Owner, Expires: s.newExpiry()}
 		if relay {
 			record.Relay = &relay
@@ -1705,7 +1874,7 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin
 			}
 			s.log("host " + a.Name + " joined from this machine as another host enrolled as mac: it enrols as " + other)
 			host, record.ID = other, other
-			result.Host = new(wire.HostID(host))
+			result.Host = new(wire.MachineRef(host))
 			err = s.records.AddHost(ctx, record)
 		}
 		if errors.Is(err, records.ErrHostTaken) {

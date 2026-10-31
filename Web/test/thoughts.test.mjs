@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";
 
-const { showsThoughts, shownItems } = await load("src/model/thoughts.ts");
+const { showsThoughts, shownItems, thoughtsItem } = await load("src/model/thoughts.ts");
 
 const entry = (id, kind) => ({ kind: "entry", id, entry: { id, kind } });
 const thought = entry("t", { agentThought: { messageID: "m", text: "Planning" } });
@@ -49,4 +49,9 @@ test("a joined run is made again when a call joins it (#1848)", () => {
   assert.notEqual(after[0], before[0]);
   assert.deepEqual(after[0].calls.map((c) => c.id), ["read", "patch", "test"]);
   assert.equal(after[0].id, "a");
+});
+
+test("the chat menu's item says what it will do, as Show Inspector does (#2383)", () => {
+  assert.equal(thoughtsItem(false).label, "Show Thoughts");
+  assert.equal(thoughtsItem(true).label, "Hide Thoughts");
 });

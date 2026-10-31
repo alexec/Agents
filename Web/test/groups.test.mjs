@@ -33,8 +33,8 @@ for (const { name, input, expected } of cases("groups/panels.json")) {
   });
 }
 
-const symbols = { working: null, needsYou: "exclamationmark.circle.fill", waiting: "zzz",
-                  done: "checkmark.circle", stopped: "stop.circle" };
+const symbols = { working: null, needsYou: "exclamationmark.circle.fill", waiting: "dot.radiowaves.left.and.right",
+                  done: "checkmark", stopped: "stop.circle" };
 
 for (const { name, input, expected } of cases("status/rows.json")) {
   test(`status: ${name}`, () => {
@@ -43,8 +43,27 @@ for (const { name, input, expected } of cases("status/rows.json")) {
   });
 }
 
-test("a project row says Needs you first, unread beside it (ProjectRow.subtitle, #70)", () => {
+test("a folder row says Needs you first, unread beside it (FolderRow.subtitle, #70)", () => {
   const [{ input }] = cases("groups/panels.json");
-  assert.equal(groups.projectSubtitle(input.agents, input.folder), "Needs you · 3 unread");
-  assert.equal(groups.projectSubtitle([], input.folder), null);
+  assert.equal(groups.folderSubtitle(input.agents, input.folder), "Needs you · 3 unread");
+  assert.equal(groups.folderSubtitle([], input.folder), null);
+});
+
+// A worktree with "folder": "" (#2650), left by #2617, counts under where the agent runs.
+test("an empty worktree folder counts as none", () => {
+  const worktree = { name: "lane", root: "file:///r/.agents/worktrees/lane/", madeByApp: true, folder: "" };
+  assert.equal(groups.folderPath({ cwd: "file:///r/.agents/worktrees/lane/", worktree }), "file:///r/.agents/worktrees/lane");
+  assert.equal(groups.folderPath({ cwd: "file:///w/", worktree: { ...worktree, folder: "file:///r/" } }), "file:///r");
+});
+
+test("Recently archived sessions are the newest three archived in the last 24 hours (#2868)", () => {
+  const now = 900_000_000;
+  const day = groups.recentArchivedWithin;
+  const archived = [now - 10, now - 20, now - day + 60, now - day - 60].map((archivedAt, i) =>
+    ({ id: `a${i}`, archivedAt, lastActivityAt: 0 }));
+  assert.deepEqual(groups.recentlyArchived(archived, 3, now).map((a) => a.id), ["a0", "a1", "a2"]);
+  assert.deepEqual(groups.recentlyArchived(archived.slice(2), 3, now).map((a) => a.id), ["a2"]);
+  assert.deepEqual(groups.recentlyArchived(archived, 3, now + day), []);
+  const before = [{ id: "old", lastActivityAt: now - 5 }];
+  assert.deepEqual(groups.recentlyArchived(before, 3, now).map((a) => a.id), ["old"]);
 });

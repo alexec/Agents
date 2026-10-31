@@ -16,20 +16,20 @@ import (
 func TestCatchUpIsOneAnswer(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	seeded(t, d, dir, nil)
 	os.WriteFile(filepath.Join(dir, "a.md"), nil, 0o644)
 	c.call(t, 2, "pins/pin", map[string]any{"folder": store.FolderURL(dir), "path": "a.md"})
 	var s map[string]json.RawMessage
 	json.Unmarshal(c.call(t, 3, "client/catchUp", map[string]any{"parts": []string{"pins", "someday"}}), &s)
-	for _, k := range []string{"projects", "agents", "permissions", "elicitations", "attention", "resuming", "disk", "storeNotes", "milestones", "pins"} {
+	for _, k := range []string{"folders", "agents", "permissions", "elicitations", "attention", "resuming", "disk", "storeNotes", "milestones", "pins"} {
 		if _, ok := s[k]; !ok {
 			t.Fatalf("no %s in %v", k, s)
 		}
 	}
 	var agents []wire.Agent
 	json.Unmarshal(s["agents"], &agents)
-	var pins []wire.ProjectPins
+	var pins []wire.FolderPins
 	json.Unmarshal(s["pins"], &pins)
 	if len(agents) != 1 || len(pins) != 1 {
 		t.Fatalf("%d agents, %d pins", len(agents), len(pins))
@@ -97,7 +97,7 @@ func TestSettingsTheWindowReads(t *testing.T) {
 func TestADropBoxAndAnArtifact(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	var put wire.DropboxPutResponse
 	json.Unmarshal(c.call(t, 2, "dropbox/put", map[string]any{"folder": store.FolderURL(dir), "subfolder": "in/box",
 		"name": "../note.txt", "data": "aGk="}), &put)
@@ -112,7 +112,7 @@ func TestADropBoxAndAnArtifact(t *testing.T) {
 		params map[string]any
 		want   string
 	}{
-		{map[string]any{"folder": store.FolderURL(t.TempDir()), "name": "x", "data": ""}, "That is not a project here."},
+		{map[string]any{"folder": store.FolderURL(t.TempDir()), "name": "x", "data": ""}, "That is not a folder here."},
 		{map[string]any{"folder": store.FolderURL(dir), "name": ".x", "data": ""}, "A drop box file needs a name that does not start with a dot."},
 		{map[string]any{"folder": store.FolderURL(dir), "subfolder": "a/.b", "name": "x", "data": ""}, "A folder in the drop box cannot start with a dot."},
 	} {

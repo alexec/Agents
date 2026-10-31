@@ -25,6 +25,24 @@ type fakeGitHub struct {
 	rabbit   []CodeRabbitComment
 	err      error
 	noRepo   bool
+	// reviews and assigned are what ask the connection's owner, alexec (#2034).
+	reviews  []OpenPR
+	assigned []Issue
+}
+
+func (f *fakeGitHub) Yours(context.Context, string) (Yours, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.err != nil {
+		return Yours{}, f.err
+	}
+	y := Yours{Login: "alexec", Reviews: f.reviews, Assigned: f.assigned}
+	for n, p := range f.prs {
+		if p.state == "open" && p.author == y.Login {
+			y.PRs = append(y.PRs, n)
+		}
+	}
+	return y, nil
 }
 
 type fakeRun struct {
@@ -255,8 +273,12 @@ func TestEventsListGivesEveryEventPollOnlyWithTheirSchemas(t *testing.T) {
 		equal(t, input["required"], []any{}, name+" required")
 		equal(t, props["repo"].(map[string]any)["type"], "string", name+" repo")
 		equal(t, e["payloadSchema"].(map[string]any)["type"], "object", name+" payload")
+		// The person's own (#2034) are anyone's already.
+		personal := name == "review.requested" || name == "issue.assigned"
 		_, hasAnyone := props["anyone"]
-		equal(t, hasAnyone, true, name+" anyone")
+		equal(t, hasAnyone, !personal, name+" anyone")
+		_, hasMine := props["mine"]
+		equal(t, hasMine, name == "checks.failed" || name == "pr.conflicted", name+" mine")
 		if strings.HasPrefix(name, "issue.") {
 			_, hasIssue := props["issue"]
 			equal(t, hasIssue, name != "issue.opened", name+" issue")
@@ -265,8 +287,8 @@ func TestEventsListGivesEveryEventPollOnlyWithTheirSchemas(t *testing.T) {
 		}
 	}
 	sort.Strings(names)
-	equal(t, names, []string{"checks.failed", "issue.closed", "issue.commented", "issue.labelled", "issue.opened",
-		"pr.closed", "pr.conflicted", "pr.merged", "pr.opened", "review.comment", "review.posted"}, "names")
+	equal(t, names, []string{"checks.failed", "issue.assigned", "issue.closed", "issue.commented", "issue.labelled", "issue.opened",
+		"pr.closed", "pr.conflicted", "pr.merged", "pr.opened", "review.comment", "review.posted", "review.requested"}, "names")
 }
 
 func TestCursorNullGivesNoEventsAndACursor(t *testing.T) {
@@ -321,7 +343,7 @@ func TestPRMergedAndClosed(t *testing.T) {
 	equal(t, ids(h.poll("pr.closed", args, closed["cursor"])), []string{"pr.closed:" + repo + ":408:" + closedAt}, "closed")
 }
 
-func TestRepoLeftOutIsTheProjectsAndNoRepoIsInvalidParams(t *testing.T) {
+func TestRepoLeftOutIsTheFoldersAndNoRepoIsInvalidParams(t *testing.T) {
 	h := newHarness(t)
 	first := h.poll("pr.merged", map[string]any{}, nil)
 	h.fake.addPR(407, "agents/pr-407", func(p *fakePR) { p.state, p.mergedAt = "merged", h.at(5) })
@@ -541,5 +563,73 @@ func TestNotSignedInAndARateLimit(t *testing.T) {
 	_, err = h.rpc(map[string]any{"name": "pr.merged", "arguments": map[string]any{"repo": repo}, "cursor": c})
 	if err == nil || err.Code != -32013 || err.Data["retryAfterMs"] != 60000 {
 		t.Fatalf("got %v", err)
+	}
+}
+
+// Notify me (#2034): what asks the connection's owner, and their own PRs only.
+func TestReviewRequestedRaisesOncePerRequestAndAgainWhenAskedAgain(t *testing.T) {
+	h := newHarness(t)
+	all := map[string]any{"repo": repo}
+	ask := func(on bool) {
+		h.fake.mu.Lock()
+		defer h.fake.mu.Unlock()
+		h.fake.reviews = nil
+		if on {
+			h.fake.reviews = []OpenPR{{PR: PR{Number: 900, Title: "Fix the walk", Branch: "b", URL: "u900"}, Author: "stranger"}}
+		}
+	}
+	first := h.poll("review.requested", all, nil)
+	ask(true)
+	raised := h.poll("review.requested", all, first["cursor"])
+	e := eventsOf(raised)
+	if len(e) != 1 || !strings.HasPrefix(e[0]["eventId"].(string), "review.requested:"+repo+":900:") {
+		t.Fatalf("raised %v", ids(raised))
+	}
+	equal(t, e[0]["data"].(map[string]any)["pr"].(map[string]any)["author"], "stranger", "anyone's PR")
+	still := h.poll("review.requested", all, raised["cursor"])
+	equal(t, ids(still), []string{}, "raised once")
+	ask(false)
+	gone := h.poll("review.requested", all, still["cursor"])
+	ask(true)
+	equal(t, len(ids(h.poll("review.requested", all, gone["cursor"]))), 1, "asked again")
+}
+
+func TestIssueAssignedRaisesTheIssue(t *testing.T) {
+	h := newHarness(t)
+	first := h.poll("issue.assigned", map[string]any{"repo": repo}, nil)
+	h.fake.mu.Lock()
+	h.fake.assigned = []Issue{{Number: 51, Title: "Notify me", URL: "u51", Author: "bob", Assignees: []string{"alexec"}}}
+	h.fake.mu.Unlock()
+	e := eventsOf(h.poll("issue.assigned", map[string]any{"repo": repo}, first["cursor"]))
+	if len(e) != 1 {
+		t.Fatalf("raised %v", e)
+	}
+	data := e[0]["data"].(map[string]any)
+	equal(t, data["issue"].(map[string]any)["title"], "Notify me", "issue")
+	if _, ok := data["assignedAt"].(string); !ok {
+		t.Fatal("no assignedAt")
+	}
+}
+
+func TestMineIsOnlyTheOwnersPRsAForksToo(t *testing.T) {
+	h := newHarness(t)
+	mine := map[string]any{"repo": repo, "mine": true}
+	h.fake.addPR(910, "agents/mine", nil)
+	h.fake.addPR(911, "theirs", func(p *fakePR) { p.author = "bob" })
+	h.fake.addPR(912, "fork/mine", func(p *fakePR) { p.trusted = false })
+	first := h.poll("checks.failed", mine, nil)
+	h.fake.addRun(9910, "agents/mine", h.at(5), 910, true)
+	h.fake.addRun(9911, "theirs", h.at(5), 911, true)
+	h.fake.addRun(9912, "fork/mine", h.at(5), 912, false)
+	equal(t, ids(h.poll("checks.failed", mine, first["cursor"])),
+		[]string{"checks.failed:" + repo + ":9910:1", "checks.failed:" + repo + ":9912:1"}, "mine")
+
+	set := func(n int) { h.fake.edit(n, func(p *fakePR) { p.conflicts = new(true) }) }
+	before := h.poll("pr.conflicted", mine, nil)
+	set(910)
+	set(911)
+	got := ids(h.poll("pr.conflicted", mine, before["cursor"]))
+	if len(got) != 1 || !strings.HasPrefix(got[0], "pr.conflicted:"+repo+":910:") {
+		t.Fatalf("conflicted %v", got)
 	}
 }

@@ -40,4 +40,14 @@ button { font: inherit; font-size: 13px; color: var(--color-text-primary); backg
 button:disabled { opacity: 0.5; cursor: default; }
 button.pill { border: none; font: inherit; font-size: var(--font-text-sm-size); }
 button.pill:hover, .pill.chosen { background: var(--color-background-info); color: var(--color-text-info); }
+/* A list's section heading (#2453). */
+li.section { display: flex; gap: 6px; align-items: baseline; padding: 10px 4px 2px; border-top: none; font-weight: 600;
+  font-size: var(--font-text-sm-size); color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.03em; }
+li.section.needs_you { color: var(--color-text-warning); }
+li.section .muted { font-weight: 400; }
+.pill.bot { padding: 0 6px; background: var(--color-background-info); color: var(--color-text-info); }
 .error { color: var(--color-text-danger); font-size: var(--font-text-sm-size); }
+.lineage { display: grid; gap: 4px; margin-top: 8px; min-width: 0; }
+.lineage-row { display: flex; flex-wrap: wrap; gap: 2px 6px; align-items: baseline; min-width: 0; }
+.lineage-title { overflow-wrap: anywhere; }
+.lineage .waste { color: var(--color-text-danger); font-size: var(--font-text-sm-size); }

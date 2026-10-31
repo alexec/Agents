@@ -24,9 +24,9 @@ public enum ControlJoin {
     }
 
     /// A host enrols with a host code, and keeps what it needs to dial again.
-    public static func enrollHost(_ code: ControlCode, privateKey: Data, hello: DaemonAPI.HostHello) async throws -> ControlMembership {
+    public static func enrollHost(_ code: ControlCode, privateKey: Data, hello: DaemonAPI.MachineHello) async throws -> ControlMembership {
         guard case .host = code.purpose else { throw Failure("that is not a host code") }
-        let announce = DaemonAPI.HostAnnounce(publicKey: try ControlAgreement.publicKey(privateKey: privateKey),
+        let announce = DaemonAPI.MachineAnnounce(publicKey: try ControlAgreement.publicKey(privateKey: privateKey),
                                               name: hello.name ?? "A host", platform: hello.platform,
                                               version: hello.version, machineID: hello.machineID, relay: hello.relay,
                                               implementation: hello.implementation)

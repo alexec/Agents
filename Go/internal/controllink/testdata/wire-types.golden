@@ -10,11 +10,11 @@ ControlOK full
 {"mac":"MAC","grant":"GRANT","host":"HOST","relayed":true,"endpoints":[{"url":"URL","pin":"PIN"}],"epoch":7}
 ControlOK zero
 {"mac":""}
-HostAnnounce full
+MachineAnnounce full
 {"publicKey":"AQID","name":"NAME","platform":"PLATFORM","version":"VERSION","machineID":"MACHINEID","implementation":"IMPLEMENTATION"}
-HostAnnounce zero
+MachineAnnounce zero
 {"publicKey":null,"name":"","platform":"","version":"","machineID":""}
-HostHello full
+MachineHello full
 {"host":"HOST","version":"VERSION","platform":"PLATFORM","machineID":"MACHINEID","name":"NAME","implementation":"IMPLEMENTATION"}
-HostHello zero
+MachineHello zero
 {"version":"","platform":"","machineID":""}

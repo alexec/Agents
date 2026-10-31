@@ -55,7 +55,8 @@ struct LegacyRecordTests {
                    "at":"2026-09-19T03:44:09.040Z"},"outcomeAsked":true}
         """#
         let agent = try decoder().decode(Agent.self, from: Data(json.utf8))
-        #expect(agent.report?.outcome == .stuck)
+        // finish_turn's stuck reads as done (#1916).
+        #expect(agent.report?.outcome == .done)
         #expect(agent.report?.message == "no certificate")
         #expect(agent.outcomeAsked)
     }
@@ -155,7 +156,7 @@ struct LegacyRecordTests {
     /// Both of 014's new shapes, through the store's own coder and back. The coding is
     /// hand-written in both directions, which is exactly why this is worth asserting.
     @Test func the014ShapesRoundTripUnchanged() throws {
-        let report = WorkReport(outcome: .partlyDone, message: "Five of six.", at: Date())
+        let report = WorkReport(outcome: .nothingToDo, message: "Five of six.", at: Date())
         let kinds: [TranscriptEntry.Kind] = [
             .workReported(report),
             .userMessage("do it", from: .person),

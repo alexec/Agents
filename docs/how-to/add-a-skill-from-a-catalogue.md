@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac]
-description: Search skills.sh from the app, look at a skill before it goes in, and add it for yourself or to a project; then keep it up to date or take it out.
+description: Search skills.sh from the app, look at a skill before it goes in, and add it for yourself or to a folder; then keep it up to date or take it out.
 ---
 
 # Add a skill from a catalogue
@@ -9,8 +9,8 @@ description: Search skills.sh from the app, look at a skill before it goes in, a
 You can find a skill on [skills.sh](https://skills.sh), in Anthropic's skills repository, or in
 a marketplace you added (see [Choose marketplaces](choose-marketplaces.md)), and add it
 without leaving the app,
-either for yourself, so every agent you start has it, or to one project, so every agent
-working in that project has it. The app shows you everything in the skill before anything is
+either for yourself, so every agent you start has it, or to one folder, so every agent
+working in that folder has it. The app shows you everything in the skill before anything is
 written, and it takes the skill at a fixed commit.
 
 ## Before you start
@@ -36,26 +36,26 @@ written, and it takes the skill at a fixed commit.
 4. Choose **Add to ~/.agents**. The skill goes into `~/.agents/skills/<name>`, and the next
    agent you start, on any runtime, has it.
 
-## Add a skill to a project
+## Add a skill to a folder
 
-1. Open the project, then choose **Project Settings** in its toolbar, and **Instructions &
-   skills** in the sheet. The **Skills** section lists the skills in the project's `.agents/skills`.
+1. Open the folder, then choose **Folder Settings** in its toolbar, and **Instructions &
+   skills** in the sheet. The **Skills** section lists the skills in the folder's `.agents/skills`.
 2. Choose **Add skill…** there, and search and choose as above. **Add to** starts on the
-   project; the button reads **Add to** and the project's name.
-3. The skill goes into `<project>/.agents/skills/<name>`, and is recorded in
-   `skills-lock.json` at the top of the project.
+   folder; the button reads **Add to** and the folder's name.
+3. The skill goes into `<folder>/.agents/skills/<name>`, and is recorded in
+   `skills-lock.json` at the top of the folder.
 
-The app writes the files and commits nothing. They show in the project's changes like
-anything else an agent writes, and once you commit them, everyone who clones the project gets
+The app writes the files and commits nothing. They show in the folder's changes like
+anything else an agent writes, and once you commit them, everyone who clones the folder gets
 the skill. A worktree's page adds to that worktree's own `.agents`, not the main checkout's.
 
-You can switch **Add to** between you and the project in the sheet at any point; nothing is
+You can switch **Add to** between you and the folder in the sheet at any point; nothing is
 fetched again.
 
 ## Keep a skill up to date
 
 When a skill's source has changed since it was added, it is marked **update** in
-**Settings ▸ Agent Configuration ▸ Skills** or in Project Settings. The app asks GitHub at most once an hour
+**Settings ▸ Agent Configuration ▸ Skills** or in Folder Settings. The app asks GitHub at most once an hour
 for each repository.
 
 1. Choose **Update…**. The sheet lists what changes, file by file, and shows the new
@@ -67,7 +67,7 @@ your edits go.
 
 ## Take a skill out
 
-Choose **Remove…** in the skill's detail, or **Remove** in Project Settings, and confirm. The
+Choose **Remove…** in the skill's detail, or **Remove** in Folder Settings, and confirm. The
 folder goes to the Trash and its record is dropped. No agent started after that has it.
 
 ## What the app will not touch
@@ -75,7 +75,7 @@ folder goes to the Trash and its record is dropped. No agent started after that 
 - **Skills you made.** Update and Remove are offered only for skills the app, or the `skills`
   tool, added: those a lock file names. If a skill of yours has the same name as one you want
   to add, the app says so and leaves yours alone. It offers the other place, you or the
-  project, when that one is free.
+  folder, when that one is free.
 - **The `skills` tool's own installs outside `~/.agents`.** `npx skills add … --agent
   claude-code` puts a skill in `~/.claude/skills`; the app leaves that folder to Claude and to
   the tool.
@@ -84,9 +84,9 @@ folder goes to the Trash and its record is dropped. No agent started after that 
 
 The app keeps the same records as the [`skills`](https://github.com/vercel-labs/skills)
 command-line tool: `~/.agents/.skill-lock.json` for yours and `skills-lock.json` for a
-project's. A skill added one way shows up the other: `npx skills list` lists what the app
+folder's. A skill added one way shows up the other: `npx skills list` lists what the app
 added, the app lists what `npx skills add` put in `~/.agents/skills`, and
-`npx skills experimental_install` in a fresh clone restores a project's skills.
+`npx skills experimental_install` in a fresh clone restores a folder's skills.
 
 ## If something goes wrong
 
@@ -100,4 +100,4 @@ added, the app lists what `npx skills add` put in `~/.agents/skills`, and
 ## Related
 
 - [Share skills, instructions and connectors with every agent](share-skills-across-agents.md)
-- [Projects, hosts and worktrees](../explanation/projects-hosts-worktrees.md)
+- [Folders, hosts and worktrees](../explanation/folders-machines-worktrees.md)

@@ -2,7 +2,7 @@
 import type { Store } from "./model/store";
 import type { Session } from "./session";
 import { Columns } from "./views/Columns";
-import { OtherControlPlane, Pairing, Unsupported } from "./views/Pairing";
+import { OtherControlPlane, Pairing, Suspended, Unsupported } from "./views/Pairing";
 
 export function App({ session, store }: { session: Session; store: Store }) {
   const state = session.state.value;
@@ -18,6 +18,9 @@ export function App({ session, store }: { session: Session; store: Store }) {
       return <Pairing session={session} />;
     case "unsupported":
       return <Unsupported />;
+    case "suspended":
+      // The person's org provider turned their access off (#1002, FR-029): this page and no other.
+      return <Suspended paired={!state.unpaired} />;
     case "wrongControlPlane":
       return <OtherControlPlane session={session} />;
     case "open":

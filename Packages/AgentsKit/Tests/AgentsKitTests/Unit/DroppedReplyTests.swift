@@ -144,7 +144,7 @@ struct DroppedReplyTests {
                 do { try await client.call(method); return false } catch { return error is DaemonClient.NoAnswer }
             }
             async let a = noAnswer(DaemonAPI.Method.agentsList)
-            async let b = noAnswer(DaemonAPI.Method.projectsList)
+            async let b = noAnswer(DaemonAPI.Method.foldersList)
             return await [a, b].filter { $0 }
         }
         #expect(failed.count == 2)
@@ -185,7 +185,7 @@ struct DroppedReplyTests {
 
     // MARK: The control plane
 
-    private let home = HostID(rawValue: "mac")
+    private let home = MachineRef(rawValue: "mac")
 
     /// A home host that never answers, and a phone on the bare wire, as today's Remote is.
     private func silentHomeAndPhone(_ kind: ClientRecord.Kind = .iPhone)

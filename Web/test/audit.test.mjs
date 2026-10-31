@@ -12,9 +12,9 @@ test("who, where and the call", () => {
   assert.equal(a.who(e.actor), "Local owner · MacBook Pro");
   assert.equal(a.place(e, () => "box"), "on box");
   assert.equal(a.call(e), "agents/stop · A1");
-  const own = entry({ method: "control/setProjectDetection" });
+  const own = entry({ method: "control/setFolderDetection" });
   assert.equal(a.place(own, (h) => h), "on the control plane");
-  assert.equal(a.call(own), "control/setProjectDetection");
+  assert.equal(a.call(own), "control/setFolderDetection");
   assert.equal(a.who(own.actor), "Someone");
   assert.equal(a.who({ user: "b", userName: "Nightly", event: { kind: "pr.merged", id: "42" } }), "Nightly · for pr.merged");
   assert.equal(a.kept(1), "Kept for 1 day");
@@ -53,9 +53,9 @@ test("a shorter time says what it deletes (#2067)", () => {
   assert.equal(a.older({ ...list, more: true }, 30, now), null);
   assert.equal(a.shorterTitle(30), "Keep the audit for 30 days?");
   assert.equal(a.shorterMessage(365, 30, 2),
-    "Entries older than 30 days are deleted in a day (up to 335 days of them, 2 entries now). To keep them, choose 365 days again before then.");
+    "Everyone's entries older than 30 days are deleted in a day (up to 335 days of them, 2 entries now). To keep them, choose 365 days again before then.");
   assert.equal(a.shorterMessage(2, 1, null),
-    "Entries older than 1 day are deleted in a day (up to 1 day of them). To keep them, choose 2 days again before then.");
+    "Everyone's entries older than 1 day are deleted in a day (up to 1 day of them). To keep them, choose 2 days again before then.");
   assert.deepEqual(a.choices(90), [30, 90, 180, 365]);
   assert.deepEqual(a.choices(7), [7, 30, 90, 180, 365]);
 });

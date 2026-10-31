@@ -1,6 +1,7 @@
 // Start a Machine from a Repository (#1809): the repository, a provider that makes machines, its
-// New Workspace form, and Start. What comes next is said in the sheet: joining on its first boot,
-// or made but to add as a host in the Mac app.
+// New Machine form, and Start. What comes next is said in the sheet: joining on its first boot,
+// or made but to add as a host in the Mac app. As New Machine (#2131), from Add a Machine… or a
+// provider's New Machine…, the repository is optional and the machine is named here.
 import { useEffect, useState } from "preact/hooks";
 import type { ProviderID } from "../protocol/generated";
 import type { Store } from "../model/store";
@@ -8,18 +9,22 @@ import { describe } from "../model/errors";
 import {
   createRequest, formFields, machineName, machineWords as words, makers, nameSuffix, repositoryOf, type FormField,
 } from "../model/machineFromRepository";
+import { addMachineWords, validMachineName } from "../model/addMachine";
 import { Modal } from "./Modal";
 
-export function MachineDialog({ store, close }: { store: Store; close: () => void }) {
+export function MachineDialog({ store, close, machine = false, picked }: {
+  store: Store; close: () => void; machine?: boolean; picked?: string | undefined;
+}) {
   const providers = store.providers.list.value;
   const [text, setText] = useState("");
-  const [provider, setProvider] = useState("");
+  const [typedName, setTypedName] = useState("");
+  const [provider, setProvider] = useState(picked ?? "");
   const [fields, setFields] = useState<FormField[]>([]);
   const [suffix] = useState(nameSuffix);
   const [step, setStep] = useState<{ kind: "asking" } | { kind: "starting" } | { kind: "said"; words: string; failed?: true }>({ kind: "asking" });
   useEffect(() => { if (providers === null) void store.providers.load(); }, []);
   const choices = makers(providers ?? []);
-  const chosen = provider || choices[0]?.id || "";
+  const chosen = choices.find((p) => p.id === provider)?.id ?? choices[0]?.id ?? "";
   // The provider's form, each time another is chosen.
   useEffect(() => {
     if (!chosen) return;
@@ -30,32 +35,51 @@ export function MachineDialog({ store, close }: { store: Store; close: () => voi
     return () => { live = false; };
   }, [chosen]);
   const repository = repositoryOf(text);
-  const name = repository ? machineName(repository.name, suffix) : "";
+  const typed = !!text.trim();
+  const named = typedName.trim();
+  const name = machine && named ? named : repository ? machineName(repository.name, suffix) : "";
+  // A repository, or for New Machine a good name and no half-typed repository.
+  const ready = !!chosen && (machine
+    ? !(typed && !repository) && (named ? validMachineName(named) : !!repository)
+    : !!repository);
   const start = async () => {
-    if (!repository || !chosen) return;
+    if (!ready) return;
     setStep({ kind: "starting" });
     try {
       const made = await store.link.call("providers/create", createRequest(chosen, name, repository, fields));
       const by = choices.find((p) => p.id === chosen)?.name ?? "The provider";
-      setStep({ kind: "said", words: made.joining ? words.joining(made.workspace.name, repository) : words.notJoining(made.workspace.name, by) });
+      const said = !made.joining ? words.notJoining(made.workspace.name, by)
+        : repository ? words.joining(made.workspace.name, repository) : addMachineWords.started(made.workspace.name);
+      setStep({ kind: "said", words: said });
     } catch (error) {
       setStep({ kind: "said", words: describe(error), failed: true });
     }
   };
   const busy = step.kind === "starting";
   const done = step.kind === "said" && !step.failed;
+  const title = machine ? addMachineWords.machineTitle : words.title;
   return (
-    <Modal label={words.title} close={close}>
+    <Modal label={title} close={close}>
       <form class="sheet-body connect-sheet provider-sheet" onSubmit={(e) => { e.preventDefault(); void start(); }}>
-        <h2>{words.title}</h2>
+        <h2>{title}</h2>
         {providers !== null && choices.length === 0 ? <p class="sheet-note">{words.noMakers}</p> : (
           <div class="token-form">
-            <label>Repository
-              <input type="url" value={text} placeholder={words.repositoryPrompt} disabled={busy || done} autofocus
+            {machine && (
+              <>
+                <label>Name
+                  <input type="text" value={typedName} placeholder={addMachineWords.namePrompt} disabled={busy || done} autofocus
+                    autocomplete="off" autocapitalize="off" spellcheck={false}
+                    onInput={(e) => setTypedName((e.target as HTMLInputElement).value)} />
+                </label>
+                <p class={`small ${named && !validMachineName(named) ? "failure" : "quiet"}`}>{addMachineWords.nameNote}</p>
+              </>
+            )}
+            <label>{machine ? addMachineWords.repositoryOptional : "Repository"}
+              <input type="url" value={text} placeholder={words.repositoryPrompt} disabled={busy || done} autofocus={!machine}
                 autocomplete="off" autocapitalize="off" spellcheck={false}
                 onInput={(e) => setText((e.target as HTMLInputElement).value)} />
             </label>
-            <p class={`small ${repository || !text.trim() ? "quiet" : "failure"}`}>{words.repositoryNote(repository, !!text.trim())}</p>
+            {(!machine || typed) && <p class={`small ${repository || !typed ? "quiet" : "failure"}`}>{words.repositoryNote(repository, typed)}</p>}
             <label>Provider
               <select value={chosen} disabled={busy || done} onChange={(e) => setProvider((e.target as HTMLSelectElement).value)}>
                 {choices.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -72,7 +96,7 @@ export function MachineDialog({ store, close }: { store: Store; close: () => voi
                       onInput={(e) => setFields(fields.map((g, j) => (j === i ? { ...g, value: (e.target as HTMLInputElement).value } : g)))} />}
               </label>
             ))}
-            {name && <p class="small quiet">Its name: {name}. {words.privateNote}</p>}
+            {name && repository && <p class="small quiet">Its name: {name}. {words.privateNote}</p>}
           </div>
         )}
         {busy && <p class="quiet small">{words.starting(name)}</p>}
@@ -81,7 +105,7 @@ export function MachineDialog({ store, close }: { store: Store; close: () => voi
           {done ? <button type="button" class="prominent" onClick={close}>Done</button> : (
             <>
               <button type="button" onClick={close}>Cancel</button>
-              <button type="submit" class="prominent" disabled={!repository || !chosen || busy}>{words.start}</button>
+              <button type="submit" class="prominent" disabled={!ready || busy}>{words.start}</button>
             </>
           )}
         </div>

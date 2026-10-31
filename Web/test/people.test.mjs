@@ -50,8 +50,8 @@ test("Remove says which machines are deleted and the work on them that is not pu
   const preview = {
     startedMachines: [
       { host: "w", name: "sam-ws", state: "online", unpushed: [
-        { project: "file:///p", worktree: "file:///p-fix", branch: "agents/fix", ahead: 2, uncommitted: 3 },
-        { project: "file:///p", worktree: "file:///p-new/", unmerged: 1 },
+        { folder: "file:///p", worktree: "file:///p-fix", branch: "agents/fix", ahead: 2, uncommitted: 3 },
+        { folder: "file:///p", worktree: "file:///p-new/", unmerged: 1 },
       ] },
       { host: "x", name: "sam-old", state: "offline", unpushed: [], unknown: "sam-old is not online, so it could not be asked." },
     ],
@@ -64,6 +64,9 @@ test("Remove says which machines are deleted and the work on them that is not pu
     "1 machine is taken off: box-1.",
   ]);
   assert.equal(p.askingLine("Sam"), "Asking Sam’s machines what work on them is not pushed…");
+  assert.equal(p.checkFailedLine("Sam", "The control plane can’t be reached."),
+    "Could not check what Sam’s machines would lose. The control plane can’t be reached. Removing Sam stops and "
+    + "deletes the machines Sam started, with any work on them not pushed, so Remove stays off until the check works.");
 });
 
 test("an invite says how long it works and where it goes", () => {
@@ -93,4 +96,27 @@ test("asks are added, said again, decided and expired", () => {
 test("a machine joins without a code by a command", () => {
   assert.equal(p.joinCommandTitle, "Add a machine without a code");
   assert.equal(p.joinCommandNote, "Run it on the machine. It shows a code; approve it here.");
+});
+
+test("what an org provider controls is said under a person, with its name (#1002, FR-028)", () => {
+  const names = { okta: "Okta" };
+  const scim = { provider: "okta", userName: "sam@example.com", active: true };
+  assert.deepEqual(p.orgLines(person({ scim }), names), ["Managed by Okta"]);
+  assert.deepEqual(p.orgLines(person({ scim, provisioned: true }), names), ["Managed by Okta", "Waiting for first sign-in"]);
+  assert.deepEqual(p.orgLines(person({ suspended: { by: "scim", provider: "entra", at: 0 } }), names), ["Suspended by entra"]);
+  assert.deepEqual(p.orgLines(person(), names), []);
+  assert.equal(p.providerManaged(person()), false);
+  assert.equal(p.providerManaged(person({ roleFrom: ["g1"] })), true);
+});
+
+test("a role a provider's group gives says Set by, and the menu does not change it", () => {
+  const names = { okta: "Okta" };
+  const groups = [{ id: "g1", name: "Admins", everyone: false, members: [], source: { scim: "okta", displayName: "Admins" }, role: "admin" }];
+  const admin = person({ id: "a", role: "admin", roleFrom: ["g1"] });
+  const other = person({ id: "b", role: "admin" });
+  assert.equal(p.roleSetBy(admin, groups, names), "Set by Okta");
+  assert.equal(p.roleSetBy(person({ roleFrom: ["gone"], scim: { provider: "okta", userName: "x", active: true } }), [], names), "Set by Okta");
+  assert.equal(p.roleSetBy(other, groups, names), null);
+  assert.equal(p.canSetRole(admin, [admin, other], true), false);
+  assert.equal(p.canSetRole(other, [admin, other], true), true);
 });

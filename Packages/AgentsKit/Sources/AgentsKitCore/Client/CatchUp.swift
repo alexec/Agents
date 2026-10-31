@@ -33,10 +33,10 @@ public extension DaemonAPI {
     /// screen it opens on, and what is waiting on a person, which the badge and the widget
     /// count. Everything else is asked for when a page that shows it opens.
     struct CatchUpSnapshot: Codable, Sendable {
-        public var projects: [ProjectSummary]
+        public var folders: [FolderSummary]
         /// The first page of live agents. A full page means there are more, which come
-        /// a project at a time as each project's page opens.
-        public var agents: [Agent]
+        /// a folder at a time as each folder's page opens. Read a row at a time (#2650).
+        @AgentRows public var agents: [Agent]
         public var permissions: [PermissionRequest]
         public var elicitations: [ElicitationRequest]
         public var attention: AttentionPending
@@ -49,7 +49,7 @@ public extension DaemonAPI {
         public var milestones: Milestones?
         /// The parts asked for, each nil when it was not asked for or the host predates it.
         public var workflows: [WorkflowSummary]?
-        public var pins: [ProjectPins]?
+        public var pins: [FolderPins]?
         public var leases: Leases?
 
         /// The leases part: the leases, and the MCP servers read with them for their page.
@@ -65,9 +65,9 @@ public extension DaemonAPI {
             }
         }
 
-        public init(projects: [ProjectSummary], agents: [Agent], permissions: [PermissionRequest],
+        public init(folders: [FolderSummary], agents: [Agent], permissions: [PermissionRequest],
                     elicitations: [ElicitationRequest], attention: AttentionPending, resuming: [UUID]) {
-            self.projects = projects
+            self.folders = folders
             self.agents = agents
             self.permissions = permissions
             self.elicitations = elicitations
@@ -88,15 +88,15 @@ public extension DaemonAPI {
 
 public extension DaemonClient {
     /// The snapshot, in one call; from a host that predates it, in one call per part,
-    /// with the agents still one page. Throws only when the projects or the agents could
+    /// with the agents still one page. Throws only when the folders or the agents could
     /// not be read: without those there is nothing to show.
     func catchUp(_ request: DaemonAPI.CatchUpRequest = .init()) async throws -> DaemonAPI.CatchUpSnapshot {
         do {
             return try await call(DaemonAPI.Method.clientCatchUp, request, returning: DaemonAPI.CatchUpSnapshot.self)
         } catch let error as JSONRPCError where error.isMethodNotFound {
-            let projects = try await call(DaemonAPI.Method.projectsList,
-                                          DaemonAPI.ProjectsListRequest(includeArchived: false),
-                                          returning: [DaemonAPI.ProjectSummary].self)
+            let folders = try await call(DaemonAPI.Method.foldersList,
+                                          DaemonAPI.FoldersListRequest(includeArchived: false),
+                                          returning: [DaemonAPI.FolderSummary].self)
             let agents = try await call(DaemonAPI.Method.agentsList, request.agents, returning: [Agent].self)
             let none = Optional<String>.none
             let permissions = try? await call(DaemonAPI.Method.permissionsPending, none,
@@ -107,7 +107,7 @@ public extension DaemonClient {
                                             returning: DaemonAPI.AttentionPending.self)
             let resuming = try? await call(DaemonAPI.Method.agentsResuming, none,
                                            returning: DaemonAPI.ResumingResponse.self)
-            return DaemonAPI.CatchUpSnapshot(projects: projects, agents: agents, permissions: permissions ?? [],
+            return DaemonAPI.CatchUpSnapshot(folders: folders, agents: agents, permissions: permissions ?? [],
                                              elicitations: elicitations ?? [],
                                              attention: attention ?? DaemonAPI.AttentionPending(needs: [], deliveries: []),
                                              resuming: resuming?.agentIDs ?? [])
@@ -117,7 +117,7 @@ public extension DaemonClient {
 
 // MARK: What a client catches up on
 
-/// What a page shows beyond the project list and the open chat, fetched when a page that
+/// What a page shows beyond the folder list and the open chat, fetched when a page that
 /// shows it opens rather than on every connection (#175).
 public enum CatchUpPart: String, CaseIterable, Codable, Sendable, Hashable {
     case workflows
@@ -214,18 +214,18 @@ public struct OnScreenParts: Sendable {
 
 public enum ClientHolding {
     /// Of the archived agents held, the ones no screen can show any more: anything
-    /// outside the open project, unless it is the open chat. An Archived fold or a
+    /// outside the open folder, unless it is the open chat. An Archived fold or a
     /// workflow's runs fetched them for a page, and that page has gone.
-    public static func archivedToLetGo(_ agents: [Agent], project: URL?, chat: UUID?) -> [UUID] {
-        archivedToLetGo(agents, projects: project.map { [$0] } ?? [], chat: chat)
+    public static func archivedToLetGo(_ agents: [Agent], folder: URL?, chat: UUID?) -> [UUID] {
+        archivedToLetGo(agents, folders: folder.map { [$0] } ?? [], chat: chat)
     }
 
-    /// The same, where several projects can show their archived sessions at once: the
-    /// open project and each open Archived fold of the Remote's sidebar (#226).
-    public static func archivedToLetGo(_ agents: [Agent], projects: Set<URL>, chat: UUID?) -> [UUID] {
-        let projects = Set(projects.map(Project.standardize))
+    /// The same, where several folders can show their archived sessions at once: the
+    /// open folder and each open Archived fold of the Remote's sidebar (#226).
+    public static func archivedToLetGo(_ agents: [Agent], folders: Set<URL>, chat: UUID?) -> [UUID] {
+        let folders = Set(folders.map(Folder.standardize))
         return agents.filter { agent in
-            agent.state == .archived && agent.id != chat && !projects.contains(Project.standardize(agent.projectFolder))
+            agent.state == .archived && agent.id != chat && !folders.contains(Folder.standardize(agent.folderPath))
         }.map(\.id)
     }
 }

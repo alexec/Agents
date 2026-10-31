@@ -4,3 +4,4 @@ export * from "../src/wire/bytes";
 export * from "../src/wire/code";
 export * from "../src/wire/keys";
 export * from "../src/wire/link";
+export * from "../src/wire/signIn";

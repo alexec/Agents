@@ -88,12 +88,12 @@ struct BlockTests {
         let a = Wait(agentID: UUID(), nameAtReport: "Fix login",
                      ending: WaitEnding(at: Self.now, how: .finished(outcome: .done, message: "Fixed.")))
         let b = Wait(agentID: UUID(), nameAtReport: "Docs",
-                     ending: WaitEnding(at: Self.now, how: .finished(outcome: .stuck, message: "No folder.")))
+                     ending: WaitEnding(at: Self.now, how: .finished(outcome: .needsAnswer, message: "No folder.")))
         let text = Block(waits: [a, b]).resumePrompt(message: "the two helpers", name: \.nameAtReport,
                                                      why: .waits)
         #expect(text.contains("every agent you were waiting on has finished"))
         #expect(text.contains("\u{201C}Fix login\u{201D} (id \(a.agentID.uuidString)): finished: complete — Fixed."))
-        #expect(text.contains("\u{201C}Docs\u{201D} (id \(b.agentID.uuidString)): finished: stuck — No folder."))
+        #expect(text.contains("\u{201C}Docs\u{201D} (id \(b.agentID.uuidString)): finished: waiting on your answer — No folder."))
         #expect(text.contains("You said you were waiting on: the two helpers"))
     }
 

@@ -52,6 +52,7 @@ export function describedAs(call: ToolCall): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
+
 /** ToolCall.line: the description where the agent wrote one, else the runtime's title. */
 export function callLine(call: ToolCall): string {
   const input = call.rawInput;
@@ -145,7 +146,7 @@ function entryIsPassing(entry: TranscriptEntry): boolean {
 const knownKinds = new Set(["userMessage", "agentMessage", "agentThought", "toolCall", "toolCallUpdate", "planUpdated",
   "usageRecorded", "servedRequest", "elicitationAsked", "elicitationAnswered", "compaction", "notice", "permissionAsked",
   "permissionAnswered", "optionChanged", "stateChanged", "background", "workReported", "runtimeNote", "poolSwitch",
-  "sandboxFailure", "handoff", "settingsChanged", "fileShown"]);
+  "sandboxFailure", "handoff", "settingsChanged", "fileShown", "notified"]);
 
 function isDrawn(item: Item): boolean {
   return item.kind === "run" || knownKinds.has(kindOf(item.entry));
@@ -227,8 +228,8 @@ function withoutRetried(text: string, all: boolean): string | undefined {
 }
 
 /** TranscriptEntry.carriesOn: the agent going on with its work. */
-const carriesOnKinds = new Set(["agentMessage", "agentThought", "toolCall", "toolCallUpdate", "appView", "fileShown", "planUpdated",
-  "permissionAsked", "elicitationAsked"]);
+const carriesOnKinds = new Set(["agentMessage", "agentThought", "toolCall", "toolCallUpdate", "appView", "fileShown", "notified",
+  "planUpdated", "permissionAsked", "elicitationAsked"]);
 
 /** TranscriptEntry.endsTheWork: the person spoke, or the agent ended. */
 function endsTheWork(entry: TranscriptEntry): boolean {
@@ -260,6 +261,8 @@ export class DisplayBuilder {
   private closedRunAt = new Map<string, number>();
   /** Where each view is (#187), by its call's id: drawn once, where the call began. */
   private viewAt = new Map<string, number>();
+  /** Where each notice's line is (#2860), by its entry's id: where it went is said on it. */
+  private noticeAt = new Map<string, number>();
   private last: TranscriptEntry | undefined;
   /** How much of `drawn` is past the agent carrying on (#394). */
   private settled = 0;
@@ -315,11 +318,24 @@ export class DisplayBuilder {
       this.drawn.push({ kind: "entry", id: entry.id, entry });
       return;
     }
-    if (kind === "fileShown") {
-      // The card stands on its own, after the run that called it (#836).
+    if (kind === "fileShown" || kind === "notified") {
+      // The card stands on its own, after the run that called it (#836); so does what
+      // the agent told the person (#2805).
       this.closeRun();
       this.resolveRetried();
+      if (kind === "notified") this.noticeAt.set(entry.id, this.drawn.length);
       this.drawn.push({ kind: "entry", id: entry.id, entry });
+      return;
+    }
+    const delivered = fields(entry, "noticeDelivered");
+    if (delivered) {
+      // Said on the notice's line (#2860), never a line of its own.
+      const at = this.noticeAt.get(delivered._0.notice);
+      const line = at === undefined ? undefined : this.drawn[at];
+      const notice = line?.kind === "entry" ? fields(line.entry, "notified") : undefined;
+      if (at !== undefined && line?.kind === "entry" && notice) {
+        this.drawn[at] = { kind: "entry", id: line.id, entry: { ...line.entry, kind: { notified: { _0: { ...notice._0, to: delivered._0.to } } } } };
+      }
       return;
     }
     const compaction = fields(entry, "compaction");
@@ -509,6 +525,8 @@ export function isOutcome(item: Item): boolean {
   if (kind === "appView") return true;
   // So is a file shown (#836): the chart or the page is what the work made.
   if (kind === "fileShown") return true;
+  // And what the agent told the person (#2805): why a notification opened this chat.
+  if (kind === "notified") return true;
   const state = fields(item.entry, "stateChanged");
   if (state) return state._0 === "stopped";
   // Where a branch was cut (#1749): drawn at every level, after the reply it keeps.
@@ -545,7 +563,23 @@ export interface ChatTurn {
   range?: { start: number; end: number };
 }
 
-/** The page cut into turns, one at each thing the person typed. */
+/**
+ * startsTurn(after:): the person's ask starts a turn, and so does the app's prompt that brings the
+ * answer to a form left open (#1641), so the answer is drawn at the end of the turn that asked
+ * (#2934). `before` is the last item ahead that is not aside.
+ */
+export function startsTurn(item: Item, before: Item | undefined): boolean {
+  if (isPersonsAsk(item)) return true;
+  if (item.kind !== "entry" || fields(item.entry, "userMessage")?.from !== "app") return false;
+  return before?.kind === "entry" && kindOf(before.entry) === "elicitationAnswered";
+}
+
+/** A state change or a passing line: what lies between a form's answer and the prompt that brings it. */
+function isAside(item: Item): boolean {
+  return (item.kind === "entry" && kindOf(item.entry) === "stateChanged") || isPassing(item);
+}
+
+/** The page cut into turns, one at each thing the person typed and at a late form answer's prompt. */
 export function turns(items: readonly Item[]): ChatTurn[] {
   const result: ChatTurn[] = [];
   let current: Item[] = [];
@@ -555,13 +589,15 @@ export function turns(items: readonly Item[]): ChatTurn[] {
     const ask = isPersonsAsk(first) ? first : undefined;
     result.push({ id: first.id, ...(ask ? { ask } : {}), items: current.slice(ask ? 1 : 0) });
   };
+  let before: Item | undefined;
   for (const item of items) {
-    if (isPersonsAsk(item)) {
+    if (startsTurn(item, before)) {
       close();
       current = [item];
     } else {
       current.push(item);
     }
+    if (!isAside(item)) before = item;
   }
   close();
   return result;
@@ -633,7 +669,8 @@ export interface TurnParts {
 
 /** TurnParts(items, isLive:). */
 export function turnParts(items: readonly Item[], isLive: boolean): TurnParts {
-  const shown = drawnInTurn(items, isLive).filter((item) => !isThought(item));
+  const drawn = drawnInTurn(items, isLive);
+  const shown = drawn.filter((item) => !isThought(item));
   const replied = new Set(reply(shown, isLive));
   const outcome: Item[] = [];
   const reports: Item[] = [];

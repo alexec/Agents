@@ -16,6 +16,7 @@ import (
 // person's window and machine are both at the other copy: the window is cut off, the
 // machine is gone, a code they made pairs nothing, and People no longer lists them.
 func TestARemovalIsInForceOnEveryCopyWithinFiveSeconds(t *testing.T) {
+	// Not parallel (#2512): it holds a wall-clock limit, which other tests running beside it would make flaky.
 	a, b := twoCopies(t)
 	_, ownerAtB := b.client("Owner's Mac at B")
 	sam := b.invite(ownerAtB, "Sam", wire.UserRoleMember)
@@ -59,6 +60,7 @@ func TestARemovalIsInForceOnEveryCopyWithinFiveSeconds(t *testing.T) {
 // their own machines; every call passed to a machine, and every control-plane method that
 // names one, reaches only the caller's own: another's is not found (FR-018).
 func TestNoRequestReachesAnotherUsersMachineAtSpecScale(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("30 machines")
 	}

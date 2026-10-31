@@ -3,25 +3,25 @@ import AppKit
 import SwiftUI
 
 /// Where a set of instructions, skills, MCP servers and plugins lives.
-/// Yours is `~/.agents`. A project's is `<project>/.agents`, except instructions,
-/// which are the project's `AGENTS.md` (the file agents read first).
+/// Yours is `~/.agents`. A folder's is `<folder>/.agents`, except instructions,
+/// which are the folder's `AGENTS.md` (the file agents read first).
 enum AgentsPlace: Equatable {
     case you
-    case project(URL)
+    case folder(URL)
 
     var destination: DaemonAPI.SkillDestination {
         switch self {
         case .you: .personal
-        case .project(let folder): .project(folder: folder.path)
+        case .folder(let folder): .folder(folder: folder.path)
         }
     }
 
     var explainer: String {
         switch self {
         case .you:
-            "Yours, in ~/.agents. Every agent you start gets them, in every project."
-        case .project:
-            "This project's, in its .agents folder. It is committed, so everyone who clones the project gets it. Secrets stay in your own secrets.env."
+            "Yours, in ~/.agents. Every agent you start gets them, in every folder."
+        case .folder:
+            "This folder's, in its .agents folder. It is committed, so everyone who clones the folder gets it. Secrets stay in your own secrets.env."
         }
     }
 
@@ -29,15 +29,15 @@ enum AgentsPlace: Equatable {
         switch self {
         case .you:
             "In ~/.agents/mcp.json. A secret is named here and kept in ~/.agents-secrets/secrets.env."
-        case .project:
-            "In .agents/mcp.json, committed with the project. Secrets aren't: it names them, and each person sets their own."
+        case .folder:
+            "In .agents/mcp.json, committed with the folder. Secrets aren't: it names them, and each person sets their own."
         }
     }
 
     var skillsNote: String {
         switch self {
         case .you: "In ~/.agents/skills. Every agent you start has these."
-        case .project: "In .agents/skills, committed with the project. Everyone who clones it gets these."
+        case .folder: "In .agents/skills, committed with the folder. Everyone who clones it gets these."
         }
     }
 }
@@ -64,9 +64,9 @@ struct AgentsInstructionsSection: View {
     @State private var text = ""
     @State private var exists = false
 
-    /// Whose disk the file is on: this Mac's host for yours, the project's host for a project's.
-    private var host: HostID {
-        if case .project = place { return model.selectedProjectHost }
+    /// Whose disk the file is on: this Mac's host for yours, the folder's host for a folder's.
+    private var host: MachineRef {
+        if case .folder = place { return model.selectedFolderHost }
         return .mac
     }
 
@@ -108,8 +108,8 @@ struct AgentsInstructionsSection: View {
         switch place {
         case .you:
             "Your AGENTS.md in ~/.agents. The app links it into the file each runtime reads."
-        case .project:
-            "AGENTS.md at the top of the project. Agents read it first."
+        case .folder:
+            "AGENTS.md at the top of the folder. Agents read it first."
         }
     }
 
@@ -123,7 +123,7 @@ struct AgentsInstructionsSection: View {
 
     private func resolvedPath() async -> String {
         switch place {
-        case .project(let folder):
+        case .folder(let folder):
             return folder.appending(path: "AGENTS.md").path
         case .you:
             guard let snapshot = await model.sharedSnapshot() else { return "" }
@@ -136,7 +136,7 @@ struct AgentsInstructionsSection: View {
         let url = URL(filePath: path)
         let starter = switch place {
         case .you: "# Personal instructions\n\nHow you like to work, for every agent the app starts.\n"
-        case .project: "# Project instructions\n\nHow to work in this project.\n"
+        case .folder: "# Folder instructions\n\nHow to work in this folder.\n"
         }
         if await model.saveText(starter, to: url, on: host, onlyIfAbsent: true) {
             exists = true
@@ -170,7 +170,7 @@ struct AgentsSkillsSection: View {
             Text(place.skillsNote)
                 .appText(.fine).foregroundStyle(.secondary)
             if skills.isEmpty {
-                Text(place == .you ? "No skills of your own yet." : "No skills in this project yet.")
+                Text(place == .you ? "No skills of your own yet." : "No skills in this folder yet.")
                     .appText(.supporting).foregroundStyle(.secondary)
                     .padding(.horizontal, 16).padding(.vertical, 13)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -261,7 +261,7 @@ private struct SetupSkillRow: View {
         } message: {
             Text(place == .you
                  ? "No agent you start will have it after that. You can take it back out of the Trash."
-                 : "Agents in this project won't have it after that. The removal shows in the project's changes, uncommitted.")
+                 : "Agents in this folder won't have it after that. The removal shows in the folder's changes, uncommitted.")
         }
     }
 
@@ -280,7 +280,7 @@ struct AgentsPluginsSection: View {
 
     var body: some View {
         switch place {
-        case .project(let folder):
+        case .folder(let folder):
             PluginsSection(folder: folder, showsEmptyState: true)
         case .you:
             YourPluginsSection()

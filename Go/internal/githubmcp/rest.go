@@ -29,7 +29,8 @@ type RealGitHub struct {
 	Token  func() string
 	Client *http.Client
 	// Repo is the repo the server's folder pushes to, read from git once it is needed.
-	Repo func(ctx context.Context) (string, error)
+	Repo        func(ctx context.Context) (string, error)
+	IssueReader IssueReader
 
 	mu        sync.Mutex
 	etags     map[string]etagged
@@ -68,15 +69,19 @@ const (
 )
 
 // NewRealGitHub reads api (https://api.github.com/ when empty) with token's answer.
-func NewRealGitHub(api string, token func() string, repo func(ctx context.Context) (string, error)) *RealGitHub {
+func NewRealGitHub(api string, token func() string, repo func(ctx context.Context) (string, error), issueReader ...IssueReader) *RealGitHub {
 	if api == "" {
 		api = "https://api.github.com/"
 	}
 	if !strings.HasSuffix(api, "/") {
 		api += "/"
 	}
-	return &RealGitHub{API: api, Token: token, Repo: repo, Client: &http.Client{Timeout: 30 * time.Second},
+	g := &RealGitHub{API: api, Token: token, Repo: repo, Client: &http.Client{Timeout: 30 * time.Second},
 		etags: map[string]etagged{}, recent: map[string]sharedBody{}, running: map[string]*fetch{}, sharing: sharedFor}
+	if len(issueReader) > 0 {
+		g.IssueReader = issueReader[0]
+	}
+	return g
 }
 
 // MARK: HTTP
@@ -329,10 +334,11 @@ type pull struct {
 	MergedAt    *string `json:"merged_at"`
 	ClosedAt    *string `json:"closed_at"`
 	MergeSHA    string  `json:"merge_commit_sha"`
+	Body        string  `json:"body"`
 }
 
 func (p pull) pr() PR {
-	return PR{Number: p.Number, Title: p.Title, Branch: p.Head.Ref, URL: p.HTMLURL}
+	return PR{Number: p.Number, Title: p.Title, Branch: p.Head.Ref, URL: p.HTMLURL, Fixes: closingRefs(p.Body)}
 }
 
 // trusted says whether the PR is the repo's own: its branch in repo, not a fork, and its
@@ -344,6 +350,8 @@ func (p pull) trusted(repo string) bool {
 
 type label struct {
 	Name string `json:"name"`
+	// Color is GitHub's 6-digit hex, without the # (#2686).
+	Color string `json:"color"`
 }
 
 type issueJSON struct {
@@ -353,12 +361,25 @@ type issueJSON struct {
 	User        user            `json:"user"`
 	Association string          `json:"author_association"`
 	Labels      []label         `json:"labels"`
+	State       string          `json:"state"`
 	Assignees   []user          `json:"assignees"`
 	CreatedAt   string          `json:"created_at"`
 	StateReason string          `json:"state_reason"`
 	PullRequest json.RawMessage `json:"pull_request"`
 	Comments    int             `json:"comments"`
 	UpdatedAt   string          `json:"updated_at"`
+	Milestone   *issueMilestone `json:"milestone"`
+}
+
+type issueMilestone struct {
+	Title string `json:"title"`
+}
+
+func (m *issueMilestone) title() string {
+	if m == nil {
+		return ""
+	}
+	return m.Title
 }
 
 func (i issueJSON) isPR() bool { return len(i.PullRequest) > 0 && string(i.PullRequest) != "null" }
@@ -617,6 +638,107 @@ func (g *RealGitHub) ConflictPRs(ctx context.Context, repo string) ([]ConflictPR
 		out = append(out, c)
 	}
 	return out, nil
+}
+
+// yoursQuery is the connection's owner and, in one repo, their open PRs, the open PRs that ask
+// them for a review, and the open issues assigned to them (#2034): GitHub's search, as @me.
+const yoursQuery = `query($mine: String!, $reviews: String!, $assigned: String!) { viewer { login }
+  mine: search(query: $mine, type: ISSUE, first: 100) { nodes { ... on PullRequest { number } } }
+  reviews: search(query: $reviews, type: ISSUE, first: 100) { nodes { ... on PullRequest {
+    number title headRefName url author { login } } } }
+  assigned: search(query: $assigned, type: ISSUE, first: 100) { nodes { ... on Issue {
+    number title url author { login } labels(first: 20) { nodes { name } } assignees(first: 10) { nodes { login } } } } } }`
+
+func (g *RealGitHub) Yours(ctx context.Context, repo string) (Yours, error) {
+	in := "repo:" + repo + " is:open "
+	request, _ := json.Marshal(map[string]any{"query": yoursQuery, "variables": map[string]string{
+		"mine": in + "is:pr author:@me", "reviews": in + "is:pr review-requested:@me", "assigned": in + "is:issue assignee:@me"}})
+	body, err := g.shared("graphql yours "+repo, func() ([]byte, error) {
+		return g.do(ctx, http.MethodPost, "graphql", request, false)
+	})
+	if err != nil {
+		return Yours{}, err
+	}
+	type login struct {
+		Login string `json:"login"`
+	}
+	var answer struct {
+		Data struct {
+			Viewer login `json:"viewer"`
+			Mine   struct {
+				Nodes []struct {
+					Number int `json:"number"`
+				} `json:"nodes"`
+			} `json:"mine"`
+			Reviews struct {
+				Nodes []struct {
+					Number      int    `json:"number"`
+					Title       string `json:"title"`
+					HeadRefName string `json:"headRefName"`
+					URL         string `json:"url"`
+					Author      *login `json:"author"`
+				} `json:"nodes"`
+			} `json:"reviews"`
+			Assigned struct {
+				Nodes []struct {
+					Number int    `json:"number"`
+					Title  string `json:"title"`
+					URL    string `json:"url"`
+					Author *login `json:"author"`
+					Labels struct {
+						Nodes []struct {
+							Name string `json:"name"`
+						} `json:"nodes"`
+					} `json:"labels"`
+					Assignees struct {
+						Nodes []login `json:"nodes"`
+					} `json:"assignees"`
+				} `json:"nodes"`
+			} `json:"assigned"`
+		} `json:"data"`
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if json.Unmarshal(body, &answer) != nil {
+		return Yours{}, &GitHubError{Kind: Failed, Message: "GitHub's answer is not JSON"}
+	}
+	if len(answer.Errors) > 0 {
+		return Yours{}, &GitHubError{Kind: Failed, Message: "GitHub: " + answer.Errors[0].Message}
+	}
+	y := Yours{Login: answer.Data.Viewer.Login}
+	for _, n := range answer.Data.Mine.Nodes {
+		if n.Number > 0 {
+			y.PRs = append(y.PRs, n.Number)
+		}
+	}
+	for _, n := range answer.Data.Reviews.Nodes {
+		if n.Number == 0 {
+			continue
+		}
+		r := OpenPR{PR: PR{Number: n.Number, Title: n.Title, Branch: n.HeadRefName, URL: n.URL}}
+		if n.Author != nil {
+			r.Author = n.Author.Login
+		}
+		y.Reviews = append(y.Reviews, r)
+	}
+	for _, n := range answer.Data.Assigned.Nodes {
+		if n.Number == 0 {
+			continue
+		}
+		i := Issue{Number: n.Number, Title: n.Title, URL: n.URL, Labels: []string{}, Assignees: []string{}}
+		if n.Author != nil {
+			i.Author = n.Author.Login
+		}
+		for _, l := range n.Labels.Nodes {
+			i.Labels = append(i.Labels, l.Name)
+		}
+		for _, a := range n.Assignees.Nodes {
+			i.Assignees = append(i.Assignees, a.Login)
+		}
+		y.Assigned = append(y.Assigned, i)
+	}
+	return y, nil
 }
 
 // newest pages path (newest first) until an item older than since by its time.

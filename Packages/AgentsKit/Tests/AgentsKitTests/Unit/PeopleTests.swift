@@ -32,7 +32,7 @@ struct PeopleTests {
         #expect(PeopleWords.canRemove(sam))
         #expect(PeopleWords.removeMessage(sam) == "Sam can no longer reach the control plane. They have no clients and no machines.")
         sam.clients = [.init(id: UUID(), name: "Sam’s iPhone", kind: .iPhone)]
-        sam.machines = [.init(id: HostID(rawValue: "h1"), name: "studio", state: "offline")]
+        sam.machines = [.init(id: MachineRef(rawValue: "h1"), name: "studio", state: "offline")]
         #expect(PeopleWords.removeMessage(sam)
             == "Sam can no longer reach the control plane. These clients are forgotten: Sam’s iPhone. These machines leave the control plane: studio.")
         #expect(PeopleWords.badges(sam) == "Member")
@@ -42,10 +42,10 @@ struct PeopleTests {
     /// not pushed, and the others leave. It reads as the control plane writes it.
     @Test func removingSaysWhatWorkIsNotPushed() throws {
         var sam = DaemonAPI.PersonRow(id: "sam", name: "Sam", role: .member)
-        sam.machines = [.init(id: HostID(rawValue: "h1"), name: "studio", state: "online")]
+        sam.machines = [.init(id: MachineRef(rawValue: "h1"), name: "studio", state: "online")]
         let line = #"{"startedMachines":[{"host":"w1","name":"sam-ws","state":"online","unpushed":["#
-            + #"{"project":"file:///p","worktree":"file:///p-fix","branch":"agents/fix","ahead":2,"uncommitted":3},"#
-            + #"{"project":"file:///p","worktree":"file:///p-new","unmerged":1}]},"#
+            + #"{"folder":"file:///p","worktree":"file:///p-fix","branch":"agents/fix","ahead":2,"uncommitted":3},"#
+            + #"{"folder":"file:///p","worktree":"file:///p-new","unmerged":1}]},"#
             + #"{"host":"w2","name":"sam-old","state":"offline","unpushed":[],"unknown":"sam-old is not online, so it could not be asked."}],"#
             + #""registeredMachines":[{"id":"h1","name":"studio","state":"online"}]}"#
         let preview = try JSONDecoder().decode(DaemonAPI.PersonRemovePreview.self, from: Data(line.utf8))
@@ -55,6 +55,10 @@ struct PeopleTests {
             + "p-new (1 commit never pushed). sam-old is not online, so it could not be asked. "
             + "These machines leave the control plane: studio.")
         #expect(PeopleWords.asking(sam) == "Asking Sam’s machines what work on them is not pushed…")
+        // A check that failed says what is at stake, and Remove stays off (#2193).
+        #expect(PeopleWords.checkFailed(sam, why: "The control plane can’t be reached.")
+            == "Could not check what Sam’s machines would lose. The control plane can’t be reached. Removing Sam stops and "
+            + "deletes the machines Sam started, with any work on them not pushed, so Remove stays off until the check works.")
         // Remove…'s sheet: a line each, a machine to a line (#2077).
         let lines = PeopleWords.removeLines(sam, preview: preview)
         try #require(lines.count == 5)
@@ -140,5 +144,35 @@ struct ChannelLinkWordsTests {
         #expect(queue.open().count == 1)
         queue.remove("r")
         #expect(queue.open().isEmpty)
+    }
+
+    /// The org provider lines under a person (#1002, FR-028).
+    @Test func orgLinesSayWhoManagesAPerson() throws {
+        let json = #"{"id":"u1","name":"Sam","kind":"person","role":"admin","signIns":[],"clients":[],"machines":[],"#
+            + #""scim":{"provider":"acme-okta","userName":"sam@acme.com","active":false},"provisioned":true,"#
+            + #""suspended":{"by":"scim","provider":"acme-okta","at":"2026-10-22T09:00:00Z"},"roleFrom":["g1"]}"#
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let sam = try decoder.decode(DaemonAPI.PersonRow.self, from: Data(json.utf8))
+        let names = ["acme-okta": "Acme Okta"]
+        #expect(PeopleWords.orgLines(sam) { names[$0] ?? $0 }
+            == ["Managed by Acme Okta", "Waiting for first sign-in", "Suspended by Acme Okta"])
+        #expect(sam.roleSetBy == "acme-okta")
+        #expect(PeopleWords.setBy("Acme Okta") == "Set by Acme Okta")
+        let lee = DaemonAPI.PersonRow(id: "u2", name: "Lee", role: .member)
+        #expect(PeopleWords.orgLines(lee) { $0 }.isEmpty && lee.roleSetBy == nil)
+    }
+
+    @Test func editInConsoleOpensConsolePeople() throws {
+        let json = #"{"name":"Team","version":"1","machineID":"m","publicWeb":"https://control.example.com/"}"#
+        let status = try JSONDecoder().decode(DaemonAPI.ControlStatus.self, from: Data(json.utf8))
+        #expect(PeopleWords.consoleURL(status)?.absoluteString == "https://control.example.com/#/console/people")
+        // A SCIM group's line on the Mac and the Remote (#1002, FR-031).
+        let scim = DaemonAPI.Group(id: "g", name: "Admins", source: .init(scim: "acme", displayName: "Admins"), role: "admin")
+        #expect(GroupWords.orgLine(scim, provider: "Acme Okta") == "From Acme Okta · Gives the admin role")
+        #expect(GroupWords.orgLine(DaemonAPI.Group(id: "h", name: "Eng", source: .init(scim: "acme", displayName: "Eng")),
+                                   provider: "Acme Okta") == "From Acme Okta")
+        // The providers' Edit in Console opens Console ▸ Sign-In (#1002, D17).
+        #expect(PeopleWords.signInConsoleURL(status)?.absoluteString == "https://control.example.com/#/console/signIn")
     }
 }

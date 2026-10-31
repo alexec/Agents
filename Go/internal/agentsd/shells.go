@@ -126,19 +126,19 @@ func (s *shell) resize(rows, cols *int64) {
 	}
 }
 
-// shellFolder: an agent's folder, or a project's for the project shell (Control-`), whose
+// shellFolder: an agent's folder, or a folder's for the folder shell (Control-`), whose
 // id the window makes from the folder and this host takes as given.
 func (d *Daemon) shellFolder(r wire.ShellAttachRequest) (string, error) {
 	if a := d.Store.Agent(wire.UUID(strings.ToUpper(string(r.AgentID)))); a != nil {
 		return store.FolderPath(a.Cwd), nil
 	}
 	if r.Folder != nil && *r.Folder != "" {
-		for _, p := range d.Store.Projects() {
+		for _, p := range d.Store.Folders() {
 			if store.FolderPath(p.Folder) == store.FolderPath(*r.Folder) {
 				return store.FolderPath(p.Folder), nil
 			}
 		}
-		return "", &Error{Code: -32005, Message: "There is no such project here."}
+		return "", &Error{Code: -32005, Message: "There is no such folder here."}
 	}
 	return "", &Error{Code: -32005, Message: "There is no such agent."}
 }
@@ -172,6 +172,10 @@ func (s *shell) replay(since *int64, startedAt *wire.Date) wire.ShellAttachRespo
 }
 
 func (d *Daemon) openShell(r wire.ShellAttachRequest, number int64) (*shell, error) {
+	// A machine that must join its control plane, and has not, opens no shell (#998, FR-028).
+	if err := d.pinRefusal(); err != nil {
+		return nil, err
+	}
 	folder, err := d.shellFolder(r)
 	if err != nil {
 		return nil, err

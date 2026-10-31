@@ -3,9 +3,11 @@ package githubmcp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -18,13 +20,15 @@ import (
 
 const boardAnswer = `{"data":{"viewer":{"login":"alexec"},"repository":{"pullRequests":{"nodes":[
  {"number":7,"title":"Fix the mean","url":"https://github.com/o/r/pull/7","headRefName":"fix-mean","baseRefName":"main",
-  "isDraft":false,"updatedAt":"2026-10-18T10:00:00Z","mergeable":"CONFLICTING","reviewDecision":"CHANGES_REQUESTED",
+  "isDraft":false,"updatedAt":"2026-10-18T10:00:00Z","mergeable":"CONFLICTING","reviewDecision":"CHANGES_REQUESTED","authorAssociation":"COLLABORATOR",
   "author":{"login":"sam","__typename":"User"},"autoMergeRequest":null,
+  "reviewRequests":{"nodes":[{"requestedReviewer":{}},{"requestedReviewer":{"login":"alexec"}}]},
+  "labels":{"nodes":[{"name":"needs-approval","color":"FBCA04"},{"name":"odd","color":"red"}]},
   "commits":{"nodes":[{"commit":{"statusCheckRollup":{"contexts":{"nodes":[
    {"__typename":"CheckRun","name":"test","status":"COMPLETED","conclusion":"FAILURE","detailsUrl":"https://github.com/o/r/actions/runs/99/job/1"},
    {"__typename":"StatusContext","context":"CodeRabbit","state":"SUCCESS","targetUrl":""}]}}}}]}},
  {"number":8,"title":"Docs","url":"https://github.com/o/r/pull/8","headRefName":"docs","baseRefName":"main",
-  "isDraft":true,"updatedAt":"2026-10-18T09:00:00Z","mergeable":"MERGEABLE","reviewDecision":null,
+  "isDraft":true,"updatedAt":"2026-10-18T09:00:00Z","mergeable":"MERGEABLE","reviewDecision":null,"authorAssociation":"OWNER",
   "author":{"login":"alexec","__typename":"User"},"autoMergeRequest":{"enabledAt":"2026-10-18T09:00:00Z"},
   "commits":{"nodes":[{"commit":{"statusCheckRollup":{"contexts":{"nodes":[
    {"__typename":"CheckRun","name":"test","status":"IN_PROGRESS","conclusion":null,"detailsUrl":""}]}}}}]}}]}}}}`
@@ -33,6 +37,7 @@ const pageAnswer = `{"data":{"viewer":{"login":"alexec"},"repository":{"pullRequ
  "number":7,"title":"Fix the mean","url":"https://github.com/o/r/pull/7","headRefName":"fix-mean","headRefOid":"c0ffee","baseRefName":"main",
  "state":"OPEN","isDraft":false,"body":"Divide by the count.","createdAt":"2026-10-18T08:00:00Z","additions":3,"deletions":1,
  "mergeable":"MERGEABLE","reviewDecision":"REVIEW_REQUIRED","author":{"login":"sam","__typename":"User"},"autoMergeRequest":null,
+ "labels":{"nodes":[{"name":"approved","color":"0e8a16"}]},
  "files":{"totalCount":1,"nodes":[{"path":"average.py","additions":3,"deletions":1,"changeType":"MODIFIED"}]},
  "comments":{"nodes":[{"author":{"login":"coderabbitai","__typename":"Bot"},"body":"<!-- This is an auto-generated comment: summarize by coderabbit.ai -->\n## Walkthrough","createdAt":"2026-10-18T08:05:00Z","url":"u1"}]},
  "reviews":{"nodes":[
@@ -51,6 +56,8 @@ type viewsAPI struct {
 	posted []string
 	// sent is each write's method, path and body.
 	sent []string
+	// queries records each GET's raw query and each GraphQL request body.
+	queries []string
 }
 
 func (a *viewsAPI) sentText() string {
@@ -64,6 +71,11 @@ func (a *viewsAPI) serve(t *testing.T) *httptest.Server {
 		body, _ := io.ReadAll(r.Body)
 		a.mu.Lock()
 		a.calls = append(a.calls, r.Method+" "+r.URL.Path)
+		if r.Method == http.MethodGet {
+			a.queries = append(a.queries, r.URL.RawQuery)
+		} else if r.URL.Path == "/graphql" {
+			a.queries = append(a.queries, string(body))
+		}
 		if r.Method != http.MethodGet && !strings.HasPrefix(string(body), `{"query":"query`) {
 			a.sent = append(a.sent, r.Method+" "+r.URL.Path+" "+string(body))
 		}
@@ -75,10 +87,24 @@ func (a *viewsAPI) serve(t *testing.T) *httptest.Server {
 			io.WriteString(w, `{"data":{"enablePullRequestAutoMerge":{"pullRequest":{"number":7}}}}`)
 		case r.URL.Path == "/graphql" && strings.Contains(string(body), "pullRequest(number"):
 			io.WriteString(w, pageAnswer)
+		case r.URL.Path == "/user":
+			io.WriteString(w, `{"login":"alexec","type":"User"}`)
 		case r.URL.Path == "/repos/o/r/issues":
 			io.WriteString(w, `[{"number":3,"title":"Mean is off by one","html_url":"https://github.com/o/r/issues/3","user":{"login":"kim"},
-			  "labels":[{"name":"bug"}],"assignees":[{"login":"sam"}],"comments":2,"updated_at":"2026-10-18T07:00:00Z"},
+			  "labels":[{"name":"bug","color":"D73A4A"},{"name":"odd","color":"red"}],"assignees":[{"login":"sam"},{"login":"AlexEC"}],"comments":2,"updated_at":"2026-10-18T07:00:00Z",
+			  "milestone":{"title":"0.13 Lineage and value"}},
+			 {"number":4,"title":"No milestone yet","html_url":"https://github.com/o/r/issues/4","user":{"login":"dependabot[bot]","type":"Bot"},
+			  "labels":[],"assignees":[],"comments":0,"updated_at":"2026-10-18T07:00:00Z"},
 			 {"number":7,"title":"a PR","pull_request":{"url":"x"}}]`)
+		case r.URL.Path == "/search/issues":
+			io.WriteString(w, `{"total_count":2,"items":[{"number":9,"title":"Old mean bug","html_url":"https://github.com/o/r/issues/9",
+			  "user":{"login":"kim"},"labels":[{"name":"bug","color":"d73a4a"}],"assignees":[]},
+			 {"number":3,"title":"Mean is off by one","html_url":"https://github.com/o/r/issues/3","user":{"login":"kim"},"labels":[]}]}`)
+		case r.URL.Path == "/repos/o/r/issues/3":
+			io.WriteString(w, `{"number":3,"title":"Mean is off by one","state":"open","html_url":"https://github.com/o/r/issues/3",
+			  "user":{"login":"kim"},"labels":[{"name":"bug","color":"d73a4a"}]}`)
+		case r.URL.Path == "/repos/o/r/issues/7":
+			io.WriteString(w, `{"number":7,"title":"a PR","state":"open","pull_request":{"url":"x"}}`)
 		case r.URL.Path == "/repos/o/r/pulls/7" && r.Method == http.MethodGet:
 			io.WriteString(w, `{"node_id":"PR_7","head":{"ref":"fix-mean","sha":"c0ffee","repo":{"full_name":"o/r"}}}`)
 		case r.URL.Path == "/repos/o/r/pulls/7/merge" && r.Method == http.MethodPut:
@@ -115,6 +141,68 @@ func (a *viewsAPI) serve(t *testing.T) *httptest.Server {
 	return s
 }
 
+func TestTheListsAskForNewestCreatedFirst(t *testing.T) {
+	c, api := viewsClient(t)
+	callTool(t, c, "show_pull_requests", map[string]any{})
+	callTool(t, c, "show_issues", map[string]any{"repo": "o/r"})
+
+	api.mu.Lock()
+	queries := append([]string(nil), api.queries...)
+	api.mu.Unlock()
+	board, issues := "", ""
+	for _, q := range queries {
+		if strings.Contains(q, `"query":"query`) && strings.Contains(q, "pullRequests(states: OPEN") {
+			board = q
+		}
+		if strings.Contains(q, "sort=created") {
+			issues = q
+		}
+	}
+	if !strings.Contains(board, "orderBy: {field: CREATED_AT, direction: DESC}") || strings.Contains(board, "UPDATED_AT") {
+		t.Errorf("board query: %s", board)
+	}
+	if !strings.Contains(issues, "sort=created") || !strings.Contains(issues, "direction=desc") || strings.Contains(issues, "sort=updated") {
+		t.Errorf("issues query: %s", issues)
+	}
+
+	tools, err := c.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"show_pull_requests", "show_issues"} {
+		found := false
+		for _, tool := range tools.Tools {
+			if tool.Name == name {
+				found = true
+				if !strings.Contains(tool.Description, "newest created first") {
+					t.Errorf("%s description: %s", name, tool.Description)
+				}
+			}
+		}
+		if !found {
+			t.Errorf("missing tool %s", name)
+		}
+	}
+	resources, err := c.ListResources(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, title := range []string{"Pull requests", "Issues"} {
+		found := false
+		for _, resource := range resources.Resources {
+			if resource.Title == title {
+				found = true
+				if !strings.Contains(resource.Description, "newest created first") {
+					t.Errorf("%s resource description: %s", title, resource.Description)
+				}
+			}
+		}
+		if !found {
+			t.Errorf("missing resource %s", title)
+		}
+	}
+}
+
 func viewsClient(t *testing.T) (*mcp.ClientSession, *viewsAPI) {
 	return viewsClientAs(t, true)
 }
@@ -124,7 +212,16 @@ func viewsClientAs(t *testing.T, person bool) (*mcp.ClientSession, *viewsAPI) {
 	t.Helper()
 	api := &viewsAPI{}
 	s := api.serve(t)
-	gh := NewRealGitHub(s.URL, func() string { return "token" }, func(context.Context) (string, error) { return "o/r", nil })
+	gh := NewRealGitHub(s.URL, func() string { return "token" }, func(context.Context) (string, error) { return "o/r", nil },
+		func(_ context.Context, owner, repo string, number int) (map[string]any, error) {
+			if owner != "o" || repo != "r" || number != 3 {
+				return nil, fmt.Errorf("unexpected issue lookup: %s/%s#%d", owner, repo, number)
+			}
+			return map[string]any{"number": 3, "body": "A description", "closed_by_pull_requests": map[string]any{
+				"total_count": 1, "references": []any{map[string]any{"number": 7, "title": "Fix the mean", "state": "MERGED",
+					"url": "https://github.com/o/r/pull/7", "repository": "o/r"}},
+			}}, nil
+		})
 	server := mcp.NewServer(&mcp.Implementation{Name: "github-mcp", Version: "test"}, nil)
 	AddViews(server, gh, person)
 	ct, st := mcp.NewInMemoryTransports()
@@ -185,6 +282,7 @@ func TestEachViewHasAToolThatFeedsItAndAPage(t *testing.T) {
 	}
 	visibility := map[string][]any{}
 	feeds := map[string]string{}
+	detailsReadOnly := false
 	for _, tool := range tools.Tools {
 		ui, _ := tool.Meta["ui"].(map[string]any)
 		visibility[tool.Name], _ = ui["visibility"].([]any)
@@ -194,12 +292,18 @@ func TestEachViewHasAToolThatFeedsItAndAPage(t *testing.T) {
 				t.Errorf("%s feeds a view but is not read-only, so it can't feed a pin", tool.Name)
 			}
 		}
+		if tool.Name == "show_issue_details" {
+			detailsReadOnly = tool.Annotations != nil && tool.Annotations.ReadOnlyHint
+		}
 	}
 	want := map[string]string{"show_pull_requests": pullsURI, "show_issues": issuesURI, "show_pull_request": prURI}
 	for name, uri := range want {
 		if feeds[name] != uri {
 			t.Errorf("%s feeds %q, not %s", name, feeds[name], uri)
 		}
+	}
+	if v := visibility["show_issue_details"]; !detailsReadOnly || len(v) != 2 || v[0] != "model" || v[1] != "app" {
+		t.Errorf("show_issue_details must be read-only and visible to the issue view and agent; visibility=%v", v)
 	}
 	// A person merges, reviews and comments from a page: no agent is offered those.
 	for _, name := range []string{"merge_pr", "review_pr", "comment_on_pr"} {
@@ -214,11 +318,29 @@ func TestEachViewHasAToolThatFeedsItAndAPage(t *testing.T) {
 		}
 		html := r.Contents[0].Text
 		if r.Contents[0].MIMEType != viewMime || !strings.HasPrefix(html, "<!doctype html>") ||
-			strings.Contains(html, "/*common.css*/") || strings.Contains(html, "/*bridge.js*/") || !strings.Contains(html, "const bridge") {
+			strings.Contains(html, "/*common.css*/") || strings.Contains(html, "/*bridge.js*/") || strings.Contains(html, "/*lineage.js*/") || !strings.Contains(html, "const bridge") {
 			t.Errorf("%s is not a whole page", uri)
+		}
+		// One label pill for every page (#2956).
+		if strings.Contains(html, "/*labels.js*/") || strings.Count(html, "const labelPill") != 1 {
+			t.Errorf("%s does not have the shared label pill once", uri)
+		}
+		if uri != issuesURI && !strings.Contains(html, "prLabels(ui, pr") {
+			t.Errorf("%s does not show a pull request's labels", uri)
 		}
 		if uri != issuesURI && !strings.Contains(html, "const prPage") {
 			t.Errorf("%s has no pull request page in it", uri)
+		}
+		if uri == issuesURI {
+			for _, want := range []string{"show_issue_details", "closed_by_pull_requests", "milestone", "aria-expanded", "issue-row",
+				"Add a label filter", "label-tags", "removeLabel", "Search issues", "labelColors", "query", "No open issues match"} {
+				if !strings.Contains(html, want) {
+					t.Errorf("issues page is missing %q", want)
+				}
+			}
+			if strings.Contains(html, "Show details") || strings.Contains(html, "Hide details") {
+				t.Error("issues page still has a details button")
+			}
 		}
 	}
 }
@@ -239,21 +361,118 @@ func TestThePullRequestsListSaysEachOnesState(t *testing.T) {
 		second["review"] != nil {
 		t.Errorf("#8: %v", second)
 	}
+	// #2453: a review asked of the viewer needs them; their own, with nothing wrong, is theirs.
+	if first["section"] != sectionNeedsYou || second["section"] != sectionYours || data["attention"] != 1.0 {
+		t.Errorf("sections: #7 %v, #8 %v, attention %v", first["section"], second["section"], data["attention"])
+	}
+	// #2956: each one's labels, and their colours; a colour that is not #rrggbb is none.
+	if l, _ := first["labels"].([]any); len(l) != 2 || l[0] != "needs-approval" || l[1] != "odd" {
+		t.Errorf("#7's labels: %v", first["labels"])
+	}
+	if l, ok := second["labels"].([]any); !ok || len(l) != 0 {
+		t.Errorf("#8's labels: %v", second["labels"])
+	}
+	if colors, _ := data["labelColors"].(map[string]any); len(colors) != 1 || colors["needs-approval"] != "#fbca04" {
+		t.Errorf("labelColors: %v", data["labelColors"])
+	}
 }
 
 func TestTheIssuesListLeavesOutPullRequests(t *testing.T) {
 	c, _ := viewsClient(t)
 	_, data := callTool(t, c, "show_issues", map[string]any{"repo": "o/r"})
 	issues, _ := data["issues"].([]any)
-	if len(issues) != 1 {
+	if len(issues) != 2 {
 		t.Fatalf("issues: %v", data)
 	}
 	i := issues[0].(map[string]any)
-	if i["number"] != 3.0 || i["comments"] != 2.0 || i["assignees"].([]any)[0] != "sam" || i["labels"].([]any)[0] != "bug" {
+	if i["number"] != 3.0 || i["comments"] != 2.0 || i["assignees"].([]any)[0] != "sam" || i["labels"].([]any)[0] != "bug" ||
+		i["milestone"] != "0.13 Lineage and value" {
 		t.Errorf("#3: %v", i)
+	}
+	// #2453: assigned to the viewer (any case) needs them; a bot's is the team's, with its pill.
+	if i["section"] != sectionNeedsYou || data["viewer"] != "alexec" || data["attention"] != 1.0 {
+		t.Errorf("#3's section: %v, viewer %v, attention %v", i["section"], data["viewer"], data["attention"])
+	}
+	if second := issues[1].(map[string]any); second["section"] != sectionTeam || second["authorBot"] != true {
+		t.Errorf("#4's section: %v", second)
+	}
+	if second := issues[1].(map[string]any); second["number"] != 4.0 {
+		t.Errorf("#4: %v", second)
+	} else if _, ok := second["milestone"]; ok {
+		t.Errorf("#4 should have no milestone: %v", second)
 	}
 	if r, _ := callTool(t, c, "show_issues", map[string]any{"repo": "not a repo"}); !r.IsError {
 		t.Error("a repo that is not owner/name was read")
+	}
+	// Each label's colour (#2686), and none for a colour that is not 6-digit hex.
+	if colors, _ := data["labelColors"].(map[string]any); colors["bug"] != "#d73a4a" || colors["odd"] != nil {
+		t.Errorf("labelColors: %v", data["labelColors"])
+	}
+}
+
+func TestTheIssuesListTakesAllItsLabelsInOneCall(t *testing.T) {
+	c, api := viewsClient(t)
+	callTool(t, c, "show_issues", map[string]any{"repo": "o/r", "label": "bug", "labels": []string{"ui", "bug"}})
+	api.mu.Lock()
+	defer api.mu.Unlock()
+	// One listing; the other call is the viewer's login (#2453), after it.
+	if len(api.queries) != 2 || !strings.Contains(api.queries[0], "labels="+url.QueryEscape("ui,bug")+"&") ||
+		api.calls[1] != "GET /user" {
+		t.Errorf("calls: %v, queries: %v", api.calls, api.queries)
+	}
+}
+
+func TestTheIssuesSearchIsOneGitHubSearch(t *testing.T) {
+	c, api := viewsClient(t)
+	_, data := callTool(t, c, "show_issues", map[string]any{"repo": "o/r", "query": " mean ", "labels": []string{"bug", "good first"}})
+	issues, _ := data["issues"].([]any)
+	if len(issues) != 2 || issues[0].(map[string]any)["number"] != 9.0 {
+		t.Fatalf("issues: %v", data)
+	}
+	if colors, _ := data["labelColors"].(map[string]any); colors["bug"] != "#d73a4a" {
+		t.Errorf("labelColors: %v", data["labelColors"])
+	}
+	api.mu.Lock()
+	q, _ := url.ParseQuery(api.queries[0])
+	api.mu.Unlock()
+	if q.Get("q") != `repo:o/r is:issue is:open mean label:"bug" label:"good first"` || q.Get("sort") != "created" || q.Get("order") != "desc" {
+		t.Errorf("search: %v", q)
+	}
+}
+
+func TestTheIssuesSearchFindsANumber(t *testing.T) {
+	c, _ := viewsClient(t)
+	_, data := callTool(t, c, "show_issues", map[string]any{"repo": "o/r", "query": "#3"})
+	issues, _ := data["issues"].([]any)
+	// #3 first, from its own read, and not twice; then the search's other one.
+	if len(issues) != 2 || issues[0].(map[string]any)["number"] != 3.0 || issues[1].(map[string]any)["number"] != 9.0 {
+		t.Fatalf("issues: %v", issues)
+	}
+	// A pull request's number is not an issue.
+	_, data = callTool(t, c, "show_issues", map[string]any{"repo": "o/r", "query": "7"})
+	if issues, _ := data["issues"].([]any); len(issues) != 2 || issues[0].(map[string]any)["number"] != 9.0 {
+		t.Fatalf("issues for 7: %v", issues)
+	}
+	// With a label it does not have, the number finds nothing of its own.
+	_, data = callTool(t, c, "show_issues", map[string]any{"repo": "o/r", "query": "3", "labels": []string{"ui"}})
+	if issues, _ := data["issues"].([]any); len(issues) != 2 || issues[0].(map[string]any)["number"] != 9.0 {
+		t.Fatalf("issues for 3 with ui: %v", issues)
+	}
+}
+
+func TestIssueDetailsUseIssueReadAndShowClosingPullRequests(t *testing.T) {
+	c, _ := viewsClient(t)
+	r, data := callTool(t, c, "show_issue_details", map[string]any{"repo": "o/r", "number": 3})
+	if r.IsError || data["body"] != "A description" || !strings.Contains(data["bodyHTML"].(string), "A description") {
+		t.Fatalf("issue details: %v", data)
+	}
+	closing, ok := data["closed_by_pull_requests"].(map[string]any)
+	if !ok || closing["total_count"] != 1.0 {
+		t.Fatalf("closing pull requests: %v", data["closed_by_pull_requests"])
+	}
+	refs, ok := closing["references"].([]any)
+	if !ok || len(refs) != 1 || refs[0].(map[string]any)["url"] != "https://github.com/o/r/pull/7" {
+		t.Fatalf("linked pull requests: %v", closing["references"])
 	}
 }
 
@@ -263,6 +482,12 @@ func TestAPullRequestsPageHasItsConversationReviewAndChecks(t *testing.T) {
 	if p["number"] != 7.0 || p["state"] != "open" || p["checks"] != "passing" || p["conflicts"] != false || p["review"] != "review_required" ||
 		p["viewer"] != "alexec" || p["filesTotal"] != 1.0 {
 		t.Fatalf("page: %v", p)
+	}
+	if l, _ := p["labels"].([]any); len(l) != 1 || l[0] != "approved" {
+		t.Errorf("labels: %v", p["labels"])
+	}
+	if colors, _ := p["labelColors"].(map[string]any); colors["approved"] != "#0e8a16" {
+		t.Errorf("labelColors: %v", p["labelColors"])
 	}
 	// CodeRabbit's review is marked as an app's (its summary is its own block); a review with no words is in its threads.
 	comments := p["comments"].([]any)

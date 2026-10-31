@@ -23,8 +23,8 @@ import (
 // admin) approves it on a signed-in client within 10 minutes. The machine then connects
 // as h:<id> with the key it asked with, as one that used a code does.
 //
-//	POST /v1/join            HostJoinAsk → HostJoinTicket
-//	GET  /v1/join/<request>  → HostJoinDecision, waiting up to 25 s for a change
+//	POST /v1/join            MachineJoinAsk → MachineJoinTicket
+//	GET  /v1/join/<request>  → MachineJoinDecision, waiting up to 25 s for a change
 //
 // Requests are kept in the store (v1/joins/<request>.json), so every copy sees them.
 
@@ -39,9 +39,6 @@ const (
 	// joinKept is how long an ended request stays, so the machine hears how it ended.
 	joinKept = time.Hour
 )
-
-// joinCodeLetters leave out what reads as another letter: 0 O 1 I L.
-const joinCodeLetters = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
 // joinRecord is v1/joins/<request>.json (data-model.md "Join request").
 type joinRecord struct {
@@ -76,20 +73,6 @@ func newJoinID() string {
 	b := make([]byte, 16)
 	rand.Read(b)
 	return hex.EncodeToString(b)
-}
-
-func newJoinCode() string {
-	b := make([]byte, 6)
-	rand.Read(b)
-	out := make([]byte, 6)
-	for i := range b {
-		// 248 is the largest multiple of 31 below 256: no letter is likelier.
-		for b[i] >= 248 {
-			rand.Read(b[i : i+1])
-		}
-		out[i] = joinCodeLetters[int(b[i])%len(joinCodeLetters)]
-	}
-	return string(out)
 }
 
 func isJoinID(s string) bool {
@@ -166,7 +149,7 @@ func (j *joins) person(named string) string {
 }
 
 // ask is POST /v1/join.
-func (j *joins) ask(ctx context.Context, a wire.HostJoinAsk, from string) (*wire.HostJoinTicket, error) {
+func (j *joins) ask(ctx context.Context, a wire.MachineJoinAsk, from string) (*wire.MachineJoinTicket, error) {
 	name := strings.TrimSpace(a.Name)
 	if name == "" || len([]rune(name)) > 80 || len(a.Platform) > 80 || len(deref(a.Version)) > 80 {
 		return nil, fail(invalidParams, "Say the machine's name and platform.")
@@ -217,7 +200,7 @@ func (j *joins) ask(ctx context.Context, a wire.HostJoinAsk, from string) (*wire
 		j.s.refusals.note("join-dropped", "", "ended the oldest request to join from "+heavy+": every place was taken")
 	}
 	now := records.At(j.now())
-	r := joinRecord{ID: newJoinID(), Code: newJoinCode(), Name: name, Platform: a.Platform, Version: deref(a.Version),
+	r := joinRecord{ID: newJoinID(), Code: controllink.JoinCode(a.PublicKey), Name: name, Platform: a.Platform, Version: deref(a.Version),
 		PublicKey: a.PublicKey, MachineID: deref(a.MachineID), Person: person, From: from,
 		Created: now, Expires: records.At(now.Add(joinLifetime))}
 	data, err := records.Encode(r)
@@ -229,11 +212,11 @@ func (j *joins) ask(ctx context.Context, a wire.HostJoinAsk, from string) (*wire
 	}
 	j.tell(r, "control/joinRequested", j.row(r))
 	j.s.log("machine " + name + " asks to join (request " + r.ID[:8] + ")")
-	return &wire.HostJoinTicket{Request: r.ID, Code: r.Code, Expires: dateOf(r.Expires.Time)}, nil
+	return &wire.MachineJoinTicket{Request: r.ID, Code: r.Code, Expires: dateOf(r.Expires.Time)}, nil
 }
 
 // decision is GET /v1/join/<request>.
-func (j *joins) decision(ctx context.Context, id string) (*wire.HostJoinDecision, error) {
+func (j *joins) decision(ctx context.Context, id string) (*wire.MachineJoinDecision, error) {
 	r, _, err := j.read(ctx, id)
 	if err != nil {
 		return nil, err
@@ -243,19 +226,19 @@ func (j *joins) decision(ctx context.Context, id string) (*wire.HostJoinDecision
 	}
 	switch {
 	case r.Result == "approved":
-		host := wire.HostID(r.Host)
-		d := &wire.HostJoinDecision{Result: "approved", Host: &host}
+		host := wire.MachineRef(r.Host)
+		d := &wire.MachineJoinDecision{Result: "approved", Host: &host}
 		if settings := j.s.records.Settings(); settings != nil {
 			d.ControlKey = settings.ControlKey
 			d.Name = optional(settings.Name)
 		}
 		return d, nil
 	case r.Result != "":
-		return &wire.HostJoinDecision{Result: r.Result}, nil
+		return &wire.MachineJoinDecision{Result: r.Result}, nil
 	case !j.open(*r):
-		return &wire.HostJoinDecision{Result: "expired"}, nil
+		return &wire.MachineJoinDecision{Result: "expired"}, nil
 	}
-	return &wire.HostJoinDecision{Result: "waiting"}, nil
+	return &wire.MachineJoinDecision{Result: "waiting"}, nil
 }
 
 // row is a request as a client's card shows it.
@@ -343,7 +326,7 @@ func (j *joins) decide(ctx context.Context, id, user string, approve bool) (*wir
 	if err := j.write(ctx, *r, etag); err != nil {
 		return nil, err
 	}
-	record := records.HostRecord{ID: host, Name: r.Name, PublicKey: r.PublicKey, Platform: r.Platform, Version: r.Version,
+	record := records.MachineRecord{ID: host, Name: r.Name, PublicKey: r.PublicKey, Platform: r.Platform, Version: r.Version,
 		Owner: &owner, Expires: j.s.newExpiry()}
 	if r.MachineID != "" {
 		mid := r.MachineID
@@ -357,7 +340,7 @@ func (j *joins) decide(ctx context.Context, id, user string, approve bool) (*wir
 	j.s.router.HoldToOwners()
 	j.tell(*r, "control/joinDecided", wire.JoinDecided{Request: r.ID, Result: r.Result})
 	j.s.log("machine " + r.Name + " joined as " + host + " by approval")
-	return &wire.JoinApproved{Host: wire.HostID(host)}, nil
+	return &wire.JoinApproved{Host: wire.MachineRef(host)}, nil
 }
 
 // end ends an open request with a result, as a decision would.
@@ -426,7 +409,7 @@ func (j *joins) serve(w http.ResponseWriter, r *http.Request) {
 			refuse(fail(invalidParams, "Say the machine's name, platform and key."))
 			return
 		}
-		a, err := require[wire.HostJoinAsk](body, "HostJoinAsk")
+		a, err := require[wire.MachineJoinAsk](body, "MachineJoinAsk")
 		if err != nil {
 			refuse(err)
 			return

@@ -215,15 +215,15 @@ public struct StoreLocations: Sendable {
     /// Skill previews fetched and not yet added (059). Held in memory, so a daemon starting
     /// removes what an earlier one left.
     public var catalogStaging: URL { cacheRoot.appendingPathComponent("catalog-staging", isDirectory: true) }
-    /// Every project we have been told about. One file, because the only things in it
-    /// are the two a project's folder cannot tell us: that it is archived, and that it
+    /// Every folder we have been told about. One file, because the only things in it
+    /// are the two a folder cannot tell us: that it is archived, and that it
     /// was added before anything ran in it.
-    public var projects: URL { root.appendingPathComponent("projects.json") }
+    public var folders: URL { root.appendingPathComponent("folders.json") }
     /// What the app remembers about workflows, which is everything their files cannot
     /// say: that one is paused, which agent is a standing workflow's, and what happened
-    /// the last time each fired. One file, for the same reason `projects` is one.
+    /// the last time each fired. One file, for the same reason `folders` is one.
     ///
-    /// Deliberately not in the repository. Writing a pause back to the project would
+    /// Deliberately not in the repository. Writing a pause back to the folder would
     /// raise a confirmation every time and fill its history with state nobody wants to
     /// review.
     public var workflows: URL { root.appendingPathComponent("workflows.json") }
@@ -231,17 +231,17 @@ public struct StoreLocations: Sendable {
     /// SHA-256 (#931). Beside `workflows`, not in it, so the heartbeat that rewrites that
     /// file does not rewrite every workflow with it.
     public var workflowCopies: URL { root.appendingPathComponent("workflow-copies", isDirectory: true) }
-    /// Which project plugins the person has approved, by the digest of their folders
-    /// (security review, S2). Outside the project for the reason `workflows` is: a thing
-    /// an agent can write to the project must not be able to approve itself.
+    /// Which folder plugins the person has approved, by the digest of their folders
+    /// (security review, S2). Outside the folder for the reason `workflows` is: a thing
+    /// an agent can write to the folder must not be able to approve itself.
     public var pluginApprovals: URL { root.appendingPathComponent("plugin-approvals.json") }
-    /// The last approved copy of each app-owned file in a project's `.agents` (#502):
-    /// `project.json` and `pins.json`, with a change made outside the app that waits for
-    /// the person's Keep or Undo. Outside the project for the reason `workflows` is.
+    /// The last approved copy of each app-owned file in a folder's `.agents` (#502):
+    /// `folder.json` and `pins.json`, with a change made outside the app that waits for
+    /// the person's Keep or Undo. Outside the folder for the reason `workflows` is.
     public var guardedFiles: URL { root.appendingPathComponent("guarded-files.json") }
     /// Every device that has announced itself to this daemon.
-    /// One file beside `projects.json`, because a device is a fact about this root
-    /// rather than about any project or agent in it.
+    /// One file beside `folders.json`, because a device is a fact about this root
+    /// rather than about any folder or agent in it.
     public var devices: URL { root.appendingPathComponent("devices.json") }
     /// The public half of the Mac's relay key, as the bridge registered it (046). Beside
     /// `devices.json` rather than in it, so that file keeps the shape older builds read.
@@ -289,10 +289,10 @@ public struct StoreLocations: Sendable {
     public var attention: URL { root.appendingPathComponent("attention.json") }
     /// The two limits the reader set: the most any one agent may spend, and the most
     /// a day may. One file, because there are two facts in it and both belong to the
-    /// person rather than to any agent or project: in `personalSettings` (#1033).
+    /// person rather than to any agent or folder: in `personalSettings` (#1033).
     public var limits: URL { personalSettings.appendingPathComponent("limits.json") }
     /// Every resource lease on the Mac and every line waiting for one (036). One file
-    /// for the root, like the limits: a lease is the Mac's, not a project's.
+    /// for the root, like the limits: a lease is the Mac's, not a folder's.
     public var leases: URL { root.appendingPathComponent("leases.json") }
     /// The resources the person declared, with what each is for (#116). The host's,
     /// beside its leases: how many builds a machine can take is that machine's.
@@ -423,7 +423,7 @@ extension StoreCoding {
 
     /// Move a file that exists and cannot be read out of the way, keeping it as
     /// `<name>.corrupt-<time>` (#171): beside the original, or in `folder` when given
-    /// (#205: a project's file is never set aside inside the person's tree). The stores
+    /// (#205: a folder's file is never set aside inside the person's tree). The stores
     /// that read such a file as empty go on to write that empty value back, and without
     /// this the only copy of what somebody set is gone. Answers where it went, or nil
     /// when it could not be moved (then it is still where it was, and a store must not
@@ -447,7 +447,7 @@ extension StoreCoding {
     }
 
     /// Where a file outside the daemon's root is set aside: a folder of its own under
-    /// `root/set-aside`, named for the folder it came from, so two projects' `pins.json`
+    /// `root/set-aside`, named for the folder it came from, so two folders' `pins.json`
     /// never meet.
     public static func asideFolder(for url: URL, under root: URL) -> URL {
         let parent = url.deletingLastPathComponent().standardizedFileURL.path

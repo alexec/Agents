@@ -44,17 +44,17 @@ You can use variables in place of the connection: set `EMAIL_IMAP_URL`, `EMAIL_U
 
 ## Add the page and the event
 
-1. Add **Email** from **Made by Agents** in the catalogue, or by hand in the project's
+1. Add **Email** from the **Agents** marketplace in the catalogue, or by hand in the folder's
    `.agents/mcp.json`:
 
    ```json
    { "mcpServers": { "email": { "command": "email-mcp", "hosted": true } } }
    ```
 
-2. In **Project Settings ▸ Agent Configuration ▸ Connectors**, choose **Approve** on
+2. In **Folder Settings ▸ Agent Configuration ▸ Connectors**, choose **Approve** on
    `email`. See [Add a connector by hand](add-a-connector-by-hand.md).
 
-3. To keep the Mail page in the sidebar, pin it in the project's `.agents/pins.json`:
+3. To keep the Mail page in the sidebar, pin it in the folder's `.agents/pins.json`:
 
    ```json
    { "pins": [ { "pinned_by": { "person": true }, "title": "Mail",
@@ -65,8 +65,8 @@ You can use variables in place of the connection: set `EMAIL_IMAP_URL`, `EMAIL_U
 
 ## Answer sign-up codes
 
-A project that pushes to GitHub or GitLab lists the ready-made workflow **Answer a sign-up
-code**, off. Turn it on in the project's Workflows. Then, when mail comes from a sender on its
+A folder that pushes to GitHub or GitLab lists the ready-made workflow **Answer a sign-up
+code**, off. Turn it on in the folder's Workflows. Then, when mail comes from a sender on its
 list (gitlab.com, github.com, DigitalOcean and AWS to start with), a new agent reads the code,
 finds the session that waits for a code from that service, gives it the code with
 `message_session`, and marks the mail read. It acts only on the senders on its list: to trust
@@ -74,7 +74,7 @@ another sender, add a trigger with its address as `from`.
 
 ## Wait for a mail in a session
 
-An agent can wait for a mail itself, with `wait_for_event`:
+An agent can wait for a mail itself, with `wait_for_event` on the mail server's event:
 
 - event `email.received`
 - where `{"from": "*@gitlab.com", "subject": "*code*"}`

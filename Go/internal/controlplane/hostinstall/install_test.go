@@ -1,10 +1,10 @@
 package hostinstall
 
 import (
-	"github.com/alexec/agents/Go/wire"
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/alexec/agents/Go/wire"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -499,7 +499,7 @@ func TestAnUpdateCopiesTheHostAndStartsItAgainAsItself(t *testing.T) {
 	var steps []string
 	codes := &fakeCodes{}
 	trust := hostKeyFingerprint
-	update := wire.HostUpdate{Host: "dev-box", Destination: "agents@devbox.lan", Trust: &trust}
+	update := wire.MachineUpdate{Host: "dev-box", Destination: "agents@devbox.lan", Trust: &trust}
 	got := reply(t)(f.installer(codes, &steps).Update(context.Background(), update, "Dev box"))
 	if !reflect.DeepEqual(got, map[string]any{"updated": true, "name": "Dev box"}) {
 		t.Fatalf("%v", got)
@@ -540,7 +540,7 @@ func TestAnUpdateToAnotherServerIsRefused(t *testing.T) {
 		var steps []string
 		trust := hostKeyFingerprint
 		_, err := f.installer(&fakeCodes{}, &steps).Update(context.Background(),
-			wire.HostUpdate{Host: "dev-box", Destination: "devbox", Trust: &trust}, "Dev box")
+			wire.MachineUpdate{Host: "dev-box", Destination: "devbox", Trust: &trust}, "Dev box")
 		if err == nil || !strings.Contains(err.Error(), c.want) {
 			t.Fatalf("%q: %v", c.member, err)
 		}

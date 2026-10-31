@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -18,15 +19,17 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// A project's pins (#159, #180, #432), in <project>/.agents/pins.json, as the Swift host
+// A folder's pins (#159, #180, #432), in <folder>/.agents/pins.json, as the Swift host
 // reads and writes them (Pins.swift, DaemonCore+Pins): pages and views, sessions and
 // workflows, ten of each at most, in the order shown.
 
 const (
-	pinsPerProject = 10
+	pinsPerFolder = 10
 	pinTitleLength = 60
 	viewArguments  = 2048
 	pinsFilePath   = ".agents/pins.json"
+	// hiddenViewsPerFolder bounds the server views hidden in one folder (#2032).
+	hiddenViewsPerFolder = 50
 )
 
 type pinner struct {
@@ -61,10 +64,13 @@ type pinsFile struct {
 	unread    []json.RawMessage
 	sessions  []sessionPin
 	workflows []workflowPin
+	// hiddenViews is the ui:// addresses of the server views a person hid (#2032).
+	hiddenViews []string
 }
 
 func (f pinsFile) empty() bool {
-	return len(f.pins) == 0 && len(f.unread) == 0 && len(f.sessions) == 0 && len(f.workflows) == 0
+	return len(f.pins) == 0 && len(f.unread) == 0 && len(f.sessions) == 0 && len(f.workflows) == 0 &&
+		len(f.hiddenViews) == 0
 }
 
 func pinRefused(msg string) error { return &Error{Code: wire.FailurePinRefused, Message: msg} }
@@ -118,9 +124,9 @@ func relativePin(file, folder string) (string, bool) {
 	return normalizePin(strings.TrimPrefix(full, root))
 }
 
-func personPinPath(given, project string) (string, bool) {
+func personPinPath(given, folder string) (string, bool) {
 	if strings.HasPrefix(given, "/") {
-		return relativePin(given, project)
+		return relativePin(given, folder)
 	}
 	return normalizePin(given)
 }
@@ -147,7 +153,7 @@ func viewProblem(v wire.ViewPin) string {
 	return ""
 }
 
-func pinsFileOf(project string) string { return filepath.Join(project, pinsFilePath) }
+func pinsFileOf(folder string) string { return filepath.Join(folder, pinsFilePath) }
 
 // readPinsFile is PinsFile.read: good entries, each once, at most the limit.
 func readPinsFile(data []byte) (pinsFile, error) {
@@ -155,6 +161,7 @@ func readPinsFile(data []byte) (pinsFile, error) {
 		Pins      []json.RawMessage `json:"pins"`
 		Sessions  []sessionPin      `json:"sessions"`
 		Workflows []workflowPin     `json:"workflows"`
+		Hidden    []string          `json:"hidden_views"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return pinsFile{}, err
@@ -181,7 +188,7 @@ func readPinsFile(data []byte) (pinsFile, error) {
 		entries = append(entries, entry)
 	}
 	seen := map[string]bool{}
-	room := pinsPerProject - len(f.unread)
+	room := pinsPerFolder - len(f.unread)
 	for _, e := range entries {
 		if e.view != nil {
 			if viewProblem(*e.view) != "" {
@@ -202,16 +209,21 @@ func readPinsFile(data []byte) (pinsFile, error) {
 	}
 	sessions := map[wire.UUID]bool{}
 	for _, s := range raw.Sessions {
-		if !sessions[s.Session] && len(f.sessions) < pinsPerProject {
+		if !sessions[s.Session] && len(f.sessions) < pinsPerFolder {
 			sessions[s.Session] = true
 			f.sessions = append(f.sessions, s)
 		}
 	}
 	workflows := map[string]bool{}
 	for _, w := range raw.Workflows {
-		if !workflows[w.Workflow] && len(f.workflows) < pinsPerProject {
+		if !workflows[w.Workflow] && len(f.workflows) < pinsPerFolder {
 			workflows[w.Workflow] = true
 			f.workflows = append(f.workflows, w)
+		}
+	}
+	for _, h := range raw.Hidden {
+		if strings.HasPrefix(h, "ui://") && !slices.Contains(f.hiddenViews, h) && len(f.hiddenViews) < hiddenViewsPerFolder {
+			f.hiddenViews = append(f.hiddenViews, h)
 		}
 	}
 	return f, nil
@@ -249,13 +261,16 @@ func (f pinsFile) data() ([]byte, error) {
 	if len(f.workflows) > 0 {
 		tree["workflows"] = asTree(f.workflows)
 	}
+	if len(f.hiddenViews) > 0 {
+		tree["hidden_views"] = asTree(f.hiddenViews)
+	}
 	b, err := diskjson.Pretty(tree)
 	return append(b, '\n'), err
 }
 
-func (d *Daemon) readPins(project string) pinsFile {
+func (d *Daemon) readPins(folder string) pinsFile {
 	// The approved copy while a change made outside the app waits (#502).
-	b, ok := d.guardedContent(project, pinsFilePath)
+	b, ok := d.guardedContent(folder, pinsFilePath)
 	if !ok {
 		return pinsFile{}
 	}
@@ -267,18 +282,18 @@ func (d *Daemon) readPins(project string) pinsFile {
 }
 
 // writePins removes an empty file, writes only what differs, and tells every client.
-func (d *Daemon) writePins(f pinsFile, project string) error {
-	if !d.settled(project, pinsFilePath) {
+func (d *Daemon) writePins(f pinsFile, folder string) error {
+	if !d.settled(folder, pinsFilePath) {
 		return pinRefused(guardedRefusal(pinsFilePath, "The pins were not changed: ").(*Error).Message)
 	}
-	defer d.approveWrite(project, pinsFilePath)
-	path := pinsFileOf(project)
-	if !ownFolders(project, ".agents") {
-		return pinRefused(linkedFolder(".agents", project).Message)
+	defer d.approveWrite(folder, pinsFilePath)
+	path := pinsFileOf(folder)
+	if !ownFolders(folder, ".agents") {
+		return pinRefused(linkedFolder(".agents", folder).Message)
 	}
 	if f.empty() {
 		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return pinRefused("The pins could not be written in " + project + "/.agents: " + err.Error())
+			return pinRefused("The pins could not be written in " + folder + "/.agents: " + err.Error())
 		}
 	} else {
 		b, err := f.data()
@@ -288,30 +303,37 @@ func (d *Daemon) writePins(f pinsFile, project string) error {
 			}
 		}
 		if err != nil {
-			return pinRefused("The pins could not be written in " + project + "/.agents: " + err.Error())
+			return pinRefused("The pins could not be written in " + folder + "/.agents: " + err.Error())
 		}
 	}
-	d.pinsChanged(project)
+	d.pinsChanged(folder)
 	return nil
 }
 
-// pinsChanged says pins/changed for a project, at most once a second.
-func (d *Daemon) pinsChanged(project string) {
+// pinsChanged says pins/changed for a folder, at most once a second.
+func (d *Daemon) pinsChanged(folder string) {
 	d.pinMu.Lock()
 	defer d.pinMu.Unlock()
+	if d.pinsStopped {
+		return
+	}
 	if d.pinTimers == nil {
 		d.pinTimers = map[string]*time.Timer{}
 	}
-	if d.pinTimers[project] != nil {
+	if d.pinTimers[folder] != nil {
 		return
 	}
-	d.pinTimers[project] = time.AfterFunc(time.Second, func() {
+	d.pinTimers[folder] = time.AfterFunc(time.Second, func() {
 		d.pinMu.Lock()
-		delete(d.pinTimers, project)
+		delete(d.pinTimers, folder)
+		stopped := d.pinsStopped
 		d.pinMu.Unlock()
-		pp := d.projectPins(project)
+		if stopped {
+			return
+		}
+		pp := d.folderPins(folder)
 		Broadcast(d, wire.NotifyPinsChanged, wire.PinsChangedNotification{Folder: pp.Folder, Pins: pp.Pins,
-			Sessions: pp.Sessions, Workflows: pp.Workflows})
+			Sessions: pp.Sessions, Workflows: pp.Workflows, Views: pp.Views})
 	})
 }
 
@@ -352,19 +374,19 @@ func (d *Daemon) pinnerView(p pinner) wire.PinnerView {
 	return wire.PinnerView{Kind: wire.PinnerKindPerson, ID: "", Name: "the person"}
 }
 
-func (d *Daemon) pinViews(project string, f pinsFile) []wire.PinView {
+func (d *Daemon) pinViews(folder string, f pinsFile) []wire.PinView {
 	out := []wire.PinView{}
 	for _, e := range f.pins {
 		v := wire.PinView{Path: e.path, PinnedBy: d.pinnerView(e.pinnedBy), View: e.view}
 		if e.view != nil {
 			v.Kind, v.Title = wire.PinKindView, defaultViewTitle(*e.view)
-			if reason := d.viewPinMissing(*e.view, project); reason != "" {
+			if reason := d.viewPinMissing(*e.view, folder); reason != "" {
 				v.Missing, v.MissingReason = true, &reason
 			}
 		} else {
 			v.Kind, _ = pinKind(e.path)
 			v.Title = defaultPinTitle(e.path)
-			fi, err := os.Stat(filepath.Join(project, e.path))
+			fi, err := os.Stat(filepath.Join(folder, e.path))
 			v.Missing = err != nil || fi.IsDir()
 		}
 		if e.title != nil {
@@ -375,9 +397,9 @@ func (d *Daemon) pinViews(project string, f pinsFile) []wire.PinView {
 	return out
 }
 
-func (d *Daemon) projectPins(project string) wire.ProjectPins {
-	f := d.readPins(project)
-	pp := wire.ProjectPins{Folder: fileURL(project, true), Pins: d.pinViews(project, f)}
+func (d *Daemon) folderPins(folder string) wire.FolderPins {
+	f := d.readPins(folder)
+	pp := wire.FolderPins{Folder: fileURL(folder, true), Pins: d.pinViews(folder, f), Views: d.serverViews(folder, f)}
 	for _, s := range f.sessions {
 		pp.Sessions = append(pp.Sessions, s.Session)
 	}
@@ -387,31 +409,31 @@ func (d *Daemon) projectPins(project string) wire.ProjectPins {
 	return pp
 }
 
-// knownPinProject is a folder this host has as a project.
-func (d *Daemon) knownPinProject(folder wire.URL) (string, error) {
+// knownPinFolder is a folder this host has as a folder.
+func (d *Daemon) knownPinFolder(folder wire.URL) (string, error) {
 	path := store.FolderPath(folder)
-	for _, s := range d.projects(true) {
-		if store.FolderPath(s.Project.Folder) == path {
+	for _, s := range d.folders(true) {
+		if store.FolderPath(s.Folder.Folder) == path {
 			return path, nil
 		}
 	}
-	return "", pinRefused("This machine has no project at " + path + ".")
+	return "", pinRefused("This machine has no folder at " + path + ".")
 }
 
-// pageURL is a file in the project folder, its links resolved, still in the folder.
-func pageURL(path, project string) (string, error) {
-	rel, ok := personPinPath(path, project)
+// pageURL is a file in the folder, its links resolved, still in the folder.
+func pageURL(path, folder string) (string, error) {
+	rel, ok := personPinPath(path, folder)
 	if !ok {
-		return "", Invalid("%s is not in this project.", path)
+		return "", Invalid("%s is not in this folder.", path)
 	}
-	full := filepath.Join(project, rel)
-	root, err := store.Resolve(project)
+	full := filepath.Join(folder, rel)
+	root, err := store.Resolve(folder)
 	if err != nil {
-		root = project
+		root = folder
 	}
 	if r, err := store.Resolve(full); err == nil {
 		if !inside(root, r) {
-			return "", Invalid("%s is not in this project.", path)
+			return "", Invalid("%s is not in this folder.", path)
 		}
 		return r, nil
 	}
@@ -440,35 +462,35 @@ func arrange[T any](items []T, key func(T) string, order []string) []T {
 }
 
 func (d *Daemon) registerPins() {
-	On(d, wire.CallPinsList, func(ctx context.Context, c *Client, _ wire.Empty) ([]wire.ProjectPins, error) {
-		ps := d.projects(false)
+	On(d, wire.CallPinsList, func(ctx context.Context, c *Client, _ wire.Empty) ([]wire.FolderPins, error) {
+		ps := d.folders(false)
 		sort.SliceStable(ps, func(i, j int) bool { return ps[i].LastActivityAt > ps[j].LastActivityAt })
-		out := []wire.ProjectPins{}
+		out := []wire.FolderPins{}
 		for _, s := range ps {
-			pp := d.projectPins(store.FolderPath(s.Project.Folder))
-			if len(pp.Pins) > 0 || len(pp.Sessions) > 0 || len(pp.Workflows) > 0 {
+			pp := d.folderPins(store.FolderPath(s.Folder.Folder))
+			if len(pp.Pins) > 0 || len(pp.Sessions) > 0 || len(pp.Workflows) > 0 || len(pp.Views) > 0 {
 				out = append(out, pp)
 			}
 		}
 		return out, nil
 	})
 	On(d, wire.CallPinsRead, func(ctx context.Context, c *Client, r wire.PinReadRequest) (wire.FileReading, error) {
-		project, err := d.knownPinProject(r.Folder)
+		folder, err := d.knownPinFolder(r.Folder)
 		if err != nil {
 			return wire.FileReading{}, err
 		}
-		path, err := pageURL(r.Path, project)
+		path, err := pageURL(r.Path, folder)
 		if err != nil {
 			return wire.FileReading{}, err
 		}
 		return reading(path, r.KnownStamp)
 	})
 	On(d, wire.CallPinsWrite, func(ctx context.Context, c *Client, r wire.PinWriteRequest) (wire.Empty, error) {
-		project, err := d.knownPinProject(r.Folder)
+		folder, err := d.knownPinFolder(r.Folder)
 		if err != nil {
 			return wire.Empty{}, err
 		}
-		path, err := pageURL(r.Path, project)
+		path, err := pageURL(r.Path, folder)
 		if err != nil {
 			return wire.Empty{}, err
 		}
@@ -484,101 +506,124 @@ func (d *Daemon) registerPins() {
 		return wire.Empty{}, nil
 	})
 	On(d, wire.CallPinsPin, func(ctx context.Context, c *Client, r wire.PinRequest) ([]wire.PinView, error) {
-		project, err := d.knownPinProject(r.Folder)
+		folder, err := d.knownPinFolder(r.Folder)
 		if err != nil {
 			return nil, err
 		}
 		const lead = "Nothing was pinned: "
 		entry := pinEntry{title: r.Title, pinnedBy: thePerson()}
 		if r.View != nil {
-			if why := d.viewPinRefusal(*r.View, project); why != "" {
+			if why := d.viewPinRefusal(*r.View, folder); why != "" {
 				return nil, pinRefused(lead + why)
 			}
 			entry.path, entry.view = r.View.URI, r.View
-			if entry.title == nil && !d.pinned(project, r.View.URI) {
-				entry.title = d.viewPinTitle(*r.View, project)
+			if entry.title == nil && !d.pinned(folder, r.View.URI) {
+				entry.title = d.viewPinTitle(*r.View, folder)
 			}
-			if err := d.pin(entry, project, lead); err != nil {
+			if err := d.pin(entry, folder, lead); err != nil {
 				return nil, err
 			}
-			return d.pinViews(project, d.readPins(project)), nil
+			return d.pinViews(folder, d.readPins(folder)), nil
 		}
-		path, ok := personPinPath(r.Path, project)
+		path, ok := personPinPath(r.Path, folder)
 		if !ok {
-			return nil, pinRefused(lead + r.Path + " is not in this project.")
+			return nil, pinRefused(lead + r.Path + " is not in this folder.")
 		}
-		if fi, err := os.Stat(filepath.Join(project, path)); err != nil || !fi.Mode().IsRegular() {
-			return nil, pinRefused(lead + "there is no file at " + path + " in the project folder.")
+		if fi, err := os.Stat(filepath.Join(folder, path)); err != nil || !fi.Mode().IsRegular() {
+			return nil, pinRefused(lead + "there is no file at " + path + " in the folder.")
 		}
 		entry.path = path
-		if err := d.pin(entry, project, lead); err != nil {
+		if err := d.pin(entry, folder, lead); err != nil {
 			return nil, err
 		}
-		return d.pinViews(project, d.readPins(project)), nil
+		return d.pinViews(folder, d.readPins(folder)), nil
 	})
 	On(d, wire.CallPinsUnpin, func(ctx context.Context, c *Client, r wire.PinPathRequest) (wire.Empty, error) {
-		project, err := d.knownPinProject(r.Folder)
+		folder, err := d.knownPinFolder(r.Folder)
 		if err != nil {
 			return wire.Empty{}, err
 		}
 		key := r.Path
 		if !strings.HasPrefix(key, "ui://") {
-			if p, ok := personPinPath(r.Path, project); ok {
+			if p, ok := personPinPath(r.Path, folder); ok {
 				key = p
 			}
 		}
-		f := d.readPins(project)
+		f := d.readPins(folder)
 		for i, e := range f.pins {
 			if e.path == key {
 				f.pins = append(f.pins[:i], f.pins[i+1:]...)
-				return wire.Empty{}, d.writePins(f, project)
+				return wire.Empty{}, d.writePins(f, folder)
 			}
 		}
-		return wire.Empty{}, pinRefused("Nothing was unpinned: " + r.Path + " is not pinned in this project.")
+		return wire.Empty{}, pinRefused("Nothing was unpinned: " + r.Path + " is not pinned in this folder.")
 	})
-	On(d, wire.CallPinsArrange, func(ctx context.Context, c *Client, r wire.PinArrangeRequest) (wire.Empty, error) {
-		project, err := d.knownPinProject(r.Folder)
+	On(d, wire.CallPinsHideView, func(ctx context.Context, c *Client, r wire.PinHideViewRequest) (wire.Empty, error) {
+		folder, err := d.knownPinFolder(r.Folder)
 		if err != nil {
 			return wire.Empty{}, err
 		}
-		f := d.readPins(project)
+		if !strings.HasPrefix(r.URI, "ui://") {
+			return wire.Empty{}, Invalid("A view's address starts ui://.")
+		}
+		f := d.readPins(folder)
+		at := slices.Index(f.hiddenViews, r.URI)
+		switch {
+		case r.Hidden && at < 0:
+			if len(f.hiddenViews) >= hiddenViewsPerFolder {
+				return wire.Empty{}, pinRefused("Nothing was hidden: this folder already hides 50 views, the most it can.")
+			}
+			f.hiddenViews = append(f.hiddenViews, r.URI)
+		case !r.Hidden && at >= 0:
+			f.hiddenViews = slices.Delete(f.hiddenViews, at, at+1)
+		default:
+			return wire.Empty{}, nil
+		}
+		return wire.Empty{}, d.writePins(f, folder)
+	})
+	On(d, wire.CallPinsArrange, func(ctx context.Context, c *Client, r wire.PinArrangeRequest) (wire.Empty, error) {
+		folder, err := d.knownPinFolder(r.Folder)
+		if err != nil {
+			return wire.Empty{}, err
+		}
+		f := d.readPins(folder)
 		f.pins = arrange(f.pins, func(e pinEntry) string { return e.path }, r.Paths)
-		return wire.Empty{}, d.writePins(f, project)
+		return wire.Empty{}, d.writePins(f, folder)
 	})
 	On(d, wire.CallPinsPinSession, func(ctx context.Context, c *Client, r wire.PinSessionRequest) (wire.Empty, error) {
-		project, err := d.knownPinProject(r.Folder)
+		folder, err := d.knownPinFolder(r.Folder)
 		if err != nil {
 			return wire.Empty{}, err
 		}
 		const lead = "Nothing was pinned: "
 		a := d.Store.Agent(r.AgentID)
-		if a == nil || projectFolder(a) != project {
-			return wire.Empty{}, pinRefused(lead + "that session is not in this project.")
+		if a == nil || folderPath(a) != folder {
+			return wire.Empty{}, pinRefused(lead + "that session is not in this folder.")
 		}
 		if a.State == wire.AgentStateArchived {
 			return wire.Empty{}, pinRefused(lead + "an archived session can't be pinned.")
 		}
-		f := d.readPins(project)
+		f := d.readPins(folder)
 		for _, s := range f.sessions {
 			if s.Session == a.ID {
 				return wire.Empty{}, nil
 			}
 		}
-		if len(f.sessions) >= pinsPerProject {
-			return wire.Empty{}, pinRefused(lead + "this project already has 10 pinned sessions, the most it can have. Unpin one first.")
+		if len(f.sessions) >= pinsPerFolder {
+			return wire.Empty{}, pinRefused(lead + "this folder already has 10 pinned sessions, the most it can have. Unpin one first.")
 		}
 		f.sessions = append(f.sessions, sessionPin{Session: a.ID, PinnedBy: thePerson()})
-		return wire.Empty{}, d.writePins(f, project)
+		return wire.Empty{}, d.writePins(f, folder)
 	})
 	On(d, wire.CallPinsUnpinSession, func(ctx context.Context, c *Client, r wire.PinSessionRequest) (wire.Empty, error) {
-		project, err := d.knownPinProject(r.Folder)
+		folder, err := d.knownPinFolder(r.Folder)
 		if err != nil {
 			return wire.Empty{}, err
 		}
-		return wire.Empty{}, d.unpinSession(project, r.AgentID)
+		return wire.Empty{}, d.unpinSession(folder, r.AgentID)
 	})
 	On(d, wire.CallPinsArrangeSessions, func(ctx context.Context, c *Client, r wire.PinArrangeSessionsRequest) (wire.Empty, error) {
-		project, err := d.knownPinProject(r.Folder)
+		folder, err := d.knownPinFolder(r.Folder)
 		if err != nil {
 			return wire.Empty{}, err
 		}
@@ -586,51 +631,51 @@ func (d *Daemon) registerPins() {
 		for i, id := range r.AgentIDs {
 			order[i] = strings.ToUpper(string(id))
 		}
-		f := d.readPins(project)
+		f := d.readPins(folder)
 		f.sessions = arrange(f.sessions, func(s sessionPin) string { return strings.ToUpper(string(s.Session)) }, order)
-		return wire.Empty{}, d.writePins(f, project)
+		return wire.Empty{}, d.writePins(f, folder)
 	})
 	On(d, wire.CallPinsPinWorkflow, func(ctx context.Context, c *Client, r wire.WorkflowRequest) (wire.Empty, error) {
-		if _, err := d.knownPinProject(r.Folder); err != nil {
+		if _, err := d.knownPinFolder(r.Folder); err != nil {
 			return wire.Empty{}, err
 		}
 		// This host keeps no workflows yet.
-		return wire.Empty{}, pinRefused("Nothing was pinned: there is no workflow called " + r.WorkflowID + " in this project.")
+		return wire.Empty{}, pinRefused("Nothing was pinned: there is no workflow called " + r.WorkflowID + " in this folder.")
 	})
 	On(d, wire.CallPinsUnpinWorkflow, func(ctx context.Context, c *Client, r wire.WorkflowRequest) (wire.Empty, error) {
-		project, err := d.knownPinProject(r.Folder)
+		folder, err := d.knownPinFolder(r.Folder)
 		if err != nil {
 			return wire.Empty{}, err
 		}
-		f := d.readPins(project)
+		f := d.readPins(folder)
 		for i, w := range f.workflows {
 			if w.Workflow == r.WorkflowID {
 				f.workflows = append(f.workflows[:i], f.workflows[i+1:]...)
-				return wire.Empty{}, d.writePins(f, project)
+				return wire.Empty{}, d.writePins(f, folder)
 			}
 		}
 		return wire.Empty{}, nil
 	})
 	On(d, wire.CallPinsArrangeWorkflows, func(ctx context.Context, c *Client, r wire.PinArrangeWorkflowsRequest) (wire.Empty, error) {
-		project, err := d.knownPinProject(r.Folder)
+		folder, err := d.knownPinFolder(r.Folder)
 		if err != nil {
 			return wire.Empty{}, err
 		}
-		f := d.readPins(project)
+		f := d.readPins(folder)
 		f.workflows = arrange(f.workflows, func(w workflowPin) string { return w.Workflow }, r.WorkflowIDs)
-		return wire.Empty{}, d.writePins(f, project)
+		return wire.Empty{}, d.writePins(f, folder)
 	})
 }
 
 // pin is DaemonCore.pin: retitled where it is, or added under the limit.
-func (d *Daemon) pin(entry pinEntry, project, lead string) error {
+func (d *Daemon) pin(entry pinEntry, folder, lead string) error {
 	if _, ok := pinKind(entry.path); entry.view == nil && !ok {
 		return pinRefused(lead + "only a Markdown (.md) or HTML (.html) page can be pinned.")
 	}
 	if entry.title != nil && utf8.RuneCountInString(*entry.title) > pinTitleLength {
 		return pinRefused(lead + "`title` is at most 60 characters.")
 	}
-	f := d.readPins(project)
+	f := d.readPins(folder)
 	for i, e := range f.pins {
 		if e.path == entry.path {
 			if entry.title != nil {
@@ -639,29 +684,49 @@ func (d *Daemon) pin(entry pinEntry, project, lead string) error {
 			if entry.view != nil {
 				f.pins[i].view = entry.view
 			}
-			return d.writePins(f, project)
+			return d.writePins(f, folder)
 		}
 	}
-	if len(f.pins)+len(f.unread) >= pinsPerProject {
-		return pinRefused(lead + "this project already has 10 pins, pages and views together, the most it can have. Unpin one first.")
+	if len(f.pins)+len(f.unread) >= pinsPerFolder {
+		return pinRefused(lead + "this folder already has 10 pins, pages and views together, the most it can have. Unpin one first.")
 	}
 	f.pins = append(f.pins, entry)
-	return d.writePins(f, project)
+	return d.writePins(f, folder)
 }
 
-func (d *Daemon) unpinSession(project string, id wire.UUID) error {
-	f := d.readPins(project)
+func (d *Daemon) unpinSession(folder string, id wire.UUID) error {
+	f := d.readPins(folder)
 	for i, s := range f.sessions {
 		if strings.EqualFold(string(s.Session), string(id)) {
 			f.sessions = append(f.sessions[:i], f.sessions[i+1:]...)
-			return d.writePins(f, project)
+			return d.writePins(f, folder)
 		}
 	}
 	return nil
 }
 
-// pinState is the Daemon's: pins/changed waiting to be said, by project.
+// stopPins stops the pins/changed waiting to be said, and says none again: a stopped
+// host reading a folder's pins reads its servers' views too, and the person's servers are
+// found by the environment, so a host that stopped would read another one's (#2673).
+func (d *Daemon) stopPins() {
+	d.pinMu.Lock()
+	defer d.pinMu.Unlock()
+	d.pinsStopped = true
+	for folder, t := range d.pinTimers {
+		t.Stop()
+		delete(d.pinTimers, folder)
+	}
+}
+
+func (d *Daemon) pinsHaveStopped() bool {
+	d.pinMu.Lock()
+	defer d.pinMu.Unlock()
+	return d.pinsStopped
+}
+
+// pinState is the Daemon's: pins/changed waiting to be said, by folder.
 type pinState struct {
-	pinMu     sync.Mutex
-	pinTimers map[string]*time.Timer
+	pinMu       sync.Mutex
+	pinTimers   map[string]*time.Timer
+	pinsStopped bool
 }

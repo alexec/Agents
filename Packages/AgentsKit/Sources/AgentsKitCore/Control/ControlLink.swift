@@ -20,7 +20,7 @@ public final class ControlLink: @unchecked Sendable {
     private var generation = 0
     private var dialling: Task<any LineTransport, any Error>?
     /// Keyed by host; nil is the control plane itself.
-    private var routes: [HostID?: Virtual] = [:]
+    private var routes: [MachineRef?: Virtual] = [:]
     private var unreadableFrames = 0
 
     /// Frames from the control plane that could not be read, each also logged (#93).
@@ -31,7 +31,7 @@ public final class ControlLink: @unchecked Sendable {
     }
 
     /// The link a host's `DaemonClient` is made with.
-    public func link(for host: HostID) -> some DaemonLink { Route(owner: self, host: host) }
+    public func link(for host: MachineRef) -> some DaemonLink { Route(owner: self, host: host) }
 
     /// The link the control plane's own `DaemonClient` is made with.
     public var controlLink: some DaemonLink { Route(owner: self, host: nil) }
@@ -51,7 +51,7 @@ public final class ControlLink: @unchecked Sendable {
 
     struct Route: DaemonLink {
         let owner: ControlLink
-        let host: HostID?
+        let host: MachineRef?
         func transport() async throws -> any LineTransport {
             try await owner.open(host)
         }
@@ -59,7 +59,7 @@ public final class ControlLink: @unchecked Sendable {
 
     // MARK: Routes
 
-    private func open(_ host: HostID?) async throws -> any LineTransport {
+    private func open(_ host: MachineRef?) async throws -> any LineTransport {
         let physical = try await connected()
         let virtual = Virtual(host: host, physical: physical)
         let replaced = lock.withLock { routes.updateValue(virtual, forKey: host) }
@@ -123,8 +123,8 @@ public final class ControlLink: @unchecked Sendable {
             if message.contains(DaemonAPI.Notification.controlHostChanged),
                case .notification(_, let params)? = try? JSONRPCCodec.decode(line: message),
                let host = params?["host"]?.stringValue, let state = params?["state"]?.stringValue,
-               !DaemonAPI.ControlHost.answers(state), state != "connecting" {
-                let id = HostID(rawValue: host)
+               !DaemonAPI.ControlMachine.answers(state), state != "connecting" {
+                let id = MachineRef(rawValue: host)
                 lock.lock()
                 let gone = routes.removeValue(forKey: id)
                 lock.unlock()
@@ -136,7 +136,7 @@ public final class ControlLink: @unchecked Sendable {
         }
     }
 
-    private func route(_ host: HostID?) -> Virtual? {
+    private func route(_ host: MachineRef?) -> Virtual? {
         lock.lock()
         defer { lock.unlock() }
         return routes[host]
@@ -155,13 +155,13 @@ public final class ControlLink: @unchecked Sendable {
     /// One host's view of the connection: writes are wrapped with its id, reads are
     /// what the control plane passed on from it.
     final class Virtual: LineTransport, @unchecked Sendable {
-        let host: HostID?
+        let host: MachineRef?
         private let physical: any LineTransport
         private let stream: AsyncThrowingStream<String, any Error>
         private let continuation: AsyncThrowingStream<String, any Error>.Continuation
         private let closed = ManagedAtomicFlag()
 
-        init(host: HostID?, physical: any LineTransport) {
+        init(host: MachineRef?, physical: any LineTransport) {
             self.host = host
             self.physical = physical
             var c: AsyncThrowingStream<String, any Error>.Continuation!

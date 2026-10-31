@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/alexec/agents/Go/wire"
 )
@@ -14,7 +15,7 @@ import (
 // trigger is one of three scopes:
 //
 //   - a machine event (machine.*, dropbox.*) stays on its machine: it runs here, unclaimed;
-//   - a project or control-plane event (a server's, such as github or a channel's) or a
+//   - a folder or control-plane event (a server's, such as github or a channel's) or a
 //     schedule is sent to the control plane (workflows/trigger), which sends it once, to one
 //     of the bot's machines (workflows/fire);
 //   - anything else this machine raised itself (its agents, its workflows, its branches) is
@@ -49,8 +50,8 @@ func scopeOf(fr fireRequest) triggerScope {
 	return scopeClaimed
 }
 
-// workflowName is a workflow as every machine names it: by the project folder's name, as
-// each keeps its own copy of the project at a path of its own.
+// workflowName is a workflow as every machine names it: by the folder's name, as
+// each keeps its own copy of the folder at a path of its own.
 func workflowName(folder, id string) string { return filepath.Base(folder) + "/" + id }
 
 // sendTrigger is workflows/trigger. taken is true when the control plane sends it once;
@@ -80,25 +81,30 @@ func (d *Daemon) sendTrigger(fr fireRequest, w wire.Workflow) (taken, ok bool) {
 	return sent.Taken, true
 }
 
-// Asked answers what the control plane asks on channel 0: workflows/fire.
+// Asked answers what the control plane asks on channel 0: workflows/fire, and git/fill
+// for a lend a person allowed (#1122). git/fill is not registered as a window method.
 func (d *Daemon) Asked(method string, params json.RawMessage) (any, bool) {
-	if method != wire.CallWorkflowsFire.Name {
+	switch method {
+	case wire.CallWorkflowsFire.Name:
+		var t wire.TeamTrigger
+		if err := json.Unmarshal(params, &t); err != nil {
+			log.Printf("workflows/fire: %v", err)
+			return wire.TeamTriggerFired{Ran: false}, true
+		}
+		return wire.TeamTriggerFired{Ran: d.fireFromControl(t)}, true
+	case wire.CallGitFill.Name:
+		return d.fillGit(params), true
+	default:
 		return nil, false
 	}
-	var t wire.TeamTrigger
-	if err := json.Unmarshal(params, &t); err != nil {
-		log.Printf("workflows/fire: %v", err)
-		return wire.TeamTriggerFired{Ran: false}, true
-	}
-	return wire.TeamTriggerFired{Ran: d.fireFromControl(t)}, true
 }
 
 // fireFromControl runs a trigger the control plane took once: true when this machine has
 // the workflow, runs it here, and one of its triggers matches. Its refusals (a run still
 // going, the cap) are recorded here as for any trigger.
 func (d *Daemon) fireFromControl(t wire.TeamTrigger) bool {
-	project, id, ok := strings.Cut(t.Workflow, "/")
-	if !ok || project == "" || id == "" {
+	folderName, id, ok := strings.Cut(t.Workflow, "/")
+	if !ok || folderName == "" || id == "" {
 		return false
 	}
 	d.workflowMu.Lock()
@@ -107,7 +113,7 @@ func (d *Daemon) fireFromControl(t wire.TeamTrigger) bool {
 	}
 	folders := make([]string, 0, len(d.workflowFiles))
 	for folder := range d.workflowFiles {
-		if filepath.Base(folder) == project && d.workflowFiles[folder][id] != nil {
+		if filepath.Base(folder) == folderName && d.workflowFiles[folder][id] != nil {
 			folders = append(folders, folder)
 		}
 	}
@@ -118,7 +124,7 @@ func (d *Daemon) fireFromControl(t wire.TeamTrigger) bool {
 		if !d.runsHere(w) || w.Problem != nil || isArchived(w) {
 			continue
 		}
-		if f, matched := matchTeamTrigger(folder, id, w, t); matched {
+		if f, matched := matchTeamTrigger(folder, id, w, t, time.Now()); matched {
 			fr = &f
 			break
 		}
@@ -133,14 +139,24 @@ func (d *Daemon) fireFromControl(t wire.TeamTrigger) bool {
 	return true
 }
 
-// matchTeamTrigger is the fire for a trigger sent by the control plane: a schedule's, or
-// the trigger the event matches, with the event's project made this machine's own folder.
-func matchTeamTrigger(folder, id string, w wire.Workflow, t wire.TeamTrigger) (fireRequest, bool) {
+// matchTeamTrigger is the fire for a trigger sent by the control plane: a due time of one
+// of its schedules, or a server's event one of its server triggers matches, with the event's
+// folder made this machine's own folder. Only what a machine may send is run: no app event,
+// no time its schedules are not due here, and only the trigger id its event or due time
+// names.
+func matchTeamTrigger(folder, id string, w wire.Workflow, t wire.TeamTrigger, now time.Time) (fireRequest, bool) {
 	fr := fireRequest{folder: folder, id: id, fromControl: true}
 	if t.DueAt != nil {
+		due := t.DueAt.Time()
+		if t.Event != nil || t.Trigger != wire.ScheduleTriggerID(due) || due.After(now.Add(5*time.Minute)) || due.Before(now.Add(-24*time.Hour)) {
+			return fr, false
+		}
+		// Only a time one of its schedules falls due here.
 		for _, trig := range w.Triggers {
-			if trig.Schedule != nil {
-				due := t.DueAt.Time()
+			if trig.Schedule == nil {
+				continue
+			}
+			if next, ok := nextDue(trig.Schedule.Value, due.Add(-time.Second)); ok && next.Equal(due) {
 				fr.trigger, fr.dueAt = trig, &due
 				return fr, true
 			}
@@ -151,12 +167,13 @@ func matchTeamTrigger(folder, id string, w wire.Workflow, t wire.TeamTrigger) (f
 		return fr, false
 	}
 	e := *t.Event
-	e.Scope = projectScope(folder)
+	if e.Details["server"] == "" || e.Details["event"] != e.Name || !isServerEventName(e.Name) || t.Trigger != triggerID(fireRequest{}, &e) {
+		return fr, false
+	}
+	e.Scope, e.ChainDepth = folderScope(folder), 0
 	for _, trig := range w.Triggers {
-		p, isPattern := triggerPattern(trig)
-		mt, isServer := serverTrigger(trig)
-		if isPattern && p.matches(e) || isServer && mt.matches(e) {
-			fr.trigger, fr.event, fr.depth = trig, &e, e.ChainDepth
+		if mt, isServer := serverTrigger(trig); isServer && mt.matches(e) {
+			fr.trigger, fr.event = trig, &e
 			return fr, true
 		}
 	}

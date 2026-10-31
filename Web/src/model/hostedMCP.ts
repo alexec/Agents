@@ -9,13 +9,6 @@ function clock(at: number): string {
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
-/** Whose file names it: the project's folder name, or the person's own. */
-export function hostedPlace(status: HostedMCPStatus): string {
-  if (status.project == null) return "Your own (~/.agents/mcp.json)";
-  const name = status.project.replace(/\/+$/, "").split("/").pop() ?? "";
-  return name || status.project;
-}
-
 /** What it is doing, in a line. */
 export function hostedLine(status: HostedMCPStatus): string {
   const using = status.users === 1 ? "1 using it" : `${status.users} using it`;
@@ -54,8 +47,8 @@ export function hostedTally(servers: HostedMCPStatus[]): { words: string; stoppe
 
 export type MCPTone = "good" | "failing" | "quiet";
 
-/** A folder URL, or a path, as the path the host writes in MCPServerHealth.project. */
-export function projectPath(folder: string): string {
+/** A folder URL, or a path, as the path the host writes in MCPServerHealth.folder. */
+export function folderPath(folder: string): string {
   if (!folder.startsWith("file:")) return folder.replace(/\/+$/, "");
   try {
     return decodeURIComponent(new URL(folder).pathname).replace(/\/+$/, "");
@@ -66,19 +59,19 @@ export function projectPath(folder: string): string {
 
 /** The person's own servers, for Activity. */
 export function personalServers(snapshot: MCPHealthSnapshot | undefined): MCPServerHealth[] {
-  return (snapshot?.servers ?? []).filter((s) => s.project == null);
+  return (snapshot?.servers ?? []).filter((s) => s.folder == null);
 }
 
-/** One project's, for its page in the sidebar; `folder` as the host writes the project's. */
-export function projectServers(snapshot: MCPHealthSnapshot | undefined, folder: string): MCPServerHealth[] {
-  const path = projectPath(folder);
-  return (snapshot?.servers ?? []).filter((s) => s.project != null && projectPath(s.project) === path);
+/** One folder's, for its page in the sidebar; `folder` as the host writes the folder's. */
+export function folderServers(snapshot: MCPHealthSnapshot | undefined, folder: string): MCPServerHealth[] {
+  const path = folderPath(folder);
+  return (snapshot?.servers ?? []).filter((s) => s.folder != null && folderPath(s.folder) === path);
 }
 
-/** Why one file could not be read: the person's (no folder) or a project's. */
+/** Why one file could not be read: the person's (no folder) or a folder's. */
 export function fileProblem(snapshot: MCPHealthSnapshot | undefined, folder?: string): string | undefined {
-  const path = folder === undefined ? undefined : projectPath(folder);
-  return snapshot?.problems.find((p) => (p.project == null ? undefined : projectPath(p.project)) === path)?.message;
+  const path = folder === undefined ? undefined : folderPath(folder);
+  return snapshot?.problems.find((p) => (p.folder == null ? undefined : folderPath(p.folder)) === path)?.message;
 }
 
 /** How it runs, beside its name. */
@@ -102,7 +95,7 @@ export function healthLine(server: MCPServerHealth): string {
       return "Answered" + tools + checked;
     }
     case "failed": return "Didn't answer" + checked;
-    case "waiting": return "Waiting for approval in this project's settings, so it is not started";
+    case "waiting": return "Waiting for approval in this folder's settings, so it is not started";
     case "missingSecret": return "Needs a secret that isn't set here, so it is not started";
     case "signIn": return "Wants a sign-in first, in Settings";
     case "oldTransport": return "Uses the old sse transport, which isn't checked";
@@ -157,23 +150,37 @@ export function levelsSentence(levels: MCPLevels | undefined): string {
   return `Reaches ${reached.join(", ")}. Not yet ${not.join(", ")}.`;
 }
 
-/** The mark on the connectors that Agents makes (#1428). */
-export const madeByAgents = "Made by Agents";
-
 export const personalIntro = "Every connector in your own ~/.agents/mcp.json, which every agent has. "
   + "A hosted one runs once on this machine; any other is checked every four hours, and when its entry changes. "
   + "Edit them in the Mac's Settings ▸ Agent Configuration ▸ Connectors.";
-export const projectIntro = "Every connector in this project's .agents/mcp.json. "
+export const folderIntro = "Every connector in this folder's .agents/mcp.json. "
   + "A hosted one runs once on its machine; any other is checked every four hours, and when its entry changes. "
-  + "Edit them in the project's settings.";
+  + "Edit them in the folder's settings.";
 export const personalEmpty = "No connectors in ~/.agents/mcp.json yet.";
-export const projectEmpty = "No connectors in this project's .agents/mcp.json yet.";
+export const folderEmpty = "No connectors in this folder's .agents/mcp.json yet.";
 
-/** What Remove… takes out (#2154), as MCPHealthWords.removes: one the app added or one written by hand. */
-export function removesWords(name: string, inProject: boolean): string {
-  return `This removes the ${name} entry from ${inProject ? ".agents/mcp.json" : "~/.agents/mcp.json"}. `
-    + "Agents started after that won't have it.";
+/**
+ * What Remove… takes out (#2154), as MCPHealthWords.removes: one the app added or one written by hand.
+ * `machine` names a server a folder is on (#2266); undefined for the Mac's. The personal file is in no
+ * git, so the daemon keeps a copy of what went, and this says where (#2195).
+ */
+export function removesWords(name: string, inFolder: boolean, machine?: string): string {
+  return `This removes the ${name} entry from ${inFolder ? ".agents/mcp.json" : "~/.agents/mcp.json"}`
+    + `${machine ? ` on ${machine}` : ""}. Agents started after that won't have it.${inFolder ? "" : removesKept}`;
 }
 
-/** Said too for a project's: its mcp.json is committed (#2154). */
-export const removesCommitted = "That file is committed with the project, so the change shows in git.";
+/** Where a removed personal entry is kept (#2195), as MCPHealthWords.removesKept. */
+export const removesKept = " A copy of the entry is kept in ~/.agents/mcp.removed.json.";
+
+/** Remove… found the machine offline (#2266), as MCPHealthWords.notRemoved. */
+export function notRemovedOffline(name: string, machine: string): string {
+  return `${name} was not removed: ${machine} is offline.`;
+}
+
+/** Remove… was refused: `why` is a sentence (#2266). */
+export function notRemoved(name: string, why: string): string {
+  return `${name} was not removed. ${why}`;
+}
+
+/** Said too for a folder's: its mcp.json is committed (#2154). */
+export const removesCommitted = "That file is committed with the folder, so the change shows in git, and git can bring back what was committed.";

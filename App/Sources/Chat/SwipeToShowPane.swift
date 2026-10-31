@@ -115,11 +115,33 @@ final class SwipeAnchor {
     weak var view: NSView?
 
     /// Whether the event is over the chat, in the chat's own window.
+    ///
+    /// The rectangle is not enough: on macOS 26 the sidebar floats over the detail
+    /// column, so a swipe on a session row was in it and opened the pane (#2459). What
+    /// the window hits there must be in the chat's own column too.
     nonisolated func holds(window number: Int, at location: NSPoint) -> Bool {
         MainActor.assumeIsolated {
-            guard let view, let window = view.window, window.windowNumber == number else { return false }
-            return view.bounds.contains(view.convert(location, from: nil))
+            guard let view, let window = view.window, window.windowNumber == number,
+                  view.bounds.contains(view.convert(location, from: nil)),
+                  let content = window.contentView,
+                  let hit = content.hitTest(content.convert(location, from: nil))
+            else { return false }
+            return Self.sameColumn(hit, as: view)
         }
+    }
+
+    /// Whether `hit` is in the same split view column as `anchor`: under the nearest
+    /// split view's child that holds the anchor (AppKit's item wrapper, not always one of
+    /// its arranged subviews). With no split view, the window is one column.
+    static func sameColumn(_ hit: NSView, as anchor: NSView) -> Bool {
+        var child = anchor
+        while let parent = child.superview {
+            if parent is NSSplitView {
+                return hit.isDescendant(of: child)
+            }
+            child = parent
+        }
+        return true
     }
 }
 
@@ -127,13 +149,19 @@ private struct SwipeAnchorView: NSViewRepresentable {
     let anchor: SwipeAnchor
 
     func makeNSView(context: Context) -> NSView {
-        let view = NSView()
+        let view = Anchor()
         anchor.view = view
         return view
     }
 
     func updateNSView(_ view: NSView, context: Context) {
         anchor.view = view
+    }
+
+    /// Where the chat is, never what a click lands on: behind the transcript, it was
+    /// still hit before the chat's own rows, so no card took a click (#2374).
+    final class Anchor: NSView {
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
     }
 }
 

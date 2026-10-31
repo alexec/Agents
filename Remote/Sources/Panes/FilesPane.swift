@@ -464,16 +464,16 @@ struct FilesPane: View {
 
     @ViewBuilder
     private func pinButton(_ path: String) -> some View {
-        let pinned = model.pins(in: agent.projectFolder).contains { $0.path == path }
+        let pinned = model.pins(in: agent.folderPath).contains { $0.path == path }
         Button(pinned ? "Unpin" : "Pin") {
             Task {
-                if pinned { await model.unpin(path, in: agent.projectFolder) }
-                else { await model.pin(path, in: agent.projectFolder) }
+                if pinned { await model.unpin(path, in: agent.folderPath) }
+                else { await model.pin(path, in: agent.folderPath) }
             }
         }
         .appText(.fine)
         .buttonStyle(.paper)
-        .disabled(!pinned && model.pins(in: agent.projectFolder).count >= PinLimits.perProject)
+        .disabled(!pinned && model.pins(in: agent.folderPath).count >= PinLimits.perFolder)
     }
 
     // MARK: One file
@@ -780,9 +780,9 @@ struct UIImageBox: Equatable {
 }
 
 extension Agent {
-    /// A file's path in the project, as a pin names it (#536): from a worktree, the same
-    /// path in the project folder, where the pin opens it, as on the Mac and the web.
+    /// A file's path in the folder, as a pin names it (#536): from a worktree, the same
+    /// path in the folder, where the pin opens it, as on the Mac and the web.
     func pinPath(_ file: String) -> String? {
-        PinRules.relative(file, in: worktree != nil ? cwd : projectFolder)
+        PinRules.relative(file, in: worktree != nil ? cwd : folderPath)
     }
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/alexec/agents/Go/internal/richtext"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -29,6 +30,13 @@ const (
 	mrURI     = "ui://gitlab/mr"
 )
 
+// MergeRequestsURI and IssuesURI are the list views' addresses, which agentsd points at a
+// project's GitLab project (#2669).
+const (
+	MergeRequestsURI = mrsURI
+	IssuesURI        = issuesURI
+)
+
 // page is a view's HTML: its file, with the shared script and styles put in.
 func page(name string) string {
 	read := func(n string) string {
@@ -39,7 +47,7 @@ func page(name string) string {
 		return string(b)
 	}
 	return strings.NewReplacer("/*common.css*/", read("common.css"), "/*mrpage.css*/", read("mrpage.css"),
-		"/*bridge.js*/", read("bridge.js"), "/*mrpage.js*/", read("mrpage.js")).Replace(read(name))
+		"/*bridge.js*/", read("bridge.js"), "/*lineage.js*/", read("lineage.js"), "/*mrpage.js*/", read("mrpage.js")).Replace(read(name))
 }
 
 func uiMeta(uri string, visibility ...string) mcp.Meta {
@@ -76,9 +84,11 @@ func addViews(server *mcp.Server, g *RealGitLab, projectOf func(context.Context,
 	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true}
 
 	tool(server, &mcp.Tool{Name: "show_merge_requests", Title: "Show merge requests",
-		Description: "The project's open merge requests, newest updated first, at most 100, each with its head commit's pipeline " +
-			"(passing, failing, running or none), whether it conflicts with its target, whether approvals are missing, and whether " +
-			"auto-merge is on. Its view is the Merge requests page, where a person opens a merge request's page.",
+		Description: "The project's open merge requests, newest created first, at most 100, each with its head commit's pipeline " +
+			"(passing, failing, running or none), whether it conflicts with its target, whether approvals are missing or changes requested, " +
+			"whether auto-merge is on, and its section for the signed-in username (viewer): needs_you (you are a reviewer, or yours with " +
+			"a failed pipeline, a conflict or changes requested), yours, team (the project's Developers and up, and bots) or others; " +
+			"attention counts needs_you. Its view is the Merge requests page, where a person opens a merge request's page.",
 		Annotations: readOnly, Meta: uiMeta(mrsURI, "model", "app")},
 		func(ctx context.Context, in boardArgs) (map[string]any, error) {
 			project, err := projectOf(ctx, in.Project)
@@ -89,8 +99,9 @@ func addViews(server *mcp.Server, g *RealGitLab, projectOf func(context.Context,
 		})
 
 	tool(server, &mcp.Tool{Name: "show_issues", Title: "Show issues",
-		Description: "The project's open issues, newest updated first, at most 100, each with its labels, assignees (usernames) " +
-			"and comment count. Its view is the Issues page, with Start Agent on each issue.",
+		Description: "The project's open issues, newest created first, at most 100, each with its labels, assignees (usernames), " +
+			"comment count and section for the signed-in username (viewer): needs_you (assigned to you), yours, team (the project's " +
+			"Developers and up, and bots) or others; attention counts needs_you. Its view is the Issues page, where a person expands a row for its Markdown description or chooses Start Agent.",
 		Annotations: readOnly, Meta: uiMeta(issuesURI, "model", "app")},
 		func(ctx context.Context, in issuesViewArgs) (map[string]any, error) {
 			project, err := projectOf(ctx, in.Project)
@@ -98,6 +109,24 @@ func addViews(server *mcp.Server, g *RealGitLab, projectOf func(context.Context,
 				return nil, err
 			}
 			return g.OpenIssues(ctx, project, in.Label)
+		})
+
+	tool(server, &mcp.Tool{Name: "show_issue_details", Title: "Show issue details",
+		Description: "One issue's description, rendered as rich text for the Issues page.",
+		Annotations: readOnly, Meta: uiMeta("", "model", "app")},
+		func(ctx context.Context, in numberArgs) (map[string]any, error) {
+			project, err := projectOf(ctx, in.Project)
+			if err != nil {
+				return nil, err
+			}
+			if in.Number < 1 {
+				return nil, fmt.Errorf("issue number must be positive")
+			}
+			var issue issueJSON
+			if err := g.get(ctx, fmt.Sprintf("projects/%s/issues/%d", pid(project), in.Number), false, &issue); err != nil {
+				return nil, err
+			}
+			return map[string]any{"description": issue.Description, "descriptionHTML": richtext.Markdown(issue.Description)}, nil
 		})
 
 	tool(server, &mcp.Tool{Name: "show_merge_request", Title: "Show a merge request",
@@ -173,10 +202,10 @@ func addViews(server *mcp.Server, g *RealGitLab, projectOf func(context.Context,
 	// No network at all: an empty csp, so the host draws them under its strictest policy.
 	meta := mcp.Meta{"ui": map[string]any{"csp": map[string]any{}, "prefersBorder": true}}
 	for _, v := range []struct{ uri, name, title, description, file string }{
-		{mrsURI, "merge-requests", "Merge requests", "The project's open merge requests, with their pipeline, conflict, approvals " +
+		{mrsURI, "merge-requests", "Merge requests", "The project's open merge requests, newest created first, with their pipeline, conflict, approvals " +
 			"and auto-merge; a merge request opens its page. Fed by show_merge_requests.", "mrs.html"},
-		{issuesURI, "issues", "Issues", "The project's open issues, with their labels and assignees, and Start Agent; a label narrows " +
-			"the list. Fed by show_issues.", "issues.html"},
+		{issuesURI, "issues", "Issues", "The project's open issues, newest created first, with their labels and assignees, and Start Agent; a label narrows " +
+			"the list. A person expands a row to read its Markdown description. Fed by show_issues.", "issues.html"},
 		{mrURI, "mr", "Merge request", "One merge request's page: description, comments, discussions on lines, files with the app's " +
 			"diff, and its pipeline with a failed job's log, with Comment, Approve, Merge, Auto-merge and Ask an Agent. Fed by show_merge_request.", "mr.html"},
 	} {

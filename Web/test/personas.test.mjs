@@ -11,7 +11,7 @@ const advertised = [
   { id: "fast", name: "Fast", type: "boolean", currentValue: false },
 ];
 const reviewer = {
-  id: "reviewer", name: "Reviewer", origin: "project",
+  id: "reviewer", name: "Reviewer", origin: "folder",
   settings: { permissionMode: "plan", model: "sonnet", options: { fast: "true" }, labels: ["review", "Bugs"] },
 };
 
@@ -24,5 +24,15 @@ test("a persona naming nothing changes nothing", () => {
 });
 
 test("its labels go beside those already there, each once", () => {
-  assert.deepEqual(p.withPersonaLabels(["bugs"], reviewer), ["bugs", "review"]);
+  assert.deepEqual(p.withPersonaLabels(["bugs"], undefined, reviewer), ["bugs", "review"]);
+});
+
+const engineer = { ...reviewer, id: "engineer", name: "Engineer", settings: { options: {}, labels: ["code", "bugs"] } };
+
+test("switching persona takes the last one's labels away, keeping those both name (#2649)", () => {
+  assert.deepEqual(p.withPersonaLabels(["mine", "review", "Bugs"], reviewer, engineer), ["mine", "Bugs", "code"]);
+});
+
+test("no persona takes the last one's labels away and keeps the person's", () => {
+  assert.deepEqual(p.withPersonaLabels(["mine", "review", "Bugs"], reviewer, undefined), ["mine"]);
 });

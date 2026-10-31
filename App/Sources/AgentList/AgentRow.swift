@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// One agent on a project page: what it is, and what it is doing.
+/// One agent on a folder page: what it is, and what it is doing.
 ///
 /// An icon for the state, the name it was given, and a line saying what it is working
 /// on. The name is what it was asked; the line under it is what is happening now, which
@@ -14,8 +14,8 @@ struct AgentRow: View {
     /// A row of the Mac's sessions list rather than a card on a page: a list-sized
     /// title and one line of what it said, so a column of them reads at a glance.
     private let isCompact: Bool
-    /// Which project it is in, after the title: under a smart row of the sidebar (#495),
-    /// which gathers sessions from every project, and nowhere else.
+    /// Which folder it is in, after the title: under a smart row of the sidebar (#495),
+    /// which gathers sessions from every folder, and nowhere else.
     private let place: String?
     /// Where it sits in the sidebar's tree (#835): a parent with its count and fold, or a
     /// child one indent in. Nil off the sidebar.
@@ -71,7 +71,14 @@ struct AgentRow: View {
     private var rowContent: some View {
         // In the sidebar, the icon column every row there has (#495): 16 wide, 6 to the title.
         HStack(alignment: .top, spacing: isCompact ? 6 : 12) {
-            if isCompact, let mark = SessionMark(agent: markAgent, group: model.work.group(of: markAgent)) {
+            if isCompact, agent.state == .archived {
+                Image(systemName: "archivebox")
+                    .glyph(size: 13)
+                    .sidebarMark(.secondary)
+                    .frame(width: 16)
+                    .padding(.top, 1)
+                    .accessibilityLabel("Archived")
+            } else if isCompact, let mark = SessionMark(agent: markAgent, group: model.work.group(of: markAgent)) {
                 mark.padding(.top, 1)
             } else {
             StatusIcon(state: agent.state, isComingBack: isComingBack,
@@ -80,7 +87,8 @@ struct AgentRow: View {
                        isUnaccountedFor: agent.endingIsUnaccountedFor,
                        ending: agent.endedReason?.summary,
                        endedReason: agent.endedReason,
-                       isUnread: agent.isUnread)
+                       isUnread: agent.isUnread,
+                       tool: RunningToolWords.tool(agent))
                 .frame(width: isCompact ? 16 : nil)
                 .padding(.top, 1)
             }
@@ -100,7 +108,7 @@ struct AgentRow: View {
                         RenameField(agent: agent)
                             .appText(isCompact ? .supporting : .reading)
                     } else {
-                    // The project's name whole up to 40% of the line, then cut, so a long
+                    // The folder's name whole up to 40% of the line, then cut, so a long
                     // one never pushes the title out (#936).
                     TitleAndPlace {
                         Text(agent.title ?? "Untitled")
@@ -123,7 +131,7 @@ struct AgentRow: View {
                     if let workflowName = startedByWorkflowName {
                         Image(systemName: "flowchart")
                             .appText(.fine)
-                            .foregroundStyle(.tertiary)
+                            .sidebarMark(.tertiary)
                             .help("Started by the workflow \(workflowName)")
                             .accessibilityLabel("started by the workflow \(workflowName)")
                     }
@@ -131,16 +139,21 @@ struct AgentRow: View {
                     if agent.isMuted {
                         Image(systemName: MuteWords.symbol)
                             .appText(.fine)
-                            .foregroundStyle(.tertiary)
+                            .sidebarMark(.tertiary)
                             .help(MuteWords.mutedHelp)
                             .accessibilityLabel(MuteWords.muted)
+                    }
+                    // Voice mode listens in this chat (#2518): beside the mute mark, and
+                    // gone the moment voice mode ends.
+                    if VoiceMode.shared.isOn(in: agent.id) {
+                        ListeningMark()
                     }
                     // Started by another agent (028): the same kind of mark, for the
                     // same reason — this is not something the person typed for.
                     if let starter = model.startedByAgentLabel(agent) {
                         Image(systemName: AgentsModel.startedByAgentSymbol)
                             .appText(.fine)
-                            .foregroundStyle(.tertiary)
+                            .sidebarMark(.tertiary)
                             .help(starter)
                             .accessibilityLabel(starter)
                     }
@@ -149,7 +162,7 @@ struct AgentRow: View {
                     if let file = FileToSeeWords.line(agent) {
                         Image(systemName: FileToSeeWords.symbol)
                             .appText(.fine)
-                            .foregroundStyle(.secondary)
+                            .sidebarMark(.secondary)
                             .help(file)
                             .accessibilityLabel(file)
                     }
@@ -170,14 +183,20 @@ struct AgentRow: View {
                     Telling(host: model.answerRecipient(agent.id), doing: acting.doing)
                         .frame(height: isCompact ? 14 : nil)
                 } else if let queued = model.queuedLine(agent) {
-                    // Its place in its project's queue (#362), in the report's place: it
+                    // Its place in its folder's queue (#362), in the report's place: it
                     // has said nothing yet, and starts by itself when a place frees.
                     Text(queued)
                         .appText(isCompact ? .fine : .supporting)
                         .foregroundStyle(.secondary)
-                        .help("Starts by itself when this project has a place free for another helper")
+                        .help("Starts by itself when this folder has a place free for another helper")
+                } else if let reason = needsYouLine {
+                    Text(reason)
+                        .appText(isCompact ? .fine : .supporting)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(isCompact ? 1 : 2)
+                        .fixedSize(horizontal: false, vertical: true)
                 } else if agent.missingFolder != nil, agent.state != .archived {
-                    // Its folder gone (#119): said before anybody types, as a project's
+                    // Its folder gone (#119): said before anybody types, as a folder's
                     // row says it, in the report's place.
                     Text(MissingFolderWords.label)
                         .appText(isCompact ? .fine : .supporting)
@@ -207,7 +226,7 @@ struct AgentRow: View {
                 // the prompt bar and the wait lines carry it, and Carry on with it.
                 if !isCompact {
                     // Working in a worktree (030): named, because with two agents in one
-                    // project the worktree is how you tell whose changes are whose. On this
+                    // folder the worktree is how you tell whose changes are whose. On this
                     // line, not the title's, so a long branch never cuts the title short (#68).
                     // Labels are shown here and changed over the chat.
                     if agent.worktree != nil || !agent.labels.isEmpty {
@@ -331,7 +350,7 @@ struct AgentRow: View {
                 }
                 // The person's title, which the runtime's no longer replaces (#751).
                 Button("Rename…") { model.renaming = Renaming(id: agent.id) }
-                // At the top of its project whatever its state, or back among the rest (#180).
+                // At the top of its folder whatever its state, or back among the rest (#180).
                 PinSessionButton(agent: agent)
                 // Branching leaves the original alone and carries the history so far.
                 Button("Branch") { Task { await model.fork(agent.id) } }
@@ -343,14 +362,25 @@ struct AgentRow: View {
                         .disabled(isActing)
                 }
             }
+            Divider()
+            // Its record and transcript as a .tar.gz, to keep or import elsewhere (#1001).
+            Button("Export…") { Task { await model.exportAgent(agent) } }
+                .disabled(model.hostUnreachable(agent.host) || model.exportImport != nil)
             // Finder only sees this Mac's disk (058, FR-019).
             if model.isOnThisMac(agent.host) {
-                Divider()
                 Button("Show in Finder") {
                     model.reveal(agent.cwd, on: agent.host)
                 }
             }
         }
+    }
+
+    /// What the session asked, or why it stopped, while this row needs a person.
+    private var needsYouLine: String? {
+        let question = model.work.permission(for: agent.id)?.toolCall.line
+            ?? model.work.elicitation(for: agent.id)?.message
+            ?? model.work.elicitation(for: agent.id)?.title
+        return StatusShape.needsYouLine(row: agent, isComingBack: isComingBack, question: question)
     }
 
     /// The session whose mark the row shows: its own, or for a folded parent the most
@@ -372,7 +402,7 @@ struct AgentRow: View {
     /// the file has since gone, so the mark never disappears with it.
     private var startedByWorkflowName: String? {
         guard let id = agent.startedByWorkflow else { return nil }
-        return model.workflows(in: agent.projectFolder).first { $0.workflow.workflowID == id }?.workflow.name ?? id
+        return model.workflows(in: agent.folderPath).first { $0.workflow.workflowID == id }?.workflow.name ?? id
     }
 }
 
@@ -413,24 +443,26 @@ private struct FoldCount: View {
 /// reader, rather than drawn.
 /// A session's mark in the sidebar (Alex, #495): what it wants, in four shapes — an
 /// orange hand when it needs the person, a spinner in the accent while it works (#1558),
-/// an empty ring once done, read or not (#1323); a numbered list while queued, an hourglass
-/// while it waits and a pause mark once stopped (#630).
+/// a tick once done, read or not (#1323, #2363); a numbered list while queued, a breathing
+/// beacon while it waits (#2456, #2657) and a pause mark once stopped (#630).
 /// An orange archive box when it asks to be archived, as it is listed under Needs You
 /// (#817). Archived keeps its `StatusIcon`.
 private struct SessionMark: View {
     private enum Kind { case needsYou, working, queued, waiting, paused, done, asksToArchive }
     private let kind: Kind
+    private let agent: Agent
     /// The tool a working session runs (#1902): a wrench in the spinner's place.
     private var tool: String?
 
     init?(agent: Agent, group: AgentGroup) {
+        self.agent = agent
         tool = group == .running ? RunningToolWords.tool(agent) : nil
         switch group {
         case .needsAttention, .blocked: kind = .needsYou
         case .running: kind = .working
         // Asking to be archived (#584) is what the person has left to do with it.
         case .finished where agent.asksToArchive: kind = .asksToArchive
-        // Read or unread, one ring (#1323): the bold title alone says unread.
+        // Read or unread, one tick (#1323, #2363): the bold title alone says unread.
         case .finished: kind = .done
         case .stopped where agent.asksToArchive: kind = .asksToArchive
         // In the accent as the rest, not the grey `StatusIcon` (#630).
@@ -444,39 +476,42 @@ private struct SessionMark: View {
 
     /// The well grows with the text beside it (#750), so the row keeps its shape.
     @ScaledMetric private var scale: CGFloat = 1
+    /// On a row filled with the accent, the ring is the ground as the other marks (#2382).
+    @Environment(\.drawsOnAccent) private var onAccent
 
     var body: some View {
         Group {
             switch kind {
             case .needsYou:
-                Image(systemName: "hand.raised.fill").tinted(.attention)
-            case .working where tool != nil:
-                Image(systemName: RunningToolWords.symbol).foregroundStyle(Paper.accent)
+                Image(systemName: "hand.raised.fill").sidebarMark(StateTint.attention.style(or: .secondary))
             case .working:
-                // In the accent as the other marks, and in step with every spinner (#1558).
-                SyncedSpinner(diameter: 12 * scale, color: Paper.accent)
+                // In the accent as the other marks, and in step with every one (#1558, #2044).
+                // One case for both activities, so a tool tips the same ring (#2332).
+                WorkingRing(size: 12 * scale, color: onAccent ? Paper.ground : Paper.accent, doing: tool != nil)
             case .queued:
-                Image(systemName: "list.number").foregroundStyle(Paper.accent)
+                Image(systemName: "list.number").sidebarMark(Paper.accent)
             case .waiting:
-                Image(systemName: "zzz").foregroundStyle(Paper.accent)
+                // The waiting card's beacon, breathing in step with every other (#2456, #2657).
+                WaitingBeacon(size: 12 * scale, color: onAccent ? Paper.ground : Paper.accent)
             case .paused:
-                Image(systemName: "pause.circle").foregroundStyle(Paper.accent)
+                Image(systemName: "pause.circle").sidebarMark(Paper.accent)
             case .done:
-                Image(systemName: "circle").foregroundStyle(Paper.accent)
+                Image(systemName: "checkmark").sidebarMark(Paper.accent)
             case .asksToArchive:
-                Image(systemName: ArchiveRequestWords.symbol).tinted(.attention)
+                Image(systemName: ArchiveRequestWords.symbol).sidebarMark(StateTint.attention.style(or: .secondary))
             }
         }
         .frame(width: 16 * scale, height: 16 * scale)
         // The tool by name on the pointer (#1902); the other marks say theirs in the row.
-        .help(tool.map(RunningToolWords.label) ?? "")
+        .help(kind == .needsYou ? StatusShape.words(row: agent, isComingBack: false)
+            : tool.map(RunningToolWords.label) ?? "")
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
     }
 
     private var label: String {
         switch kind {
-        case .needsYou: "Needs you"
+        case .needsYou: StatusShape.words(row: agent, isComingBack: false)
         case .working: tool.map(RunningToolWords.label) ?? "Working"
         case .queued: "Queued"
         case .waiting: "Waiting"
@@ -505,8 +540,12 @@ struct StatusIcon: View {
     /// Waiting for an allowance to come back (052, US4): it will carry on by itself, so
     /// it does not want a person, whatever its stopped shape says.
     var isWaitingForAllowance = false
+    /// The tool it runs, which tips the working ring (#2044, #2332).
+    var tool: String?
     /// The well grows with the text beside it (#750), so the row keeps its shape.
     @ScaledMetric private var scale: CGFloat = 1
+    /// On a row filled with the accent, the dot is the ground as the other marks (#2382).
+    @Environment(\.drawsOnAccent) private var onAccent
 
     private var shape: StatusShape {
         StatusShape(state: state, outcome: outcome, isWaiting: isWaiting, isComingBack: isComingBack,
@@ -517,15 +556,19 @@ struct StatusIcon: View {
 
     var body: some View {
         Group {
-            if let symbol = shape.symbol {
+            if shape == .waiting {
+                // The beacon breathes in the accent, where the unread dot before the title is grey,
+                // round and still (#2456, #2657).
+                WaitingBeacon(size: 12 * scale, color: onAccent ? Paper.ground : Paper.accent)
+            } else if let symbol = shape.symbol {
                 Image(systemName: symbol)
                     // Decorative: a glyph filling an 18-point well, not text (FR-015).
                     .glyph(size: 15)
-                    .foregroundStyle((StatusShape.isTinted(shape, isWaitingForAllowance: isWaitingForAllowance)
-                                      ? StateTint.attention : .none)
+                    .sidebarMark((StatusShape.isTinted(shape, isWaitingForAllowance: isWaitingForAllowance)
+                                  ? StateTint.attention : .none)
                         .style(or: .secondary))
             } else {
-                SyncedSpinner(diameter: 12 * scale)
+                WorkingRing(size: 12 * scale, doing: tool != nil)
             }
         }
         .frame(width: 18 * scale, height: 18 * scale)
@@ -534,11 +577,11 @@ struct StatusIcon: View {
     }
 
     /// What a screen reader hears, and what the tooltip says: `StatusShape.words`, which
-    /// the web remote says too.
+    /// the web remote says too. A running tool is named, as the tipping ring draws it (#2261).
     private var description: String {
         StatusShape.words(shape, state: state, isComingBack: isComingBack, outcome: outcome,
                           isUnaccountedFor: isUnaccountedFor, ending: ending, isUnread: isUnread,
-                          isWaitingForAllowance: isWaitingForAllowance)
+                          isWaitingForAllowance: isWaitingForAllowance, tool: tool)
     }
 }
 
@@ -593,6 +636,6 @@ struct PinSessionButton: View {
             Task { await model.setPinned(agent, !pinned) }
         }
         .help(pinned ? "Put this session back among the others"
-                     : "Keep this session at the top of its project, whatever its state")
+                     : "Keep this session at the top of its folder, whatever its state")
     }
 }

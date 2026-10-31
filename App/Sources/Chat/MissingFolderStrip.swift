@@ -21,11 +21,11 @@ struct MissingFolderStrip: View {
             .help(agent.folderGoneMessage)
             HStack(spacing: 8) {
                 Button {
-                    Task { await model.continueInProject(agent.id) }
+                    Task { await model.continueInFolder(agent.id) }
                 } label: {
-                    Label(MissingFolderWords.continueInProject, systemImage: "arrow.turn.down.right")
+                    Label(MissingFolderWords.continueInFolder, systemImage: "arrow.turn.down.right")
                 }
-                .help("Start a new session in the project folder that reads this one and carries on")
+                .help("Start a new session in the folder that reads this one and carries on")
                 if agent.mayRecreateWorktree {
                     Button {
                         Task { await model.recreateWorktree(agent.id) }

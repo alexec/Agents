@@ -1,0 +1,114 @@
+{
+  "servers": [
+    {
+      "server": {
+        "name": "agents/github",
+        "title": "GitHub",
+        "description": "Issues, pull requests and Actions: the official GitHub MCP server's tools, and events"
+      },
+      "_meta": {
+        "dev.agentloops/connector": {
+          "command": "github-mcp",
+          "hosted": true,
+          "declares": {
+            "tools": true,
+            "events": [
+              "checks.failed",
+              "pr.opened",
+              "pr.merged",
+              "pr.closed",
+              "pr.conflicted",
+              "review.requested",
+              "review.posted",
+              "review.comment",
+              "issue.opened",
+              "issue.labelled",
+              "issue.commented",
+              "issue.closed",
+              "issue.assigned"
+            ],
+            "views": true
+          },
+          "tested": "2026-10-19"
+        }
+      }
+    },
+    {
+      "server": {
+        "name": "agents/linear",
+        "title": "Linear",
+        "description": "Linear issues: a page of open issues with Start Agent, and events when one is opened, labelled, commented on or closed"
+      },
+      "_meta": {
+        "dev.agentloops/connector": {
+          "command": "linear-mcp",
+          "hosted": true,
+          "declares": {
+            "tools": true,
+            "events": [
+              "issue.opened",
+              "issue.labelled",
+              "issue.commented",
+              "issue.closed",
+              "issue.assigned"
+            ],
+            "views": true
+          },
+          "tested": "2026-10-19"
+        }
+      }
+    },
+    {
+      "server": {
+        "name": "agents/gitlab",
+        "title": "GitLab",
+        "description": "Merge requests, pipelines and issues on gitlab.com or a self-managed GitLab: their pages, tools to read them and comment, and events"
+      },
+      "_meta": {
+        "dev.agentloops/connector": {
+          "command": "gitlab-mcp",
+          "hosted": true,
+          "declares": {
+            "tools": true,
+            "events": [
+              "checks.failed",
+              "pr.opened",
+              "pr.merged",
+              "pr.closed",
+              "pr.conflicted",
+              "review.requested",
+              "review.comment",
+              "issue.opened",
+              "issue.labelled",
+              "issue.commented",
+              "issue.closed",
+              "issue.assigned"
+            ],
+            "views": true
+          },
+          "tested": "2026-10-20"
+        }
+      }
+    },
+    {
+      "server": {
+        "name": "agents/email",
+        "title": "Email",
+        "description": "One mailbox over IMAP: an event when mail comes, a Mail page, and tools to list, search and read it, mark it read and move it. It never sends mail"
+      },
+      "_meta": {
+        "dev.agentloops/connector": {
+          "command": "email-mcp",
+          "hosted": true,
+          "declares": {
+            "tools": true,
+            "events": [
+              "email.received"
+            ],
+            "views": true
+          }
+        }
+      }
+    }
+  ]
+}

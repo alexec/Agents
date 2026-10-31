@@ -105,13 +105,15 @@ func (d *Daemon) noteAccount(runtime string, canSteer bool, caps wire.ACPPromptC
 	Broadcast(d, wire.NotifyRuntimeAccount, a)
 }
 
-func (d *Daemon) unusable(runtime string) *string {
+// unusable is why a runtime's own sign-in cannot be used now, or nil; installed is each
+// runtime runtimeAllowances located once for all its rows (#2251).
+func (d *Daemon) unusable(runtime string, installed map[string]bool) *string {
 	rt := runtimeByID(runtime)
 	if rt == nil {
 		s := "not a runtime this app knows"
 		return &s
 	}
-	if p, _, _ := locateFor(rt); p == "" {
+	if !installed[runtime] {
 		s := "not installed"
 		return &s
 	}
@@ -135,9 +137,11 @@ func (d *Daemon) runtimeAllowances() wire.RuntimeAllowances {
 	d.allowMu.Lock()
 	states := d.allowancesLocked()
 	keys := map[string]bool{}
+	installed := map[string]bool{}
 	for i := range catalog {
 		if p, _, _ := locateFor(&catalog[i]); p != "" {
 			keys[ownKey(catalog[i].ID)] = true
+			installed[catalog[i].ID] = true
 		}
 	}
 	for k := range states {
@@ -203,10 +207,14 @@ func (d *Daemon) runtimeAllowances() wire.RuntimeAllowances {
 	for i := range out.Rows {
 		rt := runtimeOf(out.Rows[i].CredentialKey)
 		if p, ok := profiles[out.Rows[i].CredentialKey]; ok {
-			out.Rows[i].Unusable = d.accountUnusable(p)
+			out.Rows[i].Unusable = d.accountUnusable(p, installed)
+			// An org account has no plan reading: its tokens today instead (#999, FR-025).
+			if route := accountRoute(&p); route != "" {
+				out.Rows[i].TokensToday = new(d.routeTokensToday(p.RuntimeID, route, time.Now()))
+			}
 			continue
 		}
-		out.Rows[i].Unusable = d.unusable(rt)
+		out.Rows[i].Unusable = d.unusable(rt, installed)
 		if rt == "claude" && out.Rows[i].CredentialKey == ownKey(rt) && out.Rows[i].Unusable == nil {
 			out.Rows[i].SetupNote = chromeHostNote()
 		}

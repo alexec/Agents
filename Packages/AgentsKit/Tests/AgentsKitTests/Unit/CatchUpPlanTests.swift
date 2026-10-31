@@ -8,7 +8,7 @@ import Testing
 struct CatchUpPlanTests {
     // MARK: The plan
 
-    @Test func theProjectListAloneIsOneCall() {
+    @Test func theFolderListAloneIsOneCall() {
         #expect(CatchUpPlan(chat: nil, onScreen: []).steps == [.snapshot])
     }
 
@@ -94,7 +94,7 @@ struct CatchUpPlanTests {
         #expect(cache.count == 0)
     }
 
-    @Test func archivedAgentsOutsideTheOpenProjectAreLetGo() {
+    @Test func archivedAgentsOutsideTheOpenFolderAreLetGo() {
         let here = URL(filePath: "/work/here", directoryHint: .isDirectory)
         let there = URL(filePath: "/work/there", directoryHint: .isDirectory)
         func agent(_ folder: URL, _ state: AgentState) -> Agent {
@@ -105,10 +105,10 @@ struct CatchUpPlanTests {
         let openThere = agent(there, .archived)
         let liveThere = agent(there, .running)
         let all = [archivedHere, archivedThere, openThere, liveThere]
-        let letGo = ClientHolding.archivedToLetGo(all, project: here, chat: openThere.id)
+        let letGo = ClientHolding.archivedToLetGo(all, folder: here, chat: openThere.id)
         #expect(letGo == [archivedThere.id])
-        // No project open: every archived one but the open chat.
-        #expect(Set(ClientHolding.archivedToLetGo(all, project: nil, chat: nil))
+        // No folder open: every archived one but the open chat.
+        #expect(Set(ClientHolding.archivedToLetGo(all, folder: nil, chat: nil))
                 == [archivedHere.id, archivedThere.id, openThere.id])
     }
 

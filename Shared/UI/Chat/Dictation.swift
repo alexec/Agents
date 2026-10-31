@@ -21,6 +21,14 @@ private final class BufferSink: @unchecked Sendable {
     private var continuation: AsyncStream<AnalyzerInput>.Continuation?
     private var converter: AVAudioConverter?
     private var target: AVAudioFormat?
+    /// For the log: the tap's format, and buffers given and passed on, since `point`.
+    private var given: (format: String, count: Int, passed: Int) = ("none", 0, 0)
+
+    var counts: String {
+        lock.lock()
+        defer { lock.unlock() }
+        return "tap \(given.format), \(given.count) buffers, \(given.passed) passed on"
+    }
 
     func point(at continuation: AsyncStream<AnalyzerInput>.Continuation?, in target: AVAudioFormat? = nil) {
         lock.lock()
@@ -29,57 +37,59 @@ private final class BufferSink: @unchecked Sendable {
         self.continuation = continuation
         self.target = target
         converter = nil
+        given = ("none", 0, 0)
     }
 
     func append(_ buffer: AVAudioPCMBuffer) {
         lock.lock()
         defer { lock.unlock() }
         guard let continuation else { return }
+        if given.count == 0 {
+            let format = buffer.format
+            given.format = "\(format.sampleRate) Hz × \(format.channelCount) \(format.commonFormat.rawValue)"
+                + (format.isInterleaved ? " interleaved" : "")
+        }
+        given.count += 1
         guard let target, buffer.format != target else {
+            given.passed += 1
             continuation.yield(AnalyzerInput(buffer: buffer))
             return
         }
         if converter?.inputFormat != buffer.format {
-            converter = AVAudioConverter(from: buffer.format, to: target)
+            converter = DictationAudio.converter(from: buffer.format, to: target)
         }
-        guard let converter else { return }
-        let ratio = target.sampleRate / buffer.format.sampleRate
-        let capacity = AVAudioFrameCount((Double(buffer.frameLength) * ratio).rounded(.up)) + 1
-        guard let converted = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: capacity) else { return }
-        let given = Given()
-        var error: NSError?
-        let status = converter.convert(to: converted, error: &error) { _, status in
-            if given.done {
-                status.pointee = .noDataNow
-                return nil
-            }
-            given.done = true
-            status.pointee = .haveData
-            return buffer
-        }
-        if status != .error, converted.frameLength > 0 {
-            continuation.yield(AnalyzerInput(buffer: converted))
-        }
+        guard let converter, let converted = DictationAudio.convert(buffer, with: converter) else { return }
+        given.passed += 1
+        continuation.yield(AnalyzerInput(buffer: converted))
     }
-
-    /// Whether the converter has had this buffer yet. It asks until told there is no
-    /// more for now, and the same buffer twice would be heard twice.
-    private final class Given { var done = false }
 }
+
+/// The text and timing fields both transcribers expose to dictation.
+private protocol DictationResult: SpeechModuleResult {
+    var text: AttributedString { get }
+}
+
+extension DictationTranscriber.Result: DictationResult {}
+extension SpeechTranscriber.Result: DictationResult {}
 
 /// Talking into the prompt instead of typing it.
 ///
-/// Apple's dictation transcriber, on the device, as one continuous session for as long
-/// as the button is on: a pause is a pause, not the end of a request (#427). What it
-/// hears goes in at the cursor, the words it is still unsure of are the only ones it
-/// replaces, and the person can go on editing and typing while it listens. `DictationText`
-/// keeps track of all that.
+/// Apple's on-device transcriber, as one continuous session for as long as the button
+/// is on: a pause is a pause, not the end of a request (#427, #2515, #2575).
+/// What it hears goes in at the cursor, the words it is still unsure of are the only
+/// ones it replaces, and the person can go on editing and typing while it listens.
+/// `DictationText` keeps track of all that. No cloud transcription.
 ///
 /// It asks for the microphone and for speech recognition the first time and not again,
 /// and it asks at the moment of use rather than at launch.
 @MainActor
 @Observable
 final class Dictation {
+    enum Model {
+        case speech
+        case systemDictation
+    }
+
     /// Something to tell the person, and where to send them about it.
     struct Problem {
         var message: String
@@ -112,15 +122,24 @@ final class Dictation {
 
     /// Where the switches are, in each system's own words.
     #if os(iOS)
-    private static let whereTheSwitchIs = "Turn it on in Settings, under this app."
+    static let whereTheSwitchIs = "Turn it on in Settings, under this app."
     #else
-    private static let whereTheSwitchIs = "Turn it on in System Settings, under Privacy & Security."
+    static let whereTheSwitchIs = "Turn it on in System Settings, under Privacy & Security."
     #endif
 
     private(set) var isListening = false
+    /// The first volatile words of this run trailed the audio. The underline stays off
+    /// and the button's pulse is the listening mark (#2515).
+    private(set) var volatileIsLate = false
     private(set) var problem: Problem?
+    /// `finish()` is waiting for the last words.
+    private var isFinishing = false
 
-    private let engine = AVAudioEngine()
+    private let engine: AVAudioEngine
+    private let model: Model
+    /// Voice mode's engine and audio route, when this is voice mode's dictation (#2375):
+    /// they are opened and closed by voice mode, and this only adds its tap.
+    private let shared: VoiceAudio?
     private let sink = BufferSink()
     private var analyzer: SpeechAnalyzer?
     private var results: Task<Void, Never>?
@@ -134,13 +153,31 @@ final class Dictation {
     /// it has been stopped, and that result belongs to the run that is over: it must not
     /// be written over what has been typed since.
     private var run = 0
+    private let clock = ContinuousClock()
+    /// When the microphone opened for this run. Compared with a result's audio time.
+    private var listeningSince: ContinuousClock.Instant?
+    /// The first volatile result is the one that says whether the words are late.
+    /// A later revision of the same words is expected to arrive after it.
+    private var judgedVolatile = false
+    /// A first volatile result that trails its audio by more than this is late.
+    static let lateVolatile: Duration = .milliseconds(1_200)
 
     /// The words in the field still being heard, as character offsets, while dictation
-    /// is on. The field underlines them until they settle (#448).
-    var heardWords: Range<Int>? { isListening ? text.heardWords : nil }
+    /// is on. The field underlines them until they settle (#448). Nil when those words
+    /// came late: the pulse shows instead (#2515).
+    var heardWords: Range<Int>? {
+        guard isListening, !volatileIsLate else { return nil }
+        return text.heardWords
+    }
 
     /// Whether the system has been asked yet. Used to put our own words in front of
     /// the system's alert the first time.
+    init(shared: VoiceAudio? = nil, model: Model = .speech) {
+        self.shared = shared
+        engine = shared?.engine ?? AVAudioEngine()
+        self.model = model
+    }
+
     var hasBeenAsked: Bool {
         SFSpeechRecognizer.authorizationStatus() != .notDetermined
     }
@@ -217,21 +254,44 @@ final class Dictation {
                               permission: .microphone)
             return
         }
-        await listen(for: thisRun, vocabulary: vocabulary)
+        await listen(as: model, for: thisRun, vocabulary: vocabulary)
     }
 
-    private func listen(for thisRun: Int, vocabulary: [String]) async {
-        guard let locale = await DictationTranscriber.supportedLocale(equivalentTo: Locale.current) else {
-            guard thisRun == run else { return }
-            problem = Problem(message: "Dictation is not available for \(Locale.current.identifier).")
-            return
+    private func listen(as model: Model, for thisRun: Int, vocabulary: [String]) async {
+        switch model {
+        case .systemDictation:
+            guard let locale = await DictationTranscriber.supportedLocale(equivalentTo: Locale.current) else {
+                guard thisRun == run else { return }
+                problem = Problem(message: "Dictation is not available for \(Locale.current.identifier).")
+                return
+            }
+            let transcriber = DictationTranscriber(locale: locale, contentHints: [],
+                                                   transcriptionOptions: [.punctuation],
+                                                   reportingOptions: [.volatileResults, .frequentFinalization],
+                                                   attributeOptions: [])
+            await listen(with: transcriber, locale: locale, for: thisRun, vocabulary: vocabulary)
+        case .speech:
+            // Not on every device, nor in the simulator: the older model there, rather than
+            // no dictation at all (#2532).
+            guard SpeechTranscriber.isAvailable,
+                  let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale.current) else {
+                guard thisRun == run else { return }
+                note("dictation: SpeechTranscriber not available (\(SpeechTranscriber.isAvailable)), the older model")
+                await listen(as: .systemDictation, for: thisRun, vocabulary: vocabulary)
+                return
+            }
+            // The newer on-device model (#2515). Volatile results are the live words. It
+            // has no punctuation switch: the model writes the punctuation.
+            let transcriber = SpeechTranscriber(locale: locale, transcriptionOptions: [],
+                                                reportingOptions: [.volatileResults],
+                                                attributeOptions: [])
+            await listen(with: transcriber, locale: locale, for: thisRun, vocabulary: vocabulary)
         }
-        // Punctuation and capitals as system dictation writes them, and the words still
-        // being heard as they are heard, so they can be shown and settled in place.
-        let transcriber = DictationTranscriber(locale: locale, contentHints: [],
-                                               transcriptionOptions: [.punctuation],
-                                               reportingOptions: [.volatileResults, .frequentFinalization],
-                                               attributeOptions: [])
+    }
+
+    private func listen<T: LocaleDependentSpeechModule>(with transcriber: T, locale: Locale,
+                                                        for thisRun: Int, vocabulary: [String]) async
+    where T.Result: DictationResult {
         do {
             // The model for this language, the first time: a download the system shares
             // with every app, and a no-op once it is there.
@@ -246,14 +306,21 @@ final class Dictation {
         guard thisRun == run else { return }
 
         let analyzer = SpeechAnalyzer(modules: [transcriber])
-        let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber])
+        // Nil when the model is not on the device after all (the simulator's case). The
+        // microphone's own buffers would then reach the analyser, which traps on them on the
+        // audio thread, and the app is gone (#2532): a problem to show instead.
+        guard let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) else {
+            let status = await AssetInventory.status(forModules: [transcriber])
+            guard thisRun == run else { return }
+            note("dictation: no audio format for \(T.self), assets \(status)")
+            problem = Problem(message: "Dictation is not available on this device for \(locale.identifier).")
+            return
+        }
         let (input, feed) = AsyncStream<AnalyzerInput>.makeStream()
         do {
-            if !vocabulary.isEmpty {
-                let context = AnalysisContext()
-                context.contextualStrings[.general] = vocabulary
-                try await analyzer.setContext(context)
-            }
+            let context = AnalysisContext()
+            context.contextualStrings[.general] = DictationVocabulary.merging(vocabulary)
+            try await analyzer.setContext(context)
             try await analyzer.start(inputSequence: input)
         } catch {
             feed.finish()
@@ -284,6 +351,10 @@ final class Dictation {
             return
         }
         self.analyzer = analyzer
+        listeningSince = clock.now
+        note("dictation: listening, \(T.self), analyzer \(format.sampleRate) Hz × \(format.channelCount)")
+        judgedVolatile = false
+        volatileIsLate = false
         isListening = true
 
         // Called with every result, on the analyser's own schedule. Each is the words for
@@ -298,6 +369,7 @@ final class Dictation {
                     self.heard(words, final: final, from: start.isFinite ? start : 0)
                 }
             } catch {
+                note("dictation: results ended: \(error)")
                 guard let self, thisRun == self.run else { return }
                 self.problem = Problem(message: "Dictation stopped: \(error.localizedDescription)")
                 self.stop()
@@ -306,6 +378,12 @@ final class Dictation {
     }
 
     private func heard(_ words: String, final: Bool, from start: Double) {
+        if !judgedVolatile, listeningSince != nil { note("dictation: first result, final \(final), \(sink.counts)") }
+        if !final, !judgedVolatile, let listeningSince {
+            judgedVolatile = true
+            let lag = clock.now - listeningSince - Duration.seconds(start)
+            if lag > Self.lateVolatile { volatileIsLate = true }
+        }
         guard text.heard(words, final: final, from: start) else { return }
         onChange?(text.text, text.selection)
     }
@@ -319,13 +397,15 @@ final class Dictation {
 
     /// The microphone, opened once and left open for as long as dictation is on.
     private func openMicrophone() async throws {
-        guard !engine.isRunning else { return }
+        guard shared != nil || !engine.isRunning else { return }
         #if os(iOS)
+        if shared == nil {
         // A phone shares one audio route between everything on it, and the microphone
         // is not the app's until the app says it is recording.
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.record, mode: .measurement, options: .duckOthers)
         try session.setActive(true, options: .notifyOthersOnDeactivation)
+        }
         #endif
 
         // The tap is called by the audio realtime thread. A closure written inside a
@@ -342,6 +422,10 @@ final class Dictation {
         input.removeTap(onBus: 0)
         // The throwing tap that replaced the old one in 27 reaches Swift only by its refined name.
         try input.__installTap(onBus: 0, bufferSize: 1_024, format: format, error: (), block: tap)
+        if let shared {
+            try shared.start()
+            return
+        }
         engine.prepare()
         try engine.start()
     }
@@ -364,14 +448,25 @@ final class Dictation {
     }
 
     private func closeMicrophone() {
-        if engine.isRunning {
+        // Voice mode's engine goes on playing the voice: only the tap comes off.
+        if shared != nil {
+            engine.inputNode.removeTap(onBus: 0)
+            sink.point(at: nil)
+            return
+        }
+        let wasListening = engine.isRunning
+        if wasListening {
             engine.inputNode.removeTap(onBus: 0)
             engine.stop()
         }
         sink.point(at: nil)
         #if os(iOS)
-        // Give the route back, so whatever was playing before carries on.
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        // Give the route back, so whatever was playing before carries on: only a route this
+        // took, and never voice mode's, which a field's stop as its page goes would end
+        // (Alex's iPhone, 2026-10-29).
+        if wasListening, !VoiceMode.shared.isOn {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
         #endif
     }
 
@@ -384,14 +479,42 @@ final class Dictation {
     /// a problem is set there is nothing left running for it to stop.
     func dismissProblem() { problem = nil }
 
+    /// How long `finish()` waits for the last words before it stops anyway.
+    static let lastWordsWait: Duration = .seconds(2)
+
+    /// Stops listening once the last words said are in the field, so a prompt sent next
+    /// holds all of them (#2753). The microphone closes at once; the analyser then turns
+    /// the audio it still has into final words, for up to `lastWordsWait`.
+    func finish() async {
+        guard isListening, !isFinishing, let analyzer, let results else {
+            stop()
+            return
+        }
+        isFinishing = true
+        defer { isFinishing = false }
+        note("dictation: finish, \(sink.counts)")
+        // Closing the microphone ends the analyser's input.
+        closeMicrophone()
+        let inTime = await waitAtMost(Self.lastWordsWait) {
+            try? await analyzer.finalizeAndFinishThroughEndOfInput()
+            await results.value
+        }
+        if !inTime { note("dictation: last words not in after \(Self.lastWordsWait)") }
+        stop()
+    }
+
     /// Stops listening. What is in the field stays as it is, words still being heard
     /// and all: they were shown, so they are kept (#69).
     func stop() {
         // Retire pending permission and set-up work as well as results still on their
         // way. Results already queued carry the old run number.
+        if isListening { note("dictation: stop, \(sink.counts)") }
         run += 1
         onChange = nil
         isListening = false
+        volatileIsLate = false
+        listeningSince = nil
+        judgedVolatile = false
         closeMicrophone()
         results?.cancel()
         results = nil

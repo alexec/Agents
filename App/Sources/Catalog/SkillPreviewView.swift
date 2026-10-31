@@ -11,7 +11,7 @@ struct SkillPreviewView: View {
     let preview: DaemonAPI.SkillPreview
     /// Where Add puts it: where the sheet was opened (#688).
     let addTo: DaemonAPI.SkillDestination
-    let projectName: String?
+    let folderName: String?
     let runtimes: [DaemonAPI.RuntimeName]
     let back: () -> Void
     let added: (DaemonAPI.ManagedSkill) -> Void
@@ -49,7 +49,7 @@ struct SkillPreviewView: View {
                     stateNotes
                     HStack(spacing: 8) {
                         ReachDots(runtimes: runtimes, reach: reach)
-                        Text(addTo == .personal ? "every agent you start" : "every agent in this project")
+                        Text(addTo == .personal ? "every agent you start" : "every agent in this folder")
                             .appText(.fine).foregroundStyle(.secondary)
                     }
                 }
@@ -165,6 +165,10 @@ struct SkillPreviewView: View {
     private var stateNotes: some View {
         if let failure {
             note(CatalogErrorWords.sentence(failure), attention: true)
+            // The organisation's policy refused the add: ask an admin for it (#2355).
+            if failure.policyWords != nil {
+                AskAdminButton(kind: .skills, name: preview.name, source: preview.result.source)
+            }
         }
         if update?.edited == true {
             note("You've edited this skill since it was added. Updating replaces your edits; the copy with them goes to the Trash.",
@@ -262,12 +266,12 @@ struct SkillPreviewView: View {
 
     // MARK: Words
 
-    private var placeName: String { addTo == .personal ? "~/.agents" : (projectName ?? "the project") }
+    private var placeName: String { addTo == .personal ? "~/.agents" : (folderName ?? "the folder") }
 
     private var goesTo: String {
         switch addTo {
         case .personal: "~/.agents/skills/\(preview.name)"
-        case .project(let folder): Self.tilde(folder) + "/.agents/skills/\(preview.name)"
+        case .folder(let folder): Self.tilde(folder) + "/.agents/skills/\(preview.name)"
         }
     }
 
@@ -290,7 +294,7 @@ struct SkillPreviewView: View {
         return "This skill can't be added."
     }
 
-    /// Every runtime gets a skill in `~/.agents/skills` or a project's `.agents/skills` (054).
+    /// Every runtime gets a skill in `~/.agents/skills` or a folder's `.agents/skills` (054).
     private var reach: [String: DaemonAPI.Reach] {
         Dictionary(uniqueKeysWithValues: runtimes.map { ($0.id, DaemonAPI.Reach.gets("")) })
     }

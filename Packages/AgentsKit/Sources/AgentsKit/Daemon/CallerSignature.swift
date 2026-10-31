@@ -29,7 +29,7 @@ public struct RolePolicy: Sendable {
     /// The bundle identifiers that are control. The helper is the daemon's own binary.
     public static let controlIdentifiers = ["com.alexecollins.agents", "com.alexecollins.agents.bridge"]
     public static let helperIdentifier = "agentsd"
-    /// Agents Host, whose window counts this Mac's host's projects and working agents.
+    /// Agents Host, whose window counts this Mac's host's folders and working agents.
     public static let hostAppIdentifier = "com.alexecollins.agents.host"
 
     /// Who gets what, each signed by this daemon's team, tried in order. Exact
@@ -148,26 +148,6 @@ enum CallerSignature {
 
     static func satisfies(_ code: SecCode, _ requirement: SecRequirement) -> Bool {
         SecCodeCheckValidity(code, [], requirement) == errSecSuccess
-    }
-
-    /// A signed file's code directory hash, in hex: what its contents are, whatever it is
-    /// called. Nil for a file that is not validly signed.
-    static func fileIdentity(_ url: URL) -> String? {
-        var code: SecStaticCode?
-        guard SecStaticCodeCreateWithPath(url as CFURL, [], &code) == errSecSuccess, let code,
-              SecStaticCodeCheckValidity(code, [], nil) == errSecSuccess else { return nil }
-        var info: CFDictionary?
-        guard SecCodeCopySigningInformation(code, [], &info) == errSecSuccess,
-              let hash = (info as? [String: Any])?[kSecCodeInfoUnique as String] as? Data else { return nil }
-        return hash.map { String(format: "%02x", $0) }.joined()
-    }
-
-    /// Whether the file this process was started from is still the one running. False
-    /// once a build has written over it (`errSecCSStaticCodeChanged`).
-    static func selfMatchesDisk() -> Bool {
-        var me: SecCode?
-        guard SecCodeCopySelf([], &me) == errSecSuccess, let me else { return false }
-        return SecCodeCheckValidity(me, [], nil) == errSecSuccess
     }
 }
 #endif

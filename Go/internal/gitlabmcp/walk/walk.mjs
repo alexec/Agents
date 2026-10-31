@@ -50,6 +50,8 @@ const routes = {
   "GET jobs/7/trace": "\u001b[0Ksection_start:1700000000:step_script\r\u001b[0K$ pytest\n\u001b[31mFAIL: test_mean\u001b[0m\nassert 6 == 2\n",
   "GET issues": [{ iid: 5, title: "The mean is off", state: "opened", author: dev, web_url: `${web}/issues/5`, labels: ["bug"],
     assignees: [alex], user_notes_count: 2, created_at: at(-300), updated_at: at(-40) }],
+  "GET issues/5": { iid: 5, title: "The mean is off", description: "## Work\n\n- **Inspect** the response.\n\n[Read the docs](https://gitlab.test/docs)", state: "opened",
+    author: dev, web_url: `${web}/issues/5`, labels: ["bug"], assignees: [alex] },
   "POST merge_requests/3/notes": { id: 900 },
   "PUT merge_requests/3/merge": { iid: 3, state: "merged", merge_commit_sha: "m3" },
   "POST merge_requests/3/approve": { id: 1 },
@@ -98,7 +100,7 @@ const html = async (uri) => (await rpc("resources/read", { uri })).result.conten
 const host = (view, tool, args) => `<!doctype html><html><head><title>host</title></head><body style="margin:0">
 <iframe id="view" style="border:0;width:100%;height:1400px"></iframe>
 <script>
-window.asked = []; window.diff = null; window.started = null;
+window.asked = []; window.diff = null; window.started = null; window.opened = null;
 const frame = document.getElementById("view");
 const tell = (m) => frame.contentWindow.postMessage(Object.assign({ jsonrpc: "2.0" }, m), "*");
 const call = (params) => fetch("/call", { method: "POST", body: JSON.stringify(params) }).then((r) => r.json());
@@ -117,7 +119,7 @@ window.addEventListener("message", async (event) => {
     case "agents/open-diff": window.diff = m.params; reply({}); break;
     case "agents/start-agent": window.started = m.params; reply({}); break;
     case "agents/message-agent": reply(null, { code: -32001, message: "no agent on that branch" }); break;
-    case "ui/open-link": reply({}); break;
+    case "ui/open-link": window.opened = m.params.url; reply({}); break;
     default: if (m.id !== undefined) reply(null, { code: -32601, message: "not here" });
   }
 });
@@ -227,10 +229,20 @@ try {
   const issues = await chrome.page(`${base}/issues`, { width: 900, height: 700 });
   await waitFor(issues, `d.querySelectorAll("#issues li").length === 1`, "one issue");
   check(/@alex/.test(await text(issues)) && /bug/.test(await text(issues)), "the issue with its assignee and label");
+  check(!/Show details|Hide details/.test(await text(issues)), "the issue has no details button");
+  await issues.eval(view(`d.querySelector("#issues .title").click()`));
+  await waitFor(issues, `d.querySelector(".issue-body strong")`, "the Markdown description");
+  check(/Work/.test(await text(issues)) && /Inspect/.test(await text(issues)), "the row expands with rich-text Markdown");
+  await issues.eval(view(`d.querySelector(".issue-body a").click()`));
+  await waitFor(issues, `window.parent.opened === "https://gitlab.test/docs"`, "a Markdown link opens through the host");
+  await issues.eval(view(`d.querySelector("#issues .title").click()`));
+  check(await issues.eval(view(`d.querySelector("#issues li").getAttribute("aria-expanded")`)) === "false", "clicking the row closes its details");
+  await issues.eval(view(`d.querySelector("#issues .title").click()`));
+  await waitFor(issues, `d.querySelector("#issues li").getAttribute("aria-expanded") === "true"`, "the row opens again");
   await press(issues, "Start Agent");
   await sleep(500);
   const forIssue = await issues.eval("window.started");
-  check(forIssue && /GitLab issue #5 in group\/app/.test(forIssue.prompt) && forIssue.labels[0] === "#5", `Start Agent fills the form: ${js(forIssue)}`);
+  check(forIssue && forIssue.prompt.startsWith("#5: The mean is off\n") && /GitLab issue in group\/app/.test(forIssue.prompt) && forIssue.labels[0] === "#5", `Start Agent fills the form: ${js(forIssue)}`);
   await issues.shot(`${out}/web-6-issues.png`);
 
   for (const [name, page] of [["merge requests", list], ["merge request", one], ["issues", issues]]) {

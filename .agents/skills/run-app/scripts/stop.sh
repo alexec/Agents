@@ -2,7 +2,11 @@
 # Take down one scratch set-up: its window, its host, the host's agents, its control
 # plane, and its root.
 #
-#   stop.sh /tmp/run-xxxx [--keep]    --keep leaves the root on disk to read
+#   stop.sh /tmp/run-xxxx [--keep]    --keep leaves the root and its side files on disk to read
+#
+# Without --keep it also removes the files launch.sh and the walks write next to the root
+# (/tmp/run-xxxx-build.log, .env, .err, -shots/, -*.png, -chrome*…): 264 of them had
+# piled up when nothing removed them (#2400). Run it again on a kept root once read.
 #
 # Never `pkill -f agentsd`: this session is itself hosted by an Agents daemon, and a
 # pattern kill takes that one down with it. The pids in the root (daemon.lock,
@@ -70,6 +74,18 @@ rm -f "$WALK_DEFAULTS.plist"
 if [ "$KEEP" = 0 ]; then
   rm -rf "$ROOT"
   echo "removed $ROOT"
+  # The side files: only names that start with this root's own slug, followed by `-` or
+  # `.`. A slug may hold a dash, so /tmp/run-a-* can match another set-up's root
+  # /tmp/run-a-b: anything that looks like a root this skill made is left alone.
+  for side in "$ROOT"-* "$ROOT".*; do
+    [ -e "$side" ] || [ -L "$side" ] || continue
+    if [ -d "$side" ] && { [ -e "$side/daemon.lock" ] || [ -e "$side/daemon.sock" ] || [ -d "$side/control" ]; }; then
+      echo "leaving $side: a root of its own" >&2
+      continue
+    fi
+    rm -rf "$side"
+  done
+  echo "removed $ROOT-* and $ROOT.*"
 else
   echo "kept $ROOT"
 fi

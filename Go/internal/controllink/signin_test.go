@@ -16,3 +16,20 @@ func TestSignInNonceVector(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+// A sign-in's approval code is bound to the new client's key and the control key it trusts:
+// a control plane that passes a sign-in on with its own key, or is another control plane,
+// shows another code. The vector is the Swift and web clients' too.
+func TestApprovalCodeIsBoundToBothKeys(t *testing.T) {
+	client := bytes.Repeat([]byte{1}, 65)
+	control := bytes.Repeat([]byte{2}, 65)
+	if got := ApprovalCode(client, control); got != "8UMUNH" {
+		t.Fatalf("ApprovalCode = %q", got)
+	}
+	if ApprovalCode(control, control) == ApprovalCode(client, control) || ApprovalCode(client, client) == ApprovalCode(client, control) {
+		t.Fatal("the code does not change with the keys")
+	}
+	if got := JoinCode(client); got == ApprovalCode(client, nil) || len(got) != 6 {
+		t.Fatalf("JoinCode = %q", got)
+	}
+}

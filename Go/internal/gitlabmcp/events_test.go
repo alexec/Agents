@@ -3,6 +3,7 @@ package gitlabmcp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -61,8 +62,8 @@ func same(t *testing.T, got, want []string) {
 }
 
 func TestTheEventsAreTheGitHubServersNames(t *testing.T) {
-	same(t, EventNames(), []string{"checks.failed", "pr.opened", "pr.merged", "pr.closed", "pr.conflicted", "review.comment",
-		"issue.opened", "issue.labelled", "issue.commented", "issue.closed"})
+	same(t, EventNames(), []string{"checks.failed", "pr.opened", "pr.merged", "pr.closed", "pr.conflicted", "review.requested", "review.comment",
+		"issue.opened", "issue.labelled", "issue.commented", "issue.closed", "issue.assigned"})
 }
 
 func TestOpenedIsRaisedWhenReadyAndOnlyForTheProjectsOwn(t *testing.T) {
@@ -505,5 +506,62 @@ func TestOpenedListsAgainOnlyWhatChanged(t *testing.T) {
 	ids, _ := p.poll()
 	if len(ids) != 1 || !strings.HasPrefix(ids[0], "pr.opened:group/app:1:") {
 		t.Fatalf("ready: %v", ids)
+	}
+}
+
+// Notify me (#2034): what asks the connection's owner, and their own merge requests only.
+func TestReviewRequestedAndAssignedAreTheOwnersAndRaisedOnce(t *testing.T) {
+	f := newFake(t)
+	f.addMembers()
+	f.mrs = []obj{mrJSON(1, "a", stranger, nil)}
+	f.issues = []obj{issueObj(5, dev, nil)}
+	reviews := newPoller(t, f, "review.requested", nil)
+	assigned := newPoller(t, f, "issue.assigned", nil)
+	reviews.poll()
+	assigned.poll()
+	f.set(func() {
+		f.mrs[0]["reviewers"] = []obj{alex}
+		f.issues[0]["assignees"] = []obj{alex}
+	})
+	ids, result := reviews.poll()
+	if len(ids) != 1 || data(t, result, 0)["pr"].(map[string]any)["author"] != "stranger" {
+		t.Fatalf("review: %v", ids)
+	}
+	ids, result = assigned.poll()
+	if len(ids) != 1 || fmt.Sprint(data(t, result, 0)["issue"].(map[string]any)["number"]) != "5" {
+		t.Fatalf("assigned: %v", ids)
+	}
+	ids, _ = reviews.poll()
+	same(t, ids, nil)
+	f.set(func() { f.mrs[0]["reviewers"] = []obj{dev} })
+	reviews.poll()
+	f.set(func() { f.mrs[0]["reviewers"] = []obj{alex} })
+	if ids, _ = reviews.poll(); len(ids) != 1 {
+		t.Fatalf("asked again: %v", ids)
+	}
+}
+
+func TestMineIsOnlyTheOwnersMergeRequests(t *testing.T) {
+	f := newFake(t)
+	f.addMembers()
+	f.mrs = []obj{mrJSON(1, "a", alex, nil), mrJSON(2, "b", dev, nil)}
+	p := newPoller(t, f, "pr.conflicted", map[string]any{"mine": true})
+	p.poll()
+	f.set(func() {
+		for _, m := range f.mrs {
+			m["detailed_merge_status"], m["has_conflicts"] = "conflict", true
+		}
+	})
+	ids, _ := p.poll()
+	if len(ids) != 1 || !strings.HasPrefix(ids[0], "pr.conflicted:"+project+":1:") {
+		t.Fatalf("mine: %v", ids)
+	}
+}
+
+// #2349: the issues a merge request's description closes, in a nested group too.
+func TestClosingRefs(t *testing.T) {
+	got := closingRefs("Closes #4 and implements group/sub/project#9; fixing #4 again.")
+	if len(got) != 2 || got[0] != "#4" || got[1] != "group/sub/project#9" {
+		t.Fatalf("got %v", got)
 	}
 }

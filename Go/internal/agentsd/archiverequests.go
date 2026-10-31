@@ -15,7 +15,7 @@ import (
 
 // goesWithRequest is AfterTurn.requestArchive.goes(with:).
 func goesWithRequest(o wire.WorkOutcome) bool {
-	return o == wire.WorkOutcomeDone || o == wire.WorkOutcomeNothingToDo || o == wire.WorkOutcomePartlyDone
+	return o == wire.WorkOutcomeDone || o == wire.WorkOutcomeNothingToDo
 }
 
 // goesWithArchive is AfterTurn.archive.goes(with:).
@@ -25,8 +25,8 @@ func goesWithArchive(o wire.WorkOutcome) bool {
 
 // agentsMayArchive is HelperLimits.agentsMayArchive: true unless the person said not.
 func (d *Daemon) agentsMayArchive(folder string) bool {
-	if s, ok := d.summaryFor(folder); ok && s.Project.HelperLimits != nil && s.Project.HelperLimits.AgentsMayArchive != nil {
-		return *s.Project.HelperLimits.AgentsMayArchive
+	if s, ok := d.summaryFor(folder); ok && s.Folder.HelperLimits != nil && s.Folder.HelperLimits.AgentsMayArchive != nil {
+		return *s.Folder.HelperLimits.AgentsMayArchive
 	}
 	return true
 }
@@ -77,7 +77,7 @@ func (d *Daemon) settleArchiveRequest(a *wire.Agent, next wire.AgentState, why w
 			// It has something for the person (#1802): unread under Done, with its file's
 			// mark, and nobody asked to approve anything.
 			a.ArchiveRequest = nil
-		case done && (mine || a.StartedByAgent != nil && d.agentsMayArchive(projectFolder(a))):
+		case done && (mine || a.StartedByAgent != nil && d.agentsMayArchive(folderPath(a))):
 			a.ArchiveRequest, archiveNow = nil, true
 		case !wasRequested:
 			a.ArchiveRequest = &wire.ArchiveRequest{Requested: &wire.ArchiveRequestRequested{At: now()}}
@@ -106,7 +106,7 @@ func (d *Daemon) afterArchiveRequest(id wire.UUID, requested, archiveNow bool) {
 		d.endWait(id, "archiveRequested", false)
 		d.raiseAgentEvent("agent.archive_requested", id, "asked to be archived.", outcome)
 		d.reconsider()
-		d.checkQueueSoon(projectFolder(a))
+		d.checkQueueSoon(folderPath(a))
 	}
 	if archiveNow {
 		note := "Archived when it asked, as the agent that started it may archive it."
@@ -140,7 +140,7 @@ func (d *Daemon) archiveSession(caller wire.UUID, args map[string]json.RawMessag
 	case startedByThePerson(a) && d.agentsMayArchiveMyChats():
 		note = "Once this turn ends, this conversation will be archived if it ended done or with nothing to do, as the person lets agents archive the chats they start; " +
 			"not if this turn showed a file, which stays for the person to see. Otherwise it waits for the person to approve archiving it."
-	case a.StartedByAgent != nil && d.agentsMayArchive(projectFolder(a)):
+	case a.StartedByAgent != nil && d.agentsMayArchive(folderPath(a)):
 		note = "Once this turn ends, this conversation will be archived if it ended done or with nothing to do, as nobody needs to approve it; " +
 			"otherwise it waits for the person to approve archiving it."
 	}

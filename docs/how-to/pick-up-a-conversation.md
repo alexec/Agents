@@ -12,12 +12,12 @@ up so it carries on in Agents, or delete one you no longer want.
 
 ## Before you start
 
-- A project on this Mac with the runtime you used. See [Add a project](add-a-project.md).
+- A folder on this Mac with the runtime you used. See [Add a folder](add-a-folder.md).
 - A runtime that lists its conversations. One that does not says it is holding nothing.
 
 ## Steps
 
-1. Unfold the project in the sidebar and click **New session**, the first row under it (or press ⌘N).
+1. Unfold the folder in the sidebar and click **New session**, the first row under it (or press ⌘N).
 2. Above the prompt, choose the runtime you used, such as **Claude**, and the folder the
    conversation was in.
 3. Click the clock button beside the runtime (**Conversations this runtime is already
@@ -27,7 +27,7 @@ up so it carries on in Agents, or delete one you no longer want.
    its title and when it last changed. One already in Agents says **already here**.
 4. Click **Pick up** beside the one you want.
 
-   The sheet closes and the conversation opens as an agent in the project, with what was
+   The sheet closes and the conversation opens as an agent in the folder, with what was
    said so far. Send a prompt to carry on.
 5. Click **Done** to close the sheet without picking anything.
 

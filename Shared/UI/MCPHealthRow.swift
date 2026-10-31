@@ -2,7 +2,7 @@ import AgentsKitCore
 import SwiftUI
 
 /// One MCP server on an MCP Servers page (#753), the window's and the Remote's: its dot,
-/// its name and how it runs (and Made by Agents on ours), how it is doing, why it last failed
+/// its name and how it runs, how it is doing, why it last failed
 /// in the failure tint, and the five levels it reaches (#1428).
 /// The words are `MCPHealthWords`, as the web page has them.
 struct MCPHealthRow: View {
@@ -14,7 +14,6 @@ struct MCPHealthRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(server.name).appText(.reading).fontWeight(.semibold)
-                    if server.madeByAgents == true { MadeByAgentsBadge() }
                     Text(MCPHealthWords.kind(server)).appText(.fine).foregroundStyle(.secondary)
                 }
                 Text(MCPHealthWords.line(server)).appText(.fine).foregroundStyle(.secondary)

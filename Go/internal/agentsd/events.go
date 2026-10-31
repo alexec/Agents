@@ -143,6 +143,7 @@ func (d *Daemon) loadEvents() {
 		} else {
 			os.WriteFile(aside, data, 0o644)
 		}
+		store.TrimSetAsides(d.eventsPath())
 		log.Printf("events.jsonl: skipped %d unreadable line(s); the whole file is kept as %s", unreadable, filepath.Base(aside))
 	}
 	if torn {
@@ -389,16 +390,16 @@ func sameScope(a, b wire.EventScope) bool {
 	if a.Mac != nil || b.Mac != nil {
 		return a.Mac != nil && b.Mac != nil
 	}
-	if a.Project == nil || b.Project == nil {
+	if a.Folder == nil || b.Folder == nil {
 		return false
 	}
-	return store.FolderPath(a.Project.Value) == store.FolderPath(b.Project.Value)
+	return store.FolderPath(a.Folder.Value) == store.FolderPath(b.Folder.Value)
 }
 
 func macScope() wire.EventScope { return wire.EventScope{Mac: &struct{}{}} }
 
-func projectScope(folder string) wire.EventScope {
-	return wire.EventScope{Project: &wire.EventScopeProject{Value: store.FolderURL(folder)}}
+func folderScope(folder string) wire.EventScope {
+	return wire.EventScope{Folder: &wire.EventScopeFolder{Value: store.FolderURL(folder)}}
 }
 
 func sameDetails(a, b map[string]string) bool {
@@ -426,8 +427,8 @@ func (d *Daemon) raiseAs(draft wire.EventDraft, actor *wire.AuditActor) wire.Eve
 	if draft.Details == nil {
 		draft.Details = map[string]string{}
 	}
-	if draft.Scope.Project != nil {
-		draft.Scope = projectScope(store.FolderPath(draft.Scope.Project.Value))
+	if draft.Scope.Folder != nil {
+		draft.Scope = folderScope(store.FolderPath(draft.Scope.Folder.Value))
 	}
 	d.eventMu.Lock()
 	t := nowFunc()
@@ -512,7 +513,7 @@ func eventGroup(name string) (wire.EventGroup, bool) {
 		return "", false
 	}
 	switch subject {
-	case "agent", "project":
+	case "agent", "folder":
 		return wire.EventGroupAgents, true
 	case "workflow":
 		return wire.EventGroupWorkflows, true
@@ -622,7 +623,7 @@ func agentDetails(a *wire.Agent) map[string]string {
 		"runtime": a.RuntimeID, "started_by": startedBy}
 }
 
-// raiseAgentEvent is an event about one agent, in its project; a writer raises nothing.
+// raiseAgentEvent is an event about one agent, in its folder; a writer raises nothing.
 func (d *Daemon) raiseAgentEvent(name string, id wire.UUID, sentence string, extra map[string]string) {
 	if a := d.Store.Agent(id); a != nil {
 		d.raiseAbout(a, name, sentence, extra)
@@ -642,7 +643,7 @@ func (d *Daemon) raiseAbout(a *wire.Agent, name, sentence string, extra map[stri
 	if personMade(name, details) {
 		actor = d.takeActor(a.ID)
 	}
-	d.raiseAs(wire.EventDraft{Name: name, At: now(), Scope: projectScope(projectFolder(a)),
+	d.raiseAs(wire.EventDraft{Name: name, At: now(), Scope: folderScope(folderPath(a)),
 		Sentence: agentName(a.Title) + " " + sentence, Details: details, ChainDepth: d.chainDepth(a)}, actor)
 }
 
@@ -680,6 +681,7 @@ var endedSummary = map[wire.EndedReason]string{
 	wire.EndedReasonRuntimeError: "The runtime reported an error", wire.EndedReasonAllowanceSpent: "Its allowance ran out",
 	wire.EndedReasonRateLimited: "Rate limited, and still limited after retrying", wire.EndedReasonSandboxFailed: "Its sandbox could not start",
 	wire.EndedReasonImported: "Imported from another set-up, so not run here",
+	wire.EndedReasonStoppedByAdmin: "Stopped by an admin in the Console",
 }
 
 // endedCode is EndedReason.code: allowanceSpent → allowance_spent.
@@ -718,12 +720,14 @@ func (d *Daemon) raiseAgentEnding(id wire.UUID, next wire.AgentState, why *wire.
 		d.raiseAgentEvent("agent.finished", id, sentence, details)
 		return
 	}
-	if why == nil || *why == wire.EndedReasonCancelled || *why == wire.EndedReasonCostLimit {
+	if why == nil || *why == wire.EndedReasonCancelled || *why == wire.EndedReasonCostLimit || *why == wire.EndedReasonStoppedByAdmin {
 		by := "unknown"
 		if why == nil || *why == wire.EndedReasonCancelled {
 			by = "you"
 		} else if *why == wire.EndedReasonCostLimit {
 			by = "cost_limit"
+		} else if *why == wire.EndedReasonStoppedByAdmin {
+			by = "admin"
 		}
 		d.raiseAgentEvent("agent.stopped", id, "was stopped.", map[string]string{"by": by})
 		return
@@ -735,8 +739,9 @@ func (d *Daemon) raiseAgentEnding(id wire.UUID, next wire.AgentState, why *wire.
 	d.raiseAgentEvent("agent.failed", id, "ended in an error: "+words+".", map[string]string{"reason": endedCode(*why)})
 }
 
-// raiseLeaseEvent is lease.granted and lease.released, on the host's log.
-func (d *Daemon) raiseLeaseEvent(e leaseEvent) {
+// raiseLeaseEvent is lease.granted and lease.released, on the host's log: the event raised,
+// or nil.
+func (d *Daemon) raiseLeaseEvent(e leaseEvent) *wire.Event {
 	l := e.lease
 	switch {
 	case e.granted:
@@ -748,9 +753,10 @@ func (d *Daemon) raiseLeaseEvent(e leaseEvent) {
 				title = *a.Title
 			}
 		}
-		d.raise(wire.EventDraft{Name: "lease.granted", At: now(), Scope: macScope(),
+		raised := d.raise(wire.EventDraft{Name: "lease.granted", At: now(), Scope: macScope(),
 			Sentence: agentName(t) + " was given " + l.DisplayName + ".",
 			Details:  map[string]string{"resource": string(l.Resource), "agent": string(l.Holder), "agent_title": title}})
+		return &raised
 	case e.released:
 		how, words := "ended", "taken back"
 		switch e.ending {
@@ -759,10 +765,12 @@ func (d *Daemon) raiseLeaseEvent(e leaseEvent) {
 		case "released":
 			how, words = "released", "given back"
 		}
-		d.raise(wire.EventDraft{Name: "lease.released", At: now(), Scope: macScope(),
+		raised := d.raise(wire.EventDraft{Name: "lease.released", At: now(), Scope: macScope(),
 			Sentence: l.DisplayName + " was " + words + ".",
 			Details:  map[string]string{"resource": string(l.Resource), "how": how}})
+		return &raised
 	}
+	return nil
 }
 
 // diskWords is DiskSpace.words: "12.3 GB", "850 MB".

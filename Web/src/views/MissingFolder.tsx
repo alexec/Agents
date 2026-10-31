@@ -6,12 +6,12 @@ import type { Store } from "../model/store";
 import { go } from "../route";
 import { archiveWithChildren } from "./SessionMenu";
 import {
-  continueInProjectLabel, folderIsMissing, folderPath, mayRecreateWorktree, missingFolderLabel, recreateWorktreeLabel,
+  continueInFolderLabel, folderIsMissing, folderPath, mayRecreateWorktree, missingFolderLabel, recreateWorktreeLabel,
 } from "../model/missingFolder";
 
 async function continueIn(store: Store, host: string, agent: Agent, text = "", attachments: Attachment[] = []) {
-  const id = await store.continueInProject(host, agent.id, text, attachments);
-  if (id) go({ host, project: agent.worktree?.project ?? agent.cwd, session: id });
+  const id = await store.continueInFolder(host, agent.id, text, attachments);
+  if (id) go({ host, folder: agent.worktree?.folder || agent.cwd, session: id });
 }
 
 function WaysOn({ store, host, agent, text, attachments, then }: {
@@ -19,7 +19,7 @@ function WaysOn({ store, host, agent, text, attachments, then }: {
 }) {
   return (
     <span class="ways-on">
-      <button onClick={() => { then?.(); void continueIn(store, host, agent, text, attachments); }}>{continueInProjectLabel}</button>
+      <button onClick={() => { then?.(); void continueIn(store, host, agent, text, attachments); }}>{continueInFolderLabel}</button>
       {mayRecreateWorktree(agent) && (
         <button onClick={() => { then?.(); void store.recreateWorktree(host, agent.id); }}>{recreateWorktreeLabel}</button>
       )}

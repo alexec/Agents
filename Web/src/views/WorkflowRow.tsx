@@ -1,4 +1,4 @@
-// One workflow under a project's sessions (071 US5; ProjectWorkRows.swift): its status mark and its
+// One workflow under a folder's sessions (071 US5; FolderWorkRows.swift): its status mark and its
 // name, as the window's and the Remote's rows (#547), and at its end when it last ran, as a session's
 // row has its time (#755), or nothing if it never has. Off is its mark and its tooltip. What it is is
 // its page's to say (#495).
@@ -9,7 +9,7 @@
 import { useSignal } from "@preact/signals";
 import type { WorkflowSummary } from "../protocol/generated";
 import type { Store } from "../model/store";
-import { canBeApproved, canBeDenied, isOn, isUnapproved, runsHere, workflowStatus } from "../model/workflows";
+import { canBeApproved, canBeDenied, isOn, isUnapproved, runsHere, scopeSentence, workflowStatus } from "../model/workflows";
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
 import { fromWireDate } from "../protocol/dates";
 import { shortAgo } from "../model/activity";
@@ -18,23 +18,26 @@ import { Capability } from "../protocol/capabilities.generated";
 
 export function WorkflowRow({ store, host, summary, disabled, chosen, onPick, pinnedAt, place }: {
   store: Store; host: string; summary: WorkflowSummary; disabled: boolean; chosen: boolean; onPick: () => void;
-  /** The project's pinned workflows' order, for Move Up and Down: given only under Pinned, with no search. */
+  /** The folder's pinned workflows' order, for Move Up and Down: given only under Pinned, with no search. */
   pinnedAt?: string[] | undefined;
-  /** Under Pinned at the top of the sidebar, which gathers every project's: its project's name (#495). */
+  /** Under Pinned at the top of the sidebar, which gathers every folder's: its folder's name (#495). */
   place?: string | undefined;
 }) {
   const status = workflowStatus(summary);
   const ran = lastRan(summary);
   const menu = () => workflowMenu(store, host, summary, disabled, onPick, pinnedAt);
+  // A user workflow says it is in every folder (#2759), pinned or under Needs You too.
+  const pickWords = !isOn(summary) && !summary.isArchived ? `Turned off. Open ${summary.workflow.name}` : `Open ${summary.workflow.name}`;
+  const scope = scopeSentence(summary);
   return (
     <div class={`row workflow${chosen ? " chosen" : ""}`} onContextMenu={(e) => openContextMenu(e, menu())}
       onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }} {...holdForMenu(menu)}>
       <button class="pick" aria-current={chosen} onClick={onPick}
-        title={!isOn(summary) && !summary.isArchived ? `Turned off. Open ${summary.workflow.name}` : `Open ${summary.workflow.name}`}>
+        title={scope ? `${pickWords}. ${scope}` : pickWords}>
         <span class={`workflow-mark${status.tinted ? " tinted" : ""}`} role="img" aria-label={status.words} title={status.words}>{status.mark}</span>
         {/* Heavier only while it waits for an OK (#520), as a session's title is while unread. */}
         <span class={`title${summary.awaitingApproval && !summary.isArchived ? " needs-ok" : ""}${place ? " placed" : ""}`}>
-          {/* The name gives way before its project's, which is whole (#587). */}
+          {/* The name gives way before its folder's, which is whole (#587). */}
           {place ? <span class="name">{summary.workflow.name}</span> : summary.workflow.name}
           {place && <span class="place"> {place}</span>}
         </span>
@@ -70,7 +73,7 @@ export function RunNow({ store, host, summary, disabled, wide }: {
   );
 }
 
-/** What a workflow row's menu offers, in the window's order (ProjectWorkRows.swift `WorkflowListRow`). */
+/** What a workflow row's menu offers, in the window's order (FolderWorkRows.swift `WorkflowListRow`). */
 export type WorkflowAction = "open" | "unarchive" | "approve" | "deny" | "runNow" | "pin" | "unpin" | "moveUp" | "moveDown"
   | "turnOff" | "turnOn" | "mute" | "unmute" | "archive" | "delete";
 
@@ -101,7 +104,7 @@ const words: Record<WorkflowAction, string> = {
 };
 
 const helps: Partial<Record<WorkflowAction, string>> = {
-  pin: "Keep it in Pinned, at the top of its project", unpin: "Take it out of Pinned",
+  pin: "Keep it in Pinned, at the top of its folder", unpin: "Take it out of Pinned",
   turnOff: "None of its triggers run it until it is turned on again; Run Now still does",
   turnOn: "Let its triggers run it again",
   mute: workflowMuteHelp(false), unmute: workflowMuteHelp(true),
@@ -135,7 +138,7 @@ function workflowMenu(store: Store, host: string, summary: WorkflowSummary, disa
     unmute: () => void store.setWorkflowMuted(host, summary, false),
     archive: () => void store.setWorkflowArchived(host, summary, true),
     delete: () => {
-      if (confirm(`Delete “${summary.workflow.name}”? Its file is removed from disk.\n\nThe file can be restored from the project's git history.`)) {
+      if (confirm(`Delete “${summary.workflow.name}”? Its file is removed from disk.\n\nThe file can be restored from the folder's git history.`)) {
         void store.deleteWorkflow(host, summary);
       }
     },

@@ -2,7 +2,7 @@
 name: "speckit-plan"
 description: "Execute the implementation planning workflow using the plan template to generate design artifacts."
 argument-hint: "Optional guidance for the planning phase"
-compatibility: "Requires spec-kit project structure with .specify/ directory"
+compatibility: "Requires spec-kit folder structure with .specify/ directory"
 metadata:
   author: "github-spec-kit"
   source: "templates/commands/plan.md"
@@ -13,6 +13,8 @@ disable-model-invocation: false
 
 ## User Input
 
+Before planning any parser, protocol, client, format or algorithm, apply the **Libraries before our own code** rule in `AGENTS.md`: check for a fit library and prefer platform libraries, official SDKs, then widely used community libraries. Record why a library is or is not fit in the plan, including its licence, maintenance, adoption, pinning and runtime cost where relevant.
+
 ```text
 $ARGUMENTS
 ```
@@ -22,7 +24,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Pre-Execution Checks
 
 **Check for extension hooks (before planning)**:
-- Check if `.specify/extensions.yml` exists in the project root.
+- Check if `.specify/extensions.yml` exists in the folder root.
 - If it exists, read it and look for entries under the `hooks.before_plan` key
 - If the YAML cannot be parsed or is invalid, do not skip silently: tell the user that `.specify/extensions.yml` could not be read (include the parser error) and that no hooks were checked, including any mandatory (`optional: false`) hooks registered there, then continue normally
 - Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
@@ -73,7 +75,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 **You MUST complete this section before reporting completion to the user.**
 
-Check if `.specify/extensions.yml` exists in the project root.
+Check if `.specify/extensions.yml` exists in the folder root.
 - If it does not exist, or no hooks are registered under `hooks.after_plan`, skip to the Completion Report.
 - If it exists, read it and look for entries under the `hooks.after_plan` key.
 - If the YAML cannot be parsed or is invalid, do not skip silently: tell the user that `.specify/extensions.yml` could not be read (include the parser error) and that no hooks were checked, including any mandatory (`optional: false`) hooks registered there, then continue to the Completion Report.
@@ -142,11 +144,11 @@ Command ends after Phase 1 design. Report branch, IMPL_PLAN path, and generated 
    - Validation rules from requirements
    - State transitions if applicable
 
-2. **Define interface contracts** (if project has external interfaces) → `/contracts/`:
-   - Identify what interfaces the project exposes to users or other systems
-   - Document the contract format appropriate for the project type
+2. **Define interface contracts** (if folder has external interfaces) → `/contracts/`:
+   - Identify what interfaces the folder exposes to users or other systems
+   - Document the contract format appropriate for the folder type
    - Examples: public APIs for libraries, command schemas for CLI tools, endpoints for web services, grammars for parsers, UI contracts for applications
-   - Skip if project is purely internal (build scripts, one-off tools, etc.)
+   - Skip if folder is purely internal (build scripts, one-off tools, etc.)
 
 3. **Create quickstart validation guide** → `quickstart.md`:
    - Document runnable validation scenarios that prove the feature works end-to-end
@@ -159,7 +161,7 @@ Command ends after Phase 1 design. Report branch, IMPL_PLAN path, and generated 
 
 ## Key rules
 
-- Use absolute paths for filesystem operations; use project-relative paths for references in documentation
+- Use absolute paths for filesystem operations; use folder-relative paths for references in documentation
 - ERROR on gate failures or unresolved clarifications
 
 ## Done When

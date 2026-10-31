@@ -20,7 +20,7 @@ struct StatusShapeTests {
     @Test("Anything waiting on a person is needs-you, and only that gets colour")
     func needsYou() {
         #expect(StatusShape(state: .waitingOnUser, outcome: nil, isWaiting: false, isComingBack: false) == .needsYou)
-        for outcome in [WorkOutcome.needsAnswer, .partlyDone, .stuck] {
+        for outcome in [WorkOutcome.needsAnswer] {
             #expect(StatusShape(state: .finished, outcome: outcome, isWaiting: false, isComingBack: false) == .needsYou,
                     "\(outcome) should want a person")
         }
@@ -45,34 +45,34 @@ struct StatusShapeTests {
         // An outcome from an earlier turn does not dress a stopped agent up as done.
         #expect(StatusShape(state: .stopped, outcome: .done, isWaiting: false, isComingBack: false,
                             endedReason: .cancelled) == .stopped)
-        #expect(StatusShape(state: .stopped, outcome: .stuck, isWaiting: false, isComingBack: false,
-                            endedReason: .cancelled) == .stopped)
         #expect(StatusShape(state: .stopped, outcome: nil, isWaiting: false, isComingBack: false,
                             endedReason: .processDied) == .needsYou)
     }
 
-    /// Waiting on something that is not a person (039): its own shape, and no colour.
-    @Test("A turn that ended blocked is blocked, and wants nobody")
+    /// A block the app will not clear (an old record's) is done: only a question needs the
+    /// person (#1916).
+    @Test("A turn that ended waiting on nothing is done, and wants nobody")
     func blocked() {
-        let shape = StatusShape(state: .finished, outcome: .blocked, isWaiting: false, isComingBack: false)
-        #expect(shape == .needsYou)
-        #expect(shape.wantsAPerson)
-        #expect(StatusShape(state: .stopped, outcome: .blocked, isWaiting: false, isComingBack: false,
+        let shape = StatusShape(state: .finished, outcome: .waiting, isWaiting: false, isComingBack: false)
+        #expect(shape == .done)
+        #expect(!shape.wantsAPerson)
+        #expect(StatusShape(state: .stopped, outcome: .waiting, isWaiting: false, isComingBack: false,
                             endedReason: .cancelled) == .stopped)
-        #expect(StatusShape(state: .running, outcome: .blocked, isWaiting: false, isComingBack: false) == .working)
+        #expect(StatusShape(state: .running, outcome: .waiting, isWaiting: false, isComingBack: false) == .working)
     }
 
     /// Something the app watches will carry it on: its own shape, apart from Blocked,
     /// and no colour. Wanting a person still outranks it.
     @Test("A turn the app will carry on is waiting, and wants nobody")
     func waiting() {
-        let shape = StatusShape(state: .finished, outcome: .blocked, isWaiting: true, isComingBack: false)
+        let shape = StatusShape(state: .finished, outcome: .waiting, isWaiting: true, isComingBack: false)
         #expect(shape == .waiting)
         #expect(!shape.wantsAPerson)
-        #expect(shape.symbol != StatusShape.needsYou.symbol)
+        // Drawn as the waiting card's beacon, which breathes (#2456, #2657).
+        #expect(shape.symbol == "dot.radiowaves.left.and.right")
         #expect(StatusShape(state: .finished, outcome: .done, isWaiting: true, isComingBack: false) == .waiting)
-        #expect(StatusShape(state: .finished, outcome: .stuck, isWaiting: true, isComingBack: false) == .needsYou)
-        #expect(StatusShape(state: .stopped, outcome: .blocked, isWaiting: true, isComingBack: false,
+        #expect(StatusShape(state: .finished, outcome: .needsAnswer, isWaiting: true, isComingBack: false) == .needsYou)
+        #expect(StatusShape(state: .stopped, outcome: .waiting, isWaiting: true, isComingBack: false,
                             endedReason: .cancelled) == .stopped)
     }
 
@@ -84,7 +84,29 @@ struct StatusShapeTests {
         })
         #expect(shapes.isSubset(of: [.working, .needsYou, .done, .stopped]))
         #expect(StatusShape(state: .queued, outcome: nil, isWaiting: false, isComingBack: false) == .waiting)
+        // One is motion (the ring); the other four are symbols, each its own.
         #expect(Set([StatusShape.needsYou, .waiting, .done, .stopped].compactMap(\.symbol)).count == 4)
+        #expect(StatusShape.waiting.symbol == StatusShape.waitingSymbol)
+    }
+
+    @Test("A Needs You row says its question or why it stopped")
+    func needsYouLine() {
+        var asking = Agent(runtimeID: "test", cwd: URL(fileURLWithPath: "/tmp"), state: .waitingOnUser)
+        #expect(StatusShape.needsYouLine(row: asking, question: "May I run this?\nMore detail") == "May I run this?")
+        #expect(StatusShape.needsYouLine(row: asking) == nil)
+
+        asking.state = .stopped
+        asking.endedReason = .daemonGone
+        #expect(StatusShape.needsYouLine(row: asking, question: "Old question") == "Stopped with the daemon")
+
+        asking.state = .finished
+        asking.endedReason = .endTurn
+        asking.outcomeAsked = true
+        #expect(StatusShape.needsYouLine(row: asking) == "Finished without saying how it went")
+
+        asking.outcomeAsked = false
+        asking.report = WorkReport(outcome: .done, message: "The report", at: Date())
+        #expect(StatusShape.needsYouLine(row: asking) == nil)
     }
 }
 

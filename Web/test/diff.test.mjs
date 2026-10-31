@@ -7,8 +7,8 @@ const { lineDiff } = await load("src/model/diff.ts");
 const kinds = (rows) => rows.map((r) => `${r.kind[0]} ${r.text}`);
 
 test("a line added at the end keeps the rest as context", () => {
-  assert.deepEqual(kinds(lineDiff("# Work\n\nA project.\n", "# Work\n\nA project.\n\nEdited.\n")),
-    ["c # Work", "c ", "c A project.", "a ", "a Edited."]);
+  assert.deepEqual(kinds(lineDiff("# Work\n\nA folder.\n", "# Work\n\nA folder.\n\nEdited.\n")),
+    ["c # Work", "c ", "c A folder.", "a ", "a Edited."]);
 });
 
 test("a changed line is removed then added", () => {

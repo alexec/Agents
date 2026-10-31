@@ -12,7 +12,7 @@ struct AuditPane: View {
     /// The control plane, or nil while it cannot be reached.
     let control: DaemonClient?
     /// A host's name, as the client shows it.
-    let hostName: (HostID) -> String
+    let hostName: (MachineRef) -> String
 
     @State private var list: DaemonAPI.AuditList?
     @State private var problem: String?
@@ -101,8 +101,10 @@ struct AuditPane: View {
                     Button("Cancel", role: .cancel) {}
                 } message: {
                     if let days = shorter {
+                        // No count while Whose names a person: the list is theirs, and the
+                        // sweep deletes everyone's (#2192).
                         Text(AuditWords.shorterMessage(from: list.days, to: days,
-                                                       older: AuditWords.older(list, than: days)))
+                                                       older: user.isEmpty ? AuditWords.older(list, than: days) : nil))
                     }
                 }
                 if !people.isEmpty {
@@ -205,7 +207,7 @@ struct AuditPane: View {
 /// One entry: the time, what was done, then who and where, then the call in monospace.
 struct AuditRow: View {
     let entry: DaemonAPI.AuditEntry
-    let hostName: (HostID) -> String
+    let hostName: (MachineRef) -> String
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {

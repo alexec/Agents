@@ -24,7 +24,7 @@ extension AppModel {
     }
 
     /// Settings ▸ Machines: a host stops using a Mac's git access for a server.
-    func lendGit(host: HostID, from: HostID, server: String, allowed: Bool) {
+    func lendGit(host: MachineRef, from: MachineRef, server: String, allowed: Bool) {
         guard let control = controlPlaneClient() else { return }
         Task {
             defer { Task { await control.disconnect() } }
@@ -38,7 +38,7 @@ extension AppModel {
     /// person the first time; then the control plane lets the server tunnel to this Mac's
     /// host, which relays the sign-in, and the server is told where its gate goes. The
     /// token never leaves this Mac. Nil when this is not such a case.
-    func relaySignInThroughControl(_ wanted: DaemonAPI.CredentialWanted, to id: HostID) async -> Bool? {
+    func relaySignInThroughControl(_ wanted: DaemonAPI.CredentialWanted, to id: MachineRef) async -> Bool? {
         guard reachesThroughControl(id), ToolPolicyCatalog.policy(for: wanted.runtime).relay != nil,
               let lender = thisMacHostID, lender != id, let control = controlPlaneClient() else { return nil }
         defer { Task { await control.disconnect() } }
@@ -78,7 +78,7 @@ extension AppModel {
     }
 
     /// What a server may be lent from here, sent on every connect (043). Names only.
-    func credentialOffer(_ id: HostID) -> DaemonAPI.CredentialsOffer {
+    func credentialOffer(_ id: MachineRef) -> DaemonAPI.CredentialsOffer {
         let ownOnly = hosts.host(id)?.ownSignInOnly ?? false
         let runtimes = ownOnly ? [] : ServerCredentials.runtimes.filter { credentials.record($0) != nil }
         // The window relays no sign-in and lends no sign-in file: Agents Host does, on its
@@ -89,7 +89,7 @@ extension AppModel {
     /// A server's daemon wants a credential to start a runtime (043, R6). Lends the one in
     /// Settings; with none, asks the person first. True when it lent one, and the call
     /// that was refused is then sent again.
-    func answerCredentialWanted(_ wanted: DaemonAPI.CredentialWanted, on id: HostID) async -> Bool {
+    func answerCredentialWanted(_ wanted: DaemonAPI.CredentialWanted, on id: MachineRef) async -> Bool {
         guard id != .mac, !(hosts.host(id)?.ownSignInOnly ?? false) else { return false }
         // A sign-in this Mac relays, to a server of the control plane (T091).
         if let relayed = await relaySignInThroughControl(wanted, to: id) { return relayed }
@@ -145,7 +145,7 @@ extension AppModel {
 
     /// A server spent money: a model answered, so whatever sign-in it was lent worked
     /// (043, FR-011). Gemini's key is the only one lent since 056.
-    func noteServerSpent(_ id: HostID) {
+    func noteServerSpent(_ id: MachineRef) {
         guard id != .mac, !(hosts.host(id)?.ownSignInOnly ?? false),
               let record = credentials.record(RuntimeCatalog.gemini.id),
               (record.lastWorked ?? .distantPast) < Date().addingTimeInterval(-60) else { return }

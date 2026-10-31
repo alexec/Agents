@@ -82,6 +82,25 @@ func (d *Daemon) remembered(key string) (optionEntry, bool) {
 	return e, ok && e.worthKeeping()
 }
 
+// runtimeOffers is the options a runtime last offered in any folder, newest first, or nil:
+// what a start's model is matched with before its session says its own (#2274).
+func (d *Daemon) runtimeOffers(runtimeID string) []wire.ConfigOption {
+	d.optionMu.Lock()
+	defer d.optionMu.Unlock()
+	var cache map[string]optionEntry
+	b, err := os.ReadFile(d.optionCachePath())
+	if err != nil || diskjson.Unmarshal(b, &cache) != nil {
+		return nil
+	}
+	var newest optionEntry
+	for k, e := range cache {
+		if strings.HasPrefix(k, runtimeID+"\t") && len(e.Options) > 0 && e.SavedAt > newest.SavedAt {
+			newest = e
+		}
+	}
+	return newest.Options
+}
+
 // remember keeps what a runtime offered, the 50 newest.
 func (d *Daemon) remember(key string, e optionEntry) {
 	if !e.worthKeeping() {
@@ -135,7 +154,7 @@ func (d *Daemon) options(r wire.OptionsRequest) (wire.OptionsResponse, error) {
 	if shown, ok := d.remembered(key); ok {
 		// Shown at once; the runtime is asked after, and a change is said (settleDraft).
 		safe.Go("draft options", func() { d.settleDraft(draft, key, rt, path, shown) })
-		return wire.OptionsResponse{DraftID: draft, Options: shown.Options, Commands: shown.Commands}, nil
+		return wire.OptionsResponse{DraftID: draft, Options: d.markOptions(r.RuntimeID, shown.Options), Commands: shown.Commands}, nil
 	}
 	e, err := d.whatItOffers(rt, path)
 	if err != nil {
@@ -143,7 +162,7 @@ func (d *Daemon) options(r wire.OptionsRequest) (wire.OptionsResponse, error) {
 		return wire.OptionsResponse{}, err
 	}
 	d.remember(key, e)
-	return wire.OptionsResponse{DraftID: draft, Options: e.Options, Commands: e.Commands}, nil
+	return wire.OptionsResponse{DraftID: draft, Options: d.markOptions(r.RuntimeID, e.Options), Commands: e.Commands}, nil
 }
 
 func (d *Daemon) settleDraft(draft wire.UUID, key string, rt *runtimeDef, path string, shown optionEntry) {
@@ -166,7 +185,7 @@ func (d *Daemon) settleDraft(draft wire.UUID, key string, rt *runtimeDef, path s
 	if !open || (sameJSON(e.Options, shown.Options) && sameJSON(e.Commands, shown.Commands)) {
 		return
 	}
-	Broadcast(d, wire.NotifyAgentsDraftOptions, wire.DraftOptionsNotification{DraftID: draft, Options: e.Options, Commands: e.Commands})
+	Broadcast(d, wire.NotifyAgentsDraftOptions, wire.DraftOptionsNotification{DraftID: draft, Options: d.markOptions(rt.ID, e.Options), Commands: e.Commands})
 }
 
 // closeDraft lets a draft go (agents/discardDraft, or the start that used it), and says
@@ -185,7 +204,7 @@ func sameJSON(a, b any) bool {
 	return string(x) == string(y)
 }
 
-// whatItOffers opens a session in the folder, with the project's servers and the
+// whatItOffers opens a session in the folder, with the folder's servers and the
 // person's, and reads what it offers: its options with the session, its commands a moment
 // after.
 func (d *Daemon) whatItOffers(rt *runtimeDef, path string) (optionEntry, error) {
@@ -196,7 +215,8 @@ func (d *Daemon) whatItOffers(rt *runtimeDef, path string) (optionEntry, error) 
 	ctx, cancel := context.WithTimeout(d.ctx, 90*time.Second)
 	defer cancel()
 	p := &probe{commands: make(chan []wire.SlashCommand, 1)}
-	s, err := acp.Start(ctx, launch, p, d.sessionMCP(path), sessionMeta(rt.ID), "")
+	meta := sessionMeta(rt.ID)
+	s, err := acp.Start(ctx, launch, p, d.sessionMCP(path), meta, meta, "", "")
 	if err != nil {
 		return optionEntry{}, &Error{Code: CodeRuntimeWillNotStart, Message: rt.Name + " did not start: " + err.Error()}
 	}

@@ -28,7 +28,7 @@
     "name": "name",
     "kind": "iPhone"
   },
-  "HostAnnounce": {
+  "MachineAnnounce": {
     "publicKey": "AQID",
     "name": "name",
     "platform": "platform",
@@ -47,7 +47,7 @@
     "expires": 812345678.5,
     "command": "command"
   },
-  "HostHello": {
+  "MachineHello": {
     "host": "box",
     "version": "version",
     "platform": "platform",
@@ -62,7 +62,7 @@
     "runtime": "runtime",
     "allowed": true
   },
-  "HostRelayRequest": {
+  "MachineRelayRequest": {
     "host": "box",
     "relay": true
   },
@@ -221,7 +221,7 @@
     "isBastion": true,
     "known": true
   },
-  "WorkspaceInfo": {
+  "MachineInfo": {
     "id": "id",
     "name": "name",
     "state": "state",
@@ -285,14 +285,14 @@
   "ProviderRequest": {
     "id": "digitalocean-x7k2"
   },
-  "HostLink": {
+  "MachineLink": {
     "host": "box",
     "provider": "digitalocean-x7k2",
     "workspace": "workspace",
     "startWhenUsed": true,
     "stopWhenIdleMinutes": 7
   },
-  "HostWorkspaceOptions": {
+  "MachineOptions": {
     "host": "box",
     "startWhenUsed": true,
     "stopWhenIdleMinutes": 7,
@@ -325,14 +325,14 @@
     },
     "joining": true
   },
-  "HostWorkspaceCall": {
+  "MachineWorkspaceCall": {
     "agent": "agent",
     "method": "method",
     "params": {
       "k": "v"
     }
   },
-  "AgentWorkspaces": {
+  "AgentMachines": {
     "providers": [
       {
         "id": "digitalocean-x7k2",
@@ -355,11 +355,11 @@
       }
     ]
   },
-  "HostSchedule": {
+  "MachineSchedule": {
     "at": 812345678.5,
     "workflow": "workflow"
   },
-  "HostStatus": {
+  "MachineStatus": {
     "idle": true,
     "running": [
       "running"
@@ -508,7 +508,7 @@
     },
     "note": "note"
   },
-  "HostProviderDraftCall": {
+  "MachineProviderDraftCall": {
     "agentID": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
     "draft": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
     "tool": "tool",
@@ -757,7 +757,7 @@
     "request": "request",
     "result": "approved"
   },
-  "HostJoinDecision": {
+  "MachineJoinDecision": {
     "result": "approved",
     "host": "host",
     "controlKey": "AQID",
@@ -776,7 +776,6 @@
         "personName": "personName",
         "host": "host",
         "hostName": "hostName",
-        "project": "project",
         "runtime": "claude",
         "cost": {
           "USD": 1.5
@@ -789,7 +788,8 @@
         "turns": 7,
         "unpricedTurns": 7,
         "workingSeconds": 60.5,
-        "waitingSeconds": 30.5
+        "waitingSeconds": 30.5,
+        "folder": "project"
       }
     ],
     "admin": true
@@ -798,6 +798,124 @@
     "text": "text",
     "count": 7,
     "format": "jsonl"
+  },
+  "ReportValue": {
+    "range": "month",
+    "scope": {
+      "kind": "me"
+    },
+    "total": {
+      "cost": {
+        "USD": 4.5
+      },
+      "inputTokens": 7,
+      "outputTokens": 7,
+      "limitTokens": 7,
+      "turns": 1.5,
+      "workingSeconds": 60,
+      "waitingSeconds": 30
+    },
+    "waste": {
+      "cost": {
+        "USD": 4.5
+      },
+      "inputTokens": 7,
+      "outputTokens": 7,
+      "limitTokens": 7,
+      "turns": 1.5,
+      "workingSeconds": 60,
+      "waitingSeconds": 30
+    },
+    "unlinked": {
+      "cost": {
+        "USD": 4.5
+      },
+      "inputTokens": 7,
+      "outputTokens": 7,
+      "limitTokens": 7,
+      "turns": 1.5,
+      "workingSeconds": 60,
+      "waitingSeconds": 30
+    },
+    "perMergedPR": {
+      "USD": 4.5
+    },
+    "prsMerged": 1,
+    "prsClosed": 1,
+    "prsReverted": 0,
+    "failedChecks": 2,
+    "leadTimeSeconds": 3600,
+    "issues": [
+      {
+        "node": {
+          "kind": "issue",
+          "ref": "github:alexec/agents#12"
+        },
+        "total": {
+          "cost": {
+            "USD": 4.5
+          },
+          "inputTokens": 7,
+          "outputTokens": 7,
+          "limitTokens": 7,
+          "turns": 1.5,
+          "workingSeconds": 60,
+          "waitingSeconds": 30
+        },
+        "waste": {
+          "cost": {
+            "USD": 4.5
+          },
+          "inputTokens": 7,
+          "outputTokens": 7,
+          "limitTokens": 7,
+          "turns": 1.5,
+          "workingSeconds": 60,
+          "waitingSeconds": 30
+        },
+        "prsMerged": 1,
+        "prsClosed": 1,
+        "prsReverted": 0,
+        "failedChecks": 2,
+        "leadTimeSeconds": 3600
+      }
+    ],
+    "milestones": [
+      {
+        "node": {
+          "kind": "issue",
+          "ref": "github:alexec/agents#12"
+        },
+        "total": {
+          "cost": {
+            "USD": 4.5
+          },
+          "inputTokens": 7,
+          "outputTokens": 7,
+          "limitTokens": 7,
+          "turns": 1.5,
+          "workingSeconds": 60,
+          "waitingSeconds": 30
+        },
+        "waste": {
+          "cost": {
+            "USD": 4.5
+          },
+          "inputTokens": 7,
+          "outputTokens": 7,
+          "limitTokens": 7,
+          "turns": 1.5,
+          "workingSeconds": 60,
+          "waitingSeconds": 30
+        },
+        "prsMerged": 1,
+        "prsClosed": 1,
+        "prsReverted": 0,
+        "failedChecks": 2,
+        "leadTimeSeconds": 3600
+      }
+    ],
+    "limited": true
   },
   "UserSettings": {
     "mcpServers": {
@@ -811,14 +929,6 @@
     "costLimits": {
       "dailyTokens": 100000
     },
-    "resources": [
-      {
-        "name": "build",
-        "displayName": "Build",
-        "description": "When building.",
-        "holders": 3
-      }
-    ],
     "updated": "2026-10-21T14:00:00Z"
   },
   "UserSettingsPart": {
@@ -978,5 +1088,28 @@
   "SignInDecided": {
     "request": "request",
     "result": "approved"
+  },
+  "FeatureUsage": {
+    "days": 90,
+    "since": "2026-08-02",
+    "features": [
+      {
+        "method": "workflows/run",
+        "week": 0,
+        "quarter": 0,
+        "clients": []
+      },
+      {
+        "method": "sessions/start",
+        "week": 7,
+        "quarter": 30,
+        "clients": [
+          "agent",
+          "mac",
+          "web"
+        ],
+        "lastUsed": "2026-10-30"
+      }
+    ]
   }
 }

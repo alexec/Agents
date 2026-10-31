@@ -199,7 +199,8 @@ private struct ResourceRow: View {
         }
     }
 
-    /// The line in order, each with when it asked and whether its call is still open.
+    /// The line in order, each with when it asked and whether its wait for its turn is open
+    /// (#2361): either way, its turn starts it again.
     private var line: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(state.line.enumerated()), id: \.element.agentID) { index, member in
@@ -207,7 +208,7 @@ private struct ResourceRow: View {
                     Text("\(index + 1)  ").monospacedDigit()
                     agentLink(member.agentID)
                     Text("  asked \(LeaseWords.clock(member.askedAt)) \u{00B7} "
-                         + (member.isCallOpen ? "waiting in its call" : "will be started"))
+                         + (member.isCallOpen ? "waiting for lease.granted" : "will be started"))
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 8)
                     Button {

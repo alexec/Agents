@@ -9,7 +9,7 @@ import SwiftUI
 /// it sat at the foot of a column hiding itself whenever nothing had been banked.
 ///
 /// The usage charts at the top (#823) fetch the host's history; everything below them
-/// reads `model.projects` and nothing else. The grand total and the shares beneath it
+/// reads `model.folders` and nothing else. The grand total and the shares beneath it
 /// are folded from the same array in the same render, which is what makes it impossible
 /// for the total to disagree with the lines under it, or for either to be stale relative
 /// to the sidebar. It fetches nothing.
@@ -18,7 +18,7 @@ import SwiftUI
 struct SpendingView: View {
     @Environment(AppModel.self) private var model
 
-    private var spending: Spending { Spending(model.projects) }
+    private var spending: Spending { Spending(model.folders) }
 
     /// Cost, or Reports: every person's machines, from the control plane (#1811).
     @State private var pane: CostPane = .cost
@@ -27,7 +27,7 @@ struct SpendingView: View {
         Group {
             switch pane {
             case .cost: cost
-            case .reports: ReportsPane(control: model.controlRequests)
+            case .reports: ReportsPane(control: model.controlRequests, features: { await model.featureUsage() })
             }
         }
         .navigationTitle(pane.rawValue)
@@ -134,16 +134,16 @@ enum CostPane: String, CaseIterable, Identifiable {
     var id: Self { self }
 }
 
-/// One project's share of the bill.
+/// One folder's share of the bill.
 private struct ShareRow: View {
     let share: Spending.Share
     let currency: String
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
-            // Archived projects are listed with their spend like any other — nothing
+            // Archived folders are listed with their spend like any other — nothing
             // filters — and worded the way the sidebar words them, so the two surfaces
-            // describe the same project the same way.
+            // describe the same folder the same way.
             Text(share.name)
                 .lineLimit(1)
                 .foregroundStyle(share.isArchived ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))

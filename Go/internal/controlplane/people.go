@@ -144,6 +144,11 @@ func (m *Methods) peopleMethod(ctx context.Context, method string, params json.R
 	switch method {
 	case "people/list":
 		return m.peopleList(user, admin), nil
+	case "people/removeRequests":
+		if !admin {
+			return nil, fail(notPermitted, "Only an admin sees the requests.")
+		}
+		return m.s.removeRequests(ctx)
 	case "people/invite":
 		if !admin {
 			return nil, fail(notPermitted, "Only an admin can invite a person.")
@@ -182,6 +187,10 @@ func (m *Methods) peopleMethod(ctx context.Context, method string, params json.R
 			}
 			if p.RoleOrAdmin() == string(request.Role) {
 				return nil, nil
+			}
+			// A role a SCIM group gives is the provider's to change (FR-020).
+			if len(p.RoleFrom) > 0 {
+				return nil, fail(managedByProvider, "%s's role is set by their organisation's groups. Change it there.", p.Name)
 			}
 			if request.Role == wire.UserRoleMember && admins(all) <= 1 {
 				return nil, fail(notPermitted, "%s is the only admin. Make another person an admin first.", p.Name)
@@ -241,7 +250,7 @@ func (m *Methods) peopleList(user string, admin bool) wire.PeopleList {
 	for _, h := range m.records.Hosts() {
 		owner := m.s.ownerOf(h.ID)
 		state, _ := m.router.Described(h.ID)["state"].(string)
-		machines[owner] = append(machines[owner], wire.PersonMachine{ID: wire.HostID(h.ID), Name: h.Name, State: state,
+		machines[owner] = append(machines[owner], wire.PersonMachine{ID: wire.MachineRef(h.ID), Name: h.Name, State: state,
 			Platform: optional(h.Platform)})
 	}
 	people := m.records.People()
@@ -268,6 +277,21 @@ func (m *Methods) peopleList(user string, admin bool) wire.PeopleList {
 		}
 		if row.Machines == nil {
 			row.Machines = []wire.PersonMachine{}
+		}
+		// What their org provider says of them (#1002, FR-028).
+		if p.SCIM != nil && !p.SCIM.Deleted {
+			row.Scim = &wire.PersonSCIM{Provider: p.SCIM.Provider, ExternalId: optional(p.SCIM.ExternalID), UserName: p.SCIM.UserName,
+				Name: p.SCIM.Name, DisplayName: optional(p.SCIM.DisplayName), Emails: p.SCIM.Emails, Active: p.SCIM.Active}
+		}
+		if p.Provisioned {
+			row.Provisioned = new(true)
+		}
+		if p.Suspended != nil {
+			row.Suspended = &wire.PersonSuspended{By: p.Suspended.By, Provider: p.Suspended.Provider, At: wire.DateOf(p.Suspended.At.Time),
+				Why: optional(p.Suspended.Why)}
+		}
+		if len(p.RoleFrom) > 0 {
+			row.RoleFrom = p.RoleFrom
 		}
 		for _, sign := range p.SignIns {
 			in := wire.SignIn{Provider: sign.Provider, Email: optional(sign.Email), Login: optional(sign.Login)}
@@ -347,6 +371,16 @@ func (m *Methods) removePerson(ctx context.Context, user string, from Caller) er
 	}
 	m.s.joins.dropFor(ctx, user)
 	m.s.links.dropFor(ctx, user)
+	// A Remove request answered, and the refresh tokens kept for them (#1002).
+	_ = m.s.cfg.Store.Delete(ctx, removeRequestKey(user))
+	m.s.signIns.dropRefreshes(ctx, user)
+	// Their user settings, sealed secrets and saved report views (#2293).
+	if m.s.users != nil {
+		if err := m.s.users.Forget(ctx, user); err != nil {
+			m.s.log("person " + user + ": their settings could not be deleted: " + err.Error())
+		}
+	}
+	_ = m.s.cfg.Store.Delete(ctx, reportViewsKey(user))
 	m.s.peopleChanged(user, true)
 	m.s.log("person " + user + " removed")
 	return nil
@@ -360,7 +394,7 @@ var previewPatience = 10 * time.Second
 // asked at once for the work on it that is not pushed, and their registered machines.
 func (m *Methods) removePreview(user string, from Caller) wire.PersonRemovePreview {
 	out := wire.PersonRemovePreview{StartedMachines: []wire.StartedMachinePreview{}, RegisteredMachines: []wire.PersonMachine{}}
-	var started []records.HostRecord
+	var started []records.MachineRecord
 	for _, h := range m.records.Hosts() {
 		if m.s.ownerOf(h.ID) != user {
 			continue
@@ -370,7 +404,7 @@ func (m *Methods) removePreview(user string, from Caller) wire.PersonRemovePrevi
 			continue
 		}
 		state, _ := m.router.Described(h.ID)["state"].(string)
-		out.RegisteredMachines = append(out.RegisteredMachines, wire.PersonMachine{ID: wire.HostID(h.ID), Name: h.Name,
+		out.RegisteredMachines = append(out.RegisteredMachines, wire.PersonMachine{ID: wire.MachineRef(h.ID), Name: h.Name,
 			State: state, Platform: optional(h.Platform)})
 	}
 	previews := make([]wire.StartedMachinePreview, len(started))
@@ -389,25 +423,25 @@ func (m *Methods) removePreview(user string, from Caller) wire.PersonRemovePrevi
 
 // unpushedOn asks a started machine for its worktrees, on a channel bound to the admin
 // who asked, and keeps those with work that is not pushed.
-func (m *Methods) unpushedOn(h records.HostRecord, from Caller) wire.StartedMachinePreview {
+func (m *Methods) unpushedOn(h records.MachineRecord, from Caller) wire.StartedMachinePreview {
 	state, _ := m.router.Described(h.ID)["state"].(string)
-	preview := wire.StartedMachinePreview{Host: wire.HostID(h.ID), Name: h.Name, State: state, Unpushed: []wire.UnpushedWork{}}
+	preview := wire.StartedMachinePreview{Host: wire.MachineRef(h.ID), Name: h.Name, State: state, Unpushed: []wire.UnpushedWork{}}
 	if s, ok := m.router.State(h.ID); !ok || !s.online() {
 		preview.Unknown = optional(h.Name + " is not online, so it could not be asked.")
 		return preview
 	}
 	answer := m.router.DeliverKept(wire.CallWorktreesAll.Name, wire.Empty{}, from.Client, from.Kind, h.ID, previewPatience)
-	var projects []wire.ProjectWorktrees
-	if answer == nil || len(answer.Error) > 0 || json.Unmarshal(answer.Result, &projects) != nil {
+	var folders []wire.FolderWorktrees
+	if answer == nil || len(answer.Error) > 0 || json.Unmarshal(answer.Result, &folders) != nil {
 		preview.Unknown = optional(h.Name + " did not say what work on it is not pushed.")
 		return preview
 	}
-	for _, p := range projects {
+	for _, p := range folders {
 		for _, w := range p.Worktrees {
 			if w.Status == nil || !unpushed(*w.Status) {
 				continue
 			}
-			work := wire.UnpushedWork{Project: p.Project, Worktree: w.Root, Branch: w.Branch, Ahead: w.Status.Ahead,
+			work := wire.UnpushedWork{Folder: p.Folder, Worktree: w.Root, Branch: w.Branch, Ahead: w.Status.Ahead,
 				Unmerged: w.Status.Unmerged}
 			if w.Status.Uncommitted > 0 {
 				work.Uncommitted = new(w.Status.Uncommitted)
@@ -454,6 +488,8 @@ func (s *Service) peopleChanged(user string, removed bool) {
 	// A bot made, renamed or removed changes which bots' workflows each person's machine
 	// hears (#2027).
 	s.tellPeoplesMachines()
+	// A person removed may use no org route (#999).
+	s.resendOrgRoutes()
 	s.announce("peopleChanged", user, "")
 }
 

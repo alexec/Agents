@@ -3,11 +3,11 @@ import Foundation
 /// The words for a hosted MCP server's row on the MCP Servers page (#488, #589), the same on
 /// the Mac, the Remote and the web page (`Web/src/model/hostedMCP.ts`).
 public enum HostedMCPWords {
-    /// Whose file names it: the project's folder name, or the person's own.
+    /// Whose file names it: the folder name, or the person's own.
     public static func place(_ status: DaemonAPI.HostedMCPStatus) -> String {
-        guard let project = status.project else { return "Your own (~/.agents/mcp.json)" }
-        let name = (project as NSString).lastPathComponent
-        return name.isEmpty ? project : name
+        guard let folder = status.folder else { return "Your own (~/.agents/mcp.json)" }
+        let name = (folder as NSString).lastPathComponent
+        return name.isEmpty ? folder : name
     }
 
     /// What it is doing, in a line.

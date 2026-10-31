@@ -34,7 +34,9 @@ func (s *Service) actorFor(client string) wire.AuditActor {
 	return actor
 }
 
-func (s *Service) auditLog() *audit.Log { return &audit.Log{Store: s.cfg.Store} }
+func (s *Service) auditLog() *audit.Log {
+	return &audit.Log{Store: s.cfg.Store, Chain: s.auditChain, Out: s.auditSinks.Add}
+}
 
 // auditTarget is audit.Target; a test holds it to prove where it runs.
 var auditTarget = audit.Target
@@ -45,18 +47,21 @@ var auditTarget = audit.Target
 // params are the message's own, decoded from its line, and never changed after.
 func (s *Service) audited(from Caller, host, method string, params json.RawMessage) {
 	action, ok := audit.Action(method, host != "")
-	if !ok {
+	if !ok || host == "" && (orgRoutesSelfAudited[method] || orgSelfAudited[method]) {
 		return
 	}
-	go func() {
-		actor, target := s.actorFor(from.Client), auditTarget(params)
-		if err := s.auditLog().Write(context.Background(), actor, method, action, host, target); err != nil {
-			s.log("audit: could not keep " + method + ": " + err.Error())
-		}
-	}()
+	s.auditWriter.Add(audit.Pending{Method: method, Action: action, Host: host, Who: func() (wire.AuditActor, *string) {
+		return s.actorFor(from.Client), auditTarget(params)
+	}})
+}
+
+// auditTo queues an entry for something no client asked for, with who did it and what.
+func (s *Service) auditTo(actor wire.AuditActor, method, action, target string) {
+	s.auditWriter.Add(audit.Pending{Method: method, Action: action, Who: func() (wire.AuditActor, *string) { return actor, &target }})
 }
 
 func (s *Service) startAudit() {
+	go s.followAuditSinks()
 	s.router.SetAudit(func(from Caller) *wire.AuditActor {
 		actor := s.actorFor(from.Client)
 		return &actor

@@ -315,7 +315,7 @@ func (s *Service) handoverAnswer(method string, params json.RawMessage) (any, er
 		if phase != phaseServing {
 			return nil, refuseHandover("A relay is switched on or off at a copy that is serving.")
 		}
-		request, err := require[wire.HostRelayRequest](params, "HostRelayRequest")
+		request, err := require[wire.MachineRelayRequest](params, "MachineRelayRequest")
 		if err != nil {
 			return nil, refuseHandover("Say the relay host and whether it relays.")
 		}

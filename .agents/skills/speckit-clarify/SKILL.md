@@ -2,7 +2,7 @@
 name: "speckit-clarify"
 description: "Identify underspecified areas in the current feature spec by asking up to 5 highly targeted clarification questions and encoding answers back into the spec."
 argument-hint: "Optional areas to clarify in the spec"
-compatibility: "Requires spec-kit project structure with .specify/ directory"
+compatibility: "Requires spec-kit folder structure with .specify/ directory"
 metadata:
   author: "github-spec-kit"
   source: "templates/commands/clarify.md"
@@ -22,7 +22,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Pre-Execution Checks
 
 **Check for extension hooks (before clarification)**:
-- Check if `.specify/extensions.yml` exists in the project root.
+- Check if `.specify/extensions.yml` exists in the folder root.
 - If it exists, read it and look for entries under the `hooks.before_clarify` key
 - If the YAML cannot be parsed or is invalid, do not skip silently: tell the user that `.specify/extensions.yml` could not be read (include the parser error) and that no hooks were checked, including any mandatory (`optional: false`) hooks registered there, then continue normally
 - Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
@@ -70,7 +70,7 @@ Execution steps:
    - If JSON parsing fails, abort and instruct user to re-run `/speckit-specify` or verify feature branch environment.
    - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
 
-2. **IF EXISTS**: Load `.specify/memory/constitution.md` for project principles and governance constraints.
+2. **IF EXISTS**: Load `.specify/memory/constitution.md` for folder principles and governance constraints.
 
 3. Load the current spec file. Perform a structured ambiguity & coverage scan using this taxonomy. For each category, mark status: Clear / Partial / Missing. Produce an internal coverage map used for prioritization (do not output raw map unless no questions will be asked).
 
@@ -149,10 +149,10 @@ Execution steps:
        - Use everyday wording; introduce jargon only if defined in the same sentence. Self-check: a reader who does not know Spec Kit must be able to answer from the Question line alone. Terse is fine; cryptic labels are not.
     - For multiple‑choice questions:
        - **Analyze all options** and determine the **most suitable option** based on:
-          - Best practices for the project type
+          - Best practices for the folder type
           - Common patterns in similar implementations
           - Risk reduction (security, performance, maintainability)
-          - Alignment with any explicit project goals or constraints visible in the spec
+          - Alignment with any explicit folder goals or constraints visible in the spec
        - Present your **recommended option prominently** at the top with clear reasoning (1-2 sentences explaining why this is the best choice).
        - Format as: `**Recommended:** Option [X] - <reasoning>`
        - Then render all options as a Markdown table:
@@ -244,7 +244,7 @@ Context for prioritization: $ARGUMENTS
 
 **You MUST complete this section before reporting completion to the user.**
 
-Check if `.specify/extensions.yml` exists in the project root.
+Check if `.specify/extensions.yml` exists in the folder root.
 - If it does not exist, or no hooks are registered under `hooks.after_clarify`, skip to the Completion Report.
 - If it exists, read it and look for entries under the `hooks.after_clarify` key.
 - If the YAML cannot be parsed or is invalid, do not skip silently: tell the user that `.specify/extensions.yml` could not be read (include the parser error) and that no hooks were checked, including any mandatory (`optional: false`) hooks registered there, then continue to the Completion Report.

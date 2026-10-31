@@ -2,22 +2,17 @@ package agentsd
 
 import (
 	"embed"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/wire"
 )
 
-// Ready-made workflows (#1342): Agents' own workflows for the dev loop on GitHub, and on
-// GitLab too (#1633): one workflow for both forges, its skill using the server the event
-// came from. Each is readymade/<id>/workflow.md, short, and the method in
-// readymade/<id>/SKILL.md (#1563). A project that pushes to GitHub or GitLab lists each one
-// that it has no file for, off. Nothing is
-// written until a person (or an agent) turns one on or changes it: then the workflow goes
-// to .agents/workflows/<id>.md and its skill to .agents/skills/<id>/SKILL.md, and from
-// then on it is the project's own file.
+// Ready-made workflows (#1342, #1633) are copied to the person's workflow folder once.
+// After that, the files belong to the person.
 
 //go:embed readymade
 var readyMadeFS embed.FS
@@ -79,61 +74,84 @@ func pushesToForge(folder string) bool {
 	return false
 }
 
-// addReadyMadeLocked lists the ready-made workflows that a folder has no file for.
-func (d *Daemon) addReadyMadeLocked(folder string, files map[string]map[string]*workflowFile) {
-	if !pushesToForge(folder) || folder == d.chatFolder() || !ownFolders(folder, workflowsRel) {
+// removedReadyMadePath keeps the IDs of built-in workflows that the person deleted.
+func removedReadyMadePath(home string) string {
+	return filepath.Join(home, ".agents", "settings", "removed-workflows.json")
+}
+
+func markReadyMadeRemoved(home, id string) error {
+	known := false
+	for _, builtIn := range readyMadeIDs() {
+		known = known || builtIn == id
+	}
+	if !known {
+		return nil
+	}
+	path := removedReadyMadePath(home)
+	var ids []string
+	if data, err := os.ReadFile(path); err == nil {
+		_ = json.Unmarshal(data, &ids)
+	}
+	for _, existing := range ids {
+		if existing == id {
+			return nil
+		}
+	}
+	ids = append(ids, id)
+	sort.Strings(ids)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	data, err := json.Marshal(ids)
+	if err != nil {
+		return err
+	}
+	return store.WriteAtomically(path, data, 0o600)
+}
+
+// ensureReadyMadeUserWorkflowsLocked installs built-ins in the user's folder once. Existing
+// files belong to the user. A removed ID stays removed after a restart or an update.
+func (d *Daemon) ensureReadyMadeUserWorkflowsLocked() {
+	home := d.personalHome()
+	if home == "" || !ownFolders(home, workflowsRel) {
 		return
 	}
+	var removed []string
+	if data, err := os.ReadFile(removedReadyMadePath(home)); err == nil {
+		_ = json.Unmarshal(data, &removed)
+	}
+	wasRemoved := map[string]bool{}
+	for _, id := range removed {
+		wasRemoved[id] = true
+	}
 	for _, id := range readyMadeIDs() {
-		if files[folder][id] != nil {
+		if wasRemoved[id] {
 			continue
 		}
-		if files[folder] == nil {
-			files[folder] = map[string]*workflowFile{}
+		skillPath := filepath.Join(home, ".agents", "skills", id, "SKILL.md")
+		if ownFolders(home, filepath.Join(".agents", "skills", id)) {
+			if _, err := os.Lstat(skillPath); os.IsNotExist(err) {
+				if os.MkdirAll(filepath.Dir(skillPath), 0o755) == nil {
+					_, skill := readyMadeText(id)
+					_ = store.WriteAtomically(skillPath, []byte(skill), 0o644)
+				}
+			}
 		}
-		text, _ := readyMadeText(id)
-		files[folder][id] = &workflowFile{wf: parseWorkflow(text, id, folder), text: text, readyMade: true}
-	}
-}
-
-// writeReadyMadeLocked writes a ready-made workflow into its project, before the first
-// change to it. A person's change approves it at once: it is Agents' own text, and the
-// person chose it. An agent's waits for the person, as any file an agent writes does.
-// A skill of the same name that the project has already is kept, and since it is not
-// Agents' own text, the workflow with it waits for the person too (S20261019-2).
-func (d *Daemon) writeReadyMadeLocked(folder, id string, byPerson bool) error {
-	path, ok := workflowPath(folder, id)
-	if !ok {
-		return notInFolder(id)
-	}
-	workflow, skill := readyMadeText(id)
-	skillPath := filepath.Join(folder, ".agents", "skills", id, "SKILL.md")
-	if _, err := os.Lstat(skillPath); os.IsNotExist(err) && ownFolders(folder, filepath.Join(".agents", "skills", id)) {
-		os.MkdirAll(filepath.Dir(skillPath), 0o755)
-		if err := store.WriteAtomically(skillPath, []byte(skill), 0o644); err != nil {
-			return &Error{Code: wire.FailureCouldNotSave, Message: id + "'s skill was not written: " + err.Error() + "."}
+		path, ok := workflowPath(home, id)
+		if !ok {
+			continue
 		}
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return &Error{Code: wire.FailureCouldNotSave, Message: id + ".md was not written: " + err.Error() + "."}
-	}
-	if err := store.WriteAtomically(path, []byte(workflow), 0o644); err != nil {
-		return &Error{Code: wire.FailureCouldNotSave, Message: id + ".md was not written: " + err.Error() + "."}
-	}
-	d.scanLocked()
-	if f := d.fileLocked(folder, id); byPerson && f != nil && !f.readyMade && f.digest != "" && onlyOwnSkill(f, id, skill) {
-		d.keepCopyLocked(d.stateLocked(folder, id, true), f)
-		d.saveRecordsLocked(false)
-	}
-	return nil
-}
-
-// onlyOwnSkill is whether the skills a ready-made workflow names are its own, as written.
-func onlyOwnSkill(f *workflowFile, id, skill string) bool {
-	for _, s := range f.skills {
-		if s.name != id || s.text != skill {
-			return false
+		if _, err := os.Lstat(path); err == nil {
+			continue
+		} else if !os.IsNotExist(err) {
+			continue
+		}
+		workflow, _ := readyMadeText(id)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			continue
+		}
+		if err := store.WriteAtomically(path, []byte(workflow), 0o644); err != nil {
+			continue
 		}
 	}
-	return true
 }

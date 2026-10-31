@@ -1,4 +1,4 @@
-// Settings ▸ You ▸ Backups (#1810) and Servers' Backups (#1815). Listed in ./sections.ts.
+// Settings ▸ You ▸ Backups (#1810) and Machines' Backups (#1815). Listed in ./sections.ts.
 import { useEffect, useState } from "preact/hooks";
 import type { Store } from "../../model/store";
 import { hostAnswers, hostHas } from "../../model/capabilities";
@@ -109,7 +109,7 @@ function ServerBackups({ store, host, name }: { store: Store; host: string; name
   );
 }
 
-/** Servers' Backups (#1815): a row for each server that answers now, opening its backups, as the window opens
+/** Machines' Backups (#1815): a row for each server that answers now, opening its backups, as the window opens
  * them from the host's menu and the Remote from its own Settings. */
 export function ServerBackupsSection({ store }: { store: Store }) {
   const [open, setOpen] = useState<string | null>(null);
@@ -121,7 +121,7 @@ export function ServerBackupsSection({ store }: { store: Store }) {
   return (
     <>
       <section aria-labelledby="settings-server-backups">
-        <h3 class="section-head" id="settings-server-backups">Servers' Backups</h3>
+        <h3 class="section-head" id="settings-server-backups">Machines' Backups</h3>
         {servers.map((host) => (
           <div class="setting" key={host.id}>
             <span>{host.name}</span>

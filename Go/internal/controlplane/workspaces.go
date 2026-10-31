@@ -13,7 +13,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Workspace providers (#691), as ControlService.takeUp wires them: on a single copy with
+// Machine providers (#691), as ControlService.takeUp wires them: on a single copy with
 // a home for their secrets, beside the tunnels. They keep prompts and starts for a
 // stopped workspace (US3), and an agent on this machine's own host writes a map for a new
 // one (Write It for Me, #858).
@@ -67,11 +67,12 @@ func (s *Service) makeProviders(home string) *providers.Providers {
 				over, _, _ := s.tunnels.Installed(host)
 				return over
 			},
-			Connect: connect,
-			OwnerOf: s.ownerOf,
+			Connect:   connect,
+			OwnerOf:   s.ownerOf,
 			IsAdmin:   s.isAdmin,
 			InGroup:   s.inGroup,
 			GroupName: s.groupName,
+			Suspended: s.suspended,
 			HostCommand: func(person string) (string, error) {
 				shown, err := s.codes.Issue(withCodeOwner(context.Background(), person), true, false, 5*time.Minute)
 				if err != nil {
@@ -134,7 +135,7 @@ func (a providerRouter) HostState(host string) string {
 	return state
 }
 
-func (a providerRouter) SetWorkspace(host string, ws *providers.HostWorkspace) {
+func (a providerRouter) SetWorkspace(host string, ws *providers.MachineWorkspace) {
 	a.r.SetWorkspace(host, ws)
 }
 
@@ -144,6 +145,10 @@ func (a providerRouter) BroadcastControl(method string, params any) {
 
 func (a providerRouter) BroadcastControlEach(method string, params func(person string) any) {
 	a.r.BroadcastControlEach(method, params)
+}
+
+func (a providerRouter) TellPerson(person, method string, params any) {
+	a.r.TellPerson(person, method, params)
 }
 
 func (a providerRouter) DeliverKept(method string, params json.RawMessage, client, kind, host string, patience time.Duration) *providers.Reply {
@@ -171,7 +176,7 @@ func (a providerRouter) Holds(host string) bool { return a.r.Holds(host) }
 // providerMethods is the methods as the providers see them (their Methods).
 type providerMethods struct{ m *Methods }
 
-func (a providerMethods) HostRow(h records.HostRecord) any { return a.m.hostRow(h) }
+func (a providerMethods) HostRow(h records.MachineRecord) any { return a.m.hostRow(h) }
 
 func (a providerMethods) RemoveHost(host string, from providers.Caller) error {
 	_, err := a.m.Handle("hosts/remove", rawOf(map[string]string{"host": host}),
@@ -193,7 +198,7 @@ func providersCaller(c Caller) providers.Caller {
 // trusted at the install, whatever address the host has now (#1691); else the person's own
 // known_hosts (#965). With renewKey, the key it is offered is taken and pinned again for
 // its tunnel (#1701).
-func (s *Service) sshStart(host records.HostRecord, destination string, renewKey bool) error {
+func (s *Service) sshStart(host records.MachineRecord, destination string, renewKey bool) error {
 	known := ""
 	if s.tunnels != nil {
 		if _, keys, ok := s.tunnels.Installed(host.ID); ok {

@@ -10,13 +10,14 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
-import { asksToArchive, isOpenBlock, projectFolder } from "../model/groups";
+import { asksToArchive, isOpenBlock, folderPath } from "../model/groups";
 import { keepLabel } from "../model/archiveWords";
 import { carryOnHelp, carryOnLabel, carryOnPrompt, openBlock } from "../model/block";
 import { go, routeHash } from "../route";
 import { canStop, liveDescendants } from "../model/tree";
 import { isMuted, muteHelp, muteLabel, unmuteLabel } from "../model/mute";
 import { Capability } from "../protocol/capabilities.generated";
+import { setShowsThoughts, showsThoughts, thoughtsItem } from "../model/thoughts";
 
 export type Action = "carryOn" | "agents/stop" | "stopAll" | "agents/archive" | "agents/unarchive"
   | "markRead" | "markUnread" | "mute" | "unmute" | "rename" | "pin" | "unpin" | "fork" | "delete" | "keep";
@@ -58,11 +59,11 @@ export function sessionActions(agent: Agent, pinned?: boolean, started: readonly
   if (agent.state !== "archived") {
     found.push({ action: "rename", label: "Rename…", help: "Give this session a title of your own" });
   }
-  // At the top of its project whatever its state, or back among the rest (#180).
+  // At the top of its folder whatever its state, or back among the rest (#180).
   if (pinned !== undefined && agent.state !== "archived") {
     found.push(pinned
       ? { action: "unpin", label: "Unpin", help: "Put this session back among the others" }
-      : { action: "pin", label: "Pin", help: "Keep this session at the top of its project, whatever its state" });
+      : { action: "pin", label: "Pin", help: "Keep this session at the top of its folder, whatever its state" });
   }
   // Branching leaves the original alone and carries the history so far (#342), as the window's row.
   if (agent.state !== "archived") {
@@ -99,12 +100,12 @@ export function headerActions(agent: Agent, pinned: boolean): { action: Action; 
 }
 
 /**
- * `headerActions` as buttons. Archive leaves the chat for its project, once the host has it.
+ * `headerActions` as buttons. Archive leaves the chat for its folder, once the host has it.
  * Below 760 they are left to the ···, as the iPhone has them, so the title keeps the room (#665).
  */
 export function SessionButtons({ store, host, agent, disabled }: { store: Store; host: string; agent: Agent | undefined; disabled: boolean }) {
   if (!agent) return null;
-  const pinned = store.sessionPinsIn(host, projectFolder(agent)).includes(agent.id);
+  const pinned = store.sessionPinsIn(host, folderPath(agent)).includes(agent.id);
   return (
     <>
       {headerActions(agent, pinned).map(({ action, label, help }) => (
@@ -118,9 +119,9 @@ export function SessionButtons({ store, host, agent, disabled }: { store: Store;
   );
 }
 
-/** Archive, then the session's project with nothing chosen (#2090): the chat it was open in has nothing left to show. */
+/** Archive, then the session's folder with nothing chosen (#2090): the chat it was open in has nothing left to show. */
 function archiveAndLeave(store: Store, host: string, agent: Agent) {
-  void archiveWithChildren(store, host, agent).then((done) => { if (done) go({ host, project: projectFolder(agent) }); });
+  void archiveWithChildren(store, host, agent).then((done) => { if (done) go({ host, folder: folderPath(agent) }); });
 }
 
 /** The live sessions this one started, at every level, as the host's list has them (#835). */
@@ -216,7 +217,15 @@ export function SessionMenu({ store, host, agent, disabled, find, findsOnHost = 
                 openFile();
               }}>Open File…</button>
           )}
-          {sessionActions(agent, store.sessionPinsIn(host, projectFolder(agent)).includes(agent.id), startedBy(store, host, agent),
+          {inChat && (
+            // Next to the chat, not in Settings (#2383), as View ▸ Show Thoughts on the Mac.
+            <button role="menuitem" title={thoughtsItem(showsThoughts.value).title}
+              onClick={() => {
+                open.value = false;
+                setShowsThoughts(!showsThoughts.value);
+              }}>{thoughtsItem(showsThoughts.value).label}</button>
+          )}
+          {sessionActions(agent, store.sessionPinsIn(host, folderPath(agent)).includes(agent.id), startedBy(store, host, agent),
             store.has(host, Capability.mute1)).map(({ action, label, help }) => (
             <button key={action} role="menuitem" title={help}
               onClick={() => {
@@ -236,7 +245,7 @@ export function SessionMenu({ store, host, agent, disabled, find, findsOnHost = 
  * can sit in a tab or a window of its own beside this one, as the Mac's Open in New Window.
  */
 export function sessionTabURL(host: string, agent: Agent, page: { pathname: string; search: string } = location): string {
-  return page.pathname + page.search + routeHash({ host, project: projectFolder(agent), session: agent.id });
+  return page.pathname + page.search + routeHash({ host, folder: folderPath(agent), session: agent.id });
 }
 
 /** Open in New Tab (#826), from the sidebar row's menu. */
@@ -250,7 +259,7 @@ export function runSessionAction(store: Store, host: string, agent: Agent, actio
   else if (action === "carryOn") void store.prompt(host, agent.id, carryOnPrompt, []);
   else if (action === "markRead" || action === "markUnread") void store.setUnread(host, agent.id, action === "markUnread");
   else if (action === "mute" || action === "unmute") void store.setMuted(host, agent.id, action === "mute");
-  else if (action === "pin" || action === "unpin") void store.setPinned(host, projectFolder(agent), agent.id, action === "pin");
+  else if (action === "pin" || action === "unpin") void store.setPinned(host, folderPath(agent), agent.id, action === "pin");
   else if (action === "fork") void branch(store, host, agent);
   else if (action === "keep") void store.keepSession(host, agent);
   else if (action === "agents/archive") void archiveWithChildren(store, host, agent);
@@ -270,13 +279,13 @@ export const deleteMessage = "Its conversation and record are removed. This cann
 
 /** Delete, asked first (#398); the host's agent/removed takes it out of every list. */
 async function remove(store: Store, host: string, agent: Agent) {
-  if (await store.act("agents/delete", { agentID: agent.id }, host) !== null) go({ host, project: projectFolder(agent) });
+  if (await store.act("agents/delete", { agentID: agent.id }, host) !== null) go({ host, folder: folderPath(agent) });
 }
 
 /** Branch, then open the new session, as the window selects it (#342). */
 async function branch(store: Store, host: string, agent: Agent) {
   const id = await store.fork(host, agent.id);
-  if (id) go({ host, project: projectFolder(agent), session: id });
+  if (id) go({ host, folder: folderPath(agent), session: id });
 }
 
 /**
@@ -285,7 +294,7 @@ async function branch(store: Store, host: string, agent: Agent) {
  */
 export async function branchFromPrompt(store: Store, host: string, agent: Agent, entryID: string, text: string): Promise<void> {
   const id = await store.branchFrom(host, agent.id, entryID, text);
-  if (id) go({ host, project: projectFolder(agent), session: id });
+  if (id) go({ host, folder: folderPath(agent), session: id });
 }
 
 /**

@@ -1,16 +1,18 @@
 #!/bin/zsh
-# Build main and install the Remote on Alex's paired iPhone/iPad.
+# Build main and install Agents Host, the Mac window and the Remote.
 #
-# The Mac copy is off unless --install-mac is passed, and only when Alex has asked to
-# install on this Mac. Without that flag this script does not copy Agents Host or the
-# window into ~/Applications, /Applications or ~/AgentsApps, and it does not restart the
-# login-item jobs. A development run and a merge wave never pass it.
+# The Mac install runs by default. Pass --no-mac to leave Agents Host, the window and the
+# login-item jobs alone. A development run and a merge wave do not run this script.
 #
-# With --install-mac, Agents Host is swapped in at ~/Applications/Agents Host.app, where
-# its Login Items point, and launchd restarts both jobs from it. The window runs from a
-# copy in ~/Applications/AgentsLive/<sha>-<time>/, never from build/DD-store: every build
-# in the main checkout writes over that. The relaunch is this file detached (`--restart`),
-# because the host it restarts is usually the one running the session that started it.
+# Agents Host is swapped in at ~/Applications/Agents Host.app, where its Login Items point,
+# and launchd restarts both jobs from it. The window runs from a copy in
+# ~/Applications/AgentsLive/<sha>-<time>/, never from build/DD-store: every build in the
+# main checkout writes over that. The relaunch is this file detached (`--restart`), because
+# the host it restarts is usually the one running the session that started it.
+#
+# A device install is detached the same way (`--install-device`), one per device, and does
+# not wait on or delay the Mac relaunch: a locked phone or a flaky connection retries every
+# 2 minutes for up to an hour on its own, in the background.
 #
 # Everything is built in the Live configuration (#220): optimised like Release, signed for
 # development like Debug. Release itself is the App Store archive's. Scratch walks
@@ -19,12 +21,12 @@
 # Run from a worktree, it builds and installs that worktree, if clean and at origin/main
 # (#797); run from the main checkout, the main checkout.
 #
-#   ship.sh                 the Remote only; the Mac app stays where it is
-#   ship.sh --install-mac   also copy the Mac app into place and restart its login items
+#   ship.sh                 install the Mac apps and Remote (the default)
+#   ship.sh --no-mac        skip the Mac install and restart
+#   ship.sh --install-mac   accepted as an alias for the default
 #   ship.sh --no-build      reuse build/DD-host, build/DD-store and build/DD-ios as they are
 #   ship.sh --no-linux      skip rebuilding the Linux hosts in App/Resources/servers
 #   ship.sh --no-devices    skip the iPhone/iPad
-#   ship.sh --no-mac        skip the Mac (the default)
 #   ship.sh --device UDID   only this device (repeatable)
 #   ship.sh --now           relaunch the Mac after 3s instead of 20s
 #   ship.sh --list-devices  say which devices it would install on, and why it skips any;
@@ -122,13 +124,49 @@ restart() { # live-folder sha delay
   echo "$(date) done"
 }
 
+install_device() { # udid bid app sha
+  local udid=$1 bid=$2 app=$3 sha=$4
+  exec >> /tmp/ship-install-$udid-$sha.log 2>&1
+  echo "$(date) retrying install on $udid every 2m, for up to 1h"
+  local deadline=$(( $(date +%s) + 3600 )) ok=0
+  while (( $(date +%s) < deadline )); do
+    # One installer at a time across agents: a directory lock, stale after 10 minutes.
+    # Held only for this attempt, not the whole hour, so other installs are not starved.
+    local LOCK=/tmp/agents-device-install.lock i
+    for i in {1..60}; do
+      mkdir $LOCK 2>/dev/null && break
+      [[ -n $(find $LOCK -maxdepth 0 -mmin +10 2>/dev/null) ]] && { rmdir $LOCK; continue; }
+      sleep 10
+    done
+    trap 'rmdir $LOCK 2>/dev/null' EXIT
+    xcrun devicectl device install app --device $udid "$app" > /tmp/ship-install-$udid-$sha-attempt.log 2>&1 && ok=1
+    rmdir $LOCK 2>/dev/null; trap - EXIT
+    if (( ok )); then
+      xcrun devicectl device process launch --terminate-existing --device $udid $bid \
+        && echo "$(date +%T) installed and launched on $udid" \
+        || echo "installed on $udid but launch failed (locked?)"
+      break
+    fi
+    echo "$(date +%T) install on $udid failed: $(tail -3 /tmp/ship-install-$udid-$sha-attempt.log | tr '\n' ' ')"
+    echo "$(date +%T) retrying in 2m"
+    sleep 120
+  done
+  (( ok )) || echo "$(date +%T) gave up on $udid after 1h"
+  echo "$(date) done"
+}
+
 if [[ ${1:-} == --restart ]]; then
   shift
   restart "$@"
   exit
 fi
+if [[ ${1:-} == --install-device ]]; then
+  shift
+  install_device "$@"
+  exit
+fi
 
-BUILD=1 DEVICES=1 MAC=0 DELAY=20 LINUX=1 BUILD_ONLY=0 LIST_DEVICES=0
+BUILD=1 DEVICES=1 MAC=1 DELAY=20 LINUX=1 BUILD_ONLY=0 LIST_DEVICES=0
 typeset -a ONLY
 while (( $# )); do
   case $1 in
@@ -229,6 +267,17 @@ run() { # name, then the command; quiet unless it fails
   fi
 }
 
+# No point building the Remote to install it on nothing: check before the build, not
+# after. --build-only still builds it even with no device, to prove the build itself.
+if (( DEVICES )) && (( ! BUILD_ONLY )); then
+  if (( ${#ONLY} )); then
+    UDIDS=($ONLY)
+  else
+    choose_devices $LOGS/devices.json || exit 1
+    (( ${#UDIDS} )) || { echo "no paired iPhone/iPad available; skipping the Remote build and install"; DEVICES=0 }
+  fi
+fi
+
 # The apps say the version of this commit, X.Y.Z after its tag (#1748): project.yml's is only
 # for a plain xcodebuild; a release sets its own from the tag.
 XFLAGS=(-skipPackagePluginValidation -skipMacroValidation MARKETING_VERSION=$("$REPO/scripts/version.sh" --marketing))
@@ -272,36 +321,10 @@ fi
 if (( DEVICES )); then
   [[ -d $IOSAPP ]] || { echo "no device build at $IOSAPP" >&2; exit 1; }
   BID=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' $IOSAPP/Info.plist)
-  if (( ${#ONLY} )); then
-    UDIDS=($ONLY)
-  else
-    choose_devices $LOGS/devices.json || exit 1
-  fi
-  (( ${#UDIDS} )) || echo "no paired iPhone/iPad visible; skipping devices"
-  # One installer at a time across agents: a directory lock, stale after 10 minutes.
-  LOCK=/tmp/agents-device-install.lock
-  for i in {1..60}; do
-    mkdir $LOCK 2>/dev/null && break
-    [[ -n $(find $LOCK -maxdepth 0 -mmin +10 2>/dev/null) ]] && { rmdir $LOCK; continue; }
-    (( i == 1 )) && echo "another install is running; waiting"
-    sleep 10
-  done
-  trap 'rmdir /tmp/agents-device-install.lock 2>/dev/null' EXIT
   for U in $UDIDS; do
-    ok=0
-    for t in 1 2 3; do
-      if xcrun devicectl device install app --device $U $IOSAPP > $LOGS/install-$U.log 2>&1; then ok=1; break; fi
-      echo "install on $U failed (try $t); retrying in 30s"; sleep 30
-    done
-    if (( ok )); then
-      xcrun devicectl device process launch --terminate-existing --device $U $BID > $LOGS/launch-$U.log 2>&1 \
-        && echo "$(date +%T) installed and launched on $U" \
-        || echo "installed on $U but launch failed (locked? log $LOGS/launch-$U.log)"
-    else
-      echo "INSTALL FAILED on $U: $(tail -3 $LOGS/install-$U.log | tr '\n' ' ')"
-    fi
+    nohup ${0:A} --install-device $U $BID $IOSAPP $SHA >/dev/null 2>&1 &!
+    echo "$(date +%T) installing on $U in the background, retrying up to 1h; log /tmp/ship-install-$U-$SHA.log"
   done
-  rmdir $LOCK 2>/dev/null; trap - EXIT
 fi
 
 if (( MAC )); then

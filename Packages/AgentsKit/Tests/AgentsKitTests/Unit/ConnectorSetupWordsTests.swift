@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import AgentsKitCore
 
-/// A project's Connectors set-up as the host sends it, and its words (#1336).
+/// A folder's Connectors set-up as the host sends it, and its words (#1336).
 @Suite("Connector set-up words")
 struct ConnectorSetupWordsTests {
     typealias Setup = DaemonAPI.ConnectorSetup
@@ -29,13 +29,13 @@ struct ConnectorSetupWordsTests {
         let review = try #require(setup.slot(.codeReview))
         let ci = try #require(setup.slot(.ci))
         #expect(ConnectorSetupWords.setUpHeading(setup) == "Set up \u{00B7} 3 of 4")
-        #expect(ConnectorSetupWords.connectedNote(setup) == "Your connection, for every project \u{00B7} sees 3 repositories")
+        #expect(ConnectorSetupWords.connectedNote(setup) == "Your connection, for every folder \u{00B7} sees 3 repositories")
         #expect(ConnectorSetupWords.proof(tasks) == "Newest: #7 Fix the walk")
         #expect(ConnectorSetupWords.title(review) == "Skipped")
-        #expect(ConnectorSetupWords.line(ci, project: "walk", repository: setup.repository)
+        #expect(ConnectorSetupWords.line(ci, folder: "walk", repository: setup.repository)
                 .hasPrefix("GitHub refused"))
         #expect(ConnectorSetupWords.eventNouns(setup.events.names) == ["checks.*", "pr.*", "issue.*"])
-        #expect(ConnectorSetupWords.projectLine(setup) == "GitHub Issues, This Mac")
+        #expect(ConnectorSetupWords.folderLine(setup) == "GitHub Issues, This Mac")
     }
 
     @Test func aRunSaysWhenItRan() {
@@ -48,7 +48,7 @@ struct ConnectorSetupWordsTests {
     @Test func aTrackerWithNoGitHubRemote() {
         let slot = DaemonAPI.ConnectorSlot(slot: .tasks, choice: "GitHub Issues", state: .noRemote)
         #expect(ConnectorSetupWords.title(slot) == "Choose a tracker")
-        #expect(ConnectorSetupWords.line(slot, project: "Blog", repository: nil)
+        #expect(ConnectorSetupWords.line(slot, folder: "Blog", repository: nil)
                 == "Blog has no GitHub or GitLab remote, so GitHub Issues can't be read for it.")
     }
 
@@ -121,34 +121,34 @@ struct ConnectorSetupWordsTests {
         let setup = DaemonAPI.ConnectorSetup(folder: "/p", repository: "group/app", forge: .gitlab, site: "gitlab.example.com",
                                              repositoryURL: "https://gitlab.example.com/group/app", slots: [],
                                              events: .init(state: .off), done: 1)
-        #expect(ConnectorSetupWords.intro(project: "App", repository: setup.repository, site: setup.siteOrGitHub)
+        #expect(ConnectorSetupWords.intro(folder: "App", repository: setup.repository, site: setup.siteOrGitHub)
                 == "What agents in App can reach. Repository gitlab.example.com/group/app, from its git remote.")
         #expect(ConnectorSetupWords.connectButton(setup.forgeOrGitHub) == "Connect GitLab\u{2026}")
         #expect(ConnectorSetupWords.grantButton(setup) == "Open on gitlab.example.com")
         #expect(ConnectorSetupWords.grantURL(setup) == "https://gitlab.example.com/group/app")
         let ci = DaemonAPI.ConnectorSlot(slot: .ci, choice: "GitLab pipelines", state: .read)
-        #expect(ConnectorSetupWords.line(ci, project: "App", repository: "group/app", forge: .gitlab) == "No pipelines yet in group/app.")
+        #expect(ConnectorSetupWords.line(ci, folder: "App", repository: "group/app", forge: .gitlab) == "No pipelines yet in group/app.")
         #expect(ConnectorSetupWords.eventsLead(setup.events, forge: .gitlab) == "Off. They go on once a slot has read from GitLab.")
         var github = setup
         github.forge = nil
         #expect(github.forgeOrGitHub == .github)
     }
 
-    /// Disconnect names only the projects on that connection's forge (#1868), GitLab's too.
-    @Test func disconnectNamesOnlyTheProjectsOnItsForge() {
+    /// Disconnect names only the folders on that connection's forge (#1868), GitLab's too.
+    @Test func disconnectNamesOnlyTheFoldersOnItsForge() {
         let read: [DaemonAPI.ConnectorSlot] = [.init(slot: .tasks, choice: "Issues", state: .read),
                                                .init(slot: .ci, choice: "CI", state: .read),
                                                .init(slot: .workspace, choice: "This Mac", state: .read)]
         let hub = DaemonAPI.ConnectorSetup(folder: "/hub", repository: "me/hub", slots: read, events: .init(state: .off), done: 3)
         let lab = DaemonAPI.ConnectorSetup(folder: "/lab", repository: "me/lab", forge: .gitlab, slots: read,
                                            events: .init(state: .off), done: 3)
-        let projects = [(name: "Hub", setup: hub), (name: "Lab", setup: lab)]
-        #expect(ConnectorSetupWords.disconnectMessage(.github, projects: projects)
+        let folders = [(name: "Hub", setup: hub), (name: "Lab", setup: lab)]
+        #expect(ConnectorSetupWords.disconnectMessage(.github, folders: folders)
                 == "Hub loses Tasks, CI. " + ConnectorSetupWords.disconnectNote)
-        #expect(ConnectorSetupWords.disconnectMessage(.gitlab, projects: projects)
+        #expect(ConnectorSetupWords.disconnectMessage(.gitlab, folders: folders)
                 == "Lab loses Tasks, CI. " + ConnectorSetupWords.GitLab.disconnectNote)
-        #expect(ConnectorSetupWords.GitLab.disconnectNote.contains("Every project's GitLab slots wait for a connection again."))
-        #expect(ConnectorSetupWords.disconnectMessage(.linear, projects: projects)
+        #expect(ConnectorSetupWords.GitLab.disconnectNote.contains("Every folder's GitLab slots wait for a connection again."))
+        #expect(ConnectorSetupWords.disconnectMessage(.linear, folders: folders)
                 == ConnectorSetupWords.disconnectNote(.linear))
     }
 }

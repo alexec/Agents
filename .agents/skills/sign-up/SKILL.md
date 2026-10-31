@@ -26,7 +26,7 @@ against. It is never Alex's personal account.
   print, log, screenshot or store a card number. Alex types the card in, unless Alex has
   said otherwise for this sign-up.
 - **Alex's hands:** every CAPTCHA, email code or link, phone check, and the card. Ask with
-  `ask_form` and name who asks ("the <provider> sign-up lane asks: …"). `ask_form` can time
+  `ask_question` and name who asks ("the <provider> sign-up lane asks: …"). `ask_question` can time
   out after about 60 seconds; then end the turn with the question in your reply instead of
   asking again and again.
 - **The private Chrome window is on Alex's screen.** For a code or a CAPTCHA, ask Alex to
@@ -103,10 +103,10 @@ What the 0.7 sign-ups found (2026-10-19). Pages change; read the page before you
   Continue. No setting undoes it later, only an unsubscribe link.
 - Cookies: "Do Not Sell or Share My Personal Information", untick every group, "Confirm My
   Choices". The banner comes back each time the incognito browser starts.
-- Alex enters the emailed code. The welcome form (company, group, project, then dropdowns
-  whose choices are `[role=option]`) makes the first group and project.
+- Alex enters the emailed code. The welcome form (company, group, folder, then dropdowns
+  whose choices are `[role=option]`) makes the first group and folder.
 - Token: Access tokens, Generate token, Legacy token (by scope) or Fine-grained (by
-  project). Tick only the scopes needed, set an expiry, save the `glpat-` token by script.
+  folder). Tick only the scopes needed, set an expiry, save the `glpat-` token by script.
 - An OAuth application is made under the user's Applications settings once its redirect
   URI is known.
 

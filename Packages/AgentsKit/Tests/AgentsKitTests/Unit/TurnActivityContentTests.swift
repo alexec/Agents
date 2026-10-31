@@ -90,17 +90,10 @@ struct TurnActivityContentTests {
         return content
     }
 
-    @Test func partlyDoneNeedsYou() throws {
-        #expect(try endedNeedingYou(.partlyDone).line == "Partly done: The rest is yours.")
+    @Test func aQuestionNeedsYou() throws {
+        #expect(try endedNeedingYou(.needsAnswer).line == "Waiting on your answer: The rest is yours.")
     }
 
-    @Test func stuckNeedsYou() throws {
-        #expect(try endedNeedingYou(.stuck).line == "Stuck: The rest is yours.")
-    }
-
-    @Test func blockedOnWhatTheAppCannotWatchNeedsYou() throws {
-        #expect(try endedNeedingYou(.blocked, block: Block()).line == "Blocked: The rest is yours.")
-    }
 
     @Test func outcomeUnknownNeedsYou() throws {
         #expect(try endedNeedingYou(nil).line == "Outcome unknown")
@@ -129,11 +122,10 @@ struct TurnActivityContentTests {
         #expect(stopped.word == "Unexpected stop" && stopped.line == nil)
     }
 
-    /// The docs' Paused endings (#1869): a neutral word, and the reason once, not "Stopped" twice.
+    /// Stops someone chose use Paused: a neutral word, and the reason once, not "Stopped" twice.
     @Test func aStopSomeoneChoseIsPausedNotAFailure() throws {
         for (reason, line) in [(EndedReason.cancelled, "Stopped by you"),
-                               (.stoppedByAgent, "Stopped by the agent that started it"),
-                               (.allowanceSpent, "Its allowance ran out")] {
+                               (.stoppedByAgent, "Stopped by the agent that started it")] {
             var stopped = agent(.stopped)
             stopped.endedReason = reason
             let content = try #require(TurnActivityContent.make(agent: stopped, needs: [], startedAt: sent))
@@ -141,6 +133,11 @@ struct TurnActivityContentTests {
             #expect(content.word == "Paused" && content.line == line)
             #expect(content.endedAt != nil)
         }
+        var exhausted = agent(.stopped)
+        exhausted.endedReason = .allowanceSpent
+        let failed = try #require(TurnActivityContent.make(agent: exhausted, needs: [], startedAt: sent))
+        #expect(failed.phase == .failed && failed.isOver)
+        #expect(failed.word == "Unexpected stop" && failed.line == "Its allowance ran out")
         let json = #"{"phase":"paused","startedAt":800000000,"endedAt":800000300}"#
         let pushed = try JSONDecoder().decode(TurnActivityContent.self, from: Data(json.utf8))
         #expect(pushed.phase == .paused && pushed.line(isStale: false) == nil)
@@ -171,17 +168,24 @@ struct TurnActivityContentTests {
         #expect(try JSONEncoder().encode(content).count < 1024, "ActivityKit refuses 4 KB")
     }
 
-    /// What the control plane pushes (#1744), as Go writes it: the phase and the times, no
-    /// words. ActivityKit decodes it with a plain JSONDecoder.
-    @Test func aPushedStateHasNoWordsAndKeepsTheTitleItStartedWith() throws {
-        let json = #"{"phase":"approval","startedAt":800000000}"#
+    /// What the control plane pushes (#1744, #2991), as Go writes it: the phase, the
+    /// session, the counts and the times, no words. ActivityKit decodes it with a plain
+    /// JSONDecoder.
+    @Test func aPushedStateHasNoWordsAndSaysHowManySessions() throws {
+        let json = #"{"phase":"approval","agentID":"A0000000-0000-4000-8000-000000000001","startedAt":800000000,"othersWorking":2}"#
         let pushed = try JSONDecoder().decode(TurnActivityContent.self, from: Data(json.utf8))
         #expect(pushed.phase == .approval)
+        #expect(pushed.agentID == UUID(uuidString: "A0000000-0000-4000-8000-000000000001"))
         #expect(pushed.startedAt == Date(timeIntervalSinceReferenceDate: 800_000_000))
-        #expect(pushed.title == nil && pushed.line == nil && pushed.endedAt == nil)
-        #expect(pushed.title(startedWith: "Fix the widget") == "Fix the widget")
-        #expect(pushed.title(startedWith: nil) == TurnActivityContent.untitled)
+        #expect(pushed.title == nil && pushed.place == nil && pushed.line == nil && pushed.endedAt == nil)
+        #expect(pushed.shownTitle == "3 sessions")
+        #expect(pushed.others == "+2 working")
         #expect(pushed.line(isStale: false) == "Open Agents to decide")
+
+        let before = try JSONDecoder().decode(TurnActivityContent.self,
+                                              from: Data(#"{"phase":"working","startedAt":800000000}"#.utf8))
+        #expect(before.agentID == nil && before.sessions == 1 && before.others == nil, "a push from before #2991")
+        #expect(before.shownTitle == "Your session")
 
         let ended = try JSONDecoder().decode(TurnActivityContent.self,
                                              from: Data(#"{"phase":"done","startedAt":800000000,"endedAt":800000300}"#.utf8))
@@ -191,11 +195,61 @@ struct TurnActivityContentTests {
 
     /// The app's own state keeps its title and its line; a stale one says to open the app.
     @Test func theAppsOwnStateSaysItsOwnWords() {
-        let asking = TurnActivityContent(phase: .question, title: "Fix the widget", line: nil, startedAt: sent)
-        #expect(asking.title(startedWith: "Old name") == "Fix the widget")
+        let asking = TurnActivityContent(phase: .question, title: "Fix the widget", line: nil, startedAt: sent,
+                                         othersWorking: 4)
+        #expect(asking.shownTitle == "Fix the widget")
         #expect(asking.line(isStale: false) == nil)
         let working = TurnActivityContent(phase: .working, title: "t", line: "Write the view", startedAt: sent)
         #expect(working.line(isStale: false) == "Write the view")
         #expect(working.line(isStale: true) == "Open Agents to see where it is")
+    }
+
+    // MARK: One activity in total (#2991)
+
+    private func turn(_ phase: TurnActivityContent.Phase, _ title: String, startedAt offset: TimeInterval,
+                      endedAt end: TimeInterval? = nil) -> TurnActivityContent {
+        TurnActivityContent(phase: phase, agentID: UUID(), title: title, place: "Claude · api", line: nil,
+                            startedAt: sent.addingTimeInterval(offset), endedAt: end.map { sent.addingTimeInterval($0) })
+    }
+
+    @Test func theSummaryShowsTheSessionThatAsksWithACountOfTheRest() throws {
+        let summary = try #require(TurnActivityContent.summary(of: [
+            turn(.working, "Oldest", startedAt: 0),
+            turn(.approval, "Asks", startedAt: 10),
+            turn(.working, "Newest", startedAt: 20),
+            turn(.question, "Asks too", startedAt: 5),
+            turn(.done, "Over", startedAt: -50, endedAt: 30),
+        ]))
+        #expect(summary.title == "Asks", "one that asks wins, the newest of them")
+        #expect(summary.phase == .approval && summary.place == "Claude · api")
+        #expect(summary.startedAt == sent, "the timer counts from the oldest turn still running")
+        #expect(summary.othersAsking == 1 && summary.othersWorking == 2, "an ended turn is not counted")
+        #expect(summary.others == "+1 needs you · +2 working")
+        #expect(summary.sessions == 4)
+    }
+
+    @Test func withNoneAskingTheNewestWorkingOneIsShown() throws {
+        let summary = try #require(TurnActivityContent.summary(of: [
+            turn(.working, "Old", startedAt: 0), turn(.working, "New", startedAt: 20)]))
+        #expect(summary.title == "New" && summary.startedAt == sent && summary.others == "+1 working")
+    }
+
+    @Test func onceEveryTurnHasEndedTheLastToEndIsShown() throws {
+        let summary = try #require(TurnActivityContent.summary(of: [
+            turn(.done, "First", startedAt: 0, endedAt: 50), turn(.failed, "Last", startedAt: 10, endedAt: 60)]))
+        #expect(summary.title == "Last" && summary.isOver && summary.others == nil)
+        #expect(TurnActivityContent.summary(of: [TurnActivityContent]()) == nil)
+    }
+
+    @Test func oneTurnIsItsOwnSummary() throws {
+        let one = turn(.working, "Only", startedAt: 0)
+        #expect(TurnActivityContent.summary(of: [one]) == one)
+    }
+
+    @Test func aSessionIsNamedWithItsPlace() throws {
+        let working = agent(.running)
+        let content = try #require(TurnActivityContent.make(agent: working, needs: [], startedAt: sent,
+                                                            place: "Claude · api"))
+        #expect(content.agentID == working.id && content.place == "Claude · api")
     }
 }

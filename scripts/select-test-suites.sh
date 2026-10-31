@@ -74,6 +74,10 @@ else
 				*) apps=build ;;
 			esac
 			case "$path" in
+				# The main CI workflow defines these suites; run them when their execution changes.
+				.github/workflows/ci.yml)
+					unknown=true
+					;;
 				# The linters' own files (#1224): CI's lint job reads them, no build or test does.
 				scripts/lint.sh|ruff.toml|.shellcheckrc|.swiftlint.yml|Web/biome.json)
 					;;

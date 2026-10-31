@@ -11,7 +11,7 @@ These change `Packages/Wire/control.openrpc.json` and `daemon.schema.json` first
 | `signIn/providers` | pairing, any | gains `orgProviders: [{id, name, order}]` and `discover: bool` (a domain sends people) |
 | `signIn/discover` | pairing, any | `{email}` → `{provider?}`: the org provider of a claimed domain with **Send people here** (FR-011). It answers the same for an unknown domain and a domain with no switch |
 | `signIn/orgStart` | pairing, any | `{provider, purpose: "pair" \| "addToMe", returnTo: "app" \| "web", loginHint?}` → `{url}`: the `/v1/oidc/start` URL for this connection's challenge |
-| `signIn/ticket` | pairing, any | `{ticket, invite?}` → `{client, person, controlKey}` (pair) or `{person}` (addToMe). Refused with `needsInvite`, `orgSignInRequired`, `personSuspended` |
+| `signIn/ticket` | pairing, any | `{ticket, name?, kind?}` → `{client}` (pair) or `{signIn}` (addToMe). Refused with `needsInvite`, `orgSignInRequired`, `personSuspended`. The web page's ticket (`returnTo: web`) is bound to the `s:` id and key it proved, which it proves again on a new connection when it comes back (the same tab closes the first); the app's is bound to its connection. The page on the control plane's own domain takes `s:` on its socket for this |
 | `signIn/orgProviders/list` | admin | → `[OrgProvider]` (no secret) |
 | `signIn/orgProviders/set` | admin | `{provider: OrgProvider, secret?, rev?}` → `{provider}`. `secret` is write only. Refused with `changedElsewhere` on a stale `rev`, and with the reason of FR-002 |
 | `signIn/orgProviders/check` | admin | `{id}` → `{discovery: ok \| missing [..], jwksKeys: n, redirectURI}` |
@@ -71,9 +71,9 @@ These change `Packages/Wire/control.openrpc.json` and `daemon.schema.json` first
 
 | Code | Name | Meaning |
 |---|---|---|
-| `-32075` | `orgSignInRequired` | a built-in sign-in at a required domain (FR-012), with `{provider, name}` |
-| `-32076` | `personSuspended` | the person is suspended (D13), with `{provider}` |
-| `-32077` | `managedByProvider` | a role or a group member that a provider controls, with `{provider}` |
-| `-32078` | `orgProviderUnavailable` | no keeper, no HTTPS address, or a discovery document that does not do what is needed, with `{reason}` |
+| `-32077` | `orgSignInRequired` | a built-in sign-in at a required domain (FR-012), with `{provider, name}` |
+| `-32078` | `personSuspended` | the person is suspended (D13), with `{provider}` |
+| `-32079` | `managedByProvider` | a role or a group member that a provider controls, with `{provider}` |
+| `-32082` | `orgProviderUnavailable` | no keeper, no HTTPS address, or a discovery document that does not do what is needed, with `{reason}` |
 
-`signInUnavailable`, `needsInvite` and `changedElsewhere` are reused. These numbers were free on 2026-10-21; T5 and T6 may take some first, so the lane that adds them checks `Packages/Wire` again.
+`signInUnavailable`, `needsInvite` and `changedElsewhere` are reused. The numbers are the ones `Packages/Wire` gives: slice 1 moved them past the ones T5 and T6 took.

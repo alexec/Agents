@@ -14,13 +14,14 @@ struct WorkOutcomeTests {
             #expect(!outcome.heading.isEmpty)
             _ = outcome.needsAPerson
         }
-        #expect(WorkOutcome.allCases.count == 6)
+        #expect(WorkOutcome.allCases.count == 4)
     }
 
-    @Test("the three that want a person are the three the spec names")
+    /// Only a question (#1916).
+    @Test("only a question wants a person")
     func whichOnesWantAPerson() {
-        #expect(WorkOutcome.allCases.filter(\.needsAPerson) == [.needsAnswer, .partlyDone, .stuck])
-        #expect(WorkOutcome.allCases.filter { !$0.needsAPerson } == [.done, .nothingToDo, .blocked])
+        #expect(WorkOutcome.allCases.filter(\.needsAPerson) == [.needsAnswer])
+        #expect(WorkOutcome.allCases.filter { !$0.needsAPerson } == [.done, .nothingToDo, .waiting])
     }
 
     /// Two outcomes that read the same are two outcomes a person cannot tell apart,
@@ -43,10 +44,20 @@ struct WorkOutcomeTests {
     @Test("the wire spellings are the ones the tool offers")
     func wireSpellings() {
         #expect(WorkOutcome.allCases.map(\.rawValue)
-            == ["done", "nothing_to_do", "needs_answer", "partly_done", "stuck", "blocked"])
+            == ["done", "nothing_to_do", "needs_answer", "waiting"])
         for outcome in WorkOutcome.allCases {
             #expect(WorkOutcome(wire: outcome.rawValue) == outcome)
         }
+    }
+
+    /// #1916: an old record's stuck or partly_done (finish_turn's) reads as done.
+    /// #2981: so does an old wait recorded as blocked, as the wire's x-fallback reads it.
+    @Test("an old stuck, partly_done or blocked reads as done")
+    func oldEndingsReadAsDone() throws {
+        for word in ["stuck", "partly_done", "blocked"] {
+            #expect(try JSONDecoder().decode(WorkOutcome.self, from: Data("\"\(word)\"".utf8)) == .done)
+        }
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(WorkOutcome.self, from: Data("\"later\"".utf8)) }
     }
 
     /// FR-027. A newer runtime's sixth word is a report that never arrived, never a
@@ -87,7 +98,7 @@ struct WorkOutcomeTests {
         #expect(told.contains("Call this again"))
         let asked = WorkReport.tooLong(.needsAnswer)
         #expect(asked.hasPrefix("Nothing was recorded: keep the question to one sentence under 200"))
-        #expect(asked.contains("ask_form"))
+        #expect(asked.contains("ask_question"))
     }
 
     /// The limit is on what arrives. A report kept before it came down still reads back
@@ -107,15 +118,15 @@ struct WorkOutcomeTests {
         #expect(WorkReport(outcome: .done, wire: "  it is done.\n")?.message == "it is done.")
     }
 
-    // MARK: Blocked (039)
+    // MARK: Waiting (039, #1915)
 
-    @Test("a blocked report keeps its block through the record")
+    @Test("a waiting report keeps its block through the record")
     func aBlockRoundTrips() throws {
         let block = Block(waits: [Wait(agentID: UUID(), nameAtReport: "helper",
                                        ending: WaitEnding(at: Date(timeIntervalSince1970: 5),
                                                           how: .finished(outcome: .done, message: "ok")))],
                           checkAgainAt: Date(timeIntervalSince1970: 100))
-        let report = WorkReport(outcome: .blocked, message: "waiting", at: Date(timeIntervalSince1970: 1),
+        let report = WorkReport(outcome: .waiting, message: "waiting", at: Date(timeIntervalSince1970: 1),
                                 block: block)
         let back = try JSONDecoder().decode(WorkReport.self, from: JSONEncoder().encode(report))
         #expect(back == report)

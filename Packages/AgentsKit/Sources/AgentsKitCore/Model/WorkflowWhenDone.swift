@@ -50,7 +50,7 @@ public enum WorkflowWhenDone: String, Codable, Hashable, Sendable, CaseIterable 
         case .archiveAllowed:
             "A run that finishes done or with nothing to do may archive itself when there is nothing to look at. Otherwise it stays."
         case .archive:
-            "A run that finishes done or with nothing to do is archived. One that needs you, is stuck or is blocked stays."
+            "A run that finishes done or with nothing to do is archived. One that asks you something or waits stays."
         }
     }
 

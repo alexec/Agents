@@ -188,7 +188,7 @@ func worktreeList(dir string) ([]worktreeEntry, error) {
 	return out2, nil
 }
 
-// canonical is a folder's path as projects compare them, for one that may not be there:
+// canonical is a folder's path as folders compare them, for one that may not be there:
 // the links of the deepest part that is there resolved.
 func canonical(path string) string {
 	path = filepath.Clean(path)

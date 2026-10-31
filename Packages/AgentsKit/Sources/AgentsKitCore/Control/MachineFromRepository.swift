@@ -2,7 +2,7 @@ import Foundation
 
 /// Start a Machine from a Repository (#1809): pick a repository, pick a provider that makes
 /// machines, start. The control plane gives the repository to the provider (Codespaces makes
-/// the codespace from it) or has the new host clone it once it joins, and the project shows
+/// the codespace from it) or has the new host clone it once it joins, and the folder shows
 /// then. The web page's `machineFromRepository.ts` is the same.
 public enum MachineFromRepository {
     /// An https repository address, as the control plane takes one (`repositoryPath`).
@@ -55,7 +55,7 @@ public enum MachineFromRepository {
         providers.filter { $0.capabilities.contains("create") && $0.usable }
     }
 
-    /// One field of a provider's New Workspace form.
+    /// One field of a provider's New Machine form.
     public struct Field: Identifiable, Equatable, Sendable {
         public enum Kind: Sendable { case string, integer, boolean }
         public var key: String
@@ -90,8 +90,9 @@ public enum MachineFromRepository {
         }
     }
 
-    /// What Start sends: providers/create with the repository and the form's values, typed.
-    public static func request(_ provider: ProviderID, name: String, repository: Repository,
+    /// What Start sends: providers/create with the repository, if any (#2131), and the form's
+    /// values, typed.
+    public static func request(_ provider: ProviderID, name: String, repository: Repository?,
                                fields: [Field]) -> DaemonAPI.ProviderCreate {
         var options: [String: JSONValue] = [:]
         for field in fields {
@@ -103,7 +104,7 @@ public enum MachineFromRepository {
             case .string: options[field.key] = .string(v)
             }
         }
-        return DaemonAPI.ProviderCreate(id: provider, name: name, options: .object(options), repository: repository.url)
+        return DaemonAPI.ProviderCreate(id: provider, name: name, options: .object(options), repository: repository?.url)
     }
 
     /// The web page's machineWords.
@@ -112,16 +113,16 @@ public enum MachineFromRepository {
         public static let menuItem = "Start a Machine from a Repository…"
         public static let repositoryPrompt = "The repository’s https address"
         public static func repositoryNote(_ repository: Repository?, typed: Bool) -> String {
-            if let repository { return "The machine clones \(repository.path) and adds it as a project." }
+            if let repository { return "The machine clones \(repository.path) and adds it as a folder." }
             return typed ? "Give an https address of a repository, such as on GitHub or GitLab." : "The repository to work in."
         }
-        public static let noMakers = "No provider here can make a machine. Add DigitalOcean, Compute Engine or Codespaces in Settings ▸ Workspace providers."
+        public static let noMakers = "No provider here can make a machine. Add DigitalOcean, Compute Engine or Codespaces in Settings ▸ Machine providers."
         public static func starting(_ name: String) -> String { "Starting \(name)…" }
         public static func joining(_ name: String, _ repository: Repository) -> String {
-            "\(name) is starting. It installs Agents, joins and clones \(repository.path) on its first boot. The project shows when it has."
+            "\(name) is starting. It installs Agents, joins and clones \(repository.path) on its first boot. The folder shows when it has."
         }
         public static func notJoining(_ name: String, provider: String) -> String {
-            "\(provider) made \(name), but can't install Agents on its first boot. Add it as a machine in the Mac app: Settings ▸ Workspace Providers, Add as Machine…."
+            "\(provider) made \(name), but can't install Agents on its first boot. Add it as a machine in the Mac app: Settings ▸ Machine Providers, Add as Machine…."
         }
         public static let privateNote = "A private repository needs git access on the new machine."
     }

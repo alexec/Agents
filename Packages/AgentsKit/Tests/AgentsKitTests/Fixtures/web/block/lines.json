@@ -1,6 +1,7 @@
 [
   {
     "expected" : {
+      "cardTitle" : "Waiting for sessions",
       "carryOnHelp" : "Stop waiting and carry on now",
       "checksAgain" : false,
       "isBlocked" : true,
@@ -22,7 +23,7 @@
 
           ],
           "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
+          "cwd" : "file:///fixture/folder/",
           "id" : "00000000-0000-0000-0000-000000000060",
           "lastActivityAt" : 812500000,
           "runtimeID" : "claude",
@@ -45,7 +46,7 @@
 
           ],
           "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
+          "cwd" : "file:///fixture/folder/",
           "id" : "00000000-0000-0000-0000-000000000061",
           "lastActivityAt" : 812500000,
           "report" : {
@@ -73,7 +74,7 @@
 
           ],
           "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
+          "cwd" : "file:///fixture/folder/",
           "id" : "00000000-0000-0000-0000-000000000062",
           "lastActivityAt" : 812500000,
           "report" : {
@@ -100,7 +101,7 @@
               ]
             },
             "message" : "Waiting on the haikus.",
-            "outcome" : "blocked"
+            "outcome" : "waiting"
           },
           "runtimeID" : "claude",
           "startOptions" : {
@@ -120,6 +121,7 @@
   },
   {
     "expected" : {
+      "cardTitle" : "Waiting for sessions",
       "carryOnHelp" : "Stop waiting and carry on now",
       "checksAgain" : false,
       "isBlocked" : true,
@@ -141,7 +143,7 @@
 
           ],
           "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
+          "cwd" : "file:///fixture/folder/",
           "id" : "00000000-0000-0000-0000-000000000060",
           "lastActivityAt" : 812500000,
           "runtimeID" : "claude",
@@ -164,7 +166,7 @@
 
           ],
           "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
+          "cwd" : "file:///fixture/folder/",
           "id" : "00000000-0000-0000-0000-000000000061",
           "lastActivityAt" : 812500000,
           "report" : {
@@ -192,7 +194,7 @@
 
           ],
           "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
+          "cwd" : "file:///fixture/folder/",
           "id" : "00000000-0000-0000-0000-000000000062",
           "lastActivityAt" : 812500000,
           "report" : {
@@ -220,7 +222,7 @@
               "wakeOn" : "all"
             },
             "message" : "Waiting on the haikus.",
-            "outcome" : "blocked"
+            "outcome" : "waiting"
           },
           "runtimeID" : "claude",
           "startOptions" : {
@@ -240,6 +242,7 @@
   },
   {
     "expected" : {
+      "cardTitle" : "Waiting for sessions",
       "carryOnHelp" : "Stop waiting and carry on now",
       "checksAgain" : false,
       "isBlocked" : true,
@@ -261,7 +264,7 @@
 
           ],
           "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
+          "cwd" : "file:///fixture/folder/",
           "id" : "00000000-0000-0000-0000-000000000060",
           "lastActivityAt" : 812500000,
           "runtimeID" : "claude",
@@ -284,7 +287,7 @@
 
           ],
           "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
+          "cwd" : "file:///fixture/folder/",
           "id" : "00000000-0000-0000-0000-000000000061",
           "lastActivityAt" : 812500000,
           "report" : {
@@ -312,7 +315,7 @@
 
           ],
           "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
+          "cwd" : "file:///fixture/folder/",
           "id" : "00000000-0000-0000-0000-000000000062",
           "lastActivityAt" : 812500000,
           "report" : {
@@ -340,7 +343,7 @@
               "wakeOn" : "any"
             },
             "message" : "Waiting on the haikus.",
-            "outcome" : "blocked"
+            "outcome" : "waiting"
           },
           "runtimeID" : "claude",
           "startOptions" : {
@@ -360,6 +363,7 @@
   },
   {
     "expected" : {
+      "cardTitle" : "Waiting for a session",
       "carryOnHelp" : "Stop waiting and carry on now",
       "checksAgain" : true,
       "isBlocked" : true,
@@ -379,7 +383,7 @@
 
           ],
           "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
+          "cwd" : "file:///fixture/folder/",
           "id" : "00000000-0000-0000-0000-000000000060",
           "lastActivityAt" : 812500000,
           "runtimeID" : "claude",
@@ -402,7 +406,7 @@
 
           ],
           "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
+          "cwd" : "file:///fixture/folder/",
           "id" : "00000000-0000-0000-0000-000000000061",
           "lastActivityAt" : 812500000,
           "report" : {
@@ -430,7 +434,7 @@
 
           ],
           "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
+          "cwd" : "file:///fixture/folder/",
           "id" : "00000000-0000-0000-0000-000000000062",
           "lastActivityAt" : 812500000,
           "report" : {
@@ -446,7 +450,7 @@
               "wakeOn" : "any"
             },
             "message" : "Waiting on the haikus.",
-            "outcome" : "blocked"
+            "outcome" : "waiting"
           },
           "runtimeID" : "claude",
           "startOptions" : {
@@ -466,6 +470,7 @@
   },
   {
     "expected" : {
+      "cardTitle" : "Waiting to check again",
       "carryOnHelp" : "Stop waiting and carry on now",
       "checksAgain" : true,
       "isBlocked" : true,
@@ -485,7 +490,7 @@
 
           ],
           "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
+          "cwd" : "file:///fixture/folder/",
           "id" : "00000000-0000-0000-0000-000000000060",
           "lastActivityAt" : 812500000,
           "runtimeID" : "claude",
@@ -508,7 +513,7 @@
 
           ],
           "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
+          "cwd" : "file:///fixture/folder/",
           "id" : "00000000-0000-0000-0000-000000000061",
           "lastActivityAt" : 812500000,
           "report" : {
@@ -536,7 +541,7 @@
 
           ],
           "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
+          "cwd" : "file:///fixture/folder/",
           "id" : "00000000-0000-0000-0000-000000000062",
           "lastActivityAt" : 812500000,
           "report" : {
@@ -548,7 +553,7 @@
               ]
             },
             "message" : "Waiting on the haikus.",
-            "outcome" : "blocked"
+            "outcome" : "waiting"
           },
           "runtimeID" : "claude",
           "startOptions" : {
@@ -568,13 +573,14 @@
   },
   {
     "expected" : {
+      "cardTitle" : "Waiting for sessions",
       "carryOnHelp" : "Stop waiting and carry on now",
       "checksAgain" : false,
       "isBlocked" : true,
       "lines" : [
         "Carries on when any of these finishes",
         "No outcome — finished without saying how it went",
-        "Stuck — finished: stuck",
+        "Asked — finished: waiting on your answer",
         "Stopped — rate limited, and still limited after retrying",
         "Stopped, no reason — stopped",
         "Stopped, ended its turn — stopped",
@@ -594,7 +600,7 @@
 
           ],
           "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
+          "cwd" : "file:///fixture/folder/",
           "id" : "00000000-0000-0000-0000-000000000060",
           "lastActivityAt" : 812500000,
           "runtimeID" : "claude",
@@ -617,7 +623,7 @@
 
           ],
           "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
+          "cwd" : "file:///fixture/folder/",
           "id" : "00000000-0000-0000-0000-000000000061",
           "lastActivityAt" : 812500000,
           "report" : {
@@ -645,7 +651,7 @@
 
           ],
           "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
+          "cwd" : "file:///fixture/folder/",
           "id" : "00000000-0000-0000-0000-000000000062",
           "lastActivityAt" : 812500000,
           "report" : {
@@ -670,11 +676,11 @@
                     "at" : 812500180,
                     "how" : {
                       "finished" : {
-                        "outcome" : "stuck"
+                        "outcome" : "needs_answer"
                       }
                     }
                   },
-                  "nameAtReport" : "Stuck"
+                  "nameAtReport" : "Asked"
                 },
                 {
                   "agentID" : "00000000-0000-0000-0000-000000000072",
@@ -740,7 +746,7 @@
               "wakeOn" : "any"
             },
             "message" : "Waiting on the haikus.",
-            "outcome" : "blocked"
+            "outcome" : "waiting"
           },
           "runtimeID" : "claude",
           "startOptions" : {
@@ -760,7 +766,8 @@
   },
   {
     "expected" : {
-      "carryOnHelp" : "Tell it the block has cleared, and let it carry on",
+      "cardTitle" : null,
+      "carryOnHelp" : "Stop waiting and carry on now",
       "checksAgain" : false,
       "isBlocked" : false,
       "lines" : [
@@ -779,7 +786,7 @@
 
           ],
           "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
+          "cwd" : "file:///fixture/folder/",
           "id" : "00000000-0000-0000-0000-000000000060",
           "lastActivityAt" : 812500000,
           "runtimeID" : "claude",
@@ -802,7 +809,7 @@
 
           ],
           "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
+          "cwd" : "file:///fixture/folder/",
           "id" : "00000000-0000-0000-0000-000000000061",
           "lastActivityAt" : 812500000,
           "report" : {
@@ -830,7 +837,7 @@
 
           ],
           "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
+          "cwd" : "file:///fixture/folder/",
           "id" : "00000000-0000-0000-0000-000000000062",
           "lastActivityAt" : 812500000,
           "report" : {
@@ -859,7 +866,7 @@
               ]
             },
             "message" : "Waiting on the haikus.",
-            "outcome" : "blocked"
+            "outcome" : "waiting"
           },
           "runtimeID" : "claude",
           "startOptions" : {
@@ -879,102 +886,7 @@
   },
   {
     "expected" : {
-      "carryOnHelp" : "Tell it the block has cleared, and let it carry on",
-      "checksAgain" : false,
-      "isBlocked" : true,
-      "lines" : [
-
-      ],
-      "waitLine" : null
-    },
-    "input" : {
-      "agentID" : "00000000-0000-0000-0000-000000000062",
-      "agents" : [
-        {
-          "advertisedOptions" : [
-
-          ],
-          "availableCommands" : [
-
-          ],
-          "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
-          "id" : "00000000-0000-0000-0000-000000000060",
-          "lastActivityAt" : 812500000,
-          "runtimeID" : "claude",
-          "startOptions" : {
-            "extraArguments" : [
-
-            ],
-            "values" : {
-
-            }
-          },
-          "state" : "running",
-          "title" : "Haiku one, renamed"
-        },
-        {
-          "advertisedOptions" : [
-
-          ],
-          "availableCommands" : [
-
-          ],
-          "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
-          "id" : "00000000-0000-0000-0000-000000000061",
-          "lastActivityAt" : 812500000,
-          "report" : {
-            "at" : 812500060,
-            "message" : "It went.",
-            "outcome" : "done"
-          },
-          "runtimeID" : "claude",
-          "startOptions" : {
-            "extraArguments" : [
-
-            ],
-            "values" : {
-
-            }
-          },
-          "state" : "finished",
-          "title" : "Haiku two"
-        },
-        {
-          "advertisedOptions" : [
-
-          ],
-          "availableCommands" : [
-
-          ],
-          "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
-          "id" : "00000000-0000-0000-0000-000000000062",
-          "lastActivityAt" : 812500000,
-          "report" : {
-            "at" : 812500060,
-            "message" : "It went.",
-            "outcome" : "blocked"
-          },
-          "runtimeID" : "claude",
-          "startOptions" : {
-            "extraArguments" : [
-
-            ],
-            "values" : {
-
-            }
-          },
-          "state" : "finished",
-          "title" : "Lead"
-        }
-      ]
-    },
-    "name" : "blocked on nothing named"
-  },
-  {
-    "expected" : {
+      "cardTitle" : null,
       "carryOnHelp" : "Stop waiting and carry on now",
       "checksAgain" : false,
       "isBlocked" : false,
@@ -994,7 +906,7 @@
 
           ],
           "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
+          "cwd" : "file:///fixture/folder/",
           "id" : "00000000-0000-0000-0000-000000000060",
           "lastActivityAt" : 812500000,
           "runtimeID" : "claude",
@@ -1017,7 +929,7 @@
 
           ],
           "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
+          "cwd" : "file:///fixture/folder/",
           "id" : "00000000-0000-0000-0000-000000000061",
           "lastActivityAt" : 812500000,
           "report" : {
@@ -1045,7 +957,104 @@
 
           ],
           "createdAt" : 812500000,
-          "cwd" : "file:///fixture/project/",
+          "cwd" : "file:///fixture/folder/",
+          "id" : "00000000-0000-0000-0000-000000000062",
+          "lastActivityAt" : 812500000,
+          "report" : {
+            "at" : 812500060,
+            "message" : "It went.",
+            "outcome" : "waiting"
+          },
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "finished",
+          "title" : "Lead"
+        }
+      ]
+    },
+    "name" : "blocked on nothing named"
+  },
+  {
+    "expected" : {
+      "cardTitle" : null,
+      "carryOnHelp" : "Stop waiting and carry on now",
+      "checksAgain" : false,
+      "isBlocked" : false,
+      "lines" : [
+
+      ],
+      "waitLine" : null
+    },
+    "input" : {
+      "agentID" : "00000000-0000-0000-0000-000000000062",
+      "agents" : [
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/folder/",
+          "id" : "00000000-0000-0000-0000-000000000060",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "running",
+          "title" : "Haiku one, renamed"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/folder/",
+          "id" : "00000000-0000-0000-0000-000000000061",
+          "lastActivityAt" : 812500000,
+          "report" : {
+            "at" : 812500060,
+            "message" : "It went.",
+            "outcome" : "done"
+          },
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "finished",
+          "title" : "Haiku two"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/folder/",
           "id" : "00000000-0000-0000-0000-000000000062",
           "lastActivityAt" : 812500000,
           "report" : {
@@ -1059,7 +1068,7 @@
               ]
             },
             "message" : "It went.",
-            "outcome" : "blocked"
+            "outcome" : "waiting"
           },
           "runtimeID" : "claude",
           "startOptions" : {

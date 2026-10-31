@@ -62,6 +62,14 @@ struct OutcomePageTests {
         #expect(parts.live == nil)
     }
 
+    /// What voice mode speaks (#2322): the reply only, never a step or the report.
+    @Test func theReplyTextIsTheReplyOnly() {
+        let parts = TurnParts(turn([ask("Fix it"), said("Looking."), call("1", "List files"),
+                                    said("Fixed. All tests pass."), report("It works")]).items, isLive: false)
+        #expect(parts.replyText == "Fixed. All tests pass.")
+        #expect(TurnParts(turn([ask("Push"), call("1", "Push")]).items, isLive: false).replyText == "")
+    }
+
     @Test func aFailureWithNoReplyEndsOnTheFailure() {
         let stopped = TranscriptEntry(kind: .stateChanged(.stopped, reason: .rateLimited))
         let parts = TurnParts(turn([ask("Push"), call("1", "Push to origin"), stopped]).items, isLive: false)

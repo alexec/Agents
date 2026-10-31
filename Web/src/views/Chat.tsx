@@ -11,28 +11,31 @@ import { openTurnsHeld, rememberOpen, type Store } from "../model/store";
 import { backgroundAge, backgroundEnded, backgroundNoun, isRunning, subagentNoSteps, subagentStatus } from "../model/background";
 import { display, isPersonsAsk, isWorking, type ChatTurn, type Item } from "../model/turns";
 import { fromWireDate, toWireDate } from "../protocol/dates";
-import type { Agent, AppViewCall, BackgroundItem, FileMentionDTO, FindMatch, FindResult, TranscriptEntry, TurnSummary } from "../protocol/generated";
+import type { Agent, AppViewCall, BackgroundItem, ClientPermissionSettings, FileMentionDTO, FindMatch, FindResult, TranscriptEntry, TurnSummary } from "../protocol/generated";
 import { replace, route } from "../route";
 import { useWaitingCards, type WaitingCard } from "./Cards";
 import { OfflineStrip } from "./OfflineStrip";
 import { DiskStrip } from "./DiskStrip";
 import { KeptBubbles } from "./Kept";
 import { FolderGoneNotice, MissingFolderStrip } from "./MissingFolder";
-import { BlockStrip } from "./BlockStrip";
+import { AccountMoveStrip } from "./AccountMove";
 import { ContinueStrip } from "./ContinueStrip";
 import { CurrentPlanStrip } from "./PlanStrip";
+import { GoalCard } from "./GoalCard";
 import { Telling } from "./Telling";
 import { Labels } from "./Labels";
 import { Prompt } from "./Prompt";
 import { PromptMenus } from "./PromptMenus";
 import { ContextMeter, CostLimitBanner, SandboxCapsule } from "./PromptStatus";
 import { branchFromPrompt, RenameInput, SessionButtons, SessionMenu } from "./SessionMenu";
+import { Beacon } from "./SessionRow";
 import { drawable } from "../model/options";
 import { quietLine } from "../model/activity";
+import { cardTitle, carryOnHelp, carryOnPrompt, openBlock } from "../model/block";
 import { sentPrompts } from "../model/promptHistory";
 import { sessionPrompts } from "../model/sessionPrompts";
 import { PromptList } from "./chat/PromptList";
-import { asksToArchive, projectFolder } from "../model/groups";
+import { asksToArchive, folderPath } from "../model/groups";
 import { CallActionsContext, fromLine, ItemRow, TurnView, type CallActions } from "./chat/Rows";
 import { Modal } from "./Modal";
 import { nameOf, pathOf, setPane } from "./files/paneState";
@@ -44,15 +47,21 @@ import { ViewLayer, type ViewActions } from "./chat/viewLayer";
 import { ViewDiff } from "./chat/ViewDiff";
 import { offerStart } from "./NewAgent";
 import { BackToList } from "./BackToList";
-import { comingBackDescription } from "../model/status";
+import { comingBackDescription, footStatusWords } from "../model/status";
 import { ArchiveCard } from "./ArchiveCard";
 import { showsThoughts, shownItems } from "../model/thoughts";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
-import { eventWaitLine, leaseMark } from "../model/rowLines";
+import { eventWaitLine, eventWaitMinutes, eventWaitSummaryLines, leaseMark, lineResource } from "../model/rowLines";
 import { routeHash } from "../route";
+import { sessionRuntimeName } from "../model/runtimes";
 import { GuardedChangeCard } from "./GuardedChange";
 import { Capability } from "../protocol/capabilities.generated";
 import { hostNeedsUpdate } from "../model/capabilities";
+import { WorkingMark } from "./SessionRow";
+import { runningTool } from "../model/sidebar";
+import { composerReason } from "../model/orgPolicy";
+import { autoHeader, cellOf } from "../model/levels";
+import { PageTitle, chatCrumbs } from "./TopBar";
 
 /** One opened turn's entries, so an earlier page can be put in front and drawn again (#291). */
 interface HeldTurn {
@@ -83,6 +92,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   const down = linkDown || hostDown;
   // A stopped workspace that starts when used still takes a prompt, kept until it is up (#691 US3).
   const keeps = hostDown && store.startsWhenUsed(host);
+  // Why nothing can be sent to this host now, in its organisation's words (#998): the kill switch, or no policy.
+  const refusedHere = composerReason(store.policyStates.value[host]);
   const r = route.value;
   const agent = store.agent(host, session);
   // Opened: its runtime starts now, so the reply does not wait for it (#183). Once it has been
@@ -183,6 +194,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       branchNeedsUpdate: !!agent && agent.state !== "archived" && !store.has(host, Capability.chatBranch1),
       // Answered only while the agent waits on it, and while its host answers (#253).
       waitingSandbox: agent?.pendingSandboxFailure,
+      sandboxSetBy: store.sandboxSetBy.value[host],
       answerSandbox: agent?.pendingSandboxFailure && !down ? (carryOn) => store.answerSandbox(host, session, carryOn) : undefined,
       subagentSteps: (item) => (subagent.value = item),
       // A card opens its file as the agent's call did: the same path as `agent/showFile` (#836).
@@ -200,15 +212,15 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   // The chat's views (#187): one layer while the chat is open, its views told and taken down
   // when another chat opens, and when the page leaves the chat.
   const layer = useMemo(() => new ViewLayer(), []);
-  const pinFolder = agent ? projectFolder(agent) : undefined;
+  const pinFolder = agent ? folderPath(agent) : undefined;
   const viewHosting = useMemo(() => {
     const actions: ViewActions = {
       agentID: session,
       call: (method, params) => store.link.call(method, params as never, host) as Promise<unknown>,
       send: (text) => store.prompt(host, session, text, []),
-      // Pin (#189): under the project the chat works in.
+      // Pin (#189): under the folder the chat works in.
       ...(pinFolder ? { pin: (call: AppViewCall) => store.pinView(host, pinFolder, viewPin(call)) } : {}),
-      // A new agent, filled in by the view (#834): the form in the chat's project.
+      // A new agent, filled in by the view (#834): the form in the chat's folder.
       ...(pinFolder ? { startAgent: (start: Start) => offerStart(store, host, pinFolder, start) } : {}),
       // The session on a pull request's branch (#837), asked under the view first.
       ...(pinFolder ? { recipient: (message) => recipient(store.agents.value[host] ?? [], message, pinFolder) } : {}),
@@ -250,20 +262,27 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     failedTurns.value = {};
     subagent.value = null;
     openedTurns.current = [];
-    following.current = true;
-    away.value = false;
-    store.setFollowingEnd(true);
     settled.current = false;
     const timer = setTimeout(() => (settled.current = true), 400);
     return () => clearTimeout(timer);
+  }, [session]);
+  // A chat opens following its end, before the layout effects below: a line asked for as it
+  // opens (a notice's, from its notification, #2860) then leaves the end, and stays left.
+  useLayoutEffect(() => {
+    following.current = true;
+    away.value = false;
+    store.setFollowingEnd(true);
   }, [session]);
 
   // Following the end: every kind of growth, a new line or a longer one, keeps the foot in view.
   const entryCount = store.entries.value.length;
   useLayoutEffect(() => {
     const el = scroller.current;
-    if (!el || loadingEarlier.current) return;
-    if (following.current) el.scrollTop = el.scrollHeight;
+    if (!el) return;
+    if (following.current) { if (!loadingEarlier.current) el.scrollTop = el.scrollHeight; }
+    // Reading: rows put in above (an earlier page) keep the turn held where it was, before the
+    // page is painted (#2310).
+    else keepHeld(el);
   }, [entryCount, store.turns.value.length, session]);
   // Every row is watched, those drawn since too: a queued bubble or a card that grows without an
   // entry arriving used to leave the foot a frame or more behind (#378).
@@ -272,7 +291,12 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     const el = scroller.current;
     if (!el) return;
     const watcher = new ResizeObserver(() => {
-      if (following.current && !loadingEarlier.current) el.scrollTop = el.scrollHeight;
+      if (following.current) { if (!loadingEarlier.current) el.scrollTop = el.scrollHeight; return; }
+      // Reading back: a turn above that grew (its steps came, a picture, code colour) moves
+      // the turn held back to where it was on screen, in every browser, Safari before 27
+      // too, which has no scroll anchoring of its own (#2310). An earlier page too, before it
+      // is painted.
+      keepHeld(el);
     });
     sizes.current = watcher;
     watcher.observe(el);
@@ -283,15 +307,53 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     if (el && sizes.current) for (const child of Array.from(el.children)) sizes.current.observe(child);
   });
 
+  /** The turn a reader's place is held by, and how far down the pane it starts (#2310). */
+  const held = useRef<{ id: string; top: number } | null>(null);
+  const turnTop = (el: HTMLElement, turn: HTMLElement) => turn.getBoundingClientRect().top - el.getBoundingClientRect().top;
+  /** Holds the place by the first turn that starts on screen, or the one the top of the pane is in. */
+  const holdTurn = (el: HTMLElement) => {
+    const turns = Array.from(el.querySelectorAll<HTMLElement>("article.turn"));
+    const shown = turns.filter((turn) => turnTop(el, turn) + turn.offsetHeight > 0);
+    const turn = shown.find((t) => turnTop(el, t) >= -0.5) ?? shown[0];
+    held.current = turn ? { id: turn.dataset.turn ?? "", top: turnTop(el, turn) } : null;
+  };
+  /** Puts the turn held back where it was on the pane. */
+  const keepHeld = (el: HTMLElement) => {
+    const was = held.current;
+    if (!was) return;
+    const turn = el.querySelector<HTMLElement>(`article.turn[data-turn="${CSS.escape(was.id)}"]`);
+    if (!turn) return;
+    const by = turnTop(el, turn) - was.top;
+    if (Math.abs(by) > 0.5) el.scrollTop += by;
+  };
+  // A wheel or a finger up the pane is reading back, even in the frame the page grows (#2310):
+  // the scroll test below cannot tell those apart.
+  const fingerAt = useRef<number | null>(null);
+  const readBack = () => {
+    const el = scroller.current;
+    if (!el || !following.current || el.scrollHeight <= el.clientHeight + 1) return;
+    holdTurn(el);
+    follow(false);
+  };
+  const onWheel = (event: WheelEvent) => { if (event.deltaY < 0) readBack(); };
+  const onTouchStart = (event: TouchEvent) => { fingerAt.current = event.touches[0]?.clientY ?? null; };
+  const onTouchMove = (event: TouchEvent) => {
+    const y = event.touches[0]?.clientY;
+    if (fingerAt.current !== null && y !== undefined && y > fingerAt.current + 4) readBack();
+  };
+
   const earlier = async () => {
     const el = scroller.current;
     if (!el || loadingEarlier.current || !settled.current || !store.hasMoreOfTheConversation) return;
     loadingEarlier.current = true;
-    // Hold the line being read: what arrives goes above it.
+    // Hold the line being read: what arrives goes above it. Following, the foot; reading, the
+    // turn held, as any growth above it is (#2310).
     const fromBottom = el.scrollHeight - el.scrollTop;
+    if (!following.current) holdTurn(el);
     await store.loadEarlier();
     requestAnimationFrame(() => {
-      el.scrollTop = el.scrollHeight - fromBottom;
+      if (following.current) el.scrollTop = el.scrollHeight - fromBottom;
+      else keepHeld(el);
       setTimeout(() => (loadingEarlier.current = false), 250);
     });
   };
@@ -308,6 +370,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       if (el.scrollTop < was.top - 0.5 && el.scrollHeight === was.height) follow(false);
       // Back at the end on the way down, or right at it.
       else if (fromBottom < 1 || (fromBottom < atTheEnd && el.scrollTop > was.top)) follow(true);
+      if (!following.current) holdTurn(el);
     }
     if (el.scrollTop < 400) void earlier();
   };
@@ -330,6 +393,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         return;
       } else return;
       e.preventDefault();
+      if (by < 0) readBack();
       el.scrollBy({ top: by, behavior: by === page || by === -page ? "smooth" : "instant" });
     };
     document.addEventListener("keydown", press);
@@ -350,6 +414,11 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     if (target) {
       follow(false);
       target.scrollIntoView({ block: "center", behavior: "smooth" });
+      // A notice's line, gone to from its notification, is lit a moment so the eye finds it (#2860).
+      if (target.classList.contains("notice-line")) {
+        target.classList.add("lit");
+        setTimeout(() => target.classList.remove("lit"), 2000);
+      }
       focusedEntry.value = null;
       focusedIndex.value = null;
       return;
@@ -368,9 +437,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   // What waits on the person is in the conversation, not over it (#723), after all of it (#1995),
   // and the agent's wait on events under it.
   const asked = useWaitingCards({ store, host, session, down });
-  const waitLine = agent && eventWaitLine(agent, (id) => store.agent(host, id)?.title);
   const cards: WaitingCard[] = [
-    // A change its agent made to the project's own files, asked here (#531).
+    // A change its agent made to the folder's own files, asked here (#531).
     ...store.guardedChanges(host, { session }).map(({ folder, change }) => ({
       key: `guarded:${folder}|${change.path}`,
       node: <div class="cards"><GuardedChangeCard store={store} host={host} folder={folder} change={change} down={down} /></div>,
@@ -483,11 +551,13 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           branchFrom={agent.state !== "archived" && !down && store.has(host, Capability.chatBranch1) ? (prompt) => void branchFromPrompt(store, host, agent, prompt.id, prompt.text) : undefined}
           branchNeedsUpdate={agent.state !== "archived" && !store.has(host, Capability.chatBranch1)} />
       )}
-      <header class="column-head">
+      <header class="column-head page-head">
         <BackToList />
-        {agent && store.renaming.value?.id === agent.id && store.renaming.value.inChat
-          ? <h1><RenameInput store={store} host={host} agent={agent} /></h1>
-          : <h1>{agent?.title ?? "New session"}</h1>}
+        <PageTitle parts={chatCrumbs(store, host, agent?.title ?? "New session")}>
+          {agent && store.renaming.value?.id === agent.id && store.renaming.value.inChat
+            ? <h1><RenameInput store={store} host={host} agent={agent} /></h1>
+            : <h1>{agent?.title ?? "New session"}</h1>}
+        </PageTitle>
         <span class="actions">
           <button class="wide-only" onClick={() => replace({ ...r, files: !r.files })} aria-pressed={!!r.files}>Files</button>
           <SessionButtons store={store} host={host} agent={agent} disabled={down} />
@@ -502,14 +572,17 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       {!hostDown && <DiskStrip store={store} host={host} />}
       <FolderGoneNotice store={store} host={host} agent={agent} />
       <MissingFolderStrip store={store} host={host} agent={agent} />
-      <BlockStrip store={store} host={host} agent={agent} disabled={down} />
+      <AccountMoveStrip store={store} host={host} agent={agent} />
       <ContinueStrip store={store} host={host} agent={agent} disabled={down} />
-      {/* What it said it would do, under what it waits on, as the Remote has it (#341). */}
+      {/* What it keeps working towards (#2742), then what it said it would do, under what it
+          waits on, as the Remote has them (#341). */}
+      <GoalCard agent={agent} />
       <CurrentPlanStrip agent={agent} />
       {finding.value && agent && <FindBar store={store} host={host} agentID={agent.id} close={() => (finding.value = false)} />}
       <CallActionsContext.Provider value={callActions}>
       <ViewLayerContext.Provider value={viewHosting}>
-      <div class="scroll transcript" ref={scroller} onScroll={onScroll}>
+      <div class="scroll transcript" ref={scroller} onScroll={onScroll} onWheel={onWheel}
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove}>
         <div class="view-layer" ref={(el) => { layer.element = el; }} />
         <ViewDiff layer={layer} openLink={(url) => { window.open(url, "_blank", "noopener,noreferrer"); }} />
         {failure && (
@@ -529,19 +602,30 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         ))}
         {agent && <Queued store={store} host={host} agent={agent} disabled={down} draftKey={`${host}|${session}`} />}
         {agent && <KeptBubbles store={store} kept={store.keptFor(host, agent.id)} />}
-        {/* Live, at the foot: what the row says, until the prompt lands (ChatTranscript, #251). */}
-        {agent && store.isComingBack(host, agent.id) ? <p class="working coming-back" role="status">↻ {comingBackDescription}</p>
+        {/* Live, at the foot: what the row says, until the prompt lands (ChatTranscript, #251). The one
+            working mark on the page, never in a tool's or a thought's line (#2831). */}
+        {agent && store.isComingBack(host, agent.id) ? <p class="working coming-back" aria-hidden="true">↻ {comingBackDescription}</p>
           : agent && (agent.state === "running" || agent.state === "starting") && (
-          <p class="working" aria-label="Working"><span class="spinner" /></p>
+          <p class="working" aria-hidden="true"><WorkingMark tool={runningTool(agent)} /></p>
         )}
+        {/* What the foot says to a screen reader, as text, in one node that is always there: a
+            live region reads a change to its text, not to an aria-label, nor a node just drawn (#2391). */}
+        <p class="visually-hidden" role="status">{agent ? footStatusWords(agent, store.isComingBack(host, agent.id)) : ""}</p>
+        {/* What it holds and waits for in line: what the agent is doing now, as the working line says (#2344). */}
+        {agent && <LeaseLine store={store} host={host} agent={agent} />}
         {/* After all of it, where the reader is (#1995). */}
         {cards.length > 0 && (
           <div class="waiting" aria-label="Waiting for you">
             {cards.map((card) => <Fragment key={card.key}>{card.node}</Fragment>)}
           </div>
         )}
-        {/* Under them, and not in "Waiting for you": the agent waits, not the person (#2084). */}
-        {agent && waitLine && <WaitCard line={waitLine} disabled={down} stop={() => store.cancelWait(host, agent.id)} />}
+        {/* A wait on sessions or on a time, the same card in the same place (#2750): it was a strip
+            under the chat's head with Carry on. */}
+        {agent && openBlock(agent) && <BlockWaitCard store={store} host={host} agent={agent} disabled={down} />}
+        {/* Under them, and not in "Waiting for you": the agent waits, not the person (#2084). Only
+            while the wait is open: an ended one stays on the record until the agent goes on (#2749). */}
+        {agent?.eventWait && agent.eventWait.ending === undefined && <WaitCard agent={agent} title={(id) => store.agent(host, id)?.title}
+          disabled={down} stop={() => store.cancelWait(host, agent.id)} />}
         {agent && !store.isComingBack(host, agent.id) && agent.state !== "running" && agent.state !== "starting" && (
           <QuietLine since={lastEntryAt(store.entries.value, store.turns.value) ?? fromWireDate(agent.lastActivityAt)} />
         )}
@@ -559,8 +643,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       )}
       <footer class="foot">
         <BackgroundRows store={store} host={host} agent={agent} disabled={down} steps={(item) => (subagent.value = item)} />
-        {agent && <Capsules store={store} host={host} agent={agent} />}
-        <Prompt store={store} draftKey={`${host}|${session}`} placeholder={promptPlaceholder(agent)} disabled={(down && !keeps) || !agent}
+        <Prompt store={store} draftKey={`${host}|${session}`} placeholder={refusedHere ?? promptPlaceholder(agent)}
+          disabled={(down && !keeps) || !agent || refusedHere !== null}
           stop={agent && hasTurnInFlight(agent) ? () => void store.perform(host, agent.id, "agents/stop") : undefined}
           acting={agent && store.onItsWay.value[agent.id]}
           queues={willQueue(agent)} suggestion={agent?.suggestedPrompts?.[0]}
@@ -580,18 +664,31 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           where={agent && (
             <>
               <Place store={store} host={host} agent={agent} />
-              {r.project && <Labels store={store} host={host} agent={agent} folder={r.project} disabled={down} />}
+              {r.folder && <Labels store={store} host={host} agent={agent} folder={r.folder} disabled={down} />}
             </>
           )}
-          runtime={agent && <RuntimeLabel store={store} host={host} runtimeID={agent.runtimeID} />}>
+          runtime={agent && <RuntimeLabel store={store} host={host} agent={agent} />}>
           {agent && (
           <PromptMenus options={drawable(agent.advertisedOptions, [])} disabled={down} runtime={runtimeNameOn(store, host, agent.runtimeID)}
+              runtimeID={agent.runtimeID}
+              clientPermission={{
+                own: agent.clientPermission,
+                settings: store.clientPermissions.value[store.macHostID.value]?.[agent.runtimeID as Exclude<keyof ClientPermissionSettings, "setBy">] ?? "default",
+                set: (mode) => void store.setAgentClientPermission(host, agent.id, mode),
+              }}
+              levels={{
+                runtimeName: runtimeNameOn(store, host, agent.runtimeID),
+                chosen: (field) => agent.levels?.[field],
+                cell: (field, level) => cellOf(store.autoMappings.value[store.macHostID.value], agent.runtimeID, field, level),
+                choose: (field, level) => void store.setLevels(host, agent.id, field, level),
+              }}
               value={(o) => store.pendingOptions.value[agent.id]?.[o.id] ?? agent.startOptions.values[o.id] ?? o.currentValue}
               onChange={(o, v) => void store.setOption(host, agent.id, o.id, v)}
               trailing={<ContextMeter agent={agent} costs={store.costs.value[host]} />}
               besideMode={<SandboxCapsule runtimeID={agent.runtimeID} override={agent.sandboxOverride}
                 runtimeDefault={store.sandboxDefaults.value[host]?.[agent.runtimeID] ?? "runtime"}
                 mode={typeof agent.startOptions.values.mode === "string" ? agent.startOptions.values.mode : undefined} disabled={down}
+                setBy={store.sandboxSetBy.value[host]}
                 onChange={(choice) => void store.setAgentSandbox(host, agent.id, choice)} />} />
           )}
         </Prompt>
@@ -601,21 +698,21 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
 }
 
 /**
- * Where it works (PromptBar's placeTitle): its worktree, else the project folder's branch. Said,
+ * Where it works (PromptBar's placeTitle): its worktree, else the folder's branch. Said,
  * not offered: moving a session to another worktree is the window's.
  */
 function Place({ store, host, agent }: { store: Store; host: string; agent: Agent }) {
   const branch = useSignal<string | undefined>(undefined);
-  const folder = projectFolder(agent);
+  const folder = folderPath(agent);
   useEffect(() => {
     branch.value = undefined;
     if (agent.worktree) return;
     void store.worktrees(host, folder).then((list) => {
-      branch.value = list?.worktrees.find((w) => w.isProjectFolder)?.branch;
+      branch.value = list?.worktrees.find((w) => w.isFolder)?.branch;
     });
   }, [host, folder, agent.worktree?.root]);
-  const title = agent.worktree?.name ?? branch.value ?? "Project folder";
-  const help = agent.worktree ? `Worktree ${agent.worktree.name}${agent.worktree.branch ? ` on ${agent.worktree.branch}` : ""}` : "The project folder";
+  const title = agent.worktree?.name ?? branch.value ?? "Folder";
+  const help = agent.worktree ? `Worktree ${agent.worktree.name}${agent.worktree.branch ? ` on ${agent.worktree.branch}` : ""}` : "The folder";
   return <span class="pill place" title={help} aria-label={`Works in: ${title}`}>{title}</span>;
 }
 
@@ -624,9 +721,14 @@ function runtimeNameOn(store: Store, host: string, runtimeID: string): string {
   return (store.runtimes.value[host] ?? []).find((r) => r.runtime.id === runtimeID)?.runtime.name ?? runtimeID;
 }
 
-function RuntimeLabel({ store, host, runtimeID }: { store: Store; host: string; runtimeID: string }) {
-  const name = runtimeNameOn(store, host, runtimeID);
-  return <span class="pill" title="Runtime" aria-label={`Runtime: ${name}`}>{name}</span>;
+/** With the account it runs on, when that is not the runtime's own sign-in: "Claude · Work" (#2259). */
+function RuntimeLabel({ store, host, agent }: { store: Store; host: string; agent: Agent }) {
+  const named = sessionRuntimeName(runtimeNameOn(store, host, agent.runtimeID), agent.runtimeID, agent.accountID,
+    store.accountProfiles.value[host] ?? []);
+  // An Auto agent says so, with the runtime it picked (#2658, FR-009).
+  const name = agent.auto ? autoHeader(named) : named;
+  const title = agent.accountID === undefined ? "Runtime" : "Runtime and account";
+  return <span class="pill" title={title} aria-label={`Runtime: ${name}`}>{name}</span>;
 }
 
 /**
@@ -713,17 +815,21 @@ function Queued({ store, host, agent, disabled, draftKey }: { store: Store; host
 }
 
 /**
- * What the open agent holds, over the prompt (036; LeaseRow, #254): one capsule each. What it waits
- * for on events is a card at the end of the chat (#1995).
+ * What the open agent holds and waits for in line, with the working line (036; LeaseLine.swift,
+ * #2344): one line each, a way to the Resources page, with a chevron and a row's hit area (#2448). What it waits for on events is a card (#1995).
  */
-function Capsules({ store, host, agent }: { store: Store; host: string; agent: Agent }) {
-  const leases = leaseMark(agent.id, store.leases.value[host], (id) => store.agent(host, id)?.title);
+function LeaseLine({ store, host, agent }: { store: Store; host: string; agent: Agent }) {
+  // A place in line that the wait card says is left to the card (#2361).
+  const leases = leaseMark(agent.id, store.leases.value[host], (id) => store.agent(host, id)?.title, lineResource(agent));
   if (!leases) return null;
   return (
-    <div class="capsules">
-      <p class="capsule-row" role="note" aria-label={leases.full}>
-        {leases.capsules.map((text) => <span key={text} class="capsule" title={leases.full}>{text}</span>)}
-      </p>
+    <div class="lease-line" role="status" aria-label={leases.full}>
+      {leases.lines.map((text) => (
+        <button key={text} class="link" title={leases.full}
+          onClick={() => { location.hash = routeHash({ nav: "machines", section: "resources" }); }}>
+          <span class="words">{text}</span><span class="chevron" aria-hidden="true">›</span>
+        </button>
+      ))}
     </div>
   );
 }
@@ -732,16 +838,81 @@ function Capsules({ store, host, agent }: { store: Store; host: string; agent: A
  * The agent's wait on events, as a card under the questions (WaitCard.swift, #1995): what, since
  * when, until when, a way to it on the Events page, and Stop Waiting. Not tinted.
  */
-function WaitCard({ line, disabled, stop }: { line: string; disabled: boolean; stop: () => Promise<void> }) {
+function WaitCard({ agent, title, disabled, stop }: { agent: Agent; title: (id: string) => string | undefined;
+  disabled: boolean; stop: () => Promise<void> }) {
   const busy = useSignal(false);
+  const now = useSignal(Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => { now.value = Date.now(); }, 20_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const wait = agent.eventWait;
+  const line = eventWaitLine(agent, title);
+  if (!wait || wait.ending !== undefined || (!line && wait.patterns.length === 0)) return null;
+  const { elapsed, total, percent } = eventWaitMinutes(wait, new Date(now.value));
   return (
     <div class="cards">
       <div class="card wait-card">
-        <p class="strong">{line}</p>
+        {lineResource(agent) !== undefined ? <p class="strong">{line}</p> : <>
+          <div class="wait-card-heading">
+            <span class="wait-card-title"><span class="wait-card-broadcast" aria-hidden="true"><Beacon /></span>Waiting for event</span>
+            <span class="wait-card-time">{total === undefined ? `${elapsed} min` : `${elapsed} / ${total} min`}</span>
+          </div>
+          <div class="wait-card-events">
+            {eventWaitSummaryLines(wait, title).map((line) => <p class="wait-card-event" key={line.id} title={line.events.join(", ")}>
+              <span class="wait-card-source">{line.source}</span><span class="wait-card-separator">·</span>
+              <span class="wait-card-kind">{line.words}</span>
+              {line.arguments.length > 0 && <span class="wait-card-filters">({line.arguments.join(", ")})</span>}
+            </p>)}
+          </div>
+          {percent !== undefined && <div class="wait-card-progress" role="progressbar" aria-label="Event wait time"
+            aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
+            <span style={{ width: `${percent}%` }} />
+          </div>}
+        </>}
         <p class="wait-answers">
-          <button onClick={() => { location.hash = routeHash({ activity: "events" }); }}>Show in Events</button>
+          <button onClick={() => { location.hash = routeHash({ nav: "reports", section: "events" }); }}>Show in Events</button>
           <button disabled={disabled || busy.value} title="Stop waiting. Nothing will start it again for this wait."
             onClick={() => { busy.value = true; void stop().finally(() => (busy.value = false)); }}>Stop Waiting</button>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A wait on sessions or on a time (BlockWaitCard in WaitCard.swift, #2750), drawn as WaitCard is:
+ * what it waits on, since when, when it checks again, and Stop Waiting, which carries it on now.
+ */
+function BlockWaitCard({ store, host, agent, disabled }: { store: Store; host: string; agent: Agent; disabled: boolean }) {
+  const busy = useSignal(false);
+  const now = useSignal(Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => { now.value = Date.now(); }, 20_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const block = openBlock(agent);
+  if (!block || !agent.report) return null;
+  const since = fromWireDate(agent.report.at).getTime();
+  const deadline = block.checkAgainAt === undefined ? undefined : fromWireDate(block.checkAgainAt).getTime();
+  const total = deadline === undefined ? undefined : Math.max(1, Math.ceil((deadline - since) / 60_000));
+  const elapsed = Math.max(0, Math.floor((now.value - since) / 60_000));
+  const share = deadline === undefined || deadline <= since ? undefined : Math.min(100, Math.max(0, (now.value - since) / (deadline - since) * 100));
+  return (
+    <div class="cards">
+      <div class="card wait-card block-wait-card">
+        <div class="wait-card-heading">
+          <span class="wait-card-title"><span class="wait-card-broadcast" aria-hidden="true"><Beacon /></span>{cardTitle(block)}</span>
+          <span class="wait-card-time">{total === undefined ? `${elapsed} min` : `${elapsed} / ${total} min`}</span>
+        </div>
+        <div class="wait-card-events">
+          {store.waitsOf(host, agent).map((line) => <p class="wait-card-event" key={line}>{line}</p>)}
+        </div>
+        {share !== undefined && <div class="wait-card-progress" role="progressbar" aria-label="Wait time"
+          aria-valuemin={0} aria-valuemax={100} aria-valuenow={share}><span style={{ width: `${share}%` }} /></div>}
+        <p class="wait-answers">
+          <button disabled={disabled || busy.value} title={carryOnHelp(agent)}
+            onClick={() => { busy.value = true; void store.prompt(host, agent.id, carryOnPrompt, []).finally(() => (busy.value = false)); }}>Stop Waiting</button>
         </p>
       </div>
     </div>

@@ -43,6 +43,8 @@ public final class DisplayPreferenceMirror {
                 if defaults.object(forKey: key) as? Bool != value { defaults.set(value, forKey: key) }
             case (.string, .string(let value)?):
                 if defaults.string(forKey: key) != value { defaults.set(value, forKey: key) }
+            case (.int, .int(let number)?):
+                if defaults.object(forKey: key) as? Int != number { defaults.set(number, forKey: key) }
             default:
                 if defaults.object(forKey: key) != nil { defaults.removeObject(forKey: key) }
             }
@@ -63,6 +65,7 @@ public final class DisplayPreferenceMirror {
             let local: JSONValue? = switch kind {
             case .bool: (defaults.object(forKey: key) as? Bool).map(JSONValue.bool)
             case .string: defaults.string(forKey: key).map(JSONValue.string)
+            case .int: (defaults.object(forKey: key) as? Int).map(JSONValue.int)
             }
             guard local != preferences[key] else { continue }
             changes[key] = local ?? .null

@@ -12,18 +12,18 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Ports SkillUpdateRemoveTests and SkillProjectTests' listing: a project's skills listed,
+// Ports SkillUpdateRemoveTests and SkillFolderTests' listing: a folder's skills listed,
 // the lock's marked as added and the person's own not, and taking one out moves it to the
 // root's trash and its lock entry with it, while the person's own is refused.
 
 var lockTime = time.Date(2026, 10, 16, 9, 0, 0, 0, time.UTC)
 
-func TestAProjectsSkillsListedAndOneTakenOut(t *testing.T) {
+func TestAFoldersSkillsListedAndOneTakenOut(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	project := t.TempDir()
-	c.call(t, 1, "projects/add", map[string]any{"folder": "file://" + project})
-	skills := filepath.Join(project, ".agents", "skills")
+	folder := t.TempDir()
+	c.call(t, 1, "folders/add", map[string]any{"folder": "file://" + folder})
+	skills := filepath.Join(folder, ".agents", "skills")
 	write := func(name, text string) {
 		os.MkdirAll(filepath.Join(skills, name), 0o755)
 		os.WriteFile(filepath.Join(skills, name, "SKILL.md"), []byte(text), 0o644)
@@ -32,11 +32,11 @@ func TestAProjectsSkillsListedAndOneTakenOut(t *testing.T) {
 	write("mine", "---\nname: mine\n---\n")
 	os.MkdirAll(filepath.Join(skills, "not-a-skill"), 0o755)
 	hash, _ := skillcatalog.ComputedHash(filepath.Join(skills, "added"))
-	lock, _ := skillcatalog.LoadLock(skillcatalog.Project, filepath.Join(project, "skills-lock.json"))
+	lock, _ := skillcatalog.LoadLock(skillcatalog.FolderScope, filepath.Join(folder, "skills-lock.json"))
 	lock.Upsert("added", "owner/repo", "skills/added/SKILL.md", hash, lockTime)
 	lock.Write()
 
-	dest := map[string]any{"kind": "project", "folder": project}
+	dest := map[string]any{"kind": "folder", "folder": folder}
 	var list wire.SkillsListAnswer
 	json.Unmarshal(c.call(t, 2, "skills/list", map[string]any{"destination": dest}), &list)
 	if len(list.Skills) != 2 || list.Skills[0].Name != "added" || *list.Skills[0].Description != "From a catalogue." ||
@@ -68,12 +68,12 @@ func TestAProjectsSkillsListedAndOneTakenOut(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(skills, "added")); !os.IsNotExist(err) {
 		t.Fatal("still there")
 	}
-	if lock, _ := skillcatalog.LoadLock(skillcatalog.Project, filepath.Join(project, "skills-lock.json")); len(lock.Names()) != 0 {
+	if lock, _ := skillcatalog.LoadLock(skillcatalog.FolderScope, filepath.Join(folder, "skills-lock.json")); len(lock.Names()) != 0 {
 		t.Fatal(lock.Names())
 	}
 
-	// Somewhere that is not a project, and a root with no personal home, are refused.
-	e = c.callError(t, 6, "skills/list", map[string]any{"destination": map[string]any{"kind": "project", "folder": t.TempDir()}})
+	// Somewhere that is not a folder, and a root with no personal home, are refused.
+	e = c.callError(t, 6, "skills/list", map[string]any{"destination": map[string]any{"kind": "folder", "folder": t.TempDir()}})
 	if e.Code != wire.FailureCatalogRefused {
 		t.Fatalf("%+v", e)
 	}
@@ -86,18 +86,18 @@ func TestAProjectsSkillsListedAndOneTakenOut(t *testing.T) {
 	}
 }
 
-func TestAProjectPluginWaitsUntilApproved(t *testing.T) {
+func TestAFolderPluginWaitsUntilApproved(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	project := t.TempDir()
-	c.call(t, 1, "projects/add", map[string]any{"folder": "file://" + project})
-	plugins := filepath.Join(project, ".agents", "plugins")
+	folder := t.TempDir()
+	c.call(t, 1, "folders/add", map[string]any{"folder": "file://" + folder})
+	plugins := filepath.Join(folder, ".agents", "plugins")
 	os.MkdirAll(filepath.Join(plugins, "old", "hooks"), 0o755)
 	os.WriteFile(filepath.Join(plugins, "old", ".mcp.json"), []byte(`{"mcpServers":{"x":{"command":"${CLAUDE_PLUGIN_ROOT}/x"}}}`), 0o644)
 
 	// Present when approval began: approved as it stands, with what it carries.
 	var list wire.PluginsList
-	json.Unmarshal(c.call(t, 2, "plugins/list", map[string]any{"folder": "file://" + project}), &list)
+	json.Unmarshal(c.call(t, 2, "plugins/list", map[string]any{"folder": "file://" + folder}), &list)
 	if len(list.Plugins) != 1 || list.Plugins[0].Name != "old" || list.Plugins[0].AwaitingApproval != nil ||
 		len(list.Plugins[0].Carries) != 2 || list.Plugins[0].Carries[0] != "hooks" || list.Plugins[0].Carries[1] != "connectors" {
 		t.Fatalf("%+v", list)
@@ -110,7 +110,7 @@ func TestAProjectPluginWaitsUntilApproved(t *testing.T) {
 	// One that arrives after waits, and one changed after approval waits again.
 	os.MkdirAll(filepath.Join(plugins, "new", "skills"), 0o755)
 	os.WriteFile(filepath.Join(plugins, "old", "hooks", "run.sh"), []byte("echo hi"), 0o755)
-	json.Unmarshal(c.call(t, 3, "plugins/list", map[string]any{"folder": "file://" + project}), &list)
+	json.Unmarshal(c.call(t, 3, "plugins/list", map[string]any{"folder": "file://" + folder}), &list)
 	if len(list.Plugins) != 2 || list.Plugins[0].Name != "new" || list.Plugins[0].AwaitingApproval == nil ||
 		!list.Plugins[0].AwaitingApproval.IsNew || list.Plugins[1].AwaitingApproval == nil || list.Plugins[1].AwaitingApproval.IsNew {
 		t.Fatalf("%+v", list)
@@ -120,7 +120,7 @@ func TestAProjectPluginWaitsUntilApproved(t *testing.T) {
 	if e := c.callError(t, 4, "plugins/approve", map[string]any{"plugin": string(waiting.Folder), "digest": "stale"}); e.Code != wire.FailureNotChanged {
 		t.Fatalf("%+v", e)
 	}
-	if e := c.callError(t, 5, "plugins/approve", map[string]any{"plugin": "file://" + project, "digest": "x"}); e.Code != CodeInvalidParams {
+	if e := c.callError(t, 5, "plugins/approve", map[string]any{"plugin": "file://" + folder, "digest": "x"}); e.Code != CodeInvalidParams {
 		t.Fatalf("%+v", e)
 	}
 	list = wire.PluginsList{}

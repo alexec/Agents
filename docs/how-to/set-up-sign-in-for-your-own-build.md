@@ -9,12 +9,14 @@ description: Make your own Apple, Google and GitHub ids for a build of Agents fr
 The app that Agents ships has its own client ids, so its control plane needs no set-up (see
 [Sign in with Google, Apple or GitHub](sign-in-with-google-apple-or-github.md)). When you
 build Agents from source, with your own bundle ids and your own Apple team, your build does
-not have these ids. Until you make them, **Settings ▸ Control plane ▸ Sign-in** shows each
-provider as not available:
+not have these ids. Until you make them, **Settings ▸ Control plane ▸ Sign-in** shows Google
+and GitHub as not available:
 
-- "This build has no Sign in with Apple id yet."
 - "This build has no Google client id yet."
 - "This build has no GitHub App yet."
+
+Apple shows as available, because the code has it on. But the Sign in with Apple sheet only
+works in a build whose App IDs have the capability, so do the Apple steps too.
 
 Do the steps for each provider that you want. You can do one, two or all three.
 
@@ -41,14 +43,16 @@ ids of their own.
 2. Open the App ID of the Mac window (`com.alexecollins.agents.store`). Turn on the **Sign
    in with Apple** capability, and save. Do the same for the App ID of the Remote
    (`com.alexecollins.agents.remote`).
-3. Add a **Services ID**, for example `com.example.agents.signin`. Turn on **Sign in with
-   Apple** for it, and choose the Mac window's App ID as its primary App ID.
-4. Make the provisioning profiles of the two targets again, so that they have the new
-   capability.
+3. Make the provisioning profiles of the two targets again, so that they have the new
+   capability. Turning on the capability makes the profiles that exist invalid.
+
+You do not need a **Services ID**. A Services ID is for Sign in with Apple on a web page,
+and the web page pairs from a code shown on a signed-in client.
 
 ### Add the entitlement
 
-Add this key to the entitlements of the Mac window and of the Remote:
+The entitlements of the Mac window and of the Remote have this key already (#2507). Make
+sure that it is there:
 
 ```xml
 <key>com.apple.developer.applesignin</key>
@@ -68,8 +72,8 @@ The files are:
 In `Go/internal/controlplane/signin/config.go`:
 
 - `AppAppleAudiences` lists the bundle ids that a native Sign in with Apple names as its
-  audience. Make it your two bundle ids, and add your Services ID.
-- Set `AppAppleEnabled = true`.
+  audience. Make it your two bundle ids.
+- `AppAppleEnabled` is `true` already. Keep it so.
 
 ### Why Apple is invite only
 
@@ -112,7 +116,7 @@ any id in the list. Google sends the person back to the app on the client id tur
    key.
 8. In `Go/internal/controlplane/signin/config.go`, set `AppGitHubClientID` to the client id.
 
-Use a GitHub App for sign-in only. Do not use the App that connects GitHub to your projects.
+Use a GitHub App for sign-in only. Do not use the App that connects GitHub to your folders.
 Then a token that is passed on has no rights on your repositories.
 
 The **Members** permission lets the control plane check **Allowed GitHub organisations**: it
@@ -128,8 +132,7 @@ You can also give the ids to a control plane that you start yourself, with no ne
 it. Set these environment variables for the control plane's process. They replace the ids in
 `config.go`:
 
-- `AGENTS_SIGNIN_APPLE_AUDIENCES`: the Apple audiences, with commas between them. Setting it
-  also turns Apple on.
+- `AGENTS_SIGNIN_APPLE_AUDIENCES`: the Apple audiences, with commas between them.
 - `AGENTS_SIGNIN_GOOGLE_CLIENT_IDS`: the Google client ids, with commas between them.
 - `AGENTS_SIGNIN_GITHUB_CLIENT_ID`: the GitHub App's client id.
 

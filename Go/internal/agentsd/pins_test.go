@@ -12,20 +12,20 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Ports PinsTests and DaemonPinsTests: a project's pins in .agents/pins.json, in the bytes
+// Ports PinsTests and DaemonPinsTests: a folder's pins in .agents/pins.json, in the bytes
 // the Swift host writes, under its limits and in its words.
 
-func project(t *testing.T, c *conn, n int) string {
+func folder(t testing.TB, c *conn, n int) string {
 	t.Helper()
 	dir := t.TempDir()
-	c.call(t, n, "projects/add", map[string]any{"folder": store.FolderURL(dir)})
+	c.call(t, n, "folders/add", map[string]any{"folder": store.FolderURL(dir)})
 	return dir
 }
 
 func TestPinsAreTheSwiftFile(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	os.MkdirAll(filepath.Join(dir, "docs"), 0o755)
 	os.WriteFile(filepath.Join(dir, "docs", "README.md"), []byte("# hi"), 0o644)
 	os.WriteFile(filepath.Join(dir, "plan.md"), []byte("# plan"), 0o644)
@@ -67,8 +67,8 @@ func TestPinsAreTheSwiftFile(t *testing.T) {
 		params map[string]any
 		want   string
 	}{
-		{map[string]any{"folder": folder, "path": "../x.md"}, "Nothing was pinned: ../x.md is not in this project."},
-		{map[string]any{"folder": folder, "path": "gone.md"}, "Nothing was pinned: there is no file at gone.md in the project folder."},
+		{map[string]any{"folder": folder, "path": "../x.md"}, "Nothing was pinned: ../x.md is not in this folder."},
+		{map[string]any{"folder": folder, "path": "gone.md"}, "Nothing was pinned: there is no file at gone.md in the folder."},
 		{map[string]any{"folder": folder, "path": "plan.md", "title": strings.Repeat("t", 61)}, "Nothing was pinned: `title` is at most 60 characters."},
 		{map[string]any{"folder": store.FolderURL(t.TempDir()), "path": "plan.md"}, ""},
 	} {
@@ -104,10 +104,10 @@ func TestPinsAreTheSwiftFile(t *testing.T) {
 		t.Fatal(e.Message)
 	}
 	c.call(t, 44, "pins/unpin", map[string]any{"folder": folder, "path": "plan.md"})
-	if e := c.callError(t, 45, "pins/unpin", map[string]any{"folder": folder, "path": "plan.md"}); e.Message != "Nothing was unpinned: plan.md is not pinned in this project." {
+	if e := c.callError(t, 45, "pins/unpin", map[string]any{"folder": folder, "path": "plan.md"}); e.Message != "Nothing was unpinned: plan.md is not pinned in this folder." {
 		t.Fatal(e.Message)
 	}
-	var all []wire.ProjectPins
+	var all []wire.FolderPins
 	json.Unmarshal(c.call(t, 46, "pins/list", nil), &all)
 	if len(all) != 1 || len(all[0].Pins) != 9 {
 		t.Fatalf("%+v", all)
@@ -115,9 +115,9 @@ func TestPinsAreTheSwiftFile(t *testing.T) {
 }
 
 // An entry this build cannot read is kept, written back after the rest, and counts.
-// A pins.json in the folder before it is a project is said when it is added (#1622), so a
+// A pins.json in the folder before it is a folder is said when it is added (#1622), so a
 // window that read pins/list before then shows the pin at once.
-func TestPinsThereBeforeTheProjectAreSaidOnAdd(t *testing.T) {
+func TestPinsThereBeforeTheFolderAreSaidOnAdd(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
 	dir := t.TempDir()
@@ -125,7 +125,7 @@ func TestPinsThereBeforeTheProjectAreSaidOnAdd(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "plan.md"), []byte("# plan"), 0o644)
 	os.WriteFile(filepath.Join(dir, ".agents", "pins.json"),
 		[]byte(`{"pins":[{"path":"plan.md","pinned_by":{"person":true}}]}`), 0o644)
-	c.in <- `{"jsonrpc":"2.0","id":1,"method":"projects/add","params":{"folder":"` + string(store.FolderURL(dir)) + `"}}`
+	c.in <- `{"jsonrpc":"2.0","id":1,"method":"folders/add","params":{"folder":"` + string(store.FolderURL(dir)) + `"}}`
 	c.until(t, "pins/changed with plan.md", func(method string, p json.RawMessage) bool {
 		if method != "pins/changed" {
 			return false
@@ -150,7 +150,7 @@ func TestAnUnreadPinIsKept(t *testing.T) {
 func TestSessionPinsAndArchive(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	one := seeded(t, d, dir, nil)
 	two := seeded(t, d, dir, nil)
@@ -161,7 +161,7 @@ func TestSessionPinsAndArchive(t *testing.T) {
 		t.Fatalf("%+v", f.sessions)
 	}
 	other := seeded(t, d, t.TempDir(), nil)
-	if e := c.callError(t, 5, "pins/pinSession", map[string]any{"folder": folder, "agentID": other.ID}); e.Message != "Nothing was pinned: that session is not in this project." {
+	if e := c.callError(t, 5, "pins/pinSession", map[string]any{"folder": folder, "agentID": other.ID}); e.Message != "Nothing was pinned: that session is not in this folder." {
 		t.Fatal(e.Message)
 	}
 	c.call(t, 6, "agents/archive", map[string]any{"agentID": two.ID})
@@ -223,11 +223,41 @@ func TestPersonas(t *testing.T) {
 	}
 	r := byID["reviewer"]
 	if *r.Description != "Reads code" || *r.Settings.Model != "opus" || r.Settings.Options["fast"] != "true" ||
-		strings.Join(r.Settings.Labels, ",") != "review" || r.Origin != "project" {
+		strings.Join(r.Settings.Labels, ",") != "review" || r.Origin != "folder" {
 		t.Fatalf("%+v", r)
 	}
 	if *byID["broken"].Problem != "The metadata block is never closed" || *byID["linked"].Problem != "This file could not be read" {
 		t.Fatalf("%+v %+v", byID["broken"], byID["linked"])
+	}
+}
+
+func TestPersonaFilesCanBeManagedInEachScope(t *testing.T) {
+	personal := t.TempDir()
+	t.Setenv("AGENTS_PERSONAL_HOME", personal)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := folder(t, c, 1)
+	folderPath := store.FolderURL(dir)
+	content := "---\nname: Review\nfuture-key: keep me\n---\n\nRead carefully.\n"
+	c.call(t, 2, "personas/save", map[string]any{"folder": folderPath, "origin": "folder", "id": "review", "content": content})
+	var files wire.PersonaFilesAnswer
+	json.Unmarshal(c.call(t, 3, "personas/files", map[string]any{"folder": folderPath, "origin": "folder"}), &files)
+	if len(files) != 1 || files[0].ID != "review" || files[0].Content != content || files[0].Origin != wire.PersonaOriginFolder {
+		t.Fatalf("folder files: %+v", files)
+	}
+	personalContent := "Plain personal prompt\n"
+	c.call(t, 4, "personas/save", map[string]any{"origin": "personal", "id": "review", "content": personalContent})
+	json.Unmarshal(c.call(t, 5, "personas/files", map[string]any{"origin": "personal"}), &files)
+	if len(files) != 1 || files[0].Content != personalContent || files[0].Origin != wire.PersonaOriginPersonal {
+		t.Fatalf("personal files: %+v", files)
+	}
+	c.call(t, 6, "personas/save", map[string]any{"folder": folderPath, "origin": "folder", "id": "review", "content": content, "delete": true})
+	json.Unmarshal(c.call(t, 7, "personas/files", map[string]any{"folder": folderPath, "origin": "folder"}), &files)
+	if len(files) != 0 {
+		t.Fatalf("deleted folder persona remains: %+v", files)
+	}
+	if e := c.callError(t, 8, "personas/save", map[string]any{"folder": folderPath, "origin": "folder", "id": "../escape", "content": "x"}); e.Code == 0 {
+		t.Fatal("accepted a persona path traversal")
 	}
 }
 

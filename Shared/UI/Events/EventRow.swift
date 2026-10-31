@@ -16,7 +16,7 @@ import SwiftUI
 /// the web page implements its own event rows.
 struct EventRow: View {
     let event: Event
-    /// "This Mac", or the project's name.
+    /// "This Mac", or the folder's name.
     let scopeName: String
     var openAgent: ((UUID) -> Void)?
     var openWorkflow: ((URL, String) -> Void)?

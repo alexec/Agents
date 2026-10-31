@@ -1,11 +1,11 @@
 import Foundation
 
-// A project's pinned pages (#159): Markdown documents and HTML pages pinned under the
-// project. specs/159-pinned-pages/README.md is the reference.
+// A folder's pinned pages (#159): Markdown documents and HTML pages pinned under the
+// folder. specs/159-pinned-pages/README.md is the reference.
 // And its pinned sessions (#180), kept at the top of its sessions whatever their state,
 // and its pinned workflows (#432), after them.
 
-/// `<project>/.agents/pins.json`, as written: the pins in the order shown.
+/// `<folder>/.agents/pins.json`, as written: the pins in the order shown.
 public struct PinsFile: Codable, Sendable, Hashable {
     public var pins: [PinEntry]
     /// The pinned sessions (#180), in the order shown. Absent when there are none, so a
@@ -86,7 +86,7 @@ public struct PinsFile: Codable, Sendable, Hashable {
         let raw = try JSONDecoder().decode(PinsFile.self, from: data)
         var seen: Set<String> = []
         var kept: [PinEntry] = []
-        let room = PinLimits.perProject - raw.unread.count
+        let room = PinLimits.perFolder - raw.unread.count
         for entry in raw.pins {
             var clean = entry
             if let view = entry.view {
@@ -102,12 +102,12 @@ public struct PinsFile: Codable, Sendable, Hashable {
         }
         var sessions: [SessionPinEntry] = []
         for entry in raw.sessionPins where !sessions.contains(where: { $0.session == entry.session })
-            && sessions.count < PinLimits.sessionsPerProject {
+            && sessions.count < PinLimits.sessionsPerFolder {
             sessions.append(entry)
         }
         var workflows: [WorkflowPinEntry] = []
         for entry in raw.workflowPins where !workflows.contains(where: { $0.workflow == entry.workflow })
-            && workflows.count < PinLimits.workflowsPerProject {
+            && workflows.count < PinLimits.workflowsPerFolder {
             workflows.append(entry)
         }
         return (PinsFile(pins: kept, sessions: sessions, workflows: workflows, unread: raw.unread),
@@ -117,7 +117,7 @@ public struct PinsFile: Codable, Sendable, Hashable {
 }
 
 /// One pinned session (#180): which, and who pinned it. Its id is a host's record, so a
-/// project carried to another host keeps entries that name nothing there; a screen
+/// folder carried to another host keeps entries that name nothing there; a screen
 /// shows only the ones it holds.
 public struct SessionPinEntry: Codable, Sendable, Hashable {
     public var session: UUID
@@ -153,7 +153,7 @@ public struct WorkflowPinEntry: Codable, Sendable, Hashable {
 
 /// One pin in the file: a page, by its `path`, or a view (#189), by its `view`. Never both.
 public struct PinEntry: Codable, Sendable, Hashable {
-    /// Relative to the project folder, `/` between its parts, no `..`. The pin's identity.
+    /// Relative to the folder, `/` between its parts, no `..`. The pin's identity.
     /// A view pin's is its `ui://` address, and is not written: `view` says it.
     public var path: String
     /// What the row says, if not the file's own name.
@@ -247,12 +247,12 @@ public enum PinKind: String, Codable, Sendable, Hashable {
 }
 
 public enum PinLimits {
-    /// Pins a project may hold (Alex, #159).
-    public static let perProject = 10
-    /// Pinned sessions a project may hold, apart from its pages (#180).
-    public static let sessionsPerProject = 10
-    /// Pinned workflows a project may hold, apart from its pages and sessions (#432).
-    public static let workflowsPerProject = 10
+    /// Pins a folder may hold (Alex, #159).
+    public static let perFolder = 10
+    /// Pinned sessions a folder may hold, apart from its pages (#180).
+    public static let sessionsPerFolder = 10
+    /// Pinned workflows a folder may hold, apart from its pages and sessions (#432).
+    public static let workflowsPerFolder = 10
     public static let titleLength = 60
     /// A view pin's arguments, as JSON (#189).
     public static let viewArgumentsBytes = 2048
@@ -271,7 +271,7 @@ public enum PinRules {
     }
 
     /// A relative path, tidied: no leading `./` or `/`, no empty parts, nothing that
-    /// climbs out. Nil for anything that can't name a file in the project.
+    /// climbs out. Nil for anything that can't name a file in the folder.
     public static func normalize(_ path: String) -> String? {
         let parts = path.split(separator: "/", omittingEmptySubsequences: true)
             .map(String.init).filter { $0 != "." }
@@ -329,16 +329,28 @@ public struct PinView: Codable, Sendable, Hashable, Identifiable {
     /// The title given, or the file's name.
     public var title: String
     public var kind: PinKind
-    /// The file is not in the project folder (deleted, moved, or only on a branch).
+    /// The file is not in the folder (deleted, moved, or only on a branch).
     public var missing: Bool
     public var pinnedBy: PinnerView
     /// A view pin's view and feeding call (#189); `path` is then its `ui://` address.
     public var view: ViewPin?
     /// Why a view pin is missing here, in a few words: `PinMissing`.
     public var missingReason: String?
+    /// A server's list view (#2032) that the person hid from the sidebar.
+    public var hidden: Bool?
+    /// A list view's count, as its server last said it (#2033): open issues, open pull
+    /// requests. Nil when the server says none.
+    public var count: Int?
+    /// How many of `count` want the person, when the server says (PRs of yours with failed checks).
+    public var attention: Int?
+    /// When the count was read.
+    public var countAt: Date?
+    /// The last poll failed: `count` is the one before.
+    public var countStale: Bool?
 
     public init(path: String, title: String, kind: PinKind, missing: Bool, pinnedBy: PinnerView,
-                view: ViewPin? = nil, missingReason: String? = nil) {
+                view: ViewPin? = nil, missingReason: String? = nil, hidden: Bool? = nil,
+                count: Int? = nil, attention: Int? = nil, countAt: Date? = nil, countStale: Bool? = nil) {
         self.path = path
         self.title = title
         self.kind = kind
@@ -346,7 +358,22 @@ public struct PinView: Codable, Sendable, Hashable, Identifiable {
         self.pinnedBy = pinnedBy
         self.view = view
         self.missingReason = missingReason
+        self.hidden = hidden
+        self.count = count
+        self.attention = attention
+        self.countAt = countAt
+        self.countStale = countStale
     }
+
+    /// The row's tooltip for its count (#2033): when it was read, and that it may be old.
+    public var countHelp: String? {
+        guard count != nil, let countAt else { return nil }
+        let when = countAt.formatted(date: .omitted, time: .shortened)
+        return countStale == true ? "As of \(when): the server did not answer since." : "As of \(when)."
+    }
+
+    /// A server's list view, shown without a pin (#2032): Hide, not Unpin.
+    public var isServerView: Bool { pinnedBy.kind == .server }
 }
 
 /// Why a view pin shows as missing (#189), as a pinned file does until its branch lands.
@@ -377,21 +404,28 @@ public struct PinnerView: Codable, Sendable, Hashable {
 
 public enum PinnerKind: String, Codable, Sendable, Hashable {
     case person, agent, workflow
+    /// A connected server shows its list views itself (#2032): `id` is its name in
+    /// mcp.json, `name` its title ("GitHub").
+    case server
 }
 
-/// One project's pins, for the sidebar.
-public struct ProjectPins: Codable, Sendable, Hashable {
+/// One folder's pins, for the sidebar.
+public struct FolderPins: Codable, Sendable, Hashable {
     public var folder: URL
     public var pins: [PinView]
     /// Its pinned sessions in their order (#180). Nil from a host that has none to say.
     public var sessions: [UUID]?
     /// Its pinned workflows' ids in their order (#432). Nil from a host that has none to say.
     public var workflows: [String]?
+    /// Its servers' list views (#2032), the hidden ones marked. Nil from a host with none.
+    public var views: [PinView]?
 
-    public init(folder: URL, pins: [PinView], sessions: [UUID] = [], workflows: [String] = []) {
+    public init(folder: URL, pins: [PinView], sessions: [UUID] = [], workflows: [String] = [],
+                views: [PinView] = []) {
         self.folder = folder
         self.pins = pins
         self.sessions = sessions.isEmpty ? nil : sessions
         self.workflows = workflows.isEmpty ? nil : workflows
+        self.views = views.isEmpty ? nil : views
     }
 }

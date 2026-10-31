@@ -22,10 +22,12 @@ something up, not for reading through.
   stays on each machine.
 - [Workflow triggers and actions](workflows.md): the workflow file format, every trigger
   and setting, and when a workflow does not run.
-- [Workspace providers](workspace-providers.md): the tools a workspace provider offers, and
+- [Machine providers](machine-providers.md): the tools a machine provider offers, and
   how the control plane checks and calls them.
 - [Integrations](integrations.md): every third-party service and tool the app talks to,
   starts, installs or signs in to, with its state and when it was last checked.
+- [Sign-in providers](sign-in.md): org sign-in providers, claimed domains, their methods and
+  the `/v1/oidc` routes on the control plane.
 - [ssh options](ssh-options.md): how each option in your `~/.ssh/config` fares when the
   control plane connects to a server.
 - [Personas](personas.md): the persona file format, where personas live, and what picking one does.
@@ -33,12 +35,12 @@ something up, not for reading through.
   Events page.
 - [Channels](channels.md): channel identities linked to people, so a chat or email message
   acts only as the person who approved it.
-- [Groups](groups.md): groups of people, and the workspace providers each group may start
+- [Groups](groups.md): groups of people, and the machine providers each group may start
 - [Policy](policy.md): the organisation's policy, its rules, its signature and its methods
   machines from.
-- [On Every Machine](on-every-machine.md): the settings and secrets the control plane keeps
-  for you and sends to each machine of yours.
-- [Reports](reports.md): usage, cost and time by person, project and machine, added up on
+- [Secrets and what follows you](on-every-machine.md): the settings and secrets
+  the control plane keeps for you and sends to each machine of yours.
+- [Reports](reports.md): usage, cost and time by person, folder and machine, added up on
   the control plane.
 - [The Console](console.md): the control plane's app for admins on the web page, and what
   each of its pages does.

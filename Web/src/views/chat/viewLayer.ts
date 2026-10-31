@@ -21,18 +21,18 @@ import {
 
 export interface ViewActions {
   agentID: string;
-  /** Set for a view in a project's place (a pin): there is no agent to reach. */
-  project?: string;
+  /** Set for a view in a folder's place (a pin): there is no agent to reach. */
+  folder?: string;
   call(method: "views/read" | "views/call" | "views/log" | "views/context" | "views/show", params: Record<string, unknown>): Promise<unknown>;
   /** A ui/message the person said yes to, sent as their prompt. */
   send(text: string): Promise<boolean>;
-  /** Pins the call's view to the chat's project (#189); answers whether it was pinned. */
+  /** Pins the call's view to the chat's folder (#189); answers whether it was pinned. */
   pin?(call: AppViewCall): Promise<boolean>;
-  /** Opens the new-agent form in the view's project, filled in (#834). Why it was not, or null.
+  /** Opens the new-agent form in the view's folder, filled in (#834). Why it was not, or null.
    *  The person starts the agent; a view never does. */
   startAgent?(start: Start): string | null;
   /** The session a view's agents/message-agent goes to (#837): on the branch, in the view's
-   *  project, or null when there is none. */
+   *  folder, or null when there is none. */
   recipient?(message: AgentMessage): { id: string; name: string } | null;
   /** An agents/message-agent the person said yes to, sent to that session as their prompt. */
   sendTo?(id: string, text: string): Promise<boolean>;
@@ -60,7 +60,7 @@ export class HostedView {
   /** Pinned from here (#189): the caption says so instead of offering Pin. */
   readonly pinned = signal(false);
   readonly title: string;
-  /** A view in a project's place (a pin) fills the page: no "Back to the chat" bar (#188). */
+  /** A view in a folder's place (a pin) fills the page: no "Back to the chat" bar (#188). */
   readonly fillsPage: boolean;
   private pinButton: HTMLButtonElement | null = null;
   private pinnedLabel: HTMLSpanElement | null = null;
@@ -79,7 +79,7 @@ export class HostedView {
 
   constructor(public call: AppViewCall, public actions: ViewActions, private layer: ViewLayer) {
     this.title = viewTitle(call.tool, call.server);
-    this.fillsPage = !!actions.project;
+    this.fillsPage = !!actions.folder;
     this.box = document.createElement("div");
     this.box.className = "view-box";
     this.box.hidden = true;
@@ -93,7 +93,7 @@ export class HostedView {
       back.onclick = () => this.layer.setFullscreen(null);
       const pin = document.createElement("button");
       pin.textContent = "Pin";
-      pin.title = "Pin this view under the project";
+      pin.title = "Pin this view under the folder";
       pin.onclick = () => void this.pin();
       const pinned = document.createElement("span");
       pinned.textContent = "Pinned";
@@ -178,9 +178,9 @@ export class HostedView {
     this.phase.value = "ready";
   }
 
-  /** The server and project to name in views/*: none for the app's own server in a chat. */
+  /** The server and folder to name in views/*: none for the app's own server in a chat. */
   private where(): Record<string, unknown> {
-    return { ...serverParam(this.call.server), ...(this.actions.project ? { project: this.actions.project } : {}) };
+    return { ...serverParam(this.call.server), ...(this.actions.folder ? { folder: this.actions.folder } : {}) };
   }
 
   /** The person's Show or Don't Show for a person's own server's view (#191). */
@@ -192,7 +192,7 @@ export class HostedView {
     const mine = ++this.attempt;
     try {
       await this.actions.call("views/show", { agentID: this.actions.agentID, server: ask.server, uri: ask.uri, hash: ask.hash, show,
-        ...(this.actions.project ? { project: this.actions.project } : {}) });
+        ...(this.actions.folder ? { folder: this.actions.folder } : {}) });
     } catch (e) {
       this.failure.value = `That could not be kept: ${describe(e)}`;
       this.phase.value = "failed";
@@ -202,7 +202,7 @@ export class HostedView {
     if (show) {
       await this.load(mine);
     } else {
-      this.failure.value = `Not shown. Ask Again is on ${ask.server}'s row in the project's Connectors.`;
+      this.failure.value = `Not shown. Ask Again is on ${ask.server}'s row in the folder's Connectors.`;
       this.phase.value = "failed";
     }
   }
@@ -323,7 +323,7 @@ export class HostedView {
         this.post(result(ask.id));
         break;
       case "message":
-        if (this.actions.project) { this.refuse(ask.id, "ui/message"); break; }
+        if (this.actions.folder) { this.refuse(ask.id, "ui/message"); break; }
         // Never sent on the view's say-so: the person is asked, under the view.
         if (this.messageID !== null) this.post(rpcError(this.messageID, -32000, "Another message replaced it."));
         this.messageID = ask.id;
@@ -360,7 +360,7 @@ export class HostedView {
           data: `${openDiffMethod}: ${ask.diff.files.length} file(s) drawn in the page's diff` }).catch(() => {});
         break;
       case "updateContext": {
-        if (this.actions.project) { this.refuse(ask.id, "ui/update-model-context"); break; }
+        if (this.actions.folder) { this.refuse(ask.id, "ui/update-model-context"); break; }
         const words = Array.isArray(ask.content)
           ? (ask.content as { text?: unknown }[]).flatMap((b) => (typeof b?.text === "string" ? [b.text] : [])).join(" ")
           : "";
@@ -399,7 +399,7 @@ export class HostedView {
     }
   }
 
-  /** What only a chat's view may do, asked from a project's place: refused, and logged (#189). */
+  /** What only a chat's view may do, asked from a folder's place: refused, and logged (#189). */
   private refuse(id: string | number, method: string): void {
     this.post(rpcError(id, -32000, noAgentWords));
     void this.actions.call("views/log", { agentID: this.actions.agentID, viewID: this.call.id, level: "warning",

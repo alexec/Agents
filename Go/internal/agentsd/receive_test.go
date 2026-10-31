@@ -34,7 +34,7 @@ func sendGit(t *testing.T, dir string, env []string, args ...string) string {
 func macSend(t *testing.T, c *conn, src string, have []string, changes bool, branches ...string) (map[string]any, int64) {
 	t.Helper()
 	var pack wire.SendPack
-	json.Unmarshal(c.call(t, 900, "projects/sendPack", map[string]any{"folder": store.FolderURL(src), "branches": branches,
+	json.Unmarshal(c.call(t, 900, "folders/sendPack", map[string]any{"folder": store.FolderURL(src), "branches": branches,
 		"leavingOut": have, "includeChanges": changes}), &pack)
 	relay := func(f *wire.SendFile) *wire.UUID {
 		if f == nil {
@@ -44,8 +44,8 @@ func macSend(t *testing.T, c *conn, src string, have []string, changes bool, bra
 		var offset int64
 		for {
 			var part wire.SendRead
-			json.Unmarshal(c.call(t, 901, "projects/sendRead", map[string]any{"id": f.ID, "offset": offset}), &part)
-			c.call(t, 902, "projects/receiveUpload", map[string]any{"upload": u, "offset": offset, "data": part.Data})
+			json.Unmarshal(c.call(t, 901, "folders/sendRead", map[string]any{"id": f.ID, "offset": offset}), &part)
+			c.call(t, 902, "folders/receiveUpload", map[string]any{"upload": u, "offset": offset, "data": part.Data})
 			offset += int64(len(part.Data))
 			if part.End {
 				break
@@ -81,12 +81,12 @@ func TestSendToHost(t *testing.T) {
 
 	dest := filepath.Join(canonical(t.TempDir()), "hello")
 	var state wire.ReceiveState
-	json.Unmarshal(c.call(t, 1, "projects/receiveState", map[string]any{"folder": dest}), &state)
+	json.Unmarshal(c.call(t, 1, "folders/receiveState", map[string]any{"folder": dest}), &state)
 	if state.Exists || state.Repository || len(state.Heads) != 0 {
 		t.Fatalf("%+v", state)
 	}
 	var facts wire.SendFacts
-	json.Unmarshal(c.call(t, 2, "projects/sendFacts", map[string]any{"folder": store.FolderURL(src)}), &facts)
+	json.Unmarshal(c.call(t, 2, "folders/sendFacts", map[string]any{"folder": store.FolderURL(src)}), &facts)
 	if strings.Join(facts.Branches, ",") != "main,other" || *facts.Current != "main" || !facts.HasChanges ||
 		*facts.Origin != "git@github.com:example/hello.git" {
 		t.Fatalf("%+v", facts)
@@ -97,16 +97,16 @@ func TestSendToHost(t *testing.T) {
 		m["folder"], m["checkout"], m["origin"] = dest, "main", "git@github.com:example/hello.git"
 		return m
 	}
-	var summary wire.ProjectSummary
-	json.Unmarshal(c.call(t, 10, "projects/receive", send(nil, true, "main", "other")), &summary)
+	var summary wire.FolderSummary
+	json.Unmarshal(c.call(t, 10, "folders/receive", send(nil, true, "main", "other")), &summary)
 	if got := sendGit(t, src, nil, "status", "--porcelain"); got != indexBefore {
 		t.Fatalf("the Mac's index changed: %q", got)
 	}
 	if entries, _ := os.ReadDir(d.outgoingFolder()); len(entries) != 0 {
 		t.Fatalf("packed files left: %d", len(entries))
 	}
-	if store.FolderPath(summary.Project.Folder) != dest {
-		t.Fatalf("%+v", summary.Project)
+	if store.FolderPath(summary.Folder.Folder) != dest {
+		t.Fatalf("%+v", summary.Folder)
 	}
 	if b, _ := os.ReadFile(filepath.Join(dest, "README.md")); string(b) != "hello, changed\n" {
 		t.Fatalf("readme %q", b)
@@ -131,7 +131,7 @@ func TestSendToHost(t *testing.T) {
 	}
 
 	// The first send's changes are not the host's own: a second send replaces them.
-	json.Unmarshal(c.call(t, 20, "projects/receiveState", map[string]any{"folder": dest}), &state)
+	json.Unmarshal(c.call(t, 20, "folders/receiveState", map[string]any{"folder": dest}), &state)
 	if !state.Repository || state.OwnChanges || len(state.Heads) != 2 {
 		t.Fatalf("%+v", state)
 	}
@@ -143,7 +143,7 @@ func TestSendToHost(t *testing.T) {
 	if part == 0 || part >= full {
 		t.Fatalf("the second bundle carries all: %d >= %d", part, full)
 	}
-	c.call(t, 30, "projects/receive", send(state.Heads, true, "main"))
+	c.call(t, 30, "folders/receive", send(state.Heads, true, "main"))
 	if got := sendGit(t, dest, nil, "rev-parse", "HEAD"); got != head2 {
 		t.Fatal(got)
 	}
@@ -153,11 +153,11 @@ func TestSendToHost(t *testing.T) {
 
 	// The host's own change stops the next send, with nothing changed.
 	os.WriteFile(filepath.Join(dest, "host.txt"), []byte("mine\n"), 0o644)
-	json.Unmarshal(c.call(t, 40, "projects/receiveState", map[string]any{"folder": dest}), &state)
+	json.Unmarshal(c.call(t, 40, "folders/receiveState", map[string]any{"folder": dest}), &state)
 	if !state.OwnChanges {
 		t.Fatal("the host's change is not its own")
 	}
-	if msg := c.callErr(t, 50, "projects/receive", send(state.Heads, true, "main")); !strings.Contains(msg, "changes of its own") {
+	if msg := c.callErr(t, 50, "folders/receive", send(state.Heads, true, "main")); !strings.Contains(msg, "changes of its own") {
 		t.Fatal(msg)
 	}
 	if _, err := os.Stat(filepath.Join(dest, "host.txt")); err != nil {
@@ -169,7 +169,7 @@ func TestSendToHost(t *testing.T) {
 	sendGit(t, dest, nil, "-c", "user.email=h@example.com", "-c", "user.name=H", "commit", "-q", "--allow-empty", "-m", "host")
 	hostHead := sendGit(t, dest, nil, "rev-parse", "HEAD")
 	os.Remove(filepath.Join(dest, "new.txt"))
-	if msg := c.callErr(t, 60, "projects/receive", map[string]any{"folder": dest,
+	if msg := c.callErr(t, 60, "folders/receive", map[string]any{"folder": dest,
 		"branches": []map[string]any{{"name": "main", "commit": head}}, "checkout": "main"}); !strings.Contains(msg, "commits of its own") {
 		t.Fatal(msg)
 	}
@@ -183,21 +183,21 @@ func TestSendToAFolderInTheWay(t *testing.T) {
 	defer d.Shutdown()
 	dest := canonical(t.TempDir())
 	os.WriteFile(filepath.Join(dest, "x"), []byte("x"), 0o644)
-	msg := c.callErr(t, 1, "projects/receive", map[string]any{"folder": dest,
+	msg := c.callErr(t, 1, "folders/receive", map[string]any{"folder": dest,
 		"branches": []map[string]any{{"name": "main", "commit": strings.Repeat("a", 40)}}, "checkout": "main"})
 	if !strings.Contains(msg, "not a Git repository") {
 		t.Fatal(msg)
 	}
-	if msg := c.callErr(t, 2, "projects/receiveUpload", map[string]any{"upload": store.NewUUID(), "offset": 5, "data": []byte("x")}); !strings.Contains(msg, "missing") {
+	if msg := c.callErr(t, 2, "folders/receiveUpload", map[string]any{"upload": store.NewUUID(), "offset": 5, "data": []byte("x")}); !strings.Contains(msg, "missing") {
 		t.Fatal(msg)
 	}
-	if msg := c.callErr(t, 3, "projects/receive", map[string]any{"folder": "relative",
+	if msg := c.callErr(t, 3, "folders/receive", map[string]any{"folder": "relative",
 		"branches": []map[string]any{{"name": "main", "commit": strings.Repeat("a", 40)}}, "checkout": "main"}); !strings.Contains(msg, "starts with") {
 		t.Fatal(msg)
 	}
 	// A new folder whose commits never arrived is not left behind.
 	gone := filepath.Join(dest, "new")
-	c.callErr(t, 4, "projects/receive", map[string]any{"folder": gone,
+	c.callErr(t, 4, "folders/receive", map[string]any{"folder": gone,
 		"branches": []map[string]any{{"name": "main", "commit": strings.Repeat("a", 40)}}, "checkout": "main"})
 	if _, err := os.Stat(gone); err == nil {
 		t.Fatal("left behind")
@@ -217,7 +217,7 @@ func TestBringBackFromHost(t *testing.T) {
 	dest := filepath.Join(canonical(t.TempDir()), "hello")
 	m, _ := macSend(t, c, src, nil, false, "main")
 	m["folder"], m["checkout"] = dest, "main"
-	c.call(t, 1, "projects/receive", m)
+	c.call(t, 1, "folders/receive", m)
 
 	// Work on the host: a commit on main, a new branch and a change not committed.
 	host := []string{"GIT_AUTHOR_NAME=H", "GIT_AUTHOR_EMAIL=h@example.com", "GIT_COMMITTER_NAME=H", "GIT_COMMITTER_EMAIL=h@example.com"}
@@ -229,7 +229,7 @@ func TestBringBackFromHost(t *testing.T) {
 
 	macHeads := func() []string {
 		var s wire.ReceiveState
-		json.Unmarshal(c.call(t, 2, "projects/receiveState", map[string]any{"folder": src}), &s)
+		json.Unmarshal(c.call(t, 2, "folders/receiveState", map[string]any{"folder": src}), &s)
 		return s.Heads
 	}
 	back := func(changes bool, branches ...string) map[string]any {
@@ -241,7 +241,7 @@ func TestBringBackFromHost(t *testing.T) {
 		return m
 	}
 	var done wire.BringBack
-	json.Unmarshal(c.call(t, 10, "projects/bringBack", back(false, "main", "other")), &done)
+	json.Unmarshal(c.call(t, 10, "folders/bringBack", back(false, "main", "other")), &done)
 	if strings.Join(done.Moved, ",") != "main,other" || done.Applied {
 		t.Fatalf("%+v", done)
 	}
@@ -259,7 +259,7 @@ func TestBringBackFromHost(t *testing.T) {
 	}
 
 	// Again, with the uncommitted changes: nothing moves, the patch applies.
-	json.Unmarshal(c.call(t, 20, "projects/bringBack", back(true, "main")), &done)
+	json.Unmarshal(c.call(t, 20, "folders/bringBack", back(true, "main")), &done)
 	if len(done.Moved) != 0 || !done.Applied {
 		t.Fatalf("%+v", done)
 	}
@@ -270,7 +270,7 @@ func TestBringBackFromHost(t *testing.T) {
 	// The Mac's own change, where main is checked out, stops the next one.
 	sendGit(t, dest, host, "commit", "-q", "--allow-empty", "-m", "more host work")
 	macHead := sendGit(t, src, nil, "rev-parse", "HEAD")
-	if msg := c.callErr(t, 30, "projects/bringBack", back(false, "main")); !strings.Contains(msg, "uncommitted changes") {
+	if msg := c.callErr(t, 30, "folders/bringBack", back(false, "main")); !strings.Contains(msg, "uncommitted changes") {
 		t.Fatal(msg)
 	}
 	if got := sendGit(t, src, nil, "rev-parse", "HEAD"); got != macHead {
@@ -284,7 +284,7 @@ func TestBringBackFromHost(t *testing.T) {
 	sendGit(t, src, nil, "add", "-A")
 	sendGit(t, src, nil, "commit", "-q", "-m", "mac work")
 	macHead = sendGit(t, src, nil, "rev-parse", "HEAD")
-	if msg := c.callErr(t, 40, "projects/bringBack", back(false, "main")); !strings.Contains(msg, "commits of its own") {
+	if msg := c.callErr(t, 40, "folders/bringBack", back(false, "main")); !strings.Contains(msg, "commits of its own") {
 		t.Fatal(msg)
 	}
 	if got := sendGit(t, src, nil, "rev-parse", "HEAD"); got != macHead {
@@ -302,10 +302,10 @@ func TestAbandonedSendIsSwept(t *testing.T) {
 	defer d.Shutdown()
 	src := repo(t)
 	pack := func(id int) {
-		c.call(t, id, "projects/sendPack", map[string]any{"folder": store.FolderURL(src), "branches": []string{"main"}})
+		c.call(t, id, "folders/sendPack", map[string]any{"folder": store.FolderURL(src), "branches": []string{"main"}})
 	}
 	upload := func(id int) {
-		c.call(t, id, "projects/receiveUpload", map[string]any{"upload": store.NewUUID(), "offset": 0, "data": []byte("part")})
+		c.call(t, id, "folders/receiveUpload", map[string]any{"upload": store.NewUUID(), "offset": 0, "data": []byte("part")})
 	}
 	count := func(folder string) int {
 		entries, _ := os.ReadDir(folder)
@@ -342,7 +342,7 @@ func TestAbandonedSendIsSwept(t *testing.T) {
 	slow := store.NewUUID()
 	os.WriteFile(filepath.Join(d.outgoingFolder(), string(slow)), make([]byte, sendPartSize+1), 0o600)
 	age(d.outgoingFolder(), transferLimit+time.Minute)
-	c.call(t, 7, "projects/sendRead", map[string]any{"id": slow, "offset": 0})
+	c.call(t, 7, "folders/sendRead", map[string]any{"id": slow, "offset": 0})
 	pack(8)
 	if _, err := os.Stat(filepath.Join(d.outgoingFolder(), string(slow))); err != nil {
 		t.Fatal("a send that goes on lost its file")
@@ -350,11 +350,11 @@ func TestAbandonedSendIsSwept(t *testing.T) {
 
 	// A receive or a bring back that refuses at its first check removes its uploads.
 	for i, refused := range []map[string]any{
-		{"method": "projects/receive", "folder": "relative", "checkout": "main"},
-		{"method": "projects/bringBack", "folder": store.FolderURL(t.TempDir())},
+		{"method": "folders/receive", "folder": "relative", "checkout": "main"},
+		{"method": "folders/bringBack", "folder": store.FolderURL(t.TempDir())},
 	} {
 		u := store.NewUUID()
-		c.call(t, 20+i*2, "projects/receiveUpload", map[string]any{"upload": u, "offset": 0, "data": []byte("x")})
+		c.call(t, 20+i*2, "folders/receiveUpload", map[string]any{"upload": u, "offset": 0, "data": []byte("x")})
 		params := map[string]any{"bundle": u, "branches": []map[string]any{{"name": "main", "commit": strings.Repeat("a", 40)}}}
 		for k, v := range refused {
 			if k != "method" {

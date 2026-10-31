@@ -41,12 +41,23 @@ struct AddMCPByHandPane: View {
     /// The server asked for a sign-in: Verify waits on it, then asks again (#306).
     @State private var signingIn: DaemonAPI.MCPSignInTarget?
 
+    private var refusedBy: DaemonAPI.PolicySetBy? { OrgPolicyWords.customServersMark(model.policyState?.policy) }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Button("‹ Registry") { onBack() }.buttonStyle(.paper)
                 Text("Add a connector by hand").appText(.title)
                 Spacer()
+            }
+            // Refused by the organisation's policy (#998): the form stays, Add does not, and the
+            // person can ask an admin for it by the name typed (#2355).
+            if let mark = refusedBy {
+                HStack(alignment: .firstTextBaseline) {
+                    OrgPolicyLine(mark: mark)
+                    Spacer()
+                    AskAdminButton(kind: .mcp, name: name)
+                }
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
@@ -65,7 +76,7 @@ struct AddMCPByHandPane: View {
                     .disabled(verifying || !canVerify)
                 Button(addLabel) { Task { await add() } }
                     .buttonStyle(.paperProminent)
-                    .disabled(adding || addableID == nil)
+                    .disabled(adding || addableID == nil || refusedBy != nil)
             }
         }
         .padding(18)
@@ -221,7 +232,7 @@ struct AddMCPByHandPane: View {
     private var addLabel: String {
         switch destination {
         case .personal: "Add to ~/.agents"
-        case .project: "Add to project"
+        case .folder: "Add to folder"
         }
     }
 

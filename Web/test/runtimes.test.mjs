@@ -32,7 +32,7 @@ test("runtimes: a chooser's runs are available, out and cannot start", () => {
 });
 
 for (const { name, input, expected } of (await import("./fixtures.mjs")).cases("runtimes/new-session.json")) {
-  test(`runtimes: a new session opens on, ${name}`, () => assert.equal(r.newSessionRuntime(input.kept ?? undefined, input.available) ?? null, expected));
+  test(`runtimes: a new session opens on, ${name}`, () => assert.equal(r.newSessionRuntime(input.lastUsed ?? undefined, input.kept ?? undefined, input.available) ?? null, expected));
 }
 
 test("runtimes: an empty list says so when nothing on this Mac can start (#257)", () => {
@@ -54,11 +54,11 @@ test("runtimes: an empty list says so when nothing on this Mac can start (#257)"
 });
 
 test("runtimes: a new session stays on the runtime it opened with (#291)", () => {
-  assert.equal(r.formRuntime("codex", undefined, ["claude", "codex"], "claude"), "codex", "a later listing does not move it");
-  assert.equal(r.formRuntime("codex", "claude", ["claude", "codex"], "codex"), "claude", "a pick here wins");
-  assert.equal(r.formRuntime("codex", undefined, ["claude"], "claude"), "claude", "one that can no longer start falls through");
-  assert.equal(r.formRuntime(undefined, undefined, ["codex"], undefined), "codex");
-  assert.equal(r.formRuntime(undefined, undefined, ["codex", "claude"], undefined), "claude");
+  assert.equal(r.formRuntime("codex", undefined, ["claude", "codex"], "claude", "claude"), "codex", "a later listing does not move it");
+  assert.equal(r.formRuntime("codex", "claude", ["claude", "codex"], "codex", undefined), "claude", "a pick here wins");
+  assert.equal(r.formRuntime("codex", undefined, ["claude"], "claude", undefined), "claude", "one that can no longer start falls through");
+  assert.equal(r.formRuntime(undefined, undefined, ["codex"], undefined, undefined), "codex");
+  assert.equal(r.formRuntime(undefined, undefined, ["codex", "claude"], undefined, undefined), "codex");
 });
 
 test("runtimes: the Runtimes row counts working out of installed (#379)", () => {
@@ -82,6 +82,85 @@ test("runtimes: an added account's row is apart from the runtime's own, and name
   assert.deepEqual(r.accountRows(rows, "codex"), []);
   assert.equal(r.rowTitle(rows[0], "Claude"), "Claude · Work");
   assert.equal(r.rowTitle(rows[1], "Claude"), "Claude");
+  // A started session's label names its account the same way (#2259), never the runtime's own.
+  const profiles = [{ id: "w1", runtimeID: "claude", name: "Work" }, { id: "h1", runtimeID: "codex", name: "Home" }];
+  assert.equal(r.sessionRuntimeName("Claude", "claude", "w1", profiles), "Claude · Work");
+  assert.equal(r.sessionRuntimeName("Claude", "claude", "h1", profiles), "Claude", "another runtime's");
+  assert.equal(r.sessionRuntimeName("Claude", "claude", undefined, profiles), "Claude");
+  assert.equal(r.sessionRuntimeName("Claude", "claude", "default", profiles), "Claude");
   assert.equal(r.accountState({ signedIn: false }), "Not signed in");
   assert.equal(r.accountState({ signedIn: true, signedInAs: "a@example.com" }), "Signed in as a@example.com");
+});
+
+test("runtimes: one the organisation does not allow cannot start, and says why (#998)", () => {
+  const refused = { ...status("gemini", "Gemini"), setBy: { by: "organisation", rule: "runtimes", words: "Your organisation does not allow Gemini." } };
+  const got = r.runtimeRuns([status("claude", "Claude"), refused]);
+  assert.deepEqual([got.available, got.out, got.cannot].map((run) => run.map((s) => s.runtime.id)), [["claude"], [], ["gemini"]]);
+  assert.equal(r.unavailableReason(refused), "Set by your organisation. Your organisation does not allow Gemini.");
+});
+
+// An org account as a member sees it (#999, slice 3): OrgAccountMemberWordsTests says the same.
+const avail = { credentialKey: "claude:account:org:acme", entryID: "E", since: 0, status: { available: {} } };
+const clock = (wire) => `t${wire}`;
+const other = () => "Out since then";
+
+test("org account: no plan limit, its tokens today, and out until its time", () => {
+  assert.equal(r.orgAllowanceLine(avail, 12000, new Date(), clock, other), "Organisation · No plan limit · 12,000 tokens today");
+  assert.equal(r.orgAllowanceLine(avail, undefined, new Date(), clock, other), "Organisation · No plan limit");
+  const later = 2e9;
+  const limited = { ...avail, status: { rateLimited: { until: later } } };
+  assert.equal(r.orgAllowanceLine(limited, 5, new Date(0), clock, other), `Out until t${later} · 5 tokens today`);
+  assert.equal(r.isOrgRow({ credentialKey: "claude:account:org:acme", accountID: "org:acme" }), true);
+  assert.equal(r.isOrgRow({ credentialKey: "claude:account:w1", accountID: "w1" }), false);
+});
+
+test("org account: a cost says whose price it is, and the account says where it is from", () => {
+  assert.equal(r.listPrice("claude"), "list price, as Claude reports it");
+  assert.equal(r.priced({ accountID: "org:acme", runtimeID: "claude" }, "$0.42"), "$0.42 · list price, as Claude reports it");
+  assert.equal(r.priced({ runtimeID: "claude" }, "$0.42"), "$0.42");
+  const org = { id: "org:acme", runtimeID: "claude", name: "Acme", reach: { orgKey: { route: "acme" } }, source: "organisation", addedAt: 0, signedIn: true };
+  assert.equal(r.accountState(org), "From your organisation");
+});
+
+test("account choices: the default, the own sign-in, what is sent and why a session must move", () => {
+  const refused = { by: "organisation", rule: "runtimes.claude.reach", words: "Your organisation requires Claude to use Acme." };
+  const list = [
+    { id: "w1", runtimeID: "claude", name: "Work", reach: { signIn: { folder: "/a" } }, addedAt: 0, signedIn: true, setBy: refused },
+    { id: "org:acme", runtimeID: "claude", name: "Acme", reach: { orgKey: { route: "acme" } }, source: "organisation", isDefault: true, addedAt: 0, signedIn: true },
+  ];
+  const policy = { runtimes: { claude: { reach: ["orgKey", "gateway"] } } };
+  const c = r.accountChoices("claude", list, policy);
+  assert.equal(c.shows, true);
+  assert.equal(c.name(undefined), "Acme");
+  assert.equal(c.ownChoice, "default");
+  assert.equal(c.sent("default"), "default");
+  assert.equal(c.sent("nope"), undefined);
+  assert.equal(c.ownSetBy.words, "Your organisation requires Claude to use Acme.");
+  assert.equal(c.moveReason("w1", true), refused.words);
+  assert.equal(c.moveReason("org:gone", true), "Your organisation removed this way to the model.");
+  assert.equal(c.moveReason("org:acme", true), undefined);
+  assert.equal(c.moveReason("org:gone", false), undefined);
+  assert.equal(r.accountChoices("codex", list).ownChoice, undefined);
+  assert.equal(r.defaultAccountName, "Your Own Sign-In");
+});
+
+test("account words: Remove counts the sessions it stops and says it can't be undone (#2264)", () => {
+  assert.equal(r.removeMessage(0, "the Mac"), "Nothing is running on it. Its sign-in is deleted from the Mac. This can’t be undone.");
+  assert.equal(r.removeMessage(2, "the Mac"), "This stops 2 sessions mid-conversation. Its sign-in is deleted from the Mac. This can’t be undone.");
+  const work = { id: "work", runtimeID: "claude", name: "Work", reach: { signIn: { folder: "/w" } }, signedIn: true };
+  const agents = [{ runtimeID: "claude", accountID: "work", state: "running" }, { runtimeID: "claude", accountID: "work", state: "finished" },
+    { runtimeID: "claude", state: "running" }];
+  assert.equal(r.agentsHolding(agents, work).length, 1);
+});
+
+test("account words: a choice says it is not signed in, not usable or out (#2265)", () => {
+  const now = new Date();
+  const work = { id: "work", runtimeID: "claude", name: "Work", reach: { signIn: { folder: "/w" } }, signedIn: true, signedInAs: "a@b.c" };
+  const row = (status, extra = {}) => ({ credentialKey: "claude:account:work", accountID: "work", state: { status, since: 0 }, ...extra });
+  assert.equal(r.choiceNote({ ...work, signedIn: false }, undefined, now), "Not signed in");
+  assert.equal(r.choiceNote(work, undefined, now), "a@b.c");
+  assert.equal(r.choiceNote(work, row({ available: {} }), now), "a@b.c");
+  assert.equal(r.choiceNote(work, row({ available: {} }, { unusable: "no key" }), now), "Not usable: no key");
+  assert.match(r.choiceNote(work, row({ out: {} }), now), /^Out since /);
+  assert.equal(r.choiceNote(undefined, undefined, now), undefined);
 });

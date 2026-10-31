@@ -8,7 +8,7 @@ import WidgetKit
 /// A loud push carries the sealed headline and nothing legible: a mailbox item from a Mac
 /// host's relay, or the control plane's own push when no Mac relays (#1460). This opens the envelope
 /// with the device's own key — shared with the app through the keychain group — and
-/// puts the project, the agent and what is wanted into the notification. If the
+/// puts the folder, the agent and what is wanted into the notification. If the
 /// envelope cannot be opened the system shows what the push already had: a title that
 /// says only that an agent needs you, which the quickstart names as the failure to
 /// watch for, so it is never silently the norm.

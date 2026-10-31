@@ -18,14 +18,14 @@ export const groupTitles: Record<AgentGroup, string> = {
  */
 export const liveGroups: readonly AgentGroup[] = ["needsAttention", "waiting", "running", "finished", "stopped"];
 
-/** Whether somebody has to do something about this outcome (WorkOutcome.needsAPerson). */
+/** Whether somebody has to do something about this outcome (WorkOutcome.needsAPerson): only a question (#1916). */
 export function outcomeNeedsAPerson(outcome: WorkOutcome): boolean {
-  return outcome === "needs_answer" || outcome === "partly_done" || outcome === "stuck";
+  return outcome === "needs_answer";
 }
 
-/** A blocked report whose block has not cleared (WorkReport.isOpenBlock). */
+/** A waiting report whose block has not cleared (WorkReport.isOpenBlock). */
 export function isOpenBlock(report: WorkReport | undefined): boolean {
-  return report?.outcome === "blocked" && report.block?.clearedAt === undefined;
+  return report?.outcome === "waiting" && report.block?.clearedAt === undefined;
 }
 
 /** An open block the app clears by itself: it names agents, or a time (WorkReport.resumesByItself). */
@@ -34,7 +34,7 @@ export function resumesByItself(report: WorkReport | undefined): boolean {
   return report.block.waits.length > 0 || report.block.checkAgainAt !== undefined;
 }
 
-const pausedEndings: readonly (EndedReason | undefined)[] = ["cancelled", "stoppedByAgent", "allowanceSpent"];
+const pausedEndings: readonly (EndedReason | undefined)[] = ["cancelled", "stoppedByAgent", "stoppedByAdmin"];
 
 /** Agent.asksToArchive: an agent asked the person to archive it, and it is not archived yet (#584). */
 export function asksToArchive(agent: Agent): boolean {
@@ -71,7 +71,7 @@ export function endingIsUnaccountedFor(agent: Agent): boolean {
 function settled(wantsAPerson: boolean, report: WorkReport | undefined, waitingOnEvents: boolean): AgentGroup {
   if (wantsAPerson) return "needsAttention";
   if (resumesByItself(report) || waitingOnEvents) return "waiting";
-  if (isOpenBlock(report)) return "needsAttention";
+  // A block the app will not clear (an old record's) is done, not Needs you (#1916).
   return "finished";
 }
 
@@ -105,26 +105,41 @@ export interface Heading {
   agents: Agent[];
 }
 
-/** A folder without its trailing slash, so a project and its agents compare equal. */
+/** A folder without its trailing slash, so a folder and its agents compare equal. */
 export function folderKey(url: string): string {
   return url.replace(/\/+$/, "");
 }
 
-/** The folder an agent counts under: its worktree's project, else where it runs (Agent.projectFolder). */
-export function projectFolder(agent: Agent): string {
-  return folderKey(agent.worktree?.project ?? agent.cwd);
+/** The folder an agent counts under: its worktree's folder, else where it runs (Agent.folderPath); an
+ *  empty folder, left by #2617 (#2650), counts as none. */
+export function folderPath(agent: Agent): string {
+  return folderKey(agent.worktree?.folder || agent.cwd);
 }
 
 /**
- * ProjectShelf.byArchived: newest archived first, then by id (#2153); a record from before
+ * FolderShelf.byArchived: newest archived first, then by id (#2153); a record from before
  * archivedAt goes by its last activity.
  */
 export function byArchived(a: Agent, b: Agent): number {
   return (b.archivedAt ?? b.lastActivityAt) - (a.archivedAt ?? a.lastActivityAt) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 }
 
+/** How long ago a session may have been archived and still be Recently archived (#2868), in seconds. */
+export const recentArchivedWithin = 24 * 60 * 60;
+
 /**
- * ProjectShelf.byStart: newest started first, then by id (#182). A working agent's activity
+ * SidebarFolderFold.recentArchived(now:): the first `shown` of the archived, newest first, of those
+ * archived in the last 24 hours (#2868). An older one is not recent, so none is shown in its place.
+ */
+export function recentlyArchived(archived: readonly Agent[], shown: number, now: number): Agent[] {
+  const since = now - recentArchivedWithin;
+  const recent = archived.slice(0, shown);
+  const old = recent.findIndex((a) => (a.archivedAt ?? a.lastActivityAt) < since);
+  return old < 0 ? recent : recent.slice(0, old);
+}
+
+/**
+ * FolderShelf.byStart: newest started first, then by id (#182). A working agent's activity
  * changes with every line, so a live group ordered by it shuffled; when it started never changes.
  */
 export function byStart(a: Agent, b: Agent): number {
@@ -134,7 +149,7 @@ export function byStart(a: Agent, b: Agent): number {
 /** AgentsModel.agents(in:group:): newest started first; under Archived newest archived first, as the host pages them. */
 export function agentsIn(agents: readonly Agent[], folder: string, group: AgentGroup): Agent[] {
   const wanted = folderKey(folder);
-  const found = agents.filter((agent) => projectFolder(agent) === wanted && groupOf(agent) === group);
+  const found = agents.filter((agent) => folderPath(agent) === wanted && groupOf(agent) === group);
   return found.sort(group === "archived" ? byArchived : byStart);
 }
 
@@ -146,12 +161,12 @@ export function headings(agents: readonly Agent[], folder: string): Heading[] {
   });
 }
 
-/** AgentsModel.counts(in:): how many sessions of one project are in each group. */
+/** AgentsModel.counts(in:): how many sessions of one folder are in each group. */
 export function counts(agents: readonly Agent[], folder: string): Partial<Record<AgentGroup, number>> {
   const wanted = folderKey(folder);
   const result: Partial<Record<AgentGroup, number>> = {};
   for (const agent of agents) {
-    if (projectFolder(agent) !== wanted) continue;
+    if (folderPath(agent) !== wanted) continue;
     const group = groupOf(agent);
     result[group] = (result[group] ?? 0) + 1;
   }
@@ -162,17 +177,17 @@ export function counts(agents: readonly Agent[], folder: string): Partial<Record
 export function attentionCount(agents: readonly Agent[], folder: string): number {
   const wanted = folderKey(folder);
   return agents.filter((a) => {
-    if (projectFolder(a) !== wanted) return false;
+    if (folderPath(a) !== wanted) return false;
     const group = groupOf(a);
     return group === "needsAttention" || group === "blocked";
   }).length;
 }
 
 /**
- * What a project row says under its name (ProjectRow.subtitle): Needs you first, with unread
+ * What a folder row says under its name (FolderRow.subtitle): Needs you first, with unread
  * beside it; else working and unread; else complete and stopped; else nothing.
  */
-export function projectSubtitle(agents: readonly Agent[], folder: string): string | null {
+export function folderSubtitle(agents: readonly Agent[], folder: string): string | null {
   const c = counts(agents, folder);
   const unread = unreadCount(agents, folder);
   if ((c.needsAttention ?? 0) > 0) return unread > 0 ? `Needs you · ${unread} unread` : "Needs you";
@@ -189,11 +204,11 @@ export function projectSubtitle(agents: readonly Agent[], folder: string): strin
 /** AgentsModel.unreadCount(in:): finished chats nobody has looked at since. */
 export function unreadCount(agents: readonly Agent[], folder: string): number {
   const wanted = folderKey(folder);
-  return agents.filter((a) => projectFolder(a) === wanted && a.state === "finished" && a.isUnread === true).length;
+  return agents.filter((a) => folderPath(a) === wanted && a.state === "finished" && a.isUnread === true).length;
 }
 
-/** What one project's row and fold draw from its agents, worked out once per change to them (#170). */
-export interface ProjectView {
+/** What one folder's row and fold draw from its agents, worked out once per change to them (#170). */
+export interface FolderView {
   headings: Heading[];
   archived: Agent[];
   needsYou: boolean;
@@ -204,8 +219,8 @@ export interface ProjectView {
   subtitle: string | null;
 }
 
-/** One project's view, from that project's agents alone. */
-export function projectView(agents: readonly Agent[], folder: string): ProjectView {
+/** One folder's view, from that folder's agents alone. */
+export function folderView(agents: readonly Agent[], folder: string): FolderView {
   const shown = headings(agents, folder);
   return {
     headings: shown,
@@ -213,6 +228,6 @@ export function projectView(agents: readonly Agent[], folder: string): ProjectVi
     needsYou: shown.some((h) => h.group === "needsAttention"),
     working: shown.some((h) => h.group === "running"),
     attention: attentionCount(agents, folder),
-    subtitle: projectSubtitle(agents, folder),
+    subtitle: folderSubtitle(agents, folder),
   };
 }

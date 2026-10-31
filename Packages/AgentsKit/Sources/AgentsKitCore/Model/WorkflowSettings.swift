@@ -7,8 +7,8 @@ import Foundation
 /// not define a vocabulary of modes and could not support the claim if it did — that
 /// `plan` on one runtime is the same promise as `plan` on another is not something
 /// anyone here has checked, and a translation layer would be asserting it on every
-/// fire. A workflow belongs to a project, and a project's runtime is something the
-/// person already chose.
+/// fire. A workflow belongs to a folder, and it runs on Auto unless the workflow file
+/// names a runtime (#2873); on Auto the mode and model are the shared level words.
 ///
 /// All of them are optional, and a workflow stating none of them starts exactly as every
 /// workflow started before this feature.
@@ -74,13 +74,13 @@ public struct WorkflowSettings: Codable, Hashable, Sendable {
     /// `nil` when there is nothing to say.
     ///
     /// The runtime is left out when it is the default one. Naming it on every row
-    /// would put the same four words on every workflow in the project, and a row that
+    /// would put the same four words on every workflow in the folder, and a row that
     /// says something about all of them says nothing about any of them.
     public var summary: String? {
         guard !isEmpty else { return nil }
         var clauses: [String] = []
         if let permissionMode { clauses.append("in \(permissionMode) mode") }
-        if let runtimeID, runtimeID != RuntimeCatalog.defaultRuntime.id {
+        if let runtimeID, runtimeID != LevelWords.autoID {
             clauses.append("on \(RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID)")
         }
         if let model { clauses.append("using \(model)") }
@@ -95,6 +95,75 @@ public struct WorkflowSettings: Codable, Hashable, Sendable {
             }
         }
         return clauses.isEmpty ? nil : clauses.joined(separator: ", ")
+    }
+
+    /// Which runtime a run will use, and why, as the workflow page says it (#2764): the
+    /// one the file names, else Auto (#2873), never the runtime another agent used last.
+    /// The web says the same in `runsOn` (`Web/src/model/workflowSettings.ts`).
+    public struct RunsOn: Hashable, Sendable {
+        public enum Source: Hashable, Sendable { case file, fallback }
+        public var runtimeID: String
+        public var source: Source
+
+        /// `nil` when this version does not know the runtime, and on Auto.
+        public var runtime: Runtime? { RuntimeCatalog.runtime(id: runtimeID) }
+        /// Auto picks the runtime each time it runs.
+        public var isAuto: Bool { runtimeID == LevelWords.autoID }
+
+        /// `Runs on Codex (named in the file)`.
+        public var line: String {
+            let name = isAuto ? LevelWords.auto : runtime?.name ?? "\"\(runtimeID)\""
+            switch source {
+            case .file: return "Runs on \(name) (named in the file)"
+            case .fallback: return "Runs on \(name) (the default)"
+            }
+        }
+
+        /// What to mark under the line when this version does not know the runtime:
+        /// its settings cannot be shown, and a file that names it never runs.
+        public var unknown: String? {
+            guard runtime == nil, !isAuto else { return nil }
+            return source == .file
+                ? "\"\(runtimeID)\" is not a runtime this version knows, so this workflow does not run."
+                : "\"\(runtimeID)\" is not a runtime this version knows, so its settings cannot be shown."
+        }
+    }
+
+    /// The runtime a run will use.
+    public func runsOn() -> RunsOn {
+        if let runtimeID { return RunsOn(runtimeID: runtimeID, source: .file) }
+        return RunsOn(runtimeID: LevelWords.autoID, source: .fallback)
+    }
+
+    /// On Auto, the file's `permission-mode:` as a menu of the shared words (#2873). The
+    /// web builds the same in `autoOption` (`Web/src/model/workflowSettings.ts`).
+    public static let autoPermissionOption = autoOption(
+        id: "permission-mode", name: LevelWords.permissionField,
+        words: PermissionLevel.allCases.map { (LevelWords.fileWord(.permission, $0.rawValue), LevelWords.permission($0)) })
+    /// On Auto, the file's `model:` as a menu of the shared words.
+    public static let autoModelOption = autoOption(
+        id: "model", name: LevelWords.modelField,
+        words: ModelLevel.allCases.map { ($0.rawValue, LevelWords.model($0)) })
+
+    private static func autoOption(id: String, name: String, words: [(String, String)]) -> ConfigOption {
+        ConfigOption(id: id, name: name, type: "select",
+                     options: words.map { ConfigChoice(value: .string($0.0), name: $0.1) })
+    }
+
+    /// What the page says under the settings on Auto when the file names an effort:
+    /// Auto takes the effort from the model, so `effort:` does nothing there (FR-003).
+    public var autoEffortNote: String? {
+        guard runsOn().isAuto, effort != nil else { return nil }
+        return "On Auto, effort follows the model, so `effort: \(effort ?? "")` does nothing."
+    }
+
+    /// The runtime a run took, and why, from Auto's pick, under the run on the workflow
+    /// page (#2873): "Auto picked Codex. Claude: out". Nil for a run on a named runtime.
+    public static func picked(_ pick: AutoPick?, name: (String) -> String) -> String? {
+        guard let pick else { return nil }
+        let line = "\(LevelWords.auto) picked \(name(pick.runtimeID))"
+        guard !pick.skipped.isEmpty else { return line }
+        return line + ". " + LevelWords.noRuntime(pick.skipped, name: name)
     }
 
     /// The names these settings go by in the file, and the names a refusal is grouped

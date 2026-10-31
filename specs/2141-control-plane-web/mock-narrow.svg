@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="760" viewBox="0 0 860 760" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="14">
+  <rect width="860" height="760" fill="#f6f6f7"/>
+  <!-- A member's bar at 1440 -->
+  <text x="20" y="28" font-weight="700">A member’s bar (wide)</text>
+  <rect x="20" y="40" width="820" height="44" fill="#fff" stroke="#e2e2e6"/>
+  <text x="36" y="67" font-weight="700">acme control plane</text>
+  <text x="210" y="67" fill="#2453d4" font-weight="600">Overview</text><text x="290" y="67">Agents</text><text x="360" y="67">Machines</text><text x="444" y="67">Workflows</text><text x="534" y="67">Reports</text><text x="610" y="67">Settings</text>
+  <!-- 390 px: closed -->
+  <text x="20" y="128" font-weight="700">390 px, the bar closed</text>
+  <g transform="translate(20,140)">
+    <rect width="390" height="600" rx="16" fill="#fff" stroke="#ccc"/>
+    <rect width="390" height="48" rx="16" fill="#fff" stroke="#e2e2e6"/>
+    <text x="16" y="30" font-weight="700">Agents ▾</text><text x="300" y="30" fill="#5f6368" font-size="12">● 2 online</text>
+    <rect x="16" y="64" width="358" height="32" rx="6" fill="#2453d4"/><text x="140" y="85" fill="#fff" font-weight="600">+ New Session</text>
+    <text x="16" y="128" font-size="12" font-weight="700" fill="#5f6368">NEEDS YOU</text>
+    <text x="28" y="154">? fix login redirect</text>
+    <text x="16" y="190" font-size="12" font-weight="700" fill="#5f6368">▾ api</text>
+    <text x="28" y="216">? fix login redirect</text><text x="28" y="242">● flaky test</text>
+    <text x="16" y="278" font-size="12" font-weight="700" fill="#5f6368">▸ web</text>
+  </g>
+  <!-- 390 px: open -->
+  <text x="450" y="128" font-weight="700">390 px, the bar open</text>
+  <g transform="translate(450,140)">
+    <rect width="390" height="600" rx="16" fill="#fff" stroke="#ccc"/>
+    <rect width="390" height="48" rx="16" fill="#fff" stroke="#e2e2e6"/>
+    <text x="16" y="30" font-weight="700">Agents ▴</text>
+    <rect x="8" y="52" width="374" height="280" rx="10" fill="#fff" stroke="#ddd"/>
+    <text x="28" y="84">Overview</text>
+    <rect x="16" y="98" width="358" height="30" rx="6" fill="#e8eefc"/><text x="28" y="118" fill="#2453d4" font-weight="600">Agents</text><text x="340" y="118" fill="#d93025">2</text>
+    <text x="28" y="156">Machines</text><text x="28" y="194">Workflows</text><text x="28" y="232">Reports</text><text x="28" y="270">Settings</text>
+  </g>
+</svg>

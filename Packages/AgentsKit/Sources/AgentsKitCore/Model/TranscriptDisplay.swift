@@ -181,8 +181,8 @@ extension TranscriptEntry {
     /// error before it a blip it got past (#394).
     var carriesOn: Bool {
         switch kind {
-        case .agentMessage, .agentThought, .toolCall, .toolCallUpdate, .appView, .fileShown, .planUpdated,
-             .permissionAsked, .elicitationAsked:
+        case .agentMessage, .agentThought, .toolCall, .toolCallUpdate, .appView, .fileShown, .notified,
+             .planUpdated, .permissionAsked, .elicitationAsked:
             return true
         default:
             return false
@@ -232,6 +232,9 @@ public struct TranscriptDisplayBuilder: Sendable {
     /// Where in `drawn` each view is (#187), by its call's id: the call's later entries
     /// carry its result, and the view stays where the call began.
     private var viewAt: [UUID: Int] = [:]
+    /// Where in `drawn` each notice's line is (#2860), by its entry's id: where it went
+    /// comes after it, and is said on it.
+    private var noticeAt: [UUID: Int] = [:]
     /// The last entry taken, as it stands after joining, for the chunk that
     /// continues it.
     private var last: TranscriptEntry?
@@ -300,11 +303,22 @@ public struct TranscriptDisplayBuilder: Sendable {
             resolveIntermittentErrors()
             viewAt[call.id] = drawn.count
             drawn.append(.entry(entry))
-        case .fileShown:
-            // The card stands on its own, after the run that called it (#836).
+        case .fileShown, .notified:
+            // The card stands on its own, after the run that called it (#836); so does
+            // what the agent told the person (#2805).
             closeRun()
             resolveIntermittentErrors()
+            if case .notified = entry.kind { noticeAt[entry.id] = drawn.count }
             drawn.append(.entry(entry))
+        case .noticeDelivered(let delivery):
+            // Said on the notice's line (#2860), never a line of its own. One whose line
+            // is on an earlier page is left out.
+            if let at = noticeAt[delivery.notice], drawn.indices.contains(at),
+               case .entry(var line) = drawn[at], case .notified(var notice) = line.kind {
+                notice.to = delivery.to
+                line.kind = .notified(notice)
+                drawn[at] = .entry(line)
+            }
         case .compaction(_, _, let id, _):
             if let at = compactionAt(for: id), case .entry(let first) = drawn[at],
                let merged = TranscriptEntry.mergeCompaction(entry, onto: first) {

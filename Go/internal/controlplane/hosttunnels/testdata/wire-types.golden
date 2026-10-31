@@ -1,8 +1,8 @@
-HostTunnel full
+MachineTunnel full
 {"up":true,"problem":"PROBLEM"}
-HostTunnel zero
+MachineTunnel zero
 {"up":false}
-HostTunnelChanged full
+MachineTunnelChanged full
 {"name":"NAME","host":"HOST","tunnel":{"up":true,"problem":"PROBLEM"}}
-HostTunnelChanged zero
+MachineTunnelChanged zero
 {"name":"","tunnel":{"up":false}}

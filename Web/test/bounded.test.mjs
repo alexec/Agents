@@ -4,16 +4,17 @@ import assert from "node:assert/strict";
 import { load } from "./load.mjs";
 
 const {
-  Work, Store, archivedPage, searchShown, keepingTurns, effect,
+  Work, Store, archivedPage, recentArchivedShown, searchShown, keepingTurns, effect,
   turnPage, openTurnsHeld, historyEntriesCap, historyTurnsCap, rememberOpen, quietSettle,
+  CallFailed, Failure,
 } = await load("test/bounded.ts");
 const w = await load("test/wire.ts");
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function agent(id, project, at, extra = {}) {
+function agent(id, folder, at, extra = {}) {
   return {
-    id, title: `Session ${id}`, cwd: `file:///w/${project}/`, createdAt: at, lastActivityAt: at, runtimeID: "claude",
+    id, title: `Session ${id}`, cwd: `file:///w/${folder}/`, createdAt: at, lastActivityAt: at, runtimeID: "claude",
     state: "finished", advertisedOptions: [], availableCommands: [], startOptions: { extraArguments: [], values: {} }, ...extra,
   };
 }
@@ -25,23 +26,23 @@ function runs(read) {
   return { get count() { return count; }, stop };
 }
 
-test("one agent's change redraws its own project and no other", () => {
+test("one agent's change redraws its own folder and no other", () => {
   const work = new Work();
   const listed = [];
   for (let p = 0; p < 5; p++) for (let i = 0; i < 20; i++) listed.push(agent(`${p}-${i}`, `p${p}`, p * 100 + i));
   work.replaceAgents(listed, "mac");
-  const views = [0, 1, 2, 3, 4].map((p) => runs(() => work.projectView("mac", `file:///w/p${p}`)));
-  const before = work.projectView("mac", "file:///w/p1");
+  const views = [0, 1, 2, 3, 4].map((p) => runs(() => work.folderView("mac", `file:///w/p${p}`)));
+  const before = work.folderView("mac", "file:///w/p1");
   work.apply("agent/changed", { ...listed[25], isUnread: true, lastActivityAt: 10_000 }, "mac");
   assert.deepEqual(views.map((v) => v.count), [0, 1, 0, 0, 0], "only p1 was worked out again");
-  assert.notEqual(work.projectView("mac", "file:///w/p1"), before);
-  assert.equal(work.projectView("mac", "file:///w/p1").subtitle, "1 unread");
+  assert.notEqual(work.folderView("mac", "file:///w/p1"), before);
+  assert.equal(work.folderView("mac", "file:///w/p1").subtitle, "1 unread");
   assert.equal(work.agents.value.mac[0].id, "1-5", "newest first");
-  // Moving to another project tells both.
+  // Moving to another folder tells both.
   work.apply("agent/changed", { ...listed[25], cwd: "file:///w/p3/", lastActivityAt: 10_001 }, "mac");
   assert.deepEqual(views.map((v) => v.count), [0, 2, 0, 1, 0]);
-  assert.equal(work.projectAgents("mac", "file:///w/p3").length, 21);
-  // A whole list again tells only the projects whose agents differ.
+  assert.equal(work.folderAgents("mac", "file:///w/p3").length, 21);
+  // A whole list again tells only the folders whose agents differ.
   work.replaceAgents(work.agents.value.mac, "mac");
   assert.deepEqual(views.map((v) => v.count), [1, 3, 1, 2, 1], "keepingLists makes every record anew");
   work.apply("agent/removed", { agentID: "4-0" }, "mac");
@@ -250,6 +251,31 @@ test("an Archived fold asks for a page, and a reconnect lists it again rather th
   assert.deepEqual(store.agents.value.mac.map((a) => a.id), ["live", "old"]);
 });
 
+test("the sidebar asks for its few archived, the Archive page for more, and each keeps its own (#2731)", async () => {
+  const params = [];
+  const link = fakeLink((method, p) => {
+    if (method === "agents/list") {
+      params.push(p);
+      return Array.from({ length: p.limit }, (_, i) => agent(`a${i}`, "p", 100 - i, { state: "archived" }));
+    }
+    return undefined;
+  });
+  const store = new Store(link);
+  await store.loadArchived("mac", "file:///w/p", recentArchivedShown);
+  assert.deepEqual(params.map((p) => p.limit), [recentArchivedShown]);
+  await store.loadArchived("mac", "file:///w/p", archivedPage);
+  assert.deepEqual(params.map((p) => p.limit), [recentArchivedShown, archivedPage]);
+  // A second sidebar fold over what is held asks for nothing.
+  await store.loadArchived("mac", "file:///w/p", recentArchivedShown);
+  assert.equal(params.length, 2);
+  // The Archive page closing leaves the sidebar's rows.
+  store.unloadArchived("mac", "file:///w/p", archivedPage);
+  store.unloadArchived("mac", "file:///w/p", recentArchivedShown);
+  assert.equal(store.agents.value.mac.length, archivedPage);
+  store.unloadArchived("mac", "file:///w/p", recentArchivedShown);
+  assert.equal(store.agents.value.mac.length, 0);
+});
+
 test("a call that is never answered is given up", async () => {
   const sockets = [];
   const l = new w.Link({ url: "ws://localhost:1/v1/connect", origin: "http://localhost:1",
@@ -432,17 +458,17 @@ test("a heartbeat answered with an error keeps the link (#214)", async () => {
 test("a slow call waits longer than an ordinary one, unless a test says otherwise (#291)", () => {
   assert.equal(w.callTimeoutFor("hosts/list"), 30_000);
   assert.equal(w.callTimeoutFor("agents/prompt"), 30_000);
-  assert.ok(w.callTimeoutFor("projects/clone") > w.callTimeoutFor("agents/start"));
+  assert.ok(w.callTimeoutFor("folders/clone") > w.callTimeoutFor("agents/start"));
   assert.equal(w.callTimeoutFor("agents/start"), 2 * 60_000);
   assert.equal(w.callTimeoutFor("agents/options"), w.callTimeoutFor("agents/start"));
-  assert.equal(w.callTimeoutFor("projects/clone", 20), 20);
+  assert.equal(w.callTimeoutFor("folders/clone", 20), 20);
   assert.equal(w.callTimeoutFor("hosts/list", 20), 20);
 });
 
 test("one start keeps its request until it succeeds (#291)", () => {
   const store = new Store(fakeLink(() => undefined));
   const first = store.startRequestID("mac", "file:///w/p");
-  assert.equal(store.startRequestID("mac", "file:///w/p/"), first, "the same project, slash or none");
+  assert.equal(store.startRequestID("mac", "file:///w/p/"), first, "the same folder, slash or none");
   assert.notEqual(store.startRequestID("mac", "file:///w/q"), first);
   store.finishStartRequest("mac", "file:///w/p");
   assert.notEqual(store.startRequestID("mac", "file:///w/p"), first);
@@ -510,14 +536,14 @@ test("pages changed in a burst bump the revision once (#291)", async () => {
   assert.equal(work.pageRevisions.value["mac|file:///w/p"], 1);
 });
 
-test("a workflow change redraws that project's list and no other (#291)", async () => {
+test("a workflow change redraws that folder's list and no other (#291)", async () => {
   const link = fakeLink((method) => (method === "workflows/list" ? [] : undefined));
   const store = new Store(link);
   store.holdWorkflows("mac", "file:///w/p1");
   store.holdWorkflows("mac", "file:///w/p2");
   await wait(20);
-  const first = runs(() => store.projectWorkflows("mac", "file:///w/p1"));
-  const second = runs(() => store.projectWorkflows("mac", "file:///w/p2"));
+  const first = runs(() => store.folderWorkflows("mac", "file:///w/p1"));
+  const second = runs(() => store.folderWorkflows("mac", "file:///w/p2"));
   store.apply("workflow/changed", { workflow: { folder: "file:///w/p1", workflowID: "w" } }, "mac");
   assert.deepEqual([first.count, second.count], [1, 0]);
   first.stop();
@@ -536,10 +562,10 @@ test("a workflow whose runs-on: names other computers leaves this host's list (#
   store.apply("workflow/changed", { workflow: { folder: "file:///w/p", workflowID: "here", runsOn: [THIS] } }, "mac");
   store.apply("workflow/changed", { workflow: { folder: "file:///w/p", workflowID: "there", runsOn: [OTHER] } }, "mac");
   store.apply("workflow/changed", row, "mac");
-  assert.deepEqual(store.projectWorkflows("mac", "file:///w/p").map((item) => item.workflow.workflowID), ["here", "open"]);
-  const summary = store.projectWorkflows("mac", "file:///w/p").find((item) => item.workflow.workflowID === "open");
+  assert.deepEqual(store.folderWorkflows("mac", "file:///w/p").map((item) => item.workflow.workflowID), ["here", "open"]);
+  const summary = store.folderWorkflows("mac", "file:///w/p").find((item) => item.workflow.workflowID === "open");
   assert.equal(await store.setWorkflowSettings("mac", summary, { runsOn: [OTHER] }), null);
-  assert.deepEqual(store.projectWorkflows("mac", "file:///w/p").map((item) => item.workflow.workflowID), ["here"]);
+  assert.deepEqual(store.folderWorkflows("mac", "file:///w/p").map((item) => item.workflow.workflowID), ["here"]);
 });
 
 test("a reconnect lists the workflow folds still open, and no other (#291)", async () => {
@@ -642,6 +668,26 @@ test("a chat's history that did not load is said, and Try Again loads it (#400)"
   assert.equal(store.transcriptLoadFailure.value, null);
 });
 
+test("a catch-up page that starts in the reply never puts the ask below it (#2807)", async () => {
+  let down = true;
+  const entry = (id, kind) => ({ id, at: "2026-10-27T00:00:00Z", kind });
+  const ask = entry("ask", { userMessage: { text: "Notify me?", from: "person" } });
+  const reply = ["r1", "r2", "r3"].map((id) => entry(id, { agentMessage: { text: id, messageID: "m" } }));
+  const link = fakeLink((method) => {
+    if (method === "agents/turns") return { turns: [], firstTurn: 0, openStart: 0 };
+    if (method === "agents/transcript") return down ? undefined : { firstIndex: 2, total: 4, entries: reply.slice(1) };
+    return undefined;
+  });
+  const store = new Store(link);
+  // The first load fails; the turn is heard as it runs; a catch-up reads its last entries.
+  await store.openSession("mac", "s");
+  for (const heard of [ask, ...reply]) link.notify("agent/entry", { agentID: "s", entry: heard }, "mac");
+  down = false;
+  await store.reloadTranscript();
+  assert.deepEqual(store.entries.value.map((e) => e.id), ["r2", "r3"]);
+  assert.ok(store.chatTurns.value.every((turn) => !turn.ask), "the ask is earlier than the page, not after it");
+});
+
 test("turns that fail still open the last page, and say so (#400)", async () => {
   const link = fakeLink((method) => (method === "agents/transcript" ? { firstIndex: 40, total: 41, entries: [] } : undefined));
   const store = new Store(link);
@@ -675,4 +721,42 @@ test("of two loads of one chat, an older answer landing last is dropped (#400)",
   transcripts[0].reply();
   await first;
   assert.deepEqual(store.entries.value.map((e) => e.id), ["page1"], "the older answer is not shown over the newer");
+});
+
+test("a session opened is looked for once its record and history have come (#2652)", async () => {
+  const link = heldLink((method) => (method === "agents/turns" ? { turns: [], firstTurn: 0, openStart: 0 }
+    : method === "agents/transcript" ? { firstIndex: 0, total: 0, entries: [] } : []));
+  const store = new Store(link);
+  const opening = store.openSession("mac", "gone");
+  await wait(0);
+  await link.answer("agents/turns");
+  await link.answer("agents/transcript");
+  await opening;
+  assert.equal(store.lookedFor.value, null, "not until its record has been asked for");
+  await link.answer("agents/list");
+  await wait(0);
+  assert.deepEqual(store.lookedFor.value, { host: "mac", session: "gone" });
+  assert.equal(store.agent("mac", "gone"), undefined);
+});
+
+test("a session whose lookup failed is not looked for, and is once its host says it is gone (#2743)", async () => {
+  let answer = "fail";
+  const link = fakeLink((method) => {
+    if (method === "agents/turns") return { turns: [], firstTurn: 0, openStart: 0 };
+    if (method === "agents/transcript") {
+      if (answer === "gone") throw new CallFailed(Failure.noSuchAgent, "no agent gone");
+      return undefined;
+    }
+    if (method === "agents/list") return answer === "gone" ? [] : undefined;
+    return undefined;
+  });
+  const store = new Store(link);
+  await store.openSession("mac", "gone");
+  await wait(0);
+  assert.equal(store.lookedFor.value, null, "a call that failed is not an answer");
+  assert.equal(store.transcriptLoadFailure.value?.nothingLoaded, true, "said, with Try Again");
+  answer = "gone";
+  await store.reloadTranscript();
+  await wait(0);
+  assert.deepEqual(store.lookedFor.value, { host: "mac", session: "gone" });
 });

@@ -4,7 +4,7 @@
 // when; then what the answers do; then the whole change, which the page scrolls; and the host's
 // answers in a bar that stays at the foot. The version answered is the one read: a change since is
 // refused, and the refusal is said here. Answered, it goes to the session that made the change, or
-// to the project.
+// to the folder.
 import { useSignal } from "@preact/signals";
 import { useEffect, useMemo } from "preact/hooks";
 import type { ApprovalAction, GuardedChangeReading } from "../protocol/generated";
@@ -42,10 +42,10 @@ export function readingCounts(reading: GuardedChangeReading): { added: number; r
   return { added, removed };
 }
 
-export function ReviewPage({ store, host, folder, projectName, id, down }: {
-  store: Store; host: string; folder: string; projectName: string; id: string; down: boolean;
+export function ReviewPage({ store, host, folder, folderName, id, down }: {
+  store: Store; host: string; folder: string; folderName: string; id: string; down: boolean;
 }) {
-  const summary = (store.projects.value[host] ?? []).find((p) => p.project.folder === folder);
+  const summary = (store.folders.value[host] ?? []).find((p) => p.folder.folder === folder);
   const approval = summary?.approvals?.find((a) => approvalID(a) === id);
   const reading = useSignal<GuardedChangeReading | null>(null);
   const loaded = useSignal(false);
@@ -86,7 +86,7 @@ export function ReviewPage({ store, host, folder, projectName, id, down }: {
   }
   const since = approval.since === undefined ? undefined : fromWireDate(approval.since);
   const agentID = approval.agentID as string | undefined;
-  const leave = () => go(agentID && store.agent(host, agentID) ? { host, project: folder, session: agentID } : { host, project: folder });
+  const leave = () => go(agentID && store.agent(host, agentID) ? { host, folder: folder, session: agentID } : { host, folder: folder });
   // The version answered is the one read, so a change since is refused, not approved.
   const send = async (action: ApprovalAction) => {
     busy.value = true;
@@ -118,12 +118,12 @@ export function ReviewPage({ store, host, folder, projectName, id, down }: {
             <div>
               <h2>{approval.title}</h2>
               <p class="quiet small">
-                {[kindWords[approval.kind], projectName].join(" · ")}
+                {[kindWords[approval.kind], folderName].join(" · ")}
                 {since && <> · <time dateTime={since.toISOString()} title={since.toLocaleString()}>{shortAgo(since)}</time></>}
               </p>
               <p>
                 {approval.line}
-                {agentID && <> <button type="button" class="link" onClick={() => go({ host, project: folder, session: agentID })}>Open Session</button></>}
+                {agentID && <> <button type="button" class="link" onClick={() => go({ host, folder: folder, session: agentID })}>Open Session</button></>}
               </p>
             </div>
           </div>
@@ -135,15 +135,15 @@ export function ReviewPage({ store, host, folder, projectName, id, down }: {
                 +{counts.added} −{counts.removed}</span>}
               <span class="spacer" />
               {wide.value && (
-                <span class="segmented" role="radiogroup" aria-label="Show">
-                  <button type="button" role="radio" class={layout.value === "unified" ? "on" : ""} aria-checked={layout.value === "unified"} onClick={() => choose("unified")}>Unified</button>
-                  <button type="button" role="radio" class={layout.value === "sideBySide" ? "on" : ""} aria-checked={layout.value === "sideBySide"} onClick={() => choose("sideBySide")}>Side by Side</button>
+                <span class="tabs" role="tablist" aria-label="Show">
+                  <button type="button" role="tab" class={layout.value === "unified" ? "on" : ""} aria-selected={layout.value === "unified"} onClick={() => choose("unified")}>Unified</button>
+                  <button type="button" role="tab" class={layout.value === "sideBySide" ? "on" : ""} aria-selected={layout.value === "sideBySide"} onClick={() => choose("sideBySide")}>Side by Side</button>
                 </span>
               )}
             </div>
             {rows.length ? <FileDiff rows={rows} layout={wide.value ? layout.value : "unified"} /> : <p class="quiet">No lines changed.</p>}
             {reading.value.lines.length >= readingLimit && (
-              <p class="quiet small">The change is longer than {readingLimit} lines. The rest is not shown here; open {reading.value.path} in the project to read it all.</p>
+              <p class="quiet small">The change is longer than {readingLimit} lines. The rest is not shown here; open {reading.value.path} in the folder to read it all.</p>
             )}
           </> : !loaded.value ? <p class="quiet">Reading…</p> : <p class="quiet">The change could not be read.</p>}
         </div>

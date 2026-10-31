@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac, iphone, ipad, web]
-description: Connect GitHub once, set up a project's Tasks, Code review and CI from it, see its pull requests and issues on pages, act on a pull request, start an agent on an issue, and work with CodeRabbit.
+description: Connect GitHub once, set up a folder's Tasks, Code review and CI from it, see its pull requests and issues on pages, act on a pull request, start an agent on an issue, and work with CodeRabbit.
 ---
 
 # Use GitHub
@@ -17,16 +17,16 @@ the same set-up and the same pages, because the host keeps the state.
 ## Before you start
 
 - A GitHub account.
-- A project whose folder has a GitHub remote. The set-up reads the repository from the git
+- A folder whose folder has a GitHub remote. The set-up reads the repository from the git
   remote.
 
 ## Connect GitHub
 
-You connect once, and the connection is for every project on that host. Agents uses the
+You connect once, and the connection is for every folder on that host. Agents uses the
 GitHub App `agents-loops`. You choose on github.com which repositories it can see.
 
 1. Open the connection sheet:
-   - On a project's **Connectors** page (the **Connectors** row under the project in the
+   - On a folder's **Connectors** page (the **Connectors** row under the folder in the
      sidebar), choose **Connect GitHub…**.
    - Or open **Connectors** (under Activity in the sidebar; on the Mac also
      **View ▸ Connectors**). On the Mac, choose **Connect… ▸ GitHub**. On the Remote
@@ -39,7 +39,7 @@ GitHub App `agents-loops`. You choose on github.com which repositories it can se
 4. The sheet closes by itself when GitHub says yes. If the browser closed, choose
    **Open github.com Again**.
 
-If the Agents app is not installed on the project's repository, the sheet stays open. It
+If the Agents app is not installed on the folder's repository, the sheet stays open. It
 says "The Agents app is not installed on ‹repository›, so agents can't write there."
 Choose **Install on github.com**, pick the repository, and come back.
 
@@ -53,13 +53,13 @@ On **Connectors ▸ Connections**:
 
 - **Repositories on github.com** opens the page where you change which repositories the
   App can see.
-- **Disconnect** deletes the host's tokens. Before it does, it says which projects lose
+- **Disconnect** deletes the host's tokens. Before it does, it says which folders lose
   which slots. To revoke the App too, go to github.com ▸ Settings ▸ Applications.
 - When GitHub refuses a renewal, the row says so. Choose **Connect Again…**.
 
-## Set up a project's tools
+## Set up a folder's tools
 
-A project's **Connectors** page starts with its set-up. It shows four slots: **Tasks**,
+A folder's **Connectors** page starts with its set-up. It shows four slots: **Tasks**,
 **Code review**, **CI** and **Where agents run**. The heading counts the slots that are
 done, such as "Set up · 3 of 4".
 
@@ -86,18 +86,18 @@ With no GitHub remote, the page says so, and **Tasks** says **Choose a tracker**
 
 ### Events
 
-When the first slot has read, the page adds the `github` connector to the project's
-`.agents/mcp.json`, approved, once. Its events then reach the project. The page shows
+When the first slot has read, the page adds the `github` connector to the folder's
+`.agents/mcp.json`, approved, once. Its events then reach the folder. The page shows
 them, such as `issue.* pr.* checks.*`, and the workflows that start on them.
 
-To add the connector by hand, add **GitHub** from **Made by Agents** in the catalogue on the
+To add the connector by hand, add **GitHub** from the **Agents** marketplace in the catalogue on the
 Mac, or write the entry yourself:
 
 ```json
 { "mcpServers": { "github": { "command": "github-mcp", "hosted": true } } }
 ```
 
-Then choose **Approve** on its row on the project's **Connectors** page. See
+Then choose **Approve** on its row on the folder's **Connectors** page. See
 [Add a connector by hand](add-a-connector-by-hand.md).
 
 ## See pull requests and issues
@@ -110,13 +110,13 @@ feeds it. Ask, for example, "Show the open pull requests" or "Show the open issu
   CodeRabbit's status. A failing one has **Rerun**, which runs its failed jobs again.
   Click a title to open the pull request's page in the same view.
 - **Issues** (`show_issues`): each open issue with its labels, its assignees and its
-  comment count. Click a label to show only the issues with that label. Click the label
-  again to show all of them.
+  comment count. Click a row to expand its rich-text description and linked pull requests.
+  Click a label to show only the issues with that label. Click the label again to show all of them.
 
-To keep a page, choose **Pin to Project** in the view's menu, beside its name. The pin sits
-under the project in the sidebar. Each time you open it, the host reads GitHub again, so it
+To keep a page, choose **Pin to Folder** in the view's menu, beside its name. The pin sits
+under the folder in the sidebar. Each time you open it, the host reads GitHub again, so it
 is up to date when it opens. It does not update while it is open: use **Refresh**. See
-[Pin a page to a project](pin-a-page-to-a-project.md).
+[Pin a page to a folder](pin-a-page-to-a-folder.md).
 
 ## Work on a pull request
 
@@ -159,14 +159,14 @@ itself (see below).
 ## Start an agent on an issue
 
 On the **Issues** page, choose **Start Agent** on an issue. The new-agent form opens in the
-view's project, filled in:
+view's folder, filled in:
 
 - The prompt says to work on the issue, and first to assign it to yourself.
 - The label is the issue's number, such as `#12`.
 - The agent works in a new worktree named from the issue's number and title.
 
 Nothing starts until you press Start. A page can't start an agent by itself. From a pinned
-page, the form opens in the pin's project.
+page, the form opens in the pin's folder.
 
 ## Work with CodeRabbit
 
@@ -194,7 +194,7 @@ commit) and `review.comment` (each comment of CodeRabbit's) can start a workflow
 
 ## Let agents work the dev loop
 
-A project that pushes to GitHub lists three ready-made workflows on its **Workflows**
+A folder that pushes to GitHub lists three ready-made workflows on its **Workflows**
 page, off. Open one and turn on its **Enabled** switch:
 
 - **Work an issue** starts when an issue gets the `agent` label. Make that label in the

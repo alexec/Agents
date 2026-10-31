@@ -51,7 +51,7 @@ private extension String {
 }
 
 /// One agent: here or not here, being installed, or a way to get it. The same row in the
-/// sheet, in Settings ▸ Agent Runtimes and under an empty project list.
+/// sheet, in Settings ▸ Agent Runtimes and under an empty folder list.
 ///
 /// Laid out the way an `AgentRow` is: the state as an icon on the left, the name on the
 /// top line and where it stands on the line under it, so this list reads like every

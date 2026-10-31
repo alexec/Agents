@@ -19,11 +19,11 @@ import (
 )
 
 // A workflow's file, as WorkflowFile, WorkflowFolder and FrontMatter read it on the Swift
-// host: <project>/.agents/workflows/<id>.md, front matter between --- lines and the prompt
+// host: <folder>/.agents/workflows/<id>.md, front matter between --- lines and the prompt
 // under it. A file that cannot be read is still listed, with what can be read of it and
 // why the rest cannot; nothing in it ever runs.
 
-func workflowsFolder(project string) string { return filepath.Join(project, workflowsRel) }
+func workflowsFolder(folder string) string { return filepath.Join(folder, workflowsRel) }
 
 const workflowsRel = ".agents/workflows"
 
@@ -32,23 +32,30 @@ func validWorkflowID(id string) bool {
 	return id != "" && len(id) <= 200 && !strings.HasPrefix(id, ".") && !strings.ContainsAny(id, "/\\") && id != ".."
 }
 
-func workflowPath(project, id string) (string, bool) {
+func workflowPath(folder, id string) (string, bool) {
 	if !validWorkflowID(id) {
 		return "", false
 	}
-	p := filepath.Join(workflowsFolder(project), id+".md")
-	if filepath.Dir(p) != filepath.Clean(workflowsFolder(project)) || !ownFolders(project, workflowsRel) {
+	p := filepath.Join(workflowsFolder(folder), id+".md")
+	if filepath.Dir(p) != filepath.Clean(workflowsFolder(folder)) || !ownFolders(folder, workflowsRel) {
 		return "", false
 	}
 	return p, true
 }
 
+func workflowSourcePath(folder, id string, f *workflowFile) (string, bool) {
+	if f != nil && f.sourceFolder != "" {
+		return workflowPath(f.sourceFolder, id)
+	}
+	return workflowPath(folder, id)
+}
+
 // workflowIDs is WorkflowFolder.ids: the .md files, not hidden, by name.
-func workflowIDs(project string) []string {
-	if !ownFolders(project, workflowsRel) {
+func workflowIDs(folder string) []string {
+	if !ownFolders(folder, workflowsRel) {
 		return nil
 	}
-	entries, err := os.ReadDir(workflowsFolder(project))
+	entries, err := os.ReadDir(workflowsFolder(folder))
 	if err != nil {
 		return nil
 	}
@@ -126,25 +133,25 @@ type workflowSkill struct{ name, text string }
 
 func skillChangePath(name string) string { return skillsRel + "/" + name + "/SKILL.md" }
 
-// skillPath is a skill's file, when every folder down to it is a folder of the project's own.
-func skillPath(project, name string) (string, bool) {
-	if !skillName.MatchString(name) || !ownFolders(project, filepath.Join(skillsRel, name)) {
+// skillPath is a skill's file, when every folder down to it is a folder of the folder's own.
+func skillPath(folder, name string) (string, bool) {
+	if !skillName.MatchString(name) || !ownFolders(folder, filepath.Join(skillsRel, name)) {
 		return "", false
 	}
-	return filepath.Join(project, skillsRel, name, "SKILL.md"), true
+	return filepath.Join(folder, skillsRel, name, "SKILL.md"), true
 }
 
 // readWorkflowSkills is the skills a workflow's text names, by name, or why one cannot be read.
-func readWorkflowSkills(project, text string) ([]workflowSkill, string) {
+func readWorkflowSkills(folder, text string) ([]workflowSkill, string) {
 	names := map[string]bool{}
 	for _, m := range namedSkill.FindAllStringSubmatch(text, -1) {
 		names[m[1]] = true
 	}
 	var skills []workflowSkill
 	for name := range names {
-		path, ok := skillPath(project, name)
+		path, ok := skillPath(folder, name)
 		if !ok {
-			return nil, "This workflow names " + skillChangePath(name) + ", which is not a file of the project's own in " + skillsRel
+			return nil, "This workflow names " + skillChangePath(name) + ", which is not a file of the folder's own in " + skillsRel
 		}
 		body, _, why := readWorkflowFile(path)
 		if why != "" {
@@ -186,7 +193,7 @@ func workflowFileOf(folder, id, text, digest, why string) *workflowFile {
 	if why != "" {
 		wf := parseWorkflow("", id, folder)
 		wf.Problem = &wire.WorkflowProblem{Unreadable: &wire.WorkflowProblemUnreadable{Value: why}}
-		return &workflowFile{wf: wf}
+		return &workflowFile{wf: wf, sourceFolder: folder, scope: "folder"}
 	}
 	wf := parseWorkflow(text, id, folder)
 	skills, why := readWorkflowSkills(folder, text)
@@ -194,9 +201,10 @@ func workflowFileOf(folder, id, text, digest, why string) *workflowFile {
 		if wf.Problem == nil {
 			wf.Problem = &wire.WorkflowProblem{Unreadable: &wire.WorkflowProblemUnreadable{Value: why}}
 		}
-		return &workflowFile{wf: wf, text: text}
+		return &workflowFile{wf: wf, text: text, sourceFolder: folder, scope: "folder"}
 	}
-	return &workflowFile{wf: wf, digest: workflowDigest(digest, text, skills), text: text, skills: skills}
+	return &workflowFile{wf: wf, digest: workflowDigest(digest, text, skills), text: text, skills: skills,
+		sourceFolder: folder, scope: "folder"}
 }
 
 // stripFrontMatter is FrontMatter.strip: what is under the closing ---, blank lines at its
@@ -312,8 +320,8 @@ func runsOnLabels(n yamlnode.Node) ([]string, error) {
 }
 
 // parseWorkflow is WorkflowFile.parse.
-func parseWorkflow(text, id, project string) wire.Workflow {
-	w := wire.Workflow{WorkflowID: id, Folder: store.FolderURL(project), Name: defaultWorkflowName(id), Triggers: []wire.WorkflowTrigger{},
+func parseWorkflow(text, id, folder string) wire.Workflow {
+	w := wire.Workflow{WorkflowID: id, Folder: store.FolderURL(folder), Name: defaultWorkflowName(id), Triggers: []wire.WorkflowTrigger{},
 		Mode: wire.WorkflowModeNew, UnknownFields: map[string]wire.JSONValue{},
 		Settings: wire.WorkflowSettings{Options: map[string]string{}, Labels: []string{}}}
 	var front []string
@@ -472,13 +480,16 @@ func parseWorkflow(text, id, project string) wire.Workflow {
 		}
 	}
 	s, err := workflowSettings(m)
+	if err == nil && s.RuntimeID == nil {
+		err = autoWords(s) // a file with no `runtime:` runs on Auto (#2873)
+	}
 	if err != nil {
 		return broken(failureMessage(err, "The settings could not be read"))
 	}
 	w.Settings = s
 	known := map[string]bool{"on": true, "agent": true, "name": true, "permission-mode": true, "runtime": true, "model": true,
 		"labels": true, "effort": true, "options": true, "enabled": true, "archived": true, "cooldown": true, "runs-on": true, "when-done": true,
-		"continue-when-back": true}
+		"continue-when-back": true, "permission-requests": true, "sandbox": true}
 	for k, v := range m {
 		if !known[k] {
 			b, _ := json.Marshal(v.JSON())
@@ -750,4 +761,17 @@ func triggerSupported(t wire.WorkflowTrigger) bool {
 	}
 	_, ok := triggerPattern(t)
 	return ok
+}
+
+// autoWords is why settings with no `runtime:` cannot run on Auto, or nil: the file's
+// page says so when it is read, rather than a run saying it when it starts (#2873).
+func autoWords(s wire.WorkflowSettings) error {
+	model := ""
+	if s.Model != nil {
+		model = *s.Model
+	}
+	if _, _, _, _, err := fileLevels(autoRuntimeID, model, s.PermissionMode, "", ""); err != nil {
+		return failure("With no `runtime:`, a workflow runs on Auto, and " + err.(*Error).Message)
+	}
+	return nil
 }

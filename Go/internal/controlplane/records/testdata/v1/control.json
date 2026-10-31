@@ -14,7 +14,7 @@
   "owner" : "53910528-71fe-4df0-aa5f-a8f8e92b9638",
   "pin" : "68pJOOtmq-dhsJdha_txtRqkMHL-HsskodMb3odpx3s",
   "port" : 8790,
-  "projectDetection" : {
+  "folderDetection" : {
     "enabled" : true,
     "paths" : [
       "~",

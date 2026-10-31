@@ -64,28 +64,35 @@ func appToolCalls() []appTool {
 		{"release_resource", (*Daemon).releaseResource},
 		{"list_resources", (*Daemon).listResources},
 		{"wait_for_event", (*Daemon).waitForEvent},
+		{"wait_for_agents", (*Daemon).waitForAgents},
+		{"check_again", (*Daemon).checkAgain},
 		{"cancel_wait", (*Daemon).cancelWait},
 		{"show_file", (*Daemon).showFile},
 		{"suggest_next_prompt", (*Daemon).suggestNextPrompt},
-		{"ask_form", (*Daemon).askForm},
+		{"notify", (*Daemon).notify},
+		{"hang_up", (*Daemon).hangUp},
+		{"ask_question", (*Daemon).askQuestion},
+		{"ask_secret", (*Daemon).askSecret},
 		{"list_sessions", (*Daemon).listSessions},
 		{"read_session", (*Daemon).readSession},
 		{"message_session", (*Daemon).messageSession},
+		{"cancel_message", (*Daemon).cancelMessage},
 		{"archive_session", (*Daemon).archiveSession},
 		{"stop_session", (*Daemon).stopSession},
 		{"start_session", (*Daemon).startSession},
 		{"manage_workflows", (*Daemon).manageWorkflows},
-		{"list_workspaces", (*Daemon).listWorkspaces},
-		{"start_workspace", (*Daemon).startWorkspace},
-		{"stop_workspace", (*Daemon).stopWorkspace},
-		{"make_workspace", (*Daemon).makeWorkspace},
-		{"delete_workspace", (*Daemon).deleteWorkspace},
+		{"list_machines", (*Daemon).listMachines},
+		{"start_machine", (*Daemon).startMachine},
+		{"stop_machine", (*Daemon).stopMachine},
+		{"make_machine", (*Daemon).makeMachine},
+		{"delete_machine", (*Daemon).deleteMachine},
+		{"bring_back", (*Daemon).bringBackTool},
 		{"move_worktree", (*Daemon).moveWorktree},
 	}
 }
 
 // askTools put a question to a person: none on a bot's machine (#1761, FR-032).
-var askTools = map[string]bool{"ask_form": true}
+var askTools = map[string]bool{"ask_question": true, "ask_secret": true}
 
 // startAppTools listens on loopback, once, for every session's tools.
 func (d *Daemon) startAppTools() (int, error) {
@@ -152,10 +159,10 @@ func (d *Daemon) mcpServersFor(id wire.UUID) []sdk.McpServer {
 	servers := []sdk.McpServer{{Http: &sdk.McpServerHttpInline{Name: appServerName, Type: "http",
 		Url:     "http://127.0.0.1:" + strconv.Itoa(port) + appToolsPath,
 		Headers: []sdk.HttpHeader{{Name: "Authorization", Value: "Bearer " + token}}}}}
-	// Then the project's approved servers and the person's own (SessionServers.plan), each
+	// Then the folder's approved servers and the person's own (SessionServers.plan), each
 	// hosted one swapped for its route on this endpoint (#488).
 	if a != nil {
-		servers = append(servers, d.hostedSwapped(d.sessionEntries(projectFolder(a)), port, token, a.RuntimeID)...)
+		servers = append(servers, d.hostedSwapped(d.sessionEntries(folderPath(a)), port, token, a.RuntimeID)...)
 	}
 	return servers
 }
@@ -426,6 +433,7 @@ func (d *Daemon) appToolsHandle(ctx context.Context, g *appGrant, method string,
 		began := time.Now()
 		note, err := tool.call(d, g.agent, p.Arguments)
 		d.keepAppToolCall(g.agent, tool.name, p.Arguments, note, err, began)
+		d.countAppTool(g.agent, tool.name)
 		if err != nil {
 			msg := err.Error()
 			if e, ok := err.(*Error); ok {
@@ -476,7 +484,7 @@ func (d *Daemon) setSessionLabels(id wire.UUID, args map[string]json.RawMessage)
 	if a == nil {
 		return "", &Error{Code: CodeNoSuchAgent, Message: "That conversation is not open any more, so nothing was changed."}
 	}
-	labels, err := changeLabelsAs(wire.SessionLabelOwnerAgent, a.Labels, add, remove, vocabulary(projectFolder(a), d.Store.Agents()))
+	labels, err := changeLabelsAs(wire.SessionLabelOwnerAgent, a.Labels, add, remove, vocabulary(folderPath(a), d.Store.Agents()))
 	if err != nil {
 		msg := err.Error()
 		if e, ok := err.(*Error); ok {

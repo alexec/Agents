@@ -43,11 +43,20 @@ const allowedURLs = new Set([
   // Repositories on github.com (#1685): where the person changes which repositories the GitHub
   // App reaches, the same for every person, as the window's; a link opened in a new tab, never fetched.
   "https://github.com/settings/installations",
+  // Reports ▸ Value and the Lineage pane (#2998): an issue's, a PR's or a milestone's page on GitHub,
+  // as the window's, a link the person opens in a new tab, never fetched.
+  "https://github.com/",
   // Connect GitLab (#1630): the address field's example, and Make a Token's page with no address,
   // a link the person opens in a new tab, never fetched.
   "https://gitlab.com",
   // Connect Linear (#1343): the hand-back page, the one origin whose postMessage the page takes.
   "https://agentloops.dev",
+  // Console ▸ Sign-In (#1002): each preset's issuer, as a field's example text; the control plane reads the
+  // issuer's discovery document, never the page.
+  "https://acme.okta.com",
+  "https://login.microsoftonline.com/TENANT-ID/v2.0",
+  "https://accounts.google.com",
+  "https://sso.example.com",
   "http://www.w3.org/1998/Math/MathML",
   "http://www.w3.org/1999/xhtml",
   "http://www.w3.org/2000/svg",

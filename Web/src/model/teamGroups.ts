@@ -1,5 +1,5 @@
 // Settings ▸ Groups (#1761, spec 736 FR-027, FR-028): the same words as GroupWords in
-// Packages/AgentsKit. A group is everyone, or the people named; it owns workspace providers, and
+// Packages/AgentsKit. A group is everyone, or the people named; it owns machine providers, and
 // only its people see them and start machines from them. A provider with no group is the admins'.
 import type { CapReached, Group, PersonRow, ProviderSummary, SpendCaps } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
@@ -12,6 +12,12 @@ export function members(group: Group, people: readonly PersonRow[]): string {
   if (group.everyone) return "Everyone";
   if (group.members.length === 0) return "No one";
   return group.members.map((id) => people.find((p) => p.id === id)?.name ?? "Someone removed").join(", ");
+}
+
+/** The bots in a group (#2132), which a bot names itself: "review-bot, nightly-bot", or "None". */
+export function groupBots(group: Group, people: readonly PersonRow[]): string {
+  const names = people.filter((p) => p.kind === "bot" && p.group === group.id).map((p) => p.name);
+  return names.length === 0 ? "None" : names.join(", ");
 }
 
 /** "DigitalOcean, Docker", or null with none. */
@@ -47,19 +53,21 @@ export function mayNotUse(provider: ProviderSummary, groups: readonly Group[]): 
 
 export function foot(admin: boolean): string {
   return admin
-    ? "A group is everyone, or the people you name. Give a workspace provider to a group, and only its people see it and start machines from it. A provider with no group is for admins only."
-    : "The groups you are in. Their workspace providers are the ones you can start machines from.";
+    ? "A group is everyone, or the people you name. Give a machine provider to a group, and only its people see it and start machines from it. A provider with no group is for admins only."
+    : "The groups you are in. Their machine providers are the ones you can start machines from.";
 }
 
 export const removeTitle = (group: Group) => `Remove ${group.name}?`;
 export const removeMessage = "Its people keep their machines. A provider must go to another group first.";
 
-// A bot in Settings ▸ People (#1761): the same words as BotWords in Packages/AgentsKit.
+// A bot in Settings ▸ Bots (#1761, #2132): the same words as BotWords in Packages/AgentsKit.
 export const botWords = {
+  title: "Bots",
+  empty: "No bots yet. A bot runs workflows as its own user, in one group, with a daily cap.",
   make: "Make a Bot…",
   addMachine: "Add a Machine…",
   setCap: "Group and Cap…",
-  foot: "A bot runs the team’s workflows: a workflow whose runs-on: names it runs on its machines, once per trigger. Nobody can start, message or answer its agents; an admin can stop a run in Console ▸ Team Workflows, on the web page. Its spend counts against its own cap and its group’s.",
+  foot: "A bot runs the team’s workflows: a workflow whose runs-on: names it runs on its machines, once per trigger. Nobody can start, message or answer its agents; an admin can stop a run in Workflows ▸ Team Workflows, on the web page. Its spend counts against its own cap and its group’s.",
   machineFoot: "Run this on the machine for the bot. It joins as the bot’s machine; the code works once, for 10 minutes.",
 };
 

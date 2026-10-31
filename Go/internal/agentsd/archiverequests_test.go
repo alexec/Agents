@@ -69,8 +69,9 @@ func TestThePersonsChatArchivesItself(t *testing.T) {
 	if requested, archiveNow := d.settleArchiveRequest(&shown, wire.AgentStateFinished, wire.EndedReasonEndTurn, true); requested || archiveNow || shown.ArchiveRequest != nil {
 		t.Fatalf("%v %v %+v", requested, archiveNow, shown.ArchiveRequest)
 	}
-	partly := wire.Agent{ID: a.ID, AfterTurn: after, Report: &wire.WorkReport{Outcome: wire.WorkOutcomePartlyDone, At: now()}, State: wire.AgentStateFinished, Cwd: a.Cwd}
-	if requested, archiveNow := d.settleArchiveRequest(&partly, wire.AgentStateFinished, wire.EndedReasonEndTurn, false); !requested || archiveNow {
+	// A question takes the ask away (#1916: the only ending that wants the person).
+	asked := wire.Agent{ID: a.ID, AfterTurn: after, Report: &wire.WorkReport{Outcome: wire.WorkOutcomeNeedsAnswer, At: now()}, State: wire.AgentStateFinished, Cwd: a.Cwd}
+	if requested, archiveNow := d.settleArchiveRequest(&asked, wire.AgentStateFinished, wire.EndedReasonEndTurn, false); requested || archiveNow {
 		t.Fatal(requested, archiveNow)
 	}
 	// A workflow's run goes by its workflow's when-done, not by the person's setting.
@@ -129,7 +130,7 @@ func TestALeadStopsAndArchivesItsHelpers(t *testing.T) {
 		t.Fatal(text)
 	}
 	// One below one it started is its to archive too.
-	if text, _ := m.tool(4, "archive_session", map[string]any{"id": string(below.ID)}); text != "Archived “Below”, freeing its place; the person can unarchive it. This project now has 0 of 3 running, 1 of 5 not archived." {
+	if text, _ := m.tool(4, "archive_session", map[string]any{"id": string(below.ID)}); text != "Archived “Below”, freeing its place; the person can unarchive it. This folder now has 0 of 3 running, 1 of 5 not archived." {
 		t.Fatal(text)
 	}
 	if a := d.Store.Agent(below.ID); a.State != wire.AgentStateArchived || *a.ArchivedReason != wire.AgentArchivedReasonByAgent {

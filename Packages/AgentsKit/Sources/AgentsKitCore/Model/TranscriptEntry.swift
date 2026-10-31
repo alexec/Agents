@@ -9,7 +9,7 @@ public enum PromptOrigin: String, Codable, Hashable, Sendable {
     case person
     /// The app asking on its own behalf. Today: the one question after a silent ending.
     case app
-    /// Another agent in the project, with `message_session` (#560). Who is on the entry's
+    /// Another agent in the folder, with `message_session` (#560). Who is on the entry's
     /// `sender`: drawn as theirs, never as the person's.
     case agent
 }
@@ -119,6 +119,14 @@ public struct TranscriptEntry: Codable, Hashable, Sendable, Identifiable {
         /// A file an agent put in front of the person with `show_file` (#836): drawn as
         /// a card where it was called, a preview for a chart or a picture, that opens it.
         case fileShown(ShownFile)
+
+        /// What an agent told the person with `notify` (#2805): a line of its own where
+        /// it was called, with what became of the notification.
+        case notified(SentNotice)
+
+        /// Where the notice recorded as `notice` went (#2860), once its host knew. Not
+        /// drawn: it is said on that notice's line.
+        case noticeDelivered(NoticeDelivery)
 
         /// Something a newer version of this app wrote down, read by an older one.
         /// Kept whole and skipped when drawing, so a transcript is never lost to a

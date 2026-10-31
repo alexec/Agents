@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -70,12 +71,11 @@ func TestBackupDefaults(t *testing.T) {
 // One machine backs up; a second, reading the same folder, restores it: the agents come
 // back archived, with their transcripts, and are never run there. Nothing is overwritten.
 func TestBackupAndRestoreOnAnotherMachine(t *testing.T) {
-	clock := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
-	atTime(t, &clock)
+	atTime(t, time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC))
 	shared := t.TempDir()
 	rootA, rootB := t.TempDir(), t.TempDir()
 	a, ca := start(t, rootA)
-	dir := project(t, ca, 1)
+	dir := folder(t, ca, 1)
 	ca.call(t, 2, "backups/configure", map[string]any{"every": "off", "keep": 2, "folder": shared})
 
 	finished := seeded(t, a, dir, nil)
@@ -104,7 +104,7 @@ func TestBackupAndRestoreOnAnotherMachine(t *testing.T) {
 
 	// Machine B already has an agent of its own and its own usage.
 	b, cb := start(t, rootB)
-	ownDir := project(t, cb, 1)
+	ownDir := folder(t, cb, 1)
 	own := seeded(t, b, ownDir, nil)
 	writeFile(t, filepath.Join(rootB, "usage-history.json"), `{"usage":"B"}`)
 	cb.call(t, 2, "backups/configure", map[string]any{"every": "off", "keep": 3, "folder": shared})
@@ -161,12 +161,11 @@ func TestBackupAndRestoreOnAnotherMachine(t *testing.T) {
 // says it was made under, and brings no MCP servers. A backup whose manifest names this
 // root, but that is not in this machine's folder, is never run here either.
 func TestARestoreFromAnotherMachineNeverRunsHere(t *testing.T) {
-	clock := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
-	atTime(t, &clock)
+	atTime(t, time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC))
 	shared := t.TempDir()
 	a, ca := start(t, t.TempDir())
 	b, cb := start(t, t.TempDir())
-	dir := project(t, ca, 1)
+	dir := folder(t, ca, 1)
 	ca.call(t, 2, "backups/configure", map[string]any{"every": "off", "keep": 2, "folder": shared})
 	bRoot := b.Store.RootID
 	agent := seeded(t, a, dir, func(x *wire.Agent) {
@@ -206,9 +205,111 @@ func TestARestoreFromAnotherMachineNeverRunsHere(t *testing.T) {
 	}
 }
 
+// A v0.11.1 backup names a worktree's folder "project", from before #2617: the restored
+// agent gets that folder, not a blank one (#2709).
+func TestARestoreOfAnOlderBackupKeepsTheWorktreesFolder(t *testing.T) {
+	atTime(t, time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC))
+	shared := t.TempDir()
+	a, ca := start(t, t.TempDir())
+	dir := folder(t, ca, 1)
+	ca.call(t, 2, "backups/configure", map[string]any{"every": "off", "keep": 2, "folder": shared})
+	repo := "file:///Users/old/repo/"
+	agent := seeded(t, a, dir, func(x *wire.Agent) {
+		// A worktree under a root that is not on the new machine, so git can't say.
+		x.Worktree = &wire.AgentWorktree{Name: "w", Root: "file:///Users/old/elsewhere/w/", Folder: wire.URL(repo)}
+	})
+	made, err := a.makeBackup()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rewriteArchive(t, filepath.Join(shared, a.Store.RootID, "20261020T090000Z.tar.gz"), func(name string, data []byte) []byte {
+		if !strings.HasSuffix(name, "/agent.json") {
+			return data
+		}
+		var record map[string]any
+		if err := json.Unmarshal(data, &record); err != nil {
+			t.Fatal(err)
+		}
+		w := record["worktree"].(map[string]any)
+		w["project"] = w["folder"]
+		delete(w, "folder")
+		out, _ := json.Marshal(record)
+		return out
+	})
+
+	b, cb := start(t, t.TempDir())
+	cb.call(t, 1, "backups/configure", map[string]any{"every": "off", "keep": 2, "folder": shared})
+	var res wire.BackupRestoreResult
+	json.Unmarshal(cb.call(t, 2, "backups/restore", map[string]any{"id": made.ID}), &res)
+	got := b.Store.Agent(agent.ID)
+	if res.Restored != 1 || got == nil || got.Worktree == nil || got.Worktree.Folder != wire.URL(repo) {
+		t.Fatalf("restored %+v as %+v", res, got)
+	}
+	var saved wire.Agent
+	raw, _ := os.ReadFile(b.Store.Loc.Record(string(agent.ID)))
+	if diskjson.Unmarshal(raw, &saved) != nil || saved.Worktree == nil || saved.Worktree.Folder != wire.URL(repo) {
+		t.Fatalf("saved %s", raw)
+	}
+}
+
+// rewriteArchive passes each file of a backup archive through edit, in place.
+func rewriteArchive(t *testing.T, path string, edit func(name string, data []byte) []byte) {
+	t.Helper()
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	type entry struct {
+		h    *tar.Header
+		data []byte
+	}
+	var entries []entry
+	tr := tar.NewReader(gz)
+	for {
+		h, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := io.ReadAll(tr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entries = append(entries, entry{h, edit(h.Name, data)})
+	}
+	f.Close()
+	out, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zw := gzip.NewWriter(out)
+	tw := tar.NewWriter(zw)
+	for _, e := range entries {
+		e.h.Size = int64(len(e.data))
+		if err := tw.WriteHeader(e.h); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tw.Write(e.data); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	zw.Close()
+	if err := out.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestBackupsKeepTheNewestOfThisMachine(t *testing.T) {
-	clock := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
-	atTime(t, &clock)
+	clock := atTime(t, time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC))
 	shared := t.TempDir()
 	d, c := start(t, t.TempDir())
 	c.call(t, 1, "backups/configure", map[string]any{"every": "off", "keep": 2, "folder": shared})
@@ -220,7 +321,7 @@ func TestBackupsKeepTheNewestOfThisMachine(t *testing.T) {
 		if _, err := d.makeBackup(); err != nil {
 			t.Fatal(err)
 		}
-		clock = clock.Add(time.Hour)
+		clock.add(time.Hour)
 	}
 	s := backupsIn(t, c, 2)
 	if len(s.Backups) != 3 || s.Backups[0].ID != d.Store.RootID+"/20261020T120000Z" ||
@@ -235,8 +336,7 @@ func TestBackupsKeepTheNewestOfThisMachine(t *testing.T) {
 }
 
 func TestBackupIfDueFollowsTheSchedule(t *testing.T) {
-	clock := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
-	atTime(t, &clock)
+	clock := atTime(t, time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC))
 	d, c := start(t, t.TempDir())
 	c.call(t, 1, "backups/configure", map[string]any{"every": "off", "keep": 3})
 	d.backupIfDue()
@@ -244,10 +344,10 @@ func TestBackupIfDueFollowsTheSchedule(t *testing.T) {
 	c.call(t, 2, "backups/configure", map[string]any{"every": "daily", "keep": 3})
 	d.backupIfDue()
 	waitBackups(t, d, 1)
-	clock = clock.Add(23 * time.Hour)
+	clock.add(23 * time.Hour)
 	d.backupIfDue()
 	waitBackups(t, d, 1)
-	clock = clock.Add(2 * time.Hour)
+	clock.add(2 * time.Hour)
 	d.backupIfDue()
 	waitBackups(t, d, 2)
 }
@@ -366,8 +466,7 @@ func (f *fakeStore) askFor(host string) askControl {
 // A server backs up to the control plane's store in parts, waiting when asked to, and
 // leaves no archive behind; a new server of the same person lists it and restores it.
 func TestBackupToTheControlPlaneAndRestoreOnANewServer(t *testing.T) {
-	clock := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
-	atTime(t, &clock)
+	atTime(t, time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC))
 	was := backupPartBytes
 	backupPartBytes = 512
 	t.Cleanup(func() { backupPartBytes = was })
@@ -379,7 +478,7 @@ func TestBackupToTheControlPlaneAndRestoreOnANewServer(t *testing.T) {
 		t.Fatalf("a host on no control plane can use one: %+v", s)
 	}
 	a.SetControlAsk(fake.askFor("a"))
-	dir := project(t, ca, 2)
+	dir := folder(t, ca, 2)
 	ca.call(t, 3, "backups/configure", map[string]any{"every": "off", "keep": 2, "target": "control"})
 	agent := seeded(t, a, dir, nil)
 	writeFile(t, a.Store.Loc.Transcript(string(agent.ID)), strings.Repeat("{\"line\":\"a turn of the conversation\"}\n", 100))
@@ -436,8 +535,7 @@ func TestBackupToTheControlPlaneAndRestoreOnANewServer(t *testing.T) {
 // folder and a folder on another disk are not. A backup in a folder on another volume
 // restores on a new machine.
 func TestABackupFolderOnTheSameDiskIsSaid(t *testing.T) {
-	clock := time.Date(2026, 10, 22, 9, 0, 0, 0, time.UTC)
-	atTime(t, &clock)
+	atTime(t, time.Date(2026, 10, 22, 9, 0, 0, 0, time.UTC))
 	root := t.TempDir()
 	a, ca := start(t, root)
 	if s := backupsIn(t, ca, 1); s.SameDisk == nil || !*s.SameDisk {
@@ -469,7 +567,7 @@ func TestABackupFolderOnTheSameDiskIsSaid(t *testing.T) {
 	if s := backupsIn(t, ca, 5); s.SameDisk != nil {
 		t.Fatalf("a folder on another disk said to be on the same disk")
 	}
-	dir := project(t, ca, 6)
+	dir := folder(t, ca, 6)
 	agent := seeded(t, a, dir, nil)
 	made, err := a.makeBackup()
 	if err != nil {

@@ -11,21 +11,24 @@ import { useEffect } from "preact/hooks";
 import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
 import {
-  cooldownSentence, labelsNote, mcpMissedWords, mcpTriggerWords, agentModeWords, unknownLines, isUnapproved, canBeApproved, canBeDenied, workflowStatusLines, isOn, isSupportedTrigger, switchesSentence, lastRanLine, nextLine, resumedAgent, scopeLine, triggerFilters, triggerGlyph,
+  cooldownSentence, labelsNote, mcpMissedWords, mcpTriggerWords, agentModeWords, unknownLines, isUnapproved, canBeApproved, canBeDenied, workflowStatusLines, isOn, isSupportedTrigger, switchesSentence, scopeSentence, lastRanLine, nextLine, resumedAgent, scopeLine, triggerFilters, triggerGlyph,
   runsOnParts, triggerSummary, workflowRunsOnSentence, workflowHostChoices, workflowSummary,
 } from "../model/workflows";
 import { go } from "../route";
 import { RunNow } from "./WorkflowRow";
 import { rowExtras, SessionRow } from "./SessionRow";
-import { CooldownMenu, RuntimeRow, WhenDoneMenu, WorkflowSettingsForm } from "./WorkflowSettings";
-import { whenDoneSentence } from "../model/workflowSettings";
+import { CooldownMenu, WhenDoneMenu, WorkflowSettingsForm } from "./WorkflowSettings";
+import { picked, whenDoneSentence } from "../model/workflowSettings";
 import { workflowContinueSentence, workflowContinueSwitch } from "../model/continueWhenBack";
 import { BackToList } from "./BackToList";
 import { isWorkflowMuted, muteLabel, workflowMuteHelp } from "../model/mute";
 import { Capability } from "../protocol/capabilities.generated";
+import { WorkflowFileModal } from "./AgentConfigEditor";
+import { PageTitle } from "./TopBar";
+import { navTitle } from "../model/nav";
 
-export function WorkflowPage({ store, host, folder, projectName, workflowID, down }: {
-  store: Store; host: string; folder: string; projectName: string; workflowID: string; down: boolean;
+export function WorkflowPage({ store, host, folder, folderName, workflowID, down }: {
+  store: Store; host: string; folder: string; folderName: string; workflowID: string; down: boolean;
 }) {
   // Held while the page is open, shared with the sidebar's fold, and let go by the last of them (#291).
   useEffect(() => {
@@ -33,9 +36,11 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
     return () => store.releaseWorkflows(host, folder);
   }, [host, folder]);
   const known = store.workflowsKnown(host, folder);
-  const summary = store.projectWorkflows(host, folder).find((w) => w.workflow.workflowID === workflowID);
+  const summary = store.folderWorkflows(host, folder).find((w) => w.workflow.workflowID === workflowID);
   // Which half of the page is on show (#863), as the window and the Remote have it.
   const pane = useSignal<"activity" | "configuration">("activity");
+  // Its file, up in the Workflows editor (#2803).
+  const editsFile = useSignal(false);
   const runLimit = useSignal(3);
   const runs = useSignal<Agent[]>([]);
   const loadingRuns = useSignal(false);
@@ -89,21 +94,35 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
   const change = (what: Parameters<Store["setWorkflowSettings"]>[2]) =>
     void store.setWorkflowSettings(host, summary, what).then((refusal) => { problem.value = refusal ? { workflowID, text: refusal } : null; });
   const deleteWorkflow = async () => {
-    if (confirm(`Delete "${workflow.name}"? Its file is removed from disk.\n\nThe file can be restored from the project's git history.`)) {
-      if (await store.deleteWorkflow(host, summary)) go({ host, project: folder });
+    if (confirm(`Delete "${workflow.name}"? Its file is removed from disk.\n\nThe file can be restored from the folder's git history.`)) {
+      if (await store.deleteWorkflow(host, summary)) go({ host, folder: folder });
     }
   };
+  // Yours are in ~/.agents on the Mac, as Settings ▸ Agent Configuration edits them; the folder's on its host.
+  const yours = summary.scope === "user";
+  const editFile = <button class="archive" disabled={down}
+    title={yours ? "Open this workflow's file in Settings ▸ Agent Configuration ▸ Workflows"
+      : "Open this workflow's file in the folder's Agent Configuration ▸ Workflows"}
+    onClick={() => { editsFile.value = true; }}>Edit File…</button>;
   return (
     <section class="chat workflow-page" aria-label="Workflow">
-      <header class="column-head">{back}<h1>{workflow.name}</h1></header>
+      <header class="column-head page-head">{back}
+        <PageTitle parts={[{ title: navTitle.workflows, to: { nav: "workflows" } }, { title: folderName }, { title: workflow.name }]}><h1>{workflow.name}</h1></PageTitle>
+      </header>
+      {editsFile.value && <WorkflowFileModal store={store} host={yours ? store.macHostID.value : host}
+        folder={yours ? undefined : folder} path={`${workflow.workflowID}.md`} down={down}
+        close={() => { editsFile.value = false; }} />}
       <div class="scroll">
         <div class="workflow-body">
           <div class="heading">
             {!workflow.problem && <p class="quiet">{workflowSummary(workflow, runtimeName)}</p>}
+            {/* Yours, in every folder (#2759): its rows under a folder do not say so. */}
+            {scopeSentence(summary) && <p class="quiet small">{scopeSentence(summary)}</p>}
           </div>
           {summary.isArchived ? (
             <div class="controls">
               <button class="run-now prominent" disabled={down} onClick={() => void store.setWorkflowArchived(host, summary, false)}>Unarchive</button>
+              {editFile}
               <button class="archive" disabled={down} title="Delete this workflow file from disk" onClick={() => void deleteWorkflow()}>Delete…</button>
             </div>
           ) : (
@@ -135,26 +154,27 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
                   {muteLabel}
                 </label>
               )}
-              {/* Pinned to the top of its project in the sidebar (#432), as the window's page has it. */}
+              {/* Pinned to the top of its folder in the sidebar (#432), as the window's page has it. */}
               {(() => {
                 const pinned = store.workflowPinsIn(host, folder).includes(workflow.workflowID);
                 return (
                   <button class="archive" disabled={down}
-                    title={pinned ? "Take this workflow out of Pinned in the sidebar" : "Keep this workflow in Pinned, at the top of its project in the sidebar"}
+                    title={pinned ? "Take this workflow out of Pinned in the sidebar" : "Keep this workflow in Pinned, at the top of its folder in the sidebar"}
                     onClick={() => void store.setWorkflowPinned(host, folder, workflow.workflowID, !pinned)}>{pinned ? "Unpin" : "Pin"}</button>
                 );
               })()}
-              <button class="archive" disabled={down} title="Archive this workflow and go back to the project. Writes archived: true into its file"
-                onClick={async () => { await store.setWorkflowArchived(host, summary, true); go({ host, project: folder }); }}>Archive</button>
+              <button class="archive" disabled={down} title="Archive this workflow and go back to the folder. Writes archived: true into its file"
+                onClick={async () => { await store.setWorkflowArchived(host, summary, true); go({ host, folder: folder }); }}>Archive</button>
+              {editFile}
               <button class="archive" disabled={down} title="Delete this workflow file from disk" onClick={() => void deleteWorkflow()}>Delete…</button>
             </div>
           )}
           {/* The switches write the workflow's file (#125), the window's words. */}
           {!summary.isArchived && <p class="quiet small">{switchesSentence(summary)}</p>}
 
-          <div class="segmented workflow-panes" role="radiogroup" aria-label="Show">
+          <div class="tabs workflow-panes" role="tablist" aria-label="Show">
             {(["activity", "configuration"] as const).map((p) => (
-              <button key={p} role="radio" aria-checked={pane.value === p} class={pane.value === p ? "on" : ""}
+              <button key={p} role="tab" aria-selected={pane.value === p} class={pane.value === p ? "on" : ""}
                 onClick={() => { pane.value = p; }}>{p === "activity" ? "Activity" : "Configuration"}</button>
             ))}
           </div>
@@ -171,7 +191,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
                     <span>{line.text}</span>
                     {line.detail && <span class="quiet small">{line.detail}</span>}
                   </span>
-                  {line.agentID && <button class="link" onClick={() => go({ host, project: folder, session: line.agentID })}>Open the agent →</button>}
+                  {line.agentID && <button class="link" onClick={() => go({ host, folder: folder, session: line.agentID })}>Open the agent →</button>}
                 </li>
               ))}
             </ul>
@@ -182,21 +202,27 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
             <p class="last-ran quiet small">{lastRanLine(summary)}</p>
 
             {!loadingRuns.value && runs.value.length === 0 && <p class="hint">Nothing has run yet.</p>}
-            {runs.value.map((agent) => (
-              <SessionRow key={agent.id} agent={agent} chosen={false} onPick={() => go({ host, project: folder, session: agent.id })}
-                extras={rowExtras(store, host, agent)} />
-            ))}
+            {runs.value.map((agent) => {
+              const pick = picked(agent.auto, (id) => runtimeName(id) ?? id);
+              return (
+                <div key={agent.id} class="workflow-run">
+                  <SessionRow agent={agent} chosen={false} onPick={() => go({ host, folder: folder, session: agent.id })}
+                    extras={rowExtras(store, host, agent)} />
+                  {pick && <p class="quiet small">{pick}</p>}
+                </div>
+              );
+            })}
             {runs.value.length === runLimit.value && <button class="link" disabled={loadingRuns.value}
               onClick={() => { runLimit.value += 3; }}>Show more</button>}
             </>
           ) : (
             <>
             <h2 class="section-head">What it does</h2>
-            <RuntimeRow store={store} host={host} summary={summary} disabled={locked} change={change} />
+            <p class="quiet small">.agents/workflows/{workflow.workflowID}.md</p>
             <p class="agent-mode">
               <span>{agentModeWords(workflow.mode)}</span> <code class="quiet">agent: {workflow.mode}</code>
               {workflow.mode === "standing" && (standing
-                ? <button class="link" onClick={() => go({ host, project: folder, session: standing.id })}>{standing.title ?? "Untitled"} →</button>
+                ? <button class="link" onClick={() => go({ host, folder: folder, session: standing.id })}>{standing.title ?? "Untitled"} →</button>
                 : <span class="quiet"> · Started on the next run</span>)}
             </p>
             <pre class="prompt-text">{workflow.prompt || "(no prompt)"}</pre>
@@ -208,7 +234,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
               <ul class="triggers">
                 {workflow.triggers.map((trigger, index) => {
                   const filters = triggerFilters(trigger);
-                  const scope = scopeLine(trigger, projectName, hostName);
+                  const scope = scopeLine(trigger, folderName, hostName);
                   return (
                     <li key={index} class="trigger">
                       <span class="glyph" aria-hidden="true">{triggerGlyph(trigger)}</span>

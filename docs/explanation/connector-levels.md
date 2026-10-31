@@ -1,6 +1,6 @@
 ---
 diataxis: explanation
-description: What the five levels on every connector mean (Tools, Events, Views, Workflows, Tested), where they come from, why they exist, and what the Made by Agents mark says.
+description: What the five levels on every connector mean (Tools, Events, Views, Workflows, Tested), where they come from, why they exist, and where the connectors that Agents makes come from.
 devices: [mac, iphone, ipad, web]
 ---
 
@@ -8,8 +8,7 @@ devices: [mac, iphone, ipad, web]
 
 Every connector (an MCP server) shows five levels under its name: **Tools**, **Events**,
 **Views**, **Workflows** and **Tested**. A level that the connector reaches is in the
-accent colour. A level that it does not reach is grey. The connectors that Agents makes
-also carry a mark, **Made by Agents**. This page explains what each level means for you,
+accent colour. A level that it does not reach is grey. This page explains what each level means for you,
 where the app gets it, and why the levels are there at all.
 
 ## Why there are levels
@@ -74,17 +73,18 @@ such as "Reaches Tools, Events, Views. Not yet Workflows, Tested."
 
 ## Where you see them
 
-- On every **Connectors** page, for a project and your own, on the Mac, the
+- On every **Connectors** page, for a folder and your own, on the Mac, the
   Remote and the web page.
 - In the Mac's catalogue (**Add Connector…**), on each row and on a connector's detail.
   The catalogue is on the Mac only.
 
-## Made by Agents
+## The connectors that Agents makes
 
-**Made by Agents** says who made a connector. It is not a level, and it gives the
-connector no special pages or settings. Agents makes four: **GitHub**, **Linear**,
-**GitLab** and **Email**. They come first in the catalogue, in a group of their own under
-that name.
+Agents makes four connectors: **GitHub**, **Linear**, **GitLab** and **Email**. They are rows
+like any other, with no mark and no group of their own (#2155). They are in the **Agents**
+marketplace, a file that every host carries (`Go/internal/agentsd/mcpcatalog/agents.json`),
+with **Agents** as their publisher. Choose **Agents** in the catalogue's **Marketplace** menu to
+see them. Their levels before a host checks a copy come from that file.
 
 They are added in the same way as any other connector: an entry in an `mcp.json`, with a
 secret named, never written in. They run hosted, one copy on each host, so their events

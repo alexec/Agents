@@ -15,9 +15,38 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// PersonalFile is <home>/.agents/mcp.json; ProjectFile is <project>/.agents/mcp.json.
+// PersonalFile is <home>/.agents/mcp.json; FolderFile is <folder>/.agents/mcp.json.
 func PersonalFile(home string) string  { return filepath.Join(home, ".agents", "mcp.json") }
-func ProjectFile(folder string) string { return filepath.Join(folder, ".agents", "mcp.json") }
+func FolderFile(folder string) string { return filepath.Join(folder, ".agents", "mcp.json") }
+
+// RemovedFile is <home>/.agents/mcp.removed.json: the entries last taken out of the personal
+// mcp.json (#2195). That file is not in git, so this is where one written by hand comes back from.
+func RemovedFile(home string) string { return filepath.Join(home, ".agents", "mcp.removed.json") }
+
+// keptRemoved is how many entries RemovedFile keeps.
+const keptRemoved = 20
+
+// KeepRemoved puts a removed entry last in RemovedFile, in mcp.json's own shape so it can be
+// copied back as it is, and keeps only the last keptRemoved. It is the person's only copy and
+// may hold a token typed in, so it is theirs alone to read.
+func KeepRemoved(home, name string, entry skillcatalog.Value) error {
+	path := RemovedFile(home)
+	root, err := LoadFile(path)
+	if err != nil {
+		return err
+	}
+	servers, ok := root.Get("mcpServers")
+	if !ok {
+		servers = skillcatalog.Object()
+	}
+	servers.Remove(name)
+	servers.Set(name, entry)
+	if n := len(servers.Pairs); n > keptRemoved {
+		servers.Pairs = servers.Pairs[n-keptRemoved:]
+	}
+	root.Set("mcpServers", servers)
+	return store.WriteAtomically(path, []byte(root.Stringified()+"\n"), 0o600)
+}
 
 // FileProblem is an mcp.json that is there and cannot be taken as it is.
 type FileProblem struct{ Message string }
@@ -116,7 +145,7 @@ type Record struct {
 	ByHand       *bool     `json:"byHand,omitempty"`
 }
 
-// Key is personal/<name>, or <project folder>/<name>.
+// Key is personal/<name>, or <folder>/<name>.
 func Key(d wire.SkillDestination, name string) string { return skillcatalog.SidecarKey(d, name) }
 
 // LoadSidecar reads it; one that does not decode is set aside and this starts empty.
@@ -130,6 +159,7 @@ func LoadSidecar(path string) Sidecar {
 	if json.Unmarshal(b, &s) != nil {
 		aside := fmt.Sprintf("%s.unreadable-%d", path, time.Now().Unix())
 		os.Rename(path, aside)
+		store.TrimSetAsides(path)
 		log.Printf("%s: unreadable; kept as %s; servers added from the registry show as written by hand",
 			filepath.Base(path), filepath.Base(aside))
 		return empty

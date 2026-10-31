@@ -1,13 +1,10 @@
 import AgentsKitCore
 import SwiftUI
 
-/// The right-hand side, whether or not there is an agent yet.
+/// The right-hand side for a selected session. A new session starts on the folder page
+/// (`FolderAgentsView`), not here (#2651).
 ///
-/// One view rather than two, because a new chat has to turn into the chat. The prompt
-/// bar sits in the middle of an empty pane and moves to the foot of it when the
-/// conversation starts, and it is the same bar throughout.
-///
-/// Once there is a conversation the bar floats: the transcript runs the full height of
+/// The bar floats: the transcript runs the full height of
 /// the pane and scrolls underneath it, the way controls sit over content everywhere
 /// else on the system. The transcript is told how tall the bar is so the last thing an
 /// agent said can still be scrolled clear of it. What waits on the person is the last
@@ -21,7 +18,7 @@ struct ChatView: View {
     /// Set in a window of its own (#826): this session, not the selection.
     @Environment(\.poppedChat) private var popped
     /// Whether this window has an inspector: not a session's own window (#826), but a
-    /// project's does (#1089).
+    /// folder's does (#1089).
     @Environment(\.windowHasInspector) private var hasInspector
     @Environment(WindowRequests.self) private var requests
     /// Find in Chat is up over the chat (#1532).
@@ -60,7 +57,9 @@ struct ChatView: View {
                                                 go: { [model] match in await model.reveal(match) },
                                                 close: { finding = false })
                                 }
-                                // What it said it would do, as the phone has it (#341).
+                                // What it keeps working towards (#2742), then what it said
+                                // it would do, as the phone has them (#341).
+                                GoalCard(agent: agent)
                                 CurrentPlanStrip(agent: agent)
                             }
                             // On the page's own paper, across the whole pane: the
@@ -73,28 +72,29 @@ struct ChatView: View {
                         }
                         // Stopped at the pane's top. A scroll view draws on up under the
                         // window's toolbar, which paints no ground of its own since #456,
-                        // so the chat showed through behind the title and project name.
+                        // so the chat showed through behind the title and folder name.
                         .clipped()
                     form
                 }
+            } else if model.lookedForSelection == model.selection {
+                // A selection that names no session its host knows: it went while it was
+                // selected. Not a start form, which is the folder page's (#2651), as a
+                // session's own window says it (#826).
+                SessionDeletedPage(next: .pickAnother)
+            } else if let failure = model.work.transcriptLoadFailure {
+                // Not looked for: its host did not answer, so it is not called deleted (#2748).
+                SessionNotLoadedPage(failure: failure) { await model.loadTranscript() }
             } else {
-                VStack(spacing: 0) {
-                    Spacer(minLength: 0)
-                    CrowdMark()
-                        .frame(width: 220)
-                        .padding(.bottom, 28)
-                    form
-                    Spacer(minLength: 0)
-                }
+                // Not looked for yet, as the selection kept from the last launch: on its
+                // way, not gone.
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        // The prompt bar moving between the middle of an empty pane and the foot of a
-        // chat. Not one chat changing for another: animating that faded the old rows out
-        // for a quarter of a second while the new ones were built, and every frame of it
-        // redrew the whole pane, which was most of the cost of opening a chat (#90).
-        .animation(.snappy(duration: 0.28), value: (popped?.id ?? model.selection) == nil)
         // Title stays on ContentView's detail: one owner for the window title.
         .environment(\.chatActions, chatActions)
+        .environment(\.orgSandboxSetBy, model.sandboxSettings.setBy)
         .environment(\.appViewStore, views)
         .environment(\.appViewActions, agent.map(appViewActions))
         // A view full screen is drawn in the chat's place, as a pinned page is (#187).
@@ -152,14 +152,14 @@ struct ChatView: View {
             send: { [model] text in await model.send(text, to: agent.id) },
             openLink: { [openURL] url in openURL(url) },
             pin: { [model] view in
-                await model.pinView(view, in: ProjectKey(host: agent.host, folder: agent.projectFolder))
+                await model.pinView(view, in: FolderKey(host: agent.host, folder: agent.folderPath))
             },
             startAgent: { [model] start in
-                model.offerStart(start, in: ProjectKey(host: agent.host, folder: agent.projectFolder))
+                model.offerStart(start, in: FolderKey(host: agent.host, folder: agent.folderPath))
             },
             // The session on a pull request's branch (#837), asked under the view first.
             recipient: { [model] message in
-                model.recipient(of: message, in: ProjectKey(host: agent.host, folder: agent.projectFolder))
+                model.recipient(of: message, in: FolderKey(host: agent.host, folder: agent.folderPath))
             },
             sendTo: { [model] id, text in await model.send(text, to: id) })
     }
@@ -263,7 +263,10 @@ struct ChatView: View {
                         .read(agentID: agent.id, path: file.path),
                       let image = NSImage(data: bytes) else { return nil }
                 return Image(nsImage: image)
-            })
+            },
+            leaseStatus: { [model] agentID in model.work.leaseStatus(of: agentID) },
+            // Resources at the resource, as the line names it (036 FR-011).
+            openLease: { [model] name in model.showResources(at: name) })
     }
 
     /// The sandbox card's answer for the open agent (064).
@@ -278,6 +281,8 @@ struct ChatView: View {
     private func actions(for agent: Agent) -> some View {
         if agent.missingFolder != nil, agent.state != .archived {
             MissingFolderStrip(agent: agent)
+        } else if let reason = model.accountMoveReason(agent) {
+            AccountMoveStrip(agent: agent, reason: reason)
         } else if agent.state == .archived {
             // Matching the phone: an archived chat's own page is where Unarchive lives,
             // not only on the row you left it from.
@@ -297,27 +302,6 @@ struct ChatView: View {
         } else if ContinueWhenBackWords.offers(agent) || agent.continueWhenBack != nil,
                   model.host(agent.host, has: Capability.chatContinueWhenBack1) {
             ContinueWhenBackStrip(agent: agent)
-        } else if model.isBlocked(agent) {
-            // Stop is the prompt's own button while the agent works; Archive is on the
-            // session's row and in the toolbar. What is left here is only what the page
-            // has to say: what a blocked one waits on and the way on (039). An ask to be
-            // archived is a card at the end of the transcript (#827).
-            HStack(alignment: .top, spacing: 8) {
-                // What it waits on, as its row says it (#341).
-                WaitLines(lines: model.blockLines(agent))
-                Spacer(minLength: 0)
-                // What the card's Carry on does.
-                Button {
-                    Task { await model.carryOn(agent.id) }
-                } label: {
-                    Label(AgentsModel.carryOnLabel, systemImage: "play.circle")
-                }
-                .buttonStyle(.paper)
-                .appText(.fine)
-                .help(AgentsModel.carryOnHelp(for: agent))
-            }
-            .chatColumn()
-            .padding(.vertical, 8)
         }
     }
 
@@ -341,10 +325,10 @@ struct ChatView: View {
                     .help(selectedHostOffline ? offlineHelp : "")
             })
         }
-        // A change its agent made to the project's own files waits the same way (#531).
+        // A change its agent made to the folder's own files waits the same way (#531).
         for change in model.work.guardedChanges(askedIn: agent.id) {
             cards.append(WaitingCard(id: "guarded:" + change.id) {
-                GuardedChangeQuestion(change: change, key: ProjectKey(host: agent.host, folder: agent.projectFolder))
+                GuardedChangeQuestion(change: change, key: FolderKey(host: agent.host, folder: agent.folderPath))
                     .chatColumn()
             })
         }
@@ -370,11 +354,25 @@ struct ChatView: View {
                     .help(selectedHostOffline ? offlineHelp : "")
             })
         }
+        // A wait on sessions or on a time, the same card in the same place (#2750): it was
+        // a strip under the chat's head with Carry on.
+        if let (report, block) = model.work.openBlock(agent) {
+            cards.append(WaitingCard(id: "block:" + agent.id.uuidString) {
+                BlockWaitCard(block: block, since: report.at, lines: model.blockLines(agent),
+                              stop: { await model.carryOn(agent.id) },
+                              help: AgentsModel.carryOnHelp(for: agent),
+                              isDisabled: selectedHostOffline)
+                    .chatColumn()
+                    .help(selectedHostOffline ? offlineHelp : "")
+            })
+        }
         // The agent's wait on events, under the questions (#1995): it was a capsule over
         // the prompt.
         if agent.eventWait?.isOpen == true, let status = model.work.waitStatus(of: agent) {
             cards.append(WaitingCard(id: "wait:" + agent.id.uuidString) {
-                WaitCard(status: status,
+                WaitCard(status: status, eventWait: agent.eventWait,
+                         isLineWait: agent.eventWait?.lineResource != nil,
+                         lines: model.work.waitEventLines(of: agent),
                          open: { model.showEvents(at: .waitingNow) },
                          stop: { await model.cancelWait(of: agent.id) },
                          isDisabled: selectedHostOffline)

@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd"
+	"github.com/alexec/agents/Go/internal/agentsd/redact"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/buildinfo"
 	"github.com/alexec/agents/Go/internal/controllink"
@@ -27,12 +28,14 @@ import (
 	"github.com/alexec/agents/Go/internal/safe"
 )
 
-// logLine writes each line as DaemonLog does: the time in UTC to the second, then the words.
+// logLine writes each line as DaemonLog does: the time in UTC to the second, then the words,
+// with any known token shape redacted (#1001).
 type logLine struct{ w io.Writer }
 
 func (l logLine) Write(p []byte) (int, error) {
 	stamp := time.Now().UTC().Format("2006-01-02T15:04:05Z") + " "
-	if _, err := l.w.Write(append([]byte(stamp), p...)); err != nil {
+	words, _ := redact.Bytes(p)
+	if _, err := l.w.Write(append([]byte(stamp), words...)); err != nil {
 		return 0, err
 	}
 	return len(p), nil
@@ -85,14 +88,29 @@ func main() {
 		log.Fatal(err)
 	}
 	d.Quit = stop // daemon/quit
+	// This machine's key: in a Keychain item only agentsd reads on a Mac (the root's own
+	// service, so a scratch root has its own), control-host-key on Linux.
+	d.HostKey = controllink.HostKeyFor(cl.root)
 	// events/raise, as a debug build on a scratch root has it: never on a root a person
 	// uses, nor in a release.
 	d.RaiseByHand = buildinfo.Version == "dev" && !ordinaryRoot(cl.root)
 	if home := personalHome(cl); home != "" {
-		// The person's settings and chat project are in their home: a server's
+		// The person's settings are in their home: a server's
 		// (Daemon.swift's --serve), and the ordinary root's (StoreLocations.personalHome).
 		d.SettingsDir = filepath.Join(home, ".agents", "settings")
-		d.ChatHome = home
+		d.PersonalHome = home
+	}
+	// A root that joined follows its organisation's policy from its first call, also when
+	// started without the control network (#998, FR-013): only its control plane's key
+	// checks the policy it keeps. join sets it again after a new enrolment.
+	d.SetPin(machinePin(cl))
+	if member, err := controllink.LoadMembership(loc.Root); err == nil && member.Host != "" {
+		if err := d.Pin().AdmitsMember(member); err != nil {
+			log.Printf("pin: the membership kept here is for another control plane, and is not used: %v", err)
+		} else {
+			d.SetControlKey(member.ControlKey)
+			d.SetMember(member)
+		}
 	}
 	safe.Go("socket", func() {
 		if err := d.ServeSocket(ctx, loc.Socket()); err != nil && ctx.Err() == nil {
@@ -103,7 +121,6 @@ func main() {
 		join(ctx, cl, d)
 	}
 	log.Printf("agentsd %s on %s, root %s", buildinfo.String(), platform(), cl.root)
-	d.EnsureChatProject()
 	// The restart itself, for a wait or a workflow that names it (#1219), and from now on
 	// a word once a minute that this host is alive.
 	d.SayRestarted()
@@ -111,6 +128,7 @@ func main() {
 	d.StartConnections()
 	d.StartRetention()
 	d.StartBackups()
+	d.StartProjects()
 	d.StartMCPHealth()
 	d.StartMCPEvents()
 	d.StartMachineWatch()
@@ -131,7 +149,12 @@ type commandLine struct {
 	// (#1951). Agents Host gives them only then.
 	web     string
 	webPort int
-	args    []string
+	// pinAddress, pinKey and mustJoin: the Mac's managed preferences, as Agents Host gives
+	// them (#998, FR-025). /etc/agents/policy.json, when there is one, wins.
+	pinAddress string
+	pinKey     string
+	mustJoin   bool
+	args       []string
 }
 
 func parse(args []string) commandLine {
@@ -155,6 +178,8 @@ func parse(args []string) commandLine {
 			cl.detach = true
 		case "--control-network":
 			cl.network = true
+		case "--must-join":
+			cl.mustJoin = true
 		}
 	}
 	cl.root = value("--root")
@@ -163,6 +188,8 @@ func parse(args []string) commandLine {
 		cl.code = value("--control-code")
 	}
 	cl.hostName = value("--host-name")
+	cl.pinAddress = value("--pin-address")
+	cl.pinKey = value("--pin-key")
 	cl.web = value("--web")
 	cl.webPort, _ = strconv.Atoi(value("--web-port"))
 	if cl.root == "" {
@@ -179,6 +206,19 @@ func parse(args []string) commandLine {
 	}
 	cl.root, _ = filepath.Abs(cl.root)
 	return cl
+}
+
+// machinePin is the pin (#998, US7): /etc/agents/policy.json when root owns it and nobody
+// else can write it, or else the managed preferences Agents Host gave. Read once, at start.
+func machinePin(cl commandLine) *agentsd.MachinePin {
+	pin, err := agentsd.ReadPinFile(agentsd.PinFile, 0)
+	if err != nil {
+		log.Printf("pin: %v", err)
+	}
+	if pin != nil {
+		return pin
+	}
+	return agentsd.PinFromFlags(cl.pinAddress, cl.pinKey, cl.mustJoin)
 }
 
 func (cl commandLine) controlNetwork() bool { return cl.code != "" || cl.network }
@@ -226,7 +266,7 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 	if name == "" {
 		name, _ = os.Hostname()
 	}
-	hello := controllink.HostHello{Version: buildinfo.Version, Platform: platform(), MachineID: machine.ID(),
+	hello := controllink.MachineHello{Version: buildinfo.Version, Platform: platform(), MachineID: machine.ID(),
 		Implementation: new(buildinfo.Implementation), Capabilities: d.Capabilities()}
 	if name != "" {
 		hello.Name = &name
@@ -238,17 +278,26 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 			code = strings.TrimSpace(string(b))
 		}
 	}
-	private, err := controllink.HostPrivateKey(loc.Root)
+	private, err := controllink.HostPrivateKey(d.HostKey)
 	if err != nil {
 		log.Fatal(err)
 	}
+	pin := d.Pin()
 	member, err := controllink.LoadMembership(loc.Root)
+	if err == nil && member.Host != "" && pin.AdmitsMember(member) != nil {
+		// Joined another control plane before the pin: it is not dialled (FR-027).
+		member = nil
+	}
 	askFile := filepath.Join(loc.Root, "control-join-ask")
-	if code == "" && (err != nil || member.Host == "") {
+	if code == "" && (member == nil || member.Host == "") {
 		if b, err := os.ReadFile(askFile); err == nil {
 			var ask controllink.JoinAsk
 			if err := json.Unmarshal(b, &ask); err != nil {
 				log.Fatalf("control-join-ask: %v", err)
+			}
+			if err := pin.Admits(nil, ask.URL); err != nil {
+				log.Printf("pin: not asking to join %s: %v", ask.URL, err)
+				return
 			}
 			if member = askToJoin(ctx, loc.Root, ask, private, hello); member == nil {
 				return
@@ -263,6 +312,10 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 			return
 		}
 		member = enrol(ctx, code, codeFile, func(ctx context.Context, c *controllink.Code) (*controllink.Membership, error) {
+			// A code for another control plane is refused here, before it is used (FR-027).
+			if err := pin.Admits(c.ControlKey, c.URL); err != nil {
+				return nil, err
+			}
 			return controllink.Enroll(ctx, loc.Root, c, private, hello)
 		})
 		if member == nil {
@@ -271,8 +324,16 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 		os.Remove(codeFile)
 		log.Printf("enrolled as host %s with %s", member.Host, member.Name)
 	}
+	if err := pin.AdmitsMember(member); err != nil {
+		// An approved ask that turned out to be another control plane's key.
+		log.Printf("pin: the control plane joined is not the one required, and is not used: %v", err)
+		return
+	}
+	// The organisation's policy is checked with the control key (#998).
+	d.SetControlKey(member.ControlKey)
+	d.SetMember(member)
 	up := &controllink.Uplink{Root: loc.Root, Member: member, Private: private, Hello: hello, Accept: d.Accept,
-		Lend: d.LendingPort, Rotated: d.MoveLocal}
+		Lend: d.LendingPort, Rotated: func(key []byte) { d.ControlKeyRotated(key); d.MoveLocal(key) }}
 	d.Tunneler = up
 	// The needs it shows nowhere go to the control plane, offered again on each return (#1367).
 	up.OnChange = func(connected bool, problem string) {
@@ -299,7 +360,7 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 
 // askToJoin asks to join with no code (#994) until the person approves it, asking again
 // when a request is denied or runs out, or the control plane can't be reached.
-func askToJoin(ctx context.Context, root string, ask controllink.JoinAsk, private []byte, hello controllink.HostHello) *controllink.Membership {
+func askToJoin(ctx context.Context, root string, ask controllink.JoinAsk, private []byte, hello controllink.MachineHello) *controllink.Membership {
 	for {
 		member, err := controllink.AskToJoin(ctx, root, ask, private, hello, func(code string) {
 			os.WriteFile(filepath.Join(root, "control-join-shown"), []byte(code+"\n"), 0o600)

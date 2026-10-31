@@ -3,7 +3,7 @@ import SwiftUI
 
 /// One host's backups (#1815): the same `BackupsSection` as this Mac's, drawn for a server
 /// and sent to that host with the same `backups/*` methods. The Mac opens it from a host's
-/// menu in Settings ▸ Machines, the Remote from Settings ▸ Servers' Backups;
+/// menu in Settings ▸ Machines, the Remote from Settings ▸ Machines' Backups;
 /// the web page draws the same in Web/src/views/Settings.tsx.
 ///
 /// It holds the host's state itself, read when it opens and after each change. While a

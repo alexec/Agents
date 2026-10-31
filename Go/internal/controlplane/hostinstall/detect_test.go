@@ -159,7 +159,7 @@ func TestOnlyWhatAnswersIsAddedAndBastionsNeverAre(t *testing.T) {
 	}
 }
 
-// #610: Add a Server's server box, from ssh -G alone: nothing is probed or installed.
+// #610: Add a Machine's server box, from ssh -G alone: nothing is probed or installed.
 func TestTheServerBoxIsOfferedTheConfigsHostsResolved(t *testing.T) {
 	d := detector{
 		aliases: func() []string { return []string{"devbox", "bastion", "gpu", "mine"} },

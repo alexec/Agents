@@ -49,7 +49,7 @@
 <text class="k" x="200.0" y="675">[Container: files on the host]</text>
 <text class="d" x="200.0" y="696">agent records, transcripts, workflows:</text>
 <text class="d" x="200.0" y="711">~/Library/Application Support/Agents,</text>
-<text class="d" x="200.0" y="726">~/.agents, a project&#x27;s .agents/</text>
+<text class="d" x="200.0" y="726">~/.agents, a folder&#x27;s .agents/</text>
 <rect x="410" y="620" width="260" height="120" rx="8" fill="#438dd5" stroke="#438dd5"/>
 <text class="t" x="540.0" y="646">Host daemon (agentsd)</text>
 <text class="k" x="540.0" y="663">[Container: Swift daemon, macOS + Linux]</text>

@@ -77,14 +77,18 @@ nav:
       - how-to/set-up-on-this-mac.md
       - how-to/connect-a-window-or-phone.md
       - how-to/sign-in-with-google-apple-or-github.md
+      - how-to/sign-in-with-your-organisation.md
       - how-to/set-up-sign-in-for-your-own-build.md
       - how-to/use-agents-in-a-browser.md
-      - how-to/add-a-server.md
+      - how-to/add-a-machine.md
       - how-to/invite-someone.md
-      - how-to/send-a-project-to-a-server.md
-      - how-to/start-workspaces-from-agents.md
-      - how-to/add-a-workspace-provider.md
-      - how-to/set-up-a-cloud-workspace-provider.md
+      - how-to/set-an-organisation-policy.md
+      - how-to/pin-machines-with-mdm.md
+      - how-to/add-an-org-key-or-gateway.md
+      - how-to/send-a-folder-to-a-machine.md
+      - how-to/start-machines-from-agents.md
+      - how-to/add-a-machine-provider.md
+      - how-to/set-up-a-cloud-machine-provider.md
       - how-to/turn-the-relay-on-or-off.md
       - how-to/run-the-control-plane-in-the-cloud.md
       - how-to/run-the-hosted-service.md
@@ -94,10 +98,10 @@ nav:
       - how-to/back-up-a-control-plane.md
       - how-to/release-agents-host.md
       - how-to/fix-agents-host-not-starting.md
-      - how-to/chat-without-a-project.md
-      - how-to/add-a-project.md
+      - how-to/add-a-folder.md
       - how-to/start-in-a-worktree.md
       - how-to/give-an-agent-more-folders.md
+      - how-to/use-auto.md
       - how-to/choose-runtime-model-mode.md
       - how-to/pick-up-a-conversation.md
       - how-to/answer-a-question.md
@@ -120,7 +124,7 @@ nav:
       - how-to/use-linear-issues.md
       - how-to/wait-for-mail.md
       - how-to/hand-files-to-a-workflow.md
-      - how-to/pin-a-page-to-a-project.md
+      - how-to/pin-a-page-to-a-folder.md
       - how-to/sign-a-runtime-in.md
       - how-to/assess-a-runtime.md
       - how-to/share-skills-across-agents.md
@@ -158,8 +162,9 @@ nav:
       - reference/on-every-machine.md
       - reference/reports.md
       - reference/console.md
-      - reference/workspace-providers.md
+      - reference/machine-providers.md
       - reference/integrations.md
+      - reference/sign-in.md
       - reference/ssh-options.md
       - reference/get-started-checklist.md
       - reference/charts-and-diagrams.md
@@ -171,6 +176,8 @@ nav:
       - explanation/direction.md
       - explanation/why-agents.md
       - explanation/control-plane.md
+      - explanation/org-keys-and-gateways.md
+      - explanation/org-identity.md
       - explanation/people-and-machines.md
       - Compliance pack:
           - explanation/compliance/index.md
@@ -178,13 +185,14 @@ nav:
           - explanation/compliance/sub-processors.md
           - explanation/compliance/security-overview.md
           - explanation/compliance/data-and-retention.md
+      - explanation/organisation-policy.md
       - explanation/window-and-daemon.md
       - explanation/architecture.md
       - explanation/versions.md
       - explanation/scoped-tools.md
       - explanation/views.md
       - explanation/connector-levels.md
-      - explanation/projects-hosts-worktrees.md
+      - explanation/folders-machines-worktrees.md
       - explanation/leases.md
       - explanation/phone-and-ipad.md
       - explanation/live-activities.md

@@ -30,12 +30,15 @@ func (e event) json() map[string]any {
 
 var (
 	repoProperty = property{name: "repo", kind: "string",
-		description: "The GitHub repo, owner/name. Left out, the repo this project's folder pushes to.",
+		description: "The GitHub repo, owner/name. Left out, the repo this folder pushes to.",
 		pattern:     regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`), looksLike: "owner/name"}
 	prProperty = property{name: "pr", kind: "integer", description: "Only this pull request, by number."}
 	// anyoneProperty opts into anyone's issue, comment or PR (#728); left out, only the repo's own people.
 	anyoneProperty = property{name: "anyone", kind: "boolean",
 		description: "true: from anyone, bots, forks and people outside the repo too. Left out, only the repo's owner, members and collaborators, never a bot, and for a PR never one from a fork."}
+	// mineProperty is only the connection's owner's own PRs (#2034), a fork's too.
+	mineProperty = property{name: "mine", kind: "boolean",
+		description: "true: only pull requests by the GitHub account this server is connected as, whatever anyone says."}
 )
 
 // ownPRs is what every PR event says of whose PRs it raises.
@@ -59,11 +62,14 @@ func prSchema(extra map[string]any) map[string]any {
 	return object(props)
 }
 
+// fixesSchema is a PR's fixes: the issues its body closes, "#12" or "owner/repo#12" (#2349).
+var fixesSchema = map[string]any{"type": "array", "items": str}
+
 // events are the events this server offers, in CIWatcher's order.
 var events = append([]event{
 	{name: "checks.failed", title: "Checks failed",
 		description: "A pull request's checks finished with a failure: one event per run and attempt, so a rerun that fails again is a new one." + ownPRs,
-		input:       schema{repoProperty, branchProperty("Only runs on this PR branch."), prProperty, anyoneProperty},
+		input:       schema{repoProperty, branchProperty("Only runs on this PR branch."), prProperty, anyoneProperty, mineProperty},
 		payload: object(map[string]any{
 			"pr": prSchema(nil), "headSha": str,
 			"run":        object(map[string]any{"id": integer, "attempt": integer, "name": str, "url": str}),
@@ -72,17 +78,22 @@ var events = append([]event{
 	{name: "pr.opened", title: "Pull request opened",
 		description: "A pull request was opened, or a draft was marked ready for review: a PR open and not a draft now that was not at the last poll. Drafts never count. Reopened, it is raised again." + ownPRs,
 		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
-		payload:     object(map[string]any{"pr": prSchema(map[string]any{"author": str}), "openedAt": str})},
+		payload:     object(map[string]any{"pr": prSchema(map[string]any{"author": str, "fixes": fixesSchema}), "openedAt": str})},
 	{name: "pr.merged", title: "Pull request merged", description: "A pull request was merged." + ownPRs,
 		input:   schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
-		payload: object(map[string]any{"pr": prSchema(nil), "mergedAt": str, "mergeSha": str})},
+		payload: object(map[string]any{"pr": prSchema(map[string]any{"fixes": fixesSchema}), "mergedAt": str, "mergeSha": str})},
 	{name: "pr.closed", title: "Pull request closed", description: "A pull request was closed without being merged." + ownPRs,
 		input:   schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
-		payload: object(map[string]any{"pr": prSchema(nil), "closedAt": str})},
+		payload: object(map[string]any{"pr": prSchema(map[string]any{"fixes": fixesSchema}), "closedAt": str})},
 	{name: "pr.conflicted", title: "Pull request in conflict",
 		description: "An open pull request began to conflict with its base, so it cannot merge and its CI may not run until it is rebased. Once per conflict: it is raised again only after the PR merges cleanly and then conflicts anew." + ownPRs,
-		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
+		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty, mineProperty},
 		payload:     object(map[string]any{"pr": prSchema(nil), "conflictedAt": str})},
+	// For the person, not the repo (#2034): what asks the connection's owner for something.
+	{name: "review.requested", title: "Review requested from me",
+		description: "A review was requested from the GitHub account this server is connected as, on an open pull request: once per request, so a request taken back and made again is a new one. Anyone's PR, a fork's too.",
+		input:       schema{repoProperty, prProperty},
+		payload:     object(map[string]any{"pr": prSchema(map[string]any{"author": str}), "requestedAt": str})},
 	// CodeRabbit's (#1344), known by its GitHub App, not by a name.
 	{name: "review.posted", title: "CodeRabbit reviewed",
 		description: "CodeRabbit finished a review of a pull request's head commit: its CodeRabbit status on that commit gone to success, or, where it sets no status, a review by its GitHub App on that commit. Once per review: a push it reviews, or a full review asked of the same commit (coderabbit_review with full), is a new one. state is its review's (commented, approved or changes_requested), empty when only its status says so; its comments come as review.comment." + ownPRs,
@@ -93,7 +104,16 @@ var events = append([]event{
 		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
 		payload: object(map[string]any{"pr": prSchema(nil), "commentedAt": str,
 			"comment": object(map[string]any{"id": integer, "path": str, "line": integer, "inReplyTo": integer, "body": str, "url": str})})},
-}, issueEvents()...)
+}, append(issueEvents(), assignedEvent)...)
+
+// assignedEvent is for the person, not the repo (#2034): an issue given to the connection's owner.
+var assignedEvent = event{name: "issue.assigned", title: "Issue assigned to me",
+	description: "An open issue was assigned to the GitHub account this server is connected as: once per assignment, so one unassigned and assigned again is a new one. Anyone's issue.",
+	input:       schema{repoProperty, property{name: "issue", kind: "integer", description: "Only this issue, by number."}},
+	payload: object(map[string]any{"issue": object(map[string]any{
+		"number": integer, "title": str, "author": str, "labels": map[string]any{"type": "array", "items": str}, "url": str,
+		"assignees": map[string]any{"type": "array", "items": str},
+	}), "assignedAt": str})}
 
 func issueEvents() []event {
 	issueSchema := object(map[string]any{
@@ -271,13 +291,46 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 		}
 		a.repo = repo
 	}
+	// mine: the connection's owner's own open PRs, asked once a poll (#2034).
+	var yours *Yours
+	if a.mine || e.name == "review.requested" || e.name == "issue.assigned" {
+		y, err := s.GitHub.Yours(ctx, a.repo)
+		if err != nil {
+			return nil, eventsError(err)
+		}
+		yours = &y
+	}
 	switch e.name {
+	case "review.requested":
+		return s.pollDiff(ctx, e.name, "requestedAt", a, p, func() ([]state, error) {
+			var out []state
+			for _, r := range yours.Reviews {
+				j := r.PR.json()
+				j["author"] = r.Author
+				out = append(out, state{pr: r.PR, on: new(true), json: j})
+			}
+			return out, nil
+		})
+	case "issue.assigned":
+		return s.pollDiff(ctx, e.name, "assignedAt", a, p, func() ([]state, error) {
+			var out []state
+			for _, i := range yours.Assigned {
+				if a.issue == 0 || i.Number == a.issue {
+					out = append(out, state{pr: PR{Number: i.Number, Title: i.Title, URL: i.URL}, on: new(true), json: i.json()})
+				}
+			}
+			return out, nil
+		})
 	case "pr.conflicted":
 		return s.pollDiff(ctx, e.name, "conflictedAt", a, p, func() ([]state, error) {
 			prs, err := s.GitHub.ConflictPRs(ctx, a.repo)
 			var out []state
 			for _, c := range prs {
-				if a.anyone || c.Trusted {
+				if yours != nil {
+					if yours.owns(c.PR.Number) {
+						out = append(out, state{pr: c.PR, on: c.Conflicts, json: c.PR.json()})
+					}
+				} else if a.anyone || c.Trusted {
 					out = append(out, state{pr: c.PR, on: c.Conflicts, json: c.PR.json()})
 				}
 			}
@@ -312,7 +365,9 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 			return out, err
 		})
 	}
-	return s.poll(e, p, func(since string) ([]candidate, bool, error) { return candidates(ctx, s.GitHub, e.name, a, since) })
+	return s.poll(e, p, func(since string) ([]candidate, bool, error) {
+		return candidates(ctx, s.GitHub, e.name, a, yours, since)
+	})
 }
 
 // poll is events/poll over a cursor: the first poll (no cursor) gives none and starts from
@@ -462,7 +517,11 @@ func (s *Events) pollDiff(_ context.Context, name, key string, a args, p pollPar
 	out := []any{}
 	if !first {
 		for _, t := range taken {
-			data := map[string]any{"pr": t.json, key: now}
+			root := "pr"
+			if strings.HasPrefix(name, "issue.") {
+				root = "issue" // issue.assigned (#2034)
+			}
+			data := map[string]any{root: t.json, key: now}
 			for k, v := range t.extra {
 				data[k] = v
 			}
@@ -474,7 +533,7 @@ func (s *Events) pollDiff(_ context.Context, name, key string, a args, p pollPar
 }
 
 // candidates finds what an event may raise at or after since.
-func candidates(ctx context.Context, gh GitHub, name string, a args, since string) ([]candidate, bool, error) {
+func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Yours, since string) ([]candidate, bool, error) {
 	repo := a.repo
 	if kind, ok := strings.CutPrefix(name, "issue."); ok {
 		items, truncated, err := gh.IssueActivity(ctx, repo, IssueKind(kind), since)
@@ -537,14 +596,18 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, since strin
 			}
 			list = append(list, candidate{eventID: fmt.Sprintf("checks.failed:%s:%d:%d", repo, ref.ID, ref.Attempt), time: at,
 				data: func() (map[string]any, error) {
-					if a.pr != 0 && ref.PRNumber != 0 && ref.PRNumber != a.pr {
+					if (a.pr != 0 && ref.PRNumber != 0 && ref.PRNumber != a.pr) || (yours != nil && ref.PRNumber != 0 && !yours.owns(ref.PRNumber)) {
 						return nil, nil
 					}
 					details, err := gh.RunDetails(ctx, repo, ref)
 					if err != nil || details == nil {
 						return nil, err
 					}
-					if (a.pr != 0 && details.PR.Number != a.pr) || (!a.anyone && !details.Trusted) {
+					if a.pr != 0 && details.PR.Number != a.pr {
+						return nil, nil
+					}
+					// mine: the owner's own PR, trusted or not; else the trust filter (#728).
+					if yours != nil && !yours.owns(details.PR.Number) || yours == nil && !a.anyone && !details.Trusted {
 						return nil, nil
 					}
 					return details.json(), nil

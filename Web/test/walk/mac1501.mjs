@@ -1,14 +1,14 @@
 // The #1501 walk: a control plane elsewhere, where this Mac's host joined with an id of its own,
 // not `mac`. Pairs by a browser code, and checks that the page takes that host as This Mac: its
-// project is named alone in the sidebar, and a display choice made on the page goes to it
+// folder is named alone in the sidebar, and a display choice made on the page goes to it
 // (the walk reads the host's preferences/get itself afterwards).
 // Fails on any error the page throws.
 //
-//   node Web/test/walk/mac1501.mjs <page URL> <browser code> <project> <out dir> [chrome flag…]
+//   node Web/test/walk/mac1501.mjs <page URL> <browser code> <folder> <out dir> [chrome flag…]
 
 import { launch } from "./cdp.mjs";
 
-const [pageURL, code, project, out, ...args] = process.argv.slice(2);
+const [pageURL, code, folder, out, ...args] = process.argv.slice(2);
 const js = JSON.stringify;
 let failed = 0;
 const check = (ok, line) => { if (!ok) failed += 1; console.log(`${ok ? "ok  " : "FAIL"} ${line}`); };
@@ -20,9 +20,9 @@ try {
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  await page.waitFor(`document.querySelectorAll(".sidebar .row.project").length >= 1`, 20_000);
-  const labels = await page.eval(`[...document.querySelectorAll(".sidebar .row.project .disclosure")].map((b) => b.getAttribute("aria-label"))`);
-  check(labels.some((l) => l.endsWith(` ${project}`) && !l.includes(":")), `the project is named alone, as This Mac's: ${js(labels)}`);
+  await page.waitFor(`document.querySelectorAll(".sidebar .row.folder").length >= 1`, 20_000);
+  const labels = await page.eval(`[...document.querySelectorAll(".sidebar .row.folder .disclosure")].map((b) => b.getAttribute("aria-label"))`);
+  check(labels.some((l) => l.endsWith(` ${folder}`) && !l.includes(":")), `the folder is named alone, as This Mac's: ${js(labels)}`);
   await page.shot(`${out}/web-1-sidebar.png`);
 
   // A display choice: the first sidebar switch in Settings, which goes to the person's Mac.

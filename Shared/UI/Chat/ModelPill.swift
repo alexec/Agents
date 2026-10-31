@@ -98,9 +98,14 @@ struct ModelPill: View {
         ForEach(Array(option.groups.enumerated()), id: \.offset) { _, group in
             Section(group.name ?? "") {
                 ForEach(group.choices) { choice in
-                    Toggle(choice.name, isOn: Binding(
-                        get: { (chosen.wrappedValue ?? option.currentValue) == choice.value },
-                        set: { if $0 { chosen.wrappedValue = choice.value } }))
+                    if let mark = choice.setBy {
+                        // A model the organisation does not allow: shown, not chosen (#998).
+                        OrgPolicyMenuItem(name: choice.name, mark: mark)
+                    } else {
+                        Toggle(choice.name, isOn: Binding(
+                            get: { (chosen.wrappedValue ?? option.currentValue) == choice.value },
+                            set: { if $0 { chosen.wrappedValue = choice.value } }))
+                    }
                 }
             }
         }

@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac, iphone, ipad]
-description: Open shells in an agent's folder from the Terminal pane, or in the project folder with Control-`, one per tab, keep them running, and run a command from a reply.
+description: Open shells in an agent's folder from the Terminal pane, or in the folder with Control-`, one per tab, keep them running, and run a command from a reply.
 ---
 
 # Use a shell in an agent's folder
@@ -69,12 +69,12 @@ one. A session in a window of its own on the Mac has no **Terminal** pane, so it
 If the shell cannot start, the app says **The session's shell did not start, so the command
 did not run.**
 
-## A shell in the project folder
+## A shell in the folder
 
-Press Control-` (**View ▸ Project Terminal**) to open a shell in the selected project's
-own folder, on the project's Mac or server, under whatever page is open. It needs no
-agent: it opens with none chosen, and choosing an agent in the project leaves it where it
-is, in the project folder, not the agent's worktree. Another project shows that project's
+Press Control-` (**View ▸ Folder Terminal**) to open a shell in the selected folder's
+own folder, on the folder's Mac or server, under whatever page is open. It needs no
+agent: it opens with none chosen, and choosing an agent in the folder leaves it where it
+is, in the folder, not the agent's worktree. Another folder shows that folder's
 shells.
 
 Click **+** (**New shell**) for another, in a tab of its own, as in an agent's pane.
@@ -82,7 +82,7 @@ Press Control-` again, or click the down arrow, to hide them; they keep running.
 tab's **×** to end that shell; closing the last puts the panel away. Drag its top edge
 to make it taller.
 
-On iPhone and iPad, choose **Project Terminal** from a project page's **…** menu, or
+On iPhone and iPad, choose **Folder Terminal** from a folder page's **…** menu, or
 press Control-` on an iPad keyboard. It has the same tabs as the Mac. **Done** puts it
 away; **End Shell** ends the shell in front.
 
@@ -102,7 +102,7 @@ instead, click out of the shell, or use the menu.
 
 ## If it doesn't work
 
-- **The project shell says There is no such agent.** The project is on a server with an
+- **The folder shell says There is no such agent.** The folder is on a server with an
   older version of Agents. The server updates when nothing is mid-turn there.
 - **The shell is no longer running.** It exited, for example after `exit`. Click **New
   shell** to open another.

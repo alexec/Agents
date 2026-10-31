@@ -16,18 +16,18 @@ where?". You usually need only one of them at a time, so the page shows one at a
 
 ## Before you start
 
-- A project with a workflow in it. See [Set up a workflow](set-up-a-workflow.md).
+- A folder with a workflow in it. See [Set up a workflow](set-up-a-workflow.md).
 
 ## Open the page
 
-- **On the Mac:** click the workflow under **Workflows** in its project in the sidebar, or
-  under **Workflows** on the project's page. You can also right-click its row and choose
+- **On the Mac:** click the workflow under **Workflows** in its folder in the sidebar, or
+  under **Workflows** on the folder's page. You can also right-click its row and choose
   **Open**.
-- **On iPhone and iPad:** tap the workflow under **Workflows** in its project in the
-  sidebar, or on the project's page.
-- **On the web page:** click the workflow under **Workflows** in its project in the sidebar.
+- **On iPhone and iPad:** tap the workflow under **Workflows** in its folder in the
+  sidebar, or on the folder's page.
+- **On the web page:** click the workflow under **Workflows** in its folder in the sidebar.
 
-A workflow you pinned is also in its project's **Pinned** group, at the top.
+A workflow you pinned is also in its folder's **Pinned** group, at the top.
 
 The page opens on **Activity**. To see the other half, choose **Configuration** in the
 switch under the title. The page keeps your choice when you open another workflow, so you
@@ -124,7 +124,7 @@ Host** are in its place. **Approve** first, and then **Run now** comes back.
 | Archive | **Archive** | **Archive** in the bar | **Archive** |
 | Delete the file | **Delete…** | **Delete…** in the bar | **Delete…** |
 
-**Archive** goes back to the project. Off and archived are lines in the workflow's own
+**Archive** goes back to the folder. Off and archived are lines in the workflow's own
 file (`enabled: false`, `archived: true`), and the page says so under the title. Commit
 the file if your other clones should have the change too.
 
@@ -136,7 +136,7 @@ the file if your other clones should have the change too.
 - **A run started but did not finish.** Open it from **History** or **Recent runs**. Its
   status in the chat says how it ended: **Stuck**, **Partly done** or **Unexpected stop**.
 - **The page says This workflow is no longer there.** Its file was removed or renamed.
-  On the Mac, the page then goes back to the project.
+  On the Mac, the page then goes back to the folder.
 - **Run now is not there.** The workflow waits for your OK, or it is archived. Approve it,
   or click **Unarchive**.
 

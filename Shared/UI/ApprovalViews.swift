@@ -7,7 +7,7 @@ import SwiftUI
 /// approving" reads the same whatever it is. The window and the Remote both draw it.
 struct ApprovalRowLabel: View {
     let approval: Approval
-    /// Which project it is in, after the title, as a smart group's rows name theirs.
+    /// Which folder it is in, after the title, as a smart group's rows name theirs.
     var place: String?
 
     var body: some View {
@@ -43,13 +43,13 @@ struct ApprovalRowLabel: View {
 
 /// The mark every approval row wears: a shield in the attention tint, as a workflow
 /// waiting for an OK has worn (#587); a failed workflow (#989), the triangle its own row
-/// wears on its project's page.
+/// wears on its folder's page.
 struct ApprovalMark: View {
     var kind: Approval.Kind?
 
     var body: some View {
         Image(systemName: kind == .workflowFailed ? "exclamationmark.triangle" : "checkmark.shield")
-            .foregroundStyle(StateTint.attention.style(or: .primary))
+            .sidebarMark(StateTint.attention.style(or: .primary))
             .frame(width: 16)
             .accessibilityHidden(true)
     }

@@ -17,7 +17,7 @@ public enum ControlWire {
     /// A line from a client, taken apart.
     public enum ClientFrame: Equatable, Sendable {
         /// For the host named.
-        case toHost(HostID, message: String)
+        case toHost(MachineRef, message: String)
         /// For the control plane itself.
         case toControl(message: String)
         /// A bare JSON-RPC line, from a client that has never heard of the control plane:
@@ -79,7 +79,7 @@ public enum ControlWire {
 
     // MARK: Client ⇄ control
 
-    public static func wrap(host: HostID?, message: String) -> String {
+    public static func wrap(host: MachineRef?, message: String) -> String {
         guard let host else { return #"{"m":"# + message + "}" }
         return #"{"h":"# + quoted(host.rawValue) + #","m":"# + message + "}"
     }
@@ -90,7 +90,7 @@ public enum ControlWire {
         }
         if line.hasPrefix(#"{"h":""#), let (host, rest) = plainString(after: line.dropFirst(6)),
            rest.hasPrefix(#","m":"#), line.hasSuffix("}"), isHostID(host) {
-            return .toHost(HostID(rawValue: host), message: String(rest.dropFirst(5).dropLast()))
+            return .toHost(MachineRef(rawValue: host), message: String(rest.dropFirst(5).dropLast()))
         }
         guard let object = try? JSONValue.parse(Data(line.utf8)).objectValue else { throw WireError.notAnObject }
         if object["jsonrpc"] != nil { return .legacy(message: line) }
@@ -98,7 +98,7 @@ public enum ControlWire {
         let message = try encode(m)
         switch object["h"] {
         case nil, .null?: return .toControl(message: message)
-        case .string(let host)? where isHostID(host): return .toHost(HostID(rawValue: host), message: message)
+        case .string(let host)? where isHostID(host): return .toHost(MachineRef(rawValue: host), message: message)
         default: throw WireError.badHost
         }
     }
@@ -172,7 +172,7 @@ public enum ControlWire {
         return false
     }
 
-    /// A host id as `HostID.make` makes them, or `mac`: nothing that needs escaping.
+    /// A host id as `MachineRef.make` makes them, or `mac`: nothing that needs escaping.
     public static func isHostID(_ string: String) -> Bool {
         !string.isEmpty && string.count <= 64
             && string.unicodeScalars.allSatisfy { ("a"..."z").contains($0) || ("0"..."9").contains($0) || $0 == "-" }

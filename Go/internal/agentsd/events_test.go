@@ -45,7 +45,7 @@ func TestEventsAreKeptAndReadBack(t *testing.T) {
 	base := d.eventHead()
 	first := d.raise(wire.EventDraft{Name: "server.online", At: now(), Scope: macScope(), Sentence: "ci came back.", Details: map[string]string{"server": "ci"}})
 	again := d.raise(wire.EventDraft{Name: "server.online", At: now(), Scope: macScope(), Sentence: "ci came back.", Details: map[string]string{"server": "ci"}})
-	other := d.raise(wire.EventDraft{Name: "branch.moved", At: now(), Scope: projectScope(dir), Sentence: "moved", Details: map[string]string{"branch": "x"}})
+	other := d.raise(wire.EventDraft{Name: "branch.moved", At: now(), Scope: folderScope(dir), Sentence: "moved", Details: map[string]string{"branch": "x"}})
 	if first.Position != base+1 || again.Position != base+1 || again.Count != 2 || again.LastAt == nil || other.Position != base+2 {
 		t.Fatalf("%+v %+v %+v", first, again, other)
 	}
@@ -62,7 +62,7 @@ func TestEventsAreKeptAndReadBack(t *testing.T) {
 		t.Fatalf("%+v", page)
 	}
 	page = wire.EventsPage{}
-	json.Unmarshal(c.call(t, 3, "events/list", map[string]any{"limit": 200, "scope": map[string]any{"project": map[string]any{"_0": "file://" + dir}}}), &page)
+	json.Unmarshal(c.call(t, 3, "events/list", map[string]any{"limit": 200, "scope": map[string]any{"folder": map[string]any{"_0": "file://" + dir}}}), &page)
 	if len(page.Events) != 1 || page.Events[0].Name != "branch.moved" {
 		t.Fatalf("%+v", page)
 	}
@@ -158,7 +158,7 @@ func TestAnAgentsLifeIsOnTheLog(t *testing.T) {
 	fin := logged(d)[0]
 	if fin.Details["agent"] != string(id) || fin.Details["afterwards"] != "stay" || fin.Details["outcome"] != string(d.Store.Agent(id).Report.Outcome) ||
 		fin.Details["started_by"] != "person" || fin.Details["runtime"] != "claude" || !strings.Contains(fin.Sentence, "finished: ") ||
-		fin.Scope.Project == nil {
+		fin.Scope.Folder == nil {
 		t.Fatalf("%+v", fin)
 	}
 	if n := names(d); n[0] != "agent.started" {

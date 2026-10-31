@@ -50,10 +50,10 @@ struct HostPaths: Sendable, Equatable {
         }
     }
 
-    /// A daemon's root from before the control plane: agents, projects or paired devices.
+    /// A daemon's root from before the control plane: agents, folders or paired devices.
     static func isOldSetUp(_ root: URL) -> Bool {
         let files = FileManager.default
-        return ["agents", "projects.json", "devices.json"].contains {
+        return ["agents", "folders.json", "devices.json"].contains {
             files.fileExists(atPath: root.appendingPathComponent($0).path)
         }
     }

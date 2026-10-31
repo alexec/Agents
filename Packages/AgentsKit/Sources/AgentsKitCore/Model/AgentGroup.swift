@@ -1,6 +1,6 @@
 import Foundation
 
-/// Where an agent sits in the panel beside its project.
+/// Where an agent sits in the panel beside its folder.
 ///
 /// Derived from the state and never stored, which is what makes it impossible for an
 /// agent to be in two groups or in none. The mapping is total over `AgentState`, and a
@@ -66,9 +66,8 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
         case .finished: self = Self.settled(wantsAnswer || (outcomeAsked && report == nil), report,
                                             waitingOnEvents: waitingOnEvents)
         case .stopped where waitingForAllowance: self = .waiting
-        // A spent allowance is Paused, not Needs you (065, R7): the way on is a new chat,
-        // which the chat itself cannot be nagged into.
-        case .stopped: self = [.cancelled, .stoppedByAgent, .allowanceSpent].contains(endedReason) ? .stopped : .needsAttention
+        // A spent allowance ended the session in an error. Keep deliberate stops Paused.
+        case .stopped: self = [.cancelled, .stoppedByAgent, .stoppedByAdmin].contains(endedReason) ? .stopped : .needsAttention
         case .archived: self = .archived
         // A queued helper starts by itself when a place frees (#362): nobody has to do
         // anything, which is what Waiting means.
@@ -82,7 +81,7 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
                                 waitingOnEvents: Bool) -> AgentGroup {
         if wantsAPerson { return .needsAttention }
         if report?.resumesByItself == true || waitingOnEvents { return .waiting }
-        if report?.isOpenBlock == true { return .needsAttention }
+        // A block the app will not clear (an old record's) is done, not Needs you (#1916).
         return .finished
     }
 }
@@ -160,7 +159,7 @@ public extension Agent {
     }
 
     /// Needs you, or Blocked from an older daemon: one in the badge's count. Unread is a
-    /// mark on the row, not a need (#1565). The rule `ProjectShelf` counts by and the
+    /// mark on the row, not a need (#1565). The rule `FolderShelf` counts by and the
     /// daemon sends the phone (#1163), so the two cannot disagree.
     var wantsALook: Bool {
         let group = group()

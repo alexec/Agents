@@ -86,13 +86,13 @@ func TestTheFrontOffersEventsAndTools(t *testing.T) {
 	}
 	for _, name := range []string{"list_merge_requests", "get_merge_request", "list_pipelines", "get_pipeline", "list_issues",
 		"get_issue", "comment_on_merge_request", "comment_on_issue", "merge_merge_request", "show_merge_requests", "show_issues",
-		"show_merge_request", "show_merge_request_diff", "failed_log", "retry_pipeline", "approve_merge_request",
+		"show_issue_details", "show_merge_request", "show_merge_request_diff", "failed_log", "retry_pipeline", "approve_merge_request",
 		"create_merge_request", "list_merge_request_comments", "reply_to_merge_request_comment"} {
 		if tools[name] == nil {
 			t.Fatalf("no tool %s in %v", name, tools)
 		}
 	}
-	equal(t, len(tools), 19, "tools")
+	equal(t, len(tools), 20, "tools")
 	equal(t, tools["merge_merge_request"]["_meta"], map[string]any{"ui": map[string]any{"visibility": []any{"app"}}}, "merge is a view's")
 
 	mrs := tool(3, "list_merge_requests", map[string]any{})["mergeRequests"].([]any)
@@ -104,6 +104,11 @@ func TestTheFrontOffersEventsAndTools(t *testing.T) {
 	equal(t, len(tool(6, "list_pipelines", map[string]any{"status": "failed"})["pipelines"].([]any)), 1, "list_pipelines")
 	issue := tool(7, "get_issue", map[string]any{"number": 2})["issue"].(map[string]any)
 	equal(t, issue["description"], "It breaks.", "get_issue")
+	details := tool(20, "show_issue_details", map[string]any{"number": 2})
+	equal(t, details["description"], "It breaks.", "show_issue_details")
+	if !strings.Contains(details["descriptionHTML"].(string), "It breaks.") {
+		t.Fatalf("rendered issue description: %v", details)
+	}
 	equal(t, len(tool(8, "list_issues", map[string]any{})["issues"].([]any)), 1, "list_issues")
 	equal(t, tool(9, "comment_on_issue", map[string]any{"number": 2, "body": "On it."})["commentId"], float64(900), "comment_on_issue")
 	tool(10, "comment_on_merge_request", map[string]any{"number": 1, "body": "Rebased."})
@@ -151,7 +156,7 @@ func TestTheFrontOffersEventsAndTools(t *testing.T) {
 	equal(t, missing["result"].(map[string]any)["isError"], true, "no such comment")
 
 	events := call(20, "events/list", map[string]any{})["result"].(map[string]any)["events"].([]any)
-	equal(t, len(events), 10, "events")
+	equal(t, len(events), 12, "events")
 	poll := call(21, "events/poll", map[string]any{"name": "pr.merged", "arguments": map[string]any{}, "cursor": nil})
 	equal(t, poll["result"].(map[string]any)["events"], []any{}, "first poll")
 	unknown := call(22, "events/poll", map[string]any{"name": "pr.reopened", "arguments": map[string]any{}, "cursor": nil})

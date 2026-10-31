@@ -37,12 +37,16 @@ check    Starts a scratch host on that build (the run-app skill's launch.sh --no
          takes about five minutes a runtime. The agent's own report is kept in the run.
          A turn the account ended (not signed in, its allowance spent, rate limited) is
          not the runtime's failure: the runtime is skipped, with that as the reason.
+         Then Auto's mappings (#2658, FR-020): a cell whose model or mode the runtime no
+         longer offers is "dropped"; each is listed, and does not fail the runtime.
          Stops the host.
 report   A pinned runtime that passed every step: one PR per runtime, on the branch
          nightly/runtime-<id> off origin/main (only its toolset folder changes), opened or
          updated. A runtime that failed a step: one issue per runtime, opened or commented
          on, with the version, the step and its output; runtimes that failed the same step for
          the same cause share one issue. What already fails on main is listed, never filed.
+         A runtime with a dropped Auto mapping: one issue, "Auto mapping: <runtime>", opened
+         or commented on, naming each cell; the pin's PR is still opened.
          An assessment step that failed fails the runtime only when it did not fail last
          time; one that failed last time too is listed, not filed again. Then one PR on
          nightly/runtime-assessments off origin/main, with auto-merge: a record per runtime
@@ -217,15 +221,35 @@ def repin(tree, rid, version, env):
 
 # ---- plan -------------------------------------------------------------------------------
 
+def cannot_plan(step, out):
+    """plan could not even prepare its tree (#2912): file or update one issue, loudly, so a
+    runtime never tested is a failure the release reports, not a quiet `done`."""
+    prefix = "Nightly runtime check: could not plan"
+    title = f"{prefix}: {step} failed"
+    body = (f"`scripts/nightly-runtimes.py plan` could not prepare its tree at `{step}`, so no "
+            f"runtime was tested tonight.\n\n```\n{tail(out)}\n```\n\n"
+            f"Found by the nightly runtime check (#39).")
+    file_issue(prefix, title, body, False)
+    sys.exit(f"plan: {step} failed, issue filed:\n{out}")
+
+
 def prepare_tree(home, base):
     tree = os.path.join(home, "tree")
-    sh(["git", "-C", REPO, "fetch", "-q", "origin", "main"], check=True, timeout=300)
+    status, out = sh(["git", "-C", REPO, "fetch", "-q", "origin", "main"], timeout=300)
+    if status != 0:
+        cannot_plan("git fetch", out)
     if not os.path.exists(os.path.join(tree, ".git")):
-        sh(["git", "-C", REPO, "worktree", "add", "-q", "--detach", tree, base], check=True)
+        status, out = sh(["git", "-C", REPO, "worktree", "add", "-q", "--detach", tree, base])
+        if status != 0:
+            cannot_plan("git worktree add", out)
     else:
         # The tree is this script's own: put it back to the base, keeping build/ (ignored).
-        sh(["git", "-C", tree, "checkout", "-q", "--detach", "-f", base], check=True)
-        sh(["git", "-C", tree, "clean", "-qfd"], check=True)
+        status, out = sh(["git", "-C", tree, "checkout", "-q", "--detach", "-f", base])
+        if status != 0:
+            cannot_plan("git checkout", out)
+        status, out = sh(["git", "-C", tree, "clean", "-qfd"])
+        if status != 0:
+            cannot_plan("git clean", out)
     return tree
 
 
@@ -536,7 +560,7 @@ def real_turn(client, root, rid, model, timeout=300):
     os.makedirs(work, exist_ok=True)
     if not os.path.exists(os.path.join(work, ".git")):
         sh(["git", "-C", work, "init", "-q"])
-        client.call("projects/add", {"folder": "file://" + work})
+        client.call("folders/add", {"folder": "file://" + work})
     params = {"runtimeID": rid, "cwd": "file://" + work, "prompt": TURN_PROMPT}
     if model:
         params["startOptions"] = {"values": {"model": model}}
@@ -602,6 +626,28 @@ def assessment(tree, client, root, rid, run):
     passed = sum(c["verdict"] == "passed" for c in checks)
     return (ok, f"{passed} of {len(checks)} passed, ended {result['outcome']}\n\n" + module.table(result["score"]),
             {c["id"]: c["verdict"] for c in checks})
+
+
+def dropped_cells(mappings, rid):
+    """Auto's cells for a runtime whose value it no longer offers, one line each (#2658)."""
+    out = []
+    for cell in (mappings or {}).get("cells", []):
+        if cell.get("runtimeID") == rid and cell.get("mark") == "dropped":
+            out.append(f"- {cell['field']} {cell['level']}: {cell.get('words', '?')} ({cell.get('note', 'no longer offered')})")
+    return out
+
+
+def open_mapping_issue(record, rid, entry, dry_run):
+    """A runtime that dropped a model or mode an Auto cell uses: Auto skips it for that value
+    until the table or the person's own cell is changed (FR-020)."""
+    spec = RUNTIMES[rid]
+    prefix = f"Auto mapping: {spec['name']}"
+    title = f"{prefix} {entry.get('to', '?')} no longer offers a mapped value"
+    body = (f"{spec['name']} {entry.get('to')}, run {record['started']}, no longer offers what these cells of "
+            f"Settings ▸ Agent Runtimes ▸ Auto use:\n\n{entry['mappings']['output']}\n\n"
+            f"Auto skips {spec['name']} for those values until the shipped table "
+            f"(`Go/internal/agentsd/automap.go`) or the person's own cell is changed. Found by the runtime check (#2658).")
+    return file_issue(prefix, title, body, dry_run)
 
 
 # The verdict kept for an assessment that never started.
@@ -681,6 +727,14 @@ def check(args):
                 # did not fail last time does (#1284).
                 steps["assess"] = {"ok": ok, "output": out if len(out) <= 3 * OUTPUT_LIMIT else tail(out),
                                    "verdicts": verdicts}
+            # Auto's cells, now the runtime has said what it offers (#2658, FR-020): one it no
+            # longer offers is dropped. Listed and filed on its own; the runtime is not failed.
+            if ok:
+                try:
+                    dropped = dropped_cells(client.call("auto/mappings", {}), rid)
+                    entry["mappings"] = {"ok": not dropped, "output": "\n".join(dropped)}
+                except Exception as e:
+                    entry["mappings"] = {"ok": True, "output": f"not read: {type(e).__name__}: {e}"}
             print(f"{rid}: " + ", ".join(f"{s} {'ok' if v['ok'] else 'FAILED'}" for s, v in steps.items()))
     finally:
         save(os.path.join(run, "run.json"), record)
@@ -1019,6 +1073,10 @@ def report(args):
             lines.append(f"- {spec['name']} {entry['to']} (installed by the person): passed")
         else:
             failed.setdefault(cause(entry), []).append(rid)
+        if entry.get("mappings") and not entry["mappings"]["ok"]:
+            sent = open_mapping_issue(record, rid, entry, args.dry_run)
+            lines.append(f"- {spec['name']}: Auto mapping no longer offered; issue {'would be ' if args.dry_run else ''}"
+                         f"{'opened or updated' if sent else 'NOT opened (see above)'}")
         if not args.dry_run:
             previous = state.get(rid, {}).get("assessment")
             state[rid] = {"version": entry["to"], "result": "passed" if passed else "failed",

@@ -102,19 +102,19 @@ struct PagePane: View {
     private func pageActionsBar(_ url: URL) -> some View {
         if let path = agent.pinPath(url.path),
            PinRules.kind(path) != nil {
-            let pinned = model.pins(in: agent.projectFolder).contains { $0.path == path }
+            let pinned = model.pins(in: agent.folderPath).contains { $0.path == path }
             HStack {
                 Text(url.lastPathComponent).appText(.fine).foregroundStyle(.secondary)
                     .lineLimit(1).truncationMode(.middle)
                 Spacer()
-                Button(pinned ? "Unpin" : "Pin to Project", systemImage: pinned ? "pin.slash" : "pin") {
+                Button(pinned ? "Unpin" : "Pin to Folder", systemImage: pinned ? "pin.slash" : "pin") {
                     Task {
-                        if pinned { await model.unpin(path, in: agent.projectFolder) }
-                        else { await model.pin(path, in: agent.projectFolder) }
+                        if pinned { await model.unpin(path, in: agent.folderPath) }
+                        else { await model.pin(path, in: agent.folderPath) }
                     }
                 }
                 .buttonStyle(.borderless)
-                .disabled(!pinned && model.pins(in: agent.projectFolder).count >= PinLimits.perProject)
+                .disabled(!pinned && model.pins(in: agent.folderPath).count >= PinLimits.perFolder)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)

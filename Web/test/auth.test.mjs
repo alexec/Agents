@@ -155,3 +155,47 @@ test("a made key is P-256, non-extractable, with an upper-case id", async () => 
   const id = w.newClientID();
   assert.equal(id, id.toUpperCase());
 });
+
+test("a sign-in connection proves the new key as s:<id>, with the key Swift derives, and says its public half (#1002)", async () => {
+  const privateKey = await crypto.subtle.importKey("jwk", v.client.jwk, curve, false, ["deriveBits"]);
+  const publicRaw = w.unhex(v.client.public);
+  const hmac = await crypto.subtle.importKey("raw", w.unhex(v.client.key), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const said = (identity) => w.concat(w.utf8("agents-auth-v1"), w.unhex(v.serverNonce), w.unhex(v.peerNonce), w.utf8(identity), w.utf8(v.origin));
+  const identity = "s:" + v.client.id;
+  const serverMac = new Uint8Array(await crypto.subtle.sign("HMAC", hmac, w.concat(w.utf8("s"), said(identity))));
+  const server = fakeServer(() => ({ ok: { mac: w.base64url(serverMac) } }));
+  const signedIn = await w.signInConnect(server.socket, v.client.id, privateKey, publicRaw, v.origin, w.unhex(v.peerNonce));
+  const auth = server.heard[0].auth;
+  assert.equal(auth.id, identity);
+  const peerMac = new Uint8Array(await crypto.subtle.sign("HMAC", hmac, w.concat(w.utf8("c"), said(identity))));
+  assert.equal(auth.mac, w.base64url(peerMac));
+  // Standard base64, as Go writes []byte; not a paired client's capabilities.
+  assert.equal(auth.publicKey, w.base64(publicRaw));
+  assert.equal(auth.capabilities, undefined);
+  assert.equal(signedIn.control, w.base64url(w.unhex(v.control.public)));
+  assert.equal(signedIn.name, "test");
+});
+
+test("a paired client's auth says no public key", async () => {
+  const privateKey = await crypto.subtle.importKey("jwk", v.client.jwk, curve, false, ["deriveBits"]);
+  const record = { privateKey, publicKey: null, client: v.client.id, control: w.base64url(w.unhex(v.control.public)), paired: "" };
+  const server = fakeServer(() => ({ ok: { mac: w.base64url(w.unhex(v.client.mac.server)) } }));
+  await w.connect(server.socket, record, v.origin, w.unhex(v.peerNonce));
+  assert.equal("publicKey" in server.heard[0].auth, false);
+});
+
+test("a sign-in connection's calls are bare JSON-RPC, and a refusal keeps its code and data", async () => {
+  const sent = [];
+  const replies = [
+    JSON.stringify({ jsonrpc: "2.0", method: "control/signInWaiting", params: { code: "X" } }),
+    JSON.stringify({ jsonrpc: "2.0", id: 1, result: { orgProviders: [{ id: "okta", name: "Okta", order: 0 }] } }),
+    JSON.stringify({ jsonrpc: "2.0", id: 2, error: { code: -32077, message: "use Okta", data: { provider: "okta", name: "Okta" } } }),
+  ];
+  const lines = { send: (line) => sent.push(JSON.parse(line)), next: async () => replies.shift(), close() {} };
+  const connection = new w.SignInConnection(lines, { name: "cp", control: "K" });
+  const providers = await connection.call("signIn/providers", {});
+  assert.deepEqual(sent[0], { jsonrpc: "2.0", id: 1, method: "signIn/providers", params: {} });
+  assert.equal(providers.orgProviders[0].name, "Okta");
+  await assert.rejects(connection.call("signIn/ticket", { ticket: "t" }),
+    (error) => error instanceof w.CallFailed && error.code === -32077 && error.data.provider === "okta");
+});

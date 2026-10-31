@@ -69,7 +69,7 @@ func (d *Daemon) storeBackup() error {
 	defer os.RemoveAll(folder)
 	archive := filepath.Join(folder, name+".tar.gz")
 	m := backupManifest{Format: backupFormat, RootID: d.Store.RootID, Machine: macName(), MadeAt: wire.DateOf(at)}
-	if err := d.writeBackupArchive(archive, &m); err != nil {
+	if err := d.writeBackupArchive(archive, &m, d.Store.Agents(), true); err != nil {
 		return err
 	}
 	f, err := os.Open(archive)
@@ -157,5 +157,5 @@ func (d *Daemon) restoreStored(id string) (wire.BackupRestoreResult, error) {
 		return wire.BackupRestoreResult{}, fmt.Errorf("the backup came down as %d bytes, not %d", got, listed.Bytes)
 	}
 	// This machine's own as the control plane says, from the host's proof.
-	return d.restoreArchive(archive, listed.RootID, listed.ThisMachine)
+	return d.restoreArchive(archive, listed.RootID, listed.ThisMachine, true, "")
 }

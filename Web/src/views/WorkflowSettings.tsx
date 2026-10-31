@@ -1,5 +1,5 @@
 // A workflow's settings on its page (#162; the window's WorkflowPage form and the Remote's): the
-// runtime, the permission mode on the left and the model, effort and the runtime's other options
+// runtime a run will use and why (#2764), the permission mode on the left and the model, effort and the runtime's other options
 // on the right, as the prompt's menus are laid out; then its labels, in the tag input sessions
 // use; and, under the triggers, its cooldown and what a run may do when done (#433). Each control writes its one key in the file through
 // the daemon (`workflows/settings`) and is drawn from what the file says, so a refusal leaves the
@@ -13,9 +13,8 @@ import { useEffect } from "preact/hooks";
 import type { ConfigOption, JSONValue, WorkflowSettings, WorkflowSummary } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { modeOption } from "../model/options";
-import { defaultRuntime } from "../model/workflows";
 import {
-  cooldownChoices, cooldownFileText, effortOption, fileValue, modelOption, otherOptions, refusals, selectable, shown, withDefault,
+  autoEffortNote, autoOption, cooldownChoices, cooldownFileText, effortOption, fileValue, modelOption, otherOptions, refusals, runsOn, selectable, shown, withDefault,
   whenDoneChoices, whenDoneWords, type WhenDone,
 } from "../model/workflowSettings";
 import { cooldownWords } from "../model/workflows";
@@ -32,42 +31,9 @@ function writer(change: (change: Change) => void) {
 }
 
 /** One of the keys the file names on its own, set, or taken out for the default. */
-function without(s: WorkflowSettings, key: "permissionMode" | "runtimeID" | "model" | "effort", value: string | undefined): WorkflowSettings {
+function without(s: WorkflowSettings, key: "permissionMode" | "model" | "effort", value: string | undefined): WorkflowSettings {
   const { [key]: _old, ...rest } = s;
   return (value === undefined ? rest : { ...rest, [key]: value }) as WorkflowSettings;
-}
-
-/**
- * The file top left and the runtime top right, above the prompt, as the window has them. The
- * runtimes are the ones this host has; a value it does not know is shown and marked, because
- * that workflow is refusing every fire on it.
- */
-export function RuntimeRow({ store, host, summary, disabled, change }: {
-  store: Store; host: string; summary: WorkflowSummary; disabled: boolean; change: (change: Change) => void;
-}) {
-  const workflow = summary.workflow;
-  const named = workflow.settings.runtimeID;
-  const runtimes = (store.runtimes.value[host] ?? []).map((r) => r.runtime);
-  const option: ConfigOption = {
-    id: "runtime", name: "Runtime", type: "select", currentValue: null,
-    options: [
-      { value: null, name: `Default (${runtimes.find((r) => r.id === defaultRuntime)?.name ?? defaultRuntime})` },
-      ...runtimes.map((r) => ({ value: r.id, name: r.name })),
-    ],
-  };
-  return (
-    <>
-      <div class="menus file-and-runtime" role="group" aria-label="Runtime">
-        <span class="quiet small">.agents/workflows/{workflow.workflowID}.md</span>
-        <span class="spacer" />
-        <OptionControl option={option} value={named ?? null} disabled={disabled}
-          onChange={writer(change)((s, v) => without(s, "runtimeID", v))} />
-      </div>
-      {named !== undefined && runtimes.length > 0 && !runtimes.some((r) => r.id === named) && (
-        <p class="marked small">⚠︎ "{named}" is not a runtime this machine knows</p>
-      )}
-    </>
-  );
 }
 
 /** The menus, the labels and what went wrong, for one workflow. */
@@ -77,7 +43,8 @@ export function WorkflowSettingsForm({ store, host, summary, disabled, problem, 
 }) {
   const workflow = summary.workflow;
   const settings = workflow.settings;
-  const runtimeID = settings.runtimeID ?? defaultRuntime;
+  const runs = runsOn(settings.runtimeID);
+  const runtimeID = runs.runtimeID;
   const runtimes = (store.runtimes.value[host] ?? []).map((r) => r.runtime);
   const runtimeName = runtimes.find((r) => r.id === runtimeID)?.name ?? runtimeID;
   const remembered = useSignal<ConfigOption[] | null>(null);
@@ -96,13 +63,16 @@ export function WorkflowSettingsForm({ store, host, summary, disabled, problem, 
   const others = known ? otherOptions(known) : [];
   const triggering = workflow.mode === "triggering";
   const off = disabled || triggering;
-  const notKnownYet = known !== null && <p class="quiet small">The choices are not known until {runtimeName} has been used in this project.</p>;
+  const notKnownYet = known !== null && <p class="quiet small">The choices are not known until {runtimeName} has been used in this folder.</p>;
   const marks = known ? refusals(settings, known, runtimeName) : [];
 
   return (
     <div class="workflow-settings">
+      <p class="quiet small">{runs.line}</p>
+      {runs.unknown && <p class="marked small">⚠︎ {runs.unknown}</p>}
       {triggering && <p class="quiet small">This workflow resumes the agent that triggered it, so these do not apply.</p>}
       {workflow.mode === "standing" && <p class="quiet small">Applied when its standing agent is started, and again if it has to be replaced.</p>}
+      {runs.isAuto ? <AutoMenus settings={settings} disabled={off} set={set} /> : <>
       <div class="menus" role="group" aria-label="Settings for each run">
         {mode
           ? <OptionControl option={withDefault(mode, "Permission mode")} value={settings.permissionMode ?? null} disabled={off}
@@ -129,6 +99,7 @@ export function WorkflowSettingsForm({ store, host, summary, disabled, problem, 
       </div>
       {(!mode || !model) && notKnownYet}
       {marks.map((line) => <p key={line} class="marked small">⚠︎ {line}</p>)}
+      </>}
       <LabelField store={store} host={host} folder={workflow.folder} disabled={disabled}
         listID={`workflow-labels-${workflow.workflowID}`}
         labels={settings.labels.map((value) => ({ value, owner: "person" as const }))}
@@ -136,6 +107,28 @@ export function WorkflowSettingsForm({ store, host, summary, disabled, problem, 
         remove={(value) => change({ labels: (held) => held.filter((l) => labelKey(l) !== labelKey(value)) })} />
       {problem && <p class="marked small" role="alert">⚠︎ {problem}</p>}
     </div>
+  );
+}
+
+/** On Auto, the permission mode and the model in the shared words (#2873), as the window's
+ *  WorkflowPage.autoSettings: Auto picks the runtime each run, so it has no choices of its own. */
+function AutoMenus({ settings, disabled, set }: {
+  settings: WorkflowSettings; disabled: boolean; set: ReturnType<typeof writer>;
+}) {
+  const note = autoEffortNote(settings);
+  return (
+    <>
+      <div class="menus" role="group" aria-label="Settings for each run">
+        <OptionControl option={withDefault(autoOption("permission"), "Permission mode")} value={settings.permissionMode ?? null} disabled={disabled}
+          onChange={set((s, v) => without(s, "permissionMode", v))} />
+        <span class="spacer" />
+        <span class="menus-right">
+          <OptionControl option={withDefault(autoOption("model"), "Model")} value={settings.model ?? null} disabled={disabled}
+            onChange={set((s, v) => without(s, "model", v))} />
+        </span>
+      </div>
+      {note && <p class="quiet small">{note}</p>}
+    </>
   );
 }
 

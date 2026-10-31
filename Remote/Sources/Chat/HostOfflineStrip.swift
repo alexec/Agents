@@ -11,7 +11,7 @@ import SwiftUI
 /// or failed one offers Start, and a starting one shows a spinner and how long so far.
 struct HostOfflineStrip: View {
     @Environment(RemoteModel.self) private var model
-    let host: HostID
+    let host: MachineRef
 
     var body: some View {
         if host != .mac, model.isStale(on: host) {

@@ -12,7 +12,7 @@ public struct SSHCommand: Sendable {
     public var executable: URL
     /// The destination, exactly as the person typed it. Always after `--`.
     public var name: String
-    /// The master's control socket, `<root>/hosts/<id>.ctl`. Nil only for commands that
+    /// The master's control socket, `<root>/machines/<id>.ctl`. Nil only for commands that
     /// never touch a master.
     public var controlPath: URL?
     public var environment: [String: String]

@@ -19,7 +19,7 @@ import UIKit
 ///
 ///     TOKEN     LIGHT     DARK      FOR
 ///     ground    #F7F8F9   #1C1D20   the page every column sits on
-///     sidebar   #F0F1F3   #161719   the projects column, one shade deeper
+///     sidebar   #F0F1F3   #161719   the folders column, one shade deeper
 ///     raised    #FFFFFF   #26282C   what floats: prompt bar, cards, menus
 ///     well      #F0F2F4   #2A2D31   what is set into the page: code, your own message
 ///     wash      #E7EAEE   #33363B   a row under the pointer, a picked item
@@ -27,6 +27,8 @@ import UIKit
 ///     ink       #1C1D20   #E8EAED   text drawn as ink
 ///     accent    #1F5FC8   #7FB0FF   the icon's cobalt (#156, #695): links, focus, the prominent
 ///                                   button's fill; `Color.accentColor`, from the asset
+///     issue     #0E6B82   #6CC6DB   a session label naming an issue, `#12` (#2958)
+///     pull      #7442B8   #B79AF0   a session label naming a pull request, `P#12` (#2958)
 enum Paper {
     static let ground = Color(light: 0xF7F8F9, dark: 0x1C1D20)
     static let sidebar = Color(light: 0xF0F1F3, dark: 0x161719)
@@ -38,6 +40,10 @@ enum Paper {
     /// The cobalt, from the asset catalogue rather than a hex here, so a control and
     /// the system's own focus rings and selections agree. The one place a view reaches it.
     static let accent = Color.accentColor
+    /// A label chip's hue by what the label names (`SessionLabel.Kind`, #2958): not the
+    /// state tints, so a label never reads as a session needing someone or failing.
+    static let issue = Color(light: 0x0E6B82, dark: 0x6CC6DB)
+    static let pull = Color(light: 0x7442B8, dark: 0xB79AF0)
 
     /// Corner radii: control (chips, rail), card (rows, wells).
     enum Radius {
@@ -217,7 +223,40 @@ struct PaperButtonStyle<Outline: InsettableShape>: ButtonStyle {
             .background(configuration.isPressed ? Paper.wash : Paper.raised, in: outline)
             .overlay(outline.strokeBorder(Paper.rule, lineWidth: 1))
             .contentShape(outline)
+            .paperTapTarget()
             .opacity(isEnabled ? 1 : 0.4)
+    }
+}
+
+extension EnvironmentValues {
+    /// Set on a row of small round paper buttons (a prompt bar's) so that each takes a tap
+    /// of at least 44 pt on iOS, the HIG's minimum (#2897). The capsule is drawn at its
+    /// own 32 pt; the space around it takes the tap too. The Mac is clicked, so it is unchanged.
+    @Entry var paperTapTargets = false
+}
+
+extension View {
+    /// A tap area of at least 44 pt around the paper button, while `paperTapTargets` is set on iOS.
+    fileprivate func paperTapTarget() -> some View {
+        modifier(PaperTapTarget())
+    }
+}
+
+private struct PaperTapTarget: ViewModifier {
+    @Environment(\.paperTapTargets) private var isOn
+
+    func body(content: Content) -> some View {
+        #if os(iOS)
+        if isOn {
+            content
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
     }
 }
 
@@ -253,6 +292,7 @@ struct PaperProminentButtonStyle<Outline: InsettableShape>: ButtonStyle {
             .overlay(outline.strokeBorder(Paper.rule, lineWidth: 1))
             .opacity(isEnabled ? 1 : 0.4)
             .contentShape(outline)
+            .paperTapTarget()
     }
 }
 

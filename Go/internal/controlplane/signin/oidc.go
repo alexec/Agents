@@ -6,6 +6,8 @@ package signin
 import (
 	"context"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -79,6 +81,27 @@ type Claims struct {
 	// Google Workspace's domain, for an allowed domain (FR-006); "" for any other account.
 	Domain string
 	Name   string
+	// Tenant is Entra's tid; "" for another provider.
+	Tenant string
+	// Raw is every claim as it came, for an org provider's account claim (D5).
+	Raw map[string]json.RawMessage
+}
+
+// Claim is a claim as a string: one that is a string, or a number written as one.
+func (c *Claims) Claim(name string) string {
+	raw, ok := c.Raw[name]
+	if !ok {
+		return ""
+	}
+	var s string
+	if json.Unmarshal(raw, &s) == nil {
+		return s
+	}
+	var n json.Number
+	if json.Unmarshal(raw, &n) == nil {
+		return n.String()
+	}
+	return ""
 }
 
 // OIDC checks the ID tokens of one issuer: its signature against the issuer's JWKS, iss,
@@ -92,9 +115,14 @@ type OIDC struct {
 	JWKSURL   string
 	HTTP      *http.Client
 	Now       func() time.Time
+	// Name is the provider as people read it, for an org provider (#1002); "" is Title.
+	Name string
+	// Algs are what ID tokens may be signed with; none is RS256 alone (Google, Apple). An
+	// org provider takes RS256 and ES256 (research R1).
+	Algs []string
 
 	mu      sync.Mutex
-	keys    map[string]*rsa.PublicKey
+	keys    map[string]crypto.PublicKey
 	fetched time.Time
 }
 
@@ -145,9 +173,13 @@ func (o *OIDC) Check(ctx context.Context, token, nonce string) (*Claims, error) 
 	if err := decodePart(parts[0], &header); err != nil {
 		return nil, refuse("That is not an ID token.")
 	}
-	// Only what Google and Apple sign with: never "none", never a key the token brings.
-	if header.Alg != "RS256" {
-		return nil, refuse("The ID token is signed with %q, not RS256.", header.Alg)
+	// Only what the provider signs with: never "none", never a key the token brings.
+	algs := o.Algs
+	if len(algs) == 0 {
+		algs = []string{"RS256"}
+	}
+	if !slices.Contains(algs, header.Alg) {
+		return nil, refuse("The ID token is signed with %q, not %s.", header.Alg, strings.Join(algs, " or "))
 	}
 	key, err := o.key(ctx, header.Kid)
 	if err != nil {
@@ -158,8 +190,8 @@ func (o *OIDC) Check(ctx context.Context, token, nonce string) (*Claims, error) 
 		return nil, refuse("The ID token's signature is not readable.")
 	}
 	digest := sha256.Sum256([]byte(parts[0] + "." + parts[1]))
-	if rsa.VerifyPKCS1v15(key, crypto.SHA256, digest[:], signature) != nil {
-		return nil, refuse("The ID token's signature is not %s's.", o.Provider)
+	if !verify(header.Alg, key, digest[:], signature) {
+		return nil, refuse("The ID token's signature is not %s's.", o.title())
 	}
 	var claims struct {
 		Iss           string          `json:"iss"`
@@ -172,12 +204,17 @@ func (o *OIDC) Check(ctx context.Context, token, nonce string) (*Claims, error) 
 		EmailVerified json.RawMessage `json:"email_verified"`
 		HD            string          `json:"hd"`
 		Name          string          `json:"name"`
+		Tid           string          `json:"tid"`
 	}
 	if err := decodePart(parts[1], &claims); err != nil {
 		return nil, refuse("The ID token's claims are not readable.")
 	}
+	var raw map[string]json.RawMessage
+	if err := decodePart(parts[1], &raw); err != nil {
+		return nil, refuse("The ID token's claims are not readable.")
+	}
 	if !slices.Contains(o.Issuers, claims.Iss) {
-		return nil, refuse("The ID token is not from %s.", o.Provider)
+		return nil, refuse("The ID token is not from %s.", o.title())
 	}
 	if !slices.ContainsFunc(claims.Aud, func(a string) bool { return slices.Contains(o.Audiences, a) }) {
 		return nil, refuse("The ID token was made for another app.")
@@ -197,7 +234,32 @@ func (o *OIDC) Check(ctx context.Context, token, nonce string) (*Claims, error) 
 		return nil, refuse("The ID token names nobody.")
 	}
 	verified := string(claims.EmailVerified) == "true" || string(claims.EmailVerified) == `"true"`
-	return &Claims{Subject: claims.Sub, Email: claims.Email, EmailVerified: verified, Domain: claims.HD, Name: claims.Name}, nil
+	return &Claims{Subject: claims.Sub, Email: claims.Email, EmailVerified: verified, Domain: claims.HD, Name: claims.Name,
+		Tenant: claims.Tid, Raw: raw}, nil
+}
+
+// verify checks a JWS signature over digest with a key of the algorithm's kind.
+func verify(alg string, key crypto.PublicKey, digest, signature []byte) bool {
+	switch alg {
+	case "RS256":
+		k, ok := key.(*rsa.PublicKey)
+		return ok && rsa.VerifyPKCS1v15(k, crypto.SHA256, digest, signature) == nil
+	case "ES256":
+		k, ok := key.(*ecdsa.PublicKey)
+		if !ok || len(signature) != 64 {
+			return false
+		}
+		r, s := new(big.Int).SetBytes(signature[:32]), new(big.Int).SetBytes(signature[32:])
+		return ecdsa.Verify(k, digest, r, s)
+	}
+	return false
+}
+
+func (o *OIDC) title() string {
+	if o.Name != "" {
+		return o.Name
+	}
+	return Title(o.Provider)
 }
 
 // audience is aud, which is one string or a list.
@@ -228,7 +290,7 @@ func decodePart(part string, v any) error {
 }
 
 // key is the issuer's key of that id, from the JWKS kept or fetched again.
-func (o *OIDC) key(ctx context.Context, kid string) (*rsa.PublicKey, error) {
+func (o *OIDC) key(ctx context.Context, kid string) (crypto.PublicKey, error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	now := o.now()
@@ -239,7 +301,7 @@ func (o *OIDC) key(ctx context.Context, kid string) (*rsa.PublicKey, error) {
 		if k, ok := o.keys[kid]; ok {
 			return k, nil
 		}
-		return nil, refuse("The ID token's signature is not %s's.", o.Provider)
+		return nil, refuse("The ID token's signature is not %s's.", o.title())
 	}
 	keys, err := o.fetch(ctx)
 	if err != nil {
@@ -253,12 +315,24 @@ func (o *OIDC) key(ctx context.Context, kid string) (*rsa.PublicKey, error) {
 	if k, ok := keys[kid]; ok {
 		return k, nil
 	}
-	return nil, refuse("The ID token's signature is not %s's.", o.Provider)
+	return nil, refuse("The ID token's signature is not %s's.", o.title())
 }
 
-func (o *OIDC) fetch(ctx context.Context) (map[string]*rsa.PublicKey, error) {
+// Keys is how many signing keys the issuer's JWKS has now, read again (FR-004).
+func (o *OIDC) Keys(ctx context.Context) (int, error) {
+	keys, err := o.fetch(ctx)
+	if err != nil {
+		return 0, err
+	}
+	o.mu.Lock()
+	o.keys, o.fetched = keys, o.now()
+	o.mu.Unlock()
+	return len(keys), nil
+}
+
+func (o *OIDC) fetch(ctx context.Context) (map[string]crypto.PublicKey, error) {
 	unavailable := &Unavailable{fmt.Sprintf("%s's keys could not be read, so sign-in with %s is not available now. Try again later.",
-		Title(o.Provider), Title(o.Provider))}
+		o.title(), o.title())}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, o.JWKSURL, nil)
 	if err != nil {
 		return nil, unavailable
@@ -278,14 +352,26 @@ func (o *OIDC) fetch(ctx context.Context) (map[string]*rsa.PublicKey, error) {
 			Use string `json:"use"`
 			N   string `json:"n"`
 			E   string `json:"e"`
+			Crv string `json:"crv"`
+			X   string `json:"x"`
+			Y   string `json:"y"`
 		} `json:"keys"`
 	}
 	if json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&set) != nil {
 		return nil, unavailable
 	}
-	keys := map[string]*rsa.PublicKey{}
+	keys := map[string]crypto.PublicKey{}
 	for _, k := range set.Keys {
-		if k.Kty != "RSA" || (k.Use != "" && k.Use != "sig") {
+		if k.Use != "" && k.Use != "sig" {
+			continue
+		}
+		if k.Kty == "EC" {
+			if key := ecKey(k.Crv, k.X, k.Y); key != nil {
+				keys[k.Kid] = key
+			}
+			continue
+		}
+		if k.Kty != "RSA" {
 			continue
 		}
 		n, err1 := base64.RawURLEncoding.DecodeString(k.N)
@@ -299,6 +385,22 @@ func (o *OIDC) fetch(ctx context.Context) (map[string]*rsa.PublicKey, error) {
 		return nil, unavailable
 	}
 	return keys, nil
+}
+
+// ecKey is a P-256 key from a JWK's x and y, or nil for any other curve or a point that is
+// not on it.
+func ecKey(crv, x, y string) *ecdsa.PublicKey {
+	xb, err1 := base64.RawURLEncoding.DecodeString(x)
+	yb, err2 := base64.RawURLEncoding.DecodeString(y)
+	if crv != "P-256" || err1 != nil || err2 != nil || len(xb) != 32 || len(yb) != 32 {
+		return nil
+	}
+	point := append(append([]byte{4}, xb...), yb...)
+	key, err := ecdsa.ParseUncompressedPublicKey(elliptic.P256(), point)
+	if err != nil {
+		return nil
+	}
+	return key
 }
 
 // Title is a provider as the screen says it.

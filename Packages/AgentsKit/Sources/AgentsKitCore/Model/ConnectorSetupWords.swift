@@ -1,13 +1,13 @@
 import Foundation
 
-/// The words of a project's Connectors set-up (#1336) and the one Connect sheet. The same on
+/// The words of a folder's Connectors set-up (#1336) and the one Connect sheet. The same on
 /// the Mac, the Remote and the web page (`Web/src/model/connectorSetup.ts`).
 public enum ConnectorSetupWords {
     public typealias Slot = DaemonAPI.ConnectorSlot
     public typealias Setup = DaemonAPI.ConnectorSetup
 
     public static let connectTitle = "Connect GitHub once: issues, pull requests and Actions."
-    public static let connectNote = "Your connection, for every project. You choose on github.com which repositories Agents can see."
+    public static let connectNote = "Your connection, for every folder. You choose on github.com which repositories Agents can see."
     public static let connectButton = "Connect GitHub\u{2026}"
 
     /// The sheet's list of what Agents will be able to do, from the App's permissions.
@@ -16,20 +16,21 @@ public enum ConnectorSetupWords {
         "Read and write pull requests and reviews",
         "Read checks and Actions runs",
         "Read and push code",
+        "Read, create, start and stop Codespaces",
     ]
-    public static let sheetSubtitle = "For you, in every project. Agents talks to GitHub's API directly."
+    public static let sheetSubtitle = "For you, in every folder. Agents talks to GitHub's API directly."
     public static let sheetChoose = "On github.com you choose which repositories. You can take it back there, or with Disconnect on Connectors."
     public static let sheetFoot = "The token is kept by the machine, never in a log."
     public static let continueButton = "Continue on github.com"
-    /// Where the person installs the App on the project's repository.
+    /// Where the person installs the App on the folder's repository.
     public static let installURL = "https://github.com/apps/agents-loops/installations/new"
     /// Where the person sees and changes which repositories the App reaches.
     public static let installationsURL = "https://github.com/settings/installations"
 
     /// The page's line under its title.
-    public static func intro(project: String, repository: String?, site: String = "github.com") -> String {
-        guard let repository else { return "What agents in \(project) can reach. It has no GitHub or GitLab remote." }
-        return "What agents in \(project) can reach. Repository \(site)/\(repository), from its git remote."
+    public static func intro(folder: String, repository: String?, site: String = "github.com") -> String {
+        guard let repository else { return "What agents in \(folder) can reach. It has no GitHub or GitLab remote." }
+        return "What agents in \(folder) can reach. Repository \(site)/\(repository), from its git remote."
     }
 
     /// The connection, as one line once connected.
@@ -45,7 +46,7 @@ public enum ConnectorSetupWords {
     }
 
     public static func connectNote(_ forge: DaemonAPI.ConnectionProvider) -> String {
-        forge == .gitlab ? "Your connection, for every project. It reaches what your GitLab account can see." : connectNote
+        forge == .gitlab ? "Your connection, for every folder. It reaches what your GitLab account can see." : connectNote
     }
 
     public static func connectButton(_ forge: DaemonAPI.ConnectionProvider) -> String {
@@ -66,7 +67,7 @@ public enum ConnectorSetupWords {
     public static let noRemote = "No GitHub or GitLab remote"
 
     /// The button on a refused slot: GitHub's App is granted on github.com; on GitLab the
-    /// person asks for access to the project there.
+    /// person asks for access to the folder there.
     public static func grantButton(_ setup: Setup) -> String {
         setup.forgeOrGitHub == .gitlab ? "Open on \(setup.siteOrGitHub)" : "Grant on github.com"
     }
@@ -78,12 +79,12 @@ public enum ConnectorSetupWords {
     }
 
     public static func connectedNote(_ setup: Setup) -> String {
-        var parts = ["Your connection, for every project"]
+        var parts = ["Your connection, for every folder"]
         if let n = setup.repositories { parts.append(n == 1 ? "sees 1 repository" : "sees \(n) repositories") }
         return parts.joined(separator: " \u{00B7} ")
     }
 
-    /// Said when the App is not installed on the project's repository.
+    /// Said when the App is not installed on the folder's repository.
     public static func notInstalled(_ repository: String) -> String {
         "The Agents app is not installed on \(repository), so agents can't write there."
     }
@@ -110,9 +111,9 @@ public enum ConnectorSetupWords {
     }
 
     /// What the slot says under its title, when it has no proof to show.
-    public static func line(_ slot: Slot, project: String, repository: String?,
+    public static func line(_ slot: Slot, folder: String, repository: String?,
                             forge: DaemonAPI.ConnectionProvider = .github) -> String {
-        let repo = repository ?? project
+        let repo = repository ?? folder
         let gitlab = forge == .gitlab
         switch slot.state {
         case .skipped:
@@ -124,7 +125,7 @@ public enum ConnectorSetupWords {
             case .workspace: "Agents run on this Mac."
             }
         case .noRemote:
-            return "\(project) has no GitHub or GitLab remote, so \(slot.choice) can't be read for it."
+            return "\(folder) has no GitHub or GitLab remote, so \(slot.choice) can't be read for it."
         case .failed, .refused:
             return slot.message ?? "The read didn't work."
         case .notRead:
@@ -203,9 +204,6 @@ public enum ConnectorSetupWords {
         events.workflows.isEmpty ? "No workflow here starts on them yet." : "Now usable by"
     }
 
-    /// The Change… slot's other places, on the Remote and the web page.
-    public static let otherProvidersElsewhere = "Other providers are set up on the Mac."
-
     /// The Tasks slot's way to Linear (#1682): the connection first, then its connector.
     public static let connectLinear = "Connect Linear\u{2026}"
 
@@ -217,7 +215,7 @@ public enum ConnectorSetupWords {
 
     // MARK: Connectors ▸ Connections
 
-    public static let noConnections = "No connections yet. Connect GitHub to give agents issues, pull requests and Actions in every project, Linear for its issues, GitLab for merge requests, pipelines and issues, and Email for the mail they wait for."
+    public static let noConnections = "No connections yet. Connect GitHub to give agents issues, pull requests and Actions in every folder, Linear for its issues, GitLab for merge requests, pipelines and issues, and Email for the mail they wait for."
 
     /// The provider's name: GitHub, Linear.
     public static func name(_ p: DaemonAPI.ConnectionProvider) -> String {
@@ -267,14 +265,14 @@ public enum ConnectorSetupWords {
     /// A provider with no connection yet, on Connectors.
     public static func notConnectedNote(_ p: DaemonAPI.ConnectionProvider) -> String {
         switch p {
-        case .github: "Issues, pull requests and Actions in every project."
-        case .linear: "Linear issues in every project, and their events."
+        case .github: "Issues, pull requests and Actions in every folder."
+        case .linear: "Linear issues in every folder, and their events."
         case .gitlab: "Merge requests, pipelines and issues on gitlab.com or your own GitLab."
         case .email: Email.notConnectedNote
         }
     }
 
-    public static let disconnectNote = "Disconnect deletes the machine's tokens. Every project's GitHub slots wait for a connection again. To revoke the App too, go to github.com \u{25B8} Settings \u{25B8} Applications."
+    public static let disconnectNote = "Disconnect deletes the machine's tokens. Every folder's GitHub slots wait for a connection again. To revoke the App too, go to github.com \u{25B8} Settings \u{25B8} Applications."
 
     public static func disconnectNote(_ p: DaemonAPI.ConnectionProvider) -> String {
         switch p {
@@ -285,22 +283,22 @@ public enum ConnectorSetupWords {
         }
     }
 
-    /// Disconnect's message: which projects lose which slots, before it goes, then the note.
-    /// Only a project on that connection's forge loses anything (#1868): GitHub fills a GitHub
-    /// project's slots and GitLab a GitLab project's (#1632); other connections fill none.
+    /// Disconnect's message: which folders lose which slots, before it goes, then the note.
+    /// Only a folder on that connection's forge loses anything (#1868): GitHub fills a GitHub
+    /// folder's slots and GitLab a GitLab folder's (#1632); other connections fill none.
     public static func disconnectMessage(_ p: DaemonAPI.ConnectionProvider,
-                                         projects: [(name: String, setup: Setup)]) -> String {
+                                         folders: [(name: String, setup: Setup)]) -> String {
         guard p == .github || p == .gitlab else { return disconnectNote(p) }
-        let losing = projects.compactMap { project -> String? in
-            guard project.setup.forgeOrGitHub == p else { return nil }
-            let slots = project.setup.slots.filter { $0.slot != .workspace && $0.state == .read }.map { heading($0.slot) }
-            return slots.isEmpty ? nil : "\(project.name) loses \(slots.joined(separator: ", "))."
+        let losing = folders.compactMap { folder -> String? in
+            guard folder.setup.forgeOrGitHub == p else { return nil }
+            let slots = folder.setup.slots.filter { $0.slot != .workspace && $0.state == .read }.map { heading($0.slot) }
+            return slots.isEmpty ? nil : "\(folder.name) loses \(slots.joined(separator: ", "))."
         }
         return (losing + [disconnectNote(p)]).joined(separator: " ")
     }
 
-    /// A project on Connectors: what its set-up uses.
-    public static func projectLine(_ setup: Setup) -> String {
+    /// A folder on Connectors: what its set-up uses.
+    public static func folderLine(_ setup: Setup) -> String {
         if setup.repository == nil { return noRemote }
         let used = setup.slots.filter { $0.state == .read }.map(\.choice)
         return used.isEmpty ? "Not set up" : used.joined(separator: ", ")
@@ -312,10 +310,10 @@ public enum ConnectorSetupWords {
     public enum Linear {
         public static let abilities = [
             "Read and write issues",
-            "Read projects and cycles",
+            "Read folders and cycles",
             "Comment as you",
         ]
-        public static let subtitle = "For you, in every project. Agents talks to Linear's API directly."
+        public static let subtitle = "For you, in every folder. Agents talks to Linear's API directly."
         public static let choose = "On linear.app you choose the workspace. You can take it back there, or with Disconnect on Connectors."
         public static let continueButton = "Continue on linear.app"
         public static let waiting = "Waiting for linear.app\u{2026} Approve there, and Agents comes back by itself."
@@ -329,7 +327,7 @@ public enum ConnectorSetupWords {
             "Read pipelines and jobs",
             "Read and write issues",
         ]
-        public static let subtitle = "For you, in every project. Agents talks to GitLab's API directly."
+        public static let subtitle = "For you, in every folder. Agents talks to GitLab's API directly."
         public static let choose = "GitLab asks for the api scope. You can take it back on GitLab \u{25B8} Preferences \u{25B8} Applications, or with Disconnect on Connectors."
         public static let continueButton = "Continue on gitlab.com"
         /// The two ways in, as the sheet's picker says them.
@@ -342,7 +340,7 @@ public enum ConnectorSetupWords {
         public static let tokenPrompt = "glpat-\u{2026}"
         public static let tokenButton = "Connect"
         public static let checking = "Checking the token with GitLab\u{2026}"
-        public static let disconnectNote = "Disconnect deletes the machine's token. Every project's GitLab slots wait for a connection again. GitLab's events stop until you connect again or set GITLAB_TOKEN. To revoke it too, go to GitLab \u{25B8} Preferences \u{25B8} Applications or Access tokens."
+        public static let disconnectNote = "Disconnect deletes the machine's token. Every folder's GitLab slots wait for a connection again. GitLab's events stop until you connect again or set GITLAB_TOKEN. To revoke it too, go to GitLab \u{25B8} Preferences \u{25B8} Applications or Access tokens."
 
         /// How Connect Again\u{2026} opens for an ended GitLab connection (#1865): on Access token,
         /// with its GitLab's address, when it was an access token or a self-managed GitLab; on the
@@ -370,7 +368,7 @@ public enum ConnectorSetupWords {
         /// The sheet's foot: an app password, not a token.
         public static let sheetFoot = "The app password is kept by the machine, never in a log."
         public static let notConnectedNote = "One mailbox for agents: they wait for mail, such as a sign-up code, and read it."
-        public static let subtitle = "For you, in every project. Agents reads the mailbox over IMAP and never sends mail."
+        public static let subtitle = "For you, in every folder. Agents reads the mailbox over IMAP and never sends mail."
         public static let abilities = [
             "Know when mail comes, by sender and subject",
             "List, search and read messages",

@@ -11,7 +11,7 @@ import (
 )
 
 // The sessions an agent started (028, #940), as DaemonCore+Helpers keeps them on the Swift
-// host: counted against the project's helper limits, and stopped or archived only by the
+// host: counted against the folder's helper limits, and stopped or archived only by the
 // agents above them.
 
 const (
@@ -20,11 +20,11 @@ const (
 	defaultHelpersQueued      = 5
 )
 
-// helperLimitsIn is the project's limits as enforced: each the person's, or its default.
+// helperLimitsIn is the folder's limits as enforced: each the person's, or its default.
 func (d *Daemon) helperLimitsIn(folder string) (running, notArchived, queued int64) {
 	running, notArchived, queued = defaultHelpersRunning, defaultHelpersNotArchived, defaultHelpersQueued
-	if s, ok := d.summaryFor(folder); ok && s.Project.HelperLimits != nil {
-		l := s.Project.HelperLimits
+	if s, ok := d.summaryFor(folder); ok && s.Folder.HelperLimits != nil {
+		l := s.Folder.HelperLimits
 		if l.Running != nil {
 			running = *l.Running
 		}
@@ -35,26 +35,28 @@ func (d *Daemon) helperLimitsIn(folder string) (running, notArchived, queued int
 			queued = *l.Queued
 		}
 	}
+	// The organisation's caps over the folder's own (#998): the lower number is used.
+	running, notArchived, _ = d.helperCaps(running, notArchived)
 	return
 }
 
 // helpersIn is HelperLimit.helpers: started by an agent, not archived, not queued, oldest first.
+// The ones its agents started on other machines count here too (#2927).
 func (d *Daemon) helpersIn(folder string) []wire.Agent {
-	var out []wire.Agent
+	out := d.thereAgents(folder)
 	for _, a := range d.Store.Agents() {
-		if a.StartedByAgent != nil && a.State != wire.AgentStateArchived && a.State != wire.AgentStateQueued && projectFolder(&a) == folder {
+		if a.StartedByAgent != nil && a.State != wire.AgentStateArchived && a.State != wire.AgentStateQueued && folderPath(&a) == folder {
 			out = append(out, a)
 		}
 	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].CreatedAt < out[j].CreatedAt })
-	return out
+	return sortedByAge(out)
 }
 
 // helperQueue is HelperLimit.queue: the queued, first in first.
 func (d *Daemon) helperQueue(folder string) []wire.Agent {
 	var out []wire.Agent
 	for _, a := range d.Store.Agents() {
-		if a.State == wire.AgentStateQueued && projectFolder(&a) == folder {
+		if a.State == wire.AgentStateQueued && folderPath(&a) == folder {
 			out = append(out, a)
 		}
 	}
@@ -166,25 +168,40 @@ func quotedTitle(t *string) string {
 
 // stopSession is stop_session: a helper stopped, freeing its running place.
 func (d *Daemon) stopSession(caller wire.UUID, args map[string]json.RawMessage) (string, error) {
-	t, err := d.helperTarget(caller, wire.UUID(strings.ToUpper(strings.TrimSpace(argString(args, "id")))), "stop")
+	id := wire.UUID(strings.ToUpper(strings.TrimSpace(argString(args, "id"))))
+	if s := d.thereNamed(caller, string(id)); s != nil && d.Store.Agent(id) == nil {
+		return d.thereOp(caller, s, "stop")
+	}
+	t, err := d.helperTarget(caller, id, "stop")
 	if err != nil {
 		return "", err
 	}
-	name, folder := quotedTitle(t.Title), projectFolder(t)
+	name, folder := quotedTitle(t.Title), folderPath(t)
 	if t.State == wire.AgentStateQueued {
 		d.change(t.ID, func(a *wire.Agent) {
 			a.State, a.EndedReason = wire.AgentStateStopped, reason(wire.EndedReasonCancelled)
 		})
 		d.record(t.ID, stateChanged(wire.AgentStateStopped, reason(wire.EndedReasonCancelled)))
 		d.agentEnded(t.ID)
-		return "Took " + name + " off the queue; it will not start. This project now has " + d.helperPlaces(folder) + ".", nil
+		return "Took " + name + " off the queue; it will not start. This folder now has " + d.helperPlaces(folder) + ".", nil
 	}
+	if !d.stopHelper(t) {
+		return name + " had already stopped; nothing changed.", nil
+	}
+	d.checkQueueSoon(folder)
+	return "Stopped " + name + ", freeing its running place; it keeps its other place until it is archived. This folder now has " +
+		d.helperPlaces(folder) + ".", nil
+}
+
+// stopHelper stops a session that is running, and waits a moment for its turn to end;
+// false when it had already stopped.
+func (d *Daemon) stopHelper(t *wire.Agent) bool {
 	l := d.live(t.ID)
 	l.mu.Lock()
 	busy := l.running || l.inTurn
 	l.mu.Unlock()
 	if !inFlight(t.State) && !busy && (t.EventWait == nil || t.EventWait.Ending != nil) {
-		return name + " had already stopped; nothing changed.", nil
+		return false
 	}
 	l.cancel()
 	d.dropLeases(t.ID, "holderStopped")
@@ -197,23 +214,24 @@ func (d *Daemon) stopSession(caller wire.UUID, args map[string]json.RawMessage) 
 	for i := 0; i < 100 && !waitFor(); i++ {
 		time.Sleep(50 * time.Millisecond)
 	}
-	d.checkQueueSoon(folder)
-	return "Stopped " + name + ", freeing its running place; it keeps its other place until it is archived. This project now has " +
-		d.helperPlaces(folder) + ".", nil
+	return true
 }
 
 // requestArchiveHelper is archive_session with a helper's id: archived now when agents may
 // archive it and it is not running, else it waits for the person's approval.
 func (d *Daemon) requestArchiveHelper(caller, target wire.UUID) (string, error) {
+	if s := d.thereNamed(caller, string(target)); s != nil && d.Store.Agent(target) == nil {
+		return d.thereOp(caller, s, "archive")
+	}
 	t, err := d.helperTarget(caller, target, "request")
 	if err != nil {
 		return "", err
 	}
-	name, folder := quotedTitle(t.Title), projectFolder(t)
+	name, folder := quotedTitle(t.Title), folderPath(t)
 	may := d.agentsMayArchive(folder)
 	if may && !helperRunning(t) {
 		d.archiveBy(t.ID, wire.AgentArchivedReasonByAgent)
-		return "Archived " + name + ", freeing its place; the person can unarchive it. This project now has " + d.helperPlaces(folder) + ".", nil
+		return "Archived " + name + ", freeing its place; the person can unarchive it. This folder now has " + d.helperPlaces(folder) + ".", nil
 	}
 	if r := t.ArchiveRequest; r != nil && r.Requested != nil {
 		return name + " already waits for the person to approve archiving it; nothing changed.", nil
@@ -230,5 +248,5 @@ func (d *Daemon) requestArchiveHelper(caller, target wire.UUID) (string, error) 
 		return name + " will wait for the person to approve archiving it when its turn ends, freeing its running place then.", nil
 	}
 	return name + " now waits for the person to approve archiving it, which frees its running place; it keeps its other place until it is archived. " +
-		"This project now has " + d.helperPlaces(folder) + ".", nil
+		"This folder now has " + d.helperPlaces(folder) + ".", nil
 }

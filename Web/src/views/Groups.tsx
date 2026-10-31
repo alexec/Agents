@@ -1,11 +1,14 @@
 // Settings ▸ Groups (#1761, spec 736 FR-027, FR-028), as the window's and the Remote's Groups pane
-// (Shared/UI/People/GroupsPane.swift): each group, its people and the workspace providers it has.
-// An admin makes, changes and removes groups; a member sees the groups they are in, read only.
+// (Shared/UI/People/GroupsPane.swift): each group, its people and the machine providers it has.
+// An admin makes, changes and removes groups; a member sees the groups they are in, read only. A
+// group from an org provider's SCIM says so (#1002, FR-028), and only SCIM changes its members.
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import type { Group, PersonRow } from "../protocol/generated";
 import { describe } from "../model/errors";
-import { dollars, foot, groupCapFoot, groupCapLine, members, providersOf, readCap, removeMessage, removeTitle, title } from "../model/teamGroups";
+import { botWords, dollars, foot, groupBots, groupCapFoot, groupCapLine, members, providersOf, readCap, removeMessage, removeTitle, title } from "../model/teamGroups";
+import { fromProvider, orgName } from "../model/signIn";
+import { groupRoleFoot, groupRoleWords } from "../model/orgSignIn";
 import { Modal } from "./Modal";
 
 function GroupSheet({ store, group, people, close }: {
@@ -88,6 +91,15 @@ export function GroupsSection({ store, down }: { store: Store; down: boolean }) 
   const failure = store.peopleFailure.value;
   const problem = failure ? describe(failure) : null;
   const editing = useSignal<{ group: Group | null } | null>(null);
+  const setRole = async (group: Group, admin: boolean) => {
+    if (admin && !window.confirm(`Make each person in ${group.name} an admin while they are in it? ${groupRoleFoot}`)) return;
+    try {
+      // The change comes back as control/groupsChanged.
+      await store.link.call("groups/setRole", admin ? { group: group.id, role: "admin" } : { group: group.id });
+    } catch (error) {
+      store.say(describe(error));
+    }
+  };
   const remove = async (group: Group) => {
     if (!window.confirm(`${removeTitle(group)} ${removeMessage}`)) return;
     try {
@@ -112,10 +124,27 @@ export function GroupsSection({ store, down }: { store: Store; down: boolean }) 
             {shown.map((group) => (
               <li key={group.id} class="person">
                 <div class="setting"><span class="person-name">{group.name}</span></div>
+                {group.source && (
+                  <div class="person-org">
+                    <span class="quiet small">{fromProvider(orgName(group.source.scim, store.orgProviderNames.value))}</span>
+                    {/* FR-020: a SCIM group can make its people admins; an admin marks it. */}
+                    {admin
+                      ? (
+                        <label class="small">
+                          <input type="checkbox" checked={group.role === "admin"} disabled={down}
+                            onChange={(e) => void setRole(group, (e.currentTarget as HTMLInputElement).checked)} /> {groupRoleWords}
+                        </label>
+                      )
+                      : group.role === "admin" && <span class="quiet small"> · {groupRoleWords}</span>}
+                  </div>
+                )}
                 <div class="person-things">
                   <span class="faint small">People</span>
                   <span class="small">{members(group, people)}</span>
-                  <span class="faint small">Workspace providers</span>
+                  {/* Its bots apart from its people (#2132). */}
+                  <span class="faint small">{botWords.title}</span>
+                  <span class="small">{groupBots(group, people)}</span>
+                  <span class="faint small">Machine providers</span>
                   <span class="small">{providersOf(group, providers) ?? "None"}</span>
                   <span class="faint small">Daily cap</span>
                   <span class="small">{groupCapLine(group, people)}</span>

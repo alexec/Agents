@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/kms"
 	"github.com/alexec/agents/Go/internal/controlplane/usersettings"
 	"github.com/alexec/agents/Go/wire"
@@ -19,7 +20,9 @@ import (
 // The user scope (#1760, spec 736 US4): each person's settings and secrets, kept here and
 // sent to each machine of theirs on its channel 0 when it joins and when they change. Only
 // a person's own clients change them; a machine only receives them, so a machine taken over
-// cannot put an MCP server (a command) on its person's other machines.
+// cannot put an MCP server (a command) on its person's other machines. For the same reason a
+// machine does not send its agent configuration files to the person's other machines:
+// user/setAgentConfigFile is refused.
 
 // CapHostUserSettings is what a machine says when it writes host/userSettings into its
 // ~/.agents and ~/.agents-secrets. A machine that does not say it is sent nothing: no
@@ -28,6 +31,11 @@ const CapHostUserSettings = wire.CapHostUserSettings1
 
 // userDeliveryTimeout bounds opening a person's secrets for one machine.
 const userDeliveryTimeout = 30 * time.Second
+
+// userDeliveryMost is the largest host/userSettings sent, with room for the frame around it
+// under what a machine's link reads (#2730). A longer one would fail the machine's read,
+// close its link, and be sent again at the rejoin without end.
+const userDeliveryMost = controllink.MaxMessage - 1<<20
 
 // toldUsers is what each machine here was last sent, by a hash, so a change tells only the
 // machines whose delivery differs.
@@ -42,6 +50,8 @@ func (m *Methods) userMethod(ctx context.Context, method string, params json.Raw
 	switch method {
 	case "user/settings":
 		return book.Settings(ctx, user)
+	case "user/setAgentConfigFile":
+		return nil, agentConfigFileRefused()
 	case "user/secretNames":
 		rows, err := book.Names(ctx, user)
 		if err != nil {
@@ -90,6 +100,13 @@ func (m *Methods) userMethod(ctx context.Context, method string, params json.Raw
 		return wire.Empty{}, nil
 	}
 	return nil, fail(methodNotFound, "No method %s.", method)
+}
+
+// agentConfigFileRefused is user/setAgentConfigFile. The instructions, skills, personas,
+// MCP servers and plugins follow the person only from the person's own clients
+// (user/setSettings), so one machine cannot change what runs on the others.
+func agentConfigFileRefused() error {
+	return fail(notPermitted, "A machine does not send its agent configuration files to your other machines. Change them in the app.")
 }
 
 // userFailure is a book's error as words for the client. None holds a secret's value.
@@ -151,6 +168,11 @@ func (s *Service) sendUserSettings(host string, always bool) {
 			host, len(skipped), strings.Join(skipped, ", ")))
 	}
 	b, _ := json.Marshal(delivery)
+	if len(b) > userDeliveryMost {
+		s.log(fmt.Sprintf("user settings for %s are %d MB, over the %d MB a machine's link takes, and were not sent",
+			host, len(b)>>20, userDeliveryMost>>20))
+		return
+	}
 	sum := sha256.Sum256(b)
 	s.toldUsers.mu.Lock()
 	if s.toldUsers.last == nil {
@@ -205,7 +227,7 @@ func (s *Service) machineLeft(host, user, name string) {
 		names[i] = wire.UserSecretName(n)
 	}
 	s.log(fmt.Sprintf("%s was removed with %d of %s's secrets on it", host, len(had), user))
-	s.router.TellPerson(user, wire.NotifyControlSecretsLeft.Name, wire.SecretsLeft{Host: wire.HostID(host), Name: name, Secrets: names})
+	s.router.TellPerson(user, wire.NotifyControlSecretsLeft.Name, wire.SecretsLeft{Host: wire.MachineRef(host), Name: name, Secrets: names})
 	s.announce("userSettingsChanged", user, host)
 	s.router.TellPerson(user, wire.NotifyControlUserSettingsChanged.Name, wire.UserSettingsChanged{Secrets: optional(true)})
 }

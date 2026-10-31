@@ -5,7 +5,7 @@ import Foundation
 /// Three spellings are accepted, the three a person copies from a forge: `https://`,
 /// `ssh://`, and the scp-like `git@host:owner/repo`. Everything else is refused before
 /// anything is run — `http://` and `git://` send the code in the clear, and a local path
-/// is a folder, which New project already has a picker for.
+/// is a folder, which New folder already has a picker for.
 ///
 /// In Core so the window can say "that is not a URL" as it is typed, and the daemon can
 /// say it again without trusting the window.

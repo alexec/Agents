@@ -8,7 +8,7 @@ import (
 )
 
 // Groups (#1761, spec 736 data-model.md "Group"): everyone, or named users. A group owns
-// workspace providers, and a bot's cost (FR-027, FR-028, FR-033).
+// machine providers, and a bot's cost (FR-027, FR-028, FR-033).
 
 const GroupsPrefix = "v1/groups/"
 
@@ -18,27 +18,40 @@ func GroupKey(id string) string { return GroupsPrefix + id + ".json" }
 // Group is groups/<id>.json. The data model's members, "everyone" or a list, is written
 // as everyone and members, so each language reads it without a union.
 type Group struct {
-	ID        string
-	Name      string
-	Everyone  bool
-	Members   []string
+	ID       string
+	Name     string
+	Everyone bool
+	Members  []string
 	// Spend caps for the group's bots together (#1761, FR-033).
-	Caps      *Caps
+	Caps *Caps
+	// A SCIM group's provider (#1002, FR-019): only SCIM changes its members.
+	Source *GroupSource
+	// "admin": the group gives its members the admin role (FR-020).
+	Role      string
 	Rev       int
 	Removed   *bool
 	RemovedAt *Stamp
 	Extra     Extra
 }
 
+// GroupSource is where a SCIM group comes from.
+type GroupSource struct {
+	SCIM        string `json:"scim"`
+	ExternalID  string `json:"externalId,omitempty"`
+	DisplayName string `json:"displayName"`
+}
+
 type groupJSON struct {
-	ID        string   `json:"id"`
-	Name      string   `json:"name"`
-	Everyone  bool     `json:"everyone,omitempty"`
-	Members   []string `json:"members"`
-	Caps      *Caps    `json:"caps,omitempty"`
-	Rev       int      `json:"rev,omitempty"`
-	Removed   *bool    `json:"removed,omitempty"`
-	RemovedAt *Stamp   `json:"removedAt,omitempty"`
+	ID        string       `json:"id"`
+	Name      string       `json:"name"`
+	Everyone  bool         `json:"everyone,omitempty"`
+	Members   []string     `json:"members"`
+	Caps      *Caps        `json:"caps,omitempty"`
+	Source    *GroupSource `json:"source,omitempty"`
+	Role      string       `json:"role,omitempty"`
+	Rev       int          `json:"rev,omitempty"`
+	Removed   *bool        `json:"removed,omitempty"`
+	RemovedAt *Stamp       `json:"removedAt,omitempty"`
 }
 
 func (g Group) MarshalJSON() ([]byte, error) {
@@ -46,7 +59,7 @@ func (g Group) MarshalJSON() ([]byte, error) {
 	if members == nil {
 		members = []string{}
 	}
-	return encodeKeeping(groupJSON{g.ID, g.Name, g.Everyone, members, g.Caps, g.Rev, g.Removed, g.RemovedAt}, g.Extra)
+	return encodeKeeping(groupJSON{g.ID, g.Name, g.Everyone, members, g.Caps, g.Source, g.Role, g.Rev, g.Removed, g.RemovedAt}, g.Extra)
 }
 
 func (g *Group) UnmarshalJSON(data []byte) error {
@@ -55,7 +68,7 @@ func (g *Group) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	*g = Group{j.ID, j.Name, j.Everyone, j.Members, j.Caps, j.Rev, j.Removed, j.RemovedAt, extra}
+	*g = Group{j.ID, j.Name, j.Everyone, j.Members, j.Caps, j.Source, j.Role, j.Rev, j.Removed, j.RemovedAt, extra}
 	return nil
 }
 

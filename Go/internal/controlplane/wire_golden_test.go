@@ -28,6 +28,7 @@ var update = flag.Bool("update", false, "write testdata/wire.golden from what th
 // the hand-written wire types before they moved to Go/wire, so this is the proof that the
 // move changed no byte.
 func TestTheWireIsWhatItWas(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	ctx := context.Background()
 	// Hosts that say no list, as the golden was made before capabilities (#1748).
@@ -85,7 +86,7 @@ func TestTheWireIsWhatItWas(t *testing.T) {
 	answer("devices/startPairing", nil)
 	answer("clients/stopPairing", nil)
 	answer("hosts/lastHeard", map[string]any{"host": box.member.Host})
-	answer("control/setProjectDetection", map[string]any{"enabled": true, "paths": []string{" ~/src ", "", "~/work"}})
+	answer("control/setFolderDetection", map[string]any{"enabled": true, "paths": []string{" ~/src ", "", "~/work"}})
 	answer("hosts/lendSignIn", map[string]any{"host": box.member.Host, "from": home.member.Host, "runtime": "claude", "allowed": true})
 	answer("hosts/lendGit", map[string]any{"host": box.member.Host, "from": home.member.Host, "server": "github.com", "allowed": true})
 	answer("hosts/setRelay", map[string]any{"host": relayID, "relay": true})

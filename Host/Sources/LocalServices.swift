@@ -150,7 +150,7 @@ struct LocalServices {
     }
 
     /// The relay host this Mac's relay joined as, once it has.
-    var relayHost: HostID? { ControlMembership.load(paths.relayFiles.membership)?.host }
+    var relayHost: MachineRef? { ControlMembership.load(paths.relayFiles.membership)?.host }
 
     /// The relay's enrolment, and any code left for it, gone: it joins again only with a
     /// new code (#824). Its key stays.
@@ -194,6 +194,7 @@ struct LocalServices {
             // set-up's.
             arguments = [paths.agentsd.path, "--control-network"]
                 + DaemonLauncher.pageArguments(HostSettings.load(paths), paths: paths)
+                + DaemonLauncher.pinArguments()
             variables = [StoreLocations.rootVariable: paths.hostRoot.path, "PATH": path]
         case .relay:
             // `<root>/relay`, and a walk's folder standing in for iCloud when it gives one.

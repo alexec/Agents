@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/agentsd"
 	"github.com/alexec/agents/Go/internal/controllink"
 )
 
@@ -56,6 +57,11 @@ func enrol(ctx context.Context, code string, codeFile string,
 
 // refusedForGood says why the control plane will never take this code again.
 func refusedForGood(err error) (string, bool) {
+	// A code for another control plane than the one the organisation pins (#998, FR-027).
+	var pinned *agentsd.PinRefused
+	if errors.As(err, &pinned) {
+		return pinned.Words, true
+	}
 	var r *controllink.Refusal
 	if !errors.As(err, &r) {
 		return "", false

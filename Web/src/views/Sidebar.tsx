@@ -1,48 +1,54 @@
-// The page's one sidebar (#151), as the window's (#145, ProjectListView.swift) and the Remote's
+// The page's one sidebar (#151), as the window's (#145, FolderListView.swift) and the Remote's
 // (RemoteSidebar.swift), and below 760 the root list, as the iPhone Remote's (#226, #235).
-// Things-style since #495 (#499): New Session at the top, in the project last started in; Activity;
-// then what wants the person across every project — Pinned, Needs You, Working, Unread — each drawn
-// only with something in it (#507), Needs You with what waits for an OK after its sessions (#773); then a group per project, its sessions newest started first
+// Things-style since #495 (#499): New Session at the top, in the folder last started in, and Agents'
+// filters, a machine and a state (#2141); then what wants the person across every folder — Pinned, Needs You, Working, Unread — each drawn
+// only with something in it (#507), Needs You with what waits for an OK after its sessions (#773); then a group per folder, its sessions newest started first
 // with their state the row's mark, its Workflows fold (#885), and one Archived row opening a page; then the
-// archived projects; and at the foot what the hosts and this browser are doing, and Settings (#846),
-// where each smart group can be turned off. Never more than three
-// levels deep: a project's Workflows fold (#885) is the third. No host headings: a server's project reads `host:Project`. A project's row only
+// archived folders, Live Now (an admin's) and Projects (#2141); and at the foot what the hosts and
+// this browser are doing. The Activity pages are in Machines and Reports since #2141. Never more than three
+// levels deep: a folder's Workflows fold (#885) is the third. No host headings: a server's folder reads `host:Folder`. A folder's row only
 // folds (#375).
 //
 // One list for the keys: ↑ and ↓ move through every row shown, opening what they land on, as the
-// window's selection does; → unfolds a project or group and ← folds it, or steps out to its project
+// window's selection does; → unfolds a folder or group and ← folds it, or steps out to its folder
 // from a row under it. The menu key, Shift-F10 or a right click opens a row's menu.
 import { undoLabel, undoMillis } from "../model/archiveWords";
-import { healthTally, projectServers } from "../model/hostedMCP";
+import { healthTally, folderServers } from "../model/hostedMCP";
 import { signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import { actDoing, type Store } from "../model/store";
-import { byStart, folderKey, projectFolder, showsUnread } from "../model/groups";
+import { ProjectAgentConfigModal } from "./AgentConfigEditor";
+import { ProjectModal } from "./ProjectPicker";
+import { PRCostCommentModal } from "./PRCostComment";
+import { actDoing, recentArchivedShown, type Store } from "../model/store";
+import { byStart, folderKey, recentlyArchived, folderPath as agentFolderPath, showsUnread } from "../model/groups";
 import { folds } from "../model/folds";
 import { smartGroupsOn } from "../model/smartGroups";
 import { macHostNoticeDetail, macHostNoticeTitle } from "../model/macHostNotice";
 import { hostAnswers } from "../model/capabilities";
 import { Capability } from "../protocol/capabilities.generated";
 import { parseQuery, queryMatches, type LabelQuery } from "../model/labels";
-import { keepsInUnread, newSessionProject, ownCount, pinnedSessions, pinnedWorkflows, projectSessions, rememberedProject, rememberProject,
-  smartAgents, smartApprovals, smartRows, smartTitles, withKept, type ProjectKey, type SmartRow } from "../model/sidebar";
+import { keepsInUnread, newSessionFolder, pinnedSessions, pinnedWorkflows, folderSessions, rememberedFolder, rememberFolder,
+  smartAgents, smartApprovals, smartRows, smartTitles, withKept, type FolderKey, type SmartRow } from "../model/sidebar";
 import { updatedLine } from "../model/updated";
 import { namedRelative, workflowSummary } from "../model/workflows";
-import { fromWireDate } from "../protocol/dates";
-import type { Agent, ControlHost, ProjectSummary, WorkflowSummary } from "../protocol/generated";
-import { alone, aloneURL, go, route, showAll, type ActivityPage } from "../route";
+import { fromWireDate, toWireDate } from "../protocol/dates";
+import type { Agent, AgentsExportRequest, ControlMachine, FolderSummary, WorkflowSummary } from "../protocol/generated";
+import { alone, aloneURL, go, route, showAll } from "../route";
 import { onThisMac } from "../place";
 import { browserName, type Session } from "../session";
-import { ActivityRows } from "./Activity";
+import { keptByState, machineFilter, setMachineFilter, setStateFilter, stateFilter, stateFilterTitle, stateFilters,
+  type StateFilter } from "../model/agentFilters";
+import { adminOf } from "../model/console";
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
-import { CloningRows, EmptyProjects, NewProjectMenu } from "./NewProject";
+import { CloningRows, EmptyFolders, NewFolderMenu } from "./NewFolder";
 import { putFilesInDropbox, useDropboxDrop } from "./DropboxDialog";
+import { exportFromMenu, importFromMenu } from "../model/exports";
 import { rowExtras, SessionRow } from "./SessionRow";
 import { openInNewTab, RenameInput, runSessionAction, sessionActions, startedBy } from "./SessionMenu";
 import { markAgentOf, treeRows, type TreeRow } from "../model/tree";
 import { WorkflowRow } from "./WorkflowRow";
 import { footLine, offersStart } from "./OfflineStrip";
-import { PinnedPageRows } from "./Pins";
+import { PinnedPageRows, ServerViewRows, showHiddenViewsItem } from "./Pins";
 import { ApprovalRow, FailedWorkflowRow } from "./Approval";
 import { JoinRequests } from "./JoinRequest";
 import { LinkRequests } from "./ChannelLinks";
@@ -59,54 +65,51 @@ const matchesShown = 10;
 /** How long the typing pauses before the folds filter and the hosts are asked (#176). */
 export const searchPause = 150;
 
-/** A project's name in the sidebar: `host:Project` on a server, the name alone on this Mac (`macID`, #1501). */
-export function projectLabel(host: ControlHost | undefined, project: ProjectSummary, macID = "mac"): string {
-  return !host || host.id === macID ? project.name : `${host.name}:${project.name}`;
+/** A folder's name in the sidebar: `host:Folder` on a server, the name alone on this Mac (`macID`, #1501). */
+export function folderLabel(host: ControlMachine | undefined, folder: FolderSummary, macID = "mac"): string {
+  return !host || host.id === macID ? folder.name : `${host.name}:${folder.name}`;
 }
 
 /**
  * Oldest added first, then by folder, as the window's and the Remote's (SidebarOrder.byAdded,
- * #357): a row stays where it is however busy its project is, and a new project lands at the end.
+ * #357): a row stays where it is however busy its folder is, and a new folder lands at the end.
  */
-export function byAdded(a: ProjectSummary, b: ProjectSummary): number {
-  if (a.project.addedAt !== b.project.addedAt) return a.project.addedAt - b.project.addedAt;
-  const [x, y] = [folderKey(a.project.folder), folderKey(b.project.folder)];
+export function byAdded(a: FolderSummary, b: FolderSummary): number {
+  if (a.folder.addedAt !== b.folder.addedAt) return a.folder.addedAt - b.folder.addedAt;
+  const [x, y] = [folderKey(a.folder.folder), folderKey(b.folder.folder)];
   return x < y ? -1 : x > y ? 1 : 0;
 }
 
 /**
- * The pinned first, then the rest; each of the two this Mac's projects, then each server's, each
- * oldest added first, as the window's and the Remote's (SidebarOrder.projects, #250, #357): no
+ * The pinned first, then the rest; each of the two this Mac's folders, then each server's, each
+ * oldest added first, as the window's and the Remote's (SidebarOrder.folders, #250, #357): no
  * heading for a host.
  */
-export function orderedProjects(hosts: ControlHost[], projects: Record<string, ProjectSummary[]>, macID = "mac"):
-  { host: ControlHost; project: ProjectSummary }[] {
+export function orderedFolders(hosts: ControlMachine[], folders: Record<string, FolderSummary[]>, macID = "mac"):
+  { host: ControlMachine; folder: FolderSummary }[] {
   const ordered = [...hosts.filter((h) => h.id === macID), ...hosts.filter((h) => h.id !== macID)];
-  const byHost = ordered.flatMap((host) => (projects[host.id] ?? [])
-    .filter((project) => project.project.archivedAt === undefined)
+  const byHost = ordered.flatMap((host) => (folders[host.id] ?? [])
+    .filter((folder) => folder.folder.archivedAt === undefined)
     .sort(byAdded)
-    .map((project) => ({ host, project })));
-  return [...byHost.filter((r) => r.project.project.pinned === true),
-          ...byHost.filter((r) => r.project.project.pinned !== true)];
+    .map((folder) => ({ host, folder })));
+  return [...byHost.filter((r) => r.folder.folder.pinned === true),
+          ...byHost.filter((r) => r.folder.folder.pinned !== true)];
 }
 
-/** Every host's archived projects, the latest archived first (#2153), as the window's Archived projects (#343). */
-export function archivedProjects(hosts: ControlHost[], projects: Record<string, ProjectSummary[]>):
-  { host: ControlHost; project: ProjectSummary }[] {
-  return hosts.flatMap((host) => (projects[host.id] ?? [])
-    .filter((project) => project.project.archivedAt !== undefined)
-    .map((project) => ({ host, project })))
-    .sort((a, b) => (b.project.project.archivedAt ?? b.project.lastActivityAt) - (a.project.project.archivedAt ?? a.project.lastActivityAt));
+/** Every host's archived folders, the latest archived first (#2153), as the window's Archived folders (#343). */
+export function archivedFolders(hosts: ControlMachine[], folders: Record<string, FolderSummary[]>):
+  { host: ControlMachine; folder: FolderSummary }[] {
+  return hosts.flatMap((host) => (folders[host.id] ?? [])
+    .filter((folder) => folder.folder.archivedAt !== undefined)
+    .map((folder) => ({ host, folder })))
+    .sort((a, b) => (b.folder.folder.archivedAt ?? b.folder.lastActivityAt) - (a.folder.folder.archivedAt ?? a.folder.lastActivityAt));
 }
 
 export function Sidebar({ session, store, linkDown }: { session: Session; store: Store; linkDown: boolean }) {
   const search = useSignal("");
   // What the folds filter by: the field's words once typing pauses, so a keystroke costs the
-  // field and not a pass over every project (#176, #193).
+  // field and not a pass over every folder (#176, #193).
   const searched = useSignal("");
-  const confirming = useSignal(false);
-  // Why Forget This Browser did not forget it, under the confirm, as the Remote's (#935).
-  const forgetProblem = useSignal<string | null>(null);
   const r = route.value;
   // After a pause in the typing: the folds filter what is held, and the archived sessions that
   // match are the hosts' to find, a capped page each (#165).
@@ -125,26 +128,31 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
     const agent = r.host && r.session ? store.agent(r.host, r.session) : undefined;
     keptInUnread.value = agent && showsUnread(agent) ? { host: r.host!, id: agent.id } : null;
   }, [r.host, r.session]);
-  // What is open, from anywhere (a link, Back), unfolds its project so its row is there to light,
+  // What is open, from anywhere (a link, Back), unfolds its folder so its row is there to light,
   // unless an open group at the top already shows it.
   useEffect(() => {
-    if (!r.host || !r.project || !(r.session || r.workflow || r.page || r.archive || r.mcp)) return;
+    if (!r.host || !r.folder || !(r.session || r.workflow || r.page || r.archive || r.mcp)) return;
     const agent = r.session ? store.agent(r.host, r.session) : undefined;
     if (agent && inOpenSmartRow(store, r.host, agent)) return;
-    if (r.workflow && smartGroupsOn.peek().has("pinned") && folds.isSmartOpen("pinned") && store.workflowPinsIn(r.host, r.project).includes(r.workflow)) return;
-    folds.set(r.host, r.project, true);
-  }, [r.host, r.project, r.session, r.workflow, r.page, r.archive, r.mcp]);
+    if (r.workflow && smartGroupsOn.peek().has("pinned") && folds.isSmartOpen("pinned") && store.workflowPinsIn(r.host, r.folder).includes(r.workflow)) return;
+    folds.set(r.host, r.folder, true);
+  }, [r.host, r.folder, r.session, r.workflow, r.page, r.archive, r.mcp]);
   // The next New Session at the top starts here too (#495).
   useEffect(() => {
-    if (r.host && r.project && r.compose) rememberProject(storage, { host: r.host, folder: r.project });
-  }, [r.host, r.project, r.compose]);
-  // A tab holding one project alone (#1089): its sidebar is that project's only.
+    if (r.host && r.folder && r.compose) rememberFolder(storage, { host: r.host, folder: r.folder });
+  }, [r.host, r.folder, r.compose]);
+  // A tab holding one folder alone (#1089): its sidebar is that folder's only.
   const held = alone.value;
-  const every = orderedProjects(store.hosts.value, store.projects.value, store.macHostID.value);
-  const projects = held ? every.filter(({ host, project }) => host.id === held.host
-    && folderKey(project.project.folder) === folderKey(held.folder)) : every;
-  const archived = held ? [] : archivedProjects(store.hosts.value, store.projects.value);
-  const showsArchived = folds.showsArchivedProjects.value;
+  const every = orderedFolders(store.hosts.value, store.folders.value, store.macHostID.value);
+  // Agents' filters (#2141): one machine's folders, and only the folders with a session in the state asked for.
+  const machine = held ? null : machineFilter.value;
+  const state = held ? "any" : stateFilter.value;
+  const folders = held ? every.filter(({ host, folder }) => host.id === held.host
+    && folderKey(folder.folder.folder) === folderKey(held.folder))
+    : every.filter(({ host, folder }) => (machine === null || host.id === machine)
+      && (state === "any" || liveSessions(store, host.id, folder.folder.folder).length > 0));
+  const archived = held ? [] : archivedFolders(store.hosts.value, store.folders.value);
+  const showsArchived = folds.showsArchivedFolders.value;
   const offline = store.hosts.value.filter((h) => !hostAnswers(h.state));
   const macHost = store.hosts.value.find((h) => h.id === store.macHostID.value);
   const macNotice = store.macHostNotice.value;
@@ -154,68 +162,59 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
       <header class="column-head sidebar-head">
         {/* The root list's title at a phone's width, as the iPhone's (#235). */}
         {held ? <>
-          <button class="link back-all" aria-label="All projects" onClick={showAll}>‹ All</button>
-          <h1 class="alone-title">{projects[0] ? projectLabel(projects[0].host, projects[0].project, store.macHostID.value) : "Project"}</h1>
+          <button class="link back-all" aria-label="All folders" onClick={showAll}>‹ All</button>
+          <h1 class="alone-title">{folders[0] ? folderLabel(folders[0].host, folders[0].folder, store.macHostID.value) : "Folder"}</h1>
         </> : <h1 class="narrow-only">Agents</h1>}
         <input class="search" type="search" placeholder="Search" aria-label="Search sessions and workflows"
           value={search.value} onInput={(e) => (search.value = (e.currentTarget as HTMLInputElement).value)} />
-        {/* New project, which the window has in its File menu (#115): the page has no menu bar. */}
-        <NewProjectMenu store={store} newSession={newSessionStart(store, projects, linkDown)} />
+        {/* New folder, which the window has in its File menu (#115): the page has no menu bar. */}
+        <NewFolderMenu store={store} newSession={newSessionStart(store, folders, linkDown)} />
       </header>
+      {!held && <AgentFilters store={store} />}
       <div class="scroll" onKeyDown={(e) => moveWithKeys(e)}>
-        {projects.length > 0 && <NewSessionTopRow store={store} projects={projects} linkDown={linkDown} />}
-        {/* A machine asking to join (#994): at the top, whatever groups are on, and with no project yet. */}
+        {folders.length > 0 && <NewSessionTopRow store={store} folders={folders} linkDown={linkDown} />}
+        {/* A machine asking to join (#994): at the top, whatever groups are on, and with no folder yet. */}
         {!held && <JoinRequests store={store} down={linkDown} />}
         {/* A channel identity asking to act as this person (#1762), beside the machines. */}
         {!held && <LinkRequests store={store} down={linkDown} />}
         {/* A new client that signed in with GitHub as this person (#995), beside them. */}
         {!held && <SignInRequests store={store} down={linkDown} />}
-        {/* Pages about all the work rather than one project, above the smart groups, as the
-            window's (#495): Status, what goes on now, and Usage, the past (#915). Each folds, as
-            a project does, and stays while searching, as the window's and the Remote's do (#547). */}
-        {!held && <>
-        <details class="activity" aria-label="Status" open={folds.showsStatus.value}
-          onToggle={(e) => folds.setShowsStatus((e.currentTarget as HTMLDetailsElement).open)}>
-          <summary class="sidebar-head-label" data-fold="status">Status</summary>
-          <ActivityRows group="status" store={store} chosen={r.activity} onPick={(page: ActivityPage) => go({ activity: page })} />
-        </details>
-        <details class="activity" aria-label="Usage" open={folds.showsUsage.value}
-          onToggle={(e) => folds.setShowsUsage((e.currentTarget as HTMLDetailsElement).open)}>
-          <summary class="sidebar-head-label" data-fold="usage">Usage</summary>
-          <ActivityRows group="usage" store={store} chosen={r.activity} onPick={(page: ActivityPage) => go({ activity: page })} />
-        </details>
-        </>}
-        {/* Pinned, Needs You, Working, Unread: a group each across every project and host (#495, #773),
+        {/* Pinned, Needs You, Working, Unread: a group each across every folder and host (#495, #773),
             each that is on in this browser's Settings (#846). */}
-        {projects.length > 0 && smartRows.filter((row) => smartGroupsOn.value.has(row) && (!held || aloneRows.has(row))).map((row) => (
-          <SmartFold key={row} row={row} store={store} projects={projects} query={query} linkDown={linkDown}
+        {folders.length > 0 && smartRows.filter((row) => smartGroupsOn.value.has(row) && (!held || aloneRows.has(row))).map((row) => (
+          <SmartFold key={row} row={row} store={store} folders={folders} query={query} linkDown={linkDown}
             downSince={session.state.value.kind === "down" ? session.state.value.since : undefined} />
         ))}
-        {/* One group per project (#495), its name the group's heading, its sessions the rows. */}
-        <section class="project-list" aria-label="Projects">
-          {projects.map(({ host, project }) => (
-            <ProjectFold key={`${host.id}|${project.project.folder}`} store={store} host={host} project={project}
+        {/* One group per folder (#495), its name the group's heading, its sessions the rows. */}
+        <section class="folder-list" aria-label="Folders">
+          {folders.map(({ host, folder }) => (
+            <FolderFold key={`${host.id}|${folder.folder.folder}`} store={store} host={host} folder={folder}
               query={query} linkDown={linkDown} alone={!!held} />
           ))}
-          {held && <Elsewhere store={store} projects={every.filter((p) => !projects.includes(p))} />}
+          {held && <Elsewhere store={store} folders={every.filter((p) => !folders.includes(p))} />}
           {/* A host had more matches than its page: the next page, on asking (#176). */}
           {query && Object.keys(store.searchNext.value).length > 0 && (
             <button class="link more-matches" onClick={() => void store.searchMore()}>More matches…</button>
           )}
           {store.hosts.value.map((host) => <CloningRows key={host.id} store={store} host={host.id} />)}
-          <EmptyProjects store={store} />
+          <EmptyFolders store={store} />
         </section>
-        {/* Projects put away, under their own heading, closed until opened, as the window's (#343). */}
+        {/* Folders put away, under their own heading, closed until opened, as the window's (#343). */}
         {!query && archived.length > 0 && (
-          <details class="archived archived-projects" open={showsArchived}
-            onToggle={(e) => folds.setShowsArchivedProjects((e.currentTarget as HTMLDetailsElement).open)}>
-            <summary class="sidebar-head-label" data-fold="archivedProjects">Archived projects</summary>
-            {showsArchived && archived.map(({ host, project }) => (
-              <ArchivedProjectRow key={`${host.id}|${project.project.folder}`} store={store} host={host} project={project}
+          <details class="archived archived-folders" open={showsArchived}
+            onToggle={(e) => folds.setShowsArchivedFolders((e.currentTarget as HTMLDetailsElement).open)}>
+            <summary class="sidebar-head-label" data-fold="archivedFolders">Archived folders</summary>
+            {showsArchived && archived.map(({ host, folder }) => (
+              <ArchivedFolderRow key={`${host.id}|${folder.folder.folder}`} store={store} host={host} folder={folder}
                 down={linkDown || !store.hostIsOnline(host.id)} />
             ))}
           </details>
         )}
+        {/* Every person's running agents for an admin, and every project (#2141): pages in the chat's place. */}
+        {!held && <section class="agents-pages" aria-label="More">
+          {adminOf(store) === true && <AgentsPageRow id="live" title="Live Now" icon={"◉"} />}
+          <AgentsPageRow id="projects" title="Projects" icon={"▦"} />
+        </section>}
       </div>
       {/* What the hosts and this browser are doing, pinned at the foot: status lines rather than
           somewhere to go. Each is absent when there is nothing to say. */}
@@ -241,7 +240,7 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
             ) : null}
           </p>
         ))}
-        {/* A file a host keeps that could not be read (#205, #223): why paired devices or projects
+        {/* A file a host keeps that could not be read (#205, #223): why paired devices or folders
             may have gone from view, and that what they held is kept. A server's are named. */}
         {store.hosts.value.flatMap((host) => (store.storeNotes.value[host.id] ?? []).map((note) => (
           <p class="foot-line store-note" role="status" key={`${host.id}|${note}`}>
@@ -250,30 +249,42 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
         )))}
         <div class="identity">
           <span>{browserName()} {onThisMac() ? "on this Mac" : "on the web"}</span>
-          {/* This browser's Settings (#846): which smart groups are on, as the window's
-              Settings ▸ Sidebar. */}
-          <button class="link" aria-current={!!r.settings} onClick={() => go({ settings: true })}>Settings</button>
           {/* The docs site (#1327), as the window's Help ▸ Agents Help. */}
           <a class="link" href={helpSite} target="_blank" rel="noopener">Help</a>
-          {/* What forgetting does, beside the confirm, in the Remote's words (#935). */}
-          {confirming.value ? (
-            <div class="forget" role="group" aria-label="Forget This Browser">
-              <p class="small">This browser is cut off at once, at home and away, until it is paired again.</p>
-              <span class="confirm">
-                <button onClick={() => {
-                  forgetProblem.value = null;
-                  void session.forgetThisBrowser().then((problem) => (forgetProblem.value = problem));
-                }}>Forget</button>
-                <button onClick={() => { confirming.value = false; forgetProblem.value = null; }}>Cancel</button>
-              </span>
-            </div>
-          ) : (
-            <button class="link" onClick={() => (confirming.value = true)}>Forget This Browser…</button>
-          )}
-          {forgetProblem.value && <p class="failure small" role="alert">{forgetProblem.value}</p>}
+          {/* Forget This Browser is in the person's menu, in the top bar (#2142). */}
         </div>
       </footer>
     </nav>
+  );
+}
+
+/** Agents' filters (#2141): one machine, and a state. A machine filter only with more than one machine. */
+function AgentFilters({ store }: { store: Store }) {
+  const hosts = store.hosts.value;
+  const machine = machineFilter.value;
+  return (
+    <div class="agent-filters" role="group" aria-label="Filters">
+      {(hosts.length > 1 || machine !== null) && (
+        <select aria-label="Machine" value={machine ?? ""} onChange={(e) => setMachineFilter((e.currentTarget as HTMLSelectElement).value || null)}>
+          <option value="">Every machine</option>
+          {hosts.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+        </select>
+      )}
+      <select aria-label="State" value={stateFilter.value} onChange={(e) => setStateFilter((e.currentTarget as HTMLSelectElement).value as StateFilter)}>
+        {stateFilters.map((f) => <option key={f} value={f}>{stateFilterTitle[f]}</option>)}
+      </select>
+    </div>
+  );
+}
+
+/** A row at the sidebar's foot that opens one of Agents' pages in the chat's place. */
+function AgentsPageRow({ id, title, icon }: { id: string; title: string; icon: string }) {
+  const chosen = route.value.nav === "agents" && route.value.section === id;
+  return (
+    <button class={`row activity-row${chosen ? " chosen" : ""}`} aria-current={chosen} onClick={() => go({ nav: "agents", section: id })}>
+      <span class="activity-icon" aria-hidden="true">{icon}</span>
+      <span class="title">{title}</span>
+    </button>
   );
 }
 
@@ -283,9 +294,9 @@ const storage = globalThis.window?.localStorage;
 /** The session opened while it was unread, which Unread keeps until another is opened (#495). */
 const keptInUnread = signal<{ host: string; id: string } | null>(null);
 
-type Placed = { host: ControlHost; project: ProjectSummary };
+type Placed = { host: ControlMachine; folder: FolderSummary };
 
-/** One project's live sessions, every group's, as held. */
+/** One folder's live sessions, every group's, as held. */
 /** Who started a session, on whichever host holds it: a smart group gathers every host's (#835). */
 function startedByOf(store: Store, id: string): string | undefined {
   for (const agents of Object.values(store.agents.value)) {
@@ -296,13 +307,14 @@ function startedByOf(store: Store, id: string): string | undefined {
 }
 
 function liveSessions(store: Store, host: string, folder: string): Agent[] {
-  return store.projectView(host, folder).headings.flatMap((h) => h.agents);
+  const state = alone.value ? "any" : stateFilter.value;
+  return store.folderView(host, folder).headings.flatMap((h) => h.agents).filter((a) => keptByState(a, state));
 }
 
-/** Whether a session is in sight under an open group at the top, so its project need not unfold. */
+/** Whether a session is in sight under an open group at the top, so its folder need not unfold. */
 function inOpenSmartRow(store: Store, host: string, agent: Agent): boolean {
   const on = smartGroupsOn.peek();
-  const pins = store.sessionPinsIn(host, projectFolder(agent));
+  const pins = store.sessionPinsIn(host, agentFolderPath(agent));
   if (on.has("pinned") && folds.isSmartOpen("pinned") && pins.includes(agent.id)) return true;
   const kept = keptInUnread.peek();
   if (on.has("unread") && folds.isSmartOpen("unread") && kept?.host === host && kept.id === agent.id) return true;
@@ -319,35 +331,35 @@ function workflowMatches(store: Store, host: string, query: LabelQuery | undefin
 }
 
 /** New Session in the + menu (#628): its start, or undefined while there is nowhere to start one. */
-function newSessionStart(store: Store, projects: Placed[], linkDown: boolean): (() => void) | undefined {
-  const target = newSessionTarget(projects);
+function newSessionStart(store: Store, folders: Placed[], linkDown: boolean): (() => void) | undefined {
+  const target = newSessionTarget(folders);
   if (linkDown || !target || !store.hostIsOnline(target.host)) return undefined;
-  return () => go({ host: target.host, project: target.folder, compose: true });
+  return () => go({ host: target.host, folder: target.folder, compose: true });
 }
 
-/** The project New Session starts in, at the top of the sidebar and in the + menu (#628). */
-function newSessionTarget(projects: Placed[]): ProjectKey | undefined {
+/** The folder New Session starts in, at the top of the sidebar and in the + menu (#628). */
+function newSessionTarget(folders: Placed[]): FolderKey | undefined {
   const r = route.value;
-  const live = projects.map(({ host, project }) => ({ host: host.id, folder: project.project.folder }));
-  const open = r.host && r.project ? { host: r.host, folder: r.project } : undefined;
-  return newSessionProject(live, rememberedProject(storage), open);
+  const live = folders.map(({ host, folder }) => ({ host: host.id, folder: folder.folder.folder }));
+  const open = r.host && r.folder ? { host: r.host, folder: r.folder } : undefined;
+  return newSessionFolder(live, rememberedFolder(storage), open);
 }
 
 /**
- * The first row of the sidebar (#495): a new session, in the project the last one was started in,
- * as the window's and the Remote's. Lit while that form is open. A project's menu starts one in
- * that project instead, and the form's project name switches to another.
+ * The first row of the sidebar (#495): a new session, in the folder the last one was started in,
+ * as the window's and the Remote's. Lit while that form is open. A folder's menu starts one in
+ * that folder instead, and the form's folder name switches to another.
  */
-function NewSessionTopRow({ store, projects, linkDown }: { store: Store; projects: Placed[]; linkDown: boolean }) {
+function NewSessionTopRow({ store, folders, linkDown }: { store: Store; folders: Placed[]; linkDown: boolean }) {
   const r = route.value;
-  const target = newSessionTarget(projects);
-  const chosen = !!r.compose && !!target && r.host === target.host && r.project !== undefined
-    && folderKey(r.project) === folderKey(target.folder);
+  const target = newSessionTarget(folders);
+  const chosen = !!r.compose && !!target && r.host === target.host && r.folder !== undefined
+    && folderKey(r.folder) === folderKey(target.folder);
   return (
     <div class="nav-item new-session-top">
       <div class={`row new-session${chosen ? " chosen" : ""}`}>
         <button class="pick" aria-current={chosen} disabled={linkDown || !target || !store.hostIsOnline(target.host)}
-          onClick={() => target && go({ host: target.host, project: target.folder, compose: true })}>
+          onClick={() => target && go({ host: target.host, folder: target.folder, compose: true })}>
           <span class="pin-mark" aria-hidden="true">✎</span>
           <span class="title">New Session</span>
         </button>
@@ -356,31 +368,31 @@ function NewSessionTopRow({ store, projects, linkDown }: { store: Store; project
   );
 }
 
-/** A row under a group at the top: a session or a pinned workflow, with the project it is in. */
+/** A row under a group at the top: a session or a pinned workflow, with the folder it is in. */
 type SmartLine = Placed & ({ kind: "session"; agent: Agent } | { kind: "workflow"; summary: WorkflowSummary })
   & { pins?: string[] | undefined; tree?: TreeRow | undefined };
 
 /**
  * One of the groups at the top of the sidebar (#495): Pinned, Needs You, Working or Unread, across
- * every project and host, each row naming its project. Needs You lists the sessions asking, blocked or
+ * every folder and host, each row naming its folder. Needs You lists the sessions asking, blocked or
  * asking to be archived (#584, #773), then what waits for an OK, oldest first, each answered from its
  * own sheet (no Approve All, #704); its count is of both. Drawn only with something in it, and while
  * searching only with a match (#507); Unread still is while it keeps the open session. Folded, it
  * lists nothing but counts.
  */
-function SmartFold({ row, store, projects, query, linkDown, downSince }: {
-  row: SmartRow; store: Store; projects: Placed[]; query: string; linkDown: boolean;
+function SmartFold({ row, store, folders, query, linkDown, downSince }: {
+  row: SmartRow; store: Store; folders: Placed[]; query: string; linkDown: boolean;
   /** When the link was lost: Needs You says its count was last true then (#1163). */
   downSince?: number | undefined;
 }) {
   const r = route.value;
   const parsed = query ? { ...parseQuery(query), said: store.saidLines.value } : undefined;
-  // Pinned workflows of folded projects are listed too, held while Pinned is drawn (#432).
-  const flowPinned = row !== "pinned" ? [] : projects.filter(({ host, project }) =>
-    store.hostIsOnline(host.id) && store.workflowPinsIn(host.id, project.project.folder).length > 0);
-  const holding = flowPinned.map(({ host, project }) => `${host.id}|${project.project.folder}`).join("\n");
+  // Pinned workflows of folded folders are listed too, held while Pinned is drawn (#432).
+  const flowPinned = row !== "pinned" ? [] : folders.filter(({ host, folder }) =>
+    store.hostIsOnline(host.id) && store.workflowPinsIn(host.id, folder.folder.folder).length > 0);
+  const holding = flowPinned.map(({ host, folder }) => `${host.id}|${folder.folder.folder}`).join("\n");
   useEffect(() => {
-    const held = flowPinned.map(({ host, project }) => ({ host: host.id, folder: project.project.folder }));
+    const held = flowPinned.map(({ host, folder }) => ({ host: host.id, folder: folder.folder.folder }));
     for (const p of held) store.holdWorkflows(p.host, p.folder);
     return () => { for (const p of held) store.releaseWorkflows(p.host, p.folder); };
   }, [holding]);
@@ -392,14 +404,14 @@ function SmartFold({ row, store, projects, query, linkDown, downSince }: {
   let lines: SmartLine[] = [];
   let keptPlace: Placed | undefined;
   if (row === "pinned") {
-    for (const placed of projects) {
+    for (const placed of folders) {
       const host = placed.host.id;
-      const folder = placed.project.project.folder;
+      const folder = placed.folder.folder.folder;
       const pins = store.sessionPinsIn(host, folder);
       const flowPins = store.workflowPinsIn(host, folder);
       if (!pins.length && !flowPins.length) continue;
       const live = liveSessions(store, host, folder);
-      const flows = pinnedWorkflows(store.projectWorkflows(host, folder), flowPins);
+      const flows = pinnedWorkflows(store.folderWorkflows(host, folder), flowPins);
       count += pinnedSessions(live, pins).length + flows.length;
       // The whole order for Move Up and Down, which a search shows only some of.
       lines.push(...pinnedSessions(live, pins, parsed)
@@ -409,12 +421,12 @@ function SmartFold({ row, store, projects, query, linkDown, downSince }: {
     }
   } else {
     const found = new Map<Agent, Placed>();
-    for (const placed of projects) {
-      const live = liveSessions(store, placed.host.id, placed.project.project.folder);
+    for (const placed of folders) {
+      const live = liveSessions(store, placed.host.id, placed.folder.folder.folder);
       // The pinned are in Pinned alone: each session is listed once (#587).
-      const pins = store.sessionPinsIn(placed.host.id, placed.project.project.folder);
+      const pins = store.sessionPinsIn(placed.host.id, placed.folder.folder.folder);
       // A failed workflow run's agent is its workflow's row under Needs You, not a session too (#989).
-      const failed = row === "needsYou" ? failedRuns(placed.project.approvals) : new Set<string>();
+      const failed = row === "needsYou" ? failedRuns(placed.folder.approvals) : new Set<string>();
       const gathered = (query?: typeof parsed) => smartAgents(row, live, query, pins, on).filter((a) => !failed.has(a.id));
       count += gathered().length;
       if (open || parsed) for (const agent of gathered(parsed)) found.set(agent, placed);
@@ -422,15 +434,15 @@ function SmartFold({ row, store, projects, query, linkDown, downSince }: {
     // Unread keeps the session opened from it in its place, read now; none while searching.
     const kept = row === "unread" && !parsed ? keptInUnread.value : null;
     const keptAgent = kept ? store.agent(kept.host, kept.id) : undefined;
-    keptPlace = keptAgent && keepsInUnread(keptAgent, store.sessionPinsIn(kept!.host, projectFolder(keptAgent)), on) ? projects.find(({ host, project }) =>
-      host.id === kept!.host && folderKey(project.project.folder) === projectFolder(keptAgent)) : undefined;
+    keptPlace = keptAgent && keepsInUnread(keptAgent, store.sessionPinsIn(kept!.host, agentFolderPath(keptAgent)), on) ? folders.find(({ host, folder }) =>
+      host.id === kept!.host && folderKey(folder.folder.folder) === agentFolderPath(keptAgent)) : undefined;
     // Each under the session that started it when this group lists that too (#835).
     const listed = withKept([...found.keys()].sort(byStart), keptPlace ? keptAgent : undefined);
     lines = treeRows(listed, (id) => startedByOf(store, id), (id) => folds.isSessionOpen(id))
       .map((tree): SmartLine => ({ ...(found.get(tree.agent) ?? keptPlace!), kind: "session", agent: tree.agent, tree }));
   }
-  // What waits for an OK, each project's, after the sessions (#773).
-  const waiting = row !== "needsYou" ? [] : projects.map((placed) => ({ project: placed, approvals: placed.project.approvals }));
+  // What waits for an OK, each folder's, after the sessions (#773).
+  const waiting = row !== "needsYou" ? [] : folders.map((placed) => ({ folder: placed, approvals: placed.folder.approvals }));
   const approvals = smartApprovals(waiting, query);
   if (row === "needsYou") count += query ? smartApprovals(waiting).length : approvals.length;
   if (parsed ? lines.length === 0 && approvals.length === 0 : count === 0 && !keptPlace) return null;
@@ -450,9 +462,9 @@ function SmartFold({ row, store, projects, query, linkDown, downSince }: {
       </summary>
       {open && lines.map((line) => {
         const host = line.host.id;
-        const folder = line.project.project.folder;
+        const folder = line.folder.folder.folder;
         const down = linkDown || !store.hostIsOnline(host);
-        const place = projectLabel(line.host, line.project, store.macHostID.value);
+        const place = folderLabel(line.host, line.folder, store.macHostID.value);
         return line.kind === "session" ? (
           <SidebarSession key={`${host}|${line.agent.id}`} store={store} host={host} folder={folder} agent={line.agent}
             chosen={r.host === host && r.session === line.agent.id} down={down} pinnedAt={line.pins} place={place} tree={line.tree} />
@@ -460,15 +472,15 @@ function SmartFold({ row, store, projects, query, linkDown, downSince }: {
           <div class="nav-item" key={`${host}|${line.summary.workflow.workflowID}`}>
             <WorkflowRow store={store} host={host} summary={line.summary} disabled={down} place={place}
               chosen={r.host === host && r.workflow === line.summary.workflow.workflowID} pinnedAt={line.pins}
-              onPick={() => go({ host, project: folder, workflow: line.summary.workflow.workflowID })} />
+              onPick={() => go({ host, folder: folder, workflow: line.summary.workflow.workflowID })} />
           </div>
         );
       })}
-      {open && approvals.map(({ project: placed, approval }) => {
+      {open && approvals.map(({ folder: placed, approval }) => {
         const host = placed.host.id;
-        const folder = placed.project.project.folder;
+        const folder = placed.folder.folder.folder;
         const key = `${host}|${folder}|${approvalID(approval)}`;
-        const place = projectLabel(placed.host, placed.project, store.macHostID.value);
+        const place = folderLabel(placed.host, placed.folder, store.macHostID.value);
         const down = linkDown || !store.hostIsOnline(host);
         if (opensItsSubject(approval)) {
           const agentID = approval.agentID as string | undefined;
@@ -478,50 +490,61 @@ function SmartFold({ row, store, projects, query, linkDown, downSince }: {
           );
         }
         return <ApprovalRow key={key} store={store} host={host} folder={folder} approval={approval} place={place} down={down}
-          chosen={r.host === host && r.review === approvalID(approval) && r.project !== undefined && folderKey(r.project) === folderKey(folder)} />;
+          chosen={r.host === host && r.review === approvalID(approval) && r.folder !== undefined && folderKey(r.folder) === folderKey(folder)} />;
       })}
     </details>
   );
 }
 
 /**
- * One project (#495): a group headed by its row, then its pinned pages, its live sessions newest
+ * One folder (#495): a group headed by its row, then its pinned pages, its live sessions newest
  * started first with their state the row's mark, its Workflows fold (#885), and one Archived row
- * opening a page. Its pinned sessions and workflows are in Pinned at the top. A search unfolds every project
+ * opening a page. Its pinned sessions and workflows are in Pinned at the top. A search unfolds every folder
  * with something that matches, its archived matches inline, and hides the rest. It reads its own
- * project's agents alone, so a change to an agent draws one fold again, and a folded one reads
+ * folder's agents alone, so a change to an agent draws one fold again, and a folded one reads
  * nothing of its sessions (#170). `query` is the search's words, already trimmed.
  */
-const ProjectFold = memo(function ProjectFold({ store, host, project, query, linkDown, alone: isAlone = false }: {
-  store: Store; host: ControlHost; project: ProjectSummary; query: string; linkDown: boolean;
-  /** In a tab holding this project alone (#1089): its rows under a Sessions heading, always open. */
+const FolderFold = memo(function FolderFold({ store, host, folder: summary, query, linkDown, alone: isAlone = false }: {
+  store: Store; host: ControlMachine; folder: FolderSummary; query: string; linkDown: boolean;
+  /** In a tab holding this folder alone (#1089): its rows under a Sessions heading, always open. */
   alone?: boolean;
 }) {
   const r = route.value;
-  const folder = project.project.folder;
-  const label = projectLabel(host, project, store.macHostID.value);
+  const folder = summary.folder.folder;
+  const label = folderLabel(host, summary, store.macHostID.value);
   const searching = query !== "";
   const unfolded = searching || isAlone || folds.isOpen(host.id, folder);
   const down = linkDown || !store.hostIsOnline(host.id);
   // Every match on show, past the first few; a new search shows the few again.
   const showsAllMatches = useSignal(false);
+  const configOpen = useSignal(false);
+  const projectOpen = useSignal(false);
+  const prCostOpen = useSignal(false);
   useEffect(() => { showsAllMatches.value = false; }, [query]);
   const online = store.hostIsOnline(host.id);
-  // A file dragged onto the row goes into the project's drop box (#231). Before any early return:
+  // A file dragged onto the row goes into the folder's drop box (#231). Before any early return:
   // it is a hook.
   const drop = useDropboxDrop(store, host.id, folder, down);
-  // The list is held while the project is open, and let go when it folds (#291).
+  // The list is held while the folder is open, and let go when it folds (#291).
   useEffect(() => {
     if (!unfolded || !online) return;
     store.holdWorkflows(host.id, folder);
     return () => store.releaseWorkflows(host.id, folder);
   }, [unfolded, online, host.id, folder]);
+  // Its Recently archived sessions, the few it shows, while it is open by hand (#2731): not because
+  // a search unfolded it, since the search brings its own matches.
+  const opened = isAlone || folds.isOpen(host.id, folder);
+  useEffect(() => {
+    if (!opened || !online) return;
+    void store.loadArchived(host.id, folder, recentArchivedShown);
+    return () => store.unloadArchived(host.id, folder, recentArchivedShown);
+  }, [opened, online, host.id, folder]);
 
-  const view = store.projectView(host.id, folder);
+  const view = store.folderView(host.id, folder);
   // The matcher is made once per fold, not per row.
   const parsed = searching ? { ...parseQuery(query), said: store.saidLines.value } : undefined;
-  const live = view.headings.flatMap((h) => h.agents);
-  // Those a group at the top lists are there alone (#495, #587), out of the project's list. A
+  const live = view.headings.flatMap((h) => h.agents).filter((a) => isAlone || keptByState(a, stateFilter.value));
+  // Those a group at the top lists are there alone (#495, #587), out of the folder's list. A
   // group turned off (#846) lists nothing, so its sessions are here unless the next group has them.
   const on = smartGroupsOn.value;
   const pins = store.sessionPinsIn(host.id, folder);
@@ -529,48 +552,72 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   const keptID = !parsed && keptInUnread.value?.host === host.id ? keptInUnread.value.id : undefined;
   const keptAgent = keptID ? live.find((a) => a.id === keptID) : undefined;
   const kept = keptAgent && keepsInUnread(keptAgent, pins, on) ? keptAgent.id : undefined;
-  const sessions = !unfolded ? [] : projectSessions(live, pins, parsed, kept, on);
-  // The heading's grey count, as every group's heading has one (#587), folded or not.
-  const own = ownCount(live, pins, kept, on);
+  const sessions = !unfolded ? [] : folderSessions(live, pins, parsed, kept, on);
+  const recentArchived = !parsed ? recentlyArchived(view.archived, recentArchivedShown, toWireDate(new Date())) : [];
   const archived = !unfolded || !parsed ? [] : view.archived.filter((a) => queryMatches(parsed, a));
-  const allWorkflows = (unfolded ? store.projectWorkflows(host.id, folder) : [])
+  const allWorkflows = (unfolded ? store.folderWorkflows(host.id, folder) : [])
     .filter(workflowMatches(store, host.id, parsed))
     .sort((a, b) => a.workflow.name.localeCompare(b.workflow.name));
-  // With Pinned off (#846), the pinned workflows are in the project's list with the rest.
+  // With Pinned off (#846), the pinned workflows are in the folder's list with the rest.
   const flowPins = on.has("pinned") ? store.workflowPinsIn(host.id, folder) : [];
   const workflows = allWorkflows.filter((w) => !w.isArchived && !flowPins.includes(w.workflow.workflowID));
+  const folderWorkflows = workflows.filter((w) => w.scope !== "user");
+  const userWorkflows = workflows.filter((w) => w.scope === "user");
   const archivedWorkflows = allWorkflows.filter((w) => w.isArchived);
   const workflowsOpen = searching || folds.isWorkflowsOpen(host.id, folder);
+  // Under a Sessions row, as the workflows are under theirs (#2312), the only layout (#2381); not in a
+  // tab of the folder alone, whose group is headed Sessions already. A search holds it open.
+  const groupsSessions = !isAlone && sessions.length > 0;
+  const sessionsOpen = searching || folds.isSessionsOpen(host.id, folder);
+  const recentArchivedOpen = searching || folds.isRecentArchivedSessionsOpen(host.id, folder);
   const nameMatches = label.toLowerCase().includes(query.toLowerCase());
   if (searching && sessions.length === 0 && archived.length === 0 && workflows.length === 0
     && archivedWorkflows.length === 0 && !nameMatches) return null;
 
-  const here = r.host === host.id && r.project !== undefined && folderKey(r.project) === folderKey(folder);
-  const archiveCount = (project.counts.archived ?? 0) + archivedWorkflows.length;
-  const mcpServers = projectServers(store.mcpHealthOf(host.id), folder);
+  const here = r.host === host.id && r.folder !== undefined && folderKey(r.folder) === folderKey(folder);
+  const archiveCount = (summary.counts.archived ?? 0) + archivedWorkflows.length;
+  const mcpServers = folderServers(store.mcpHealthOf(host.id), folder);
   const mcpTally = healthTally(mcpServers);
   const fold = (open: boolean) => folds.set(host.id, folder, open);
-  const projectPinned = project.project.pinned === true;
-  const projectMenu: MenuItem[] = [
-    { label: "New Session", disabled: down, help: "Start a new session in this project",
-      run: () => go({ host: host.id, project: folder, compose: true }) },
-    // The project alone, in a tab of its own (#1089), as the window opens it in a window of its own.
-    { label: "Open in New Tab", help: "Open this project alone in a new browser tab",
+  const folderPinned = summary.folder.pinned === true;
+  const folderMenu: MenuItem[] = [
+    { label: "New Session", disabled: down, help: "Start a new session in this folder",
+      run: () => go({ host: host.id, folder: folder, compose: true }) },
+    // The folder alone, in a tab of its own (#1089), as the window opens it in a window of its own.
+    { label: "Open in New Tab", help: "Open this folder alone in a new browser tab",
       run: () => void window.open(aloneURL(host.id, folder), "_blank", "noopener") },
-    { label: "Put Files in Drop Box…", disabled: down, help: "Put files into this project's .agents/dropbox/ (#231)",
+    { label: "Put Files in Drop Box…", disabled: down, help: "Put files into this folder's .agents/dropbox/ (#231)",
       run: () => putFilesInDropbox(host.id, folder, label) },
+    { label: "Agent Configuration…", disabled: down,
+      run: () => { configOpen.value = true; } },
+    // What people work on, across machines (#2317), as the window's Folder Settings ▸ Project.
+    { label: "Project…", disabled: down, help: "Choose the project this folder is in",
+      run: () => { projectOpen.value = true; } },
+    // What its merged pull requests say they cost (#2352), as the window's Folder Settings ▸ Cost on pull requests.
+    ...(store.has(host.id, Capability.lineageComment1) ? [
+      { label: "Cost on Pull Requests…", disabled: down, help: "Choose what a merged pull request says it cost",
+        run: () => { prCostOpen.value = true; } },
+    ] : []),
+    ...showHiddenViewsItem(store, host.id, folder, down),
     // To the top of the sidebar, as the window's Pin.
-    { label: projectPinned ? "Unpin" : "Pin", disabled: down,
-      help: projectPinned ? "Let this project take its place among the others" : "Keep this project at the top of the sidebar",
-      run: () => void store.setProjectPinned(host.id, folder, !projectPinned) },
-    // Into Archived projects, asked first (#668), as the window's Archive.
-    { label: "Archive…", disabled: down, help: "Put this project away in Archived projects",
+    { label: folderPinned ? "Unpin" : "Pin", disabled: down,
+      help: folderPinned ? "Let this folder take its place among the others" : "Keep this folder at the top of the sidebar",
+      run: () => void store.setFolderPinned(host.id, folder, !folderPinned) },
+    // Into Archived folders, asked first (#668), as the window's Archive.
+    { label: "Archive…", disabled: down, help: "Put this folder away in Archived folders",
       run: () => {
-        if (!confirm(`${archiveProjectTitle(label)}\n\n${archiveProjectMessage}`)) return;
-        void store.archiveProject(host.id, folder).then((summary) => {
-          if (summary && here) go({});
+        if (!confirm(`${archiveFolderTitle(label)}\n\n${archiveFolderMessage}`)) return;
+        void store.archiveFolder(host.id, folder).then((summary) => {
+          if (summary && here) go({ nav: "agents" });
         });
       } },
+    // Its agents as a .tar.gz, and an export brought back on its machine (#1001), as the window's.
+    ...(store.has(host.id, Capability.agentsExport1) ? [
+      { label: "Export Agents…", disabled: down || !!store.exportImport.value, help: "Download this folder's agents as a .tar.gz",
+        run: () => exportFromMenu(store, host.id, { folder: folder as NonNullable<AgentsExportRequest["folder"]> }) },
+      { label: "Import Agents…", disabled: down || !!store.exportImport.value, help: "Bring back the agents of an export, archived, into this folder",
+        run: () => importFromMenu(store, host.id, { folder, name: summary.name }) },
+    ] : []),
   ];
   const row = (agent: Agent, tree?: TreeRow) => (
     <SidebarSession key={agent.id} store={store} host={host.id} folder={folder} agent={agent}
@@ -582,44 +629,74 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
     <div class="nav-item" key={summary.workflow.workflowID}>
       <WorkflowRow store={store} host={host.id} summary={summary} disabled={down}
         chosen={here && r.workflow === summary.workflow.workflowID}
-        onPick={() => go({ host: host.id, project: folder, workflow: summary.workflow.workflowID })} />
+        onPick={() => go({ host: host.id, folder: folder, workflow: summary.workflow.workflowID })} />
     </div>
   );
   return (
-    <div class={`project-fold${down && !linkDown ? " greyed" : ""}`} role="group" aria-label={label}
+    <div class={`folder-fold${down && !linkDown ? " greyed" : ""}`} role="group" aria-label={label}
       data-host={host.id} data-folder={folder}>
+      {projectOpen.value && <ProjectModal store={store} host={host.id} folder={folder} summary={summary}
+        close={() => { projectOpen.value = false; }} />}
+      {prCostOpen.value && <PRCostCommentModal store={store} host={host.id} folder={folder} summary={summary}
+        close={() => { prCostOpen.value = false; }} />}
+      {configOpen.value && <ProjectAgentConfigModal store={store} host={host.id} folder={folder} down={down}
+        close={() => { configOpen.value = false; }} />}
       {isAlone ? (
-        // The tab is the project, so its name is the tab's title and not a heading (#1089).
+        // The tab is the folder, so its name is the tab's title and not a heading (#1089).
         <p class={`sidebar-head-label alone-sessions${drop.targeted ? " drop-target" : ""}`} {...drop.props}>Sessions</p>
       ) : (
-      <div class={`row project${drop.targeted ? " drop-target" : ""}`} {...drop.props}>
+      <div class={`row folder${drop.targeted ? " drop-target" : ""}`} {...drop.props}>
         <button class="disclosure" aria-label={unfolded ? `Fold ${label}` : `Unfold ${label}`} aria-expanded={unfolded}
           tabIndex={-1} disabled={searching} onClick={() => fold(!unfolded)}>{unfolded ? "⌄" : "›"}</button>
-        <button class="pick" aria-expanded={unfolded} data-fold="project" title={folderPath(folder)}
+        <button class="pick" aria-expanded={unfolded} data-fold="folder" title={folderPath(folder)}
           onClick={(e) => {
             // The row folds or unfolds, and nothing else (#375): a session starts from New Session
             // at the top. Not when the arrow keys land here (a click with no detail): moving
             // through the list folds nothing.
             if (e.detail > 0 && !searching) fold(!unfolded);
           }}
-          onContextMenu={(e) => openContextMenu(e, projectMenu)} {...holdForMenu(() => projectMenu)}
-          onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, projectMenu); }}>
-          <span class="title">{project.isChat === true && <ChatMark />}{label}</span>
+          onContextMenu={(e) => openContextMenu(e, folderMenu)} {...holdForMenu(() => folderMenu)}
+          onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, folderMenu); }}>
+          <span class="title">{label}</span>
           {/* A heading, as the groups' at the top (#587): who needs you is in Needs You, so no
               line under it and no dot; only a missing folder is said. */}
-          {!project.exists && <span class="subtitle">Folder is missing</span>}
+          {!summary.exists && <span class="subtitle">Folder is missing</span>}
         </button>
-        {own > 0 && <span class="count" aria-label={`${own} sessions`}>{own}</span>}
       </div>
       )}
       <DropNote note={drop.note} />
       {unfolded && (
         <div class="fold-body">
-          {/* The project's pinned pages first (#159), not while searching: the search is for sessions. */}
+          {/* The folder's pinned pages first (#159), not while searching: the search is for sessions. */}
           {!searching && <PinnedPageRows store={store} host={host.id} folder={folder} down={down} chosen={here ? r.page : undefined} />}
-          {sessionRows.map((tree) => row(tree.agent, tree))}
+          {/* Then its servers' list views, without a pin (#2032). */}
+          {!searching && <ServerViewRows store={store} host={host.id} folder={folder} down={down} chosen={here ? r.page : undefined} />}
+          {groupsSessions ? (
+            <details class="sessions" open={sessionsOpen}
+              onToggle={(e) => {
+                const now = (e.currentTarget as HTMLDetailsElement).open;
+                if (!searching && now !== sessionsOpen) folds.setSessions(host.id, folder, now);
+              }}>
+              <summary data-fold="sessions" aria-label={`Sessions, ${sessions.length}`}>
+                Sessions<span class="count">{sessions.length}</span>
+              </summary>
+              {sessionsOpen && sessionRows.map((tree) => row(tree.agent, tree))}
+            </details>
+          ) : sessionRows.map((tree) => row(tree.agent, tree))}
+          {recentArchived.length > 0 && (
+            <details class="recent-archived-sessions" open={recentArchivedOpen}
+              onToggle={(e) => {
+                const now = (e.currentTarget as HTMLDetailsElement).open;
+                if (!searching && now !== recentArchivedOpen) folds.setRecentArchivedSessions(host.id, folder, now);
+              }}>
+              <summary data-fold="recent-archived-sessions" aria-label={`Recently archived sessions, ${recentArchived.length}`}>
+                Recently archived sessions<span class="count">{recentArchived.length}</span>
+              </summary>
+              {recentArchivedOpen && recentArchived.map((agent) => row(agent))}
+            </details>
+          )}
           {/* Its workflows after the sessions (#495), in a Workflows fold of their own, one level in,
-              as a mailbox's sub-mailboxes in Mail (#885): folded until opened, kept per project, its
+              as a mailbox's sub-mailboxes in Mail (#885): folded until opened, kept per folder, its
               grey count on the right. A search holds it open. */}
           {workflows.length > 0 && (
             <details class="workflows" open={workflowsOpen}
@@ -630,7 +707,16 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
               <summary data-fold="workflows" aria-label={`Workflows, ${workflows.length}`}>
                 Workflows<span class="count">{workflows.length}</span>
               </summary>
-              {workflowsOpen && workflows.map(workflowRow)}
+              {workflowsOpen && <>
+                {folderWorkflows.length > 0 && <>
+                  <div class="workflow-group-heading">Folder workflows<span class="count">{folderWorkflows.length}</span></div>
+                  {folderWorkflows.map(workflowRow)}
+                </>}
+                {userWorkflows.length > 0 && <>
+                  <div class="workflow-group-heading">User workflows<span class="count">{userWorkflows.length}</span></div>
+                  {userWorkflows.map(workflowRow)}
+                </>}
+              </>}
             </details>
           )}
           {searching ? <>
@@ -641,12 +727,12 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
               <button class="link show-all" onClick={() => (showsAllMatches.value = true)}>Show all {archived.length}</button>
             )}
           </> : <>
-          {/* Its connectors (#753), under every project even with none yet (#1422): a page, red when one does not answer,
+          {/* Its connectors (#753), under every folder even with none yet (#1422): a page, red when one does not answer,
               with how many after the title, small and grey, none at zero (#1569). */}
           <div class="nav-item">
             <div class={`row page-row${here && r.mcp ? " chosen" : ""}`}>
               <button class="pick" aria-current={here && !!r.mcp} aria-label={`Connectors, ${mcpTally?.words ?? "none yet"}`}
-                title={mcpTally?.words ?? "No connectors yet"} onClick={() => go({ host: host.id, project: folder, mcp: true })}>
+                title={mcpTally?.words ?? "No connectors yet"} onClick={() => go({ host: host.id, folder: folder, mcp: true })}>
                 <span class={`pin-mark${mcpTally?.failing ? " warns" : ""}`} aria-hidden="true">▤</span>
                 <span class="title">Connectors{mcpServers.length > 0 && <span class="count">{mcpServers.length}</span>}</span>
               </button>
@@ -658,7 +744,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
               <div class={`row page-row${here && r.archive ? " chosen" : ""}`}>
                 {/* Nothing at its end, which is only a session's (#587): the count is its tooltip's. */}
                 <button class="pick" aria-current={here && !!r.archive} aria-label={`Archived, ${archiveCount}`}
-                  title={`${archiveCount} archived`} onClick={() => go({ host: host.id, project: folder, archive: true })}>
+                  title={`${archiveCount} archived`} onClick={() => go({ host: host.id, folder: folder, archive: true })}>
                   <span class="pin-mark" aria-hidden="true">▣</span>
                   <span class="title">Archived</span>
                 </button>
@@ -673,28 +759,28 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
 });
 
 /**
- * An archived project, with when it was put away, Unarchive and Delete…, as the window's
- * ArchivedProjectRow (#343, #677), named as its live row was: `server:Project` on a server.
- * Unarchived, it is a project again and its new-session form opens.
+ * An archived folder, with when it was put away, Unarchive and Delete…, as the window's
+ * ArchivedFolderRow (#343, #677), named as its live row was: `server:Folder` on a server.
+ * Unarchived, it is a folder again and its new-session form opens.
  */
-function ArchivedProjectRow({ store, host, project, down }: {
-  store: Store; host: ControlHost; project: ProjectSummary; down: boolean;
+function ArchivedFolderRow({ store, host, folder: summary, down }: {
+  store: Store; host: ControlMachine; folder: FolderSummary; down: boolean;
 }) {
-  const folder = project.project.folder;
-  const archivedAt = project.project.archivedAt;
-  const label = projectLabel(host, project, store.macHostID.value);
+  const folder = summary.folder.folder;
+  const archivedAt = summary.folder.archivedAt;
+  const label = folderLabel(host, summary, store.macHostID.value);
   const unarchive = async () => {
-    if (await store.unarchiveProject(host.id, folder)) go({ host: host.id, project: folder, compose: true });
+    if (await store.unarchiveFolder(host.id, folder)) go({ host: host.id, folder: folder, compose: true });
   };
   const remove = () => {
-    if (confirm(`${deleteProjectTitle(label)}\n\n${deleteProjectMessage}`)) void store.deleteProject(host.id, folder);
+    if (confirm(`${deleteFolderTitle(label)}\n\n${deleteFolderMessage}`)) void store.deleteFolder(host.id, folder);
   };
   const menu: MenuItem[] = [
     { label: "Unarchive", disabled: down, run: () => void unarchive() },
     { label: "Delete…", disabled: down, run: remove },
   ];
   return (
-    <div class="row archived-project" title={folderPath(folder)}
+    <div class="row archived-folder" title={folderPath(folder)}
       onContextMenu={(e) => openContextMenu(e, menu)} {...holdForMenu(() => menu)}>
       <span class="title">{label}</span>
       <button class="link" disabled={down} onClick={() => void unarchive()}
@@ -704,23 +790,23 @@ function ArchivedProjectRow({ store, host, project, down }: {
   );
 }
 
-/** ProjectArchiveWords.confirmTitle: "Archive “devbox:Agents”?". */
-export function archiveProjectTitle(label: string): string {
+/** FolderArchiveWords.confirmTitle: "Archive “devbox:Agents”?". */
+export function archiveFolderTitle(label: string): string {
   return `Archive \u201C${label}\u201D?`;
 }
 
-/** ProjectArchiveWords.confirmMessage. */
-export const archiveProjectMessage = "It moves to Archived projects with its sessions, and its workflows stop. "
+/** FolderArchiveWords.confirmMessage. */
+export const archiveFolderMessage = "It moves to Archived folders with its sessions, and its workflows stop. "
   + "Unarchive returns it. Its folder and files are not touched.";
 
-/** DeletionWords.projectConfirmTitle: "Delete “devbox:Agents”?". */
-export function deleteProjectTitle(label: string): string {
+/** DeletionWords.folderConfirmTitle: "Delete “devbox:Agents”?". */
+export function deleteFolderTitle(label: string): string {
   return `Delete \u201C${label}\u201D?`;
 }
 
-/** DeletionWords.projectConfirmMessage. */
-export const deleteProjectMessage = "Every session in it is deleted, with its conversation and record, "
-  + "and the project leaves the list. Its folder and files are not touched. This cannot be undone.";
+/** DeletionWords.folderConfirmMessage. */
+export const deleteFolderMessage = "Every session in it is deleted, with its conversation and record, "
+  + "and the folder leaves the list. Its folder and files are not touched. This cannot be undone.";
 
 /**
  * One session's row in the sidebar, drawn again only when the agent, whether it is chosen, or its
@@ -732,7 +818,7 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
   tree?: TreeRow | undefined;
   /** Under Pinned: the whole pinned order, for its Move Up and Move Down (#180). */
   pinnedAt?: string[] | undefined;
-  /** Under a group at the top, which gathers every project's: its project's name (#495). */
+  /** Under a group at the top, which gathers every folder's: its folder's name (#495). */
   place?: string | undefined;
 }) {
   const act = store.onItsWay.value[agent.id];
@@ -752,12 +838,17 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
       label: words, help, disabled: down || !!store.onItsWay.value[agent.id],
       run: () => runSessionAction(store, host, agent, action),
     })),
+    // Its record and transcript as a .tar.gz (#1001), as the window's Export….
+    ...(store.has(host, Capability.agentsExport1) ? [
+      { label: "Export…", help: "Download this session as a .tar.gz", disabled: down || !!store.exportImport.value,
+        run: () => exportFromMenu(store, host, { agentID: agent.id }) },
+    ] : []),
     ...(pinnedAt ? [
       { label: "Move Up", disabled: down || pinnedAt[0] === agent.id, run: () => move(-1) },
       { label: "Move Down", disabled: down || pinnedAt[pinnedAt.length - 1] === agent.id, run: () => move(1) },
     ] : []),
   ];
-  // Into its project's drop box, never its worktree (#231).
+  // Into its folder's drop box, never its worktree (#231).
   const drop = useDropboxDrop(store, host, folder, down);
   const parent = tree !== undefined && tree.children > 0;
   // A folded parent's mark is the most urgent of it and the sessions it started (#835).
@@ -776,7 +867,7 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
       {/* No wait lines: in the sidebar a session's row is its title and one line (#587). */}
       {store.renaming.value?.id === agent.id && !store.renaming.value.inChat
         ? <div class="row session renaming"><RenameInput store={store} host={host} agent={agent} /></div>
-        : <SessionRow agent={agent} chosen={chosen} onPick={() => { if (chosen) store.toEndAsks.value++; go({ host, project: folder, session: agent.id }); }} going={going}
+        : <SessionRow agent={agent} chosen={chosen} onPick={() => { if (chosen) store.toEndAsks.value++; go({ host, folder: folder, session: agent.id }); }} going={going}
         extras={rowExtras(store, host, agent)}
         inSidebar place={place} markAgent={markAgent} />}
       {parent && (
@@ -810,13 +901,13 @@ function folderPath(folder: string): string {
 /** Every row the keys move through, in the order shown. */
 function navRows(list: HTMLElement): HTMLElement[] {
   return [...list.querySelectorAll<HTMLElement>(
-    ".new-session-top .pick, .activity .row, details.smart > summary, details.workflows > summary, .project-fold > .row.project .pick, .nav-item .row.pin .pick, .nav-item .row.session, .nav-item .row.workflow .pick, .nav-item .row.page-row .pick, details.archived > summary",
+    ".new-session-top .pick, .activity .row, details.smart > summary, details.sessions > summary, details.workflows > summary, .folder-fold > .row.folder .pick, .nav-item .row.pin .pick, .nav-item .row.session, .nav-item .row.workflow .pick, .nav-item .row.page-row .pick, details.archived > summary",
   )].filter((el) => el.offsetParent !== null);
 }
 
 /**
  * ↑ and ↓ through the list, opening what they land on (a fold's summary and an approval are landed
- * on and not opened); → unfolds and ← folds, or steps out to the project; Home and End.
+ * on and not opened); → unfolds and ← folds, or steps out to the folder; Home and End.
  */
 function moveWithKeys(e: KeyboardEvent): void {
   const list = e.currentTarget as HTMLElement;
@@ -832,15 +923,15 @@ function moveWithKeys(e: KeyboardEvent): void {
     // A fold's summary, and what waits for an OK, whose sheet Enter opens (#773), are only landed on.
     if (el.tagName !== "SUMMARY" && !el.classList.contains("approval")) el.click();
   };
-  const fold = current.closest<HTMLElement>(".project-fold");
-  const isProject = current.matches(".pick[data-fold=project]");
+  const fold = current.closest<HTMLElement>(".folder-fold");
+  const isFolder = current.matches(".pick[data-fold=folder]");
   switch (e.key) {
     case "ArrowDown": land(rows[here + 1]); break;
     case "ArrowUp": land(rows[here - 1]); break;
     case "Home": land(rows[0]); break;
     case "End": land(rows[rows.length - 1]); break;
     case "ArrowRight":
-      if (isProject && fold && current.getAttribute("aria-expanded") !== "true") {
+      if (isFolder && fold && current.getAttribute("aria-expanded") !== "true") {
         e.preventDefault();
         folds.set(fold.dataset.host!, fold.dataset.folder!, true);
       } else if (current.tagName === "SUMMARY" && !(current.parentElement as HTMLDetailsElement).open) {
@@ -849,57 +940,46 @@ function moveWithKeys(e: KeyboardEvent): void {
       }
       break;
     case "ArrowLeft":
-      if (isProject && fold && current.getAttribute("aria-expanded") === "true") {
+      if (isFolder && fold && current.getAttribute("aria-expanded") === "true") {
         e.preventDefault();
         folds.set(fold.dataset.host!, fold.dataset.folder!, false);
       } else if (current.tagName === "SUMMARY" && (current.parentElement as HTMLDetailsElement).open) {
         e.preventDefault();
         current.click();
-      } else if (fold && !isProject) {
+      } else if (fold && !isFolder) {
         e.preventDefault();
-        fold.querySelector<HTMLElement>(".pick[data-fold=project]")?.focus();
+        fold.querySelector<HTMLElement>(".pick[data-fold=folder]")?.focus();
       }
       break;
   }
 }
 
-/** The chat project's mark (#229): two bubbles drawn in the name's own grey (#694), as the window's is. */
-function ChatMark() {
-  return (
-    <svg class="project-chat" role="img" aria-label="chat project" viewBox="0 0 16 16" width="12" height="12"
-      fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round">
-      <path d="M2 3.5h7.5v5H5L2.5 10.5V8.5H2z" />
-      <path d="M11 6h3v5h-.5v2L11 11H7.5V9.5" />
-    </svg>
-  );
-}
-
-/** The groups a tab holding one project draws (#1089): Working and Unread are its sessions, in its list. */
+/** The groups a tab holding one folder draws (#1089): Working and Unread are its sessions, in its list. */
 const aloneRows = new Set<SmartRow>(["pinned", "needsYou"]);
 
 /**
- * "✋ N elsewhere" (#1089): sessions in other projects need the person. A click shows every project
+ * "✋ N elsewhere" (#1089): sessions in other folders need the person. A click shows every folder
  * again, at the first of them.
  */
-function Elsewhere({ store, projects }: { store: Store; projects: Placed[] }) {
+function Elsewhere({ store, folders }: { store: Store; folders: Placed[] }) {
   const on = smartGroupsOn.value;
   let count = 0;
   let first: { host: string; folder: string; id: string } | undefined;
-  for (const { host, project } of projects) {
-    const folder = project.project.folder;
-    const failed = failedRuns(project.approvals);
-    const asking = smartAgents("needsYou", liveSessions(store, host.id, folder), undefined, store.sessionPinsIn(host.id, folder), on)
+  for (const { host, folder } of folders) {
+    const path = folder.folder.folder;
+    const failed = failedRuns(folder.approvals);
+    const asking = smartAgents("needsYou", liveSessions(store, host.id, path), undefined, store.sessionPinsIn(host.id, path), on)
       .filter((a) => !failed.has(a.id));
     count += asking.length;
-    if (!first && asking[0]) first = { host: host.id, folder, id: asking[0].id };
+    if (!first && asking[0]) first = { host: host.id, folder: path, id: asking[0].id };
   }
-  count += smartApprovals(projects.map((placed) => ({ project: placed, approvals: placed.project.approvals }))).length;
+  count += smartApprovals(folders.map((placed) => ({ folder: placed, approvals: placed.folder.approvals }))).length;
   if (count === 0) return null;
   return (
-    <button class="link elsewhere" title="Sessions in other projects need you"
+    <button class="link elsewhere" title="Sessions in other folders need you"
       onClick={() => {
         showAll();
-        if (first) go({ host: first.host, project: first.folder, session: first.id });
+        if (first) go({ host: first.host, folder: first.folder, session: first.id });
       }}>✋ {count} elsewhere</button>
   );
 }

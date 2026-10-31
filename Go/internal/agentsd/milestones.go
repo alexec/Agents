@@ -272,8 +272,8 @@ func (d *Daemon) checkCloudHosts() {
 	if held || ask == nil {
 		return
 	}
-	out, err := (*ask)(d.ctx, "host/workspaces", wire.HostWorkspaceCall{Agent: "Agents Host", Method: workspacesForAgent, Params: json.RawMessage("{}")})
-	var listed wire.AgentWorkspaces
+	out, err := (*ask)(d.ctx, "host/machines", wire.MachineWorkspaceCall{Agent: "Agents Host", Method: machinesForAgent, Params: json.RawMessage("{}")})
+	var listed wire.AgentMachines
 	if err != nil || json.Unmarshal(out, &listed) != nil {
 		return
 	}
@@ -282,7 +282,7 @@ func (d *Daemon) checkCloudHosts() {
 	}
 }
 
-func anyRunning(listed wire.AgentWorkspaces) bool {
+func anyRunning(listed wire.AgentMachines) bool {
 	for _, p := range listed.Providers {
 		for _, w := range p.Workspaces {
 			if w.State == "running" || w.HostState != nil && *w.HostState == "online" {
@@ -293,7 +293,7 @@ func anyRunning(listed wire.AgentWorkspaces) bool {
 	return false
 }
 
-// hasWorkflowHere is whether a project has a workflow that runs on this host.
+// hasWorkflowHere is whether a folder has a workflow that runs on this host.
 func (d *Daemon) hasWorkflowHere() bool {
 	d.workflowMu.Lock()
 	defer d.workflowMu.Unlock()

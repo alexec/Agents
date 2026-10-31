@@ -72,6 +72,12 @@ packages:
   # the grammars are seventeen megabytes it has no use for.
   CodeText:
     path: Packages/CodeText
+  # The voice of voice mode (#2322): Kokoro-82M through Core ML (was Paradee-8M). The two
+  # apps link this; AgentsKitCore does not, so `swift test` never resolves it. Exact,
+  # because FluidAudio's Kokoro build is a beta conversion and its API may change in any release.
+  FluidAudio:
+    url: https://github.com/FluidInference/FluidAudio.git
+    exactVersion: 0.17.7
 targets:
   # The Mac window (058, research R12): the App Store app, sandboxed, and linking
   # AgentsKitCore only, as the Remote does. It carries no helpers, no Linux programs and
@@ -118,6 +124,12 @@ targets:
         product: AgentsKitCore
       - package: SwiftTerm
       - package: CodeText
+      - package: FluidAudio
+    # The voice's models, copied into Resources/Voice (#2322).
+    postBuildScripts:
+      - name: Carry the voice
+        script: sh "$SRCROOT/scripts/voice-models.sh" --carry
+        basedOnDependencyAnalysis: false
     info:
       path: App/Info-Store.plist
       properties:
@@ -129,7 +141,8 @@ targets:
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
         NSHumanReadableCopyright: © 2026 Alex Collins
         NSMicrophoneUsageDescription: >-
-          So you can say what you want done instead of typing it.
+          So you can say what you want done instead of typing it, and talk to your
+          agents in voice mode. No audio is kept.
         NSSpeechRecognitionUsageDescription: >-
           So what you say becomes the words in the prompt. It is recognised on this Mac
           where this Mac can do it.
@@ -196,12 +209,19 @@ targets:
       # the shell it draws is the one the Mac's daemon holds.
       - package: SwiftTerm
       - package: CodeText
+      # Voice mode's voice (#2322). See the note on the package.
+      - package: FluidAudio
       # The notification service extension: the banner's words are assembled on the
       # device, from a sealed push (021 T068).
       - target: RemoteNotify
       # The Home-screen widget (068). Same reason: it is not installed on its own, so it
       # ships inside this bundle and is versioned with it.
       - target: RemoteWidget
+    # The voice's models, copied into the bundle's Voice folder (#2322).
+    postBuildScripts:
+      - name: Carry the voice
+        script: sh "$SRCROOT/scripts/voice-models.sh" --carry
+        basedOnDependencyAnalysis: false
     info:
       path: Remote/Info.plist
       properties:
@@ -232,7 +252,8 @@ targets:
         # Dictation: the shared prompt asks for both when first used. Recognition runs
         # on the phone or iPad, so these descriptions are written for that device.
         NSMicrophoneUsageDescription: >-
-          To hear what you say while you dictate into your prompt.
+          To hear what you say while you dictate into your prompt, or talk to an agent
+          in voice mode.
         NSSpeechRecognitionUsageDescription: >-
           To turn what you say into words for your prompt.
         # A silent push — a need moved elsewhere, or met — wakes the app to show or
@@ -278,6 +299,9 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ENABLE_PREVIEWS: YES
         GENERATE_INFOPLIST_FILE: NO
+        # Carry the voice reads the build cache in ~/Library/Caches and may fetch the models
+        # (#2322), which a sandboxed script phase may not.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
       # The App Store archive (058, T089): production push and iCloud. Uploading is Alex's.
       configs:
         Release:
@@ -474,9 +498,9 @@ targets:
       - name: Build the email MCP server
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" email-mcp
         basedOnDependencyAnalysis: false
-      # The command workspace provider (#691, in Go since #1364), which agents-control looks
+      # The command machine provider (#691, in Go since #1364), which agents-control looks
       # for beside itself, built and carried the same way.
-      - name: Build the command workspace provider
+      - name: Build the command machine provider
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" workspace-commands
         basedOnDependencyAnalysis: false
     # Carried into Contents/Helpers and signed here, not by a copy phase, which would try
@@ -500,7 +524,7 @@ targets:
       - name: Carry the email MCP server
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" --carry email-mcp
         basedOnDependencyAnalysis: false
-      - name: Carry the command workspace provider
+      - name: Carry the command machine provider
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" --carry workspace-commands
         basedOnDependencyAnalysis: false
     sources:

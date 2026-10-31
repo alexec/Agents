@@ -248,13 +248,17 @@ public struct ConfigChoice: Codable, Hashable, Sendable, Identifiable {
     public var value: JSONValue
     public var name: String
     public var description: String?
+    /// Set when the organisation's policy refuses this choice (#998, FR-010): a mode above the
+    /// ceiling, or a model it does not allow. Drawn dimmed with **Set by your organisation**.
+    public var setBy: DaemonAPI.PolicySetBy?
 
     public var id: String { value.stringValue ?? name }
 
-    public init(value: JSONValue, name: String, description: String? = nil) {
+    public init(value: JSONValue, name: String, description: String? = nil, setBy: DaemonAPI.PolicySetBy? = nil) {
         self.value = value
         self.name = name
         self.description = description
+        self.setBy = setBy
     }
 
     /// A choice with no value is not a choice. This is the entry the audit found: a
@@ -264,6 +268,7 @@ public struct ConfigChoice: Codable, Hashable, Sendable, Identifiable {
         self.value = value
         self.name = wire["name"]?.stringValue ?? value.stringValue ?? "Unnamed"
         self.description = wire["description"]?.stringValue
+        self.setBy = try? wire["setBy"]?.decode(DaemonAPI.PolicySetBy.self)
     }
 }
 

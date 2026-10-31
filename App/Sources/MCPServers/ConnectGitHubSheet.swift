@@ -5,15 +5,15 @@ import SwiftUI
 /// Connect GitHub (#1336, frame B): the one sheet. It says what Agents will be able to do,
 /// then Continue on github.com starts the host's device flow (#1335): the sheet shows the
 /// code, copies it, opens github.com/login/device, waits, and closes by itself once GitHub
-/// says yes. When the Agents app is not installed on the project's repository, it stays
+/// says yes. When the Agents app is not installed on the folder's repository, it stays
 /// open for one more step: the install link.
 struct ConnectGitHubSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
 
-    var host: HostID
-    /// The project whose page opened it, for the install step; nil from Connectors.
-    var project: ProjectKey?
+    var host: MachineRef
+    /// The folder whose page opened it, for the install step; nil from Connectors.
+    var folder: FolderKey?
     var onConnected: () -> Void = {}
 
     private enum Step: Equatable {
@@ -169,9 +169,9 @@ struct ConnectGitHubSheet: View {
         }
     }
 
-    /// Closes, unless the App is not installed on the project's repository.
+    /// Closes, unless the App is not installed on the folder's repository.
     private func afterConnecting(_ connection: DaemonAPI.Connection?) async {
-        if let project, case .success(let setup) = await model.connectorSetup(project, reading: .fresh),
+        if let folder, case .success(let setup) = await model.connectorSetup(folder, reading: .fresh),
            setup.installed == false, let repository = setup.repository {
             step = .install(login: connection?.login ?? "you", repository: repository)
             onConnected()

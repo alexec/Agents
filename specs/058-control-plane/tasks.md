@@ -184,7 +184,7 @@ Walk quickstart Walk 1, steps 1–2, with `agentsd` and a scripted client.
 violations.
 
 - [x] T044 (a second target, `AgentsStore`, over the same sources, with its own bundle id `com.alexecollins.agents.store` so a walk never shares the real app's defaults; the ssh servers, launch agents and move files are excluded; a store-only `HostSet` and `ControlConfig` stand in) [US1] Add the `AGENTS_STORE` configuration to the Agents target in `project.yml`:
-  - `App/Agents-Store.entitlements` with `com.apple.security.app-sandbox`, `network.client`, `device.audio-input` and `files.user-selected.read-only`;
+  - `App/Agents-Store.entitlements` with `com.apple.security.app-sandbox`, `network.client`, `device.audio-input` and `files.user-selected.read-write` (read-only until #2302's Export…; #2498);
   - `NSBonjourServices` = `_agents-control._tcp`, and `NSLocalNetworkUsageDescription`;
   - link `AgentsKitCore` only;
   - no `Contents/Helpers`, `Resources/servers` or `Resources/toolsets` in that configuration.

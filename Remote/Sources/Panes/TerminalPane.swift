@@ -88,10 +88,10 @@ struct TerminalPane: View {
 }
 
 /// One tab's screen, and what it says when that shell will not start or has ended. An
-/// agent's tab's, or the project's own shell (#418), whose client the model has made.
+/// agent's tab's, or the folder's own shell (#418), whose client the model has made.
 struct ShellScreen: View {
     @Environment(RemoteModel.self) private var model
-    /// The agent's id, or the project's shell's.
+    /// The agent's id, or the folder's shell's.
     let id: UUID
     let shell: Int
     let isFront: Bool

@@ -7,28 +7,28 @@ description: Have agents start by themselves, on a schedule or when another agen
 # Set up a workflow
 
 A workflow gives an agent a prompt by itself: on a schedule, or when something happens to
-another agent in the same project. This guide sets up one that starts a reviewer whenever
+another agent in the same folder. This guide sets up one that starts a reviewer whenever
 an agent finishes.
 
 ## Before you start
 
-- A project with a runtime that works in it. See [Add a project](add-a-project.md).
+- A folder with a runtime that works in it. See [Add a folder](add-a-folder.md).
 - For the full list of triggers and settings, see
   [Workflow triggers and actions](../reference/workflows.md).
 
 ## Steps
 
-1. Ask an agent in the project to write the workflow for you, in words. For example:
+1. Ask an agent in the folder to write the workflow for you, in words. For example:
 
    ```text
-   Add a workflow: whenever an agent in this project finishes, start a new agent that
+   Add a workflow: whenever an agent in this folder finishes, start a new agent that
    reviews what it changed and lists anything that looks wrong. It should not change
    any files.
    ```
 
-   The agent writes it as a file in the project and it appears on the project's page
+   The agent writes it as a file in the folder and it appears on the folder's page
    under **Workflows**. You can instead write the file yourself: a workflow is one
-   Markdown file in the project's `.agents/workflows` folder. The one above looks like
+   Markdown file in the folder's `.agents/workflows` folder. The one above looks like
    this, saved as `.agents/workflows/review-finished-work.md`:
 
    ```markdown
@@ -60,7 +60,7 @@ an agent finishes.
            branch: agents/fix-640
      ```
 
-     The project page then says *When a branch an agent works on moved; never the default
+     The folder page then says *When a branch an agent works on moved; never the default
      branch (branch agents/fix-640)*. A list, such as `branch: [agents/fix-640, agents/fix-641]`,
      means any of them.
      Any other detail under an event is an error in the file. To act only on some agents,
@@ -74,18 +74,18 @@ an agent finishes.
    - `permission-mode`, `runtime`, `model` and `effort` are optional. The values are the
      runtime's own; `plan` is Claude's read-only mode. Leave them out to use the
      runtime's defaults.
-   - `hosts` is optional. Leave it out and every computer with this project runs the
+   - `hosts` is optional. Leave it out and every computer with this folder runs the
      workflow. To pin it to one computer, open its page and choose that computer under
      **Runs on**. The page writes the computer's id.
    - `when-done` is optional. Leave it out and every run stays in the list when it is
      done. `archive-allowed` lets a run with nothing to show archive itself, and `archive`
      archives every run that finishes done. The **When done** menu on its page writes it.
-2. Open the project's page and find the workflow under **Workflows**. Its line says what
+2. Open the folder's page and find the workflow under **Workflows**. Its line says what
    it does, such as *When an agent finishes, in a new agent*. A workflow an agent wrote,
    or one you wrote in another editor, shows a raised hand and **New — waiting for your
    OK**: it does not run until you approve it.
 
-   On iPhone and iPad and on the web page, the same list is on the project's page, and
+   On iPhone and iPad and on the web page, the same list is on the folder's page, and
    you can approve a waiting workflow on its page there too.
 3. Click the workflow to open its page. Check what it will do and the settings it will
    start the agent with (**Runtime**, **Permission mode**, **Model**, **Effort**), change
@@ -93,10 +93,10 @@ an agent finishes.
 4. To try it without waiting, click **Run now**. On iPhone and iPad, **Run now** is on
    the workflow's page too.
 
-   A new agent starts, named after the workflow, and appears on the project's page. The
+   A new agent starts, named after the workflow, and appears on the folder's page. The
    workflow's page lists it under **History** (**Recent runs** on iPhone and iPad). See
    [Read a workflow's page](read-a-workflows-page.md).
-5. From now on, each time an agent in the project finishes, the workflow starts a reviewer.
+5. From now on, each time an agent in the folder finishes, the workflow starts a reviewer.
 
 **When the file changes**
 
@@ -118,8 +118,8 @@ last tag." Nothing else runs it, and its row reads **By hand, with Run now**. Se
 
 **Pin it to the sidebar**
 
-Pin a workflow you run often, and it sits in its project's **Pinned** group, with the pinned
-sessions, at the top of the project in the sidebar: one click opens its page, and **Run
+Pin a workflow you run often, and it sits in its folder's **Pinned** group, with the pinned
+sessions, at the top of the folder in the sidebar: one click opens its page, and **Run
 now** is there.
 
 - On the Mac, right-click its row and choose **Pin**, swipe the row right with two fingers,
@@ -129,7 +129,7 @@ now** is there.
 - On the web page, **Pin**, **Move Up** and **Move Down** are in the row's **···** menu, and
   **Pin** is on its page.
 
-**Unpin** is in the same places. The pin is kept in the project's `.agents/pins.json`, so it
+**Unpin** is in the same places. The pin is kept in the folder's `.agents/pins.json`, so it
 lasts through a restart and every client sees it. Archiving a workflow unpins it, and
 unarchiving it does not pin it again.
 
@@ -144,7 +144,7 @@ unarchiving it does not pin it again.
   does not run until you click **Unarchive**. The file is kept.
 - Both write the workflow's own file: off adds `enabled: false` and archive adds
   `archived: true`, and turning it back on or unarchiving it takes the line out. That
-  is a change in your project you may commit, and it is how the choice reaches your other
+  is a change in your folder you may commit, and it is how the choice reaches your other
   clones, Macs and servers. Commit it if they should have it too.
 - To remove it for good, delete its file. **Show in Finder** on the row's menu finds it.
 
@@ -154,7 +154,7 @@ When a workflow's prompt grows past a few paragraphs, put the method in a skill 
 the workflow slim (#1563). A person or an agent can then follow the same method by hand,
 and you change the method without touching the workflow's triggers.
 
-1. Write the method as a skill in the project: `.agents/skills/<name>/SKILL.md`, with a
+1. Write the method as a skill in the folder: `.agents/skills/<name>/SKILL.md`, with a
    `name` and a `description` that says when to use it. See
    [Share skills across agents](share-skills-across-agents.md).
 2. Keep the workflow to its front matter, one or two lines about what it is for, its
@@ -168,11 +168,11 @@ and you change the method without touching the workflow's triggers.
          at: [":00"]
          between: "07:00-07:00"
    agent: new
-   permission-mode: auto
+   permission-mode: approve-for-me
    when-done: archive
    ---
 
-   You read the crash reports this project's apps wrote on this Mac since the last run,
+   You read the crash reports this folder's apps wrote on this Mac since the last run,
    and file a GitHub issue for each distinct crash that is not already tracked. The
    issues are the handoff: you fix nothing.
 
@@ -200,7 +200,7 @@ The workflow does not run, and its page says why, when a skill it names:
 
 - is not there, or cannot be read;
 - is a link, or is in a folder that is a link;
-- is outside the project's `.agents/skills` folder, for example a name with `/` or `..`.
+- is outside the folder's `.agents/skills` folder, for example a name with `/` or `..`.
 
 ## Let an agent run a workflow
 
@@ -238,7 +238,9 @@ A workflow that did not run says why on its row and its page, for example:
   the last agent it started was working. It runs when that one finishes.
 - **Did not run — 10 triggers are already queued for it**: triggers are coming faster
   than its runs finish. Ten wait at most.
-- **Did not run — a run is still going**: you pressed **Run now** while it was running.
+- **Did not run — a run is still going**: you pressed **Run now** while a run was
+  starting or already using the workflow's selected runtime. If a run is active on
+  another runtime, select a runtime in the workflow and press **Run now** to retry there.
 - **Did not run — this chain is already 3 deep**: workflows set off by agents that
   workflows started stop after three steps, so a reviewer that finishes cannot set off
   reviews for ever. That is why the example's prompt tells a reviewer of a reviewer to

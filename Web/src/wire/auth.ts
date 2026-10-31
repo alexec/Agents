@@ -14,7 +14,11 @@ export interface LineSocket {
 }
 
 export type RefusalReason =
-  | "unknown" | "forgotten" | "expired" | "spent" | "bad-proof" | "wrong-control-plane" | "bad-message";
+  | "unknown" | "forgotten" | "expired" | "spent" | "bad-proof" | "wrong-control-plane" | "bad-message"
+  // The person's org provider suspended them (#1002, D13): the key stays.
+  | "suspended"
+  // The browser's key, or its person, holds as many sockets as it may: too many tabs (#2194).
+  | "crowded";
 
 /** The control plane said no. */
 export class Refused extends Error {
@@ -84,14 +88,16 @@ function transcript(serverNonce: Uint8Array, peerNonce: Uint8Array, identity: st
 
 /** Proves `key` as `identity`, and checks the control plane proves it back; the ok's new key, if it gave one. */
 async function prove(socket: LineSocket, hello: Hello, identity: string, key: CryptoKey, origin: string,
-                     peerNonce: Uint8Array, kind: string): Promise<NewKeyOffer | undefined> {
+                     peerNonce: Uint8Array, kind: string, publicKey?: Uint8Array): Promise<NewKeyOffer | undefined> {
   const serverNonce = fromBase64url(hello.nonce);
   if (!serverNonce) throw new Refused("bad-message");
   const said = transcript(serverNonce, peerNonce, identity, origin);
   const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, concat(utf8("c"), said) as BufferSource));
   // A paired client says what it has (#1748); a code's holder is not a client yet.
   const capabilities = identity.startsWith("c:") ? DeclaredCapabilities["client"] : undefined;
-  socket.send(JSON.stringify({ auth: { id: identity, nonce: base64url(peerNonce), mac: base64url(mac), kind, capabilities } }));
+  // A client signing in (`s:`, #995) says its new key, X9.63, in standard base64 as Go writes bytes.
+  const publicKey64 = publicKey ? base64(publicKey) : undefined;
+  socket.send(JSON.stringify({ auth: { id: identity, nonce: base64url(peerNonce), mac: base64url(mac), kind, capabilities, publicKey: publicKey64 } }));
   const answer = parse(await socket.next(15_000));
   const refused = answer["refused"] as { reason?: RefusalReason } | undefined;
   if (refused) throw new Refused(refused.reason ?? "unknown");
@@ -161,4 +167,26 @@ export async function connect(socket: LineSocket, record: KeyRecord, origin: str
   const offer = await prove(socket, hello, "c:" + record.client, key, origin, peerNonce, kind);
   if (!offer) return { name: hello.name };
   return { name: hello.name, newKey: await checkedNewKey(offer, key) };
+}
+
+/** A sign-in connection that proved its key: the control plane's name and key, from its hello. */
+export interface SignedIn {
+  name: string;
+  /** The hello's control key, base64url: trusted (TLS), and kept once the browser is paired. */
+  control: string;
+}
+
+/**
+ * Opens a sign-in connection as `s:<client>` (#995, #1002 FR-027): proves the browser's new key,
+ * bound to the client id as a paired client's is, and says its public half. The hello's control
+ * key is trusted: the page came from this control plane over TLS.
+ */
+export async function signInConnect(socket: LineSocket, client: string, privateKey: CryptoKey, publicRaw: Uint8Array,
+                                    origin: string, peerNonce: Uint8Array = nonce(), kind = "browser"): Promise<SignedIn> {
+  const hello = await readHello(socket);
+  const control = fromBase64url(hello.control);
+  if (!control || control.length !== 65) throw new Refused("bad-message");
+  const key = await clientKey(privateKey, control, client);
+  await prove(socket, hello, "s:" + client, key, origin, peerNonce, kind, publicRaw);
+  return { name: hello.name, control: hello.control };
 }

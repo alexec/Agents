@@ -104,6 +104,7 @@ func personOf(t *testing.T, p *plane, m *controllink.ClientMembership) string {
 // US2 AS1 and AS3 (FR-005, FR-009): the local owner adds a Google and an Apple sign-in
 // to themselves, and a new client that signs in with either pairs as them, with no code.
 func TestASignInPairsAKnownPersonWithNoCode(t *testing.T) {
+	t.Parallel()
 	f := newProvidersFake(t)
 	p, m, owner := signInPlane(t, f)
 	ownerID := personOf(t, p, m)
@@ -143,6 +144,7 @@ func TestASignInPairsAKnownPersonWithNoCode(t *testing.T) {
 // connection, a provider turned off, an account nobody has, a removed person. Each pairs
 // nothing.
 func TestEveryRefusedSignInPairsNothing(t *testing.T) {
+	t.Parallel()
 	f := newProvidersFake(t)
 	p, m, owner := signInPlane(t, f)
 	addToMe(t, owner, m, signin.Google, func(n string) string { return f.mint(signin.Google, "alex", n, nil) })
@@ -162,16 +164,19 @@ func TestEveryRefusedSignInPairsNothing(t *testing.T) {
 		"bad signature": {signin.Google, func(n string) string {
 			return f.google.Forge(signintest.Claims{"sub": "alex", "aud": googleApp, "nonce": n})
 		}, "signature"},
-		"wrong aud":       {signin.Google, func(n string) string { return f.mint(signin.Google, "alex", n, signintest.Claims{"aud": "other-app"}) }, "another app"},
-		"expired":         {signin.Google, func(n string) string { return f.mint(signin.Google, "alex", n, signintest.Claims{"exp": time.Now().Add(-time.Hour).Unix()}) }, "expired"},
-		"replayed nonce":  {signin.Google, func(string) string { return earlier }, "another sign-in"},
-		"wrong issuer":    {signin.Google, func(n string) string { return f.apple.Mint(signintest.Claims{"sub": "alex", "aud": googleApp, "nonce": n}) }, "signature"},
-		"nobody has it":   {signin.Google, func(n string) string { return f.mint(signin.Google, "stranger", n, nil) }, "Ask an admin for an invite"},
-		"Apple stranger":  {signin.Apple, func(n string) string { return f.mint(signin.Apple, "stranger", n, nil) }, "Ask an admin for an invite"},
-		"GitHub stranger": {signin.GitHub, func(string) string { return f.github.Token(99, "stranger") }, "Ask an admin for an invite"},
+		"wrong aud": {signin.Google, func(n string) string { return f.mint(signin.Google, "alex", n, signintest.Claims{"aud": "other-app"}) }, "another app"},
+		"expired": {signin.Google, func(n string) string {
+			return f.mint(signin.Google, "alex", n, signintest.Claims{"exp": time.Now().Add(-time.Hour).Unix()})
+		}, "expired"},
+		"replayed nonce": {signin.Google, func(string) string { return earlier }, "another sign-in"},
+		"wrong issuer": {signin.Google, func(n string) string {
+			return f.apple.Mint(signintest.Claims{"sub": "alex", "aud": googleApp, "nonce": n})
+		}, "signature"},
+		"nobody has it":    {signin.Google, func(n string) string { return f.mint(signin.Google, "stranger", n, nil) }, "Ask an admin for an invite"},
+		"Apple stranger":   {signin.Apple, func(n string) string { return f.mint(signin.Apple, "stranger", n, nil) }, "Ask an admin for an invite"},
+		"GitHub stranger":  {signin.GitHub, func(string) string { return f.github.Token(99, "stranger") }, "Ask an admin for an invite"},
 		"GitHub bad token": {signin.GitHub, func(string) string { return "ghu_nope" }, "did not accept"},
 	}
-	before := len(p.s.Records().Clients())
 	for name, c := range cases {
 		_, err := p.signInAs(c.provider, c.token, nil)
 		if err == nil || !strings.Contains(err.Error(), c.want) {
@@ -180,7 +185,7 @@ func TestEveryRefusedSignInPairsNothing(t *testing.T) {
 	}
 	// Removed (FR-029): Sam's sign-in is refused until a new invite.
 	call(t, owner, "", "people/remove", map[string]string{"user": sam.id})
-	before = len(p.s.Records().Clients())
+	before := len(p.s.Records().Clients())
 	if _, err := p.signInAs(signin.Apple, func(n string) string { return f.mint(signin.Apple, "sam", n, nil) }, nil); err == nil ||
 		!strings.Contains(err.Error(), "removed") {
 		t.Errorf("removed: %v", err)
@@ -206,6 +211,7 @@ func TestEveryRefusedSignInPairsNothing(t *testing.T) {
 // FR-011, SC-005: a sign-in made for one control plane pairs nothing on another, for
 // Google, Apple and GitHub, though both trust the same app.
 func TestASignInSentToAnotherControlPlanePairsNothing(t *testing.T) {
+	t.Parallel()
 	f := newProvidersFake(t)
 	a, am, aOwner := signInPlane(t, f)
 	b, bm, bOwner := signInPlane(t, f)
@@ -257,6 +263,7 @@ func TestASignInSentToAnotherControlPlanePairsNothing(t *testing.T) {
 // waits for Approve on one of their clients, which shows the same code. Nobody else
 // decides it. The control plane asks GitHub once and keeps no token.
 func TestAGitHubSignInWaitsForThePersonsApprove(t *testing.T) {
+	t.Parallel()
 	f := newProvidersFake(t)
 	p, _, owner := signInPlane(t, f)
 	sam := p.invite(owner, "Sam", wire.UserRoleMember)
@@ -336,9 +343,77 @@ func TestAGitHubSignInWaitsForThePersonsApprove(t *testing.T) {
 	noSecretKept(t, p, token, second)
 }
 
+// #2097 (FR-014a, FR-014b): a browser asks by a sign-in's email; the person's card has no
+// code, and Approve needs the code the browser shows. An account nobody has waits the same.
+func TestABrowserPairsByApprovalWithItsCode(t *testing.T) {
+	t.Parallel()
+	f := newProvidersFake(t)
+	p, _, owner := signInPlane(t, f)
+	sam := p.invite(owner, "Sam", wire.UserRoleMember)
+	if _, e := addToMe(t, sam.window, sam.member, signin.Google, func(n string) string {
+		return f.mint(signin.Google, "sam-google", n, signintest.Claims{"email": "sam@example.com"})
+	}); e != "" {
+		t.Fatal(e)
+	}
+	ask := func(account string) (chan error, func() string, chan *controllink.ClientMembership, context.CancelFunc) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		var mu sync.Mutex
+		shown := ""
+		done, member := make(chan error, 1), make(chan *controllink.ClientMembership, 1)
+		go func() {
+			m, err := controllink.SignInByApproval(ctx, p.url, "", nil, "Chrome on Mac", account, func(w wire.SignInWaiting) {
+				mu.Lock()
+				shown = w.Code
+				mu.Unlock()
+			})
+			member <- m
+			done <- err
+		}()
+		return done, func() string { mu.Lock(); defer mu.Unlock(); return shown }, member, cancel
+	}
+
+	// Nobody has this account: a code is shown, and nobody is asked.
+	_, shownNobody, _, stop := ask("nobody@example.com")
+	p.waitFor(func() bool { return shownNobody() != "" }, "the code for an account nobody has")
+	var requests []wire.SignInRequest
+	for _, s := range []*controllink.Session{sam.window, owner} {
+		json.Unmarshal(call(t, s, "", "signIn/requests", nil), &requests)
+		if len(requests) != 0 {
+			t.Fatalf("an account nobody has asked %+v", requests)
+		}
+	}
+	stop()
+
+	done, shown, member, cancel := ask("SAM@example.com")
+	defer cancel()
+	note := waitNote(t, sam.window, "control/signInRequested")
+	var asked wire.SignInRequest
+	json.Unmarshal(note.Params, &asked)
+	p.waitFor(func() bool { return shown() != "" }, "the code in the browser")
+	if asked.Code != "" || asked.Provider != "browser" || asked.Kind != "browser" || deref(asked.Login) != "SAM@example.com" {
+		t.Fatalf("the card is %+v", asked)
+	}
+	for _, typed := range []*string{nil, new("WRONG1")} {
+		if e := callError(t, sam.window, "", "signIn/approve", wire.SignInDecide{Request: asked.Request, Code: typed}); !strings.Contains(e, "not the code") {
+			t.Fatalf("approved with %v: %s", typed, e)
+		}
+	}
+	typed := strings.ToLower(shown()[:3]) + " " + shown()[3:]
+	call(t, sam.window, "", "signIn/approve", wire.SignInDecide{Request: asked.Request, Code: &typed})
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	// A browser connects as the page does, not as a window: its record says whose it is.
+	got := p.s.Records().Client((<-member).Client)
+	if got == nil || got.Kind != records.KindBrowser || got.Owner == nil || *got.Owner != sam.id {
+		t.Fatalf("paired as %+v", got)
+	}
+}
+
 // FR-006: with organisations allowed, a GitHub sign-in outside them is refused, to add or
 // to pair; inside one it works.
 func TestAllowedGitHubOrganisations(t *testing.T) {
+	t.Parallel()
 	f := newProvidersFake(t)
 	p, m, owner := signInPlane(t, f)
 	var shown wire.SignInProviders
@@ -363,6 +438,7 @@ func TestAllowedGitHubOrganisations(t *testing.T) {
 // US2 AS8 (FR-006): a Google Workspace account on an allowed domain joins as a member with
 // no invite. Another domain, a personal account and an email not verified do not.
 func TestAnAllowedGoogleDomainJoinsWithNoInvite(t *testing.T) {
+	t.Parallel()
 	f := newProvidersFake(t)
 	p, _, owner := signInPlane(t, f)
 	call(t, owner, "", "signIn/configure", wire.SignInConfigure{Provider: signin.Google, Domains: []string{"Example.com"}})
@@ -405,6 +481,7 @@ func TestAnAllowedGoogleDomainJoinsWithNoInvite(t *testing.T) {
 // FR-015: a provider that cannot be reached says sign-in is not available, and why;
 // paired clients carry on.
 func TestAProviderThatCannotBeReachedSaysSo(t *testing.T) {
+	t.Parallel()
 	f := newProvidersFake(t)
 	p, _, owner := signInPlane(t, f)
 	f.google.Down.Store(true)
@@ -423,6 +500,7 @@ func TestAProviderThatCannotBeReachedSaysSo(t *testing.T) {
 // build has no id for cannot be turned on; a challenge is used once; a sign-in can be
 // taken off again.
 func TestSignInSettingsAndChallenges(t *testing.T) {
+	t.Parallel()
 	f := newProvidersFake(t)
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) {
 		cfg := f.config()

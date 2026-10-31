@@ -1,7 +1,7 @@
 // The prompt bar's look (#108): a new session and an open session, at 1440 and at phone width, to
 // set beside the window's. Reads nothing back but where the bar's controls are.
 //
-//   node Web/test/walk/bar.mjs <WEB_URL> <browser code> <project name> <session title> <out dir> <prefix>
+//   node Web/test/walk/bar.mjs <WEB_URL> <browser code> <folder name> <session title> <out dir> <prefix>
 //
 // The code is a browser's (`agents-control code --client --browser`).
 
@@ -9,7 +9,7 @@ import { writeFileSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 import { launch } from "./cdp.mjs";
 
-const [webURL, code, project, title, out, prefix] = process.argv.slice(2);
+const [webURL, code, folder, title, out, prefix] = process.argv.slice(2);
 const notes = [];
 const say = (line) => { notes.push(line); console.log(line); };
 
@@ -19,7 +19,7 @@ await page.waitFor(`document.querySelector("textarea")`);
 await page.focus("textarea");
 await page.type(code);
 await page.press("Connect");
-await page.waitFor(`document.querySelector(".projects .row")`);
+await page.waitFor(`document.querySelector(".folders .row")`);
 
 const clickRow = (text) => page.eval(`(() => {
   const row = [...document.querySelectorAll(".row")].find((r) => r.querySelector(".title")?.textContent === ${JSON.stringify(text)}
@@ -66,7 +66,7 @@ async function shoot(name, width, height) {
   say(`${name} (${width}×${height}): ${JSON.stringify(await where())}; problems ${JSON.stringify(await problems())}`);
 }
 
-if (!(await clickRow(project))) throw new Error(`no project called ${project}`);
+if (!(await clickRow(folder))) throw new Error(`no folder called ${folder}`);
 await page.waitFor(`document.querySelector(".sessions .row")`);
 await page.press("New session");
 await page.waitFor(`document.querySelector(".new-agent .menus") || document.querySelector(".new-agent .failure")`, 60_000);

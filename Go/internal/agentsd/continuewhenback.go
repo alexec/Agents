@@ -139,10 +139,10 @@ func (d *Daemon) resumeContinues() {
 
 // continuesByItself is whether a turn refused for a spent allowance waits at once, with
 // nobody to choose Continue (#1918): a workflow's run with `continue-when-back: true`, or a
-// helper in a project whose helpers are set to (HelperLimits.continueWhenBack). A chat the
+// helper in a folder whose helpers are set to (HelperLimits.continueWhenBack). A chat the
 // person started waits only when the person asks.
 func (d *Daemon) continuesByItself(a *wire.Agent) bool {
-	folder := projectFolder(a)
+	folder := folderPath(a)
 	if a.StartedByWorkflow != nil {
 		d.workflowMu.Lock()
 		defer d.workflowMu.Unlock()
@@ -151,7 +151,7 @@ func (d *Daemon) continuesByItself(a *wire.Agent) bool {
 	}
 	if a.StartedByAgent != nil {
 		s, ok := d.summaryFor(folder)
-		return ok && s.Project.HelperLimits != nil && s.Project.HelperLimits.ContinueWhenBack != nil && *s.Project.HelperLimits.ContinueWhenBack
+		return ok && s.Folder.HelperLimits != nil && s.Folder.HelperLimits.ContinueWhenBack != nil && *s.Folder.HelperLimits.ContinueWhenBack
 	}
 	return false
 }

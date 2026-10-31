@@ -391,7 +391,7 @@ func (p *Provider) Create(name string, options map[string]any, firstBoot string)
 	}
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return Workspace{}, Failure{Reason: "A new workspace needs a name."}
+		return Workspace{}, Failure{Reason: "A new machine needs a name."}
 	}
 	all, err := p.List()
 	if err != nil {

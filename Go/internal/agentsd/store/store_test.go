@@ -3,6 +3,7 @@ package store
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -169,18 +170,18 @@ func TestAppendManyOpensTheTranscriptOnce(t *testing.T) {
 	}
 }
 
-func TestProjectsFile(t *testing.T) {
+func TestFoldersFile(t *testing.T) {
 	s, _ := Open(t.TempDir())
-	ps := []wire.Project{{Folder: FolderURL("/w/b"), AddedAt: 2}, {Folder: FolderURL("/w/a b"), AddedAt: 1}}
-	if err := s.SaveProjects(ps); err != nil {
+	ps := []wire.Folder{{Folder: FolderURL("/w/b"), AddedAt: 2}, {Folder: FolderURL("/w/a b"), AddedAt: 1}}
+	if err := s.SaveFolders(ps); err != nil {
 		t.Fatal(err)
 	}
-	b, _ := os.ReadFile(s.Loc.Projects())
+	b, _ := os.ReadFile(s.Loc.Folders())
 	if string(b) != `[{"addedAt":"2001-01-01T00:00:01.000Z","folder":"file:///w/a%20b"},{"addedAt":"2001-01-01T00:00:02.000Z","folder":"file:///w/b"}]` {
-		t.Fatalf("projects.json %s", b)
+		t.Fatalf("folders.json %s", b)
 	}
 	s2, _ := Open(s.Loc.Root)
-	if got := s2.Projects(); len(got) != 2 || FolderPath(got[0].Folder) != "/w/a b" {
+	if got := s2.Folders(); len(got) != 2 || FolderPath(got[0].Folder) != "/w/a b" {
 		t.Fatalf("%v", got)
 	}
 }
@@ -228,5 +229,84 @@ func TestEntriesFrom(t *testing.T) {
 	}
 	if len(s.ib.indexes) != 0 {
 		t.Fatalf("kept %d line indexes", len(s.ib.indexes))
+	}
+}
+
+// A transcript line with a token in it is written redacted, and the caller gets the
+// redacted entry to send on (#1001, SC-001).
+func TestATokenInATranscriptLineIsStoredRedacted(t *testing.T) {
+	s, _ := Open(t.TempDir())
+	id := NewUUID()
+	token := "ghp_" + strings.Repeat("a1B2", 9)
+	said := "Your token is " + token + ".\nKeep it safe."
+	call := wire.ToolCall{Title: "cat .env: GITHUB_TOKEN=" + token, Content: []wire.ToolCallContent{}}
+	n, got, err := s.AppendOne(id, wire.TranscriptEntry{ID: NewUUID(), Kind: wire.TranscriptEntryKind{
+		AgentMessage: &wire.TranscriptEntryKindAgentMessage{Text: said}}})
+	if err != nil || n != 0 {
+		t.Fatal(n, err)
+	}
+	if want := "Your token is [redacted:github].\nKeep it safe."; got.Kind.AgentMessage == nil || got.Kind.AgentMessage.Text != want {
+		t.Fatalf("entry sent on: %+v", got.Kind.AgentMessage)
+	}
+	if _, err := s.Append(id, wire.TranscriptEntry{ID: NewUUID(), Kind: wire.TranscriptEntryKind{
+		ToolCall: &wire.TranscriptEntryKindToolCall{Value: call}}}); err != nil {
+		t.Fatal(err)
+	}
+	plain := "Nothing secret here."
+	if _, got, _ := s.AppendOne(id, wire.TranscriptEntry{ID: NewUUID(), Kind: wire.TranscriptEntryKind{
+		AgentMessage: &wire.TranscriptEntryKindAgentMessage{Text: plain}}}); got.Kind.AgentMessage.Text != plain {
+		t.Fatalf("plain text changed: %q", got.Kind.AgentMessage.Text)
+	}
+	b, err := os.ReadFile(s.Loc.Transcript(string(id)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), token) || strings.Count(string(b), "[redacted:github]") != 2 {
+		t.Fatalf("transcript on disk:\n%s", b)
+	}
+	entries, _, _ := s.Transcript(id, 0)
+	if len(entries) != 3 || entries[1].Kind.ToolCall.Value.Title != "cat .env: GITHUB_TOKEN=[redacted:github]" {
+		t.Fatalf("read back: %+v", entries)
+	}
+}
+
+// A worktree record with no folder (#2650) gets one on load, written back: the old
+// "project" key when it has one, else the repository its root belongs to. None is left "".
+func TestAWorktreeWithNoFolderIsFilled(t *testing.T) {
+	root := t.TempDir()
+	repo := filepath.Join(t.TempDir(), "repo")
+	wt := filepath.Join(repo, ".agents", "worktrees", "lane")
+	os.MkdirAll(wt, 0o755)
+	if out, err := exec.Command("git", "init", "-q", repo).CombinedOutput(); err != nil {
+		t.Skipf("no git here: %v %s", err, out)
+	}
+	write := func(id, worktree string) {
+		dir := filepath.Join(root, "agents", id)
+		os.MkdirAll(dir, 0o755)
+		b := `{"id":"` + id + `","runtimeID":"claude","cwd":"file:///w/","state":"stopped","endedReason":"endTurn",` +
+			`"advertisedOptions":[],"availableCommands":[],"worktree":` + worktree + `}`
+		if err := os.WriteFile(filepath.Join(dir, "agent.json"), []byte(b), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	empty, old, gone := NewUUID(), NewUUID(), NewUUID()
+	write(string(empty), `{"name":"lane","root":"`+string(PathURL(wt))+`","madeByApp":true,"folder":""}`)
+	write(string(old), `{"name":"lane","root":"file:///x/.agents/worktrees/lane","madeByApp":true,"project":"file:///x"}`)
+	write(string(gone), `{"name":"lane","root":"file:///nowhere/src/.agents/worktrees/lane","madeByApp":true,"folder":""}`)
+	s, err := Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[wire.UUID]wire.URL{empty: FolderURL(repo), old: "file:///x", gone: "file:///nowhere/src"}
+	for id, folder := range want {
+		if a := s.Agent(id); a == nil || a.Worktree == nil || a.Worktree.Folder != folder {
+			t.Errorf("%s: folder %+v, want %s", id, a.Worktree, folder)
+		}
+		b, _ := os.ReadFile(s.Loc.Record(string(id)))
+		var rec struct{ Worktree struct{ Folder wire.URL } }
+		json.Unmarshal(b, &rec)
+		if rec.Worktree.Folder != folder {
+			t.Errorf("%s: written back as %q, want %s", id, rec.Worktree.Folder, folder)
+		}
 	}
 }
