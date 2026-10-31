@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"go/format"
-	"sort"
 	"strings"
 	"unicode"
 )
@@ -14,22 +13,6 @@ type goGen struct {
 	out   strings.Builder
 	named map[string]bool // every Go type name taken, definitions and inline types
 	queue []func()        // inline types, written after the type that holds them
-}
-
-func legacyCases(name string, legacy map[string]string) string {
-	if len(legacy) == 0 {
-		return ""
-	}
-	var out strings.Builder
-	keys := make([]string, 0, len(legacy))
-	for key := range legacy {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		fmt.Fprintf(&out, "case %s(%q):\n\t\t*v = %s%s\n\t", name, key, name, goName(legacy[key]))
-	}
-	return strings.TrimSuffix(out.String(), "\t")
 }
 
 func goTypes(doc *Document) (string, error) {
@@ -217,13 +200,12 @@ func (v *%[1]s) UnmarshalJSON(b []byte) error {
 	switch %[1]s(s) {
 	case %[2]s:
 		*v = %[1]s(s)
-	%[5]s
 	default:
 		*v = %[1]s%[4]s
 	}
 	return nil
 }
-`, name, strings.Join(values, ",\n\t\t"), s.Fallback, goName(s.Fallback), legacyCases(name, s.Legacy))
+`, name, strings.Join(values, ",\n\t\t"), s.Fallback, goName(s.Fallback))
 	}
 }
 

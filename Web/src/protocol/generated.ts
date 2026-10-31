@@ -8578,8 +8578,8 @@ export type Weekday =
   | "sat";
 
 /**
- * How a turn ended (#1916): only a question needs the person. Old `blocked` reads as `waiting`; old
- * `stuck` or `partly_done` reads as `done`.
+ * How a turn ended (#1916): only a question needs the person. A value this build does not know,
+ * such as an old record's `blocked`, `stuck` or `partly_done`, reads as `done`.
  */
 export type WorkOutcome =
   | "done"
