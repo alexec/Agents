@@ -428,10 +428,12 @@ from you until Alex speaks to it (#1728), so do not leave this to it:
    before this one ships (#2309). For a patch, the enhancement PRs that waited for it are
    labelled `hold:v<version>` (for v0.12.3, `hold:v0.12.3`, #2801). For each open pull
    request still labelled `hold:v<major.minor>` (for v0.6.0, `hold:v0.6`) or
-   `hold:v<version>`: `gh pr edit N --remove-label <the label>`, then
-   `gh pr merge N --auto --squash`. Turning auto-merge on is not merging: CI and the
-   branch rules still decide. A stacked PR whose base is not `main` refuses auto-merge;
-   leave it, and name it in the report.
+   `hold:v<version>`: `gh pr edit N --remove-label <the label>`. A PR that still carries
+   `needs-approval` (AGENTS.md, "A UI enhancement waits for Alex") is still waiting on
+   Alex's screenshot approval: leave its auto-merge off, and name it in the report
+   instead. For every other one, `gh pr merge N --auto --squash`. Turning auto-merge on
+   is not merging: CI and the branch rules still decide. A stacked PR whose base is not
+   `main` refuses auto-merge; leave it, and name it in the report.
 5. **Unpark the new open milestone:** the open milestone is now the next milestone of item 0
    (AGENTS.md, "Work by milestone"). Take `parked` off its open issues, and only its:
    `gh issue edit N --remove-label parked`. Every later milestone keeps `parked` (#2309).
