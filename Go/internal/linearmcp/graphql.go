@@ -156,14 +156,15 @@ func linearError(res *http.Response, errs []gqlError) *LinearError {
 // MARK: What is read
 
 const fragments = `
-fragment P on User { displayName app guest }
+fragment P on User { id displayName app guest }
 fragment I on Issue {
   id identifier title url createdAt
-  team { key } state { name type } labels { nodes { name } } assignee { displayName }
+  team { key } state { name type } labels { nodes { name } } assignee { id displayName }
   creator { ...P } botActor { name }
 }`
 
 type gqlPerson struct {
+	ID          string `json:"id"`
 	DisplayName string `json:"displayName"`
 	App         bool   `json:"app"`
 	Guest       bool   `json:"guest"`
@@ -176,7 +177,7 @@ type gqlBot struct {
 // person is who did something: the user, else the app (bot) that did it, else nobody.
 func person(user *gqlPerson, bot *gqlBot) *Person {
 	if user != nil {
-		return &Person{Name: user.DisplayName, App: user.App, Guest: user.Guest}
+		return &Person{ID: user.ID, Name: user.DisplayName, App: user.App, Guest: user.Guest}
 	}
 	if bot != nil {
 		name := bot.Name
@@ -207,6 +208,7 @@ type gqlIssue struct {
 		} `json:"nodes"`
 	} `json:"labels"`
 	Assignee *struct {
+		ID          string `json:"id"`
 		DisplayName string `json:"displayName"`
 	} `json:"assignee"`
 	Creator  *gqlPerson `json:"creator"`
@@ -227,7 +229,7 @@ func (g gqlIssue) issue() Issue {
 	}
 	sort.Strings(i.Labels)
 	if g.Assignee != nil {
-		i.Assignee = g.Assignee.DisplayName
+		i.Assignee, i.AssigneeID = g.Assignee.DisplayName, g.Assignee.ID
 	}
 	return i
 }

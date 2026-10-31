@@ -1,8 +1,8 @@
-{"data":{"issues":{"nodes":[
+{"data":{"viewer":{"id":"u1","displayName":"alex","app":false,"guest":false},"issues":{"nodes":[
  {"id":"a1","identifier":"ENG-5","title":"Crash on start","url":"https://linear.app/loops/issue/ENG-5","createdAt":"2026-10-16T12:00:00.000Z",
-  "team":{"key":"ENG"},"state":{"name":"Todo","type":"unstarted"},"labels":{"nodes":[{"name":"Bug"}]},"assignee":{"displayName":"alex"},
-  "creator":{"displayName":"alex","app":false,"guest":false},"botActor":null,"priority":0,"updatedAt":"2026-10-18T09:00:00.000Z","comments":{"nodes":[]}},
+  "team":{"key":"ENG"},"state":{"name":"Todo","type":"unstarted"},"labels":{"nodes":[{"name":"Bug"}]},"assignee":{"id":"u1","displayName":"alex"},
+  "creator":{"id":"u1","displayName":"alex","app":false,"guest":false},"botActor":null,"priority":0,"updatedAt":"2026-10-18T09:00:00.000Z","comments":{"nodes":[]}},
  {"id":"a2","identifier":"ENG-7","title":"Login loops","url":"https://linear.app/loops/issue/ENG-7","createdAt":"2026-10-17T12:00:00.000Z",
   "team":{"key":"ENG"},"state":{"name":"In Progress","type":"started"},"labels":{"nodes":[{"name":"Bug"}]},"assignee":null,
-  "creator":{"displayName":"sam","app":false,"guest":false},"botActor":null,"priority":1,"updatedAt":"2026-10-19T09:00:00.000Z","comments":{"nodes":[{"id":"c1"},{"id":"c2"}]}}
+  "creator":{"id":"u2","displayName":"sam","app":false,"guest":false},"botActor":null,"priority":1,"updatedAt":"2026-10-19T09:00:00.000Z","comments":{"nodes":[{"id":"c1"},{"id":"c2"}]}}
 ]}}}

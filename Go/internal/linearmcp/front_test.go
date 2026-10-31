@@ -99,6 +99,14 @@ func TestTheFrontOffersEventsAndTheIssuesView(t *testing.T) {
 	shown := call(4, "tools/call", map[string]any{"name": "show_issues", "arguments": map[string]any{"team": "ENG"}})["result"].(map[string]any)
 	issues := shown["structuredContent"].(map[string]any)["issues"].([]any)
 	equal(t, issues[0].(map[string]any)["identifier"], "ENG-5", "the listed issue")
+	sections := []any{}
+	for _, issue := range issues {
+		sections = append(sections, issue.(map[string]any)["section"])
+	}
+	equal(t, sections, []any{"needs_you", "yours", "team", "others"}, "each issue's section (#2453)")
+	equal(t, issues[2].(map[string]any)["authorBot"], true, "an app's issue")
+	equal(t, shown["structuredContent"].(map[string]any)["attention"], float64(1), "attention is the Needs you count")
+	equal(t, shown["structuredContent"].(map[string]any)["viewer"], "alex", "the viewer")
 	details := call(10, "tools/call", map[string]any{"name": "show_issue_details", "arguments": map[string]any{"identifier": "ENG-5"}})["result"].(map[string]any)
 	equal(t, details["structuredContent"].(map[string]any)["descriptionHTML"], "<p><strong>Text</strong></p>\n", "rendered issue description")
 	refused := call(9, "tools/call", map[string]any{"name": "show_issues", "arguments": map[string]any{"state": "completed"}})["result"].(map[string]any)

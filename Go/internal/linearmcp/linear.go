@@ -10,6 +10,8 @@ import (
 
 // Person is who did something: a workspace user, or an app or integration.
 type Person struct {
+	// ID is the user's Linear id; an app with no user has none.
+	ID   string
 	Name string
 	// App says it is an app or integration (a bot), not a person.
 	App bool
@@ -38,6 +40,7 @@ type Issue struct {
 	StateType  string // triage, backlog, unstarted, started, completed or canceled
 	Labels     []string
 	Assignee   string
+	AssigneeID string // the assignee's user id, for the Issues page's Needs you (#2453)
 	URL        string
 	CreatedAt  string
 	Creator    *Person
