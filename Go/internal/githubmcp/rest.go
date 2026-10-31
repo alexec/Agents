@@ -413,6 +413,16 @@ func query(path string, page int) string {
 func (g *RealGitHub) DefaultRepo(ctx context.Context) (string, error) { return g.Repo(ctx) }
 
 func (g *RealGitHub) FailedRuns(ctx context.Context, repo, branch, since string) ([]RunRef, bool, error) {
+	return g.runs(ctx, repo, branch, since, "failure", isFailed)
+}
+
+func (g *RealGitHub) PassedRuns(ctx context.Context, repo, branch, since string) ([]RunRef, bool, error) {
+	return g.runs(ctx, repo, branch, since, "success", isSucceeded)
+}
+
+// runs are pull_request runs updated at or after since whose status matches status, in any
+// order; matches filters the conclusion too, as a defensive double-check of status.
+func (g *RealGitHub) runs(ctx context.Context, repo, branch, since, status string, matches func(string) bool) ([]RunRef, bool, error) {
 	type run struct {
 		ID           int    `json:"id"`
 		Attempt      int    `json:"run_attempt"`
@@ -433,7 +443,7 @@ func (g *RealGitHub) FailedRuns(ctx context.Context, repo, branch, since string)
 	if t, ok := parseTime(since); ok {
 		floor = timeString(t.Add(-rerunWindow))
 	}
-	path := fmt.Sprintf("repos/%s/actions/runs?event=pull_request&status=failure", repo)
+	path := fmt.Sprintf("repos/%s/actions/runs?event=pull_request&status=%s", repo, status)
 	if branch != "" {
 		path += "&branch=" + url.QueryEscape(branch)
 	}
@@ -446,7 +456,7 @@ func (g *RealGitHub) FailedRuns(ctx context.Context, repo, branch, since string)
 			return nil, false, err
 		}
 		for _, r := range list.Runs {
-			if r.Status != "completed" || !isFailed(r.Conclusion) || before(r.UpdatedAt, since) {
+			if r.Status != "completed" || !matches(r.Conclusion) || before(r.UpdatedAt, since) {
 				continue
 			}
 			name := r.Name
@@ -472,7 +482,7 @@ func (g *RealGitHub) FailedRuns(ctx context.Context, repo, branch, since string)
 	return runs, true, nil
 }
 
-func (g *RealGitHub) RunDetails(ctx context.Context, repo string, run RunRef) (*FailedRunData, error) {
+func (g *RealGitHub) RunDetails(ctx context.Context, repo string, run RunRef) (*RunData, error) {
 	number := run.PRNumber
 	if number == 0 {
 		// A fork's PR isn't on the run; find it by the head commit.
@@ -517,7 +527,7 @@ func (g *RealGitHub) RunDetails(ctx context.Context, repo string, run RunRef) (*
 	if pr.Number == 0 {
 		pr.Number = number
 	}
-	return &FailedRunData{PR: pr, HeadSHA: run.HeadSHA, Run: run, FailedJobs: failed, Trusted: p.trusted(repo)}, nil
+	return &RunData{PR: pr, HeadSHA: run.HeadSHA, Run: run, FailedJobs: failed, Trusted: p.trusted(repo)}, nil
 }
 
 func (g *RealGitHub) ClosedPRs(ctx context.Context, repo, since string) ([]MergedPR, []ClosedPR, bool, error) {

@@ -93,6 +93,24 @@ func TestFailedRunsAndTheirDetails(t *testing.T) {
 	equal(t, details.Trusted, false, "a first-time contributor is not one of the repo's own")
 }
 
+func TestPassedRunsOnlyMatchesSuccess(t *testing.T) {
+	since := "2026-10-16T10:00:00.000Z"
+	api := newFakeAPI(t, map[string]string{
+		"repos/" + repo + "/actions/runs": `{"workflow_runs": [
+			{"id": 3, "run_attempt": 1, "name": "CI", "html_url": "u3", "head_sha": "s3", "head_branch": "agents/b", "status": "completed",
+			 "conclusion": "success", "updated_at": "2026-10-16T10:05:00Z", "created_at": "2026-10-16T10:00:00Z", "pull_requests": [{"number": 11}]},
+			{"id": 4, "run_attempt": 1, "name": "CI", "html_url": "u4", "head_sha": "s4", "head_branch": "agents/c", "status": "completed",
+			 "conclusion": "failure", "updated_at": "2026-10-16T10:05:00Z", "created_at": "2026-10-16T10:00:00Z", "pull_requests": [{"number": 12}]}]}`,
+	})
+	g := api.github()
+	runs, truncated, err := g.PassedRuns(context.Background(), repo, "", since)
+	if err != nil || truncated {
+		t.Fatal(err, truncated)
+	}
+	equal(t, runs, []RunRef{{ID: 3, Attempt: 1, Name: "CI", URL: "u3", HeadSHA: "s3", Branch: "agents/b", PRNumber: 11,
+		UpdatedAt: "2026-10-16T10:05:00Z"}}, "only the successful run")
+}
+
 // A PR is the repo's own only from a branch of the repo, by one of its own: a collaborator's
 // fork, or a fork since deleted, is not.
 func TestAPRFromAForkIsNotTheReposOwn(t *testing.T) {
