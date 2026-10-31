@@ -25,9 +25,15 @@ import (
 type copyRunning struct {
 	service *controlplane.Service
 	proxy   *httputil.ReverseProxy
+	// Its store, held to its plan (#2224, limits.go).
+	limits *limitedStore
 	// Under Service.mu: the requests open now, and when the last one ended.
 	open int
 	last time.Time
+	// Under Service.mu: its WebSockets open now, against the plan's connections.
+	sockets int
+	// When the sweep last deleted its old events.
+	eventsSwept time.Time
 }
 
 // loopback is where this service reaches its copies from: they believe its
@@ -88,7 +94,17 @@ func (s *Service) copyFor(ctx context.Context, id string) (*copyRunning, error) 
 }
 
 func (s *Service) startCopy(ctx context.Context, id string) (*copyRunning, error) {
-	st := accountStore(s.cfg.Store, id)
+	acc, err := s.accounts.get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if acc == nil {
+		return nil, errors.New("the account is gone")
+	}
+	st, err := s.limitedFor(ctx, acc)
+	if err != nil {
+		return nil, fmt.Errorf("its store's size: %w", err)
+	}
 	key, err := kms.Kept{Store: st, Keeper: s.cfg.Keeper}.ControlKey(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("its control key: %w", err)
@@ -124,7 +140,13 @@ func (s *Service) startCopy(ctx context.Context, id string) (*copyRunning, error
 		plain(w, http.StatusBadGateway, "Your control plane did not answer. Try again in a moment.\n")
 	}
 	s.log(fmt.Sprintf("%s: started at %s", id, cfg.URL))
-	return &copyRunning{service: service, proxy: proxy}, nil
+	c := &copyRunning{service: service, proxy: proxy, limits: st, eventsSwept: s.cfg.Now()}
+	if n, err := s.sweepEvents(ctx, st); err != nil {
+		s.log(id + ": events sweep: " + err.Error())
+	} else if n > 0 {
+		s.log(fmt.Sprintf("%s: deleted %d events older than its plan keeps", id, n))
+	}
+	return c, nil
 }
 
 // clientOf is the address a request comes from: the last X-Forwarded-For entry when the
@@ -173,7 +195,7 @@ func (s *Service) makeRoomLocked() bool {
 	done := make(chan struct{})
 	s.starting[oldest] = done
 	s.mu.Unlock()
-	c.service.Stop()
+	s.stopRunning(oldest, c)
 	s.log(oldest + ": stopped, to make room")
 	s.mu.Lock()
 	delete(s.starting, oldest)
@@ -191,7 +213,7 @@ func (s *Service) suspended(w http.ResponseWriter) {
 func (s *Service) toAccount(w http.ResponseWriter, r *http.Request, id string) {
 	if c := s.inUse(id); c != nil {
 		defer s.done(c)
-		c.proxy.ServeHTTP(w, r)
+		s.serve(w, r, c)
 		return
 	}
 	acc, err := s.accounts.get(r.Context(), id)
@@ -222,6 +244,28 @@ func (s *Service) toAccount(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 	defer s.done(c)
+	s.serve(w, r, c)
+}
+
+// serve passes a request to a running copy, and a WebSocket only under the plan's
+// connections (#2224).
+func (s *Service) serve(w http.ResponseWriter, r *http.Request, c *copyRunning) {
+	if isWebSocket(r.Header) && c.limits != nil {
+		p := c.limits.planNow()
+		s.mu.Lock()
+		if c.sockets >= p.Connections {
+			s.mu.Unlock()
+			plain(w, http.StatusTooManyRequests, c.limits.refuse(p, "connections", plural(p.Connections, "connection", "connections")+" at once", "Close one").Error()+"\n")
+			return
+		}
+		c.sockets++
+		s.mu.Unlock()
+		defer func() {
+			s.mu.Lock()
+			c.sockets--
+			s.mu.Unlock()
+		}()
+	}
 	c.proxy.ServeHTTP(w, r)
 }
 
@@ -245,7 +289,17 @@ func (s *Service) stopCopy(id string) {
 	delete(s.copies, id)
 	s.mu.Unlock()
 	if c != nil {
-		c.service.Stop()
+		s.stopRunning(id, c)
+	}
+}
+
+// stopRunning stops a copy taken out of copies, and keeps its store's size for its next start.
+func (s *Service) stopRunning(id string, c *copyRunning) {
+	c.service.Stop()
+	if c.limits != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		s.keepUsage(ctx, id, c.limits)
+		cancel()
 	}
 }
 
@@ -305,7 +359,7 @@ func (s *Service) sweepIdle() {
 	}
 	s.mu.Unlock()
 	for id, c := range idle {
-		c.service.Stop()
+		s.stopRunning(id, c)
 		s.log(id + ": stopped, idle")
 		s.mu.Lock()
 		done := s.starting[id]
@@ -315,17 +369,20 @@ func (s *Service) sweepIdle() {
 	}
 }
 
-// sweepSuspended stops the running copies whose accounts are suspended or gone. A request
-// to a running copy reads no account (P20261020-24), so the operator's command, in another
-// process, reaches a running copy here, within a minute.
-func (s *Service) sweepSuspended(ctx context.Context) {
+// sweepAccounts reads each running copy's account again: it stops the copies whose
+// accounts are suspended or gone, gives the rest their plan as it is now, keeps their
+// store's size, and deletes their events older than the plan keeps, each hour. A request
+// to a running copy reads no account (P20261020-24), so the operator's command and a
+// change of plan, from elsewhere, reach a running copy here, within a minute.
+func (s *Service) sweepAccounts(ctx context.Context) {
 	s.mu.Lock()
-	ids := make([]string, 0, len(s.copies))
-	for id := range s.copies {
-		ids = append(ids, id)
+	running := make(map[string]*copyRunning, len(s.copies))
+	for id, c := range s.copies {
+		running[id] = c
 	}
 	s.mu.Unlock()
-	for _, id := range ids {
+	now := s.cfg.Now()
+	for id, c := range running {
 		acc, err := s.accounts.get(ctx, id)
 		if err != nil {
 			continue
@@ -333,6 +390,25 @@ func (s *Service) sweepSuspended(ctx context.Context) {
 		if acc == nil || acc.Suspended != nil {
 			s.stopCopy(id)
 			s.log(id + ": stopped, suspended")
+			continue
+		}
+		if c.limits == nil {
+			continue
+		}
+		c.limits.setPlan(PlanOf(acc))
+		s.keepUsage(ctx, id, c.limits)
+		s.mu.Lock()
+		due := now.Sub(c.eventsSwept) >= time.Hour
+		if due {
+			c.eventsSwept = now
+		}
+		s.mu.Unlock()
+		if due {
+			if n, err := s.sweepEvents(ctx, c.limits); err != nil {
+				s.log(id + ": events sweep: " + err.Error())
+			} else if n > 0 {
+				s.log(fmt.Sprintf("%s: deleted %d events older than its plan keeps", id, n))
+			}
 		}
 	}
 }
@@ -348,7 +424,7 @@ func (s *Service) sweepIdleEvery(every time.Duration) {
 		case <-t.C:
 			s.sweepIdle()
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			s.sweepSuspended(ctx)
+			s.sweepAccounts(ctx)
 			cancel()
 		}
 	}

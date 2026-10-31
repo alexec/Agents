@@ -139,8 +139,8 @@ func (s *Service) Stop() {
 	copies := s.copies
 	s.copies = map[string]*copyRunning{}
 	s.mu.Unlock()
-	for _, c := range copies {
-		c.service.Stop()
+	for id, c := range copies {
+		s.stopRunning(id, c)
 	}
 }
 
