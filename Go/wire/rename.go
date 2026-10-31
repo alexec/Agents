@@ -11,7 +11,8 @@ import "strings"
 //  3. The old names are removed.
 //
 // Until step 3 the documents and the code keep the old names; a receiver reads a new name
-// as its old one with OldMethodName, where it decodes a message.
+// as its old one with OldMethodName, where it decodes a message, and a sender that can't
+// change a generated Name directly sends its new name with NewMethodName.
 
 // renamed is each old prefix by its new one.
 var renamed = [][2]string{{"machine/", "host/"}, {"machines/", "hosts/"}}
@@ -32,6 +33,19 @@ func OldMethodName(method string) string {
 			if _, known := ControlCapabilities[old]; known {
 				return old
 			}
+		}
+	}
+	return method
+}
+
+// NewMethodName is method under its new name, the reverse of OldMethodName: a sender
+// uses it to send a host/* or hosts/* method of control.openrpc.json (hosts/list is
+// machines/list) as its machine/* or machines/* name (#2653), where it can't change a
+// generated Method's or Notification's Name directly.
+func NewMethodName(method string) string {
+	for _, r := range renamed {
+		if rest, ok := strings.CutPrefix(method, r[1]); ok {
+			return r[0] + rest
 		}
 	}
 	return method

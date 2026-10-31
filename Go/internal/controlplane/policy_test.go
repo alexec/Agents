@@ -32,7 +32,7 @@ type policiesTold struct {
 func newPoliciesTold() *policiesTold { return &policiesTold{got: map[string][]policyLine{}} }
 
 func (d *policiesTold) heard(host, method string, params json.RawMessage) {
-	if method != wire.NotifyHostPolicy.Name {
+	if method != wire.NewMethodName(wire.NotifyHostPolicy.Name) {
 		return
 	}
 	var line policyLine

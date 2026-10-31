@@ -225,7 +225,7 @@ func (u *Uplink) Run(ctx context.Context) {
 		u.mu.Unlock()
 		hello := u.Hello
 		hello.Host = new(wire.MachineRef(u.Member.Host))
-		u.Tell("host/hello", hello)
+		u.Tell("machine/hello", hello)
 		log.Printf("uplink: connected to the control plane as %s", u.Member.Host)
 		if u.OnChange != nil {
 			u.OnChange(true, "")

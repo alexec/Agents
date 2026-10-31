@@ -210,7 +210,7 @@ func (s *Service) sendHostUser(host string) {
 	if u.Kind == records.KindPerson {
 		u.Bots = s.botsOfGroups(user)
 	}
-	s.router.Tell(host, wire.NotifyHostUser.Name, u)
+	s.router.Tell(host, wire.NewMethodName(wire.NotifyHostUser.Name), u)
 }
 
 // botsOfGroups is the names of the bots in a person's groups, sorted (#2027): a runs-on:

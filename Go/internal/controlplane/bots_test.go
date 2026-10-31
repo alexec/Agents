@@ -37,7 +37,7 @@ type hostUsers struct {
 }
 
 func (h *hostUsers) heard(host, method string, params json.RawMessage) {
-	if method != wire.NotifyHostUser.Name {
+	if method != wire.NewMethodName(wire.NotifyHostUser.Name) {
 		return
 	}
 	var u wire.MachineUser

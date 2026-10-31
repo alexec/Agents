@@ -88,7 +88,7 @@ func (d *Daemon) reviseHostStatus() {
 	}
 	d.statusMu.Unlock()
 	if !same {
-		(*tell)(wire.CallHostStatus.Name, status)
+		(*tell)(wire.NewMethodName(wire.CallHostStatus.Name), status)
 	}
 }
 

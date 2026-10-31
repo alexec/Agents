@@ -203,7 +203,7 @@ public final class ControlUplink: @unchecked Sendable {
             return (uplink, id)
         }
         guard let transport,
-              let line = try? JSONRPCCodec.encode(.request(id: .number(id), method: method, params: params))
+              let line = try? JSONRPCCodec.encode(.request(id: .number(id), method: DaemonAPI.newMethodName(method), params: params))
         else { return }
         try? transport.write(line: ControlWire.channel(0, message: line))
     }
@@ -216,7 +216,7 @@ public final class ControlUplink: @unchecked Sendable {
             nextHello += 1
             return (uplink, id)
         }
-        guard let transport, let line = try? JSONRPCCodec.encode(.request(id: .number(id), method: method, params: params)) else {
+        guard let transport, let line = try? JSONRPCCodec.encode(.request(id: .number(id), method: DaemonAPI.newMethodName(method), params: params)) else {
             throw JSONRPCError(code: DaemonAPI.Failure.hostOffline, message: "This host can’t reach its control plane now.")
         }
         let timer = Task { [weak self] in
@@ -257,7 +257,7 @@ public final class ControlUplink: @unchecked Sendable {
 
     private func sayHello(on transport: any LineTransport) throws {
         let id = lock.withLock { () -> Int in defer { nextHello += 1 }; return nextHello }
-        let line = try JSONRPCCodec.encode(.request(id: .number(id), method: DaemonAPI.Method.hostHello,
+        let line = try JSONRPCCodec.encode(.request(id: .number(id), method: DaemonAPI.newMethodName(DaemonAPI.Method.hostHello),
                                                     params: try JSONValue.encoding(hello)))
         try transport.write(line: ControlWire.channel(0, message: line))
     }

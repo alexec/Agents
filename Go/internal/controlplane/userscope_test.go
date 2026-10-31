@@ -25,7 +25,7 @@ type deliveries struct {
 }
 
 func (d *deliveries) heard(host, method string, params json.RawMessage) {
-	if method != wire.NotifyHostUserSettings.Name {
+	if method != wire.NewMethodName(wire.NotifyHostUserSettings.Name) {
 		return
 	}
 	var u wire.MachineUserSettings

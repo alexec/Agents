@@ -240,7 +240,7 @@ func (d *Daemon) orgSecret(r wire.DeliveredRoute, field string) ([]byte, bool) {
 
 func (d *Daemon) askOrgRoutesAgain() {
 	if tell := d.tellControl.Load(); tell != nil {
-		(*tell)(wire.CallHostOrgRoutesAgain.Name, wire.Empty{})
+		(*tell)(wire.NewMethodName(wire.CallHostOrgRoutesAgain.Name), wire.Empty{})
 	}
 }
 
@@ -306,7 +306,7 @@ func (d *Daemon) toldOrgRoutes(params json.RawMessage) {
 	d.stopRemovedOrgSessions(gone)
 	d.dropStandInsOfGoneRoutes()
 	if tell := d.tellControl.Load(); tell != nil {
-		(*tell)(wire.CallHostOrgRoutesApplied.Name, applied)
+		(*tell)(wire.NewMethodName(wire.CallHostOrgRoutesApplied.Name), applied)
 	}
 	if again {
 		d.askOrgRoutesAgain()

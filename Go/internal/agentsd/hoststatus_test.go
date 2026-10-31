@@ -16,7 +16,7 @@ type toldStatus struct {
 }
 
 func (c *toldStatus) tell(method string, params any) {
-	if method != wire.CallHostStatus.Name {
+	if method != wire.NewMethodName(wire.CallHostStatus.Name) {
 		return
 	}
 	c.mu.Lock()

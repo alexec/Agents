@@ -864,7 +864,7 @@ func (s *Service) sendOrgRoutes(host string, always bool) {
 		return
 	}
 	// The machine may have changed hands while the secrets were opened.
-	if s.records.Host(host) == nil || s.ownerOf(host) != user || !s.router.Tell(host, wire.NotifyHostOrgRoutes.Name, delivery) {
+	if s.records.Host(host) == nil || s.ownerOf(host) != user || !s.router.Tell(host, wire.NewMethodName(wire.NotifyHostOrgRoutes.Name), delivery) {
 		s.orgRoutes.mu.Lock()
 		delete(s.orgRoutes.told, host)
 		s.orgRoutes.mu.Unlock()

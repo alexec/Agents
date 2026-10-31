@@ -500,7 +500,7 @@ func (s *Service) tellMachinesProjects() {
 		if s.toldProjects.same(host, projects) {
 			continue
 		}
-		if s.router.Tell(host, wire.NotifyHostProjects.Name, projects) {
+		if s.router.Tell(host, wire.NewMethodName(wire.NotifyHostProjects.Name), projects) {
 			s.toldProjects.note(host, projects)
 		} else {
 			s.toldProjects.forget(host)

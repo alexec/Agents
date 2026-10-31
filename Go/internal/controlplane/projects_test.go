@@ -157,7 +157,7 @@ func TestAProjectsSlotsGoToItsMachines(t *testing.T) {
 	var mu sync.Mutex
 	heard := map[string][]wire.MachineProjects{}
 	p.told = func(host, method string, params json.RawMessage) {
-		if method != wire.NotifyHostProjects.Name {
+		if method != wire.NewMethodName(wire.NotifyHostProjects.Name) {
 			return
 		}
 		var m wire.MachineProjects
@@ -269,7 +269,7 @@ func TestAProjectChangeReadsAndTellsOnlyWhatChanged(t *testing.T) {
 	var mu sync.Mutex
 	heard := map[string]int{}
 	p.told = func(host, method string, params json.RawMessage) {
-		if method == wire.NotifyHostProjects.Name {
+		if method == wire.NewMethodName(wire.NotifyHostProjects.Name) {
 			mu.Lock()
 			heard[host]++
 			mu.Unlock()

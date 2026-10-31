@@ -39,7 +39,7 @@ func TestAnAgentsWorkspaceTools(t *testing.T) {
 		mu.Lock()
 		asked = append(asked, call)
 		mu.Unlock()
-		if method != "host/machines" {
+		if method != "machine/machines" {
 			t.Errorf("method %s", method)
 		}
 		switch call.Method {

@@ -826,7 +826,7 @@ func TestHostsHearThePairedWindows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for line := readUntil(t, host, "host/clients"); !strings.Contains(line, m.Client); line = readUntil(t, host, "host/clients") {
+	for line := readUntil(t, host, "machine/clients"); !strings.Contains(line, m.Client); line = readUntil(t, host, "machine/clients") {
 	}
 	if err := p.s.methods.forget(context.Background(), m.Client, 0); err != nil {
 		t.Fatal(err)
@@ -840,21 +840,21 @@ func TestHostsHearThePairedWindows(t *testing.T) {
 		if err != nil {
 			t.Fatal("a forgotten window is still listed:", err)
 		}
-		if strings.Contains(line, "host/clients") && !strings.Contains(line, m.Client) {
+		if strings.Contains(line, "machine/clients") && !strings.Contains(line, m.Client) {
 			return
 		}
 	}
 }
 
-// A host hears host/clients when it says hello and when the paired windows change, not
+// A host hears machine/clients when it says hello and when the paired windows change, not
 // on every refresh (#1528): forty refreshes (ten minutes of them) tell it nothing, so the
-// next host/clients it reads is the one that lists a new window.
+// next machine/clients it reads is the one that lists a new window.
 func TestAHostHearsThePairedWindowsOnlyWhenTheyChange(t *testing.T) {
 	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, host := p.rawHost("this mac", false)
-	if line := readUntil(t, host, "host/clients"); !strings.Contains(line, `"clients":[]`) {
-		t.Fatal("the hello's host/clients:", line)
+	if line := readUntil(t, host, "machine/clients"); !strings.Contains(line, `"clients":[]`) {
+		t.Fatal("the hello's machine/clients:", line)
 	}
 	for range 40 {
 		p.s.syncRelays()
@@ -863,7 +863,7 @@ func TestAHostHearsThePairedWindowsOnlyWhenTheyChange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if line := readUntil(t, host, "host/clients"); !strings.Contains(line, m.Client) {
+	if line := readUntil(t, host, "machine/clients"); !strings.Contains(line, m.Client) {
 		t.Fatal("the refreshes told the host an unchanged list:", line)
 	}
 }

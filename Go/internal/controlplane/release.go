@@ -19,5 +19,5 @@ func (s *Service) sendRelease(host string) {
 	if h == nil || !slices.Contains(hostCapabilities(*h), wire.CapHostUpdate1) {
 		return
 	}
-	s.router.Tell(host, wire.NotifyHostRelease.Name, wire.MachineRelease{Version: version})
+	s.router.Tell(host, wire.NewMethodName(wire.NotifyHostRelease.Name), wire.MachineRelease{Version: version})
 }

@@ -252,7 +252,7 @@ func (d *Daemon) tellControlPolicyApplied(version int64) {
 		return
 	}
 	if tell := d.tellControl.Load(); tell != nil {
-		(*tell)(wire.CallHostPolicyApplied.Name, wire.PolicyApplied{Version: version})
+		(*tell)(wire.NewMethodName(wire.CallHostPolicyApplied.Name), wire.PolicyApplied{Version: version})
 	}
 }
 

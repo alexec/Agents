@@ -136,7 +136,7 @@ func (m *Membership) Save(root string) error {
 	return os.Rename(tmp, filepath.Join(root, "control-host.json"))
 }
 
-// Enroll uses a host code once: proves the code's key, says hosts/announce, keeps the answer.
+// Enroll uses a host code once: proves the code's key, says machines/announce, keeps the answer.
 func Enroll(ctx context.Context, root string, code *Code, private []byte, hello MachineHello) (*Membership, error) {
 	if !code.Host {
 		return nil, errors.New("that is not a host code")
@@ -158,7 +158,7 @@ func Enroll(ctx context.Context, root string, code *Code, private []byte, hello 
 	}
 	params, _ := json.Marshal(wire.MachineAnnounce{PublicKey: pub, Name: name, Platform: hello.Platform, Version: hello.Version,
 		MachineID: hello.MachineID, Implementation: hello.Implementation})
-	req, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "hosts/announce", "params": json.RawMessage(params)})
+	req, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "machines/announce", "params": json.RawMessage(params)})
 	if err := l.Write(ctx, string(req)); err != nil {
 		return nil, err
 	}
@@ -175,7 +175,7 @@ func Enroll(ctx context.Context, root string, code *Code, private []byte, hello 
 		return nil, err
 	}
 	if reply.Result == nil || reply.Result.Host == nil || *reply.Result.Host == "" {
-		return nil, fmt.Errorf("hosts/announce: %s", line)
+		return nil, fmt.Errorf("machines/announce: %s", line)
 	}
 	m := &Membership{Host: string(*reply.Result.Host), ControlKey: code.ControlKey, Addresses: []string{}, Name: code.Name, URL: code.URL, Pin: code.Pin}
 	return m, m.Save(root)

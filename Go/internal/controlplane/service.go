@@ -760,7 +760,7 @@ func (s *Service) tellHostClients(only ...string) {
 		if len(only) == 0 && s.told.last[host] == sum {
 			continue
 		}
-		if s.router.Tell(host, wire.NotifyHostClients.Name, clients) {
+		if s.router.Tell(host, wire.NewMethodName(wire.NotifyHostClients.Name), clients) {
 			s.told.last[host] = sum
 		} else {
 			delete(s.told.last, host)

@@ -14,6 +14,20 @@ export function targetOf(method: Method): "host" | "control" {
   return MethodTarget[method];
 }
 
+// The wire's host/* and hosts/* methods are renamed machine/* and machines/* over three
+// releases (#2653): this tree's documents, and so `Methods`, keep the old names until the
+// last one, but a sender sends the new name. newMethodName is applied once, in Link.call,
+// so every call site still uses the typed (old) name.
+const renamed: readonly (readonly [string, string])[] = [["machine/", "host/"], ["machines/", "hosts/"]];
+
+/** method's new name: a host/* or hosts/* method sent as machine/* or machines/* (#2653). */
+export function newMethodName(method: string): string {
+  for (const [to, from] of renamed) {
+    if (method.startsWith(from)) return to + method.slice(from.length);
+  }
+  return method;
+}
+
 /** The one thing every caller needs: send `method` to `host` (or the control plane). */
 export interface Caller {
   call<M extends Method>(method: M, params: Params<M>, host?: string): Promise<Result<M>>;
