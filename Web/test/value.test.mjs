@@ -31,3 +31,10 @@ test("an issue's line", () => {
   assert.equal(v.rowLine(row), "$10.00 · 1 merged, 1 closed · $3.00 wasted · 1 failed CI round · 1h to merge");
   assert.equal(v.rowLine({ ...row, prsMerged: 0, prsClosed: 0, waste: cost(0), failedChecks: 0, leadTimeSeconds: undefined }), "$10.00 · Not merged yet");
 });
+
+test("a GitHub issue's or milestone's address, as ReportValueWords.url has it; none for another tracker", () => {
+  assert.equal(v.nodeUrl({ kind: "issue", ref: "github:alexec/agents#12" }), "https://github.com/alexec/agents/issues/12");
+  assert.equal(v.nodeUrl({ kind: "milestone", ref: "github:alexec/agents/milestone/15" }), "https://github.com/alexec/agents/milestone/15");
+  assert.equal(v.nodeUrl({ kind: "issue", ref: "linear:ENG-4" }), undefined);
+  assert.equal(v.nodeUrl({ kind: "issue", ref: "github:alexec/agents#x" }), undefined);
+});

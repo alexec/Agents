@@ -59,8 +59,9 @@ export function Lineage({ store, host, session }: { store: Store; host: string; 
               );
               return (
                 <li key={row.node.ref}>
-                  {/* A session goes to its chat. An issue or a PR is not a link: the page reaches only its own origin. */}
-                  {row.session && store.agent(host, row.session) ? <button class="row lineage-row" title="Show this session"
+                  {/* A session goes to its chat; an issue, a PR or a milestone on GitHub opens there. */}
+                  {row.url ? <a class="row lineage-row" href={row.url} target="_blank" rel="noopener noreferrer" title="Open it on GitHub">{inner}</a>
+                    : row.session && store.agent(host, row.session) ? <button class="row lineage-row" title="Show this session"
                     onClick={() => go({ ...route.value, host, session: row.session as UUID })}>{inner}</button>
                     : <div class="row lineage-row">{inner}</div>}
                 </li>

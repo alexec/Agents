@@ -173,7 +173,12 @@ func TestOnlyTheStarterReachesASessionFromAnotherMachine(t *testing.T) {
 	var id wire.UUID
 	json.Unmarshal(c.call(t, 2, "agents/start", map[string]any{"runtimeID": "claude", "cwd": "file://" + dir, "prompt": "Check the Windows bug",
 		"startedFrom": from}), &id)
-	waitFor(t, "its turn to end", func() bool { a := d.Store.Agent(id); return a != nil && a.State == wire.AgentStateFinished })
+	// Ended as hasEnded says, not only saved Finished: end saves the state before its turn
+	// loop lets go, and a status asked between the two has no ending yet (#2973).
+	waitFor(t, "its turn to end", func() bool {
+		a := d.Store.Agent(id)
+		return a != nil && a.State == wire.AgentStateFinished && d.hasEnded(a) != ""
+	})
 
 	// Another agent, or the same id from another machine, is not its starter.
 	for i, who := range []map[string]any{{"machine": "Alex's Mac", "agent": "BBBBBBBB-BBBB-CCCC-DDDD-EEEEEEEEEEEE", "who": "x"},

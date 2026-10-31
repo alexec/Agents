@@ -34,6 +34,8 @@ try {
   await page.waitFor(`document.querySelector(".sub-app-row.on") && document.querySelector(".data-table")`, 20_000);
   await pause(1000);
   check(await page.eval(`document.querySelector(".data-table th[aria-sort]")?.textContent.startsWith("Machine")`), "the table is sorted by Machine");
+  check(await page.eval(`(() => { const w = document.querySelector(".data-table-wrap"); return w.tabIndex === 0 && w.getAttribute("role") === "region" && w.getAttribute("aria-label") === "Machines"; })()`),
+    "the table's sideways scroll takes the keyboard focus, named for the table (#3002)");
   await page.eval(`[...document.querySelectorAll(".data-table th .sort")].find((b) => b.textContent.startsWith("Machine")).click()`);
   await pause(300);
   check(await page.eval(`document.querySelector(".data-table th[aria-sort]")?.getAttribute("aria-sort") === "descending"`), "pressed again, the other way");

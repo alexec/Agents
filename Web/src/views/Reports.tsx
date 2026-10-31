@@ -16,7 +16,7 @@ import { adoption, adoptionLine, barCaption, adoptionNote, budgetWords, dimensio
 import type { OutcomeGroup, OutcomeOrder, ReportDimension, ReportGroup } from "../model/reports";
 import { featureLine, featureUnused, featuresNote, mergeFeatures, noFeatures } from "../model/features";
 import { hostAnswers } from "../model/capabilities";
-import { leadLine, noValue, noValueHere, nodeName, rowLine, unlinkedLine, valueHeadline, valueNote, wasteLine } from "../model/value";
+import { leadLine, noValue, noValueHere, nodeName, nodeUrl, rowLine, unlinkedLine, valueHeadline, valueNote, wasteLine } from "../model/value";
 import type { Section } from "../model/console";
 import { Choice } from "./Choice";
 
@@ -376,12 +376,16 @@ function ValuePane({ store, scope, initial }: { store: Store; scope: ReportScope
     });
   }, [range.value, scope && scopeKey(scope)]);
   const shown = value.value?.range === range.value && sameScope(value.value.scope, asked.scope) ? value.value : null;
-  const row = (r: ReportValueRow) => (
-    <li key={r.node.ref}>
-      <span>{nodeName(r.node)}</span>
-      <span class="quiet small">{rowLine(r)}</span>
-    </li>
-  );
+  // An issue or a milestone on GitHub opens there, as the window's Link does.
+  const row = (r: ReportValueRow) => {
+    const url = nodeUrl(r.node);
+    return (
+      <li key={r.node.ref}>
+        {url ? <a href={url} target="_blank" rel="noopener noreferrer">{nodeName(r.node)}</a> : <span>{nodeName(r.node)}</span>}
+        <span class="quiet small">{rowLine(r)}</span>
+      </li>
+    );
+  };
   const lead = shown && leadLine(shown);
   const unlinked = shown && unlinkedLine(shown);
   return (
