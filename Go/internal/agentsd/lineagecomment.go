@@ -180,6 +180,12 @@ func (d *Daemon) flushPRComments() {
 	d.commentDirty = map[string]bool{}
 	d.commentMu.Unlock()
 	sort.Slice(jobs, func(i, j int) bool { return jobs[i].ref < jobs[j].ref })
+	// The links once for every PR, not once each: a merge storm dirties many (#2976).
+	if len(jobs) > 0 {
+		d.workMu.Lock()
+		d.refreshCostLinksLocked()
+		d.workMu.Unlock()
+	}
 
 	now := nowFunc()
 	for _, j := range jobs {
@@ -233,10 +239,9 @@ func (d *Daemon) saveComments() {
 }
 
 // prCostBody is the comment on pr: its own total and the issues it fixes, and the refs it
-// added up.
+// added up. The caller refreshes the ledger's links first.
 func (d *Daemon) prCostBody(pr wire.LineageNode, mode wire.PRCostComment) (string, []string) {
 	d.workMu.Lock()
-	d.refreshCostLinksLocked()
 	f := d.costLedgerLocked()
 	c := f.Nodes[costKey(pr)]
 	total, failed := blankLineageCost(), int64(0)
