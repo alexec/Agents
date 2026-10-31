@@ -13,6 +13,16 @@ export function Banner({ session }: { session: Session }) {
       </div>
     );
   }
+  // The address itself refused the connection (suspended, over a plan's limit, 1003
+  // CL-002, #2235): its own words, not "can't reach".
+  if (state.kind === "down" && state.refusalLine) {
+    return (
+      <div class="banner" role="status">
+        <span>⚠︎ <strong>{state.refusalLine}</strong></span>
+        <button onClick={() => session.link.retryNow()}>Try Now</button>
+      </div>
+    );
+  }
   return (
     <div class="banner" role="status">
       <span>⚠︎ <strong>Can't reach the control plane</strong> at {location.host}. Trying again.</span>

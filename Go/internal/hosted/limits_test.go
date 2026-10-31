@@ -189,8 +189,9 @@ func TestConnectionsHoldToThePlan(t *testing.T) {
 	res := connect()
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(res.Body)
-	if res.StatusCode != http.StatusTooManyRequests || !strings.Contains(buf.String(), "Your Free plan allows 2 connections at once. Close one") {
-		t.Fatal(res.StatusCode, buf.String())
+	if res.StatusCode != http.StatusTooManyRequests || res.Header.Get("Agents-Refusal") != "limit" ||
+		!strings.Contains(buf.String(), "Your Free plan allows 2 connections at once. Close one") {
+		t.Fatal(res.StatusCode, res.Header.Get("Agents-Refusal"), buf.String())
 	}
 	// The account page shows the plan and its use.
 	if _, page := b.get("https://" + domain + "/account"); !strings.Contains(page, "Free Plan") || !strings.Contains(page, "0 of 2") {

@@ -46,6 +46,10 @@ public enum PairingAttempt {
         switch error {
         case _ where unanswered:
             return "The control plane didn’t answer. Check it’s running and \(device) can reach it, then try again."
+        case let refusal as ControlRefusal:
+            // The address itself refused (suspended, over a plan's limit, #2235): its own
+            // words, not "couldn't reach it".
+            return refusal.line
         case let error as JSONRPCError:
             // The control plane's own words: it wrote them for a person.
             return error.message

@@ -255,6 +255,7 @@ func (s *Service) serve(w http.ResponseWriter, r *http.Request, c *copyRunning) 
 		s.mu.Lock()
 		if c.sockets >= p.Connections {
 			s.mu.Unlock()
+			w.Header().Set("Agents-Refusal", "limit")
 			plain(w, http.StatusTooManyRequests, c.limits.refuse(p, "connections", plural(p.Connections, "connection", "connections")+" at once", "Close one").Error()+"\n")
 			return
 		}

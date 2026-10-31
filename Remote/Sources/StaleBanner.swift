@@ -64,6 +64,7 @@ struct StaleBanner: View {
     }
 
     private var staleLine: String {
+        if let refusal = model.controlPlaneRefusalLine { return refusal }
         guard let last = model.lastHeard else { return "Not connected to your Mac yet" }
         return "Last heard from your Mac \(last)"
     }

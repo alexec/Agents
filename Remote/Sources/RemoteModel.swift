@@ -1910,6 +1910,11 @@ final class RemoteModel {
         return lastHeardFrom.formatted(.relative(presentation: .named))
     }
 
+    /// The control plane's address itself refused the connection (suspended, over a
+    /// plan's limit, #2235): its words, shown in the stale banner in place of "last
+    /// heard from your Mac".
+    private(set) var controlPlaneRefusalLine: String?
+
     // MARK: Staying in touch
 
     /// Keep trying until the Mac answers.
@@ -1992,6 +1997,7 @@ final class RemoteModel {
             isConnected = true
             lastHeardFrom = Date()
             problem = nil
+            controlPlaneRefusalLine = nil
             listen()
             // Each call here with a deadline: this runs inside the reconnect loop, and a
             // reply lost to a Mac restarting left the loop, and so the app, waiting for
@@ -2015,6 +2021,12 @@ final class RemoteModel {
             let reason = ControlPlaneLink.refused.take()
             // Suspended by the organisation (#1002): only that, with the pairing kept.
             signIn.refused(reason)
+            // The address itself refused (suspended, over a plan's limit, #2235): its
+            // words replace the stale banner's, and trying again soon is pointless.
+            if let line = ControlPlaneLink.hostedRefusal.take() {
+                controlPlaneRefusalLine = line
+                backoff.holdOff()
+            }
             if let reason, refusals.forgets(after: reason) {
                 note("link: forgotten by the control plane (\(reason))")
                 // Forgotten from a window, or unknown for minutes on end: this device asks
