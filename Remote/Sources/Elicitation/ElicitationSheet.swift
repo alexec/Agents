@@ -30,14 +30,14 @@ struct ElicitationSheet: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if request.secret == nil {
-                    Text(request.title)
+                    MarkdownText(markdown: request.title)
                         .appText(.reading).fontWeight(.semibold)
                         .fixedSize(horizontal: false, vertical: true)
                     // The question itself often lives here rather than in the schema: a
                     // one-question form arrives with an untitled field and the whole
                     // question in `message`.
                     if let message = request.message, message != request.title {
-                        Text(message)
+                        MarkdownText(markdown: message)
                             .appText(.reading)
                             .fixedSize(horizontal: false, vertical: true)
                     }

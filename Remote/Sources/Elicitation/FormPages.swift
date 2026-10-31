@@ -144,7 +144,7 @@ struct FormPages: View {
     private func asked(_ property: ElicitationSchema.Property) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 4) {
-                Text(property.title ?? property.name)
+                MarkdownText(markdown: property.title ?? property.name)
                     .appText(.reading).fontWeight(.medium)
                 if property.isRequired {
                     Text("needed").appText(.fine).foregroundStyle(.tertiary)

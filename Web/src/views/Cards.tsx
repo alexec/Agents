@@ -448,8 +448,8 @@ function ElicitationCard({ request, asker, hold, answer, active }: {
   return (
     <section ref={card} class={cardClass(hold)} aria-label="Question">
       {asker && <p class="quiet small asker">{asker}</p>}
-      {!request.secret && <p class="strong">{title}</p>}
-      {!request.secret && request.message && request.message !== title && <p>{request.message}</p>}
+      {!request.secret && <div class="strong"><Markdown text={title} /></div>}
+      {!request.secret && request.message && request.message !== title && <Markdown text={request.message} />}
       {body}
       <AnsweredNote answered={hold.answered} />
     </section>
@@ -505,7 +505,7 @@ function Field({ property, value, inert, set, chose }: {
 }) {
   const label = property.title ?? property.name;
   const asked = (
-    <p class="asked"><span class="strong">{label}</span>{property.isRequired && <span class="small faint"> needed</span>}</p>
+    <div class="asked"><div class="strong"><Markdown text={label} /></div>{property.isRequired && <span class="small faint"> needed</span>}</div>
   );
   const choices = choicesOf(property);
   const kind = property.kind;

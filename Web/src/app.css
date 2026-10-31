@@ -707,7 +707,7 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
   background: var(--paper-ground);
   color: inherit;
 }
-.card .asked { margin: 0; }
+.card .asked { margin: 0; display: flex; align-items: baseline; gap: 4px; }
 /* An agent's ask_secret (#2885): the name, why and where, close together as on the window. */
 .card .secret { margin: 0; }
 
