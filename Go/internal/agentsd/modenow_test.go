@@ -50,4 +50,16 @@ func TestTheModeChecksReadTheModeAnAgentIsInNow(t *testing.T) {
 	if m := inheritedMode(d.Store.Agent(helper.ID), ""); m == nil || *m != "plan" {
 		t.Fatal(m)
 	}
+	// The runtime moved itself, not the window: said in the transcript the same way
+	// CurrentModeUpdate is, not silently (#3082).
+	entries, _, _ := d.Store.Transcript(helper.ID, 0)
+	var changed *wire.TranscriptEntryKindOptionChanged
+	for _, e := range entries {
+		if e.Kind.OptionChanged != nil {
+			changed = e.Kind.OptionChanged
+		}
+	}
+	if changed == nil || changed.ID != "mode" || string(changed.Value) != `"plan"` {
+		t.Fatalf("option changed record: %+v", changed)
+	}
 }

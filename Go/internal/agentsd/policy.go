@@ -1153,7 +1153,7 @@ func (d *Daemon) capAgentMode(l *live, a *wire.Agent, p *wire.OrgPolicy) {
 	l.mu.Unlock()
 	if s != nil {
 		ctx, cancel := context.WithTimeout(d.ctx, 30*time.Second)
-		err := s.SetConfig(ctx, optionID, lower)
+		_, err := s.SetConfig(ctx, optionID, lower)
 		cancel()
 		if err != nil {
 			log.Printf("agent %s: policy: set %s=%s: %v", a.ID, optionID, lower, err)
@@ -1186,7 +1186,7 @@ func (d *Daemon) capApproveAll(l *live, a *wire.Agent, p *wire.OrgPolicy) {
 	l.mu.Unlock()
 	if s != nil {
 		ctx, cancel := context.WithTimeout(d.ctx, 30*time.Second)
-		err := s.SetConfig(ctx, id, off)
+		_, err := s.SetConfig(ctx, id, off)
 		cancel()
 		if err != nil {
 			log.Printf("agent %s: policy: set %s=%s: %v", a.ID, id, off, err)

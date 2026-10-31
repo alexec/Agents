@@ -56,6 +56,9 @@ type fakeRuntime struct {
 	rateLimited bool
 	// systemPrompt is the runtime's system-prompt field from session/new or resume.
 	systemPrompt string
+	// failSetConfig is whether session/set_config_option always refuses, for a cwd called
+	// modepushfails (#3082).
+	failSetConfig bool
 }
 
 // systemPromptOf is the brief a runtime was given in _meta, as Claude or Grok take it.
@@ -129,7 +132,9 @@ func (f *fakeRuntime) UnstableForkSession(_ context.Context, r sdk.UnstableForkS
 	return sdk.UnstableForkSessionResponse{SessionId: "forked-" + r.SessionId}, nil
 }
 
-// ResumeSession has its own conversation, and no other.
+// ResumeSession has its own conversation, and no other. A cwd called modepush or
+// modepushfails answers at its own default mode, "default", as a fresh process would,
+// not the person's saved choice (#3082).
 func (f *fakeRuntime) ResumeSession(_ context.Context, r sdk.ResumeSessionRequest) (sdk.ResumeSessionResponse, error) {
 	if r.SessionId != "fake-session" {
 		return sdk.ResumeSessionResponse{}, fmt.Errorf("no session %s", r.SessionId)
@@ -137,7 +142,14 @@ func (f *fakeRuntime) ResumeSession(_ context.Context, r sdk.ResumeSessionReques
 	b, _ := json.Marshal(r.Meta)
 	f.sandboxOff = strings.Contains(string(b), `"sandbox":{"enabled":false}`)
 	f.systemPrompt = systemPromptOf(r.Meta)
-	return sdk.ResumeSessionResponse{}, nil
+	var out sdk.ResumeSessionResponse
+	switch filepath.Base(r.Cwd) {
+	case "modepush", "modepushfails":
+		f.failSetConfig = filepath.Base(r.Cwd) == "modepushfails"
+		json.Unmarshal([]byte(`{"configOptions":[{"type":"select","id":"mode","name":"Mode","category":"mode",
+			"currentValue":"default","options":[{"value":"default","name":"Approve"},{"value":"ask","name":"Ask"}]}]}`), &out)
+	}
+	return out, nil
 }
 
 // NewSession in a folder called offers offers a model, and a command a moment after; in
@@ -165,8 +177,16 @@ func (f *fakeRuntime) NewSession(_ context.Context, r sdk.NewSessionRequest) (sd
 	return out, nil
 }
 func (f *fakeRuntime) Cancel(context.Context, sdk.CancelNotification) error { return nil }
-func (f *fakeRuntime) SetSessionConfigOption(context.Context, sdk.SetSessionConfigOptionRequest) (sdk.SetSessionConfigOptionResponse, error) {
-	return sdk.SetSessionConfigOptionResponse{}, nil
+func (f *fakeRuntime) SetSessionConfigOption(_ context.Context, r sdk.SetSessionConfigOptionRequest) (sdk.SetSessionConfigOptionResponse, error) {
+	if f.failSetConfig {
+		return sdk.SetSessionConfigOptionResponse{}, fmt.Errorf("fake runtime refused")
+	}
+	var out sdk.SetSessionConfigOptionResponse
+	if r.ValueId != nil && string(r.ValueId.ConfigId) == "mode" {
+		json.Unmarshal([]byte(`{"configOptions":[{"type":"select","id":"mode","name":"Mode","category":"mode",
+			"currentValue":"`+string(r.ValueId.Value)+`","options":[{"value":"default","name":"Approve"},{"value":"ask","name":"Ask"}]}]}`), &out)
+	}
+	return out, nil
 }
 
 func (f *fakeRuntime) Prompt(ctx context.Context, p sdk.PromptRequest) (sdk.PromptResponse, error) {

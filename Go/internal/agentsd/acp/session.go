@@ -302,11 +302,13 @@ func (s *Session) Steer(ctx context.Context, blocks []sdk.ContentBlock) (string,
 	return "failed", nil
 }
 
-func (s *Session) SetConfig(ctx context.Context, id, value string) error {
-	_, err := s.conn.SetSessionConfigOption(ctx, sdk.SetSessionConfigOptionRequest{
+// SetConfig also returns the runtime's reply: the full option set as it stands after the
+// change, so a caller can show what actually took rather than what it asked for (#3082).
+func (s *Session) SetConfig(ctx context.Context, id, value string) ([]sdk.SessionConfigOption, error) {
+	resp, err := s.conn.SetSessionConfigOption(ctx, sdk.SetSessionConfigOptionRequest{
 		ValueId: &sdk.SetSessionConfigOptionValueId{SessionId: s.ID, ConfigId: sdk.SessionConfigId(id), Value: sdk.SessionConfigValueId(value)},
 	})
-	return err
+	return resp.ConfigOptions, err
 }
 
 // Stop ends the process group: TERM, then KILL.

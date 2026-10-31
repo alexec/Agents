@@ -128,6 +128,16 @@ func modeOption(options []wire.ConfigOption) *wire.ConfigOption {
 	return nil
 }
 
+// optionNamed is the option by its ID, for a message naming it by what it is called.
+func optionNamed(options []wire.ConfigOption, id string) *wire.ConfigOption {
+	for _, o := range options {
+		if o.ID == id {
+			return &o
+		}
+	}
+	return nil
+}
+
 // rememberMode keeps the runtime's mode when the option set is its mode, and says
 // modes/changed (DaemonCore.rememberMode).
 func (d *Daemon) rememberMode(runtimeID, optionID string, v wire.JSONValue, options []wire.ConfigOption) {

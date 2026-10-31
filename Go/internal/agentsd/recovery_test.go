@@ -3,6 +3,8 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -86,6 +88,60 @@ func TestAConversationTheRuntimeLostGoesOnInANewOne(t *testing.T) {
 	}
 	if a := d.Store.Agent(id); *a.RuntimeSessionID != "fake-session" {
 		t.Fatal(*a.RuntimeSessionID)
+	}
+}
+
+// modeCwd is a folder named for the fake runtime's NewSession to pick its behaviour by
+// (#3082): it must exist, since the daemon launches the runtime in it.
+func modeCwd(t *testing.T, name string) string {
+	t.Helper()
+	dir := filepath.Join(t.TempDir(), name)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+// A reconnect (here, a daemon restart) relaunches the runtime, whose fresh process starts
+// at its own default mode, "default": the person's saved choice, "ask", must still be what
+// shows once the daemon has pushed it back, not the runtime's default (#3082).
+func TestASavedModeIsKeptNotTheFreshProcessDefault(t *testing.T) {
+	fakeRuntimes(t)
+	root := t.TempDir()
+	category := "mode"
+	id := leftWorking(t, root, wire.AgentStateRunning, "fake-session", func(a *wire.Agent) {
+		a.Cwd = store.FolderURL(modeCwd(t, "modepush"))
+		a.StartOptions.Values = map[string]wire.JSONValue{"mode": wire.JSONValue(`"ask"`)}
+		a.AdvertisedOptions = []wire.ConfigOption{{ID: "mode", Name: "Mode", Type: "select", Category: &category, CurrentValue: wire.JSONValue(`"ask"`)}}
+	})
+	d, _ := start(t, root)
+	defer d.Shutdown()
+	d.PickUpAfterRestart()
+	waitFor(t, "finished", func() bool { return d.Store.Agent(id).State == wire.AgentStateFinished })
+	a := d.Store.Agent(id)
+	if o := modeOption(a.AdvertisedOptions); o == nil || string(o.CurrentValue) != `"ask"` {
+		t.Fatalf("advertised mode after reconnect: %+v", a.AdvertisedOptions)
+	}
+}
+
+// When the runtime refuses the re-push, that must say so in the transcript, not just the
+// daemon log: a push failure used to leave the wrong mode showing with nothing to explain
+// it (#3082).
+func TestAFailedModePushIsNotedNotSilent(t *testing.T) {
+	fakeRuntimes(t)
+	root := t.TempDir()
+	category := "mode"
+	id := leftWorking(t, root, wire.AgentStateRunning, "fake-session", func(a *wire.Agent) {
+		a.Cwd = store.FolderURL(modeCwd(t, "modepushfails"))
+		a.StartOptions.Values = map[string]wire.JSONValue{"mode": wire.JSONValue(`"ask"`)}
+		a.AdvertisedOptions = []wire.ConfigOption{{ID: "mode", Name: "Mode", Type: "select", Category: &category, CurrentValue: wire.JSONValue(`"ask"`)}}
+	})
+	d, _ := start(t, root)
+	defer d.Shutdown()
+	d.PickUpAfterRestart()
+	waitFor(t, "finished", func() bool { return d.Store.Agent(id).State == wire.AgentStateFinished })
+	if n := notices(d, id); len(n) == 0 || n[0] != "Did not keep the saved Mode." {
+		t.Fatalf("%q", n)
 	}
 }
 

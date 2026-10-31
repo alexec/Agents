@@ -637,14 +637,31 @@ func (l *live) turn() bool {
 				d.dropAppTokens(l.id)
 			}
 		})
-		// The start options the window chose (model, mode) go first.
+		// The start options the window chose (model, mode) go first. The runtime's reply
+		// is the full set as it stands after the change, so the display is set from what
+		// took, not left on the fresh process's own defaults (#3082).
+		var pushed []sdk.SessionConfigOption
 		for k, v := range a.StartOptions.Values {
 			var sv string
 			if json.Unmarshal(v, &sv) == nil && sv != "" {
-				if err := s.SetConfig(ctx, k, sv); err != nil {
+				opts, err := s.SetConfig(ctx, k, sv)
+				if err != nil {
+					name := k
+					if o := optionNamed(a.AdvertisedOptions, k); o != nil {
+						name = o.Name
+					}
 					log.Printf("agent %s: set %s=%s: %v", l.id, k, sv, err)
+					d.record(l.id, notice("warning", "Did not keep the saved "+name+".", err.Error()))
+					continue
 				}
+				pushed = opts
 			}
+		}
+		if opts := configOptions(pushed); opts != nil {
+			d.change(l.id, func(a *wire.Agent) {
+				a.AdvertisedOptions = d.markOptions(a.RuntimeID, withAppOptions(a.RuntimeID, a.StartOptions.Values, opts))
+				a.Levels = d.matchLevels(a)
+			})
 		}
 		// The policy again, now the runtime has said its options: an agent with no model
 		// or mode chosen runs on the runtime's own, which the check before it started
@@ -1214,14 +1231,22 @@ func (l *live) Update(n sdk.SessionNotification) {
 		d.record(l.id, wire.TranscriptEntryKind{OptionChanged: &wire.TranscriptEntryKindOptionChanged{ID: "mode", Value: v}})
 	case u.ConfigOptionUpdate != nil:
 		if opts := configOptions(u.ConfigOptionUpdate.ConfigOptions); opts != nil {
+			var changedID string
+			var changedValue wire.JSONValue
 			d.change(l.id, func(a *wire.Agent) {
 				was, now := modeOption(a.AdvertisedOptions), modeOption(opts)
 				if was != nil && now != nil && was.ID == now.ID && len(now.CurrentValue) > 0 && !bytes.Equal(was.CurrentValue, now.CurrentValue) {
 					keepMode(a, now.ID, now.CurrentValue)
+					changedID, changedValue = now.ID, now.CurrentValue
 				}
 				a.AdvertisedOptions = d.markOptions(a.RuntimeID, withAppOptions(a.RuntimeID, a.StartOptions.Values, opts))
 				a.Levels = d.matchLevels(a)
 			})
+			// Not the window's own choice (CurrentModeUpdate, just above): the runtime
+			// moved itself, so it goes in the transcript the same way, not silently (#3082).
+			if changedID != "" {
+				d.record(l.id, wire.TranscriptEntryKind{OptionChanged: &wire.TranscriptEntryKindOptionChanged{ID: changedID, Value: changedValue}})
+			}
 		}
 	case u.AvailableCommandsUpdate != nil:
 		b, _ := json.Marshal(u.AvailableCommandsUpdate.AvailableCommands)
