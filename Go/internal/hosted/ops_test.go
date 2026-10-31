@@ -84,7 +84,7 @@ func TestMetricsCountLimits(t *testing.T) {
 	l := limited(plans[PlanFree])
 	l.onRefuse = s.metrics.refused
 	ctx := context.Background()
-	for _, key := range []string{"v1/hosts/a.json", "v1/hosts/b.json", "v1/hosts/c.json"} {
+	for _, key := range []string{"v1/machines/a.json", "v1/machines/b.json", "v1/machines/c.json"} {
 		_, _ = l.Put(ctx, key, []byte(`{}`), store.Absent)
 	}
 	if s.metrics.refusals["machines"] != 1 {
