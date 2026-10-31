@@ -1221,24 +1221,6 @@ export interface CapReached {
   until: WireDate;
 }
 
-export interface CarriedSetting {
-  optionID: string;
-  name: string;
-  from?: JSONValue;
-  to?: JSONValue;
-  source: CarriedSettingSource;
-}
-
-export type CarriedSettingSource =
-  | { level: { _0: string } }
-  | { sameValue: Record<string, never> }
-  | { poolEntry: Record<string, never> }
-  | { remembered: Record<string, never> }
-  | { runtimeDefault: Record<string, never> }
-  | { strictestMode: Record<string, never> }
-  | { closestNoLooser: Record<string, never> }
-  | { person: Record<string, never> };
-
 /** An approval of an MCP server or skill (#2019, M5): for a group, or for one person. */
 export interface CatalogApproval {
   kind: CatalogKind;
@@ -2681,11 +2663,6 @@ export interface DropboxPutResponse {
   path: string;
 }
 
-export type Dropped =
-  | { extraArguments: { _0: string[] } }
-  | { alwaysAllow: { count: number } }
-  | { queuedSlashCommand: { _0: string } };
-
 export interface EarnedMilestone {
   id: string;
   at: WireDate;
@@ -3133,8 +3110,6 @@ export interface Folder {
   folder: URLString;
   archivedAt?: WireDate;
   addedAt: WireDate;
-  laidOutAt?: WireDate;
-  layoutVersion?: number;
   helperLimits?: HelperLimits;
   diskSpace?: DiskThresholds;
   pinned?: boolean;
@@ -7851,36 +7826,6 @@ export interface SurfaceIdentification {
   kind: DeviceKind;
 }
 
-export interface SwitchRecord {
-  id: UUID;
-  at: WireDate;
-  agentID: UUID;
-  from: SwitchRecordSide;
-  to: SwitchRecordSide;
-  reason: SwitchRecordReason;
-  carried: CarriedSetting[];
-  dropped: Dropped[];
-  shortened?: number;
-  billing: Payment;
-  fromReturnsAt?: WireDate;
-}
-
-export type SwitchRecordReason =
-  | "allowanceSpent"
-  | "overage"
-  | "creditUsedUp"
-  | "rateLimitPersisted"
-  | "runtimeFailed"
-  | "everyoneOutResumed"
-  | "byHand";
-
-export interface SwitchRecordSide {
-  entryID?: UUID;
-  runtimeID: string;
-  model?: JSONValue;
-  mode?: JSONValue;
-}
-
 /**
  * A bot on Console ▸ Team Workflows (#1804, M6): its group, caps and spend today, its machines, the
  * workflows it ran and what runs now.
@@ -8049,10 +7994,7 @@ export type TranscriptEntryKind =
   | { background: { _0: BackgroundItem } }
   | { workReported: { _0: WorkReport } }
   | { runtimeNote: { _0: string } }
-  | { poolSwitch: { _0: SwitchRecord } }
   | { sandboxFailure: { _0: SandboxFailureRecord } }
-  | { handoff: { markdown: string; characters: number } }
-  | { settingsChanged: { _0: SwitchRecord } }
   | { appView: { _0: AppViewCall } }
   | { fileShown: { _0: ShownFile } }
   | { notified: { _0: SentNotice } }
@@ -8098,8 +8040,6 @@ export interface TurnSummary {
   start: number;
   end: number;
   ask?: TranscriptEntry;
-  last?: TranscriptEntry;
-  concise?: TranscriptEntry[];
   outcome?: TranscriptEntry[];
   steps?: number;
   usage?: TurnUsage;
@@ -9639,7 +9579,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BuildOutputRemoved: { required: ["removed", "freed"], optional: [] },
   CancelWaitRequest: { required: ["agentID"], optional: [] },
   CapReached: { required: ["user", "name", "spentUSD", "capUSD", "until"], optional: ["group"] },
-  CarriedSetting: { required: ["optionID", "name", "source"], optional: ["from", "to"] },
   CatalogApproval: { required: ["kind", "name", "by", "at"], optional: ["source", "group", "groupName", "user", "userName"] },
   CatalogApprovalList: { required: ["approvals"], optional: [] },
   CatalogAsk: { required: ["kind", "name"], optional: ["source", "why"] },
@@ -9812,7 +9751,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FindResult: { required: ["matches", "more"], optional: [] },
   FleetBoard: { required: ["machines"], optional: [] },
   FleetMachine: { required: ["host", "ownerName", "bot"], optional: ["running", "heardAt"] },
-  Folder: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits", "diskSpace", "pinned", "prCostComment"] },
+  Folder: { required: ["folder", "addedAt"], optional: ["archivedAt", "helperLimits", "diskSpace", "pinned", "prCostComment"] },
   FolderDetection: { required: ["enabled", "paths"], optional: [] },
   FolderHunk: { required: ["oldStart", "newStart", "noNewlineAtEnd", "lines"], optional: [] },
   FolderMCPServer: { required: ["name", "summary", "approval", "missingSecrets", "secretNames", "entryDigest"], optional: ["managed", "signIn", "views"] },
@@ -10293,8 +10232,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   StoreNotes: { required: ["notes"], optional: [] },
   SuggestedPrompt: { required: ["id", "label", "prompt"], optional: [] },
   SurfaceIdentification: { required: ["id", "name", "kind"], optional: [] },
-  SwitchRecord: { required: ["id", "at", "agentID", "from", "to", "reason", "carried", "dropped", "billing"], optional: ["shortened", "fromReturnsAt"] },
-  SwitchRecordSide: { required: ["runtimeID"], optional: ["entryID", "model", "mode"] },
   TeamBot: { required: ["user", "name", "spentTodayUSD", "capped", "machines", "online", "workflows", "live"], optional: ["group", "groupName", "caps"] },
   TeamBotRun: { required: ["host", "hostName", "agent"], optional: ["workflow", "since"] },
   TeamTrigger: { required: ["workflow", "trigger", "runsOn"], optional: ["event", "dueAt"] },
@@ -10312,7 +10249,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   TranscriptPage: { required: ["firstIndex", "total", "entries"], optional: [] },
   TranscriptRequest: { required: ["agentID", "limit"], optional: ["before", "from"] },
   TunnelOpen: { required: ["runtime", "ref"], optional: [] },
-  TurnSummary: { required: ["id", "start", "end"], optional: ["ask", "last", "concise", "outcome", "steps", "usage"] },
+  TurnSummary: { required: ["id", "start", "end"], optional: ["ask", "outcome", "steps", "usage"] },
   TurnUsage: { required: ["totalTokens", "inputTokens", "outputTokens"], optional: ["thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "cost", "route", "relayTokens"] },
   TurnsPage: { required: ["turns", "firstTurn", "openStart"], optional: ["firstPrompt"] },
   TurnsRequest: { required: ["agentID", "limit"], optional: ["before"] },

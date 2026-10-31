@@ -2921,162 +2921,6 @@
       ],
       "additionalProperties": false
     },
-    "CarriedSetting": {
-      "type": "object",
-      "properties": {
-        "optionID": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "from": {
-          "$ref": "#/definitions/JSONValue"
-        },
-        "to": {
-          "$ref": "#/definitions/JSONValue"
-        },
-        "source": {
-          "$ref": "#/definitions/CarriedSettingSource"
-        }
-      },
-      "required": [
-        "optionID",
-        "name",
-        "source"
-      ],
-      "additionalProperties": false
-    },
-    "CarriedSettingSource": {
-      "anyOf": [
-        {
-          "type": "object",
-          "properties": {
-            "level": {
-              "type": "object",
-              "properties": {
-                "_0": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "_0"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "level"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "sameValue": {
-              "type": "object",
-              "additionalProperties": {
-                "not": {}
-              }
-            }
-          },
-          "required": [
-            "sameValue"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "poolEntry": {
-              "type": "object",
-              "additionalProperties": {
-                "not": {}
-              }
-            }
-          },
-          "required": [
-            "poolEntry"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "remembered": {
-              "type": "object",
-              "additionalProperties": {
-                "not": {}
-              }
-            }
-          },
-          "required": [
-            "remembered"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "runtimeDefault": {
-              "type": "object",
-              "additionalProperties": {
-                "not": {}
-              }
-            }
-          },
-          "required": [
-            "runtimeDefault"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "strictestMode": {
-              "type": "object",
-              "additionalProperties": {
-                "not": {}
-              }
-            }
-          },
-          "required": [
-            "strictestMode"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "closestNoLooser": {
-              "type": "object",
-              "additionalProperties": {
-                "not": {}
-              }
-            }
-          },
-          "required": [
-            "closestNoLooser"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "person": {
-              "type": "object",
-              "additionalProperties": {
-                "not": {}
-              }
-            }
-          },
-          "required": [
-            "person"
-          ],
-          "additionalProperties": false
-        }
-      ]
-    },
     "CatalogApproval": {
       "type": "object",
       "description": "An approval of an MCP server or skill (#2019, M5): for a group, or for one person.",
@@ -7072,76 +6916,6 @@
       ],
       "additionalProperties": false
     },
-    "Dropped": {
-      "anyOf": [
-        {
-          "type": "object",
-          "properties": {
-            "extraArguments": {
-              "type": "object",
-              "properties": {
-                "_0": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                }
-              },
-              "required": [
-                "_0"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "extraArguments"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "alwaysAllow": {
-              "type": "object",
-              "properties": {
-                "count": {
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "count"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "alwaysAllow"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "queuedSlashCommand": {
-              "type": "object",
-              "properties": {
-                "_0": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "_0"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "queuedSlashCommand"
-          ],
-          "additionalProperties": false
-        }
-      ]
-    },
     "EarnedMilestone": {
       "type": "object",
       "properties": {
@@ -8642,12 +8416,6 @@
         },
         "addedAt": {
           "$ref": "#/definitions/WireDate"
-        },
-        "laidOutAt": {
-          "$ref": "#/definitions/WireDate"
-        },
-        "layoutVersion": {
-          "type": "integer"
         },
         "helperLimits": {
           "$ref": "#/definitions/HelperLimits"
@@ -22301,95 +22069,6 @@
       ],
       "additionalProperties": false
     },
-    "SwitchRecord": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "$ref": "#/definitions/UUID"
-        },
-        "at": {
-          "$ref": "#/definitions/WireDate"
-        },
-        "agentID": {
-          "$ref": "#/definitions/UUID"
-        },
-        "from": {
-          "$ref": "#/definitions/SwitchRecordSide"
-        },
-        "to": {
-          "$ref": "#/definitions/SwitchRecordSide"
-        },
-        "reason": {
-          "$ref": "#/definitions/SwitchRecordReason"
-        },
-        "carried": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/CarriedSetting"
-          }
-        },
-        "dropped": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/Dropped"
-          }
-        },
-        "shortened": {
-          "type": "integer"
-        },
-        "billing": {
-          "$ref": "#/definitions/Payment"
-        },
-        "fromReturnsAt": {
-          "$ref": "#/definitions/WireDate"
-        }
-      },
-      "required": [
-        "id",
-        "at",
-        "agentID",
-        "from",
-        "to",
-        "reason",
-        "carried",
-        "dropped",
-        "billing"
-      ],
-      "additionalProperties": false
-    },
-    "SwitchRecordReason": {
-      "type": "string",
-      "enum": [
-        "allowanceSpent",
-        "overage",
-        "creditUsedUp",
-        "rateLimitPersisted",
-        "runtimeFailed",
-        "everyoneOutResumed",
-        "byHand"
-      ]
-    },
-    "SwitchRecordSide": {
-      "type": "object",
-      "properties": {
-        "entryID": {
-          "$ref": "#/definitions/UUID"
-        },
-        "runtimeID": {
-          "type": "string"
-        },
-        "model": {
-          "$ref": "#/definitions/JSONValue"
-        },
-        "mode": {
-          "$ref": "#/definitions/JSONValue"
-        }
-      },
-      "required": [
-        "runtimeID"
-      ],
-      "additionalProperties": false
-    },
     "TeamBot": {
       "type": "object",
       "description": "A bot on Console ▸ Team Workflows (#1804, M6): its group, caps and spend today, its machines, the workflows it ran and what runs now.",
@@ -23282,27 +22961,6 @@
         {
           "type": "object",
           "properties": {
-            "poolSwitch": {
-              "type": "object",
-              "properties": {
-                "_0": {
-                  "$ref": "#/definitions/SwitchRecord"
-                }
-              },
-              "required": [
-                "_0"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "poolSwitch"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
             "sandboxFailure": {
               "type": "object",
               "properties": {
@@ -23318,52 +22976,6 @@
           },
           "required": [
             "sandboxFailure"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "handoff": {
-              "type": "object",
-              "properties": {
-                "markdown": {
-                  "type": "string"
-                },
-                "characters": {
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "markdown",
-                "characters"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "handoff"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "settingsChanged": {
-              "type": "object",
-              "properties": {
-                "_0": {
-                  "$ref": "#/definitions/SwitchRecord"
-                }
-              },
-              "required": [
-                "_0"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "settingsChanged"
           ],
           "additionalProperties": false
         },
@@ -23545,15 +23157,6 @@
         },
         "ask": {
           "$ref": "#/definitions/TranscriptEntry"
-        },
-        "last": {
-          "$ref": "#/definitions/TranscriptEntry"
-        },
-        "concise": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/TranscriptEntry"
-          }
         },
         "outcome": {
           "type": "array",

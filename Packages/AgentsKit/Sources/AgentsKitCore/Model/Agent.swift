@@ -129,18 +129,6 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// moved on by the person, is not what the ask was about.
     public var afterTurn: AfterTurn?
 
-    /// The pool entry the chat is on now (052): which runtime *and* which way of paying
-    /// for it, since Codex on its plan and Codex on a key are two entries. Nil when it
-    /// started outside the pool.
-    public var poolEntryID: UUID?
-
-    /// The chat's own "carry on when this runs out" is off (052, FR-003). Off is rare, so
-    /// only written when true.
-    public var switchingOff: Bool
-    /// Waiting for an allowance to come back, when every runtime in the pool was out
-    /// (052, US4). Kept on the record, so a restart still resumes it.
-    public var allowanceWait: AllowanceWait?
-
     public var createdAt: Date
     public var lastActivityAt: Date
     /// A finished conversation nobody has looked at since it finished. Set by the
@@ -414,11 +402,6 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         outcomeAsked = try c.decodeIfPresent(Bool.self, forKey: .outcomeAsked) ?? false
         // New with the title on `finish_turn`. An older record's title came from the
         // runtime or the prompt, so a runtime title may still replace it.
-        // 052's, read and never written since 065. Kept: 052 is after the cut-off
-        // (#58: 051), so a record a 052 build wrote must still open.
-        poolEntryID = try c.decodeIfPresent(UUID.self, forKey: .poolEntryID)
-        switchingOff = try c.decodeIfPresent(Bool.self, forKey: .switchingOff) ?? false
-        allowanceWait = try c.decodeIfPresent(AllowanceWait.self, forKey: .allowanceWait)
         // Written only when asked.
         archiveRequest = try c.decodeIfPresent(ArchiveRequest.self, forKey: .archiveRequest)
         // Parked before #584: no longer a place. The session goes back to the group its
@@ -513,9 +496,6 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         if restartPickUps != 0 { try c.encode(restartPickUps, forKey: .restartPickUps) }
         try c.encodeIfPresent(report, forKey: .report)
         if outcomeAsked { try c.encode(outcomeAsked, forKey: .outcomeAsked) }
-        // 052's poolEntryID, switchingOff and allowanceWait are read from an older record
-        // and never written again (065): nothing sets them, and a wait found at launch is
-        // cleared. They go once the #58 cut-off moves past 052.
         try c.encodeIfPresent(archiveRequest, forKey: .archiveRequest)
         try c.encodeIfPresent(afterTurn, forKey: .afterTurn)
         try c.encodeIfPresent(archivedAt, forKey: .archivedAt)
@@ -564,7 +544,6 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         /// Gone: the runtime names the conversation now. Known, so an older record's
         /// key is dropped rather than carried on as an unknown field.
         case titledByAgent
-        case poolEntryID, switchingOff, allowanceWait
         /// Parking, gone since #584. Known, so an older record's key is read once and
         /// dropped rather than carried on as an unknown field.
         case parking
@@ -678,9 +657,6 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.restartPickUps = restartPickUps
         self.report = report
         self.outcomeAsked = outcomeAsked
-        self.poolEntryID = nil
-        self.switchingOff = false
-        self.allowanceWait = nil
         self.archiveRequest = archiveRequest
         self.afterTurn = afterTurn
         self.archivedAt = archivedAt

@@ -110,14 +110,14 @@ func (d *Daemon) turns(r wire.TurnsRequest) (wire.TurnsPage, error) {
 	page.FirstPrompt = new(int64(before))
 	for p := start; p < end; p++ {
 		if p < len(t.known) {
-			// A file the Swift host wrote before 069 kept no outcome: made again for the page.
-			if k := t.known[p]; k.Concise == nil || k.Outcome == nil {
+			// A file written before 069 kept no outcome: made again for the page.
+			if k := t.known[p]; k.Outcome == nil {
 				entries, _, err := d.Store.Entries(r.AgentID, ends, int(k.Start), int(k.End))
 				if err != nil {
 					return wire.TurnsPage{}, err
 				}
 				fresh := turnSummaryOf(entries, k.Start)
-				t.known[p].Concise, t.known[p].Outcome, t.known[p].Steps = fresh.Concise, fresh.Outcome, fresh.Steps
+				t.known[p].Outcome, t.known[p].Steps = fresh.Outcome, fresh.Steps
 			}
 			page.Turns = append(page.Turns, t.known[p])
 		} else if s, ok := t.later[p]; ok {

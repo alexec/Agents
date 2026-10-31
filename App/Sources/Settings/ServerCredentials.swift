@@ -36,9 +36,6 @@ final class ServerCredentials {
         // The container is the window's own folder.
         store = CredentialStore(locations: locations, fileRoot: nil)
         self.checker = checker
-        // A Claude token from before 056 (or 047's OpenAI key) is lent to nothing now.
-        // Kept while 056 is after the #58 cut-off (051).
-        store.forgetKindsNoLongerTaken()
         refresh()
     }
 

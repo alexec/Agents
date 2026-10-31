@@ -993,7 +993,7 @@ function BackgroundRows({ store, host, agent, disabled, steps }: {
 /** When the conversation last did anything: its last entry, or the last stored turn's (AgentsModel.lastEntryAt). */
 function lastEntryAt(entries: readonly TranscriptEntry[], turns: readonly TurnSummary[]): Date | null {
   const turn = turns[turns.length - 1];
-  const at = entries[entries.length - 1]?.at ?? turn?.outcome?.[turn.outcome.length - 1]?.at ?? turn?.last?.at ?? turn?.ask?.at;
+  const at = entries[entries.length - 1]?.at ?? turn?.outcome?.[turn.outcome.length - 1]?.at ?? turn?.ask?.at;
   return at === undefined ? null : fromWireDate(at);
 }
 

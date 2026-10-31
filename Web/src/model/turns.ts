@@ -145,8 +145,8 @@ function entryIsPassing(entry: TranscriptEntry): boolean {
 
 const knownKinds = new Set(["userMessage", "agentMessage", "agentThought", "toolCall", "toolCallUpdate", "planUpdated",
   "usageRecorded", "servedRequest", "elicitationAsked", "elicitationAnswered", "compaction", "notice", "permissionAsked",
-  "permissionAnswered", "optionChanged", "stateChanged", "background", "workReported", "runtimeNote", "poolSwitch",
-  "sandboxFailure", "handoff", "settingsChanged", "fileShown", "notified"]);
+  "permissionAnswered", "optionChanged", "stateChanged", "background", "workReported", "runtimeNote",
+  "sandboxFailure", "fileShown", "notified"]);
 
 function isDrawn(item: Item): boolean {
   return item.kind === "run" || knownKinds.has(kindOf(item.entry));
@@ -609,7 +609,7 @@ function entryItem(entry: TranscriptEntry): Item {
 
 /** ChatTurn(summary): a stored turn, drawn from its outcome until opened. */
 export function storedTurn(summary: TurnSummary): ChatTurn {
-  const outcome = summary.outcome ?? summary.concise ?? (summary.last ? [summary.last] : []);
+  const outcome = summary.outcome ?? [];
   return {
     id: summary.id,
     ...(summary.ask ? { ask: entryItem(summary.ask) } : {}),

@@ -55,11 +55,6 @@ public struct CredentialStore: Sendable {
         }
     }
 
-    /// Kinds an earlier build kept and this one retired (056's Claude token, 047's OpenAI
-    /// key). Only these are forgotten: a kind this build does not know may be a newer
-    /// build's, and swapping builds must not delete it (#205).
-    static let retiredKinds: Set<String> = ["oauthToken", "openAIAPIKey"]
-
     // MARK: Records
 
     private enum Contents {
@@ -105,26 +100,6 @@ public struct CredentialStore: Sendable {
     }
 
     public func record(for runtimeID: String) -> Record? { records()[runtimeID] }
-
-    /// A record of a kind this version no longer takes (056: Claude's token; 047: Codex's
-    /// OpenAI key) is forgotten, and its secret deleted from the Keychain: nothing will lend
-    /// it again, so nothing should keep it. A record this build cannot read for any other
-    /// reason, a newer build's kind among them, is left with its secret (#205), and so is
-    /// every other runtime's. Returns the runtimes forgotten. Kept past the #58 cut-off
-    /// (051) for 056's Claude token.
-    @discardableResult
-    public func forgetKindsNoLongerTaken() -> [String] {
-        guard case .read(var entries) = contents() else { return [] }
-        let dropped = entries.filter { _, entry in
-            guard Self.decode(entry) == nil, let kind = (entry as? [String: Any])?["kind"] as? String else { return false }
-            return Self.retiredKinds.contains(kind)
-        }.keys.sorted()
-        guard !dropped.isEmpty else { return [] }
-        for runtimeID in dropped { entries[runtimeID] = nil }
-        guard (try? write(entries)) != nil else { return [] }
-        for runtimeID in dropped { try? deleteSecret(for: runtimeID) }
-        return dropped
-    }
 
     // MARK: Secrets
 

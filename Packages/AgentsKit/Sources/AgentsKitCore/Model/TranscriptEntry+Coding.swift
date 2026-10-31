@@ -73,15 +73,9 @@ extension TranscriptEntry.Kind {
             return .stateChanged(state, reason: try? payload["reason"]?.decode(EndedReason.self))
         case "runtimeNote":
             return .runtimeNote(payload["_0"]?.stringValue ?? "")
-        case "poolSwitch", "settingsChanged":
-            guard let record = try? payload["_0"]?.decode(SwitchRecord.self) else { return nil }
-            return name == "poolSwitch" ? .poolSwitch(record) : .settingsChanged(record)
         case "sandboxFailure":
             guard let record = try? payload["_0"]?.decode(SandboxFailureRecord.self) else { return nil }
             return .sandboxFailure(record)
-        case "handoff":
-            return .handoff(markdown: payload["markdown"]?.stringValue ?? "",
-                            characters: payload["characters"]?.intValue ?? 0)
         case "background":
             guard let item = try? payload["_0"]?.decode(BackgroundItem.self) else { return nil }
             return .background(item)
@@ -170,14 +164,8 @@ extension TranscriptEntry.Kind {
             return ["background": ["_0": (try? JSONValue.encoding(item)) ?? .null]]
         case .workReported(let report):
             return ["workReported": ["_0": (try? JSONValue.encoding(report)) ?? .null]]
-        case .poolSwitch(let record):
-            return ["poolSwitch": ["_0": (try? JSONValue.encoding(record)) ?? .null]]
-        case .settingsChanged(let record):
-            return ["settingsChanged": ["_0": (try? JSONValue.encoding(record)) ?? .null]]
         case .sandboxFailure(let record):
             return ["sandboxFailure": ["_0": (try? JSONValue.encoding(record)) ?? .null]]
-        case .handoff(let markdown, let characters):
-            return ["handoff": ["markdown": .string(markdown), "characters": .int(characters)]]
         case .appView(let call):
             return ["appView": ["_0": (try? JSONValue.encoding(call)) ?? .null]]
         case .fileShown(let file):

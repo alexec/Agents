@@ -127,7 +127,7 @@ public extension Agent {
     func group() -> AgentGroup {
         AgentGroup(for: state, report: report, outcomeAsked: outcomeAsked,
                    waitingOnEvents: eventWait?.isOpen == true,
-                   endedReason: endedReason, waitingForAllowance: allowanceWait != nil || continueWhenBack != nil)
+                   endedReason: endedReason, waitingForAllowance: continueWhenBack != nil)
     }
 
     /// Whether the agent explicitly asked for an answer.
