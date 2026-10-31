@@ -67,6 +67,10 @@ test("Team Workflows: a bot's machines, spend and runs in words", () => {
   assert.equal(c.spendWords(bot({ capped: true })), "At its cap until midnight UTC");
   assert.equal(c.runsWords(1), "1 run");
   assert.equal(c.runsWords(3), "3 runs");
+  const run = { host: "h", hostName: "Bot Mac", agent: "a" };
+  assert.equal(c.teamStopQuestion(bot(), { ...run, workflow: "review" }),
+    "Stop review-bot's review on Bot Mac? It stops now; the workflow runs again at its next trigger.");
+  assert.match(c.teamStopQuestion(bot(), run), /^Stop review-bot's agent on Bot Mac\? /);
 });
 
 test("Live Now (#2019, M9) says each agent's state and cost, and adds up the board", () => {

@@ -1,13 +1,13 @@
 // Console ▸ Team Workflows (#1804, M6): each bot (#1761), its group, its machines and its spend
 // today against its cap, the workflows it ran in the last 7 days, and the agents running on its
-// machines now, each with Stop (bots/stopRun). Numbers and ids only; no agent's title or words.
+// machines now, each with Stop… (bots/stopRun), asked first (#3000). Numbers and ids only; no agent's title or words.
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import type { TeamBotRun, TeamWorkflows } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import { ago } from "../model/connectorSetup";
-import { failedWords, machineWords, noBots, runsWords, spendWords, teamWorkflowsFoot } from "../model/console";
+import { failedWords, machineWords, noBots, runsWords, spendWords, teamStopQuestion, teamWorkflowsFoot } from "../model/console";
 import { DataTable } from "./DataTable";
 
 export function TeamWorkflowsPage({ store, down }: { store: Store; down: boolean }) {
@@ -66,7 +66,7 @@ export function TeamWorkflowsPage({ store, down }: { store: Store; down: boolean
                     Running {run.workflow ?? "an agent"} on {run.hostName}
                     {run.since !== undefined && <span class="quiet small"> · started {ago(fromWireDate(run.since))}</span>}
                   </span>
-                  <span class="request-actions"><button type="button" disabled={down} onClick={() => void stop(run)}>Stop</button></span>
+                  <span class="request-actions"><button type="button" disabled={down} onClick={() => { if (window.confirm(teamStopQuestion(bot, run))) void stop(run); }}>Stop…</button></span>
                 </li>
               ))}
             </ul>
