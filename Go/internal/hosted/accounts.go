@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controlplane/store"
@@ -16,6 +17,11 @@ import (
 //	hosted/v1/accounts/<id>.json   an account: who signed up, and when
 //	hosted/v1/github/<id>.json     a GitHub user's account, written once (one account each)
 //	hosted/v1/keys/control.sealed  this service's own key, for its session key
+//	hosted/v1/allow/<login>.json   a GitHub login that may sign up (#2152, signup.go)
+//	hosted/v1/invites/<code>.json  an invite link, and who used it
+//	hosted/v1/waiting/<id>.json    a GitHub user on the waitlist: its place's key below
+//	hosted/v1/waitlist/<place>.json  the waitlist, in order of its keys
+//	hosted/v1/blocked/<id>.json    a GitHub user who may not sign up
 //	accounts/<id>/v1/…             the account's control plane's store, its sealed key too
 const (
 	hostedPrefix   = "hosted/"
@@ -27,13 +33,27 @@ type Account struct {
 	ID      string    `json:"id"`
 	GitHub  GitHubID  `json:"github"`
 	Created time.Time `json:"created"`
+	// The plan whose limits hold (spec 1003 FR-020): "" is free.
+	Plan string `json:"plan,omitempty"`
+	// Set by the operator: the control plane is stopped and refuses every request.
+	Suspended *Suspension `json:"suspended,omitempty"`
+	// When its name's certificate was first allowed (FR-008), so it counts once.
+	Certificate *time.Time `json:"certificate,omitempty"`
+}
+
+// Suspension is why and when the operator suspended an account.
+type Suspension struct {
+	Reason string    `json:"reason"`
+	At     time.Time `json:"at"`
 }
 
 // GitHubID is who signed in: GitHub's numeric id, which never changes, and the login
-// when they signed up, for the page.
+// when they signed up, for the page. Created is when the GitHub account was made, for
+// the minimum age (#2152); it is not kept.
 type GitHubID struct {
-	ID    int64  `json:"id"`
-	Login string `json:"login"`
+	ID      int64     `json:"id"`
+	Login   string    `json:"login"`
+	Created time.Time `json:"-"`
 }
 
 type accounts struct {
@@ -41,8 +61,10 @@ type accounts struct {
 	now   func() time.Time
 }
 
-func accountKey(id string) string  { return hostedPrefix + "v1/accounts/" + id + ".json" }
-func gitHubKey(id int64) string     { return hostedPrefix + "v1/github/" + strconv.FormatInt(id, 10) + ".json" }
+func accountKey(id string) string { return hostedPrefix + "v1/accounts/" + id + ".json" }
+func gitHubKey(id int64) string {
+	return hostedPrefix + "v1/github/" + strconv.FormatInt(id, 10) + ".json"
+}
 func accountStore(st store.Store, id string) *store.Prefixed {
 	return store.NewPrefixed(st, accountsPrefix+id+"/")
 }
@@ -94,6 +116,55 @@ func (a *accounts) make(ctx context.Context, user GitHubID) (*Account, bool, err
 		return nil, false, err
 	}
 	return &acc, true, nil
+}
+
+// update changes an account's record by f, again on a conflict, and gives it back as
+// written; nil when there is no account.
+func (a *accounts) update(ctx context.Context, id string, f func(*Account)) (*Account, error) {
+	for range 5 {
+		o, err := a.store.Get(ctx, accountKey(id))
+		if err != nil || o == nil {
+			return nil, err
+		}
+		var acc Account
+		if err := json.Unmarshal(o.Data, &acc); err != nil {
+			return nil, err
+		}
+		f(&acc)
+		data, _ := json.MarshalIndent(acc, "", "  ")
+		if _, err := a.store.Put(ctx, accountKey(id), data, store.Matching(o.ETag)); err != nil {
+			if store.IsConflict(err) {
+				continue
+			}
+			return nil, err
+		}
+		return &acc, nil
+	}
+	return nil, fmt.Errorf("account %s kept changing", id)
+}
+
+// all is every account, in order of id.
+func (a *accounts) all(ctx context.Context) ([]Account, error) {
+	keys, err := a.store.List(ctx, hostedPrefix+"v1/accounts/")
+	if err != nil {
+		return nil, err
+	}
+	var list []Account
+	for _, k := range keys {
+		id := strings.TrimSuffix(strings.TrimPrefix(k.Key, hostedPrefix+"v1/accounts/"), ".json")
+		if acc, err := a.get(ctx, id); err != nil {
+			return nil, err
+		} else if acc != nil {
+			list = append(list, *acc)
+		}
+	}
+	return list, nil
+}
+
+// count is how many accounts there are.
+func (a *accounts) count(ctx context.Context) (int, error) {
+	keys, err := a.store.List(ctx, hostedPrefix+"v1/accounts/")
+	return len(keys), err
 }
 
 // remove deletes the account: its control plane's whole store, then the account, then the

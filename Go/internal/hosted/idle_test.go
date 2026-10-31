@@ -61,7 +61,7 @@ func idleService(t *testing.T, n int) (*Service, *countingStore, *clock, []strin
 	st := &countingStore{Store: store.NewMemory()}
 	now := &clock{now: time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)}
 	keeper := "base64key://" + base64.URLEncoding.EncodeToString(bytes.Repeat([]byte{3}, 32))
-	s, err := New(context.Background(), Config{Store: st, Keeper: keeper, Domain: domain, Now: now.Now})
+	s, err := New(context.Background(), Config{Store: st, Keeper: keeper, Domain: domain, Now: now.Now, MaxCopies: 1000})
 	if err != nil {
 		t.Fatal(err)
 	}

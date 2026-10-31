@@ -69,6 +69,44 @@ Caddy gets a certificate for each control plane's name the first time it is aske
 and only for a name that `agents-hosted` says is an account's. Without the client secret,
 the sign-up page says that sign-up is not open.
 
+## Who can sign up
+
+Sign-up is by invitation at the start. A person with no invite who signs in with GitHub goes
+on a waitlist and sees their place in it. Agents keeps no email address, so they sign in
+again later to see if their account is ready.
+
+- **Invite a person** with a link they can use once, within 14 days:
+
+    ```sh
+    docker compose -f deploy/compose.hosted.yaml exec hosted agents-hosted admin invite
+    ```
+
+- **Allow a GitHub login**, or admit one from the waitlist: `agents-hosted admin allow <login>`.
+  An allowed login may sign up whatever its GitHub account's age.
+- **See the waitlist:** `agents-hosted admin waitlist`.
+
+These limits keep the service whole. Each is a setting below:
+
+- A GitHub account younger than 30 days waits, unless its login is allowed.
+- 3 new accounts or waitlist entries an hour from one address, and 30 an hour in all. A
+  person who has an account signs in whatever the rate.
+- At most 100 accounts. At the cap, even an invited person waits, at the front.
+- At most 50 control planes run at once. The one idle longest stops to make room.
+- At most 10 new certificates an hour and 40 a week, below Let's Encrypt's limits. A new
+  account's address works once its certificate is allowed.
+
+## Suspend or block an account
+
+Run these on the service's machine. A running service sees each change within a minute.
+
+| Command | What it does |
+| --- | --- |
+| `agents-hosted admin accounts` | Lists every account, its GitHub login, plan and state |
+| `agents-hosted admin suspend <account> <why>` | Stops its control plane, which then refuses every request. Its records are kept. The person reads why on their account page, and can delete the account |
+| `agents-hosted admin unsuspend <account>` | Lets it start again |
+| `agents-hosted admin block <GitHub id or login> [why]` | Refuses that GitHub user, and suspends their account |
+| `agents-hosted admin unblock <GitHub id>` | Lets them sign up again |
+
 ## Settings
 
 | Variable | What it is |
@@ -80,6 +118,14 @@ the sign-up page says that sign-up is not open.
 | `AGENTS_HOSTED_GITHUB_CLIENT_ID` | The GitHub App's client id; `agents-loops`'s when unset |
 | `AGENTS_HOSTED_GITHUB_SECRET` | Its client secret |
 | `AGENTS_HOSTED_VIEWS_DOMAIN` | The name where each page's MCP Apps views are drawn, or none |
+| `AGENTS_HOSTED_SIGNUP` | `invite` (the default), `open` or `closed` |
+| `AGENTS_HOSTED_MAX_ACCOUNTS` | The most accounts; 100 |
+| `AGENTS_HOSTED_MIN_GITHUB_AGE` | The youngest GitHub account that may sign up without being allowed, in days; 30 |
+| `AGENTS_HOSTED_SIGNUPS_PER_ADDRESS` | New accounts and waitlist entries an hour from one address; 3 |
+| `AGENTS_HOSTED_SIGNUPS_PER_HOUR` | New accounts and waitlist entries an hour in all; 30 |
+| `AGENTS_HOSTED_MAX_COPIES` | Control planes running at once; 50 |
+| `AGENTS_HOSTED_CERTS_PER_HOUR` | New certificates an hour; 10 |
+| `AGENTS_HOSTED_CERTS_PER_WEEK` | New certificates a week; 40 |
 
 ## Related
 
