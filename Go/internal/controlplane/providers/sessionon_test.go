@@ -178,6 +178,12 @@ func TestAnAgentSendsAFolderToAnotherMachine(t *testing.T) {
 			return &Reply{Result: rawOf(wire.ReceiveState{Folder: "file:///home/me/app/", Exists: true, Repository: true, Heads: []string{"abc"}})}
 		case MethodReceive:
 			return &Reply{Result: rawOf(wire.FolderSummary{Name: "app"})}
+		case MethodSendFacts:
+			return &Reply{Result: rawOf(wire.SendFacts{Branches: []string{"main"}, Current: new("main")})}
+		case MethodSendPack:
+			return &Reply{Result: rawOf(wire.SendPack{Commits: []wire.SentBranch{{Name: "main", Commit: "0123456789012345678901234567890123456789"}}})}
+		case MethodSendRead:
+			return &Reply{Result: rawOf(wire.SendRead{Data: wire.Data("hello"), End: true})}
 		}
 		return &Reply{Result: rawOf(map[string]any{})}
 	}
@@ -206,6 +212,25 @@ func TestAnAgentSendsAFolderToAnotherMachine(t *testing.T) {
 		t.Fatalf("%s", sent[1].params)
 	}
 
+	// bring_back's steps (#2947): facts, pack and read, each with its answer.
+	out, err = h.agentCall(MethodSendFolder, map[string]any{"host": "devbox", "facts": map[string]any{"folder": "file:///home/me/app/"}})
+	if f := out.(wire.MachineFolderSent).Facts; err != nil || f == nil || f.Current == nil || *f.Current != "main" {
+		t.Fatalf("%v %+v", err, out)
+	}
+	out, err = h.agentCall(MethodSendFolder, map[string]any{"host": "devbox", "pack": map[string]any{"folder": "file:///home/me/app/",
+		"branches": []any{"main"}, "leavingOut": []any{}, "includeChanges": false}})
+	if p := out.(wire.MachineFolderSent).Pack; err != nil || p == nil || len(p.Commits) != 1 {
+		t.Fatalf("%v %+v", err, out)
+	}
+	out, err = h.agentCall(MethodSendFolder, map[string]any{"host": "devbox", "read": map[string]any{"id": records.NewUUID(), "offset": 0}})
+	if r := out.(wire.MachineFolderSent).Read; err != nil || r == nil || string(r.Data) != "hello" || !r.End {
+		t.Fatalf("%v %+v", err, out)
+	}
+	sent = h.router.deliveries()
+	if len(sent) != 6 || sent[3].method != MethodSendFacts || sent[4].method != MethodSendPack || sent[5].method != MethodSendRead {
+		t.Fatalf("%+v", sent)
+	}
+
 	if _, err := h.agentCall(MethodSendFolder, map[string]any{"host": "devbox"}); failureOf(err) == nil || failureOf(err).Code != CodeInvalidParams {
 		t.Fatalf("%v", err)
 	}
@@ -213,7 +238,7 @@ func TestAnAgentSendsAFolderToAnotherMachine(t *testing.T) {
 	if _, err := h.agentCall(MethodSendFolder, map[string]any{"host": "devbox", "state": map[string]any{"folder": "/a"}}); failureOf(err) == nil || failureOf(err).Code != CodeHostOffline {
 		t.Fatalf("%v", err)
 	}
-	if len(h.router.deliveries()) != 3 {
+	if len(h.router.deliveries()) != 6 {
 		t.Fatal("sent to an offline machine")
 	}
 }

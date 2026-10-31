@@ -194,7 +194,8 @@ uncommitted changes, as **Send to ‹server›…** does (see
 which branch goes where. Agents makes the folder if it is not there, and never overwrites
 work done there: a folder with changes or commits of its own on that machine stops the send
 before you are asked. For a send, the machine must be running; the agent can start it with
-`start_machine` first. To bring the work back, use **Bring Back from ‹server›…**. The agent that asked
+`start_machine` first. To bring the work back, use **Bring Back from ‹server›…**, or the
+agent can, with `bring_back` (#2947): you say yes on its question card first. The agent that asked
 sees the new session in its own list of sessions, and can read it, message it, wait for it,
 stop it and archive it, as for a session in its own folder (#2927). No other agent can.
 The new session counts in the helper limits of the asking agent's folder until it is

@@ -86,6 +86,7 @@ func appToolCalls() []appTool {
 		{"stop_machine", (*Daemon).stopMachine},
 		{"make_machine", (*Daemon).makeMachine},
 		{"delete_machine", (*Daemon).deleteMachine},
+		{"bring_back", (*Daemon).bringBackTool},
 		{"move_worktree", (*Daemon).moveWorktree},
 	}
 }
