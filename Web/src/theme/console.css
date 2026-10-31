@@ -152,6 +152,7 @@ span.tabs { display: inline-flex; margin: 0; border-bottom: 0; }
 
 /* The console's table: dense rows, hairlines, numbers right, the header kept at the top, sortable. */
 .data-table-wrap { overflow-x: auto; border: 1px solid var(--paper-rule); border-radius: var(--radius-console); background: var(--paper-raised); }
+.data-table-wrap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .console-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 0.8125rem; }
 .console-table th { position: sticky; top: 0; z-index: 1; text-align: left; font-weight: 600; font-size: 0.75rem; opacity: 1;
   color: color-mix(in srgb, var(--paper-ink) 62%, transparent); background: var(--paper-raised); padding: 0 12px; height: var(--console-row);

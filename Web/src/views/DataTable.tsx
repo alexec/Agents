@@ -1,7 +1,8 @@
 // The console's table (#2142): one for every list a person scans (machines, agents, people, requests,
 // events). A header sorts by its column and again the other way (aria-sort, ▲ ▼); the order is kept for
 // the tab. The header stays at the top while the page scrolls; below 760 the table scrolls sideways
-// with its first column fixed. A row that opens something takes `onOpen`, the whole row its target.
+// with its first column fixed, and the scroll takes the keyboard focus so arrow keys can reach the hidden
+// columns (#3002). A row that opens something takes `onOpen`, the whole row its target.
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { keepOrder, keptOrder, nextOrder, sortRows, type SortDir, type SortKey, type SortOrder } from "../model/sort";
@@ -39,7 +40,7 @@ export function DataTable<T>({ id, label, columns, rows, rowKey, order, empty, o
     keepOrder(id, sorted.value);
   };
   return (
-    <div class="data-table-wrap">
+    <div class="data-table-wrap" role="region" aria-label={label} tabIndex={0}>
       <table class="data-table console-table" aria-label={label}>
         <thead>
           <tr>
