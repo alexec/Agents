@@ -5,8 +5,8 @@ import SwiftUI
 /// The client's half of a code-flow sign-in (#1343, Linear), the same on the Mac and the
 /// Remote. The host made the verifier and the state and keeps them; this opens the authorize
 /// address in an authentication session, which catches agents://oauth/callback when the
-/// hand-back page (agentloops.dev/oauth/callback) sends the person there, and gives the code
-/// and the state to the host. No token reaches this side.
+/// hand-back page (oauth.agentloops.dev/oauth/callback) sends the person there, and gives the
+/// code and the state to the host. No token reaches this side.
 enum CodeFlowSignIn {
     enum Outcome: Equatable {
         case connected(DaemonAPI.ConnectionSignIn)
