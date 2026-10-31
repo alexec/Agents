@@ -110,6 +110,9 @@ type Router struct {
 	copier func(host, method, reply string)
 	// The organisation's policy's check of a call to a machine (#998): it reads only memory.
 	policyGate func(host, method string) error
+	// The plan's check of a call that starts another running agent (#2243): it reads only
+	// memory and the hosts' own cached lists, never a host.
+	agentsRunningGate func(host, method string) error
 	// Told of each request a client made, for the metrics and the log (#2176), and of each
 	// notification sent to clients.
 	requested func(caller Caller, host, method string, id json.RawMessage, result string, took time.Duration)
@@ -1514,6 +1517,15 @@ func (r *Router) toHostLocked(host, msg, sessionID string) {
 			return
 		}
 	}
+	// At the plan's limit on agents running at once, starting one more is refused;
+	// nothing running is stopped (#2243).
+	if r.agentsRunningGate != nil {
+		if refusal := r.agentsRunningGate(host, m.Method); refusal != nil {
+			r.writeLocked(sessionID, s.wrap(host, replyError(m.ID, refusal)))
+			r.noteLocked(s.caller, host, m, "refused")
+			return
+		}
+	}
 	c, ok := s.channels[host]
 	h := r.hosts[host]
 	if !ok || h == nil {
@@ -1744,6 +1756,14 @@ func (r *Router) noteLocked(caller Caller, host string, m *message, result strin
 func (r *Router) SetPolicyGate(gate func(host, method string) error) {
 	r.mu.Lock()
 	r.policyGate = gate
+	r.mu.Unlock()
+}
+
+// SetAgentsRunningGate says what checks each call that starts another running agent
+// against the plan's limit (#2243).
+func (r *Router) SetAgentsRunningGate(gate func(host, method string) error) {
+	r.mu.Lock()
+	r.agentsRunningGate = gate
 	r.mu.Unlock()
 }
 

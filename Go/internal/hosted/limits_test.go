@@ -88,6 +88,29 @@ func TestStorageHoldsToThePlan(t *testing.T) {
 	}
 }
 
+// #2243: agents running at once holds to the plan too, with words that name the limit and
+// the plan; under the limit, and a plan change, are not refused.
+func TestAgentsRunningHoldsToThePlan(t *testing.T) {
+	p := plans[PlanFree] // AgentsRunning: 3
+	a := &agentsCap{plan: p, account: "https://" + domain + "/account"}
+	if err := a.gate(2); err != nil {
+		t.Fatal("under the limit was refused:", err)
+	}
+	err := a.gate(3)
+	var limit *LimitError
+	if !errors.As(err, &limit) || err.Error() != "Your Free plan allows 3 agents running at once. Wait for one to finish, or upgrade at https://hosted.test/account." {
+		t.Fatalf("%v", err)
+	}
+	if err := a.gate(4); !errors.As(err, &limit) {
+		t.Fatal("over the limit was not refused:", err)
+	}
+	// A plan change is read fresh, not cached.
+	a.setPlan(plans[PlanPro]) // AgentsRunning: 30
+	if err := a.gate(3); err != nil {
+		t.Fatal("under the new plan's limit was refused:", err)
+	}
+}
+
 // #2224 US5: the sweep deletes the days of events before the plan keeps.
 func TestEventsPastThePlanGo(t *testing.T) {
 	s, _, now, _ := idleService(t, 0)

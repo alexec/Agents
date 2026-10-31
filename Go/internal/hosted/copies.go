@@ -27,6 +27,8 @@ type copyRunning struct {
 	proxy   *httputil.ReverseProxy
 	// Its store, held to its plan (#2224, limits.go).
 	limits *limitedStore
+	// Its gate on agents running at once, held to its plan (#2243, limits.go).
+	agents *agentsCap
 	// Under Service.mu: the requests open now, and when the last one ended.
 	open int
 	last time.Time
@@ -114,9 +116,11 @@ func (s *Service) startCopy(ctx context.Context, id string) (*copyRunning, error
 	if s.cfg.ViewsDomain != "" {
 		views = "https://" + s.cfg.ViewsDomain
 	}
+	agents := &agentsCap{plan: PlanOf(acc), account: "https://" + s.cfg.Domain + "/account"}
 	cfg := controlplane.Config{Store: st, PrivateKey: key, URL: s.accountURL(id), Bind: "127.0.0.1", Port: 0,
 		Name: "Your control plane", MachineID: "hosted-" + id, PublicWeb: s.cfg.Web, PublicViews: views,
-		TrustedProxies: trusted, Hosted: true, SecretKeeper: s.cfg.Keeper, Log: func(line string) { s.log(id + ": " + line) }}
+		TrustedProxies: trusted, Hosted: true, SecretKeeper: s.cfg.Keeper, AgentsRunningGate: agents.gate,
+		Log: func(line string) { s.log(id + ": " + line) }}
 	service, err := controlplane.New(cfg)
 	if err != nil {
 		return nil, err
@@ -140,7 +144,7 @@ func (s *Service) startCopy(ctx context.Context, id string) (*copyRunning, error
 		plain(w, http.StatusBadGateway, "Your control plane did not answer. Try again in a moment.\n")
 	}
 	s.log(fmt.Sprintf("%s: started at %s", id, cfg.URL))
-	c := &copyRunning{service: service, proxy: proxy, limits: st, eventsSwept: s.cfg.Now()}
+	c := &copyRunning{service: service, proxy: proxy, limits: st, agents: agents, eventsSwept: s.cfg.Now()}
 	if n, err := s.sweepEvents(ctx, st); err != nil {
 		s.log(id + ": events sweep: " + err.Error())
 	} else if n > 0 {
@@ -396,6 +400,9 @@ func (s *Service) sweepAccounts(ctx context.Context) {
 			continue
 		}
 		c.limits.setPlan(PlanOf(acc))
+		if c.agents != nil {
+			c.agents.setPlan(PlanOf(acc))
+		}
 		s.keepUsage(ctx, id, c.limits)
 		s.mu.Lock()
 		due := now.Sub(c.eventsSwept) >= time.Hour

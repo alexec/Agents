@@ -11,16 +11,18 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 )
 
-// Each account's control plane is held to its plan (#2224, spec 1003 FR-021) from
-// outside it, so the control plane is unchanged:
+// Each account's control plane is held to its plan (#2224, spec 1003 FR-021), mostly
+// from outside it, so the control plane stays mostly unchanged:
 //
 //   - its store (limitedStore) refuses a new machine or client over the plan's number, and
 //     a write that makes the store larger than the plan's storage;
 //   - the proxy counts its open WebSockets (toAccount);
-//   - the sweep deletes its events older than the plan keeps (sweepEvents).
+//   - the sweep deletes its events older than the plan keeps (sweepEvents);
+//   - its agents running at once (agentsCap) go through the control plane's one hook for
+//     it, Config.AgentsRunningGate (#2243, spec 1003 FR-022).
 //
 // A refusal is a *LimitError, whose words name the limit and the plan. The control plane
-// passes a store error's words on as its answer's message. Nothing is deleted at a limit.
+// passes a store error's words on as its answer's message. Nothing running is stopped.
 
 // usageKey is where an account's bytes are kept between its copy's runs, in the service's
 // own store, so a start does not read the whole store each time.
@@ -52,6 +54,36 @@ type limitedStore struct {
 var countedFolders = map[string]func(Plan) (int, string, string){
 	records.MachinesPrefix: func(p Plan) (int, string, string) { return p.Machines, "machine", "machines" },
 	records.ClientsPrefix:  func(p Plan) (int, string, string) { return p.Clients, "client", "clients" },
+}
+
+// agentsCap is a copy's gate on agents running at once, held to its plan (#2243, spec
+// 1003 FR-022): the control plane asks it how many may run, each time it is asked how
+// many run now. setPlan changes it as sweepAccounts rereads the account.
+type agentsCap struct {
+	account string
+
+	mu   sync.Mutex
+	plan Plan
+}
+
+func (a *agentsCap) setPlan(p Plan) {
+	a.mu.Lock()
+	a.plan = p
+	a.mu.Unlock()
+}
+
+// gate refuses one more agent when as many already run as the plan allows. Nothing
+// running is stopped (FR-022): a refusal only turns away the one that would start next.
+func (a *agentsCap) gate(running int) error {
+	a.mu.Lock()
+	p := a.plan
+	a.mu.Unlock()
+	if p.AgentsRunning <= 0 || running < p.AgentsRunning {
+		return nil
+	}
+	return &LimitError{Plan: p, Limit: "agents running at once",
+		Allows: plural(p.AgentsRunning, "agent running at once", "agents running at once"),
+		Do:     "Wait for one to finish", Account: a.account}
 }
 
 func (l *limitedStore) setPlan(p Plan) {
