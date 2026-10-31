@@ -110,19 +110,13 @@ private struct VoiceTuningSections: View {
             slider("Pause between sentences", value: $gap, in: 0...800, step: 25, shows: "\(Int(gap)) ms")
             slider("Wait before your words go", value: $wait, in: 0.8...3.5, step: 0.1, shows: String(format: "%.1f s", wait))
             // Last, as it plays what the settings above it make (Alex, 2026-10-29).
-            LabeledContent("Sample") {
-                Button {
-                    sample.play()
-                } label: {
-                    if sample.isMaking {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Label("Play a Sample", systemImage: "play.circle")
-                    }
-                }
-                .disabled(sample.isMaking)
-                .help("Hear this voice at this speed, with this pause between sentences")
-            }
+            #if os(iOS)
+            // A plain button row: in a phone's Form, a button in a LabeledContent drew the row
+            // far taller than its content (#3028).
+            sampleButton
+            #else
+            LabeledContent("Sample") { sampleButton }
+            #endif
             if let problem = sample.problem {
                 Text(problem)
                     .appText(.fine)
@@ -151,6 +145,20 @@ private struct VoiceTuningSections: View {
         }
         .paperListRow()
         #endif
+    }
+
+    private var sampleButton: some View {
+        Button {
+            sample.play()
+        } label: {
+            if sample.isMaking {
+                ProgressView().controlSize(.small)
+            } else {
+                Label("Play a Sample", systemImage: "play.circle")
+            }
+        }
+        .disabled(sample.isMaking)
+        .help("Hear this voice at this speed, with this pause between sentences")
     }
 
     private func slider(_ title: String, value: Binding<Double>, in range: ClosedRange<Double>, step: Double,
