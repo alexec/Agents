@@ -57,6 +57,11 @@ checks); on Issues, the issues assigned to the viewer (before: none).
    count, from GitHub's own data.
 2. **The gitlab server (#2952):** the same on Merge requests and Issues (GitLab's `reviewers`,
    `assignees`, and the project's members for Team).
+   Needs you on a merge request: the viewer is one of its `reviewers`; or the viewer's own has
+   a failed pipeline, a conflict, or `detailed_merge_status` `requested_changes`. Team: the
+   project's members, directly or through a group, with Developer access (30) or more, read
+   in one `members/all?user_ids[]=…` call for the list's authors and kept 10 minutes; and
+   bots. When GitLab cannot say who is a member, nobody is: the list still shows.
 3. **The linear server (#2950):** Issues: Needs you (assigned to you), Yours, Team (the
    workspace's members), Others.
 4. **The people map (#2951):** the host passes the control plane's people and bots, with their

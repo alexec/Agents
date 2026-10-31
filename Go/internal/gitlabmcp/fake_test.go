@@ -40,6 +40,8 @@ type fakeGitLab struct {
 	issues   []obj
 	activity []obj
 	members  map[int]int // user id → access level
+	// memberLists counts the calls that list members by user_ids[] (#2952).
+	memberLists int
 	requests []string
 	posted   []obj         // what was POSTed or PUT, with its path
 	diffs    map[int][]obj // merge request → its files
@@ -277,6 +279,16 @@ func (f *fakeGitLab) serve(w http.ResponseWriter, r *http.Request) {
 		answer(404, obj{"message": "404 Not found"})
 	case len(parts) == 1 && parts[0] == "events":
 		answer(200, f.activity)
+	case len(parts) == 2 && parts[0] == "members" && parts[1] == "all":
+		f.memberLists++
+		out := []obj{}
+		for _, v := range q["user_ids[]"] {
+			id, _ := strconv.Atoi(v)
+			if level, ok := f.members[id]; ok {
+				out = append(out, obj{"id": id, "access_level": level})
+			}
+		}
+		answer(200, out)
 	case len(parts) == 3 && parts[0] == "members" && parts[1] == "all":
 		id, _ := strconv.Atoi(parts[2])
 		if level, ok := f.members[id]; ok {

@@ -2,7 +2,7 @@
 // server's page shapes (#1341), in GitLab's words: a pipeline, not checks.
 const MR_CHECKS = { passing: "Pipeline passed", failing: "Pipeline failed", running: "Pipeline running", none: "No pipeline", skipped: "Skipped" };
 const MR_JOBS = { passing: "Passed", failing: "Failed", running: "Running", none: "Not run", skipped: "Skipped" };
-const MR_REVIEWS = { approved: "Approved", review_required: "Approval needed" };
+const MR_REVIEWS = { approved: "Approved", changes_requested: "Changes requested", review_required: "Approval needed" };
 const mrPills = (ui, mr) => {
   const pill = (kind, text, title) => ui.el("span", { className: "pill " + kind, textContent: text, title: title || "" });
   const out = [];
