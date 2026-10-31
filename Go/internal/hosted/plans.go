@@ -22,8 +22,7 @@ type Plan struct {
 	Storage int64
 	// How long its events (the audit) are kept.
 	EventsKept time.Duration
-	// Agents running at once: recorded, not enforced in 0.12 (it needs the control plane,
-	// spec 1003 phase 6).
+	// Agents running at once (#2243): the control plane refuses to start one more.
 	AgentsRunning int
 }
 

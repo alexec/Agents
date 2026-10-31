@@ -245,7 +245,7 @@ Alex runs `deploy/gcp/hosted-up.sh` with a project, a zone, the names and the se
   | Connections open at once | 20 | 200 |
   | Storage | 1 GB | 20 GB |
   | Events kept | 7 days | 90 days |
-  | Agents running at once (recorded, not enforced in 0.12) | 3 | 30 |
+  | Agents running at once | 3 | 30 |
 
   The numbers are in one table in `Go/internal/hosted/plans.go`; changing them is a one-line change.
 - **FR-021**: `agents-hosted` holds each account's control plane to its plan:
@@ -253,6 +253,7 @@ Alex runs `deploy/gcp/hosted-up.sh` with a project, a zone, the names and the se
   - **Storage:** a write that makes the account's store larger than the limit is refused. A write that does not make it larger is never refused.
   - **Connections:** the proxy counts each account's open WebSockets. One over the limit gets `429` and the words.
   - **Events:** a sweep each hour deletes the account's events older than the plan keeps.
+  - **Agents running at once** (#2243): the control plane's router refuses `agents/start` and the other ways to begin another running agent, at the plan's limit, through a hook (`Config.AgentsRunningGate`) `agents-hosted` sets per account.
 - **FR-022**: A refusal names the limit and the plan: "Your Free plan allows 2 machines. Remove one, or upgrade at https://<domain>/account." The words reach the client that asked, as the control plane passes a store error on. Where the control plane does not pass it on, the words go in the service's log and the gap goes on the 0.12 follow-up list for the control-plane hook.
 - **FR-023**: A refusal at a limit deletes nothing. A downgrade deletes nothing, except events past the plan's days.
 - **FR-024**: The account page shows the plan and the use of each limit ("Machines: 1 of 2", "Storage: 120 MB of 1 GB").
@@ -305,7 +306,6 @@ Alex runs `deploy/gcp/hosted-up.sh` with a project, a zone, the names and the se
 ## Not in this spec
 
 - Open sign-up with Turnstile (FR-001 `open` is the setting; the CAPTCHA comes with it).
-- Enforcing agents running at once (needs a control-plane hook, after v0.11.0 ships).
 - Several people in one hosted account beyond what the team tier (T1–T4) gives every control plane.
 - An admin web page, invoices in Agents, taxes, more than one paid plan, yearly prices.
 - Many service processes over one store (the rates, the copies and the certificate count are per process).

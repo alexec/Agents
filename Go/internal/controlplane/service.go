@@ -86,6 +86,11 @@ type Config struct {
 	// tunnels, and it installs, finds and updates no machine over ssh. Machines join by a
 	// code, their join command, or a provider.
 	Hosted bool
+	// AgentsRunningGate is this copy's plan's limit on agents running at once (#2243, spec
+	// 1003 FR-022): told how many run now, across every host here, before another is let
+	// start; it answers nil to allow, or the words of a refusal that names the limit and
+	// the plan. agents-hosted sets it per account; nil holds no copy to a limit.
+	AgentsRunningGate func(running int) error
 	// Where other copies reach this one (several copies over one store, US3). "" for a
 	// single copy (Agents Host's), which links with nobody and takes no leases (#206).
 	PeerURL string
@@ -282,6 +287,7 @@ func New(cfg Config) (*Service, error) {
 	s.router.handler = s.methods
 	s.router.SetOwnership(s)
 	s.router.SetPolicyGate(s.policyGate)
+	s.router.SetAgentsRunningGate(s.agentsRunningGate)
 	s.router.SetTeam(false, cfg.Version)
 	s.joins = newJoins(s)
 	s.links = newLinks(s)
