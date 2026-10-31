@@ -6575,6 +6575,15 @@ type PersonInvited struct {
 	Role UserRole `json:"role"`
 }
 
+// The person key moving to a new pair (#2957, data-model.md "PersonKeyRotation"): the new public key, signed by the one it replaces. A machine moves its pin only with one that checks against the key it has pinned.
+type PersonKeyRotation struct {
+	NewKey Data `json:"newKey"`
+
+	NewKeyID string `json:"newKeyID"`
+
+	Signature PolicySignature `json:"signature"`
+}
+
 // A machine in People: its name, its state and nothing inside it (FR-019).
 type PersonMachine struct {
 	ID MachineRef `json:"id"`
@@ -6839,6 +6848,17 @@ type PingResponse struct {
 	Ok bool `json:"ok"`
 }
 
+// The person's public key this machine trusts (#2957, data-model.md "PinnedPersonKey"), kept at <root>/person-key.pub.json: from a join code, the Mac window's direct link, or, for a machine joined before this version, the first signed layer the control plane sends (trust on first use, research R3).
+type PinnedPersonKey struct {
+	Key Data `json:"key"`
+
+	KeyID string `json:"keyID"`
+
+	From string `json:"from"`
+
+	At Date `json:"at"`
+}
+
 type PinnerKind string
 
 const PinnerKindPerson PinnerKind = "person"
@@ -6946,9 +6966,16 @@ type PolicyBudgets struct {
 	Raises []BudgetRaise `json:"raises"`
 }
 
-// The variable names a person's own pass-through list may name (#998, FR-011a), * at the end allowed.
+// policy/effective (#2957): the rules for an agent in folder, or, with no folder, outside any folder layer.
+type PolicyEffectiveRequest struct {
+	Folder *URL `json:"folder,omitzero"`
+}
+
+// The variable names a person's own pass-through list may name (#998, FR-011a), * at the end allowed. runtimes names ones for one runtime only (#2957, moved here from runtime-environment.json's own runtimes map).
 type PolicyEnvironment struct {
 	PassThrough []string `json:"passThrough"`
+
+	Runtimes map[string][]string `json:"runtimes,omitzero"`
 }
 
 // One folder that sets its own rules, for the Agents ▸ Policy banner (#2957, EffectivePolicy.foldersWithRules).
@@ -6965,6 +6992,13 @@ type PolicyHelpers struct {
 	MostRunning *int64 `json:"mostRunning,omitzero"`
 
 	MostNotArchived *int64 `json:"mostNotArchived,omitzero"`
+}
+
+// Which machine signs your layer (#2957, research R4): the Mac's host, or the first machine of yours that saved one, when you have no Mac.
+type PolicyKeeper struct {
+	Host string `json:"host"`
+
+	Name string `json:"name"`
 }
 
 // policy/get and policy/set (#998): the whole policy with its store tag, for an admin. No policy and no rev when none was ever set. machines is each machine's applied version, by host id.
@@ -8948,6 +8982,13 @@ type SetUnreadRequest struct {
 	Unread bool `json:"unread"`
 }
 
+// policy/setYours (#2957): the rules to save as your layer, at the revision this client last read. Refused conflict when revision is not the current one, notKeeper on a machine that is not the keeper, forbidden from the agent socket role, an MCP tool or a workflow (FR-010), and invalid when the rules fail policylayers.Validate.
+type SetYourPolicyRequest struct {
+	Rules PolicyRules `json:"rules"`
+
+	Revision int64 `json:"revision"`
+}
+
 type SharedInstructions struct {
 	Path string `json:"path"`
 
@@ -9501,6 +9542,17 @@ type SignedPolicy struct {
 	Policy OrgPolicy `json:"policy"`
 
 	Signature PolicySignature `json:"signature"`
+}
+
+// Your layer, signed by the person key (#2957, data-model.md "SignedYourPolicy"): what the control plane stores and forwards, and what a non-keeper machine verifies before it applies a copy.
+type SignedYourPolicy struct {
+	// The exact CanonicalJSON bytes of YourPolicy, base64.
+	Policy string `json:"policy"`
+
+	Signature PolicySignature `json:"signature"`
+
+	// Present only on the first copy after a new person key.
+	Rotation *PersonKeyRotation `json:"rotation,omitzero"`
 }
 
 // An iOS simulator on a Mac host (#842): its UDID, its name, its system and whether it is booted.
@@ -11304,3 +11356,38 @@ type WriteFailureCause string
 const WriteFailureCauseDiskFull WriteFailureCause = "diskFull"
 const WriteFailureCauseNotAllowed WriteFailureCause = "notAllowed"
 const WriteFailureCauseReadOnly WriteFailureCause = "readOnly"
+
+// Your layer (#2957, data-model.md "YourPolicy"): the rules, kept on the keeper and sent, signed, to your other machines. No agent, MCP tool or workflow can change it (FR-010).
+type YourPolicy struct {
+	Rules PolicyRules `json:"rules"`
+
+	// One higher at each save. A machine refuses a lower one (FR-011).
+	Revision int64 `json:"revision"`
+
+	Changed Date `json:"changed"`
+
+	// Which client saved it.
+	ChangedFrom *YourPolicyChangedFrom `json:"changedFrom,omitzero"`
+
+	// The person's id (the user scope's user, or local for a person with no control plane).
+	Person string `json:"person"`
+
+	// The host id of the keeper (research R4).
+	Keeper string `json:"keeper"`
+}
+
+// Which client saved it.
+type YourPolicyChangedFrom struct {
+	Client string `json:"client"`
+
+	Kind string `json:"kind"`
+}
+
+// policy/yours (#2957): your layer, which machine is the keeper, and the person key this machine has pinned.
+type YourPolicyState struct {
+	Policy YourPolicy `json:"policy"`
+
+	Keeper PolicyKeeper `json:"keeper"`
+
+	PinnedKeyID *string `json:"pinnedKeyID,omitzero"`
+}

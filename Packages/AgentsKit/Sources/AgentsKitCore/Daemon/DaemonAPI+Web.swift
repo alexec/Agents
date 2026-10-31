@@ -75,6 +75,10 @@ public extension DaemonAPI {
                 // composer, and the person's pass-through names, marked (#998).
                 Row(Method.daemonPolicyState, params: Empty.self, result: PolicyState.self, kind: .hostRequest),
                 Row(Method.settingsPassThrough, params: Empty.self, result: PassThroughState.self, kind: .hostRequest),
+                // Policy layers (#2957): the effective policy, and the person's own layer.
+                Row(Method.policyEffective, params: PolicyEffectiveRequest.self, result: EffectivePolicy.self, kind: .hostRequest),
+                Row(Method.policyYours, params: Empty.self, result: YourPolicyState.self, kind: .hostRequest),
+                Row(Method.policySetYours, params: SetYourPolicyRequest.self, result: YourPolicy.self, kind: .hostRequest),
                 Row(Method.optionsRemembered, params: RememberedOptionsRequest.self, result: [ConfigOption].self,
                     kind: .hostRequest),
                 Row(Method.modesRemembered, params: Empty.self, result: RememberedModes.self, kind: .hostRequest),

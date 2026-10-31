@@ -5087,6 +5087,84 @@
       }
     },
     {
+      "name": "policy/effective",
+      "x-capability": "host.policy-layers/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "The effective policy for an agent in a folder, or, with no folder, outside any folder layer (#2957): every rule, the layer that decides it, and each layer's own value.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PolicyEffectiveRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/EffectivePolicy"
+        }
+      }
+    },
+    {
+      "name": "policy/setYours",
+      "x-capability": "host.policy-layers/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Saves your layer, on the keeper only (#2957, FR-010, FR-011): refused conflict, notKeeper, forbidden or invalid (SetYourPolicyRequest).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SetYourPolicyRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/YourPolicy"
+        }
+      }
+    },
+    {
+      "name": "policy/yours",
+      "x-capability": "host.policy-layers/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Your layer, which machine is the keeper, and the person key this machine has pinned (#2957).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/YourPolicyState"
+        }
+      }
+    },
+    {
       "name": "pool/applyAllowances",
       "x-capability": "pool/1",
       "paramStructure": "by-name",
@@ -7680,6 +7758,10 @@
       "notInWorkflowFolder": {
         "code": -32016,
         "message": "notInWorkflowFolder"
+      },
+      "notKeeper": {
+        "code": -32101,
+        "message": "notKeeper"
       },
       "notLinked": {
         "code": -32065,
