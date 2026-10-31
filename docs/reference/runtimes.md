@@ -545,12 +545,14 @@ permission requests; the other two give a card):
 
 | Runtime | Fast | Balanced | Smart |
 | --- | --- | --- | --- |
-| Claude | Haiku | Sonnet | Opus |
+| Claude | Haiku | Sonnet | Fable 5.1, else Opus |
 | Codex | 5.6 Luna | its default | 6 Luna |
 | Grok | Grok 4.7 Fast | its default | Grok 4.7 |
 | Antigravity | Gemini 3.8 Flash (Low) | its default | Gemini 3.8 Flash (High) |
 | Copilot | its default (nearest safer: no smaller model known) | its default | Claude Sonnet 5.5 |
 | Gemini, Cursor, OpenCode | its default (nearest safer: no other model known) | its default | its default (nearest safer: no other model known) |
+
+Smart is the runtime's most capable model that its model picker offers. The runtime check (`scripts/nightly-runtimes.py`) files an "Auto models" issue when a runtime offers a model that it did not offer at its last check, so that this table does not go stale (#3041).
 
 **Sandbox**:
 

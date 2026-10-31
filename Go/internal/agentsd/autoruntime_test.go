@@ -68,9 +68,16 @@ func TestADroppedCell(t *testing.T) {
 	if m := cellMapping("claude", wire.AutoFieldModel, "balanced", settings, offers); m.Mark != wire.AutoMarkAutoMapped || m.Words != "Sonnet 5" {
 		t.Fatalf("%+v", m)
 	}
-	// Opus with 1M context, else Opus: the first the plan has.
+	// Fable, its most capable (#3041), with 1M context or not, else Opus: the first the plan has.
+	if m := cellMapping("claude", wire.AutoFieldModel, "smart", settings, offers); m.Native == nil || stringValue(m.Native.Options["model"]) != "opus[1m]" {
+		t.Fatalf("%+v", m)
+	}
 	offers[0].Options = json.RawMessage(`[{"value":"opus","name":"Opus 5.5"}]`)
 	if m := cellMapping("claude", wire.AutoFieldModel, "smart", settings, offers); m.Native == nil || stringValue(m.Native.Options["model"]) != "opus" {
+		t.Fatalf("%+v", m)
+	}
+	offers[0].Options = json.RawMessage(`[{"value":"opus[1m]","name":"Opus 5.5"},{"value":"claude-fable-5-1[1m]","name":"Fable 5.1"}]`)
+	if m := cellMapping("claude", wire.AutoFieldModel, "smart", settings, offers); m.Native == nil || stringValue(m.Native.Options["model"]) != "claude-fable-5-1[1m]" {
 		t.Fatalf("%+v", m)
 	}
 }

@@ -87,7 +87,8 @@ var autoModels = map[string]map[string]autoCell{
 	"claude": {
 		"fast":     {models: []string{"haiku"}, options: map[string]string{"effort": "low"}, words: "Haiku, low effort"},
 		"balanced": {models: []string{"sonnet"}, words: "Sonnet"},
-		"smart":    {models: []string{"opus[1m]", "opus"}, options: map[string]string{"effort": "high"}, words: "Opus, high effort"},
+		"smart": {models: []string{"claude-fable-5-1[1m]", "claude-fable-5-1", "opus[1m]", "opus"},
+			options: map[string]string{"effort": "high"}, words: "Fable 5.1, high effort"},
 	},
 	"codex": {
 		"fast":     {models: []string{"gpt-5.6-luna"}, options: map[string]string{"reasoning_effort": "low"}, words: "5.6 Luna, low effort"},
