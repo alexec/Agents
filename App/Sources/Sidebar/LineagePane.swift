@@ -145,10 +145,20 @@ private struct LineageGraphView: View {
                         .offset(x: node.x, y: node.y)
                 }
                 // The verbs over the boxes: a line that skips a tier passes under one.
-                Canvas { context, _ in labels(&context) }
-                    .frame(width: graph.width, height: graph.height)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
+                ForEach(graph.edges) { edge in
+                    if let mid = graph.curve(edge)?.mid {
+                        Text(edge.label)
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 3)
+                            .background(Paper.ground, in: RoundedRectangle(cornerRadius: 3))
+                            .fixedSize()
+                            .position(x: mid.x, y: mid.y)
+                    }
+                }
+                .frame(width: graph.width, height: graph.height, alignment: .topLeading)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
             }
             .frame(width: graph.width, height: graph.height, alignment: .topLeading)
             .scaleEffect(scale, anchor: .topLeading)
@@ -192,20 +202,6 @@ private struct LineageGraphView: View {
             }
             head.closeSubpath()
             context.fill(head, with: .color(.secondary))
-        }
-    }
-
-    /// Each link's verb, halfway along its line.
-    private func labels(_ context: inout GraphicsContext) {
-        for edge in graph.edges {
-            guard let curve = graph.curve(edge) else { continue }
-            let label = context.resolve(Text(edge.label).font(.caption2).foregroundStyle(.secondary))
-            let size = label.measure(in: CGSize(width: 160, height: 40))
-            let at = CGPoint(x: curve.mid.x, y: curve.mid.y)
-            context.fill(Path(roundedRect: CGRect(x: at.x - size.width / 2 - 3, y: at.y - size.height / 2 - 1,
-                                                  width: size.width + 6, height: size.height + 2), cornerRadius: 3),
-                         with: .color(Paper.ground))
-            context.draw(label, at: at)
         }
     }
 }
