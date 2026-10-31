@@ -215,11 +215,11 @@ export function triggerURL(trigger: MCPEventTrigger): string | undefined {
   const pr = typeof args.pr === "number" ? args.pr : undefined;
   const issue = typeof args.issue === "number" ? args.issue : undefined;
   if (repo !== undefined) {
-    if (pr !== undefined) return `https://github.com/${repo}/pull/${pr}`;
-    if (issue !== undefined) return `https://github.com/${repo}/issues/${issue}`;
+    if (pr !== undefined) return "https://github.com/" + repo + "/pull/" + pr;
+    if (issue !== undefined) return "https://github.com/" + repo + "/issues/" + issue;
   } else if (project !== undefined && project.includes("/")) {
-    if (pr !== undefined) return `https://gitlab.com/${project}/-/merge_requests/${pr}`;
-    if (issue !== undefined) return `https://gitlab.com/${project}/-/issues/${issue}`;
+    if (pr !== undefined) return "https://gitlab.com/" + project + "/-/merge_requests/" + pr;
+    if (issue !== undefined) return "https://gitlab.com/" + project + "/-/issues/" + issue;
   }
   return undefined;
 }
