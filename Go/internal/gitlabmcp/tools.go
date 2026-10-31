@@ -144,6 +144,18 @@ func tool[In any](server *mcp.Server, t *mcp.Tool, f func(context.Context, In) (
 	})
 }
 
+// toolMeta is tool, with the call's _meta too (#2951): show_merge_requests and show_issues
+// take the control plane's people in it.
+func toolMeta[In any](server *mcp.Server, t *mcp.Tool, f func(context.Context, mcp.Meta, In) (map[string]any, error)) {
+	mcp.AddTool(server, t, func(ctx context.Context, req *mcp.CallToolRequest, in In) (*mcp.CallToolResult, any, error) {
+		r, err := f(ctx, req.Params.Meta, in)
+		if err != nil {
+			return failed(err), nil, nil
+		}
+		return structured(r), nil, nil
+	})
+}
+
 // AddTools puts the tools and the views (views.go) on server; with person, also the tools
 // only a view may call.
 func AddTools(server *mcp.Server, g *RealGitLab, person bool) {

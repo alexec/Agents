@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // What the views read and do on GitLab (#1631), in the github server's shapes
@@ -66,7 +68,7 @@ func (m mergeRequest) changesRequested() bool { return m.DetailedMergeStatus == 
 
 // Board is the open merge requests, newest created first, each with its head commit's
 // pipeline and its section for who is signed in (#2952).
-func (g *RealGitLab) Board(ctx context.Context, project string) (map[string]any, error) {
+func (g *RealGitLab) Board(ctx context.Context, project string, meta mcp.Meta) (map[string]any, error) {
 	var mrs []mergeRequest
 	if err := g.get(ctx, fmt.Sprintf("projects/%s/merge_requests?state=opened&order_by=created_at&sort=desc&per_page=100", pid(project)), false, &mrs); err != nil {
 		return nil, err
@@ -92,6 +94,8 @@ func (g *RealGitLab) Board(ctx context.Context, project string) (map[string]any,
 		authors[i] = m.Author
 	}
 	team := g.developers(ctx, project, authors)
+	// The control plane's people (#2951): names a row, tells Team from Others.
+	people := teamMetaOf(meta, "gitlab")
 	out := make([]any, len(mrs))
 	needsYou := 0
 	for i, m := range mrs {
@@ -113,9 +117,21 @@ func (g *RealGitLab) Board(ctx context.Context, project string) (map[string]any,
 		if isBot(m.Author.Username, m.Author.Bot) {
 			j["authorBot"] = true
 		}
-		j["section"] = mrSection(m, j["checks"].(string), viewer, team[m.Author.ID])
-		if j["section"] == sectionNeedsYou {
+		section := mrSection(m, j["checks"].(string), viewer, team[m.Author.ID], people)
+		j["section"] = section
+		if tp, on := people[strings.ToLower(m.Author.Username)]; on {
+			j["authorName"] = tp.Name
+			if tp.Bot {
+				j["authorBot"] = true
+			}
+		}
+		if section == sectionNeedsYou {
 			needsYou++
+		}
+		if section == sectionNeedsYou || section == sectionYours {
+			if who := agentOnOf(meta, "agentOnPR", m.IID); who != "" {
+				j["agentOn"] = who
+			}
 		}
 		out[i] = j
 	}
@@ -127,7 +143,7 @@ func (g *RealGitLab) Board(ctx context.Context, project string) (map[string]any,
 
 // OpenIssues are the open issues, newest created first, at most 100, with label's only when it
 // is set, each with its section for who is signed in (#2952).
-func (g *RealGitLab) OpenIssues(ctx context.Context, project, label string) (map[string]any, error) {
+func (g *RealGitLab) OpenIssues(ctx context.Context, project, label string, meta mcp.Meta) (map[string]any, error) {
 	path := fmt.Sprintf("projects/%s/issues?state=opened&order_by=created_at&sort=desc&per_page=100", pid(project))
 	if label != "" {
 		path += "&labels=" + url.QueryEscape(label)
@@ -143,6 +159,8 @@ func (g *RealGitLab) OpenIssues(ctx context.Context, project, label string) (map
 		authors[i] = is.Author
 	}
 	team := g.developers(ctx, project, authors)
+	// The control plane's people (#2951): names a row, tells Team from Others.
+	people := teamMetaOf(meta, "gitlab")
 	out := make([]any, len(list))
 	needsYou := 0
 	for i, is := range list {
@@ -151,9 +169,21 @@ func (g *RealGitLab) OpenIssues(ctx context.Context, project, label string) (map
 		if isBot(is.Author.Username, is.Author.Bot) {
 			j["authorBot"] = true
 		}
-		j["section"] = issueSection(is, viewer, team[is.Author.ID])
-		if j["section"] == sectionNeedsYou {
+		section := issueSection(is, viewer, team[is.Author.ID], people)
+		j["section"] = section
+		if tp, on := people[strings.ToLower(is.Author.Username)]; on {
+			j["authorName"] = tp.Name
+			if tp.Bot {
+				j["authorBot"] = true
+			}
+		}
+		if section == sectionNeedsYou {
 			needsYou++
+		}
+		if section == sectionNeedsYou || section == sectionYours {
+			if who := agentOnOf(meta, "agentOnIssue", is.IID); who != "" {
+				j["agentOn"] = who
+			}
 		}
 		out[i] = j
 	}

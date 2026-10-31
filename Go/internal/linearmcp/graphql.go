@@ -156,7 +156,7 @@ func linearError(res *http.Response, errs []gqlError) *LinearError {
 // MARK: What is read
 
 const fragments = `
-fragment P on User { id displayName app guest }
+fragment P on User { id displayName email app guest }
 fragment I on Issue {
   id identifier title url createdAt
   team { key } state { name type } labels { nodes { name } } assignee { id displayName }
@@ -166,6 +166,7 @@ fragment I on Issue {
 type gqlPerson struct {
 	ID          string `json:"id"`
 	DisplayName string `json:"displayName"`
+	Email       string `json:"email"`
 	App         bool   `json:"app"`
 	Guest       bool   `json:"guest"`
 }
@@ -177,7 +178,7 @@ type gqlBot struct {
 // person is who did something: the user, else the app (bot) that did it, else nobody.
 func person(user *gqlPerson, bot *gqlBot) *Person {
 	if user != nil {
-		return &Person{ID: user.ID, Name: user.DisplayName, App: user.App, Guest: user.Guest}
+		return &Person{ID: user.ID, Name: user.DisplayName, Email: user.Email, App: user.App, Guest: user.Guest}
 	}
 	if bot != nil {
 		name := bot.Name

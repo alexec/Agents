@@ -69,7 +69,26 @@ type Person struct {
 	Rev       int
 	Removed   *bool
 	RemovedAt *Stamp
-	Extra     Extra
+	// Their GitHub, GitLab and Linear logins (#2951), for the github, gitlab and linear
+	// servers' Team section and rows named as the control plane knows them. Set from a
+	// machine's own connection when it is signed in, or by hand in Settings ▸ You.
+	GitHubLogin string
+	GitLabLogin string
+	LinearLogin string
+	Extra       Extra
+}
+
+// ForgeLogin is the person's login on that forge ("github", "gitlab" or "linear"), or "".
+func (p *Person) ForgeLogin(forge string) string {
+	switch forge {
+	case "github":
+		return p.GitHubLogin
+	case "gitlab":
+		return p.GitLabLogin
+	case "linear":
+		return p.LinearLogin
+	}
+	return ""
 }
 
 // PersonSCIM is a person's scim part: the SCIM user as it came, the Enterprise User
@@ -125,11 +144,14 @@ type personJSON struct {
 	Rev         int         `json:"rev,omitempty"`
 	Removed     *bool       `json:"removed,omitempty"`
 	RemovedAt   *Stamp      `json:"removedAt,omitempty"`
+	GitHubLogin string      `json:"gitHubLogin,omitempty"`
+	GitLabLogin string      `json:"gitLabLogin,omitempty"`
+	LinearLogin string      `json:"linearLogin,omitempty"`
 }
 
 func (p Person) MarshalJSON() ([]byte, error) {
 	return encodeKeeping(personJSON{p.ID, p.Name, p.Kind, p.Role, p.SignIns, p.Group, p.Caps, p.SCIM, p.Provisioned, p.Suspended,
-		p.RoleFrom, p.RoleByHand, p.LastNames, p.Rev, p.Removed, p.RemovedAt}, p.Extra)
+		p.RoleFrom, p.RoleByHand, p.LastNames, p.Rev, p.Removed, p.RemovedAt, p.GitHubLogin, p.GitLabLogin, p.LinearLogin}, p.Extra)
 }
 
 func (p *Person) UnmarshalJSON(data []byte) error {
@@ -139,7 +161,7 @@ func (p *Person) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*p = Person{j.ID, j.Name, j.Kind, j.Role, j.SignIns, j.Group, j.Caps, j.SCIM, j.Provisioned, j.Suspended, j.RoleFrom,
-		j.RoleByHand, j.LastNames, j.Rev, j.Removed, j.RemovedAt, extra}
+		j.RoleByHand, j.LastNames, j.Rev, j.Removed, j.RemovedAt, j.GitHubLogin, j.GitLabLogin, j.LinearLogin, extra}
 	return nil
 }
 

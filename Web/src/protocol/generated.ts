@@ -3203,6 +3203,16 @@ export interface FoldersListRequest {
   includeArchived: boolean;
 }
 
+/**
+ * people/setForgeLogins (#2951): the caller's own GitHub, GitLab and Linear logins, for Settings ▸
+ * You, replacing what was kept; blank clears one.
+ */
+export interface ForgeLogins {
+  github?: string;
+  gitlab?: string;
+  linear?: string;
+}
+
 export interface FoundFolder {
   typed?: string;
   folder: URLString;
@@ -5161,6 +5171,16 @@ export interface PendingMove {
 export interface PeopleChanged {
   user?: string;
   removed?: boolean;
+}
+
+/**
+ * people/forViews (#2951): every person and bot on this control plane, with their forge logins and
+ * which is the caller, for the github, gitlab and linear servers' Team section and "An agent is on
+ * it". Narrower than PeopleList: open to a member as much as an admin, and holds no role, clients
+ * or machines.
+ */
+export interface PeopleForViews {
+  people: TeamPerson[];
 }
 
 /** people/list (#994): every user for an admin; for a member, only themselves. */
@@ -7855,6 +7875,21 @@ export interface TeamBotRun {
 }
 
 /**
+ * people/forViews (#2951): one person or bot on this control plane, as the github, gitlab and
+ * linear servers' feeding tools are fed it in their call's _meta, so a row can name them and Team
+ * can be told from Others.
+ */
+export interface TeamPerson {
+  id: string;
+  name: string;
+  kind: "person" | "bot";
+  githubLogin?: string;
+  gitlabLogin?: string;
+  linearLogin?: string;
+  you?: boolean;
+}
+
+/**
  * workflows/trigger and workflows/fire (#2011, spec 736 FR-035): a folder or control-plane event (a
  * server's, such as github or a channel's) or a schedule that a runs-on: workflow's trigger
  * matched. A machine sends it to the control plane, which sends it once to one of the bot's
@@ -8999,11 +9034,13 @@ export interface Methods {
   "orgRoutes/remove": { params: OrgRouteRequest; result: Empty };
   "orgRoutes/replaceKey": { params: OrgRouteReplaceKey; result: OrgRouteKept };
   "orgRoutes/set": { params: OrgRouteSet; result: OrgRouteKept };
+  "people/forViews": { params: Empty; result: PeopleForViews };
   "people/invite": { params: PersonInvite; result: PersonInvited };
   "people/list": { params: Empty; result: PeopleList };
   "people/remove": { params: PersonRequest; result: Empty };
   "people/removePreview": { params: PersonRequest; result: PersonRemovePreview };
   "people/removeRequests": { params: Empty; result: RemoveRequestList };
+  "people/setForgeLogins": { params: ForgeLogins; result: Empty };
   "people/setRole": { params: PersonRoleRequest; result: Empty };
   "permissions/answer": { params: AnswerRequest; result: Empty };
   "permissions/pending": { params: Empty; result: PermissionRequest[] };
@@ -9290,11 +9327,13 @@ export const MethodTarget = {
   "orgRoutes/remove": "control",
   "orgRoutes/replaceKey": "control",
   "orgRoutes/set": "control",
+  "people/forViews": "control",
   "people/invite": "control",
   "people/list": "control",
   "people/remove": "control",
   "people/removePreview": "control",
   "people/removeRequests": "control",
+  "people/setForgeLogins": "control",
   "people/setRole": "control",
   "permissions/answer": "host",
   "permissions/pending": "host",
@@ -9756,6 +9795,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FolderWorktrees: { required: ["worktrees", "folder"], optional: [] },
   FoldersFindRequest: { required: [], optional: ["paths", "folders"] },
   FoldersListRequest: { required: ["includeArchived"], optional: [] },
+  ForgeLogins: { required: [], optional: ["github", "gitlab", "linear"] },
   FoundFolder: { required: ["folder", "exists", "isRepository", "isFolder"], optional: ["typed"] },
   GitAsk: { required: ["server", "from"], optional: [] },
   GitCredential: { required: ["username", "password"], optional: [] },
@@ -9943,6 +9983,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PassThroughState: { required: ["names"], optional: [] },
   PendingMove: { required: ["target", "removeLeft", "discardChanges", "askedBy", "askedAt"], optional: [] },
   PeopleChanged: { required: [], optional: ["user", "removed"] },
+  PeopleForViews: { required: ["people"], optional: [] },
   PeopleList: { required: ["people", "admin"], optional: [] },
   PermissionNotification: { required: ["agentID", "requestID"], optional: ["request"] },
   PermissionOption: { required: ["optionID", "name", "kind"], optional: [] },
@@ -10227,6 +10268,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SurfaceIdentification: { required: ["id", "name", "kind"], optional: [] },
   TeamBot: { required: ["user", "name", "spentTodayUSD", "capped", "machines", "online", "workflows", "live"], optional: ["group", "groupName", "caps"] },
   TeamBotRun: { required: ["host", "hostName", "agent"], optional: ["workflow", "since"] },
+  TeamPerson: { required: ["id", "name", "kind"], optional: ["githubLogin", "gitlabLogin", "linearLogin", "you"] },
   TeamTrigger: { required: ["workflow", "trigger", "runsOn"], optional: ["event", "dueAt"] },
   TeamTriggerFired: { required: ["ran"], optional: [] },
   TeamTriggerSent: { required: ["taken"], optional: [] },
