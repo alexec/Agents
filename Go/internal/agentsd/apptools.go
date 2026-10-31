@@ -47,6 +47,15 @@ type appToolsState struct {
 	appServer  *http.Server
 	appPort    int
 	appStarted bool
+	// images is drive_screen's own screenshot, by agent, taken out and sent back as an
+	// image content block the one time tools/call answers, never kept (FR-016).
+	images map[wire.UUID]pendingImage
+}
+
+// pendingImage is a drive_screen screenshot waiting to go out with its tool reply.
+type pendingImage struct {
+	Data string // base64
+	Mime string
 }
 
 // appTool is one of the tools, and what this host does when it is called.
@@ -88,6 +97,7 @@ func appToolCalls() []appTool {
 		{"delete_machine", (*Daemon).deleteMachine},
 		{"bring_back", (*Daemon).bringBackTool},
 		{"move_worktree", (*Daemon).moveWorktree},
+		{"drive_screen", (*Daemon).driveScreen},
 	}
 }
 
@@ -355,7 +365,7 @@ func writeJSON(w http.ResponseWriter, v any, session string) {
 
 // offeredTools is the tools this host lists to a session: the Swift host's, those it does,
 // each with the optional description AppService adds to every schema.
-func offeredTools(movesItself, bot bool) []json.RawMessage {
+func offeredTools(movesItself, bot, desktopControl bool) []json.RawMessage {
 	var all []map[string]json.RawMessage
 	if err := json.Unmarshal(wire.AppTools, &all); err != nil {
 		log.Printf("app tools: %v", err)
@@ -369,8 +379,10 @@ func offeredTools(movesItself, bot bool) []json.RawMessage {
 	for _, t := range all {
 		var name string
 		json.Unmarshal(t["name"], &name)
-		// A bot's machine has no ask tools: nobody answers there (#1761, FR-032).
-		if !done[name] || name == "move_worktree" && !movesItself || askTools[name] && bot {
+		// A bot's machine has no ask tools: nobody answers there (#1761, FR-032). A host
+		// with no agents-drive beside it has no drive_screen (#3004, host.desktop-control/1).
+		if !done[name] || name == "move_worktree" && !movesItself || askTools[name] && bot ||
+			name == "drive_screen" && !desktopControl {
 			continue
 		}
 		b, _ := json.Marshal(t)
@@ -397,7 +409,7 @@ func (d *Daemon) appToolsHandle(ctx context.Context, g *appGrant, method string,
 	case "ping":
 		return map[string]any{}, nil
 	case "tools/list":
-		return map[string]any{"tools": offeredTools(g.movesItself, d.isBot())}, nil
+		return map[string]any{"tools": offeredTools(g.movesItself, d.isBot(), d.desktopControlAvailable())}, nil
 	case "resources/list":
 		return map[string]any{"resources": []any{}}, nil
 	case "resources/read":
@@ -440,6 +452,16 @@ func (d *Daemon) appToolsHandle(ctx context.Context, g *appGrant, method string,
 				msg = e.Message
 			}
 			return toolReply(msg, true), nil
+		}
+		d.appMu.Lock()
+		image, hasImage := d.images[g.agent]
+		delete(d.images, g.agent)
+		d.appMu.Unlock()
+		if hasImage {
+			return map[string]any{"content": []any{
+				map[string]any{"type": "text", "text": note},
+				map[string]any{"type": "image", "data": image.Data, "mimeType": image.Mime},
+			}, "isError": false}, nil
 		}
 		return toolReply(note, false), nil
 	}

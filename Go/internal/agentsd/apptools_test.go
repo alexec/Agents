@@ -83,7 +83,13 @@ func TestTheAppsToolsAreServedToEachRuntime(t *testing.T) {
 		} `json:"tools"`
 	}
 	json.Unmarshal(list["result"], &tools)
-	if len(tools.Tools) != len(appToolCalls()) || tools.Tools[0].Name != "show_file" || tools.Tools[0].Description == "" ||
+	// drive_screen is the one tool this host may not offer at all, on a host with no
+	// agents-drive beside it (#3004, host.desktop-control/1): this runner has none.
+	want := len(appToolCalls())
+	if !d.desktopControlAvailable() {
+		want--
+	}
+	if len(tools.Tools) != want || tools.Tools[0].Name != "show_file" || tools.Tools[0].Description == "" ||
 		!strings.Contains(string(tools.Tools[0].InputSchema["properties"]), `"description"`) {
 		t.Fatalf("%s", list["result"])
 	}

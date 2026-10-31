@@ -262,7 +262,9 @@ func personaPrompt(a *wire.Agent) string {
 // tools this host offers it, under the names Grok calls.
 func grokRules() string {
 	var cards []string
-	for _, raw := range offeredTools(runtimeCanMove("grok"), false) {
+	// Written once, for every host (#3004): never claims drive_screen, since whether this
+	// one host has agents-drive beside it is not known here.
+	for _, raw := range offeredTools(runtimeCanMove("grok"), false, false) {
 		var t map[string]any
 		if json.Unmarshal(raw, &t) != nil {
 			continue

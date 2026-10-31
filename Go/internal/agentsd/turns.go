@@ -957,6 +957,7 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 	// said, as a stop or a crash, nor picked up after a restart.
 	if a := d.Store.Agent(l.id); a != nil && a.State == wire.AgentStateArchived {
 		l.forgetTools()
+		d.endScreenDrive(l.id)
 		d.workflowRunFinished(l.id)
 		d.guardedTurnEnded(l.id)
 		d.checkQueueSoon(folderPath(a))
@@ -977,6 +978,7 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 	}
 	var requested, archiveNow bool
 	l.forgetTools()
+	d.endScreenDrive(l.id)
 	d.change(l.id, func(a *wire.Agent) {
 		a.State, a.EndedReason, a.RunningTool = s, reason(why), nil
 		if why != wire.EndedReasonDaemonGone {

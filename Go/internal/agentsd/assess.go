@@ -91,6 +91,7 @@ var appToolMethods = map[string]string{
 	"make_machine":        "machines/make",
 	"delete_machine":      "machines/delete",
 	"bring_back":          "branches/bringBack",
+	"drive_screen":        "screen/drive",
 }
 
 // appToolMethod is the method a tool is, or the tool's own name for one not in the table.

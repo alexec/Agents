@@ -109,8 +109,9 @@ func TestEveryAppToolIsOneMethodNamedAfterIt(t *testing.T) {
 	// The tools whose noun is not in their name: ask_question asks a question (#2298), and
 	// cancel_wait cancels a wait for an event.
 	// hang_up hangs up a voice call (#2375), notify tells the person (#2805), and bring_back
-	// brings back a branch (#2947).
-	nouns := map[string]string{"bring_back": "branches", "notify": "people", "ask_question": "questions", "cancel_wait": "events", "wait_for_event": "events", "wait_for_agents": "agents", "check_again": "waits", "hang_up": "calls", "cancel_message": "sessions"}
+	// brings back a branch (#2947). drive_screen's noun, the screen, is singular: there is
+	// one of it (#3004).
+	nouns := map[string]string{"bring_back": "branches", "notify": "people", "ask_question": "questions", "cancel_wait": "events", "wait_for_event": "events", "wait_for_agents": "agents", "check_again": "waits", "hang_up": "calls", "cancel_message": "sessions", "drive_screen": "screen"}
 	seen := map[string]string{}
 	for _, tool := range appToolCalls() {
 		method, ok := appToolMethods[tool.name]
