@@ -1,7 +1,7 @@
 // Labels on a session and the search field's query: SessionLabelPolicy (Model/SessionLabel.swift)
 // and SessionLabelQuery (Model/SessionLabelQuery.swift), ported by hand and held to
 // Fixtures/web/labels (research R7).
-import type { Agent } from "../protocol/generated";
+import type { Agent, SessionLabel } from "../protocol/generated";
 
 export const maximumLabels = 5;
 export const maximumLabelLength = 24;
@@ -52,6 +52,12 @@ export function labelKind(value: string): LabelKind {
   if (/^[Pp]#[0-9]+$/.test(text)) return "pullRequest";
   if (["merged", "closed", "archived"].includes(text.toLowerCase())) return "finished";
   return "plain";
+}
+
+/** A label chip's classes: what it names, and `agent` for one the agent added, outlined and
+ *  not filled, as LabelChip draws it on the Mac and the Remote (#2997). */
+export function labelClass(label: Pick<SessionLabel, "value" | "owner">): string {
+  return `chip label ${labelKind(label.value)}${label.owner === "agent" ? " agent" : ""}`;
 }
 
 export interface LabelQuery {
