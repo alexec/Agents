@@ -19,6 +19,7 @@
               "pr.merged",
               "pr.closed",
               "pr.conflicted",
+              "pr.commented",
               "review.requested",
               "review.posted",
               "review.comment",
