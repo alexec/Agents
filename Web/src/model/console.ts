@@ -2,7 +2,7 @@
 // audit, team workflows) and of Reports (everyone, scoped by role), each a page in its section of the
 // bar since #2141 (model/nav.ts). The Mac window and the Remote draw the Me scope of Reports already
 // (Cost, Time, Pool), and leave the admins' pages to the web.
-import type { ChannelLinkRequest, FleetMachine, Group, LiveAgent, LiveBoard, PersonRow, TeamBot } from "../protocol/generated";
+import type { ChannelLinkRequest, FleetMachine, Group, LiveAgent, LiveBoard, PersonRow, TeamBot, TeamBotRun } from "../protocol/generated";
 import { dollars } from "./teamGroups";
 import { money } from "./limits";
 import { CallFailed } from "../wire/link";
@@ -148,7 +148,7 @@ export function linkWords(r: ChannelLinkRequest): string {
 // Console ▸ Team Workflows (M6): each bot, the workflows it ran this week, and what runs now.
 
 export const noBots = "No bots yet. Make one in People and Groups: a bot runs a workflow whose runs-on: names it.";
-export const teamWorkflowsFoot = "Runs are the triggers each bot claimed in the last 7 days, once each across its machines. Stop ends one agent on a bot’s machine; the workflow runs again at its next trigger.";
+export const teamWorkflowsFoot = "Runs are the triggers each bot claimed in the last 7 days, once each across its machines. Stop… ends one agent on a bot’s machine, after it asks; the workflow runs again at its next trigger.";
 
 /** "2 of 3 machines online". */
 export function machineWords(bot: TeamBot): string {
@@ -161,6 +161,11 @@ export function spendWords(bot: TeamBot): string {
   if (bot.capped) return "At its cap until midnight UTC";
   const cap = bot.caps?.dailyUSD;
   return cap !== undefined ? `${dollars(bot.spentTodayUSD)} today of ${dollars(cap)} a day` : `${dollars(bot.spentTodayUSD)} today`;
+}
+
+/** Stop…'s question (#3000), as Live Now's Stop… asks first. */
+export function teamStopQuestion(bot: TeamBot, run: TeamBotRun): string {
+  return `Stop ${bot.name}'s ${run.workflow ?? "agent"} on ${run.hostName}? It stops now; the workflow runs again at its next trigger.`;
 }
 
 /** "3 runs", "1 run". */
