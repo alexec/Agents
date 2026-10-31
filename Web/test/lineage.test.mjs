@@ -67,28 +67,8 @@ test("an issue, a PR or a milestone on GitHub has its address; a session has non
   assert.equal(l.lineageUrl({ kind: "milestone", ref: "github:alexec/agents/milestone/15" }), "https://github.com/alexec/agents/milestone/15");
 });
 
-// The tree and the graph (#3019), as LineageLayoutTests has them on the window.
+// The graph (#3019), as LineageLayoutTests has it on the window.
 const title = (n) => n.ref === helper.ref ? "Helper" : undefined;
-
-test("the tree shows each node once, under the first node that reached it", () => {
-  const tree = l.lineageTree(session, graph, new Map(), title);
-  assert.deepEqual(tree.map((t) => t.row.name), ["This session", "alexec/agents#12", "alexec/agents#34", "Helper"]);
-  assert.deepEqual(tree.map((t) => t.depth), [0, 1, 2, 1]);
-  assert.deepEqual(tree.map((t) => t.guides), [[], [], [true], []]);
-  assert.deepEqual(tree.map((t) => t.last), [true, false, true, true]);
-  assert.deepEqual(tree.map((t) => t.hasChildren), [true, true, false, false]);
-  // The helper's own link to the issue is not a line of the tree, but stays in its words.
-  assert.ok(tree[3].row.links.includes("Works on alexec/agents#12 · when it started"));
-  assert.equal(tree[0].row.session, undefined);
-});
-
-test("a node the walk did not reach goes last, alone", () => {
-  const stray = { kind: "issue", ref: "github:alexec/agents#99" };
-  const tree = l.lineageTree(session, { ...graph, nodes: [...graph.nodes, stray] }, new Map(), title);
-  assert.equal(tree.at(-1).row.node.ref, stray.ref);
-  assert.equal(tree.at(-1).depth, 0);
-  assert.deepEqual(l.lineageTree(session, { nodes: [session], links: [] }, new Map(), title), []);
-});
 
 test("the graph has a tier per kind, centred on the widest", () => {
   const g = l.lineageGraph(session, graph, new Map(), title);

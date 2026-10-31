@@ -109,7 +109,7 @@ public extension DaemonAPI {
 
 /// A session's Lineage pane (#2940), as `Web/src/model/lineage.ts` has it on the web page: the
 /// nodes the session is linked to, each with its links and, for an issue or a PR, what was banked
-/// on it. `LineageLayout` lays them out as a tree or a graph (#3019).
+/// on it. `LineageLayout` lays them out as a graph (#3019).
 public enum LineageList {
     public typealias Node = DaemonAPI.LineageNode
 
@@ -137,8 +137,6 @@ public enum LineageList {
         public var id: String { node.ref }
     }
 
-    /// The kinds in the order the tree shows a node's children.
-    static let kinds = ["issue", "pr", "session", "workflow-run", "milestone"]
 
     /// A row for each node the walk reached, once, in the walk's order, the session itself left out.
     public static func rows(of session: Node, graph: DaemonAPI.LineageGraph,

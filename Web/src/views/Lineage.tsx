@@ -1,28 +1,24 @@
 // A session's Lineage tab (#2940), as the window's LineagePane: the issues, pull requests,
 // helpers and workflow runs the session is linked to, from lineage/walk (depth 2), each with its
-// links and, for an issue or a PR, what lineage/cost says was banked on it. Two layouts, behind its
-// Layout switch so Alex can compare them (#3019): a tree from this session, and a graph of boxes and
-// lines.
+// links and, for an issue or a PR, what lineage/cost says was banked on it, as a graph of boxes
+// and lines (#3019).
 import { useSignal } from "@preact/signals";
-import type { ComponentChildren } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import type { LineageCostRollup, LineageGraph, LineageNode } from "../protocol/generated";
 import type { UUID } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
 import {
-  box, costKey, costed, curve, keepStyle, keptStyle, lineageDepth, lineageGraph, lineageNote, lineageStyles, lineageTree, noLineage,
-  sessionNode, type GraphNode, type LineageGraphLayout, type LineageRow, type LineageStyle, type TreeRow,
+  box, costKey, costed, curve, lineageDepth, lineageGraph, lineageNote, noLineage, sessionNode, type GraphNode,
+  type LineageGraphLayout, type LineageRow,
 } from "../model/lineage";
 import { go, route } from "../route";
-import { Choice } from "./Choice";
 
 export function Lineage({ store, host, session }: { store: Store; host: string; session: string }) {
   const graph = useSignal<LineageGraph | null>(null);
   const costs = useSignal<ReadonlyMap<string, LineageCostRollup>>(new Map());
   const failed = useSignal<string | null>(null);
   const asked = useSignal(0);
-  const style = useSignal<LineageStyle>(keptStyle());
   const me = sessionNode(session);
   useEffect(() => {
     let current = true;
@@ -58,69 +54,18 @@ export function Lineage({ store, host, session }: { store: Store; host: string; 
     </>
   );
   return (
-    <div class={`lineage lineage-${style.value}`}>
+    <div class="lineage">
       <div class="crumbs">
         <span class="title">Lineage</span>
-        <Choice label="Layout" value={style.value} options={lineageStyles}
-          title="Show the links as a tree from this session, or as a graph of boxes and lines"
-          onPick={(v) => { style.value = v; keepStyle(v); }} />
         <button class="link" onClick={() => { asked.value++; }}>Refresh</button>
       </div>
-      {empty ? <p class="hint">{noLineage}</p>
-        : style.value === "tree" ? <Tree rows={lineageTree(me, graph.value, costs.value, title)} me={me} show={show} />
-        : <Graph layout={lineageGraph(me, graph.value, costs.value, title)} show={show} />}
+      {empty ? <p class="hint">{noLineage}</p> : <Graph layout={lineageGraph(me, graph.value, costs.value, title)} show={show} />}
       {footer}
     </div>
   );
 }
 
 type Show = (row: LineageRow) => (() => void) | undefined;
-
-/** A row of the tree: a link to GitHub, a button to a session's chat, or neither. */
-function Row({ row, show, children }: { row: LineageRow; show: Show; children: ComponentChildren }) {
-  const go = show(row);
-  return row.url ? <a class="row lineage-row" href={row.url} target="_blank" rel="noopener noreferrer" title="Open it on GitHub">{children}</a>
-    : go ? <button class="row lineage-row" title="Show this session" onClick={go}>{children}</button>
-    : <div class="row lineage-row">{children}</div>;
-}
-
-/** How far each level of the tree is in, and where the elbow meets a row's dot: LineageLayout's TreeLines. */
-const indent = 18, elbow = 15;
-
-/** The tree (#3019): the list's rows, this session at the top, each indented under the node the walk reached it
- * from, with a line from each to its parent. */
-function Tree({ rows, me, show }: { rows: TreeRow[]; me: LineageNode; show: Show }) {
-  return (
-    <ul class="lineage-tree">
-      {rows.map((t) => (
-        <li key={t.row.node.ref} style={{ paddingLeft: `${indent * (t.depth + 1)}px` }}>
-          <TreeLines tree={t} here={t.row.node.kind === me.kind && t.row.node.ref === me.ref} />
-          <Row row={t.row} show={show}>
-            <span class="title">{t.row.name}</span>
-            {t.row.cost && <span class="subtitle lineage-cost">{t.row.cost}</span>}
-            {t.row.links.map((line) => <span key={line} class="subtitle">{line}</span>)}
-          </Row>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-/** The lines before a row of the tree: an ancestor's line going on down past it, the elbow from its parent's line
- * to its dot, and a line down from its dot to its first child. */
-function TreeLines({ tree, here }: { tree: TreeRow; here: boolean }) {
-  const x = (level: number) => indent * level + indent / 2;
-  const parent = x(tree.depth - 1), own = x(tree.depth);
-  return (
-    <svg class="lineage-lines" width={indent * (tree.depth + 1)} aria-hidden="true">
-      {tree.guides.map((on, i) => on && <line key={i} x1={x(i)} x2={x(i)} y1={0} y2="100%" />)}
-      {tree.depth > 0 && <line x1={parent} x2={parent} y1={0} y2={tree.last ? elbow : "100%"} />}
-      {tree.depth > 0 && <line x1={parent} x2={own - 4} y1={elbow} y2={elbow} />}
-      {tree.hasChildren && <line x1={own} x2={own} y1={elbow + 4} y2="100%" />}
-      <circle class={here ? "here" : undefined} cx={own} cy={elbow} r={3.5} />
-    </svg>
-  );
-}
 
 /** "alexec/agents#12" in at most `n` letters, cut in the middle as the window's truncationMode(.middle). */
 function clip(text: string, n: number): string {
@@ -204,11 +149,11 @@ function Graph({ layout, show }: { layout: LineageGraphLayout; show: Show }) {
   );
 }
 
-/** One box of the graph: the node's name, and its kind and cost. */
+/** One box of the graph: the node's name, and its kind and cost; its links, one a line, in its title. */
 function Box({ node, show }: { node: GraphNode; show: Show }) {
   const inner = (
     <>
-      <title>{node.row.name}</title>
+      <title>{[node.row.name, ...node.row.links].join("\n")}</title>
       <rect class={node.here ? "box here" : "box"} width={box.width} height={box.height} rx={10} />
       <text class="name" x={10} y={20}>{clip(node.row.name, 28)}</text>
       <text class="detail" x={10} y={38}>{clip(node.detail, 34)}</text>

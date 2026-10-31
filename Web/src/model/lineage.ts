@@ -27,8 +27,6 @@ export interface LineageRow {
   url?: string | undefined;
 }
 
-/** The kinds in the order the tree shows a node's children. */
-const kinds = ["issue", "pr", "session", "workflow-run", "milestone"];
 
 /** A node's address on GitHub: a PR's is its /pull/ page. */
 export function lineageUrl(n: LineageNode): string | undefined {
@@ -91,40 +89,11 @@ export function lineageRows(session: LineageNode, graph: LineageGraph, costs: Re
   return rows;
 }
 
-// The two layouts of the pane (#3019), behind its Layout switch, as LineageLayout has them on the
-// window: a tree of the list's rows, and a graph of boxes and lines. Both start at this session.
-// The links are not a tree: a session that works on an issue and on the PR that fixes it makes a
-// triangle. The tree shows each node once, under the first node the walk reached it from, and its
-// other links stay in its lines; the graph draws every link.
+// The pane as a graph of boxes and lines (#3019), as LineageLayout has it on the window: this
+// session and the nodes it is linked to, a line for every link. The links are not a tree: a session
+// that works on an issue and on the PR that fixes it makes a triangle.
 
-export type LineageStyle = "tree" | "graph";
-export const lineageStyles: readonly (readonly [LineageStyle, string])[] = [["tree", "Tree"], ["graph", "Graph"]];
-
-const styleKey = "lineageLayout";
-
-/** The layout this browser was left on, else the tree. */
-export function keptStyle(): LineageStyle {
-  try { return globalThis.window?.localStorage.getItem(styleKey) === "graph" ? "graph" : "tree"; } catch { return "tree"; }
-}
-
-export function keepStyle(style: LineageStyle): void {
-  try { globalThis.window?.localStorage.setItem(styleKey, style); } catch { /* private mode: for this page only */ }
-}
-
-/** One row of the tree: the list's row, how deep it is, and the lines to draw before it. */
-export interface TreeRow {
-  row: LineageRow;
-  /** 0 for this session (and for a node the walk did not reach from it), 1 for its links, and so on. */
-  depth: number;
-  /** For each level from 1 to depth - 1: whether that ancestor has a sibling below, so its line goes on down. */
-  guides: boolean[];
-  /** The last child of its parent: its line stops at this row. */
-  last: boolean;
-  /** A line goes down from it to its first child. */
-  hasChildren: boolean;
-}
-
-/** The row for this session itself, at the top of the tree and in the graph. */
+/** The row for this session itself, a box of the graph. */
 export const hereRow = (session: LineageNode): LineageRow => ({ node: session, name: "This session", links: [] });
 
 /** Each node's links, either way, in the order the walk gave them. */
@@ -133,42 +102,6 @@ function neighbours(graph: LineageGraph): Map<string, LineageNode[]> {
   const add = (a: LineageNode, b: LineageNode) => { const list = next.get(key(a)) ?? []; list.push(b); next.set(key(a), list); };
   for (const l of graph.links) { add(l.from, l.to); add(l.to, l.from); }
   return next;
-}
-
-const rank = (n: LineageNode) => { const i = kinds.indexOf(n.kind); return i < 0 ? kinds.length : i; };
-
-/** The tree, depth first, each node's children by kind: issues, PRs, sessions, runs, milestones. */
-export function lineageTree(session: LineageNode, graph: LineageGraph, costs: ReadonlyMap<string, LineageCostRollup>,
-  title: (n: LineageNode) => string | undefined): TreeRow[] {
-  const rows = lineageRows(session, graph, costs, title);
-  if (rows.length === 0) return [];
-  const byNode = new Map(rows.map((r) => [key(r.node), r]));
-  const next = neighbours(graph);
-  const children = new Map<string, LineageNode[]>();
-  const placed = new Set([key(session)]);
-  const queue = [session];
-  for (let parent = queue.shift(); parent; parent = queue.shift()) {
-    for (const n of next.get(key(parent)) ?? []) {
-      if (!byNode.has(key(n)) || placed.has(key(n))) continue;
-      placed.add(key(n));
-      children.set(key(parent), [...children.get(key(parent)) ?? [], n]);
-      queue.push(n);
-    }
-  }
-  for (const [parent, list] of children) {
-    children.set(parent, list.map((n, i) => [n, i] as const).sort(([a, i], [b, j]) => rank(a) - rank(b) || i - j).map(([n]) => n));
-  }
-  const out: TreeRow[] = [];
-  const visit = (node: LineageNode, depth: number, guides: boolean[], last: boolean) => {
-    const kids = children.get(key(node)) ?? [];
-    out.push({ row: same(node, session) ? hereRow(session) : byNode.get(key(node))!, depth, guides, last, hasChildren: kids.length > 0 });
-    const below = depth === 0 ? guides : [...guides, !last];
-    kids.forEach((kid, i) => { visit(kid, depth + 1, below, i === kids.length - 1); });
-  };
-  visit(session, 0, [], true);
-  // A node the walk did not reach from this session (a walk cut at its limit) goes last, alone.
-  for (const row of rows) if (!placed.has(key(row.node))) out.push({ row, depth: 0, guides: [], last: true, hasChildren: false });
-  return out;
 }
 
 /** One box of the graph, its top-left corner in pixels. */

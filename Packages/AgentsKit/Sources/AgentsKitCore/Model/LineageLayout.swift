@@ -1,74 +1,14 @@
 import Foundation
 
-/// The two layouts of a session's Lineage pane (#3019), behind the pane's Layout switch, as
-/// `Web/src/model/lineage.ts` has them: a tree of the list's rows, and a graph of boxes and lines.
-/// Both start at this session. The links are not a tree: a session that works on an issue and on
-/// the PR that fixes it makes a triangle. The tree shows each node once, under the first node the
-/// walk reached it from, and its other links stay in its lines; the graph draws every link.
+/// A session's Lineage pane as a graph of boxes and lines (#3019), as `Web/src/model/lineage.ts`
+/// has it: this session and the nodes it is linked to, a line for every link. The links are not a
+/// tree: a session that works on an issue and on the PR that fixes it makes a triangle.
 public enum LineageLayout {
     public typealias Node = DaemonAPI.LineageNode
 
-    public enum Style: String, CaseIterable, Sendable {
-        case tree, graph
-
-        public var title: String { self == .tree ? "Tree" : "Graph" }
-    }
-
-    /// One row of the tree: the list's row, how deep it is, and the lines to draw before it.
-    public struct TreeRow: Sendable, Hashable, Identifiable {
-        public var row: LineageList.Row
-        /// 0 for this session (and for a node the walk did not reach from it), 1 for its links, and so on.
-        public var depth: Int
-        /// For each level from 1 to depth - 1: whether that ancestor has a sibling below, so its line
-        /// goes on down past this row.
-        public var guides: [Bool]
-        /// The last child of its parent: its line stops at this row.
-        public var last: Bool
-        /// A line goes down from it to its first child.
-        public var hasChildren: Bool
-        public var id: String { row.id }
-    }
-
-    /// The row for this session itself, at the top of the tree and in the graph.
+    /// The row for this session itself, a box of the graph.
     public static func here(_ session: Node) -> LineageList.Row {
         LineageList.Row(node: session, name: "This session", links: [], cost: nil, url: nil, session: nil)
-    }
-
-    /// The tree, depth first, each node's children by kind: issues, PRs, sessions, runs, milestones.
-    public static func tree(of session: Node, graph: DaemonAPI.LineageGraph,
-                            costs: [Node: DaemonAPI.LineageCostRollup],
-                            title: @escaping (Node) -> String?) -> [TreeRow] {
-        let rows = LineageList.rows(of: session, graph: graph, costs: costs, title: title)
-        guard !rows.isEmpty else { return [] }
-        let byNode = Dictionary(rows.map { ($0.node, $0) }, uniquingKeysWith: { a, _ in a })
-        let next = neighbours(graph)
-        var children: [Node: [Node]] = [:]
-        var placed: Set<Node> = [session]
-        var queue = [session]
-        while !queue.isEmpty {
-            let parent = queue.removeFirst()
-            for n in next[parent] ?? [] where byNode[n] != nil && placed.insert(n).inserted {
-                children[parent, default: []].append(n)
-                queue.append(n)
-            }
-        }
-        for (parent, list) in children { children[parent] = byKind(list) }
-        var out: [TreeRow] = []
-        func visit(_ node: Node, depth: Int, guides: [Bool], last: Bool) {
-            let kids = children[node] ?? []
-            out.append(TreeRow(row: node == session ? here(session) : byNode[node]!, depth: depth,
-                               guides: guides, last: last, hasChildren: !kids.isEmpty))
-            let below = depth == 0 ? guides : guides + [!last]
-            for (i, kid) in kids.enumerated() {
-                visit(kid, depth: depth + 1, guides: below, last: i == kids.count - 1)
-            }
-        }
-        visit(session, depth: 0, guides: [], last: true)
-        // A node the walk did not reach from this session (a walk cut at its limit) goes last, alone.
-        for row in rows where !placed.contains(row.node) {
-            out.append(TreeRow(row: row, depth: 0, guides: [], last: true, hasChildren: false))
-        }
-        return out
     }
 
     /// One box of the graph, its top-left corner in points.
@@ -229,9 +169,4 @@ public enum LineageLayout {
         return next
     }
 
-    /// In `LineageList.kinds`' order, the walk's order within a kind.
-    static func byKind(_ nodes: [Node]) -> [Node] {
-        let rank = { (n: Node) in LineageList.kinds.firstIndex(of: n.kind) ?? LineageList.kinds.count }
-        return nodes.enumerated().sorted { (rank($0.element), $0.offset) < (rank($1.element), $1.offset) }.map(\.element)
-    }
 }

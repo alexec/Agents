@@ -1,6 +1,6 @@
-// A session's Lineage tab (#2940) as a tree and as a graph (#3019): on a run-app root with sessions
-// linked by lineage/link, open a session, choose Lineage, and shoot the tree; switch Layout to Graph
-// and shoot that; then a session with no links. Screenshots into <out dir>.
+// A session's Lineage tab (#2940) as a graph (#3019): on a run-app root with sessions linked by
+// lineage/link, open a session, choose Lineage, and shoot the graph; then a session with no links.
+// Screenshots into <out dir>.
 //
 //   node Web/test/walk/lineage3019.mjs <WEB_URL> <browser code> <out dir> <linked title> <unlinked title>
 
@@ -32,19 +32,12 @@ try {
   await page.press("Files");
   await page.waitFor(`document.querySelector("aside.files")`, 30_000);
   await page.eval(`[...document.querySelectorAll("aside.files [role=tab]")].find((t) => t.textContent === "Lineage")?.click()`);
-  // The tree first, as a browser that never chose starts on it.
-  await page.eval(`localStorage.removeItem("lineageLayout")`);
-  await page.waitFor(`document.querySelector(".lineage-tree .lineage-cost")`, 30_000);
-  const tree = await page.eval(`[...document.querySelectorAll(".lineage-tree > li")].map((li) => li.style.paddingLeft + " " + li.querySelector(".title").textContent)`);
-  ok(`tree ${JSON.stringify(tree)}`, tree[0] === "18px This session" && tree.some((r) => r.startsWith("54px")));
-  await sleep(400);
-  await page.shot(`${out}/web-tree.png`);
-  await page.eval(`(() => { const s = document.querySelector(".lineage .choice select"); s.value = "graph"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
-  await page.waitFor(`document.querySelector(".lineage-graph .lineage-box")`, 30_000);
+  await page.waitFor(`[...document.querySelectorAll(".lineage-graph .lineage-box .detail")].some((d) => d.textContent.includes("·"))`, 30_000);
   const boxes = await page.eval(`document.querySelectorAll(".lineage-graph .lineage-box").length`);
   const edges = await page.eval(`document.querySelectorAll(".lineage-graph .lineage-edge").length`);
-  ok(`graph ${boxes} boxes, ${edges} lines`, boxes === tree.length && edges >= boxes - 1);
-  ok("the layout is kept", (await page.eval(`localStorage.getItem("lineageLayout")`)) === "graph");
+  ok(`graph ${boxes} boxes, ${edges} lines`, boxes >= 2 && edges >= boxes - 1);
+  const here = await page.eval(`document.querySelector(".lineage-box .box.here")?.parentElement.querySelector(".name").textContent`);
+  ok(`this session is a box: ${here}`, here === "This session");
   await sleep(400);
   await page.shot(`${out}/web-graph.png`);
   await open(unlinked);

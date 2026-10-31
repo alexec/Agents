@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import AgentsKitCore
 
-/// A session's Lineage pane as a tree and as a graph (#3019), as `Web/test/lineage.test.mjs` has them.
+/// A session's Lineage pane as a graph (#3019), as `Web/test/lineage.test.mjs` has it.
 @Suite("Lineage layout")
 struct LineageLayoutTests {
     typealias Node = DaemonAPI.LineageNode
@@ -24,28 +24,6 @@ struct LineageLayoutTests {
     }
 
     func title(_ n: Node) -> String? { n == helper ? "Helper" : nil }
-
-    @Test func theTreeShowsEachNodeOnceUnderTheFirstNodeThatReachedIt() throws {
-        let tree = LineageLayout.tree(of: session, graph: graph, costs: [:], title: title)
-        try #require(tree.count == 4)
-        #expect(tree.map(\.row.name) == ["This session", "alexec/agents#12", "alexec/agents#34", "Helper"])
-        #expect(tree.map(\.depth) == [0, 1, 2, 1])
-        #expect(tree.map(\.guides) == [[], [], [true], []])
-        #expect(tree.map(\.last) == [true, false, true, true])
-        #expect(tree.map(\.hasChildren) == [true, true, false, false])
-        // The helper's own link to the issue is not a line of the tree, but stays in its words.
-        #expect(tree[3].row.links.contains("Works on alexec/agents#12 · when it started"))
-        #expect(tree[0].row.session == nil && tree[0].row.links.isEmpty)
-    }
-
-    @Test func aNodeTheWalkDidNotReachGoesLastAlone() {
-        let stray = Node(kind: "issue", ref: "github:alexec/agents#99")
-        var cut = graph
-        cut.nodes.append(stray)
-        let tree = LineageLayout.tree(of: session, graph: cut, costs: [:], title: title)
-        #expect(tree.last?.row.node == stray && tree.last?.depth == 0)
-        #expect(LineageLayout.tree(of: session, graph: .init(nodes: [session]), costs: [:], title: title).isEmpty)
-    }
 
     @Test func theGraphHasATierPerKindCentredOnTheWidest() throws {
         let g = LineageLayout.graph(of: session, graph: graph, costs: [:], title: title)
