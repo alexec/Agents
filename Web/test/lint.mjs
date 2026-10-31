@@ -54,6 +54,9 @@ const allowedURLs = new Set([
   // Connect GitLab (#1630): the address field's example, and Make a Token's page with no address,
   // a link the person opens in a new tab, never fetched.
   "https://gitlab.com",
+  // The wait card's link to the merge request or issue its arguments name (#3077): a link
+  // the person opens in a new tab, never fetched.
+  "https://gitlab.com/",
   // Connect Linear (#1343): the hand-back page, the one origin whose postMessage the page takes.
   "https://oauth.agentloops.dev",
   // Console ▸ Sign-In (#1002): each preset's issuer, as a field's example text; the control plane reads the

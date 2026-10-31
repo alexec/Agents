@@ -505,6 +505,8 @@ button.link.reading:hover { text-decoration: underline; }
 .wait-card-source, .wait-card-separator { color: var(--paper-ink); opacity: .68; }
 .wait-card-kind { font-weight: 500; overflow-wrap: anywhere; }
 .wait-card-filters { color: var(--paper-ink); opacity: .68; overflow-wrap: anywhere; }
+/* The PR or issue named in them, as a link (#3077): the accent colour, underlined. */
+a.wait-card-filters { color: var(--accent); opacity: 1; text-decoration: underline; }
 .wait-card-progress { height: 3px; overflow: hidden; border-radius: 99px; background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .wait-card-progress span { display: block; height: 100%; background: var(--accent); transition: width .2s linear; }
 .wait-card .wait-answers { display: flex; justify-content: flex-end; gap: 10px; }
