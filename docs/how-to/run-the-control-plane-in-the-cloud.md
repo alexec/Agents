@@ -112,7 +112,9 @@ In the repository on your Mac:
 
    It makes an **A** record for `control.agentloops.dev` and one for
    `views.agentloops.dev`, DNS only (not proxied), and never prints the token. Use
-   `--zone` and `--names` for other names.
+   `--zone` and `--names` for other names. To put Cloudflare's proxy and rate rules in
+   front instead (#2151), see [Cloudflare in front](../../deploy/README.md#cloudflare-in-front)
+   in `deploy/README.md`: give `--proxied` here, once that section's other steps are done.
 4. Run `up.sh` again, with the same options:
 
    ```sh
@@ -520,7 +522,14 @@ may write to about it; without it, the project's page.
 
 - **The certificate renews itself.** Caddy renews it about a month before it runs out.
   Nothing needs doing: no client or host holds a pin, so a renewed certificate, even with
-  a new key, is accepted like the old one, and live connections carry on.
+  a new key, is accepted like the old one, and live connections carry on. Behind a proxy
+  such as Cloudflare's, TLS-ALPN can't reach this Caddy, so it renews over HTTP-01 instead,
+  also with nothing to configure.
+- **A proxy in front is optional, and trusted only by its own address.** Caddy reads the
+  real client address from Cloudflare's published ranges only (`deploy/Caddyfile.public`);
+  from anywhere else it's the direct peer, as without a proxy at all. See [Cloudflare in
+  front](../../deploy/README.md#cloudflare-in-front) to put Cloudflare's proxy and rate
+  rules in front of `agentloops.dev` (#2151); a self-hosted control plane needs none of it.
 - **The page and the control plane are one version.** The image builds the page from the
   same checkout, so an upgrade changes both. A browser that has the page open loads it
   again when it reconnects.

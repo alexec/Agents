@@ -10,7 +10,7 @@ pass was written for. Each finding was checked again against `Go/internal/contro
 | P2 code id costs a GET | **Not fixed; P3 covers it.** A made-up code id is a failed proof, so a source has 20 a minute | `TestSourcesRefuseAfterTwentyFailedProofs` |
 | P3 in-process budget | **Fixed.** Per-source table: 20 failed proofs a minute, then 429 for a minute; 50 sockets waiting for `auth` | `TestSourcesRefuseAfterTwentyFailedProofs`, `TestSourcesCapSocketsWaitingForAuth`, `TestSourcesHoldABoundedTable`, `TestForwardedForIsTrustedOnlyFromTheProxy`, `TestAStrangerIsRefusedAfterTwentyFailedProofs` |
 | P3 Caddy | **Fixed.** `request_body max_size 1MB` on every site, in `Caddyfile.public` (the Pebble walk imports it) and `Caddyfile` | `TestEveryPublicRouteCapsItsBody` |
-| P3 firewall | Not code: the how-to, at T131 | — |
+| P3 firewall | **Fixed, #2151.** Cloudflare's proxy and rate rules sit in front of `agentloops.dev` once Alex turns them on: `deploy/gcp/up.sh --cloudflare` locks the GCP firewall to Cloudflare's ranges, and `deploy/Caddyfile.public` trusts `CF-Connecting-IP` only from them. Self-hosted, with no Cloudflare, is unchanged | — |
 | P4 forwarding after a restart | **Fixed before this pass** (a mark in the store, `resumeForwardingIfMarked`); now tested | `TestAForwardingCopyForwardsAfterARestart` |
 | P5 forwarding is public for 30 days | Unchanged, by design | — |
 | Logs | **Fixed.** A store error on a code named its key; it is no longer logged | `TestNoSecretReachesTheLog` |
@@ -131,7 +131,8 @@ capped (`maxMessage`), and the listen backlog is 256. Caddy's stock image has no
   The id is random, and the secret is the id plus an HMAC of it under the control key.
   That needs the tag in the id, a change to code version 2. Or a per-source budget (P3)
   covers it.
-- **P3. No per-source limits.** *Go, 2026-10-18: 1 and 2 fixed, 3 is the how-to's.*
+- **P3. No per-source limits.** *Go, 2026-10-18: 1 and 2 fixed, 3 is the how-to's.* *#2151: 3
+  is also Cloudflare's own ranges now, for `agentloops.dev` (`deploy/gcp/up.sh --cloudflare`).*
   `sources.go` keeps a table keyed by the source address: the peer's, or the last
   `X-Forwarded-For` entry when the peer is in `AGENTS_CONTROL_TRUSTED_PROXIES`.
   `compose.public.yaml` gives Caddy a fixed address (172.30.61.250) on its own subnet and
