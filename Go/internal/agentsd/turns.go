@@ -637,14 +637,35 @@ func (l *live) turn() bool {
 				d.dropAppTokens(l.id)
 			}
 		})
-		// The start options the window chose (model, mode) go first.
+		// The start options the window chose (model, mode) go first. What the runtime
+		// hands back replaces the handshake's own defaults above, so the mode pill shows
+		// the person's choice, not the runtime's; a push it refuses is a notice, not a
+		// silent revert (#3082).
+		var pushed []wire.ConfigOption
+		refused := false
 		for k, v := range a.StartOptions.Values {
 			var sv string
 			if json.Unmarshal(v, &sv) == nil && sv != "" {
-				if err := s.SetConfig(ctx, k, sv); err != nil {
+				got, err := s.SetOption(ctx, k, sv)
+				if err != nil {
 					log.Printf("agent %s: set %s=%s: %v", l.id, k, sv, err)
+					refused = true
+					continue
+				}
+				if opts := configOptions(got); len(opts) > 0 {
+					pushed = opts
 				}
 			}
+		}
+		if len(pushed) > 0 {
+			d.change(l.id, func(a *wire.Agent) {
+				a.AdvertisedOptions = d.markOptions(a.RuntimeID, withAppOptions(a.RuntimeID, a.StartOptions.Values, pushed))
+				a.Levels = d.matchLevels(a)
+			})
+		}
+		if refused {
+			d.record(l.id, notice("error", rt.Name+" did not keep its mode and model",
+				"Showing what it started with until the next reconnect."))
 		}
 		// The policy again, now the runtime has said its options: an agent with no model
 		// or mode chosen runs on the runtime's own, which the check before it started
@@ -1214,14 +1235,22 @@ func (l *live) Update(n sdk.SessionNotification) {
 		d.record(l.id, wire.TranscriptEntryKind{OptionChanged: &wire.TranscriptEntryKindOptionChanged{ID: "mode", Value: v}})
 	case u.ConfigOptionUpdate != nil:
 		if opts := configOptions(u.ConfigOptionUpdate.ConfigOptions); opts != nil {
+			var changedID string
+			var changedValue wire.JSONValue
 			d.change(l.id, func(a *wire.Agent) {
 				was, now := modeOption(a.AdvertisedOptions), modeOption(opts)
 				if was != nil && now != nil && was.ID == now.ID && len(now.CurrentValue) > 0 && !bytes.Equal(was.CurrentValue, now.CurrentValue) {
 					keepMode(a, now.ID, now.CurrentValue)
+					changedID, changedValue = now.ID, now.CurrentValue
 				}
 				a.AdvertisedOptions = d.markOptions(a.RuntimeID, withAppOptions(a.RuntimeID, a.StartOptions.Values, opts))
 				a.Levels = d.matchLevels(a)
 			})
+			// A mode moving on its own (Claude leaving plan mode, or a stale update after a
+			// reconnect) is visible in the transcript, as CurrentModeUpdate already is (#3082).
+			if changedID != "" {
+				d.record(l.id, wire.TranscriptEntryKind{OptionChanged: &wire.TranscriptEntryKindOptionChanged{ID: changedID, Value: changedValue}})
+			}
 		}
 	case u.AvailableCommandsUpdate != nil:
 		b, _ := json.Marshal(u.AvailableCommandsUpdate.AvailableCommands)

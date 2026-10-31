@@ -50,4 +50,16 @@ func TestTheModeChecksReadTheModeAnAgentIsInNow(t *testing.T) {
 	if m := inheritedMode(d.Store.Agent(helper.ID), ""); m == nil || *m != "plan" {
 		t.Fatal(m)
 	}
+	// Visible in the transcript, as CurrentModeUpdate's move into acceptEdits already was
+	// above: a mode moving on its own is never silent (#3082).
+	entries, _, _ := d.Store.Transcript(helper.ID, 0)
+	var changed []string
+	for _, e := range entries {
+		if c := e.Kind.OptionChanged; c != nil {
+			changed = append(changed, c.ID+"="+string(c.Value))
+		}
+	}
+	if len(changed) != 1 || changed[0] != `mode="plan"` {
+		t.Fatal(changed)
+	}
 }

@@ -129,7 +129,9 @@ func (f *fakeRuntime) UnstableForkSession(_ context.Context, r sdk.UnstableForkS
 	return sdk.UnstableForkSessionResponse{SessionId: "forked-" + r.SessionId}, nil
 }
 
-// ResumeSession has its own conversation, and no other.
+// ResumeSession has its own conversation, and no other. In a folder called reconnecting
+// it hands back a mode of its own ("default"), as a runtime's fresh process does before
+// the daemon re-pushes the agent's saved mode (#3082).
 func (f *fakeRuntime) ResumeSession(_ context.Context, r sdk.ResumeSessionRequest) (sdk.ResumeSessionResponse, error) {
 	if r.SessionId != "fake-session" {
 		return sdk.ResumeSessionResponse{}, fmt.Errorf("no session %s", r.SessionId)
@@ -137,7 +139,12 @@ func (f *fakeRuntime) ResumeSession(_ context.Context, r sdk.ResumeSessionReques
 	b, _ := json.Marshal(r.Meta)
 	f.sandboxOff = strings.Contains(string(b), `"sandbox":{"enabled":false}`)
 	f.systemPrompt = systemPromptOf(r.Meta)
-	return sdk.ResumeSessionResponse{}, nil
+	var out sdk.ResumeSessionResponse
+	if filepath.Base(r.Cwd) == "reconnecting" {
+		json.Unmarshal([]byte(`{"configOptions":[{"type":"select","id":"mode","name":"Mode","currentValue":"default",
+			"options":[{"value":"default","name":"Default"},{"value":"plan","name":"Plan"}]}]}`), &out)
+	}
+	return out, nil
 }
 
 // NewSession in a folder called offers offers a model, and a command a moment after; in
@@ -165,8 +172,18 @@ func (f *fakeRuntime) NewSession(_ context.Context, r sdk.NewSessionRequest) (sd
 	return out, nil
 }
 func (f *fakeRuntime) Cancel(context.Context, sdk.CancelNotification) error { return nil }
-func (f *fakeRuntime) SetSessionConfigOption(context.Context, sdk.SetSessionConfigOptionRequest) (sdk.SetSessionConfigOptionResponse, error) {
-	return sdk.SetSessionConfigOptionResponse{}, nil
+
+// SetSessionConfigOption, for a value ID, hands back what it was just set to: a runtime
+// saying its options are different from what the daemon asked for (#3082).
+func (f *fakeRuntime) SetSessionConfigOption(_ context.Context, r sdk.SetSessionConfigOptionRequest) (sdk.SetSessionConfigOptionResponse, error) {
+	if r.ValueId == nil {
+		return sdk.SetSessionConfigOptionResponse{}, nil
+	}
+	var opt sdk.SessionConfigOption
+	raw, _ := json.Marshal(map[string]any{"type": "select", "id": r.ValueId.ConfigId, "name": "Mode",
+		"currentValue": r.ValueId.Value, "options": []map[string]any{{"value": r.ValueId.Value, "name": r.ValueId.Value}}})
+	json.Unmarshal(raw, &opt)
+	return sdk.SetSessionConfigOptionResponse{ConfigOptions: []sdk.SessionConfigOption{opt}}, nil
 }
 
 func (f *fakeRuntime) Prompt(ctx context.Context, p sdk.PromptRequest) (sdk.PromptResponse, error) {
