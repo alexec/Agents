@@ -1,0 +1,41 @@
+# Scores each pull request's risk from its file list and diff stats and labels it
+# `risk:low` / `risk:medium` / `risk:high`, with a PR comment giving the breakdown
+# (#3040), modeled on the `areas` check (areas.yml + scripts/pr-areas.py).
+#
+# v1 is report-only: scripts/pr-risk.py never fails, so this job never blocks a merge
+# or turns auto-merge off. It is a fast, no-token signal for lanes, the Scrum Master
+# and Alex of which open PRs deserve a closer look.
+name: risk
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  # The label and comment go through the issues/PR APIs; a fork's token cannot write
+  # them, and the script then only warns.
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: risk-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  score:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            scripts/pr-risk.py
+          sparse-checkout-cone-mode: false
+
+      - name: Score risk and label it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: python3 scripts/pr-risk.py pr "$PR" --apply
