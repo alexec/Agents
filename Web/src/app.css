@@ -255,6 +255,7 @@ input.rename {
   padding: 6px 8px;
 }
 
+a.row { color: inherit; text-decoration: none; }
 .row:hover { background: var(--paper-wash); }
 .row.chosen { background: var(--paper-selection); }
 .row .title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

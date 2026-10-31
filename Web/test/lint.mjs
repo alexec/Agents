@@ -43,6 +43,9 @@ const allowedURLs = new Set([
   // Repositories on github.com (#1685): where the person changes which repositories the GitHub
   // App reaches, the same for every person, as the window's; a link opened in a new tab, never fetched.
   "https://github.com/settings/installations",
+  // Reports ▸ Value and the Lineage pane (#2998): an issue's, a PR's or a milestone's page on GitHub,
+  // as the window's, a link the person opens in a new tab, never fetched.
+  "https://github.com/",
   // Connect GitLab (#1630): the address field's example, and Make a Token's page with no address,
   // a link the person opens in a new tab, never fetched.
   "https://gitlab.com",

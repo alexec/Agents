@@ -59,3 +59,12 @@ test("only issues and PRs are costed", () => {
   assert.ok(l.costed(issue) && l.costed(pr));
   assert.ok(!l.costed(helper));
 });
+
+test("an issue, a PR or a milestone on GitHub has its address; a session has none", () => {
+  const rows = l.lineageGroups(session, graph, new Map(), () => undefined).flatMap((g) => g.rows);
+  const url = (ref) => rows.find((r) => r.node.ref === ref).url;
+  assert.equal(url(issue.ref), "https://github.com/alexec/agents/issues/12");
+  assert.equal(url(pr.ref), "https://github.com/alexec/agents/pull/34");
+  assert.equal(url(helper.ref), undefined);
+  assert.equal(l.lineageUrl({ kind: "milestone", ref: "github:alexec/agents/milestone/15" }), "https://github.com/alexec/agents/milestone/15");
+});
