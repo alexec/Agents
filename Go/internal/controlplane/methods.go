@@ -122,11 +122,13 @@ var own = methodSet(
 	"orgRoutes/remove",
 	"orgRoutes/replaceKey",
 	"orgRoutes/set",
+	"people/forViews",
 	"people/invite",
 	"people/list",
 	"people/remove",
 	"people/removePreview",
 	"people/removeRequests",
+	"people/setForgeLogins",
 	"people/setRole",
 	"policy/get",
 	"policy/mine",
@@ -240,6 +242,7 @@ var writes = methodSet(
 	"orgRoutes/set",
 	"people/invite",
 	"people/remove",
+	"people/setForgeLogins",
 	"people/setRole",
 	"policy/raise",
 	"policy/set",
@@ -319,7 +322,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			}
 		}
 		return out, nil
-	case "people/list", "people/invite", "people/setRole", "people/remove", "people/removePreview", "people/removeRequests":
+	case "people/list", "people/invite", "people/setRole", "people/remove", "people/removePreview", "people/removeRequests",
+		"people/forViews", "people/setForgeLogins":
 		return m.peopleMethod(ctx, method, params, from)
 	case "groups/list", "groups/set", "groups/remove", "groups/setRole", "providers/setGroup":
 		return m.groupsMethod(ctx, method, params, from)

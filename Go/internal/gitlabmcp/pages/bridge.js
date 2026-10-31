@@ -90,10 +90,13 @@ const bridge = (name, on) => {
       return [head, ...rows.map(row)];
     });
   };
-  // Who opened it, with a bot pill for a bot.
-  const who = (login, bot) => [el("span", { textContent: login || "someone" }),
-    bot ? el("span", { className: "pill bot", textContent: "bot", title: login + " is a bot" }) : null];
-  const ui = { $, request, notify, log, el, link, openLink, button, errorText, data, call, ago, size, sections, who };
+  // Who opened it: as the control plane knows them (#2951) when it does, else the login,
+  // with a bot pill for a bot.
+  const who = (login, bot, name) => [el("span", { textContent: name || login || "someone" }),
+    bot ? el("span", { className: "pill bot", textContent: "bot", title: (name || login) + " is a bot" }) : null];
+  // An agent is on it (#2951): a session of the viewer's own, on this row.
+  const agentOn = (title) => title ? el("span", { className: "pill agent", textContent: "Agent", title: title + " is on it" }) : null;
+  const ui = { $, request, notify, log, el, link, openLink, button, errorText, data, call, ago, size, sections, who, agentOn };
   ui.start = (waitingWords) => {
     new ResizeObserver(size).observe(document.querySelector("main"));
     request("ui/initialize", {

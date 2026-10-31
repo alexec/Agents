@@ -53,10 +53,10 @@
     return el("li", {}, [
       link(`#${pr.number}`, pr.url),
       title,
-      el("span", { className: "pills" }, [yourReview(pr), ...prPills(ui, pr), rerun]),
+      el("span", { className: "pills" }, [yourReview(pr), ui.agentOn(pr.agentOn), ...prPills(ui, pr), rerun]),
       el("span", { className: "meta" }, [
         el("span", { className: "branch", textContent: pr.branch, title: `${pr.branch} → ${pr.base}` }),
-        ...ui.who(pr.author, pr.authorBot),
+        ...ui.who(pr.author, pr.authorBot, pr.authorName),
         pr.updatedAt ? el("span", { textContent: ui.ago(pr.updatedAt) }) : null,
         ...prLabels(ui, pr, labelColors),
       ]),

@@ -83,32 +83,36 @@ type retryArgs struct {
 func addViews(server *mcp.Server, g *RealGitLab, projectOf func(context.Context, string) (string, error), person bool) {
 	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true}
 
-	tool(server, &mcp.Tool{Name: "show_merge_requests", Title: "Show merge requests",
+	toolMeta(server, &mcp.Tool{Name: "show_merge_requests", Title: "Show merge requests",
 		Description: "The project's open merge requests, newest created first, at most 100, each with its head commit's pipeline " +
 			"(passing, failing, running or none), whether it conflicts with its target, whether approvals are missing or changes requested, " +
 			"whether auto-merge is on, and its section for the signed-in username (viewer): needs_you (you are a reviewer, or yours with " +
-			"a failed pipeline, a conflict or changes requested), yours, team (the project's Developers and up, and bots) or others; " +
-			"attention counts needs_you. Its view is the Merge requests page, where a person opens a merge request's page.",
+			"a failed pipeline, a conflict or changes requested), yours, team (the people and bots on this control plane, or the " +
+			"project's Developers and up, and bots, with no control plane) or others; attention counts needs_you. A row the control " +
+			"plane knows has authorName; agentOn says who is on one of the viewer's own. " +
+			"Its view is the Merge requests page, where a person opens a merge request's page.",
 		Annotations: readOnly, Meta: uiMeta(mrsURI, "model", "app")},
-		func(ctx context.Context, in boardArgs) (map[string]any, error) {
+		func(ctx context.Context, meta mcp.Meta, in boardArgs) (map[string]any, error) {
 			project, err := projectOf(ctx, in.Project)
 			if err != nil {
 				return nil, err
 			}
-			return g.Board(ctx, project)
+			return g.Board(ctx, project, meta)
 		})
 
-	tool(server, &mcp.Tool{Name: "show_issues", Title: "Show issues",
+	toolMeta(server, &mcp.Tool{Name: "show_issues", Title: "Show issues",
 		Description: "The project's open issues, newest created first, at most 100, each with its labels, assignees (usernames), " +
-			"comment count and section for the signed-in username (viewer): needs_you (assigned to you), yours, team (the project's " +
-			"Developers and up, and bots) or others; attention counts needs_you. Its view is the Issues page, where a person expands a row for its Markdown description or chooses Start Agent.",
+			"comment count and section for the signed-in username (viewer): needs_you (assigned to you), yours, team (the people and " +
+			"bots on this control plane, or the project's Developers and up, and bots, with no control plane) or others; attention " +
+			"counts needs_you. A row the control plane knows has authorName; agentOn says who is on one of the viewer's own. " +
+			"Its view is the Issues page, where a person expands a row for its Markdown description or chooses Start Agent.",
 		Annotations: readOnly, Meta: uiMeta(issuesURI, "model", "app")},
-		func(ctx context.Context, in issuesViewArgs) (map[string]any, error) {
+		func(ctx context.Context, meta mcp.Meta, in issuesViewArgs) (map[string]any, error) {
 			project, err := projectOf(ctx, in.Project)
 			if err != nil {
 				return nil, err
 			}
-			return g.OpenIssues(ctx, project, in.Label)
+			return g.OpenIssues(ctx, project, in.Label, meta)
 		})
 
 	tool(server, &mcp.Tool{Name: "show_issue_details", Title: "Show issue details",

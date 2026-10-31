@@ -3084,6 +3084,32 @@
       }
     },
     {
+      "name": "people/forViews",
+      "x-capability": "people/1",
+      "description": "Every person and bot on this control plane, with their forge logins and which is the caller (#2951), for the github, gitlab and linear servers' Team section and \"An agent is on it\". Open to a member as much as an admin.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/PeopleForViews"
+        }
+      }
+    },
+    {
       "name": "people/invite",
       "x-capability": "people/1",
       "tags": [
@@ -3208,6 +3234,32 @@
           "name": "web"
         }
       ]
+    },
+    {
+      "name": "people/setForgeLogins",
+      "x-capability": "people/1",
+      "description": "Sets the caller's own GitHub, GitLab and Linear logins (#2951), for Settings ▸ You, when they are not filled in from a machine's connection.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ForgeLogins"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
     },
     {
       "name": "people/setRole",

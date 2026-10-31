@@ -52,7 +52,7 @@ func TestTheViewListsOpenIssues(t *testing.T) {
 	if list[1].Priority != "" || list[1].Assignee != "alex" || list[1].AssigneeID != "u1" || list[1].Creator.ID != "u1" {
 		t.Fatalf("no priority is none: %+v", list[1])
 	}
-	if issueSection(list[1].Issue, viewer) != sectionNeedsYou || issueSection(list[0].Issue, viewer) != sectionTeam {
+	if issueSection(list[1].Issue, viewer, nil) != sectionNeedsYou || issueSection(list[0].Issue, viewer, nil) != sectionTeam {
 		t.Fatal("ENG-5 is assigned to the viewer; ENG-7 is by sam, a member")
 	}
 }

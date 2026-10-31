@@ -11,8 +11,9 @@ import (
 // Person is who did something: a workspace user, or an app or integration.
 type Person struct {
 	// ID is the user's Linear id; an app with no user has none.
-	ID   string
-	Name string
+	ID    string
+	Name  string
+	Email string
 	// App says it is an app or integration (a bot), not a person.
 	App bool
 	// Guest says it is a guest of the workspace, not one of its members.

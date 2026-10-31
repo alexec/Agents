@@ -600,10 +600,18 @@ func (d *Daemon) callFromView(ctx context.Context, r wire.ViewCallRequest) (wire
 	if !isNull(r.Arguments) {
 		args = r.Arguments
 	}
+	call := map[string]any{"name": r.Name, "arguments": args}
+	// The control plane's people, for the github, gitlab and linear servers' Team section
+	// and "An agent is on it" (#2951): the server makes no control-plane call of its own.
+	if teamFeedingTools[r.Name] {
+		if meta := d.teamMeta(ctx, folder); meta != nil {
+			call["_meta"] = meta
+		}
+	}
 	var result json.RawMessage
 	if err := onViewServer(ctx, s, func(m *viewSession) error {
 		var err error
-		result, err = m.call("tools/call", map[string]any{"name": r.Name, "arguments": args})
+		result, err = m.call("tools/call", call)
 		return err
 	}); err != nil {
 		return nil, err

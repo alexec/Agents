@@ -31,7 +31,7 @@ a.title { color: inherit; }
   background: var(--color-background-tertiary); color: var(--color-text-secondary); white-space: nowrap; }
 .pill.passing, .pill.approved, .pill.merged, .pill.assigned { background: var(--color-background-success); color: var(--color-text-success); }
 .pill.failing, .pill.changes_requested, .pill.closed { background: var(--color-background-danger); color: var(--color-text-danger); }
-.pill.running, .pill.auto, .pill.app { background: var(--color-background-info); color: var(--color-text-info); }
+.pill.running, .pill.auto, .pill.app, .pill.agent { background: var(--color-background-info); color: var(--color-text-info); }
 .pill.conflicts, .pill.review_required { background: var(--color-background-warning); color: var(--color-text-warning); }
 .pill.skipped { opacity: 0.7; }
 .pills { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }

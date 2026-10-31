@@ -108,12 +108,14 @@ func AddViews(server *mcp.Server, linear Views) {
 	mcp.AddTool(server, &mcp.Tool{Name: "show_issues", Title: "Show Linear issues",
 		Description: "The Linear workspace's open issues (not completed or canceled), newest updated first, at most 100, each with " +
 			"its identifier (ENG-12), team, state, priority, labels, assignee, comment count and section for the API key's user (viewer): " +
-			"needs_you (assigned to you), yours, team (the workspace's members and apps) or others (guests); attention counts needs_you. " +
+			"needs_you (assigned to you), yours, team (the people and bots on this control plane, or the workspace's members and " +
+			"apps, with no control plane) or others (guests); attention counts needs_you. A row the control plane knows has " +
+			"authorName; agentOn says who is on one of the viewer's own. " +
 			"It also gives the workspace's teams. " +
 			"A team key, a state type (triage, backlog, unstarted, started) or a label narrows it. " +
 			"Its view is the Linear issues page, where a person expands a row for its Markdown description or chooses Start Agent.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true}, Meta: uiMeta(issuesURI, "model", "app")},
-		func(ctx context.Context, _ *mcp.CallToolRequest, in issuesArgs) (*mcp.CallToolResult, any, error) {
+		func(ctx context.Context, req *mcp.CallToolRequest, in issuesArgs) (*mcp.CallToolResult, any, error) {
 			if in.State != "" && !contains(openStateTypes, in.State) {
 				return failed(fmt.Errorf("state must be one of %s", strings.Join(openStateTypes, ", "))), nil, nil
 			}
@@ -125,14 +127,30 @@ func AddViews(server *mcp.Server, linear Views) {
 			if err != nil {
 				return failed(err), nil, nil
 			}
+			// The control plane's people (#2951): names a row, tells Team from Others.
+			people := teamMetaOf(req.Params.Meta, "linear")
 			issues := make([]any, len(list))
 			// The count on the sidebar's row (#2033): the issues that need the viewer (#2453).
 			needsYou := 0
 			for i, l := range list {
 				j := l.json()
-				j["section"] = issueSection(l.Issue, viewer)
-				if j["section"] == sectionNeedsYou {
+				section := issueSection(l.Issue, viewer, people)
+				j["section"] = section
+				if l.Creator != nil {
+					if tp, on := people[strings.ToLower(l.Creator.Email)]; on {
+						j["authorName"] = tp.Name
+						if tp.Bot {
+							j["authorBot"] = true
+						}
+					}
+				}
+				if section == sectionNeedsYou {
 					needsYou++
+				}
+				if section == sectionNeedsYou || section == sectionYours {
+					if who := agentOnOf(req.Params.Meta, l.Identifier); who != "" {
+						j["agentOn"] = who
+					}
 				}
 				issues[i] = j
 			}

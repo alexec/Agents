@@ -8739,6 +8739,22 @@
       ],
       "additionalProperties": false
     },
+    "ForgeLogins": {
+      "type": "object",
+      "description": "people/setForgeLogins (#2951): the caller's own GitHub, GitLab and Linear logins, for Settings ▸ You, replacing what was kept; blank clears one.",
+      "properties": {
+        "github": {
+          "type": "string"
+        },
+        "gitlab": {
+          "type": "string"
+        },
+        "linear": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
     "FoundFolder": {
       "type": "object",
       "properties": {
@@ -14585,6 +14601,22 @@
           "type": "boolean"
         }
       },
+      "additionalProperties": false
+    },
+    "PeopleForViews": {
+      "type": "object",
+      "description": "people/forViews (#2951): every person and bot on this control plane, with their forge logins and which is the caller, for the github, gitlab and linear servers' Team section and \"An agent is on it\". Narrower than PeopleList: open to a member as much as an admin, and holds no role, clients or machines.",
+      "properties": {
+        "people": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TeamPerson"
+          }
+        }
+      },
+      "required": [
+        "people"
+      ],
       "additionalProperties": false
     },
     "PeopleList": {
@@ -22130,6 +22162,43 @@
         "host",
         "hostName",
         "agent"
+      ],
+      "additionalProperties": false
+    },
+    "TeamPerson": {
+      "type": "object",
+      "description": "people/forViews (#2951): one person or bot on this control plane, as the github, gitlab and linear servers' feeding tools are fed it in their call's _meta, so a row can name them and Team can be told from Others.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "person",
+            "bot"
+          ]
+        },
+        "githubLogin": {
+          "type": "string"
+        },
+        "gitlabLogin": {
+          "type": "string"
+        },
+        "linearLogin": {
+          "type": "string"
+        },
+        "you": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind"
       ],
       "additionalProperties": false
     },

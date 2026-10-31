@@ -428,6 +428,10 @@ public extension DaemonAPI {
                 Row(Method.peopleRemove, params: PersonRequest.self, result: Empty.self, kind: .controlRequest),
                 Row(Method.peopleRemovePreview, params: PersonRequest.self, result: PersonRemovePreview.self,
                     kind: .controlRequest),
+                // The control plane's people (#2951): the github, gitlab and linear servers' Team
+                // section, and Settings ▸ Account's GitHub, GitLab and Linear login fields.
+                Row(Method.peopleForViews, params: Empty.self, result: PeopleForViews.self, kind: .controlRequest),
+                Row(Method.peopleSetForgeLogins, params: ForgeLogins.self, result: Empty.self, kind: .controlRequest),
                 // Groups own machine providers (#1761): Settings ▸ Groups.
                 Row(Method.groupsList, params: Empty.self, result: GroupList.self, kind: .controlRequest),
                 Row(Method.groupsSet, params: GroupSet.self, result: Group.self, kind: .controlRequest),

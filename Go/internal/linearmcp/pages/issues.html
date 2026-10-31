@@ -95,9 +95,10 @@ select { font: inherit; }
       el("span", { className: "title", textContent: issue.title, title: issue.title }),
       start,
       el("span", { className: "meta" }, [
+        ui.agentOn(issue.agentOn),
         el("span", { className: "pill", textContent: issue.state || stateWords[issue.stateType] || "" }),
         assignee,
-        ...ui.who(issue.author, issue.authorBot),
+        ...ui.who(issue.author, issue.authorBot, issue.authorName),
         el("span", { textContent: [issue.priority, comments, issue.updatedAt ? ui.ago(issue.updatedAt) : ""].filter(Boolean).join(" · ") }),
         ...issueLabels,
       ]),
