@@ -6942,6 +6942,109 @@
       ],
       "additionalProperties": false
     },
+    "EffectiveLayerValue": {
+      "type": "object",
+      "description": "One layer's value of a rule, from the top down (#2957, data-model.md \"EffectiveLayerValue\"). kept is true when the layer sets a value but a layer above it caps the effect: the value stays, and applies again when the cap goes (FR-006).",
+      "properties": {
+        "layer": {
+          "$ref": "#/definitions/PolicyLayerRef"
+        },
+        "value": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "words": {
+          "type": "string",
+          "description": "The value in the clients' words, or \"Not set\" when the layer does not set this rule."
+        },
+        "kept": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "layer",
+        "words",
+        "kept"
+      ],
+      "additionalProperties": false
+    },
+    "EffectivePolicy": {
+      "type": "object",
+      "description": "What a folder's agents may do, after every layer (#2957, data-model.md \"EffectivePolicy\"). Made by policylayers.Resolve; never stored.",
+      "properties": {
+        "folder": {
+          "type": "string"
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EffectiveRule"
+          }
+        },
+        "organisation": {
+          "type": "string"
+        },
+        "foldersWithRules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PolicyFolderWithRules"
+          }
+        },
+        "behind": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PolicyBehindMachine"
+          },
+          "description": "The person's machines that do not say host.policy-layers/1 (Edge Cases, \"A machine of an older version\")."
+        }
+      },
+      "required": [
+        "rules",
+        "foldersWithRules",
+        "behind"
+      ],
+      "additionalProperties": false
+    },
+    "EffectiveRule": {
+      "type": "object",
+      "description": "The effective value of one rule, with every layer that sets it (#2957, data-model.md \"EffectiveRule\").",
+      "properties": {
+        "rule": {
+          "$ref": "#/definitions/PolicyRuleName"
+        },
+        "value": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "words": {
+          "type": "string"
+        },
+        "decides": {
+          "$ref": "#/definitions/PolicyLayerRef",
+          "description": "Absent when no layer sets this rule: today's default applies."
+        },
+        "layers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EffectiveLayerValue"
+          },
+          "description": "Every layer from the top down, for Where this comes from."
+        },
+        "cap": {
+          "$ref": "#/definitions/JSONValue",
+          "description": "The tightest value of the layers above the one being edited; a menu dims what is looser."
+        },
+        "capLine": {
+          "type": "string",
+          "description": "For example \"Acme: at most Approve for me\"."
+        }
+      },
+      "required": [
+        "rule",
+        "value",
+        "words",
+        "layers"
+      ],
+      "additionalProperties": false
+    },
     "EffectiveSandbox": {
       "type": "object",
       "properties": {
@@ -15613,6 +15716,23 @@
       ],
       "additionalProperties": false
     },
+    "PolicyBehindMachine": {
+      "type": "object",
+      "description": "A machine of the person's that does not say host.policy-layers/1 (#2957, EffectivePolicy.behind, Edge Cases \"A machine of an older version\").",
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "host",
+        "name"
+      ],
+      "additionalProperties": false
+    },
     "PolicyBudgets": {
       "type": "object",
       "description": "Each person's budget per UTC day and per agent (#998, FR-016): a ceiling over their own CostLimits. Money is US dollars.",
@@ -15666,6 +15786,27 @@
       ],
       "additionalProperties": false
     },
+    "PolicyFolderWithRules": {
+      "type": "object",
+      "description": "One folder that sets its own rules, for the Agents ▸ Policy banner (#2957, EffectivePolicy.foldersWithRules).",
+      "properties": {
+        "folder": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "count": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "folder",
+        "name",
+        "count"
+      ],
+      "additionalProperties": false
+    },
     "PolicyHelpers": {
       "type": "object",
       "description": "The ceiling over each folder's helper limits (#998, #64).",
@@ -15698,6 +15839,33 @@
       },
       "additionalProperties": false
     },
+    "PolicyLayerRef": {
+      "type": "object",
+      "description": "Which layer sets or decides a rule (#2957, data-model.md \"PolicyLayerRef\"): the organisation, the person (\"You\"), or a folder.",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "organisation",
+            "you",
+            "folder"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "description": "The organisation's name, \"You\", or the folder's name."
+        },
+        "folder": {
+          "type": "string",
+          "description": "The folder's path, when kind is folder."
+        }
+      },
+      "required": [
+        "kind",
+        "name"
+      ],
+      "additionalProperties": false
+    },
     "PolicyMarketplaces": {
       "type": "object",
       "description": "The marketplaces a policy allows (#998), by the ids #687 gives them, and whether an MCP server added by hand is allowed.",
@@ -15720,6 +15888,19 @@
         "allowed",
         "customServers"
       ],
+      "additionalProperties": false
+    },
+    "PolicyNoticeLimits": {
+      "type": "object",
+      "description": "How many notices a burst allows, and how long to wait after one, before an agent may send another (#2957). Unset means 3 and 10 minutes. Not notices: OrgPolicy.notices already means the Antigravity terms (spec 998).",
+      "properties": {
+        "burst": {
+          "type": "integer"
+        },
+        "waitMinutes": {
+          "type": "integer"
+        }
+      },
       "additionalProperties": false
     },
     "PolicyNotices": {
@@ -15771,7 +15952,7 @@
     },
     "PolicyRefusal": {
       "type": "object",
-      "description": "The data of a policyRefused error (#998, FR-010): why, the rule, and the words for the client.",
+      "description": "The data of a policyRefused error (#998, FR-010): why, the rule, and the words for the client. layer and value name which layer decided and what it allows (#2957, R8): \"Acme: at most Approve for me\".",
       "properties": {
         "reason": {
           "type": "string",
@@ -15792,12 +15973,104 @@
         },
         "until": {
           "$ref": "#/definitions/WireDate"
+        },
+        "layer": {
+          "$ref": "#/definitions/PolicyLayerRef"
+        },
+        "value": {
+          "type": "string"
         }
       },
       "required": [
         "reason",
         "words"
       ],
+      "additionalProperties": false
+    },
+    "PolicyRuleBudgets": {
+      "type": "object",
+      "description": "Money and tokens a layer caps per agent and per UTC day (#2957, data-model.md \"PolicyRules\"). Unset means no limit. Unlike OrgPolicy's PolicyBudgets, no allowUnmetered or raises: only the organisation layer has those (FR-003).",
+      "properties": {
+        "perAgent": {
+          "$ref": "#/definitions/Cost"
+        },
+        "daily": {
+          "$ref": "#/definitions/Cost"
+        },
+        "perAgentTokens": {
+          "type": "integer"
+        },
+        "dailyTokens": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PolicyRuleName": {
+      "type": "string",
+      "enum": [
+        "permissionMode",
+        "permissionRequests",
+        "sandbox",
+        "budgets.perAgent",
+        "budgets.daily",
+        "budgets.perAgentTokens",
+        "budgets.dailyTokens",
+        "helpers.mostRunning",
+        "helpers.mostNotArchived",
+        "workflows.mostOn",
+        "noticeLimits.burst",
+        "noticeLimits.waitMinutes",
+        "archiveMyChats",
+        "runtimes",
+        "marketplaces.allowed",
+        "marketplaces.customServers",
+        "environment"
+      ],
+      "description": "One rule a policy layer can set (#2957, data-model.md \"EffectiveRule\")."
+    },
+    "PolicyRules": {
+      "type": "object",
+      "description": "The rules a layer sets (#2957, data-model.md \"PolicyRules\"): the same shape on the organisation, your and a folder's layer (FR-002). Every field is optional: absent sets nothing.",
+      "properties": {
+        "permissionMode": {
+          "$ref": "#/definitions/PermissionLevel"
+        },
+        "permissionRequests": {
+          "$ref": "#/definitions/ClientPermissionMode"
+        },
+        "sandbox": {
+          "$ref": "#/definitions/SandboxChoice"
+        },
+        "budgets": {
+          "$ref": "#/definitions/PolicyRuleBudgets"
+        },
+        "helpers": {
+          "$ref": "#/definitions/PolicyHelpers"
+        },
+        "workflows": {
+          "$ref": "#/definitions/PolicyWorkflows"
+        },
+        "noticeLimits": {
+          "$ref": "#/definitions/PolicyNoticeLimits"
+        },
+        "archiveMyChats": {
+          "type": "boolean"
+        },
+        "runtimes": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/PolicyRuntimeRule"
+          },
+          "description": "A runtime not named is not allowed. Absent allows every runtime and model."
+        },
+        "marketplaces": {
+          "$ref": "#/definitions/PolicyMarketplaces"
+        },
+        "environment": {
+          "$ref": "#/definitions/PolicyEnvironment"
+        }
+      },
       "additionalProperties": false
     },
     "PolicyRuntimeRule": {
@@ -15839,12 +16112,14 @@
     },
     "PolicySetBy": {
       "type": "object",
-      "description": "The mark on a choice a policy refuses or caps (#998, FR-010).",
+      "description": "The mark on a choice a policy refuses or caps (#998, FR-010). layer names which layer decided (#2957, R8).",
       "properties": {
         "by": {
           "type": "string",
           "enum": [
-            "organisation"
+            "organisation",
+            "you",
+            "folder"
           ]
         },
         "rule": {
@@ -15852,6 +16127,9 @@
         },
         "words": {
           "type": "string"
+        },
+        "layer": {
+          "$ref": "#/definitions/PolicyLayerRef"
         }
       },
       "required": [
@@ -15973,6 +16251,16 @@
       "properties": {
         "policy": {
           "$ref": "#/definitions/OrgPolicy"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PolicyWorkflows": {
+      "type": "object",
+      "description": "How many workflows a layer allows turned on at once, in each folder (#2957). Unset means 20.",
+      "properties": {
+        "mostOn": {
+          "type": "integer"
         }
       },
       "additionalProperties": false

@@ -59,6 +59,7 @@ export const Capability = {
   groups1: "groups/1",
   handover1: "handover/1",
   hostOrgRoutes1: "host.org-routes/1",
+  hostPolicyLayers1: "host.policy-layers/1",
   hostPolicy1: "host.policy/1",
   hostSuspend1: "host.suspend/1",
   hostTeam1: "host.team/1",
@@ -715,5 +716,6 @@ export const DeclaredCapabilities: Readonly<Record<string, readonly Capability[]
     "agents.move-worktree/1",
     "host.team/1",
     "host.suspend/1",
+    "host.policy-layers/1",
   ],
 };

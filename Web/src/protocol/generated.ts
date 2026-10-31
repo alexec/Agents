@@ -2675,6 +2675,53 @@ export interface EditQueuedResult {
   edited: boolean;
 }
 
+/**
+ * One layer's value of a rule, from the top down (#2957, data-model.md "EffectiveLayerValue"). kept
+ * is true when the layer sets a value but a layer above it caps the effect: the value stays, and
+ * applies again when the cap goes (FR-006).
+ */
+export interface EffectiveLayerValue {
+  layer: PolicyLayerRef;
+  value?: JSONValue;
+  /** The value in the clients' words, or "Not set" when the layer does not set this rule. */
+  words: string;
+  kept: boolean;
+}
+
+/**
+ * What a folder's agents may do, after every layer (#2957, data-model.md "EffectivePolicy"). Made
+ * by policylayers.Resolve; never stored.
+ */
+export interface EffectivePolicy {
+  folder?: string;
+  rules: EffectiveRule[];
+  organisation?: string;
+  foldersWithRules: PolicyFolderWithRules[];
+  /**
+   * The person's machines that do not say host.policy-layers/1 (Edge Cases, "A machine of an older
+   * version").
+   */
+  behind: PolicyBehindMachine[];
+}
+
+/**
+ * The effective value of one rule, with every layer that sets it (#2957, data-model.md
+ * "EffectiveRule").
+ */
+export interface EffectiveRule {
+  rule: PolicyRuleName;
+  value: JSONValue;
+  words: string;
+  /** Absent when no layer sets this rule: today's default applies. */
+  decides?: PolicyLayerRef;
+  /** Every layer from the top down, for Where this comes from. */
+  layers: EffectiveLayerValue[];
+  /** The tightest value of the layers above the one being edited; a menu dims what is looser. */
+  cap?: JSONValue;
+  /** For example "Acme: at most Approve for me". */
+  capLine?: string;
+}
+
 export interface EffectiveSandbox {
   state: SandboxState;
   requested: SandboxChoice;
@@ -5533,6 +5580,15 @@ export interface PolicyApplied {
 }
 
 /**
+ * A machine of the person's that does not say host.policy-layers/1 (#2957, EffectivePolicy.behind,
+ * Edge Cases "A machine of an older version").
+ */
+export interface PolicyBehindMachine {
+  host: string;
+  name: string;
+}
+
+/**
  * Each person's budget per UTC day and per agent (#998, FR-016): a ceiling over their own
  * CostLimits. Money is US dollars.
  */
@@ -5557,6 +5613,16 @@ export interface PolicyEnvironment {
   passThrough: string[];
 }
 
+/**
+ * One folder that sets its own rules, for the Agents ▸ Policy banner (#2957,
+ * EffectivePolicy.foldersWithRules).
+ */
+export interface PolicyFolderWithRules {
+  folder: string;
+  name: string;
+  count: number;
+}
+
 /** The ceiling over each folder's helper limits (#998, #64). */
 export interface PolicyHelpers {
   mostRunning?: number;
@@ -5574,12 +5640,34 @@ export interface PolicyKept {
 }
 
 /**
+ * Which layer sets or decides a rule (#2957, data-model.md "PolicyLayerRef"): the organisation, the
+ * person ("You"), or a folder.
+ */
+export interface PolicyLayerRef {
+  kind: "organisation" | "you" | "folder";
+  /** The organisation's name, "You", or the folder's name. */
+  name: string;
+  /** The folder's path, when kind is folder. */
+  folder?: string;
+}
+
+/**
  * The marketplaces a policy allows (#998), by the ids #687 gives them, and whether an MCP server
  * added by hand is allowed.
  */
 export interface PolicyMarketplaces {
   allowed: string[];
   customServers: "allow" | "refuse";
+}
+
+/**
+ * How many notices a burst allows, and how long to wait after one, before an agent may send another
+ * (#2957). Unset means 3 and 10 minutes. Not notices: OrgPolicy.notices already means the
+ * Antigravity terms (spec 998).
+ */
+export interface PolicyNoticeLimits {
+  burst?: number;
+  waitMinutes?: number;
 }
 
 /** The notices a policy decides for every member (#999, FR-008). */
@@ -5607,12 +5695,67 @@ export type PolicyReach =
 
 /**
  * The data of a policyRefused error (#998, FR-010): why, the rule, and the words for the client.
+ * layer and value name which layer decided and what it allows (#2957, R8): "Acme: at most Approve
+ * for me".
  */
 export interface PolicyRefusal {
   reason: "policy" | "budget" | "stopAll" | "noPolicy" | "mustJoin" | "update";
   rule?: string;
   words: string;
   until?: WireDate;
+  layer?: PolicyLayerRef;
+  value?: string;
+}
+
+/**
+ * Money and tokens a layer caps per agent and per UTC day (#2957, data-model.md "PolicyRules").
+ * Unset means no limit. Unlike OrgPolicy's PolicyBudgets, no allowUnmetered or raises: only the
+ * organisation layer has those (FR-003).
+ */
+export interface PolicyRuleBudgets {
+  perAgent?: Cost;
+  daily?: Cost;
+  perAgentTokens?: number;
+  dailyTokens?: number;
+}
+
+/** One rule a policy layer can set (#2957, data-model.md "EffectiveRule"). */
+export type PolicyRuleName =
+  | "permissionMode"
+  | "permissionRequests"
+  | "sandbox"
+  | "budgets.perAgent"
+  | "budgets.daily"
+  | "budgets.perAgentTokens"
+  | "budgets.dailyTokens"
+  | "helpers.mostRunning"
+  | "helpers.mostNotArchived"
+  | "workflows.mostOn"
+  | "noticeLimits.burst"
+  | "noticeLimits.waitMinutes"
+  | "archiveMyChats"
+  | "runtimes"
+  | "marketplaces.allowed"
+  | "marketplaces.customServers"
+  | "environment";
+
+/**
+ * The rules a layer sets (#2957, data-model.md "PolicyRules"): the same shape on the organisation,
+ * your and a folder's layer (FR-002). Every field is optional: absent sets nothing.
+ */
+export interface PolicyRules {
+  permissionMode?: PermissionLevel;
+  permissionRequests?: ClientPermissionMode;
+  sandbox?: SandboxChoice;
+  budgets?: PolicyRuleBudgets;
+  helpers?: PolicyHelpers;
+  workflows?: PolicyWorkflows;
+  noticeLimits?: PolicyNoticeLimits;
+  archiveMyChats?: boolean;
+  /** A runtime not named is not allowed. Absent allows every runtime and model. */
+  runtimes?: Record<string, PolicyRuntimeRule>;
+  marketplaces?: PolicyMarketplaces;
+  environment?: PolicyEnvironment;
 }
 
 /** One allowed runtime in a policy (#998). */
@@ -5637,11 +5780,15 @@ export interface PolicySet {
   rev?: string;
 }
 
-/** The mark on a choice a policy refuses or caps (#998, FR-010). */
+/**
+ * The mark on a choice a policy refuses or caps (#998, FR-010). layer names which layer decided
+ * (#2957, R8).
+ */
 export interface PolicySetBy {
-  by: "organisation";
+  by: "organisation" | "you" | "folder";
   rule: string;
   words: string;
+  layer?: PolicyLayerRef;
 }
 
 /**
@@ -5699,6 +5846,11 @@ export interface PolicyStopAllRequest {
  */
 export interface PolicyView {
   policy?: OrgPolicy;
+}
+
+/** How many workflows a layer allows turned on at once, in each folder (#2957). Unset means 20. */
+export interface PolicyWorkflows {
+  mostOn?: number;
 }
 
 export interface PresenceReport {
@@ -9743,6 +9895,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   EarnedMilestone: { required: ["id", "at"], optional: [] },
   EditQueuedRequest: { required: ["agentID", "promptID", "text"], optional: [] },
   EditQueuedResult: { required: ["edited"], optional: [] },
+  EffectiveLayerValue: { required: ["layer", "words", "kept"], optional: ["value"] },
+  EffectivePolicy: { required: ["rules", "foldersWithRules", "behind"], optional: ["folder", "organisation"] },
+  EffectiveRule: { required: ["rule", "value", "words", "layers"], optional: ["decides", "cap", "capLine"] },
   EffectiveSandbox: { required: ["state", "requested"], optional: ["reason"] },
   ElicitationAnswer: { required: ["question", "answer"], optional: [] },
   ElicitationNotification: { required: ["agentID", "requestID"], optional: ["request"] },
@@ -10030,22 +10185,29 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PluginsList: { required: ["folder", "plugins"], optional: [] },
   PluginsListRequest: { required: ["folder"], optional: [] },
   PolicyApplied: { required: ["version"], optional: [] },
+  PolicyBehindMachine: { required: ["host", "name"], optional: [] },
   PolicyBudgets: { required: ["allowUnmetered", "raises"], optional: ["daily", "dailyTokens", "perAgent", "perAgentTokens"] },
   PolicyEnvironment: { required: ["passThrough"], optional: [] },
+  PolicyFolderWithRules: { required: ["folder", "name", "count"], optional: [] },
   PolicyHelpers: { required: [], optional: ["mostRunning", "mostNotArchived"] },
   PolicyKept: { required: [], optional: ["policy", "rev", "machines"] },
+  PolicyLayerRef: { required: ["kind", "name"], optional: ["folder"] },
   PolicyMarketplaces: { required: ["allowed", "customServers"], optional: [] },
+  PolicyNoticeLimits: { required: [], optional: ["burst", "waitMinutes"] },
   PolicyNotices: { required: [], optional: ["antigravityTerms"] },
   PolicyRaiseRequest: { required: ["user"], optional: ["daily", "dailyTokens", "request"] },
-  PolicyRefusal: { required: ["reason", "words"], optional: ["rule", "until"] },
+  PolicyRefusal: { required: ["reason", "words"], optional: ["rule", "until", "layer", "value"] },
+  PolicyRuleBudgets: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
+  PolicyRules: { required: [], optional: ["permissionMode", "permissionRequests", "sandbox", "budgets", "helpers", "workflows", "noticeLimits", "archiveMyChats", "runtimes", "marketplaces", "environment"] },
   PolicyRuntimeRule: { required: [], optional: ["models", "reach"] },
   PolicySet: { required: ["policy"], optional: ["rev"] },
-  PolicySetBy: { required: ["by", "rule", "words"], optional: [] },
+  PolicySetBy: { required: ["by", "rule", "words"], optional: ["layer"] },
   PolicySignature: { required: ["version", "keyID", "alg", "sig"], optional: [] },
   PolicyState: { required: ["stopAll", "noPolicy"], optional: ["version", "policy", "update", "refusal"] },
   PolicyStopAll: { required: ["on", "by", "at"], optional: ["note"] },
   PolicyStopAllRequest: { required: ["on"], optional: ["note"] },
   PolicyView: { required: [], optional: ["policy"] },
+  PolicyWorkflows: { required: [], optional: ["mostOn"] },
   PresenceReport: { required: ["active"], optional: ["watching", "mayNotify", "showing", "alsoShowing"] },
   PreviewFile: { required: ["path", "bytes", "runnable", "via"], optional: [] },
   PrewarmRequest: { required: ["agentID", "why"], optional: [] },

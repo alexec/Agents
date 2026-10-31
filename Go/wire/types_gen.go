@@ -3202,6 +3202,53 @@ type EditQueuedResult struct {
 	Edited bool `json:"edited"`
 }
 
+// One layer's value of a rule, from the top down (#2957, data-model.md "EffectiveLayerValue"). kept is true when the layer sets a value but a layer above it caps the effect: the value stays, and applies again when the cap goes (FR-006).
+type EffectiveLayerValue struct {
+	Layer PolicyLayerRef `json:"layer"`
+
+	Value JSONValue `json:"value,omitzero"`
+
+	// The value in the clients' words, or "Not set" when the layer does not set this rule.
+	Words string `json:"words"`
+
+	Kept bool `json:"kept"`
+}
+
+// What a folder's agents may do, after every layer (#2957, data-model.md "EffectivePolicy"). Made by policylayers.Resolve; never stored.
+type EffectivePolicy struct {
+	Folder *string `json:"folder,omitzero"`
+
+	Rules []EffectiveRule `json:"rules"`
+
+	Organisation *string `json:"organisation,omitzero"`
+
+	FoldersWithRules []PolicyFolderWithRules `json:"foldersWithRules"`
+
+	// The person's machines that do not say host.policy-layers/1 (Edge Cases, "A machine of an older version").
+	Behind []PolicyBehindMachine `json:"behind"`
+}
+
+// The effective value of one rule, with every layer that sets it (#2957, data-model.md "EffectiveRule").
+type EffectiveRule struct {
+	Rule PolicyRuleName `json:"rule"`
+
+	Value JSONValue `json:"value"`
+
+	Words string `json:"words"`
+
+	// Absent when no layer sets this rule: today's default applies.
+	Decides *PolicyLayerRef `json:"decides,omitzero"`
+
+	// Every layer from the top down, for Where this comes from.
+	Layers []EffectiveLayerValue `json:"layers"`
+
+	// The tightest value of the layers above the one being edited; a menu dims what is looser.
+	Cap JSONValue `json:"cap,omitzero"`
+
+	// For example "Acme: at most Approve for me".
+	CapLine *string `json:"capLine,omitzero"`
+}
+
 type EffectiveSandbox struct {
 	State SandboxState `json:"state"`
 
@@ -6875,6 +6922,13 @@ type PolicyApplied struct {
 	Version int64 `json:"version"`
 }
 
+// A machine of the person's that does not say host.policy-layers/1 (#2957, EffectivePolicy.behind, Edge Cases "A machine of an older version").
+type PolicyBehindMachine struct {
+	Host string `json:"host"`
+
+	Name string `json:"name"`
+}
+
 // Each person's budget per UTC day and per agent (#998, FR-016): a ceiling over their own CostLimits. Money is US dollars.
 type PolicyBudgets struct {
 	Daily *float64 `json:"daily,omitzero"`
@@ -6897,6 +6951,15 @@ type PolicyEnvironment struct {
 	PassThrough []string `json:"passThrough"`
 }
 
+// One folder that sets its own rules, for the Agents ▸ Policy banner (#2957, EffectivePolicy.foldersWithRules).
+type PolicyFolderWithRules struct {
+	Folder string `json:"folder"`
+
+	Name string `json:"name"`
+
+	Count int64 `json:"count"`
+}
+
 // The ceiling over each folder's helper limits (#998, #64).
 type PolicyHelpers struct {
 	MostRunning *int64 `json:"mostRunning,omitzero"`
@@ -6913,11 +6976,29 @@ type PolicyKept struct {
 	Machines map[string]int64 `json:"machines,omitzero"`
 }
 
+// Which layer sets or decides a rule (#2957, data-model.md "PolicyLayerRef"): the organisation, the person ("You"), or a folder.
+type PolicyLayerRef struct {
+	Kind string `json:"kind"`
+
+	// The organisation's name, "You", or the folder's name.
+	Name string `json:"name"`
+
+	// The folder's path, when kind is folder.
+	Folder *string `json:"folder,omitzero"`
+}
+
 // The marketplaces a policy allows (#998), by the ids #687 gives them, and whether an MCP server added by hand is allowed.
 type PolicyMarketplaces struct {
 	Allowed []string `json:"allowed"`
 
 	CustomServers string `json:"customServers"`
+}
+
+// How many notices a burst allows, and how long to wait after one, before an agent may send another (#2957). Unset means 3 and 10 minutes. Not notices: OrgPolicy.notices already means the Antigravity terms (spec 998).
+type PolicyNoticeLimits struct {
+	Burst *int64 `json:"burst,omitzero"`
+
+	WaitMinutes *int64 `json:"waitMinutes,omitzero"`
 }
 
 // The notices a policy decides for every member (#999, FR-008).
@@ -6944,7 +7025,7 @@ const PolicyReachSignIn PolicyReach = "signIn"
 const PolicyReachOrgKey PolicyReach = "orgKey"
 const PolicyReachGateway PolicyReach = "gateway"
 
-// The data of a policyRefused error (#998, FR-010): why, the rule, and the words for the client.
+// The data of a policyRefused error (#998, FR-010): why, the rule, and the words for the client. layer and value name which layer decided and what it allows (#2957, R8): "Acme: at most Approve for me".
 type PolicyRefusal struct {
 	Reason string `json:"reason"`
 
@@ -6953,6 +7034,68 @@ type PolicyRefusal struct {
 	Words string `json:"words"`
 
 	Until *Date `json:"until,omitzero"`
+
+	Layer *PolicyLayerRef `json:"layer,omitzero"`
+
+	Value *string `json:"value,omitzero"`
+}
+
+// Money and tokens a layer caps per agent and per UTC day (#2957, data-model.md "PolicyRules"). Unset means no limit. Unlike OrgPolicy's PolicyBudgets, no allowUnmetered or raises: only the organisation layer has those (FR-003).
+type PolicyRuleBudgets struct {
+	PerAgent *Cost `json:"perAgent,omitzero"`
+
+	Daily *Cost `json:"daily,omitzero"`
+
+	PerAgentTokens *int64 `json:"perAgentTokens,omitzero"`
+
+	DailyTokens *int64 `json:"dailyTokens,omitzero"`
+}
+
+// One rule a policy layer can set (#2957, data-model.md "EffectiveRule").
+type PolicyRuleName string
+
+const PolicyRuleNamePermissionMode PolicyRuleName = "permissionMode"
+const PolicyRuleNamePermissionRequests PolicyRuleName = "permissionRequests"
+const PolicyRuleNameSandbox PolicyRuleName = "sandbox"
+const PolicyRuleNameBudgetsPerAgent PolicyRuleName = "budgets.perAgent"
+const PolicyRuleNameBudgetsDaily PolicyRuleName = "budgets.daily"
+const PolicyRuleNameBudgetsPerAgentTokens PolicyRuleName = "budgets.perAgentTokens"
+const PolicyRuleNameBudgetsDailyTokens PolicyRuleName = "budgets.dailyTokens"
+const PolicyRuleNameHelpersMostRunning PolicyRuleName = "helpers.mostRunning"
+const PolicyRuleNameHelpersMostNotArchived PolicyRuleName = "helpers.mostNotArchived"
+const PolicyRuleNameWorkflowsMostOn PolicyRuleName = "workflows.mostOn"
+const PolicyRuleNameNoticeLimitsBurst PolicyRuleName = "noticeLimits.burst"
+const PolicyRuleNameNoticeLimitsWaitMinutes PolicyRuleName = "noticeLimits.waitMinutes"
+const PolicyRuleNameArchiveMyChats PolicyRuleName = "archiveMyChats"
+const PolicyRuleNameRuntimes PolicyRuleName = "runtimes"
+const PolicyRuleNameMarketplacesAllowed PolicyRuleName = "marketplaces.allowed"
+const PolicyRuleNameMarketplacesCustomServers PolicyRuleName = "marketplaces.customServers"
+const PolicyRuleNameEnvironment PolicyRuleName = "environment"
+
+// The rules a layer sets (#2957, data-model.md "PolicyRules"): the same shape on the organisation, your and a folder's layer (FR-002). Every field is optional: absent sets nothing.
+type PolicyRules struct {
+	PermissionMode *PermissionLevel `json:"permissionMode,omitzero"`
+
+	PermissionRequests *ClientPermissionMode `json:"permissionRequests,omitzero"`
+
+	Sandbox *SandboxChoice `json:"sandbox,omitzero"`
+
+	Budgets *PolicyRuleBudgets `json:"budgets,omitzero"`
+
+	Helpers *PolicyHelpers `json:"helpers,omitzero"`
+
+	Workflows *PolicyWorkflows `json:"workflows,omitzero"`
+
+	NoticeLimits *PolicyNoticeLimits `json:"noticeLimits,omitzero"`
+
+	ArchiveMyChats *bool `json:"archiveMyChats,omitzero"`
+
+	// A runtime not named is not allowed. Absent allows every runtime and model.
+	Runtimes map[string]PolicyRuntimeRule `json:"runtimes,omitzero"`
+
+	Marketplaces *PolicyMarketplaces `json:"marketplaces,omitzero"`
+
+	Environment *PolicyEnvironment `json:"environment,omitzero"`
 }
 
 // One allowed runtime in a policy (#998).
@@ -6971,13 +7114,15 @@ type PolicySet struct {
 	Rev *string `json:"rev,omitzero"`
 }
 
-// The mark on a choice a policy refuses or caps (#998, FR-010).
+// The mark on a choice a policy refuses or caps (#998, FR-010). layer names which layer decided (#2957, R8).
 type PolicySetBy struct {
 	By string `json:"by"`
 
 	Rule string `json:"rule"`
 
 	Words string `json:"words"`
+
+	Layer *PolicyLayerRef `json:"layer,omitzero"`
 }
 
 // The control key's signature of a policy (#998, FR-004), kept at v1/policy.sig: ECDSA P-256 with SHA-256 (es256), over the policy's canonical JSON (keys sorted, no spaces). sig is the 64 bytes r then s.
@@ -7033,6 +7178,11 @@ type PolicyStopAllRequest struct {
 // policy/mine and control/policyChanged (#998): the policy in force, for any person, with only their own budget raises. No policy when none was ever set.
 type PolicyView struct {
 	Policy *OrgPolicy `json:"policy,omitzero"`
+}
+
+// How many workflows a layer allows turned on at once, in each folder (#2957). Unset means 20.
+type PolicyWorkflows struct {
+	MostOn *int64 `json:"mostOn,omitzero"`
 }
 
 type PresenceReport struct {
