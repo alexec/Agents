@@ -3,6 +3,7 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -157,5 +159,45 @@ func TestCostCommentWords(t *testing.T) {
 		if c.got != c.want {
 			t.Errorf("%q, not %q", c.got, c.want)
 		}
+	}
+}
+
+// #2976: a flush of many dirty PRs over a full ledger reads the graph's links once, not
+// once per PR.
+func BenchmarkFlushPRComments(b *testing.B) {
+	d, c := start(b, b.TempDir())
+	defer d.Shutdown()
+	fake := &fakeCommenter{}
+	was, wasAfter := prCommenter, prCommentAfter
+	prCommenter, prCommentAfter = fake.comment, time.Hour
+	defer func() { prCommenter, prCommentAfter = was, wasAfter }()
+	dir := folder(b, c, 1)
+	c.call(b, 2, "folders/setPRCostComment", map[string]any{"folder": store.FolderURL(dir), "prCostComment": "cost"})
+
+	repo := forgeRepo{"github", "alexec/agents"}
+	d.workMu.Lock()
+	f := d.costLedgerLocked()
+	for i := range costNodesKept {
+		n := wire.LineageNode{Kind: lineage.KindIssue, Ref: fmt.Sprintf("github:alexec/agents#%d", i)}
+		f.Nodes[costKey(n)] = wire.LineageCostNode{Node: n, Banked: blankLineageCost()}
+	}
+	d.workMu.Unlock()
+	const prs = 50
+	d.commentMu.Lock()
+	pf := d.prCommentsLocked()
+	for i := range prs {
+		pr := repo.pr(100_000 + i)
+		pf.PRs[pr.Ref] = &prCommentRecord{Folder: dir, Forge: repo.forge, Path: repo.path, Number: 100_000 + i, MergedAt: nowFunc()}
+	}
+	d.commentMu.Unlock()
+
+	b.ReportAllocs()
+	for b.Loop() {
+		d.commentMu.Lock()
+		for ref := range pf.PRs {
+			d.commentDirty[ref] = true
+		}
+		d.commentMu.Unlock()
+		d.flushPRComments()
 	}
 }

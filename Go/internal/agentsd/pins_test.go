@@ -15,7 +15,7 @@ import (
 // Ports PinsTests and DaemonPinsTests: a folder's pins in .agents/pins.json, in the bytes
 // the Swift host writes, under its limits and in its words.
 
-func folder(t *testing.T, c *conn, n int) string {
+func folder(t testing.TB, c *conn, n int) string {
 	t.Helper()
 	dir := t.TempDir()
 	c.call(t, n, "folders/add", map[string]any{"folder": store.FolderURL(dir)})

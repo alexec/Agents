@@ -34,7 +34,7 @@ func (c *conn) In() <-chan string { return c.in }
 func (c *conn) Close()            {}
 func (c *conn) Device() string    { return "" }
 
-func (c *conn) call(t *testing.T, id int, method string, params any) json.RawMessage {
+func (c *conn) call(t testing.TB, id int, method string, params any) json.RawMessage {
 	t.Helper()
 	p, _ := json.Marshal(params)
 	b, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": json.RawMessage(p)})
@@ -60,13 +60,13 @@ func (c *conn) call(t *testing.T, id int, method string, params any) json.RawMes
 
 func mustJSON(v any) []byte { b, _ := json.Marshal(v); return b }
 
-func start(t *testing.T, root string) (*Daemon, *conn) {
+func start(t testing.TB, root string) (*Daemon, *conn) {
 	t.Helper()
 	return startWith(t, context.Background(), root)
 }
 
 // startWith is start on a context of the test's, as main's that a signal ends.
-func startWith(t *testing.T, ctx context.Context, root string) (*Daemon, *conn) {
+func startWith(t testing.TB, ctx context.Context, root string) (*Daemon, *conn) {
 	t.Helper()
 	d, err := New(ctx, root)
 	if err != nil {
