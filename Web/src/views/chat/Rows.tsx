@@ -7,7 +7,7 @@ import { createContext } from "preact";
 import { useContext, useEffect, useRef } from "preact/hooks";
 import type {
   AgentState, BackgroundItem, ContentBlock, EndedReason, FileReading, JSONValue, Plan, ToolCall, ToolCallContent, ToolCallLocation,
-  PolicySetBy, SandboxFailureRecord, SwitchRecord, TranscriptEntry, WorkReport,
+  PolicySetBy, SandboxFailureRecord, TranscriptEntry, WorkReport,
 } from "../../protocol/generated";
 import { lineDiff } from "../../model/diff";
 import { Lines } from "../Changes";
@@ -23,7 +23,6 @@ import { FileCard } from "./FileCard";
 import { noticeClock, noticeOutcome } from "../../model/notified";
 import { fromWireDate } from "../../protocol/dates";
 import type { Shown } from "../../model/shownFile";
-import { switchNote } from "../../model/switchNote";
 import { continueWithout, keepStopped, sandboxCard } from "../../model/sandboxWords";
 import { OrgPolicyLine } from "../OrgPolicyLine";
 import { memo } from "../../render/memo";
@@ -242,17 +241,6 @@ function ToolRun({ calls, background }: { calls: ToolCall[]; background: readonl
   return <div class="run"><ToolCallLine call={calls[calls.length - 1]!} background={background} onClick={() => (expanded.value = true)} /></div>;
 }
 
-/** SwitchNote: the headline, then each line under it, as the window and the Remote draw it (#252). */
-function SwitchNote({ record }: { record: SwitchRecord }) {
-  const note = switchNote(record);
-  return (
-    <div class="note switch">
-      <p class="strong">⇄ {note.headline}</p>
-      {note.lines.map((line) => <p key={line} class="quiet">{line}</p>)}
-    </div>
-  );
-}
-
 /**
  * SandboxFailureCard (064, #253): what happened, what Continue without sandbox would change, and
  * the two answers while the card waits. An answered or superseded card keeps saying what happened.
@@ -438,24 +426,8 @@ function entryBody(entry: TranscriptEntry) {
       return <ReportLine report={fields(entry, "workReported")!._0} />;
     case "runtimeNote":
       return <p class="quiet">{fields(entry, "runtimeNote")!._0}</p>;
-    case "poolSwitch":
-      return <SwitchNote record={fields(entry, "poolSwitch")!._0} />;
     case "sandboxFailure":
       return <SandboxFailureCard record={fields(entry, "sandboxFailure")!._0} />;
-    case "settingsChanged": {
-      const record = fields(entry, "settingsChanged")!._0;
-      const carried = record.carried.flatMap((s) => (typeof s.to === "string" ? [`${s.name} ${s.to}`] : []));
-      return <p class="quiet">Changed what it carried on with: {carried.join(", ")}</p>;
-    }
-    case "handoff": {
-      const handoff = fields(entry, "handoff")!;
-      return (
-        <details class="note">
-          <summary class="faint">What it was handed ({handoff.characters.toLocaleString()} characters)</summary>
-          <div class="quiet"><Markdown text={handoff.markdown} /></div>
-        </details>
-      );
-    }
     case "appView":
       return <AppView call={fields(entry, "appView")!._0} />;
     case "fileShown":
@@ -583,7 +555,7 @@ export const TurnView = memo(function TurnView({ turn, focusedRun, fetched, fetc
   const items = isSummaryOnly(turn) ? fetched ?? [] : turn.items;
   const parts = waiting ? undefined : turnParts(items, isLive);
   const outcome = parts?.outcome ?? turn.storedOutcome ?? [];
-  const stepCount = parts?.stepCount ?? turn.storedStepCount;
+  const stepCount = parts?.stepCount ?? turn.storedStepCount ?? 0;
   const outcomeIDs = new Set((parts?.outcome ?? []).map((i) => i.id));
   // Thinking too, each a folded line in its place (#1315).
   const steps = drawnInTurn(items, isLive).filter((i) => !outcomeIDs.has(i.id));

@@ -98,19 +98,8 @@ public struct TranscriptEntry: Codable, Hashable, Sendable, Identifiable {
         /// across the gaps where there is no agent process at all.
         case runtimeNote(String)
 
-        /// A chat carried on with another runtime (052): drawn as the tinted note, with
-        /// what it carried and what it did not. An older build reads it as unrecognised.
-        /// Nothing writes it since 065; read because 052 is after the #58 cut-off (051).
-        case poolSwitch(SwitchRecord)
         /// A runtime's sandbox could not be set up (064). The card, until answered.
         case sandboxFailure(SandboxFailureRecord)
-
-        /// What the new runtime was handed, built from this record (052, R4). Drawn
-        /// folded under the switch note, never as the person's words.
-        case handoff(markdown: String, characters: Int)
-
-        /// The settings a switch chose, changed afterwards from its note (052, FR-029).
-        case settingsChanged(SwitchRecord)
 
         /// A call of a tool that has a view (#187): drawn as the view, where the call began.
         /// Written by the daemon as the call arrives and again as it ends, under one id.

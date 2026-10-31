@@ -81,30 +81,6 @@ struct CredentialStoreTests {
         }
     }
 
-    /// A Claude token saved before 056 is forgotten, record and Keychain item both; a
-    /// Gemini key beside it stays (FR-010).
-    @Test func aClaudeTokenFromBefore056IsForgottenAndGeminisKept() throws {
-        try withStore { store in
-            try store.save(Self.token, for: "gemini")
-            let item: [String: Any] = [
-                kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: store.service,
-                kSecAttrAccount as String: "claude", kSecValueData as String: Data("sk-ant-oat01-OLDTOKEN".utf8)]
-            #expect(SecItemAdd(item as CFDictionary, nil) == errSecSuccess)
-            var all = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: store.file)) as? [String: Any])
-            all["claude"] = ["kind": "oauthToken", "lastFour": "KEN0", "addedAt": "2026-09-20T10:00:00Z"]
-            try JSONSerialization.data(withJSONObject: all).write(to: store.file)
-
-            #expect(store.forgetKindsNoLongerTaken() == ["claude"])
-            let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
-                                        kSecAttrService as String: store.service, kSecAttrAccount as String: "claude"]
-            #expect(SecItemCopyMatching(query as CFDictionary, nil) == errSecItemNotFound)
-            let text = try String(contentsOf: store.file, encoding: .utf8)
-            #expect(!text.contains("claude"))
-            #expect(store.secret(for: "gemini") == Self.token)
-            #expect(store.forgetKindsNoLongerTaken().isEmpty, "once")
-        }
-    }
-
     private func keychainHas(_ store: CredentialStore, _ account: String) -> Bool {
         let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
                                     kSecAttrService as String: store.service, kSecAttrAccount as String: account]
@@ -118,8 +94,8 @@ struct CredentialStoreTests {
         #expect(SecItemAdd(item as CFDictionary, nil) == errSecSuccess)
     }
 
-    /// A kind a newer build added is not this build's to forget (#205): swapping builds
-    /// keeps its record and its Keychain item, and a save beside it carries it through.
+    /// A kind a newer build added, swapping builds keeps its record and its Keychain
+    /// item, and a save beside it carries it through (#205).
     @Test func aNewerBuildsKindIsKeptRecordAndSecret() throws {
         try withStore { store in
             defer { try? store.remove("future") }
@@ -129,7 +105,6 @@ struct CredentialStoreTests {
                 .write(to: store.file)
             addItem(store, "future")
 
-            #expect(store.forgetKindsNoLongerTaken().isEmpty)
             #expect(keychainHas(store, "future"))
             try store.save(Self.token, for: "gemini")
             try store.markWorked("future")
@@ -162,7 +137,6 @@ struct CredentialStoreTests {
             #expect(throws: CredentialStore.Unreadable.self) { try store.save(Self.key, for: "gemini") }
             #expect(throws: CredentialStore.Unreadable.self) { try store.remove("gemini") }
             #expect(throws: CredentialStore.Unreadable.self) { try store.markWorked("gemini") }
-            #expect(store.forgetKindsNoLongerTaken().isEmpty)
             try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: store.file.path)
             #expect(try Data(contentsOf: store.file) == bytes, "byte for byte")
             #expect(store.secret(for: "gemini") == Self.token, "the Keychain item is untouched")

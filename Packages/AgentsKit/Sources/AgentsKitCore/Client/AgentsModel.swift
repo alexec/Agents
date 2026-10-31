@@ -132,7 +132,7 @@ public final class AgentsModel {
     /// When the conversation last did anything: its last entry, or the last stored turn's
     /// when the page holds none. The foot of the chat says it once it is quiet (#1564).
     public var lastEntryAt: Date? {
-        entries.last?.at ?? turns.last.flatMap { $0.outcome?.last?.at ?? $0.last?.at ?? $0.ask?.at }
+        entries.last?.at ?? turns.last.flatMap { $0.outcome?.last?.at ?? $0.ask?.at }
     }
     @ObservationIgnored private var display = TranscriptDisplayBuilder()
     /// Everything exchanged in the page, newest first: `Artifact.all(in: entries)`,

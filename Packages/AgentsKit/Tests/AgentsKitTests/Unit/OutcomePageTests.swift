@@ -156,14 +156,11 @@ struct OutcomePageTests {
         #expect(TurnSummary.of([ask("Go"), said("Done")], start: 0).usage == nil)
     }
 
-    @Test func aSummaryKeepsTheAskAndACutDownLastBlock() {
+    @Test func aSummaryKeepsTheAskAndStart() {
         let entries = [ask("Go"), said("Looking"), call("1", "List files")]
         let summary = TurnSummary.of(entries, start: 10)
         #expect(summary.start == 10 && summary.end == 13)
         #expect(summary.ask?.text == "Go")
-        guard case .toolCall(let kept)? = summary.last?.kind else { Issue.record("no tool call"); return }
-        #expect(kept.rawInput == .object(["description": .string("List files")]))
-        #expect(kept.turnLine == "List files")
     }
 
     @Test func splittingLeavesTheLastTurnOpen() {
@@ -172,7 +169,7 @@ struct OutcomePageTests {
         #expect(closed.map(\.start) == [5, 7])
         #expect(closed.map(\.end) == [7, 9])
         #expect(openStart == 9)
-        #expect(closed.map { $0.last?.text } == ["a", "b"])
+        #expect(closed.map { $0.outcome?.last?.text } == ["a", "b"])
     }
 
     /// A chunk on the tail keeps the turns in front as the same values (#285).
