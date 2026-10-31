@@ -749,10 +749,11 @@ final class VoiceMode {
              permission: .microphone)
     }
 
-    /// Words as if heard, for a walk: they go after the pause, as spoken ones do, and
-    /// stop the voice when it is speaking.
+    /// Words as if heard, for a walk: they go after the pause, as spoken ones do, stop
+    /// the voice when it is speaking, and while a prompt sends (#3070), join the one
+    /// already on its way there.
     func walkHeard(_ words: String) {
-        guard phase == .listening || phase == .speaking else { return }
+        guard phase == .listening || phase == .speaking || phase == .sending else { return }
         heardChanged(words)
     }
 
@@ -855,7 +856,9 @@ final class VoiceMode {
         }
         // Words while an answer waits to go are not a prompt.
         guard confirming == nil else { return }
-        dictation.stop()
+        // The microphone stays open through send(): a continuation said right after the
+        // pause fires is heard, not lost, on exactly the round trip that takes longest, a
+        // new session's (#3070).
         phase = .sending
         armTick()
         let agent = agentID
@@ -867,6 +870,11 @@ final class VoiceMode {
         clearJoin()
         let target = walkSendFails ? nil : await send(outgoing, stop)
         guard agentID == agent, phase == .sending else { return }
+        // What was heard while that call was in flight, not sent with it (#3070).
+        let continued = heard.trimmingCharacters(in: .whitespacesAndNewlines)
+        let leftover = continued == words ? "" :
+            (continued.hasPrefix(words) ? String(continued.dropFirst(words.count)) : continued)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
         if let target {
             sound(.sent)
             // A new session's first words started it: voice mode goes on in its chat.
@@ -883,10 +891,12 @@ final class VoiceMode {
             if observedAgentResponseIDs.subtracting(responseBaseline).isEmpty {
                 joinTarget = target
                 joinFirstText = words
-                joinText = nil
-                joinStarted = false
-                joinDeadline = ContinuousClock.now.advanced(by: Self.joinFor)
+                // Already heard while sending: joined at once, not waiting for a fresh
+                // word to arrive once the mic is confirmed open again (#3070).
+                joinText = leftover.isEmpty ? nil : leftover
+                joinStarted = !leftover.isEmpty
                 joinBaselineItemIDs = itemBaseline
+                armJoinDeadline()
             }
             saidSteps = []
         } else {
@@ -896,9 +906,24 @@ final class VoiceMode {
             queue.insert(VoiceModeWords.notSent, at: 0)
         }
         if queue.isEmpty {
-            listen()
+            listen(after: leftover)
         } else {
             startSpeaking()
+        }
+    }
+
+    /// Arms the join window once the microphone is confirmed listening again, not from
+    /// when `send()` returned: a slow round trip can otherwise spend the window before the
+    /// mic has even reopened (#3070).
+    private func armJoinDeadline() {
+        Task { [weak self] in
+            for _ in 0..<20 {
+                guard let self, self.joinTarget != nil else { return }
+                if self.isWalked || self.dictation.isListening { break }
+                try? await Task.sleep(for: .milliseconds(50))
+            }
+            guard let self, self.joinTarget != nil else { return }
+            self.joinDeadline = ContinuousClock.now.advanced(by: Self.joinFor)
         }
     }
 
