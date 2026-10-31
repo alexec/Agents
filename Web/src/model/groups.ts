@@ -46,6 +46,14 @@ export function isWaiting(agent: Agent): boolean {
   return (agent.eventWait !== undefined && agent.eventWait.ending === undefined) || resumesByItself(agent.report);
 }
 
+/**
+ * Whether only the connected person can carry this open wait on, given its filter
+ * (#3051): review.requested or issue.assigned today, a PR comment by them once #2838 lands.
+ */
+export function waitingForPerson(agent: Agent): boolean {
+  return agent.eventWait !== undefined && agent.eventWait.ending === undefined && agent.eventWait.forPerson === true;
+}
+
 /** Agent.showsUnread: a finished turn nobody has opened since. A mark on the row, never a group (#70). */
 export function showsUnread(agent: Agent): boolean {
   return agent.state === "finished" && agent.isUnread === true;
@@ -56,10 +64,11 @@ export function drawsUnread(agent: Agent): boolean {
   return showsUnread(agent) && groupOf(agent) === "finished";
 }
 
-/** Agent.needsAPerson: it asked for an answer. */
+/** Agent.needsAPerson: it asked for an answer, or waits on something only they can settle (#3051). */
 export function needsAPerson(agent: Agent): boolean {
   return agent.state === "waitingOnUser"
-    || (agent.state === "finished" && agent.report !== undefined && outcomeNeedsAPerson(agent.report.outcome));
+    || (agent.state === "finished"
+      && ((agent.report !== undefined && outcomeNeedsAPerson(agent.report.outcome)) || waitingForPerson(agent)));
 }
 
 /** Agent.endingIsUnaccountedFor: ended cleanly, was asked how it went, said nothing. */
@@ -78,7 +87,8 @@ function settled(wantsAPerson: boolean, report: WorkReport | undefined, waitingO
 /** Agent.group(). A shown file is never a group (#1057). */
 export function groupOf(agent: Agent): AgentGroup {
   const report = agent.report;
-  const wantsAnswer = report !== undefined && outcomeNeedsAPerson(report.outcome);
+  // A wait only the connected person can settle (#3051) needs them too, as a question does.
+  const wantsAnswer = (report !== undefined && outcomeNeedsAPerson(report.outcome)) || waitingForPerson(agent);
   const outcomeAsked = agent.outcomeAsked === true;
   const waitingOnEvents = agent.eventWait !== undefined && agent.eventWait.ending === undefined;
   switch (agent.state) {

@@ -28,7 +28,8 @@ public enum StatusShape: Hashable, Sendable {
     /// `isWaiting` is `Agent.isWaiting`: the app will carry it on by itself.
     public init(state: AgentState, outcome: WorkOutcome?, isWaiting: Bool, isComingBack: Bool,
                 endedReason: EndedReason? = nil,
-                waitingForAllowance: Bool = false, outcomeUnknown: Bool = false) {
+                waitingForAllowance: Bool = false, outcomeUnknown: Bool = false,
+                waitingForPerson: Bool = false) {
         // Coming back is work being done on the chat's behalf, even though the record
         // still reads stopped until the pick-up lands. Showing the stop mark would say
         // it was left for dead; the spinner says wait.
@@ -43,6 +44,8 @@ public enum StatusShape: Hashable, Sendable {
         case .finished:
             switch outcome {
             case .some(let outcome) where outcome.needsAPerson: self = .needsYou
+            // A wait only the connected person can settle (#3051) needs them too.
+            case _ where waitingForPerson: self = .needsYou
             case _ where isWaiting: self = .waiting
             // Only a question needs the person (#1916).
             default: self = .done
@@ -90,7 +93,8 @@ public extension StatusShape {
         self.init(state: agent.state, outcome: agent.report?.outcome, isWaiting: agent.isWaiting,
                   isComingBack: isComingBack, endedReason: agent.endedReason,
                   waitingForAllowance: agent.continueWhenBack != nil,
-                  outcomeUnknown: agent.endingIsUnaccountedFor)
+                  outcomeUnknown: agent.endingIsUnaccountedFor,
+                  waitingForPerson: agent.isWaitingForPerson)
     }
 
     /// Whether the row draws the shape in the app's one colour: it wants a person, and the

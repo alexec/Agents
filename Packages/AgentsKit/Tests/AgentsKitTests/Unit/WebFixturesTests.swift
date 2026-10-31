@@ -77,6 +77,10 @@ struct WebFixturesTests {
     static let openWait = EventWait(id: id(900), patterns: [EventPattern("ci.finished")], from: 4, since: base)
     static let endedWait = EventWait(id: id(901), patterns: [EventPattern("ci.finished")], from: 4, since: base,
                                      ending: .timedOut)
+    // A wait only the connected person can settle (#3051): review.requested, not an
+    // ownership filter like mine, which only narrows which PRs a wait watches.
+    static let personWait = EventWait(id: id(902), patterns: [EventPattern("review.requested")], from: 4, since: base,
+                                      forPerson: true)
 
     static func encode(_ value: some Encodable) throws -> JSONValue { try JSONValue.encoding(value) }
     static func encodeAny(_ value: any Encodable) throws -> JSONValue { try encode(value) }
@@ -102,6 +106,7 @@ struct WebFixturesTests {
             ("blocked, cleared", agent(15, .finished, report: report(.waiting, block: cleared))),
             ("finished, waiting on events", agent(16, .finished, endedReason: .endTurn, eventWait: openWait)),
             ("finished, wait on events ended", agent(17, .finished, endedReason: .endTurn, eventWait: endedWait)),
+            ("finished, waiting on the person", agent(38, .finished, endedReason: .endTurn, eventWait: personWait)),
             ("asked how it went, said nothing", agent(18, .finished, endedReason: .endTurn, outcomeAsked: true)),
             ("done", agent(19, .finished, endedReason: .endTurn, report: report(.done))),
             ("nothing to do", agent(20, .finished, report: report(.nothingToDo))),

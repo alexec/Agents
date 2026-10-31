@@ -69,6 +69,7 @@ struct SidebarSessionRow: View {
                            isWaiting: agent.isWaiting,
                            endedReason: agent.endedReason,
                            outcomeUnknown: agent.endingIsUnaccountedFor,
+                           isWaitingForPerson: agent.isWaitingForPerson,
                            tool: RunningToolWords.tool(agent))
             }
             VStack(alignment: .leading, spacing: 3) {

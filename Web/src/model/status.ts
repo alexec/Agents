@@ -1,7 +1,7 @@
 // The shape and words beside a session's title: StatusShape (UI/StatusShape.swift) as the Mac's
 // sessions list draws it, ported by hand and held to Fixtures/web/status (research R7).
 import type { Agent, AgentState, EndedReason, WorkOutcome } from "../protocol/generated";
-import { endingIsUnaccountedFor, isWaiting, outcomeNeedsAPerson, folderPath } from "./groups";
+import { endingIsUnaccountedFor, isWaiting, outcomeNeedsAPerson, waitingForPerson, folderPath } from "./groups";
 import { runningToolLabel } from "./sidebar";
 
 /** Working is a spinner; the rest are drawn. Only needsYou is ever in colour. */
@@ -53,6 +53,8 @@ export function shapeOf(agent: Agent, isComingBack = false): StatusShape {
       // Unread is the row's mark, not a need (#70).
       if (endingIsUnaccountedFor(agent)) return "needsYou";
       if (outcome !== undefined && outcomeNeedsAPerson(outcome)) return "needsYou";
+      // A wait only the connected person can settle (#3051) needs them too.
+      if (waitingForPerson(agent)) return "needsYou";
       if (isWaiting(agent)) return "waiting";
       // Only a question needs the person (#1916).
       return "done";

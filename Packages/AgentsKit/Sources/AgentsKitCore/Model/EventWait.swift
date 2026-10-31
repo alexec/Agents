@@ -25,10 +25,13 @@ public struct EventWait: Codable, Hashable, Sendable {
     /// Its servers' events, each a subscription it holds while it is open (#577). `nil`
     /// on a wait made before then, whose server patterns match on details as they did.
     public var serverEvents: [WaitServerEvent]?
+    /// Only the connected person can carry this on (#3051): `review.requested` or
+    /// `issue.assigned` today. `nil` or `false` for everything else.
+    public var forPerson: Bool?
 
     public init(id: UUID = UUID(), patterns: [EventPattern], from: EventPosition,
                 deadline: Date? = nil, since: Date, ending: EventWaitEnding? = nil,
-                resumePromptID: UUID? = nil, serverEvents: [WaitServerEvent]? = nil) {
+                resumePromptID: UUID? = nil, serverEvents: [WaitServerEvent]? = nil, forPerson: Bool? = nil) {
         self.id = id
         self.patterns = patterns
         self.from = from
@@ -37,6 +40,7 @@ public struct EventWait: Codable, Hashable, Sendable {
         self.ending = ending
         self.resumePromptID = resumePromptID
         self.serverEvents = serverEvents
+        self.forPerson = forPerson
     }
 
     /// The range a deadline may be given in, the same as 039's check-again.

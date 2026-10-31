@@ -50,9 +50,11 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     /// Nor is a file the agent showed (#1057): the file's card in the chat and the files
     /// pane say it, and most files shown ask nothing of the person.
     public init(for state: AgentState, report: WorkReport?, outcomeAsked: Bool,
-                waitingOnEvents: Bool = false,
+                waitingOnEvents: Bool = false, waitingForPerson: Bool = false,
                 endedReason: EndedReason? = nil, waitingForAllowance: Bool = false) {
-        let wantsAnswer = report?.outcome.needsAPerson == true
+        // A wait only the connected person can settle (#3051) needs them too, as a
+        // question does: review.requested or issue.assigned today.
+        let wantsAnswer = report?.outcome.needsAPerson == true || waitingForPerson
         switch state {
         // Grouped with the working agents. No heading is added, renamed or removed
         // (FR-006, FR-023).
@@ -126,17 +128,25 @@ public extension Agent {
     /// window get the same answer (FR-001, FR-004): a shown file is not a group (#1057).
     func group() -> AgentGroup {
         AgentGroup(for: state, report: report, outcomeAsked: outcomeAsked,
-                   waitingOnEvents: eventWait?.isOpen == true,
+                   waitingOnEvents: eventWait?.isOpen == true, waitingForPerson: isWaitingForPerson,
                    endedReason: endedReason, waitingForAllowance: allowanceWait != nil || continueWhenBack != nil)
+    }
+
+    /// Whether only the connected person can carry this open wait on, given its filter
+    /// (#3051): `review.requested` or `issue.assigned` today, a PR comment by them once
+    /// #2838 lands.
+    var isWaitingForPerson: Bool {
+        eventWait?.isOpen == true && eventWait?.forPerson == true
     }
 
     /// Whether the agent explicitly asked for an answer.
     ///
     /// The two ways that becomes true: a question asked mid-turn, which holds the
     /// runtime, and an outcome reported at the end of one, which does not. Both reach
-    /// the person the same way, because to them they are the same news.
+    /// the person the same way, because to them they are the same news. A wait only
+    /// they can settle (#3051) reaches them the same way too.
     var needsAPerson: Bool {
-        state == .waitingOnUser || (state == .finished && report?.outcome.needsAPerson == true)
+        state == .waitingOnUser || (state == .finished && (report?.outcome.needsAPerson == true || isWaitingForPerson))
     }
 
     /// Whether the app will carry this agent on by itself: an open wait on events, or a
